@@ -1,6 +1,11 @@
 import type { IRuntime } from '@migaia/reactive'
 import { persistUnit } from '../core/persist-unit.js'
-import type { ICodec } from '@migaia/storage-contract'
+import type {
+  ICodec,
+  IMigrationStep,
+  IMigrationReset,
+  ISyncMigrationSteps
+} from '@migaia/storage-contract'
 import type {
   IPersistHandle,
   IPersistStorage,
@@ -27,7 +32,7 @@ export type IPersistableCollection<TState> = {
 /** Whole-collection attachment options with optional shape-specific write projection and merge. */
 export type IPersistCollectionOptions<TState> = Pick<
   IPersistUnitOptions<TState>,
-  'debounceMs' | 'maxWaitMs' | 'scheduler'
+  'debounceMs' | 'maxWaitMs' | 'scheduler' | 'codecStages' | 'transactionStages'
 > & {
   /** Required archive key passed unchanged to storage. */
   key: string
@@ -37,8 +42,8 @@ export type IPersistCollectionOptions<TState> = Pick<
   codec?: ICodec
   /** Nonnegative safe archive version, default 0. */
   version?: number
-  /** Synchronously converts a mismatched archive version; absence rejects that hydration. */
-  migrate?: (persisted: TState, fromVersion: number) => TState
+  /** Contiguous upgrade steps, or an explicit reset of older archives. */
+  migrations?: Readonly<Record<number, IMigrationStep>> | IMigrationReset
   /** Synchronous write projection, default identity; pair partial non-object shapes with merge. */
   partialize?: (state: TState) => Partial<TState>
   /**
@@ -78,6 +83,15 @@ function toPersistUnit<TState>(collection: IPersistableCollection<TState>): IPer
  * remain on the handle. Disposal removes this effect without disposing collection, Runtime or
  * storage.
  */
+export function persistCollection<
+  TState,
+  const TSteps extends Readonly<Record<number, IMigrationStep>> | IMigrationReset
+>(
+  collection: IPersistableCollection<TState>,
+  options: Omit<IPersistCollectionOptions<TState>, 'migrations'> & {
+    readonly migrations?: TSteps & ISyncMigrationSteps<NoInfer<TSteps>>
+  }
+): IPersistHandle
 export function persistCollection<TState>(
   collection: IPersistableCollection<TState>,
   options: IPersistCollectionOptions<TState>
@@ -89,7 +103,9 @@ export function persistCollection<TState>(
     storage: snapshot.storage,
     codec: snapshot.codec,
     version: snapshot.version,
-    migrate: snapshot.migrate,
+    migrations: snapshot.migrations,
+    codecStages: snapshot.codecStages,
+    transactionStages: snapshot.transactionStages,
     partialize: snapshot.partialize,
     merge: snapshot.merge,
     debounceMs: snapshot.debounceMs,

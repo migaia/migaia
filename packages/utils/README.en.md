@@ -103,6 +103,8 @@ async function fetchWithTimeout(url: string, ms: number) {
 | Accept, protect and update config | `ownConfig`, `readonlyConfig`, `patchConfig` | `@migaia/utils/config` |
 | Base64 and UTF-8 | `bytesToBase64`, `base64ToBytes`, `encodeUtf8` | `@migaia/utils/bytes` |
 | Fill templates, format numbers and money | `format`, `formatCurrency` | `@migaia/utils/string`, `/number` |
+| Identify the server runtime running the program | `detectServerRuntime` | `@migaia/utils` |
+| Spread cache expiry times without extending the original deadline | `jitter` | `@migaia/utils/number` |
 
 A few terms used across the package:
 
@@ -454,3 +456,20 @@ console.log(routerConfig === telemetryConfig) // true: both received one initial
 The first failure stays cached, and there is no reset. Put required retries inside the wrapped initializer. For refreshing, rebuilding after logout or isolating work per tenant or request, use a container with that lifecycle.
 
 If the shared task uses one caller's cancellation signal, that caller's cancellation affects every other waiter too. Each wrapper has its own cache; duplicated module instances, iframes, Workers and Node `vm` do not share it.
+
+## Optional values
+
+`IMaybe<T>` distinguishes `{ some: true, value: T }` from `{ some: false }`, including a present undefined. Root exports `isSome`/`isNone` for narrowing, `unwrapOr(m, fallback)` for a same-domain fallback, `mapMaybe(m, mapper)` for one synchronous mapping of a present value, and `toUndefined(m)` when collapsing absence is intentional. None is reused without calling the mapper; mapper results retain identity and are not awaited. Typed optional values receive no extra runtime validation.
+
+Mapper failures retain existing coded errors. An uncoded mutable native Error receives utils INVALID_ARGUMENT on the same instance, preserving native type and stack. An identity conflict wraps the original on cause; failed identity attachment aggregates the original first and the attachment failure second. Non-Error values follow existing toError/NON_ERROR_VALUE semantics.
+
+```ts
+import { isSome, isNone, unwrapOr, mapMaybe, toUndefined, type IMaybe } from '@migaia/utils'
+const present: IMaybe<number | undefined> = { some: true, value: undefined }
+const missing: IMaybe<number> = { some: false }
+const mapped = mapMaybe({ some: true, value: 3 }, (value) => value * 2)
+console.log(isSome(present), isNone(missing))
+console.log(unwrapOr(mapped, 0), toUndefined(missing))
+// true true
+// 6 undefined
+```

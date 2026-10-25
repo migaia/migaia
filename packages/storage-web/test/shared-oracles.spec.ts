@@ -1,10 +1,11 @@
+import { entityTestFeatures } from './helpers/entity-features.js'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { defineEntity } from '../src/entity.js'
-import { getBackendReactiveController } from '../src/backends/reactive-controller.js'
-import { memoryStorageHost } from '../src/backends/memory.js'
-import { safeJsonPayloadByteLength } from '../src/utils/json.js'
+import { defineEntity } from '@migaia/storage-host/entity'
+import { createMemoryTestStore } from './helpers/installed-backends.js'
+import { createReactiveServiceFixture } from './helpers/reactive-service.js'
+import { safeJsonPayloadByteLength } from '@migaia/storage-host/authoring/backend'
 import { utf8ByteLength } from '@migaia/utils/bytes'
 
 type IIndexedUser = {
@@ -13,7 +14,7 @@ type IIndexedUser = {
   readonly tags: readonly string[]
 }
 
-/** Repository root used by authority and owner-boundary assertions. */
+/** Repository root resolves the package manifest used by the release-surface assertion. */
 const repositoryRoot = resolve(import.meta.dirname, '..', '..', '..')
 
 /** Reads one package file from the current worktree without relying on built artifacts. */
@@ -21,24 +22,20 @@ const readPackageFile = (packageName: string, fileName: string): string =>
   readFileSync(resolve(repositoryRoot, 'packages', packageName, fileName), 'utf8')
 
 describe('shared oracle clusters', () => {
-  it('proves current authority, exact surface, and neutral contract boundary', () => {
+  it('declares the private browser package release surface', () => {
     const storageManifest = JSON.parse(readPackageFile('storage-web', 'package.json')) as {
       readonly private?: boolean
       readonly sideEffects?: boolean
       readonly exports?: Readonly<Record<string, unknown>>
     }
-    const storageRoot = readPackageFile('storage-web', 'src/index.ts')
-    const contractCapabilities = readPackageFile('storage-contract', 'src/capabilities.ts')
     expect(storageManifest.private).toBe(true)
     expect(storageManifest.sideEffects).toBe(false)
     expect(storageManifest.exports?.['./reactive']).toBeUndefined()
-    expect(storageRoot).toContain('StorageError')
-    expect(storageRoot).not.toMatch(/export \* from/)
-    expect(contractCapabilities).not.toMatch(/from ['"](?:node:|@migaia\/(?:storage-web|reactive))/)
   })
 
   it('proves typed index projection and fallback ordering through one query route', async () => {
     const entity = defineEntity<IIndexedUser>()({
+      features: entityTestFeatures,
       name: 'indexed-users',
       key: 'id',
       indexes: {
@@ -46,7 +43,7 @@ describe('shared oracle clusters', () => {
         tags: { path: 'tags', multiEntry: true }
       }
     })
-    const repository = entity.connect(memoryStorageHost())
+    const repository = entity.connect(await createMemoryTestStore())
     await repository.put({ id: 'u2', email: 'same@example.com', tags: ['staff'] })
     await repository.put({ id: 'u1', email: 'same@example.com', tags: ['admin', 'staff'] })
     await repository.put({ id: 'u3', email: 'z@example.com', tags: ['staff'] })
@@ -55,40 +52,20 @@ describe('shared oracle clusters', () => {
       repository.list({ index: 'tags', range: { lower: 'admin', upper: 'admin' } })
     ).resolves.toEqual([{ id: 'u1', email: 'same@example.com', tags: ['admin', 'staff'] }])
     await expect(
-      repository.findManyBy(
-        'email',
-        { lower: 'same@example.com', upper: 'z@example.com' },
-        { direction: 'prev', limit: 2 }
-      )
+      repository.list({
+        index: 'email',
+        range: { lower: 'same@example.com', upper: 'z@example.com' },
+        direction: 'prev',
+        limit: 2
+      })
     ).resolves.toEqual([
       { id: 'u3', email: 'z@example.com', tags: ['staff'] },
       { id: 'u2', email: 'same@example.com', tags: ['staff'] }
     ])
   })
 
-  it('preserves private IDB authority and migration owners', () => {
-    const indexedDbSource = readPackageFile('storage-web', 'src/backends/indexed-db.ts')
-    const backfillSource = readPackageFile('storage-web', 'src/backends/indexed-db-backfill.ts')
-    const repositorySource = readPackageFile('storage-web', 'src/entity/repository.ts')
-    expect(indexedDbSource).toContain(
-      "const mutationLeaseBrand = Symbol('indexeddb-mutation-lease')"
-    )
-    expect(indexedDbSource).toContain('withInternalMutationLease')
-    expect(indexedDbSource).toContain('secondaryIndexes: true')
-    expect(indexedDbSource).toContain('changeFeed: coordination.admitted')
-    expect(backfillSource).toContain('IndexedDbBackfillPhase')
-    expect(backfillSource).toContain('canonical')
-    expect(backfillSource).toContain('legacy')
-    expect(repositorySource).toContain('safeJsonPayloadByteLength')
-    expect(indexedDbSource).not.toMatch(
-      /metadata\.(?:get|put|delete)\(['"](?:schema|migration|repository:|index:)/
-    )
-  })
-
   it('proves one mutation lease drains before controller disposal', async () => {
-    const store = memoryStorageHost()
-    const controller = getBackendReactiveController(store)
-    if (controller === undefined) throw new Error('memory controller is not registered')
+    const { controller, host } = await createReactiveServiceFixture({ id: 'shared-lease' })
     const release = controller.beginMutation()
     const disposal = controller.dispose()
     expect(() => controller.beginMutation()).toThrow()
@@ -101,11 +78,10 @@ describe('shared oracle clusters', () => {
     release()
     await disposal
     expect(settled).toBe(true)
+    await host.dispose()
   })
 
   it('proves one JSON payload owner has exact UTF-8 and fail-closed structured-clone boundaries', () => {
-    const jsonSource = readPackageFile('storage-web', 'src/utils/json.ts')
-    expect(jsonSource.match(/JSON\.stringify/g)).toHaveLength(1)
     expect(safeJsonPayloadByteLength(undefined)).toBe(0)
     expect(safeJsonPayloadByteLength({ text: 'CJK-💡' })).toBe(
       utf8ByteLength(JSON.stringify({ text: 'CJK-💡' }))

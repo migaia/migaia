@@ -16,6 +16,15 @@ const PACKAGES = [
   'reactive',
   'serialize',
   'storage-contract',
+  'storage-host',
+  'storage-plugin-redis',
+  'storage-plugin-postgres',
+  'storage-plugin-sqlite',
+  'storage-plugin-qdrant',
+  'storage-plugin-sparql',
+  'storage-plugin-object',
+  'storage-plugin-cache',
+  'storage-plugin-archive',
   'plugin-host',
   'resource',
   'rpc-contract',
@@ -1906,6 +1915,10 @@ function declarationEnd(source: string, start: number, kind: string): number {
   let parentheses = 0
   let brackets = 0
   let braces = 0
+  /** Generic defaults can contain braces before a class or interface body begins. */
+  let headerGenerics = 0
+  /** Once the real body starts, runtime comparison operators are not generic delimiters. */
+  let bodyStarted = !['class', 'interface'].includes(kind)
   let quote: string | null = null
   let lineComment = false
   let blockComment = false
@@ -1945,15 +1958,22 @@ function declarationEnd(source: string, start: number, kind: string): number {
       quote = character
       continue
     }
-    if (character === '(') parentheses += 1
+    if (!bodyStarted && character === '<') headerGenerics += 1
+    else if (!bodyStarted && character === '>' && source[index - 1] !== '=')
+      headerGenerics = Math.max(0, headerGenerics - 1)
+    else if (character === '(') parentheses += 1
     else if (character === ')') parentheses = Math.max(0, parentheses - 1)
     else if (character === '[') brackets += 1
     else if (character === ']') brackets = Math.max(0, brackets - 1)
-    else if (character === '{') braces += 1
-    else if (character === '}') {
+    else if (character === '{') {
+      if (headerGenerics === 0 && braces === 0 && parentheses === 0 && brackets === 0)
+        bodyStarted = true
+      braces += 1
+    } else if (character === '}') {
       braces = Math.max(0, braces - 1)
       if (
         braces === 0 &&
+        bodyStarted &&
         parentheses === 0 &&
         brackets === 0 &&
         ['class', 'interface', 'namespace'].includes(kind)
@@ -1989,6 +2009,19 @@ function declarationImportFiles(filePath: string, specifier: string): string[] {
   /** Existing declaration-file resolution already handles concrete targets and wildcard artifacts. */
   const target = manifest.exports?.[key]
   return declarationFiles(directory, typeof target === 'string' ? target : target?.types)
+}
+
+/** Type-only re-exports expose declaration shape without advertising a callable runtime value. */
+function typeOnlyDeclaration(record: Record<string, unknown>, signature: string) {
+  return {
+    ...record,
+    kind: 'type',
+    signature,
+    core: signature,
+    parameters: [],
+    parameterDetails: [],
+    returns: null
+  }
 }
 
 /** Extracts balanced, source-backed declaration records from a declaration file. */
@@ -2141,12 +2174,28 @@ function declarationSymbols(filePath: string, visited = new Set<string>()) {
      */
     if (reexport[3] && !reexport[3].startsWith('.') && !reexport[3].startsWith('@migaia/')) continue
     if (reexport[1] === '*') {
-      for (const target of declarationImportFiles(filePath, reexport[3]))
-        records.push(
-          ...declarationSymbols(target, new Set(visited)).filter(
-            (record) => record.name !== 'default'
-          )
+      const typeOnly = /^export\s+type\b/.test(reexport[0])
+      for (const target of declarationImportFiles(filePath, reexport[3])) {
+        const targetRecords = declarationSymbols(target, new Set(visited))
+        /** Dual value/type names retain only their type declaration through an erased star. */
+        const declaredTypes = new Set(
+          targetRecords
+            .filter((record) => record.kind === 'type' || record.kind === 'interface')
+            .map((record) => record.name)
         )
+        for (const record of targetRecords) {
+          if (record.name === 'default') continue
+          if (typeOnly && record.kind !== 'type' && record.kind !== 'interface') {
+            if (declaredTypes.has(record.name)) continue
+            records.push(
+              typeOnlyDeclaration(
+                record,
+                `export type { ${String(record.name)} } from '${reexport[3]}';`
+              )
+            )
+          } else records.push(record)
+        }
+      }
       continue
     }
     const bindings = (reexport[2] ?? '').split(',').map((binding) => {
@@ -2205,15 +2254,8 @@ function declarationSymbols(filePath: string, visited = new Set<string>()) {
               new RegExp(`\\b${declarationName ?? imported?.imported ?? binding.imported}\\b`),
               binding.exported
             )
-        records.push({
-          ...record,
-          name: binding.exported,
-          signature,
-          ...(typeOnlyValue
-            ? { kind: 'type', core: signature, parameters: [], parameterDetails: [], returns: null }
-            : {}),
-          aliasOf: binding.imported
-        })
+        const exposed = { ...record, name: binding.exported, signature, aliasOf: binding.imported }
+        records.push(typeOnlyValue ? typeOnlyDeclaration(exposed, signature) : exposed)
       }
     }
   }

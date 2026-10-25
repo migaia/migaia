@@ -23,15 +23,16 @@
 在 ESM 项目保存为 overview.ts，用 Node 24 运行；示例使用真实内存后端，内容只在该后端实例存活期间保留：
 
 ```bash
-pnpm add @migaia/store-persist @migaia/store-light @migaia/storage-web
+pnpm add @migaia/store-persist @migaia/store-light @migaia/storage-host
 ```
 
 ```ts doc-test=run
 import { createStore } from '@migaia/store-light'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
 import { persist } from '@migaia/store-persist/light'
 
-const storage = memoryStorageHost()
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })
+const storage = host.backend('memory')
 const settings = createStore({ theme: 'light' })
 const handle = persist(settings, { key: 'settings', storage })
 await handle.ready
@@ -40,7 +41,6 @@ await handle.flush()
 console.log('已保存：', (await storage.get('settings')) !== null)
 handle.dispose()
 await settings.$dispose()
-storage.dispose()
 ```
 
 输出：
@@ -59,10 +59,11 @@ key 是本例存档名，storage 为调用方创建的内存后端；persist 从
 
 ```ts doc-test=check
 import { createStore } from '@migaia/store-light'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
 
 const store = createStore({ count: 0 })
-const storage = memoryStorageHost()
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })
+const storage = host.backend('memory')
 const off = store.$subscribe(() => {
   void storage.set('settings', JSON.stringify(store.$plain())) // 未串行，也不等待写入结果
 })
@@ -94,7 +95,7 @@ void off // 没有安排退订和资源释放
 | -------------------------- | ------------------------------------------------------- | ---------------------------------------------------- |
 | 恢复存档时保留启动期修改   | persist → local edit → ready → flush                    | [完整代码](./USEGUIDE.md#恢复存档时保留启动期修改)   |
 | 修复坏存档后再恢复写入     | ready rejection → repair storage → retryHydrate → flush | [完整代码](./USEGUIDE.md#修复坏存档后再恢复写入)     |
-| 迁移旧设置并只保存指定字段 | version / migrate → partialize → flush                  | [完整代码](./USEGUIDE.md#迁移旧设置并只保存指定字段) |
+| 迁移旧设置并只保存指定字段 | version / migrations → partialize → flush               | [完整代码](./USEGUIDE.md#迁移旧设置并只保存指定字段) |
 | 完整恢复 Map 条目          | persistCollection → flush → new Map → ready             | [完整代码](./USEGUIDE.md#完整恢复-map-条目)          |
 | 独立停止某个键的持久化     | persistKeyed × 2 → ready → dispose one → flush          | [完整代码](./USEGUIDE.md#独立停止某个键的持久化)     |
 | 清理存档而不重置内存值     | clearFamily → inspect memory → change → flush           | [完整代码](./USEGUIDE.md#清理存档而不重置内存值)     |
@@ -102,7 +103,7 @@ void off // 没有安排退订和资源释放
 ## 安装
 
 ```bash
-pnpm add @migaia/store-persist @migaia/store-light @migaia/storage-web
+pnpm add @migaia/store-persist @migaia/store-light @migaia/storage-host
 ```
 
 只安装所用 Store 模型的可选 peer；上面的 light 示例需要 store-light，集合和 keyed 场景按需安装：
@@ -148,7 +149,7 @@ persistUnit(unit, options) 是三个适配器共用的引擎。unit 必须提供
 | storage    | 必填，满足最小 KeyValueStore 投影；见后文选路。                                                                                |
 | codec      | defaultJsonCodec；编码完整的 version / state 信封，而不只编码 state。                                                          |
 | version    | 0；必须是非负安全整数。                                                                                                        |
-| migrate    | 未设置；存档版本不同时执行 migrate(persisted, fromVersion)，缺失则水合失败。keyed facade 不公开此选项。                        |
+| migrations | 连续目标版本步骤或 `{ reset: () => state }`，只允许同步。未来或不可升级版本报 VERSION_UNSUPPORTED；keyed 不公开此选项。        |
 | partialize | 恒等函数；写入前从当前快照裁出需要保存的字段。                                                                                 |
 | merge      | 核心 / indexed / keyed 可自定义 merge(persisted, current)；缺省浅三向合并普通对象，其他形状整体替换。light 不公开 merge 选项。 |
 | debounceMs | 0，不防抖；有限数，范围 0 到 2147483647，允许小数。                                                                            |
@@ -157,7 +158,7 @@ persistUnit(unit, options) 是三个适配器共用的引擎。unit 必须提供
 
 facade 先捕获 options 自身属性；getter 使用原 options 作为 receiver 读取一次。核心也在创建时捕获配置字段，恢复使用已捕获并验证的 merge，不重新读取调用方的 getter。非对象、反射或 getter 失败以 INVALID_OPTION TypeError 报告，捕获的原因为 cause。key、namespace、id 在拼接前检查字符串，不把对象或数字悄悄转成键，也不额外要求非空字符串。容量时间、version 与回调形状在创建持久化状态前按实际配置校验。
 
-migrate、partialize、merge 都是同步回调，不能返回 Promise / thenable；异步结果或读取 then 失败以 INVALID_OPTION 拒绝，避免 Promise 被当作业务状态写入。普通同步业务回调或后端异常保留原来的公共错误路径；不要把所有失败都改判为某一个本包码。
+迁移步骤必须同步；类型拒绝已知 Promise/thenable，运行时 MIGRATION_FAILED 保留原始 cause。partialize 与 merge 保留同步 INVALID_OPTION 规则。
 
 ### 三个状态适配器
 
@@ -177,11 +178,11 @@ clearFamily(storage, namespace) 的两个参数均必填，返回 `Promise<numbe
 
 ### 加载、版本迁移与本地修改
 
-构造时先捕获启动快照并建立变化订阅，再异步读取存档。存档不存在时水合成功，保留内存初值。存档存在时先解码、验证 envelope，再在 version 不同且提供 migrate 时迁移，最后合并并同步 restore。版本相同不调用 migrate；版本不同而未提供 migrate 以 ENVELOPE_INVALID 拒绝，不把旧值冒充新 schema。
+创建时构造唯一迁移计划，再订阅。水合复用 storage-contract 的 assertVersionedEnvelope 与 storage-host/authoring/migration 的 migrateEnvelopeSync。同版本保留状态；可升级旧档执行连续步骤或一次 reset，未来版本报 VERSION_UNSUPPORTED。水合错误原样传出并阻止写入；升级与恢复本身不写回，应用变化与 flush 沿原调度保存。
 
 缺省 merge 对普通对象（Object.prototype 或 null 原型）按字段浅比较：以构造时启动快照为基线，用 Object.is 比较当前字段；本地已改字段保留当前值，未改字段接受存档值，同时保留未归档的当前字段。它不是深度冲突解决，嵌套引用内部变化不自动得到逐层比较；重试也沿用这一启动基线。非普通对象、数组、Map、Set 等整体接受持久化形状，自定义 merge 则负责应用自己的规则。
 
-水合期间通知只标 dirty，不提前覆盖未知存档；恢复时的同步通知也归入这个窗口。水合成功后有 dirty 才重新安排写入。水合失败保留错误和 dirty 状态，flush / clear 不写而抛原水合错误；修复配置或存档后，成功 retryHydrate 才重新打开写入。恢复期间再次调用不会另起并行重读，但不保证它等待当前恢复或返回相同 Promise；需要恢复结果时等待发起重试的那次调用。
+水合期间通知只标 dirty，不提前覆盖未知存档；忽略同步 restore 本身的通知；异步读取期间的应用变化仍标 dirty。水合成功后有 dirty 才重新安排写入。水合失败保留错误和 dirty 状态，flush / clear 不写而抛原水合错误；修复配置或存档后，成功 retryHydrate 才重新打开写入。恢复期间再次调用不会另起并行重读，但不保证它等待当前恢复或返回相同 Promise；需要恢复结果时等待发起重试的那次调用。
 
 ### Handle 状态与等待
 
@@ -197,7 +198,7 @@ clearFamily(storage, namespace) 的两个参数均必填，返回 `Promise<numbe
 | ready                | 首次 hydrate 尝试的 Promise：成功 resolve，失败或完成前被释放中断则 reject；重试不替换原 Promise。                            |
 | settled              | 首次尝试无论成功失败都 resolve 的等待屏障，不表示以后 retry 已完成。                                                          |
 | retryHydrate()       | 无参数；失败后重读，成功恢复写入；应等待此调用本身判断恢复结果。                                                              |
-| flush() / clear()    | 无参数，返回 `Promise<void>`，具体串行与删除规则见后文。                                                                      |
+| flush(tx?) / clear() | 返回 `Promise<void>`；flush 可接参与事务视图，clear 无参数。                                                                  |
 | disposed / dispose() | live 布尔 getter / 同步幂等释放。                                                                                             |
 | disposeAsync()       | 同步停止后等待已接纳的写入/删除及最终写入结束；最终写入失败见 writeError；已有 flush/clear 保留原结果。                       |
 
@@ -223,11 +224,11 @@ dispose 同步、幂等：标记终态、请求 abort 所有在途适配器操�
 
 ### 存档、默认 codec 与兼容读取
 
-信封格式为 version（非负安全整数）与 state（非 null / undefined）。assertEnvelope(value, key) 拒绝非对象、数组、非法 version 或缺失 state，返回捕获的 version / state；两属性各读一次，属性访问或反射失败由 PersistEnvelopeError 包装并在 cause 保留。PersistEnvelopeError 继承 TypeError、携带 ENVELOPE_INVALID，key 用于标明存档身份。
+统一 envelope 为普通对象，自有 version 是非负安全整数，自有 state 非 null/undefined。assertVersionedEnvelope 与 IVersionedEnvelope 从 @migaia/storage-contract 导入；属性各读一次，ENVELOPE_INVALID 保留访问失败 cause。store-persist 不再拥有重复校验器或 envelope 错误类。
 
-defaultJsonCodec 名称为 migaia-collections-json-v1，output 为 text；委托 storage-contract 的 collectionsJsonCodec，支持真实 Map / Set（含跨 realm）往返，避免普通 JSON 将集合静默编码为空对象。它仍继承 JSON 的循环引用、BigInt 等限制，不是任意对象图的无损编码。新格式用版本化元组，其精确保留形状不是可任意占用的普通业务数组。
+defaultJsonCodec 为名称 collections-json@1、output 为 text 的冻结对象，包装 fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))，默认就保留嵌套 Map/Set，使用 $rpc map/entries 与 set/values 保留记录。非有限数、undefined 根值、稀疏数组、循环与 Date 被拒绝；普通类实例投影可枚举字段。编码错误链依次为本包 ENCODE_FAILED、contract INVALID_ARGUMENT 与 serialize ENCODE_FAILED。非字符串或坏 JSON 保留本包 ENVELOPE_INVALID TypeError；合法 JSON 的 envelope 错误归 storage-contract。
 
-读取旧存档时，仅唯一自有键为 `__migaia_persist_map__` 或 `__migaia_persist_set__` 且值为数组的对象是旧保留 marker；多字段同名 lookalike 保持全部数据。发现精确旧 marker 后沿 legacy reviver 读取，不把其中原本的普通应用数组重新解释为新元组；没有精确旧 marker 才委托新格式解码。新写入格式与 codec name 不变，不使用相似字段猜集合。
+历史集合标记与元组形数组均为普通应用数据，不恢复成集合；解码只委托规范 codec 一次。
 
 defaultJsonCodec.encode 失败抛 ENCODE_FAILED TypeError，原因为 cause；decode 非字符串或坏 JSON / marker 抛 ENVELOPE_INVALID TypeError，解析失败的原因为 cause。默认 codec 不做加密或脱敏；自定义 codec 必须处理自己声明的数据形状。
 
@@ -254,14 +255,91 @@ STORE_PERSIST_SOURCE 为 @migaia/store-persist；稳定码由 StorePersistErrorC
 | codecNotResolved / CODEC_NOT_RESOLVED            | 未解析到 codec，显式配置或修正默认解析。                      |
 | codecOutputMismatch / CODEC_OUTPUT_MISMATCH      | codec output、实际 payload 与后端路由不一致。                 |
 | backendCapability / BACKEND_CAPABILITY           | 进入 binary 分支但缺字节方法。                                |
-| envelopeInvalid / ENVELOPE_INVALID               | 坏存档、版本不合法或不匹配且无 migrate。                      |
+| envelopeInvalid / ENVELOPE_INVALID               | Default JSON non-string input or decoding failure only.       |
 | encodeFailed / ENCODE_FAILED                     | 默认 codec 编码失败，查看 cause 与待存值。                    |
 | hydrateAndWriteFailed / HYDRATE_AND_WRITE_FAILED | 水合和写入均失败，展开 AggregateError.errors。                |
 | abortedByDispose / ABORTED_BY_DISPOSE            | 释放中止，保持 DOMException / AbortError 及原始 cause。       |
 | invalidOption / INVALID_OPTION                   | key、namespace、version、时间、回调、scheduler 或配置不合法。 |
 
-配置 version 非负安全整数等非法项同步 TypeError；信封问题由 PersistEnvelopeError 报告。水合失败后 flush / clear 继续抛 hydrationError，成功 retry 才解锁；写入失败查 writeError，并检查 codec 与后端是否匹配。已释放 handle 不能重用，业务内存和存档删除需分别管理。
+非法配置同步抛本包 INVALID_OPTION TypeError，cause 保留 contract 计划错误。水合直接保留 contract ENVELOPE_INVALID、VERSION_UNSUPPORTED 与 MIGRATION_FAILED。失败水合使 flush/clear 阻塞至重试成功；写入错误查 writeError。handle 只拥有订阅和已接纳写入，store/runtime 始终借用。
 
 公开错误工厂 createStorePersistError / createStorePersistTypeError 接收必填 code、message 和可选 options.cause；createStorePersistAbortError 接收 code、message、可选 cause，返回原生 DOMException，保持 name 为 AbortError；createStorePersistAggregateError 接收 code、errors、message，errors 保留原失败。code 类型为 IStorePersistErrorCode，工厂附加身份但不覆盖 stack。底层工具不需要在普通 Store 使用中自行重复实现。
 
 包已有 fmt、lint、typecheck、typecheck:test、test、build 和 test:packed 脚本；实际报告说明哪些被执行，不以手册列出命令当成验证结论。排查未保存字段先看 partialize 与 debounce，再看 hydrationError / writeError；Map / Set 形状不对时检查是否换用了不支持集合的 codec。
+
+## Canonical codec composition and observation
+
+```ts
+import { fromValueCodec } from '@migaia/storage-host/authoring/codec'
+import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStore } from '@migaia/store-light'
+import { persist } from '@migaia/store-persist/light'
+
+const codec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))
+const text = await codec.encode({ roles: new Map([['Ada', new Set(['read'])]]) })
+console.log(await codec.decode(text))
+
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })
+const storage = host.backend('memory')
+const state = createStore({ count: 1 })
+await using handle = persist(state, {
+  key: 'counter',
+  storage,
+  codecStages: host.codecStages(storage)
+})
+await handle.ready
+await handle.flush()
+await handle.disposeAsync()
+await state.$dispose()
+```
+
+The default codec already preserves collections. Use `{ ...row }` to project a named class. codecStages observes each real encode/decode once; before/after/error failures only report, before never waits, and no business values enter observation. disposeAsync caches the rejecting main Promise; Symbol.asyncDispose caches a separate reporting Promise over one cleanup. Neither closes a borrowed store/runtime. Without native Symbol.asyncDispose, plugin-host asyncDisposeKey is the fixed fallback; language-level await using is not promised.
+
+## 快照与其他写入共同提交
+
+`persistTransaction(storage, [handle], run, options?)` 先暂停并排空这些句柄的旧工作，再借用该原始完整 store 的一个事务。句柄必须活动且由同一个 storage 创建；空数组、复制的句柄与错误的事务视图报 `INVALID_OPTION`，文本适配器报 `BACKEND_CAPABILITY`。具体 store 的事务对象扩展、选项与回调返回值类型保持。
+
+```ts doc-test=check
+import { createStore } from '@migaia/store-light'
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { persistTransaction } from '@migaia/store-persist'
+import { persist } from '@migaia/store-persist/light'
+
+await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })
+const storage = host.backend('memory')
+const settings = createStore({ count: 0 })
+const handle = persist(settings, { key: 'settings', storage })
+await handle.ready
+try {
+  await persistTransaction(storage, [handle], async (tx) => {
+    settings.count = 1
+    await handle.flush(tx)
+    await tx.set('settings-source', 'user', { conflictPolicy: 'replace' })
+  })
+} finally {
+  await handle.disposeAsync()
+  await settings.$dispose()
+}
+```
+
+`flush(tx)` 在调用时读取 snapshot、执行 partialize 并启动同一个 codec 的编码；同一句柄多次调用按次序写入各自快照。它只等此次编码与请求，外层 `persistTransaction` 成功才表示提交。实体可在同一个回调中用 `repository.in(tx).put(value)` 与快照、文本和字节写入共同提交。
+
+参与期间，订阅只记录变化；无参数 `flush()`、`clear()`、`retryHydrate()` 拒绝。成功后继续按原 debounce 保存更新的内存；失败或回滚也不撤销内存，而是恢复普通镜像写入。需要撤销业务状态时，由调用方在 catch 中恢复。参与期间 dispose 会请求中止事务，不启动最终旁路写入；disposeAsync 等待真实事务结束。句柄始终借用 store 与 Runtime，不负责关闭它们。
+
+IndexedDB 必须在原生活跃窗口直接发起请求。先取外部数据，再开始事务；不要在回调中等待 fetch、定时器或跨任务的 codec。对上例已有对象，可把外部读取放在协调边界之前：
+
+```ts
+async function saveExternal(loadSettings: () => Promise<{ count: number }>): Promise<void> {
+  const incoming = await loadSettings()
+  await persistTransaction(storage, [handle], async (tx) => {
+    settings.count = incoming.count
+    await handle.flush(tx)
+    await tx.set('settings-source', 'remote', { conflictPolicy: 'replace' })
+  })
+}
+```
+
+可选 `transactionStages: host.transactionStages(storage)` 沿三个适配入口传给同一引擎；这里只发出 beforePersistFlush / afterPersistFlush，后者表示请求完成。codecStages 绑定此次真实操作视图，每次转换只观察一次。观察失败只报告，不等待、不改变业务结果。导出的 `ITransactionScopeOf<typeof storage>` 保留具体后端事务类型。
+
+`ctx.concurrency` 可覆盖原始 store 的缺省策略。忙句柄先尝试一次：fail 立即拒绝，只有策略选择 wait 才进入可取消的 FIFO；自定义策略只在真实冲突后运行。句柄等待与后端内部重试共用这次调用的期限和等待预算，`timeoutMs` 不会在进入后端时重新起算。超时或取消后仍等待已开始的工作真正结束才释放占用。后端自有选项（包括 symbol 字段）保留值身份，取消 signal 则沿同一次协调传递。

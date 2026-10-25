@@ -1,3 +1,6 @@
+import type { ITransactionOptions } from './concurrency.js'
+import type { ITransactionScope } from './transaction.js'
+import type { IStorageIterator } from './resource.js'
 import type { IKeyRange, IOperationContext, IStorageKey, IWriteOptions } from './context.js'
 import { inspectStoreShape, type IRecordStore } from './store.js'
 import { StorageContractError, StorageContractErrorCode } from './errors.js'
@@ -64,14 +67,8 @@ export type IRecordIndexQuery = {
 }
 
 /** Indexed record operations valid during one backend-owned transaction callback. */
-export type ISecondaryIndexTransactionScope<TValue = unknown> = {
-  /** Reads a record within this transaction, or undefined when absent. */
-  get(key: IStorageKey): Promise<TValue | undefined>
-  /** Writes a record with required primary key and index projections, returning that key. */
-  put(value: TValue, key: IStorageKey, projection: IRecordIndexProjection): Promise<IStorageKey>
-  /** Deletes a record and lets the provider update its associated index entries. */
-  delete(key: IStorageKey): Promise<void>
-}
+export type ISecondaryIndexTransactionScope<TValue = unknown> = ITransactionScope<TValue> &
+  Required<Pick<ITransactionScope<TValue>, 'putIndexedRecord' | 'iterateRecordIndex'>>
 
 /** Record-store extension whose logical indexes remain owned and executed by the provider. */
 export type ISecondaryIndexRecordStore<TValue = unknown> = IRecordStore<TValue> & {
@@ -98,13 +95,13 @@ export type ISecondaryIndexRecordStore<TValue = unknown> = IRecordStore<TValue> 
   iterateRecordIndex(
     query: IRecordIndexQuery,
     ctx?: IOperationContext
-  ): AsyncIterableIterator<[IStorageKey, TValue]>
+  ): IStorageIterator<[IStorageKey, TValue]>
   /** Executes work under a provider-owned indexed transaction and returns the callback result. */
-  transactionIndexed<T>(
+  transactionIndexed<TResult>(
     handle: IRecordIndexHandle,
-    run: (tx: ISecondaryIndexTransactionScope<TValue>) => Promise<T>,
-    ctx?: IOperationContext
-  ): Promise<T>
+    run: (tx: ISecondaryIndexTransactionScope<TValue>) => TResult,
+    ctx?: ITransactionOptions
+  ): Promise<Awaited<TResult>>
 }
 
 const SECONDARY_INDEX_METHODS = [
@@ -115,29 +112,25 @@ const SECONDARY_INDEX_METHODS = [
   'transactionIndexed'
 ] as const
 
-/** Compose canonical record admission without discarding its original reflection/getter failure. */
+/** Adds only native index method checks to the canonical pure record shape. */
 const inspectSecondaryIndexShape = (value: unknown) => {
   /** This module adds only extension checks; base record requirements stay owned by store.ts. */
   const snapshot = inspectStoreShape(value, true)
   if (!snapshot.valid || snapshot.capabilities === undefined) return snapshot
-  try {
-    if (
+  return {
+    ...snapshot,
+    valid:
       snapshot.capabilities.secondaryIndexes === true &&
       SECONDARY_INDEX_METHODS.every(
         (name) => typeof (value as Record<string, unknown>)[name] === 'function'
       )
-    )
-      return snapshot
-    return { ...snapshot, valid: false }
-  } catch (cause) {
-    return { ...snapshot, valid: false, cause }
   }
 }
 
 /**
  * Returns the same record store after base admission, a true secondaryIndexes flag, and checks that
  * all five extension methods are callable. It does not create indexes or invoke operations.
- * Incomplete shapes throw UNSUPPORTED_CAPABILITY; accessor/reflection failure remains on cause.
+ * Incomplete shapes throw UNSUPPORTED_CAPABILITY.
  */
 export const asSecondaryIndexRecordStore = <T = unknown>(
   store: IRecordStore<T>
@@ -151,9 +144,6 @@ export const asSecondaryIndexRecordStore = <T = unknown>(
   return store as ISecondaryIndexRecordStore<T>
 }
 
-/**
- * Same full secondary-index admission as the assertion, returning false for invalid or throwing
- * shapes.
- */
+/** Same pure secondary-index admission as the assertion, returning false for invalid shapes. */
 export const isSecondaryIndexRecordStore = (store: unknown): store is ISecondaryIndexRecordStore =>
   inspectSecondaryIndexShape(store).valid

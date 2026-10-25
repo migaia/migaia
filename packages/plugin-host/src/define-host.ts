@@ -1,7 +1,7 @@
 import { identifyPluginHostCallbackFailure } from './error-text.js'
 import { deferred } from '@migaia/utils/promise'
 import { PluginHost } from './host-runtime.js'
-import { openComposition, registerManagedHost } from './composition.js'
+import { aliasManagedHost } from './composition.js'
 import { readDefinedPluginDefinition } from './define-plugin.js'
 import type { PluginHostError } from './error-text.js'
 import { issueHostIdentity, type IPluginHostIdentity } from './host-identity.js'
@@ -91,9 +91,9 @@ export type IDefineHostOptions<
 /**
  * The value a `defineHost` call returns.
  *
- * It carries the host's public surface plus the two members that are `protected` on the class —
- * `useSync` and `runPipeline` — because on a handle "only the owner may call this" is expressed by
- * who holds the object rather than by who extends the class.
+ * It carries the host's public surface plus the owner-only class entries: `useSync`, `runPipeline`,
+ * `runPipelineSync` and `runPipelineAsync`. Handle possession expresses execution authority instead
+ * of subclass access.
  */
 export type IHostHandle<
   TDomainCore extends object,
@@ -170,6 +170,13 @@ export type IHostHandle<
    * it.
    */
   runPipeline(value: TValue, done: (value: TValue) => void): void | Promise<void>
+  /** Runs synchronous stages, rejecting before effects if any visible async stage exists. */
+  runPipelineSync<TResult>(value: TValue, done: (value: TValue) => TResult): TResult | undefined
+  /** Waits for async execution; an empty lane returns the exact terminal Promise. */
+  runPipelineAsync<TResult>(
+    value: TValue,
+    done: (value: TValue) => Promise<TResult>
+  ): Promise<TResult | undefined>
   /** Shared singleflight completion; defaults to structured cleanup, custom middleware may reject. */
   dispose(): Promise<IPluginHostDisposalResult>
 }> &
@@ -182,8 +189,8 @@ export type IHostHandle<
  *
  * The four `protected` hooks a subclass used to override become four optional callbacks, and what
  * came back is a frozen handle rather than an instance — so a consumer holds a host without also
- * inheriting its whole surface, and the two protected members that only a host's owner may call
- * (`useSync`, `runPipeline`) are on the handle instead of on everything that extends the class.
+ * inheriting its whole surface. Protected installation and execution entries are available on the
+ * owner handle instead of becoming public methods on every class instance.
  *
  * The handle is registered as a managed host, so `isManagedHost` and `openComposition` accept it on
  * the same terms as a class instance: a composing package branches on what a value _is_, not on
@@ -235,6 +242,14 @@ export function defineHost<
     }
     runPipelinePublic(value: TValue, done: (value: TValue) => void) {
       return this.runPipeline(value, done)
+    }
+    /** Owner handle forwards the sync entry without another execution owner. */
+    runPipelineSyncPublic<TResult>(value: TValue, done: (value: TValue) => TResult) {
+      return this.runPipelineSync(value, done)
+    }
+    /** Owner handle preserves the empty-lane terminal Promise identity. */
+    runPipelineAsyncPublic<TResult>(value: TValue, done: (value: TValue) => Promise<TResult>) {
+      return this.runPipelineAsync(value, done)
     }
     /** Only the package-owned frozen surface receives this committed-publication read capability. */
     readRuntimeSharedExtensionPublic(key: PropertyKey): object | undefined {
@@ -298,6 +313,10 @@ export function defineHost<
     },
     runPipeline: (value: TValue, done: (value: TValue) => void) =>
       runtime.runPipelinePublic(value, done),
+    runPipelineSync: <TResult>(value: TValue, done: (value: TValue) => TResult) =>
+      runtime.runPipelineSyncPublic(value, done),
+    runPipelineAsync: <TResult>(value: TValue, done: (value: TValue) => Promise<TResult>) =>
+      runtime.runPipelineAsyncPublic(value, done),
     dispose: (): Promise<IPluginHostDisposalResult> => {
       if (disposal) return disposal
       /** Publish before user middleware can synchronously call this same public method again. */
@@ -340,6 +359,6 @@ export function defineHost<
     writable: false
   })
   Object.freeze(handleSurface)
-  registerManagedHost(handle, openComposition(runtime))
+  aliasManagedHost(handle, runtime)
   return handle as unknown as IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface>
 }

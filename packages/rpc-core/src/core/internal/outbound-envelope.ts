@@ -410,10 +410,7 @@ export function outboundJsonByteUpperBound(value: unknown): number | undefined {
   return prepareOwnedJsonSnapshot(value).byteUpperBound
 }
 
-/**
- * Copies validated snapshots once, sorting owned JSON output or retaining legacy snapshot key
- * order.
- */
-export function materializeOutboundJson(value: unknown, sortKeys = true): unknown {
-  return captureOwnedJson(value, sortKeys).value
+/** Copies validated snapshots once, preserving each object's own key order. */
+export function materializeOutboundJson(value: unknown): unknown {
+  return captureOwnedJson(value).value
 }

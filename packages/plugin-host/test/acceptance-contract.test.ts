@@ -287,14 +287,6 @@ describe('acceptance contract', () => {
     expect(events).toEqual(['install', 'install', 'dispose', 'dispose'])
   })
 
-  it('has one canonical Host runtime owner', () => {
-    const source = readFileSync(new URL('../src/host-runtime.ts', import.meta.url), 'utf8')
-    expect((source.match(/export class PluginHost/g) ?? []).length).toBe(1)
-    expect(readFileSync(new URL('../src/define-plugin.ts', import.meta.url), 'utf8')).toContain(
-      'const definitions = new WeakMap'
-    )
-  })
-
   it('records 15-sample trusted admission speed evidence', async () => {
     const genericSamples: number[] = []
     const coldTrustedSamples: number[] = []

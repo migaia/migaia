@@ -1,5 +1,6 @@
 import {
   retainTopologyFailure,
+  createTopologyReadonlyMap,
   snapshotTopologyDependencies,
   snapshotTopologyIndexNode
 } from './topology-admission.js'
@@ -189,31 +190,6 @@ class OverlayStore<K, V> implements IKeyedStore<K, V> {
   }
 }
 
-/** Creates a mutation-incapable map facade over an immutable entry snapshot. */
-function createReadonlyMap<K, V>(entries: readonly (readonly [K, V])[]): ReadonlyMap<K, V> {
-  /** Private lookup hidden behind the frozen facade. */
-  const lookup = new Map(entries)
-  /** Read-only map implementation returned to callers. */
-  const facade = {
-    get: (key: K): V | undefined => lookup.get(key),
-    has: (key: K): boolean => lookup.has(key),
-    get size(): number {
-      return lookup.size
-    },
-    entries: (): MapIterator<[K, V]> => lookup.entries(),
-    keys: (): MapIterator<K> => lookup.keys(),
-    values: (): MapIterator<V> => lookup.values(),
-    forEach: (
-      callback: (value: V, key: K, map: ReadonlyMap<K, V>) => void,
-      thisArg?: unknown
-    ): void => {
-      for (const [key, value] of lookup) Reflect.apply(callback, thisArg, [value, key, facade])
-    },
-    [Symbol.iterator]: (): MapIterator<[K, V]> => lookup[Symbol.iterator]()
-  } as ReadonlyMap<K, V>
-  return Object.freeze(facade)
-}
-
 /** Mutable topology owner; all public values leave through frozen snapshots. */
 class TopologyIndex implements ITopologyIndex {
   /** Caller-owned error policy retained for structural failures. */
@@ -377,25 +353,14 @@ class TopologyIndex implements ITopologyIndex {
     )
     return Object.freeze({
       ordered,
-      providers: createReadonlyMap(
+      providers: createTopologyReadonlyMap(
         [...providerEntries].map(([provider, consumers]) => [provider, Object.freeze(consumers)])
       ),
-      consumers: createReadonlyMap(consumerEntries),
-      indegree: createReadonlyMap(indegreeEntries),
-      level: createReadonlyMap(levelEntries),
-      ordinal: createReadonlyMap(ordinalEntries)
+      consumers: createTopologyReadonlyMap(consumerEntries),
+      indegree: createTopologyReadonlyMap(indegreeEntries),
+      level: createTopologyReadonlyMap(levelEntries),
+      ordinal: createTopologyReadonlyMap(ordinalEntries)
     })
-  }
-
-  /** Builds only from the static topology owner's already-admitted immutable snapshots. */
-  static fromSnapshots(
-    adapter: ITopologyIndexAdapter,
-    nodes: readonly ITopologyIndexNode[]
-  ): ITopologyIndex {
-    /** A fresh index has no transaction or external mutation authority to reconcile. */
-    const index = new TopologyIndex(adapter)
-    for (const node of nodes) index.#addSnapshot(node)
-    return index
   }
 
   /** Adds one node atomically and activates reverse-indexed dangling edges. */
@@ -773,12 +738,4 @@ class TopologyTransaction implements ITopologyTransaction {
  */
 export function createTopologyIndex(adapter: ITopologyIndexAdapter): ITopologyIndex {
   return new TopologyIndex(adapter)
-}
-
-/** Package-private trusted construction; no package subpath re-exports this factory. */
-export function createTopologyIndexFromSnapshots(
-  adapter: ITopologyIndexAdapter,
-  nodes: readonly ITopologyIndexNode[]
-): ITopologyIndex {
-  return TopologyIndex.fromSnapshots(adapter, nodes)
 }

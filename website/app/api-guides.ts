@@ -1,6 +1,6 @@
+import { storageHostInputExamples } from './reference/storage-host-authoring.js'
 import { rpcApiGuides } from './rpc-api-guides.js'
 import { capabilityHostExample } from './reference/capability.js'
-import { storageFeatureExample } from './reference/storage-web.js'
 import { utilsApiGuides } from './utils-api-guides.js'
 import { completionApiGuides } from './completion-api-guides.js'
 import { microHubApiGuides } from './micro-hub-api-guides.js'
@@ -67,6 +67,182 @@ const configurationOptionDescriptions: readonly {
   readonly zh: string
 }[] = [
   {
+    keys: ['storage-host:authoring/concurrency:associateNormalizedLockKeys:signal'],
+    en: 'Original caller cancellation signal carried with the lock request; it remains live while the existing operation waits. Omit it when the caller has no cancellation source.',
+    zh: '随锁请求传入的原调用方取消信号；已有操作等待期间仍观察此信号。调用方没有取消来源时省略。'
+  },
+  {
+    keys: ['storage-host:authoring/concurrency:associateNormalizedLockKeys:timeoutMs'],
+    en: 'Optional operation timeout in milliseconds, retained on the original request. Key association starts no timer; the original operation owner applies the timeout when work begins.',
+    zh: '原请求保留的可选操作超时，单位为毫秒。关联键不会启动定时器；工作开始时由原操作管理对象应用期限。'
+  },
+  {
+    keys: ['storage-host:authoring/concurrency:associateNormalizedLockKeys:pageSize'],
+    en: 'Optional scan page size retained with the original operation context. Lock-key association does not read records or change pagination.',
+    zh: '随原操作上下文保留的可选扫描分页数量。关联锁键不会读取记录，也不会改变分页方式。'
+  },
+  {
+    keys: ['storage-host:authoring/concurrency:associateNormalizedLockKeys:orgId'],
+    en: 'Original organization identifier carried by the backend request. Pass the ID already chosen by the organization view; association does not create or switch organizations.',
+    zh: '后端请求携带的原组织标识。使用组织视图已经选定的编号；关联操作不会创建或切换组织。'
+  },
+  {
+    keys: ['storage-host:authoring/sparql:createSparqlTag:select'],
+    en: 'Backend callback for SELECT queries. Enter the existing operation before invoking prepare(), execute the prepared text and return the native row list. Failures reject the query.',
+    zh: '执行 SELECT 查询的后端回调。先进入已有操作，再调用 prepare() 取得文本，执行后返回原生查询行列表。失败会拒绝查询。'
+  },
+  {
+    keys: ['storage-host:authoring/sparql:createSparqlTag:update'],
+    en: 'Backend callback for UPDATE queries. Enter the existing operation before invoking prepare(), execute the prepared text and return the native completion without a return value. Failures reject the query.',
+    zh: '执行 UPDATE 查询的后端回调。先进入已有操作，再调用 prepare() 取得文本，执行后返回原生无返回值的完成结果。失败会拒绝查询。'
+  },
+  {
+    keys: ['storage-host:authoring/sql:createSqlTag:get'],
+    en: 'Backend callback for get(). Enter the existing operation before invoking prepare(), then execute its text and bound values and return one row or undefined when there is no match. Preserve a native failure as the query rejection.',
+    zh: 'get() 的后端回调。先进入已有操作，再调用 prepare() 取得文本与绑定值，执行后返回一行数据；没有匹配时返回 undefined。原生失败作为查询拒绝保留。'
+  },
+  {
+    keys: ['storage-host:authoring/sql:createSqlTag:run'],
+    en: 'Backend callback for run(). Enter the existing operation before invoking prepare(), then execute its text and bound values and return the native mutation result including its affected-row facts. Preserve a native failure as the query rejection.',
+    zh: 'run() 的后端回调。先进入已有操作，再调用 prepare() 取得文本与绑定值，执行后返回原生写入结果及受影响行信息。原生失败作为查询拒绝保留。'
+  },
+  {
+    keys: [
+      'storage-contract:index:isStorageBase:asyncDisposeKey',
+      'storage-host:authoring/store:snapshotStorageBaseDetailed:asyncDisposeKey',
+      'storage-host:authoring/transaction:createTransactionOwner:asyncDisposeKey'
+    ],
+    en: 'The asynchronous disposal symbol used by the resource protocol. Omit it to use Symbol.asyncDispose; supply the same symbol used by a backend when validating or registering its cleanup method.',
+    zh: '资源协议用于异步释放的符号。省略时使用 Symbol.asyncDispose；后端使用其它释放符号时，校验或登记清理方法必须传入同一个符号。'
+  },
+  {
+    keys: [
+      'storage-host:authoring/blob:createStorageBlobBodyReader:backend',
+      'storage-host:authoring/blob:createStorageBlobObject:backend'
+    ],
+    en: 'Optional backend label included in argument and cleanup diagnostics. Use the label of the backend that owns the stream; omission adds no backend label.',
+    zh: '参数或清理失败的可选后端名称。使用拥有此数据流的后端名称；省略时不附加后端名称。'
+  },
+  {
+    keys: [
+      'storage-host:authoring/blob:createStorageBlobBodyReader:report',
+      'storage-host:authoring/blob:createStorageBlobObject:report',
+      'storage-host:authoring/resource:createStorageIteratorLifetime:report'
+    ],
+    en: 'Required failure reporter for cleanup or late failures that cannot replace the primary result. Receive the original failure and return void or a Promise for reporting completion.',
+    zh: '必填的失败报告回调，用于无法替换主要结果的清理失败或迟到失败。接收原失败，可直接返回，也可返回报告完成时结算的 Promise。'
+  },
+  {
+    keys: [
+      'storage-host:authoring/blob:createStorageBlobBodyReader:normalizeFailure',
+      'storage-host:authoring/blob:createStorageBlobObject:normalizeFailure'
+    ],
+    en: 'Optional callback that attaches the owning backend’s error classification to a read or cleanup failure. Return the classified failure; omission preserves the received failure unchanged.',
+    zh: '可选回调，为读取或清理失败附加所属后端的错误分类，并返回分类后的失败。省略时原样保留收到的失败。'
+  },
+  {
+    keys: ['storage-host:authoring/blob:createStorageBlobObject:close'],
+    en: 'Required callback that releases the original download resource after its reader is released. Return a Promise when closing is asynchronous; a rejection follows the existing primary-error and reporting rules.',
+    zh: '必填回调，在释放读取器后关闭原下载资源。异步关闭时返回 Promise；拒绝按已有的主要错误与报告规则处理。'
+  },
+  {
+    keys: ['storage-host:authoring/resource:createStorageIteratorLifetime:close'],
+    en: 'Required callback that releases the iterator’s original resource after accepted advances drain. Its Promise determines cleanup completion; repeated disposal shares that cleanup result.',
+    zh: '必填回调，在已接受的推进操作结束后释放迭代器的原资源。返回的 Promise 决定清理何时完成；重复释放共享该清理结果。'
+  },
+  {
+    keys: [
+      'storage-host:authoring/blob:createStorageBlobObject:onSettled',
+      'storage-host:authoring/resource:createStorageIteratorLifetime:onSettled'
+    ],
+    en: 'Optional synchronous callback invoked when resource cleanup settles. Use it to remove the resource from its backend’s existing registry; omission requires no registry notification.',
+    zh: '资源清理结束时执行的可选同步回调。用于从后端已有登记表中移除该资源；省略时不通知登记表。'
+  },
+  {
+    keys: ['storage-host:authoring/capability:provideCapabilities:onInstaller'],
+    en: 'Optional synchronous callback receiving the installer for the capabilities just provided. Retain that port when a transaction scope must install the same definitions; omission only installs them on the supplied store.',
+    zh: '可选同步回调，接收本次能力集合的安装端口。事务作用域需要安装同一组定义时保留该端口；省略时只在传入的存储上安装。'
+  },
+  {
+    keys: ['storage-host:authoring/concurrency:associateNormalizedLockKeys:lock'],
+    en: 'The original lock request associated with already normalized lock metadata. Pass the exact options object later consumed by the transaction; this does not acquire any lock.',
+    zh: '与已规范化锁信息关联的原锁请求。传入之后交给事务使用的同一选项对象；此操作不会取得锁。'
+  },
+  {
+    keys: ['storage-host:authoring/concurrency:associateNormalizedLockKeys:concurrency'],
+    en: 'The concurrency policy carried by the original request. Keep the same policy identity when associating normalized keys; policy execution remains with the transaction owner.',
+    zh: '原请求携带的并发策略。关联规范化键时保留同一策略身份；策略仍由事务执行。'
+  },
+  {
+    keys: [
+      'storage-host:authoring/key:projectStorageBatchKeys:rejectDuplicates',
+      'storage-host:authoring/key:snapshotStorageBatchKeys:rejectDuplicates'
+    ],
+    en: 'Choose true for a write batch that must reject equivalent keys before I/O. The default false retains repeated positions, as required for ordered batch reads.',
+    zh: '写批需要在读写前拒绝等价重复键时设为 true。默认 false 保留重复位置，适合要求结果与输入逐项对应的批量读取。'
+  },
+  {
+    keys: ['storage-host:authoring/sparql:createSparqlTag:ask'],
+    en: 'Backend callback for ASK queries. Enter the backend’s existing operation or transaction before calling prepare(), then execute the returned text and return the native boolean result.',
+    zh: '执行 ASK 查询的后端回调。先进入后端已有操作或事务，再调用 prepare() 取得查询文本，执行后返回原生布尔结果。'
+  },
+  {
+    keys: ['storage-host:authoring/sparql:createSparqlTag:construct'],
+    en: 'Backend callback for CONSTRUCT queries. Enter the existing operation before calling prepare(), execute its text, and return the resulting raw RDF quads. A failure rejects the query.',
+    zh: '执行 CONSTRUCT 查询的后端回调。先进入已有操作，再调用 prepare() 取得文本，执行后返回原始 RDF 四元组。失败会拒绝查询。'
+  },
+  {
+    keys: ['storage-host:authoring/sql:createSqlTag:dialect'],
+    en: 'Required SQL dialect: sqlite uses ? placeholders; postgres uses numbered $1 placeholders and PostgreSQL quoting rules. Select the dialect of the connection used by the supplied execution callbacks.',
+    zh: '必填 SQL 方言。sqlite 使用 ? 占位符；postgres 使用 $1 递增占位符及 PostgreSQL 引号规则。选择执行回调实际连接使用的方言。'
+  },
+  {
+    keys: ['storage-host:authoring/sql:createSqlTag:all'],
+    en: 'Backend callback for all() queries. Enter the original operation or transaction before invoking prepare(), then execute its text and bound values and return all rows without replacing their value types.',
+    zh: 'all() 查询的后端回调。先进入原操作或事务，再调用 prepare() 取得文本与绑定值，执行后返回全部行，保留原值类型。'
+  },
+  {
+    keys: ['storage-host:authoring/transaction:createTransactionBuilder:lock'],
+    en: 'Not accepted in the optimistic builder options. Omit this field; ordinary builders declare keys through lock(), while optimistic mode executes without a pessimistic key lock.',
+    zh: '乐观事务构建器不接受此选项。省略该字段；普通构建器通过 lock() 声明键，乐观模式不获取悲观键锁。'
+  },
+  {
+    keys: ['storage-host:authoring/transaction:createTransactionBuilder:concurrency'],
+    en: 'Optional policy for this transaction branch. Optimistic mode accepts only a policy whose locking value is optimistic; omission inherits the original store’s default policy.',
+    zh: '本事务分支的可选策略。乐观模式只接受 locking 为 optimistic 的策略；省略时继承原存储的默认策略。'
+  },
+  {
+    keys: ['storage-host:authoring/transaction:createTransactionOwner:activityMode'],
+    en: 'Native transaction activity model. Choose native for transactions whose activity is controlled by the database, such as IndexedDB. The default managed mode uses the backend’s managed transaction lifetime.',
+    zh: '原生事务的活动模型。IndexedDB 等由数据库控制活动状态的事务使用 native；默认 managed 使用后端管理的事务生命周期。'
+  },
+  {
+    keys: ['storage-host:authoring/transaction:createTransactionOwner:defaultPolicy'],
+    en: 'Authentic concurrency policy used when an operation supplies no override. Create it with ConcurrencyPolicy and retain it on the backend’s single transaction owner.',
+    zh: '操作未覆盖策略时使用的真实并发策略。通过 ConcurrencyPolicy 创建，交给该后端唯一的事务管理对象持有。'
+  },
+  {
+    keys: ['storage-host:authoring/transaction:createTransactionOwner:concurrencyStages'],
+    en: 'Optional observer of the existing concurrency stages. Use it for diagnostics around acquisition and execution; it does not add a lock, retry loop, or another transaction.',
+    zh: '已有并发阶段的可选观察回调。用于记录获取与执行过程；不会增加锁、重试循环或另一层事务。'
+  },
+  {
+    keys: [
+      'storage-host:authoring/vector:snapshotStorageVector:dimensions',
+      'storage-host:authoring/vector:snapshotStorageVectorCollection:dimensions'
+    ],
+    en: 'Expected positive vector width when configuration is supplied. Every dense vector must match it. Collection configuration requires dimensions; vector-only validation can omit it to validate finite components without a width constraint.',
+    zh: '提供配置时使用的正整数向量宽度，每个稠密向量都必须匹配。集合配置需要 dimensions；单个向量校验可省略它，只检查有限数值而不限制宽度。'
+  },
+  {
+    keys: [
+      'storage-host:authoring/vector:snapshotStorageVector:metric',
+      'storage-host:authoring/vector:snapshotStorageVectorCollection:metric'
+    ],
+    en: 'Similarity metric: cosine compares direction, dot uses the dot product, and euclid uses Euclidean distance. Collection configuration requires a metric; vector-only validation can omit it. Use the existing collection’s metric when validating its vectors.',
+    zh: '相似度规则。cosine 比较方向，dot 使用点积，euclid 使用欧氏距离。集合配置需要 metric；单个向量校验可省略。校验既有集合的向量时使用集合已有规则。'
+  },
+  {
     keys: ['lifecycle:index:boundedWait:reportCleanup'],
     en: 'Use this callback when timer cleanup failures should be logged without changing the wait result. If cancelling the timer fails, the callback receives that error synchronously. The wait still returns true for task completion or false for expiry, or rejects with the task failure. Without this callback, a timer cleanup failure also makes the wait reject.',
     zh: '希望记录取消计时器的失败、同时保留原等待结果时，设置这个回调。取消计时器失败后，回调会立即收到该错误。任务成功仍返回 true，到期仍返回 false，任务失败仍以原错误拒绝。省略回调时，取消计时器失败也会使等待被拒绝。'
@@ -95,7 +271,6 @@ const configurationOptionDescriptions: readonly {
       'store-light:index:createStoreLightError:cause',
       'store-light:index:createStoreLightTypeError:cause',
       'store-middleware:index:createStoreMiddlewareError:cause',
-      'store-persist:index:PersistEnvelopeError:cause',
       'store-persist:index:createStorePersistError:cause',
       'store-persist:index:createStorePersistTypeError:cause',
       'store-react:index:createStoreReactError:cause',
@@ -1327,19 +1502,14 @@ const configurationOptionDescriptions: readonly {
     keys: [
       'storage-web:plugins/cookies:cookieBackendPlugin:id',
       'storage-web:plugins/local-storage:localStorageBackendPlugin:id',
-      'storage-web:plugins/reactive/cookies:cookiesReactive:id',
-      'storage-web:plugins/reactive/local-storage:localStorageReactive:id',
-      'storage-web:plugins/reactive/session-storage:sessionStorageReactive:id',
       'storage-web:plugins/session-storage:sessionStorageBackendPlugin:id'
     ],
-    en: 'A backend plugin adds one storage implementation to the Host, the object that installs and releases plugins. Set id when you need to choose a name for that installed storage. Use the same name in host.backend(id), or in backendId when creating a query that refreshes after storage changes. Omitting id uses this plugin factory’s built-in name.',
-    zh: '后端插件把一种存储实现加入 Host，也就是负责安装和释放插件的宿主对象。需要为安装后的存储指定名称时设置 id。之后用相同名称调用 host.backend(id)；创建随存储变化而刷新的查询时，也把它传给 backendId。省略时使用当前插件工厂自带的名称。'
+    en: 'A backend plugin adds one storage implementation to the Host, the object that installs and releases plugins. Set id when you need to choose a name for that installed storage. Use the same name in host.backend(id); live queries are created from that installed store’s selected query methods. Omitting id uses this plugin factory’s built-in name.',
+    zh: '后端插件把一种存储实现加入 Host，也就是负责安装和释放插件的宿主对象。需要为安装后的存储指定名称时设置 id。之后用相同名称调用 host.backend(id)；实时查询从该已安装存储所选的查询方法创建。省略时使用当前插件工厂自带的名称。'
   },
   {
     keys: [
       'storage-web:plugins/local-storage:localStorageBackendPlugin:namespace',
-      'storage-web:plugins/reactive/local-storage:localStorageReactive:namespace',
-      'storage-web:plugins/reactive/session-storage:sessionStorageReactive:namespace',
       'storage-web:plugins/session-storage:sessionStorageBackendPlugin:namespace'
     ],
     en: 'A namespace is a prefix added to storage keys so applications or instances can keep their data separate. Set a distinct nonempty name when they share the same browser storage. Omitting it uses default. Reopen saved data with the same namespace; a different name selects a different set of keys.',
@@ -1348,8 +1518,6 @@ const configurationOptionDescriptions: readonly {
   {
     keys: [
       'storage-web:plugins/local-storage:localStorageBackendPlugin:namespaceCodec',
-      'storage-web:plugins/reactive/local-storage:localStorageReactive:namespaceCodec',
-      'storage-web:plugins/reactive/session-storage:sessionStorageReactive:namespaceCodec',
       'storage-web:plugins/session-storage:sessionStorageBackendPlugin:namespaceCodec'
     ],
     en: 'This key converter combines a namespace and the key used by your application into the key stored by the browser. Supply it only when you need a custom key format; otherwise the built-in converter is used. Keep the same converter when reopening data. Changing the format can make previously saved keys invisible to this instance.',
@@ -1431,14 +1599,14 @@ const configurationOptionDescriptions: readonly {
       'store-persist:keyed:persistKeyed:version',
       'store-persist:light:persist:version'
     ],
-    en: 'Identifies the shape of your saved application state with a nonnegative safe integer; the default is 0. Change it when old saved state needs conversion before your application can use it. Loading compares this number with the saved version. A mismatch calls migrate; without migrate, restoration fails instead of applying incompatible state.',
-    zh: '用非负安全整数标识应用保存的状态结构，默认值为 0。旧状态需要转换后才能使用时，应更新版本。加载时会比较当前版本和保存的版本；不一致则调用 migrate 转换，没有提供 migrate 时恢复会失败，不会直接应用不兼容状态。'
+    en: 'Identifies the shape of your saved application state with a nonnegative safe integer; the default is 0. Change it when old saved state needs conversion before your application can use it. Loading compares this number with the saved version. Reachable older archives run migrations; future or unreachable versions fail with VERSION_UNSUPPORTED and close writes.',
+    zh: '用非负安全整数标识应用保存的状态结构，默认值为 0。旧状态需要转换后才能使用时，应更新版本。加载时会比较当前版本和保存的版本；可升级旧档执行 migrations；未来或不可达版本报 VERSION_UNSUPPORTED 并阻止写入。'
   },
   {
     keys: [
-      'store-persist:index:persistUnit:migrate',
-      'store-persist:indexed:persistCollection:migrate',
-      'store-persist:light:persist:migrate'
+      'store-persist:index:persistUnit:migrations',
+      'store-persist:indexed:persistCollection:migrations',
+      'store-persist:light:persist:migrations'
     ],
     en: 'Converts old saved state when its version differs from the configured version. The callback receives that state and its old version, and must return the converted state synchronously. Omit it if you do not support loading older or different versions; a mismatch then fails restoration. Throwing or returning a Promise also fails restoration, which you can observe through ready and hydrationError.',
     zh: '已保存版本与配置版本不一致时，用此函数转换旧状态。函数收到旧状态和旧版本号，必须同步返回转换后的状态。不需要支持其他版本时可以省略，遇到版本不一致就会恢复失败。函数抛错或返回 Promise 也会使恢复失败，可通过 ready 的拒绝和 hydrationError 查看原因。'
@@ -1662,6 +1830,23 @@ const workerAdapterTimeoutDescription = {
 const optionTranslations: Readonly<
   Record<string, Readonly<Partial<Record<IGuideLocale, string>>>>
 > = {
+  /** Pure vector guards document known schema facts without introducing a collection or copying it. */
+  'storage-contract:index:assertStorageVector:dimensions': {
+    en: 'When the collection schema is known, require this exact positive number of components; omission validates the supplied dense vector without imposing a known dimension.',
+    zh: '已知集合结构时，要求向量分量数等于该正整数；省略时仍校验稠密向量，但不额外指定已知维度。'
+  },
+  'storage-contract:index:assertStorageVector:metric': {
+    en: 'Validate the known cosine, dot or euclid distance family; cosine also rejects a zero direction. Omit only when no collection metric is known.',
+    zh: '校验已知的 cosine、dot 或 euclid 距离类型；cosine 还会拒绝零向量。尚不知道集合距离类型时可省略。'
+  },
+  'storage-contract:index:assertStorageVectorCollection:dimensions': {
+    en: 'Positive safe integer declaring the component count for this collection; every stored vector must use the same count.',
+    zh: '用正的安全整数声明集合维度；写入该集合的每个向量都必须有相同分量数。'
+  },
+  'storage-contract:index:assertStorageVectorCollection:metric': {
+    en: 'Declare the native cosine, dot or euclid distance family used by the collection; cosine vectors must have a nonzero direction.',
+    zh: '声明集合使用的原生 cosine、dot 或 euclid 距离类型；cosine 向量必须具有非零方向。'
+  },
   'store-worker:index:WorkerAdapter:timeoutMs': workerAdapterTimeoutDescription,
   /** Bind reviewed descriptions only to their listed public configuration fields. */
   ...Object.fromEntries(
@@ -2268,7 +2453,7 @@ const optionTranslations: Readonly<
     en: 'Maximum wait for one cleanup step. A timeout records a failure and continues other cleanup; it does not stop the pending Promise. false waits without a deadline.',
     zh: '单个清理步骤的最长等待时间。超时记录失败并继续其他清理，不会停止仍在运行的 Promise。false 表示不设截止时间。'
   },
-  'storage-web:*:*:report': {
+  'storage-host:*:*:report': {
     en: 'Receives contained late rejections and cleanup failures from host installation or disposal; it never replaces the primary operation result or primary error.'
   },
   'capability:graph-dynamic:createDynamicCapabilityGraph:report': {
@@ -2431,40 +2616,38 @@ const optionTranslations: Readonly<
   'storage-web:*:*:document': {
     en: 'Document injection point for tests. Browser hosts default to globalThis.document.'
   },
-  'storage-web:cookies:cookiesHost:scope': {
-    en: 'Cookie scope used to filter invalidation. Changes that cannot be proven unrelated conservatively trigger a refresh.'
-  },
-  'storage-web:plugins-reactive-cookies:cookiesReactive:scope': {
-    en: 'Cookie scope used to filter invalidation. Changes that cannot be proven unrelated conservatively trigger a refresh.'
-  },
   'storage-web:plugins-cookies:cookieBackendPlugin:scope': {
     en: 'Fixed cookie scope reused for both writes and removals so cleanup targets the same physical cookie.'
   },
-  'storage-web:entity:defineEntity:name': {
-    en: "Schema name. The default passthrough schema uses 'passthrough' and returns values unchanged."
+  'storage-host:entity:defineEntity:features': {
+    en: 'Optional entity Feature factories selected before connection; omitted definitions support basic reads and writes only.',
+    zh: '连接前选择的实体特性工厂；省略时仅提供基础读写。'
   },
-  'storage-web:entity:defineEntity:key': {
-    en: 'Stable entity key used to isolate this record family when one backend stores several entity definitions.'
+  'storage-host:entity:defineEntity:name': {
+    en: 'Stable entity namespace. Names beginning with the reserved double-underscore prefix are rejected.'
   },
-  'storage-web:entity:defineEntity:schema': {
+  'storage-host:entity:defineEntity:key': {
+    en: 'Domain property whose value is used as the primary key for this entity.'
+  },
+  'storage-host:entity:defineEntity:schema': {
     en: 'Schema that validates the entity value at its public storage boundary.'
   },
-  'storage-web:entity:defineEntity:codec': {
+  'storage-host:entity:defineEntity:codec': {
     en: 'Optional explicit codec. When omitted, connect selects structuredCodec for record stores and jsonCodec for key/value-only stores.'
   },
-  'storage-web:entity:defineEntity:version': {
+  'storage-host:entity:defineEntity:version': {
     en: 'Current entity schema version used to determine which ordered migrations must run.'
   },
-  'storage-web:entity:defineEntity:migrations': {
-    en: 'Version-indexed migration functions. When provided, this must be a plain object rather than an array.'
+  'storage-host:entity:defineEntity:migrations': {
+    en: 'Complete own IMigrationStep table from version 2 through the current version; missing steps reject definition.'
   },
-  'storage-web:entity:defineEntity:validateOnRead': {
+  'storage-host:entity:defineEntity:validateOnRead': {
     en: 'Controls whether stored values are validated when read. Defaults to true.'
   },
-  'storage-web:entity:defineEntity:onDiagnostic': {
+  'storage-host:entity:defineEntity:onDiagnostic': {
     en: 'Diagnostic callback for non-fatal entity messages. Defaults to console.warn; callback failure does not alter storage behavior.'
   },
-  'storage-web:entity:defineEntity:defaultOrderBy': {
+  'storage-host:entity:defineEntity:defaultOrderBy': {
     en: 'Default comparator used for ordered entity results when a call does not provide a more specific ordering.'
   },
   'store-indexed:*:*:mutationGuard': {
@@ -4315,13 +4498,13 @@ const storePersistUnitOptions: Readonly<Record<IGuideLocale, readonly IApiOption
       example: '2'
     },
     {
-      name: 'options.migrate',
+      name: 'options.migrations',
       description:
-        'Synchronous transformation from persisted state and its previous version to the current state shape.',
+        'Contiguous synchronous target-version steps, or one explicit reset of older archives; future versions are rejected.',
       defaultValue: 'undefined',
-      type: '(persisted: TState, fromVersion: number) => TState',
+      type: 'Readonly<Record<number, IMigrationStep>> | IMigrationReset',
       whenToUse: 'Read older envelopes after increasing version.',
-      example: '(old, from) => migrateSettings(old, from)'
+      example: '{ 2: (old, ctx) => upgradeSettings(old, ctx.fromVersion) }'
     },
     {
       name: 'options.partialize',
@@ -4422,12 +4605,12 @@ const storePersistUnitOptions: Readonly<Record<IGuideLocale, readonly IApiOption
       example: '2'
     },
     {
-      name: 'options.migrate',
+      name: 'options.migrations',
       description: '把 persisted state 与旧 version 同步转换为当前 state shape。',
       defaultValue: 'undefined',
-      type: '(persisted: TState, fromVersion: number) => TState',
+      type: 'Readonly<Record<number, IMigrationStep>> | IMigrationReset',
       whenToUse: 'version 增加后继续读取旧 envelope。',
-      example: '(old, from) => migrateSettings(old, from)'
+      example: '{ 2: (old, ctx) => upgradeSettings(old, ctx.fromVersion) }'
     },
     {
       name: 'options.partialize',
@@ -5916,27 +6099,6 @@ const runtimeCompletionApiGuides = {
     ],
     avoidZh: ['生产环境需要真实单调时钟。', '外部应用测试已经提供框架 fake timers。']
   }),
-  'storage-web:plugins-indexed-db:prepareIndexedDbStore': createStorageContractGuide({
-    purposeEn:
-      'Prepares an IndexedDB-backed key/value store for plugin use by completing its existing readiness path. It does not create a second store or transfer disposal ownership away from the caller.',
-    purposeZh:
-      '通过既有 readiness 路径准备 plugin 要使用的 IndexedDB key/value store，不创建第二个 store，不移交调用方的 dispose 所有权。',
-    quickStart:
-      "import { prepareIndexedDbStore } from '@migaia/storage-web/plugins/indexed-db'\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst store = indexedDbHost({ dbName: 'task-cache' })\ntry {\n  await prepareIndexedDbStore(store)\n  await store.set('status', 'ready')\n  console.log(await store.get('status'))\n} finally {\n  await store.dispose()\n}",
-    scenariosEn: [
-      'Prepare a caller-owned IndexedDB store before plugin installation.',
-      'Wait for backend readiness before writing cached state.'
-    ],
-    scenariosZh: [
-      'plugin 安装前准备调用方拥有的 IndexedDB store。',
-      '写入缓存状态前等待 backend 就绪。'
-    ],
-    avoidEn: [
-      'A memory backend needs no IndexedDB preparation.',
-      'The caller cannot dispose its owned store.'
-    ],
-    avoidZh: ['内存 backend 不需要 IndexedDB 准备。', '调用方无法释放自有 store。']
-  }),
   'supervision:coroutine:createCoroutineSupervisor': createStorageContractGuide({
     purposeEn:
       'Supervises a cooperative in-process task with one exposed application port and optional heartbeat checks. Stop aborts its signal; the task still owns releasing its resources before actual exit returns the budget lease.',
@@ -6126,444 +6288,20 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
   ...runtimeCompletionApiGuides,
   ...microHubApiGuides,
   ...foundationApiGuides,
-  'storage-web:memory:memoryStorageHost': createStorageWebGuide({
+  'storage-host:entity:jsonCodec': createStorageWebGuide({
     purposeEn:
-      'Creates an isolated synchronous in-memory record store with text, byte, structured-record, transaction, iteration, metadata, and post-commit change-feed channels. It is process-local and loses all data when the instance is discarded.',
+      'Strict portable JSON text codec backed by defineJsonCodec. Encoding undefined, non-finite numbers or other unsupported portable values rejects SERIALIZE_FAILED before backend I/O. The cause chain retains the contract adapter and original serialization failure; decoding failures use DESERIALIZE_FAILED.',
     purposeZh:
-      '创建隔离的 synchronous in-memory record store，提供 text、byte、structured-record、transaction、iteration、metadata 与 post-commit change-feed channel。它仅存在于当前 process，instance 丢弃后全部数据消失。',
-    quickStart: `import { memoryStorageHost } from '@migaia/storage-web/memory'\n\ntype User = { id: number; name: string }\n\nconst storage = memoryStorageHost<User>()\nawait storage.putRecord({ id: 1, name: 'Ada' }, 1)\nconst user = await storage.getRecord(1)\nconsole.log(user)\nawait storage.dispose()`,
-    scenariosEn: [
-      'Tests need a real contract implementation without browser globals.',
-      'Ephemeral application state needs record and transaction semantics.',
-      'A fallback store must remain synchronous and observable.'
-    ],
-    scenariosZh: [
-      '测试需要不依赖 browser global 的真实 contract implementation。',
-      'ephemeral application state 需要 record 与 transaction semantics。',
-      'fallback store 必须保持 synchronous 且 observable。'
-    ],
-    avoidEn: [
-      'Data must survive reload or process restart.',
-      'Several tabs need a shared durable source.',
-      'Memory growth is not bounded by the owner lifecycle.'
-    ],
-    avoidZh: [
-      'data 必须跨 reload 或 process restart 保留。',
-      '多个 tab 需要 shared durable source。',
-      'owner lifecycle 无法约束 memory growth。'
-    ]
-  }),
-  'storage-web:local-storage:localStorageHost': createStorageWebGuide({
-    purposeEn:
-      'Creates a namespaced synchronous key-value store over Web Storage localStorage. It persists text values across reloads, exposes sync and async views, and never claims record, binary, transaction, or change-feed capabilities.',
-    purposeZh:
-      '在 Web Storage localStorage 上创建 namespaced synchronous key-value store。它跨 reload 持久化 text value，提供 sync/async view，并且不会声称支持 record、binary、transaction 或 change-feed。',
-    quickStart: `import { localStorageHost } from '@migaia/storage-web/local-storage'\n\nconst settings = localStorageHost({ storage: globalThis.localStorage })\nsettings.sync.set('theme', 'dark')\nconst theme = await settings.get('theme')\nconsole.log(theme)\nawait settings.remove('theme')\nawait settings.dispose()`,
-    scenariosEn: [
-      'Small durable browser settings.',
-      'Immediate synchronous reads are required at startup.',
-      'A namespace must isolate several application roots.'
-    ],
-    scenariosZh: [
-      '小型 durable browser settings。',
-      'startup 需要 immediate synchronous read。',
-      'namespace 必须隔离多个 application root。'
-    ],
-    avoidEn: [
-      'Large or structured records are required.',
-      'Writes need transactions or cross-tab change feeds.',
-      'The host may not provide Web Storage and no injection is available.'
-    ],
-    avoidZh: [
-      '需要 large 或 structured record。',
-      'write 需要 transaction 或 cross-tab change feed。',
-      'host 可能没有 Web Storage 且无法 injection。'
-    ],
-    optionsEn: [
-      {
-        name: 'storage',
-        description: 'Injected Web Storage-compatible surface.',
-        defaultValue: 'globalThis.localStorage',
-        type: 'IWebStorageLike',
-        whenToUse: 'Use tests, non-browser hosts, or an explicit storage owner.',
-        example: 'fakeStorage'
-      }
-    ],
-    optionsZh: [
-      {
-        name: 'storage',
-        description: 'injected Web Storage-compatible surface。',
-        defaultValue: 'globalThis.localStorage',
-        type: 'IWebStorageLike',
-        whenToUse: '用于测试、non-browser host 或 explicit storage owner。',
-        example: 'fakeStorage'
-      }
-    ]
-  }),
-  'storage-web:session-storage:sessionStorageHost': createStorageWebGuide({
-    purposeEn:
-      'Creates a namespaced synchronous key-value store over sessionStorage. Values survive reload within one browsing context but are discarded when that tab or window session ends.',
-    purposeZh:
-      '在 sessionStorage 上创建 namespaced synchronous key-value store。value 在同一 browsing context 的 reload 后仍存在，但 tab/window session 结束时会被丢弃。',
-    quickStart: `import { sessionStorageHost } from '@migaia/storage-web/session-storage'\n\nconst draft = sessionStorageHost({ storage: globalThis.sessionStorage })\ndraft.sync.set('step', 'shipping')\nconst step = await draft.get('step')\nconsole.log(step)\nawait draft.remove('step')\nawait draft.dispose()`,
-    scenariosEn: [
-      'Per-tab drafts survive reload.',
-      'Sensitive workflow state should not persist indefinitely.',
-      'Synchronous startup reads are required within one session.'
-    ],
-    scenariosZh: [
-      'per-tab draft 需要跨 reload。',
-      'sensitive workflow state 不应无限期持久化。',
-      '单个 session 内需要 synchronous startup read。'
-    ],
-    avoidEn: [
-      'Data must be shared across tabs.',
-      'Data must survive browser restart.',
-      'Structured records or transactions are required.'
-    ],
-    avoidZh: [
-      'data 必须跨 tab 共享。',
-      'data 必须跨 browser restart 保留。',
-      '需要 structured record 或 transaction。'
-    ],
-    optionsEn: [
-      {
-        name: 'storage',
-        description: 'Injected Web Storage-compatible surface.',
-        defaultValue: 'globalThis.sessionStorage',
-        type: 'IWebStorageLike',
-        whenToUse: 'Use tests or non-browser hosts.',
-        example: 'fakeStorage'
-      }
-    ],
-    optionsZh: [
-      {
-        name: 'storage',
-        description: 'injected Web Storage-compatible surface。',
-        defaultValue: 'globalThis.sessionStorage',
-        type: 'IWebStorageLike',
-        whenToUse: '用于测试或 non-browser host。',
-        example: 'fakeStorage'
-      }
-    ]
-  }),
-  'storage-web:cookies:cookiesHost': createStorageWebGuide({
-    purposeEn:
-      'Creates a namespaced synchronous cookie-backed text store with one fixed scope for every write and removal. Cookie limits and visibility apply: a missing JavaScript-visible key does not prove an HttpOnly cookie is absent.',
-    purposeZh:
-      '创建 namespaced synchronous cookie-backed text store，并为每次 write/removal 使用同一个 fixed scope。cookie limit 与 visibility 仍然成立：JavaScript 看不到 key，并不能证明 HttpOnly cookie 不存在。',
-    quickStart: `import { cookiesHost } from '@migaia/storage-web/cookies'\n\nconst preferences = cookiesHost({ namespace: 'prefs', scope: { path: '/', sameSite: 'lax', secure: true } })\nawait preferences.set('theme', 'dark', { maxAge: 86_400 })\nconst theme = await preferences.get('theme')\nconsole.log(theme)\nawait preferences.remove('theme')\nawait preferences.dispose()`,
-    scenariosEn: [
-      'A small value must accompany HTTP requests.',
-      'Cookie write and delete scope must remain identical.',
-      'Tests need an injected document.cookie surface.'
-    ],
-    scenariosZh: [
-      'small value 必须随 HTTP request 发送。',
-      'cookie write 与 delete scope 必须完全一致。',
-      '测试需要 injected document.cookie surface。'
-    ],
-    avoidEn: [
-      'Values may exceed about 4 KiB.',
-      'Absence must be authoritative despite HttpOnly entries.',
-      'Structured records, transactions, or iteration are required.'
-    ],
-    avoidZh: [
-      'value 可能超过约 4 KiB。',
-      '存在 HttpOnly entry 时仍要求 absence authoritative。',
-      '需要 structured record、transaction 或 iteration。'
-    ],
-    optionsEn: [
-      {
-        name: 'namespace',
-        description: 'Logical prefix isolating cookie names.',
-        defaultValue: "'default'",
-        type: 'string',
-        whenToUse: 'Separate independent cookie domains.',
-        example: "'prefs'"
-      },
-      {
-        name: 'namespaceCodec',
-        description:
-          'Advanced physical-name codec; changing it changes the persisted cookie format.',
-        defaultValue: 'lengthPrefixedNamespaceCodec',
-        type: 'INamespaceCodec',
-        whenToUse: 'Only with an explicit cookie-name migration.',
-        example: 'customNamespaceCodec'
-      },
-      {
-        name: 'scope.path',
-        description: 'Path applied identically to writes and removals.',
-        defaultValue: 'undefined',
-        type: 'string',
-        whenToUse: 'Limit request visibility to one URL subtree.',
-        example: "'/'"
-      },
-      {
-        name: 'scope.domain',
-        description: 'Domain applied identically to writes and removals.',
-        defaultValue: 'undefined',
-        type: 'string',
-        whenToUse: 'Share a cookie across intended subdomains.',
-        example: "'.example.com'"
-      },
-      {
-        name: 'scope.sameSite',
-        description: 'Cross-site delivery policy.',
-        defaultValue: 'undefined',
-        type: "'strict' | 'lax' | 'none'",
-        whenToUse: 'Choose the CSRF and navigation behavior deliberately.',
-        example: "'lax'"
-      },
-      {
-        name: 'scope.secure',
-        description: 'Restricts delivery to secure transports.',
-        defaultValue: 'false',
-        type: 'boolean',
-        whenToUse: 'Enable for production HTTPS cookies.',
-        example: 'true'
-      },
-      {
-        name: 'scope.partitioned',
-        description: 'Requests partitioned cookie storage where supported.',
-        defaultValue: 'false',
-        type: 'boolean',
-        whenToUse: 'Use in an embedded cross-site context with explicit policy.',
-        example: 'true'
-      },
-      {
-        name: 'document',
-        description: 'Injected document.cookie-compatible owner.',
-        defaultValue: 'globalThis.document',
-        type: 'ICookieDocument',
-        whenToUse: 'Use tests or an explicit host adapter.',
-        example: 'fakeCookieDocument'
-      }
-    ],
-    optionsZh: [
-      {
-        name: 'namespace',
-        description: '隔离 cookie name 的 logical prefix。',
-        defaultValue: "'default'",
-        type: 'string',
-        whenToUse: '分离 independent cookie domain。',
-        example: "'prefs'"
-      },
-      {
-        name: 'namespaceCodec',
-        description: 'advanced physical-name codec；改变它会改变 persisted cookie format。',
-        defaultValue: 'lengthPrefixedNamespaceCodec',
-        type: 'INamespaceCodec',
-        whenToUse: '仅配合显式 cookie-name migration 使用。',
-        example: 'customNamespaceCodec'
-      },
-      {
-        name: 'scope.path',
-        description: 'write 与 removal 使用完全相同的 path。',
-        defaultValue: 'undefined',
-        type: 'string',
-        whenToUse: '把 request visibility 限制在 URL subtree。',
-        example: "'/'"
-      },
-      {
-        name: 'scope.domain',
-        description: 'write 与 removal 使用完全相同的 domain。',
-        defaultValue: 'undefined',
-        type: 'string',
-        whenToUse: '在预期 subdomain 之间共享 cookie。',
-        example: "'.example.com'"
-      },
-      {
-        name: 'scope.sameSite',
-        description: 'cross-site delivery policy。',
-        defaultValue: 'undefined',
-        type: "'strict' | 'lax' | 'none'",
-        whenToUse: '明确选择 CSRF 与 navigation behavior。',
-        example: "'lax'"
-      },
-      {
-        name: 'scope.secure',
-        description: '把 delivery 限制到 secure transport。',
-        defaultValue: 'false',
-        type: 'boolean',
-        whenToUse: 'production HTTPS cookie 应开启。',
-        example: 'true'
-      },
-      {
-        name: 'scope.partitioned',
-        description: '在支持的 host 请求 partitioned cookie storage。',
-        defaultValue: 'false',
-        type: 'boolean',
-        whenToUse: '在 embedded cross-site context 按明确 policy 使用。',
-        example: 'true'
-      },
-      {
-        name: 'document',
-        description: 'injected document.cookie-compatible owner。',
-        defaultValue: 'globalThis.document',
-        type: 'ICookieDocument',
-        whenToUse: '用于测试或 explicit host adapter。',
-        example: 'fakeCookieDocument'
-      }
-    ]
-  }),
-  'storage-web:indexed-db:indexedDbHost': createStorageWebGuide({
-    purposeEn:
-      'Creates the durable structured browser store: text, bytes, records, transactions, iteration, metadata, secondary indexes, and post-commit change feed. Opening and schema work remain lazy until the first operation.',
-    purposeZh:
-      '创建 durable structured browser store，提供 text、bytes、records、transactions、iteration、metadata、secondary indexes 与 post-commit change feed。open 与 schema work 会延迟到首次 operation。',
-    quickStart: `import { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\ntype User = { id: number; email: string }\n\nconst db = indexedDbHost<User>({ dbName: 'app-data', recordsStoreName: 'users' })\ntry {\n  await db.putRecord({ id: 1, email: 'ada@example.com' }, 1)\n  for await (const [key, user] of db.iterateRecords()) console.log(key, user)\n} finally {\n  await db.dispose()\n}`,
-    scenariosEn: [
-      'Durable structured records exceed Web Storage limits.',
-      'Transactions, iteration, indexes, or change feeds are required.',
-      'Binary payloads need a native byte channel.'
-    ],
-    scenariosZh: [
-      'durable structured record 超过 Web Storage limit。',
-      '需要 transaction、iteration、index 或 change feed。',
-      'binary payload 需要 native byte channel。'
-    ],
-    avoidEn: [
-      'Only a tiny synchronous setting is needed.',
-      'The host lacks IndexedDB and no factory injection is available.',
-      'The caller cannot dispose the store lifecycle.'
-    ],
-    avoidZh: [
-      '只需要 tiny synchronous setting。',
-      'host 缺少 IndexedDB 且无法 injection factory。',
-      'caller 无法 dispose store lifecycle。'
-    ],
-    optionsEn: [
-      {
-        name: 'dbName',
-        description: 'Physical IndexedDB database name.',
-        defaultValue: "'storage-web'",
-        type: 'string',
-        whenToUse: 'Isolate an application or explicit database lifecycle.',
-        example: "'app-data'"
-      },
-      {
-        name: 'kvStoreName',
-        description: 'Object store for the string key-value channel.',
-        defaultValue: "'kv'",
-        type: 'string',
-        whenToUse: 'Preserve an existing physical layout or choose an explicit one.',
-        example: "'settings'"
-      },
-      {
-        name: 'bytesStoreName',
-        description: 'Object store for binary values.',
-        defaultValue: "'bytes'",
-        type: 'string',
-        whenToUse: 'Preserve an existing byte-channel layout.',
-        example: "'assets'"
-      },
-      {
-        name: 'recordsStoreName',
-        description: 'Object store for structured records.',
-        defaultValue: "'records'",
-        type: 'string',
-        whenToUse: 'Name the primary record collection.',
-        example: "'users'"
-      },
-      {
-        name: 'cleanupLegacyRecords',
-        description: 'Explicit release-time opt-in to delete the migrated legacy documents store.',
-        defaultValue: 'false',
-        type: 'boolean',
-        whenToUse: 'Enable only after migration evidence proves rollback is no longer needed.',
-        example: 'true'
-      },
-      {
-        name: 'factory',
-        description: 'Injected IndexedDB factory.',
-        defaultValue: 'globalThis.indexedDB',
-        type: 'IDBFactory',
-        whenToUse: 'Use fake-indexeddb in tests or an explicit host adapter.',
-        example: 'indexedDB'
-      },
-      {
-        name: 'keyRange',
-        description: 'Injected IDBKeyRange constructor paired with factory.',
-        defaultValue: 'globalThis.IDBKeyRange',
-        type: 'typeof IDBKeyRange',
-        whenToUse: 'Inject alongside a non-host factory.',
-        example: 'IDBKeyRange'
-      }
-    ],
-    optionsZh: [
-      {
-        name: 'dbName',
-        description: 'physical IndexedDB database name。',
-        defaultValue: "'storage-web'",
-        type: 'string',
-        whenToUse: '隔离 application 或 explicit database lifecycle。',
-        example: "'app-data'"
-      },
-      {
-        name: 'kvStoreName',
-        description: 'string key-value channel 使用的 object store。',
-        defaultValue: "'kv'",
-        type: 'string',
-        whenToUse: '保留 existing physical layout 或显式选择。',
-        example: "'settings'"
-      },
-      {
-        name: 'bytesStoreName',
-        description: 'binary value 使用的 object store。',
-        defaultValue: "'bytes'",
-        type: 'string',
-        whenToUse: '保留 existing byte-channel layout。',
-        example: "'assets'"
-      },
-      {
-        name: 'recordsStoreName',
-        description: 'structured record 使用的 object store。',
-        defaultValue: "'records'",
-        type: 'string',
-        whenToUse: '命名 primary record collection。',
-        example: "'users'"
-      },
-      {
-        name: 'cleanupLegacyRecords',
-        description: 'release 时删除 migrated legacy documents store 的显式 opt-in。',
-        defaultValue: 'false',
-        type: 'boolean',
-        whenToUse: '只有 migration evidence 证明不再需要 rollback 后才开启。',
-        example: 'true'
-      },
-      {
-        name: 'factory',
-        description: 'injected IndexedDB factory。',
-        defaultValue: 'globalThis.indexedDB',
-        type: 'IDBFactory',
-        whenToUse: '测试使用 fake-indexeddb，或接入 explicit host adapter。',
-        example: 'indexedDB'
-      },
-      {
-        name: 'keyRange',
-        description: '与 factory 配对的 injected IDBKeyRange constructor。',
-        defaultValue: 'globalThis.IDBKeyRange',
-        type: 'typeof IDBKeyRange',
-        whenToUse: '使用 non-host factory 时一起注入。',
-        example: 'IDBKeyRange'
-      }
-    ]
-  }),
-  'storage-web:serialize:jsonCodec': createStorageWebGuide({
-    purposeEn:
-      'The default zero-dependency codec for JSON-compatible values. It writes text on every backend, converts undefined top-level results to null, and reports serialization and parsing failures as StorageError values.',
-    purposeZh:
-      '面向 JSON-compatible value 的默认零依赖 codec。它在所有 backend 写入 text，把 top-level undefined 结果归一为 null，并将 stringify/parse failure 报告为 StorageError。',
-    quickStart: `import { jsonCodec } from '@migaia/storage-web/serialize'\n\nconst raw = await jsonCodec.encode({ id: 1, name: 'Ada' })\nconst user = await jsonCodec.decode(raw)\nconsole.log(user)`,
+      '基于 defineJsonCodec 的严格可移植 JSON 文本编解码器。编码 undefined、非有限数字或其他不支持的可移植值时，在后端 I/O 前拒绝 SERIALIZE_FAILED。原因链保留契约适配器与原始序列化失败；解码失败使用 DESERIALIZE_FAILED。',
+    quickStart: `import { jsonCodec } from '@migaia/storage-host/entity'\n\nconst raw = await jsonCodec.encode({ id: 1, name: 'Ada' })\nconst user = await jsonCodec.decode(raw)\nconsole.log(user)`,
     scenariosEn: [
       'Portable text storage across every backend.',
-      'Plain objects and arrays need the smallest built-in choice.',
+      'Plain JSON objects and arrays need a stable text format.',
       'Persisted payloads must remain inspectable as JSON.'
     ],
     scenariosZh: [
       '需要跨所有 backend 的 portable text storage。',
-      'plain object 与 array 需要最小 built-in choice。',
+      '普通 JSON 对象与数组需要稳定的文本格式。',
       'persisted payload 必须保持可检查的 JSON text。'
     ],
     avoidEn: [
@@ -6577,12 +6315,12 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       'domain value 需要显式 replacer、reviver 或 versioned schema。'
     ]
   }),
-  'storage-web:serialize:binaryCodec': createStorageWebGuide({
+  'storage-host:entity:binaryCodec': createStorageWebGuide({
     purposeEn:
       'Passes Uint8Array payloads through the binary channel without JSON conversion. selectCodec keeps bytes native on binary backends and explicitly wraps them as Base64 on text-only backends.',
     purposeZh:
       '通过 binary channel 直接传递 Uint8Array，不经过 JSON conversion。selectCodec 在 binary backend 保持原生 bytes，在 text-only backend 则显式包装为 Base64。',
-    quickStart: `import { binaryCodec } from '@migaia/storage-web/serialize'\n\nconst bytes = new Uint8Array([1, 2, 3])\nconst encoded = await binaryCodec.encode(bytes)\nconst restored = await binaryCodec.decode(encoded)\nconsole.log(restored)`,
+    quickStart: `import { binaryCodec } from '@migaia/storage-host/entity'\n\nconst bytes = new Uint8Array([1, 2, 3])\nconst encoded = await binaryCodec.encode(bytes)\nconst restored = await binaryCodec.decode(encoded)\nconsole.log(restored)`,
     scenariosEn: [
       'Images, hashes, or protocol frames are already bytes.',
       'A binary-capable backend should avoid text conversion.',
@@ -6604,12 +6342,12 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       'structured record 需要在 IndexedDB 中保持可查询。'
     ]
   }),
-  'storage-web:serialize:structuredCodec': createStorageWebGuide({
+  'storage-host:entity:structuredCodec': createStorageWebGuide({
     purposeEn:
       'Preserves structured-clone values without serialization so an IndexedDB-style record backend can store Blob, File, ArrayBuffer, Map, Set, Date, and cyclic graphs. Selection rejects backends without record capability instead of losing data.',
     purposeZh:
       '不做 serialization，保留 structured-clone value，让 IndexedDB 类 record backend 存储 Blob、File、ArrayBuffer、Map、Set、Date 与 cyclic graph。selection 遇到不支持 record 的 backend 会拒绝，而不是丢失数据。',
-    quickStart: `import { structuredCodec } from '@migaia/storage-web/serialize'\n\nconst payload = { createdAt: new Date(), tags: new Set(['stable']) }\nconst stored = await structuredCodec.encode(payload)\nconsole.log(stored)`,
+    quickStart: `import { structuredCodec } from '@migaia/storage-host/entity'\n\nconst payload = { createdAt: new Date(), tags: new Set(['stable']) }\nconst stored = await structuredCodec.encode(payload)\nconsole.log(stored)`,
     scenariosEn: [
       'IndexedDB records contain native structured-clone values.',
       'Cycles or non-JSON containers must retain semantics.',
@@ -6631,12 +6369,12 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       'interchange 或 debugging 需要稳定 wire format。'
     ]
   }),
-  'storage-web:serialize:selectCodec': createStorageWebGuide({
+  'storage-host:entity:selectCodec': createStorageWebGuide({
     purposeEn:
       'Binds a codec to one backend capability snapshot. Matching output stays direct, binary-to-text uses a reported Base64 fallback, and structured-to-text fails explicitly because no lossless fallback exists.',
     purposeZh:
       '把 codec 绑定到一次 backend capability snapshot。匹配的 output 直接使用；binary-to-text 使用会被报告的 Base64 fallback；structured-to-text 因不存在无损 fallback 而显式失败。',
-    quickStart: `import { binaryCodec, selectCodec } from '@migaia/storage-web/serialize'\n\nexport async function writeAvatar(storage: { capabilities: Parameters<typeof selectCodec>[1]; set(key: string, value: unknown): Promise<void> }, bytes: Uint8Array): Promise<void> {\n  const selected = selectCodec(binaryCodec, storage.capabilities, (message) => console.warn(message))\n  await storage.set('avatar', await selected.encode(bytes))\n}`,
+    quickStart: `import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { binaryCodec, selectCodec } from '@migaia/storage-host/entity'\n\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\ntry {\n  const storage = host.backend('memory')\n  const selected = selectCodec(binaryCodec, storage.capabilities, (message) => console.warn(message))\n  const encoded = await selected.encode(new Uint8Array([1, 2, 3]))\n  console.log(encoded, await selected.decode(encoded))\n} finally {\n  await host.dispose()\n}`,
     scenariosEn: [
       'An entity codec must be reconciled with its concrete backend.',
       'Binary data may accept an observable Base64 fallback.',
@@ -6717,12 +6455,12 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       }
     ]
   }),
-  'storage-web:schema:fromStandardSchema': createStorageWebGuide({
+  'storage-host:entity:fromStandardSchema': createStorageWebGuide({
     purposeEn:
       'Adapts a Standard Schema v1 validator to the storage entity schema contract without importing Zod, Valibot, or ArkType. Both synchronous and asynchronous validators are supported, and issue messages remain the validation failure cause.',
     purposeZh:
       '把 Standard Schema v1 validator 适配为 storage entity schema contract，无需 import Zod、Valibot 或 ArkType。支持 sync/async validator，并把 issue message 保留为 validation failure cause。',
-    quickStart: `import { fromStandardSchema } from '@migaia/storage-web/schema'\n\nconst standardSchema = { '~standard': { version: 1 as const, vendor: 'example', validate: (value: unknown) => ({ value }) } }\nconst userSchema = fromStandardSchema(standardSchema)\nconst user = await userSchema.validate({ id: 1, name: 'Ada' })\nconsole.log(user)`,
+    quickStart: `import { fromStandardSchema } from '@migaia/storage-host/entity'\n\nconst standardSchema = { '~standard': { version: 1 as const, vendor: 'example', validate: (value: unknown) => ({ value }) } }\nconst userSchema = fromStandardSchema(standardSchema)\nconst user = await userSchema.validate({ id: 1, name: 'Ada' })\nconsole.log(user)`,
     scenariosEn: [
       'An existing Standard Schema library owns runtime validation.',
       'Storage entities need validated and inferred output.',
@@ -6767,12 +6505,12 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       }
     ]
   }),
-  'storage-web:schema:passthrough': createStorageWebGuide({
+  'storage-host:entity:passthrough': createStorageWebGuide({
     purposeEn:
       'Creates the zero-validation schema adapter used when the storage boundary intentionally trusts its input. It returns the same value asynchronously and adds no validation dependency.',
     purposeZh:
       '创建 zero-validation schema adapter，用于 storage boundary 明确信任 input 的场景。它异步返回同一个 value，不增加 validation dependency。',
-    quickStart: `import { passthrough } from '@migaia/storage-web/schema'\n\nconst schema = passthrough<{ id: number; name: string }>()\nconst user = await schema.validate({ id: 1, name: 'Ada' })\nconsole.log(user)`,
+    quickStart: `import { passthrough } from '@migaia/storage-host/entity'\n\nconst schema = passthrough<{ id: number; name: string }>()\nconst user = await schema.validate({ id: 1, name: 'Ada' })\nconsole.log(user)`,
     scenariosEn: [
       'Data was already validated at a stronger upstream boundary.',
       'A prototype needs the schema contract without runtime validation.',
@@ -6794,130 +6532,13 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       'cast 会向 downstream code 隐藏 malformed data。'
     ]
   }),
-  'storage-web:schema:runMigrations': createStorageWebGuide({
-    purposeEn:
-      'Runs declared asynchronous migrations in ascending version order for one value. Missing version steps are explicit no-ops, cancellation preserves the abort reason, and failures retain their original cause.',
-    purposeZh:
-      '对单个 value 按 version 升序执行已声明的 async migration。缺失 version step 是显式 no-op；cancellation 保留 abort reason；failure 保留原始 cause。',
-    quickStart: `import { runMigrations } from '@migaia/storage-web/schema'\n\ntype IUserRecord = { version?: number; enabled?: boolean }\nconst saved: IUserRecord = { version: 1 }\nconst signal = new AbortController().signal\nconst current = await runMigrations(saved, 1, 3, {\n  2: async (value) => ({ ...(value as IUserRecord), enabled: true }),\n  3: async (value) => ({ ...(value as IUserRecord), version: 3 })\n}, signal)\nconsole.log(current)`,
-    scenariosEn: [
-      'A persisted entity is older than the current schema version.',
-      'Migration steps need asynchronous dependencies.',
-      'A long migration must cooperate with operation cancellation.'
-    ],
-    scenariosZh: [
-      'persisted entity 早于 current schema version。',
-      'migration step 需要 async dependency。',
-      'long migration 必须配合 operation cancellation。'
-    ],
-    avoidEn: [
-      'The target version is not newer than the stored version.',
-      'A database-wide atomic migration is required.',
-      'Missing steps should be treated as errors rather than no-ops.'
-    ],
-    avoidZh: [
-      'target version 不高于 stored version。',
-      '需要 database-wide atomic migration。',
-      'missing step 应被视为 error，而不是 no-op。'
-    ],
-    optionsEn: [
-      {
-        name: 'value',
-        description: 'Stored value supplied to the first applicable migration.',
-        defaultValue: 'required',
-        optional: false,
-        type: 'unknown',
-        whenToUse: 'Pass the decoded historical entity.',
-        example: 'saved'
-      },
-      {
-        name: 'fromVersion',
-        description: 'Non-negative safe integer describing the stored value version.',
-        defaultValue: 'required',
-        optional: false,
-        type: 'number',
-        whenToUse: 'Read from persisted entity metadata.',
-        example: '1'
-      },
-      {
-        name: 'toVersion',
-        description:
-          'Non-negative safe integer target version; versions from fromVersion + 1 are visited in order.',
-        defaultValue: 'required',
-        optional: false,
-        type: 'number',
-        whenToUse: 'Use the current entity definition version.',
-        example: '3'
-      },
-      {
-        name: 'migrations',
-        description: 'Version-keyed asynchronous steps; an absent version is a no-op.',
-        defaultValue: 'undefined',
-        type: 'Record<number, IMigration>',
-        whenToUse: 'Declare only versions whose data shape changes.',
-        example: '{ 2: migrateToV2, 3: migrateToV3 }'
-      },
-      {
-        name: 'signal',
-        description: 'Optional cooperative cancellation signal whose reason is preserved.',
-        defaultValue: 'undefined',
-        type: 'IAbortSignal',
-        whenToUse: 'Bind work to request, host, or disposal lifetime.',
-        example: 'controller.signal'
-      }
-    ],
-    optionsZh: [
-      {
-        name: 'value',
-        description: '传给第一个 applicable migration 的 stored value。',
-        defaultValue: 'required',
-        optional: false,
-        type: 'unknown',
-        whenToUse: '传入 decoded historical entity。',
-        example: 'saved'
-      },
-      {
-        name: 'fromVersion',
-        description: '描述 stored value version 的 non-negative safe integer。',
-        defaultValue: 'required',
-        optional: false,
-        type: 'number',
-        whenToUse: '从 persisted entity metadata 读取。',
-        example: '1'
-      },
-      {
-        name: 'toVersion',
-        description: 'non-negative safe integer target version；从 fromVersion + 1 开始按序访问。',
-        defaultValue: 'required',
-        optional: false,
-        type: 'number',
-        whenToUse: '使用 current entity definition version。',
-        example: '3'
-      },
-      {
-        name: 'migrations',
-        description: '按 version 编号的 async step；缺失 version 是 no-op。',
-        defaultValue: 'undefined',
-        type: 'Record<number, IMigration>',
-        whenToUse: '仅声明 data shape 发生变化的 version。',
-        example: '{ 2: migrateToV2, 3: migrateToV3 }'
-      },
-      {
-        name: 'signal',
-        description: '可选 cooperative cancellation signal，并保留其 reason。',
-        defaultValue: 'undefined',
-        type: 'IAbortSignal',
-        whenToUse: '把 work 绑定到 request、host 或 disposal lifetime。',
-        example: 'controller.signal'
-      }
-    ]
-  }),
-  'storage-web:entity:defineEntity': createStorageWebGuide({
+  'storage-host:entity:defineEntity': createStorageWebGuide({
     purposeEn:
       'Declares one versioned domain record and later connects that immutable definition to a concrete store. The resulting repository owns validation, codec selection, migrations, entity-key isolation, indexes, listing, streaming, and transactional batch behavior.',
     purposeZh:
       '声明一个 versioned domain record，之后再把 immutable definition 连接到 concrete store。生成的 repository 统一负责 validation、codec selection、migration、entity-key isolation、index、list、stream 与 transactional batch behavior。',
-    quickStart: `import { defineEntity } from '@migaia/storage-web/entity'\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\ntype IUser = { id: number; email: string }\n\nconst users = defineEntity<IUser>()({\n  name: 'users',\n  key: 'id',\n  indexes: { email: { path: 'email', unique: true } }\n})\nconst repository = users.connect(indexedDbHost({ dbName: 'app' }))\nawait repository.put({ id: 1, email: 'ada@example.com' })`,
+    quickStart:
+      "import { entityQueryFeature } from '@migaia/storage-host/entity/query'\nimport { entityIndexesFeature } from '@migaia/storage-host/entity/indexes'\nimport { entityUniqueFeature } from '@migaia/storage-host/entity/unique'\nimport { indexedDbIndexesFeature } from '@migaia/storage-web/features/indexed-db-indexes'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\n\ntype IUser = { id: number; email: string }\nconst users = defineEntity<IUser>()({\n  features: [entityQueryFeature(), entityIndexesFeature(), entityUniqueFeature()],\n  name: 'users',\n  key: 'id',\n  indexes: { email: { path: 'email', unique: true } },\n})\nconst host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin({ dbName: 'app' }, { indexes: indexedDbIndexesFeature() }),\n  ],\n})\ntry {\n  const repository = users.connect(host.backend('indexed-db'))\n  await repository.put({ id: 1, email: 'ada@example.com' })\n  console.log(await repository.query().limit(20).all())\n} finally {\n  await host.dispose()\n}",
     scenariosEn: [
       'Domain records need one backend-neutral repository contract.',
       'Persisted data requires validation and ordered version migration.',
@@ -6994,7 +6615,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
         description:
           'Complete version-keyed async chain from version 2 through the current version; every step is required.',
         defaultValue: 'undefined',
-        type: 'Record<number, IMigration>',
+        type: 'Readonly<Record<number, IMigrationStep>>',
         whenToUse: 'Transform older persisted shapes before validation and use.',
         example: '{ 2: migrateUserV2 }'
       },
@@ -7019,7 +6640,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       {
         name: 'defaultOrderBy',
         description:
-          'Entity-wide comparator used by list and stream when a call does not provide its own orderBy.',
+          'Default list/stream comparator; comparator ordering requires a finite limit on each query.',
         defaultValue: 'undefined',
         type: 'IRecordComparator<TDomain>',
         whenToUse: 'Establish one deterministic default presentation order.',
@@ -7028,10 +6649,10 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       {
         name: 'indexes',
         description:
-          'Named path, compound-path, or custom projection definitions. Use the curried defineEntity<T>()({...}) form so literal names and query key types are preserved.',
+          'Named path, compound-path, or custom projections. Use curried defineEntity<T>()({...}) to infer index keys. Unique writes require record transactions or the backend atomic commit port; unsupported raw value-only stores reject UNSUPPORTED_CAPABILITY before any side effect.',
         defaultValue: 'undefined',
         type: 'Readonly<Record<string, IEntityIndex<TDomain>>>',
-        whenToUse: 'Support typed findBy, findManyBy, streamBy, and indexed list queries.',
+        whenToUse: 'Support typed findBy and query().index(name, key) reads.',
         example: "{ email: { path: 'email', unique: true } }"
       }
     ],
@@ -7085,7 +6706,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
         name: 'migrations',
         description: '从 version 2 到 current version 的完整 async step chain；每一步都必须存在。',
         defaultValue: 'undefined',
-        type: 'Record<number, IMigration>',
+        type: 'Readonly<Record<number, IMigrationStep>>',
         whenToUse: '在 validation 与使用前转换 historical persisted shape。',
         example: '{ 2: migrateUserV2 }'
       },
@@ -7108,7 +6729,8 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       },
       {
         name: 'defaultOrderBy',
-        description: '调用未提供 orderBy 时，list 与 stream 使用的 entity-wide comparator。',
+        description:
+          'list 与 stream 的默认比较函数；使用比较函数排序时，每次查询都必须提供有限 limit。',
         defaultValue: 'undefined',
         type: 'IRecordComparator<TDomain>',
         whenToUse: '建立统一且 deterministic 的默认展示顺序。',
@@ -7117,20 +6739,20 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       {
         name: 'indexes',
         description:
-          'named path、compound-path 或 custom projection definition。必须使用 curried defineEntity<T>()({...}) 形式，保留 literal name 与 query key type。',
+          '命名路径、组合路径或自定义投影；使用 defineEntity<T>()({...}) 推断索引键。unique 写入要求记录事务或后端原子提交端口；缺少两者的原始纯值存储在任何副作用前拒绝 UNSUPPORTED_CAPABILITY。',
         defaultValue: 'undefined',
         type: 'Readonly<Record<string, IEntityIndex<TDomain>>>',
-        whenToUse: '支持 typed findBy、findManyBy、streamBy 与 indexed list query。',
+        whenToUse: '支持 typed findBy 与 query().index(name, key) 读取。',
         example: "{ email: { path: 'email', unique: true } }"
       }
     ]
   }),
-  'storage-web:host:assertStorageBackendId': createStorageWebGuide({
+  'storage-host:index:assertStorageBackendId': createStorageWebGuide({
     purposeEn:
       'Validates the public backend identifier grammar before it can enter plugin, registry, or topology state. IDs are case-sensitive ASCII strings, 1–64 characters, beginning with a letter and continuing with letters, digits, dot, underscore, or hyphen.',
     purposeZh:
       '在 backend identifier 进入 plugin、registry 或 topology state 前验证 public grammar。ID 是 case-sensitive ASCII string，长度 1–64，首字符必须是 letter，后续只允许 letter、digit、dot、underscore 或 hyphen。',
-    quickStart: `import { assertStorageBackendId } from '@migaia/storage-web/host'\n\nconst candidate: unknown = 'indexed-db'\nassertStorageBackendId(candidate)\nconst id: string = candidate // 校验成功后由 assertion narrowing 得到 backend ID`,
+    quickStart: `import { assertStorageBackendId } from '@migaia/storage-host'\n\nconst candidate: unknown = 'indexed-db'\nassertStorageBackendId(candidate)\nconst id: string = candidate // 校验成功后由 assertion narrowing 得到 backend ID`,
     scenariosEn: [
       'A configuration value is about to become a backend ID.',
       'A custom backend factory needs the same grammar as built-ins.',
@@ -7174,75 +6796,77 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       }
     ]
   }),
-  'storage-web:host:definePlugin': createStorageWebGuide({
+  'storage-host:index:definePlugin': createStorageWebGuide({
     purposeEn:
-      "Defines a Storage plugin through PluginHost's canonical function form. The Host supplies the implicit per-registration store capability; callers cannot replace it.",
+      'Defines one host-owned backend installation. Acquire and register the actual store inside install; the original Host owns rollback, Feature composition and final disposal. Return application methods from install when the plugin needs extensions.',
     purposeZh:
-      '通过 PluginHost 的规范函数形式定义 Storage 插件。Host 会为每次注册提供唯一的 Store，并把注册、安装、Feature 组合和释放串成一条生命周期。插件可以用 registerStore 接入后端，用 getStore 读写数据，用 getBackendId 标识当前后端；跨插件能力通过 Feature（featureExpose）提供；插件返回的 install 扩展才是 Host 对外发布的业务能力。',
-    quickStart: `import { createStorageHost, definePlugin } from '@migaia/storage-web/host'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst cachePlugin = definePlugin('cache', (core) => {\n  const store = memoryStorageHost()\n  core.registerStore(store) // Host 把这个 Store 绑定到本次 cache 注册，其他插件不能替换。\n\n  return {\n    install: async () => {\n      await core.getStore().set('user:1', JSON.stringify({ name: 'Ada' }))\n      return {\n        readUser: () => core.getStore().get('user:1'),\n        recordCount: async () => (await core.getStore().keys()).length\n      }\n    }\n  }\n})\n\nconst host = await createStorageHost()\ntry {\n  const appStorage = await host.use(cachePlugin)\n  console.log(await appStorage.extensions.readUser(), await appStorage.extensions.recordCount()) // { name: 'Ada' } 1：数据由 install 写入，再由发布的能力读取。\n} finally {\n  await host.dispose()\n}`,
+      '定义由宿主拥有的后端安装过程。在 install 内取得并登记实际存储，由原宿主负责回滚、特性组合与最终释放；需要业务扩展时，从 install 返回相应方法。',
+    quickStart:
+      "import { definePlugin } from '@migaia/storage-host'\nimport type { IKeyValueStore } from '@migaia/storage-contract'\n\n/** Acquire a fresh application-owned backend during each installation. */\nexport function defineCachePlugin(acquire: () => IKeyValueStore) {\n  return definePlugin('cache', (core) => ({\n    install: () => {\n      const store = acquire()\n      core.registerStore(store)\n      return { readUser: () => store.get('user:1') }\n    }\n  }))\n}",
     scenariosEn: [
-      'A Storage backend needs PluginHost lifecycle ownership.',
-      'The plugin should receive its store capability from the Host.',
-      'Installation and cleanup must follow the Host transaction.'
+      'A backend needs one installation and final-disposal owner.',
+      'Register the acquired original store inside the installation window.',
+      'Return selected application methods from the plugin install hook.'
     ],
     scenariosZh: [
-      'Storage backend 需要由 PluginHost 统一管理生命周期。',
-      '插件应由 Host 提供 store 能力，而不是自行替换。',
-      '安装与清理必须遵循 Host 的事务边界。'
+      '后端需要唯一的安装与最终释放所有者。',
+      '在安装窗口内登记取得的原始存储。',
+      '从插件 install 钩子返回选定的业务方法。'
     ],
     avoidEn: [
-      'The plugin should construct or replace the Host-provided store capability.',
-      'A standalone store has no PluginHost lifecycle.',
-      'The plugin needs the backend-definition API instead.'
+      'A built-in backend plugin already covers the storage mechanism.',
+      'Another owner may dispose the registered store independently.',
+      'Only a Feature on an existing backend is needed.'
     ],
     avoidZh: [
-      '插件需要自行构造或替换 Host 提供的 store 能力。',
-      '独立 store 不需要 PluginHost 生命周期。',
-      '实际需求是 backend-definition API。'
+      '内建后端插件已满足存储需求。',
+      '另一个所有者可能独立释放已登记存储。',
+      '只需要为既有后端添加特性。'
     ]
   }),
-  'storage-web:host:defineFeature': createStorageWebGuide({
+  'storage-host:index:defineFeature': createStorageWebGuide({
     purposeEn:
-      'Defines an optional capability for a storage plugin, such as counting saved keys. A Host manages installed storage plugins and releases them when closed. A Feature describes how to build a capability. A Plugin is the backend plugin that pairs a store with selected capabilities for the Host to install. Defining a Feature creates no Host, opens no database, and activates no capability. Pass the Feature in the third argument of definePlugin(), then install that Plugin with createStorageHost({ plugins }) or host.use(). Each installation receives its own backend store and Feature output. The example installs an in-memory cache and reads the count through the installed plugin handle. The count method comes from the object returned by install.',
+      'Defines a Feature for an explicit backend kind. The factory returns capability implementations, fluent methods and store/transaction API methods. Pass the selected Feature record as the backend plugin second argument; defining it alone acquires no store.',
     purposeZh:
-      '给存储插件定义一项可选能力，例如统计已保存的键。Host 是管理已安装存储插件、并在关闭时释放它们的宿主对象。Feature 描述如何创建一项能力，Plugin 则把存储与选定能力组合成供宿主安装的后端插件，两者不是一回事。定义 Feature 不会创建 Host、不会打开数据库，也不会启用任何能力。把 Feature 作为第三个参数交给 definePlugin()，再通过 createStorageHost({ plugins }) 或 host.use() 安装插件。每次安装都使用各自的后端存储和能力输出。下面安装一个内存缓存，再通过安装后返回的插件句柄读取数量；这个查询方法由 install 返回的对象提供。',
-    quickStart: storageFeatureExample,
+      '为明确的后端种类定义特性。工厂返回能力实现、链式方法以及存储与事务 API 方法；把选定的特性记录作为后端插件第二参数传入。仅定义特性不会取得存储。',
+    quickStart:
+      "import { createStorageHost, defineFeature, memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host'\nimport { kv } from '@migaia/storage-contract'\n\nconst metrics = defineFeature(memoryBackendKind, ({ featureExpose }) => ({\n  capabilities: [],\n  chain: {},\n  api: {\n    store: {\n      async count() { return (await this.store.use(kv).keys()).length },\n      backendId: () => featureExpose.getBackendId()\n    },\n    transaction: {}\n  }\n}))\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'cache' }, { metrics })] })\ntry {\n  const cache = host.backend('cache')\n  await cache.set('user:1', 'Ada')\n  console.log(await cache.api.count(), cache.api.backendId())\n} finally {\n  await host.dispose()\n}",
     scenariosEn: [
-      'Add methods that inspect one installed plugin’s own store. In this example metrics counts that store’s keys, so data saved by another backend is not included.',
-      'Make a capability available to application code by returning selected methods from install. Without that return value, the Feature output is available inside the plugin but not as a public extension method.',
-      'Running the example prints 1 cache. The first value is the number of saved keys; cache is the name supplied to definePlugin. Both assertions pass, and finally closes the Host and releases the memory store.'
+      'Attach methods to the actual store under store.api.',
+      'Use the exact opaque backend kind to reject incompatible Feature selection before acquisition.',
+      'Dispose the Host to release the original registration and its Feature output.'
     ],
     scenariosZh: [
-      '为一个已安装插件添加检查自身存储的方法。例子中的 metrics 只统计该存储的键，不会把其他后端的数据算进去。',
-      '需要把能力交给应用使用时，从 install 返回选定的方法。不返回这些方法，能力输出仍可在插件内部使用，但不会成为公开扩展方法。',
-      '运行示例会输出 1 cache。第一个值表示保存了一个键，cache 是传给 definePlugin 的名称。两项断言都会通过；finally 关闭宿主并释放内存存储。'
+      '把方法添加到实际存储的 store.api。',
+      '使用精确的不透明后端种类，在取得存储前拒绝不兼容的特性选择。',
+      '关闭宿主，释放原注册及其特性输出。'
     ],
     avoidEn: [
-      'Use memoryStorageHost() directly when you only need a standalone memory store. Define a Feature when the behavior should be installed with a managed storage plugin.',
-      'Keep work that must survive plugin removal outside this capability. The Host releases the plugin’s registered store during cleanup.',
-      'Use definePlugin() to create the complete backend plugin. The Host installs that plugin; a Feature definition alone does not register a store or provide an installable plugin.'
+      'Ordinary managed storage needs no Feature; install its backend plugin alone.',
+      'The work must survive removal of this backend registration.',
+      'The Feature target does not include the selected backend kind.'
     ],
     avoidZh: [
-      '只需要一个独立内存存储时，直接创建并使用 memoryStorageHost() 即可。需要让行为随受管理的存储插件一起安装时，再定义能力。',
-      '必须在插件移除后继续运行的工作，应放在此能力之外。宿主清理插件时会释放插件登记的存储。',
-      '完整后端插件用 definePlugin() 创建，再交给宿主安装。单独定义一项能力既不会登记存储，也不会产生可安装的插件。'
+      '普通受管理存储无需特性，单独安装后端插件即可。',
+      '工作必须在后端注册移除后继续存在。',
+      '特性目标不包含所选择的后端种类。'
     ]
   }),
-  'storage-web:host:createStorageHost': createStorageWebGuide({
+  'storage-host:index:createStorageHost': createStorageWebGuide({
     purposeEn:
       'Creates the lifecycle owner for a typed backend registry and optionally installs one initial plugin tuple atomically. Failed initial installation disposes the facade before the primary error is rethrown.',
     purposeZh:
       '创建 typed backend registry 的 lifecycle owner，并可原子安装一组 initial plugin tuple。initial installation 失败时会先 dispose facade，再重新抛出 primary error。',
-    quickStart: `import { createStorageHost } from '@migaia/storage-web/host'\n\nconst host = await createStorageHost({ plugins: [] })\ntry {\n  console.log(host.backends())\n} finally {\n  await host.dispose()\n}`,
+    quickStart: `import { createStorageHost } from '@migaia/storage-host'\n\nconst host = await createStorageHost({ plugins: [] })\ntry {\n  console.log(host.backends())\n} finally {\n  await host.dispose()\n}`,
     scenariosEn: [
       'Several backends need one install, lookup, rollback, and disposal owner.',
       'Literal plugin IDs should produce typed backend access.',
-      'Reactive capability should appear only for plugins that declare it.'
+      'Only explicitly selected Features add API or fluent methods.'
     ],
     scenariosZh: [
       '多个 backend 需要统一 install、lookup、rollback 与 disposal owner。',
       'literal plugin ID 应产生 typed backend access。',
-      'reactive capability 只应出现在声明它的 plugin 上。'
+      '只有显式选择的特性才添加 API 或链式方法。'
     ],
     avoidEn: [
       'A single standalone store already has a clear owner.',
@@ -7276,7 +6900,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
         name: 'scheduler',
         description: 'Lifecycle scheduler used for deterministic time, deadlines, and cleanup.',
         defaultValue: 'systemScheduler',
-        type: 'ILifecycleScheduler',
+        type: 'IScheduler',
         whenToUse: 'Inject virtual time in tests or an application-owned scheduler.',
         example: 'scheduler'
       },
@@ -7311,7 +6935,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
         name: 'scheduler',
         description: '用于 deterministic time、deadline 与 cleanup 的 lifecycle scheduler。',
         defaultValue: 'systemScheduler',
-        type: 'ILifecycleScheduler',
+        type: 'IScheduler',
         whenToUse: '测试注入 virtual time，或使用 application-owned scheduler。',
         example: 'scheduler'
       },
@@ -7326,20 +6950,20 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       }
     ]
   }),
-  'storage-web:host:StorageHostFacade': createStorageWebGuide({
+  'storage-host:index:StorageHostFacade': createStorageWebGuide({
     purposeEn:
       'The imperative Host implementation for incremental plugin installation. It serializes installation batches, publishes registry changes only after complete commit, provides typed backend lookup, and exposes one idempotent disposal promise.',
     purposeZh:
       '用于 incremental plugin installation 的 imperative Host implementation。它串行化 installation batch，只在完整 commit 后 publish registry change，提供 typed backend lookup，并暴露一个 idempotent disposal promise。',
-    quickStart: `import { StorageHostFacade } from '@migaia/storage-web/host'\nimport { memoryBackendPlugin } from '@migaia/storage-web/plugins/memory'\n\nexport async function installCache(): Promise<void> {\n  const host = new StorageHostFacade({ installTimeoutMs: 10_000 })\n  const ready = await host.use(memoryBackendPlugin({ id: 'cache' }))\n  console.log(ready.backends())\n  await ready.dispose()\n}`,
+    quickStart: `import { StorageHostFacade } from '@migaia/storage-host'\nimport { memoryBackendPlugin } from '@migaia/storage-host'\n\nexport async function installCache(): Promise<void> {\n  const host = new StorageHostFacade({ installTimeoutMs: 10_000 })\n  const ready = await host.use(memoryBackendPlugin({ id: 'cache' }))\n  console.log(ready.backends())\n  await ready.dispose()\n}`,
     scenariosEn: [
       'Plugins are admitted after Host construction.',
-      'Callers need hasBackend, backend, backends, or reactiveBackend inspection.',
+      'Callers need hasBackend, backend, or backends inspection.',
       'Concurrent installation must fail rather than interleave registry publication.'
     ],
     scenariosZh: [
       'plugin 在 Host construction 后动态 admission。',
-      'caller 需要 hasBackend、backend、backends 或 reactiveBackend inspection。',
+      'caller 需要 hasBackend、backend 或 backends inspection。',
       'concurrent installation 必须失败，不能交错 registry publication。'
     ],
     avoidEn: [
@@ -7365,7 +6989,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
         name: 'scheduler',
         description: 'Shared lifecycle scheduler for Host and plugin deadlines.',
         defaultValue: 'systemScheduler',
-        type: 'ILifecycleScheduler',
+        type: 'IScheduler',
         whenToUse: 'Control time deterministically or share application lifecycle time.',
         example: 'scheduler'
       },
@@ -7391,7 +7015,7 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
         name: 'scheduler',
         description: 'Host 与 plugin deadline 共享的 lifecycle scheduler。',
         defaultValue: 'systemScheduler',
-        type: 'ILifecycleScheduler',
+        type: 'IScheduler',
         whenToUse: 'deterministic control time，或共享 application lifecycle time。',
         example: 'scheduler'
       },
@@ -7586,12 +7210,13 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       }
     ]
   }),
-  'storage-web:plugins-memory:memoryBackendPlugin': createStorageWebGuide({
+  'storage-host:index:memoryBackendPlugin': createStorageWebGuide({
     purposeEn:
-      'Wraps the canonical in-memory store as a Host-installable backend plugin. After use(), hasBackend(id) becomes true and backend(id) exposes the typed key-value store; the Host owns atomic publication and disposal. This non-reactive variant does not expose liveQuery capability.',
+      'Ephemeral text, bytes and structured records are isolated in this installation. Its Host owns the original store and transaction lifecycle. Selected Features belong in the separate second argument.',
     purposeZh:
-      '把 canonical in-memory store 包装为 Host-installable backend plugin。use() 成功后，hasBackend(id) 变为 true，backend(id) 返回 typed key-value store；Host 负责 atomic publication 与 disposal。这个 non-reactive variant 不提供 liveQuery capability。',
-    quickStart: `import { createStorageHost } from '@migaia/storage-web/host'\nimport { memoryBackendPlugin } from '@migaia/storage-web/plugins/memory'\n\nconst host = await createStorageHost()\nconsole.log(host.hasBackend('cache')) // false：尚未安装\n\nconst appStorage = await host.use(memoryBackendPlugin({ id: 'cache' }))\nconsole.log(appStorage.hasBackend('cache')) // true：Host registry 已发布能力\nconsole.log(appStorage.hasReactiveBackend('cache')) // false：本插件不提供 liveQuery\n\nconst cache = appStorage.backend('cache')\nawait cache.set('session', 'signed-in')\nconsole.log(await cache.get('session')) // signed-in\n\nawait appStorage.dispose() // Host 统一释放插件拥有的 store`,
+      '文本、字节与结构化记录隔离在本次内存安装内；宿主拥有原存储与事务生命周期。选定的特性作为独立第二参数传入。',
+    quickStart:
+      "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'cache', namespace: 'app' })] })\ntry {\n  const storage = host.backend('cache')\n  await storage.set('status', 'ready')\n  console.log(await storage.get('status'))\n} finally {\n  await host.dispose()\n}",
     scenariosEn: [
       'Tests need a lifecycle-owned in-memory backend.',
       'Ephemeral state participates in typed Host lookup.',
@@ -7603,16 +7228,50 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       '明确不需要 reactive query。'
     ],
     avoidEn: [
+      'Two backends must commit one atomic native transaction; separate memory installations cannot provide that.',
       'Data must survive process or page lifetime.',
-      'Live queries are required; use memoryReactive.',
-      'A directly owned memoryStorage instance is simpler.'
+      'Independent installations must share the same memory data.'
     ],
     avoidZh: [
+      '两个后端必须在同一个原生事务内原子提交；独立内存安装不提供该能力。',
       'data 必须跨 process 或 page lifetime。',
-      '需要 live query；使用 memoryReactive。',
-      '直接拥有 memoryStorage instance 更简单。'
+      '多个独立安装必须共享同一份内存数据。'
     ],
     optionsEn: [
+      {
+        name: 'namespace',
+        description: 'Logical namespace within this isolated memory instance.',
+        defaultValue: "'default'",
+        type: 'string',
+        whenToUse: 'Separate data families inside this instance.',
+        example: "'app'"
+      },
+      {
+        name: 'concurrency',
+        description:
+          'Authentic default policy from @migaia/storage-contract, retained by the original transaction owner.',
+        defaultValue: 'ConcurrencyPolicy.wait()',
+        type: 'IConcurrencyPolicy',
+        whenToUse: 'Choose a default policy for writes and transactions.',
+        example: 'ConcurrencyPolicy.optimistic({ retries: 2 })'
+      },
+      {
+        name: 'owner',
+        description: 'Optional lock-holder diagnostic label.',
+        defaultValue: 'undefined',
+        type: '{ readonly label?: string }',
+        whenToUse: 'Identify this instance in lock diagnostics.',
+        example: "{ label: 'cache' }"
+      },
+      {
+        name: 'features',
+        description: 'Selected Feature record, passed separately after native backend options.',
+        defaultValue: 'undefined',
+        type: 'IStorageFeatureRecord',
+        whenToUse: 'Attach only Features targeting this backend kind.',
+        example:
+          '{ notifications: memoryNotificationsFeature(), reactive: reactiveFeature(memoryBackendKind) }'
+      },
       {
         name: 'id',
         description: 'Literal Host registry ID for this memory instance.',
@@ -7623,6 +7282,39 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       }
     ],
     optionsZh: [
+      {
+        name: 'namespace',
+        description: '当前隔离内存实例内的逻辑命名空间。',
+        defaultValue: "'default'",
+        type: 'string',
+        whenToUse: '区分当前实例内的数据集合。',
+        example: "'app'"
+      },
+      {
+        name: 'concurrency',
+        description: '来自 @migaia/storage-contract 的真实缺省策略，由原事务所有者保留。',
+        defaultValue: 'ConcurrencyPolicy.wait()',
+        type: 'IConcurrencyPolicy',
+        whenToUse: '选择写入与事务的缺省策略。',
+        example: 'ConcurrencyPolicy.optimistic({ retries: 2 })'
+      },
+      {
+        name: 'owner',
+        description: '可选锁持有者诊断标签。',
+        defaultValue: 'undefined',
+        type: '{ readonly label?: string }',
+        whenToUse: '在锁诊断中标识当前实例。',
+        example: "{ label: 'cache' }"
+      },
+      {
+        name: 'features',
+        description: '作为原生后端选项之后的独立第二参数传入的特性记录。',
+        defaultValue: 'undefined',
+        type: 'IStorageFeatureRecord',
+        whenToUse: '仅安装目标包含当前后端种类的特性。',
+        example:
+          '{ notifications: memoryNotificationsFeature(), reactive: reactiveFeature(memoryBackendKind) }'
+      },
       {
         name: 'id',
         description: '该 memory instance 的 literal Host registry ID。',
@@ -7635,10 +7327,11 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
   }),
   'storage-web:plugins-local-storage:localStorageBackendPlugin': createStorageWebGuide({
     purposeEn:
-      'Wraps the namespaced localStorage factory as a non-reactive Host plugin. After use(), the literal ID is published through hasBackend() and backend(), adding typed lookup, atomic installation, and Host-owned cleanup without adding live queries.',
+      'Installs a namespaced localStorage text backend. The Host owns installation and cleanup; durable browser data remains after disposal. Add selected Features through the second argument.',
     purposeZh:
-      '把 namespaced localStorage factory 包装为 non-reactive Host plugin。use() 成功后，literal ID 会通过 hasBackend() 与 backend() 发布，获得 typed lookup、atomic installation 与 Host-owned cleanup，但不会新增 live query。',
-    quickStart: `import { createStorageHost } from '@migaia/storage-web/host'\nimport { localStorageBackendPlugin } from '@migaia/storage-web/plugins/local-storage'\n\nconst host = await createStorageHost()\nconsole.log(host.hasBackend('settings')) // false\n\nconst appStorage = await host.use(localStorageBackendPlugin({ id: 'settings' }))\nconsole.log(appStorage.hasBackend('settings')) // true：Host 获得持久化 text store\nconsole.log(appStorage.hasReactiveBackend('settings')) // false：不会产生订阅能力\n\nconst settings = appStorage.backend('settings')\nawait settings.set('theme', 'dark')\nconsole.log(await settings.get('theme')) // dark，刷新页面后仍可读取\n\nawait appStorage.dispose()`,
+      '安装带命名空间的 localStorage 文本后端；宿主拥有安装与清理，释放后浏览器持久数据仍保留。通过第二参数选择特性。',
+    quickStart:
+      "import { createStorageHost } from '@migaia/storage-host'\nimport { localStorageBackendPlugin } from '@migaia/storage-web/local-storage'\n\nconst host = await createStorageHost({ plugins: [localStorageBackendPlugin({ id: 'settings', namespace: 'app' })] })\ntry {\n  const storage = host.backend('settings')\n  await storage.set('status', 'ready')\n  console.log(await storage.get('status'))\n} finally {\n  await host.dispose()\n}",
     scenariosEn: [
       'Durable text settings need Host ownership.',
       'Synchronous localStorage access is required behind typed lookup.',
@@ -7650,16 +7343,24 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       '不需要 live-query invalidation。'
     ],
     avoidEn: [
-      'Reactive reads are required; use localStorageReactive.',
+      'Large values or binary attachments belong in IndexedDB rather than synchronous text storage.',
       'Structured records or transactions are needed.',
       'The host has no Web Storage and no injected surface.'
     ],
     avoidZh: [
-      '需要 reactive read；使用 localStorageReactive。',
+      '大型值或二进制附件应交给 IndexedDB，不应放进同步文本存储。',
       '需要 structured record 或 transaction。',
       'host 没有 Web Storage 且未注入 surface。'
     ],
     optionsEn: [
+      {
+        name: 'features',
+        description: 'Selected Feature record, passed separately after native backend options.',
+        defaultValue: 'undefined',
+        type: 'IStorageFeatureRecord',
+        whenToUse: 'Attach only Features targeting this backend kind.',
+        example: '{ reactive: reactiveFeature(localStorageBackendKind) }'
+      },
       {
         name: 'id',
         description: 'Literal Host registry ID for this backend instance.',
@@ -7694,6 +7395,14 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       }
     ],
     optionsZh: [
+      {
+        name: 'features',
+        description: '作为原生后端选项之后的独立第二参数传入的特性记录。',
+        defaultValue: 'undefined',
+        type: 'IStorageFeatureRecord',
+        whenToUse: '仅安装目标包含当前后端种类的特性。',
+        example: '{ reactive: reactiveFeature(localStorageBackendKind) }'
+      },
       {
         name: 'id',
         description: '该 backend instance 的 literal Host registry ID。',
@@ -7730,10 +7439,11 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
   }),
   'storage-web:plugins-session-storage:sessionStorageBackendPlugin': createStorageWebGuide({
     purposeEn:
-      'Wraps sessionStorage as a non-reactive Host plugin for per-browsing-context text state. After use(), the Host publishes the literal ID for typed lookup and owns cleanup, without changing session lifetime semantics or adding live queries.',
+      'Installs a sessionStorage text backend for one browsing context. Host cleanup preserves the browser session data; selected Features are passed separately as the second argument.',
     purposeZh:
-      '把 sessionStorage 包装为 non-reactive Host plugin，用于 per-browsing-context text state。use() 后 Host 会发布 literal ID、提供 typed lookup 并统一 cleanup，但不改变 session lifetime semantics，也不增加 live query。',
-    quickStart: `import { createStorageHost } from '@migaia/storage-web/host'\nimport { sessionStorageBackendPlugin } from '@migaia/storage-web/plugins/session-storage'\n\nconst host = await createStorageHost()\nconsole.log(host.hasBackend('draft')) // false\n\nconst appStorage = await host.use(sessionStorageBackendPlugin({ id: 'draft' }))\nconsole.log(appStorage.hasBackend('draft')) // true：Host 获得当前 tab 的 session store\nconsole.log(appStorage.hasReactiveBackend('draft')) // false\n\nconst draft = appStorage.backend('draft')\nawait draft.set('step', 'shipping')\nconsole.log(await draft.get('step')) // shipping；同 tab reload 后仍可读取\n\nawait appStorage.dispose()`,
+      '为当前浏览上下文安装 sessionStorage 文本后端；宿主清理不会删除浏览器会话数据，选定特性作为第二参数单独传入。',
+    quickStart:
+      "import { createStorageHost } from '@migaia/storage-host'\nimport { sessionStorageBackendPlugin } from '@migaia/storage-web/session-storage'\n\nconst host = await createStorageHost({ plugins: [sessionStorageBackendPlugin({ id: 'draft', namespace: 'checkout' })] })\ntry {\n  const storage = host.backend('draft')\n  await storage.set('status', 'ready')\n  console.log(await storage.get('status'))\n} finally {\n  await host.dispose()\n}",
     scenariosEn: [
       'Per-tab drafts need typed Host ownership.',
       'State may survive reload but not the session.',
@@ -7745,16 +7455,24 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       '不需要 reactive invalidation。'
     ],
     avoidEn: [
+      'Data must survive closing this tab.',
       'State must be shared across tabs.',
-      'Live queries are required; use sessionStorageReactive.',
       'Structured records or transactions are needed.'
     ],
     avoidZh: [
+      '数据必须在关闭本标签页后保留。',
       'state 必须跨 tab 共享。',
-      '需要 live query；使用 sessionStorageReactive。',
       '需要 structured record 或 transaction。'
     ],
     optionsEn: [
+      {
+        name: 'features',
+        description: 'Selected Feature record, passed separately after native backend options.',
+        defaultValue: 'undefined',
+        type: 'IStorageFeatureRecord',
+        whenToUse: 'Attach only Features targeting this backend kind.',
+        example: '{ reactive: reactiveFeature(sessionStorageBackendKind) }'
+      },
       {
         name: 'id',
         description: 'Literal Host registry ID.',
@@ -7789,6 +7507,14 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       }
     ],
     optionsZh: [
+      {
+        name: 'features',
+        description: '作为原生后端选项之后的独立第二参数传入的特性记录。',
+        defaultValue: 'undefined',
+        type: 'IStorageFeatureRecord',
+        whenToUse: '仅安装目标包含当前后端种类的特性。',
+        example: '{ reactive: reactiveFeature(sessionStorageBackendKind) }'
+      },
       {
         name: 'id',
         description: 'literal Host registry ID。',
@@ -7825,10 +7551,11 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
   }),
   'storage-web:plugins-cookies:cookieBackendPlugin': createStorageWebGuide({
     purposeEn:
-      'Wraps the cookie text store as a non-reactive Host plugin. After use(), the Host publishes a typed cookie backend through hasBackend() and backend(), owns its cleanup, and preserves one fixed write/removal scope. It adds no polling or live-query capability and cannot bypass cookie size, visibility, security, or HttpOnly limits.',
+      'Installs the cookie text backend with a fixed write/removal scope. The Host owns cleanup; cookie size, JavaScript visibility and HttpOnly limits still apply. Pass selected Features as the second argument.',
     purposeZh:
-      '把 cookie text store 包装为 non-reactive Host plugin。use() 成功后，Host 会通过 hasBackend() 与 backend() 发布 typed cookie backend、统一 cleanup，并固定 write/removal scope。它不会增加 polling 或 live-query 能力，也不会绕过 cookie size、visibility、security 或 HttpOnly 限制。',
-    quickStart: `import { createStorageHost } from '@migaia/storage-web/host'\nimport { cookieBackendPlugin } from '@migaia/storage-web/plugins/cookies'\n\nconst host = await createStorageHost()\nconsole.log(host.hasBackend('prefs')) // false：Host 尚无 cookie 能力\n\nconst appStorage = await host.use(\n  cookieBackendPlugin({\n    id: 'prefs',\n    scope: { path: '/', sameSite: 'lax', secure: location.protocol === 'https:' }\n  })\n)\nconsole.log(appStorage.hasBackend('prefs')) // true：registry 已发布 typed cookie store\nconsole.log(appStorage.hasReactiveBackend('prefs')) // false：不会轮询 document.cookie\n\nconst prefs = appStorage.backend('prefs')\nawait prefs.set('theme', 'dark') // 写入 app namespace，并应用固定 scope\nconsole.log(await prefs.get('theme')) // dark；后续请求可携带该 cookie\nawait prefs.remove('theme') // 使用同一 path/domain scope，避免删错 cookie\n\nawait appStorage.dispose() // 释放 Host/plugin 资源；不会替你删除持久 cookie`,
+      '安装使用固定写入与删除范围的 cookie 文本后端。宿主拥有清理；cookie 大小、JavaScript 可见性及 HttpOnly 限制仍成立。选定特性作为第二参数传入。',
+    quickStart:
+      "import { createStorageHost } from '@migaia/storage-host'\nimport { cookieBackendPlugin } from '@migaia/storage-web/cookies'\n\nconst host = await createStorageHost({ plugins: [cookieBackendPlugin({ id: 'prefs', namespace: 'app', scope: { path: '/', sameSite: 'lax', secure: location.protocol === 'https:' } })] })\ntry {\n  const storage = host.backend('prefs')\n  await storage.set('status', 'ready')\n  console.log(await storage.get('status'))\n} finally {\n  await host.dispose()\n}",
     scenariosEn: [
       'Small request-carried values need Host ownership.',
       'Write and removal scope must remain identical.',
@@ -7840,16 +7567,24 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       '明确不需要 reactive polling。'
     ],
     avoidEn: [
+      'Authentication secrets need server-managed HttpOnly cookies, which document.cookie cannot create.',
       'Values may exceed cookie limits.',
-      'Reactive reads are required; use cookiesReactive.',
       'Absence must account for HttpOnly cookies.'
     ],
     avoidZh: [
+      '认证秘密需要服务端管理的 HttpOnly Cookie，document.cookie 无法创建。',
       'value 可能超过 cookie limit。',
-      '需要 reactive read；使用 cookiesReactive。',
       'absence 必须覆盖 HttpOnly cookie。'
     ],
     optionsEn: [
+      {
+        name: 'features',
+        description: 'Selected Feature record, passed separately after native backend options.',
+        defaultValue: 'undefined',
+        type: 'IStorageFeatureRecord',
+        whenToUse: 'Attach only Features targeting this backend kind.',
+        example: '{ reactive: reactiveFeature(cookieBackendKind) }'
+      },
       {
         name: 'id',
         description: 'Literal Host registry ID.',
@@ -7933,6 +7668,14 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       }
     ],
     optionsZh: [
+      {
+        name: 'features',
+        description: '作为原生后端选项之后的独立第二参数传入的特性记录。',
+        defaultValue: 'undefined',
+        type: 'IStorageFeatureRecord',
+        whenToUse: '仅安装目标包含当前后端种类的特性。',
+        example: '{ reactive: reactiveFeature(cookieBackendKind) }'
+      },
       {
         name: 'id',
         description: 'literal Host registry ID。',
@@ -8018,31 +7761,42 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
   }),
   'storage-web:plugins-indexed-db:indexedDbBackendPlugin': createStorageWebGuide({
     purposeEn:
-      'Wraps IndexedDB as a non-reactive Host plugin. Successful use() publishes the literal ID for typed backend lookup only after private preparation opens and backfills the database; failure rolls back without leaking the owner. This variant adds no live-query capability.',
+      'Installs the durable IndexedDB backend with its actual record, byte and transaction channels. Preparation completes before publication. Pass selected Features as the second argument; failed installation rolls back its original owner.',
     purposeZh:
-      '把 IndexedDB 包装为 non-reactive Host plugin。use() 只有在 private preparation 打开并 backfill database 后，才发布 literal ID 与 typed backend lookup；失败会 rollback 且不泄漏 owner。这个 variant 不增加 live-query 能力。',
-    quickStart: `import { createStorageHost } from '@migaia/storage-web/host'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/plugins/indexed-db'\n\nconst host = await createStorageHost()\nconsole.log(host.hasBackend('records')) // false\n\nconst appStorage = await host.use(\n  indexedDbBackendPlugin({ id: 'records', dbName: 'app', recordsStoreName: 'users' })\n) // resolve 前已完成 open/backfill；失败不会发布半成品\nconsole.log(appStorage.hasBackend('records')) // true\nconsole.log(appStorage.hasReactiveBackend('records')) // false：需要订阅时改用 indexedDbReactive\n\nconst records = appStorage.backend('records')\nawait records.set('last-sync', '2026-09-02T00:00:00Z')\nconsole.log(await records.get('last-sync'))\n\nawait appStorage.dispose()`,
+      '安装具有实际记录、字节与事务通道的 IndexedDB 持久后端；准备完成后才发布。选定特性作为第二参数传入，安装失败由原所有者回滚。',
+    quickStart:
+      "import { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\n\nconst host = await createStorageHost({ plugins: [indexedDbBackendPlugin({ id: 'records', dbName: 'app', recordsStoreName: 'users' })] })\ntry {\n  const storage = host.backend('records')\n  await storage.set('status', 'ready')\n  console.log(await storage.get('status'))\n} finally {\n  await host.dispose()\n}",
     scenariosEn: [
-      'Durable records, bytes, indexes, and transactions need Host ownership.',
+      'Durable records, bytes, and transactions need Host ownership; select the indexes Feature when secondary indexes are needed.',
       'Database preparation must finish before publication.',
       'Live queries are not required.'
     ],
     scenariosZh: [
-      'durable record、byte、index 与 transaction 需要 Host ownership。',
+      '持久记录、字节与事务需要宿主管理；需要次级索引时显式选择索引特性。',
       'database preparation 必须在 publication 前完成。',
       '不需要 live query。'
     ],
     avoidEn: [
+      'A transaction must remain open across network requests; native IndexedDB does not provide that lifetime.',
       'Only a tiny synchronous setting is needed.',
-      'Reactive reads are required; use indexedDbReactive.',
       'The Host lacks IndexedDB and no factory is injected.'
     ],
     avoidZh: [
+      '事务需要跨网络请求一直保持打开；原生 IndexedDB 不提供这种生命周期。',
       '只需要 tiny synchronous setting。',
-      '需要 reactive read；使用 indexedDbReactive。',
       'Host 缺少 IndexedDB 且未注入 factory。'
     ],
     optionsEn: [
+      {
+        name: 'features',
+        description:
+          'Selected Feature record, passed separately after native backend options. TTL, batch, journal, notifications, change feed, indexes and raw record keyset pagination each have an independent factory.',
+        defaultValue: 'undefined',
+        type: 'IStorageFeatureRecord',
+        whenToUse: 'Attach only Features targeting this backend kind.',
+        example:
+          '{ notifications: indexedDbNotificationsFeature(), reactive: reactiveFeature(indexedDbBackendKind) }'
+      },
       {
         name: 'id',
         description: 'Literal Host registry ID.',
@@ -8110,6 +7864,16 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
     ],
     optionsZh: [
       {
+        name: 'features',
+        description:
+          '作为原生后端选项之后的独立第二参数传入的特性记录；期限、批量、日志、通知、变更流、索引与原始记录游标分页各有独立工厂。',
+        defaultValue: 'undefined',
+        type: 'IStorageFeatureRecord',
+        whenToUse: '仅安装目标包含当前后端种类的特性。',
+        example:
+          '{ notifications: indexedDbNotificationsFeature(), reactive: reactiveFeature(indexedDbBackendKind) }'
+      },
+      {
         name: 'id',
         description: 'literal Host registry ID。',
         defaultValue: "'indexed-db'",
@@ -8175,705 +7939,54 @@ const apiGuides: Readonly<Record<string, Readonly<Partial<Record<IGuideLocale, I
       }
     ]
   }),
-  'storage-web:reactive-adapter:defineReactiveAdapterFeature': createStorageWebGuide({
+  'storage-web:features-reactive:reactiveFeature': createStorageWebGuide({
     purposeEn:
-      'Defines a kind-hidden advanced custom reactive capability. Plugin installation supplies its exact Store and Host-snapshotted scheduler; the adapter declares consistency visibility and supplies a lifecycle-owned source that invalidates Host live queries.',
+      'Adds live() to an existing query terminal for an explicit backend kind. Pass the Feature record as the backend plugin second argument. Memory and IndexedDB also require their notifications Feature before live(); missing assembly rejects explicitly. The caller supplies its Runtime; the original Host owns source cleanup. Memory uses instance-local push; browser backends retain their native eventual visibility and reconciliation polling.',
     purposeZh:
-      '定义 kind-hidden advanced custom reactive capability。Plugin 安装时提供 exact Store 和 Host 已快照 scheduler；adapter 声明 consistency visibility，并提供 lifecycle-owned source 来 invalidate Host live query。',
-    quickStart: `import { createStorageHost, definePlugin } from '@migaia/storage-web/host'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
-import { defineReactiveAdapterFeature } from '@migaia/storage-web/reactive-adapter'
-
-type ICacheStore = ReturnType<typeof memoryStorageHost>
-
-const reactive = defineReactiveAdapterFeature<ICacheStore>({
-  mode: 'polling',
-  pollIntervalMs: 1_000,
-  visibility: 'instance',
-  // 真实 backend 可在这里订阅 change feed；空 disposer 表示本例只依赖 polling。
-  subscribe: () => () => undefined
-})
-
-// Store 类型无法从工厂推断，需显式给出，让 Feature 的 store 约束成立
-const plugin = definePlugin<'cache-reactive', { reactive: typeof reactive }, ICacheStore>('cache-reactive', (core) => ({
-  install: () => {
-    core.registerStore(memoryStorageHost())
-    return {}
-  }
-}), { reactive })
-
-const host = await createStorageHost()
-try {
-  await host.use(plugin)
-  console.log(host.hasBackend('cache-reactive')) // true：Plugin 安装后，Host 才拥有这份 store 与 reactive adapter。
-} finally {
-  await host.dispose()
-}`,
+      '为明确后端种类的已有查询终点添加 live()。将特性记录作为后端插件第二参数传入；内存与 IndexedDB 还须在调用 live() 前选择各自的通知特性，缺失时明确拒绝。调用方提供 Runtime，原宿主拥有来源清理。内存使用实例内推送；浏览器后端保留原生的最终可见性与协调轮询。',
+    quickStart:
+      "import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'\nimport { createRuntime } from '@migaia/reactive'\nimport { records } from '@migaia/storage-contract'\nimport {\n  createStorageHost,\n  memoryBackendKind,\n  memoryBackendPlugin,\n} from '@migaia/storage-host'\nimport { reactiveFeature } from '@migaia/storage-web/features/reactive'\n\ntype IUser = { id: number; name: string }\nconst runtime = createRuntime()\nconst host = await createStorageHost({\n  plugins: [\n    memoryBackendPlugin(undefined, {\n      notifications: memoryNotificationsFeature(),\n      reactive: reactiveFeature(memoryBackendKind),\n    }),\n  ],\n})\ntry {\n  const store = host.backend('memory')\n  await store.putRecord({ id: 1, name: 'Ada' }, 1)\n  const users = store.use(records).query<IUser>().limit(20).live({ runtime })\n  try {\n    await users.ready\n    console.log(users.state.value)\n  } finally {\n    await users.dispose()\n  }\n} finally {\n  await host.dispose()\n}",
     scenariosEn: [
-      'A custom backend has a real push or polling invalidation source.',
-      'Visibility guarantees must be explicit in live-query consistency.',
-      'Source cleanup must belong to Host lifecycle.'
+      'Several mounted views share one backend change source while keeping independent live results.',
+      'Refresh a bounded record query after committed writes.',
+      'Install the same Feature definition independently for matching backend registrations.'
     ],
     scenariosZh: [
-      'custom backend 有真实 push 或 polling invalidation source。',
-      'visibility guarantee 必须在 live-query consistency 中显式声明。',
-      'source cleanup 必须属于 Host lifecycle。'
+      '多个已挂载视图共享同一后端变化来源，并保留独立的持续结果。',
+      '在写入提交后刷新有界记录查询。',
+      '为匹配的后端注册分别安装同一特性定义。'
     ],
     avoidEn: [
-      'A built-in reactive plugin already exists.',
-      'The source cannot return or expose bounded cleanup.',
-      'The declared visibility is stronger than the backend can guarantee.'
+      'Changes happen through an external writer with no supported invalidation feed.',
+      'The selected capability has no existing all() query terminal.',
+      'Synchronous cross-context freshness is required.'
     ],
     avoidZh: [
-      '已有 built-in reactive plugin。',
-      'source 无法返回或暴露 bounded cleanup。',
-      'declared visibility 强于 backend 实际 guarantee。'
+      '变化来自外部写入者，且没有受支持的失效通知流。',
+      '所选能力没有已有的 all() 查询终点。',
+      '需要跨上下文同步刷新保证。'
     ],
     optionsEn: [
       {
-        name: 'mode',
-        description: 'Invalidation strategy: push, polling, or hybrid (push plus polling).',
-        defaultValue: 'required',
-        optional: false,
-        type: "'push' | 'hybrid' | 'polling'",
-        whenToUse: 'State how freshness is obtained.',
-        example: "'polling'"
-      },
-      {
-        name: 'pollIntervalMs',
-        description: 'Polling cadence used by polling or hybrid adapters.',
-        defaultValue: 'undefined',
-        type: 'number',
-        whenToUse: 'Bound eventual refresh when no complete push source exists.',
-        example: '1_000'
-      },
-      {
-        name: 'visibility',
-        description: 'Honest scope across which mutations eventually become observable.',
-        defaultValue: 'required',
-        optional: false,
-        type: 'IStorageReactiveVisibility',
-        whenToUse: 'Expose the consistency guarantee to query consumers.',
-        example: "'instance'"
-      },
-      {
-        name: 'subscribe',
+        name: 'target',
         description:
-          'Lifecycle-owned source receiving store, cancellation, invalidation, and reporting controls.',
+          'The exact opaque backend kind or nonempty kind tuple accepted by this Feature.',
         defaultValue: 'required',
         optional: false,
-        type: '(context: IReactiveAdapterContext) => IStorageReactiveSourceDisposer | PromiseLike<unknown>',
-        whenToUse: 'Bridge backend changes into Host invalidation.',
-        example: '() => () => undefined'
+        type: 'IStorageFeatureTarget',
+        whenToUse: 'Use the kind exported by the backend that receives this Feature.',
+        example: 'memoryBackendKind'
       }
     ],
     optionsZh: [
       {
-        name: 'mode',
-        description: 'invalidation strategy：push、polling 或 hybrid（push 加 polling）。',
-        defaultValue: 'required',
+        name: 'target',
+        description: '该特性接受的精确不透明后端种类，或非空种类元组。',
+        defaultValue: '必填',
         optional: false,
-        type: "'push' | 'hybrid' | 'polling'",
-        whenToUse: '声明 freshness 如何获得。',
-        example: "'push'"
-      },
-      {
-        name: 'pollIntervalMs',
-        description: 'polling 或 hybrid adapter 使用的 polling cadence。',
-        defaultValue: 'undefined',
-        type: 'number',
-        whenToUse: '没有完整 push source 时约束 eventual refresh。',
-        example: '1_000'
-      },
-      {
-        name: 'visibility',
-        description: 'mutation 最终可被观察到的真实 scope。',
-        defaultValue: 'required',
-        optional: false,
-        type: 'IStorageReactiveVisibility',
-        whenToUse: '向 query consumer 暴露 consistency guarantee。',
-        example: "'instance'"
-      },
-      {
-        name: 'subscribe',
-        description:
-          '接收 store、cancellation、invalidation 与 reporting control 的 lifecycle-owned source。',
-        defaultValue: 'required',
-        optional: false,
-        type: '(context: IReactiveAdapterContext) => IStorageReactiveSourceDisposer | PromiseLike<unknown>',
-        whenToUse: '把 backend change 桥接到 Host invalidation。',
-        example: '() => () => undefined'
-      }
-    ]
-  }),
-  'storage-web:plugins-reactive-memory:memoryReactive': createStorageWebGuide({
-    purposeEn:
-      'Creates the Host plugin for the in-memory reactive fast path. Changes are pushed within the exact store instance, so live queries receive immediate instance-local invalidation without polling or cross-instance visibility claims.',
-    purposeZh:
-      '创建 in-memory reactive fast path 的 Host plugin。change 在 exact store instance 内 push，因此 live query 获得即时 instance-local invalidation，不使用 polling，也不声称 cross-instance visibility。',
-    quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { createStorageHost } from '@migaia/storage-web/host'\nimport { memoryReactive } from '@migaia/storage-web/plugins/reactive/memory'\n\nconst runtime = createRuntime()\nconst host = await createStorageHost({ plugins: [memoryReactive({ id: 'cache' })] })\nconst query = host.liveQuery({ backendId: 'cache', runtime, query: ({ store }) => store.get('user') })\nawait query.ready\nconsole.log(query.state)\nawait Promise.all([query.dispose(), host.dispose()])`,
-    scenariosEn: [
-      'Tests need deterministic push invalidation.',
-      'Ephemeral state needs live queries in one Host instance.',
-      'Polling overhead and cross-context guarantees are unnecessary.'
-    ],
-    scenariosZh: [
-      '测试需要 deterministic push invalidation。',
-      'ephemeral state 需要在单个 Host instance 内使用 live query。',
-      '不需要 polling overhead 与 cross-context guarantee。'
-    ],
-    avoidEn: [
-      'Data must persist.',
-      'Another store instance must observe changes.',
-      'Only direct reads are needed; use memoryBackendPlugin.'
-    ],
-    avoidZh: [
-      'data 必须持久化。',
-      '另一个 store instance 必须观察 change。',
-      '只需要 direct read；使用 memoryBackendPlugin。'
-    ],
-    optionsEn: [
-      {
-        name: 'id',
-        description: 'Literal reactive backend ID used by Host lookup and liveQuery.backendId.',
-        defaultValue: "'memory'",
-        type: 'string',
-        whenToUse: 'Choose a domain-specific query source name.',
-        example: "'cache'"
-      }
-    ],
-    optionsZh: [
-      {
-        name: 'id',
-        description: 'Host lookup 与 liveQuery.backendId 使用的 literal reactive backend ID。',
-        defaultValue: "'memory'",
-        type: 'string',
-        whenToUse: '选择 domain-specific query source name。',
-        example: "'cache'"
-      }
-    ]
-  }),
-  'storage-web:plugins-reactive-local-storage:localStorageReactive': createStorageWebGuide({
-    purposeEn:
-      'Creates the localStorage reactive Host plugin with hybrid invalidation. Same-document writes are observed through the store source, while a one-second polling fallback provides document-eventual visibility; it does not claim synchronous cross-tab coherence.',
-    purposeZh:
-      '创建使用 hybrid invalidation 的 localStorage reactive Host plugin。同 document write 通过 store source 观察，同时以 1 秒 polling fallback 提供 document-eventual visibility；它不声称 synchronous cross-tab coherence。',
-    quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { createStorageHost } from '@migaia/storage-web/host'\nimport { localStorageReactive } from '@migaia/storage-web/plugins/reactive/local-storage'\n\nconst runtime = createRuntime()\nconst host = await createStorageHost({ plugins: [localStorageReactive({ id: 'settings', storage: globalThis.localStorage })] })\nconst theme = host.liveQuery({ backendId: 'settings', runtime, query: ({ store }) => store.get('theme') })\nawait theme.ready\nconsole.log(theme.state)\nawait Promise.all([theme.dispose(), host.dispose()])`,
-    scenariosEn: [
-      'Durable browser settings drive reactive UI.',
-      'Same-document writes need prompt invalidation with polling recovery.',
-      'Document-eventual consistency is sufficient.'
-    ],
-    scenariosZh: [
-      'durable browser setting 驱动 reactive UI。',
-      'same-document write 需要及时 invalidation 与 polling recovery。',
-      'document-eventual consistency 已足够。'
-    ],
-    avoidEn: [
-      'Synchronous cross-tab consistency is required.',
-      'Structured records or transactions are needed.',
-      'No live query is used; choose localStorageBackendPlugin.'
-    ],
-    avoidZh: [
-      '需要 synchronous cross-tab consistency。',
-      '需要 structured record 或 transaction。',
-      '没有使用 live query；选择 localStorageBackendPlugin。'
-    ],
-    optionsEn: [
-      {
-        name: 'id',
-        description: 'Literal reactive backend ID.',
-        defaultValue: "'local'",
-        type: 'string',
-        whenToUse: 'Name the live-query source.',
-        example: "'settings'"
-      },
-      {
-        name: 'namespace',
-        description: 'Logical prefix isolating persisted keys.',
-        defaultValue: "'default'",
-        type: 'string',
-        whenToUse: 'Separate application data.',
-        example: "'app'"
-      },
-      {
-        name: 'namespaceCodec',
-        description: 'Advanced persisted key codec.',
-        defaultValue: 'lengthPrefixedNamespaceCodec',
-        type: 'INamespaceCodec',
-        whenToUse: 'Only with an explicit format migration.',
-        example: 'customNamespaceCodec'
-      },
-      {
-        name: 'storage',
-        description: 'Injected Web Storage-compatible surface.',
-        defaultValue: 'globalThis.localStorage',
-        type: 'IWebStorageLike',
-        whenToUse: 'Use tests or an explicit host owner.',
-        example: 'fakeStorage'
-      }
-    ],
-    optionsZh: [
-      {
-        name: 'id',
-        description: 'literal reactive backend ID。',
-        defaultValue: "'local'",
-        type: 'string',
-        whenToUse: '命名 live-query source。',
-        example: "'settings'"
-      },
-      {
-        name: 'namespace',
-        description: '隔离 persisted key 的 logical prefix。',
-        defaultValue: "'default'",
-        type: 'string',
-        whenToUse: '分离 application data。',
-        example: "'app'"
-      },
-      {
-        name: 'namespaceCodec',
-        description: 'advanced persisted key codec。',
-        defaultValue: 'lengthPrefixedNamespaceCodec',
-        type: 'INamespaceCodec',
-        whenToUse: '仅配合显式 format migration。',
-        example: 'customNamespaceCodec'
-      },
-      {
-        name: 'storage',
-        description: 'injected Web Storage-compatible surface。',
-        defaultValue: 'globalThis.localStorage',
-        type: 'IWebStorageLike',
-        whenToUse: '用于测试或 explicit host owner。',
-        example: 'fakeStorage'
-      }
-    ]
-  }),
-  'storage-web:plugins-reactive-session-storage:sessionStorageReactive': createStorageWebGuide({
-    purposeEn:
-      'Creates the sessionStorage reactive Host plugin with hybrid invalidation and one-second polling. Its guarantee is top-level-context-eventual: it follows the current tab or window session, not durable or origin-wide state.',
-    purposeZh:
-      '创建使用 hybrid invalidation 与 1 秒 polling 的 sessionStorage reactive Host plugin。它保证 top-level-context-eventual：跟随当前 tab/window session，而不是 durable 或 origin-wide state。',
-    quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { createStorageHost } from '@migaia/storage-web/host'\nimport { sessionStorageReactive } from '@migaia/storage-web/plugins/reactive/session-storage'\n\nconst runtime = createRuntime()\nconst host = await createStorageHost({ plugins: [sessionStorageReactive({ id: 'draft', storage: globalThis.sessionStorage })] })\nconst step = host.liveQuery({ backendId: 'draft', runtime, query: ({ store }) => store.get('step') })\nawait step.ready\nconsole.log(step.state)\nawait Promise.all([step.dispose(), host.dispose()])`,
-    scenariosEn: [
-      'A per-tab draft drives reactive UI.',
-      'Reload survival is needed within one session.',
-      'Eventual visibility inside the top-level context is sufficient.'
-    ],
-    scenariosZh: [
-      'per-tab draft 驱动 reactive UI。',
-      '需要在单个 session 内跨 reload。',
-      'top-level context 内 eventual visibility 已足够。'
-    ],
-    avoidEn: [
-      'State must be shared across tabs or browser restarts.',
-      'Only direct reads are needed.',
-      'Structured records or transactions are required.'
-    ],
-    avoidZh: [
-      'state 必须跨 tab 或 browser restart。',
-      '只需要 direct read。',
-      '需要 structured record 或 transaction。'
-    ],
-    optionsEn: [
-      {
-        name: 'id',
-        description: 'Literal reactive backend ID.',
-        defaultValue: "'session'",
-        type: 'string',
-        whenToUse: 'Name the live-query source.',
-        example: "'draft'"
-      },
-      {
-        name: 'namespace',
-        description: 'Logical prefix isolating session keys.',
-        defaultValue: "'default'",
-        type: 'string',
-        whenToUse: 'Separate independent workflows.',
-        example: "'checkout'"
-      },
-      {
-        name: 'namespaceCodec',
-        description: 'Advanced persisted key codec.',
-        defaultValue: 'lengthPrefixedNamespaceCodec',
-        type: 'INamespaceCodec',
-        whenToUse: 'Only with an explicit format migration.',
-        example: 'customNamespaceCodec'
-      },
-      {
-        name: 'storage',
-        description: 'Injected sessionStorage-compatible surface.',
-        defaultValue: 'globalThis.sessionStorage',
-        type: 'IWebStorageLike',
-        whenToUse: 'Use tests or a non-browser host.',
-        example: 'fakeStorage'
-      }
-    ],
-    optionsZh: [
-      {
-        name: 'id',
-        description: 'literal reactive backend ID。',
-        defaultValue: "'session'",
-        type: 'string',
-        whenToUse: '命名 live-query source。',
-        example: "'draft'"
-      },
-      {
-        name: 'namespace',
-        description: '隔离 session key 的 logical prefix。',
-        defaultValue: "'default'",
-        type: 'string',
-        whenToUse: '分离 independent workflow。',
-        example: "'checkout'"
-      },
-      {
-        name: 'namespaceCodec',
-        description: 'advanced persisted key codec。',
-        defaultValue: 'lengthPrefixedNamespaceCodec',
-        type: 'INamespaceCodec',
-        whenToUse: '仅配合显式 format migration。',
-        example: 'customNamespaceCodec'
-      },
-      {
-        name: 'storage',
-        description: 'injected sessionStorage-compatible surface。',
-        defaultValue: 'globalThis.sessionStorage',
-        type: 'IWebStorageLike',
-        whenToUse: '用于测试或 non-browser host。',
-        example: 'fakeStorage'
-      }
-    ]
-  }),
-  'storage-web:plugins-reactive-cookies:cookiesReactive': createStorageWebGuide({
-    purposeEn:
-      'Creates the cookie reactive Host plugin with hybrid one-second polling and origin-js-visible-eventual consistency. It can observe only cookies visible to JavaScript and cannot prove the absence or state of HttpOnly cookies.',
-    purposeZh:
-      '创建使用 hybrid 1 秒 polling 与 origin-js-visible-eventual consistency 的 cookie reactive Host plugin。它只能观察 JavaScript 可见 cookie，无法证明 HttpOnly cookie 的 absence 或 state。',
-    quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { createStorageHost } from '@migaia/storage-web/host'\nimport { cookiesReactive } from '@migaia/storage-web/plugins/reactive/cookies'\n\nconst runtime = createRuntime()\nconst host = await createStorageHost({\n  plugins: [cookiesReactive({ id: 'prefs', namespace: 'app', scope: { path: '/', sameSite: 'lax', secure: true } })]\n})\n// cookiesReactive 内部会注册同配置的 cookiesHost；调用方不需要重复传入 cookieHost。\nconst theme = host.liveQuery({ backendId: 'prefs', runtime, query: ({ store }) => store.get('theme') })\ntry {\n  await theme.ready\n  console.log(theme.state)\n} finally {\n  await Promise.all([theme.dispose(), host.dispose()])\n}`,
-    scenariosEn: [
-      'A small JS-visible cookie drives reactive presentation.',
-      'Origin-visible eventual polling is acceptable.',
-      'Cookie write and removal scope must stay identical.'
-    ],
-    scenariosZh: [
-      'small JS-visible cookie 驱动 reactive presentation。',
-      '可以接受 origin-visible eventual polling。',
-      'cookie write 与 removal scope 必须一致。'
-    ],
-    avoidEn: [
-      'HttpOnly state must be observed.',
-      'Payloads may exceed cookie limits.',
-      'Reactive polling is unnecessary; use cookieBackendPlugin.'
-    ],
-    avoidZh: [
-      '必须观察 HttpOnly state。',
-      'payload 可能超过 cookie limit。',
-      '不需要 reactive polling；使用 cookieBackendPlugin。'
-    ],
-    optionsEn: [
-      {
-        name: 'id',
-        description: 'Literal reactive backend ID.',
-        defaultValue: "'cookies'",
-        type: 'string',
-        whenToUse: 'Name the live-query source.',
-        example: "'prefs'"
-      },
-      {
-        name: 'namespace',
-        description: 'Logical prefix isolating cookie names.',
-        defaultValue: "'default'",
-        type: 'string',
-        whenToUse: 'Separate independent cookie domains.',
-        example: "'app'"
-      },
-      {
-        name: 'namespaceCodec',
-        description: 'Advanced persisted cookie-name codec.',
-        defaultValue: 'lengthPrefixedNamespaceCodec',
-        type: 'INamespaceCodec',
-        whenToUse: 'Only with an explicit name migration.',
-        example: 'customNamespaceCodec'
-      },
-      {
-        name: 'scope.path',
-        description: 'Path shared by writes and removals.',
-        defaultValue: 'undefined',
-        type: 'string',
-        whenToUse: 'Limit delivery to a URL subtree.',
-        example: "'/'"
-      },
-      {
-        name: 'scope.domain',
-        description: 'Domain shared by writes and removals.',
-        defaultValue: 'undefined',
-        type: 'string',
-        whenToUse: 'Share across intended subdomains.',
-        example: "'.example.com'"
-      },
-      {
-        name: 'scope.sameSite',
-        description: 'Cross-site delivery policy.',
-        defaultValue: 'undefined',
-        type: "'strict' | 'lax' | 'none'",
-        whenToUse: 'Choose navigation and CSRF behavior.',
-        example: "'lax'"
-      },
-      {
-        name: 'scope.secure',
-        description: 'Restricts delivery to secure transport.',
-        defaultValue: 'false',
-        type: 'boolean',
-        whenToUse: 'Enable for production HTTPS.',
-        example: 'true'
-      },
-      {
-        name: 'scope.partitioned',
-        description: 'Requests partitioned storage where supported.',
-        defaultValue: 'false',
-        type: 'boolean',
-        whenToUse: 'Use in an explicitly designed embedded context.',
-        example: 'true'
-      },
-      {
-        name: 'document',
-        description: 'Injected document.cookie-compatible owner.',
-        defaultValue: 'globalThis.document',
-        type: 'ICookieDocument',
-        whenToUse: 'Use tests or an explicit host adapter.',
-        example: 'fakeDocument'
-      }
-    ],
-    optionsZh: [
-      {
-        name: 'id',
-        description: 'literal reactive backend ID。',
-        defaultValue: "'cookies'",
-        type: 'string',
-        whenToUse: '命名 live-query source。',
-        example: "'prefs'"
-      },
-      {
-        name: 'namespace',
-        description: '隔离 cookie name 的 logical prefix。',
-        defaultValue: "'default'",
-        type: 'string',
-        whenToUse: '分离 independent cookie domain。',
-        example: "'app'"
-      },
-      {
-        name: 'namespaceCodec',
-        description: 'advanced persisted cookie-name codec。',
-        defaultValue: 'lengthPrefixedNamespaceCodec',
-        type: 'INamespaceCodec',
-        whenToUse: '仅配合显式 name migration。',
-        example: 'customNamespaceCodec'
-      },
-      {
-        name: 'scope.path',
-        description: 'write 与 removal 共享的 path。',
-        defaultValue: 'undefined',
-        type: 'string',
-        whenToUse: '限制到 URL subtree。',
-        example: "'/'"
-      },
-      {
-        name: 'scope.domain',
-        description: 'write 与 removal 共享的 domain。',
-        defaultValue: 'undefined',
-        type: 'string',
-        whenToUse: '在预期 subdomain 间共享。',
-        example: "'.example.com'"
-      },
-      {
-        name: 'scope.sameSite',
-        description: 'cross-site delivery policy。',
-        defaultValue: 'undefined',
-        type: "'strict' | 'lax' | 'none'",
-        whenToUse: '选择 navigation 与 CSRF behavior。',
-        example: "'lax'"
-      },
-      {
-        name: 'scope.secure',
-        description: '把 delivery 限制到 secure transport。',
-        defaultValue: 'false',
-        type: 'boolean',
-        whenToUse: 'production HTTPS 应开启。',
-        example: 'true'
-      },
-      {
-        name: 'scope.partitioned',
-        description: '在支持的 host 请求 partitioned storage。',
-        defaultValue: 'false',
-        type: 'boolean',
-        whenToUse: '用于明确设计的 embedded context。',
-        example: 'true'
-      },
-      {
-        name: 'document',
-        description: 'injected document.cookie-compatible owner。',
-        defaultValue: 'globalThis.document',
-        type: 'ICookieDocument',
-        whenToUse: '用于测试或 explicit host adapter。',
-        example: 'fakeDocument'
-      }
-    ]
-  }),
-  'storage-web:plugins-reactive-indexed-db:indexedDbReactive': createStorageWebGuide({
-    purposeEn:
-      'Creates the IndexedDB reactive Host plugin with origin-eventual hybrid invalidation and one-second polling. Host preparation opens and backfills the durable store before publication; live queries may preserve previous data while later generations refresh.',
-    purposeZh:
-      '创建使用 origin-eventual hybrid invalidation 与 1 秒 polling 的 IndexedDB reactive Host plugin。Host preparation 会在 publication 前打开并 backfill durable store；后续 generation refresh 时 live query 可以保留 previous data。',
-    quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { createStorageHost } from '@migaia/storage-web/host'\nimport { indexedDbReactive } from '@migaia/storage-web/plugins/reactive/indexed-db'\n\ntype User = { id: number; email: string }\nconst runtime = createRuntime()\nconst host = await createStorageHost({ plugins: [indexedDbReactive({ id: 'records', dbName: 'app', recordsStoreName: 'users' })] })\nconst users = host.liveQuery({ backendId: 'records', runtime, keepPreviousData: true, query: async ({ store }) => {\n  const result: User[] = []\n  for await (const [, user] of store.iterateRecords()) result.push(user as User)\n  return result\n} })\nawait users.ready\nconsole.log(users.state)\nawait Promise.all([users.dispose(), host.dispose()])`,
-    scenariosEn: [
-      'Durable structured records drive reactive UI.',
-      'Origin-eventual visibility with polling recovery is acceptable.',
-      'Preparation, indexes, transactions, and lifecycle cleanup need one Host owner.'
-    ],
-    scenariosZh: [
-      'durable structured record 驱动 reactive UI。',
-      '可以接受 origin-eventual visibility 与 polling recovery。',
-      'preparation、index、transaction 与 lifecycle cleanup 需要统一 Host owner。'
-    ],
-    avoidEn: [
-      'Synchronous cross-context coherence is required.',
-      'Only direct IndexedDB access is needed.',
-      'A tiny synchronous setting would be simpler in Web Storage.'
-    ],
-    avoidZh: [
-      '需要 synchronous cross-context coherence。',
-      '只需要 direct IndexedDB access。',
-      'tiny synchronous setting 使用 Web Storage 更简单。'
-    ],
-    optionsEn: [
-      {
-        name: 'id',
-        description: 'Literal reactive backend ID.',
-        defaultValue: "'indexed-db'",
-        type: 'string',
-        whenToUse: 'Name the live-query source.',
-        example: "'records'"
-      },
-      {
-        name: 'dbName',
-        description: 'Physical IndexedDB database name.',
-        defaultValue: "'storage-web'",
-        type: 'string',
-        whenToUse: 'Isolate one application database lifecycle.',
-        example: "'app'"
-      },
-      {
-        name: 'kvStoreName',
-        description: 'Object store for text values.',
-        defaultValue: "'kv'",
-        type: 'string',
-        whenToUse: 'Preserve an existing physical layout.',
-        example: "'settings'"
-      },
-      {
-        name: 'bytesStoreName',
-        description: 'Object store for byte values.',
-        defaultValue: "'bytes'",
-        type: 'string',
-        whenToUse: 'Preserve an existing byte layout.',
-        example: "'assets'"
-      },
-      {
-        name: 'recordsStoreName',
-        description: 'Object store for structured records.',
-        defaultValue: "'records'",
-        type: 'string',
-        whenToUse: 'Name the primary record collection.',
-        example: "'users'"
-      },
-      {
-        name: 'cleanupLegacyRecords',
-        description: 'Release-time opt-in to delete migrated legacy records.',
-        defaultValue: 'false',
-        type: 'boolean',
-        whenToUse: 'Enable only after rollback is no longer required.',
-        example: 'true'
-      },
-      {
-        name: 'factory',
-        description: 'Injected IndexedDB factory.',
-        defaultValue: 'globalThis.indexedDB',
-        type: 'IDBFactory',
-        whenToUse: 'Use tests or an explicit host adapter.',
-        example: 'indexedDB'
-      },
-      {
-        name: 'keyRange',
-        description: 'Injected IDBKeyRange constructor paired with factory.',
-        defaultValue: 'globalThis.IDBKeyRange',
-        type: 'typeof IDBKeyRange',
-        whenToUse: 'Inject alongside a non-host factory.',
-        example: 'IDBKeyRange'
-      }
-    ],
-    optionsZh: [
-      {
-        name: 'id',
-        description: 'literal reactive backend ID。',
-        defaultValue: "'indexed-db'",
-        type: 'string',
-        whenToUse: '命名 live-query source。',
-        example: "'records'"
-      },
-      {
-        name: 'dbName',
-        description: 'physical IndexedDB database name。',
-        defaultValue: "'storage-web'",
-        type: 'string',
-        whenToUse: '隔离 application database lifecycle。',
-        example: "'app'"
-      },
-      {
-        name: 'kvStoreName',
-        description: 'text value 使用的 object store。',
-        defaultValue: "'kv'",
-        type: 'string',
-        whenToUse: '保留 existing physical layout。',
-        example: "'settings'"
-      },
-      {
-        name: 'bytesStoreName',
-        description: 'byte value 使用的 object store。',
-        defaultValue: "'bytes'",
-        type: 'string',
-        whenToUse: '保留 existing byte layout。',
-        example: "'assets'"
-      },
-      {
-        name: 'recordsStoreName',
-        description: 'structured record 使用的 object store。',
-        defaultValue: "'records'",
-        type: 'string',
-        whenToUse: '命名 primary record collection。',
-        example: "'users'"
-      },
-      {
-        name: 'cleanupLegacyRecords',
-        description: 'release 时删除 migrated legacy record 的 opt-in。',
-        defaultValue: 'false',
-        type: 'boolean',
-        whenToUse: '仅在不再需要 rollback 后开启。',
-        example: 'true'
-      },
-      {
-        name: 'factory',
-        description: 'injected IndexedDB factory。',
-        defaultValue: 'globalThis.indexedDB',
-        type: 'IDBFactory',
-        whenToUse: '用于测试或 explicit host adapter。',
-        example: 'indexedDB'
-      },
-      {
-        name: 'keyRange',
-        description: '与 factory 配对的 injected IDBKeyRange constructor。',
-        defaultValue: 'globalThis.IDBKeyRange',
-        type: 'typeof IDBKeyRange',
-        whenToUse: '使用 non-host factory 时一起注入。',
-        example: 'IDBKeyRange'
+        type: 'IStorageFeatureTarget',
+        whenToUse: '使用实际接收此特性的后端所导出的种类。',
+        example: 'memoryBackendKind'
       }
     ]
   }),
@@ -11033,20 +10146,20 @@ try {
       }
     ]
   }),
-  'storage-contract:index:snapshotCodec': createStorageContractGuide({
+  'storage-host:authoring-codec:snapshotCodec': createStorageContractGuide({
     purposeEn:
-      'Reads a codec descriptor once, validates its non-empty name, output channel, encode, and decode functions, then returns the captured surface. Throwing accessors and malformed descriptors become INVALID_ARGUMENT with their cause retained.',
+      'Validates and returns the original codec instance so class-private methods retain their receiver. It performs no conversion, descriptor clone or freezing.',
     purposeZh:
-      '一次读取 codec descriptor，验证非空 name、output channel、encode 与 decode function，再返回 captured surface。throwing accessor 与 malformed descriptor 会成为 INVALID_ARGUMENT，并保留 cause。',
-    quickStart: `import { snapshotCodec } from '@migaia/storage-contract'\n\nconst candidateCodec = { name: 'json', output: 'text' as const, encode: async (value: unknown) => JSON.stringify(value), decode: async (text: string) => JSON.parse(text) }\nconst value = { id: 1, name: 'Ada' }\nconst stableCodec = snapshotCodec(candidateCodec)\nconst encoded = await stableCodec.encode(value)\nconsole.log(encoded)`,
+      '校验后返回同一 codec 实例，使合法 class 的方法保留原 receiver；不执行转换、不复制 descriptor、不冻结。',
+    quickStart: storageHostInputExamples.snapshotCodec,
     scenariosEn: [
+      'A codec class uses private fields and its original instance must remain the method receiver.',
       'A codec crosses a plugin or configuration boundary.',
-      'Routing by output must not reread mutable getters.',
       'Encoding and decoding must use one admitted descriptor.'
     ],
     scenariosZh: [
+      '编解码器类使用私有字段，需要保留原实例作为方法接收者。',
       'codec 穿过 plugin 或 configuration boundary。',
-      '按 output routing 时不得重复读取 mutable getter。',
       'encode 与 decode 必须使用同一个 admitted descriptor。'
     ],
     avoidEn: [
@@ -11084,9 +10197,9 @@ try {
   }),
   'storage-contract:index:assertCodec': createStorageContractGuide({
     purposeEn:
-      'Assertion form of the shared codec contract. It narrows an unknown value to ICodec while preserving the same one-read validation and INVALID_ARGUMENT semantics as snapshotCodec.',
+      'Pure assertion form of the shared codec contract. It narrows an unknown value to ICodec without copying or executing the original codec; invalid ordinary shapes retain INVALID_ARGUMENT.',
     purposeZh:
-      'shared codec contract 的 assertion 形式。它把 unknown value 收窄为 ICodec，并保持与 snapshotCodec 相同的 one-read validation 与 INVALID_ARGUMENT semantics。',
+      'shared codec contract 的纯 assertion 形式；把 unknown 收窄为 ICodec，不复制或执行原 codec，普通无效 shape 保留 INVALID_ARGUMENT。',
     quickStart: `import { assertCodec } from '@migaia/storage-contract'\n\nconst options = { codec: { name: 'json', output: 'text', encode: JSON.stringify, decode: JSON.parse } }\nconst installCodec = (codec: typeof options.codec) => console.log('installed', codec.name)\nassertCodec(options.codec)\ninstallCodec(options.codec) // 先验证 descriptor，再把 codec 交给注册流程`,
     scenariosEn: [
       'A public API only needs entry validation.',
@@ -11131,60 +10244,31 @@ try {
       }
     ]
   }),
-  'storage-contract:index:collectionsJsonCodec': createStorageContractGuide({
+  'storage-host:authoring-codec:fromValueCodec': createStorageContractGuide({
     purposeEn:
-      'Versioned text codec that preserves genuine Map and Set instances through JSON while leaving ordinary JSON values unchanged. It emits exact tagged tuples and only revives those exact tuples; malformed roots and payloads retain parser failures under INVALID_ARGUMENT.',
+      'Adapt a value codec into the storage codec contract once. The adapter preserves each callback input/output, names the format id@version and maps string/binary/unknown carriers to text/binary/structured. Failures retain the original serialize error on cause.',
     purposeZh:
-      'versioned text codec：通过 JSON 保留 genuine Map/Set instance，同时不改变普通 JSON value。它只生成并恢复精确 tagged tuple；malformed root 与 payload 会在 INVALID_ARGUMENT 下保留 parser failure。',
-    quickStart: `import { collectionsJsonCodec } from '@migaia/storage-contract'\n\nconst text = await collectionsJsonCodec.encode({ roles: new Set(['admin']) })\nconst restored = (await collectionsJsonCodec.decode(text)) as { roles: Set<string> }\nconsole.log(restored.roles instanceof Set)`,
+      '将值编解码器一次适配为存储契约。适配器保留真实输入输出，以 id@version 命名，并将 string/uint8array/unknown 载体映射为 text/binary/structured；失败在 cause 保留原 serialize 错误。',
+    quickStart:
+      "import { fromValueCodec } from '@migaia/storage-host/authoring/codec'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\n\nconst codec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\nconst text = await codec.encode({ roles: new Set(['admin']) })\nconsole.log(await codec.decode(text))",
     scenariosEn: [
-      'Persisting JSON-compatible state containing Map or Set.',
-      'A stable text wire format is required.',
-      'Legacy plain JSON must remain readable.'
+      'Use a serialize codec with storage.',
+      'Preserve Map/Set with the collections codec.',
+      'Compose tagged readers without losing their legacy input type.'
     ],
     scenariosZh: [
-      '持久化包含 Map 或 Set 的 JSON-compatible state。',
-      '需要稳定 text wire format。',
-      'legacy plain JSON 必须保持 readable。'
+      '将 serialize codec 接入存储。',
+      '通过集合 codec 保留 Map/Set。',
+      '组合 tagged 读取器并保留旧格式输入类型。'
     ],
     avoidEn: [
-      'Values contain cycles, functions, or host objects.',
-      'Binary size or throughput is the primary requirement.',
-      'Domain schema validation or encryption is required.'
+      'Cross-store transactions.',
+      'Domain schema validation.',
+      'Creating a second migration or codec registry.'
     ],
-    avoidZh: [
-      'value 包含 cycle、function 或 host object。',
-      'binary size 或 throughput 是首要需求。',
-      '需要 domain schema validation 或 encryption。'
-    ]
+    avoidZh: ['跨 store 事务。', '业务 schema 校验。', '另建迁移或 codec 注册表。']
   }),
-  'storage-contract:index:COLLECTIONS_JSON_CODEC_NAME': createStorageContractGuide({
-    purposeEn:
-      'Stable wire identifier migaia-collections-json-v1 used by collectionsJsonCodec and its exact Map/Set tuples. Consumers may compare it for diagnostics or registry selection but must not synthesize tagged payloads manually.',
-    purposeZh:
-      'collectionsJsonCodec 及其精确 Map/Set tuple 使用的稳定 wire identifier：migaia-collections-json-v1。consumer 可用于 diagnostic 或 registry selection，但不应手工合成 tagged payload。',
-    quickStart: `import { COLLECTIONS_JSON_CODEC_NAME, collectionsJsonCodec } from '@migaia/storage-contract'\n\nconst codecRegistry = new Map<string, unknown>()\ncodecRegistry.set(COLLECTIONS_JSON_CODEC_NAME, collectionsJsonCodec)\nconsole.log(codecRegistry.get(COLLECTIONS_JSON_CODEC_NAME))`,
-    scenariosEn: [
-      'Registering the canonical codec.',
-      'Displaying persisted-format diagnostics.',
-      'Asserting wire compatibility in tests.'
-    ],
-    scenariosZh: [
-      '注册 canonical codec。',
-      '展示 persisted-format diagnostic。',
-      '在测试中断言 wire compatibility。'
-    ],
-    avoidEn: [
-      'Creating a second codec with the same name.',
-      'Using the identifier as a storage key.',
-      'Hand-authoring collection wire tuples.'
-    ],
-    avoidZh: [
-      '创建同名的第二个 codec。',
-      '把 identifier 当作 storage key。',
-      '手工编写 collection wire tuple。'
-    ]
-  }),
+
   'storage-contract:index:ConflictPolicy': createStorageContractGuide({
     purposeEn:
       'Canonical runtime values for write conflict behavior. conflict rejects an incompatible existing revision; replace explicitly permits overwrite. Use the constant instead of copying protocol strings.',
@@ -11242,16 +10326,12 @@ await records.putRecord({ id: 1 }, 'user:1', { conflictPolicy: ConflictPolicy.co
       '继续增加 alias。'
     ]
   }),
-  'storage-contract:index:intrinsicConstructorName': createStorageContractGuide({
+  'storage-host:authoring-backend:intrinsicConstructorName': createStorageContractGuide({
     purposeEn:
-      'Best-effort diagnostic helper that reads an object prototype constructor name and returns undefined when access fails. Because prototype, constructor, and name are mutable, the result must never drive security, protocol, or capability decisions.',
-    purposeZh:
-      'best-effort diagnostic helper：读取 object prototype constructor name，访问失败时返回 undefined。由于 prototype、constructor 与 name 都可 mutation，该结果绝不能驱动 security、protocol 或 capability decision。',
-    quickStart: `import { intrinsicConstructorName } from '@migaia/storage-contract'
-
-const value: unknown = new Uint8Array([1, 2, 3])
-const diagnostic = { receivedType: intrinsicConstructorName(value) ?? typeof value }
-console.log(diagnostic) // 仅用于诊断，不参与协议或权限判断`,
+      'Reads ordinary prototype constructor metadata for diagnostics. The mutable name must never select a protocol or grant a capability.',
+    purposeZh: '读取普通 prototype constructor 元数据作诊断；可变名称不能选择协议或授予能力。',
+    quickStart:
+      "import { intrinsicConstructorName } from '@migaia/storage-host/authoring/backend'\n\nconst value: unknown = new Uint8Array([1, 2, 3])\nconst diagnostic = { receivedType: intrinsicConstructorName(value) ?? typeof value }\nconsole.log(diagnostic) // 仅用于诊断，不参与协议或权限判断",
     scenariosEn: [
       'Improving an invalid-value diagnostic.',
       'Logging an unexpected cross-realm object.',
@@ -11485,20 +10565,21 @@ console.log(diagnostic) // 仅用于诊断，不参与协议或权限判断`,
       }
     ]
   }),
-  'storage-contract:index:snapshotOperationContext': createStorageContractGuide({
+  'storage-host:authoring-context:snapshotOperationContext': createStorageContractGuide({
     purposeEn:
-      'Reads cancellation, timeout, page size, and conflict policy once, validates their bounds, and freezes a reusable operation snapshot. Reusing a snapshot does not touch caller getters again.',
+      'Captures scalar operation choices before native asynchronous work while borrowing the original live signal. Results are ordinary records without repeated-call identity or accessor-read guarantees.',
     purposeZh:
-      '一次读取 cancellation、timeout、page size 与 conflict policy，验证边界并冻结可复用 operation snapshot。再次传入该 snapshot 时不会重复访问 caller getter。',
-    quickStart: `import { snapshotOperationContext } from '@migaia/storage-contract'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst storage = memoryStorageHost()\nconst ctx = snapshotOperationContext({ timeoutMs: 2_000, pageSize: 128 })\nconsole.log(await storage.keys(ctx))\nawait storage.dispose()`,
+      '在原生异步工作前保存标量操作意图，借用同一 live signal；结果为普通记录，不承诺重复调用身份或属性读取次数。',
+    quickStart:
+      "import { snapshotOperationContext } from '@migaia/storage-host/authoring/context'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst storage = host.backend('memory')\nconst ctx = snapshotOperationContext({ timeoutMs: 2_000, pageSize: 128 })\nconsole.log(await storage.keys(ctx))\nawait host.dispose()",
     scenariosEn: [
+      'A caller may change page size or timeout options while a queued operation awaits execution.',
       'An asynchronous operation crosses several internal layers.',
-      'Hostile or mutable option getters must be observed once.',
       'Pagination and cancellation need one validated context.'
     ],
     scenariosZh: [
+      '操作排队等待期间，调用方可能修改分页数量或超时选项。',
       'asynchronous operation 会穿过多个内部 layer。',
-      'hostile 或 mutable option getter 必须只观察一次。',
       'pagination 与 cancellation 需要同一个 validated context。'
     ],
     avoidEn: [
@@ -11582,9 +10663,9 @@ console.log(diagnostic) // 仅用于诊断，不参与协议或权限判断`,
   }),
   'storage-contract:index:assertOperationContext': createStorageContractGuide({
     purposeEn:
-      'Validates the asynchronous operation context without returning its snapshot. Invalid signals, timeouts, page sizes, policies, or throwing accessors become INVALID_ARGUMENT with the original cause retained.',
+      'Validates ordinary asynchronous context fields without allocating a snapshot, timer or subscription. Invalid signal shapes, timeouts, page sizes and policies retain INVALID_ARGUMENT.',
     purposeZh:
-      '验证 asynchronous operation context，但不返回 snapshot。无效 signal、timeout、page size、policy 或 throwing accessor 会成为 INVALID_ARGUMENT，并保留 original cause。',
+      '纯校验普通 asynchronous context 字段，不分配 snapshot、timer 或 subscription；无效 signal shape、timeout、page size 与 policy 保留 INVALID_ARGUMENT。',
     quickStart: `import { assertOperationContext } from '@migaia/storage-contract'\n\nconst options = { signal: undefined, timeoutMs: 2_000, pageSize: 50 }\nconst runBackendOperation = (context: typeof options) => ({ acceptedTimeout: context.timeoutMs })\nassertOperationContext(options)\nconst result = runBackendOperation(options)\nconsole.log(result) // { acceptedTimeout: 2000 }：资源分配前先拒绝无效上下文`,
     scenariosEn: [
       'A public method validates before allocating backend resources.',
@@ -11627,12 +10708,12 @@ console.log(diagnostic) // 仅用于诊断，不参与协议或权限判断`,
       }
     ]
   }),
-  'storage-contract:index:snapshotSyncWriteOptions': createStorageContractGuide({
+  'storage-host:authoring-context:snapshotSyncWriteOptions': createStorageContractGuide({
     purposeEn:
       'Validates the reduced synchronous-write contract and returns only conflictPolicy. signal and timeoutMs are rejected because a synchronous channel cannot honor cancellation after execution begins.',
     purposeZh:
       '验证精简的 synchronous-write contract，并只返回 conflictPolicy。signal 与 timeoutMs 会被拒绝，因为同步通道在执行开始后无法兑现 cancellation。',
-    quickStart: `import { ConflictPolicy, snapshotSyncWriteOptions } from '@migaia/storage-contract'\n\nconst options = snapshotSyncWriteOptions({ conflictPolicy: ConflictPolicy.replace })\nconst storage = { sync: { set: (key: string, value: string, writeOptions: unknown) => console.log(key, value, writeOptions) } }\nstorage.sync.set('theme', 'dark', options)`,
+    quickStart: storageHostInputExamples.snapshotSyncWriteOptions,
     scenariosEn: [
       'A synchronous adapter snapshots write policy.',
       'One validation path is shared by local, session, cookie, and memory stores.',
@@ -11887,12 +10968,13 @@ console.log(diagnostic) // 仅用于诊断，不参与协议或权限判断`,
       }
     ]
   }),
-  'storage-contract:index:snapshotStorageKey': createStorageContractGuide({
+  'storage-host:authoring-key:snapshotStorageKey': createStorageContractGuide({
     purposeEn:
       'Validates and detaches a structured key so later asynchronous work cannot observe caller mutation. Compound arrays and Dates are copied; ArrayBuffers are normalized through the cross-realm key classifier.',
     purposeZh:
       '验证并 detach structured key，使后续 asynchronous work 无法观察 caller mutation。compound array 与 Date 会复制；ArrayBuffer 通过 cross-realm key classifier 规范化。',
-    quickStart: `import { snapshotStorageKey } from '@migaia/storage-contract'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst storage = memoryStorageHost()\nconst records = storage\nconst tenantId = 'tenant-42'\nconst cursor = new Date('2026-01-01')\nconst stableKey = snapshotStorageKey([tenantId, cursor], storage.backend)\nqueueMicrotask(async () => console.log(await records.getRecord(stableKey)))\nawait storage.dispose()`,
+    quickStart:
+      "import { snapshotStorageKey } from '@migaia/storage-host/authoring/key'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst storage = host.backend('memory')\nconst records = storage\nconst tenantId = 'tenant-42'\nconst cursor = new Date('2026-01-01')\nconst stableKey = snapshotStorageKey([tenantId, cursor], storage.backend)\nconsole.log(await records.getRecord(stableKey))\nawait host.dispose()",
     scenariosEn: [
       'A key crosses an async scheduling boundary.',
       'Caller-owned compound arrays may mutate.',
@@ -11970,12 +11052,13 @@ console.log(diagnostic) // 仅用于诊断，不参与协议或权限判断`,
       }
     ]
   }),
-  'storage-contract:index:compareStorageKeys': createStorageContractGuide({
+  'storage-host:authoring-key:compareStorageKeys': createStorageContractGuide({
     purposeEn:
       'Provides the canonical total ordering for valid storage keys: number, Date, string, ArrayBuffer, then compound array, with lexicographic comparison inside each domain. It matches validation and cross-realm classification.',
     purposeZh:
       '提供 valid storage key 的 canonical total ordering：number、Date、string、ArrayBuffer、compound array；每个 domain 内按 lexicographic rule 比较，并与 validation/cross-realm classification 一致。',
-    quickStart: `import { compareStorageKeys } from '@migaia/storage-contract'\n\nconst keys = ['b', 2, 'a']\nconst ordered = keys.toSorted(compareStorageKeys)\nconst first = ordered.at(0)\nconsole.log(first) // 按 storage key 规范取得稳定的第一个 key`,
+    quickStart:
+      "import { compareStorageKeys } from '@migaia/storage-host/authoring/key'\n\nconst keys = ['b', 2, 'a']\nconst ordered = keys.toSorted(compareStorageKeys)\nconst first = ordered.at(0)\nconsole.log(first) // 按 storage key 规范取得稳定的第一个 key",
     scenariosEn: [
       'Producing deterministic snapshots.',
       'Sorting mixed valid key domains.',
@@ -12198,12 +11281,13 @@ console.log(diagnostic) // 仅用于诊断，不参与协议或权限判断`,
       }
     ]
   }),
-  'storage-contract:index:snapshotStorageCapabilities': createStorageContractGuide({
+  'storage-host:authoring-store:snapshotStorageCapabilities': createStorageContractGuide({
     purposeEn:
-      'Reads a backend capability descriptor exactly once and returns a detached fact object. Invalid shapes and hostile getters produce undefined instead of escaping an exception, so feature routing can fail closed.',
+      'Validates and detaches scalar capability facts for deferred host admission. Legacy secondary-index and change-feed omissions normalize to false.',
     purposeZh:
-      '只读取一次 backend capability descriptor，并返回独立的事实对象。无效 shape 或 hostile getter 返回 undefined，不让异常逃逸，使 feature routing 可以 fail closed。',
-    quickStart: `import { snapshotStorageCapabilities } from '@migaia/storage-contract'\n\nconst candidate = { capabilities: { transactions: true, records: true } }\nconst useNonTransactionalPath = () => console.log('fallback path')\nconst capabilities = snapshotStorageCapabilities(candidate.capabilities)\nif (!capabilities?.transactions) useNonTransactionalPath()\nelse console.log('transaction path')`,
+      '为异步宿主准入校验并分离标量能力事实；旧 secondary-index 与 change-feed 省略形状补 false。',
+    quickStart:
+      "import { snapshotStorageCapabilities } from '@migaia/storage-host/authoring/store'\n\nconst candidate = { capabilities: { transactions: true, records: true } }\nconst useNonTransactionalPath = () => console.log('fallback path')\nconst capabilities = snapshotStorageCapabilities(candidate.capabilities)\nif (!capabilities?.transactions) useNonTransactionalPath()\nelse console.log('transaction path')",
     scenariosEn: [
       'Routing work before touching an optional backend channel.',
       'Admitting a plugin-supplied capability object.',
@@ -12297,20 +11381,21 @@ console.log(diagnostic) // 仅用于诊断，不参与协议或权限判断`,
       }
     ]
   }),
-  'storage-contract:index:snapshotKeyValueStoreDetailed': createStorageContractGuide({
+  'storage-host:authoring-store:snapshotKeyValueStoreDetailed': createStorageContractGuide({
     purposeEn:
-      'Performs one-read admission for the complete base key-value store surface. Success returns the store, normalized backend and capabilities, plus the original dispose function and receiver; failure retains an accessor cause when one exists.',
+      'Checks the original KV shape and retains its resource receiver plus detached capability facts for later host admission. Ordinary invalid shapes return a failed admission record.',
     purposeZh:
-      '对完整 base key-value store surface 执行 one-read admission。成功时返回 store、normalized backend/capabilities，以及原始 dispose function 与 receiver；失败时保留可用的 accessor cause。',
-    quickStart: `import { snapshotKeyValueStoreDetailed } from '@migaia/storage-contract'\n\nexport async function closeCandidate(candidate: unknown): Promise<void> {\n  const admission = snapshotKeyValueStoreDetailed(candidate)\n  if (!admission.valid) throw new Error('Store admission failed', { cause: admission.cause })\n  await admission.dispose()\n}`,
+      '检查原 KV shape，保存原资源 receiver 与独立能力事实供后续宿主准入；普通无效形状返回失败记录。',
+    quickStart:
+      "import { snapshotKeyValueStoreDetailed } from '@migaia/storage-host/authoring/store'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\ntry {\n  const admission = snapshotKeyValueStoreDetailed(host.backend('memory'))\n  if (admission.valid) console.log(await admission.store.keys())\n  else console.log(admission.cause)\n} finally {\n  await host.dispose()\n}",
     scenariosEn: [
-      'A lifecycle owner must capture callable identity once.',
-      'A failed hostile getter must remain diagnosable.',
+      'A failed store check must return structured admission details before resource registration.',
+      'A lifecycle owner checks the original store before accepting responsibility for it.',
       'Installation must validate before registering cleanup.'
     ],
     scenariosZh: [
-      'lifecycle owner 必须一次捕获 callable identity。',
-      'hostile getter failure 必须保持可诊断。',
+      '登记资源前，需要取得存储检查失败的具体结果。',
+      '生命周期管理代码先检查原存储，再接受清理责任。',
       'installation 必须在注册 cleanup 前完成验证。'
     ],
     avoidEn: [
@@ -12347,12 +11432,12 @@ console.log(diagnostic) // 仅用于诊断，不参与协议或权限判断`,
       }
     ]
   }),
-  'storage-contract:index:snapshotKeyValueStore': createStorageContractGuide({
+  'storage-host:authoring-store:snapshotKeyValueStore': createStorageContractGuide({
     purposeEn:
-      'Returns a stable base-store snapshot containing the admitted store, backend kind, and capability facts. It avoids re-reading public accessors while composing higher-level capability checks.',
-    purposeZh:
-      '返回包含 admitted store、backend kind 与 capability facts 的稳定 base-store snapshot。在组合高阶 capability check 时避免重复读取 public accessor。',
-    quickStart: `import { snapshotKeyValueStore } from '@migaia/storage-contract'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst candidate = memoryStorageHost()\nconst snapshot = snapshotKeyValueStore(candidate)\nif (snapshot) console.log(snapshot.backend, snapshot.store)\nawait candidate.dispose()`,
+      'Retains the original admitted KV object and an independent capability descriptor before deferred host routing.',
+    purposeZh: '在宿主异步路由前保留准入后的原 KV 对象及独立能力说明。',
+    quickStart:
+      "import { snapshotKeyValueStore } from '@migaia/storage-host/authoring/store'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst candidate = host.backend('memory')\nconst snapshot = snapshotKeyValueStore(candidate)\nif (snapshot) console.log(snapshot.backend, snapshot.store)\nawait host.dispose()",
     scenariosEn: [
       'Composing a change-feed or adapter guard.',
       'Selecting a backend path after a single admission.',
@@ -12396,12 +11481,12 @@ console.log(diagnostic) // 仅用于诊断，不参与协议或权限判断`,
       }
     ]
   }),
-  'storage-contract:index:snapshotRecordStore': createStorageContractGuide({
+  'storage-host:authoring-store:snapshotRecordStore': createStorageContractGuide({
     purposeEn:
-      'Admits the complete structured-record surface and requires records, binary, transactions, and iteration capabilities together. The snapshot is the safe starting point for record and secondary-index composition.',
-    purposeZh:
-      '接纳完整 structured-record surface，并同时要求 records、binary、transactions 与 iteration capability。该 snapshot 是组合 record 与 secondary-index 能力的安全起点。',
-    quickStart: `import { snapshotRecordStore } from '@migaia/storage-contract'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\ntype User = { id: number; name: string }\nconst candidate = memoryStorageHost<User>()\nawait candidate.putRecord({ id: 1, name: 'Ada' }, 1)\nconst snapshot = snapshotRecordStore<User>(candidate)\nif (snapshot) console.log(await snapshot.store.getRecord(1))\nawait candidate.dispose()`,
+      'Admits the complete structured-record surface and retains the original provider with independent capability facts for deferred consumption.',
+    purposeZh: '检查完整结构化记录接口，为异步消费保留原 provider 与独立能力事实。',
+    quickStart:
+      "import { snapshotRecordStore } from '@migaia/storage-host/authoring/store'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\ntype User = { id: number; name: string }\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst candidate = host.backend('memory')\nawait candidate.putRecord({ id: 1, name: 'Ada' }, 1)\nconst snapshot = snapshotRecordStore<User>(candidate)\nif (snapshot) console.log(await snapshot.store.getRecord(1))\nawait host.dispose()",
     scenariosEn: [
       'An adapter requires all L1 record operations.',
       'A secondary-index guard needs an admitted record base.',
@@ -12499,7 +11584,7 @@ console.log(diagnostic) // 仅用于诊断，不参与协议或权限判断`,
       'Requires a base store to expose the complete structured-record contract and returns it narrowed as IRecordStore. Incomplete capability flags or methods throw UNSUPPORTED before record work begins.',
     purposeZh:
       '要求 base store 暴露完整 structured-record contract，并将其收窄为 IRecordStore。capability flag 或 method 不完整时，在 record work 开始前抛出 UNSUPPORTED。',
-    quickStart: `import { asRecordStore } from '@migaia/storage-contract'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\ntype User = { id: string; name: string }\nconst storage = memoryStorageHost<User>()\nconst records = asRecordStore<User>(storage)\nawait records.putRecord({ id: 'user-42', name: 'Ada' }, 'user-42')\nconsole.log(await records.getRecord('user-42'))\nawait storage.dispose()`,
+    quickStart: `import { asRecordStore } from '@migaia/storage-contract'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\ntype User = { id: string; name: string }\nconst host = await createStorageHost({ plugins: [memoryBackendPlugin()] })\nconst storage = host.backend('memory')\nconst records = asRecordStore<User>(storage)\nawait records.putRecord({ id: 'user-42', name: 'Ada' }, 'user-42')\nconsole.log(await records.getRecord('user-42'))\nawait host.dispose()`,
     scenariosEn: [
       'Record support is mandatory for the requested feature.',
       'A public API should fail early instead of branching repeatedly.',
@@ -12709,7 +11794,8 @@ export async function readByEmail(
       'Requires a base store to declare changeFeed and expose subscribeChanges, then narrows it to the post-commit invalidation channel. Missing support throws UNSUPPORTED before listener registration.',
     purposeZh:
       '要求 base store 声明 changeFeed 并暴露 subscribeChanges，再收窄为 post-commit invalidation channel。缺少支持时会在注册 listener 前抛出 UNSUPPORTED。',
-    quickStart: `import { memoryStorageHost } from '@migaia/storage-web/memory'\nimport { asChangeFeedStore } from '@migaia/storage-contract'\n\nconst storage = memoryStorageHost()\nconst changes = asChangeFeedStore(storage)\nconst invalidate = (keys: readonly unknown[] | undefined) => console.log('invalidate:', keys ?? 'all')\nconst unsubscribe = changes.subscribeChanges((change) => invalidate(change.keys))\ntry {\n  await storage.set('theme', 'dark')\n} finally {\n  unsubscribe()\n  await storage.dispose()\n}`,
+    quickStart:
+      "import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { asChangeFeedStore } from '@migaia/storage-contract'\n\nconst host = await createStorageHost({\n  plugins: [\n    memoryBackendPlugin(undefined, { notifications: memoryNotificationsFeature() }),\n  ],\n})\nconst storage = host.backend('memory')\nconst changes = asChangeFeedStore(storage)\nconst invalidate = (keys: readonly unknown[] | undefined) =>\n  console.log('invalidate:', keys ?? 'all')\nconst unsubscribe = changes.subscribeChanges((change) => invalidate(change.keys))\ntry {\n  await storage.set('theme', 'dark')\n} finally {\n  unsubscribe()\n  await host.dispose()\n}",
     scenariosEn: [
       'A cache must observe committed external writes.',
       'Cross-context invalidation is mandatory.',
@@ -12758,7 +11844,8 @@ export async function readByEmail(
       'Boolean guard for post-commit change notifications. It first admits the full base store, then requires changeFeed === true and a callable subscribeChanges method.',
     purposeZh:
       'post-commit change notification 的 boolean guard。先接纳完整 base store，再要求 changeFeed === true 且 subscribeChanges callable。',
-    quickStart: `import { isChangeFeedStore } from '@migaia/storage-contract'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst storage = memoryStorageHost()\nconst refreshCache = (change: unknown) => console.log('refresh cache:', change)\nconst unsubscribe = isChangeFeedStore(storage)\n  ? storage.subscribeChanges(refreshCache)\n  : undefined\ntry {\n  console.log(Boolean(unsubscribe))\n} finally {\n  unsubscribe?.()\n  await storage.dispose()\n}`,
+    quickStart:
+      "import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'\nimport { isChangeFeedStore } from '@migaia/storage-contract'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst host = await createStorageHost({\n  plugins: [\n    memoryBackendPlugin(undefined, { notifications: memoryNotificationsFeature() }),\n  ],\n})\nconst storage = host.backend('memory')\nconst refreshCache = (change: unknown) => console.log('refresh cache:', change)\nconst unsubscribe = isChangeFeedStore(storage)\n  ? storage.subscribeChanges(refreshCache)\n  : undefined\ntry {\n  console.log(Boolean(unsubscribe))\n} finally {\n  unsubscribe?.()\n  await host.dispose()\n}",
     scenariosEn: [
       'Selecting subscription or polling.',
       'Displaying whether live invalidation is available.',
@@ -12802,11 +11889,44 @@ export async function readByEmail(
       }
     ]
   }),
+  'store-persist:index:persistTransaction': {
+    en: {
+      purpose:
+        'Drain authentic handles on one complete backend store, then commit their snapshots with entity, text and byte writes in its original transaction. Client Store state in application memory does not roll back. Native backend writes roll back on failure; normal mirroring resumes after settlement.',
+      quickStart:
+        "import { createStore } from '@migaia/store-light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { persistTransaction } from '@migaia/store-persist'\nimport { persist } from '@migaia/store-persist/light'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst settings = createStore({ count: 0 })\nconst handle = persist(settings, { key: 'settings', storage })\nawait handle.ready\ntry {\n  await persistTransaction(storage, [handle], async (tx) => {\n    settings.count = 1\n    await handle.flush(tx)\n    await tx.set('settings-source', 'user', { conflictPolicy: 'replace' })\n  })\n} finally {\n  await handle.disposeAsync()\n  await settings.$dispose()\n}",
+      scenarios: [
+        'A form snapshot and related storage writes must commit together.',
+        'Concrete backend scope extensions and transaction options must remain available.'
+      ],
+      avoidWhen: [
+        'The adapter is text-only or handles belong to different stores.',
+        'IndexedDB callback waits for external I/O; load that data before starting.'
+      ],
+      options: []
+    },
+    zh: {
+      purpose:
+        '排空同一完整后端存储上的真实句柄，在其原始事务中共同提交快照、实体、文本与字节。应用内存中的客户端 Store 状态不回滚；原生后端写入在失败时回滚，结算后恢复普通镜像写入。',
+      quickStart:
+        "import { createStore } from '@migaia/store-light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { persistTransaction } from '@migaia/store-persist'\nimport { persist } from '@migaia/store-persist/light'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst settings = createStore({ count: 0 })\nconst handle = persist(settings, { key: 'settings', storage })\nawait handle.ready\ntry {\n  await persistTransaction(storage, [handle], async (tx) => {\n    settings.count = 1\n    await handle.flush(tx)\n    await tx.set('settings-source', 'user', { conflictPolicy: 'replace' })\n  })\n} finally {\n  await handle.disposeAsync()\n  await settings.$dispose()\n}",
+      scenarios: [
+        '表单快照与相关存储写入必须共同提交。',
+        '需要保留具体后端 scope 扩展与事务选项。'
+      ],
+      avoidWhen: [
+        '适配器只提供文本或句柄来自不同 store。',
+        'IndexedDB 回调等待外部 I/O；应在开始前读取外部数据。'
+      ],
+      options: []
+    }
+  },
   'store-persist:index:persistUnit': {
     en: {
       purpose:
         'Attaches one persistence state machine to any synchronous unit adapter. It owns hydration, version migration, startup-write reconciliation, debounced serialized writes, retry/flush/clear, and abort-on-dispose in one shared implementation.',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\nimport { persistUnit, type IPersistUnit } from '@migaia/store-persist'\n\ntype ISettings = { theme: string; fontSize: number }\nconst runtime = createRuntime()\nconst storage = memoryStorageHost()\nlet settings: ISettings = { theme: 'light', fontSize: 14 }\nconst listeners = new Set<() => void>()\n// 任意状态源只要提供 snapshot/restore/subscribe 就能接入 persistUnit。\nconst unit: IPersistUnit<ISettings> = {\n  snapshot: () => settings,\n  restore: (next) => { settings = next },\n  subscribe: (onChange) => { listeners.add(onChange); return () => listeners.delete(onChange) }\n}\nconst migrateSettings = (persisted: ISettings, fromVersion: number) => (fromVersion < 2 ? { ...persisted, fontSize: 14 } : persisted)\nconst selectPersistedSettings = (state: ISettings) => ({ theme: state.theme })\nconst handle = persistUnit(unit, {\n  key: 'settings:v2', runtime, storage, version: 2,\n  migrate: migrateSettings, partialize: selectPersistedSettings,\n  debounceMs: 250\n})\ntry {\n  await handle.ready\n  await handle.flush()\n} finally {\n  handle.dispose()\n}`,
+      quickStart:
+        "import { createRuntime } from '@migaia/reactive'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { persistUnit, type IPersistUnit } from '@migaia/store-persist'\n\ntype ISettings = { theme: string; fontSize: number }\nconst runtime = createRuntime()\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nlet settings: ISettings = { theme: 'light', fontSize: 14 }\nconst listeners = new Set<() => void>()\n// 任意状态源只要提供 snapshot/restore/subscribe 就能接入 persistUnit。\nconst unit: IPersistUnit<ISettings> = {\n  snapshot: () => settings,\n  restore: (next) => { settings = next },\n  subscribe: (onChange) => { listeners.add(onChange); return () => listeners.delete(onChange) }\n}\nconst migrateSettings = (persisted: ISettings, fromVersion: number) => (fromVersion < 2 ? { ...persisted, fontSize: 14 } : persisted)\nconst selectPersistedSettings = (state: ISettings) => ({ theme: state.theme })\nconst handle = persistUnit(unit, {\n  key: 'settings:v2', runtime, storage, version: 2,\n  migrations: { 2: (saved, ctx) => migrateSettings(saved as ISettings, ctx.fromVersion) }, partialize: selectPersistedSettings,\n  debounceMs: 250\n})\ntry {\n  await handle.ready\n  await handle.flush()\n} finally {\n  handle.dispose()\n}",
       scenarios: [
         'A custom state owner can synchronously snapshot, restore, and subscribe.',
         'Hydration and writes need one observable lifecycle handle.',
@@ -12822,7 +11942,8 @@ export async function readByEmail(
     zh: {
       purpose:
         '给任意同步 unit adapter 接入一套 persistence state machine。统一拥有 hydration、version migration、startup-write reconciliation、debounced serialized write、retry/flush/clear 与 dispose abort。',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\nimport { persistUnit, type IPersistUnit } from '@migaia/store-persist'\n\ntype ISettings = { theme: string; fontSize: number }\nconst runtime = createRuntime()\nconst storage = memoryStorageHost()\nlet settings: ISettings = { theme: 'light', fontSize: 14 }\nconst listeners = new Set<() => void>()\n// 任意状态源只要提供 snapshot/restore/subscribe 就能接入 persistUnit。\nconst unit: IPersistUnit<ISettings> = {\n  snapshot: () => settings,\n  restore: (next) => { settings = next },\n  subscribe: (onChange) => { listeners.add(onChange); return () => listeners.delete(onChange) }\n}\nconst migrateSettings = (persisted: ISettings, fromVersion: number) => (fromVersion < 2 ? { ...persisted, fontSize: 14 } : persisted)\nconst selectPersistedSettings = (state: ISettings) => ({ theme: state.theme })\nconst handle = persistUnit(unit, {\n  key: 'settings:v2', runtime, storage, version: 2,\n  migrate: migrateSettings, partialize: selectPersistedSettings,\n  debounceMs: 250\n})\ntry {\n  await handle.ready\n  await handle.flush()\n} finally {\n  handle.dispose()\n}`,
+      quickStart:
+        "import { createRuntime } from '@migaia/reactive'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { persistUnit, type IPersistUnit } from '@migaia/store-persist'\n\ntype ISettings = { theme: string; fontSize: number }\nconst runtime = createRuntime()\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nlet settings: ISettings = { theme: 'light', fontSize: 14 }\nconst listeners = new Set<() => void>()\n// 任意状态源只要提供 snapshot/restore/subscribe 就能接入 persistUnit。\nconst unit: IPersistUnit<ISettings> = {\n  snapshot: () => settings,\n  restore: (next) => { settings = next },\n  subscribe: (onChange) => { listeners.add(onChange); return () => listeners.delete(onChange) }\n}\nconst migrateSettings = (persisted: ISettings, fromVersion: number) => (fromVersion < 2 ? { ...persisted, fontSize: 14 } : persisted)\nconst selectPersistedSettings = (state: ISettings) => ({ theme: state.theme })\nconst handle = persistUnit(unit, {\n  key: 'settings:v2', runtime, storage, version: 2,\n  migrations: { 2: (saved, ctx) => migrateSettings(saved as ISettings, ctx.fromVersion) }, partialize: selectPersistedSettings,\n  debounceMs: 250\n})\ntry {\n  await handle.ready\n  await handle.flush()\n} finally {\n  handle.dispose()\n}",
       scenarios: [
         'custom state owner 能同步 snapshot、restore 与 subscribe。',
         'hydration/write 需要一个可观察 lifecycle handle。',
@@ -12839,7 +11960,7 @@ export async function readByEmail(
   'store-persist:index:defaultJsonCodec': {
     en: {
       purpose:
-        'Provides the default text codec for persistence envelopes. It round-trips Map and Set through the canonical collections JSON codec and reads only the two exact legacy collection tags.',
+        'Provides the default text codec for persistence envelopes. It composes fromValueCodec and defineCollectionsJsonCodec, preserves Map/Set by default, rejects invalid portable values, and treats historical markers/tuples as ordinary data.',
       quickStart: `import { defaultJsonCodec } from '@migaia/store-persist'\n\nconst state = { theme: 'dark' }\nconst encoded = await defaultJsonCodec.encode({ version: 1, state })\nconst envelope = await defaultJsonCodec.decode(encoded)\nconsole.log(envelope)`,
       scenarios: [
         'Persisted state is JSON-compatible plus Map or Set.',
@@ -12855,12 +11976,12 @@ export async function readByEmail(
     },
     zh: {
       purpose:
-        '提供 persistence envelope 的默认 text codec。通过 canonical collections JSON codec 往返 Map/Set，并且只读取两个精确 legacy collection tag。',
+        '提供 envelope 默认 text codec，组合 fromValueCodec 与 defineCollectionsJsonCodec，默认保留 Map/Set，拒绝非法 portable 值，将历史标记与元组视为普通数据。',
       quickStart: `import { defaultJsonCodec } from '@migaia/store-persist'\n\nconst state = { theme: 'dark' }\nconst encoded = await defaultJsonCodec.encode({ version: 1, state })\nconst envelope = await defaultJsonCodec.decode(encoded)\nconsole.log(envelope)`,
       scenarios: [
         'persisted state 是 JSON-compatible，并包含 Map 或 Set。',
         '目标 backend channel 是 text storage。',
-        '必须继续读取 legacy tagged Map/Set archive。'
+        '需要默认保留嵌套 Map/Set，并拒绝非法 portable 值。'
       ],
       avoidWhen: [
         'binary output 明显更小或更快。',
@@ -12874,7 +11995,8 @@ export async function readByEmail(
     en: {
       purpose:
         'Encodes one envelope and routes it to text or byte storage according to codec.output and backend capabilities. Structured output is rejected because the minimal persistence storage contract has no record channel.',
-      quickStart: `import { defaultJsonCodec, writeEnvelope } from '@migaia/store-persist'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst storage = memoryStorageHost()\nconst state = { theme: 'dark' }\nawait writeEnvelope(storage, 'settings', defaultJsonCodec, { version: 2, state }, {})\nconsole.log(await storage.get('settings'))`,
+      quickStart:
+        "import { defaultJsonCodec, writeEnvelope } from '@migaia/store-persist'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst state = { theme: 'dark' }\nawait writeEnvelope(storage, 'settings', defaultJsonCodec, { version: 2, state }, {})\nconsole.log(await storage.get('settings'))",
       scenarios: [
         'A custom persistence adapter needs the canonical output-channel routing.',
         'Binary codecs should use setBytes only on a capable backend.',
@@ -12936,7 +12058,8 @@ export async function readByEmail(
     zh: {
       purpose:
         '编码一份 envelope，并按 codec.output 与 backend capabilities 路由到 text 或 byte storage。minimal persistence storage contract 没有 record channel，因此拒绝 structured output。',
-      quickStart: `import { defaultJsonCodec, writeEnvelope } from '@migaia/store-persist'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst storage = memoryStorageHost()\nconst state = { theme: 'dark' }\nawait writeEnvelope(storage, 'settings', defaultJsonCodec, { version: 2, state }, {})\nconsole.log(await storage.get('settings'))`,
+      quickStart:
+        "import { defaultJsonCodec, writeEnvelope } from '@migaia/store-persist'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst state = { theme: 'dark' }\nawait writeEnvelope(storage, 'settings', defaultJsonCodec, { version: 2, state }, {})\nconsole.log(await storage.get('settings'))",
       scenarios: [
         'custom persistence adapter 需要 canonical output-channel routing。',
         'binary codec 只应在 capable backend 上使用 setBytes。',
@@ -12999,15 +12122,8 @@ export async function readByEmail(
     en: {
       purpose:
         'Reads and decodes one persisted value from the codec-selected text or binary channel. Missing storage values become undefined; binary codecs never silently fall back to text.',
-      quickStart: `import { defaultJsonCodec, readEnvelope } from '@migaia/store-persist'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
-
-const storage = memoryStorageHost()
-const codec = defaultJsonCodec
-const controller = new AbortController()
-const signal = controller.signal
-const rawEnvelope = await readEnvelope(storage, 'settings', codec, { signal })
-if (rawEnvelope === undefined) console.log('first run: no saved envelope') // missing 是正常状态，不自动当作错误`,
+      quickStart:
+        "import { defaultJsonCodec, readEnvelope } from '@migaia/store-persist'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst codec = defaultJsonCodec\nconst controller = new AbortController()\nconst signal = controller.signal\nconst rawEnvelope = await readEnvelope(storage, 'settings', codec, { signal })\nif (rawEnvelope === undefined) console.log('first run: no saved envelope') // missing 是正常状态，不自动当作错误",
       scenarios: [
         'A custom adapter needs the canonical read-channel decision.',
         'Missing archives are normal first-run state.',
@@ -13059,15 +12175,8 @@ if (rawEnvelope === undefined) console.log('first run: no saved envelope') // mi
     zh: {
       purpose:
         '从 codec 选择的 text 或 binary channel 读取并解码一个 persisted value。missing storage value 返回 undefined；binary codec 绝不静默 fallback 到 text。',
-      quickStart: `import { defaultJsonCodec, readEnvelope } from '@migaia/store-persist'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
-
-const storage = memoryStorageHost()
-const codec = defaultJsonCodec
-const controller = new AbortController()
-const signal = controller.signal
-const rawEnvelope = await readEnvelope(storage, 'settings', codec, { signal })
-if (rawEnvelope === undefined) console.log('首次运行：没有已保存的 envelope') // missing 是正常状态，不自动当作错误`,
+      quickStart:
+        "import { defaultJsonCodec, readEnvelope } from '@migaia/store-persist'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst codec = defaultJsonCodec\nconst controller = new AbortController()\nconst signal = controller.signal\nconst rawEnvelope = await readEnvelope(storage, 'settings', codec, { signal })\nif (rawEnvelope === undefined) console.log('首次运行：没有已保存的 envelope') // missing 是正常状态，不自动当作错误",
       scenarios: [
         'custom adapter 需要 canonical read-channel decision。',
         'missing archive 是正常 first-run state。',
@@ -13121,11 +12230,8 @@ if (rawEnvelope === undefined) console.log('首次运行：没有已保存的 en
     en: {
       purpose:
         'Removes one persisted envelope through the storage boundary while forwarding cancellation. It does not mutate the live state or dispose the persistence handle.',
-      quickStart: `import { removeEnvelope } from '@migaia/store-persist'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
-
-const storage = memoryStorageHost()
-await removeEnvelope(storage, 'settings', {}) // 只删除这一份 envelope，不重置 live state`,
+      quickStart:
+        "import { removeEnvelope } from '@migaia/store-persist'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nawait removeEnvelope(storage, 'settings', {}) // 只删除这一份 envelope，不重置 live state",
       scenarios: [
         'A custom adapter implements clear.',
         'A migration intentionally invalidates one archive key.',
@@ -13168,11 +12274,8 @@ await removeEnvelope(storage, 'settings', {}) // 只删除这一份 envelope，�
     zh: {
       purpose:
         '通过 storage boundary 移除一份 persisted envelope，并转发 cancellation；不会 mutation live state，也不会 dispose persistence handle。',
-      quickStart: `import { removeEnvelope } from '@migaia/store-persist'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
-
-const storage = memoryStorageHost()
-await removeEnvelope(storage, 'settings', {}) // 只删除这一份 envelope，不重置 live state`,
+      quickStart:
+        "import { removeEnvelope } from '@migaia/store-persist'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nawait removeEnvelope(storage, 'settings', {}) // 只删除这一份 envelope，不重置 live state",
       scenarios: [
         'custom adapter 实现 clear。',
         'migration 有意使一个 archive key 失效。',
@@ -13213,132 +12316,7 @@ await removeEnvelope(storage, 'settings', {}) // 只删除这一份 envelope，�
       ]
     }
   },
-  'store-persist:index:assertEnvelope': {
-    en: {
-      purpose:
-        'Validates decoded data as a versioned persistence envelope before hydration. It rejects arrays, unsafe or negative versions, and missing state with PersistEnvelopeError.',
-      quickStart: `import { assertEnvelope } from '@migaia/store-persist'\n\ntype Settings = { theme: string }\nconst decoded: unknown = { version: 2, state: { theme: 'dark' } }\nconst restore = (value: Settings) => console.log('restored:', value)\nconst envelope = assertEnvelope<Settings>(decoded, 'settings')\nrestore(envelope.state)`,
-      scenarios: [
-        'A custom codec has decoded untrusted storage data.',
-        'Migration needs a trustworthy previous version.',
-        'Corrupt archives must fail before mutating live state.'
-      ],
-      avoidWhen: [
-        'The value has not been decoded yet.',
-        'Validating an arbitrary domain object.',
-        'Silently repairing malformed persisted data.'
-      ],
-      options: [
-        {
-          name: 'value',
-          description: 'Unknown decoded value to validate without trusting its shape.',
-          defaultValue: 'required',
-          optional: false,
-          type: 'unknown',
-          whenToUse: 'Pass the direct result of codec.decode.',
-          example: 'decoded'
-        },
-        {
-          name: 'key',
-          description: 'Stable storage key included in diagnostics.',
-          defaultValue: 'required',
-          optional: false,
-          type: 'string',
-          whenToUse: 'Identify the archive that failed validation.',
-          example: "'settings'"
-        }
-      ]
-    },
-    zh: {
-      purpose:
-        'hydration 前把 decoded data 验证为 versioned persistence envelope。array、不安全或负 version、缺少 state 都会以 PersistEnvelopeError 失败。',
-      quickStart: `import { assertEnvelope } from '@migaia/store-persist'\n\ntype Settings = { theme: string }\nconst decoded: unknown = { version: 2, state: { theme: 'dark' } }\nconst restore = (value: Settings) => console.log('restored:', value)\nconst envelope = assertEnvelope<Settings>(decoded, 'settings')\nrestore(envelope.state)`,
-      scenarios: [
-        'custom codec 刚解码不可信 storage data。',
-        'migration 需要可信 previous version。',
-        'corrupt archive 必须在 mutation live state 前失败。'
-      ],
-      avoidWhen: [
-        'value 尚未 decode。',
-        '验证任意 domain object。',
-        '静默修补 malformed persisted data。'
-      ],
-      options: [
-        {
-          name: 'value',
-          description: '不预先信任 shape 的 decoded value。',
-          defaultValue: '必填',
-          optional: false,
-          type: 'unknown',
-          whenToUse: '直接传入 codec.decode 的结果。',
-          example: 'decoded'
-        },
-        {
-          name: 'key',
-          description: '写入 diagnostic 的稳定 storage key。',
-          defaultValue: '必填',
-          optional: false,
-          type: 'string',
-          whenToUse: '标识 validation 失败的 archive。',
-          example: "'settings'"
-        }
-      ]
-    }
-  },
-  'store-persist:index:PersistEnvelopeError': {
-    en: {
-      purpose:
-        'Native TypeError raised when persisted input is not a usable { version, state } envelope. It always carries STORE_PERSIST_SOURCE and ENVELOPE_INVALID.',
-      quickStart: `import { assertEnvelope, PersistEnvelopeError } from '@migaia/store-persist'\n\nconst value: unknown = { version: 2, state: { theme: 'dark' } }\nconst quarantine = (key: string) => console.warn('quarantine:', key)\ntry {\n  assertEnvelope(value, 'settings')\n} catch (error) {\n  if (error instanceof PersistEnvelopeError) quarantine('settings')\n}`,
-      scenarios: [
-        'A boundary distinguishes corrupt archives from backend failures.',
-        'Diagnostics group invalid envelope reports.',
-        'Recovery quarantines only malformed records.'
-      ],
-      avoidWhen: [
-        'Throwing codec output mismatch.',
-        'Representing a version mismatch that migrate can handle.',
-        'Constructing it instead of calling assertEnvelope.'
-      ],
-      options: [
-        {
-          name: 'message',
-          description: 'Human-readable envelope validation failure.',
-          defaultValue: 'required',
-          optional: false,
-          type: 'string',
-          whenToUse: 'Normally supplied internally by assertEnvelope.',
-          example: "'archive has no usable version'"
-        }
-      ]
-    },
-    zh: {
-      purpose:
-        'persisted input 不是可用 { version, state } envelope 时抛出的 native TypeError；始终携带 STORE_PERSIST_SOURCE 与 ENVELOPE_INVALID。',
-      quickStart: `import { assertEnvelope, PersistEnvelopeError } from '@migaia/store-persist'\n\nconst value: unknown = { version: 2, state: { theme: 'dark' } }\nconst quarantine = (key: string) => console.warn('quarantine:', key)\ntry {\n  assertEnvelope(value, 'settings')\n} catch (error) {\n  if (error instanceof PersistEnvelopeError) quarantine('settings')\n}`,
-      scenarios: [
-        'boundary 区分 corrupt archive 与 backend failure。',
-        'diagnostic 聚合 invalid envelope report。',
-        'recovery 只 quarantine malformed record。'
-      ],
-      avoidWhen: [
-        '抛 codec output mismatch。',
-        '表示 migrate 可以处理的 version mismatch。',
-        '绕过 assertEnvelope 直接构造。'
-      ],
-      options: [
-        {
-          name: 'message',
-          description: '面向人类的 envelope validation failure。',
-          defaultValue: '必填',
-          optional: false,
-          type: 'string',
-          whenToUse: '通常由 assertEnvelope 内部提供。',
-          example: "'archive has no usable version'"
-        }
-      ]
-    }
-  },
+
   'store-persist:index:PersistState': {
     en: {
       purpose:
@@ -13473,7 +12451,7 @@ if (handle.status.value === PersistState.error) console.error(handle.error.value
     en: {
       purpose:
         'Connects one Store Light instance to versioned persistence. It hydrates through $hydrate, observes later changes without an initial false write, and returns the shared flush, clear, retry, and dispose lifecycle handle.',
-      quickStart: `import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst settings = createStore({ theme: 'light', fontSize: 14 })\nconst storage = indexedDbHost({ dbName: 'app' })\nconst handle = persist(settings, { key: 'settings', storage, version: 2 })\ntry {\n  await handle.ready\n  settings.theme = 'dark'\n  await handle.flush()\n  console.log(settings.$plain())\n} finally {\n  handle.dispose()\n  await settings.$dispose()\n  await storage.dispose()\n}`,
+      quickStart: `import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\n\nconst settings = createStore({ theme: 'light', fontSize: 14 })\nconst host = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName: 'app' })] })\nconst storage = host.backend('indexed-db')\nconst handle = persist(settings, { key: 'settings', storage })\ntry {\n  await handle.ready\n  settings.theme = 'dark'\n  await handle.flush()\n  console.log(settings.$plain())\n} finally {\n  handle.dispose()\n  await settings.$dispose()\n  await host.dispose()\n}`,
       scenarios: [
         'Application settings should survive reloads.',
         'Only a safe subset of flat Store state should be stored.',
@@ -13530,12 +12508,12 @@ if (handle.status.value === PersistState.error) console.error(handle.error.value
           example: '2'
         },
         {
-          name: 'options.migrate',
+          name: 'options.migrations',
           description: 'Synchronous conversion from an older stored version.',
           defaultValue: 'undefined',
           type: '(persisted, fromVersion) => state',
           whenToUse: 'Keep existing archives readable after a schema change.',
-          example: '(old, from) => migrateSettings(old, from)'
+          example: '{ 2: (old, ctx) => upgradeSettings(old, ctx.fromVersion) }'
         },
         {
           name: 'options.partialize',
@@ -13576,7 +12554,7 @@ if (handle.status.value === PersistState.error) console.error(handle.error.value
     zh: {
       purpose:
         '把一份 Store Light state 接入 versioned persistence。通过 $hydrate 恢复，跳过 initial false write 后观察变化，并返回共享 flush、clear、retry、dispose lifecycle handle。',
-      quickStart: `import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst settings = createStore({ theme: 'light', fontSize: 14 })\nconst storage = indexedDbHost({ dbName: 'app' })\nconst handle = persist(settings, { key: 'settings', storage, version: 2 })\ntry {\n  await handle.ready\n  settings.theme = 'dark'\n  await handle.flush()\n  console.log(settings.$plain())\n} finally {\n  handle.dispose()\n  await settings.$dispose()\n  await storage.dispose()\n}`,
+      quickStart: `import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\n\nconst settings = createStore({ theme: 'light', fontSize: 14 })\nconst host = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName: 'app' })] })\nconst storage = host.backend('indexed-db')\nconst handle = persist(settings, { key: 'settings', storage })\ntry {\n  await handle.ready\n  settings.theme = 'dark'\n  await handle.flush()\n  console.log(settings.$plain())\n} finally {\n  handle.dispose()\n  await settings.$dispose()\n  await host.dispose()\n}`,
       scenarios: [
         'application settings 需要跨 reload 保留。',
         '只存 flat Store state 的安全 subset。',
@@ -13633,12 +12611,12 @@ if (handle.status.value === PersistState.error) console.error(handle.error.value
           example: '2'
         },
         {
-          name: 'options.migrate',
+          name: 'options.migrations',
           description: '从旧 stored version 同步转换到当前 shape。',
           defaultValue: 'undefined',
           type: '(persisted, fromVersion) => state',
           whenToUse: 'schema 变化后继续读取现有 archive。',
-          example: '(old, from) => migrateSettings(old, from)'
+          example: '{ 2: (old, ctx) => upgradeSettings(old, ctx.fromVersion) }'
         },
         {
           name: 'options.partialize',
@@ -13680,7 +12658,8 @@ if (handle.status.value === PersistState.error) console.error(handle.error.value
     en: {
       purpose:
         'Persists one observable object, array, map, or set through its tracked snapshot and atomic replace operations. A Runtime effect observes structural changes and skips its synchronous first run.',
-      quickStart: `import { ObservableMap } from '@migaia/store-indexed'\nimport { persistCollection } from '@migaia/store-persist/indexed'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst cart = new ObservableMap<string, number>()\nconst storage = memoryStorageHost()\nconst handle = persistCollection(cart, { key: 'cart', storage })\ntry {\n  await handle.ready\n  cart.set('sku-42', 2)\n  await handle.flush()\n  console.log(cart.get('sku-42'))\n} finally {\n  handle.dispose()\n  cart.dispose()\n  await storage.dispose()\n}`,
+      quickStart:
+        "import { ObservableMap } from '@migaia/store-indexed'\nimport { persistCollection } from '@migaia/store-persist/indexed'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst cart = new ObservableMap<string, number>()\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst handle = persistCollection(cart, { key: 'cart', storage })\ntry {\n  await handle.ready\n  cart.set('sku-42', 2)\n  await handle.flush()\n  console.log(cart.get('sku-42'))\n} finally {\n  handle.dispose()\n  cart.dispose()\n  await host.dispose()\n}",
       scenarios: [
         'A reactive map or set must survive reloads.',
         'Hydration must atomically replace collection contents.',
@@ -13709,7 +12688,8 @@ if (handle.status.value === PersistState.error) console.error(handle.error.value
     zh: {
       purpose:
         '通过 tracked snapshot 与 atomic replace 持久化 observable object、array、map 或 set。Runtime effect 观察 structural change，并跳过同步首次执行。',
-      quickStart: `import { ObservableMap } from '@migaia/store-indexed'\nimport { persistCollection } from '@migaia/store-persist/indexed'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst cart = new ObservableMap<string, number>()\nconst storage = memoryStorageHost()\nconst handle = persistCollection(cart, { key: 'cart', storage })\ntry {\n  await handle.ready\n  cart.set('sku-42', 2)\n  await handle.flush()\n  console.log(cart.get('sku-42'))\n} finally {\n  handle.dispose()\n  cart.dispose()\n  await storage.dispose()\n}`,
+      quickStart:
+        "import { ObservableMap } from '@migaia/store-indexed'\nimport { persistCollection } from '@migaia/store-persist/indexed'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst cart = new ObservableMap<string, number>()\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst handle = persistCollection(cart, { key: 'cart', storage })\ntry {\n  await handle.ready\n  cart.set('sku-42', 2)\n  await handle.flush()\n  console.log(cart.get('sku-42'))\n} finally {\n  handle.dispose()\n  cart.dispose()\n  await host.dispose()\n}",
       scenarios: [
         'reactive map 或 set 需要跨 reload 保留。',
         'hydration 必须原子替换 collection content。',
@@ -13740,7 +12720,8 @@ if (handle.status.value === PersistState.error) console.error(handle.error.value
     en: {
       purpose:
         'Persists exactly one writable atom under namespace:id. Each call owns an independent persistence lifecycle; the returned value is the atom value captured when the handle is created.',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, familyDef } from '@migaia/store-keyed'\nimport { persistKeyed } from '@migaia/store-persist/keyed'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst runtime = createRuntime()\nconst atomStore = createAtomStore(runtime)\nconst session = familyDef(() => ({ userId: '', accessToken: '' }))\nconst userId = 'user-42'\nconst storage = memoryStorageHost()\nconst sessionHandle = persistKeyed(atomStore, session(userId), userId, { namespace: 'sessions', storage })\ntry {\n  await sessionHandle.ready\n  atomStore.set(session(userId), { userId, accessToken: 'token' })\n  await sessionHandle.flush()\n  console.log(atomStore.peek(session(userId)))\n} finally {\n  sessionHandle.dispose()\n  await storage.dispose()\n}`,
+      quickStart:
+        "import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, familyDef } from '@migaia/store-keyed'\nimport { persistKeyed } from '@migaia/store-persist/keyed'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst runtime = createRuntime()\nconst atomStore = createAtomStore(runtime)\nconst session = familyDef(() => ({ userId: '', accessToken: '' }))\nconst userId = 'user-42'\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst sessionHandle = persistKeyed(atomStore, session(userId), userId, { namespace: 'sessions', storage })\ntry {\n  await sessionHandle.ready\n  atomStore.set(session(userId), { userId, accessToken: 'token' })\n  await sessionHandle.flush()\n  console.log(atomStore.peek(session(userId)))\n} finally {\n  sessionHandle.dispose()\n  await host.dispose()\n}",
       scenarios: [
         'One family member needs independent persistence.',
         'Per-user state requires stable namespace isolation.',
@@ -13861,7 +12842,8 @@ if (handle.status.value === PersistState.error) console.error(handle.error.value
     zh: {
       purpose:
         '把恰好一个 writable atom 持久化到 namespace:id。每次调用拥有独立 persistence lifecycle；返回 value 是创建 handle 时取得的 atom value。',
-      quickStart: `import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, familyDef } from '@migaia/store-keyed'\nimport { persistKeyed } from '@migaia/store-persist/keyed'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst runtime = createRuntime()\nconst atomStore = createAtomStore(runtime)\nconst session = familyDef(() => ({ userId: '', accessToken: '' }))\nconst userId = 'user-42'\nconst storage = memoryStorageHost()\nconst sessionHandle = persistKeyed(atomStore, session(userId), userId, { namespace: 'sessions', storage })\ntry {\n  await sessionHandle.ready\n  atomStore.set(session(userId), { userId, accessToken: 'token' })\n  await sessionHandle.flush()\n  console.log(atomStore.peek(session(userId)))\n} finally {\n  sessionHandle.dispose()\n  await storage.dispose()\n}`,
+      quickStart:
+        "import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, familyDef } from '@migaia/store-keyed'\nimport { persistKeyed } from '@migaia/store-persist/keyed'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst runtime = createRuntime()\nconst atomStore = createAtomStore(runtime)\nconst session = familyDef(() => ({ userId: '', accessToken: '' }))\nconst userId = 'user-42'\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst sessionHandle = persistKeyed(atomStore, session(userId), userId, { namespace: 'sessions', storage })\ntry {\n  await sessionHandle.ready\n  atomStore.set(session(userId), { userId, accessToken: 'token' })\n  await sessionHandle.flush()\n  console.log(atomStore.peek(session(userId)))\n} finally {\n  sessionHandle.dispose()\n  await host.dispose()\n}",
       scenarios: [
         '一个 family member 需要独立 persistence。',
         'per-user state 需要稳定 namespace isolation。',
@@ -13982,14 +12964,8 @@ if (handle.status.value === PersistState.error) console.error(handle.error.value
     en: {
       purpose:
         'Removes every persisted record whose key begins with namespace:. It only changes storage; live atoms and active persistence handles remain untouched and may write again after their next change.',
-      quickStart: `import { memoryStorageHost } from '@migaia/storage-web/memory'
-import { clearFamily } from '@migaia/store-persist/keyed'
-
-const storage = memoryStorageHost()
-await storage.set('sessions:alice', JSON.stringify({ token: 'a' }))
-await storage.set('sessions:bob', JSON.stringify({ token: 'b' }))
-const removed = await clearFamily(storage, 'sessions')
-console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions family，但不影响内存中的 live atom`,
+      quickStart:
+        "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { clearFamily } from '@migaia/store-persist/keyed'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nawait storage.set('sessions:alice', JSON.stringify({ token: 'a' }))\nawait storage.set('sessions:bob', JSON.stringify({ token: 'b' }))\nconst removed = await clearFamily(storage, 'sessions')\nconsole.log(removed, await storage.keys()) // 2 []：清掉整个 sessions family，但不影响内存中的 live atom",
       scenarios: [
         'Logout removes every stored session member.',
         'A tenant namespace is invalidated.',
@@ -14024,14 +13000,8 @@ console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions famil
     zh: {
       purpose:
         '移除 key 以 namespace: 开头的全部 persisted record。它只改变 storage；live atom 与 active persistence handle 不受影响，并可能在下次 change 后重新写入。',
-      quickStart: `import { memoryStorageHost } from '@migaia/storage-web/memory'
-import { clearFamily } from '@migaia/store-persist/keyed'
-
-const storage = memoryStorageHost()
-await storage.set('sessions:alice', JSON.stringify({ token: 'a' }))
-await storage.set('sessions:bob', JSON.stringify({ token: 'b' }))
-const removed = await clearFamily(storage, 'sessions')
-console.log(removed, await storage.keys()) // 2 []：清掉整个 sessions family，但不影响内存中的 live atom`,
+      quickStart:
+        "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { clearFamily } from '@migaia/store-persist/keyed'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nawait storage.set('sessions:alice', JSON.stringify({ token: 'a' }))\nawait storage.set('sessions:bob', JSON.stringify({ token: 'b' }))\nconst removed = await clearFamily(storage, 'sessions')\nconsole.log(removed, await storage.keys()) // 2 []：清掉整个 sessions family，但不影响内存中的 live atom",
       scenarios: [
         'logout 移除全部 stored session member。',
         'tenant namespace 被整体 invalidated。',
@@ -28899,10 +27869,7 @@ export function findApiGuide(
 ): IApiGuide | undefined {
   /** Curated guide keys predate hierarchical URLs and retain their stable dash-delimited identity. */
   const guideModuleName = moduleName.replaceAll('/', '-')
-  /**
-   * Canonical guides are shared by the same class or scheduler operation re-exported at another
-   * entry.
-   */
+  /** Canonical guides are shared by the same public operation re-exported at another entry. */
   const guideKey =
     library === 'plugin-host' && guideModuleName === 'index' && symbolName === 'PluginHost'
       ? 'plugin-host:index:PluginHost'
@@ -28910,7 +27877,15 @@ export function findApiGuide(
           guideModuleName === 'testing' &&
           symbolName === 'createManualScheduler'
         ? 'utils:scheduler:createManualScheduler'
-        : `${library}:${guideModuleName}:${symbolName}`
+        : library === 'storage-web' &&
+            [
+              'local-storage:localStorageBackendPlugin',
+              'session-storage:sessionStorageBackendPlugin',
+              'cookies:cookieBackendPlugin',
+              'indexed-db:indexedDbBackendPlugin'
+            ].includes(`${guideModuleName}:${symbolName}`)
+          ? `${library}:plugins-${guideModuleName}:${symbolName}`
+          : `${library}:${guideModuleName}:${symbolName}`
   const storedGuide = apiGuides[guideKey]?.[locale]
   /** Option translations belong to the same canonical guide, not a second rendered description. */
   /** Existing extracted RPC fields keep their exact names and gain only maintained localized prose. */
@@ -28979,40 +27954,7 @@ export function findApiGuide(
       : `${guide.purpose} ${locale === 'zh' ? 'restore() 是幂等的。' : 'The restore() operation is idempotent.'}`
     return { ...guide, purpose, quickStart }
   }
-  if (!guide || library !== 'storage-web') return guide
-  const isWebStoragePlugin =
-    symbolName === 'localStorageBackendPlugin' ||
-    symbolName === 'sessionStorageBackendPlugin' ||
-    symbolName === 'localStorageReactive' ||
-    symbolName === 'sessionStorageReactive'
-  const isCookieGuide =
-    symbolName === 'cookiesHost' ||
-    symbolName === 'cookieBackendPlugin' ||
-    symbolName === 'cookiesReactive'
-  if (!isWebStoragePlugin && !isCookieGuide) return guide
-  const options = isWebStoragePlugin
-    ? guide.options.filter((option) => option.name === 'storage')
-    : guide.options
-        .filter(
-          (option) =>
-            option.name === 'namespace' ||
-            option.name === 'namespaceCodec' ||
-            option.name === 'scope' ||
-            option.name === 'document'
-        )
-        .concat(
-          guide.options.some((option) => option.name === 'scope')
-            ? []
-            : guide.options
-                .filter((option) => option.name === 'scope.path')
-                .map((option) => ({ ...option, name: 'scope', type: 'ICookieScope' }))
-        )
-        .sort(
-          (left, right) =>
-            ['namespace', 'namespaceCodec', 'scope', 'document'].indexOf(left.name) -
-            ['namespace', 'namespaceCodec', 'scope', 'document'].indexOf(right.name)
-        )
-  return { ...guide, options }
+  return guide
 }
 
 /** Builds a reference guide for non-callable public constants from their actual contract shape. */

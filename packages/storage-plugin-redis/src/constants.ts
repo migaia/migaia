@@ -1,0 +1,199 @@
+/** Stable protocol words are shared by adapters and the fixed-command backend. */
+export const RedisCommand = {
+  /** Native BLOCK protocol word used by fixed Redis endpoints. */
+  block: 'BLOCK',
+  /** Native COUNT protocol word used by fixed Redis endpoints. */
+  count: 'COUNT',
+  /** Native CREATE protocol word used by fixed Redis endpoints. */
+  create: 'CREATE',
+  /** Native DEL protocol word used by fixed Redis endpoints. */
+  del: 'DEL',
+  /** Native EVAL protocol word used by fixed Redis endpoints. */
+  eval: 'EVAL',
+  /** Native GET protocol word used by fixed Redis endpoints. */
+  get: 'GET',
+  /** Native GROUP protocol word used by fixed Redis endpoints. */
+  group: 'GROUP',
+  /** Native HGET protocol word used by fixed Redis endpoints. */
+  hget: 'HGET',
+  /** Native binary HASH capture for selected vector points. */
+  hgetall: 'HGETALL',
+  /** Private namespace truncation removes only the fields accepted by its native draft. */
+  hdel: 'HDEL',
+  /** Exact Redis absolute expiry preserves HASH deadlines across draft rewrites. */
+  pexpiretime: 'PEXPIRETIME',
+  /** Native HINCRBY protocol word used by fixed Redis endpoints. */
+  hincrby: 'HINCRBY',
+  /** Native HMGET protocol word used by fixed Redis endpoints. */
+  hmget: 'HMGET',
+  /** Native HSET protocol word used by fixed Redis endpoints. */
+  hset: 'HSET',
+  /** Native INFO protocol word used by fixed Redis endpoints. */
+  info: 'INFO',
+  /** Native KEEPTTL protocol word used by fixed Redis endpoints. */
+  keepttl: 'KEEPTTL',
+  /** Native LIMIT protocol word used by fixed Redis endpoints. */
+  limit: 'LIMIT',
+  /** Native MATCH protocol word used by fixed Redis endpoints. */
+  match: 'MATCH',
+  /** Native MGET protocol word used by fixed Redis endpoints. */
+  mget: 'MGET',
+  /** Native MKSTREAM protocol word used by fixed Redis endpoints. */
+  mkstream: 'MKSTREAM',
+  /** Native NX protocol word used by fixed Redis endpoints. */
+  nx: 'NX',
+  /** Native PERSIST protocol word used by fixed Redis endpoints. */
+  persist: 'PERSIST',
+  /** Native PEXPIREAT protocol word used by fixed Redis endpoints. */
+  pexpireat: 'PEXPIREAT',
+  /** Native PTTL protocol word used by fixed Redis endpoints. */
+  pttl: 'PTTL',
+  /** Native PUBLISH protocol word used by fixed Redis endpoints. */
+  publish: 'PUBLISH',
+  /** Native PX protocol word used by fixed Redis endpoints. */
+  px: 'PX',
+  /** Native SCAN protocol word used by fixed Redis endpoints. */
+  scan: 'SCAN',
+  /** Native SERVER protocol word used by fixed Redis endpoints. */
+  server: 'SERVER',
+  /** Native SET protocol word used by fixed Redis endpoints. */
+  set: 'SET',
+  /** Native STREAMS protocol word used by fixed Redis endpoints. */
+  streams: 'STREAMS',
+  /** Native TIME protocol word used by fixed Redis endpoints. */
+  time: 'TIME',
+  /** Native WATCH protocol word used by fixed Redis endpoints. */
+  watch: 'WATCH',
+  /** Native WITHSCORES protocol word used by fixed Redis endpoints. */
+  withscores: 'WITHSCORES',
+  /** Native XACK protocol word used by fixed Redis endpoints. */
+  xack: 'XACK',
+  /** Native XADD protocol word used by fixed Redis endpoints. */
+  xadd: 'XADD',
+  /** Native XAUTOCLAIM protocol word used by fixed Redis endpoints. */
+  xautoclaim: 'XAUTOCLAIM',
+  /** Native XGROUP protocol word used by fixed Redis endpoints. */
+  xgroup: 'XGROUP',
+  /** Native XRANGE protocol word used by fixed Redis endpoints. */
+  xrange: 'XRANGE',
+  /** Native XREADGROUP protocol word used by fixed Redis endpoints. */
+  xreadgroup: 'XREADGROUP',
+  /** Native ZADD protocol word used by fixed Redis endpoints. */
+  zadd: 'ZADD',
+  /** Native ZRANGE protocol word used by fixed Redis endpoints. */
+  zrange: 'ZRANGE',
+  /** Native ZRANGEBYLEX protocol word used by fixed Redis endpoints. */
+  zrangebylex: 'ZRANGEBYLEX',
+  /** Native ZRANK protocol word used by fixed Redis endpoints. */
+  zrank: 'ZRANK',
+  /** Native ZREM protocol word used by fixed Redis endpoints. */
+  zrem: 'ZREM',
+  /** Native MAXLEN protocol word used by fixed Redis endpoints. */
+  maxlen: 'MAXLEN',
+  /** Native XREAD protocol word used by fixed Redis endpoints. */
+  xread: 'XREAD',
+  /** Native XREVRANGE protocol word used by fixed Redis endpoints. */
+  xrevrange: 'XREVRANGE',
+  /** Native Stream metadata carries retention facts without a client ledger. */
+  xinfo: 'XINFO',
+  /** Native XINFO target for the selected commit Stream. */
+  stream: 'STREAM',
+  /** Native existence check distinguishes empty Streams from missing storage. */
+  exists: 'EXISTS',
+  /** Native subscription setup is observed without exposing its channel. */
+  subscribe: 'SUBSCRIBE',
+  multi: 'MULTI',
+  exec: 'EXEC',
+  discard: 'DISCARD',
+  unwatch: 'UNWATCH'
+} as const
+/**
+ * MULTI acknowledgement words are fixed native protocol replies checked before another command is
+ * queued.
+ */
+export const RedisReply = { ok: 'OK', queued: 'QUEUED' } as const
+/** Native subscription callbacks and fixed reply diagnostics share one owner. */
+export const RedisText = {
+  backend: 'redis',
+  failed: 'Redis operation failed',
+  decodeFailed: 'Redis reply or persisted value is invalid',
+  argument: 'Redis command arguments are invalid',
+  transactionFailed: 'Redis transaction failed',
+  connectionChanged: 'Redis connection changed before EXEC',
+  lockConflict: 'Redis lock is held by another attempt',
+  message: 'message',
+  error: 'error'
+} as const
+/** Original SDK aggregate evidence travels with its actual EXEC reply, without a registry. */
+export const redisExecCause = Symbol('redis-exec-cause')
+
+/** Backend operations and protocol events have one stable package owner. */
+export const RedisOperation = {
+  /** Stable changes.read endpoint identity for original pipelines and observations. */
+  changesRead: 'changes.read',
+  /** Stable changes.tail endpoint identity for original pipelines and observations. */
+  changesTail: 'changes.tail',
+  /** Stable pubsub.keyspace endpoint identity for original pipelines and observations. */
+  pubsubKeyspace: 'pubsub.keyspace',
+  /** Stable pubsub.publish endpoint identity for original pipelines and observations. */
+  pubsubPublish: 'pubsub.publish',
+  /** Stable pubsub.subscribe endpoint identity for original pipelines and observations. */
+  pubsubSubscribe: 'pubsub.subscribe',
+  /** Stable rateLimit.consume endpoint identity for original pipelines and observations. */
+  rateLimitConsume: 'rateLimit.consume',
+  /** Stable sortedSets.add endpoint identity for original pipelines and observations. */
+  sortedSetsAdd: 'sortedSets.add',
+  /** Stable sortedSets.rank endpoint identity for original pipelines and observations. */
+  sortedSetsRank: 'sortedSets.rank',
+  /** Stable sortedSets.top endpoint identity for original pipelines and observations. */
+  sortedSetsTop: 'sortedSets.top',
+  /** Stable streams.ack endpoint identity for original pipelines and observations. */
+  streamsAck: 'streams.ack',
+  /** Stable streams.add endpoint identity for original pipelines and observations. */
+  streamsAdd: 'streams.add',
+  /** Stable streams.autoClaim endpoint identity for original pipelines and observations. */
+  streamsAutoClaim: 'streams.autoClaim',
+  /** Stable streams.createGroup endpoint identity for original pipelines and observations. */
+  streamsCreateGroup: 'streams.createGroup',
+  /** Stable streams.range endpoint identity for original pipelines and observations. */
+  streamsRange: 'streams.range',
+  /** Stable streams.readGroup endpoint identity for original pipelines and observations. */
+  streamsReadGroup: 'streams.readGroup',
+
+  get: 'get',
+  set: 'set',
+  remove: 'remove',
+  has: 'has',
+  keys: 'keys',
+  clearValues: 'clearValues',
+  clearBytes: 'clearBytes',
+  clearRecords: 'clearRecords',
+  clearAll: 'clearAll',
+  getBytes: 'getBytes',
+  setBytes: 'setBytes',
+  removeBytes: 'removeBytes',
+  getRecord: 'getRecord',
+  putRecord: 'putRecord',
+  deleteRecord: 'deleteRecord',
+  getMany: 'getMany',
+  setMany: 'setMany',
+  removeMany: 'removeMany',
+  removeByPrefix: 'removeByPrefix',
+  next: 'iterateRecords.next',
+  transaction: 'transaction',
+  expire: 'ttl.expire',
+  remaining: 'ttl.remaining',
+  persist: 'ttl.persist',
+  increment: 'counter.increment',
+  inspectLocks: 'inspectLocks',
+  watch: 'watch.next',
+  queryDelete: 'query.delete',
+  queryUpdate: 'query.update',
+  /** Standard vector endpoints retain one original pipeline each. */
+  vectorUpsert: 'vector.upsert',
+  vectorDelete: 'vector.delete',
+  vectorDeleteWhere: 'vector.deleteWhere',
+  vectorSearch: 'vector.search',
+  onRedisCommand: 'onRedisCommand',
+  onWatchConflict: 'onWatchConflict'
+} as const

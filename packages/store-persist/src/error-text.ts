@@ -16,9 +16,22 @@ export const StorePersistErrorText = {
     `[store] codec "${name}" must encode to a string when the backend has no binary channel`,
   binaryRead: (name: string): string =>
     `[store] binary codec "${name}" requires a storage backend with binary read support`,
-  archiveEnvelope: (key: string): string => `[store] persist archive "${key}" is not an envelope`,
-  archiveVersion: (key: string): string => `[store] persist archive "${key}" has no usable version`,
-  archiveState: (key: string): string => `[store] persist archive "${key}" carries no state`,
+  /** Invalid plans fail attachment before any subscription or storage operation. */
+  migrationsInvalid: (key: string): string => `[store] persist "${key}" migrations are invalid`,
+  /** Codec observers must belong to the codec stage family before attachment begins. */
+  codecStagesInvalid: '[store] persist codecStages must be a codec observer',
+  /** Transactional attachments reject wrong-kind observers before subscription or I/O. */
+  transactionStagesInvalid: '[store] persist transactionStages must be a transaction observer',
+  /** Atomic participation needs the original complete transaction-capable store. */
+  transactionBackend: '[store] persistTransaction requires a complete transaction-capable store',
+  /** Only privately registered active handles of one exact store may enlist or flush its scope. */
+  transactionParticipation:
+    '[store] persistTransaction requires active handles from the same store',
+  /** Direct operations cannot overtake an enlisted snapshot or wait behind its own transaction. */
+  transactionDirectOperation:
+    '[store] persistence is participating in a transaction; use flush(tx)',
+  /** Snapshot and partialize failures enter the existing encoding boundary before any tx request. */
+  transactionSnapshot: '[store] persist transaction snapshot cannot be encoded',
   aborted: '[store] persist operation was aborted by dispose',
   noCodec: (key: string): string => `[store] persist "${key}" resolved no codec`,
   invalidVersion: (key: string): string =>
@@ -34,7 +47,5 @@ export const StorePersistErrorText = {
     `[store] persist "${key}" ${name} must return synchronously`,
   codecInvalid: (key: string): string => `[store] persist "${key}" codec is invalid`,
   storageInvalid: (key: string): string => `[store] persist "${key}" storage adapter is invalid`,
-  hydrationWriteFailed: '[store] persist hydration and write both failed',
-  versionMismatch: (key: string, archive: number, current: number): string =>
-    `[store] persist archive "${key}" is version ${archive}, but this store is version ${current}; provide migrate() to convert it`
+  hydrationWriteFailed: '[store] persist hydration and write both failed'
 } as const

@@ -40,6 +40,40 @@ export const serializeCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
       )
     }
   ],
+  createTaggedCodec: [
+    {
+      title: t('Write new tagged values and read old formats', '写入新标签，读取旧格式'),
+      problem: t(
+        'Keep codec identity beside its encoded payload. Register the current writer first, older readers after it, and an explicit untagged reader for legacy values.',
+        '让 codec 身份随编码载荷保存。首项登记新写入器，后续登记旧读取器，并显式指定无标签旧值的读取器。'
+      ),
+      example: t(
+        "import { createTaggedCodec } from '@migaia/serialize/tagged'\nimport { defineJsonCodec } from '@migaia/serialize/codecs/json'\n\nconst current = defineJsonCodec({ version: 2 })\nconst previous = defineJsonCodec({ version: 1 })\nconst tagged = createTaggedCodec({ codecs: [current, previous], untagged: previous })\nconsole.log(tagged.encode({ count: 2 })) // mgt1:json@2;{\"count\":2}\nconsole.log(tagged.decode('mgt1:json@1;{\"count\":1}')) // { count: 1 }\nconsole.log(tagged.decode('{\"count\":1}')) // { count: 1 }\ntry {\n  tagged.decode('mgt1:json@3;{\"count\":3}')\n} catch (error) {\n  console.log((error as Error & { code: string }).code) // TAG_UNKNOWN\n}",
+        "import { createTaggedCodec } from '@migaia/serialize/tagged'\nimport { defineJsonCodec } from '@migaia/serialize/codecs/json'\n\nconst current = defineJsonCodec({ version: 2 })\nconst previous = defineJsonCodec({ version: 1 })\nconst tagged = createTaggedCodec({ codecs: [current, previous], untagged: previous })\nconsole.log(tagged.encode({ count: 2 })) // mgt1:json@2;{\"count\":2}\nconsole.log(tagged.decode('mgt1:json@1;{\"count\":1}')) // { count: 1 }\nconsole.log(tagged.decode('{\"count\":1}')) // { count: 1 }\ntry {\n  tagged.decode('mgt1:json@3;{\"count\":3}')\n} catch (error) {\n  console.log((error as Error & { code: string }).code) // TAG_UNKNOWN\n}"
+      ),
+      result: t(
+        'Writes mgt1:json@2;, reads json@1 and raw JSON, and reports TAG_UNKNOWN for json@3. Raw text starting with mgt1: is interpreted as tagged input; malformed headers never fall back.',
+        '写入 mgt1:json@2;，读取 json@1 与原始 JSON，json@3 报 TAG_UNKNOWN。以 mgt1: 开头的原始文本会被当作带标签输入，损坏头部不回退。'
+      )
+    }
+  ],
+  defineCollectionsJsonCodec: [
+    {
+      title: t('Preserve nested collections', '保留嵌套集合'),
+      problem: t(
+        'Persist Map and Set with the shared strict portable rules. The collection codec preserves insertion order and rejects invalid values instead of silently dropping them.',
+        '使用同一套严格 portable 规则保存 Map 与 Set，保留插入顺序并拒绝非法值，避免静默丢失数据。'
+      ),
+      example: t(
+        "import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst codec = defineCollectionsJsonCodec({ version: 1 })\nconst text = codec.encode(new Map([['roles', new Set(['read'])]]))\nconsole.log(text, codec.decode(text))",
+        "import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst codec = defineCollectionsJsonCodec({ version: 1 })\nconst text = codec.encode(new Map([['roles', new Set(['read'])]]))\nconsole.log(text, codec.decode(text))"
+      ),
+      result: t(
+        'The text uses $rpc map/set records; decode returns a Map containing a Set. Bytes stay reserved records. Old tuple formats remain ordinary arrays.',
+        '文本使用 $rpc map/set 记录；解码返回包含 Set 的 Map。字节保留为记录，旧元组格式仍为普通数组。'
+      )
+    }
+  ],
   defineJsonCodec: [
     {
       title: t(

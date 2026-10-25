@@ -1,6 +1,12 @@
-import { createRegistrationView } from './composition.js'
+import { createRegistrationView, openComposition as openManagedComposition } from './composition.js'
+import { PluginHostCompositionRuntime } from './composition-runtime.js'
 export { inspectFeatures } from './feature-runtime.js'
-import type { IRegistrationToken, IRegistrationView, IPluginConstraint } from './typing.js'
+import type {
+  IRegistrationToken,
+  IRegistrationView,
+  IPluginConstraint,
+  IPluginHostCompositionIntegration
+} from './typing.js'
 
 /**
  * Creates a narrow extension view for an exact committed registration token, rather than a
@@ -12,7 +18,11 @@ export const createView = <TPlugin extends IPluginConstraint<any>>(
 ): IRegistrationView<TPlugin> =>
   createRegistrationView(token) as unknown as IRegistrationView<TPlugin>
 
-export { isManagedHost, openComposition } from './composition.js'
+export { isManagedHost } from './composition.js'
+
+/** Acquires the stable composition facade over the original Host state on its first real use. */
+export const openComposition = (target: object): IPluginHostCompositionIntegration<object> =>
+  openManagedComposition(target, (port) => new PluginHostCompositionRuntime(port))
 
 export type { IRegistrationToken, IRegistrationView } from './typing.js'
 export type { IPluginHostCompositionIntegration } from './typing.js'

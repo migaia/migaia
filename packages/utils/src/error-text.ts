@@ -1,5 +1,15 @@
 /** Stable public text for errors crossing the utils package boundary. */
 export const UtilsErrorText = {
+  /** Option mapping failed and an immutable or conflicting native error required a causal wrapper. */
+  maybeMapperFailed: '[utils] optional value mapper failed',
+  /** A deadline cannot be jittered from a negative or non-finite starting value. */
+  jitterValueInvalid: '[utils] jitter value must be a finite non-negative number',
+  /** A bounded reduction requires a finite ratio within the inclusive unit interval. */
+  jitterRatioInvalid: '[utils] jitter ratio must be a finite number between 0 and 1',
+  /** A random sample outside the unit interval would violate the promised deadline bounds. */
+  jitterRandomInvalid: '[utils] jitter random result must be a finite number between 0 and 1',
+  /** Injected randomness failed; the original thrown value remains available on cause. */
+  jitterRandomFailed: '[utils] jitter random callback failed',
   invalidArgument: (field: string, expectation: string) =>
     `[utils] invalid ${field}: ${expectation}`,
   nonErrorValue: '[utils] non-Error value was converted',

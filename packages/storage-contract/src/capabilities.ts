@@ -1,11 +1,13 @@
 /**
- * Known provider labels. A label identifies a backend family; inspect capabilities before using
- * extensions.
+ * Open provider label domain. Runtime admission applies the canonical lowercase backend-name
+ * pattern; a label never grants capability or extension authority.
  */
-export type IBackendKind = 'local' | 'session' | 'cookie' | 'indexeddb' | 'memory'
+export type IBackendKind = string
 
 /** Provider capability facts, independent of any browser or database implementation. */
 export type IStorageCapabilities = {
+  /** Whether native KV batch writes and counted prefix removal are supported. Omission means false. */
+  readonly batch?: boolean
   /** Whether a synchronous key-value channel is available. */
   readonly syncRead: boolean
   /** Whether the provider supports the byte channel. */
@@ -35,79 +37,24 @@ export type IStorageCapabilitiesInspection = {
   readonly cause: unknown
 }
 
-/** Inspect capability accessors once while retaining a hostile getter failure for boundary owners. */
-const inspectStorageCapabilities = (value: unknown): IStorageCapabilitiesInspection => {
+/** Checks declared scalar facts without copying them or executing provider operations. */
+export const isStorageCapabilities = (value: unknown): value is IStorageCapabilities => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+  /** A legacy descriptor may omit only the explicitly optional capability flags. */
   const candidate = value as Record<string, unknown>
-  let syncRead: unknown
-  let binary: unknown
-  let records: unknown
-  let transactions: unknown
-  let iteration: unknown
-  let maxValueBytes: unknown
-  let opaqueEntries: unknown
-  let secondaryIndexes: unknown
-  let changeFeed: unknown
-  try {
-    if (typeof value !== 'object' || value === null || Array.isArray(value))
-      return { value: undefined, cause: undefined }
-    syncRead = candidate.syncRead
-    binary = candidate.binary
-    records = candidate.records
-    transactions = candidate.transactions
-    iteration = candidate.iteration
-    maxValueBytes = candidate.maxValueBytes
-    opaqueEntries = candidate.opaqueEntries
-    secondaryIndexes = candidate.secondaryIndexes
-    changeFeed = candidate.changeFeed
-  } catch (cause) {
-    return { value: undefined, cause }
-  }
-  if (
-    [syncRead, binary, records, transactions, iteration, opaqueEntries].some(
-      (entry) => typeof entry !== 'boolean'
-    ) ||
-    (secondaryIndexes !== undefined && typeof secondaryIndexes !== 'boolean') ||
-    (changeFeed !== undefined && typeof changeFeed !== 'boolean') ||
-    (maxValueBytes !== undefined &&
-      (typeof maxValueBytes !== 'number' ||
-        !Number.isSafeInteger(maxValueBytes) ||
-        maxValueBytes < 0))
+  return (
+    typeof candidate.syncRead === 'boolean' &&
+    typeof candidate.binary === 'boolean' &&
+    typeof candidate.records === 'boolean' &&
+    typeof candidate.transactions === 'boolean' &&
+    typeof candidate.iteration === 'boolean' &&
+    typeof candidate.opaqueEntries === 'boolean' &&
+    (candidate.secondaryIndexes === undefined || typeof candidate.secondaryIndexes === 'boolean') &&
+    (candidate.changeFeed === undefined || typeof candidate.changeFeed === 'boolean') &&
+    (candidate.batch === undefined || typeof candidate.batch === 'boolean') &&
+    (candidate.maxValueBytes === undefined ||
+      (typeof candidate.maxValueBytes === 'number' &&
+        Number.isSafeInteger(candidate.maxValueBytes) &&
+        candidate.maxValueBytes >= 0))
   )
-    return { value: undefined, cause: undefined }
-  return {
-    value: {
-      syncRead: syncRead as boolean,
-      binary: binary as boolean,
-      records: records as boolean,
-      transactions: transactions as boolean,
-      iteration: iteration as boolean,
-      maxValueBytes: maxValueBytes as number | undefined,
-      opaqueEntries: opaqueEntries as boolean,
-      secondaryIndexes: secondaryIndexes === undefined ? false : (secondaryIndexes as boolean),
-      changeFeed: changeFeed === undefined ? false : (changeFeed as boolean)
-    },
-    cause: undefined
-  }
 }
-
-/** Return capability facts and preserve the exact accessor failure for a composing guard. */
-export const snapshotStorageCapabilitiesDetailed = inspectStorageCapabilities
-
-/**
- * Reads capability fields once into a new descriptor before a consumer chooses a storage route.
- * Required flags must be booleans; maxValueBytes must be undefined or a non-negative safe integer.
- * Legacy descriptors may omit secondaryIndexes/changeFeed; both become false in the result. Invalid
- * objects, reflection failures, and throwing getters return undefined rather than throw. The
- * returned record is independent of the input descriptor but is not frozen.
- */
-export const snapshotStorageCapabilities = (value: unknown): IStorageCapabilities | undefined => {
-  return inspectStorageCapabilities(value).value
-}
-
-/**
- * Tests the same descriptor shape as snapshotStorageCapabilities without retaining its result.
- * Returns false for malformed values or throwing accessors. This checks declared facts only; it
- * does not invoke storage methods or prove a provider actually implements those capabilities.
- */
-export const isStorageCapabilities = (value: unknown): value is IStorageCapabilities =>
-  snapshotStorageCapabilities(value) !== undefined

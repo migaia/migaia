@@ -15,12 +15,7 @@ import {
 } from './admission-runtime.js'
 import { PluginHostInstallRuntime, type IInstallBatchContext } from './install-runtime.js'
 import { PluginHostErrorCode } from './error-code.js'
-import {
-  buildManagedPort,
-  registerManagedHost,
-  isManagedHost,
-  openComposition
-} from './composition.js'
+import { registerManagedHost, matchesManagedHost } from './composition.js'
 import { PluginHostState } from './host-state.js'
 import type { IHostCoreConstructionRequest } from './define-host.js'
 import { reportQueueWait, translateQueueRejection } from './host-queue.js'
@@ -85,7 +80,7 @@ import {
 import { PluginHostCoreRuntime } from './core-runtime.js'
 import { PluginHostConfigRuntime } from './config-runtime.js'
 import { PluginHostDisposalRuntime } from './host-disposal-runtime.js'
-import { PluginHostCompositionRuntime } from './composition-runtime.js'
+import type { IPluginHostCompositionRuntimePort } from './composition-runtime.js'
 import {
   PluginHostEnablementRuntime,
   createPluginHostEnablementFacade
@@ -115,7 +110,6 @@ import type {
   IPluginDependencyPlan,
   IPluginRemoval,
   IPluginHostCompositionSnapshot,
-  IPluginHostCompositionIntegration,
   IPluginHostOptions,
   IPluginEnablement
 } from './typing.js'
@@ -175,7 +169,7 @@ const DEFAULT_DISPOSE_STEP_TIMEOUT_MS = 5000
  * explicit path. Handles address names, while captured callable views retain exact-generation
  * revocation guards.
  */
-export class PluginHost<
+class PluginHostConstructor<
   TDomainCore extends object,
   TValue = never,
   TInstalled extends readonly IPluginConstraint<any>[] = readonly []
@@ -237,6 +231,14 @@ export class PluginHost<
   #pipelineMode: IMiddlewarePipelineMode
   /** Canonical stateless runner that owns mode dispatch, lifting, and violation semantics. */
   #pipeline: IMiddlewarePipeline<IMiddlewarePipelineMode, TValue>
+  /** Canonical sync runner consumes original sync forms from the same registration lane. */
+  #syncPipeline: IMiddlewarePipeline<IMiddlewarePipelineMode, TValue>
+  /** Canonical async runner consumes derived async forms from that same lane. */
+  #asyncPipeline: IMiddlewarePipeline<IMiddlewarePipelineMode, TValue>
+  /** Fixed sync execution policy shares original leases, depth and pending ownership. */
+  readonly #syncPipelineExecution: IPluginHostPipelineExecutionPort<TValue>
+  /** Fixed async execution policy shares original leases, depth and pending ownership. */
+  readonly #asyncPipelineExecution: IPluginHostPipelineExecutionPort<TValue>
   /** Stable execution policy avoids rebuilding four Host closures for every log/stage run. */
   readonly #pipelineExecution: IPluginHostPipelineExecutionPort<TValue>
   #diagnostic: IPluginHostDiagnostic
@@ -247,7 +249,6 @@ export class PluginHost<
   #pipelineDepth = 0
   #configRuntime: PluginHostConfigRuntime<TDomainCore, TValue, TInstalled>
   #hostDisposalRuntime: PluginHostDisposalRuntime<IRegistration<TDomainCore, TValue>>
-  #compositionRuntime: PluginHostCompositionRuntime<TDomainCore, TValue>
   #enablementRuntime: PluginHostEnablementRuntime<TDomainCore, TValue>
   /** Readonly enablement facade over the same runtime that owns this Host's registrations. */
   readonly plugin: IPluginEnablement<this, TInstalled, TDomainCore, TValue>
@@ -321,14 +322,14 @@ export class PluginHost<
         ),
         this
       )
-    this.#pipeline = createPipeline<TValue, IMiddlewarePipelineMode>({
-      mode: this.#pipelineMode,
+    /** All runners share cancellation, violation reporting and error combination policy. */
+    const pipelineOptions = {
       onViolation: this.#onPipelineViolation,
       assertActive: () => this.#assertActive(),
       // Every mode observes the lifecycle abort signal, so in-flight stages of any mode can
       // stop through `context.signal` when the host closes.
       signal: this.#liveSignal,
-      combineStageAndDownstreamError: (stageError, downstreamError) =>
+      combineStageAndDownstreamError: (stageError: unknown, downstreamError: unknown) =>
         tagPluginHostError(
           new AggregateError(
             [stageError, downstreamError],
@@ -336,7 +337,25 @@ export class PluginHost<
           ),
           PluginHostErrorCode.pipelineFailed
         )
+    }
+    this.#pipeline = createPipeline<TValue, IMiddlewarePipelineMode>({
+      ...pipelineOptions,
+      mode: this.#pipelineMode
     })
+    this.#syncPipeline =
+      this.#pipelineMode === MiddlewarePipelineMode.sync
+        ? this.#pipeline
+        : createPipeline<TValue, IMiddlewarePipelineMode>({
+            ...pipelineOptions,
+            mode: MiddlewarePipelineMode.sync
+          })
+    this.#asyncPipeline =
+      this.#pipelineMode === MiddlewarePipelineMode.async
+        ? this.#pipeline
+        : createPipeline<TValue, IMiddlewarePipelineMode>({
+            ...pipelineOptions,
+            mode: MiddlewarePipelineMode.async
+          })
     this.#pipelineExecution = {
       mode: this.#pipelineMode,
       runner: this.#pipeline,
@@ -349,6 +368,16 @@ export class PluginHost<
         this.#pipelineDepth -= 1
       },
       pending: this.#pending
+    }
+    this.#syncPipelineExecution = {
+      ...this.#pipelineExecution,
+      mode: MiddlewarePipelineMode.sync,
+      runner: this.#syncPipeline
+    }
+    this.#asyncPipelineExecution = {
+      ...this.#pipelineExecution,
+      mode: MiddlewarePipelineMode.async,
+      runner: this.#asyncPipeline
     }
     // 时间策略统一走 lifecycle scheduler / 可配置阈值。负数/NaN/Infinity 立即 INVALID_OPTION。
     for (const [label, value] of [
@@ -514,9 +543,42 @@ export class PluginHost<
         return Object.freeze({
           identity: this.identity,
           nodeId: readHostNodeId(this),
-          matchesHost: (host: object) =>
-            isManagedHost(host) && openComposition(host) === openComposition(this),
+          matchesHost: (host: object) => matchesManagedHost(host, this),
           assertCurrent,
+          assertPreparedRegistration: () => {
+            this.#assertActive()
+            if (registration.lifecycle === PluginHostRegistrationLifecycle.install) {
+              this.#state.assertRegistrationValid(registration, (current) =>
+                this.#operationRuntime.assertCurrent(current)
+              )
+              return
+            }
+            if (this.#state.registrations.get(registration.name) === registration) {
+              assertCurrent()
+              return
+            }
+            /** The original lifecycle owner already retains the exact active install row. */
+            const current = this.#hookRegistration
+            if (
+              batch &&
+              !batch.committed &&
+              batch.registrations.get(registration.name) === registration &&
+              registration.installed &&
+              !registration.lifecycleController?.signal.aborted &&
+              current !== undefined &&
+              batch.registrations.get(current.name) === current &&
+              current.lifecycle === PluginHostRegistrationLifecycle.install &&
+              this.#operationRuntime.isCurrent(current.operation)
+            ) {
+              /** The original candidate handle owns installed/enabled/activation checks. */
+              void this.#createHandle(registration.name, batch).extensions
+              return
+            }
+            throw new PluginHostError(
+              PluginHostErrorCode.registrationRevoked,
+              ERROR_TEXT.REGISTRATION_REVOKED
+            )
+          },
           readSharedExtension: (key: PropertyKey) => {
             this.#assertActive()
             return this.#state.readSharedExtension(key)
@@ -665,7 +727,8 @@ export class PluginHost<
       state: this.#state,
       removal: this.#removalRuntime
     })
-    this.#compositionRuntime = new PluginHostCompositionRuntime({
+    /** Composition captures the original ports now and creates its facade only on public demand. */
+    const compositionPort = {
       host: this,
       scheduler: this.#scheduler,
       pipelineDrainTimeoutMs,
@@ -680,7 +743,7 @@ export class PluginHost<
       diagnostic: this.#diagnostic,
       installation: this.#installRuntime,
       removal: this.#removalRuntime
-    })
+    } satisfies IPluginHostCompositionRuntimePort<TDomainCore, TValue>
     this.#pipelineDrainTimeoutMs = pipelineDrainTimeoutMs
     this.#queueAdmissionTimeoutMs = options.queueAdmissionTimeoutMs
     this.#queue = createMutationQueue({
@@ -699,14 +762,12 @@ export class PluginHost<
     // 八个它永远不该调用的方法。登记发生在构造函数末尾，此时 Host 已完整。
     registerManagedHost(
       this,
-      buildManagedPort(
-        this.#compositionRuntime as unknown as IPluginHostCompositionIntegration<object>,
-        () => this.revision,
-        () => {
-          this.#assertActive()
-          return this.#createView()
-        }
-      )
+      compositionPort,
+      () => this.revision,
+      () => {
+        this.#assertActive()
+        return this.#createView()
+      }
     )
   }
 
@@ -808,10 +869,27 @@ export class PluginHost<
     kind: IMiddlewarePipelineMode
   ): void {
     try {
+      /** Preserve the existing host-mode lift, reusing it for the async view when modes match. */
+      const lifted = this.#pipeline.lift(stage as never, kind as never)
       registerPluginHostStage({
         host: this,
         depth: this.#pipelineDepth,
-        stage: this.#pipeline.lift(stage as never, kind as never),
+        stage: lifted,
+        forms: {
+          syncStage:
+            kind === MiddlewarePipelineMode.sync
+              ? (stage as ISyncMiddlewareStage<TValue>)
+              : undefined,
+          asyncStage:
+            kind === MiddlewarePipelineMode.sync || kind === MiddlewarePipelineMode.async
+              ? ((this.#pipelineMode === MiddlewarePipelineMode.async
+                  ? lifted
+                  : this.#asyncPipeline.lift(
+                      stage as never,
+                      kind as never
+                    )) as IAsyncMiddlewareStage<TValue>)
+              : undefined
+        },
         owner,
         lanes: this.#state.lanes,
         stageSlots: this.#state.stageSlots,
@@ -851,6 +929,92 @@ export class PluginHost<
       )
     } catch (error) {
       this.#rethrowWithIdentity(error)
+    }
+  }
+
+  /** Rejects explicit ordinary entries on generator hosts without altering their old protocol. */
+  #assertOrdinaryEntry(mode: IMiddlewarePipelineMode): void {
+    if (
+      this.#pipelineMode === MiddlewarePipelineMode.generator ||
+      this.#pipelineMode === MiddlewarePipelineMode.asyncGenerator
+    )
+      throw attachPluginHostIdentity(
+        new PluginHostError(
+          PluginHostErrorCode.pipelineModeMismatch,
+          ERROR_TEXT.PIPELINE_ENTRY_MODE_MISMATCH(this.#pipelineMode, mode)
+        ),
+        this
+      )
+  }
+
+  /**
+   * Runs original sync forms from the canonical lane. Async intervention rejects before any stage
+   * or terminal runs. Empty lanes call the terminal directly; a halted stage returns undefined.
+   */
+  protected runPipelineSync<TResult>(
+    value: TValue,
+    done: (value: TValue) => TResult
+  ): TResult | undefined {
+    this.#assertActive()
+    this.#assertOrdinaryEntry(MiddlewarePipelineMode.sync)
+    if (this.#state.lanes.asyncStageCount > 0)
+      throw attachPluginHostIdentity(
+        new PluginHostError(
+          PluginHostErrorCode.asyncStageInSyncEntry,
+          ERROR_TEXT.ASYNC_STAGE_IN_SYNC_ENTRY
+        ),
+        this
+      )
+    if (this.#state.lanes.size === 0) return done(value)
+    /** One immutable generation snapshot supplies both runner views and the existing lease key. */
+    const snapshot = this.#state.lanes.snapshot()
+    /** A stage may deliberately stop before the terminal, retaining the existing halt protocol. */
+    let result: TResult | undefined
+    try {
+      executePluginHostPipeline(
+        this.#syncPipelineExecution,
+        snapshot,
+        value,
+        (next) => {
+          result = done(next)
+        },
+        snapshot.syncStages
+      )
+      return result
+    } catch (error) {
+      this.#rethrowWithIdentity(error)
+    }
+  }
+
+  /**
+   * Runs the async forms and waits for the actual terminal Promise. With no stages, returns that
+   * exact Promise without a context or dispatch; halted stages resolve undefined.
+   */
+  protected runPipelineAsync<TResult>(
+    value: TValue,
+    done: (value: TValue) => Promise<TResult>
+  ): Promise<TResult | undefined> {
+    try {
+      this.#assertActive()
+      this.#assertOrdinaryEntry(MiddlewarePipelineMode.async)
+      if (this.#state.lanes.size === 0) return done(value)
+      /** Runner views and generation leases share one canonical immutable snapshot. */
+      const snapshot = this.#state.lanes.snapshot()
+      /** Only a fulfilled terminal publishes a result; downstream failure remains runner-owned. */
+      let result: TResult | undefined
+      /** Existing pending tracking waits for terminal I/O and upstream onion cleanup. */
+      const completion = executePluginHostPipeline(
+        this.#asyncPipelineExecution,
+        snapshot,
+        value,
+        async (next) => {
+          result = await done(next)
+        },
+        snapshot.asyncStages
+      ) as Promise<void>
+      return completion.then(() => result)
+    } catch (error) {
+      return Promise.reject(error)
     }
   }
 
@@ -1309,10 +1473,26 @@ export class PluginHost<
   }
 }
 
-if (asyncDisposeKey !== undefined)
-  Object.defineProperty(PluginHost.prototype, asyncDisposeKey, {
-    configurable: true,
-    value(this: PluginHost<object, unknown>) {
-      return this.dispose()
-    }
-  })
+/** Set up the optional native disposal method only when the public constructor is retained. */
+function initializePluginHost(): typeof PluginHostConstructor {
+  /** Keep constructor reflection stable for consumers and diagnostic tooling. */
+  const name = 'PluginHost'
+  Object.defineProperty(PluginHostConstructor, 'name', { configurable: true, value: name })
+  if (asyncDisposeKey !== undefined)
+    Object.defineProperty(PluginHostConstructor.prototype, asyncDisposeKey, {
+      configurable: true,
+      value(this: PluginHost<object, unknown>) {
+        return this.dispose()
+      }
+    })
+  return PluginHostConstructor
+}
+
+/** Public constructor keeps its generic axes while unused applications can discard setup. */
+export const PluginHost = /* @__PURE__ */ initializePluginHost()
+/** Instance type preserves the implementation's exact lifecycle and private-state identity. */
+export type PluginHost<
+  TDomainCore extends object,
+  TValue = never,
+  TInstalled extends readonly IPluginConstraint<any>[] = readonly []
+> = PluginHostConstructor<TDomainCore, TValue, TInstalled>

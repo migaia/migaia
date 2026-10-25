@@ -1,6 +1,6 @@
-import { createTopologyIndexFromSnapshots } from './topology-index.js'
 import {
   admitTopologyId,
+  createTopologyReadonlyMap,
   isTopologyRecord,
   snapshotTopologyDependencies,
   retainTopologyFailure,
@@ -153,27 +153,102 @@ export function buildCapabilityTopology(
       if (edge.required && !nodeIds.has(edge.provider)) onUnknownProvider(node.id, edge.provider)
     }
   }
-  /** Temporary index centralizes adjacency, level, ordering, and cycle semantics. */
-  const ordinalById = new Map(snapshots.map((node) => [node.id, node.ordinal]))
-  const index = createTopologyIndexFromSnapshots(
-    {
-      onCycle: (path) => {
-        /** Open cycle nodes rotated to the legacy static projection's lowest ordinal. */
-        const cycle = path.slice(0, -1)
-        if (cycle.length === 0) return onCycle(path)
-        let start = 0
-        for (let index = 1; index < cycle.length; index += 1) {
-          if ((ordinalById.get(cycle[index]!) ?? 0) < (ordinalById.get(cycle[start]!) ?? 0))
-            start = index
+  /** Dense ordinals provide stable placement without comparison sorting. */
+  const ordinalNodes: ITopologyNode[] = []
+  /** Canonical captured nodes keyed by identity for constant-time edge lookup. */
+  const byId = new Map<string, ITopologyNode>()
+  for (const node of snapshots) {
+    ordinalNodes[node.ordinal] = node
+    byId.set(node.id, node)
+  }
+  /** Completed nodes retain longest provider-path depth. */
+  const levels = new Map<string, number>()
+  /** Active DFS positions identify the first closed cycle in ordinal/declaration order. */
+  const active = new Map<string, number>()
+  /** Iterative traversal avoids host call-stack limits on long Feature chains. */
+  const frames: Array<{ readonly node: ITopologyNode; edge: number; level: number }> = []
+  for (const root of ordinalNodes) {
+    if (levels.has(root.id)) continue
+    active.set(root.id, 0)
+    frames.push({ node: root, edge: 0, level: 0 })
+    while (frames.length > 0) {
+      /** Current continuation resumes after its next provider completes. */
+      const frame = frames[frames.length - 1]!
+      /** Each dependency advances once after its provider depth is known. */
+      const edge = frame.node.dependencies[frame.edge]
+      if (edge) {
+        /** Missing optional providers do not add a scheduling edge. */
+        const provider = byId.get(edge.provider)
+        if (!provider) {
+          frame.edge += 1
+          continue
         }
-        const normalized = [...cycle.slice(start), ...cycle.slice(0, start)]
-        return onCycle(Object.freeze([...normalized, normalized[0]!]))
-      },
-      onInvalid: invalid
-    },
-    [...snapshots].sort((left, right) => left.ordinal - right.ordinal)
-  )
-  return index.snapshot()
+        /** A provider already on this path closes the first deterministic cycle. */
+        const activeIndex = active.get(provider.id)
+        if (activeIndex !== undefined)
+          onCycle(
+            Object.freeze([...frames.slice(activeIndex).map((entry) => entry.node.id), provider.id])
+          )
+        /** Completed provider depth is reused across shared dependencies. */
+        const providerLevel = levels.get(provider.id)
+        if (providerLevel === undefined) {
+          active.set(provider.id, frames.length)
+          frames.push({ node: provider, edge: 0, level: 0 })
+          continue
+        }
+        frame.level = Math.max(frame.level, providerLevel + 1)
+        frame.edge += 1
+        continue
+      }
+      levels.set(frame.node.id, frame.level)
+      active.delete(frame.node.id)
+      frames.pop()
+    }
+  }
+  /** Level buckets retain ordinal order because nodes enter them in ordinal order. */
+  const buckets: ITopologyNode[][] = []
+  /** Provider keys follow the first referencing consumer in registration order. */
+  const providers = new Map<string, ITopologyNode[]>()
+  /** Every consumer keeps its captured dependency array, including absent optional providers. */
+  const consumers: Array<readonly [string, readonly ITopologyDependency[]]> = []
+  /** Counts only edges whose provider is present, before traversal. */
+  const indegree: Array<readonly [string, number]> = []
+  /** Public maps retain registration order independently of DFS completion order. */
+  const levelEntries: Array<readonly [string, number]> = []
+  /** Public ordinals retain the caller's admitted dense registration positions. */
+  const ordinals: Array<readonly [string, number]> = []
+  for (const node of ordinalNodes) {
+    /** Precomputed depth chooses the bucket without comparison sorting. */
+    const level = levels.get(node.id)!
+    ;(buckets[level] ??= []).push(node)
+    consumers.push([node.id, node.dependencies])
+    levelEntries.push([node.id, level])
+    ordinals.push([node.id, node.ordinal])
+    /** Original indegree includes every edge to a present provider. */
+    let present = 0
+    for (const edge of node.dependencies) {
+      if (!byId.has(edge.provider)) continue
+      present += 1
+      /** Existing provider bucket preserves consumer registration order. */
+      const bucket = providers.get(edge.provider)
+      if (bucket) bucket.push(node)
+      else providers.set(edge.provider, [node])
+    }
+    indegree.push([node.id, present])
+  }
+  /** Flattening at most one bucket per node keeps scheduling linear. */
+  const ordered: ITopologyNode[] = []
+  for (const bucket of buckets) if (bucket) for (const node of bucket) ordered.push(node)
+  return Object.freeze({
+    ordered: Object.freeze(ordered),
+    providers: createTopologyReadonlyMap(
+      [...providers].map(([id, entries]) => [id, Object.freeze(entries)])
+    ),
+    consumers: createTopologyReadonlyMap(consumers),
+    indegree: createTopologyReadonlyMap(indegree),
+    level: createTopologyReadonlyMap(levelEntries),
+    ordinal: createTopologyReadonlyMap(ordinals)
+  })
 }
 
 export {

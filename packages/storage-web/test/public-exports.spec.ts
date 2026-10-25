@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { assertExactRetainedModules } from '../../../scripts/storage-v2-retained-ledger.mjs'
-import * as storageWeb from '../src/index'
+import * as storageWeb from '../src/index.js'
 
 /**
  * `docs/store/public-exports.baseline.json` 记录跨包公开面基线，移除任何 导出都要求一次显式的兼容性决定。这条测试是仓库里第一次真正把这份 JSON
@@ -37,13 +37,12 @@ const directConsumerFiles = [
   '../../../fixtures/consumers/electron-renderer.ts'
 ] as const
 
-/** Built reactive entries must retain the canonical function identity and diagnostic name. */
-const canonicalReactiveEntries = [
-  ['memory', 'memoryReactive'],
-  ['local-storage', 'localStorageReactive'],
-  ['session-storage', 'sessionStorageReactive'],
-  ['cookies', 'cookiesReactive'],
-  ['indexed-db', 'indexedDbReactive']
+/** Atomic backend entries and their plugin entries share the original factory object. */
+const canonicalBackendEntries = [
+  ['local-storage', 'localStorageBackendPlugin'],
+  ['session-storage', 'sessionStorageBackendPlugin'],
+  ['cookies', 'cookieBackendPlugin'],
+  ['indexed-db', 'indexedDbBackendPlugin']
 ] as const
 
 /** Reads built JavaScript after the package test script has completed its mandatory build step. */
@@ -63,14 +62,48 @@ describe('public exports baseline', () => {
   })
 })
 
+describe('native Blob subpath', () => {
+  it('publishes the selected Feature only at its dedicated built entry', async () => {
+    const entry = await import('../dist/features/blobs.js')
+    expect(Object.keys(entry)).toEqual(['indexedDbBlobFeature'])
+    expect(entry.indexedDbBlobFeature).toBeTypeOf('function')
+    expect(Object.hasOwn(storageWeb, 'indexedDbBlobFeature')).toBe(false)
+    const manifest = JSON.parse(
+      readFileSync(resolve(import.meta.dirname, '../package.json'), 'utf8')
+    )
+    expect(manifest.exports['./features/blobs']).toEqual({
+      types: './dist/features/blobs.d.ts',
+      default: './dist/features/blobs.js'
+    })
+  })
+})
+
 describe('package-owner bundle boundary', () => {
   it('keeps canonical owner roots and subpaths external instead of bundling duplicate code', () => {
     const source = readBuiltJavaScript()
+    /** Explicit notifications borrow the host controller instead of embedding another owner. */
+    const notifications = readFileSync(
+      resolve(import.meta.dirname, '../dist/features/indexed-db-notifications.js'),
+      'utf8'
+    )
+    /** The host's stable authoring entry exposes the actual change-controller implementation. */
+    const controllerEntry = readFileSync(
+      resolve(import.meta.dirname, '../../storage-host/src/authoring/change-controller.ts'),
+      'utf8'
+    )
     expect(source).toContain('from "@migaia/utils/promise"')
     expect(source).toContain('from "@migaia/utils/bytes"')
-    expect(source).toContain('from "@migaia/event-subscriber"')
+    expect(source).toContain('from "@migaia/storage-host/authoring/change-controller"')
+    expect(notifications).toContain('from "@migaia/storage-host/authoring/change-controller"')
+    expect(notifications).toContain('from "@migaia/event-subscriber"')
+    expect(controllerEntry).toContain(
+      "export { createBackendChangeController } from '../core/change-controller.js'"
+    )
     expect(source).not.toContain('//#region ../utils/')
     expect(source).not.toContain('//#region ../event-subscriber/')
+    expect(source).not.toContain('//#region ../storage-host/')
+    expect(notifications).not.toContain('//#region ../event-subscriber/')
+    expect(notifications).not.toContain('//#region ../storage-host/')
     expect(source).not.toContain('[utils] operation aborted')
   })
 
@@ -90,14 +123,31 @@ describe('atomic consumer and artifact correction', () => {
     }
   })
 
-  it('retains canonical reactive names and exact aggregate identity in built artifacts', async () => {
-    const aggregate = await import('../dist/plugins/reactive/index.js')
-    for (const [entry, exportName] of canonicalReactiveEntries) {
-      const exact = await import(`../dist/plugins/reactive/${entry}.js`)
-      const factory = exact[exportName as keyof typeof exact]
-      expect(factory).toBe(aggregate[exportName as keyof typeof aggregate])
+  it('retains canonical backend factory identity across atomic entries', async () => {
+    for (const [entry, exportName] of canonicalBackendEntries) {
+      const atomic = await import(`../dist/${entry}.js`)
+      const plugin = await import(`../dist/plugins/${entry}.js`)
+      const factory = atomic[exportName]
+      expect(factory).toBe(plugin[exportName])
       expect(factory).toBeTypeOf('function')
-      expect((factory as { readonly name: string }).name).toBe(exportName)
+      expect(factory.name).toBe(exportName)
     }
+  })
+})
+
+/** Optional IDB behavior is selected through its own public runtime entry. */
+describe('explicit IndexedDB Feature subpaths', () => {
+  it.each([
+    ['ttl', 'indexedDbTtlFeature'],
+    ['batch', 'indexedDbBatchFeature'],
+    ['journal', 'indexedDbJournalFeature'],
+    ['notifications', 'indexedDbNotificationsFeature'],
+    ['change-feed', 'indexedDbChangeFeedFeature'],
+    ['indexes', 'indexedDbIndexesFeature']
+  ])('publishes only the %s assembly factory', async (path, factory) => {
+    const entry = await import(`../dist/features/indexed-db-${path}.js`)
+    expect(Object.keys(entry)).toEqual([factory])
+    expect(entry[factory]).toBeTypeOf('function')
+    expect(Object.hasOwn(storageWeb, factory)).toBe(false)
   })
 })

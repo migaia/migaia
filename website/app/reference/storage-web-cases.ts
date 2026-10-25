@@ -1,115 +1,210 @@
 import type { ICaseDoc, IText } from './contract.js'
 
-/** Keeps localized explanations beside complete public-entry examples. */
+/** Keep localized explanations beside the same public browser installation. */
 const t = (en: string, zh: string): IText => ({ en, zh })
 
-/** Real in-memory storage paths with explicit ownership and deterministic output. */
+/** Browser cases use actual host ownership, native ports, and current public entries. */
 export const storageWebCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
-  memoryStorageHost: [
+  indexedDbBlobFeature: [
     {
-      title: t(
-        'Keep edits to inputs and returned copies out of stored data',
-        '修改输入与读取结果时不污染存储'
-      ),
+      title: t('Commit attachments with records', '随记录提交附件'),
       problem: t(
-        'A preview edits an uploaded byte array and a profile object after saving them. Those local edits must not silently rewrite the saved version.\n\nA Map that retains caller objects shares mutable references. Returning the same byte buffer or nested Map exposes another route around the write API.\n\nmemoryStorageHost copies bytes on both write and read and structured-clones records at both boundaries. Use setBytes/getBytes for bytes and putRecord/getRecord for structured values.',
-        '预览保存上传字节和用户资料后，还会继续修改本地对象；这些修改不应悄悄覆盖已保存的版本。\n\n直接把对象放进 `Map` 会共享可变引用；读取时返回原字节数组或嵌套 `Map`，又给调用者提供了绕过写入方法的修改途径。\n\n`memoryStorageHost` 在写入和读取时都复制字节，并对记录执行结构化克隆；字节使用 `setBytes/getBytes`，对象记录使用 `putRecord/getRecord`。'
+        'Attachments and records need one native rollback boundary.',
+        '附件与记录需要共用原生回滚边界。'
       ),
-      example: t(
-        "import { memoryStorageHost } from '@migaia/storage-web/memory'\n\ntype IProfile = { visits: Map<string, number> }\nconst store = memoryStorageHost<IProfile>()\ntry {\n  const bytes = new Uint8Array([1, 2])\n  await store.setBytes('avatar', bytes)\n  bytes[0] = 9\n  const copy = await store.getBytes('avatar')\n  if (copy) copy[1] = 8\n  console.log(JSON.stringify(Array.from((await store.getBytes('avatar')) ?? [])))\n  const profile = { visits: new Map([['home', 1]]) }\n  await store.putRecord(profile, 'profile')\n  profile.visits.set('home', 9)\n  const record = await store.getRecord('profile')\n  record?.visits.set('home', 8)\n  console.log((await store.getRecord('profile'))?.visits.get('home'))\n} finally {\n  await store.dispose()\n}",
-        "import { memoryStorageHost } from '@migaia/storage-web/memory'\n\ntype IProfile = { visits: Map<string, number> }\nconst store = memoryStorageHost<IProfile>()\ntry {\n  const bytes = new Uint8Array([1, 2])\n  await store.setBytes('avatar', bytes)\n  bytes[0] = 9\n  const copy = await store.getBytes('avatar')\n  if (copy) copy[1] = 8\n  console.log(JSON.stringify(Array.from((await store.getBytes('avatar')) ?? [])))\n  const profile = { visits: new Map([['home', 1]]) }\n  await store.putRecord(profile, 'profile')\n  profile.visits.set('home', 9)\n  const record = await store.getRecord('profile')\n  record?.visits.set('home', 8)\n  console.log((await store.getRecord('profile'))?.visits.get('home'))\n} finally {\n  await store.dispose()\n}"
-      ),
+      example:
+        "import { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nimport { indexedDbBlobFeature } from '@migaia/storage-web/features/blobs'\n\nconst host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin(\n      { dbName: 'attachments' },\n      { blobs: indexedDbBlobFeature() },\n    ),\n  ],\n})\ntry {\n  const store = host.backend('indexed-db')\n  await store.transaction(async (scope) => {\n    await scope.api.blobs.put(\n      'avatar',\n      new Blob(['avatar bytes'], { type: 'text/plain' }),\n    )\n    await scope.putRecord({ attachment: 'avatar' }, 'profile')\n  })\n  console.log(await (await store.api.blobs.get('avatar'))?.text())\n} finally {\n  await host.dispose()\n}",
       result: t(
-        'Prints `[1,2]` and `1` on separate lines. Neither edits to the original input nor edits to the first returned copy change the next read.\n\nThis store is volatile and isolated per factory call. Records must support structured cloning; this is not JSON conversion or browser persistence. It offers no native secondary indexes.',
-        '逐行输出 `[1,2]` 和 `1`；修改原始输入与首次读取的副本，都没有改变下一次读取的结果。\n\n每次工厂调用创建独立的易失存储；记录必须可被结构化克隆，这不是 JSON 转换，也不提供浏览器持久化，且没有原生二级索引。'
-      )
-    },
-    {
-      title: t(
-        'Discard a failed draft without erasing an unrelated write',
-        '丢弃失败草稿并保留无关写入'
-      ),
-      problem: t(
-        'A multi-record operation fails after preparing a balance change. An audit record written independently during the operation must remain available.\n\nWriting each step directly exposes partial results. Restoring an old copy of the whole Map on failure can erase another successful write that happened in the meantime.\n\nmemoryStorageHost.transaction stages record changes until its callback succeeds. This example deliberately rejects the draft while using the ordinary store API for a separate audit write.',
-        '多记录操作在准备修改余额后失败，但操作期间通过独立路径写入的审计记录仍须保留。\n\n逐步直接写入会留下半成品；失败时用旧 `Map` 覆盖整个存储，又可能抹掉期间已经成功完成的其他写入。\n\n`memoryStorageHost.transaction` 先暂存记录改动，回调成功后才提交；本例主动让草稿失败，同时通过普通存储方法独立写入审计记录。'
-      ),
-      example: t(
-        "import { StorageError } from '@migaia/storage-web'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst store = memoryStorageHost<{ count: number }>()\nconst original = new Error('request failed')\ntry {\n  await store.putRecord({ count: 1 }, 'balance')\n  const changes: string[] = []\n  const stop = store.subscribeChanges((change) => { changes.push(change.kind) })\n  try {\n    await store.transaction(async (tx) => {\n      await tx.put({ count: 2 }, 'balance')\n      await store.putRecord({ count: 9 }, 'audit')\n      throw original\n    })\n  } catch (error) {\n    if (!(error instanceof StorageError)) throw error\n    console.log(error.code, error.cause === original)\n  }\n  console.log((await store.getRecord('balance'))?.count, (await store.getRecord('audit'))?.count)\n  console.log(changes.join(','))\n  stop()\n} finally {\n  await store.dispose()\n}",
-        "import { StorageError } from '@migaia/storage-web'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst store = memoryStorageHost<{ count: number }>()\nconst original = new Error('请求失败')\ntry {\n  await store.putRecord({ count: 1 }, 'balance')\n  const changes: string[] = []\n  const stop = store.subscribeChanges((change) => { changes.push(change.kind) })\n  try {\n    await store.transaction(async (tx) => {\n      await tx.put({ count: 2 }, 'balance')\n      await store.putRecord({ count: 9 }, 'audit')\n      throw original\n    })\n  } catch (error) {\n    if (!(error instanceof StorageError)) throw error\n    console.log(error.code, error.cause === original)\n  }\n  console.log((await store.getRecord('balance'))?.count, (await store.getRecord('audit'))?.count)\n  console.log(changes.join(','))\n  stop()\n} finally {\n  await store.dispose()\n}"
-      ),
-      result: t(
-        'Prints `TRANSACTION_FAILED true`, `1 9`, and `put`. The original error remains on cause, the balance stays 1, and only the independent audit write emits a change.\n\nThe transaction covers record operations made through tx, not arbitrary external effects. Its callback error discards the draft; successful commits still use optimistic conflict checks and may reject with TRANSACTION_CONFLICT.',
-        '逐行输出 `TRANSACTION_FAILED true`、`1 9`、`put`；原始错误保留在 `cause`，余额仍为 `1`，只有独立审计写入发出变更通知。\n\n事务只覆盖通过 `tx` 发起的记录操作，不会撤销任意外部副作用；回调失败会丢弃草稿，成功提交仍须通过乐观冲突检查，也可能以 `TRANSACTION_CONFLICT` 拒绝。'
+        'Prints avatar bytes after one actual commit; a failed transaction leaves both rows absent.',
+        '一次真实提交后输出 avatar bytes；失败事务不留下两类行。'
       )
     }
   ],
-  defineEntity: [
+  localStorageBackendPlugin: [
     {
-      title: t('Reuse a primary key across separate record kinds', '让不同记录种类复用同一个主键'),
+      title: t('Apply one recoverable text draft', '应用可恢复的文本 draft'),
       problem: t(
-        'Users and teams both have a record with ID 1. Saving a team must not replace the user simply because both live in the same backend.\n\nUsing the raw ID as a global Map key makes unrelated record kinds collide. Scattered string prefixes also force every read and delete to repeat the same encoding rule.\n\ndefineEntity captures the record kind in name and the primary-key field in key. Connect both definitions to the same memory store; each repository keeps its own record space.',
-        '用户和团队都有主键为 `1` 的记录；即使共用一个后端，保存团队也不应覆盖用户。\n\n把原始主键直接当成全局 `Map` 键会让不同记录种类发生碰撞；到处拼接字符串前缀，又要求每次读取和删除都重复同一套编码规则。\n\n`defineEntity` 用 `name` 确定记录种类，用 `key` 指定主键字段；把两份定义连接到同一个内存后端，各自的仓储就拥有独立记录空间。'
+        'Several text values need one recoverable WAL intent.',
+        '多个文本值需要共用可恢复 WAL intent。'
       ),
-      example: t(
-        "import { defineEntity } from '@migaia/storage-web/entity'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\ntype IRow = { id: string; name: string }\nconst store = memoryStorageHost()\nconst users = defineEntity<IRow>({ name: 'users', key: 'id' }).connect(store)\nconst teams = defineEntity<IRow>({ name: 'teams', key: 'id' }).connect(store)\ntry {\n  await users.put({ id: '1', name: 'Ada' })\n  await teams.put({ id: '1', name: 'Research' })\n  console.log((await users.get('1'))?.name, (await teams.get('1'))?.name)\n} finally {\n  await store.dispose()\n}",
-        "import { defineEntity } from '@migaia/storage-web/entity'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\ntype IRow = { id: string; name: string }\nconst store = memoryStorageHost()\nconst users = defineEntity<IRow>({ name: 'users', key: 'id' }).connect(store)\nconst teams = defineEntity<IRow>({ name: 'teams', key: 'id' }).connect(store)\ntry {\n  await users.put({ id: '1', name: '艾达' })\n  await teams.put({ id: '1', name: '研发' })\n  console.log((await users.get('1'))?.name, (await teams.get('1'))?.name)\n} finally {\n  await store.dispose()\n}"
-      ),
+      example:
+        "import { storageJournalPlugin } from '@migaia/storage-host/journal'\nimport { Logger } from '@migaia/logger'\nimport { wal, memoryLogStore } from '@migaia/logger/plugins/durable'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { localStorageBackendPlugin } from '@migaia/storage-web/local-storage'\nconst logger = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [wal({ store: memoryLogStore() })],\n})\nconst host = await createStorageHost({\n  plugins: [\n    storageJournalPlugin(),\n    localStorageBackendPlugin({ namespace: 'draft', redo: true }),\n  ],\n  journal: { logger, namespace: 'draft', redoWal: logger.wal },\n})\ntry {\n  await host.backend('local').transaction(async (scope) => {\n    await scope.set('a', 'first')\n    await scope.set('b', 'second')\n  })\n  console.log(await host.backend('local').get('b'))\n} finally {\n  await host.dispose()\n  await logger.shutdown('manual')\n}",
       result: t(
-        'Prints `Ada Research`. Both repositories retrieve their own record even though the backend and primary key are identical.\n\nThe default version is 1, the default schema is passthrough without validation, and memory uses structuredCodec by default. Names isolate record kinds, not access permissions; dispose the store after use.',
-        '输出 `艾达 研发`；两个仓储共用后端与主键，仍分别读取到自己的记录。\n\n版本默认 `1`，结构校验器默认 `passthrough`，不做校验；内存后端默认使用 `structuredCodec`，名称隔离记录种类，不承担访问权限控制，使用结束后释放存储。'
+        'Prints second. This memory WAL demonstrates same-owner recovery only while it stays alive. Crash recovery needs a separate persistent carrier such as an original IndexedDB storageLogStore, held by one owner; participating same-origin popups may directly borrow that exact logger/WAL object.',
+        '输出 second。示例 memory WAL 仅在对象存活时支持同拥有者恢复；崩溃恢复需独立持久载体，例如由一个拥有者持有的原 IndexedDB storageLogStore，同源 popup 可直接借用该精确 logger/WAL 对象。'
       )
     },
     {
-      title: t(
-        'Transfer a unique value in one final transaction draft',
-        '在同一事务最终草稿中转移唯一值'
-      ),
+      title: t('Save namespaced browser preferences', '保存有命名空间的浏览器偏好'),
       problem: t(
-        'Two screens use separate repositories over one store. They must reject duplicate email owners, yet allow a batch to move an email from one record to another.\n\nA uniqueness cache owned by each repository misses writes from the other. Checking only intermediate batch steps rejects a valid transfer before the old owner is removed.\n\nUse the curried defineEntity form to declare a unique byEmail path index. Both repositories enforce it; batch validates its final draft. onDiagnostic is silent here to keep the output focused.',
-        '两个页面各自连接同一个存储，既要拒绝邮箱被两个记录占用，也要允许在一批改动中把邮箱从旧记录转给新记录。\n\n每个仓储自行维护唯一值缓存，会漏掉另一个仓储的写入；只检查批处理中间步骤，又会在旧所有者被移除前误拒绝合法转移。\n\n用 `defineEntity<T>()({...})` 声明 `byEmail` 路径索引及 `unique: true`，两个仓储共同遵守约束，`batch` 检查最终草稿；本例用 `onDiagnostic` 静默诊断，突出业务输出。'
+        'Two parts of an application share localStorage. A namespace keeps their text keys separate while one host owns listeners and cleanup.',
+        '应用多个部分共用本地存储；命名空间隔离文本键，宿主统一拥有监听与清理。'
       ),
-      example: t(
-        "import { StorageError } from '@migaia/storage-web'\nimport { defineEntity } from '@migaia/storage-web/entity'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\ntype IUser = { id: string; email: string }\nconst store = memoryStorageHost()\nconst definition = defineEntity<IUser>()({\n  name: 'users',\n  key: 'id',\n  indexes: { byEmail: { path: 'email', unique: true } },\n  onDiagnostic: () => {}\n})\ntry {\n  const first = definition.connect(store)\n  const second = definition.connect(store)\n  await first.put({ id: 'a', email: 'same@example.test' })\n  try {\n    await second.put({ id: 'b', email: 'same@example.test' })\n  } catch (error) {\n    if (!(error instanceof StorageError)) throw error\n    console.log(error.code)\n  }\n  console.log((await second.get('b')) === undefined)\n  await second.batch(async (tx) => {\n    await tx.put({ id: 'b', email: 'same@example.test' })\n    await tx.remove('a')\n  })\n  console.log((await first.findBy('byEmail', 'same@example.test'))?.id, (await first.get('a')) === undefined)\n} finally {\n  await store.dispose()\n}",
-        "import { StorageError } from '@migaia/storage-web'\nimport { defineEntity } from '@migaia/storage-web/entity'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\ntype IUser = { id: string; email: string }\nconst store = memoryStorageHost()\nconst definition = defineEntity<IUser>()({\n  name: 'users',\n  key: 'id',\n  indexes: { byEmail: { path: 'email', unique: true } },\n  onDiagnostic: () => {}\n})\ntry {\n  const first = definition.connect(store)\n  const second = definition.connect(store)\n  await first.put({ id: 'a', email: 'same@example.test' })\n  try {\n    await second.put({ id: 'b', email: 'same@example.test' })\n  } catch (error) {\n    if (!(error instanceof StorageError)) throw error\n    console.log(error.code)\n  }\n  console.log((await second.get('b')) === undefined)\n  await second.batch(async (tx) => {\n    await tx.put({ id: 'b', email: 'same@example.test' })\n    await tx.remove('a')\n  })\n  console.log((await first.findBy('byEmail', 'same@example.test'))?.id, (await first.get('a')) === undefined)\n} finally {\n  await store.dispose()\n}"
-      ),
+      example: `import { createStorageHost } from '@migaia/storage-host'
+import { localStorageBackendPlugin } from '@migaia/storage-web/local-storage'
+
+const host = await createStorageHost({
+  plugins: [localStorageBackendPlugin({ namespace: 'editor' })]
+})
+try {
+  const preferences = host.backend('local')
+  await preferences.set('theme', 'dark')
+  console.log(await preferences.get('theme'))
+} finally {
+  await host.dispose()
+}`,
       result: t(
-        'Prints `INDEX_UNIQUE_CONFLICT`, `true`, and `b true`. The rejected write leaves no record b; the later batch transfers the email to b and removes a.\n\nMemory uses a fallback uniqueness check, not a native index. unique defaults to false and an omitted diagnostic callback uses console.warn. Repository batch needs a record backend with rollback support.',
-        '逐行输出 `INDEX_UNIQUE_CONFLICT`、`true`、`b true`；失败写入没有留下记录 `b`，后续批处理把邮箱转给 `b`，并移除了 `a`。\n\n内存后端通过回退检查保证唯一性，没有原生索引；`unique` 默认 `false`，省略诊断回调时使用 `console.warn`，仓储 `batch` 要求后端支持记录事务与回滚。'
+        'Reads dark from the selected namespace. Host disposal releases resources and leaves persistent browser data intact.',
+        '从选定命名空间读到深色主题；宿主释放资源后，浏览器持久化数据仍保留。'
       )
     },
     {
-      title: t(
-        'Preview an upgrade before explicitly saving its new version',
-        '先读取升级结果再显式保存新版本'
-      ),
+      title: t('Keep organization preferences separate', '隔离组织偏好'),
       problem: t(
-        'A release renames a stored field. Readers need the new shape immediately, but an ordinary get must not silently rewrite persisted records.\n\nCombining reads with migration writes makes a page visit a hidden mutation. Conversely, changing only TypeScript types leaves old stored values in the previous shape.\n\ndefineEntity declares version 2 and its required step 2. get runs that step in memory; migrate persists it explicitly. The example uses batchSize 1 instead of the default 100.',
-        '新版本把已存字段改了名字；读取者需要立刻拿到新结构，但一次普通 `get` 不应悄悄改写已存记录。\n\n把读取与迁移写入绑在一起，会让访问页面变成隐藏修改；只改 TypeScript 类型，又不会改变后端里旧数据的实际结构。\n\n`defineEntity` 声明 `version: 2` 和必需的目标步骤 `2`，`get` 在内存中执行升级，`migrate` 才显式写回；本例将 `batchSize` 从默认 `100` 改成 `1`。'
+        'One configured browser namespace serves a default organization and explicit UUID organizations without sharing their keys.',
+        '同一配置命名空间分别服务缺省组织与显式UUID组织，不共享键值。'
       ),
-      example: t(
-        "import { defineEntity } from '@migaia/storage-web/entity'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\ntype IOldUser = { id: string; name: string }\ntype IUser = { id: string; displayName: string }\nconst store = memoryStorageHost()\ntry {\n  const old = defineEntity<IOldUser>({ name: 'users', key: 'id' }).connect(store)\n  await old.put({ id: 'a', name: 'Ada' })\n  let upgrades = 0\n  const users = defineEntity<IUser>({\n    name: 'users',\n    key: 'id',\n    version: 2,\n    migrations: {\n      2: async (previous) => {\n        upgrades += 1\n        const value = previous as IOldUser\n        return { id: value.id, displayName: value.name }\n      }\n    }\n  }).connect(store)\n  console.log((await users.get('a'))?.displayName, (await users.get('a'))?.displayName, upgrades)\n  const result = await users.migrate({ batchSize: 1 })\n  console.log(result.migrated, upgrades)\n  console.log((await users.get('a'))?.displayName, upgrades)\n} finally {\n  await store.dispose()\n}",
-        "import { defineEntity } from '@migaia/storage-web/entity'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\ntype IOldUser = { id: string; name: string }\ntype IUser = { id: string; displayName: string }\nconst store = memoryStorageHost()\ntry {\n  const old = defineEntity<IOldUser>({ name: 'users', key: 'id' }).connect(store)\n  await old.put({ id: 'a', name: '艾达' })\n  let upgrades = 0\n  const users = defineEntity<IUser>({\n    name: 'users',\n    key: 'id',\n    version: 2,\n    migrations: {\n      2: async (previous) => {\n        upgrades += 1\n        const value = previous as IOldUser\n        return { id: value.id, displayName: value.name }\n      }\n    }\n  }).connect(store)\n  console.log((await users.get('a'))?.displayName, (await users.get('a'))?.displayName, upgrades)\n  const result = await users.migrate({ batchSize: 1 })\n  console.log(result.migrated, upgrades)\n  console.log((await users.get('a'))?.displayName, upgrades)\n} finally {\n  await store.dispose()\n}"
-      ),
+      example:
+        "import { createStorageHost, createOrgId } from '@migaia/storage-host'\nimport { localStorageBackendPlugin } from '@migaia/storage-web/local-storage'\nconst host = await createStorageHost({ plugins: [localStorageBackendPlugin({ namespace: 'preferences' })] })\ntry {\n  const org = createOrgId()\n  const settings = host.org(org).backend('local')\n  await host.backend('local').set('theme', 'light')\n  await settings.set('theme', 'dark')\n  console.log(await host.backend('local').get('theme'), await settings.get('theme'))\n  await host.dropOrg(org)\n  console.log(await settings.get('theme'))\n} finally { await host.dispose() }",
       result: t(
-        'Prints `Ada Ada 2`, `1 3`, and `Ada 3`. Two reads each upgrade the old record; migrate upgrades and saves it once; the final read needs no further upgrade.\n\nA definition above version 1 requires every step from 2 through its version. Reads do not write back. Explicit migration reports per-record results and is not an atomic migration of the entire database.',
-        '逐行输出 `艾达 艾达 2`、`1 3`、`艾达 3`；两次读取分别升级旧记录，`migrate` 再升级并保存一次，最后读取不再执行升级。\n\n高于版本 `1` 的定义必须提供从 `2` 到当前版本的全部步骤；读取不写回，显式迁移返回逐记录处理统计，不承诺整个数据库一次原子升级。'
+        'Prints light dark, then null. The original organization view remains reusable after its target is cleared.',
+        '依次输出light dark及null；目标清理后原组织视图仍可复用。'
+      )
+    },
+    {
+      title: t('Watch native text invalidations', '观察原生文本失效提示'),
+      problem: t(
+        'Preferences need committed local and cross-document notifications from an admitted native Window source.',
+        '偏好变更需来自已准入 Window 事件源的本实例提交与跨文档提示。'
+      ),
+      example:
+        "import { createStorageHost } from '@migaia/storage-host'\nimport { asChangeFeedStore } from '@migaia/storage-contract'\nimport { localStorageBackendPlugin } from '@migaia/storage-web/local-storage'\nconst host = await createStorageHost({ plugins: [localStorageBackendPlugin({ namespace: 'preferences' })] })\ntry {\n  const preferences = asChangeFeedStore(host.backend('local'))\n  const changes = preferences.watch('theme')\n  try {\n    const changed = changes.next()\n    await preferences.set('theme', 'dark')\n    await changed\n    console.log(await preferences.get('theme'))\n  } finally { await changes.dispose() }\n} finally { await host.dispose() }",
+      result: t(
+        'Prints dark and closes the original iterator. A Storage-like injection without its native event source rejects feed admission. Hints require rereading current data.',
+        '输出 dark 后关闭原迭代器。缺少原生事件源的 Storage-like 注入不能准入变更流；提示需要重新读取当前值。'
       )
     }
   ],
-  createStorageHost: [
+  indexedDbBackendPlugin: [
     {
-      title: t('Own and close named backend instances together', '统一拥有和关闭具名后端实例'),
+      title: t('Commit native history with opt-in undo', '提交原生历史并显式选择 undo'),
       problem: t(
-        'Preferences and temporary drafts need separate storage instances. Application shutdown must close both, including a store retained by a screen after the host is gone.\n\nA registry of store objects alone does not assign cleanup ownership. Forgetting one disposer leaves a stale screen able to write through an old reference.\n\nInstall storage-contract directly for its error type. createStorageHost installs two memoryBackendPlugin instances under distinct IDs. backend returns their actual stores; awaiting host.dispose releases the stores created by those plugins.',
-        '偏好设置和临时草稿需要独立存储；应用退出时必须关闭两者，即使页面仍持有宿主之外的存储引用。\n\n只把存储对象放进注册表，并没有确定谁负责清理；漏调一个释放方法，就会让旧页面继续通过残留引用写入。\n\n直接安装 `@migaia/storage-contract` 以读取错误类型；`createStorageHost` 把两个 `memoryBackendPlugin` 实例安装到不同 ID，`backend` 返回真实存储；等待 `host.dispose()` 会释放这些插件创建的存储。'
+        "Use the current org's original native log objects for data, binlog and undo to share the actual native terminal.",
+        '使用当前组织的原生日志对象，让业务、binlog 与 undo 共用真实原生终点。'
       ),
-      example: t(
-        "import { StorageContractError } from '@migaia/storage-contract'\nimport { createStorageHost } from '@migaia/storage-web/host'\nimport { memoryBackendPlugin } from '@migaia/storage-web/plugins/memory'\n\nconst host = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'preferences' }), memoryBackendPlugin({ id: 'drafts' })] as const\n})\nconst preferences = host.backend('preferences')\nconst drafts = host.backend('drafts')\ntry {\n  await preferences.set('theme', 'dark')\n  await drafts.set('theme', 'light')\n  console.log(await preferences.get('theme'), await drafts.get('theme'), host.backends().size)\n} finally {\n  await host.dispose()\n}\ntry {\n  await drafts.get('theme')\n} catch (error) {\n  if (!(error instanceof StorageContractError)) throw error\n  console.log(error.code)\n}",
-        "import { StorageContractError } from '@migaia/storage-contract'\nimport { createStorageHost } from '@migaia/storage-web/host'\nimport { memoryBackendPlugin } from '@migaia/storage-web/plugins/memory'\n\nconst host = await createStorageHost({\n  plugins: [memoryBackendPlugin({ id: 'preferences' }), memoryBackendPlugin({ id: 'drafts' })] as const\n})\nconst preferences = host.backend('preferences')\nconst drafts = host.backend('drafts')\ntry {\n  await preferences.set('theme', '深色')\n  await drafts.set('theme', '浅色')\n  console.log(await preferences.get('theme'), await drafts.get('theme'), host.backends().size)\n} finally {\n  await host.dispose()\n}\ntry {\n  await drafts.get('theme')\n} catch (error) {\n  if (!(error instanceof StorageContractError)) throw error\n  console.log(error.code)\n}"
-      ),
+      example:
+        "import { storageJournalPlugin } from '@migaia/storage-host/journal'\nimport { indexedDbJournalFeature } from '@migaia/storage-web/features/indexed-db-journal'\nimport { Logger } from '@migaia/logger'\nimport { binlog, undoLog } from '@migaia/logger/plugins/durable'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nlet latest!: () => Promise<string>\nlet shutdown!: () => Promise<void>\nconst host = await createStorageHost({\n  plugins: [\n    storageJournalPlugin(),\n    indexedDbBackendPlugin(\n      { dbName: 'journalled-editor' },\n      { journal: indexedDbJournalFeature() },\n    ),\n  ],\n  journal: async ({ storageLogStore }) => {\n    const records = await storageLogStore('indexed-db', { prefix: 'commits' })\n    const images = await storageLogStore('indexed-db', { prefix: 'undo' })\n    const logger = new Logger({\n      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n      plugins: [binlog({ store: records }), undoLog({ store: images })],\n    })\n    latest = async () =>\n      ((await logger.binlog.read(1))[0]!.payload as { txId: string }).txId\n    shutdown = () => logger.shutdown('manual')\n    return {\n      logger,\n      namespace: 'editor',\n      indexedDbUndo: true,\n      atomicBinlog: { 'indexed-db': records },\n      atomicUndo: { 'indexed-db': images },\n    }\n  },\n})\ntry {\n  const store = host.backend('indexed-db')\n  await store.set('draft', 'saved')\n  await store.undo(await latest())\n  console.log(await store.get('draft'))\n} finally {\n  await shutdown()\n  await host.dispose()\n}",
       result: t(
-        'Prints `dark light 2` and `STORE_DISPOSED`. The same text key has independent values in two backends, and a retained store rejects reads after host disposal.\n\nThese plugins create volatile owned stores. Initial plugin installation completes before the host resolves; the default batch installation budget is 30000 ms. This example makes no browser persistence claim.',
-        '逐行输出 `深色 浅色 2`、`STORE_DISPOSED`；两个后端的同名文本键保留独立值，宿主释放后，残留存储引用的读取被拒绝。\n\n这些插件创建由宿主拥有的易失存储；初始插件全部安装完成后宿主才返回，整批安装预算默认 `30000` 毫秒，本例不证明浏览器持久化。'
+        'Prints null. Native complete publishes both business and log state. Undo is checked before restoration; active commit journaling rejects native Feature handles outside the current image domain, while telemetry-only Features stay available.',
+        '输出 null；真实 complete 才发布业务与日志状态。undo 在恢复前完成比对；提交日志拒绝当前镜像域外的原生 Feature 句柄，仅遥测 Feature 保持可用。'
+      )
+    },
+    {
+      title: t('Keep private history across business clear', '业务清理后保留私有历史'),
+      problem: t(
+        'A persistent log needs its original native metadata namespace; lifetime-exclusive owners may cache, while other reliable native transactions restore current state for each operation.',
+        '持久日志使用原生私有元数据命名空间；资源期间独占的拥有者可缓存，其它可靠原生事务按操作现读。'
+      ),
+      example:
+        "import { storageJournalPlugin } from '@migaia/storage-host/journal'\nimport { indexedDbJournalFeature } from '@migaia/storage-web/features/indexed-db-journal'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { storageLogStore } from '@migaia/storage-host/journal'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\n\nconst host = await createStorageHost({\n  plugins: [\n    storageJournalPlugin(),\n    indexedDbBackendPlugin(\n      { dbName: 'history' },\n      { journal: indexedDbJournalFeature() },\n    ),\n  ],\n})\ntry {\n  const log = await storageLogStore(host, 'indexed-db', { prefix: 'audit' })\n  try {\n    await log.append([{ kind: 'saved', payload: { id: 'draft' } }])\n    await host.backend('indexed-db').clearAll()\n    console.log(await log.lastSeq())\n  } finally {\n    await log.dispose()\n  }\n} finally {\n  await host.dispose()\n}",
+      result: t(
+        'Prints 1. Native Web Locks retain lifetime exclusion and the cached path, with LOCK_REJECTED on conflict. Otherwise indexExclusive:false restores current lastSeq/state/records inside each original journal-store readwrite transaction and retains no index across operations.',
+        '输出 1；原生 Web Locks 保留资源独占与缓存路径，冲突报 LOCK_REJECTED；其它 indexExclusive:false 组合在每操作原 journal-store readwrite 事务现读 lastSeq/state/记录，不跨操作缓存。'
+      )
+    },
+    {
+      title: t('Commit text, bytes and records together', '一起提交文本、字节与记录'),
+      problem: t(
+        'A saved document and its attachment must share one rollback boundary. Use the supplied native transaction scope for every participating write.',
+        '文档与附件需要共用回滚边界，所有参与写入均使用所提供的原生事务作用域。'
+      ),
+      example: `import { createStorageHost } from '@migaia/storage-host'
+import { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'
+
+const host = await createStorageHost({
+  plugins: [indexedDbBackendPlugin({ dbName: 'editor' })]
+})
+try {
+  const store = host.backend('indexed-db')
+  await store.transaction(async (scope) => {
+    await scope.set('last-document', 'a')
+    await scope.setBytes('attachment:a', new Uint8Array([1, 2]))
+    await scope.putRecord({ id: 'a', title: 'Draft' }, 'document:a')
+  })
+  console.log(await store.getRecord('document:a'))
+} finally {
+  await host.dispose()
+}`,
+      result: t(
+        'The record is readable after the original native transaction completes. An operation failure rolls back participating channels. Timers and network waits do not preserve native activity.',
+        '原生事务完成后可读到记录；操作失败会回滚参与的数据通道，定时器和网络等待不保留原生活跃性。'
+      )
+    },
+    {
+      title: t('Keep an expiry draft in the native transaction', '在原生事务中提交期限草稿'),
+      problem: t(
+        'A text entry and its expiry must share one atomic rollback boundary.',
+        '文本值与期限需要共用原子的回滚边界。'
+      ),
+      example:
+        "import { indexedDbTtlFeature } from '@migaia/storage-web/features/indexed-db-ttl'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { ttl } from '@migaia/storage-contract'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\n\nconst host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin({ dbName: 'expiry' }, { ttl: indexedDbTtlFeature() }),\n  ],\n})\ntry {\n  const store = host.backend('indexed-db')\n  await store.transaction(async (scope) => {\n    await scope.set('draft', 'temporary')\n    await scope.use(ttl).expire({ channel: 'text', key: 'draft' }, 0)\n  })\n  console.log(await store.get('draft'))\n} finally {\n  await host.dispose()\n}",
+      result: t(
+        'Prints null. A zero duration removes the target in the same native transaction; text, bytes and records share the TTL capability.',
+        '输出 null。零期限在同一原生事务删除目标，文本、字节和记录均支持 TTL 能力。'
+      )
+    },
+    {
+      title: t('Delete one organization database', '删除单个组织数据库'),
+      problem: t(
+        'Organization deletion must remove its physical IndexedDB target while preserving other organizations and reusable views.',
+        '删除组织时需移除其物理 IndexedDB 目标，保留其它组织及可复用视图。'
+      ),
+      example:
+        "import { createStorageHost, createOrgId } from '@migaia/storage-host'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\nconst host = await createStorageHost({ plugins: [indexedDbBackendPlugin({ dbName: 'preferences' })] })\ntry {\n  const org = createOrgId()\n  const settings = host.org(org).backend('indexed-db')\n  await host.backend('indexed-db').set('theme', 'light')\n  await settings.set('theme', 'dark')\n  await host.dropOrg(org)\n  console.log(await settings.get('theme'), await host.backend('indexed-db').get('theme'))\n} finally { await host.dispose() }",
+      result: t(
+        'Prints null light. The deleted organization reopens through the original native layout; the configured default remains intact.',
+        '输出 null light；删除的组织通过原生布局重新打开，配置的缺省目标保持不变。'
+      )
+    }
+  ],
+  cookieBackendPlugin: [
+    {
+      title: t('Keep expiry stable during redo', '在 redo 时保持过期时间'),
+      problem: t(
+        'Cookie recovery must not renew a relative Max-Age.',
+        'Cookie 恢复不能重新延长相对 Max-Age。'
+      ),
+      example: `import type { ICookiesOptions } from '@migaia/storage-web/cookies'
+const options: ICookiesOptions = { namespace: 'consent', scope: { path: '/' }, redo: true }
+console.log(options.redo)`,
+      result: t(
+        'Prints true. Installation also requires native Web Locks and journal.redoWal equal to the selected original logger.wal. The original cookie serializer and visibility checks apply; pending intent stores an absolute expiry.',
+        '输出 true；安装还要求原生 Web Locks 及 journal.redoWal 等于选定原 logger.wal。继续使用原 Cookie serializer 与可见性检查，pending intent 保存绝对期限。'
+      )
+    },
+    {
+      title: t('Reuse one Cookie scope for writes and removal', '写入与删除复用同一 Cookie 作用域'),
+      problem: t(
+        'Removing a cookie with a different path can leave the original value behind. Choose the scope once when installing its backend.',
+        '删除时使用不同路径可能留下原值，在安装后端时一次选定作用域。'
+      ),
+      example: `import { createStorageHost } from '@migaia/storage-host'
+import { cookieBackendPlugin } from '@migaia/storage-web/cookies'
+
+const host = await createStorageHost({ plugins: [cookieBackendPlugin({
+  namespace: 'editor', scope: { path: '/', sameSite: 'lax', secure: true }
+})] })
+try {
+  const cookies = host.backend('cookies')
+  await cookies.set('theme', 'dark', { maxAge: 3600 })
+  console.log(await cookies.get('theme'))
+  await cookies.remove('theme')
+} finally {
+  await host.dispose()
+}`,
+      result: t(
+        'Both assignments use the same fixed scope. Only JS-visible cookies participate; HttpOnly data and server-side changes remain outside this view.',
+        '写入与删除使用同一固定作用域；只处理脚本可见 Cookie，不包含 HttpOnly 数据或服务端变化。'
       )
     }
   ]

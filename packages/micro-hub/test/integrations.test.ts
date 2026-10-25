@@ -1,4 +1,4 @@
-import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { createMemoryTestStore } from './helpers/memory.js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createMicroHub, defineContract, getMicroHub, keyed, resource } from '../src/index.js'
 import { persist, type IPersistOptions } from '../src/persist/index.js'
@@ -18,7 +18,7 @@ afterEach(async () => {
 describe('persistence integration', () => {
   it('persists selected fields and restores them into a new hub', async () => {
     /** Backend is borrowed across two independent hub lifetimes. */
-    const backend = memoryStorageHost()
+    const backend = await createMemoryTestStore()
     /** Only count is selected for persistence. */
     const contract = defineContract('saved', {
       version: 1,
@@ -45,7 +45,7 @@ describe('persistence integration', () => {
 
   it('keeps a startup write while restoring untouched fields from delayed storage', async () => {
     /** Concrete envelope predates the application mount. */
-    const backend = memoryStorageHost()
+    const backend = await createMemoryTestStore()
     await backend.set(
       'custom:archive',
       JSON.stringify({ version: 1, state: { count: 8, label: 'saved' } })
@@ -86,7 +86,7 @@ describe('persistence integration', () => {
 
   it('discards an archive of another contract version', async () => {
     /** Existing archive represents a prior major contract. */
-    const backend = memoryStorageHost()
+    const backend = await createMemoryTestStore()
     await backend.set('micro-hub:versioned', JSON.stringify({ version: 1, state: { count: 9 } }))
     /** Current major starts from its own field values. */
     const contract = defineContract('versioned', { version: 2, state: { count: 1 } })
@@ -98,9 +98,36 @@ describe('persistence integration', () => {
     expect(owned.state.count.get()).toBe(1)
   })
 
+  it('reports and preserves a future archive without resetting or writing it', async () => {
+    /** A newer application owns the archived shape. */
+    const backend = await createMemoryTestStore()
+    /** Failed hydration must preserve the exact original text. */
+    const raw = JSON.stringify({ version: 3, state: { count: 9 } })
+    await backend.set('micro-hub:future', raw)
+    /** The older contract is deliberately unable to consume version three. */
+    const contract = defineContract('future', { version: 2, state: { count: 1 } })
+    /** Ready errors must reach the existing hub report channel once. */
+    const reports: unknown[] = []
+    /** The actual persistence driver must use its configured reset plan only for old archives. */
+    const owned = createMicroHub({
+      plugins: [state(), persist({ store: backend })],
+      report: (error) => reports.push(error)
+    })
+      .connect('owner')
+      .own(contract, { persist: ['count'] })
+    await expect(owned.persistence!.ready).rejects.toMatchObject({
+      source: '@migaia/storage-contract',
+      code: 'VERSION_UNSUPPORTED'
+    })
+    await expect(owned.persistence!.flush()).rejects.toBe(owned.persistence!.hydrationError.value)
+    expect(owned.state.count.get()).toBe(1)
+    expect(reports).toEqual([owned.persistence!.hydrationError.value])
+    expect(await backend.get('micro-hub:future')).toBe(raw)
+  })
+
   it('validates persisted fields before attaching storage and permits retry after rollback', async () => {
     /** Backend is not touched when the requested state field is invalid. */
-    const backend = memoryStorageHost()
+    const backend = await createMemoryTestStore()
     /** State includes a keyed field that this persistence facade does not support. */
     const contract = defineContract('invalidpersist', {
       version: 1,
@@ -128,7 +155,7 @@ describe('persistence integration', () => {
   it('stops scheduled writes at ownership release and flushes the pending debounce snapshot', async () => {
     vi.useFakeTimers()
     /** Backend exposes final storage data without adding timing delays. */
-    const backend = memoryStorageHost()
+    const backend = await createMemoryTestStore()
     /** Count updates drive the debounced attachment. */
     const contract = defineContract('debounced', {
       version: 1,
@@ -154,7 +181,7 @@ describe('persistence integration', () => {
     'keeps a commit made right before $ending without debounce',
     async ({ ending }) => {
       /** Backend is borrowed by the ending hub and by the hub that restores from it. */
-      const backend = memoryStorageHost()
+      const backend = await createMemoryTestStore()
       /** Count updates are written without a debounce window. */
       const contract = defineContract('immediate', {
         version: 1,
@@ -208,7 +235,7 @@ describe('persistence integration', () => {
     'orders replacement-owner I/O after $sequence',
     async ({ inFlight, failOutgoing, releaseIntermediate }) => {
       /** One backend is borrowed by successive owners and the eventual fresh hub. */
-      const backend = memoryStorageHost()
+      const backend = await createMemoryTestStore()
       /** All three lifecycle phases address this same storage envelope. */
       const storageKey = 'micro-hub:reownpersist'
       /** Calls record adapter admission order rather than only the eventual in-memory value. */

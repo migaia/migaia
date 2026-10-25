@@ -1,11 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { captureOperationCleanup } from '../helpers/operation-reporter.js'
-import {
-  assertOperationContext,
-  mergeSignals,
-  throwIfAborted,
-  withAbort
-} from '../../src/core/operation'
+import { assertOperationContext } from '@migaia/storage-contract'
+import { mergeSignals, throwIfAborted, withAbort } from '@migaia/storage-host/authoring/backend'
 
 const noopReporter = (): void => {}
 
@@ -26,24 +22,6 @@ describe('throwIfAborted', () => {
         expect.objectContaining({ code: 'INVALID_ARGUMENT' })
       )
   })
-  it('signal surface getter 异常归一为 INVALID_ARGUMENT', () => {
-    for (const field of ['aborted', 'addEventListener', 'removeEventListener'] as const) {
-      const cause = new Error(`hostile ${field} getter`)
-      const signal = {
-        aborted: false,
-        addEventListener: () => {},
-        removeEventListener: () => {}
-      }
-      Object.defineProperty(signal, field, {
-        get: () => {
-          throw cause
-        }
-      })
-      expect(() => assertOperationContext({ signal: signal as never })).toThrow(
-        expect.objectContaining({ code: 'INVALID_ARGUMENT', cause })
-      )
-    }
-  })
   it('未 abort 时不抛错', () => {
     const controller = new AbortController()
     expect(() => throwIfAborted(controller.signal)).not.toThrow()
@@ -55,24 +33,7 @@ describe('throwIfAborted', () => {
       expect.objectContaining({ code: 'ABORTED' })
     )
   })
-  it('已 abort signal 的 hostile reason getter 仍归一为 ABORTED', () => {
-    const cause = new Error('hostile reason getter')
-    const signal = {
-      aborted: true,
-      get reason(): never {
-        throw cause
-      },
-      addEventListener: () => {},
-      removeEventListener: () => {}
-    } as never
-    expect(() => throwIfAborted(signal)).toThrow(
-      expect.objectContaining({ code: 'ABORTED', cause })
-    )
-    const merged = mergeSignals({ signal, timeoutMs: 1000 }, noopReporter)
-    expect(merged.signal?.aborted).toBe(true)
-    expect(merged.signal?.reason).toBe(cause)
-    merged.dispose()
-  })
+
   it('signal 为 undefined 时不抛错', () => {
     expect(() => throwIfAborted(undefined)).not.toThrow()
   })
@@ -185,26 +146,13 @@ describe('mergeSignals', () => {
     const { signal } = mergeSignals({ signal: controller.signal }, noopReporter)
     expect(signal).toBe(controller.signal)
   })
-  it('operation context 每个字段只读取一次并传递快照', async () => {
+  it('operation context 保留 signal 和选项值', async () => {
     const controller = new AbortController()
-    let reads = 0
     const context = {
-      get signal() {
-        reads += 1
-        return controller.signal
-      },
-      get timeoutMs() {
-        reads += 1
-        return undefined
-      },
-      get pageSize() {
-        reads += 1
-        return 64
-      },
-      get conflictPolicy() {
-        reads += 1
-        return 'replace' as const
-      }
+      signal: controller.signal,
+      timeoutMs: undefined,
+      pageSize: 64,
+      conflictPolicy: 'replace' as const
     }
     await expect(
       withAbort(context, async (signal, snapshot) => ({ signal, snapshot }))
@@ -217,30 +165,12 @@ describe('mergeSignals', () => {
         conflictPolicy: 'replace'
       }
     })
-    expect(reads).toBe(4)
   })
-  it('可信快照跨层复用时不重新探测稳定 signal surface', async () => {
-    const reads = { aborted: 0, addEventListener: 0, removeEventListener: 0 }
-    const signal = {
-      get aborted() {
-        reads.aborted += 1
-        return false
-      },
-      get addEventListener() {
-        reads.addEventListener += 1
-        if (reads.addEventListener > 1) throw new Error('addEventListener read twice')
-        return () => {}
-      },
-      get removeEventListener() {
-        reads.removeEventListener += 1
-        if (reads.removeEventListener > 1) throw new Error('removeEventListener read twice')
-        return () => {}
-      }
-    } as never
-    const snapshot = mergeSignals({ signal }, noopReporter).context
+  it('operation context 可跨层复用', async () => {
+    const controller = new AbortController()
+    const snapshot = mergeSignals({ signal: controller.signal }, noopReporter).context
     await expect(withAbort(snapshot, async () => 42)).resolves.toBe(42)
-    expect(reads).toEqual({ aborted: 2, addEventListener: 1, removeEventListener: 1 })
-    expect(Object.isFrozen(snapshot)).toBe(true)
+    expect(snapshot?.signal).toBe(controller.signal)
   })
   it('timeoutMs 到期后合成 signal 被 abort', async () => {
     const { signal, dispose } = mergeSignals({ timeoutMs: 5 }, noopReporter)

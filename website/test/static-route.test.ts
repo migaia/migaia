@@ -3917,10 +3917,10 @@ test('gives primary tasks independent bilingual pages', () => {
       'Stop accepting work and shut down after parent loss',
       'Keep shutdown and exit callbacks separate'
     ],
-    ['/zh/docs/storage-contract', '在存储边界固定输入与错误语义', '为什么选它'],
+    ['/zh/docs/storage-contract', '用同一契约连接存储实现', '为什么选它'],
     [
       '/en/docs/storage-contract',
-      'Capture inputs and failures at storage boundaries',
+      'Connect storage implementations through one contract',
       'Why choose it'
     ],
     ['/zh/docs/storage-contract/getting-started', '安装并保存第一项偏好', '字符串存储的完整方法'],
@@ -4514,7 +4514,9 @@ test('gives primary tasks independent bilingual pages', () => {
   assert.match(storageContractText, /This real memory backend emits events after a write commits/)
   assert.match(storageContractText, /The example skips non-increasing numbers/)
   assert.match(storageContractText, /Call unsubscribe\(\) when the view closes/)
-  assert.match(storageContractText, /collectionsJsonCodec/)
+  assert.match(storageContractText, /defineCollectionsJsonCodec/)
+  assert.match(storageContractText, /fromValueCodec/)
+  assert.doesNotMatch(storageContractText, /import \{ collectionsJsonCodec \}/)
   assert.match(storageContractText, /UNSUPPORTED_CAPABILITY/)
   assert.match(guideSource, /const stableKey = snapshotStorageKey\(key, 'memory'/)
   assert.match(guideSource, /change\.sequence <= sequence/)
@@ -4590,7 +4592,7 @@ test('gives primary tasks independent bilingual pages', () => {
   assert.match(storageWebStartText, /secondaryIndexes[\s\S]*changeFeed/)
   assert.match(storageWebStartText, /putRecord/)
   assert.match(storageWebStartText, /Compose backends/)
-  assert.match(storageWebStartText, /memoryStorageHost/)
+  assert.match(storageWebStartText, /memoryBackendPlugin/)
   assert.match(storageWebStartText, /Close the instance without deleting browser-persistent data/)
   assert.match(storageWebStartText, /namespaceCodec/)
 
@@ -4617,7 +4619,9 @@ test('gives primary tasks independent bilingual pages', () => {
   assert.match(storageWebText, /StorageContractError/)
   assert.match(storageWebText, /memoryBackendPlugin\(\{ id: 'drafts' \}\)/)
   assert.match(guideSource, /await db\.transaction\(async \(tx\)/)
-  assert.match(storageWebText, /indexedDbReactive\(\{ id: 'users'/)
+  assert.match(storageWebText, /reactiveFeature\(indexedDbBackendKind\)/)
+  assert.match(storageWebText, /indexedDbBackendPlugin\(/)
+  assert.match(storageWebText, /query\(\)\.limit\(20\)\.live\(/)
 
   /** The first RPC task uses the current public client/provider presets for one price call. */
   const rpcStart = readFileSync(
@@ -5781,20 +5785,18 @@ test('keeps every maintained Storage Web continuation resolvable', () => {
 test('explains selection and the real clone boundary', () => {
   const html = readFileSync(join(buildRoot, artifactPath('/zh/docs/storage-web/readme')), 'utf8')
   const text = renderedText(html)
-
+  assert.match(text, /@migaia\/storage-host\/entity/)
   assert.match(
     text,
-    /jsonCodec.*output:text.*structuredCodec.*output:structured.*binaryCodec.*output:binary.*selectCodec.*直连、回退或拒绝/s
+    /jsonCodec.*output.*text.*structuredCodec.*output.*structured.*binaryCodec.*output.*binary.*selectCodec.*直连、回退或拒绝/s
   )
-  assert.match(text, /structuredCodec.*encode\/decode 恒等，不复制；真正复制在 record backend/s)
-  assert.match(text, /bytes 复制，record 采用 structuredClone/)
-  assert.match(text, /structuredCodec.*encode\/decode 恒等，不复制.*binaryCodec.*校验后原样返回/s)
-  assert.match(
-    text,
-    /jsonCodec 不保留 Date\/Map\/Set\/bytes 原类型，也不能表示循环。structuredCodec 可交给后端保存可 structured-clone 的内建类型与循环/
-  )
-  assert.match(html, /UNSUPPORTED_CAPABILITY/)
-  assert.match(text, /schema 处理领域表示，codec 处理保存格式，二者不是同一层/)
-  assert.match(text, /不重建 class 业务实例，不做 schema 校验/)
-  assert.match(text, /读取 codec.decode→版本迁移（存储表示）→schema.decode→validate/)
+  assert.match(text, /structuredCodec.*encode\/decode.*原样返回值，不复制.*真正复制在记录后端/s)
+  assert.match(text, /内存后端会复制字节，记录采用 structuredClone/)
+  assert.match(text, /binaryCodec.*校验后原样返回字节视图，后端负责写入快照/s)
+  assert.match(text, /jsonCodec.*不能表示循环.*structuredCodec.*内建类型与循环/s)
+  assert.match(text, /defineCollectionsJsonCodec.*fromValueCodec/s)
+  assert.match(text, /UNSUPPORTED_CAPABILITY/)
+  assert.match(text, /schema 处理领域表示，codec 处理保存格式/)
+  assert.match(text, /不重建 class 业务实例，也不做 schema 校验/)
+  assert.match(text, /codec.decode.*版本迁移（存储表示）.*schema.decode.*validate/s)
 })

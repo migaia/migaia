@@ -103,6 +103,8 @@ async function fetchWithTimeout(url: string, ms: number) {
 | 接收、保护、更新配置 | `ownConfig`、`readonlyConfig`、`patchConfig` | `@migaia/utils/config` |
 | Base64 与 UTF-8 | `bytesToBase64`、`base64ToBytes`、`encodeUtf8` | `@migaia/utils/bytes` |
 | 模板插值、数字和金额格式化 | `format`、`formatCurrency` | `@migaia/utils/string`、`/number` |
+| 识别启动程序的服务端运行时 | `detectServerRuntime` | `@migaia/utils` |
+| 分散缓存到期时间，且不延长原期限 | `jitter` | `@migaia/utils/number` |
 
 几个贯穿全包的说法：
 
@@ -428,3 +430,20 @@ console.log(routerConfig === telemetryConfig) // true：两处获得同一次初
 ```
 
 首次失败会一直缓存，没有 reset。需要失败重试时，把重试放进被包装的初始化函数；需要刷新、登出后重建或按租户或请求隔离时，应选有对应生命周期的容器。如果把某一个调用者的取消信号交给共享任务，该调用者取消后，其他等待者也会受影响。每个包装函数的缓存独立，模块重复实例化或跨 iframe、Worker、Node `vm` 时不会共享。
+
+## 可选值
+
+`IMaybe<T>` 区分 `{ some: true, value: T }` 与 `{ some: false }`，包括“存在但值为 undefined”。root 导出 `isSome`/`isNone` 用于类型收窄，`unwrapOr(m, fallback)` 接受同值域的缺省值，`mapMaybe(m, mapper)` 仅对存在值同步映射一次，`toUndefined(m)` 用于有意合并缺失与 undefined。None 原样复用且不调用 mapper；mapper 结果保留身份、不等待 Promise。typed 可选值不附加运行时验证。
+
+mapper 失败保留原有带码错误；未编码且可写的原生 Error 在原实例附 utils INVALID_ARGUMENT，保留原生类型与 stack。身份冲突时原错位于包装 cause；附加身份失败时聚合原错首位、附加失败次位。非 Error 沿原 toError/NON_ERROR_VALUE 语义。
+
+```ts
+import { isSome, isNone, unwrapOr, mapMaybe, toUndefined, type IMaybe } from '@migaia/utils'
+const present: IMaybe<number | undefined> = { some: true, value: undefined }
+const missing: IMaybe<number> = { some: false }
+const mapped = mapMaybe({ some: true, value: 3 }, (value) => value * 2)
+console.log(isSome(present), isNone(missing))
+console.log(unwrapOr(mapped, 0), toUndefined(missing))
+// true true
+// 6 undefined
+```

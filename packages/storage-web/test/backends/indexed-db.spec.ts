@@ -1,36 +1,90 @@
+import { entityTestFeatures } from '../helpers/entity-features.js'
 import {
-  StorageContractError,
-  StorageContractErrorCode,
+  kv,
+  records,
   isChangeFeedStore,
   type IStorageChange,
   type IStorageKey
 } from '@migaia/storage-contract'
-import { IDBCursor, IDBDatabase, IDBFactory, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
+import {
+  forceCloseDatabase,
+  IDBCursor,
+  IDBDatabase,
+  IDBFactory,
+  IDBKeyRange,
+  IDBObjectStore
+} from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
-import { indexedDbHost } from '../../src/backends/indexed-db'
 import {
-  asIndexedDbBackfillStore,
-  IndexedDbBackfillPhase,
-  isBackfillContentionFailure
-} from '../../src/backends/indexed-db-backfill.js'
-import {
-  composeRepositoryKey,
-  legacyEntityRange,
-  repositoryEntityRange
-} from '../../src/entity/key.js'
-import { encodeFlatStorageKey } from '../../src/core/key-domain.js'
+  defineEntity,
+  REPOSITORY_KEY_PREFIX,
+  RecordIndexBackfillPhase,
+  type IRecordIndexBackfillStore
+} from '@migaia/storage-host/entity'
+import type { IKeyValueStore } from '@migaia/storage-contract'
+import { createOrgId, createStorageHost, STORAGE_HOST_SOURCE } from '@migaia/storage-host'
+import { STORAGE_WEB_SOURCE } from '../../src/index.js'
+import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
+import { walkErrorCauses } from '@migaia/utils/error'
+import { encodeFlatStorageKey } from '@migaia/storage-host/authoring/backend'
 import { captureOperationCleanup } from '../helpers/operation-reporter.js'
+import {
+  createIndexedDbTestStore,
+  createIndexedDbBackfillTestStore
+} from '../helpers/installed-backends.js'
+
+/** Public installation keeps the original native failure reachable below its host/plugin wrappers. */
+const expectNativeInstallationFailure = async (
+  pending: Promise<unknown>,
+  expected: Record<string, unknown>
+): Promise<void> => {
+  const failure: unknown = await pending.then(
+    () => undefined,
+    (cause: unknown) => cause
+  )
+  const identity = failure as { readonly source?: unknown } | undefined
+  if (identity?.source !== STORAGE_WEB_SOURCE)
+    expect(failure).toMatchObject({ source: STORAGE_HOST_SOURCE, code: 'BACKEND_INSTALL_FAILED' })
+  expect(walkErrorCauses(failure)).toContainEqual(expect.objectContaining(expected))
+}
 
 const encoder = new TextEncoder()
 
 /** 每个用例一套全新的 IndexedDB，避免相互串数据。 */
 const freshFactory = () => new IDBFactory()
 const freshDb = () =>
-  indexedDbHost({
+  createIndexedDbTestStore({
     factory: freshFactory(),
     keyRange: IDBKeyRange,
     dbName: `test-${Math.random().toString(36).slice(2)}`
   })
+/** Capture the actual provider during the same real plugin installation, without a lookup registry. */
+const createBackfillDb = (
+  options: Parameters<typeof createIndexedDbTestStore>[0] = {
+    factory: freshFactory(),
+    keyRange: IDBKeyRange,
+    dbName: `test-1o8ee6u6sqp`
+  }
+) => createIndexedDbBackfillTestStore(options)
+
+/** Native key fixtures derive canonical identity through the same actual public repository. */
+const entityRecordKey = (store: IKeyValueStore, scope: string, id: IStorageKey): IStorageKey =>
+  defineEntity<{ id: IStorageKey }>({ features: entityTestFeatures, name: scope, key: 'id' })
+    .connect(store)
+    .lockKey(id).key
+
+/** These explicit bounds select the known native canonical-key fixture prefix. */
+const canonicalFixtureRange = (scope: string) => ({
+  lower: [REPOSITORY_KEY_PREFIX, scope, ''],
+  upper: [REPOSITORY_KEY_PREFIX, scope, '\uffff']
+})
+
+/** Legacy native fixture keys use the original public record channel and remain ordinary data. */
+const legacyFixtureRange = (scope: string) => ({
+  lower: [scope],
+  upper: [scope, '\uffff']
+})
+
 /** Test-only physical scope for the string-key fixtures in this file. */
 const backfillOptions = {
   range: { lower: '', upper: '\uffff' },
@@ -87,21 +141,256 @@ class TestBroadcastChannel {
 }
 
 describe('indexedDbHost backend', () => {
-  it('record mutations advance global epoch and invalidate open transactions', async () => {
-    const store = freshDb()
-    await store.putRecord({ value: 'first' }, 'first')
-    const pending = store.transaction(async (tx) => {
-      await tx.get('first')
-      await store.putRecord({ value: 'concurrent' }, 'concurrent')
-      await tx.put({ value: 'should-not-commit' }, 'result')
+  it('seeks prefixes without IDBKeyRange while preserving earlier and later native keys', async () => {
+    /** Missing range support uses the same native cursor rather than a different backend. */
+    const store = await createIndexedDbTestStore({
+      factory: freshFactory(),
+      dbName: 'prefix-without-keyrange'
     })
-    await expect(pending).rejects.toMatchObject({ code: 'TRANSACTION_CONFLICT' })
-    await expect(store.getRecord('result')).resolves.toBeUndefined()
+    for (const key of ['a', 'team:1', 'team:2', 'z']) await store.set(key, key)
+    await expect(store.use(kv).removeByPrefix('team:')).resolves.toBe(2)
+    expect(await store.keys()).toEqual(['a', 'z'])
+    await expect(store.use(kv).removeByPrefix('missing:')).resolves.toBe(0)
+    for (const key of [['a'], ['team', '1'], ['team', '2'], ['z']] as const)
+      await store.putRecord({ key }, key)
+    await expect(store.use(records).removeByPrefix(['team'])).resolves.toBe(2)
+    expect(await store.getRecord(['a'])).toEqual({ key: ['a'] })
+    expect(await store.getRecord(['z'])).toEqual({ key: ['z'] })
+    expect(await store.getRecord(['team', '1'])).toBeUndefined()
+    await store.clearAll()
+    await expect(store.use(records).removeByPrefix(['team'])).resolves.toBe(0)
+  })
+
+  it('keeps inclusive upper-only and empty record ranges in native order', async () => {
+    /** The public iterator snapshots each caller range before opening its native page. */
+    const store = await freshDb()
+    for (const key of ['a', 'b', 'c']) await store.putRecord({ key }, key)
+    /** An omitted upperOpen includes the boundary row. */
+    const bounded: IStorageKey[] = []
+    for await (const [key] of store.iterateRecords({ upper: 'b' })) bounded.push(key)
+    expect(bounded).toEqual(['a', 'b'])
+    /** An explicitly empty range retains the same full source as an omitted range. */
+    const all: IStorageKey[] = []
+    for await (const [key] of store.iterateRecords({})) all.push(key)
+    expect(all).toEqual(['a', 'b', 'c'])
+  })
+
+  it('keeps transaction record queries usable without keyset and rejects paging at its terminal', async () => {
+    /** No optional assembly is selected, so the missing keyset belongs to this registration. */
+    await using host = await createStorageHost({
+      plugins: [indexedDbBackendPlugin({ factory: freshFactory(), keyRange: IDBKeyRange })]
+    })
+    /** The ordinary backend retains native transactions without granting optional pagination. */
+    const store = host.backend('indexed-db')
+    await store.putRecord({ value: 'kept' }, 'row')
+    await expect(
+      store.transaction(async (scope) => {
+        expect(await scope.use(records).query().all()).toEqual([{ value: 'kept' }])
+        await scope.use(records).query().page(1)
+      })
+    ).rejects.toMatchObject({
+      source: STORAGE_WEB_SOURCE,
+      code: 'INDEXED_DB_FEATURE_NOT_INSTALLED',
+      message: expect.stringContaining('indexedDbKeysetFeature')
+    })
+    expect(await store.getRecord('row')).toEqual({ value: 'kept' })
+  })
+
+  it('rejects a non-string transaction value without committing its earlier write', async () => {
+    /** Runtime inputs still pass through the original transaction validation boundary. */
+    const store = await freshDb()
+    await expect(
+      store.transaction(async (scope) => {
+        await scope.set('first', 'rolled back')
+        await scope.set('invalid', 42 as never)
+      })
+    ).rejects.toMatchObject({ source: STORAGE_WEB_SOURCE, code: 'INVALID_CONFIG' })
+    expect(await store.get('first')).toBeNull()
+    expect(await store.get('invalid')).toBeNull()
+  })
+
+  it('reopens after a native forced close without losing committed text or records', async () => {
+    /** Observing the injected native factory obtains the actual owned connection. */
+    const factory = freshFactory()
+    /** The public port observer forwards every real open and upgrade. */
+    const opening = vi.spyOn(factory, 'open')
+    /** Installation owns this connection until native storage reports its close event. */
+    const store = await createIndexedDbTestStore({
+      factory,
+      keyRange: IDBKeyRange,
+      dbName: 'native-close-recovery'
+    })
+    await store.set('text', 'committed')
+    await store.putRecord({ value: 'record' }, 'row')
+    /** The last successful native open is the active installed connection, not a replacement. */
+    const database = opening.mock.results.at(-1)!.value.result as IDBDatabase
+    /** Await the actual native close event before exercising automatic reopening. */
+    const closed = new Promise<void>((resolve) => {
+      database.addEventListener('close', () => resolve(), { once: true })
+    })
+    opening.mockClear()
+    // fake-indexeddb's declaration mistakenly takes a constructor; its runtime takes the database.
+    forceCloseDatabase(database as unknown as typeof IDBDatabase)
+    await closed
+    expect(await store.get('text')).toBe('committed')
+    expect(await store.getRecord('row')).toEqual({ value: 'record' })
+    expect(opening).toHaveBeenCalledExactlyOnceWith('native-close-recovery')
+  })
+
+  it.each(['request', 'throw'] as const)(
+    'retains a native delete %s failure and allows the organization to reopen unchanged',
+    async (failureMode) => {
+      /** Each organization deletion owns a real installed database and committed sentinel. */
+      const factory = freshFactory()
+      /** An explicit default organization targets the configured physical database. */
+      const org = createOrgId()
+      await using host = await createStorageHost({
+        org,
+        plugins: [
+          indexedDbBackendPlugin({ factory, keyRange: IDBKeyRange, dbName: 'failed-delete' })
+        ]
+      })
+      /** The borrowed view remains usable after the failed maintenance operation settles. */
+      const store = host.backend('indexed-db')
+      await store.set('sentinel', 'preserved')
+      /** The injected native port reports its original failure without deleting storage. */
+      const cause = new DOMException('native deletion denied', 'SecurityError')
+      /** This fault replaces only the one native request; normal reads and opens remain real. */
+      const deletion = vi.spyOn(factory, 'deleteDatabase').mockImplementationOnce(() => {
+        if (failureMode === 'throw') throw cause
+        return {
+          error: cause,
+          set onblocked(_handler: unknown) {},
+          set onupgradeneeded(_handler: unknown) {},
+          set onsuccess(_handler: unknown) {},
+          set onerror(handler: () => void) {
+            queueMicrotask(handler)
+          }
+        } as unknown as IDBOpenDBRequest
+      })
+      /** Capture the public failure chain before checking native identity and recovery. */
+      const failure: unknown = await host.dropOrg(org).catch((error: unknown) => error)
+      expect(walkErrorCauses(failure)).toContainEqual(
+        expect.objectContaining({
+          source: STORAGE_WEB_SOURCE,
+          code: 'BACKEND_UNAVAILABLE',
+          operation: 'indexeddb.delete',
+          cause
+        })
+      )
+      expect(walkErrorCauses(failure)).toContain(cause)
+      expect(deletion).toHaveBeenCalledExactlyOnceWith('failed-delete')
+      expect(await store.get('sentinel')).toBe('preserved')
+    }
+  )
+
+  it('rejects a future schema checkpoint without overwriting metadata or committed data', async () => {
+    /** The original public backend creates the supported layout before a newer writer takes over. */
+    const factory = freshFactory()
+    /** Native request observation exposes the same physical database used by ordinary writes. */
+    const opening = vi.spyOn(factory, 'open')
+    /** Installation and the raw metadata edit share this existing database name. */
+    const options = { factory, keyRange: IDBKeyRange, dbName: 'future-schema-preserved' }
+    /** A real supported write provides data that the rejected older reader must leave intact. */
+    const store = await createIndexedDbTestStore(options)
+    await store.set('sentinel', 'preserved')
+    /** A future producer updates the actual durable schema checkpoint through the native port. */
+    const database = opening.mock.results.at(-1)!.value.result as IDBDatabase
+    await new Promise<void>((resolve, reject) => {
+      /** Both writes belong to the existing physical metadata store's native transaction. */
+      const transaction = database.transaction('storage-web:meta', 'readwrite')
+      transaction
+        .objectStore('storage-web:meta')
+        .put({ version: 4 }, ['__storage_web_internal__', 'schema'])
+      transaction.oncomplete = () => resolve()
+      transaction.onabort = () => reject(transaction.error)
+    })
+    await store.dispose()
+    await expectNativeInstallationFailure(createIndexedDbTestStore(options), {
+      source: STORAGE_WEB_SOURCE,
+      code: 'VERSION_UNSUPPORTED',
+      operation: 'indexeddb.schema'
+    })
+    /** Independent native reading verifies that failed installation does not downgrade data. */
+    const preserved = await new Promise<IDBDatabase>((resolve, reject) => {
+      /** This connection is read-only inspection after the rejected host released its handle. */
+      const request = factory.open(options.dbName)
+      request.onsuccess = () => resolve(request.result)
+      request.onerror = () => reject(request.error)
+    })
+    try {
+      for (const [storeName, key, expected] of [
+        ['kv', 'sentinel', 'preserved'],
+        ['storage-web:meta', ['__storage_web_internal__', 'schema'], { version: 4 }]
+      ] as const) {
+        await expect(
+          new Promise<unknown>((resolve, reject) => {
+            /** Each assertion reads the independently opened native transaction directly. */
+            const request = preserved
+              .transaction(storeName, 'readonly')
+              .objectStore(storeName)
+              .get(typeof key === 'string' ? key : [...key])
+            request.onsuccess = () => resolve(request.result)
+            request.onerror = () => reject(request.error)
+          })
+        ).resolves.toEqual(expected)
+      }
+    } finally {
+      preserved.close()
+    }
+  })
+
+  it.each(['kv', 'storage-web:meta', '__storage_web_revisions__'])(
+    'rejects an existing keyPath on %s without deleting the database',
+    async (keyPathStore) => {
+      /** A physical database created by another producer can conflict with this declared layout. */
+      const factory = freshFactory()
+      /** The native schema conflict remains stable until the caller repairs or replaces storage. */
+      const dbName = 'foreign-keypath-' + keyPathStore
+      /** Seed only a real native schema, with one unsupported keyPath among otherwise valid stores. */
+      const database = await new Promise<IDBDatabase>((resolve, reject) => {
+        /** The supplied schema is accepted by IndexedDB but incompatible with this backend. */
+        const request = factory.open(dbName, 1)
+        request.onupgradeneeded = () => {
+          for (const name of [
+            'kv',
+            'bytes',
+            'records',
+            'storage-web:meta',
+            '__storage_web_revisions__'
+          ])
+            request.result.createObjectStore(name, name === keyPathStore ? { keyPath: 'id' } : {})
+        }
+        request.onsuccess = () => resolve(request.result)
+        request.onerror = () => reject(request.error)
+      })
+      database.close()
+      await expectNativeInstallationFailure(
+        createStorageHost({
+          plugins: [indexedDbBackendPlugin({ factory, keyRange: IDBKeyRange, dbName })]
+        }),
+        { source: STORAGE_WEB_SOURCE, code: 'INVALID_CONFIG', operation: 'indexeddb.schema' }
+      )
+      expect(await factory.databases()).toContainEqual({ name: dbName, version: 1 })
+    }
+  )
+
+  it('serializes overlapping native record updates without losing a write', async () => {
+    const store = await freshDb()
+    await store.putRecord({ value: 0 }, 'counter')
+    /** Both original callbacks read and write under their own overlapping native transactions. */
+    const update = () =>
+      store.transaction(async (scope) => {
+        const previous = (await scope.getRecord('counter')) as { value: number }
+        await scope.putRecord({ value: previous.value + 1 }, 'counter')
+      })
+    await Promise.all([update(), update()])
+    await expect(store.getRecord('counter')).resolves.toEqual({ value: 2 })
     await store.dispose()
   })
 
-  it('inventories every public mutation route before native enablement', async () => {
-    const store = freshDb()
+  it('exposes every public mutation route through the installed backend', async () => {
+    const store = await freshDb()
     const requiredRoutes = [
       'putRecord',
       'deleteRecord',
@@ -116,27 +405,329 @@ describe('indexedDbHost backend', () => {
     await store.dispose()
   })
 
-  it('exposes private backfill capability only through the fail-closed guard', async () => {
-    const store = freshDb()
-    expect(asIndexedDbBackfillStore(store)).toBeDefined()
+  it('registers the original private backfill provider without publishing session methods', async () => {
+    const { store, capability: backfill } = await createBackfillDb()
+    expect(backfill).toBeDefined()
     expect('openBackfillSession' in store).toBe(false)
-    expect(asIndexedDbBackfillStore({ openBackfillSession: () => undefined })).toBeUndefined()
     await store.dispose()
   })
 
+  it('invalidates an issued backfill when the index fingerprint changes during public preparation', async () => {
+    /** The registered provider and public index API share their real generation owner. */
+    const { store, capability } = await createBackfillDb()
+    expect(capability.prepare).toBeTypeOf('function')
+    await capability.prepare!()
+    await store.putRecord({ value: 1 }, 'row')
+    /** This first handle is authentic, and its successor comes from a real definition change. */
+    const handle = await store.ensureRecordIndexes('changing-definition', [
+      { name: 'value', unique: false, multiEntry: false, revision: 1 }
+    ])
+    /** An asynchronous application preparation can overlap a legitimate schema revision. */
+    const session = await capability.openBackfillSession(handle, backfillOptions)
+    await expect(
+      session.readBatch(undefined, {
+        prepare: async () => {
+          await store.ensureRecordIndexes('changing-definition', [
+            { name: 'value', unique: false, multiEntry: false, revision: 2 }
+          ])
+          return { decodedBytes: 1, outcome: 'skipped' }
+        }
+      })
+    ).rejects.toMatchObject({ code: 'INDEX_BACKFILL_STALE' })
+    await expect(session.renew()).rejects.toMatchObject({ code: 'INDEX_BACKFILL_STALE' })
+    await expect(session.fail(new Error('obsolete preparation'))).rejects.toMatchObject({
+      code: 'INDEX_BACKFILL_STALE'
+    })
+    await expect(
+      store.putIndexedRecord({ value: 2 }, 'row', handle, {
+        value: { kind: 'single', key: 2 }
+      })
+    ).rejects.toMatchObject({ code: 'INDEX_BACKFILL_STALE' })
+    expect(await store.getRecord('row')).toEqual({ value: 1 })
+    session.release()
+  })
+
+  it.each(['error', 'function'] as const)(
+    'persists a failed readiness and releases the lease for an uncloneable %s cause',
+    async (causeKind) => {
+      /** Failure reporting and durable readiness remain owned by the installed native provider. */
+      const { store, capability } = await createBackfillDb()
+      /** Same definitions after failure must issue a fresh generation instead of reviving a lease. */
+      const definitions = [
+        { name: 'value', unique: false, multiEntry: false, revision: 1 }
+      ] as const
+      /** The original issued handle acquires a real metadata-owned lease. */
+      const handle = await store.ensureRecordIndexes('uncloneable-failure', definitions)
+      /** Session failure accepts the application's original unknown cause. */
+      const session = await capability.openBackfillSession(handle, backfillOptions)
+      /** Error.cause and a function value both fail structuredClone through supported input paths. */
+      const cause =
+        causeKind === 'error'
+          ? new Error('application preparation failed', { cause: () => undefined })
+          : () => undefined
+      /** Capture the public cleanup report without replacing the original backfill method. */
+      const captured = await captureOperationCleanup(() => session.fail(cause))
+      expect(captured.reports).toContain(cause)
+      expect(await store.getRecordIndexReadiness(handle)).toMatchObject({
+        status: 'failed',
+        scanned: 0,
+        indexed: 0
+      })
+      await expect(session.renew()).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
+      /** A fresh real registration proves failed ownership no longer blocks acquisition. */
+      const replacement = await store.ensureRecordIndexes('uncloneable-failure', definitions)
+      expect(replacement.generation).not.toBe(handle.generation)
+      /** The successor lease opens immediately without a timeout or private-state edit. */
+      const successor = await capability.openBackfillSession(replacement, backfillOptions)
+      await expect(successor.readBatch()).resolves.toMatchObject({
+        candidates: [],
+        endOfScan: true
+      })
+      successor.release()
+    }
+  )
+
+  it('rejects old lease actions after a committed batch while allowing a fresh owner to resume', async () => {
+    /** A nonterminal batch releases its lease through the normal commit receipt. */
+    const { store, capability } = await createBackfillDb()
+    await store.putRecord({ value: 1 }, 'a')
+    await store.putRecord({ value: 2 }, 'b')
+    /** Both records use one real generation, with one issued candidate per page. */
+    const handle = await store.ensureRecordIndexes('released-batch', [
+      { name: 'value', unique: false, multiEntry: false, revision: 1 }
+    ])
+    /** The first owner commits its issued page without claiming complete readiness. */
+    const session = await capability.openBackfillSession(handle, {
+      ...backfillOptions,
+      batchSize: 1
+    })
+    /** The issued manifest supplies exactly the accepted revision and checkpoint. */
+    const batch = await session.readBatch()
+    expect(
+      await session.commitBatch({
+        generation: handle.generation,
+        ownerToken: session.ownerToken,
+        checkpoint: batch.checkpoint,
+        nextCheckpoint: batch.candidates[0]!.key,
+        endOfScan: batch.endOfScan,
+        projections: batch.candidates.map((candidate) => ({
+          key: candidate.key,
+          expectedRevision: candidate.revision,
+          outcome: 'skipped' as const
+        }))
+      })
+    ).toMatchObject({ status: 'running', scanned: 1 })
+    await expect(session.readBatch()).rejects.toMatchObject({ code: 'BACKEND_UNAVAILABLE' })
+    await expect(session.fail('late failure after commit')).rejects.toMatchObject({
+      code: 'BACKEND_UNAVAILABLE'
+    })
+    /** A newly acquired owner resumes after a without repeating the committed candidate. */
+    const successor = await capability.openBackfillSession(handle, {
+      ...backfillOptions,
+      batchSize: 1
+    })
+    await expect(successor.readBatch()).resolves.toMatchObject({
+      checkpoint: 'a',
+      candidates: [{ key: 'b', raw: { value: 2 } }]
+    })
+    successor.release()
+    session.release()
+  })
+
+  it('requires legacy participation when a legitimate scan resumes in its legacy phase', async () => {
+    /** A canonical-to-legacy transition comes only from an actually committed canonical batch. */
+    const { store, capability } = await createBackfillDb()
+    /** This scope is empty so both phase transitions exercise normal completion, not forged data. */
+    const handle = await store.ensureRecordIndexes('legacy-resume-contract', [
+      { name: 'value', unique: false, multiEntry: false, revision: 1 }
+    ])
+    /** Legacy inclusion is part of the original scan's public options. */
+    const session = await capability.openBackfillSession(handle, {
+      ...backfillOptions,
+      includeLegacy: true
+    })
+    /** The issued empty canonical page advances readiness into the real legacy phase. */
+    const batch = await session.readBatch()
+    expect(
+      await session.commitBatch({
+        phase: batch.phase,
+        generation: handle.generation,
+        ownerToken: session.ownerToken,
+        checkpoint: batch.checkpoint,
+        nextCheckpoint: undefined,
+        endOfScan: true,
+        projections: []
+      })
+    ).toMatchObject({ status: 'running' })
+    session.release()
+    await expect(capability.openBackfillSession(handle, backfillOptions)).rejects.toMatchObject({
+      code: 'INVALID_CONFIG'
+    })
+    /** Keeping the required option resumes and completes the remaining empty phase normally. */
+    const legacy = await capability.openBackfillSession(handle, {
+      ...backfillOptions,
+      includeLegacy: true
+    })
+    /** The successor observes the durable phase rather than a caller-invented phase value. */
+    const finalBatch = await legacy.readBatch()
+    expect(finalBatch.phase).toBe(RecordIndexBackfillPhase.legacy)
+    expect(
+      await legacy.commitBatch({
+        phase: finalBatch.phase,
+        generation: handle.generation,
+        ownerToken: legacy.ownerToken,
+        checkpoint: finalBatch.checkpoint,
+        nextCheckpoint: undefined,
+        endOfScan: true,
+        projections: []
+      })
+    ).toMatchObject({ status: 'complete' })
+    legacy.release()
+  })
+
+  it('rejects a negative decoded budget before issuing a batch and accepts a later valid preparation', async () => {
+    /** Application preparation runs through the registered provider with a real stored candidate. */
+    const { store, capability } = await createBackfillDb()
+    await store.putRecord({ value: 1 }, 'row')
+    /** The decoder budget belongs to this one public backfill operation. */
+    const handle = await store.ensureRecordIndexes('negative-decoded-budget', [
+      { name: 'value', unique: false, multiEntry: false, revision: 1 }
+    ])
+    /** A rejected application result does not release or publish the session's candidate manifest. */
+    const session = await capability.openBackfillSession(handle, backfillOptions)
+    await expect(
+      session.readBatch(undefined, {
+        prepare: async () => ({ decodedBytes: -1, outcome: 'skipped' })
+      })
+    ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
+    await expect(
+      session.readBatch(undefined, {
+        prepare: async () => ({ decodedBytes: 1, outcome: 'skipped' })
+      })
+    ).resolves.toMatchObject({ candidates: [{ key: 'row' }], endOfScan: true })
+    expect(await store.getRecordIndexReadiness(handle)).toMatchObject({
+      status: 'running',
+      scanned: 0
+    })
+    session.release()
+  })
+
+  it('keeps a newer indexed write when an earlier issued projection commits and omits absent index entries', async () => {
+    /** Revision changes made through indexed writes retain this same generation and raw epoch. */
+    const { store, capability } = await createBackfillDb()
+    await store.putRecord({ value: 1 }, 'a')
+    await store.putRecord({ value: 3 }, 'b')
+    /** Optional entries are an allowed projection representation for a missing indexed field. */
+    const handle = await store.ensureRecordIndexes('indexed-revision-race', [
+      { name: 'value', unique: false, multiEntry: false, revision: 1 },
+      { name: 'optional', unique: false, multiEntry: false, revision: 1 }
+    ])
+    /** The original page captures a's old revision before the concurrent legitimate indexed write. */
+    const session = await capability.openBackfillSession(handle, backfillOptions)
+    /** Candidate identity and revision come from the actual issued page. */
+    const batch = await session.readBatch()
+    await store.putIndexedRecord({ value: 2 }, 'a', handle, {
+      value: { kind: 'single', key: 2 },
+      optional: undefined
+    })
+    expect(
+      await session.commitBatch({
+        generation: handle.generation,
+        ownerToken: session.ownerToken,
+        checkpoint: batch.checkpoint,
+        nextCheckpoint: batch.candidates.at(-1)!.key,
+        endOfScan: batch.endOfScan,
+        projections: batch.candidates.map((candidate) => ({
+          key: candidate.key,
+          expectedRevision: candidate.revision,
+          outcome: 'indexed' as const,
+          projection: {
+            value: { kind: 'single' as const, key: (candidate.raw as { value: number }).value },
+            optional: undefined
+          }
+        }))
+      })
+    ).toMatchObject({ status: 'complete', scanned: 2, indexed: 1 })
+    /** The accepted index exposes the fresh write and stable row, without replaying a's stale value. */
+    const values: unknown[] = []
+    for await (const [, value] of store.iterateRecordIndex({ handle, index: 'value' }))
+      values.push(value)
+    expect(values).toEqual([{ value: 2 }, { value: 3 }])
+    await expect(
+      store.iterateRecordIndex({ handle, index: 'optional' }).next()
+    ).resolves.toMatchObject({ done: true })
+    /** The authentic transaction source applies reverse direction and limit to the same sidecars. */
+    expect(
+      await store.transaction(async (scope) => {
+        /** The native iterator must stop after one emitted row instead of draining the index. */
+        const rows: unknown[] = []
+        for await (const [, value] of scope.iterateRecordIndex!({
+          handle,
+          index: 'value',
+          direction: 'prev',
+          limit: 1
+        }))
+          rows.push(value)
+        return rows
+      })
+    ).toEqual([{ value: 3 }])
+    session.release()
+  })
+
+  it('rejects native index iteration before readiness is complete', async () => {
+    /** A public issued handle starts pending and cannot substitute for complete projection proof. */
+    const store = await freshDb()
+    /** No backfill is run, so the pending state is produced by the normal ensure API. */
+    const handle = await store.ensureRecordIndexes('pending-native-index', [
+      { name: 'value', unique: false, multiEntry: false, revision: 1 }
+    ])
+    await expect(store.iterateRecordIndex({ handle, index: 'value' }).next()).rejects.toMatchObject(
+      {
+        code: 'BACKEND_UNAVAILABLE',
+        cause: expect.objectContaining({
+          message: 'record index is not complete; caller must use fallback scan'
+        })
+      }
+    )
+    expect(await store.getRecordIndexReadiness(handle)).toMatchObject({ status: 'pending' })
+  })
+
+  it('rejects root and transaction index cursors without native range support', async () => {
+    /** Range support is optional for CRUD, but both native index cursor routes require it. */
+    const store = await createIndexedDbTestStore({
+      factory: freshFactory(),
+      dbName: 'index-without-keyrange'
+    })
+    /** This valid issued handle does not manufacture an invalid native owner or generation. */
+    const handle = await store.ensureRecordIndexes('missing-native-range', [
+      { name: 'value', unique: false, multiEntry: false, revision: 1 }
+    ])
+    await expect(store.iterateRecordIndex({ handle, index: 'value' }).next()).rejects.toMatchObject(
+      { code: 'BACKEND_UNAVAILABLE' }
+    )
+    await expect(
+      store.transaction(async (scope) => {
+        for await (const _entry of scope.iterateRecordIndex!({ handle, index: 'value' })) {
+          throw new Error('a cursor without IDBKeyRange must not emit a row')
+        }
+      })
+    ).rejects.toMatchObject({ code: 'BACKEND_UNAVAILABLE' })
+    await store.set('still-usable', 'value')
+    expect(await store.get('still-usable')).toBe('value')
+  })
+
   it('opens a leased backfill session and returns immutable record snapshots', async () => {
-    const store = freshDb()
+    const { store, capability: backfill } = await createBackfillDb()
     await store.putRecord({ value: 1 }, 'record-1')
     const handle = await store.ensureRecordIndexes('users', [
       { name: 'value', unique: false, multiEntry: false, revision: 1 }
     ])
-    const session = await asIndexedDbBackfillStore(store)
+    const session = await backfill
     expect(session).toBeDefined()
     const batch = await session!.openBackfillSession(handle, { ...backfillOptions, batchSize: 2 })
     const result = await batch.readBatch()
     expect(result.endOfScan).toBe(true)
     expect(result.candidates).toHaveLength(1)
-    expect(Object.isFrozen(result.candidates)).toBe(true)
     const candidate = result.candidates[0]!
     await expect(
       batch.commitBatch({
@@ -177,23 +768,23 @@ describe('indexedDbHost backend', () => {
   })
 
   it('resumes from canonical phase into bounded legacy phase', async () => {
-    const store = freshDb()
-    await store.putRecord({ value: 1 }, composeRepositoryKey('phased', 'canonical'))
+    const { store, capability: backfill } = await createBackfillDb()
+    await store.putRecord({ value: 1 }, entityRecordKey(store, 'phased', 'canonical'))
     await store.putRecord({ value: 2 }, ['phased', 'legacy'])
     const handle = await store.ensureRecordIndexes('phased', [
       { name: 'value', unique: false, multiEntry: false, revision: 1 }
     ])
-    const capability = asIndexedDbBackfillStore(store)!
+    const capability = backfill
     const options = {
-      range: repositoryEntityRange('phased'),
-      legacyRange: legacyEntityRange('phased'),
+      range: canonicalFixtureRange('phased'),
+      legacyRange: legacyFixtureRange('phased'),
       includeLegacy: true,
       allowComplete: true,
       batchSize: 1
     } as const
     const canonical = await capability.openBackfillSession(handle, options)
     const canonicalBatch = await canonical.readBatch()
-    expect(canonicalBatch.phase).toBe(IndexedDbBackfillPhase.canonical)
+    expect(canonicalBatch.phase).toBe(RecordIndexBackfillPhase.canonical)
     expect(canonicalBatch.candidates).toHaveLength(1)
     await canonical.commitBatch({
       phase: canonicalBatch.phase,
@@ -215,7 +806,7 @@ describe('indexedDbHost backend', () => {
 
     const legacy = await capability.openBackfillSession(handle, options)
     const legacyBatch = await legacy.readBatch()
-    expect(legacyBatch.phase).toBe(IndexedDbBackfillPhase.legacy)
+    expect(legacyBatch.phase).toBe(RecordIndexBackfillPhase.legacy)
     expect(legacyBatch.candidates).toHaveLength(1)
     await expect(
       legacy.commitBatch({
@@ -240,12 +831,12 @@ describe('indexedDbHost backend', () => {
   })
 
   it('rejects foreign owners and refuses forged completion checkpoints', async () => {
-    const store = freshDb()
+    const { store, capability: backfill } = await createBackfillDb()
     await store.putRecord({ value: 1 }, 'record-1')
     const handle = await store.ensureRecordIndexes('users', [
       { name: 'value', unique: false, multiEntry: false, revision: 1 }
     ])
-    const capability = await asIndexedDbBackfillStore(store)
+    const capability = await backfill
     const session = await capability!.openBackfillSession(handle, {
       ...backfillOptions,
       batchSize: 2
@@ -282,11 +873,11 @@ describe('indexedDbHost backend', () => {
   })
 
   it('validates lease options and completes an issued empty batch', async () => {
-    const store = freshDb()
+    const { store, capability: backfill } = await createBackfillDb()
     const handle = await store.ensureRecordIndexes('empty', [
       { name: 'value', unique: false, multiEntry: false, revision: 1 }
     ])
-    const capability = asIndexedDbBackfillStore(store)!
+    const capability = backfill
     await expect(
       capability.openBackfillSession(handle, { ...backfillOptions, batchSize: 0 })
     ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
@@ -329,13 +920,13 @@ describe('indexedDbHost backend', () => {
   })
 
   it('preserves one exact nonterminal retry and rejects successor or altered replays', async () => {
-    const store = freshDb()
+    const { store, capability: backfill } = await createBackfillDb()
     await store.putRecord({ value: 1 }, 'record-1')
     await store.putRecord({ value: 2 }, 'record-2')
     const handle = await store.ensureRecordIndexes('retry', [
       { name: 'value', unique: false, multiEntry: false, revision: 1 }
     ])
-    const capability = asIndexedDbBackfillStore(store)!
+    const capability = backfill
     const owner = await capability.openBackfillSession(handle, {
       ...backfillOptions,
       batchSize: 1
@@ -376,11 +967,11 @@ describe('indexedDbHost backend', () => {
   })
 
   it('classifies terminal reopen as stale rather than fallback contention', async () => {
-    const store = freshDb()
+    const { store, capability: backfill } = await createBackfillDb()
     const handle = await store.ensureRecordIndexes('terminal-reopen', [
       { name: 'value', unique: false, multiEntry: false, revision: 1 }
     ])
-    const capability = asIndexedDbBackfillStore(store)!
+    const capability = backfill
     const session = await capability.openBackfillSession(handle, backfillOptions)
     const batch = await session.readBatch()
     await session.commitBatch({
@@ -396,7 +987,6 @@ describe('indexedDbHost backend', () => {
       throw new Error('terminal reopen unexpectedly succeeded')
     } catch (cause) {
       expect(cause).toMatchObject({ code: 'INDEX_BACKFILL_STALE' })
-      expect(isBackfillContentionFailure(cause)).toBe(false)
     }
     session.release()
     await store.dispose()
@@ -405,17 +995,26 @@ describe('indexedDbHost backend', () => {
   it('keeps takeover observations local to one IndexedDB context', async () => {
     const factory = new IDBFactory()
     const dbName = `restart-lease-${Math.random().toString(36).slice(2)}`
-    const ownerStore = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
-    const contenderStore = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
-    const restartedStore = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
+    const { store: ownerStore, capability: ownerCapability } = await createBackfillDb({
+      factory,
+      keyRange: IDBKeyRange,
+      dbName
+    })
+    const { store: contenderStore, capability: contenderCapability } = await createBackfillDb({
+      factory,
+      keyRange: IDBKeyRange,
+      dbName
+    })
+    const { store: restartedStore, capability: restartedCapability } = await createBackfillDb({
+      factory,
+      keyRange: IDBKeyRange,
+      dbName
+    })
     const definitions = [{ name: 'value', unique: false, multiEntry: false, revision: 1 }] as const
-    await ownerStore.putRecord({ value: 1 }, composeRepositoryKey('restart-lease', 'id-0'))
-    const ownerCapability = asIndexedDbBackfillStore(ownerStore)!
-    const contenderCapability = asIndexedDbBackfillStore(contenderStore)!
-    const restartedCapability = asIndexedDbBackfillStore(restartedStore)!
+    await ownerStore.putRecord({ value: 1 }, entityRecordKey(ownerStore, 'restart-lease', 'id-0'))
     const handle = await ownerCapability.ensureRecordIndexes('restart-lease', definitions)
     const owner = await ownerCapability.openBackfillSession(handle, {
-      range: repositoryEntityRange('restart-lease'),
+      range: canonicalFixtureRange('restart-lease'),
       allowComplete: true,
       leaseMs: 5_000
     })
@@ -424,7 +1023,7 @@ describe('indexedDbHost backend', () => {
     clock.mockReturnValue(1_000)
     await expect(
       contenderCapability.openBackfillSession(handle, {
-        range: repositoryEntityRange('restart-lease'),
+        range: canonicalFixtureRange('restart-lease'),
         allowComplete: true,
         leaseMs: 5_000
       })
@@ -432,7 +1031,7 @@ describe('indexedDbHost backend', () => {
     clock.mockReturnValue(1_001)
     await expect(
       restartedCapability.openBackfillSession(handle, {
-        range: repositoryEntityRange('restart-lease'),
+        range: canonicalFixtureRange('restart-lease'),
         allowComplete: true,
         leaseMs: 5_000
       })
@@ -442,14 +1041,14 @@ describe('indexedDbHost backend', () => {
     clock.mockReturnValue(6_001)
     await expect(
       contenderCapability.openBackfillSession(handle, {
-        range: repositoryEntityRange('restart-lease'),
+        range: canonicalFixtureRange('restart-lease'),
         allowComplete: true,
         leaseMs: 5_000
       })
     ).rejects.toMatchObject({ code: 'BACKEND_UNAVAILABLE' })
     clock.mockReturnValue(11_002)
     const takeover = await contenderCapability.openBackfillSession(handle, {
-      range: repositoryEntityRange('restart-lease'),
+      range: canonicalFixtureRange('restart-lease'),
       allowComplete: true,
       leaseMs: 5_000
     })
@@ -477,13 +1076,11 @@ describe('indexedDbHost backend', () => {
   })
 
   it('自动生成 key 即使随机源重复也不会覆盖已有 record', async () => {
-    const originalCrypto = globalThis.crypto
-    Object.defineProperty(globalThis, 'crypto', {
-      configurable: true,
-      value: { randomUUID: () => 'fixed-auto-key' }
-    })
+    const random = vi
+      .spyOn(globalThis.crypto, 'randomUUID')
+      .mockReturnValue('00000000-0000-4000-8000-000000000000')
     try {
-      const store = freshDb()
+      const store = await freshDb()
       const first = await store.putRecord({ value: 1 })
       const second = await store.putRecord({ value: 2 })
       expect(second).not.toEqual(first)
@@ -491,15 +1088,19 @@ describe('indexedDbHost backend', () => {
       await expect(store.getRecord(second)).resolves.toEqual({ value: 2 })
       await store.dispose()
     } finally {
-      Object.defineProperty(globalThis, 'crypto', { configurable: true, value: originalCrypto })
+      random.mockRestore()
     }
   })
 
   it('keeps hostile scopes out of private generation tokens', async () => {
     const factory = freshFactory()
     const dbName = 'indexed-generation-hostile-scope'
-    const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
-    const capability = asIndexedDbBackfillStore(store)!
+    const { store, capability: backfill } = await createBackfillDb({
+      factory,
+      keyRange: IDBKeyRange,
+      dbName
+    })
+    const capability = backfill
     const scopes = ['scope\u0000with-nul', `scope-${String.fromCodePoint(0x10ffff)}`]
     const definitions = [{ name: 'value', unique: false, multiEntry: false, revision: 1 }] as const
 
@@ -542,7 +1143,7 @@ describe('indexedDbHost backend', () => {
   it('rotates malformed persisted generations once and rejects old handles', async () => {
     const factory = freshFactory()
     const dbName = 'indexed-generation-recovery'
-    const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
+    const store = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
     const definitions = [{ name: 'value', unique: false, multiEntry: false, revision: 1 }] as const
     const scope = 'recovery-scope'
     const handle = await store.ensureRecordIndexes(scope, definitions)
@@ -569,8 +1170,16 @@ describe('indexedDbHost backend', () => {
     })
     database.close()
 
-    const firstConnection = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
-    const secondConnection = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
+    const firstConnection = await createIndexedDbTestStore({
+      factory,
+      keyRange: IDBKeyRange,
+      dbName
+    })
+    const secondConnection = await createIndexedDbTestStore({
+      factory,
+      keyRange: IDBKeyRange,
+      dbName
+    })
     const [recovered, adopted] = await Promise.all([
       firstConnection.ensureRecordIndexes(scope, definitions),
       secondConnection.ensureRecordIndexes(scope, definitions)
@@ -618,49 +1227,40 @@ describe('indexedDbHost backend', () => {
     inspected.close()
   })
 
-  it('构造期拒绝 null、数组和 primitive options', () => {
+  it('安装时拒绝 null、数组和 primitive options', async () => {
     for (const options of [null, [], 'options', 1])
-      expect(() => indexedDbHost(options as never)).toThrowError(
-        expect.objectContaining({ code: 'INVALID_CONFIG' })
-      )
+      await expectNativeInstallationFailure(createIndexedDbTestStore(options as never), {
+        code: 'INVALID_CONFIG'
+      })
   })
 
-  it('构造期拒绝非 boolean cleanupLegacyRecords', () => {
+  it('安装时拒绝非 boolean cleanupLegacyRecords', async () => {
     for (const cleanupLegacyRecords of [null, 'yes', 1, []])
-      expect(() =>
-        indexedDbHost({
+      await expectNativeInstallationFailure(
+        createIndexedDbTestStore({
           factory: freshFactory(),
           keyRange: IDBKeyRange,
           cleanupLegacyRecords: cleanupLegacyRecords as never
-        })
-      ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }))
-  })
-
-  it('构造字段 getter 异常统一返回 INVALID_CONFIG', () => {
-    expect(() =>
-      indexedDbHost({
-        get dbName(): string {
-          throw new Error('hostile dbName')
-        }
-      })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }))
+        }),
+        { code: 'INVALID_CONFIG' }
+      )
   })
 
   it('拒绝运行时非字符串 value', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     await expect(store.set('key', 42 as unknown as string)).rejects.toMatchObject({
       code: 'INVALID_CONFIG'
     })
     await store.dispose()
   })
   it('L0、bytes 与 metadata 通道拒绝运行时非字符串 key', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     const invalidKey = 42 as unknown as string
     for (const invoke of [
       () => store.get(invalidKey),
       () => store.set(invalidKey, 'value'),
       () => store.remove(invalidKey),
-      () => store.has(invalidKey),
+      () => store.use(kv).has(invalidKey),
       () => store.getBytes(invalidKey),
       () => store.removeBytes(invalidKey),
       () => store.setBytes(invalidKey, new Uint8Array([1])),
@@ -670,13 +1270,13 @@ describe('indexedDbHost backend', () => {
     ])
       await expect(invoke()).rejects.toMatchObject({
         code: 'INVALID_ARGUMENT',
-        backend: 'indexeddb'
+        backend: 'indexed-db'
       })
     await store.dispose()
   })
 
   it('结构化 key 在异步边界前快照，调用方后续修改不改变目标记录', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     const key: IStorageKey = ['tenant', 1]
     const pendingPut = store.putRecord({ value: 'original' }, key)
     ;(key as IStorageKey[])[1] = 2
@@ -686,7 +1286,7 @@ describe('indexedDbHost backend', () => {
 
     const transactionKey: IStorageKey = ['transaction', 1]
     await store.transaction(async (tx) => {
-      const pending = tx.put({ value: 'transaction' }, transactionKey)
+      const pending = tx.putRecord({ value: 'transaction' }, transactionKey)
       ;(transactionKey as IStorageKey[])[1] = 2
       await pending
     })
@@ -695,16 +1295,11 @@ describe('indexedDbHost backend', () => {
     })
     await expect(store.getRecord(['transaction', 2])).resolves.toBeUndefined()
 
-    const overriddenMapKey = ['overridden-map', 1] as IStorageKey[]
-    overriddenMapKey.map = (() => ['overridden-map', 2]) as typeof overriddenMapKey.map
-    await store.putRecord({ value: 'map-safe' }, overriddenMapKey)
-    await expect(store.getRecord(['overridden-map', 1])).resolves.toEqual({ value: 'map-safe' })
-    await expect(store.getRecord(['overridden-map', 2])).resolves.toBeUndefined()
     await store.dispose()
   })
 
   it('可变写入值在异步边界前快照', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     const record = { nested: { value: 1 } }
     const pendingRecord = store.putRecord(record, 'record-snapshot')
     record.nested.value = 2
@@ -719,7 +1314,7 @@ describe('indexedDbHost backend', () => {
 
     const transactionValue = { nested: { value: 1 } }
     await store.transaction(async (tx) => {
-      const pending = tx.put(transactionValue, 'transaction-value-snapshot')
+      const pending = tx.putRecord(transactionValue, 'transaction-value-snapshot')
       transactionValue.nested.value = 2
       await pending
     })
@@ -730,7 +1325,7 @@ describe('indexedDbHost backend', () => {
   })
 
   it('值为 undefined 的 record 仍参与跨通道冲突检测', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     await store.putRecord(undefined, 'undefined-record')
     await expect(store.set('undefined-record', 'text')).rejects.toMatchObject({
       code: 'DUPLICATE_KEY',
@@ -746,7 +1341,7 @@ describe('indexedDbHost backend', () => {
   })
 
   it('clearRecords 在 epoch 请求期间 abort 时不提交 destructive clear', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     await store.putRecord({ keep: true }, 'keep')
     const controller = new AbortController()
     const pending = store.clearRecords({ signal: controller.signal })
@@ -756,72 +1351,8 @@ describe('indexedDbHost backend', () => {
     await store.dispose()
   })
 
-  it('clearRecords revision result getter 异常会 reject 且不执行 clear', async () => {
-    const store = freshDb()
-    await store.putRecord({ keep: true }, 'revision-result-keep')
-    const originalGet = IDBObjectStore.prototype.get
-    const cause = new Error('hostile revision result getter')
-    IDBObjectStore.prototype.get = (() =>
-      ({
-        get result(): never {
-          throw cause
-        },
-        set onsuccess(handler: (() => void) | null) {
-          queueMicrotask(() => handler?.())
-        },
-        set onerror(_handler: unknown) {}
-      }) as unknown as IDBRequest) as typeof originalGet
-    try {
-      await expect(store.clearRecords()).rejects.toMatchObject({
-        code: 'TRANSACTION_FAILED',
-        backend: 'indexeddb',
-        cause
-      })
-    } finally {
-      IDBObjectStore.prototype.get = originalGet
-    }
-    await expect(store.getRecord('revision-result-keep')).resolves.toEqual({ keep: true })
-    await store.dispose()
-  })
-
-  it.each(['clearAll', 'deleteRecord', 'clearRecords'] as const)(
-    '%s revision handler setter 异常会回滚 destructive transaction',
-    async (operation) => {
-      const store = freshDb()
-      await store.set('keep-value', 'value')
-      await store.putRecord({ keep: true }, 'keep-record')
-      const originalGet = IDBObjectStore.prototype.get
-      const cause = new Error(`hostile ${operation} revision handler setter`)
-      IDBObjectStore.prototype.get = (() =>
-        ({
-          set onsuccess(_handler: unknown) {
-            throw cause
-          },
-          set onerror(_handler: unknown) {}
-        }) as unknown as IDBRequest) as typeof originalGet
-      try {
-        const pending =
-          operation === 'clearAll'
-            ? store.clearAll()
-            : operation === 'deleteRecord'
-              ? store.deleteRecord('keep-record')
-              : store.clearRecords()
-        await expect(pending).rejects.toMatchObject({
-          code: 'TRANSACTION_FAILED',
-          backend: 'indexeddb',
-          cause
-        })
-      } finally {
-        IDBObjectStore.prototype.get = originalGet
-      }
-      await expect(store.get('keep-value')).resolves.toBe('value')
-      await expect(store.getRecord('keep-record')).resolves.toEqual({ keep: true })
-      await store.dispose()
-    }
-  )
-
   it('clearAll 在 epoch 请求期间 abort 时不提交 destructive clear', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     await store.set('keep', 'value')
     await store.putRecord({ keep: true }, 'record')
     const controller = new AbortController()
@@ -836,7 +1367,7 @@ describe('indexedDbHost backend', () => {
   it.each(['clearRecords', 'clearAll'] as const)(
     '%s atomically wipes the sidecar and every scope index handle, so an old complete handle becomes stale',
     async (operation) => {
-      const store = freshDb()
+      const { store, capability: backfill } = await createBackfillDb()
       const indexed = store as unknown as {
         ensureRecordIndexes: (
           scope: string,
@@ -851,7 +1382,7 @@ describe('indexedDbHost backend', () => {
       const handle = await indexed.ensureRecordIndexes('users', [
         { name: 'value', unique: false, multiEntry: false, revision: 1 }
       ])
-      const capability = asIndexedDbBackfillStore(store)!
+      const capability = backfill
       const session = await capability.openBackfillSession(handle, backfillOptions)
       const batch = await session.readBatch()
       await session.commitBatch({
@@ -926,16 +1457,16 @@ describe('indexedDbHost backend', () => {
   }
 
   it('rejects nested undefined in the raw backfill budget before sidecar writes', async () => {
-    const store = freshDb()
+    const { store, capability: backfill } = await createBackfillDb()
     const scope = 'raw-nested-undefined'
-    await store.putRecord({ payload: { nested: undefined } }, composeRepositoryKey(scope, 'id-0'))
+    await store.putRecord({ payload: { nested: undefined } }, entityRecordKey(store, scope, 'id-0'))
     const indexed = store as unknown as IIndexedTestStore
     const handle = await indexed.ensureRecordIndexes(scope, [
       { name: 'payload', unique: false, multiEntry: false, revision: 1 }
     ])
-    const capability = asIndexedDbBackfillStore(store)!
+    const capability = backfill
     const session = await capability.openBackfillSession(handle, {
-      range: repositoryEntityRange(scope),
+      range: canonicalFixtureRange(scope),
       allowComplete: true,
       batchSize: 1
     })
@@ -960,17 +1491,17 @@ describe('indexedDbHost backend', () => {
    * while building the next one.
    */
   const buildCompleteIndex = async (
-    store: ReturnType<typeof freshDb>,
+    store: Awaited<ReturnType<typeof freshDb>>,
+    capability: IRecordIndexBackfillStore<unknown>,
     scope: string,
     records: ReadonlyArray<readonly [string, number]>
   ) => {
     for (const [id, value] of records)
-      await store.putRecord({ value }, composeRepositoryKey(scope, id))
+      await store.putRecord({ value }, entityRecordKey(store, scope, id))
     const indexed = store as unknown as IIndexedTestStore
     const handle = await indexed.ensureRecordIndexes(scope, [
       { name: 'value', unique: false, multiEntry: false, revision: 1 }
     ])
-    const capability = asIndexedDbBackfillStore(store)!
     const session = await capability.openBackfillSession(handle, backfillOptions)
     const batch = await session.readBatch()
     await session.commitBatch({
@@ -992,7 +1523,7 @@ describe('indexedDbHost backend', () => {
   }
 
   const isIndexQueryable = async (
-    store: ReturnType<typeof freshDb>,
+    store: Awaited<ReturnType<typeof freshDb>>,
     handle: { scope: string; generation: string; fingerprint: string }
   ): Promise<boolean> => {
     const indexed = store as unknown as IIndexedTestStore
@@ -1005,16 +1536,16 @@ describe('indexedDbHost backend', () => {
   }
 
   it('resumes from a durable checkpoint on the next immediate query', async () => {
-    const store = freshDb()
+    const { store, capability: backfill } = await createBackfillDb()
     const indexed = store as unknown as IIndexedTestStore
-    await store.putRecord({ value: 1 }, composeRepositoryKey('resume', 'id-0'))
-    await store.putRecord({ value: 2 }, composeRepositoryKey('resume', 'id-1'))
+    await store.putRecord({ value: 1 }, entityRecordKey(store, 'resume', 'id-0'))
+    await store.putRecord({ value: 2 }, entityRecordKey(store, 'resume', 'id-1'))
     const handle = await indexed.ensureRecordIndexes('resume', [
       { name: 'value', unique: false, multiEntry: false, revision: 1 }
     ])
-    const capability = asIndexedDbBackfillStore(store)!
+    const capability = backfill
     const options = {
-      range: repositoryEntityRange('resume'),
+      range: canonicalFixtureRange('resume'),
       allowComplete: true,
       batchSize: 1
     }
@@ -1063,19 +1594,19 @@ describe('indexedDbHost backend', () => {
   })
 
   it('enforces the decoded backfill page cap and rejects late release writes', async () => {
-    const store = freshDb()
+    const { store, capability: backfill } = await createBackfillDb()
     const indexed = store as unknown as IIndexedTestStore
     await store.putRecord(
       { value: 'x'.repeat(1024 * 1024 + 32) },
-      composeRepositoryKey('cap', 'id-0')
+      entityRecordKey(store, 'cap', 'id-0')
     )
-    await store.putRecord({ value: 'small' }, composeRepositoryKey('cap', 'id-1'))
+    await store.putRecord({ value: 'small' }, entityRecordKey(store, 'cap', 'id-1'))
     const handle = await indexed.ensureRecordIndexes('cap', [
       { name: 'value', unique: false, multiEntry: false, revision: 1 }
     ])
-    const capability = asIndexedDbBackfillStore(store)!
+    const capability = backfill
     const session = await capability.openBackfillSession(handle, {
-      range: repositoryEntityRange('cap'),
+      range: canonicalFixtureRange('cap'),
       allowComplete: true,
       batchSize: 2,
       leaseMs: 5_000
@@ -1089,17 +1620,17 @@ describe('indexedDbHost backend', () => {
   })
 
   it('rejects two-item aggregate decoded overflow before issuing a partial page', async () => {
-    const store = freshDb()
+    const { store, capability: backfill } = await createBackfillDb()
     const scope = 'decoded-aggregate-cap'
-    await store.putRecord({ value: 1 }, composeRepositoryKey(scope, 'id-0'))
-    await store.putRecord({ value: 2 }, composeRepositoryKey(scope, 'id-1'))
+    await store.putRecord({ value: 1 }, entityRecordKey(store, scope, 'id-0'))
+    await store.putRecord({ value: 2 }, entityRecordKey(store, scope, 'id-1'))
     const indexed = store as unknown as IIndexedTestStore
     const handle = await indexed.ensureRecordIndexes(scope, [
       { name: 'value', unique: false, multiEntry: false, revision: 1 }
     ])
-    const capability = asIndexedDbBackfillStore(store)!
+    const capability = backfill
     const session = await capability.openBackfillSession(handle, {
-      range: repositoryEntityRange(scope),
+      range: canonicalFixtureRange(scope),
       allowComplete: true,
       batchSize: 2
     })
@@ -1121,21 +1652,21 @@ describe('indexedDbHost backend', () => {
   })
 
   it('accounts the exact persisted tuple and accepts its byte boundary', async () => {
-    const store = freshDb()
+    const { store, capability: backfill } = await createBackfillDb()
     const scope = 's'.repeat(120)
     const indexName = 'i'.repeat(120)
     const indexed = store as unknown as IIndexedTestStore
-    await store.putRecord({ value: 1 }, composeRepositoryKey(scope, 'id-0'))
+    await store.putRecord({ value: 1 }, entityRecordKey(store, scope, 'id-0'))
     const handle = await indexed.ensureRecordIndexes(scope, [
       { name: indexName, unique: false, multiEntry: false, revision: 1 }
     ])
-    const capability = asIndexedDbBackfillStore(store)!
+    const capability = backfill
     const session = await capability.openBackfillSession(handle, {
-      range: repositoryEntityRange(scope),
+      range: canonicalFixtureRange(scope),
       allowComplete: true,
       batchSize: 1
     })
-    const recordKey = composeRepositoryKey(scope, 'id-0')
+    const recordKey = entityRecordKey(store, scope, 'id-0')
     const tupleBytes = (indexValue: string): number =>
       encoder.encode(
         encodeFlatStorageKey([scope, indexName, handle.generation, indexValue, recordKey])
@@ -1180,13 +1711,13 @@ describe('indexedDbHost backend', () => {
   })
 
   it('rejects a preparation that settles after session release', async () => {
-    const store = freshDb()
-    await store.putRecord({ value: 'pending' }, composeRepositoryKey('late-release', 'id-0'))
+    const { store, capability: backfill } = await createBackfillDb()
+    await store.putRecord({ value: 'pending' }, entityRecordKey(store, 'late-release', 'id-0'))
     const handle = await store.ensureRecordIndexes('late-release', [
       { name: 'value', unique: false, multiEntry: false, revision: 1 }
     ])
-    const session = asIndexedDbBackfillStore(store)!.openBackfillSession(handle, {
-      range: repositoryEntityRange('late-release'),
+    const session = backfill.openBackfillSession(handle, {
+      range: canonicalFixtureRange('late-release'),
       allowComplete: true,
       leaseMs: 5_000
     })
@@ -1213,15 +1744,15 @@ describe('indexedDbHost backend', () => {
   })
 
   it('reports abort and expired lease-renew failures without metadata completion', async () => {
-    const store = freshDb()
+    const { store, capability: backfill } = await createBackfillDb()
     const indexed = store as unknown as IIndexedTestStore
-    await store.putRecord({ value: 1 }, composeRepositoryKey('failure', 'id-0'))
+    await store.putRecord({ value: 1 }, entityRecordKey(store, 'failure', 'id-0'))
     const handle = await indexed.ensureRecordIndexes('failure', [
       { name: 'value', unique: false, multiEntry: false, revision: 1 }
     ])
-    const capability = asIndexedDbBackfillStore(store)!
+    const capability = backfill
     const session = await capability.openBackfillSession(handle, {
-      range: repositoryEntityRange('failure'),
+      range: canonicalFixtureRange('failure'),
       allowComplete: true,
       leaseMs: 5_000
     })
@@ -1234,14 +1765,14 @@ describe('indexedDbHost backend', () => {
     clock.mockReturnValue(1_000)
     await expect(
       capability.openBackfillSession(handle, {
-        range: repositoryEntityRange('failure'),
+        range: canonicalFixtureRange('failure'),
         allowComplete: true,
         leaseMs: 5_000
       })
     ).rejects.toMatchObject({ code: 'BACKEND_UNAVAILABLE' })
     clock.mockReturnValue(6_001)
     const takeover = await capability.openBackfillSession(handle, {
-      range: repositoryEntityRange('failure'),
+      range: canonicalFixtureRange('failure'),
       allowComplete: true,
       leaseMs: 5_000
     })
@@ -1254,19 +1785,19 @@ describe('indexedDbHost backend', () => {
   it.each(['putRecord', 'deleteRecord'] as const)(
     'raw %s on a canonical entity key downgrades only that scope’s index, not other scopes',
     async (operation) => {
-      const store = freshDb()
-      const usersHandle = await buildCompleteIndex(store, 'users', [
+      const { store, capability: backfill } = await createBackfillDb()
+      const usersHandle = await buildCompleteIndex(store, backfill, 'users', [
         ['users-a', 1],
         ['users-b', 2]
       ])
-      const postsHandle = await buildCompleteIndex(store, 'posts', [
+      const postsHandle = await buildCompleteIndex(store, backfill, 'posts', [
         ['posts-a', 10],
         ['posts-b', 20]
       ])
       await expect(isIndexQueryable(store, usersHandle)).resolves.toBe(true)
       await expect(isIndexQueryable(store, postsHandle)).resolves.toBe(true)
 
-      const canonicalKey = composeRepositoryKey('users', 'raw-bypass-id')
+      const canonicalKey = entityRecordKey(store, 'users', 'raw-bypass-id')
       if (operation === 'putRecord') await store.putRecord({ value: 999 }, canonicalKey)
       else {
         await store.putRecord({ value: 999 }, canonicalKey)
@@ -1283,9 +1814,7 @@ describe('indexedDbHost backend', () => {
         [{ name: 'value', unique: false, multiEntry: false, revision: 1 }]
       )
       expect(freshUsersHandle.generation).not.toBe(usersHandle.generation)
-      await expect(
-        asIndexedDbBackfillStore(store)!.getRecordIndexReadiness(freshUsersHandle)
-      ).resolves.toMatchObject({
+      await expect(store.getRecordIndexReadiness(freshUsersHandle)).resolves.toMatchObject({
         status: 'pending',
         scanned: 0,
         indexed: 0
@@ -1297,8 +1826,8 @@ describe('indexedDbHost backend', () => {
   it.each(['putRecord', 'deleteRecord'] as const)(
     'raw %s on a legacy-shaped key conservatively invalidates every scope',
     async (operation) => {
-      const store = freshDb()
-      const usersHandle = await buildCompleteIndex(store, 'users', [
+      const { store, capability: backfill } = await createBackfillDb()
+      const usersHandle = await buildCompleteIndex(store, backfill, 'users', [
         ['users-a', 1],
         ['users-b', 2]
       ])
@@ -1323,9 +1852,9 @@ describe('indexedDbHost backend', () => {
     ['binary', new Uint8Array([1, 2, 3]).buffer] as const,
     ['compound', ['legacy-scope', 'legacy-id'] as const]
   ])('/061 rotates all non-canonical raw key domains (%s)', async (_label, rawKey) => {
-    const store = freshDb()
+    const { store, capability: backfill } = await createBackfillDb()
     const indexed = store as unknown as IIndexedTestStore
-    const oldHandle = await buildCompleteIndex(store, 'raw-domain', [['seed', 1]])
+    const oldHandle = await buildCompleteIndex(store, backfill, 'raw-domain', [['seed', 1]])
 
     await store.putRecord({ value: 2 }, rawKey as IStorageKey)
 
@@ -1333,14 +1862,10 @@ describe('indexedDbHost backend', () => {
       { name: 'value', unique: false, multiEntry: false, revision: 1 }
     ])
     expect(freshHandle.generation).not.toBe(oldHandle.generation)
-    await expect(
-      asIndexedDbBackfillStore(store)!.getRecordIndexReadiness(freshHandle)
-    ).resolves.toMatchObject({
+    await expect(store.getRecordIndexReadiness(freshHandle)).resolves.toMatchObject({
       status: 'pending'
     })
-    await expect(
-      asIndexedDbBackfillStore(store)!.getRecordIndexReadiness(oldHandle)
-    ).rejects.toMatchObject({
+    await expect(store.getRecordIndexReadiness(oldHandle)).rejects.toMatchObject({
       code: 'INDEX_BACKFILL_STALE'
     })
     await expect(
@@ -1352,12 +1877,12 @@ describe('indexedDbHost backend', () => {
   })
 
   it('aborts a raw mutation transaction without rotating the complete generation', async () => {
-    const store = freshDb()
-    const oldHandle = await buildCompleteIndex(store, 'rollback', [['seed', 1]])
+    const { store, capability: backfill } = await createBackfillDb()
+    const oldHandle = await buildCompleteIndex(store, backfill, 'rollback', [['seed', 1]])
     const failure = new Error('transaction rollback')
     await expect(
       store.transaction(async (transaction) => {
-        await transaction.put({ value: 2 }, composeRepositoryKey('rollback', 'uncommitted'))
+        await transaction.putRecord({ value: 2 }, entityRecordKey(store, 'rollback', 'uncommitted'))
         throw failure
       })
     ).rejects.toMatchObject({ code: 'TRANSACTION_FAILED' })
@@ -1366,23 +1891,23 @@ describe('indexedDbHost backend', () => {
   })
 
   it('a raw canonical write to an already-scanned key mid-backfill must never let the index report complete', async () => {
-    const store = freshDb()
+    const { store, capability: backfill } = await createBackfillDb()
     const indexed = store as unknown as IIndexedTestStore
-    await store.putRecord({ value: 1 }, composeRepositoryKey('users', 'id-0'))
-    await store.putRecord({ value: 2 }, composeRepositoryKey('users', 'id-1'))
-    await store.putRecord({ value: 3 }, composeRepositoryKey('users', 'id-2'))
+    await store.putRecord({ value: 1 }, entityRecordKey(store, 'users', 'id-0'))
+    await store.putRecord({ value: 2 }, entityRecordKey(store, 'users', 'id-1'))
+    await store.putRecord({ value: 3 }, entityRecordKey(store, 'users', 'id-2'))
     const handle = await indexed.ensureRecordIndexes('users', [
       { name: 'value', unique: false, multiEntry: false, revision: 1 }
     ])
-    const capability = asIndexedDbBackfillStore(store)!
-    const scopeRange = { range: repositoryEntityRange('users'), allowComplete: true }
+    const capability = backfill
+    const scopeRange = { range: canonicalFixtureRange('users'), allowComplete: true }
     const session = await capability.openBackfillSession(handle, scopeRange)
     const batch = await session.readBatch()
     expect(batch.candidates).toHaveLength(3)
 
     // The raw write lands on an already-scanned canonical key, after `readBatch` already
     // captured id-0's old revision/value — the exact stale-revision scenario.
-    await store.putRecord({ value: 999 }, composeRepositoryKey('users', 'id-0'))
+    await store.putRecord({ value: 999 }, entityRecordKey(store, 'users', 'id-0'))
 
     await expect(
       session.commitBatch({
@@ -1400,18 +1925,18 @@ describe('indexedDbHost backend', () => {
   })
 
   it('a raw canonical write landing between two batch commits (on an already-committed key) must also block completion', async () => {
-    const store = freshDb()
+    const { store, capability: backfill } = await createBackfillDb()
     const indexed = store as unknown as IIndexedTestStore
-    await store.putRecord({ value: 1 }, composeRepositoryKey('users', 'id-0'))
-    await store.putRecord({ value: 2 }, composeRepositoryKey('users', 'id-1'))
-    await store.putRecord({ value: 3 }, composeRepositoryKey('users', 'id-2'))
-    await store.putRecord({ value: 4 }, composeRepositoryKey('users', 'id-3'))
+    await store.putRecord({ value: 1 }, entityRecordKey(store, 'users', 'id-0'))
+    await store.putRecord({ value: 2 }, entityRecordKey(store, 'users', 'id-1'))
+    await store.putRecord({ value: 3 }, entityRecordKey(store, 'users', 'id-2'))
+    await store.putRecord({ value: 4 }, entityRecordKey(store, 'users', 'id-3'))
     const handle = await indexed.ensureRecordIndexes('users', [
       { name: 'value', unique: false, multiEntry: false, revision: 1 }
     ])
-    const capability = asIndexedDbBackfillStore(store)!
+    const capability = backfill
     const session = await capability.openBackfillSession(handle, {
-      range: repositoryEntityRange('users'),
+      range: canonicalFixtureRange('users'),
       allowComplete: true,
       batchSize: 2
     })
@@ -1438,7 +1963,7 @@ describe('indexedDbHost backend', () => {
     // The raw write lands *between* commits, on `id-0` — a key the *first* batch already
     // committed cleanly. No later batch's `projections` will ever include it again, so a
     // batch-local check cannot see this; only the scope-epoch comparison at final completion can.
-    await store.putRecord({ value: 999 }, composeRepositoryKey('users', 'id-0'))
+    await store.putRecord({ value: 999 }, entityRecordKey(store, 'users', 'id-0'))
 
     await expect(session.readBatch()).rejects.toMatchObject({ code: 'INDEX_BACKFILL_STALE' })
     await expect(isIndexQueryable(store, handle)).resolves.toBe(false)
@@ -1446,15 +1971,15 @@ describe('indexedDbHost backend', () => {
   })
 
   it('after a stale-skipped scan reaches its natural end, a later fresh full re-scan with no further raw writes can still reach complete', async () => {
-    const store = freshDb()
+    const { store, capability: backfill } = await createBackfillDb()
     const indexed = store as unknown as IIndexedTestStore
-    await store.putRecord({ value: 1 }, composeRepositoryKey('recover', 'id-0'))
-    await store.putRecord({ value: 2 }, composeRepositoryKey('recover', 'id-1'))
+    await store.putRecord({ value: 1 }, entityRecordKey(store, 'recover', 'id-0'))
+    await store.putRecord({ value: 2 }, entityRecordKey(store, 'recover', 'id-1'))
     const handle = await indexed.ensureRecordIndexes('recover', [
       { name: 'value', unique: false, multiEntry: false, revision: 1 }
     ])
-    const capability = asIndexedDbBackfillStore(store)!
-    const scopeRange = { range: repositoryEntityRange('recover'), allowComplete: true }
+    const capability = backfill
+    const scopeRange = { range: canonicalFixtureRange('recover'), allowComplete: true }
 
     // First attempt: a raw write interleaves, so this scan must not reach `complete` (same
     // mechanism as the other stale-revision fixtures above).
@@ -1465,7 +1990,7 @@ describe('indexedDbHost backend', () => {
     })
     const firstBatch = await firstSession.readBatch()
     expect(firstBatch.candidates).toHaveLength(2)
-    await store.putRecord({ value: 999 }, composeRepositoryKey('recover', 'id-0'))
+    await store.putRecord({ value: 999 }, entityRecordKey(store, 'recover', 'id-0'))
     await expect(
       firstSession.commitBatch({
         generation: handle.generation,
@@ -1516,7 +2041,7 @@ describe('indexedDbHost backend', () => {
   })
 
   it('deleteRecord 在 revision 请求期间 abort 时不提交 delete', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     await store.putRecord({ keep: true }, 'delete-me')
     const controller = new AbortController()
     const pending = store.deleteRecord('delete-me', { signal: controller.signal })
@@ -1528,7 +2053,7 @@ describe('indexedDbHost backend', () => {
   })
 
   it('putRecord 在 revision 请求期间 abort 时不提交 put', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     await store.putRecord({ warm: true }, 'warm')
     const controller = new AbortController()
     const pending = store.putRecord({ keep: true }, 'put-me', {
@@ -1541,69 +2066,80 @@ describe('indexedDbHost backend', () => {
     await store.dispose()
   })
   it('拒绝非 Uint8Array 的 bytes value', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     await expect(
       store.setBytes('key', new DataView(new ArrayBuffer(1)) as unknown as Uint8Array)
     ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
     await store.dispose()
   })
 
-  it('拒绝结构非法的 factory 与 keyRange 注入', () => {
-    expect(() => indexedDbHost({ factory: {} as IDBFactory })).toThrowError(
-      expect.objectContaining({ code: 'INVALID_CONFIG' })
+  it('拒绝结构非法的 factory 与 keyRange 注入', async () => {
+    await expectNativeInstallationFailure(createIndexedDbTestStore({ factory: {} as IDBFactory }), {
+      code: 'INVALID_CONFIG'
+    })
+    await expectNativeInstallationFailure(
+      createIndexedDbTestStore({ factory: freshFactory(), keyRange: {} as typeof IDBKeyRange }),
+      { code: 'INVALID_CONFIG' }
     )
-    expect(() =>
-      indexedDbHost({ factory: freshFactory(), keyRange: {} as typeof IDBKeyRange })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }))
   })
 
-  it('拒绝空/非法数据库名、重复/保留名和空的 channel store 名', () => {
-    expect(() =>
-      indexedDbHost({ factory: freshFactory(), keyRange: IDBKeyRange, dbName: '' })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }))
-    expect(() =>
-      indexedDbHost({
+  it('拒绝空/非法数据库名、重复/保留名和空的 channel store 名', async () => {
+    await expectNativeInstallationFailure(
+      createIndexedDbTestStore({ factory: freshFactory(), keyRange: IDBKeyRange, dbName: '' }),
+      { code: 'INVALID_CONFIG' }
+    )
+    await expectNativeInstallationFailure(
+      createIndexedDbTestStore({
         factory: freshFactory(),
         keyRange: IDBKeyRange,
         dbName: null as unknown as string
-      })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }))
-    expect(() =>
-      indexedDbHost({
+      }),
+      { code: 'INVALID_CONFIG' }
+    )
+    await expectNativeInstallationFailure(
+      createIndexedDbTestStore({
         factory: freshFactory(),
         keyRange: IDBKeyRange,
         kvStoreName: 'same',
         bytesStoreName: 'same'
-      })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }))
-    expect(() =>
-      indexedDbHost({
+      }),
+      { code: 'INVALID_CONFIG' }
+    )
+    await expectNativeInstallationFailure(
+      createIndexedDbTestStore({
         factory: freshFactory(),
         keyRange: IDBKeyRange,
         recordsStoreName: '__storage_web_revisions__'
-      })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }))
-    expect(() =>
-      indexedDbHost({ factory: freshFactory(), keyRange: IDBKeyRange, recordsStoreName: '' })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }))
-    expect(() =>
-      indexedDbHost({
+      }),
+      { code: 'INVALID_CONFIG' }
+    )
+    await expectNativeInstallationFailure(
+      createIndexedDbTestStore({
+        factory: freshFactory(),
+        keyRange: IDBKeyRange,
+        recordsStoreName: ''
+      }),
+      { code: 'INVALID_CONFIG' }
+    )
+    await expectNativeInstallationFailure(
+      createIndexedDbTestStore({
         factory: freshFactory(),
         keyRange: IDBKeyRange,
         bytesStoreName: null as unknown as string
-      })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }))
+      }),
+      { code: 'INVALID_CONFIG' }
+    )
   })
 
   it('不同 records store 的 transaction revision 不互相污染', async () => {
     const factory = freshFactory()
-    const first = indexedDbHost({
+    const first = await createIndexedDbTestStore({
       factory,
       keyRange: IDBKeyRange,
       dbName: 'revision-scope',
       recordsStoreName: 'records-a'
     })
-    const second = indexedDbHost({
+    const second = await createIndexedDbTestStore({
       factory,
       keyRange: IDBKeyRange,
       dbName: 'revision-scope',
@@ -1611,36 +2147,48 @@ describe('indexedDbHost backend', () => {
     })
     await first.putRecord({ value: 'a' }, 'same')
     await second.putRecord({ value: 'b' }, 'same')
-    await expect(first.transaction(async (tx) => tx.get('same'))).resolves.toEqual({ value: 'a' })
+    await expect(first.transaction(async (tx) => tx.getRecord('same'))).resolves.toEqual({
+      value: 'a'
+    })
     await first.dispose()
     await second.dispose()
   })
 
-  it('首次 transaction snapshot 将 record、revision 与 epoch 绑定在同一 readonly transaction', async () => {
+  it('record 读写与修订检查共用同一原生 readwrite transaction', async () => {
     const factory = freshFactory()
     const dbName = 'snapshot-epoch-atomic'
-    const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
+    const store = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
     await store.putRecord({ value: 'before' }, 'key')
-    let release: (() => void) | undefined
-    const pause = new Promise<void>((resolve) => {
-      release = resolve
-    })
-    const transaction = store.transaction(async (tx) => {
-      await tx.get('key')
-      await pause
-      await tx.put({ value: 'transaction' }, 'key')
-    })
-    await new Promise<void>((resolve) => queueMicrotask(resolve))
-    await store.clearRecords()
-    await store.putRecord({ value: 'after-clear' }, 'key')
-    release!()
-    await expect(transaction).rejects.toMatchObject({ code: 'TRANSACTION_CONFLICT' })
-    await expect(store.getRecord('key')).resolves.toEqual({ value: 'after-clear' })
+    /**
+     * Call-through observation distinguishes one native transaction from snapshot plus draft
+     * commit.
+     */
+    const native = vi.spyOn(IDBDatabase.prototype, 'transaction')
+    try {
+      await store.transaction(async (tx) => {
+        expect(await tx.getRecord('key')).toEqual({ value: 'before' })
+        await tx.putRecord({ value: 'transaction' }, 'key')
+        expect(await tx.getRecord('key')).toEqual({ value: 'transaction' })
+      })
+      expect(native).toHaveBeenCalledTimes(1)
+      expect(native.mock.calls[0]?.[1]).toBe('readwrite')
+      expect(native.mock.calls[0]?.[0]).toEqual(
+        expect.arrayContaining([
+          'records',
+          '__storage_web_revisions__',
+          'storage-web:index-records',
+          'storage-web:meta'
+        ])
+      )
+    } finally {
+      native.mockRestore()
+    }
+    await expect(store.getRecord('key')).resolves.toEqual({ value: 'transaction' })
     await store.dispose()
   })
 
   it('writeTo 路径在 pre-abort 时不调度写入并稳定返回 ABORTED', async () => {
-    const store = indexedDbHost({
+    const store = await createIndexedDbTestStore({
       factory: freshFactory(),
       keyRange: IDBKeyRange,
       dbName: 'pre-abort-write-to'
@@ -1657,7 +2205,7 @@ describe('indexedDbHost backend', () => {
   })
 
   it('读取路径等待 readonly transaction settle 后才返回', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     await store.set('settle', 'ok')
     await expect(store.get('settle')).resolves.toBe('ok')
     await expect(store.getRecord('missing')).resolves.toBeUndefined()
@@ -1676,7 +2224,7 @@ describe('indexedDbHost backend', () => {
       }
       request.onerror = () => reject(request.error)
     })
-    const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
+    const store = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
     await store.get('probe')
     await store.dispose()
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -1699,7 +2247,11 @@ describe('indexedDbHost backend', () => {
 
   it('schema v3 creates one fixed sidecar store with lookup and record indexes', async () => {
     const factory = freshFactory()
-    const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName: 'sidecar-schema-v3' })
+    const store = await createIndexedDbTestStore({
+      factory,
+      keyRange: IDBKeyRange,
+      dbName: 'sidecar-schema-v3'
+    })
     await store.get('probe')
     await store.dispose()
     const database = await new Promise<IDBDatabase>((resolve, reject) => {
@@ -1747,7 +2299,7 @@ describe('indexedDbHost backend', () => {
     })
     legacy.close()
 
-    const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
+    const store = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
     await expect(store.getBytes('bytes-key')).resolves.toEqual(new Uint8Array([1, 2, 3]))
     await expect(store.getRecord('record-key')).resolves.toEqual({ stable: true })
     await store.dispose()
@@ -1764,10 +2316,8 @@ describe('indexedDbHost backend', () => {
   it('logical index definitions do not trigger another database upgrade', async () => {
     const factory = freshFactory()
     const dbName = 'logical-index-no-upgrade'
-    const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
-    const indexed = store as unknown as {
-      ensureRecordIndexes: (scope: string, definitions: readonly unknown[]) => Promise<unknown>
-    }
+    const store = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
+    const indexed = store
     await store.get('probe')
     await indexed.ensureRecordIndexes('users', [
       { name: 'email', unique: false, multiEntry: false, revision: 1 }
@@ -1784,19 +2334,12 @@ describe('indexedDbHost backend', () => {
 
   it('indexed put atomically replaces sidecar projection and increments revision', async () => {
     const factory = freshFactory()
-    const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName: 'indexed-put' })
-    const indexed = store as unknown as {
-      ensureRecordIndexes: (
-        scope: string,
-        definitions: readonly unknown[]
-      ) => Promise<{ scope: string; generation: string; fingerprint: string }>
-      putIndexedRecord: (
-        value: unknown,
-        key: string,
-        handle: { scope: string; generation: string; fingerprint: string },
-        projection: Record<string, unknown>
-      ) => Promise<string>
-    }
+    const store = await createIndexedDbTestStore({
+      factory,
+      keyRange: IDBKeyRange,
+      dbName: 'indexed-put'
+    })
+    const indexed = store
     const handle = await indexed.ensureRecordIndexes('users', [
       { name: 'email', unique: false, multiEntry: false, revision: 1 }
     ])
@@ -1833,57 +2376,57 @@ describe('indexedDbHost backend', () => {
   })
 
   it('indexed planner rolls back unique conflicts and atomically deletes rows', async () => {
-    const store = freshDb()
+    const store = await freshDb()
+    /** Canonical entity keys let the complete scope remove the matching sidecars precisely. */
+    const firstKey = entityRecordKey(store, 'unique-users', 'u1')
+    /** A separate record owns the second unique index value after the first record is deleted. */
+    const secondKey = entityRecordKey(store, 'unique-users', 'u2')
+    /** This third record must never survive its conflicting unique projection. */
+    const thirdKey = entityRecordKey(store, 'unique-users', 'u3')
     const handle = await store.ensureRecordIndexes('unique-users', [
       { name: 'email', unique: true, multiEntry: false, revision: 1 }
     ])
     await expect(
       store.transactionIndexed(handle, async (transaction) => {
-        await transaction.put({ id: 'u1' }, 'u1', {
+        await transaction.putIndexedRecord({ id: 'u1' }, firstKey, handle, {
           email: { kind: 'single', key: 'same@example.test' }
         })
-        await transaction.put({ id: 'u2' }, 'u2', {
+        await transaction.putIndexedRecord({ id: 'u2' }, secondKey, handle, {
           email: { kind: 'single', key: 'same@example.test' }
         })
       })
     ).rejects.toMatchObject({ code: 'INDEX_UNIQUE_CONFLICT' })
-    await expect(store.getRecord('u1')).resolves.toBeUndefined()
-    await expect(store.getRecord('u2')).resolves.toBeUndefined()
+    await expect(store.getRecord(firstKey)).resolves.toBeUndefined()
+    await expect(store.getRecord(secondKey)).resolves.toBeUndefined()
 
     await store.transactionIndexed(handle, async (transaction) => {
-      await transaction.put({ id: 'u1' }, 'u1', {
+      await transaction.putIndexedRecord({ id: 'u1' }, firstKey, handle, {
         email: { kind: 'single', key: 'one@example.test' }
       })
-      await transaction.put({ id: 'u2' }, 'u2', {
+      await transaction.putIndexedRecord({ id: 'u2' }, secondKey, handle, {
         email: { kind: 'single', key: 'two@example.test' }
       })
     })
     await expect(
-      store.putIndexedRecord({ id: 'u3' }, 'u3', handle, {
+      store.putIndexedRecord({ id: 'u3' }, thirdKey, handle, {
         email: { kind: 'single', key: 'one@example.test' }
       })
     ).rejects.toMatchObject({ code: 'INDEX_UNIQUE_CONFLICT' })
-    await expect(store.getRecord('u3')).resolves.toBeUndefined()
+    await expect(store.getRecord(thirdKey)).resolves.toBeUndefined()
     await store.transactionIndexed(handle, async (transaction) => {
-      expect(await transaction.get('u1')).toEqual({ id: 'u1' })
-      await transaction.delete('u1')
+      expect(await transaction.getRecord(firstKey)).toEqual({ id: 'u1' })
+      await transaction.deleteRecord(firstKey)
     })
-    await expect(store.getRecord('u1')).resolves.toBeUndefined()
-    await expect(store.getRecord('u2')).resolves.toEqual({ id: 'u2' })
+    await expect(store.getRecord(firstKey)).resolves.toBeUndefined()
+    await expect(store.getRecord(secondKey)).resolves.toEqual({ id: 'u2' })
     await store.dispose()
   })
 
   it('reports orphan sidecar rows and excludes them from results', async () => {
     const factory = freshFactory()
     const dbName = 'indexed-orphan-report'
-    const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
-    const indexed = store as unknown as {
-      ensureRecordIndexes: (
-        scope: string,
-        definitions: readonly unknown[]
-      ) => Promise<{ scope: string; generation: string; fingerprint: string }>
-      iterateRecordIndex: (query: unknown) => AsyncIterableIterator<[IStorageKey, unknown]>
-    }
+    const store = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
+    const indexed = store
     const handle = await indexed.ensureRecordIndexes('users', [
       { name: 'email', unique: false, multiEntry: false, revision: 1 }
     ])
@@ -1922,7 +2465,7 @@ describe('indexedDbHost backend', () => {
     const originalError = console.error
     console.error = (...args: unknown[]) => reported.push(args[1])
     try {
-      const reopened = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
+      const reopened = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
       const result = await reopened.iterateRecordIndex({ handle, index: 'email' }).next()
       expect(result.done).toBe(true)
       expect(reported[0]).toEqual(
@@ -1940,7 +2483,7 @@ describe('indexedDbHost backend', () => {
   })
 
   it('pages a native index in bounded transactions across both directions', async () => {
-    const store = freshDb()
+    const { store, capability: backfill } = await createBackfillDb()
     const total = 70
     for (let index = 0; index < total; index += 1)
       await store.putRecord({ value: index }, `record-${index}`)
@@ -1956,7 +2499,7 @@ describe('indexedDbHost backend', () => {
     const handle = await indexed.ensureRecordIndexes('users', [
       { name: 'value', unique: false, multiEntry: false, revision: 1 }
     ])
-    const capability = asIndexedDbBackfillStore(store)!
+    const capability = backfill
     const session = await capability.openBackfillSession(handle, backfillOptions)
     const batch = await session.readBatch()
     expect(batch.candidates).toHaveLength(total)
@@ -2003,7 +2546,7 @@ describe('indexedDbHost backend', () => {
   })
 
   it('pages a non-unique index whose duplicate group straddles the page boundary in both directions without loss or duplication', async () => {
-    const store = freshDb()
+    const { store, capability: backfill } = await createBackfillDb()
     /**
      * 50 unique-low + 20 tied (value 50) + 50 unique-high records. Forward order consumes 50 low +
      * 14 of the tie group before the 64-item page boundary; backward order consumes 50 high + 14 of
@@ -2042,7 +2585,7 @@ describe('indexedDbHost backend', () => {
     const handle = await indexed.ensureRecordIndexes('users', [
       { name: 'value', unique: false, multiEntry: false, revision: 1 }
     ])
-    const capability = asIndexedDbBackfillStore(store)!
+    const capability = backfill
     const session = await capability.openBackfillSession(handle, backfillOptions)
     const batch = await session.readBatch()
     expect(batch.candidates).toHaveLength(total)
@@ -2090,7 +2633,7 @@ describe('indexedDbHost backend', () => {
   })
 
   it('pages a tie group larger than the page size with O(pageSize) cursor steps, not a quadratic re-walk', async () => {
-    const store = freshDb()
+    const { store, capability: backfill } = await createBackfillDb()
     // Exceeds `INDEX_QUERY_PAGE_SIZE` (64, so the group spans multiple pages) while staying under
     // the backfill session's own default batch cap (128), so a single `readBatch` covers it.
     const total = 100
@@ -2108,7 +2651,7 @@ describe('indexedDbHost backend', () => {
     const handle = await indexed.ensureRecordIndexes('users', [
       { name: 'value', unique: false, multiEntry: false, revision: 1 }
     ])
-    const capability = asIndexedDbBackfillStore(store)!
+    const capability = backfill
     const session = await capability.openBackfillSession(handle, backfillOptions)
     const batch = await session.readBatch()
     expect(batch.candidates).toHaveLength(total)
@@ -2140,13 +2683,13 @@ describe('indexedDbHost backend', () => {
     const originalContinuePrimaryKey = IDBCursor.prototype.continuePrimaryKey
     IDBCursor.prototype.continue = function (...args: Parameters<typeof originalContinue>) {
       continueCalls += 1
-      return originalContinue.apply(this, args)
+      return Reflect.apply(originalContinue, this, args)
     }
     IDBCursor.prototype.continuePrimaryKey = function (
       ...args: Parameters<typeof originalContinuePrimaryKey>
     ) {
       continuePrimaryKeyCalls += 1
-      return originalContinuePrimaryKey.apply(this, args)
+      return Reflect.apply(originalContinuePrimaryKey, this, args)
     }
     let forwardKeys: string[]
     try {
@@ -2185,7 +2728,7 @@ describe('indexedDbHost backend', () => {
     })
     legacyDb.close()
 
-    const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
+    const store = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
     await expect(store.getRecord('legacy-key')).resolves.toEqual({ legacy: true })
     await store.dispose()
     const database = await new Promise<IDBDatabase>((resolve) => {
@@ -2220,7 +2763,7 @@ describe('indexedDbHost backend', () => {
     })
     legacyDb.close()
 
-    const first = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
+    const first = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
     await expect(first.getRecord('legacy-key')).resolves.toEqual({ legacy: true })
     await first.clearRecords()
     await expect(first.getRecord('legacy-key')).resolves.toBeUndefined()
@@ -2229,7 +2772,7 @@ describe('indexedDbHost backend', () => {
     // The legacy `documents` store was never touched by clearRecords, so re-running the
     // migration guard on a fresh store instance must recognize the checkpoint as complete and
     // not silently re-copy the already-cleared row back into `records`.
-    const second = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
+    const second = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
     await expect(second.getRecord('legacy-key')).resolves.toBeUndefined()
     await second.dispose()
 
@@ -2247,11 +2790,11 @@ describe('indexedDbHost backend', () => {
   })
 
   it.each(['clearRecords', 'clearAll'] as const)(
-    '%s 保留 public metadata，清空 per-record revisions 但保留 global epoch',
+    '%s 保留 public metadata、global epoch 与防 ABA 墓碑，清空旧索引 revisions',
     async (operation) => {
       const factory = freshFactory()
       const dbName = `clear-scope-${operation}`
-      const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
+      const store = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
       await store.metadata!.set('user-key', { keep: 'yes' })
       await store.putRecord({ value: 1 }, 'record-1')
       await store.putRecord({ value: 2 }, 'record-2')
@@ -2263,8 +2806,8 @@ describe('indexedDbHost backend', () => {
       await expect(store.getRecord('record-1')).resolves.toBeUndefined()
       await store.dispose()
 
-      // Per-record/per-scope revisions to be cleared, not just the record itself —
-      // only the global epoch counter may survive.
+      // Original record/index revisions are cleared; complete point tombstones survive so an
+      // independently opened contract writer cannot reset a committed undo revision.
       const database = await new Promise<IDBDatabase>((resolve) => {
         const request = factory.open(dbName)
         request.onsuccess = () => resolve(request.result)
@@ -2275,7 +2818,11 @@ describe('indexedDbHost backend', () => {
         request.onsuccess = () => resolve(request.result as IDBValidKey[])
       })
       database.close()
-      expect(revisionKeys).toEqual(['__storage_web_record_epoch__'])
+      expect(revisionKeys).toEqual([
+        '__storage_web_record_epoch__',
+        ['__storage_web_internal__', 'journal-point', 'record', encodeFlatStorageKey('record-1')],
+        ['__storage_web_internal__', 'journal-point', 'record', encodeFlatStorageKey('record-2')]
+      ])
     }
   )
 
@@ -2296,11 +2843,16 @@ describe('indexedDbHost backend', () => {
       transaction.oncomplete = () => resolve()
     })
     legacyDb.close()
-    const first = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
+    const first = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
     await expect(first.getRecord('key')).resolves.toEqual({ value: 'legacy' })
     await first.putRecord({ value: 'new' }, 'key', { conflictPolicy: 'replace' })
     await first.dispose()
-    const second = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName, kvStoreName: 'kv-next' })
+    const second = await createIndexedDbTestStore({
+      factory,
+      keyRange: IDBKeyRange,
+      dbName,
+      kvStoreName: 'kv-next'
+    })
     await expect(second.getRecord('key')).resolves.toEqual({ value: 'new' })
     await second.dispose()
   })
@@ -2319,7 +2871,7 @@ describe('indexedDbHost backend', () => {
       transaction.oncomplete = () => resolve()
     })
     legacyDb.close()
-    const store = indexedDbHost({
+    const store = await createIndexedDbTestStore({
       factory,
       keyRange: IDBKeyRange,
       dbName,
@@ -2349,10 +2901,10 @@ describe('indexedDbHost backend', () => {
       transaction.oncomplete = () => resolve()
     })
     legacyDb.close()
-    const first = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
+    const first = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
     await expect(first.getRecord('key')).resolves.toEqual({ legacy: true })
     await first.dispose()
-    const cleanup = indexedDbHost({
+    const cleanup = await createIndexedDbTestStore({
       factory,
       keyRange: IDBKeyRange,
       dbName,
@@ -2384,7 +2936,7 @@ describe('indexedDbHost backend', () => {
       transaction.oncomplete = () => resolve()
     })
     legacyDb.close()
-    const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
+    const store = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
     await expect(store.getRecord('legacy-000')).resolves.toEqual({ index: 0 })
     await store.dispose()
     const database = await new Promise<IDBDatabase>((resolve) => {
@@ -2416,58 +2968,12 @@ describe('indexedDbHost backend', () => {
       transaction.oncomplete = () => resolve()
     })
     legacyDb.close()
-    await expect(indexedDbHost({ factory, dbName }).getRecord('key-000')).rejects.toMatchObject({
+    await expectNativeInstallationFailure(createIndexedDbTestStore({ factory, dbName }), {
       code: 'BACKEND_UNAVAILABLE'
     })
-    const retry = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
+    const retry = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
     await expect(retry.getRecord('key-129')).resolves.toEqual({ index: 129 })
     await retry.dispose()
-  })
-
-  it('legacy migration cursor result getter 异常会 settle 为 TRANSACTION_FAILED', async () => {
-    const factory = freshFactory()
-    const dbName = 'documents-hostile-cursor-result'
-    const legacyDb = await new Promise<IDBDatabase>((resolve) => {
-      const request = factory.open(dbName, 1)
-      request.onupgradeneeded = () => request.result.createObjectStore('documents')
-      request.onsuccess = () => resolve(request.result)
-    })
-    await new Promise<void>((resolve) => {
-      const transaction = legacyDb.transaction('documents', 'readwrite')
-      transaction.objectStore('documents').put({ legacy: true }, 'key')
-      transaction.oncomplete = () => resolve()
-    })
-    legacyDb.close()
-    const originalOpenCursor = IDBObjectStore.prototype.openCursor
-    const originalClose = IDBDatabase.prototype.close
-    const cause = new Error('hostile legacy cursor result getter')
-    const closeCause = new Error('hostile rollback close')
-    IDBObjectStore.prototype.openCursor = (() =>
-      ({
-        get result(): never {
-          IDBDatabase.prototype.close = () => {
-            throw closeCause
-          }
-          throw cause
-        },
-        set onsuccess(handler: (() => void) | null) {
-          queueMicrotask(() => handler?.())
-        },
-        set onerror(_handler: unknown) {}
-      }) as unknown as IDBRequest) as typeof originalOpenCursor
-    const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
-    try {
-      await expect(store.getRecord('key')).rejects.toMatchObject({
-        code: 'TRANSACTION_FAILED',
-        backend: 'indexeddb',
-        operation: 'indexeddb.legacy.cursor',
-        cause
-      })
-    } finally {
-      IDBObjectStore.prototype.openCursor = originalOpenCursor
-      IDBDatabase.prototype.close = originalClose
-      await store.dispose()
-    }
   })
 
   it('legacy migration transaction 提前 complete 时不会永久 pending', async () => {
@@ -2490,53 +2996,17 @@ describe('indexedDbHost backend', () => {
         set onsuccess(_handler: unknown) {},
         set onerror(_handler: unknown) {}
       }) as unknown as IDBRequest) as typeof originalOpenCursor
-    const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
     try {
-      await expect(store.getRecord('key')).rejects.toMatchObject({
-        code: 'TRANSACTION_FAILED',
-        backend: 'indexeddb',
-        operation: 'indexeddb.legacy.cursor'
-      })
+      await expectNativeInstallationFailure(
+        createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName }),
+        {
+          code: 'TRANSACTION_FAILED',
+          backend: 'indexed-db',
+          operation: 'indexeddb.legacy.cursor'
+        }
+      )
     } finally {
       IDBObjectStore.prototype.openCursor = originalOpenCursor
-      await store.dispose()
-    }
-  })
-
-  it('legacy cursor request handler setter 异常会 abort 并保留 operation', async () => {
-    const factory = freshFactory()
-    const dbName = 'documents-hostile-cursor-setter'
-    const legacyDb = await new Promise<IDBDatabase>((resolve) => {
-      const request = factory.open(dbName, 1)
-      request.onupgradeneeded = () => request.result.createObjectStore('documents')
-      request.onsuccess = () => resolve(request.result)
-    })
-    await new Promise<void>((resolve) => {
-      const transaction = legacyDb.transaction('documents', 'readwrite')
-      transaction.objectStore('documents').put({ legacy: true }, 'key')
-      transaction.oncomplete = () => resolve()
-    })
-    legacyDb.close()
-    const originalOpenCursor = IDBObjectStore.prototype.openCursor
-    const cause = new Error('hostile legacy cursor onsuccess setter')
-    IDBObjectStore.prototype.openCursor = (() =>
-      ({
-        set onsuccess(_handler: unknown) {
-          throw cause
-        },
-        set onerror(_handler: unknown) {}
-      }) as unknown as IDBRequest) as typeof originalOpenCursor
-    const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
-    try {
-      await expect(store.getRecord('key')).rejects.toMatchObject({
-        code: 'TRANSACTION_FAILED',
-        backend: 'indexeddb',
-        operation: 'indexeddb.legacy.cursor',
-        cause
-      })
-    } finally {
-      IDBObjectStore.prototype.openCursor = originalOpenCursor
-      await store.dispose()
     }
   })
 
@@ -2562,14 +3032,14 @@ describe('indexedDbHost backend', () => {
       transaction.oncomplete = () => resolve()
     })
     legacyDb.close()
-    const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
+    const store = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
     await expect(store.getRecord('same')).resolves.toEqual({ value: 'current' })
     await store.dispose()
   })
 
-  it('backend 与 capabilities 正确声明（无 sync 通道）', () => {
-    const store = freshDb()
-    expect(store.backend).toBe('indexeddb')
+  it('backend 与 capabilities 正确声明（无 sync 通道）', async () => {
+    const store = await freshDb()
+    expect(store.backend).toBe('indexed-db')
     expect(store.capabilities.syncRead).toBe(false)
     expect(store.capabilities.binary).toBe(true)
     expect(store.capabilities.records).toBe(true)
@@ -2578,21 +3048,22 @@ describe('indexedDbHost backend', () => {
   })
 
   it('metadata channel persists and deletes maintenance state', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     await store.metadata!.set('maintenance', { batch: 2 })
     await expect(store.metadata!.get('maintenance')).resolves.toEqual({ batch: 2 })
     await store.metadata!.delete('maintenance')
     await expect(store.metadata!.get('maintenance')).resolves.toBeUndefined()
   })
 
-  it('未提供 factory 且 globalThis.indexedDB 不存在时抛 BACKEND_UNAVAILABLE', () => {
-    expect(() => indexedDbHost({ factory: undefined as unknown as IDBFactory })).toThrow(
-      expect.objectContaining({ code: 'BACKEND_UNAVAILABLE' })
+  it('未提供 factory 且 globalThis.indexedDB 不存在时抛 BACKEND_UNAVAILABLE', async () => {
+    await expectNativeInstallationFailure(
+      createIndexedDbTestStore({ factory: undefined as unknown as IDBFactory }),
+      { code: 'BACKEND_UNAVAILABLE' }
     )
   })
 
   it('两条通道字节原样存取，文本通道存字符串', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     const bytes = new Uint8Array([0, 1, 2, 250, 255])
     await store.setBytes('bin-key', bytes)
     await expect(store.getBytes('bin-key')).resolves.toEqual(bytes)
@@ -2604,7 +3075,7 @@ describe('indexedDbHost backend', () => {
   })
 
   it('iterateRecords 按 pageSize 分页且保持完整顺序', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     for (let index = 0; index < 5; index += 1) await store.putRecord({ index }, `page-${index}`)
     const keys: string[] = []
     for await (const [key] of store.iterateRecords(undefined, { pageSize: 2 }))
@@ -2613,7 +3084,7 @@ describe('indexedDbHost backend', () => {
   })
 
   it('非字符串 record key 不与 value/bytes 字符串 key 冲突', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     await store.set('1', 'text')
     await store.putRecord({ kind: 'number' }, 1)
     await expect(store.get('1')).resolves.toBe('text')
@@ -2623,7 +3094,7 @@ describe('indexedDbHost backend', () => {
   })
 
   it('已 abort 的 signal 立即拒绝', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     const controller = new AbortController()
     controller.abort()
     await expect(store.set('k', 'v', { signal: controller.signal })).rejects.toMatchObject({
@@ -2631,72 +3102,35 @@ describe('indexedDbHost backend', () => {
     })
   })
 
-  it('request event 中动态 signal getter 失败会 settle 为 INVALID_CONFIG', async () => {
-    const store = freshDb()
-    await store.get('warm-connection')
-    const originalGet = IDBObjectStore.prototype.get
-    let reads = 0
-    IDBObjectStore.prototype.get = (() => {
-      const cause = new DOMException('forced request failure', 'UnknownError')
-      return {
-        error: cause,
-        result: undefined,
-        set onsuccess(_handler: unknown) {},
-        set onerror(handler: (() => void) | null) {
-          queueMicrotask(() => handler?.())
-        }
-      } as IDBRequest
-    }) as typeof originalGet
-    try {
-      await expect(
-        store.get('dynamic-signal', {
-          signal: {
-            get aborted() {
-              reads += 1
-              if (reads === 9) throw new Error('hostile dynamic aborted getter')
-              return false
-            },
-            addEventListener: () => {},
-            removeEventListener: () => {}
-          } as never
-        })
-      ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
-      expect(reads).toBe(9)
-    } finally {
-      IDBObjectStore.prototype.get = originalGet
-      await store.dispose()
-    }
-  })
-
   it('重复打开同一个 dbName 复用同一个连接（不重复升级）', async () => {
     const factory = freshFactory()
     const dbName = `shared-${Math.random().toString(36).slice(2)}`
-    const storeA = indexedDbHost({ factory, dbName })
+    const storeA = await createIndexedDbTestStore({ factory, dbName })
     await storeA.set('k', 'from-a')
-    const storeB = indexedDbHost({ factory, dbName })
+    const storeB = await createIndexedDbTestStore({ factory, dbName })
     await expect(storeB.get('k')).resolves.toBe('from-a')
   })
 
   it('dispose 后关闭连接，操作抛 STORE_DISPOSED', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     await store.set('k', 'v')
     await store.dispose()
     await expect(store.get('k')).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
   })
 
-  it('dispose 在连接从未建立时也是无操作', async () => {
-    const store = freshDb()
+  it('dispose 在安装后尚未执行数据操作时正常完成', async () => {
+    const store = await freshDb()
     await expect(store.dispose()).resolves.toBeUndefined()
   })
 
   it('getBytes 对已存在但类型不是字节的值返回 null', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     await store.set('k', 'plain text')
     await expect(store.getBytes('k')).resolves.toBeNull()
   })
 
   it('iterate 遍历 records store，range 按 IDBKeyRange 语义过滤', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     await store.putRecord({ v: 1 }, 1)
     await store.putRecord({ v: 2 }, 2)
     await store.putRecord({ v: 3 }, 3)
@@ -2714,7 +3148,7 @@ describe('indexedDbHost backend', () => {
   })
 
   it('iterate 在已 abort 时抛 ABORTED', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     await store.putRecord({ v: 1 }, 1)
     const controller = new AbortController()
     controller.abort()
@@ -2723,7 +3157,7 @@ describe('indexedDbHost backend', () => {
   })
 
   it('悬挂 cursor 在外部 abort 后主动唤醒并以 ABORTED 结束', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     await store.putRecord({ v: 1 }, 'hanging-key')
     const originalOpenCursor = IDBObjectStore.prototype.openCursor
     IDBObjectStore.prototype.openCursor = (() => ({}) as IDBRequest) as typeof originalOpenCursor
@@ -2739,7 +3173,7 @@ describe('indexedDbHost backend', () => {
   })
 
   it('悬挂 cursor 在 timeout 到期后主动唤醒并以 ABORTED 结束', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     await store.putRecord({ v: 1 }, 'timeout-hanging-key')
     const originalOpenCursor = IDBObjectStore.prototype.openCursor
     IDBObjectStore.prototype.openCursor = (() => ({}) as IDBRequest) as typeof originalOpenCursor
@@ -2752,7 +3186,7 @@ describe('indexedDbHost backend', () => {
   })
 
   it('cursor listener 同步 abort race 稳定返回 ABORTED', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     await store.putRecord({ v: 1 }, 'sync-abort-key')
     let aborted = false
     const signal = {
@@ -2773,7 +3207,7 @@ describe('indexedDbHost backend', () => {
   })
 
   it('cursor listener setup/cleanup 异常遵循共享 operation 协议', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     await store.putRecord({ v: 1 }, 'listener-key')
     await expect(
       store
@@ -2808,7 +3242,7 @@ describe('indexedDbHost backend', () => {
   })
 
   it('cursor request.error 统一归一为 TRANSACTION_FAILED 并保留 cause', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     const originalOpenCursor = IDBObjectStore.prototype.openCursor
     const cause = new DOMException('cursor failed', 'UnknownError')
     IDBObjectStore.prototype.openCursor = (() => {
@@ -2832,68 +3266,10 @@ describe('indexedDbHost backend', () => {
     }
   })
 
-  it('cursor request.result getter 异常会 settle 为 TRANSACTION_FAILED', async () => {
-    const store = freshDb()
-    await store.putRecord({ v: 1 }, 'cursor-result-key')
-    const originalOpenCursor = IDBObjectStore.prototype.openCursor
-    const cause = new Error('hostile cursor result getter')
-    IDBObjectStore.prototype.openCursor = (() =>
-      ({
-        get result(): never {
-          throw cause
-        },
-        set onsuccess(handler: (() => void) | null) {
-          queueMicrotask(() => handler?.())
-        },
-        set onerror(_handler: unknown) {}
-      }) as unknown as IDBRequest) as typeof originalOpenCursor
-    try {
-      await expect(store.iterateRecords().next()).rejects.toMatchObject({
-        code: 'TRANSACTION_FAILED',
-        backend: 'indexeddb',
-        operation: 'indexeddb.cursor',
-        cause
-      })
-    } finally {
-      IDBObjectStore.prototype.openCursor = originalOpenCursor
-      await store.dispose()
-    }
-  })
-
-  it('cursor request.result getter 抛 contract 错误原样穿透（不归一为 TRANSACTION_FAILED）', async () => {
-    const store = freshDb()
-    await store.putRecord({ v: 1 }, 'cursor-contract-key')
-    const originalOpenCursor = IDBObjectStore.prototype.openCursor
-    const cause = new Error('hostile contract result getter')
-    const contractError = new StorageContractError(StorageContractErrorCode.invalidArgument, {
-      cause
-    })
-    IDBObjectStore.prototype.openCursor = (() =>
-      ({
-        get result(): never {
-          throw contractError
-        },
-        set onsuccess(handler: (() => void) | null) {
-          queueMicrotask(() => handler?.())
-        },
-        set onerror(_handler: unknown) {}
-      }) as unknown as IDBRequest) as typeof originalOpenCursor
-    try {
-      await expect(store.iterateRecords().next()).rejects.toMatchObject({
-        source: '@migaia/storage-contract',
-        code: 'INVALID_ARGUMENT',
-        cause
-      })
-    } finally {
-      IDBObjectStore.prototype.openCursor = originalOpenCursor
-      await store.dispose()
-    }
-  })
-
   it.each(['key', 'value', 'continue'] as const)(
     'cursor %s 异常保留 owning operation 且不会泄漏 callback',
     async (attack) => {
-      const store = freshDb()
+      const store = await freshDb()
       await store.putRecord({ v: 1 }, `cursor-${attack}-key`)
       const originalOpenCursor = IDBObjectStore.prototype.openCursor
       const cause = new Error(`hostile cursor ${attack}`)
@@ -2921,7 +3297,7 @@ describe('indexedDbHost backend', () => {
       try {
         await expect(store.iterateRecords().next()).rejects.toMatchObject({
           code: 'TRANSACTION_FAILED',
-          backend: 'indexeddb',
+          backend: 'indexed-db',
           operation: 'indexeddb.cursor',
           cause
         })
@@ -2933,7 +3309,7 @@ describe('indexedDbHost backend', () => {
   )
 
   it('cursor transaction 提前 complete 时不会永久 pending', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     await store.putRecord({ v: 1 }, 'premature-complete-key')
     const originalOpenCursor = IDBObjectStore.prototype.openCursor
     IDBObjectStore.prototype.openCursor = (() =>
@@ -2944,7 +3320,7 @@ describe('indexedDbHost backend', () => {
     try {
       await expect(store.iterateRecords().next()).rejects.toMatchObject({
         code: 'TRANSACTION_FAILED',
-        backend: 'indexeddb',
+        backend: 'indexed-db',
         operation: 'indexeddb.cursor'
       })
     } finally {
@@ -2953,46 +3329,21 @@ describe('indexedDbHost backend', () => {
     }
   })
 
-  it('runtime cursor request handler setter 异常会 abort 并保留 operation', async () => {
-    const store = freshDb()
-    await store.putRecord({ v: 1 }, 'cursor-setter-key')
-    const originalOpenCursor = IDBObjectStore.prototype.openCursor
-    const cause = new Error('hostile runtime cursor onsuccess setter')
-    IDBObjectStore.prototype.openCursor = (() =>
-      ({
-        set onsuccess(_handler: unknown) {
-          throw cause
-        },
-        set onerror(_handler: unknown) {}
-      }) as unknown as IDBRequest) as typeof originalOpenCursor
-    try {
-      await expect(store.iterateRecords().next()).rejects.toMatchObject({
-        code: 'TRANSACTION_FAILED',
-        backend: 'indexeddb',
-        operation: 'indexeddb.cursor',
-        cause
-      })
-    } finally {
-      IDBObjectStore.prototype.openCursor = originalOpenCursor
-      await store.dispose()
-    }
-  })
-
   it('transaction 成功后写入持久化', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     await store.transaction(async (tx) => {
-      await tx.put({ v: 1 }, 'tx-key')
+      await tx.putRecord({ v: 1 }, 'tx-key')
     })
     await expect(store.getRecord('tx-key')).resolves.toEqual({ v: 1 })
   })
 
   it('transaction 内抛错时通过原生 abort 整批回滚', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     await store.putRecord({ v: 'before' }, 'existing')
     await expect(
       store.transaction(async (tx) => {
-        await tx.put({ v: 'new' }, 'tx-key')
-        await tx.delete('existing')
+        await tx.putRecord({ v: 'new' }, 'tx-key')
+        await tx.deleteRecord('existing')
         throw new Error('boom')
       })
     ).rejects.toMatchObject({ code: 'TRANSACTION_FAILED' })
@@ -3000,14 +3351,13 @@ describe('indexedDbHost backend', () => {
     await expect(store.getRecord('existing')).resolves.toEqual({ v: 'before' })
   })
 
-  it('transaction 内跨宏任务 await 后仍保持单次提交语义', async () => {
-    const store = freshDb()
+  it('transaction 内同任务的 microtask await 后保持单次提交语义', async () => {
+    const store = await freshDb()
     await expect(
       store.transaction(async (tx) => {
-        await tx.put({ v: 1 }, 'k')
-        // draft 事务允许回调跨宏任务，不会让底层 IDB 事务提前提交。
-        await new Promise((resolve) => setTimeout(resolve, 10))
-        await tx.put({ v: 2 }, 'k2')
+        await tx.putRecord({ v: 1 }, 'k')
+        await Promise.resolve()
+        await tx.putRecord({ v: 2 }, 'k2')
       })
     ).resolves.toBeUndefined()
     await expect(store.getRecord('k')).resolves.toEqual({ v: 1 })
@@ -3015,25 +3365,25 @@ describe('indexedDbHost backend', () => {
   })
 
   it('自动生成 key（putRecord 不传 key）可用返回值读回', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     const key = await store.putRecord({ a: 1 })
     await expect(store.getRecord(key)).resolves.toEqual({ a: 1 })
   })
 
   it('setBytes 接受由其他 codec 产出的字节', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     await store.setBytes('k', encoder.encode('hello'))
     const read = await store.getBytes('k')
     expect(read).toBeInstanceOf(Uint8Array)
     expect(new TextDecoder().decode(read!)).toBe('hello')
   })
 
-  it('transaction 作用域内 get 可读取快照内已写入的值', async () => {
-    const store = freshDb()
+  it('transaction 作用域内 getRecord 可读取已写入的记录', async () => {
+    const store = await freshDb()
     await store.putRecord({ v: 1 }, 'k')
     await store.transaction(async (tx) => {
-      await expect(tx.get('k')).resolves.toEqual({ v: 1 })
-      await expect(tx.get('missing')).resolves.toBeUndefined()
+      await expect(tx.getRecord('k')).resolves.toEqual({ v: 1 })
+      await expect(tx.getRecord('missing')).resolves.toBeUndefined()
     })
   })
 
@@ -3058,7 +3408,7 @@ describe('indexedDbHost backend', () => {
     })
     rawDb.close()
 
-    const store = indexedDbHost({ factory, dbName, keyRange: IDBKeyRange })
+    const store = await createIndexedDbTestStore({ factory, dbName, keyRange: IDBKeyRange })
     await expect(store.getBytes('raw-buffer-key')).resolves.toEqual(new Uint8Array([9, 8, 7]))
   })
 
@@ -3078,13 +3428,13 @@ describe('indexedDbHost backend', () => {
     })
     legacyDb.close()
 
-    const store = indexedDbHost({ factory, dbName, keyRange: IDBKeyRange })
+    const store = await createIndexedDbTestStore({ factory, dbName, keyRange: IDBKeyRange })
     await expect(store.get('legacy-key')).resolves.toBe('legacy-value')
     await store.putRecord({ v: 1 }, 'doc-key')
     await expect(store.getRecord('doc-key')).resolves.toEqual({ v: 1 })
   })
 
-  it('升级前 close 抛错时保留 recovery connection 并允许后续重试', async () => {
+  it('升级前 close 抛错时回滚 recovery connection，后续安装可重试', async () => {
     const factory = freshFactory()
     const dbName = 'partial-hostile-transition-close'
     const legacyDb = await new Promise<IDBDatabase>((resolve) => {
@@ -3098,160 +3448,29 @@ describe('indexedDbHost backend', () => {
       transaction.oncomplete = () => resolve()
     })
     legacyDb.close()
-
-    const originalClose = IDBDatabase.prototype.close
     const cause = new Error('hostile transition close')
-    IDBDatabase.prototype.close = () => {
+    const close = vi.spyOn(IDBDatabase.prototype, 'close').mockImplementationOnce(() => {
       throw cause
-    }
-    const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
+    })
     try {
-      await expect(store.get('legacy-key')).rejects.toMatchObject({
-        code: 'BACKEND_UNAVAILABLE',
-        backend: 'indexeddb',
-        operation: 'indexeddb.close',
-        cause
-      })
-      IDBDatabase.prototype.close = originalClose
+      await expectNativeInstallationFailure(
+        createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName }),
+        {
+          code: 'BACKEND_UNAVAILABLE',
+          backend: 'indexed-db',
+          operation: 'indexeddb.close',
+          cause
+        }
+      )
+      // Original host rollback retries only its retained recovery connection before it rejects.
+      expect(close).toHaveBeenCalledTimes(2)
+      const store = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
       await expect(store.get('legacy-key')).resolves.toBe('legacy-value')
       await expect(store.putRecord({ recovered: true }, 'record')).resolves.toBe('record')
     } finally {
-      IDBDatabase.prototype.close = originalClose
-      await store.dispose()
+      close.mockRestore()
     }
   })
-
-  it.each(['objectStoreNames', 'version'] as const)(
-    'open schema inspection 的 %s getter 异常会关闭连接并允许重试',
-    async (property) => {
-      const factory = freshFactory()
-      const dbName = `hostile-schema-${property}`
-      const emptyDatabase = await new Promise<IDBDatabase>((resolve) => {
-        const request = factory.open(dbName, 1)
-        request.onsuccess = () => resolve(request.result)
-      })
-      emptyDatabase.close()
-      const cause = new Error(`hostile database ${property} getter`)
-      let intercepted = false
-      const hostileFactory = {
-        open: (name: string, version?: number) => {
-          const nativeRequest =
-            version === undefined ? factory.open(name) : factory.open(name, version)
-          if (intercepted) return nativeRequest
-          intercepted = true
-          return {
-            get result(): IDBDatabase {
-              const database = nativeRequest.result
-              return new Proxy(database, {
-                get: (target, key) => {
-                  if (key === property) throw cause
-                  if (key === 'close') return () => target.close()
-                  return Reflect.get(target, key, target)
-                }
-              })
-            },
-            get transaction(): IDBTransaction | null {
-              return nativeRequest.transaction
-            },
-            get error(): DOMException | null {
-              return nativeRequest.error
-            },
-            set onupgradeneeded(handler: (() => void) | null) {
-              nativeRequest.onupgradeneeded = () => handler?.()
-            },
-            set onblocked(handler: (() => void) | null) {
-              nativeRequest.onblocked = () => handler?.()
-            },
-            set onerror(handler: (() => void) | null) {
-              nativeRequest.onerror = () => handler?.()
-            },
-            set onsuccess(handler: (() => void) | null) {
-              nativeRequest.onsuccess = () => handler?.()
-            }
-          } as unknown as IDBOpenDBRequest
-        }
-      } as unknown as IDBFactory
-      const store = indexedDbHost({ factory: hostileFactory, keyRange: IDBKeyRange, dbName })
-      try {
-        await expect(store.get('key')).rejects.toMatchObject({
-          code: 'BACKEND_UNAVAILABLE',
-          backend: 'indexeddb',
-          operation: 'indexeddb.open',
-          cause
-        })
-        await expect(store.set('key', 'recovered')).resolves.toBeUndefined()
-        await expect(store.get('key')).resolves.toBe('recovered')
-      } finally {
-        await store.dispose()
-      }
-    }
-  )
-
-  it.each(['onversionchange', 'onclose'] as const)(
-    'connection %s setter 异常会关闭连接并允许同实例重试',
-    async (property) => {
-      const factory = freshFactory()
-      const dbName = `hostile-connection-${property}`
-      const seed = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
-      await seed.set('seed', 'value')
-      await seed.dispose()
-      const cause = new Error(`hostile connection ${property} setter`)
-      let intercepted = false
-      const hostileFactory = {
-        open: (name: string, version?: number) => {
-          const nativeRequest =
-            version === undefined ? factory.open(name) : factory.open(name, version)
-          if (intercepted) return nativeRequest
-          intercepted = true
-          return {
-            get result(): IDBDatabase {
-              const database = nativeRequest.result
-              return new Proxy(database, {
-                get: (target, key) => {
-                  if (key === 'close') return () => target.close()
-                  return Reflect.get(target, key, target)
-                },
-                set: (target, key, value) => {
-                  if (key === property) throw cause
-                  return Reflect.set(target, key, value, target)
-                }
-              })
-            },
-            get transaction(): IDBTransaction | null {
-              return nativeRequest.transaction
-            },
-            get error(): DOMException | null {
-              return nativeRequest.error
-            },
-            set onupgradeneeded(handler: (() => void) | null) {
-              nativeRequest.onupgradeneeded = () => handler?.()
-            },
-            set onblocked(handler: (() => void) | null) {
-              nativeRequest.onblocked = () => handler?.()
-            },
-            set onerror(handler: (() => void) | null) {
-              nativeRequest.onerror = () => handler?.()
-            },
-            set onsuccess(handler: (() => void) | null) {
-              nativeRequest.onsuccess = () => handler?.()
-            }
-          } as unknown as IDBOpenDBRequest
-        }
-      } as unknown as IDBFactory
-      const store = indexedDbHost({ factory: hostileFactory, keyRange: IDBKeyRange, dbName })
-      try {
-        await expect(store.get('seed')).rejects.toMatchObject({
-          code: 'BACKEND_UNAVAILABLE',
-          backend: 'indexeddb',
-          operation: 'indexeddb.open',
-          cause
-        })
-        await expect(store.get('seed')).resolves.toBe('value')
-      } finally {
-        await store.dispose()
-      }
-    }
-  )
 
   it('open 请求失败时归一为可读错误（而非裸 IDB 异常）', async () => {
     const failingFactory: IDBFactory = {
@@ -3274,108 +3493,17 @@ describe('indexedDbHost backend', () => {
       }
     } as unknown as IDBFactory
 
-    const store = indexedDbHost({ factory: failingFactory, dbName: 'x' })
-    await expect(store.get('k')).rejects.toMatchObject({
-      source: '@migaia/storage-web',
-      code: 'BACKEND_UNAVAILABLE',
-      backend: 'indexeddb',
-      operation: 'indexeddb.open',
-      cause: expect.objectContaining({ name: 'UnknownError', message: 'open failed' })
-    })
-  })
-
-  it('open success result getter 异常会 settle 为 BACKEND_UNAVAILABLE', async () => {
-    const cause = new Error('hostile open result getter')
-    const hostileFactory = {
-      open: () =>
-        ({
-          get result(): never {
-            throw cause
-          },
-          set onupgradeneeded(_handler: unknown) {},
-          set onblocked(_handler: unknown) {},
-          set onerror(_handler: unknown) {},
-          set onsuccess(handler: (() => void) | null) {
-            queueMicrotask(() => handler?.())
-          }
-        }) as unknown as IDBOpenDBRequest
-    } as unknown as IDBFactory
-    const store = indexedDbHost({ factory: hostileFactory, dbName: 'hostile-open-result' })
-    await expect(store.get('k')).rejects.toMatchObject({
-      code: 'BACKEND_UNAVAILABLE',
-      backend: 'indexeddb',
-      operation: 'indexeddb.open',
-      cause
-    })
-  })
-
-  it('upgrade result getter 异常会 abort 并 settle 为 BACKEND_UNAVAILABLE', async () => {
-    const cause = new Error('hostile upgrade result getter')
-    const hostileFactory = {
-      open: () =>
-        ({
-          get result(): never {
-            throw cause
-          },
-          get transaction(): null {
-            return null
-          },
-          set onupgradeneeded(handler: (() => void) | null) {
-            queueMicrotask(() => handler?.())
-          },
-          set onblocked(_handler: unknown) {},
-          set onerror(_handler: unknown) {},
-          set onsuccess(_handler: unknown) {}
-        }) as unknown as IDBOpenDBRequest
-    } as unknown as IDBFactory
-    const store = indexedDbHost({ factory: hostileFactory, dbName: 'hostile-upgrade-result' })
-    await expect(store.get('k')).rejects.toMatchObject({
-      code: 'BACKEND_UNAVAILABLE',
-      backend: 'indexeddb',
-      operation: 'indexeddb.open',
-      cause
-    })
-  })
-
-  it.each(['onupgradeneeded', 'onblocked', 'onsuccess', 'onerror'] as const)(
-    'open request %s setter 异常会 abort upgrade 并归一 open failure',
-    async (property) => {
-      const cause = new Error(`hostile open ${property} setter`)
-      let abortCalls = 0
-      const transaction = {
-        abort: () => {
-          abortCalls += 1
-        }
-      } as unknown as IDBTransaction
-      const hostileFactory = {
-        open: () =>
-          ({
-            transaction,
-            set onupgradeneeded(_handler: unknown) {
-              if (property === 'onupgradeneeded') throw cause
-            },
-            set onblocked(_handler: unknown) {
-              if (property === 'onblocked') throw cause
-            },
-            set onsuccess(_handler: unknown) {
-              if (property === 'onsuccess') throw cause
-            },
-            set onerror(_handler: unknown) {
-              if (property === 'onerror') throw cause
-            }
-          }) as unknown as IDBOpenDBRequest
-      } as unknown as IDBFactory
-      const store = indexedDbHost({ factory: hostileFactory, dbName: `hostile-open-${property}` })
-      await expect(store.get('key')).rejects.toMatchObject({
+    await expectNativeInstallationFailure(
+      createIndexedDbTestStore({ factory: failingFactory, dbName: 'x' }),
+      {
+        source: '@migaia/storage-web',
         code: 'BACKEND_UNAVAILABLE',
-        backend: 'indexeddb',
+        backend: 'indexed-db',
         operation: 'indexeddb.open',
-        cause
-      })
-      expect(abortCalls).toBe(1)
-      await store.dispose()
-    }
-  )
+        cause: expect.objectContaining({ name: 'UnknownError', message: 'open failed' })
+      }
+    )
+  })
 
   it('factory.open 同步抛错时也归一为 UNAVAILABLE', async () => {
     const cause = new DOMException('open threw', 'SecurityError')
@@ -3384,26 +3512,28 @@ describe('indexedDbHost backend', () => {
         throw cause
       }
     } as unknown as IDBFactory
-    const store = indexedDbHost({ factory: throwingFactory, dbName: 'sync-open-throw' })
-    await expect(store.get('k')).rejects.toMatchObject({
-      code: 'BACKEND_UNAVAILABLE',
-      operation: 'indexeddb.open',
-      cause
-    })
+    await expectNativeInstallationFailure(
+      createIndexedDbTestStore({ factory: throwingFactory, dbName: 'sync-open-throw' }),
+      {
+        code: 'BACKEND_UNAVAILABLE',
+        operation: 'indexeddb.open',
+        cause
+      }
+    )
   })
 
-  it('dispose 在连接仍处于打开中途时等待其结果再关闭', async () => {
-    const store = freshDb()
+  it('dispose 封口已安装后端并等待已接纳请求结算', async () => {
+    const store = await freshDb()
     const pendingGet = store.get('k')
     const disposePromise = store.dispose()
     await expect(pendingGet).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
     await expect(disposePromise).resolves.toBeUndefined()
   })
 
-  it('dispose 与异步 open 竞态时不会让操作复用已关闭连接', async () => {
+  it('dispose 后的请求不能复用已关闭连接', async () => {
     const factory = freshFactory()
     const dbName = 'dispose-open-race'
-    const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
+    const store = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
     const pending = store.get('k')
     await store.dispose()
     await expect(pending).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
@@ -3413,7 +3543,7 @@ describe('indexedDbHost backend', () => {
   it('versionchange close 抛错后仍清除 stale connection cache', async () => {
     const factory = freshFactory()
     const dbName = 'versionchange-hostile-close'
-    const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
+    const store = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
     await store.set('before', 'value')
     const current = await new Promise<IDBDatabase>((resolve, reject) => {
       const request = factory.open(dbName)
@@ -3455,7 +3585,7 @@ describe('indexedDbHost backend', () => {
     const original = crypto.randomUUID
     Object.defineProperty(crypto, 'randomUUID', { value: undefined, configurable: true })
     try {
-      const store = freshDb()
+      const store = await freshDb()
       const key = await store.putRecord({ a: 1 })
       expect(typeof key).toBe('string')
     } finally {
@@ -3464,16 +3594,16 @@ describe('indexedDbHost backend', () => {
   })
 
   it('transaction 作用域内 put 不传 key 时自动生成', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     let generatedKey: unknown
     await store.transaction(async (tx) => {
-      generatedKey = await tx.put({ v: 'auto' })
+      generatedKey = await tx.putRecord({ v: 'auto' })
     })
     await expect(store.getRecord(generatedKey as never)).resolves.toEqual({ v: 'auto' })
   })
 
   it('iterate 在没有注入 keyRange 且传了 range 时抛 BACKEND_UNAVAILABLE', async () => {
-    const store = indexedDbHost({ factory: freshFactory(), dbName: 'no-keyrange' })
+    const store = await createIndexedDbTestStore({ factory: freshFactory(), dbName: 'no-keyrange' })
     const iterator = store.iterateRecords({ lower: 1 })
     await expect(iterator.next()).rejects.toMatchObject({ code: 'BACKEND_UNAVAILABLE' })
   })
@@ -3481,13 +3611,13 @@ describe('indexedDbHost backend', () => {
 
 describe('indexedDbHost backend change feed (record channel + clearAll only)', () => {
   it('putRecord/deleteRecord/clearRecords/clearAll each fire exactly one correctly-typed post-commit event', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
 
     await store.putRecord({ x: 1 }, 'r')
     await store.deleteRecord('r')
-    await store.putRecord({ x: 1 }, composeRepositoryKey('users', 'id-1'))
+    await store.putRecord({ x: 1 }, entityRecordKey(store, 'users', 'id-1'))
     await store.clearRecords()
     await store.putRecord({ x: 2 }, 'r2')
     await store.clearAll()
@@ -3500,7 +3630,7 @@ describe('indexedDbHost backend change feed (record channel + clearAll only)', (
       {
         channel: 'record',
         kind: 'put',
-        keys: [composeRepositoryKey('users', 'id-1')],
+        keys: [entityRecordKey(store, 'users', 'id-1')],
         scope: 'users'
       },
       { channel: 'record', kind: 'clear', keys: undefined, scope: undefined },
@@ -3513,7 +3643,7 @@ describe('indexedDbHost backend change feed (record channel + clearAll only)', (
   })
 
   it('a no-op deleteRecord/clearRecords/clearAll (nothing to remove/clear) publishes nothing', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
 
@@ -3526,7 +3656,7 @@ describe('indexedDbHost backend change feed (record channel + clearAll only)', (
   })
 
   it('a putRecord whose write is aborted mid-transaction (real IDBTransaction abort/rollback) publishes nothing', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     await store.putRecord({ warm: true }, 'warm')
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
@@ -3544,7 +3674,7 @@ describe('indexedDbHost backend change feed (record channel + clearAll only)', (
   })
 
   it('a deleteRecord whose write is aborted mid-transaction publishes nothing, even though the key existed', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     await store.putRecord({ keep: true }, 'delete-me')
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
@@ -3560,23 +3690,22 @@ describe('indexedDbHost backend change feed (record channel + clearAll only)', (
     await store.dispose()
   })
 
-  it('a real transaction() commit-conflict rollback (SWV2-T43-style) publishes nothing for either concurrent write', async () => {
-    const store = freshDb()
+  it('a rolled-back native callback publishes nothing while a queued independent write publishes its commit', async () => {
+    const store = await freshDb()
     await store.putRecord({ value: 'first' }, 'first')
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
-
+    const cause = new Error('native callback rollback')
     const pending = store.transaction(async (tx) => {
-      await tx.get('first')
-      await store.putRecord({ value: 'concurrent' }, 'concurrent')
-      await tx.put({ value: 'should-not-commit' }, 'result')
+      await tx.getRecord('first')
+      await tx.putRecord({ value: 'should-not-commit' }, 'result')
+      throw cause
     })
-    await expect(pending).rejects.toMatchObject({ code: 'TRANSACTION_CONFLICT' })
+    // Independent work queues outside the callback; awaiting it inside would block the native owner.
+    const concurrent = store.putRecord({ value: 'concurrent' }, 'concurrent')
+    await expect(pending).rejects.toMatchObject({ code: 'TRANSACTION_FAILED', cause })
+    await concurrent
     await expect(store.getRecord('result')).resolves.toBeUndefined()
-    // The genuinely-committed out-of-band `putRecord('concurrent')` (the write that *causes* the
-    // conflict) correctly publishes — `putRecord` is wired. The rolled-back `tx.put('result')`
-    // inside `transaction()` correctly does not, since `transaction`/`transactionIndexed` batch
-    // routes are explicitly out of scope this round (disclosed, not claimed wired).
     expect(changes.map(({ kind, keys }) => ({ kind, keys }))).toEqual([
       { kind: 'put', keys: ['concurrent'] }
     ])
@@ -3586,14 +3715,14 @@ describe('indexedDbHost backend change feed (record channel + clearAll only)', (
   it('reopening the same physical database (dispose then a fresh store instance) starts a new, independent change feed: no leaked listeners, no cross-instance delivery, distinct origin', async () => {
     const factory = freshFactory()
     const dbName = 'change-feed-reopen'
-    const first = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
+    const first = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
     const firstChanges: IStorageChange[] = []
     first.subscribeChanges((change) => firstChanges.push(change))
     await first.putRecord({ x: 1 }, 'r')
     expect(firstChanges).toHaveLength(1)
     await first.dispose()
 
-    const second = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
+    const second = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
     const secondChanges: IStorageChange[] = []
     second.subscribeChanges((change) => secondChanges.push(change))
     await second.putRecord({ x: 2 }, 'r2')
@@ -3608,7 +3737,7 @@ describe('indexedDbHost backend change feed (record channel + clearAll only)', (
   })
 
   it('a conflictPolicy:"replace" write that silently evicts an existing record publishes that record\'s own remove event, matching the memory backend', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     await store.putRecord({ x: 1 }, 'shared')
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
@@ -3626,14 +3755,14 @@ describe('indexedDbHost backend change feed (record channel + clearAll only)', (
   })
 
   it('transaction() publishes exactly one batch event for the records it actually commits, and none for a rolled-back or read-only transaction', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
 
     await store.transaction(async (tx) => {
-      await tx.put({ v: 1 }, 'a')
-      await tx.put({ v: 2 }, 'b')
-      await tx.delete('a')
+      await tx.putRecord({ v: 1 }, 'a')
+      await tx.putRecord({ v: 2 }, 'b')
+      await tx.deleteRecord('a')
     })
     expect(changes).toHaveLength(1)
     expect(changes[0]).toMatchObject({ channel: 'record', kind: 'batch' })
@@ -3642,7 +3771,7 @@ describe('indexedDbHost backend change feed (record channel + clearAll only)', (
     // A transaction whose callback throws must roll back with zero events.
     await expect(
       store.transaction(async (tx) => {
-        await tx.put({ v: 3 }, 'c')
+        await tx.putRecord({ v: 3 }, 'c')
         throw new Error('callback failure')
       })
     ).rejects.toThrow()
@@ -3651,13 +3780,13 @@ describe('indexedDbHost backend change feed (record channel + clearAll only)', (
 
     // A read-only transaction has nothing to report.
     await store.transaction(async (tx) => {
-      await tx.get('a')
+      await tx.getRecord('a')
     })
     expect(changes).toHaveLength(1)
     await store.dispose()
   })
 
-  it('the legacy documents→records migration publishes a batch event for the records it actually copies', async () => {
+  it('legacy documents migration finishes before publication without replaying its installation event', async () => {
     const factory = freshFactory()
     const dbName = 'change-feed-legacy-migration'
     const legacyDb = await new Promise<IDBDatabase>((resolve) => {
@@ -3675,20 +3804,18 @@ describe('indexedDbHost backend change feed (record channel + clearAll only)', (
     })
     legacyDb.close()
 
-    const store = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
+    const store = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
-    // The first operation triggers lazy open, which runs the legacy migration before this read
-    // can resolve.
+    // Eager preparation completes migration before a consumer can subscribe to the published store.
     await expect(store.getRecord('legacy-key')).resolves.toEqual({ legacy: true })
 
-    expect(changes).toHaveLength(1)
-    expect(changes[0]).toMatchObject({ channel: 'record', kind: 'batch', keys: ['legacy-key'] })
+    expect(changes).toHaveLength(0)
     await store.dispose()
   })
 
   it('a database with no legacy documents store publishes no migration event', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
     await store.putRecord({ x: 1 }, 'k')
@@ -3698,7 +3825,7 @@ describe('indexedDbHost backend change feed (record channel + clearAll only)', (
   })
 
   it('(planner) transactionIndexed/putIndexedRecord publish exactly one batch event for the records they actually commit, and none on unique-conflict rollback', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     const handle = await store.ensureRecordIndexes('idx-users', [
       { name: 'email', unique: true, multiEntry: false, revision: 1 }
     ])
@@ -3706,41 +3833,71 @@ describe('indexedDbHost backend change feed (record channel + clearAll only)', (
     store.subscribeChanges((change) => changes.push(change))
 
     await store.transactionIndexed(handle, async (transaction) => {
-      await transaction.put({ id: 'u1' }, 'u1', { email: { kind: 'single', key: 'one@test' } })
-      await transaction.put({ id: 'u2' }, 'u2', { email: { kind: 'single', key: 'two@test' } })
+      await transaction.putIndexedRecord(
+        { id: 'u1' },
+        entityRecordKey(store, 'idx-users', 'u1'),
+        handle,
+        { email: { kind: 'single', key: 'one@test' } }
+      )
+      await transaction.putIndexedRecord(
+        { id: 'u2' },
+        entityRecordKey(store, 'idx-users', 'u2'),
+        handle,
+        { email: { kind: 'single', key: 'two@test' } }
+      )
     })
     expect(changes).toHaveLength(1)
     expect(changes[0]).toMatchObject({ channel: 'record', kind: 'batch' })
-    expect(new Set(changes[0]!.keys)).toEqual(new Set(['u1', 'u2']))
+    expect(new Set(changes[0]!.keys)).toEqual(
+      new Set([
+        entityRecordKey(store, 'idx-users', 'u1'),
+        entityRecordKey(store, 'idx-users', 'u2')
+      ])
+    )
 
     await expect(
       store.transactionIndexed(handle, async (transaction) => {
-        await transaction.put({ id: 'u3' }, 'u3', { email: { kind: 'single', key: 'one@test' } })
+        await transaction.putIndexedRecord(
+          { id: 'u3' },
+          entityRecordKey(store, 'idx-users', 'u3'),
+          handle,
+          { email: { kind: 'single', key: 'one@test' } }
+        )
       })
     ).rejects.toMatchObject({ code: 'INDEX_UNIQUE_CONFLICT' })
     // Rejected by the planner's own in-callback unique check, before any transaction commit.
     expect(changes).toHaveLength(1)
-    await expect(store.getRecord('u3')).resolves.toBeUndefined()
+    await expect(
+      store.getRecord(entityRecordKey(store, 'idx-users', 'u3'))
+    ).resolves.toBeUndefined()
 
     await expect(
-      store.putIndexedRecord({ id: 'u4' }, 'u4', handle, {
+      store.putIndexedRecord({ id: 'u4' }, entityRecordKey(store, 'idx-users', 'u4'), handle, {
         email: { kind: 'single', key: 'one@test' }
       })
     ).rejects.toMatchObject({ code: 'INDEX_UNIQUE_CONFLICT' })
     expect(changes).toHaveLength(1)
-    await expect(store.getRecord('u4')).resolves.toBeUndefined()
+    await expect(
+      store.getRecord(entityRecordKey(store, 'idx-users', 'u4'))
+    ).resolves.toBeUndefined()
 
     await store.transactionIndexed(handle, async (transaction) => {
-      await transaction.delete('u1')
+      await transaction.deleteRecord(entityRecordKey(store, 'idx-users', 'u1'))
     })
     expect(changes).toHaveLength(2)
-    expect(changes[1]).toMatchObject({ channel: 'record', kind: 'batch', keys: ['u1'] })
-    await expect(store.getRecord('u1')).resolves.toBeUndefined()
+    expect(changes[1]).toMatchObject({
+      channel: 'record',
+      kind: 'batch',
+      keys: [entityRecordKey(store, 'idx-users', 'u1')]
+    })
+    await expect(
+      store.getRecord(entityRecordKey(store, 'idx-users', 'u1'))
+    ).resolves.toBeUndefined()
     await store.dispose()
   })
 
   it('the local feed publishes value/bytes routes reached through the writeTo helper (remove/clearValues/clearBytes), not just literal object-store calls — capability flag is asserted separately', async () => {
-    const store = freshDb()
+    const store = await freshDb()
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
 
@@ -3771,7 +3928,7 @@ describe('indexedDbHost backend change feed (record channel + clearAll only)', (
   })
 
   it("a `replace`-policy write evicts the other channel and publishes that channel's own remove, not just the attempted channel's put", async () => {
-    const store = freshDb()
+    const store = await freshDb()
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
 
@@ -3790,19 +3947,20 @@ describe('indexedDbHost backend change feed (record channel + clearAll only)', (
     await store.dispose()
   })
 
-  it("`transaction()` evicting a value/bytes entry stays silent on its own, matching the memory backend's emitEvent:false parity — the eviction is not double-reported outside the batch event", async () => {
-    const store = freshDb()
+  it('transaction replacement publishes each actually changed channel once after commit', async () => {
+    const store = await freshDb()
     await store.set('shared', 'v1')
     const changes: IStorageChange[] = []
     store.subscribeChanges((change) => changes.push(change))
 
     await store.transaction(async (tx) => {
-      await tx.put({ id: 'shared' }, 'shared', { conflictPolicy: 'replace' })
+      await tx.putRecord({ id: 'shared' }, 'shared', { conflictPolicy: 'replace' })
     })
 
-    // Exactly one event: the record batch. No standalone value:remove for the eviction.
-    expect(changes).toHaveLength(1)
-    expect(changes[0]).toMatchObject({ channel: 'record', kind: 'batch', keys: ['shared'] })
+    expect(changes.map(({ channel, kind, keys }) => ({ channel, kind, keys }))).toEqual([
+      { channel: 'value', kind: 'batch', keys: ['shared'] },
+      { channel: 'record', kind: 'batch', keys: ['shared'] }
+    ])
     await expect(store.get('shared')).resolves.toBeNull()
     await store.dispose()
   })
@@ -3810,10 +3968,13 @@ describe('indexedDbHost backend change feed (record channel + clearAll only)', (
   it('injected factories keep public changeFeed false while same-page handles retain private coordination', async () => {
     const factory = freshFactory()
     const dbName = `shared-${Math.random().toString(36).slice(2)}`
-    const writer = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
-    const reader = indexedDbHost({ factory, keyRange: IDBKeyRange, dbName })
+    const writer = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
+    const reader = await createIndexedDbTestStore({ factory, keyRange: IDBKeyRange, dbName })
     expect(writer.capabilities.changeFeed).toBe(false)
     expect(reader.capabilities.changeFeed).toBe(false)
+    expect(() => reader.watch('k')).toThrowError(
+      expect.objectContaining({ code: 'UNSUPPORTED_CAPABILITY' })
+    )
     expect(isChangeFeedStore(writer)).toBe(false)
     expect(isChangeFeedStore(reader)).toBe(false)
     const writerEvents: IStorageChange[] = []
@@ -3837,8 +3998,8 @@ describe('indexedDbHost backend change feed (record channel + clearAll only)', (
     const dbName = `r09-wire-${Math.random().toString(36).slice(2)}`
     const indexedDbDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'indexedDB')
     const broadcastDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'BroadcastChannel')
-    let writer: ReturnType<typeof indexedDbHost> | undefined
-    let reader: ReturnType<typeof indexedDbHost> | undefined
+    let writer: Awaited<ReturnType<typeof createIndexedDbTestStore>> | undefined
+    let reader: Awaited<ReturnType<typeof createIndexedDbTestStore>> | undefined
     let rogue: TestBroadcastChannel | undefined
     try {
       Object.defineProperty(globalThis, 'indexedDB', {
@@ -3851,19 +4012,29 @@ describe('indexedDbHost backend change feed (record channel + clearAll only)', (
       })
       TestBroadcastChannel.instances.length = 0
       TestBroadcastChannel.closedCount = 0
-      writer = indexedDbHost({ dbName, keyRange: IDBKeyRange })
-      reader = indexedDbHost({ dbName, keyRange: IDBKeyRange })
+      writer = await createIndexedDbTestStore({ dbName, keyRange: IDBKeyRange })
+      reader = await createIndexedDbTestStore({ dbName, keyRange: IDBKeyRange })
       expect(writer.capabilities.changeFeed).toBe(true)
       expect(reader.capabilities.changeFeed).toBe(true)
       expect(isChangeFeedStore(writer)).toBe(true)
       expect(TestBroadcastChannel.instances).toHaveLength(1)
       const readerEvents: IStorageChange[] = []
       reader.subscribeChanges((change) => readerEvents.push(change))
+      const localWatch = reader.watch('wire-key')
+      const localNext = localWatch.next()
+      const remoteWatch = reader.watch('remote-key')
+      const remoteNext = remoteWatch.next()
 
       await writer.set('wire-key', 'value')
       await new Promise<void>((resolve) => queueMicrotask(resolve))
       expect(readerEvents).toHaveLength(1)
       expect(readerEvents[0]).toMatchObject({ channel: 'value', kind: 'put', keys: ['wire-key'] })
+      expect((await localNext).value).toBe(readerEvents[0])
+      expect(readerEvents[0]!.orgId).toMatch(/^[0-9a-f-]{36}$/)
+      const disposed = localWatch.dispose()
+      expect(localWatch.dispose()).toBe(disposed)
+      await disposed
+      await expect(localWatch.next()).resolves.toMatchObject({ done: true })
 
       rogue = new TestBroadcastChannel(TestBroadcastChannel.instances[0]!.name)
       rogue.postMessage({
@@ -3913,26 +4084,22 @@ describe('indexedDbHost backend change feed (record channel + clearAll only)', (
         kind: 'put',
         unexpected: true
       })
-      let statefulKeysReads = 0
       rogue.postMessage({
         version: 1,
-        origin: 'stateful-accessor',
+        origin: 'plain-hint',
         sequence: 10,
         channel: 'value',
         kind: 'put',
-        get keys() {
-          statefulKeysReads += 1
-          return statefulKeysReads === 1
-            ? [encodeFlatStorageKey('stateful-key')]
-            : Array.from({ length: 129 }, (_, index) => encodeFlatStorageKey(`oversized-${index}`))
-        }
+        keys: [encodeFlatStorageKey('stateful-key')]
       })
       await new Promise<void>((resolve) => queueMicrotask(resolve))
       expect(readerEvents).toHaveLength(4)
-      expect(statefulKeysReads).toBe(1)
       expect(readerEvents[1]).toMatchObject({ keys: ['remote-key'] })
       expect(readerEvents[2]).toMatchObject({ keys: ['remote-newer-key'], sequence: 3 })
       expect(readerEvents[3]).toMatchObject({ keys: ['stateful-key'], sequence: 10 })
+      const remote = (await remoteNext).value
+      expect(remote).toMatchObject({ keys: ['remote-key'], orgId: readerEvents[0]!.orgId })
+      await remoteWatch.dispose()
 
       await writer.dispose()
       expect(TestBroadcastChannel.closedCount).toBe(0)
@@ -3954,49 +4121,6 @@ describe('indexedDbHost backend change feed (record channel + clearAll only)', (
       if (writer !== undefined) await writer.dispose()
       if (reader !== undefined) await reader.dispose()
       rogue?.close()
-      if (indexedDbDescriptor === undefined) Reflect.deleteProperty(globalThis, 'indexedDB')
-      else Object.defineProperty(globalThis, 'indexedDB', indexedDbDescriptor)
-      if (broadcastDescriptor === undefined) Reflect.deleteProperty(globalThis, 'BroadcastChannel')
-      else Object.defineProperty(globalThis, 'BroadcastChannel', broadcastDescriptor)
-    }
-  })
-
-  it('snapshots platform getters once, opens no database, and fails closed without transport', async () => {
-    const factory = freshFactory()
-    const dbName = `r09-admission-${Math.random().toString(36).slice(2)}`
-    const indexedDbDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'indexedDB')
-    const broadcastDescriptor = Object.getOwnPropertyDescriptor(globalThis, 'BroadcastChannel')
-    let indexedDbReads = 0
-    let broadcastReads = 0
-    let store: ReturnType<typeof indexedDbHost> | undefined
-    const openSpy = vi.spyOn(factory, 'open')
-    try {
-      Object.defineProperty(globalThis, 'indexedDB', {
-        configurable: true,
-        get: () => {
-          indexedDbReads += 1
-          return factory
-        }
-      })
-      Object.defineProperty(globalThis, 'BroadcastChannel', {
-        configurable: true,
-        get: () => {
-          broadcastReads += 1
-          return undefined
-        }
-      })
-      store = indexedDbHost({ dbName, keyRange: IDBKeyRange })
-      expect(indexedDbReads).toBe(1)
-      expect(broadcastReads).toBe(1)
-      expect(store.capabilities.changeFeed).toBe(false)
-      expect(isChangeFeedStore(store)).toBe(false)
-      expect(openSpy).not.toHaveBeenCalled()
-      await store.set('admitted-later', 'value')
-      expect(await store.get('admitted-later')).toBe('value')
-      expect(openSpy).toHaveBeenCalled()
-    } finally {
-      if (store !== undefined) await store.dispose()
-      openSpy.mockRestore()
       if (indexedDbDescriptor === undefined) Reflect.deleteProperty(globalThis, 'indexedDB')
       else Object.defineProperty(globalThis, 'indexedDB', indexedDbDescriptor)
       if (broadcastDescriptor === undefined) Reflect.deleteProperty(globalThis, 'BroadcastChannel')

@@ -378,6 +378,10 @@
             "blocks": [
               {
                 "type": "paragraph",
+                "text": "静态建图只读取一次节点和边，以迭代 DFS 和 ordinal/level 桶在线性 O(v + e + p) 成本内构造，p 为捕获输入大小。多闭环按根 ordinal 与声明依赖顺序报告遇到的首个闭环。动态增删保留原算法。"
+              },
+              {
+                "type": "paragraph",
                 "text": "buildCapabilityTopology(nodes, onUnknownProvider, onCycle, onInvalid) 只计算，不调用 start 或 release。四个参数均必填。节点为 { id, dependencies, ordinal }；ordinal 必须是唯一安全整数，连续覆盖 [0, nodeCount)，不静默重排或重写坏输入。边的 provider 非空、required 为 boolean；缺席 required provider 交 onUnknownProvider(nodeId, provider)，存在的 optional 边也参与层级和环检测。"
               },
               {
@@ -1234,6 +1238,10 @@
             "blocks": [
               {
                 "type": "paragraph",
+                "text": "静态建图只读取一次节点和边，以迭代 DFS 和 ordinal/level 桶在线性 O(v + e + p) 成本内构造，p 为捕获输入大小。多闭环按根 ordinal 与声明依赖顺序报告遇到的首个闭环。动态增删保留原算法。"
+              },
+              {
+                "type": "paragraph",
                 "text": "buildCapabilityTopology(nodes, onUnknownProvider, onCycle, onInvalid) 只计算，不调用 start 或 release。四个参数均必填。节点为 { id, dependencies, ordinal }；ordinal 必须是唯一安全整数，连续覆盖 [0, nodeCount)，不静默重排或重写坏输入。边的 provider 非空、required 为 boolean；缺席 required provider 交 onUnknownProvider(nodeId, provider)，存在的 optional 边也参与层级和环检测。"
               },
               {
@@ -1944,6 +1952,10 @@
               "blocks": [
                 {
                   "type": "paragraph",
+                  "text": "Static construction reads each node and edge once, then uses iterative DFS and ordinal/level buckets in O(v + e + p), where p is the captured input size. Multiple cycles report the first closed path reached by root ordinal and declared provider order. Incremental edits retain their existing algorithm."
+                },
+                {
+                  "type": "paragraph",
                   "text": "buildCapabilityTopology(nodes, onUnknownProvider, onCycle, onInvalid) computes a plan without calling start or release. All four arguments are required. Nodes contain id, dependencies and ordinal. Ordinals must be unique safe integers covering [0, nodeCount) without gaps. Invalid input is not silently sorted or rewritten. Edges require a nonempty provider and boolean required. Missing required providers go to onUnknownProvider(nodeId, provider); present optional edges also affect levels and cycle checks."
                 },
                 {
@@ -1993,7 +2005,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Base readers retain the original snapshot until commit; base writes and nested begin calls are rejected. Commit publishes the working view, while rollback discards it and preserves observable facts. Settled transactions reject reads as well as writes. Static topology and indexes share one private structural/edge admission owner; the trusted construction helper is not exported."
+                  "text": "Base readers retain the original snapshot until commit; base writes and nested begin calls are rejected. Commit publishes the working view, while rollback discards it and preserves observable facts. Settled transactions reject reads as well as writes. Static topology and indexes share one private structural/edge admission owner; static construction does not replay incremental edits."
                 }
               ]
             },
@@ -2882,6 +2894,10 @@
               "blocks": [
                 {
                   "type": "paragraph",
+                  "text": "Static construction reads each node and edge once, then uses iterative DFS and ordinal/level buckets in O(v + e + p), where p is the captured input size. Multiple cycles report the first closed path reached by root ordinal and declared provider order. Incremental edits retain their existing algorithm."
+                },
+                {
+                  "type": "paragraph",
                   "text": "buildCapabilityTopology(nodes, onUnknownProvider, onCycle, onInvalid) computes a plan without calling start or release. All four arguments are required. Nodes contain id, dependencies and ordinal. Ordinals must be unique safe integers covering [0, nodeCount) without gaps. Invalid input is not silently sorted or rewritten. Edges require a nonempty provider and boolean required. Missing required providers go to onUnknownProvider(nodeId, provider); present optional edges also affect levels and cycle checks."
                 },
                 {
@@ -2931,7 +2947,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Base readers retain the original snapshot until commit; base writes and nested begin calls are rejected. Commit publishes the working view, while rollback discards it and preserves observable facts. Settled transactions reject reads as well as writes. Static topology and indexes share one private structural/edge admission owner; the trusted construction helper is not exported."
+                  "text": "Base readers retain the original snapshot until commit; base writes and nested begin calls are rejected. Commit publishes the working view, while rollback discards it and preserves observable facts. Settled transactions reject reads as well as writes. Static topology and indexes share one private structural/edge admission owner; static construction does not replay incremental edits."
                 }
               ]
             },

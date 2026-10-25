@@ -300,15 +300,22 @@ export async function loader({ params }: { readonly params: IDocsRouteProps['par
     selectedSymbol && symbolDocFor(reference, selectedModule, selectedSymbol.name)
   )
   /** Runtime signatures render without source JSDoc; hydration needs only those declaration tokens. */
-  const renderedApis = selectedSymbol
-    ? content.apis.map((api) => ({
-        ...api,
-        symbols: api.symbols.map((symbol) => ({
-          ...symbol,
-          signature: withoutDocComments(symbol.signature)
+  const renderedApis =
+    selectedSymbol || selectedType
+      ? content.apis.map((api) => ({
+          ...api,
+          symbols: api.symbols.map((symbol) => ({
+            ...symbol,
+            signature: withoutDocComments(symbol.signature),
+            // Authored runtime and strict type articles read maintained member prose.
+            members: symbol.members.map((member) => ({
+              ...member,
+              signature: withoutDocComments(member.signature),
+              description: selectedType || hasAuthoredSymbol ? null : member.description
+            }))
+          }))
         }))
-      }))
-    : content.apis
+      : content.apis
   return {
     ...content,
     apis: packApis(renderedApis),
@@ -329,7 +336,41 @@ export async function loader({ params }: { readonly params: IDocsRouteProps['par
             ...(selectedApi?.symbols ?? []),
             ...content.apis.flatMap((entry) => entry.symbols)
           ])
-        : reference
+        : selectedType && reference
+          ? renderedTypeReference(
+              reference,
+              selectedType,
+              content.apis.flatMap((api) => api.symbols)
+            )
+          : reference
+  }
+}
+
+/** A type article needs its own composed surface and the object parameters its methods expose. */
+function renderedTypeReference(
+  reference: ILocalizedReference,
+  symbol: IApiSymbol,
+  symbols: readonly IApiSymbol[]
+): ILocalizedReference {
+  /** Match ModuleOverview's visible surface rather than serializing unrelated linked type guides. */
+  const surface = instanceSurface(symbol, symbols)
+  /** Parameter field panels render their named type guides on the same article. */
+  const names = new Set([
+    symbol.name,
+    ...surface.owners,
+    ...surface.members.flatMap((member) =>
+      member.parameterDetails.map((parameter) => parameterTypeName(parameter.type))
+    )
+  ])
+  return {
+    ...reference,
+    modules: {},
+    symbols: {},
+    types: Object.fromEntries(
+      Object.entries(reference.types).filter(([key]) =>
+        names.has(key.slice(key.lastIndexOf(':') + 1))
+      )
+    )
   }
 }
 
@@ -1432,14 +1473,16 @@ function referenceSections(
   const memberSections = ownSurface
     ? ['members', ...classMemberGroups(ownSurface.members).map(({ key }) => `members-${key}`)]
     : []
+  /** Promoting a maintained case to the quick start removes its separate cases section. */
+  const authoredExample = symbolDoc ? authoredPrimaryExample(symbolDoc, symbol.name) : undefined
   /** Audited pages derive their inventory from the reference doc alone. */
   if (symbolDoc)
     return [
       'overview',
-      ...(symbolDoc.example ? ['quick-start'] : []),
+      ...(authoredExample ? ['quick-start'] : []),
       // A first case that repeats the minimal example renders inside the quick-start section.
       ...(symbolDoc.cases.length >
-      (symbolDoc.example && symbolDoc.cases[0]?.example === symbolDoc.example ? 1 : 0)
+      (authoredExample && symbolDoc.cases[0]?.example === authoredExample ? 1 : 0)
         ? ['cases']
         : []),
       ...(Object.keys(symbolDoc.params).length > 0 || symbolDoc.returns ? ['contract'] : []),
@@ -1470,6 +1513,16 @@ function referenceSections(
     'related-apis',
     'signature'
   ]
+}
+
+/** Reuses the maintained program that demonstrates this API, in article and outline alike. */
+function authoredPrimaryExample(symbolDoc: ILocalizedSymbolDoc, name: string) {
+  return (
+    symbolDoc.example ??
+    symbolDoc.cases[0]?.example ??
+    symbolDoc.optionCases[0]?.example ??
+    Object.values(symbolDoc.options).find((option) => option.example?.includes(name))?.example
+  )
 }
 
 /** Selects an observable maintained example shared by rendering and its section inventory. */
@@ -2079,6 +2132,11 @@ function classMemberGroups(members: readonly IApiMember[]) {
   })
 }
 
+/** Computed symbol names contain a dot but still identify one direct member. */
+function isDirectMemberName(name: string): boolean {
+  return !name.includes('.') || /^\[[^\]]+\]$/.test(name)
+}
+
 /**
  * Renders every public instance method and property of one instance surface: a class, an
  * object-shaped type, or the result type a factory returns. For an audited library every sentence
@@ -2100,6 +2158,7 @@ function ClassMemberReference({
   members,
   nestedDocs,
   parameterTypeDoc,
+  shownExample,
   strict = false,
   symbol
 }: {
@@ -2129,6 +2188,8 @@ function ClassMemberReference({
   readonly members: readonly IApiMember[]
   /** Resolves the reference doc of a parameter's object type so its fields render in place. */
   readonly parameterTypeDoc?: (typeName: string) => ILocalizedTypeDoc | undefined
+  /** The primary program already rendered above remains the single owner of identical code. */
+  readonly shownExample?: string
   /** Lists documented nested fields (`restart.mode`) of one member, keyed by dotted path. */
   readonly nestedDocs?: (name: string) => readonly (readonly [string, ILocalizedMemberDoc])[]
   /** True for audited libraries: never substitute declaration comments for reference text. */
@@ -2137,7 +2198,7 @@ function ClassMemberReference({
 }) {
   /** Documented members the resolved surface does not list; dotted keys render under their parent. */
   const documentedOnly = Object.entries(documented ?? guide?.members ?? {}).filter(
-    ([name]) => !name.includes('.') && !members.some((member) => member.name === name)
+    ([name]) => isDirectMemberName(name) && !members.some((member) => member.name === name)
   )
   if (members.length === 0 && bases.length === 0 && !guide && documentedOnly.length === 0)
     return null
@@ -2182,7 +2243,7 @@ function ClassMemberReference({
               </ul>
             </>
           ) : null}
-          {guide.example ? (
+          {guide.example && guide.example !== shownExample ? (
             <CodeBlock
               code={guide.example}
               label={label(`${symbol.name} usage example`, `${symbol.name} 用法示例`)}
@@ -2371,7 +2432,7 @@ function parameterFieldsDocFor(
     ? instanceGuideFor(reference, module, parameterTypeName(parameter.type))
     : undefined
   /** Dotted entries are subordinate to their top-level field. */
-  const fields = Object.keys(typeDoc?.members ?? {}).filter((name) => !name.includes('.'))
+  const fields = Object.keys(typeDoc?.members ?? {}).filter(isDirectMemberName)
   return fields.length > 0 && fields.every((name) => optionNames.has(name)) ? undefined : typeDoc
 }
 
@@ -2665,11 +2726,12 @@ function ReferenceMemberDetails({
             </dd>
           </div>
         ) : null}
-        {resultType || doc?.returns ? (
+        {(!method && resultType) || doc?.returns ? (
           <div>
             <dt>{resultType && !method ? label('Type', '类型') : label('Returns', '返回')}</dt>
             <dd>
-              {resultType ? (
+              {/* Method signatures already show this exact return type above the contract. */}
+              {resultType && !method ? (
                 <TypeExpression
                   api={api}
                   libraryApis={libraryApis}
@@ -2677,7 +2739,7 @@ function ReferenceMemberDetails({
                   value={resultType}
                 />
               ) : null}
-              {resultType && doc?.returns ? ' — ' : null}
+              {resultType && !method && doc?.returns ? ' — ' : null}
               {doc?.returns ? (
                 <InlineText library={api.library} locale={locale} text={doc.returns} />
               ) : null}
@@ -2821,13 +2883,15 @@ function inlineTextParts(text: string): readonly string[] {
 /** Renders reference prose without truncation; blank lines separate paragraphs. */
 function ReferenceParagraphs({
   className,
+  domain = 'docs',
   library,
   locale,
   text
 }: {
   /** Optional emphasis belongs to the first paragraph, not a wrapper around nested paragraphs. */
   readonly className?: string
-  readonly library: string
+  readonly domain?: IDomain
+  readonly library?: string
   readonly locale: ILocale
   readonly text: string
 }) {
@@ -2839,7 +2903,7 @@ function ReferenceParagraphs({
         .filter((paragraph) => paragraph.trim())
         .map((paragraph, index) => (
           <p className={index === 0 ? className : undefined} key={paragraph}>
-            <InlineText library={library} locale={locale} text={paragraph.trim()} />
+            <InlineText domain={domain} library={library} locale={locale} text={paragraph.trim()} />
           </p>
         ))}
     </>
@@ -3197,7 +3261,9 @@ function SingleApiReference({
     ? symbolDoc.purpose
     : openingSentence(guide?.purpose ?? localizedSymbolPurpose(locale, symbol) ?? symbol.purpose)
   /** Preserve the authored minimal example and its public import paths. */
-  const rawQuickExample = symbolDoc ? symbolDoc.example : primaryExample(guide, symbol, api.library)
+  const rawQuickExample = symbolDoc
+    ? authoredPrimaryExample(symbolDoc, symbol.name)
+    : primaryExample(guide, symbol, api.library)
   /** Copyable imports resolve to the canonical public module. */
   const quickExample = rawQuickExample
     ? exampleWithPrimaryImport(rawQuickExample, api, symbol)
@@ -3207,7 +3273,7 @@ function SingleApiReference({
    * inside the minimal example section, instead of repeating its prose under the cases heading.
    */
   const leadCase =
-    quickExample && symbolDoc?.cases[0]?.example === symbolDoc?.example
+    quickExample && symbolDoc?.cases[0]?.example === rawQuickExample
       ? symbolDoc?.cases[0]
       : undefined
   /** Cases still listed under the cases heading after the lead case moved up. */
@@ -3426,6 +3492,13 @@ function SingleApiReference({
           id={`${symbol.fragment}--quick-start`}
         >
           <h2>{locale === 'zh' ? '最小示例' : 'Minimal example'}</h2>
+          {symbolDoc?.exampleIntro ? (
+            <ReferenceParagraphs
+              library={library.slug}
+              locale={locale}
+              text={symbolDoc.exampleIntro}
+            />
+          ) : null}
           {leadCase ? (
             // The first case already is the minimal example; it renders here once with its anchor.
             <div className="reference-case" id={`${symbol.fragment}--case-1`}>
@@ -3436,13 +3509,6 @@ function SingleApiReference({
               <CodeBlock code={quickExample} label={symbol.name} locale={locale} />
               <ReferenceParagraphs library={library.slug} locale={locale} text={leadCase.result} />
             </div>
-          ) : null}
-          {!leadCase && symbolDoc?.exampleIntro ? (
-            <ReferenceParagraphs
-              library={library.slug}
-              locale={locale}
-              text={symbolDoc.exampleIntro}
-            />
           ) : null}
           {leadCase ? null : <CodeBlock code={quickExample} label={symbol.name} locale={locale} />}
           {!leadCase && symbolDoc?.exampleResult ? (
@@ -3575,13 +3641,11 @@ function SingleApiReference({
                     </td>
                     <td className="option-behavior">
                       {member.description ? (
-                        <p>
-                          <InlineText
-                            library={library.slug}
-                            locale={locale}
-                            text={member.description}
-                          />
-                        </p>
+                        <ReferenceParagraphs
+                          library={library.slug}
+                          locale={locale}
+                          text={member.description}
+                        />
                       ) : null}
                     </td>
                   </tr>
@@ -3777,6 +3841,7 @@ function SingleApiReference({
           members={ownSurface.members}
           nestedDocs={nestedDocResolver(reference, api.module, [symbol.name, ...ownSurface.owners])}
           parameterTypeDoc={(typeName) => instanceGuideFor(reference, api.module, typeName)}
+          shownExample={rawQuickExample}
           strict={Boolean(reference)}
           symbol={symbol}
         />
@@ -3803,6 +3868,7 @@ function SingleApiReference({
           members={surface.members}
           nestedDocs={nestedDocResolver(reference, api.module, [symbol.name, ...surface.owners])}
           parameterTypeDoc={(typeName) => instanceGuideFor(reference, api.module, typeName)}
+          shownExample={rawQuickExample}
           strict={Boolean(reference)}
           symbol={symbol}
         />
@@ -4568,9 +4634,7 @@ function MaintainedBlock({
         </aside>
       )
     return (
-      <p>
-        <InlineText domain={domain} library={library} locale={locale} text={block.text} />
-      </p>
+      <ReferenceParagraphs domain={domain} library={library} locale={locale} text={block.text} />
     )
   }
   if (block.type === 'list' && block.items.every((item) => /\s(?:——|—)\s/.test(item)))

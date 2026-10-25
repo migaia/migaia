@@ -35,7 +35,13 @@
       "slug": "logger",
       "description": null,
       "version": "0.0.11",
-      "exports": [".", "./plugins", "./plugins/file"],
+      "exports": [
+        ".",
+        "./plugins",
+        "./plugins/durable",
+        "./plugins/durable/file",
+        "./plugins/file"
+      ],
       "readmeLocales": ["zh", "en"]
     },
     {
@@ -192,13 +198,15 @@
         ".",
         "./codec",
         "./codecs/cbor",
+        "./codecs/collections-json",
         "./codecs/identity/v1",
         "./codecs/json",
         "./codecs/message-pack",
         "./codecs/protobuf",
         "./core",
         "./plugins",
-        "./registry"
+        "./registry",
+        "./tagged"
       ],
       "readmeLocales": ["zh", "en"]
     },
@@ -206,35 +214,156 @@
       "slug": "storage-contract",
       "description": "Runtime-neutral storage contract: key-value store, codec, capability, context, key-domain and contract-level error types.",
       "version": "0.0.8",
+      "exports": [".", "./conformance"],
+      "readmeLocales": ["zh", "en"]
+    },
+    {
+      "slug": "storage-host",
+      "description": "Runtime-neutral storage host and typed backend authoring",
+      "version": "0.0.0",
+      "exports": [
+        ".",
+        "./authoring/backend",
+        "./authoring/blob",
+        "./authoring/capability",
+        "./authoring/change-controller",
+        "./authoring/change-iterator",
+        "./authoring/codec",
+        "./authoring/concurrency",
+        "./authoring/context",
+        "./authoring/counter",
+        "./authoring/key",
+        "./authoring/migration",
+        "./authoring/query",
+        "./authoring/rdf",
+        "./authoring/resource",
+        "./authoring/sparql",
+        "./authoring/sql",
+        "./authoring/store",
+        "./authoring/transaction",
+        "./authoring/ttl",
+        "./authoring/vector",
+        "./entity",
+        "./entity/indexes",
+        "./entity/keyset",
+        "./entity/migration",
+        "./entity/query",
+        "./entity/unique",
+        "./features/memory-change-feed",
+        "./features/memory-notifications",
+        "./journal",
+        "./vector/mmr"
+      ],
+      "readmeLocales": ["zh", "en"]
+    },
+    {
+      "slug": "storage-plugin-archive",
+      "description": "Explicit record archival over borrowed transactional hot and blob cold storage",
+      "version": "0.0.0",
       "exports": ["."],
       "readmeLocales": ["zh", "en"]
     },
     {
+      "slug": "storage-plugin-cache",
+      "description": "Multi-tier cache orchestration over borrowed storage backends",
+      "version": "0.0.0",
+      "exports": [".", "./features/semantic"],
+      "readmeLocales": ["zh", "en"]
+    },
+    {
+      "slug": "storage-plugin-object",
+      "description": "Native filesystem and S3 object storage backend",
+      "version": "0.0.0",
+      "exports": [".", "./features/presign", "./fs", "./s3"],
+      "readmeLocales": ["zh", "en"]
+    },
+    {
+      "slug": "storage-plugin-postgres",
+      "description": "PostgreSQL storage backend with native transactions and optional pgvector",
+      "version": "0.0.0",
+      "exports": [
+        ".",
+        "./bun",
+        "./features/copy",
+        "./features/listen",
+        "./features/logical-replication",
+        "./features/pgvector",
+        "./features/quantized",
+        "./pg",
+        "./postgres-js"
+      ],
+      "readmeLocales": ["zh", "en"]
+    },
+    {
+      "slug": "storage-plugin-qdrant",
+      "description": "Native Qdrant vector storage backend",
+      "version": "0.0.0",
+      "exports": [
+        ".",
+        "./client",
+        "./features/group-by",
+        "./features/hybrid",
+        "./features/management",
+        "./features/recommend",
+        "./features/rescore",
+        "./http"
+      ],
+      "readmeLocales": ["zh", "en"]
+    },
+    {
+      "slug": "storage-plugin-redis",
+      "description": "Native Redis and Valkey storage backend",
+      "version": "0.0.0",
+      "exports": [
+        ".",
+        "./bun",
+        "./features/change-stream",
+        "./features/pubsub",
+        "./features/rate-limit",
+        "./features/search",
+        "./features/sorted-sets",
+        "./features/streams",
+        "./ioredis",
+        "./node-redis"
+      ],
+      "readmeLocales": ["zh", "en"]
+    },
+    {
+      "slug": "storage-plugin-sparql",
+      "description": "Native RDF and SPARQL protocol storage backend",
+      "version": "0.0.0",
+      "exports": [".", "./features/graph-store", "./features/ontology", "./http", "./oxigraph"],
+      "readmeLocales": ["zh", "en"]
+    },
+    {
+      "slug": "storage-plugin-sqlite",
+      "description": "Native SQLite storage backend with transactional SQL",
+      "version": "0.0.0",
+      "exports": [".", "./bun", "./features/maintenance", "./node"],
+      "readmeLocales": ["zh", "en"]
+    },
+    {
       "slug": "storage-web",
-      "description": "Independent web storage library: localStorage, sessionStorage, cookies, IndexedDB CRUD with entity, schema and serialize extension points.",
+      "description": "Browser backend plugins for localStorage, sessionStorage, cookies and native IndexedDB, with optional reactive queries.",
       "version": "0.0.8",
       "exports": [
         ".",
         "./cookies",
-        "./entity",
-        "./host",
+        "./features/blobs",
+        "./features/indexed-db-batch",
+        "./features/indexed-db-change-feed",
+        "./features/indexed-db-indexes",
+        "./features/indexed-db-journal",
+        "./features/indexed-db-keyset",
+        "./features/indexed-db-notifications",
+        "./features/indexed-db-ttl",
+        "./features/reactive",
         "./indexed-db",
         "./local-storage",
-        "./memory",
         "./plugins/cookies",
         "./plugins/indexed-db",
         "./plugins/local-storage",
-        "./plugins/memory",
-        "./plugins/reactive",
-        "./plugins/reactive/cookies",
-        "./plugins/reactive/indexed-db",
-        "./plugins/reactive/local-storage",
-        "./plugins/reactive/memory",
-        "./plugins/reactive/session-storage",
         "./plugins/session-storage",
-        "./reactive-adapter",
-        "./schema",
-        "./serialize",
         "./session-storage"
       ],
       "readmeLocales": ["zh", "en"]

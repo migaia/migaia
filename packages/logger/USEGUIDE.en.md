@@ -487,3 +487,107 @@ pnpm --filter @migaia/logger run test
 ```
 
 The test script builds this package first. typecheck:browser and test:e2e are separate existing commands; listing them here is not an execution claim.
+
+## Durable log plugins
+
+`@migaia/logger/plugins/durable` exports the `binlog`, `wal`, and `undoLog` plugin factories, the `ILogStore` contract, `memoryLogStore`, `LogRecordState`, and `LogStage`. Each plugin borrows one distinct caller-owned store. The original object remains intact, including class methods and symbols; it never enters plugin configuration. Another installed plugin cannot borrow the same object. Plugins never close injected resources.
+
+`binlog` adds ordered append/read/subscribe operations. `wal.begin` commits pending intent before it returns; `complete` and `abort` only advance pending records to a terminal state. `undoLog` adds `undo.record/get/list/forget`; it stores images and does not apply business rollback. Active transaction ids are unique. Forget persists done before removing the active image, and then permits id reuse. `list` defaults to 100 items, newest time first with sequence descending for ties; `sinceTime` includes its boundary. Reads return independent snapshots.
+
+```ts
+import { Logger } from '@migaia/logger'
+import { binlog, wal, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'
+
+await using events = memoryLogStore()
+await using intents = memoryLogStore()
+await using images = memoryLogStore()
+const log = new Logger({
+  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+  plugins: [binlog({ store: events }), wal({ store: intents }), undoLog({ store: images })]
+})
+try {
+  await Promise.all([log.binlog.ready(), log.wal.ready(), log.undo.ready()])
+  const seq = await log.binlog.append('order.created', { id: 'o1' })
+  const off = log.binlog.subscribe(seq, (record) => console.log(record.seq))
+  const intent = await log.wal.begin('save-order', { id: 'o1' })
+  await log.undo.record('tx1', [{ target: 'o1', before: null, after: { total: 120 } }])
+  await log.wal.complete(intent)
+  console.log(await log.undo.get('tx1'))
+  await log.undo.forget('tx1')
+  off()
+} finally {
+  try {
+    await log.shutdown('manual')
+  } finally {
+    await Promise.all([log.binlog.whenIdle(), log.wal.whenIdle(), log.undo.whenIdle()])
+  }
+}
+```
+
+Call `ready()` before opening a native transaction. Ordinary methods automatically await initialization. `whenIdle()` remains callable after uninstall and waits for already accepted work; it does not await external subscriber callbacks or prove that an owning business transaction committed. Logger flush/shutdown retain their existing finite budgets. Always wait for durable `whenIdle` in `finally`, including rejected shutdown, before the creator closes the stores. Old nested APIs and extracted methods stay revoked after reinstall.
+
+`binlog.append(kind,payload,options?)` returns one sequence; `appendBatch(records,options?)` returns all sequences. `read(fromSeq,{limit?})` starts inclusively and defaults to 100; `lastSeq()` retains the committed high watermark after `truncate(beforeSeq)` removes the strict prefix. Subscribers process history and live data through one cursor, one callback at a time; slow listeners do not block writes or other subscribers. Cancellation is idempotent. Callback failure stops that subscriber and reports the original error through source `hook`. Truncation past its cursor stops it with `LOG_SUBSCRIPTION_TRUNCATED`. Optional `echo:true` emits tag `binlog`, message `kind`, and metadata `{seq,time}` without copying payload into output.
+
+A native transaction owner may pass `ILogAppendOptions.transaction` to binlog append methods or `undo.record`. That owner creates an `ILogAppendPort` bound to the exact store and active transaction. Logger starts the captured append in the current stack, returns provisional sequences without committing, and registers its actual Promise in the same FIFO for `whenIdle`. Store-owned `onAppend` publishes once after real commit, including a late commit after plugin reinstall. Rollback publishes nothing and does not reserve undo ids. Memory/file stores do not provide cross-resource transaction ports; supplying the same backend name does not establish atomicity.
+
+### Native log resources
+
+`memoryLogStore(options?)` provides process-local atomicity. `fileLogStore(path,options?)` from the separate `/plugins/durable/file` entry uses builtin SQLite: Node/Deno load `node:sqlite`, Bun loads `bun:sqlite`. macOS, Linux, and Windows local filesystems form the support matrix; only runtime/OS combinations actually exercised establish verification. Network filesystems do not receive a locking/durability guarantee. The file resource uses `synchronous=FULL`, one native transaction per mutation, and a retained exclusive connection lock. Prepared statements release before the connection closes. No storage package or third-party native driver is required. A failed COMMIT stops admission because its outcome may be unknown; reopen to recover committed state without automatic replay.
+
+```ts
+import { fileLogStore } from '@migaia/logger/plugins/durable/file'
+
+await using store = await fileLogStore('./orders.sqlite')
+await store.append([{ kind: 'order.created', payload: { id: 'o1' } }])
+console.log(await store.lastSeq())
+```
+
+`ILogStore.append` atomically creates records and pending states, allocating sequences from one. Empty batches allocate nothing. `read(fromSeq,limit)` reads ascending retained records; limits are nonnegative safe integers. `setState(seq,state)` permits pending to done/aborted, or an unchanged pending state; terminal/missing records reject `WAL_RECORD_INVALID`. `states(LogRecordState.pending)` returns only active sequences. Truncation preserves the permanent sequence/time watermark, so new records never reuse committed numbers. `onAppend` returns an idempotent off function and delivers one frozen `{lastSeq,count}` notice after a nonempty commit; empty appends, state changes, rollback, and truncation do not publish. Listener failures only report.
+
+Payloads accept plain JSON data: no undefined, nonfinite numbers, bigint, functions, classes, cycles, sparse arrays, or accessors. Input snapshots complete before FIFO admission without invoking getters/toJSON. Shared subobjects are copied as JSON values. Store and plugin observations use fixed `LogStage` names and identity statistics, never records, transaction ids, native handles, or authentication settings. Observer failure only reports. Original I/O failures stay reachable through `cause`; payload/range/closed/lock errors retain their semantic codes.
+
+Explicit `dispose()` returns a stable main Promise that rejects on cleanup failure. The asynchronous disposal symbol returns a different stable Promise that reports failure and resolves. Both share one physical cleanup. The creator owns the resource and may use raw methods before borrowing; while borrowed, business reads/writes go through its one plugin. A custom store must implement the same atomicity, snapshots, sequence/state, notices, and resource rules. This forwarding example preserves one existing owner rather than creating a second commit mechanism:
+
+```ts
+import { memoryLogStore } from '@migaia/logger/plugins/durable'
+import type { ILogStore } from '@migaia/logger/plugins/durable'
+
+const delegate = memoryLogStore()
+// A custom implementation must preserve this single owner's atomic commit and notices.
+const custom: ILogStore = {
+  append: (records) => delegate.append(records),
+  read: (fromSeq, limit) => delegate.read(fromSeq, limit),
+  lastSeq: () => delegate.lastSeq(),
+  onAppend: (listener) => delegate.onAppend(listener),
+  truncate: (beforeSeq) => delegate.truncate(beforeSeq),
+  setState: (seq, state) => delegate.setState(seq, state),
+  states: (filter) => delegate.states(filter),
+  dispose: () => delegate.dispose(),
+  [Symbol.asyncDispose]: () => delegate[Symbol.asyncDispose]()
+}
+await custom.append([{ kind: 'custom', payload: null }])
+await custom.dispose()
+```
+
+`assertLogInteger(value, minimum = 1)` reuses original numeric admission: a safe integer at or above minimum. Invalid values retain `RangeError/INVALID_OPTION`; exhausted integers retain `LOG_SEQUENCE_EXHAUSTED`.
+
+Native log adapters reuse `snapshotLogRecords`, `prepareLogAppend`, `snapshotLogStoreState`, and `createLogStoreIndex` from the same durable entry. Capture portable JSON before asynchronous admission, prepare sequence/time from the serialized committed head, and persist with the adapter's original transaction. Only after its actual commit, apply the exact prepared batch with `index.applyAppend` and publish the original append notice once. Rollback does not apply the batch or advance watermarks. Check state/truncation before native writes and apply those changes after commit. Recovery reuses the file store's row/state/payload checks; an optional payload decoder runs after row identity validation. The index contains committed data and the original pending-list algorithm only; it provides no queue, resource, notification channel, or close authority. These author helpers do not change the synchronous commit or observation timing of memory/file stores.
+
+```ts
+import {
+  snapshotLogRecords,
+  prepareLogAppend,
+  snapshotLogStoreState,
+  createLogStoreIndex
+} from '@migaia/logger/plugins/durable'
+
+const state = snapshotLogStoreState({ lastSeq: 0, time: 0, floor: 1 }, [])
+const index = createLogStoreIndex(state)
+const batch = prepareLogAppend(
+  snapshotLogRecords([{ kind: 'order.created', payload: { id: 'o1' } }]),
+  index
+)
+console.log(index.lastSeq, batch[0]?.seq) // 0 1: preparation is not a commit.
+```
+
+`level()` also supplies `atLevel(level, entry)`. The entry keeps its category tag, normal `dispatchRaw` payload and original Error references while passing through the same level threshold and filters. For example, `log.atLevel('debug', { tag: 'storage', message: 'get', meta: { operation: 'get' } })` uses the original asyncOutput and output resources. Ordinary unknown tags retain their existing filter-only policy; debug/error and other existing methods keep their behavior.

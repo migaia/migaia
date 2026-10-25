@@ -58,9 +58,46 @@ export const StorageContractErrorCode = Object.freeze({
    * The caller handles the result as cancellation. A write that has entered atomic commit reports
    * the actual commit result rather than claiming rollback.
    */
-  aborted: 'ABORTED'
+  aborted: 'ABORTED',
+
+  /**
+   * A strict query contains client-only steps; inspect its plan or remove strictness before
+   * reading.
+   */
+  queryNotPushable: 'QUERY_NOT_PUSHABLE',
+
+  /** FirstOrThrow exhausted the query; use first or maybe when absence is expected. */
+  queryEmptyResult: 'QUERY_EMPTY_RESULT',
+
+  /** A bounded vector scorer threw or rejected; inspect its unchanged original cause. */
+  rerankFailed: 'RERANK_FAILED',
+  /** A scorer must return one finite numeric score per actual hit; correct its result. */
+  rerankResultInvalid: 'RERANK_RESULT_INVALID',
+
+  /** A durable replay cursor was evicted; invalidate the full cache and subscribe from now. */
+  changeCursorExpired: 'CHANGE_CURSOR_EXPIRED',
+
+  /** A genuine policy threw or returned an invalid/inapplicable decision; correct the policy. */
+  concurrencyPolicyFailed: 'CONCURRENCY_POLICY_FAILED',
+  /** A logical admission or physical operation deadline expired; resources have finished cleanup. */
+  lockTimeout: 'LOCK_TIMEOUT',
+  /** A real acquisition conflict was rejected by policy; choose a different key or retry later. */
+  lockRejected: 'LOCK_REJECTED',
+  /** A completed rollback reported a write conflict that policy declined to retry; reload data. */
+  writeConflict: 'WRITE_CONFLICT',
+  /** A backend confirmed another attempt replaced its expired lock; retry with a fresh attempt. */
+  lockLost: 'LOCK_LOST',
+
+  /** Saved data is not an own-property version/state envelope; correct the archive or writer. */
+  envelopeInvalid: 'ENVELOPE_INVALID',
+  /** The archive is newer than this code or older than its migration range; update the plan. */
+  versionUnsupported: 'VERSION_UNSUPPORTED',
+  /** Migration target keys contain a gap, alias, or out-of-range version; correct the steps. */
+  migrationGap: 'MIGRATION_GAP',
+  /** A migration step failed or returned a thenable to the sync entry; inspect the original cause. */
+  migrationFailed: 'MIGRATION_FAILED'
 } as const)
 
-/** Union of this package's five stable semantic error codes. */
+/** Union of this package's stable semantic error codes. */
 export type IStorageContractErrorCode =
   (typeof StorageContractErrorCode)[keyof typeof StorageContractErrorCode]

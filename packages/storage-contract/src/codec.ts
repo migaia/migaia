@@ -1,4 +1,5 @@
 import type { IOperationContext } from './context.js'
+import type { StorageStageKind } from './stage-kind.js'
 
 /** Declared encoded form: text strings, binary bytes, or backend-supported structured values. */
 export type ICodecOutput = 'text' | 'binary' | 'structured'
@@ -22,3 +23,16 @@ export type ICodec<T = unknown, TRaw = string | Uint8Array | unknown> = {
    */
   decode(raw: TRaw, ctx?: IOperationContext): Promise<T>
 }
+
+/** Observation-only codec ports are bound to real stores and scopes by their existing host owner. */
+export type ICodecStageObserver = Readonly<{
+  readonly kind: typeof StorageStageKind.codec
+  forTransaction: (scope: object) => ICodecStageObserver
+  beforeEncode?: (operation: string, codec: string) => void | PromiseLike<void>
+  afterEncode?: (operation: string, codec: string) => void | PromiseLike<void>
+  onEncodeError?: (operation: string, codec: string, code?: string) => void | PromiseLike<void>
+  beforeDecode?: (operation: string, codec: string) => void | PromiseLike<void>
+  afterDecode?: (operation: string, codec: string) => void | PromiseLike<void>
+  onDecodeError?: (operation: string, codec: string, code?: string) => void | PromiseLike<void>
+  report: (error: unknown) => undefined
+}>

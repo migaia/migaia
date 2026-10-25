@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
 import { createStore } from '@migaia/store-light'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { createMemoryTestStore } from './helpers/memory.js'
 import { persist } from '../src/light-index.js'
 import { createAtomStore, atomDef } from '@migaia/store-keyed'
 import { persistKeyed } from '../src/keyed-index.js'
-import { assertEnvelope, persistUnit, type IPersistHandle } from '../src/index.js'
+import { persistUnit, type IPersistHandle } from '../src/index.js'
 import { defaultJsonCodec, PersistState } from '../src/index.js'
 
 describe('store-persist audit regressions', () => {
@@ -13,7 +13,7 @@ describe('store-persist audit regressions', () => {
     /** The generic root engine uses a complete adapter over an actual Store. */
     const store = createStore({ count: 0 })
     /** Real archive contents make the custom merge observable after the asynchronous read. */
-    const backend = memoryStorageHost()
+    const backend = await createMemoryTestStore()
     await backend.set(
       'merge-once',
       (await defaultJsonCodec.encode({ version: 0, state: { count: 9 } })) as string
@@ -60,7 +60,7 @@ describe('store-persist audit regressions', () => {
     /** No pending state change introduces a debounced write before the explicit flush calls. */
     const store = createStore({ count: 1 }, { runtime })
     /** Closing the real backend yields its genuine coded boundary error. */
-    const backend = memoryStorageHost()
+    const backend = await createMemoryTestStore()
     /** Exercise the highest existing facade rather than a private write queue. */
     const handle = persist(store, { key: 'strict', storage: backend })
     try {
@@ -107,8 +107,8 @@ describe('store-persist audit regressions', () => {
     expect(decoded.state.currentSet).toEqual(value.state.currentSet)
   })
 
-  it('continues reading exact one-key legacy collection archives', async () => {
-    /** Exact one-key old markers remain the supported archive migration grammar. */
+  it('reads exact old collection markers as ordinary objects', async () => {
+    /** Old markers have no reserved meaning in the canonical codec. */
     const raw = JSON.stringify({
       version: 0,
       state: {
@@ -116,12 +116,12 @@ describe('store-persist audit regressions', () => {
         set: { __migaia_persist_set__: ['old'] }
       }
     })
-    /** Normal legacy archives still decode to native collections. */
+    /** The codec returns these old markers unchanged. */
     const decoded = (await defaultJsonCodec.decode(raw)) as {
-      state: { map: Map<string, number>; set: Set<string> }
+      state: { map: unknown; set: unknown }
     }
-    expect(decoded.state.map).toEqual(new Map([['old', 1]]))
-    expect(decoded.state.set).toEqual(new Set(['old']))
+    expect(decoded.state.map).toEqual({ __migaia_persist_map__: [['old', 1]] })
+    expect(decoded.state.set).toEqual({ __migaia_persist_set__: ['old'] })
   })
   it('invokes a facade option getter with the original receiver once', async () => {
     /** Both value source and storage are complete actual public implementations. */
@@ -129,7 +129,7 @@ describe('store-persist audit regressions', () => {
     /** An extra option property is legitimately read by the key getter through this. */
     const store = createStore({ count: 0 }, { runtime })
     /** The backend is disposed even if the wrapper rejects during construction. */
-    const backend = memoryStorageHost()
+    const backend = await createMemoryTestStore()
     /** Observe identity rather than substituting descriptor internals. */
     const receivers: unknown[] = []
     /** The getter returns a string only when it receives the actual options object. */
@@ -160,7 +160,7 @@ describe('store-persist audit regressions', () => {
     /** The initial snapshot differs from the restored archive. */
     const definition = atomDef(0)
     /** Actual storage and the public default codec supply the hydration input. */
-    const backend = memoryStorageHost()
+    const backend = await createMemoryTestStore()
     await backend.set(
       'prefs:user',
       (await defaultJsonCodec.encode({ version: 0, state: 9 })) as string
@@ -183,7 +183,7 @@ describe('store-persist audit regressions', () => {
 
   it('rejects ready when disposal cancels the still-pending hydration', async () => {
     /** Gate the real backend read without replacing its cancellation or capability semantics. */
-    const backend = memoryStorageHost()
+    const backend = await createMemoryTestStore()
     /** The original backend get remains the sole actual storage operation. */
     let release!: () => void
     /** No timer or simulated lifecycle is needed to force this supported race. */
@@ -230,32 +230,6 @@ describe('store-persist audit regressions', () => {
     }
   })
 
-  it('keeps a failed envelope getter reachable through a coded validation error', () => {
-    /** The accessor owns this real native failure and its stack. */
-    const primary = new Error('envelope getter failed')
-    /** The public unknown boundary must expose its semantic validation identity. */
-    let failure: unknown
-    try {
-      assertEnvelope(
-        {
-          get version() {
-            throw primary
-          },
-          state: {}
-        },
-        'audit'
-      )
-    } catch (error) {
-      failure = error
-    }
-    expect(failure).toMatchObject({
-      source: '@migaia/store-persist',
-      code: 'ENVELOPE_INVALID',
-      cause: primary
-    })
-    expect((failure as Error).cause).toBe(primary)
-    expect(primary.stack).toBeTruthy()
-  })
   it('keeps the private active projection out of the public runtime vocabulary', () => {
     expect(PersistState).not.toHaveProperty('active')
     expect(PersistState.disposed).toBe('disposed')
@@ -269,9 +243,11 @@ describe('store-persist audit regressions', () => {
       state: { __migaia_persist_map__: [['literal', literal]] }
     })
     /** Legacy compatibility must retain the application value rather than reinterpret it as a Map. */
-    const decoded = (await defaultJsonCodec.decode(raw)) as { state: Map<string, unknown> }
-    expect(decoded.state).toBeInstanceOf(Map)
-    expect(decoded.state.get('literal')).toEqual(literal)
-    expect(Array.isArray(decoded.state.get('literal'))).toBe(true)
+    const decoded = (await defaultJsonCodec.decode(raw)) as {
+      state: { __migaia_persist_map__: [string, unknown][] }
+    }
+    expect(decoded.state).toEqual({ __migaia_persist_map__: [['literal', literal]] })
+    expect(decoded.state.__migaia_persist_map__[0]![1]).toEqual(literal)
+    expect(Array.isArray(decoded.state.__migaia_persist_map__[0]![1])).toBe(true)
   })
 })

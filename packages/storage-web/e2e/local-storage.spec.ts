@@ -15,12 +15,8 @@ test('真实浏览器页面中的 Storage 异常归一化并保留 cause', async
     hasCause: true,
     invalidStorageCode: 'INVALID_CONFIG',
     invalidLengthCode: 'INVALID_CONFIG',
-    constructorOptionReads: 3,
-    optionGetterCode: 'INVALID_CONFIG',
-    storageLengthReads: 1,
-    storageGetterCode: 'INVALID_CONFIG',
-    namespaceCodecReads: 2,
-    runtimeLengthReads: 2,
+    invalidNamespaceCode: 'INVALID_CONFIG',
+    invalidStorageMethodCode: 'INVALID_CONFIG',
     codecPhysicalClear: true,
     partialClearCode: 'BACKEND_UNAVAILABLE',
     partialClearOperation: 'local.clearAll',
@@ -33,5 +29,20 @@ test('真实浏览器页面中的 Storage 异常归一化并保留 cause', async
     incoherentClearCode: 'BACKEND_UNAVAILABLE',
     incoherentClearOperation: 'local.clearAll',
     incoherentClearPreservedValues: true
+  })
+})
+
+test('native text backends isolate configured organization targets and preserve unique writers', async ({
+  page
+}) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runBrowserTextOrgScenario())
+  expect(result).toEqual({
+    combinations: 6,
+    defaultShared: true,
+    isolated: true,
+    dropIsolated: true,
+    physicalPrefix: true,
+    uniqueConflicts: 6
   })
 })

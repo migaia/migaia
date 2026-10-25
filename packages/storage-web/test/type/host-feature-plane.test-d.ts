@@ -1,86 +1,41 @@
-import {
-  createStorageHost,
-  defineFeature,
-  definePlugin,
-  type IStoragePluginCore
-} from '../../src/host/index.js'
-import { memoryReactive } from '../../src/plugins/reactive/memory.js'
+import { memoryTestFeatures } from '../helpers/memory-features.js'
 import { createRuntime } from '@migaia/reactive'
-import type { IKeyValueStore } from '@migaia/storage-contract'
+import { records, type IStorageIterator, type IStorageChange } from '@migaia/storage-contract'
+import { createStorageHost, memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host'
+import { expectTypeOf } from 'vitest'
+import { reactiveFeature } from '../../src/features/reactive.js'
+import { localStorageBackendPlugin } from '../../src/local-storage.js'
 
-const runtime = createRuntime()
-
-/** Feature factories receive only the reserved exposure plane, never Plugin lifecycle authority. */
-const reservedFeature = defineFeature((core) => {
-  // @ts-expect-error cross-plugin capabilities arrive through declared Feature dependencies.
-  void core.features
-  // @ts-expect-error Store transfer belongs to Plugin install, not Feature factories.
-  void core.registerStore
-  // @ts-expect-error resource ownership belongs to Plugin install, not Feature factories.
-  void core.onDispose
-  return { readStore: () => core.featureExpose.getStore() }
-})
-void reservedFeature
-
-/** Explicit Plugin-core annotation, not registerStore's callback body, carries an exact Store. */
-type IExactStore = IKeyValueStore & { readonly custom: <TValue>(value: TValue) => TValue }
-declare const exactStore: IExactStore
-const exactPlugin = definePlugin('exact', (core: IStoragePluginCore<IExactStore>) => ({
-  install: () => {
-    core.registerStore(exactStore)
-    return { echo: <TValue>(value: TValue): TValue => exactStore.custom(value) }
-  },
-  expose: () => ({ installed: () => true })
-}))
-const exactHost = await createStorageHost({ plugins: [exactPlugin] as const })
-const exactBackend: IExactStore = exactHost.backend('exact')
-const literalEcho: 'literal' = exactHost.extensions.echo('literal')
-type IExactExtensionKeysStayLiteral = string extends keyof typeof exactHost.extensions
-  ? false
-  : true
-const exactExtensionKeysStayLiteral: IExactExtensionKeysStayLiteral = true
-void exactBackend
-void literalEcho
-void exactExtensionKeysStayLiteral
-// @ts-expect-error unknown extension keys must not appear through a merger index signature.
-void exactHost.extensions.missing
-// @ts-expect-error Store-only methods do not become Host extensions.
-exactHost.extensions.custom('literal')
-// @ts-expect-error Extension methods do not become Store methods.
-exactHost.backend('exact').installed()
-const basePlugin = definePlugin('base', (core) => ({
-  install: () => {
-    core.registerStore(exactStore)
-    return {}
-  }
-}))
-const baseHost = await createStorageHost({ plugins: [basePlugin] as const })
-// @ts-expect-error unannotated callbacks retain the base Store contract.
-baseHost.backend('base').custom('literal')
-
-/** Exact reactive plugin IDs add one backend-specific live-query authority. */
+/** Selecting the Feature adds live only to the existing chain, preserving its selected result. */
 const host = await createStorageHost({
-  plugins: [memoryReactive({ id: 'reactive' })] as const
+  plugins: [
+    memoryBackendPlugin(
+      { id: 'live' },
+      { ...memoryTestFeatures, reactive: reactiveFeature(memoryBackendKind) }
+    )
+  ]
 })
-void host.backend('reactive').get
-const boundQuery = host.reactiveBackend('reactive')?.liveQuery({
-  runtime,
-  query: ({ store }) => store
-})
-const rootQuery = host.liveQuery({ backendId: 'reactive', runtime, query: ({ store }) => store })
-// @ts-expect-error the live-query state projection is read-only
-rootQuery.state.value = host.backend('reactive')
-if (boundQuery !== undefined) {
-  // @ts-expect-error the backend-bound state projection is read-only
-  boundQuery.state.value = host.backend('reactive')
-}
+const query = host
+  .backend('live')
+  .use(records)
+  .query<{ name: string; age: number }>()
+  .select('name')
+  .live({ runtime: createRuntime() })
+expectTypeOf(query.state.value.value).toEqualTypeOf<{ name: string }[] | undefined>()
+// @ts-expect-error the original Resource projection remains readonly.
+query.state.value = { status: 'ready', value: [] }
+// @ts-expect-error Feature methods remain on chains, not the store root.
+host.backend('live').live({ runtime: createRuntime() })
 
-/** Widened IDs do not manufacture static capability authority. */
-declare const widenedId: string
-const widenedHost = await createStorageHost({
-  plugins: [memoryReactive({ id: widenedId })] as const
-})
-// @ts-expect-error widened IDs must not expose a guessed backend key
-widenedHost.backend('unknown')
-// @ts-expect-error widened IDs must not expose a guessed reactive key
-widenedHost.liveQuery({ backendId: 'unknown', runtime, query: () => undefined })
+/** Omitted Features do not manufacture a live terminal or an API result. */
+const ordinary = await createStorageHost({ plugins: [memoryBackendPlugin({}, memoryTestFeatures)] })
+// @ts-expect-error no live terminal exists without a selected reactive Feature.
+ordinary.backend('memory').use(records).query().live({ runtime: createRuntime() })
+
+/** Static watch methods retain runtime admission and never grant organization close ownership. */
+const browser = await createStorageHost({ plugins: [localStorageBackendPlugin()] })
+/** This original borrowed view shares the native feed but owns only its returned iterator. */
+const org = browser.org('00000000-0000-0000-0000-000000000000').backend('local')
+expectTypeOf(org.watch('theme')).toEqualTypeOf<IStorageIterator<IStorageChange>>()
+// @ts-expect-error borrowed organization views retain no backend disposal authority.
+org.dispose()

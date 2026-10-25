@@ -1,15 +1,51 @@
+import { IndexedDbFeature } from './constants.js'
 /** Stable diagnostic text shared by backend, entity, Host and reactive boundaries. */
 export const StorageErrorText = Object.freeze({
-  /** A KV snapshot changed while schema/projection work ran; the caller retries the whole write. */
-  entityUniqueSnapshotChanged: 'entity unique-write snapshot changed before commit',
-  /** Entity construction requires every upgrade step, including when the graph is omitted. */
-  entityMigrationGraphIncomplete: 'entity migration graph must contain every version step',
-  /** Standard Schema issue arrays must contain object entries with string messages. */
-  standardSchemaIssuesInvalid: 'Standard Schema returned invalid issues',
+  /** Cookie validation keeps the original scalar value failure text. */
+  cookieValueInvalid: 'cookie value must be a string',
+  /** Cookie expiry validation rejects unsafe relative seconds before native assignment. */
+  cookieMaxAgeInvalid: 'cookie maxAge must be a safe integer',
+  /** Cookie expiry validation preserves the existing invalid-Date scenario. */
+  cookieExpiresInvalid: 'cookie expires must be a valid Date',
+  /** A visible name after assignment belongs to an unknown fixed scope. */
+  cookieRedoScopeMismatch: 'same cookie name remains visible from an unknown scope',
+  /** A native cookie assignment was rejected by the active document scope. */
+  cookieRedoWriteInvisible: 'cookie write was not visible in the active scope',
+  /** Only an explicit true declaration can authorize realm-local journal index exclusion. */
+  indexedDbJournalFactoryIsolationInvalid: 'journalFactoryIsPrivate must be true or omitted',
+  /** The known shared realm factory cannot be declared private by this optional admission fact. */
+  indexedDbJournalFactoryMustBeInjected:
+    'journalFactoryIsPrivate requires a separate private injected factory',
+  /** Native batch keys are a finite caller-provided array captured before issuing requests. */
+  storageBatchKeysInvalid: 'storage batch keys must be an array',
+  /** Native batch writes capture one key/value entry for every requested position. */
+  storageBatchEntriesInvalid: 'storage batch entries must be an array',
+  /** Duplicate canonical keys are rejected before a native batch makes partial progress. */
+  storageBatchDuplicateKey: 'storage batch contains duplicate keys',
+  /** An optional IndexedDB holder label is configuration, never lock or transaction authority. */
+  indexedDbOwnerInvalid: 'IndexedDB owner must be an object with an optional string label',
+  /** Feature schema declarations are accepted only before the original IndexedDB opener runs. */
+  indexedDbSchemaDeclarationInvalid:
+    'IndexedDB Feature object stores must be declared before opening',
+  /** The native transaction must remain abortable until the backend chooses its terminal state. */
+  indexedDbTransactionEndedEarly: 'IndexedDB transaction ended before the commit decision',
+  /** The native text channel accepts strings rather than portable records. */
+  storageValueInvalid: 'storage value must be a string',
+  /** The native binary channel accepts a detached copy of actual byte views. */
+  storageBytesInvalid: 'bytes value must be a Uint8Array',
   /** Namespace codecs must encode a physical key as a string. */
   namespaceCodecEncodeInvalid: 'namespace codec encode must return a string',
   /** Namespace codecs may decode only a string key or an absent foreign namespace. */
   namespaceCodecDecodeInvalid: 'namespace codec decode must return string or undefined',
+  /** Typed namespace support requires both directions so cleanup can identify every written key. */
+  namespaceTypedCodecInvalid:
+    'typed namespace codec must provide callable encode and decode methods',
+  /** Original namespace codec admission requires both callable string-key methods. */
+  namespaceCodecInvalid: 'namespace codec must provide callable encode and decode methods',
+  /** Physical string-key encoding preserves the original namespace/key argument boundary. */
+  namespaceKeyInvalid: 'namespace and key must be strings',
+  /** Physical-key decoding preserves the original string-only argument boundary. */
+  namespacePhysicalKeyInvalid: 'namespace and physicalKey must be strings',
   /** Injected Web Storage values must implement the complete Storage surface. */
   webStorageInjectionInvalid: 'web storage injection must implement the Storage surface',
   /** Live Web Storage length must remain a usable enumeration bound. */
@@ -24,40 +60,10 @@ export const StorageErrorText = Object.freeze({
   indexedDbUpgradeTransactionMissing: 'IndexedDB upgrade event is missing its transaction',
   /** A cookie document must keep exposing its string cookie property after admission. */
   cookieDocumentBecameInvalid: 'cookie document must continue exposing a string cookie property',
-  /** Entity ordering extensions must return a finite comparable number. */
-  entityComparatorInvalid: 'entity orderBy comparator must return a number',
-  /** Encoded storage keys are bounded to the contract depth and node limits. */
-  storageKeyDecodeLimitExceeded: 'storage key exceeds decode limits',
-  /** Encoded storage keys must use the canonical two-slot wire tuple. */
-  storageKeyWireInvalid: 'invalid storage key wire',
-  /** Encoded binary storage keys must remain within the public key-size limit. */
-  storageKeyBinaryTooLarge: 'key too large',
-  /** Encoded storage keys must use one of the registered wire tags. */
-  storageKeyWireTagInvalid: 'invalid storage key wire tag',
-  /** Stable text for rejecting malformed backend identifiers before host mutation. */
-  backendIdInvalid: 'storage backend id is invalid',
-  /** Stable text for duplicate backend registration or install-batch identifiers. */
-  backendDuplicate: 'storage backend is already installed',
-  /** Stable text for a valid backend identifier absent from the host registry. */
-  backendNotInstalled: 'storage backend is not installed',
-  /** Stable text for backend plugin/store contract rejection. */
-  backendPluginInvalid: 'storage backend plugin is invalid',
-  /** Stable text for backend factory, preparation, or PluginHost install failure. */
-  backendInstallFailed: 'storage backend installation failed',
-  /** Stable text for rejecting host mutation while another batch is installing. */
-  storageHostBusy: 'storage host is busy installing plugins',
-  /** Stable text for host operations after seal or terminal disposal. */
-  storageHostDisposed: 'storage host is disposed',
-  /** Stable text for aggregate host cleanup failure. */
-  storageHostDisposeFailed: 'storage host failed to dispose',
   /** Stable text for aggregate live-query cleanup failure. */
   liveQueryDisposeFailed: 'live query failed to dispose',
   /** Stable text for malformed reactive feature/provider/adapter descriptors. */
   reactiveFeatureInvalid: 'reactive feature is invalid',
-  /** Stable text for rejected reactive feature topology. */
-  reactiveTopologyInvalid: 'reactive feature topology is invalid',
-  /** Stable text for live-query service lookup before service installation. */
-  reactiveServiceNotInstalled: 'reactive live-query service is not installed',
   /** Stable text for backend reactive adapter lookup failure. */
   reactiveAdapterNotInstalled: 'reactive backend adapter is not installed',
   /** Stable text for recoverable adapter event, poll, or authoritative-read failure. */
@@ -89,3 +95,10 @@ export const indexBackfillFailureText = (entityName: string): string =>
 /** Stable public text for a logical unique-index collision. */
 export const indexUniqueConflictText = (indexName: string): string =>
   `indexed record conflicts with unique index "${indexName}"`
+
+/** Missing IDB Feature names are stable migration guidance for explicit installation. */
+export function indexedDbFeatureMissingText(feature: string): string {
+  return feature === IndexedDbFeature.hostJournal
+    ? 'IndexedDB undo requires explicit storageJournalPlugin() and journal configuration'
+    : `IndexedDB ${feature} requires its explicit indexedDb${feature[0]!.toUpperCase()}${feature.slice(1)}Feature assembly`
+}

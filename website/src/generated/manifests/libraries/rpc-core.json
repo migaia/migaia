@@ -463,7 +463,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "非法方法名、参数或选项可能在 Promise 返回前同步抛错，把整个调用表达式放进 try，而非只接 .catch。close 与事件不提供业务回滚，也不能把断线解释为调用未执行。"
+                "text": "非法方法名、参数或选项可能在 Promise 返回前同步抛错，把整个调用表达式放进 try，而非只接 .catch。Peer 已经关闭、或它的代次已被停止和替换时，新调用会同步抛出 REMOTE_CLOSED；监督器正在启动下一代（例如 Worker 崩溃后正在重启）时，调用返回以 REMOTE_CLOSED 拒绝的 Promise，不会同步抛错。close 与事件不提供业务回滚，也不能把断线解释为调用未执行。"
               }
             ]
           },
@@ -1295,7 +1295,7 @@
               },
               {
                 "type": "paragraph",
-                "text": "非法方法名、参数或选项可能在 Promise 返回前同步抛错，把整个调用表达式放进 try，而非只接 .catch。close 与事件不提供业务回滚，也不能把断线解释为调用未执行。"
+                "text": "非法方法名、参数或选项可能在 Promise 返回前同步抛错，把整个调用表达式放进 try，而非只接 .catch。Peer 已经关闭、或它的代次已被停止和替换时，新调用会同步抛出 REMOTE_CLOSED；监督器正在启动下一代（例如 Worker 崩溃后正在重启）时，调用返回以 REMOTE_CLOSED 拒绝的 Promise，不会同步抛错。close 与事件不提供业务回滚，也不能把断线解释为调用未执行。"
               }
             ]
           },
@@ -2018,7 +2018,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Invalid names, values, or options may throw before a Promise is returned. Wrap the whole call expression in try instead of only attaching catch. Close/events provide no business rollback and cannot turn disconnection into proof of non-execution."
+                  "text": "Invalid names, values, or options may throw before a Promise is returned. Wrap the whole call expression in try instead of only attaching catch. After the Peer is closed, or its generation was stopped and replaced, a new call throws REMOTE_CLOSED synchronously; while the supervisor starts the next generation (for example while a crashed Worker restarts), the call returns a Promise that rejects with REMOTE_CLOSED instead of throwing. Close/events provide no business rollback and cannot turn disconnection into proof of non-execution."
                 }
               ]
             },
@@ -2932,7 +2932,7 @@
                 },
                 {
                   "type": "paragraph",
-                  "text": "Invalid names, values, or options may throw before a Promise is returned. Wrap the whole call expression in try instead of only attaching catch. Close/events provide no business rollback and cannot turn disconnection into proof of non-execution."
+                  "text": "Invalid names, values, or options may throw before a Promise is returned. Wrap the whole call expression in try instead of only attaching catch. After the Peer is closed, or its generation was stopped and replaced, a new call throws REMOTE_CLOSED synchronously; while the supervisor starts the next generation (for example while a crashed Worker restarts), the call returns a Promise that rejects with REMOTE_CLOSED instead of throwing. Close/events provide no business rollback and cannot turn disconnection into proof of non-execution."
                 }
               ]
             },

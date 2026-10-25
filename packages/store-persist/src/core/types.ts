@@ -1,6 +1,15 @@
 import type { IScheduler } from '@migaia/utils/scheduler'
 import type { IReactiveComputed, IDisposer, IRuntime } from '@migaia/reactive'
-import type { ICodec, IKeyValueStore, IRecordStore } from '@migaia/storage-contract'
+import type {
+  ICodec,
+  IKeyValueStore,
+  IRecordStore,
+  IMigrationStep,
+  IMigrationReset,
+  ICodecStageObserver,
+  ITransactionScope,
+  ITransactionStageObserver
+} from '@migaia/storage-contract'
 import { PersistState } from '../state-constants.js'
 
 /**
@@ -75,13 +84,15 @@ export type IPersistHandle = {
   /**
    * Cancels debounce, waits for initial hydration and an observed in-flight write, then requests a
    * current snapshot write. Hydration/write failures reject; disposal is AbortError cancellation.
-   * Completion depends on the adapter settling even when it ignores cancellation.
+   * Completion depends on the adapter settling even when it ignores cancellation. With an enlisted
+   * authentic transaction view, captures and starts encoding now, then writes through that view in
+   * call order. Only the outer persistTransaction success means commit.
    */
-  flush(): Promise<void>
+  flush(tx?: Omit<ITransactionScope, 'use'>): Promise<void>
   /**
    * Cancels debounce and queues removal of the codec's archive channel after initial hydration and
    * earlier writes. Does not reset live state or disable future writes; hydration/removal failures
-   * reject, and disposal rejects with `AbortError`.
+   * reject, and disposal rejects with `AbortError`. Direct operations reject during participation.
    */
   clear(): Promise<void>
   /** Terminal marker set synchronously by dispose, including while adapter work is still pending. */
@@ -90,7 +101,8 @@ export type IPersistHandle = {
    * Idempotently stops scheduling and aborts active operations without awaiting them. A pending
    * debounce or an admitted, unfinished write snapshots one final unawaited write; inspect
    * writeError for failure. Unsubscribe failures can throw after the handle is already terminal;
-   * borrowed resources remain owned by their caller.
+   * borrowed resources remain owned by their caller. During transaction participation, aborts that
+   * transaction without a final side write.
    */
   dispose(): void
   /**
@@ -98,9 +110,12 @@ export type IPersistHandle = {
    * snapshot write to settle, including adapters that ignore abort. Final-write failures remain on
    * writeError; existing flush/clear promises retain their original outcomes. A synchronous cleanup
    * failure rejects after the write chain settles. Does not wait for borrowed adapter reads or
-   * dispose the borrowed store/runtime.
+   * dispose the borrowed store/runtime. Participation additionally waits for the actual native
+   * transaction to finish releasing work.
    */
   disposeAsync(): Promise<void>
+  /** Reports cleanup failure then completes; owns a separate cached Promise for the same cleanup. */
+  [Symbol.asyncDispose](): Promise<void>
 }
 
 /**
@@ -124,11 +139,12 @@ export type IPersistUnitOptions<TState> = {
   codec?: ICodec
   /** Archive schema version, default 0; must be a nonnegative safe integer. */
   version?: number
-  /**
-   * Synchronously transforms a different archived version; absence makes a version mismatch fail
-   * hydration.
-   */
-  migrate?: (persisted: TState, fromVersion: number) => TState
+  /** Contiguous synchronous upgrade steps, or one old-archive reset. Future archives are rejected. */
+  migrations?: Readonly<Record<number, IMigrationStep>> | IMigrationReset
+  /** Store-bound codec observations; failures report without controlling conversion or storage. */
+  codecStages?: ICodecStageObserver
+  /** Store-bound transaction observations; only before/afterPersistFlush are emitted here. */
+  transactionStages?: ITransactionStageObserver
   /** Synchronously selects state for each write, default identity; does not change in-memory state. */
   partialize?: (state: TState) => Partial<TState>
   /**

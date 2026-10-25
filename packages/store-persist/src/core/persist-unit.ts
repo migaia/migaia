@@ -3,13 +3,35 @@ import { resolveScheduler, resolveSchedulerOption } from '@migaia/lifecycle/sche
 import { systemScheduler, type IScheduledTask } from '@migaia/utils/scheduler'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IDisposer } from '@migaia/reactive'
-import { readEnvelope, removeEnvelope, writeEnvelope } from '../storage/codec.js'
+import {
+  readEnvelopeWithStages,
+  removeEnvelope,
+  writeEnvelopeWithStages,
+  normalizeTransactionEncodingFailure
+} from '../storage/codec.js'
 import { defaultJsonCodec } from '../storage/codec.js'
-import { assertEnvelope, type IEnvelope } from './envelope.js'
+import {
+  assertVersionedEnvelope,
+  StorageStageKind,
+  type ITransactionScope,
+  type ITransactionStageObserver,
+  type IStorageBase,
+  type IVersionedEnvelope,
+  type IMigrationStep,
+  type IMigrationReset,
+  type ISyncMigrationSteps
+} from '@migaia/storage-contract'
+import {
+  assertTransactionOwner,
+  runTransactionOperation
+} from '@migaia/storage-host/authoring/transaction'
+import { migrateEnvelopeSync } from '@migaia/storage-host/authoring/migration'
+import { asyncDisposeKey } from '@migaia/plugin-host'
+import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
+import { isUint8Array } from '@migaia/utils/bytes'
 import {
   createStorePersistAbortError,
   createStorePersistAggregateError,
-  createStorePersistError,
   createStorePersistTypeError
 } from '../errors.js'
 import { StorePersistErrorCode } from '../error-code.js'
@@ -21,9 +43,18 @@ import type {
   IPersistUnitOptions,
   IWriteStatus
 } from './types.js'
-import { PersistState } from '../state-constants.js'
+import { PersistState, PersistCodecOutput } from '../state-constants.js'
 import { StorePersistErrorText } from '../error-text.js'
-import { assertPersistString } from './options.js'
+import {
+  assertPersistString,
+  createPersistMigrationPlan,
+  assertPersistStageKind,
+  bindPersistStages
+} from './options.js'
+import {
+  registerPersistTransactionParticipant,
+  type IPersistParticipationControl
+} from './persist-transaction.js'
 
 /** Maximum single delay accepted by Web/Node timers. */
 const MAX_TIMER_DELAY_MS = 2_147_483_647
@@ -110,6 +141,15 @@ function mergePersistedPlainState<TState>(
  * hydration/write failures are exposed by the handle's promises and error values. Storage, unit and
  * Runtime are borrowed; dispose stops this attachment rather than disposing those resources.
  */
+export function persistUnit<
+  TState,
+  const TSteps extends Readonly<Record<number, IMigrationStep>> | IMigrationReset
+>(
+  unit: IPersistUnit<TState>,
+  options: Omit<IPersistUnitOptions<TState>, 'migrations'> & {
+    readonly migrations?: TSteps & ISyncMigrationSteps<NoInfer<TSteps>>
+  }
+): IPersistHandle
 export function persistUnit<TState>(
   unit: IPersistUnit<TState>,
   options: IPersistUnitOptions<TState>
@@ -120,7 +160,9 @@ export function persistUnit<TState>(
     storage: IPersistUnitOptions<TState>['storage']
     codec: IPersistUnitOptions<TState>['codec']
     version: IPersistUnitOptions<TState>['version']
-    migrate: IPersistUnitOptions<TState>['migrate']
+    migrations: IPersistUnitOptions<TState>['migrations']
+    codecStages: IPersistUnitOptions<TState>['codecStages']
+    transactionStages: IPersistUnitOptions<TState>['transactionStages']
     partialize: IPersistUnitOptions<TState>['partialize']
     merge: IPersistUnitOptions<TState>['merge']
     debounceMs: IPersistUnitOptions<TState>['debounceMs']
@@ -134,7 +176,9 @@ export function persistUnit<TState>(
       storage: options.storage,
       codec: options.codec,
       version: options.version,
-      migrate: options.migrate,
+      migrations: options.migrations,
+      codecStages: options.codecStages,
+      transactionStages: options.transactionStages,
       partialize: options.partialize,
       merge: options.merge,
       debounceMs: options.debounceMs,
@@ -154,7 +198,9 @@ export function persistUnit<TState>(
     storage,
     codec = defaultJsonCodec,
     version = 0,
-    migrate,
+    migrations,
+    codecStages,
+    transactionStages,
     partialize = (state: TState) => state as Partial<TState>,
     // Plain-object snapshots use a shallow current-first merge so a startup
     // mutation is not lost while storage is loading. Collection/array shapes
@@ -225,7 +271,6 @@ export function persistUnit<TState>(
     )
   }
   for (const [name, callback] of [
-    ['migrate', migrate],
     ['partialize', partialize],
     ['merge', merge]
   ] as const) {
@@ -258,6 +303,18 @@ export function persistUnit<TState>(
       StorePersistErrorText.maxWait(key)
     )
   }
+  /** One frozen plan is shared by every hydration attempt and never rebuilt during reads. */
+  const migrationPlan = createPersistMigrationPlan(key, version, migrations)
+  assertPersistStageKind(
+    codecStages,
+    StorageStageKind.codec,
+    StorePersistErrorText.codecStagesInvalid
+  )
+  assertPersistStageKind(
+    transactionStages,
+    StorageStageKind.transaction,
+    StorePersistErrorText.transactionStagesInvalid
+  )
   /** Own the debounce clock and timer through the same admitted scheduler snapshot. */
   const scheduler = resolveSchedulerOption(extracted) ?? resolveScheduler(systemScheduler)
 
@@ -294,6 +351,10 @@ export function persistUnit<TState>(
   /** First-change deadline remains stable while later changes extend the quiet interval. */
   let writeDeadline: number | undefined
   let disposed = false
+  /** The one cleanup outcome survives a prior synchronous dispose call. */
+  let disposalFailure: unknown
+  /** A thrown undefined is still a cleanup failure and must reject asynchronous disposal. */
+  let disposalFailed = false
   let generationEpoch = 0
   const activeOperations = new Set<IAbortController>()
   let hydrationSettled = false
@@ -311,6 +372,44 @@ export function persistUnit<TState>(
    */
   let writeDrain: Promise<void> | undefined
   let writeRequested = false
+  /** Only unsettled existing mutations are retained, so this participation sees their real outcomes. */
+  const pendingWrites = new Set<Promise<void>>()
+  /** Application notifications identify changes made after the last successful snapshot. */
+  let changeRevision = 0
+  /** Each successful native write records the notification revision captured with that snapshot. */
+  let persistedRevision = 0
+  /** A live coordination owns admission until its actual transaction finishes. */
+  let participation:
+    | {
+        readonly control: IPersistParticipationControl
+        transactionId?: string
+        store?: IStorageBase
+        flushChain: Promise<void>
+        flushed: boolean
+        lastFlushedRevision: number
+      }
+    | undefined
+  /** Closing only this handle's private utility queue rejects its not-yet-started coordinations. */
+  let closeParticipationQueue: ((reason: unknown) => void) | undefined
+
+  /** Pending mutation failures remain visible to a coordinator that admitted before they settled. */
+  function trackPendingWrite(operation: Promise<void>): Promise<void> {
+    pendingWrites.add(operation)
+    void operation.then(
+      () => pendingWrites.delete(operation),
+      () => pendingWrites.delete(operation)
+    )
+    return operation
+  }
+
+  /** Direct calls cannot wait behind their own active transaction or bypass its snapshot. */
+  function assertDirectOperation(): void {
+    if (participation !== undefined)
+      throw createStorePersistTypeError(
+        StorePersistErrorCode.invalidOption,
+        StorePersistErrorText.transactionDirectOperation
+      )
+  }
 
   function assertActive(): void {
     if (disposed) throw disposedError()
@@ -357,20 +456,29 @@ export function persistUnit<TState>(
     // chaining after writeChain would only see its error-swallowing recovery promise.
     if (writeDrain) return writeDrain
 
-    const operation = writeChain.then(async () => {
-      while (!disposed && writeRequested) {
-        writeRequested = false
-        await runWriteOperation(() =>
-          runAdapterOperation(async (signal) => {
-            const envelope: IEnvelope<Partial<TState>> = {
-              version,
-              state: assertSynchronousCallbackResult(key, 'partialize', partialize(unit.snapshot()))
-            }
-            await writeEnvelope(storage, key, codec, envelope, { signal })
-          })
-        )
-      }
-    })
+    const operation = trackPendingWrite(
+      writeChain.then(async () => {
+        while (!disposed && writeRequested) {
+          writeRequested = false
+          await runWriteOperation(() =>
+            runAdapterOperation(async (signal) => {
+              /** The persisted revision belongs to the snapshot taken before awaiting the codec. */
+              const snapshotRevision = changeRevision
+              const envelope: IVersionedEnvelope<Partial<TState>> = {
+                version,
+                state: assertSynchronousCallbackResult(
+                  key,
+                  'partialize',
+                  partialize(unit.snapshot())
+                )
+              }
+              await writeEnvelopeWithStages(storage, key, codec, envelope, { signal }, codecStages)
+              persistedRevision = snapshotRevision
+            })
+          )
+        }
+      })
+    )
     writeChain = operation.catch(() => undefined)
     writeDrain = operation
     void operation.then(
@@ -397,7 +505,11 @@ export function persistUnit<TState>(
   /** Coalesces changes until quiet time or the first change's optional maximum deadline. */
   function scheduleWrite(): void {
     if (disposed) return
-    if (hydrating || hydrationFailed || !hydrationSettled) {
+    // Restoring an archive is not an application mutation and must not write that archive back.
+    if (hydrating) return
+    changeRevision++
+    if (participation !== undefined) return
+    if (hydrationFailed || !hydrationSettled) {
       dirtyDuringHydrate = true
       return
     }
@@ -428,7 +540,7 @@ export function persistUnit<TState>(
    */
   function startFinalWrite(): void {
     /** Envelope built from the snapshot at dispose time. */
-    let envelope: IEnvelope<Partial<TState>>
+    let envelope: IVersionedEnvelope<Partial<TState>>
     try {
       envelope = {
         version,
@@ -439,7 +551,7 @@ export function persistUnit<TState>(
       return
     }
     writeChain = writeChain
-      .then(() => writeEnvelope(storage, key, codec, envelope, {}))
+      .then(() => writeEnvelopeWithStages(storage, key, codec, envelope, {}, codecStages))
       .catch((caught: unknown) => {
         writeError.value = caught
       })
@@ -454,25 +566,12 @@ export function persistUnit<TState>(
     hydrationError.value = undefined
     try {
       const raw = await runAdapterOperation((signal) =>
-        readEnvelope(storage, key, codec, { signal })
+        readEnvelopeWithStages(storage, key, codec, { signal }, codecStages)
       )
       assertActive()
       if (raw !== undefined) {
-        const envelope = assertEnvelope<Partial<TState>>(raw, key)
-        let state = envelope.state
-        if (envelope.version !== version) {
-          if (!migrate) {
-            throw createStorePersistError(
-              StorePersistErrorCode.envelopeInvalid,
-              StorePersistErrorText.versionMismatch(key, envelope.version, version)
-            )
-          }
-          state = assertSynchronousCallbackResult(
-            key,
-            'migrate',
-            migrate(state as TState, envelope.version)
-          ) as Partial<TState>
-        }
+        const envelope = assertVersionedEnvelope(raw)
+        const state = migrateEnvelopeSync(migrationPlan, envelope) as Partial<TState>
         // Always reconcile the persisted snapshot with the current snapshot. The
         // default object merge preserves fields initialized or mutated while the
         // async read was in flight; custom store shapes can provide their own merge.
@@ -513,22 +612,65 @@ export function persistUnit<TState>(
   /** Stops admission immediately and queues the final snapshot before releasing the subscription. */
   const dispose = (): void => {
     if (disposed) return
-    disposed = true
-    generationEpoch++
-    for (const controller of activeOperations) controller.abort()
-    activeOperations.clear()
-    writeStatus.value = PersistState.disposed
-    lifecycleDisposed.value = true
-    /** An admitted write is aborted below or never starts, because its loop stops on `disposed`. */
-    const writeAdmitted = writeDrain !== undefined
-    if (clearWriteTimer() || writeAdmitted) {
-      // A pending debounce window or an admitted write still owes storage the latest state.
-      startFinalWrite()
+    try {
+      disposed = true
+      /** The same cancellation reaches an active native transaction before its callback returns. */
+      const cancellation = disposedError()
+      participation?.control.abort(cancellation)
+      closeParticipationQueue?.(cancellation)
+      generationEpoch++
+      for (const controller of activeOperations) controller.abort()
+      activeOperations.clear()
+      writeStatus.value = PersistState.disposed
+      lifecycleDisposed.value = true
+      /** An admitted write is aborted below or never starts, because its loop stops on `disposed`. */
+      const writeAdmitted = writeDrain !== undefined
+      if ((clearWriteTimer() || writeAdmitted) && participation === undefined) {
+        // A pending debounce window or an admitted write still owes storage the latest state.
+        startFinalWrite()
+      }
+      stopSubscription?.()
+    } catch (cause) {
+      disposalFailed = true
+      disposalFailure = cause
+      throw cause
     }
-    stopSubscription?.()
   }
 
-  return {
+  /** Explicit and symbol callers share cleanup but retain separate stable Promise identities. */
+  let disposalPromise: Promise<void> | undefined
+  /** Symbol disposal reports primary failure without rejecting a language-managed cleanup. */
+  let symbolDisposalPromise: Promise<void> | undefined
+  /** Synchronous admission stops first; the Promise still waits for all admitted writes. */
+  const disposeAsync = (): Promise<void> => {
+    if (disposalPromise !== undefined) return disposalPromise
+    /** Retain actual transaction completion before disposal can change attachment state. */
+    const transactionCompletion = participation?.control.completion
+    // Cache before unsubscribe can reenter disposal, while stopping admission synchronously.
+    disposalPromise = Promise.resolve()
+      .then(() => writeChain)
+      .then(() => transactionCompletion)
+      .then(() => {
+        if (disposalFailed) throw disposalFailure
+      })
+    try {
+      dispose()
+    } catch (cause) {
+      disposalFailed = true
+      disposalFailure = cause
+    }
+    return disposalPromise
+  }
+  /** Runtime reporting uses the observer's owning reporter when one was supplied. */
+  const reportDisposalFailure = (cause: unknown): void => {
+    observeThenableRejection(undefined, { error: cause }, (error) => {
+      if (codecStages === undefined) throw error
+      codecStages.report(error)
+    })
+  }
+
+  /** All adapters return this original handle, which alone receives private enlistment authority. */
+  const handle: IPersistHandle = {
     status,
     error,
     hydrated,
@@ -540,6 +682,7 @@ export function persistUnit<TState>(
     settled,
     async retryHydrate() {
       assertActive()
+      assertDirectOperation()
       if (!hydrationFailed) {
         await settled
         if (hydrationFailed) throw hydrationError.value
@@ -553,32 +696,33 @@ export function persistUnit<TState>(
         retryPromise = undefined
       }
     },
-    async flush() {
-      assertActive()
-      const pendingWrite = writeDrain
-      clearWriteTimer()
-      await settled
-      if (hydrationFailed) throw hydrationError.value
-      // Capture the write already observed by this flush before checking the
-      // lifecycle again. If dispose wins while the adapter ignores abort, its
-      // late storage failure must remain reachable as the AbortError cause.
-      if (pendingWrite) await pendingWrite
-      assertActive()
-      await enqueueWrite()
-      assertActive()
+    flush(tx) {
+      if (tx !== undefined) {
+        try {
+          return flushTransaction(tx)
+        } catch (cause) {
+          return Promise.reject(cause)
+        }
+      }
+      return flushDirect()
     },
     async clear() {
       assertActive()
+      assertDirectOperation()
       clearWriteTimer()
       await settled
       if (hydrationFailed) throw hydrationError.value
       assertActive()
-      const operation = writeChain.then(async () => {
-        assertActive()
-        await runWriteOperation(() =>
-          runAdapterOperation((signal) => removeEnvelope(storage, key, { signal }, codec))
-        )
-      })
+      assertDirectOperation()
+      /** Existing queued removals remain observable until their real completion. */
+      const operation = trackPendingWrite(
+        writeChain.then(async () => {
+          assertActive()
+          await runWriteOperation(() =>
+            runAdapterOperation((signal) => removeEnvelope(storage, key, { signal }, codec))
+          )
+        })
+      )
       writeChain = operation.catch(() => undefined)
       await operation
       assertActive()
@@ -587,13 +731,187 @@ export function persistUnit<TState>(
       return disposed
     },
     dispose,
-    /** Drains admitted storage work even when synchronous subscription cleanup throws. */
-    async disposeAsync() {
-      try {
-        dispose()
-      } finally {
-        await writeChain
-      }
+    disposeAsync,
+    [asyncDisposeKey]() {
+      symbolDisposalPromise ??= disposeAsync().catch(reportDisposalFailure)
+      return symbolDisposalPromise
     }
   }
+
+  /** Direct flushing retains the original queue, hydration and cancellation behavior. */
+  async function flushDirect(): Promise<void> {
+    assertActive()
+    assertDirectOperation()
+    const pendingWrite = writeDrain
+    clearWriteTimer()
+    await settled
+    if (hydrationFailed) throw hydrationError.value
+    // Capture the write already observed by this flush before checking the
+    // lifecycle again. If dispose wins while the adapter ignores abort, its
+    // late storage failure must remain reachable as the AbortError cause.
+    if (pendingWrite) await pendingWrite
+    assertActive()
+    assertDirectOperation()
+    await enqueueWrite()
+    assertActive()
+  }
+
+  /** Captures and starts conversion inside the canonical operation owner before queuing requests. */
+  function flushTransaction(tx: Omit<ITransactionScope, 'use'>): Promise<void> {
+    assertActive()
+    /** Only a handle enlisted in this active original transaction may use any derived view. */
+    const active = participation
+    if (active === undefined || active.transactionId === undefined || active.store === undefined)
+      throw createStorePersistTypeError(
+        StorePersistErrorCode.invalidOption,
+        StorePersistErrorText.transactionParticipation
+      )
+    /** Keep the ownership guard's failure as cause without wrapping local mismatch twice. */
+    let transactionId: string
+    try {
+      transactionId = assertTransactionOwner(active.store, tx).id
+    } catch (cause) {
+      throw createStorePersistTypeError(
+        StorePersistErrorCode.invalidOption,
+        StorePersistErrorText.transactionParticipation,
+        { cause }
+      )
+    }
+    if (transactionId !== active.transactionId)
+      throw createStorePersistTypeError(
+        StorePersistErrorCode.invalidOption,
+        StorePersistErrorText.transactionParticipation
+      )
+    return runTransactionOperation(tx, (scope) => {
+      active.flushed = true
+      writeStatus.value = PersistState.writing
+      /** Snapshot failures belong to encoding and are registered before the first native request. */
+      let envelope: IVersionedEnvelope<unknown>
+      /** The notification revision is read in the same synchronous call as the state snapshot. */
+      const snapshotRevision = changeRevision
+      try {
+        /** Async identity byte codecs must receive this call's bytes, not a later mutable view. */
+        const state = assertSynchronousCallbackResult(
+          key,
+          'partialize',
+          partialize(unit.snapshot())
+        )
+        envelope = {
+          version,
+          state:
+            codec.output === PersistCodecOutput.binary && isUint8Array(state)
+              ? new Uint8Array(state)
+              : state
+        }
+      } catch (cause) {
+        throw normalizeTransactionEncodingFailure(cause)
+      }
+      /** Observation binds the authentic operation view, without keeping a root-store fallback. */
+      const selectedCodecStages = bindPersistStages(codecStages, scope)
+      /** The transaction owner remains responsible for mode, identity and view expiration. */
+      const selectedTransactionStages = bindPersistStages(transactionStages, scope)
+      observePersistFlush(selectedTransactionStages, 'beforePersistFlush')
+      /** Retain this predecessor without observing a rejected ordering Promise before conversion. */
+      const previousFlush = active.flushChain
+      /** Conversion sees this call's state immediately; native writes retain the original order. */
+      const operation = writeEnvelopeWithStages(
+        {
+          capabilities: storage.capabilities,
+          set: (archiveKey, text) => scope.set(archiveKey, text, { conflictPolicy: 'replace' }),
+          getBytes: (archiveKey) => scope.getBytes(archiveKey),
+          setBytes: (archiveKey, bytes) =>
+            scope.setBytes(archiveKey, bytes, { conflictPolicy: 'replace' })
+        },
+        key,
+        codec,
+        envelope,
+        {},
+        selectedCodecStages,
+        normalizeTransactionEncodingFailure,
+        () => previousFlush.then(assertActive)
+      ).then(() => {
+        active.lastFlushedRevision = snapshotRevision
+        observePersistFlush(selectedTransactionStages, 'afterPersistFlush')
+      })
+      active.flushChain = operation
+      return operation
+    })
+  }
+
+  /** Public transaction observations cannot wait, veto conversion, or replace its failure. */
+  function observePersistFlush(
+    observer: ITransactionStageObserver | undefined,
+    stage: 'beforePersistFlush' | 'afterPersistFlush'
+  ): void {
+    if (observer === undefined) return
+    try {
+      /** Dynamic callback getters belong to the same report-only observation boundary. */
+      const callback = observer[stage]
+      if (callback === undefined) return
+      /** No business state or encoded value enters this observation. */
+      const result = Reflect.apply(callback, observer, [])
+      observeThenableRejection(result, inspectThenable(result), (error) => observer.report(error))
+    } catch (error) {
+      observeThenableRejection(undefined, { error }, (failure) => observer.report(failure))
+    }
+  }
+
+  closeParticipationQueue = registerPersistTransactionParticipant(handle, {
+    storage,
+    disposed: () => disposed,
+    async pause(control) {
+      assertActive()
+      participation = {
+        control,
+        flushChain: Promise.resolve(),
+        flushed: false,
+        lastFlushedRevision: persistedRevision
+      }
+      clearWriteTimer()
+      /** Snapshot every already-admitted outcome before new direct mutations are closed out. */
+      const pending = [...pendingWrites]
+      await settled
+      if (retryPromise !== undefined) await retryPromise
+      if (hydrationFailed) throw hydrationError.value
+      /** Wait all old work before examining failure, so another handle can never overtake it. */
+      const outcomes = await Promise.allSettled(pending)
+      for (const outcome of outcomes) if (outcome.status === 'rejected') throw outcome.reason
+      await writeChain
+      assertActive()
+    },
+    bind(scope, owner) {
+      assertActive()
+      if (participation === undefined)
+        throw createStorePersistTypeError(
+          StorePersistErrorCode.invalidOption,
+          StorePersistErrorText.transactionParticipation
+        )
+      participation.store = owner
+      participation.transactionId = assertTransactionOwner(owner, scope).id
+      participation.flushChain = Promise.resolve()
+      participation.flushed = false
+    },
+    finish(committed, failure) {
+      /** Stop retaining native identity as soon as its owner has actually settled. */
+      const completed = participation
+      participation = undefined
+      if (completed === undefined || disposed) return
+      if (committed && completed.flushed) persistedRevision = completed.lastFlushedRevision
+      if (completed.flushed) {
+        writeStatus.value = committed ? PersistState.idle : PersistState.error
+        writeError.value = committed ? undefined : failure
+      }
+      if (changeRevision !== persistedRevision) {
+        try {
+          scheduleWrite()
+        } catch (cause) {
+          // A committed transaction stays committed; failed mirroring remains an ordinary write outcome.
+          writeError.value = cause
+          writeStatus.value = PersistState.error
+          throw cause
+        }
+      }
+    }
+  })
+  return handle
 }

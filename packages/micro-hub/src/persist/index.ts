@@ -89,7 +89,7 @@ function createPersistDriver(hub: IHubRuntime, options: IPersistOptions): IMicro
         keys: (context) => options.store.keys(context)
       }
       /** Persistence of the selected fields; store-persist handles hydrate races and debounce. */
-      const handle = persistUnit<Record<string, unknown>>(
+      const handle = persistUnit(
         {
           snapshot: () => {
             /** Current values of the persisted fields. */
@@ -122,10 +122,12 @@ function createPersistDriver(hub: IHubRuntime, options: IPersistOptions): IMicro
           version: entry.contract.version,
           // A new major version means a new shape: start from the contract's initial values
           // instead of failing hydration and closing writes.
-          migrate: () => ({}),
+          migrations: { reset: () => ({}) },
           debounceMs: options.debounceMs ?? 0
         }
       )
+      // Hydration owns its own failure channel, independently of later disposal.
+      void handle.ready.catch((error: unknown) => hub.report(error))
       owner.track(() => {
         for (const [field, def] of defs) {
           if (handle.hydrated.peek() || !Object.is(initial.get(field), state.store.peek(def))) {

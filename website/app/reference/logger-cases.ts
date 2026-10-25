@@ -1,10 +1,203 @@
-import type { ICaseDoc, IText } from './contract.js'
+import type { ICaseDoc, ICode, IText } from './contract.js'
 
 /** Localized task explanation for the public logger entries. */
 const t = (en: string, zh: string): IText => ({ en, zh })
 
+/** Native authors can prepare committed facts without allocating another resource owner. */
+export const loggerIndexExample: ICode = t(
+  `import {
+  snapshotLogRecords, prepareLogAppend, snapshotLogStoreState, createLogStoreIndex
+} from '@migaia/logger/plugins/durable'
+
+const state = snapshotLogStoreState({ lastSeq: 0, time: 0, floor: 1 }, [])
+const index = createLogStoreIndex(state)
+const batch = prepareLogAppend(
+  snapshotLogRecords([{ kind: 'order.created', payload: { id: 'o1' } }]),
+  index
+)
+console.log(index.lastSeq, batch[0]?.seq) // Preparation is not a commit.`,
+  `import {
+  snapshotLogRecords, prepareLogAppend, snapshotLogStoreState, createLogStoreIndex
+} from '@migaia/logger/plugins/durable'
+
+const state = snapshotLogStoreState({ lastSeq: 0, time: 0, floor: 1 }, [])
+const index = createLogStoreIndex(state)
+const batch = prepareLogAppend(
+  snapshotLogRecords([{ kind: 'order.created', payload: { id: 'o1' } }]),
+  index
+)
+console.log(index.lastSeq, batch[0]?.seq) // 准备批次不等于提交。`
+)
+
+/** A real resource example exercises committed data and one-way intent states. */
+export const loggerStoreExample = `import { memoryLogStore, LogRecordState } from '@migaia/logger/plugins/durable'
+
+await using store = memoryLogStore()
+const off = store.onAppend(notice => console.log(notice.lastSeq, notice.count))
+const sequences = await store.append([{ kind: 'order.created', payload: { id: 'o1' } }])
+const seq = sequences[0]!
+console.log((await store.read(seq, 10))[0]?.kind)
+await store.setState(seq, LogRecordState.done)
+console.log(await store.states(LogRecordState.pending))
+await store.truncate(seq + 1)
+console.log(await store.lastSeq())
+off()`
+
+/** A second data index follows real committed resource changes; it owns no persistence or cleanup. */
+export const loggerCommittedIndexExample = `import {
+  memoryLogStore, createLogStoreIndex, snapshotLogRecords, LogRecordState
+} from '@migaia/logger/plugins/durable'
+
+await using store = memoryLogStore()
+const index = createLogStoreIndex()
+await store.append(snapshotLogRecords([{ kind: 'order.created', payload: { id: 'o1' } }]))
+const committed = await store.read(1, 10)
+index.applyAppend(committed)
+console.log(index.read(1, 10)[0]?.kind, index.pending())
+console.log(index.lastSeq, index.time >= 0, index.floor)
+if (index.checkState(1, LogRecordState.done)) {
+  await store.setState(1, LogRecordState.done)
+  index.applyState(1, LogRecordState.done)
+}
+if (index.checkTruncate(2)) {
+  await store.truncate(2)
+  index.applyTruncate(2)
+}
+console.log(index.read(1, 10), index.pending(), index.lastSeq, index.floor)`
+
 /** Complete examples use in-memory sinks and the public host capability port. */
 export const loggerCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  integerAdmission: [
+    {
+      title: t('Reuse log integer admission', '复用日志整数准入'),
+      problem: t(
+        'Preserve numeric errors in native log adapters.',
+        '原生日志适配器保留数字错误语义。'
+      ),
+      example: t(
+        "import { assertLogInteger } from '@migaia/logger/plugins/durable'\n\nconst input: unknown = 0\nassertLogInteger(input, 0)\nconsole.log(input)",
+        "import { assertLogInteger } from '@migaia/logger/plugins/durable'\n\nconst input: unknown = 0\nassertLogInteger(input, 0)\nconsole.log(input)"
+      ),
+      result: t(
+        'Prints 0; fractional values reject with the original coded RangeError.',
+        '输出 0；小数仍按原带码 RangeError 拒绝。'
+      )
+    }
+  ],
+  committedIndex: [
+    {
+      title: t('Prepare a native append before commit', '原生提交前准备追加批次'),
+      problem: t(
+        'Keep asynchronous persistence in its native transaction while reusing the original committed index.',
+        '异步持久化仍由原生事务拥有，同时复用原已提交索引。'
+      ),
+      example: loggerIndexExample,
+      result: t(
+        'Prints 0 1. Preparation leaves the index unchanged; apply the exact batch only after commit, and leave rollback unapplied.',
+        '输出 0 1。准备不修改索引；仅真实 commit 后应用原批次，rollback 不应用。'
+      )
+    }
+  ],
+  memoryLogStore: [
+    {
+      title: t(
+        'Keep ordered records and explicit resource ownership',
+        '保留有序记录与明确资源归属'
+      ),
+      problem: t(
+        'Use durable log resources without changing ordinary output sinks. Each installed plugin borrows a distinct store; the creator closes it after accepted work ends.',
+        '使用持久日志资源而不改变普通输出端。每个插件借用独立 store；已接纳工作结束后由创建者关闭。'
+      ),
+      example: t(
+        "import { memoryLogStore } from '@migaia/logger/plugins/durable'\nimport type { ILogStore } from '@migaia/logger/plugins/durable'\n\nconst delegate = memoryLogStore()\nconst custom: ILogStore = {\n  append: records => delegate.append(records),\n  read: (fromSeq, limit) => delegate.read(fromSeq, limit),\n  lastSeq: () => delegate.lastSeq(),\n  onAppend: listener => delegate.onAppend(listener),\n  truncate: beforeSeq => delegate.truncate(beforeSeq),\n  setState: (seq, state) => delegate.setState(seq, state),\n  states: filter => delegate.states(filter),\n  dispose: () => delegate.dispose(),\n  [Symbol.asyncDispose]: () => delegate[Symbol.asyncDispose]()\n}\nawait custom.append([{ kind: 'custom', payload: null }])\nawait custom.dispose()",
+        "import { memoryLogStore } from '@migaia/logger/plugins/durable'\nimport type { ILogStore } from '@migaia/logger/plugins/durable'\n\nconst delegate = memoryLogStore()\nconst custom: ILogStore = {\n  append: records => delegate.append(records),\n  read: (fromSeq, limit) => delegate.read(fromSeq, limit),\n  lastSeq: () => delegate.lastSeq(),\n  onAppend: listener => delegate.onAppend(listener),\n  truncate: beforeSeq => delegate.truncate(beforeSeq),\n  setState: (seq, state) => delegate.setState(seq, state),\n  states: filter => delegate.states(filter),\n  dispose: () => delegate.dispose(),\n  [Symbol.asyncDispose]: () => delegate[Symbol.asyncDispose]()\n}\nawait custom.append([{ kind: 'custom', payload: null }])\nawait custom.dispose()"
+      ),
+      result: t(
+        'Records retain their JSON values. Initialization and whenIdle are explicit; shutdown completion alone does not prove all I/O ended. File stores use actual builtin SQLite, and external native transaction atomicity belongs to its original owner.',
+        '记录保留 JSON 原值。初始化与 whenIdle 明确等待；仅 shutdown 返回不能证明全部 I/O 结束。文件资源使用实际内置 SQLite，外部原生事务原子性属于原拥有者。'
+      )
+    }
+  ],
+  fileLogStore: [
+    {
+      title: t(
+        'Keep ordered records and explicit resource ownership',
+        '保留有序记录与明确资源归属'
+      ),
+      problem: t(
+        'Use durable log resources without changing ordinary output sinks. Each installed plugin borrows a distinct store; the creator closes it after accepted work ends.',
+        '使用持久日志资源而不改变普通输出端。每个插件借用独立 store；已接纳工作结束后由创建者关闭。'
+      ),
+      example: t(
+        "import { fileLogStore } from '@migaia/logger/plugins/durable/file'\n\nawait using store = await fileLogStore('./orders.sqlite')\nawait store.append([{ kind: 'order.created', payload: { id: 'o1' } }])\nconsole.log(await store.lastSeq())",
+        "import { fileLogStore } from '@migaia/logger/plugins/durable/file'\n\nawait using store = await fileLogStore('./orders.sqlite')\nawait store.append([{ kind: 'order.created', payload: { id: 'o1' } }])\nconsole.log(await store.lastSeq())"
+      ),
+      result: t(
+        'Records retain their JSON values. Initialization and whenIdle are explicit; shutdown completion alone does not prove all I/O ended. File stores use actual builtin SQLite, and external native transaction atomicity belongs to its original owner.',
+        '记录保留 JSON 原值。初始化与 whenIdle 明确等待；仅 shutdown 返回不能证明全部 I/O 结束。文件资源使用实际内置 SQLite，外部原生事务原子性属于原拥有者。'
+      )
+    }
+  ],
+  binlog: [
+    {
+      title: t(
+        'Keep ordered records and explicit resource ownership',
+        '保留有序记录与明确资源归属'
+      ),
+      problem: t(
+        'Use durable log resources without changing ordinary output sinks. Each installed plugin borrows a distinct store; the creator closes it after accepted work ends.',
+        '使用持久日志资源而不改变普通输出端。每个插件借用独立 store；已接纳工作结束后由创建者关闭。'
+      ),
+      example: t(
+        "import { Logger } from '@migaia/logger'\nimport { binlog, wal, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'\n\nawait using events = memoryLogStore()\nawait using intents = memoryLogStore()\nawait using images = memoryLogStore()\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [binlog({ store: events }), wal({ store: intents }), undoLog({ store: images })]\n})\ntry {\n  await Promise.all([log.binlog.ready(), log.wal.ready(), log.undo.ready()])\n  const seq = await log.binlog.append('order.created', { id: 'o1' })\n  const off = log.binlog.subscribe(seq, record => console.log(record.seq))\n  const intent = await log.wal.begin('save-order', { id: 'o1' })\n  await log.undo.record('tx1', [{ target: 'o1', before: null, after: { total: 120 } }])\n  await log.wal.complete(intent)\n  console.log(await log.undo.get('tx1'))\n  await log.undo.forget('tx1')\n  off()\n} finally {\n  try { await log.shutdown('manual') }\n  finally { await Promise.all([log.binlog.whenIdle(), log.wal.whenIdle(), log.undo.whenIdle()]) }\n}",
+        "import { Logger } from '@migaia/logger'\nimport { binlog, wal, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'\n\nawait using events = memoryLogStore()\nawait using intents = memoryLogStore()\nawait using images = memoryLogStore()\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [binlog({ store: events }), wal({ store: intents }), undoLog({ store: images })]\n})\ntry {\n  await Promise.all([log.binlog.ready(), log.wal.ready(), log.undo.ready()])\n  const seq = await log.binlog.append('order.created', { id: 'o1' })\n  const off = log.binlog.subscribe(seq, record => console.log(record.seq))\n  const intent = await log.wal.begin('save-order', { id: 'o1' })\n  await log.undo.record('tx1', [{ target: 'o1', before: null, after: { total: 120 } }])\n  await log.wal.complete(intent)\n  console.log(await log.undo.get('tx1'))\n  await log.undo.forget('tx1')\n  off()\n} finally {\n  try { await log.shutdown('manual') }\n  finally { await Promise.all([log.binlog.whenIdle(), log.wal.whenIdle(), log.undo.whenIdle()]) }\n}"
+      ),
+      result: t(
+        'Records retain their JSON values. Initialization and whenIdle are explicit; shutdown completion alone does not prove all I/O ended. File stores use actual builtin SQLite, and external native transaction atomicity belongs to its original owner.',
+        '记录保留 JSON 原值。初始化与 whenIdle 明确等待；仅 shutdown 返回不能证明全部 I/O 结束。文件资源使用实际内置 SQLite，外部原生事务原子性属于原拥有者。'
+      )
+    }
+  ],
+  wal: [
+    {
+      title: t(
+        'Keep ordered records and explicit resource ownership',
+        '保留有序记录与明确资源归属'
+      ),
+      problem: t(
+        'Use durable log resources without changing ordinary output sinks. Each installed plugin borrows a distinct store; the creator closes it after accepted work ends.',
+        '使用持久日志资源而不改变普通输出端。每个插件借用独立 store；已接纳工作结束后由创建者关闭。'
+      ),
+      example: t(
+        "import { Logger } from '@migaia/logger'\nimport { binlog, wal, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'\n\nawait using events = memoryLogStore()\nawait using intents = memoryLogStore()\nawait using images = memoryLogStore()\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [binlog({ store: events }), wal({ store: intents }), undoLog({ store: images })]\n})\ntry {\n  await Promise.all([log.binlog.ready(), log.wal.ready(), log.undo.ready()])\n  const seq = await log.binlog.append('order.created', { id: 'o1' })\n  const off = log.binlog.subscribe(seq, record => console.log(record.seq))\n  const intent = await log.wal.begin('save-order', { id: 'o1' })\n  await log.undo.record('tx1', [{ target: 'o1', before: null, after: { total: 120 } }])\n  await log.wal.complete(intent)\n  console.log(await log.undo.get('tx1'))\n  await log.undo.forget('tx1')\n  off()\n} finally {\n  try { await log.shutdown('manual') }\n  finally { await Promise.all([log.binlog.whenIdle(), log.wal.whenIdle(), log.undo.whenIdle()]) }\n}",
+        "import { Logger } from '@migaia/logger'\nimport { binlog, wal, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'\n\nawait using events = memoryLogStore()\nawait using intents = memoryLogStore()\nawait using images = memoryLogStore()\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [binlog({ store: events }), wal({ store: intents }), undoLog({ store: images })]\n})\ntry {\n  await Promise.all([log.binlog.ready(), log.wal.ready(), log.undo.ready()])\n  const seq = await log.binlog.append('order.created', { id: 'o1' })\n  const off = log.binlog.subscribe(seq, record => console.log(record.seq))\n  const intent = await log.wal.begin('save-order', { id: 'o1' })\n  await log.undo.record('tx1', [{ target: 'o1', before: null, after: { total: 120 } }])\n  await log.wal.complete(intent)\n  console.log(await log.undo.get('tx1'))\n  await log.undo.forget('tx1')\n  off()\n} finally {\n  try { await log.shutdown('manual') }\n  finally { await Promise.all([log.binlog.whenIdle(), log.wal.whenIdle(), log.undo.whenIdle()]) }\n}"
+      ),
+      result: t(
+        'Records retain their JSON values. Initialization and whenIdle are explicit; shutdown completion alone does not prove all I/O ended. File stores use actual builtin SQLite, and external native transaction atomicity belongs to its original owner.',
+        '记录保留 JSON 原值。初始化与 whenIdle 明确等待；仅 shutdown 返回不能证明全部 I/O 结束。文件资源使用实际内置 SQLite，外部原生事务原子性属于原拥有者。'
+      )
+    }
+  ],
+  undoLog: [
+    {
+      title: t(
+        'Keep ordered records and explicit resource ownership',
+        '保留有序记录与明确资源归属'
+      ),
+      problem: t(
+        'Use durable log resources without changing ordinary output sinks. Each installed plugin borrows a distinct store; the creator closes it after accepted work ends.',
+        '使用持久日志资源而不改变普通输出端。每个插件借用独立 store；已接纳工作结束后由创建者关闭。'
+      ),
+      example: t(
+        "import { Logger } from '@migaia/logger'\nimport { binlog, wal, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'\n\nawait using events = memoryLogStore()\nawait using intents = memoryLogStore()\nawait using images = memoryLogStore()\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [binlog({ store: events }), wal({ store: intents }), undoLog({ store: images })]\n})\ntry {\n  await Promise.all([log.binlog.ready(), log.wal.ready(), log.undo.ready()])\n  const seq = await log.binlog.append('order.created', { id: 'o1' })\n  const off = log.binlog.subscribe(seq, record => console.log(record.seq))\n  const intent = await log.wal.begin('save-order', { id: 'o1' })\n  await log.undo.record('tx1', [{ target: 'o1', before: null, after: { total: 120 } }])\n  await log.wal.complete(intent)\n  console.log(await log.undo.get('tx1'))\n  await log.undo.forget('tx1')\n  off()\n} finally {\n  try { await log.shutdown('manual') }\n  finally { await Promise.all([log.binlog.whenIdle(), log.wal.whenIdle(), log.undo.whenIdle()]) }\n}",
+        "import { Logger } from '@migaia/logger'\nimport { binlog, wal, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'\n\nawait using events = memoryLogStore()\nawait using intents = memoryLogStore()\nawait using images = memoryLogStore()\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [binlog({ store: events }), wal({ store: intents }), undoLog({ store: images })]\n})\ntry {\n  await Promise.all([log.binlog.ready(), log.wal.ready(), log.undo.ready()])\n  const seq = await log.binlog.append('order.created', { id: 'o1' })\n  const off = log.binlog.subscribe(seq, record => console.log(record.seq))\n  const intent = await log.wal.begin('save-order', { id: 'o1' })\n  await log.undo.record('tx1', [{ target: 'o1', before: null, after: { total: 120 } }])\n  await log.wal.complete(intent)\n  console.log(await log.undo.get('tx1'))\n  await log.undo.forget('tx1')\n  off()\n} finally {\n  try { await log.shutdown('manual') }\n  finally { await Promise.all([log.binlog.whenIdle(), log.wal.whenIdle(), log.undo.whenIdle()]) }\n}"
+      ),
+      result: t(
+        'Records retain their JSON values. Initialization and whenIdle are explicit; shutdown completion alone does not prove all I/O ended. File stores use actual builtin SQLite, and external native transaction atomicity belongs to its original owner.',
+        '记录保留 JSON 原值。初始化与 whenIdle 明确等待；仅 shutdown 返回不能证明全部 I/O 结束。文件资源使用实际内置 SQLite，外部原生事务原子性属于原拥有者。'
+      )
+    }
+  ],
   Logger: [
     {
       title: t(
@@ -91,8 +284,8 @@ export const loggerCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
         "import { Logger, LoggerLevel } from '@migaia/logger'\nimport { level } from '@migaia/logger/plugins'\n\nconst log = new Logger({\n  execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },\n  plugins: [level({ level: LoggerLevel.warn })]\n})\nconst entries: string[] = []\nlog.useSink((entry) => { entries.push(entry.tag + ':' + entry.message) })\nconst off = log.addFilter((entry) => entry.message !== '保密')\nlog.info('低于阈值')\nlog.warn('保密')\nlog.error('可见')\noff()\noff()\nlog.warn('保密')\nlog.setLevel(LoggerLevel.info)\nlog.info('已放行')\nconsole.log(entries.join(','))\nawait log.shutdown('manual')"
       ),
       result: t(
-        'Prints `error:shown,warn:private,info:visible`. The first info entry fails the threshold and the first private warning fails the filter; removing that filter and lowering the threshold each affects later calls.\n\nDefaults are level: debug, filters: [], and asyncOutput: false. Standard levels are debug, info, warn, error and fatal; non-level tags bypass the threshold but still pass through filters. The off function removes matching filter function identities.',
-        '输出 `error:可见,warn:保密,info:已放行`；首条信息被门槛挡住，首条保密警告被过滤，之后撤销过滤器与降低门槛分别影响后续调用。\n\n默认 `level: debug`、`filters: []`、`asyncOutput: false`；标准级别为 `debug`、`info`、`warn`、`error`、`fatal`，其他标签不受级别门槛限制，但仍经过过滤；移除句柄按过滤函数身份删除匹配项。'
+        'Prints `error:shown,warn:private,info:visible`. atLevel(level, entry) also preserves a category tag while using this same threshold and filters. The first info entry fails the threshold and the first private warning fails the filter; removing that filter and lowering the threshold each affects later calls.\n\nDefaults are level: debug, filters: [], and asyncOutput: false. Standard levels are debug, info, warn, error and fatal; non-level tags bypass the threshold but still pass through filters. The off function removes matching filter function identities.',
+        '输出 `error:可见,warn:保密,info:已放行`；atLevel(level, entry) 也保留分类 tag 并复用此门槛与过滤器。首条信息被门槛挡住，首条保密警告被过滤，之后撤销过滤器与降低门槛分别影响后续调用。\n\n默认 `level: debug`、`filters: []`、`asyncOutput: false`；标准级别为 `debug`、`info`、`warn`、`error`、`fatal`，其他标签不受级别门槛限制，但仍经过过滤；移除句柄按过滤函数身份删除匹配项。'
       )
     }
   ],

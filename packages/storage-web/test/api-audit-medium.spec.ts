@@ -1,9 +1,11 @@
+import { entityTestFeatures } from './helpers/entity-features.js'
 import { describe, expect, it } from 'vitest'
-import { StorageError, StorageErrorCode, lengthPrefixedNamespaceCodec } from '../src/index.js'
-import { defineEntity } from '../src/entity.js'
-import { fromStandardSchema } from '../src/schema.js'
-import { memoryStorageHost } from '../src/memory.js'
-import { localStorageHost } from '../src/local-storage.js'
+import { lengthPrefixedNamespaceCodec } from '../src/index.js'
+import { StorageError, StorageErrorCode } from '@migaia/storage-host'
+import { defineEntity } from '@migaia/storage-host/entity'
+import { fromStandardSchema } from '@migaia/storage-host/entity'
+import { createMemoryTestStore } from './helpers/installed-backends.js'
+import { createLocalTestStore } from './helpers/installed-backends.js'
 import { fakeWebStorage } from '../src/testing/fake-web-storage.js'
 
 /** Follow only standard error links to prove the exact original instance remains reachable. */
@@ -30,10 +32,11 @@ describe('storage-web audit medium severity regressions', () => {
       'application validation message'
     )
     /** Exercise the public schema-to-repository write path. */
-    const store = memoryStorageHost()
+    const store = await createMemoryTestStore()
     try {
       /** This is a supported throwing schema, not a forged backend. */
       const repo = defineEntity<{ id: string }>({
+        features: entityTestFeatures,
         name: 'audit-error-chain',
         key: 'id',
         schema: {
@@ -52,7 +55,7 @@ describe('storage-web audit medium severity regressions', () => {
         (error: unknown) => error
       )
       expect(failure).toMatchObject({
-        source: '@migaia/storage-web',
+        source: '@migaia/storage-host',
         code: 'VALIDATION_FAILED',
         message: primary.message
       })
@@ -63,17 +66,28 @@ describe('storage-web audit medium severity regressions', () => {
     }
   })
 
-  it.each([undefined, {}])('rejects a missing complete v2 migration graph: %s', (migrations) => {
-    expect(() =>
-      defineEntity<{ id: string }>({
-        name: 'audit-graph',
-        key: 'id',
-        version: 2,
-        ...(migrations === undefined ? {} : { migrations })
-      })
-    ).toThrowError(
-      expect.objectContaining({ source: '@migaia/storage-web', code: 'INVALID_CONFIG' })
-    )
+  it.each([undefined, {}])('keeps a current-only v2 plan explicit: %s', async (migrations) => {
+    const store = await createMemoryTestStore()
+    const previous = defineEntity<{ id: string }>({
+      features: entityTestFeatures,
+      name: 'audit-graph',
+      key: 'id'
+    }).connect(store)
+    await previous.put({ id: 'old' })
+    const current = defineEntity<{ id: string }>({
+      features: entityTestFeatures,
+      name: 'audit-graph',
+      key: 'id',
+      version: 2,
+      ...(migrations === undefined ? {} : { migrations })
+    }).connect(store)
+    await current.put({ id: 'current' })
+    await expect(current.get('current')).resolves.toEqual({ id: 'current' })
+    await expect(current.get('old')).rejects.toMatchObject({
+      source: '@migaia/storage-host',
+      code: 'VERSION_UNSUPPORTED'
+    })
+    await store.dispose()
   })
 
   it('classifies an asynchronous Standard Schema rejection and preserves its cause', async () => {
@@ -90,10 +104,55 @@ describe('storage-web audit medium severity regressions', () => {
       }
     })
     await expect(schema.validate('input')).rejects.toMatchObject({
-      source: '@migaia/storage-web',
+      source: '@migaia/storage-host',
       code: 'VALIDATION_FAILED',
       cause: primary
     })
+  })
+
+  it('retains a moved schema failure owner through repository read staging', async () => {
+    /** Toggle only the actual validator so a public write can seed the subsequent read. */
+    let rejectValidation = false
+    /** Preserve this exact validator failure through host and repository wrappers. */
+    const primary = new Error('read validator rejected')
+    /** The moved adapter remains the error owner through the same host repository boundary. */
+    const schema = fromStandardSchema<{ id: string }>({
+      '~standard': {
+        version: 1,
+        vendor: 'moved-schema',
+        async validate(value) {
+          if (rejectValidation) throw primary
+          return { value: value as { id: string } }
+        }
+      }
+    })
+    /** Drive the existing public storage and entity entries instead of internal staging helpers. */
+    const store = await createMemoryTestStore()
+    try {
+      /** Reads must preserve the host error, its stage and the original validator cause. */
+      const repository = defineEntity({
+        features: entityTestFeatures,
+        name: 'moved-schema',
+        key: 'id',
+        schema
+      }).connect(store)
+      await repository.put({ id: 'row' })
+      rejectValidation = true
+      /** The cause graph must retain the exact original rejection after stage enrichment. */
+      const failure = await repository.get('row').then(
+        () => undefined,
+        (error: unknown) => error
+      )
+      expect(failure).toMatchObject({
+        source: '@migaia/storage-host',
+        code: 'VALIDATION_FAILED',
+        stage: 'validate',
+        extensionStage: 'schema'
+      })
+      expect(reaches(failure, primary)).toBe(true)
+    } finally {
+      await store.dispose()
+    }
   })
 
   it('skips malformed foreign physical keys while enumerating its own namespace', async () => {
@@ -102,7 +161,7 @@ describe('storage-web audit medium severity regressions', () => {
     const storage = fakeWebStorage()
     storage.setItem('sw1:3:%GG:foreign', 'foreign')
     /** The public backend must keep unrelated physical data from blocking its own keys. */
-    const store = localStorageHost({ namespace: 'app', storage })
+    const store = await createLocalTestStore({ namespace: 'app', storage })
     try {
       store.sync.set('owned', 'value')
       expect(store.sync.keys()).toEqual(['owned'])

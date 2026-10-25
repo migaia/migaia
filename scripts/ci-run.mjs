@@ -130,10 +130,10 @@ const packedCommands = Object.freeze({
     'test/packed-export-smoke.mjs'
   ],
   'plugin-host': ['pnpm run build && node test/packed-smoke.mjs', 'node', 'test/packed-smoke.mjs'],
-  'storage-contract': [
-    'pnpm run build && node test/packed-export-smoke.mjs',
+  'storage-host': [
+    'pnpm run build && node test/authoring-packed-export-smoke.mjs',
     'node',
-    'test/packed-export-smoke.mjs'
+    'test/authoring-packed-export-smoke.mjs'
   ],
   'store-persist': [
     'pnpm run build && node test/packed-export-smoke.mjs',

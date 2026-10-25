@@ -6,8 +6,12 @@ import { withDistFreshness } from '../../scripts/vitest-dist-freshness.mjs';
 export default defineConfig(withDistFreshness({
   cacheDir: fileURLToPath(new URL('../../node_modules/.vite/middleware-pipeline', import.meta.url)),
   build: {
-    target: 'es2020',
+    target: 'es2022',
     lib: { entry: 'src/index.ts', formats: ['es'], fileName: () => 'index.js' },
-    sourcemap: true
+    sourcemap: true,
+    rollupOptions: {
+      /** Shared error and utility ownership stays with the published dependency. */
+      external: (id) => id === '@migaia/utils' || id.startsWith('@migaia/utils/')
+    }
   }
 }));

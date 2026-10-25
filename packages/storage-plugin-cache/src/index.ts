@@ -1,0 +1,19 @@
+export { ERROR_SOURCE, CacheErrorCode } from './error-code.js'
+export type { ICacheErrorCode } from './error-code.js'
+export { CacheWriteMode } from './constants.js'
+export { cacheBackendKind } from './kind.js'
+export { cacheKey } from './key.js'
+export type {
+  ICacheOptions,
+  ICacheTierOptions,
+  ICacheCallOptions,
+  ICacheEntryInfo,
+  ICacheLoader,
+  ICacheBatchLoader,
+  ICacheStats,
+  ICacheStore
+} from './types.js'
+import './hooks.js'
+export type { ICacheTierHookPayload } from './hooks.js'
+
+export { cachePlugin } from './plugin.js'

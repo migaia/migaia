@@ -2,6 +2,40 @@ import { UtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
 import { attachErrorIdentity } from './error.js'
 
+/** Builds a native argument error while retaining an injected random callback's thrown value. */
+function jitterArgumentError(message: string, cause?: unknown): RangeError {
+  return attachErrorIdentity(new RangeError(message, { cause }), {
+    source: '@migaia/utils',
+    code: UtilsErrorCode.invalidArgument
+  })
+}
+
+/**
+ * Shortens a finite non-negative value by at most `ratio`, which must be between zero and one.
+ * Calls `random` once after argument validation; its result must also be between zero and one.
+ * Invalid inputs and callback failures throw a coded RangeError, retaining callback failures as
+ * cause.
+ */
+export function jitter(value: number, ratio: number, random: () => number = Math.random): number {
+  if (!Number.isFinite(value) || value < 0) {
+    throw jitterArgumentError(UtilsErrorText.jitterValueInvalid)
+  }
+  if (!Number.isFinite(ratio) || ratio < 0 || ratio > 1) {
+    throw jitterArgumentError(UtilsErrorText.jitterRatioInvalid)
+  }
+  /** One sample determines the reduction and is never retried if the callback fails. */
+  let sample: number
+  try {
+    sample = random()
+  } catch (cause) {
+    throw jitterArgumentError(UtilsErrorText.jitterRandomFailed, cause)
+  }
+  if (!Number.isFinite(sample) || sample < 0 || sample > 1) {
+    throw jitterArgumentError(UtilsErrorText.jitterRandomInvalid)
+  }
+  return value * (1 - ratio * sample)
+}
+
 /** Public numeric values accepted without lossy coercion from strings. */
 export type INumericValue = number | bigint
 

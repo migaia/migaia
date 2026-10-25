@@ -9,6 +9,65 @@ const t = (en: string, zh: string): IText => ({ en, zh })
  * output is quoted in `result`.
  */
 export const utilsCases: Readonly<Record<string, readonly ICaseDoc[]>> = {
+  mapMaybe: [
+    {
+      title: t('Distinguish absence from a present undefined', '区分缺失与存在的 undefined'),
+      problem: t(
+        'A query result can legitimately contain undefined. A discriminant preserves presence, and mapping must not run on missing values.',
+        '查询结果可能合法地为 undefined；判别字段保留存在性，缺失时不能运行映射。'
+      ),
+      example: t(
+        "import { isSome, isNone, unwrapOr, mapMaybe, toUndefined, type IMaybe } from '@migaia/utils'\nconst present: IMaybe<number | undefined> = { some: true, value: undefined }\nconst missing: IMaybe<number> = { some: false }\nconst mapped = mapMaybe({ some: true, value: 3 }, value => value * 2)\nconsole.log(isSome(present), isNone(missing))\nconsole.log(unwrapOr(mapped, 0), toUndefined(missing))\n// true true\n// 6 undefined",
+        "import { isSome, isNone, unwrapOr, mapMaybe, toUndefined, type IMaybe } from '@migaia/utils'\nconst present: IMaybe<number | undefined> = { some: true, value: undefined }\nconst missing: IMaybe<number> = { some: false }\nconst mapped = mapMaybe({ some: true, value: 3 }, value => value * 2)\nconsole.log(isSome(present), isNone(missing))\nconsole.log(unwrapOr(mapped, 0), toUndefined(missing))\n// true true\n// 6 undefined"
+      ),
+      result: t(
+        'Prints true true, then 6 undefined. mapMaybe maps one present value and preserves missing values without calling its mapper.',
+        '先输出 true true，再输出 6 undefined；mapMaybe 仅映射存在值，缺失时保留 None 且不运行 mapper。'
+      )
+    }
+  ],
+  jitter: [
+    {
+      title: t('Spread cache expiration times', '分散缓存到期时间'),
+      problem: t(
+        'Entries written together should expire at different times while respecting the original freshness limit.',
+        '一起写入的缓存需要分散到期时间，同时遵守原来的新鲜度上限。'
+      ),
+      example: {
+        en: `import { jitter } from '@migaia/utils/number'
+
+console.log(jitter(60_000, 0.2, () => 0.5))`,
+        zh: `import { jitter } from '@migaia/utils/number'
+
+console.log(jitter(60_000, 0.2, () => 0.5))`
+      },
+      result: t(
+        'Prints 54000. Every accepted sample produces a TTL between 48000 and 60000 milliseconds.',
+        '输出 54000。每个有效随机结果都使 TTL 位于 48000 至 60000 毫秒之间。'
+      )
+    }
+  ],
+  detectServerRuntime: [
+    {
+      title: t('Select a native server adapter', '选择原生服务端适配器'),
+      problem: t(
+        'A native adapter needs the runtime that started the program. Deno and Bun can also expose Node compatibility globals.',
+        '原生适配器需要识别启动程序的运行时。Deno 与 Bun 也可能暴露 Node 兼容全局。'
+      ),
+      example: {
+        en: `import { detectServerRuntime } from '@migaia/utils'
+
+console.log(detectServerRuntime())`,
+        zh: `import { detectServerRuntime } from '@migaia/utils'
+
+console.log(detectServerRuntime())`
+      },
+      result: t(
+        'Prints node on Node. Deno returns deno, Bun returns bun, and browsers return undefined.',
+        'Node 输出 node。Deno 返回 deno，Bun 返回 bun，浏览器返回 undefined。'
+      )
+    }
+  ],
   withTimeout: [
     {
       title: t('Time out a slow request and actually stop it', '给慢请求加超时，并让请求真的停下'),

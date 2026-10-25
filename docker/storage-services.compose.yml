@@ -1,0 +1,160 @@
+name: migai-storage
+
+# These credentials and loopback ports belong only to disposable local test services.
+x-storage-test-environment:
+  MIGAIA_REDIS_URL: redis://127.0.0.1:${MIGAIA_REDIS_PORT:-17379}
+  MIGAIA_VALKEY_URL: redis://127.0.0.1:${MIGAIA_VALKEY_PORT:-17380}
+  MIGAIA_REDIS_STACK_URL: redis://127.0.0.1:${MIGAIA_REDIS_STACK_PORT:-17381}
+  MIGAIA_PG_URL: postgresql://storage:storage-local@127.0.0.1:${MIGAIA_PG_PORT:-15432}/storage
+  MIGAIA_PG_REPLICATION_URL: postgresql://storage:storage-local@127.0.0.1:${MIGAIA_PG_REPLICATION_PORT:-15433}/storage
+  MIGAIA_PG_PUBLICATION: migai_storage_publication
+  MIGAIA_QDRANT_URL: http://127.0.0.1:${MIGAIA_QDRANT_PORT:-16333}
+  MIGAIA_SPARQL_QUERY_URL: http://127.0.0.1:${MIGAIA_FUSEKI_PORT:-13030}/storage/sparql
+  MIGAIA_SPARQL_UPDATE_URL: http://127.0.0.1:${MIGAIA_FUSEKI_PORT:-13030}/storage/update
+  MIGAIA_SPARQL_GRAPH_STORE_URL: http://127.0.0.1:${MIGAIA_FUSEKI_PORT:-13030}/storage/data
+  MIGAIA_S3_ENDPOINT: http://127.0.0.1:${MIGAIA_S3_PORT:-19000}
+  MIGAIA_S3_REGION: us-east-1
+  MIGAIA_S3_BUCKET: migai-storage-tests
+  MIGAIA_S3_ACCESS_KEY_ID: storage
+  MIGAIA_S3_SECRET_ACCESS_KEY: storage-local
+
+services:
+  redis:
+    image: redis:8.10.2-alpine
+    command: [redis-server, --appendonly, 'yes', --notify-keyspace-events, KEA]
+    ports: ['127.0.0.1:${MIGAIA_REDIS_PORT:-17379}:6379']
+    volumes: [redis-data:/data]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    command: [valkey-server, --appendonly, 'yes', --notify-keyspace-events, KEA]
+    ports: ['127.0.0.1:${MIGAIA_VALKEY_PORT:-17380}:6379']
+    volumes: [valkey-data:/data]
+    healthcheck:
+      test: [CMD, valkey-cli, ping]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  postgres:
+    image: pgvector/pgvector:0.8.7-pg16
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - max_replication_slots=16
+      - -c
+      - max_wal_senders=16
+    environment:
+      POSTGRES_DB: storage
+      POSTGRES_USER: storage
+      POSTGRES_PASSWORD: storage-local
+    ports: ['127.0.0.1:${MIGAIA_PG_PORT:-15432}:5432']
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    configs:
+      - source: postgres-init
+        target: /docker-entrypoint-initdb.d/storage.sql
+    healthcheck:
+      test: [CMD, pg_isready, -U, storage, -d, storage]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  # Logical-decoding tests need their own cluster: slot snapshots can wait on cluster transactions.
+  postgres-replication:
+    image: pgvector/pgvector:0.8.7-pg16
+    command:
+      - postgres
+      - -c
+      - wal_level=logical
+      - -c
+      - max_replication_slots=16
+      - -c
+      - max_wal_senders=16
+    environment:
+      POSTGRES_DB: storage
+      POSTGRES_USER: storage
+      POSTGRES_PASSWORD: storage-local
+    ports: ['127.0.0.1:${MIGAIA_PG_REPLICATION_PORT:-15433}:5432']
+    volumes: [postgres-replication-data:/var/lib/postgresql/data]
+    configs:
+      - source: postgres-init
+        target: /docker-entrypoint-initdb.d/storage.sql
+    healthcheck:
+      test: [CMD, pg_isready, -U, storage, -d, storage]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  qdrant:
+    image: qdrant/qdrant:v1.15.5
+    ports: ['127.0.0.1:${MIGAIA_QDRANT_PORT:-16333}:6333']
+    volumes: [qdrant-data:/qdrant/storage]
+
+  fuseki:
+    image: migai-storage-fuseki:6.2.0
+    build:
+      context: ./storage-services
+      dockerfile: fuseki.Dockerfile
+    ports: ['127.0.0.1:${MIGAIA_FUSEKI_PORT:-13030}:3030']
+    volumes: [fuseki-data:/fuseki/databases]
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, 'http://127.0.0.1:3030/storage/sparql?query=ASK%7B%7D']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  redis-stack:
+    image: redis/redis-stack-server:7.4.0-v8
+    environment:
+      REDIS_ARGS: --appendonly yes --notify-keyspace-events KEA
+    ports: ['127.0.0.1:${MIGAIA_REDIS_STACK_PORT:-17381}:6379']
+    volumes: [redis-stack-data:/data]
+    healthcheck:
+      test: [CMD, redis-cli, ping]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  seaweedfs:
+    # Official single-container S3 server; mini provisions its fixture identity and bucket.
+    image: chrislusf/seaweedfs:4.48
+    command: [mini, -dir=/data, -ip=127.0.0.1, -ip.bind=0.0.0.0, -s3.port=8333]
+    environment:
+      AWS_ACCESS_KEY_ID: storage
+      AWS_SECRET_ACCESS_KEY: storage-local
+      S3_BUCKET: migai-storage-tests
+      # Encoded storage keys exceed the filer default of 255 bytes; S3 permits 1024.
+      WEED_FILER_OPTIONS_MAX_FILE_NAME_LENGTH: 1024
+    ports: ['127.0.0.1:${MIGAIA_S3_PORT:-19000}:8333']
+    volumes: [seaweedfs-data:/data]
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, 'http://127.0.0.1:8888/buckets/migai-storage-tests/']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+configs:
+  postgres-init:
+    content: |
+      CREATE EXTENSION IF NOT EXISTS vector;
+      ALTER ROLE storage WITH REPLICATION;
+      -- This disposable fixture keeps only storage tables in public. Production deployments
+      -- should use their own storage schema or publish the required storage tables explicitly.
+      CREATE PUBLICATION migai_storage_publication FOR TABLES IN SCHEMA public;
+
+volumes:
+  redis-data:
+  valkey-data:
+  postgres-data:
+  postgres-replication-data:
+  qdrant-data:
+  fuseki-data:
+  redis-stack-data:
+  seaweedfs-data:

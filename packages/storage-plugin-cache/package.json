@@ -1,0 +1,54 @@
+{
+  "name": "@migaia/storage-plugin-cache",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Multi-tier cache orchestration over borrowed storage backends",
+  "files": [
+    "dist",
+    "README.md",
+    "README.en.md",
+    "USEGUIDE.md",
+    "USEGUIDE.en.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./features/semantic": {
+      "types": "./dist/features/semantic.d.ts",
+      "default": "./dist/features/semantic.js"
+    }
+  },
+  "scripts": {
+    "fmt": "oxfmt src test README.md README.en.md USEGUIDE.md USEGUIDE.en.md package.json",
+    "lint": "oxlint src test",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
+    "build": "node ../../scripts/dist-stamp.mjs clean && vite build && tsc -p tsconfig.json --emitDeclarationOnly && node ../../scripts/dist-stamp.mjs write",
+    "test": "pnpm run build && vitest run"
+  },
+  "dependencies": {
+    "@migaia/serialize": "workspace:^",
+    "@migaia/storage-contract": "workspace:^",
+    "@migaia/utils": "workspace:^"
+  },
+  "devDependencies": {
+    "@migaia/logger": "workspace:^",
+    "@migaia/storage-plugin-postgres": "workspace:^",
+    "@migaia/storage-plugin-qdrant": "workspace:^",
+    "@migaia/storage-plugin-redis": "workspace:^",
+    "@migaia/storage-plugin-sqlite": "workspace:^",
+    "@types/pg": "8.23.1",
+    "pg": "8.23.1",
+    "redis": "6.3.0"
+  },
+  "peerDependencies": {
+    "@migaia/storage-host": "workspace:^"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}

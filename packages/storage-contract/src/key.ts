@@ -1,7 +1,8 @@
 import { StorageContractError, StorageContractErrorCode } from './errors.js'
 import { isArrayBuffer } from '@migaia/utils/bytes'
-import type { IBackendKind } from './capabilities.js'
-import type { IKeyRange, IStorageKey } from './context.js'
+import { type IBackendKind } from './capabilities.js'
+import { type IStorageKey } from './context.js'
+import { StorageContractErrorText } from './error-text.js'
 
 /** Hard limits protect flat-key decoding from pathological persisted input. */
 export const KEY_DOMAIN_LIMITS = Object.freeze({
@@ -20,38 +21,71 @@ export const KEY_DOMAIN_LIMITS = Object.freeze({
  */
 export function assertStringStorageKey(
   value: unknown,
-  backend: IBackendKind,
+  backend: IBackendKind | undefined,
   label = 'key'
 ): asserts value is string {
   if (typeof value !== 'string')
     throw new StorageContractError(StorageContractErrorCode.invalidArgument, {
       backend,
-      cause: new TypeError(`${label} must be a string`)
+      cause: new TypeError(StorageContractErrorText.stringStorageKey(label))
     })
 }
 
-const dateValue = (value: unknown): number | undefined => {
+/** Reads the Date internal slot across supported realms without cloning caller data. */
+function dateValue(value: unknown): number | undefined {
   try {
-    const structuredClone = (globalThis as { structuredClone?: (input: unknown) => unknown })
-      .structuredClone
-    const cloned = typeof structuredClone === 'function' ? structuredClone(value) : value
-    return cloned instanceof Date ? cloned.getTime() : undefined
+    return Reflect.apply(Date.prototype.getTime, value, []) as number
   } catch {
     return undefined
   }
 }
 
-const bufferValue = (value: unknown): ArrayBuffer | undefined => {
+/** Borrows an available native buffer view; detached buffers fail without allocating a copy. */
+function bufferValue(value: unknown): Uint8Array | undefined {
   if (!isArrayBuffer(value)) return undefined
   try {
-    const structuredClone = (globalThis as { structuredClone?: (input: unknown) => unknown })
-      .structuredClone
-    const cloned = typeof structuredClone === 'function' ? structuredClone(value) : value
-    if (isArrayBuffer(cloned)) return new Uint8Array(cloned).slice().buffer
-    return undefined
+    return new Uint8Array(value)
   } catch {
     return undefined
   }
+}
+
+/** One recursive admission retains only a bounded node count and active container ancestors. */
+type IStorageKeyValidationContext = {
+  nodes: number
+  readonly active: Set<readonly unknown[]>
+}
+
+/** Checks each supported key component without copying it or reading unrelated object fields. */
+function validStorageKey(
+  candidate: unknown,
+  depth: number,
+  context: IStorageKeyValidationContext
+): boolean {
+  context.nodes++
+  if (context.nodes > KEY_DOMAIN_LIMITS.maxNodes || depth > KEY_DOMAIN_LIMITS.maxDepth) return false
+  if (typeof candidate === 'string') return true
+  if (typeof candidate === 'number') return Number.isFinite(candidate)
+  if (Array.isArray(candidate)) {
+    if (candidate.length === 0 || context.active.has(candidate)) return false
+    context.active.add(candidate)
+    for (let index = 0; index < candidate.length; index++)
+      if (
+        !Object.hasOwn(candidate, index) ||
+        !validStorageKey(candidate[index], depth + 1, context)
+      ) {
+        context.active.delete(candidate)
+        return false
+      }
+    context.active.delete(candidate)
+    return true
+  }
+  /** Date and binary classification use actual built-in slots, preserving cross-realm inputs. */
+  const date = dateValue(candidate)
+  if (date !== undefined) return !Number.isNaN(date)
+  /** A borrowed byte view supplies the native byte length without cloning caller storage. */
+  const bytes = bufferValue(candidate)
+  return bytes !== undefined && bytes.byteLength <= KEY_DOMAIN_LIMITS.maxBinaryBytes
 }
 
 /**
@@ -59,137 +93,22 @@ const bufferValue = (value: unknown): ArrayBuffer | undefined => {
  * finite numbers, valid Dates, available ArrayBuffers, and nonempty, dense, acyclic arrays of keys.
  * KEY_DOMAIN_LIMITS bounds recursive depth, visited nodes, and each binary component's size.
  *
- * Date/ArrayBuffer inspection uses structuredClone when available for cross-realm support, rather
- * than trusting constructor names. Invalid keys produce INVALID_KEY with backend/key details. label
- * defaults to key and affects only the message. No key is copied or frozen by this assertion.
+ * Date/ArrayBuffer inspection uses native internal slots for cross-realm support without copying
+ * input data or trusting constructor names. Invalid keys produce INVALID_KEY with backend/key
+ * details. label defaults to key and affects only the message. No key is copied or frozen by this
+ * assertion.
  */
 export function assertStorageKey(
   value: unknown,
-  backend: IBackendKind,
+  backend: IBackendKind | undefined,
   label = 'key'
 ): asserts value is IStorageKey {
-  let nodes = 0
-  const visit = (candidate: unknown, depth: number, seen: Set<unknown>): boolean => {
-    nodes += 1
-    if (nodes > KEY_DOMAIN_LIMITS.maxNodes || depth > KEY_DOMAIN_LIMITS.maxDepth) return false
-    if (typeof candidate === 'string') return true
-    if (typeof candidate === 'number') return Number.isFinite(candidate)
-    if (Array.isArray(candidate)) {
-      try {
-        const length = candidate.length
-        if (length === 0) return false
-        if (seen.has(candidate)) return false
-        seen.add(candidate)
-        for (let index = 0; index < length; index += 1) {
-          if (!Object.hasOwn(candidate, index) || !visit(candidate[index], depth + 1, seen)) {
-            seen.delete(candidate)
-            return false
-          }
-        }
-        seen.delete(candidate)
-        return true
-      } catch {
-        seen.delete(candidate)
-        return false
-      }
-    }
-    const date = dateValue(candidate)
-    if (date !== undefined) return !Number.isNaN(date)
-    const buffer = bufferValue(candidate)
-    if (buffer !== undefined) return buffer.byteLength <= KEY_DOMAIN_LIMITS.maxBinaryBytes
-    return false
-  }
-  if (!visit(value, 0, new Set()))
+  /** State belongs to this single pure validation call, never to a backend or later operation. */
+  const context: IStorageKeyValidationContext = { nodes: 0, active: new Set() }
+  if (!validStorageKey(value, 0, context))
     throw new StorageContractError(StorageContractErrorCode.invalidKey, {
       backend,
       key: value as IStorageKey,
-      cause: new TypeError(`invalid ${label}`)
+      cause: new TypeError(StorageContractErrorText.invalidStorageKey(label))
     })
 }
-
-/**
- * Validates and copies a structured key before asynchronous work can observe later input changes.
- * Strings/numbers retain their value; Dates, ArrayBuffers, and nested arrays are copied
- * recursively, then the copy is validated again. The returned copy is independently owned but not
- * frozen. Invalid keys or copy failures produce INVALID_KEY; existing contract failures pass
- * through. backend identifies the provider for diagnostics, and label defaults to key.
- */
-export const snapshotStorageKey = (
-  value: unknown,
-  backend: IBackendKind,
-  label = 'key'
-): IStorageKey => {
-  assertStorageKey(value, backend, label)
-  const clone = (candidate: IStorageKey): IStorageKey => {
-    if (typeof candidate === 'string' || typeof candidate === 'number') return candidate
-    if (Array.isArray(candidate)) {
-      const snapshot: IStorageKey[] = []
-      for (let index = 0; index < candidate.length; index += 1)
-        snapshot.push(clone(candidate[index]!))
-      return snapshot
-    }
-    const date = dateValue(candidate)
-    if (date !== undefined) return new Date(date)
-    const buffer = bufferValue(candidate)
-    if (buffer !== undefined) return buffer
-    return candidate
-  }
-  try {
-    const snapshot = clone(value)
-    assertStorageKey(snapshot, backend, label)
-    return snapshot
-  } catch (cause) {
-    if (cause instanceof StorageContractError) throw cause
-    throw new StorageContractError(StorageContractErrorCode.invalidKey, {
-      backend,
-      key: value,
-      cause
-    })
-  }
-}
-
-/**
- * Compares already-valid storage keys for sorting or range work without touching a provider.
- * Returns a negative, zero, or positive number; it is not restricted to -1/0/1. Cross-type order is
- * number, Date, string, ArrayBuffer, then array. Binary values compare bytewise and arrays compare
- * componentwise, with a shorter equal prefix first. Use assertStorageKey before unknown inputs.
- */
-export const compareStorageKeys = (a: IStorageKey, b: IStorageKey): number => {
-  const rank = (value: IStorageKey): number => {
-    if (typeof value === 'number') return 0
-    if (Array.isArray(value)) return 4
-    if (dateValue(value) !== undefined) return 1
-    if (typeof value === 'string') return 2
-    if (bufferValue(value) !== undefined) return 3
-    return 4
-  }
-  const rankA = rank(a)
-  const rankB = rank(b)
-  if (rankA !== rankB) return rankA - rankB
-  if (typeof a === 'number' && typeof b === 'number') return a - b
-  const dateA = dateValue(a)
-  const dateB = dateValue(b)
-  if (dateA !== undefined && dateB !== undefined) return dateA - dateB
-  if (typeof a === 'string' && typeof b === 'string') return a < b ? -1 : a > b ? 1 : 0
-  const bytesA = bufferValue(a)
-  const bytesB = bufferValue(b)
-  if (bytesA !== undefined && bytesB !== undefined) {
-    const viewA = new Uint8Array(bytesA)
-    const viewB = new Uint8Array(bytesB)
-    const length = Math.min(viewA.length, viewB.length)
-    for (let index = 0; index < length; index += 1) {
-      if (viewA[index] !== viewB[index]) return viewA[index]! - viewB[index]!
-    }
-    return viewA.length - viewB.length
-  }
-  const arrayA = a as readonly IStorageKey[]
-  const arrayB = b as readonly IStorageKey[]
-  const length = Math.min(arrayA.length, arrayB.length)
-  for (let index = 0; index < length; index += 1) {
-    const comparison = compareStorageKeys(arrayA[index]!, arrayB[index]!)
-    if (comparison !== 0) return comparison
-  }
-  return arrayA.length - arrayB.length
-}
-
-export type { IKeyRange, IStorageKey }

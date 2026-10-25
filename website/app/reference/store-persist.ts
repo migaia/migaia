@@ -2,7 +2,7 @@
  * Verified against packages/store-persist/src plus README/USEGUIDE on 2026-10-18. All facades
  * retain the complete engine handle and live disposal getter; keyed value alone is an initial
  * snapshot. Initial readiness rejects on cancellation, strict flush observes the actual write
- * drain, and the default codec reads exact legacy markers while writing the canonical collections
+ * drain, and the default codec delegates strict collection values to their canonical owner
  * representation.
  */
 import type {
@@ -40,20 +40,8 @@ const ctx = t(
   '必填上下文对象；`signal` 默认 `undefined`，提供时转交编解码器与存储操作。'
 )
 /** Core example injects an ordinary Store through the minimal unit contract. */
-const coreExample = `import { createStore } from '@migaia/store-light'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
-import { persistUnit } from '@migaia/store-persist'
-const store = createStore({ count: 0 })
-const handle = persistUnit({
-  snapshot: () => store.$plain(),
-  restore: state => store.$hydrate(state),
-  subscribe: onChange => store.$subscribe(onChange, { fireImmediately: false })
-}, { key: 'counter', runtime: store.$runtime, storage: memoryStorageHost() })
-await handle.ready
-store.count = 1
-await handle.flush()
-handle.dispose()
-await store.$dispose()`
+const coreExample =
+  "import { createStore } from '@migaia/store-light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { persistUnit } from '@migaia/store-persist'\nconst store = createStore({ count: 0 })\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst handle = persistUnit({\n  snapshot: () => store.$plain(),\n  restore: state => store.$hydrate(state),\n  subscribe: onChange => store.$subscribe(onChange, { fireImmediately: false })\n}, { key: 'counter', runtime: store.$runtime, storage })\nawait handle.ready\nstore.count = 1\nawait handle.flush()\nhandle.dispose()\nawait store.$dispose()"
 /** Light adapter example owns both the subscription and original Store. */
 const lightExample = storePersistCases.persist![0]!.example
 /** Collection example releases persistence before its source collection. */
@@ -93,23 +81,13 @@ onEditorClosed(() => handle.disposeAsync())`,
         'The application now uses version two, but old archives may still use version one. A synchronous migration upgrades their shape; partialize keeps transient editor fields out of later writes.',
         '应用现在使用第二版结构，旧存档却可能仍是第一版。同步迁移升级它们的形状，partialize 则从后续保存中排除编辑器临时字段。'
       ),
-      example: `import { persistUnit } from '@migaia/store-persist'
-
-const handle = persistUnit(draftUnit, {
-  ...draftArchiveOptions,
-  version: 2,
-  migrate: (saved, fromVersion) => upgradeDraft(saved, fromVersion),
-  partialize: (state) => ({ text: state.text }),
-  merge: (saved, current) => ({ ...current, ...saved })
-})
-await handle.ready
-renderDraft(draftUnit.snapshot())
-onEditorClosed(() => handle.disposeAsync())`,
+      example:
+        "import { persistUnit } from '@migaia/store-persist'\n\nconst handle = persistUnit(draftUnit, {\n  ...draftArchiveOptions,\n  version: 2,\n  migrations: { 2: (saved, { fromVersion }) => upgradeDraft(saved, fromVersion) },\n  partialize: (state) => ({ text: state.text }),\n  merge: (saved, current) => ({ ...current, ...saved })\n})\nawait handle.ready\nrenderDraft(draftUnit.snapshot())\nonEditorClosed(() => handle.disposeAsync())",
       result: t(
         'Old saved content can appear in the current editor; subsequent archives use version two and the selected fields.',
         '旧内容可在当前编辑器中显示，后续存档使用第二版结构与选定字段。'
       ),
-      covers: ['version', 'partialize', 'migrate', 'merge']
+      covers: ['version', 'partialize', 'migrations', 'merge']
     },
     {
       title: t('Save during continuous editing', '持续编辑期间也保存'),
@@ -164,22 +142,13 @@ onEditorClosed(() => handle.disposeAsync())`,
         'The application now uses version two, but old archives may still use version one. A synchronous migration upgrades their shape; partialize keeps transient editor fields out of later writes.',
         '应用现在使用第二版结构，旧存档却可能仍是第一版。同步迁移升级它们的形状，partialize 则从后续保存中排除编辑器临时字段。'
       ),
-      example: `import { persist } from '@migaia/store-persist/light'
-
-const handle = persist(draftStore, {
-  ...draftArchiveOptions,
-  version: 2,
-  migrate: (saved, fromVersion) => upgradeDraft(saved, fromVersion),
-  partialize: (state) => ({ text: state.text })
-})
-await handle.ready
-renderDraft(draftStore.$plain())
-onEditorClosed(() => handle.disposeAsync())`,
+      example:
+        "import { persist } from '@migaia/store-persist/light'\n\nconst handle = persist(draftStore, {\n  ...draftArchiveOptions,\n  version: 2,\n  migrations: { 2: (saved, { fromVersion }) => upgradeDraft(saved, fromVersion) },\n  partialize: (state) => ({ text: state.text })\n})\nawait handle.ready\nrenderDraft(draftStore.$plain())\nonEditorClosed(() => handle.disposeAsync())",
       result: t(
         'Old saved content can appear in the current editor; subsequent archives use version two and the selected fields.',
         '旧内容可在当前编辑器中显示，后续存档使用第二版结构与选定字段。'
       ),
-      covers: ['version', 'partialize', 'migrate']
+      covers: ['version', 'partialize', 'migrations']
     },
     {
       title: t('Save during continuous editing', '持续编辑期间也保存'),
@@ -234,23 +203,13 @@ onEditorClosed(() => handle.disposeAsync())`,
         'The application now uses version two, but old archives may still use version one. A synchronous migration upgrades their shape; partialize keeps transient editor fields out of later writes.',
         '应用现在使用第二版结构，旧存档却可能仍是第一版。同步迁移升级它们的形状，partialize 则从后续保存中排除编辑器临时字段。'
       ),
-      example: `import { persistCollection } from '@migaia/store-persist/indexed'
-
-const handle = persistCollection(cartRows, {
-  ...cartArchiveOptions,
-  version: 2,
-  migrate: (saved, fromVersion) => upgradeCartRows(saved, fromVersion),
-  partialize: (rows) => selectSavedCartRows(rows),
-  merge: (saved, current) => mergeCartRows(saved, current)
-})
-await handle.ready
-renderCart(cartRows.snapshot())
-onEditorClosed(() => handle.disposeAsync())`,
+      example:
+        "import { persistCollection } from '@migaia/store-persist/indexed'\n\nconst handle = persistCollection(cartRows, {\n  ...cartArchiveOptions,\n  version: 2,\n  migrations: { 2: (saved, { fromVersion }) => upgradeCartRows(saved, fromVersion) },\n  partialize: (rows) => selectSavedCartRows(rows),\n  merge: (saved, current) => mergeCartRows(saved, current)\n})\nawait handle.ready\nrenderCart(cartRows.snapshot())\nonEditorClosed(() => handle.disposeAsync())",
       result: t(
         'Old saved content can appear in the current editor; subsequent archives use version two and the selected fields.',
         '旧内容可在当前编辑器中显示，后续存档使用第二版结构与选定字段。'
       ),
-      covers: ['version', 'partialize', 'migrate', 'merge']
+      covers: ['version', 'partialize', 'migrations', 'merge']
     },
     {
       title: t('Save during continuous editing', '持续编辑期间也保存'),
@@ -363,9 +322,33 @@ const unitOptions: Readonly<Record<string, IMemberDoc>> = {
       '来自存储契约的编解码器，处理完整版本与状态信封；支持文本与二进制路径，结构化写入会拒绝。'
     ),
     default: t(
-      'defaultJsonCodec with Map/Set round trips and legacy-tag reading.',
-      '默认使用支持映射、集合往返及旧标签读取的本包编解码器。'
+      'defaultJsonCodec with strict portable values and Map/Set round trips.',
+      '默认使用支持严格 portable 值域与 Map/Set 往返的本包 codec。'
     )
+  },
+  codecStages: {
+    default: t(
+      'Omitted: no explicit codec-stage observer is installed.',
+      '省略时不安装显式编解码阶段观察者。'
+    ),
+    summary: t(
+      'Optional store-bound observer from host.codecStages(storage). Each actual conversion emits once; observer failures only report and never delay conversion.',
+      '可选的 host.codecStages(storage) 接点，绑定真实 store。每次实际转换只观察一次；失败只报告，不等待或改变编解码。'
+    ),
+    example:
+      "const handle = persist(state, { key: 'state', storage, codecStages: host.codecStages(storage) })"
+  },
+  transactionStages: {
+    default: t(
+      'Omitted: no explicit transactional flush observer is installed.',
+      '省略时不安装显式事务刷新观察者。'
+    ),
+    summary: t(
+      'Optional host.transactionStages(storage) observer. Emits before/afterPersistFlush using the actual operation view; after means request completion, and observer failures only report.',
+      '可选的 host.transactionStages(storage) 观察接点，绑定实际操作视图。只发出 before/afterPersistFlush；after 表示请求完成，观察失败只报告。'
+    ),
+    example:
+      "const handle = persist(state, {\n  key: 'state', storage,\n  transactionStages: host.transactionStages(storage)\n})"
   },
   version: {
     summary: t(
@@ -373,37 +356,23 @@ const unitOptions: Readonly<Record<string, IMemberDoc>> = {
       '应用数据结构版本，必须是安全非负整数，并与每个保存信封的版本比较。'
     ),
     default: t(
-      '0; an unequal saved version requires migrate.',
+      '0; older archives require reachable steps, and future archives are rejected.',
       '默认零；保存版本不同时需要迁移函数。'
     )
   },
-  migrate: {
+  migrations: {
     whenToUse: t(
-      'Set it when stored schema versions differ. The callback receives the saved state and its version and must return the current shape synchronously. Without it a mismatch fails; returning a Promise also fails hydration.',
-      '存档版本与当前结构不同时设置。回调接收保存状态及其版本，必须同步返回当前形状。省略时版本不匹配会失败，返回 Promise 也会使恢复失败。'
+      'Upgrade reachable older archives with contiguous synchronous steps, or reset them once. Future archives are always rejected.',
+      '用连续同步步骤升级可达旧档，或一次重置；未来版本始终被拒绝。'
     ),
     example: persistOptionCases.IPersistUnitOptions![1]!.example,
     summary: t(
-      'Synchronous callback on version mismatch; receives decoded persisted state and the archive version. Throw or thenable result fails hydration.',
-      '版本不一致时同步调用，接收解码后的保存状态与存档版本；抛错或返回可等待对象会使水合失败。'
-    ),
-    params: {
-      persisted: t(
-        'Decoded archive state before merging into current memory.',
-        '合入当前内存前的已解码存档状态。'
-      ),
-      fromVersion: t(
-        'Schema version read from the stored envelope.',
-        '从已保存信封读取的数据结构版本。'
-      )
-    },
-    returns: t(
-      'Synchronous state compatible with the configured version.',
-      '返回与配置版本兼容的同步状态。'
+      'A target-version step record or { reset: () => state }. Step context contains fromVersion/toVersion; known thenables are rejected.',
+      '目标版本步骤表或 { reset: () => state }；步骤上下文含 fromVersion/toVersion，拒绝已知 thenable。'
     ),
     default: t(
-      'Omitted: version mismatch fails hydration with ENVELOPE_INVALID.',
-      '省略时版本不一致会以信封无效错误使水合失败。'
+      'Omitted: only the configured version is readable; other versions fail with storage-contract VERSION_UNSUPPORTED.',
+      '省略时只读取当前配置版本，其他版本报 storage-contract VERSION_UNSUPPORTED。'
     )
   },
   partialize: {
@@ -488,8 +457,8 @@ const unitOptions: Readonly<Record<string, IMemberDoc>> = {
 /** Collection wrappers infer runtime from the owned source. */
 const collectionOptions: Readonly<Record<string, IMemberDoc>> = {
   ...Object.fromEntries(Object.entries(unitOptions).filter(([name]) => name !== 'runtime')),
-  migrate: {
-    ...unitOptions.migrate!,
+  migrations: {
+    ...unitOptions.migrations!,
     example: persistOptionCases.IPersistCollectionOptions![1]!.example
   },
   partialize: {
@@ -504,7 +473,10 @@ const collectionOptions: Readonly<Record<string, IMemberDoc>> = {
 /** Light wrappers expose neither a runtime override nor a custom merge. */
 const lightOptions: Readonly<Record<string, IMemberDoc>> = {
   ...Object.fromEntries(Object.entries(collectionOptions).filter(([name]) => name !== 'merge')),
-  migrate: { ...unitOptions.migrate!, example: persistOptionCases.IPersistOptions![1]!.example },
+  migrations: {
+    ...unitOptions.migrations!,
+    example: persistOptionCases.IPersistOptions![1]!.example
+  },
   partialize: {
     ...unitOptions.partialize!,
     example: persistOptionCases.IPersistOptions![1]!.example
@@ -513,7 +485,7 @@ const lightOptions: Readonly<Record<string, IMemberDoc>> = {
 /** Keyed options use namespace instead of an archive key and expose no migration callback. */
 const keyedOptions: Readonly<Record<string, IMemberDoc>> = {
   ...Object.fromEntries(
-    Object.entries(collectionOptions).filter(([name]) => name !== 'key' && name !== 'migrate')
+    Object.entries(collectionOptions).filter(([name]) => name !== 'key' && name !== 'migrations')
   ),
   merge: { ...unitOptions.merge!, example: persistOptionCases.IPersistKeyedOptions![1]!.example },
   namespace: {
@@ -606,12 +578,17 @@ const handleMembers: Readonly<Record<string, IMemberDoc>> = {
     'try { await handle.ready } catch { await handle.retryHydrate() }'
   ),
   flush: method(
-    'Cancels the debounce window, waits for initial hydration and the actual pending write drain, then requests a strict immediate serialized write. Concurrent callers observe the same original drain failure; the scheduling recovery chain never replaces its result.',
-    '取消防抖窗口，等待初次水合及实际待完成写入，再请求严格的立即串行写入。并发调用者均观察同一写入的原始失败，调度恢复链不会替代实际结果。',
-    {},
+    'Without tx, drains and writes the current snapshot. With an enlisted authentic tx, captures and starts encoding at invocation, then writes through that operation view in call order. Only outer persistTransaction success means commit.',
+    '不传 tx 时排空并保存当前快照；传入已登记的真实 tx 时，在调用瞬间读取并启动编码，经此次操作视图按次序写入。只有外层 persistTransaction 成功才表示提交。',
+    {
+      tx: t(
+        "Optional active view from this handle's persistTransaction.",
+        '可选的、本句柄所属 persistTransaction 的活动视图。'
+      )
+    },
     t(
-      'Promise resolving after the write; hydration/write failures reject, and disposal during the wait produces AbortError.',
-      '写入完成后 Promise 兑现；恢复或写入失败会拒绝，等待期间释放产生 `AbortError`。'
+      'Promise of this encoding and request. Direct flush rejects during participation; memory does not roll back with storage.',
+      '此次编码与请求的 Promise；参与期间直接 flush 拒绝，内存不随存储回滚。'
     ),
     'await handle.ready\nawait handle.flush()'
   ),
@@ -634,6 +611,16 @@ const handleMembers: Readonly<Record<string, IMemberDoc>> = {
       '写入链结算后兑现的 Promise。同步清理失败会在此后拒绝，最终写入失败保留在 writeError 中。'
     ),
     'await handle.disposeAsync()\nconsole.log(handle.disposed)'
+  ),
+  '[Symbol.asyncDispose]': method(
+    'Shares one cleanup with disposeAsync while caching a distinct Promise that reports cleanup failure and resolves.',
+    '与 disposeAsync 共享一次清理，缓存独立 Promise；清理失败报告后成功结束。',
+    {},
+    t(
+      'The same reporting Promise on repeated symbol calls.',
+      '重复符号调用返回同一个报告 Promise。'
+    ),
+    'await handle[Symbol.asyncDispose]()'
   ),
   dispose: method(
     'Idempotently stops persistence subscriptions, cancels the debounce timer and aborts active adapter operations. A pending debounce window starts one unawaited final snapshot write. It does not clear business values or dispose the source state.',
@@ -662,20 +649,20 @@ const handleType = {
   members: handleMembers
 }
 /** Decoder failures and rejected records retain application context. */
-const persistErrorOptionCases = (name: string, envelope = false): readonly IOptionCaseDoc[] => [
+const persistErrorOptionCases = (name: string): readonly IOptionCaseDoc[] => [
   {
     title: t('Explain why a saved draft cannot be decoded', '说明保存草稿为何无法解码'),
     problem: t(
       'The editor needs a short restore message, while support needs the decoder failure. Preserve that failure on cause instead of replacing it with a new message.',
       '编辑器需要简短的恢复提示，支持人员仍需要解码器的失败。用 cause 保留它，不要只用新消息替换。'
     ),
-    example: `import { ${name}${envelope ? '' : ', StorePersistErrorCode'} } from '@migaia/store-persist'
+    example: `import { ${name}, StorePersistErrorCode } from '@migaia/store-persist'
 
 try {
   await decodeSavedDraft(upload)
 } catch (cause) {
-  const error = ${envelope ? 'new ' : ''}${name}(
-    ${envelope ? '' : 'StorePersistErrorCode.envelopeInvalid,\n    '}'Saved draft could not be decoded',
+  const error = ${name}(
+    StorePersistErrorCode.envelopeInvalid, 'Saved draft could not be decoded',
     { cause }
   )
   showDraftError(error.message)
@@ -693,12 +680,12 @@ try {
       'An archive validator returns a record identifying a rejected field. Keeping it as cause lets support inspect the key and submitted version while the page shows a short message.',
       '存档校验器用记录指出被拒绝字段。把记录放入 cause，页面可显示简短提示，支持人员仍能查看键与提交版本。'
     ),
-    example: `import { ${name}${envelope ? '' : ', StorePersistErrorCode'} } from '@migaia/store-persist'
+    example: `import { ${name}, StorePersistErrorCode } from '@migaia/store-persist'
 
 const rejection = validateSavedDraft(upload)
 if (rejection) {
-  const error = ${envelope ? 'new ' : ''}${name}(
-    ${envelope ? '' : 'StorePersistErrorCode.envelopeInvalid,\n    '}'Saved draft rejected',
+  const error = ${name}(
+    StorePersistErrorCode.envelopeInvalid, 'Saved draft rejected',
     { cause: rejection }
   )
   showDraftError(error.message)
@@ -824,6 +811,37 @@ export const storePersistReference: ILibraryReference = {
     }
   },
   symbols: {
+    persistTransaction: {
+      role: 'operation',
+      purpose: t(
+        'Drains authentic handles attached to the same complete store, then borrows one original transaction. Snapshot, entity, text and byte writes commit together; memory remains caller-owned and ordinary mirroring resumes after settlement.',
+        '排空绑定同一完整 store 的真实句柄，再借用一个原始事务。快照、实体、文本和字节共同提交；内存由调用方持有，结算后恢复普通镜像写入。'
+      ),
+      params: {
+        store: t(
+          'Original complete record store supporting transactions.',
+          '支持事务的原始完整记录 store。'
+        ),
+        handles: t(
+          'Nonempty array of active handles attached to that exact store; duplicates enlist once.',
+          '绑定该 store 的活动句柄非空数组；重复项只参与一次。'
+        ),
+        run: t(
+          'Callback retaining the concrete backend scope and Awaited result.',
+          '保留具体后端 scope 与 Awaited 结果的回调。'
+        ),
+        ctx: t(
+          'Original backend options. concurrency overrides its default; fail rejects busy handles immediately, while wait alone enters FIFO. One deadline and wait budget continue into backend retries; extension and symbol values remain intact.',
+          '原后端选项。concurrency 覆盖缺省策略；fail 立即拒绝忙句柄，只有 wait 进入 FIFO。期限与等待预算延续到后端重试，扩展与 symbol 值保留身份。'
+        )
+      },
+      returns: t(
+        'Resolves only after native commit; failure preserves storage errors and does not undo memory. IndexedDB external data must be read before starting.',
+        '原生提交后才兑现；失败保留存储错误且不撤销内存。IndexedDB 的外部数据须先读取再开始事务。'
+      ),
+      example:
+        "await persistTransaction(storage, [handle], async (tx) => {\n  state.count = 1\n  await handle.flush(tx)\n  await tx.set('source', 'user', { conflictPolicy: 'replace' })\n})"
+    },
     persistUnit: adapter(
       'Connects a caller-provided synchronous state unit to asynchronous hydration and serialized writes. Automatic writes stay gated after hydration failure until successful retry.',
       '将调用方提供的同步状态单元连接到异步水合与串行写入；水合失败后自动写入保持关闭，直到重试成功。',
@@ -849,8 +867,8 @@ export const storePersistReference: ILibraryReference = {
       lightExample,
       {
         exampleIntro: {
-          en: "Run these examples with Node 24 and install @migaia/store-light and @migaia/storage-web directly alongside this package. createStore(shape, options?) receives the shown initial fields; omitted options use defaultRuntime, debugName 'Store', warnAsyncActions false and no mutationPolicy. Scalar fields use Object.is for equality.\n\nmemoryStorageHost() takes no arguments and creates an isolated in-memory backend; it does not survive process exit. The codec encodes the complete { version, state } envelope; version is a nonnegative safe integer and state must be present and non-null. Decode its string result before inspecting state. Persistence options and callback arguments are listed below; dispose persistence first, then release the Store and backend separately.",
-          zh: "在 Node 24 运行示例；除本包外，直接安装 `@migaia/store-light` 和 `@migaia/storage-web`。`createStore(shape, options?)` 接收代码中的初始字段；省略选项时使用 `defaultRuntime`、`debugName: 'Store'`、`warnAsyncActions: false`，不设置 `mutationPolicy`，标量字段按 `Object.is` 判断相等。\n\n`memoryStorageHost()` 无参数，每次创建独立的内存后端，进程退出后数据不保留。编解码器处理完整的 `{ version, state }` 存档：版本是安全非负整数，状态必须存在且不为 `null` 或 `undefined`；检查状态前先解码字符串。下表列出持久化选项与回调参数；先停止持久化，再分别释放 Store 和后端。"
+          en: "Run these examples with Node 24 and install @migaia/store-light and @migaia/storage-host directly alongside this package. createStore(shape, options?) receives the shown initial fields; omitted options use defaultRuntime, debugName 'Store', warnAsyncActions false and no mutationPolicy. Scalar fields use Object.is for equality.\n\nmemoryBackendPlugin() takes no arguments and creates an isolated in-memory backend; it does not survive process exit. The codec encodes the complete { version, state } envelope; version is a nonnegative safe integer and state must be present and non-null. Decode its string result before inspecting state. Persistence options and callback arguments are listed below; dispose persistence first, then release the Store and backend separately.",
+          zh: "在 Node 24 运行示例；除本包外，直接安装 `@migaia/store-light` 和 `@migaia/storage-host`。`createStore(shape, options?)` 接收代码中的初始字段；省略选项时使用 `defaultRuntime`、`debugName: 'Store'`、`warnAsyncActions: false`，不设置 `mutationPolicy`，标量字段按 `Object.is` 判断相等。\n\n`memoryBackendPlugin()` 无参数，每次创建独立的内存后端，进程退出后数据不保留。编解码器处理完整的 `{ version, state }` 存档：版本是安全非负整数，状态必须存在且不为 `null` 或 `undefined`；检查状态前先解码字符串。下表列出持久化选项与回调参数；先停止持久化，再分别释放 Store 和后端。"
         },
         cases: storePersistCases.persist
       }
@@ -868,8 +886,8 @@ export const storePersistReference: ILibraryReference = {
       indexedExample,
       {
         exampleIntro: {
-          en: "Install @migaia/store-indexed and @migaia/storage-web directly for this Node 24 example. new ObservableMap(entries = [], runtime = defaultRuntime, options = {}) accepts iterable key/value pairs. Omitted options leave mutationGuard undefined and use debugName 'ObservableMap'; the collection borrows its Runtime.\n\nmemoryStorageHost() takes no arguments and creates isolated memory storage. The first handle writes an envelope with version 0 and the Map snapshot; the second restores it into a collection initially containing stale. No custom codec or merge is supplied. Persistence owns only its subscription and status; release both collections and the backend separately.",
-          zh: "此 Node 24 示例需直接安装 `@migaia/store-indexed` 与 `@migaia/storage-web`。`new ObservableMap(entries = [], runtime = defaultRuntime, options = {})` 接收键值对可迭代对象；省略选项时 `mutationGuard` 为 `undefined`，`debugName` 为 `'ObservableMap'`，集合借用运行时。\n\n`memoryStorageHost()` 无参数，创建独立内存后端。首个句柄保存版本 `0` 和 `Map` 快照，第二个句柄将其恢复到原本含 `stale` 的集合；未提供自定义编解码器或合并函数。持久化只持有订阅与状态，两个集合和后端仍需分别释放。"
+          en: "Install @migaia/store-indexed and @migaia/storage-host directly for this Node 24 example. new ObservableMap(entries = [], runtime = defaultRuntime, options = {}) accepts iterable key/value pairs. Omitted options leave mutationGuard undefined and use debugName 'ObservableMap'; the collection borrows its Runtime.\n\nmemoryBackendPlugin() takes no arguments and creates isolated memory storage. The first handle writes an envelope with version 0 and the Map snapshot; the second restores it into a collection initially containing stale. No custom codec or merge is supplied. Persistence owns only its subscription and status; release both collections and the backend separately.",
+          zh: "此 Node 24 示例需直接安装 `@migaia/store-indexed` 与 `@migaia/storage-host`。`new ObservableMap(entries = [], runtime = defaultRuntime, options = {})` 接收键值对可迭代对象；省略选项时 `mutationGuard` 为 `undefined`，`debugName` 为 `'ObservableMap'`，集合借用运行时。\n\n`memoryBackendPlugin()` 无参数，创建独立内存后端。首个句柄保存版本 `0` 和 `Map` 快照，第二个句柄将其恢复到原本含 `stale` 的集合；未提供自定义编解码器或合并函数。持久化只持有订阅与状态，两个集合和后端仍需分别释放。"
         },
         cases: storePersistCases.persistCollection
       }
@@ -895,8 +913,8 @@ export const storePersistReference: ILibraryReference = {
       keyedExample,
       {
         exampleIntro: {
-          en: "Install @migaia/reactive, @migaia/store-keyed and @migaia/storage-web directly. createAtomStore(runtime) requires a real Runtime; createRuntime() uses the host adapter and its default microtask scheduler. familyDef(initial, options = {}) calls initial(key) for new definitions; options default to maxSize 4096 and debugLabel 'family'.\n\nThe shown initial callback creates a name record; the namespace and explicit id select namespace:id in storage, independently of the definition cache. memoryStorageHost() has no arguments and owns isolated memory storage. version and debounceMs default to 0; migrate is not an option on this adapter. value is an initial snapshot; use atoms.peek(def) for the current value. Dispose every persistence handle before AtomStore and storage.",
-          zh: "直接安装 `@migaia/reactive`、`@migaia/store-keyed` 和 `@migaia/storage-web`。`createAtomStore(runtime)` 必须接收真实运行时，`createRuntime()` 使用宿主适配器及其默认微任务调度；`familyDef(initial, options = {})` 为新定义调用 `initial(key)`，选项默认 `maxSize: 4096`、`debugLabel: 'family'`。\n\n本例初始回调返回含 `name` 的记录；命名空间与显式标识决定 `namespace:id` 存储键，不从定义缓存推导。`memoryStorageHost()` 无参数并持有独立内存数据；`version`、`debounceMs` 默认 `0`，此适配器不提供 `migrate` 选项。`value` 是初始快照，当前值用 `atoms.peek(def)` 读取；先逐个释放持久化句柄，再释放原子存储和后端。"
+          en: "Install @migaia/reactive, @migaia/store-keyed and @migaia/storage-host directly. createAtomStore(runtime) requires a real Runtime; createRuntime() uses the host adapter and its default microtask scheduler. familyDef(initial, options = {}) calls initial(key) for new definitions; options default to maxSize 4096 and debugLabel 'family'.\n\nThe shown initial callback creates a name record; the namespace and explicit id select namespace:id in storage, independently of the definition cache. memoryBackendPlugin() has no arguments and owns isolated memory storage. version and debounceMs default to 0; migrations is not an option on this adapter. value is an initial snapshot; use atoms.peek(def) for the current value. Dispose every persistence handle before AtomStore and storage.",
+          zh: "直接安装 `@migaia/reactive`、`@migaia/store-keyed` 和 `@migaia/storage-host`。`createAtomStore(runtime)` 必须接收真实运行时，`createRuntime()` 使用宿主适配器及其默认微任务调度；`familyDef(initial, options = {})` 为新定义调用 `initial(key)`，选项默认 `maxSize: 4096`、`debugLabel: 'family'`。\n\n本例初始回调返回含 `name` 的记录；命名空间与显式标识决定 `namespace:id` 存储键，不从定义缓存推导。`memoryBackendPlugin()` 无参数并持有独立内存数据；`version`、`debounceMs` 默认 `0`，此适配器不提供 `migrations` 选项。`value` 是初始快照，当前值用 `atoms.peek(def)` 读取；先逐个释放持久化句柄，再释放原子存储和后端。"
         },
         cases: storePersistCases.persistKeyed
       }
@@ -919,37 +937,18 @@ export const storePersistReference: ILibraryReference = {
         '全部移除成功后返回匹配记录数；后端失败会拒绝，先前已移除记录保持生效。'
       ),
       exampleIntro: {
-        en: "Install @migaia/reactive, @migaia/store-keyed and @migaia/storage-web directly. createAtomStore requires the Runtime created here; createRuntime() keeps the host's default microtask scheduling. familyDef(initial, options = {}) uses the shown initial value 0, default maxSize 4096 and debugLabel 'family'.\n\nThe example first writes through a real persistKeyed handle with required namespace 'users' and id 'u1'; version and debounceMs are both omitted and default to 0. memoryStorageHost() takes no arguments. clearFamily receives that same backend and the exact namespace, without a colon; it adds the colon when matching keys. It neither stops persistence nor disposes the borrowed AtomStore or backend.",
-        zh: "直接安装 `@migaia/reactive`、`@migaia/store-keyed` 和 `@migaia/storage-web`。`createAtomStore` 使用本例创建的运行时，`createRuntime()` 保留宿主默认的微任务调度；`familyDef(initial, options = {})` 的初始回调返回 `0`，选项默认 `maxSize: 4096`、`debugLabel: 'family'`。\n\n本例先用真实 `persistKeyed` 句柄写入，必填命名空间为 `'users'`，标识为 `'u1'`；未提供的 `version` 与 `debounceMs` 均默认 `0`。`memoryStorageHost()` 无参数；`clearFamily` 接收同一后端与不含尾部冒号的命名空间，匹配时自行追加冒号。它不停止持久化，也不释放借用的原子存储与后端。"
+        en: "Install @migaia/reactive, @migaia/store-keyed and @migaia/storage-host directly. createAtomStore requires the Runtime created here; createRuntime() keeps the host's default microtask scheduling. familyDef(initial, options = {}) uses the shown initial value 0, default maxSize 4096 and debugLabel 'family'.\n\nThe example first writes through a real persistKeyed handle with required namespace 'users' and id 'u1'; version and debounceMs are both omitted and default to 0. memoryBackendPlugin() takes no arguments. clearFamily receives that same backend and the exact namespace, without a colon; it adds the colon when matching keys. It neither stops persistence nor disposes the borrowed AtomStore or backend.",
+        zh: "直接安装 `@migaia/reactive`、`@migaia/store-keyed` 和 `@migaia/storage-host`。`createAtomStore` 使用本例创建的运行时，`createRuntime()` 保留宿主默认的微任务调度；`familyDef(initial, options = {})` 的初始回调返回 `0`，选项默认 `maxSize: 4096`、`debugLabel: 'family'`。\n\n本例先用真实 `persistKeyed` 句柄写入，必填命名空间为 `'users'`，标识为 `'u1'`；未提供的 `version` 与 `debounceMs` 均默认 `0`。`memoryBackendPlugin()` 无参数；`clearFamily` 接收同一后端与不含尾部冒号的命名空间，匹配时自行追加冒号。它不停止持久化，也不释放借用的原子存储与后端。"
       },
       cases: storePersistCases.clearFamily,
       example: storePersistCases.clearFamily![0]!.example
     },
-    assertEnvelope: {
-      role: 'operation',
-      purpose: t(
-        'Validates only the outer archive shape: non-array object, safe nonnegative version and a present non-null state. It does not validate the application state schema.',
-        '仅校验外层存档形状：非数组对象、安全非负版本与存在且非空的状态；不校验应用内部状态结构。'
-      ),
-      params: {
-        value: t(
-          'Decoded archive value returned by a codec or supplied by the application.',
-          '由编解码器返回或应用提供的已解码存档值。'
-        ),
-        key
-      },
-      returns: t(
-        'A new envelope retaining the original state reference, with version and state read once. Invalid shape, a revoked proxy or failed property reflection throws PersistEnvelopeError/ENVELOPE_INVALID with the original access failure on cause.',
-        '返回保留原状态引用的新信封，版本与状态分别读取一次。非法形状、已撤销代理或属性反射失败抛 `PersistEnvelopeError`／`ENVELOPE_INVALID`，原访问失败保留在原因链中。'
-      ),
-      example:
-        "const envelope = assertEnvelope<{ count: number }>({ version: 0, state: { count: 1 } }, 'counter')"
-    },
+
     defaultJsonCodec: {
       role: 'constant',
       purpose: t(
-        'Frozen ICodec named migaia-collections-json-v1, delegating current writes to collectionsJsonCodec versioned tuples for Map/Set round trips. Decode recognizes only sole-own-key array markers __migaia_persist_map__ and __migaia_persist_set__; an archive containing either uses the legacy reviver and preserves ordinary application arrays. Extra-field lookalikes remain ordinary records and use canonical decoding. Invalid JSON and encode failures retain causes.',
-        '名称为 `migaia-collections-json-v1` 的冻结编解码器，当前写入委托集合编解码器的版本元组，支持映射与成员集合往返。解码仅把唯一自有键为 `__migaia_persist_map__` 或 `__migaia_persist_set__` 且值为数组的对象视为旧标签；含精确旧标签的存档沿用旧恢复逻辑，保留普通应用数组。多字段同名对象仍为普通记录并走规范解码。非法文本与编码失败保留原因。'
+        'Frozen text codec collections-json@1, composing fromValueCodec with defineCollectionsJsonCodec. Nested Map/Set round-trip by default with $rpc records. Non-finite numbers, undefined roots, sparse arrays, cycles and Date fail; class instances project enumerable fields. Historical markers and tuples remain ordinary data. Errors preserve contract and serialize causes.',
+        '名称为 collections-json@1 的冻结 text codec，组合 fromValueCodec 与 defineCollectionsJsonCodec，默认通过 $rpc 记录往返嵌套 Map/Set。非有限数、undefined 根值、稀疏数组、循环与 Date 被拒绝；类实例投影可枚举字段。历史标记和元组为普通数据；错误保留 contract 与 serialize 原因链。'
       ),
       example:
         "const raw = await defaultJsonCodec.encode({ version: 0, state: new Set(['a']) })\nconst value = await defaultJsonCodec.decode(raw)"
@@ -1000,7 +999,7 @@ export const storePersistReference: ILibraryReference = {
         '所选后端用 `null` 表示缺失时返回 `undefined`；非缺失记录透传编解码器结果，编解码器也可能返回 `undefined`。不受支持的二进制读取及后端、编解码失败会拒绝。'
       ),
       example:
-        "const raw = await readEnvelope(storage, 'counter', defaultJsonCodec, {})\nif (raw !== undefined) assertEnvelope(raw, 'counter')"
+        "import { assertVersionedEnvelope } from '@migaia/storage-contract'\nconst raw = await readEnvelope(storage, 'counter', defaultJsonCodec, {})\nif (raw !== undefined) assertVersionedEnvelope(raw)"
     },
     removeEnvelope: {
       role: 'operation',
@@ -1046,34 +1045,7 @@ export const storePersistReference: ILibraryReference = {
       'AggregateError',
       'errors'
     ),
-    PersistEnvelopeError: {
-      optionCases: persistErrorOptionCases('PersistEnvelopeError', true),
-      role: 'error',
-      purpose: t(
-        'Native TypeError subclass identifying invalid archive envelopes with this package source and ENVELOPE_INVALID code.',
-        '原生类型错误子类，用本包来源与信封无效错误码识别非法存档信封。'
-      ),
-      params: {
-        message: t(
-          'Caller-authored concrete envelope validation failure.',
-          '调用方编写的具体信封校验失败说明。'
-        )
-      },
-      optionDocs: {
-        cause: {
-          summary: t(
-            'Original property-access or reflection failure retained by identity on the native TypeError cause.',
-            '按身份保留在原生类型错误原因属性上的原始属性访问或反射失败。'
-          ),
-          default: t('Omitted: no original cause is attached.', '省略时不附加原始原因。')
-        }
-      },
-      returns: t(
-        'An error instance with native TypeError behavior and stable source/code.',
-        '返回保留原生类型错误行为与稳定来源、错误码的实例。'
-      ),
-      example: "const error = new PersistEnvelopeError('Invalid saved envelope')"
-    },
+
     STORE_PERSIST_SOURCE: {
       role: 'constant',
       purpose: t(
@@ -1109,27 +1081,13 @@ export const storePersistReference: ILibraryReference = {
     }
   },
   types: {
-    IEnvelope: {
-      scenarios: [
-        t(
-          'Validate decoded archives before restoring application state.',
-          '恢复应用状态前校验解码存档。'
-        )
-      ],
-      example: "const envelope = assertEnvelope({ version: 0, state: { count: 1 } }, 'counter')",
+    ITransactionScopeOf: {
       summary: t(
-        'Versioned archive container; version describes the application schema and state holds the complete or partial persisted snapshot.',
-        '带版本的存档容器；版本描述应用数据结构，状态保存完整或部分持久化快照。'
+        'Extracts the original transaction callback scope, preserving concrete backend extensions such as sql.',
+        '提取原事务回调 scope，保留 sql 等具体后端扩展。'
       ),
-      members: {
-        version: unitOptions.version!,
-        state: {
-          summary: t(
-            'Persisted application snapshot; assertEnvelope rejects null or undefined but does not inspect its inner schema.',
-            '已保存的应用快照；外层校验拒绝空值，但不检查内部结构。'
-          )
-        }
-      }
+      example: 'type IScope = ITransactionScopeOf<typeof storage>',
+      members: {}
     },
     IPersistUnitOptions: {
       optionCases: persistOptionCases.IPersistUnitOptions!,
@@ -1331,21 +1289,7 @@ export const storePersistReference: ILibraryReference = {
         }
       }
     },
-    PersistEnvelopeError: {
-      scenarios: [
-        t(
-          'Recognize malformed archive envelopes without relying on message text.',
-          '识别格式非法的存档信封，无需依赖消息文本。'
-        )
-      ],
-      example:
-        "const error = new PersistEnvelopeError('Invalid saved envelope')\nconsole.log(error instanceof TypeError)",
-      summary: t(
-        'Native TypeError subclass with package source and ENVELOPE_INVALID identity; no additional public methods beyond native Error.',
-        '带本包来源与信封无效身份的原生类型错误子类，除原生错误外没有新增公开方法。'
-      ),
-      members: {}
-    },
+
     ...Object.fromEntries(
       [
         [

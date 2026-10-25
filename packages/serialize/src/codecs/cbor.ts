@@ -72,7 +72,7 @@ export type ICborCodecOptions<TVersion extends number> = Readonly<{
  */
 export function defineCBORCodec<const TVersion extends number>(
   options: ICborCodecOptions<TVersion>
-): ICodec<ICodecValue, Uint8Array, 'cbor', TVersion> {
+): ICodec<ICodecValue, Uint8Array, 'cbor', TVersion> & { readonly encodedType: 'uint8array' } {
   const version = assertCodecVersion(options.version)
   return Object.freeze({
     id: 'cbor' as const,

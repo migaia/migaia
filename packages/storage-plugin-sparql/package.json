@@ -1,0 +1,64 @@
+{
+  "name": "@migaia/storage-plugin-sparql",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Native RDF and SPARQL protocol storage backend",
+  "files": [
+    "dist",
+    "README.md",
+    "README.en.md",
+    "USEGUIDE.md",
+    "USEGUIDE.en.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./http": {
+      "types": "./dist/http.d.ts",
+      "default": "./dist/http.js"
+    },
+    "./oxigraph": {
+      "types": "./dist/oxigraph.d.ts",
+      "default": "./dist/oxigraph.js"
+    },
+    "./features/graph-store": {
+      "types": "./dist/features/graph-store.d.ts",
+      "default": "./dist/features/graph-store.js"
+    },
+    "./features/ontology": {
+      "types": "./dist/features/ontology.d.ts",
+      "default": "./dist/features/ontology.js"
+    }
+  },
+  "scripts": {
+    "fmt": "oxfmt src test README.md README.en.md USEGUIDE.md USEGUIDE.en.md package.json",
+    "lint": "oxlint src test",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
+    "build": "node ../../scripts/dist-stamp.mjs clean && vite build && tsc -p tsconfig.json --emitDeclarationOnly && node ../../scripts/dist-stamp.mjs write",
+    "test": "pnpm run build && vitest run"
+  },
+  "dependencies": {
+    "@migaia/lifecycle": "workspace:^",
+    "@migaia/storage-contract": "workspace:^",
+    "@migaia/utils": "workspace:^",
+    "@rdfjs/types": "2.0.1"
+  },
+  "devDependencies": {
+    "@types/n3": "1.26.1",
+    "n3": "1.26.0",
+    "oxigraph": "0.4.11"
+  },
+  "peerDependencies": {
+    "@migaia/storage-host": "workspace:^",
+    "n3": "^1.26.0",
+    "oxigraph": "^0.4.11"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}

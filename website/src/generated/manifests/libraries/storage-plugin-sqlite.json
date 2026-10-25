@@ -1,0 +1,2419 @@
+{
+  "version": 1,
+  "library": {
+    "slug": "storage-plugin-sqlite",
+    "description": "Native SQLite storage backend with transactional SQL",
+    "version": "0.0.0",
+    "exports": [".", "./bun", "./features/maintenance", "./node"],
+    "readmeLocales": ["zh", "en"],
+    "documentation": {
+      "readme": {
+        "sections": [
+          {
+            "id": "migaia-storage-plugin-sqlite",
+            "heading": "@migaia/storage-plugin-sqlite",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "English"
+              },
+              {
+                "type": "paragraph",
+                "text": "当本地设置、离线记录和缓存需要一起保存时，本包把文本、记录、过期时间与应用 SQL 统一放进运行时内置的 SQLite 事务，避免多个更新只成功一部分。选择 Node 或 Bun 对应的驱动和数据库文件，再把插件安装到 host；无需另装 npm 原生数据库扩展，连接由应用创建和关闭。"
+              }
+            ]
+          },
+          {
+            "id": "你可能遇到过",
+            "heading": "你可能遇到过",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "本地设置写了一半：几个更新各自提交，中途失败没有回滚。",
+                  "两个进程同时改同一项：只有内存锁，另一个进程看不到。",
+                  "到期缓存仍被当成有效数据：值和期限分开保存，读取时没有统一处理。",
+                  "事务还在运行，根查询却抢了连接：同一连接混用了事务内外操作。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "为什么选它",
+            "heading": "为什么选它",
+            "blocks": [
+              {
+                "type": "list",
+                "items": [
+                  "数据与期限一起写。 批量值、记录和 TTL 在同一个原生事务内更新，见一起保存值和期限。",
+                  "应用 SQL 与存储方法共用事务。 使用同一 tx，SQL 与 KV 可以共同提交或回滚，见把应用-sql-和存储修改一起提交。",
+                  "连接释放顺序明确。 你创建连接，host 使用它；先释放 host，再释放连接。Node/Bun 使用各自内置模块，不增加 npm 原生 addon。",
+                  "并发限制说清楚。 文件 WAL 模式支持跨连接逻辑锁；非 WAL 模式只在当前进程协调，见并发与取消。不以此声称更快。"
+                ]
+              }
+            ]
+          },
+          {
+            "id": "从这里开始",
+            "heading": "从这里开始",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "下面在真正的 SQLite 内存数据库中写入并读取。持久保存时把 `:memory:` 换成文件路径。Node 需要24或更新版本。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nawait using connection = nodeSqliteDriver(':memory:')\nawait using host = await createStorageHost({\n  plugins: [sqliteBackendPlugin({ driver: connection })] as const\n})\nconst store = host.backend('sqlite')\nawait store.set('theme', 'dark')\nconsole.log(await store.get('theme'))"
+              },
+              {
+                "type": "paragraph",
+                "text": "预期输出："
+              },
+              {
+                "type": "code",
+                "language": "text",
+                "code": "dark"
+              },
+              {
+                "type": "paragraph",
+                "text": "多项数据共同保存，看一起保存值和期限；文件备份看备份数据库文件。"
+              }
+            ]
+          },
+          {
+            "id": "手写时的隐患",
+            "heading": "手写时的隐患",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "下面假定应用表已存在，只展示，不执行。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { DatabaseSync } from 'node:sqlite'\nexport function save(database: DatabaseSync, name: string) {\n  database.prepare('INSERT INTO app_users(name) VALUES(?)').run(name)\n  // 第二条语句失败时，第一条已经提交。\n  database.prepare('UPDATE app_counts SET count=count+1').run()\n  // 事务期间误用另一个根入口，可能打乱同一连接上的工作。\n}"
+              },
+              {
+                "type": "paragraph",
+                "text": "使用 `store.transaction`，并且在回调里只使用 tx。被捕获或未 await 的数据操作失败，仍会使该事务回滚。"
+              }
+            ]
+          },
+          {
+            "id": "三分钟心智模型",
+            "heading": "三分钟心智模型",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["要做什么", "使用什么"],
+                "rows": [
+                  ["打开与关闭 SQLite 文件", "`/node` 或 `/bun` 创建的 connection"],
+                  ["使用文件中的标准存储", "host 安装后的 `backend('sqlite')`"],
+                  ["选择 KV、记录、SQL、TTL、计数", "`store.use(token)`"],
+                  ["多项操作共同提交", "`transaction` 或 `tx().lock(...).run(...)`"],
+                  ["备份和整理文件", "显式选择维护 Feature"]
+                ]
+              },
+              {
+                "type": "paragraph",
+                "text": "能力令牌标识一组方法；Feature 是额外安装的功能。WAL 是 SQLite 把变更先记入旁边日志文件的模式，允许本包通过共享文件协调逻辑锁。"
+              }
+            ]
+          },
+          {
+            "id": "典型场景",
+            "heading": "典型场景",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["场景", "怎么组合", "详细说明"],
+                "rows": [
+                  ["多租户本地缓存", "org + kv + ttl", "一起保存值和期限"],
+                  ["业务表与设置共同更新", "tx.sql + tx.set", "SQL 与存储共同提交"],
+                  ["导出可重新打开的备份", "maintenance.backup", "备份数据库文件"]
+                ]
+              }
+            ]
+          },
+          {
+            "id": "安装",
+            "heading": "安装",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "当前包 `private: true`，用于本仓库工作区。它不是公共 registry 发布承诺。消费包中添加："
+              },
+              {
+                "type": "code",
+                "language": "bash",
+                "code": "pnpm add @migaia/storage-host @migaia/storage-contract @migaia/storage-plugin-sqlite --workspace"
+              },
+              {
+                "type": "paragraph",
+                "text": "Node 24+ 与 Deno 使用 `/node` 的 `nodeSqliteDriver(path)`；Bun 使用 `/bun` 的 `bunSqliteDriver(path)`。Deno 需要数据库及其日志文件的读写权限。子入口明确选择运行时，不自动回退。根入口不加载任何数据库驱动。"
+              }
+            ]
+          },
+          {
+            "id": "常用-api",
+            "heading": "常用 API",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["API", "用途"],
+                "rows": [
+                  ["`sqliteBackendPlugin({ driver, table?, wal? })`", "安装 SQLite 存储"],
+                  ["`store.use(kv / records / sql / ttl / counter)`", "标准数据、查询、期限与计数"],
+                  ["`store.transaction` / `store.tx()`", "同一连接中的原生事务"],
+                  ["`store.sql` / `tx.sql`", "绑定参数 SQL"],
+                  ["`host.org(id).backend('sqlite')`", "固定组织的数据视图"],
+                  ["`sqliteMaintenanceFeature()`", "增加 backup 与 vacuum"]
+                ]
+              }
+            ]
+          },
+          {
+            "id": "契约细节",
+            "heading": "契约细节",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "每个 driver 同时只交给一个 store；多个连接可以使用同一个文件。文件库默认 WAL，内存库默认非 WAL；内存库要求 WAL 会拒绝。默认表前缀 `migaia`，默认锁期限30000ms，无 heartbeat。事务占用连接时根操作会失败，应改用 tx。"
+              },
+              {
+                "type": "paragraph",
+                "text": "本包不提供向量、RDF 或实时变更流。记录字段查询在客户端求值；取消不能抢占已经开始的同步 SQLite 工作。错误、数据类型、维护与日志的详细限制见 USEGUIDE。"
+              }
+            ]
+          }
+        ]
+      },
+      "guide": {
+        "sections": [
+          {
+            "id": "sqlite-使用指南",
+            "heading": "SQLite 使用指南",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "English"
+              },
+              {
+                "type": "paragraph",
+                "text": "Node 24+ 使用下列完整示例；Bun 把驱动入口换为 `/bun` 的 `bunSqliteDriver`。文件示例会写入当前目录，先确认目录可写。先创建 connection，再创建 host，离开作用域时会先释放 host。"
+              }
+            ]
+          },
+          {
+            "id": "按场景查找",
+            "heading": "按场景查找",
+            "blocks": [
+              {
+                "type": "table",
+                "headers": ["问题", "场景"],
+                "rows": [
+                  ["值、记录与期限需要共同保存", "一起保存值和期限"],
+                  ["应用表和 KV 必须共同回滚", "把应用 SQL 和存储修改一起提交"],
+                  ["需要一个独立备份文件", "备份数据库文件"],
+                  ["多连接写入或取消等待", "并发与取消"]
+                ]
+              }
+            ]
+          },
+          {
+            "id": "一起保存值和期限",
+            "heading": "一起保存值和期限",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "示例在文件中使用固定组织，预期输出 `ready`、`1`、`true`。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { kv, records, ttl, counter } from '@migaia/storage-contract'\nimport { lockKey } from '@migaia/storage-host/authoring/concurrency'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nawait using connection = nodeSqliteDriver('./example-settings.sqlite')\nawait using host = await createStorageHost({\n  plugins: [sqliteBackendPlugin({ driver: connection })] as const\n})\nconst store = host.org('10000000-0000-4000-8000-000000000001').backend('sqlite')\nawait store\n  .tx()\n  .lock(lockKey.text('example:status'))\n  .run(async (tx) => {\n    await tx.use(kv).setMany([\n      { key: 'example:status', value: 'ready' },\n      { key: ['example', 1], value: 'first', ttlMs: 60000 }\n    ])\n    await tx.putRecord({ name: 'Ada' }, 'example:user')\n    await tx.use(ttl).expire(lockKey.text('example:status'), 60000)\n    await tx.set('example:count', '0')\n    await tx.use(counter).increment('example:count')\n  })\nconsole.log(await store.get('example:status'))\nconsole.log(await store.get('example:count'))\nconsole.log((await store.use(records).query().all()).length >= 1)"
+              },
+              {
+                "type": "paragraph",
+                "text": "组织 ID 是 UUID。所有组织共用连接和物理表；逻辑键、期限、修订与锁按组织隔离。访问组织不会开新连接或创建新表。`host.dropOrg(id)` 只删除相应组织的托管数据，不删除应用表。显式组织视图不提供任意 SQL 或数据库维护。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`setMany` 的 ttlMs 为有限非负毫秒；零立即过期，省略时保留活值期限，新值没有期限。`getMany` 保留输入顺序、重复和缺失位置，缺失为 undefined；重复写键在 I/O 前拒绝。批次写入和删除同事务成功或回滚；删除返回实际数量，分块读取使用同一快照。每批一次 pipeline 和计数观察，空批不做原生操作。"
+              },
+              {
+                "type": "paragraph",
+                "text": "TTL 使用本地 Date.now，值和期限共同写入。覆盖活值保留期限；删除、清空、跨通道替换清掉旧期限。读取、枚举、记录查询会惰性清理过期行，不启动 timer。事务观察过的活值在提交前过期时，会进入冲突处理，不能以旧观察继续提交。counter 从缺失的0开始，只接受规范十进制与安全整数，非法文本和溢出在写入前拒绝。"
+              }
+            ]
+          },
+          {
+            "id": "把应用-sql-和存储修改一起提交",
+            "heading": "把应用 SQL 和存储修改一起提交",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "该内存库示例先创建自己的应用表。预期输出为 `Ada`、`1`。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { sqlFragment } from '@migaia/storage-host/authoring/sql'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nawait using connection = nodeSqliteDriver(':memory:')\nawait using host = await createStorageHost({\n  plugins: [sqliteBackendPlugin({ driver: connection })] as const\n})\nconst store = host.backend('sqlite')\nawait store.sql`CREATE TABLE app_users(id INTEGER PRIMARY KEY, name TEXT)`.run()\nawait store.transaction(async (tx) => {\n  await tx.sql`INSERT INTO app_users VALUES(${1}, ${'Ada'})`.run()\n  await tx.set('user-count', '1')\n})\nconst row = await store.sql<{ name: string }>`\n  SELECT name FROM ${sqlFragment.id('app_users')} WHERE id=${1}\n`.get()\nconsole.log(row?.name)\nconsole.log(store.sync!.get('user-count'))"
+              },
+              {
+                "type": "paragraph",
+                "text": "SQL 插值绑定为参数；标识符用 sqlFragment.id，组合片段使用同一 SQL 工具。只接受单条语句及可选末尾分号；事务控制和 journal_mode 修改会拒绝，请使用 transaction。带内部语句列表的完整 trigger body 不在此入口范围。行类型由调用方声明，不检查列名或转换 Date。"
+              },
+              {
+                "type": "paragraph",
+                "text": "安全整数读为 number，其余整数保留 bigint。boolean 输入绑定成0/1，BLOB 返回独立 Uint8Array。run 的 changes、lastInsertRowid 是 number或bigint，SQLite 总有 lastInsertRowid。标准 sql 令牌与原生 store.sql 使用同一标签。Statement 缓存最多64项；Node 缓存淘汰不代表立即 finalize。"
+              },
+              {
+                "type": "paragraph",
+                "text": "事务占用连接时，根读取、同步方法与根 SQL 报 TRANSACTION_FAILED；请在回调内使用 tx。回调结束后 tx 失效；未 await 或已 catch 的操作失败仍使事务回滚。取消后也要等已开始的原生工作结束，再回滚和释放锁，不能强行抢占同步语句或忽略取消的回调。"
+              }
+            ]
+          },
+          {
+            "id": "备份数据库文件",
+            "heading": "备份数据库文件",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "显式选择维护 Feature。示例写一项状态，并创建一个新的备份文件；预期输出 `ready`。每次使用不同文件名，避免覆盖。"
+              },
+              {
+                "type": "code",
+                "language": "ts",
+                "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nimport { sqliteMaintenanceFeature } from '@migaia/storage-plugin-sqlite/features/maintenance'\nawait using connection = nodeSqliteDriver('./example-settings.sqlite')\nawait using host = await createStorageHost({\n  plugins: [\n    sqliteBackendPlugin({ driver: connection }, { maintenance: sqliteMaintenanceFeature() })\n  ] as const\n})\nconst store = host.backend('sqlite')\nawait store.set('example:backup', 'ready')\nawait store.api.maintenance.backup(`./example-backup-${crypto.randomUUID()}.sqlite`)\nconsole.log(await store.get('example:backup'))"
+              },
+              {
+                "type": "paragraph",
+                "text": "backup 使用 VACUUM INTO，要求目标不存在且路径可写，不预删、不覆盖。原生失败可能留下不完整文件；取消也不能证明文件未被写入。vacuum 整理当前库。维护只在根 store.api.maintenance 出现，不在 tx.api 或组织视图出现。应用自定义 Feature 可以选择事务 API；其 SQL 和 KV 同事务，失败不会被方法外层 catch 掩盖。"
+              }
+            ]
+          },
+          {
+            "id": "并发与取消",
+            "heading": "并发与取消",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "文件库默认 wal:true，安装会请求并确认实际模式；已有 journal_mode=OFF 的连接拒绝。内存库默认 false，显式 true 拒绝。wal:false 保留真实 BEGIN/COMMIT/ROLLBACK，但逻辑锁只协调当前进程，不承诺跨进程。"
+              },
+              {
+                "type": "paragraph",
+                "text": "通过 tx().lock(lockKey.text(...)).run 使用逻辑键锁。锁策略从 `@migaia/storage-host/authoring/concurrency` 选择。只有相同逻辑键才产生逻辑冲突；SQLite writer 串行等待不是业务键冲突。inspectLocks 返回实际持锁方和过期信息。maxLockMs 默认30000ms，无 heartbeat，取消是协作式。"
+              }
+            ]
+          },
+          {
+            "id": "数据与错误边界",
+            "heading": "数据与错误边界",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "文本、字节、记录分别保存，但同键跨通道写入默认 DUPLICATE_KEY。明确 conflictPolicy:'replace' 才原子替换；同通道更新直接覆盖。文本/字节缺失为 null，记录/metadata 缺失为 undefined。keys 只列文本字符串键，clearAll 保留 metadata，单通道清空不影响其它通道。文本可保留 NUL 和孤立 UTF-16 代理项；记录/metadata 使用支持 Map/Set 的集合编码，非便携值在改表前拒绝，字节读写复制。"
+              },
+              {
+                "type": "paragraph",
+                "text": "driver 必填；table 默认 migaia；concurrency 选择冲突策略，maxLockMs 是锁期限。一个 store 独占使用 driver，但不负责关闭它。多连接可共用文件，不能同时把同一 driver 交给两个 store。Feature 借用的 exec/prepare 客户端不含关闭权。dispose 重复返回相同主 Promise，符号释放有独立的报告型 Promise，两者共享一次清理；失败后仍终止。"
+              },
+              {
+                "type": "paragraph",
+                "text": "本包错误 source 为 @migaia/storage-plugin-sqlite，码为 SQLITE_FAILED、TRANSACTION_FAILED、DUPLICATE_KEY、DECODE_FAILED。校验、取消、超时和并发使用共享错误码。原生或编码错误保留在 cause；回滚也失败时，aggregate errors 首项保留主错误。解码失败不自动修补数据。向量和 RDF 不支持，对应锁在原生调用前报 UNSUPPORTED_CAPABILITY；不提供变更流或服务端记录字段索引。"
+              }
+            ]
+          },
+          {
+            "id": "可选日志",
+            "heading": "可选日志",
+            "blocks": [
+              {
+                "type": "paragraph",
+                "text": "通过宿主 journal 配置显式启用。完整值、每次实际修改和绝对期限在 SQLite 事务中捕获，保留同键多写与中间值。undo 先锁定并检查全部目标的最终修订和镜像，再恢复；恢复原绝对期限，不刷新过期数据。组织重建或非 WAL 本地协调组重新打开后，旧镜像不能继续使用。metadata 不产生业务修改日志。"
+              },
+              {
+                "type": "paragraph",
+                "text": "外置 binlog 在提交后写入，失败报告但不能撤回数据。支持的 WAL 组合使用与数据共同提交的 marker，恢复不重放已提交修改。raw SQL 无完整标准镜像目标，选择提交日志时在执行前拒绝。全局 journal 使用异步 pipeline，因此同步入口报 ASYNC_STAGE_IN_SYNC_ENTRY；普通无日志安装仍有同步 API。"
+              },
+              {
+                "type": "paragraph",
+                "text": "`storageLogStore` 从 `@migaia/storage-host/journal` 单独导入，可在初始化器内打开同库日志。内存连接的同 namespace 日志独占使用，释放后可重开；文件日志每次在 BEGIN IMMEDIATE 中读取当前索引，允许多连接共用。业务 clear 不清私有日志。选中提交日志时，读取触发的惰性过期删除也进入日志；仅遥测或初始化器不启用该写入行为。遥测每个根操作或完整事务只发一条，logger 与日志载体仍由调用方在 host 之后释放。"
+              }
+            ]
+          }
+        ]
+      },
+      "en": {
+        "readme": {
+          "sections": [
+            {
+              "id": "migaia-storage-plugin-sqlite",
+              "heading": "@migaia/storage-plugin-sqlite",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "中文"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "When local settings, offline records and caches must be saved together, this module combines text, records, expiry and application SQL in the runtime's built-in SQLite transaction, avoiding partially saved updates. Choose the Node or Bun driver and a database file, then install the plugin in a host. No npm native database extension is needed; your application creates and closes the connection."
+                }
+              ]
+            },
+            {
+              "id": "sound-familiar",
+              "heading": "Sound familiar?",
+              "blocks": [
+                {
+                  "type": "list",
+                  "items": [
+                    "A settings update is only half saved: each statement committed separately.",
+                    "Two processes change the same item: an in-memory lock cannot coordinate them.",
+                    "Expired cache data still looks valid: values and deadlines follow different write paths.",
+                    "A root query runs during a transaction: both are trying to use one connection."
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "why-choose-it",
+              "heading": "Why choose it?",
+              "blocks": [
+                {
+                  "type": "list",
+                  "items": [
+                    "Write data and expiry together. Batch values, records and TTL share one native transaction. See Save values with expiry.",
+                    "Combine application SQL with storage methods. Use the same tx to commit or roll back SQL and KV together. See Commit SQL and storage together.",
+                    "Keep connection cleanup explicit. Your application creates the connection; release the host before releasing it. Node and Bun use built-in modules, with no npm native addon.",
+                    "Understand concurrency limits. File WAL mode coordinates logical locks across connections. Non-WAL mode coordinates only within the current process. See Concurrency and cancellation. No speed claim is made."
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "start-here",
+              "heading": "Start here",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "This writes to a real SQLite in-memory database. Replace `:memory:` with a filename to persist data. Node 24 or later is required."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nawait using connection = nodeSqliteDriver(':memory:')\nawait using host = await createStorageHost({\n  plugins: [sqliteBackendPlugin({ driver: connection })] as const\n})\nconst store = host.backend('sqlite')\nawait store.set('theme', 'dark')\nconsole.log(await store.get('theme'))"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Expected output:"
+                },
+                {
+                  "type": "code",
+                  "language": "text",
+                  "code": "dark"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "For a multi-value update, see Save values with expiry. To create a database backup, see Back up a database."
+                }
+              ]
+            },
+            {
+              "id": "pitfalls-in-hand-written-code",
+              "heading": "Pitfalls in hand-written code",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "This function assumes its application tables already exist. It is shown without execution."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { DatabaseSync } from 'node:sqlite'\nexport function save(database: DatabaseSync, name: string) {\n  database.prepare('INSERT INTO app_users(name) VALUES(?)').run(name)\n  // The first statement has committed if the next one fails.\n  database.prepare('UPDATE app_counts SET count=count+1').run()\n  // A root operation during a transaction can interfere with work on this connection.\n}"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Use `store.transaction` and use only tx inside its callback. A caught or unawaited data-operation failure still causes rollback."
+                }
+              ]
+            },
+            {
+              "id": "the-model-in-three-minutes",
+              "heading": "The model in three minutes",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["Task", "Tool"],
+                  "rows": [
+                    [
+                      "Open and close the SQLite file",
+                      "A connection created through `/node` or `/bun`"
+                    ],
+                    ["Use standard storage in that database", "`host.backend('sqlite')`"],
+                    ["Select KV, records, SQL, expiry or counters", "`store.use(token)`"],
+                    [
+                      "Commit several changes together",
+                      "`transaction` or `tx().lock(...).run(...)`"
+                    ],
+                    ["Back up or compact the file", "The explicitly selected maintenance Feature"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "A capability token selects a set of methods. A Feature is an optional addition. WAL is SQLite's write-ahead log mode; here it also enables shared-file coordination for logical locks."
+                }
+              ]
+            },
+            {
+              "id": "typical-scenarios",
+              "heading": "Typical scenarios",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["Scenario", "Building blocks", "Details"],
+                  "rows": [
+                    ["Local tenant caches", "Organizations, kv, ttl", "Save values with expiry"],
+                    [
+                      "Update application tables and settings",
+                      "tx.sql, tx.set",
+                      "Commit SQL and storage together"
+                    ],
+                    ["Create a database copy", "maintenance.backup", "Back up a database"]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "install",
+              "heading": "Install",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "This module is currently `private: true` for use within the repository workspace, rather than a promise of public registry availability. Add it to a consuming workspace module:"
+                },
+                {
+                  "type": "code",
+                  "language": "bash",
+                  "code": "pnpm add @migaia/storage-host @migaia/storage-contract @migaia/storage-plugin-sqlite --workspace"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Node 24+ and Deno use `nodeSqliteDriver(path)` from `/node`. Bun uses `bunSqliteDriver(path)` from `/bun`. Deno needs read/write permission for the database and its journal files. Entry selection is explicit; no runtime fallback occurs. The root entry loads no database SDK."
+                }
+              ]
+            },
+            {
+              "id": "essential-api",
+              "heading": "Essential API",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["API", "Purpose"],
+                  "rows": [
+                    ["`sqliteBackendPlugin({ driver, table?, wal? })`", "Install SQLite storage"],
+                    [
+                      "`store.use(kv / records / sql / ttl / counter)`",
+                      "Standard values, queries, expiry and counters"
+                    ],
+                    [
+                      "`store.transaction` / `store.tx()`",
+                      "Native transactions on the same connection"
+                    ],
+                    ["`store.sql` / `tx.sql`", "Parameterized SQL"],
+                    ["`host.org(id).backend('sqlite')`", "Organization-scoped data"],
+                    ["`sqliteMaintenanceFeature()`", "Add backup and vacuum"]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "contract-details",
+              "heading": "Contract details",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Give one driver to only one store at a time; multiple connections may open the same file. Files default to WAL and in-memory databases default to non-WAL. Requesting WAL for an in-memory database rejects. The default table prefix is `migaia`. Lock leases default to 30000ms without heartbeat. While a transaction occupies the connection, root operations fail; use tx instead."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Vectors, RDF and live change feeds are not provided. Record field queries evaluate on the client. Cancellation cannot preempt synchronous SQLite work already in progress. See Data and failures for data types, maintenance, logging and error details."
+                }
+              ]
+            }
+          ]
+        },
+        "guide": {
+          "sections": [
+            {
+              "id": "sqlite-usage-guide",
+              "heading": "SQLite usage guide",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "中文"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "These are complete Node 24+ programs. In Bun, use `bunSqliteDriver` from `/bun`. File examples write in the current directory, which must be writable. Create the connection before the host so scope cleanup releases the host first."
+                }
+              ]
+            },
+            {
+              "id": "find-a-scenario",
+              "heading": "Find a scenario",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["Need", "Section"],
+                  "rows": [
+                    ["Save values, records and deadlines together", "Save values with expiry"],
+                    [
+                      "Roll back application SQL and KV together",
+                      "Commit SQL and storage together"
+                    ],
+                    ["Produce a separate backup file", "Back up a database"],
+                    ["Coordinate connections or cancel work", "Concurrency and cancellation"]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "save-values-with-expiry",
+              "heading": "Save values with expiry",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "The example uses a fixed organization in a file database. Expected output: `ready`, `1`, `true`."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { kv, records, ttl, counter } from '@migaia/storage-contract'\nimport { lockKey } from '@migaia/storage-host/authoring/concurrency'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nawait using connection = nodeSqliteDriver('./example-settings.sqlite')\nawait using host = await createStorageHost({\n  plugins: [sqliteBackendPlugin({ driver: connection })] as const\n})\nconst store = host.org('10000000-0000-4000-8000-000000000001').backend('sqlite')\nawait store\n  .tx()\n  .lock(lockKey.text('example:status'))\n  .run(async (tx) => {\n    await tx.use(kv).setMany([\n      { key: 'example:status', value: 'ready' },\n      { key: ['example', 1], value: 'first', ttlMs: 60000 }\n    ])\n    await tx.putRecord({ name: 'Ada' }, 'example:user')\n    await tx.use(ttl).expire(lockKey.text('example:status'), 60000)\n    await tx.set('example:count', '0')\n    await tx.use(counter).increment('example:count')\n  })\nconsole.log(await store.get('example:status'))\nconsole.log(await store.get('example:count'))\nconsole.log((await store.use(records).query().all()).length >= 1)"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Organization IDs are UUID strings. Organizations share one connection and the physical tables; keys, expiry, revisions and locks remain separate. Accessing an organization opens no extra connection or table. `host.dropOrg(id)` removes only that organization's managed rows, never application tables. Explicit organization views provide neither arbitrary SQL nor maintenance."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`setMany` accepts finite nonnegative ttlMs. Zero expires immediately; omission keeps a live deadline and gives a new value no deadline. `getMany` retains input order, duplicates and undefined missing positions. Equivalent duplicate write keys reject before I/O. Batch writes/deletes commit or roll back together; deletes return actual counts, and chunked reads share one snapshot. One batch enters its pipeline and count observation once; an empty batch performs no native work."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "TTL uses local Date.now and is written with the value. Replacing a live value retains expiry; removal, clear and cross-channel replacement remove the old deadline. Reads, enumeration and record queries clean expired rows lazily, without timers. A value observed alive and then expired before commit enters conflict handling instead of committing a stale observation. Counters start missing values at 0 and accept only canonical decimal text and safe integers; invalid text or overflow reject before writes."
+                }
+              ]
+            },
+            {
+              "id": "commit-sql-and-storage-together",
+              "heading": "Commit SQL and storage together",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "This creates its own application table in an in-memory database. Expected output: `Ada`, `1`."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { sqlFragment } from '@migaia/storage-host/authoring/sql'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nawait using connection = nodeSqliteDriver(':memory:')\nawait using host = await createStorageHost({\n  plugins: [sqliteBackendPlugin({ driver: connection })] as const\n})\nconst store = host.backend('sqlite')\nawait store.sql`CREATE TABLE app_users(id INTEGER PRIMARY KEY, name TEXT)`.run()\nawait store.transaction(async (tx) => {\n  await tx.sql`INSERT INTO app_users VALUES(${1}, ${'Ada'})`.run()\n  await tx.set('user-count', '1')\n})\nconst row = await store.sql<{ name: string }>`\n  SELECT name FROM ${sqlFragment.id('app_users')} WHERE id=${1}\n`.get()\nconsole.log(row?.name)\nconsole.log(store.sync!.get('user-count'))"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "SQL interpolation binds values; use sqlFragment.id for identifiers and the same SQL tools for fragment composition. One statement with an optional trailing semicolon is accepted. Transaction-control statements and journal_mode changes reject: use transaction instead. Complete trigger bodies containing internal statement lists are outside this endpoint. Row types are caller declarations, with no column validation or Date conversion."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Safe integers read as number; larger integers remain bigint. Boolean inputs become 0/1; BLOB results are independent Uint8Array values. Both changes and lastInsertRowid are number or bigint, and SQLite always supplies lastInsertRowid. The standard sql token uses the same native tag. Statement caching is bounded to 64 entries; evicting a Node entry does not immediately finalize its native statement."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "While a transaction uses the connection, root reads, synchronous methods and root SQL fail with TRANSACTION_FAILED. Use tx inside the callback. A saved tx expires when the callback ends. Caught and unawaited operation failures still roll back. Cancellation waits for started work to settle before rollback and lock release; it cannot preempt a synchronous statement or a callback that ignores cancellation."
+                }
+              ]
+            },
+            {
+              "id": "back-up-a-database",
+              "heading": "Back up a database",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Select the maintenance Feature explicitly. This writes a status and creates a new backup filename each run. Expected output: `ready`."
+                },
+                {
+                  "type": "code",
+                  "language": "ts",
+                  "code": "import { createStorageHost } from '@migaia/storage-host'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nimport { sqliteMaintenanceFeature } from '@migaia/storage-plugin-sqlite/features/maintenance'\nawait using connection = nodeSqliteDriver('./example-settings.sqlite')\nawait using host = await createStorageHost({\n  plugins: [\n    sqliteBackendPlugin({ driver: connection }, { maintenance: sqliteMaintenanceFeature() })\n  ] as const\n})\nconst store = host.backend('sqlite')\nawait store.set('example:backup', 'ready')\nawait store.api.maintenance.backup(`./example-backup-${crypto.randomUUID()}.sqlite`)\nconsole.log(await store.get('example:backup'))"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Backup uses VACUUM INTO. The destination must not exist and must be writable; it is neither deleted nor overwritten first. Failure may leave a partial file. Cancellation cannot prove that no file was written. Vacuum compacts the current database. Maintenance appears only on root store.api.maintenance, never on tx.api or organization views. Application Features may provide transaction APIs; their SQL and KV participate in that same transaction, including failure tracking."
+                }
+              ]
+            },
+            {
+              "id": "concurrency-and-cancellation",
+              "heading": "Concurrency and cancellation",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Files default to wal:true; installation requests and verifies the actual mode. Connections already using journal_mode=OFF reject. In-memory databases default to false and reject explicit true. wal:false still uses real BEGIN/COMMIT/ROLLBACK, but its logical locks coordinate only the current process."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Use tx().lock(lockKey.text(...)).run for explicit logical locks. Select policies from `@migaia/storage-host/authoring/concurrency`. Only matching logical keys conflict; SQLite's physical writer wait is not a business-key conflict. inspectLocks returns actual holders and expiry. maxLockMs defaults to 30000ms, without heartbeat. Cancellation is cooperative."
+                }
+              ]
+            },
+            {
+              "id": "data-and-failures",
+              "heading": "Data and failures",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Text, bytes and records use separate channels, but another channel holding the same key causes DUPLICATE_KEY. Explicit conflictPolicy:'replace' replaces it atomically; same-channel writes overwrite normally. Missing text/bytes return null and missing records/metadata return undefined. keys lists only text string keys; clearAll retains metadata; clearing one channel leaves the others alone. Text retains NUL and lone UTF-16 surrogates. Records/metadata use collection-aware encoding including Map/Set. Nonportable values reject before table modification; byte inputs and outputs are copied."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Driver is required; table defaults to migaia. concurrency selects conflict behavior and maxLockMs bounds the lease. A store uses the driver exclusively but never closes it. Separate connections may share a file; one driver cannot serve two stores concurrently. Feature clients expose exec/prepare without disposal. Repeated dispose returns the same main Promise; symbolic cleanup has a separate report-only Promise, sharing one real cleanup. The store stays terminal after cleanup failure."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "module failures use source @migaia/storage-plugin-sqlite and SQLITE_FAILED, TRANSACTION_FAILED, DUPLICATE_KEY or DECODE_FAILED. Shared validation, cancellation, timeout and conflict codes retain their source. Original failures remain on cause; aggregate errors keep the primary failure first if rollback also fails. Decode errors never repair data automatically. Vectors and RDF are unsupported, including their lock targets before native I/O. No live change feed or server-side record-field index is provided."
+                }
+              ]
+            },
+            {
+              "id": "optional-journals",
+              "heading": "Optional journals",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "Enable journals explicitly through the host's journal option. SQLite captures complete values, every actual mutation and absolute expiry inside the data transaction, retaining repeated writes and intermediate values. Undo locks and checks every target's final revision/image before restoring. It restores original absolute deadlines, without extending expired data. Recreated organizations and reopened non-WAL coordination groups cannot reuse old undo images. Metadata is excluded from business mutation logs."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "External binlog append happens after commit; failure reports but cannot undo committed data. Supported WAL combinations use a marker committed with the data, and recovery does not replay known committed changes. Raw SQL has no complete standard-image target and rejects before execution when commit logging is selected. Global journal configuration uses an asynchronous pipeline, so synchronous entries fail with ASYNC_STAGE_IN_SYNC_ENTRY; installations without journals retain synchronous APIs."
+                },
+                {
+                  "type": "paragraph",
+                  "text": "Import storageLogStore separately from `@migaia/storage-host/journal`; an initializer can open a journal in the same database. An in-memory connection exclusively uses a journal namespace until release. File journals read current indexes inside each BEGIN IMMEDIATE transaction and allow multiple connections. Business clear operations leave private journals intact. With commit logging selected, expiry cleanup triggered by reads is logged too; telemetry-only or initializer-only configurations do not enable this mutation logging. Telemetry records each root operation or whole transaction once. The application releases the logger and its storage after releasing the host."
+                }
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "apis": [
+    {
+      "id": "storage-plugin-sqlite:index",
+      "library": "storage-plugin-sqlite",
+      "module": "index",
+      "exportPath": ".",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/storage-plugin-sqlite/getting-started",
+      "architecturePath": "/en/docs/storage-plugin-sqlite",
+      "symbols": [
+        {
+          "name": "ISqliteCapabilities",
+          "kind": "type",
+          "signature": "export type ISqliteCapabilities = typeof kv | typeof records | typeof sql | typeof ttl | typeof counter;",
+          "declarationLine": 27,
+          "source": "packages/storage-plugin-sqlite/dist/types.d.ts",
+          "purpose": "The exact built-in capability token union: kv, records, sql, ttl and counter.",
+          "core": "The exact built-in capability token union: kv, records, sql, ttl and counter.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "ISqliteCapabilities",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ISqliteCapabilities = typeof kv | typeof records | typeof sql | typeof ttl | typeof counter;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The exact built-in capability token union: kv, records, sql, ttl and counter."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ISqliteCapabilities from @migaia/storage-plugin-sqlite, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ISqliteCapabilities when its type contract and declared inputs match the result you need. Choose a different public symbol when ISqliteCapabilities does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The exact built-in capability token union: kv, records, sql, ttl and counter."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-sqlite/dist/types.d.ts:ISqliteCapabilities:export type ISqliteCapabilities = typeof kv | typeof records | typeof sql | typeof ttl | typeof counter;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-sqlite-index--ISqliteCapabilities"
+        },
+        {
+          "name": "ISqliteConnection",
+          "kind": "type",
+          "signature": "export type ISqliteConnection = ISqliteDriver & IStorageResource;",
+          "declarationLine": 25,
+          "source": "packages/storage-plugin-sqlite/dist/types.d.ts",
+          "purpose": "The creating caller owns this driver and storage resource. Dispose the host before the connection; backend disposal never closes it.",
+          "core": "dispose: Seal the driver and close the native connection once.\nThe same explicit disposal Promise on repeated calls; native close failure rejects with its cause.",
+          "advanced": "Give the host a borrowed connection and keep disposal in the creating application.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": ["ISqliteDriver", "IStorageResource"],
+          "aliasOf": "ISqliteConnection",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ISqliteConnection = ISqliteDriver & IStorageResource;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Give the host a borrowed connection and keep disposal in the creating application.",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The creating caller owns this driver and storage resource. Dispose the host before the connection; backend disposal never closes it."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ISqliteConnection from @migaia/storage-plugin-sqlite, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ISqliteConnection when its type contract and declared inputs match the result you need. Choose a different public symbol when ISqliteConnection does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "dispose: Seal the driver and close the native connection once.\nThe same explicit disposal Promise on repeated calls; native close failure rejects with its cause."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "Give the host a borrowed connection and keep disposal in the creating application."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-sqlite/dist/types.d.ts:ISqliteConnection:export type ISqliteConnection = ISqliteDriver & IStorageResource;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-sqlite-index--ISqliteConnection"
+        },
+        {
+          "name": "ISqliteDriver",
+          "kind": "type",
+          "signature": "export type ISqliteDriver = { exec(sql: string): void; prepare(sql: string): ISqliteStatement; };",
+          "declarationLine": 14,
+          "source": "packages/storage-plugin-sqlite/dist/types.d.ts",
+          "purpose": "The synchronous trusted driver surface borrowed by a backend. Selected Features receive the same frozen exec/prepare view for store and transaction calls, without connection disposal authority.",
+          "core": "exec: Execute trusted native SQL without parameters.\nexec.sql: Native SQL text supplied by the driver owner.\nCompletes synchronously or throws a coded native failure.\nprepare: Prepare a native statement without adding a driver cache.\nprepare.sql: Native SQL with positional placeholders.\nA synchronous statement borrowed from the same connection.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "exec",
+              "kind": "method",
+              "optional": false,
+              "signature": "exec(sql: string): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "sql",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "prepare",
+              "kind": "method",
+              "optional": false,
+              "signature": "prepare(sql: string): ISqliteStatement;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "sql",
+                  "type": "string",
+                  "optional": false
+                }
+              ],
+              "returns": "ISqliteStatement"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "ISqliteDriver",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ISqliteDriver = { exec(sql: string): void; prepare(sql: string): ISqliteStatement; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The synchronous trusted driver surface borrowed by a backend. Selected Features receive the same frozen exec/prepare view for store and transaction calls, without connection disposal authority."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ISqliteDriver from @migaia/storage-plugin-sqlite, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ISqliteDriver when its type contract and declared inputs match the result you need. Choose a different public symbol when ISqliteDriver does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "exec: Execute trusted native SQL without parameters.\nexec.sql: Native SQL text supplied by the driver owner.\nCompletes synchronously or throws a coded native failure.\nprepare: Prepare a native statement without adding a driver cache.\nprepare.sql: Native SQL with positional placeholders.\nA synchronous statement borrowed from the same connection."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-sqlite/dist/types.d.ts:ISqliteDriver:export type ISqliteDriver = { exec(sql: string): void; prepare(sql: string): ISqliteStatement; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-sqlite-index--ISqliteDriver"
+        },
+        {
+          "name": "ISqliteErrorCode",
+          "kind": "type",
+          "signature": "export type ISqliteErrorCode = (typeof SqliteErrorCode)[keyof typeof SqliteErrorCode];",
+          "declarationLine": 15,
+          "source": "packages/storage-plugin-sqlite/dist/error-code.d.ts",
+          "purpose": "The value union of the canonical SqliteErrorCode table.",
+          "core": "The value union of the canonical SqliteErrorCode table.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "ISqliteErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ISqliteErrorCode = (typeof SqliteErrorCode)[keyof typeof SqliteErrorCode];"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The value union of the canonical SqliteErrorCode table."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ISqliteErrorCode from @migaia/storage-plugin-sqlite, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ISqliteErrorCode when its type contract and declared inputs match the result you need. Choose a different public symbol when ISqliteErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The value union of the canonical SqliteErrorCode table."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-sqlite/dist/error-code.d.ts:ISqliteErrorCode:export type ISqliteErrorCode = (typeof SqliteErrorCode)[keyof typeof SqliteErrorCode];",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-sqlite-index--ISqliteErrorCode"
+        },
+        {
+          "name": "ISqliteExecutor",
+          "kind": "type",
+          "signature": "export type ISqliteExecutor = ISqlExecutor<ISqliteValue, ISqliteRunResult>;",
+          "declarationLine": 12,
+          "source": "packages/storage-plugin-sqlite/dist/types.d.ts",
+          "purpose": "The common storage SQL executor specialized for native SQLite rows and mutation results. Its sql tag compiles lazily after operation admission.",
+          "core": "sql: Compose safe SQL through the shared template tag and fragment utilities.\nsql.strings: Template literal segments.\nsql.values: Bound values or shared SQL nodes.\nA lazy statement exposing run, get and all. Transaction control and journal_mode mutation are rejected.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": ["ISqlExecutor"],
+          "aliasOf": "ISqliteExecutor",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ISqliteExecutor = ISqlExecutor<ISqliteValue, ISqliteRunResult>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The common storage SQL executor specialized for native SQLite rows and mutation results. Its sql tag compiles lazily after operation admission."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ISqliteExecutor from @migaia/storage-plugin-sqlite, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ISqliteExecutor when its type contract and declared inputs match the result you need. Choose a different public symbol when ISqliteExecutor does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "sql: Compose safe SQL through the shared template tag and fragment utilities.\nsql.strings: Template literal segments.\nsql.values: Bound values or shared SQL nodes.\nA lazy statement exposing run, get and all. Transaction control and journal_mode mutation are rejected."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-sqlite/dist/types.d.ts:ISqliteExecutor:export type ISqliteExecutor = ISqlExecutor<ISqliteValue, ISqliteRunResult>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-sqlite-index--ISqliteExecutor"
+        },
+        {
+          "name": "ISqliteMaintenanceApi",
+          "kind": "type",
+          "signature": "export type ISqliteMaintenanceApi = { backup(path: string, ctx?: IOperationContext): Promise<void>; vacuum(ctx?: IOperationContext): Promise<void>; };",
+          "declarationLine": 57,
+          "source": "packages/storage-plugin-sqlite/dist/types.d.ts",
+          "purpose": "Store-only maintenance supplied by sqliteMaintenanceFeature on the original admitted SQL endpoint.",
+          "core": "backup: Run native VACUUM INTO without deleting an existing target.\nbackup.path: New backup destination path.\nbackup.ctx: Optional operation cancellation context.\nResolves after native backup; an existing nonempty target or active transaction rejects.\nvacuum: Run native VACUUM on the original connection.\nvacuum.ctx: Optional operation cancellation context.\nResolves after native maintenance; an active transaction rejects.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "backup",
+              "kind": "method",
+              "optional": false,
+              "signature": "backup(path: string, ctx?: IOperationContext): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "path",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "vacuum",
+              "kind": "method",
+              "optional": false,
+              "signature": "vacuum(ctx?: IOperationContext): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<void>"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "ISqliteMaintenanceApi",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ISqliteMaintenanceApi = { backup(path: string, ctx?: IOperationContext): Promise<void>; vacuum(ctx?: IOperationContext): Promise<void>; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Store-only maintenance supplied by sqliteMaintenanceFeature on the original admitted SQL endpoint."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ISqliteMaintenanceApi from @migaia/storage-plugin-sqlite, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ISqliteMaintenanceApi when its type contract and declared inputs match the result you need. Choose a different public symbol when ISqliteMaintenanceApi does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "backup: Run native VACUUM INTO without deleting an existing target.\nbackup.path: New backup destination path.\nbackup.ctx: Optional operation cancellation context.\nResolves after native backup; an existing nonempty target or active transaction rejects.\nvacuum: Run native VACUUM on the original connection.\nvacuum.ctx: Optional operation cancellation context.\nResolves after native maintenance; an active transaction rejects."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-sqlite/dist/types.d.ts:ISqliteMaintenanceApi:export type ISqliteMaintenanceApi = { backup(path: string, ctx?: IOperationContext): Promise<void>; vacuum(ctx?: IOperationContext): Promise<void>; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-sqlite-index--ISqliteMaintenanceApi"
+        },
+        {
+          "name": "ISqliteOptions",
+          "kind": "type",
+          "signature": "export type ISqliteOptions = { readonly driver: ISqliteDriver; readonly table?: string; readonly concurrency?: IConcurrencyPolicy; readonly owner?: { readonly label?: string; }; readonly maxLockMs?: number; readonly wal?: boolean; };",
+          "declarationLine": 46,
+          "source": "packages/storage-plugin-sqlite/dist/types.d.ts",
+          "purpose": "Installation settings captured by sqliteBackendPlugin before native work begins.",
+          "core": "driver: Caller-owned native connection, exclusive to one installed store until that store drains.\ntable: Physical table prefix, quoted as complete SQL identifiers.\nmigaia, with separate channel and control tables.\nconcurrency: Default policy resolved by the shared concurrency owner.\nThe shared default concurrency policy.\nChoose a logical acquisition budget instead of changing native SQLite timeouts.\nowner: Optional diagnostic owner label; it grants no authority.\nNo custom owner label.\nmaxLockMs: Maximum native WAL lock lease; expiration rejects continued transaction use.\n30000 milliseconds.\nwal: Select native cross-connection WAL locks or the original in-process shared lock port.\ntrue for file databases; false for memory databases. A requested WAL mode must be confirmed by SQLite.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "driver",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly driver: ISqliteDriver;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ISqliteDriver"
+            },
+            {
+              "name": "table",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly table?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "concurrency",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly concurrency?: IConcurrencyPolicy;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IConcurrencyPolicy"
+            },
+            {
+              "name": "owner",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly owner?: { readonly label?: string; };",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "{ readonly label?: string; }"
+            },
+            {
+              "name": "maxLockMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly maxLockMs?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "wal",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly wal?: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "ISqliteOptions",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ISqliteOptions = { readonly driver: ISqliteDriver; readonly table?: string; readonly concurrency?: IConcurrencyPolicy; readonly owner?: { readonly label?: string; }; readonly maxLockMs?: number; readonly wal?: boolean; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Installation settings captured by sqliteBackendPlugin before native work begins."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ISqliteOptions from @migaia/storage-plugin-sqlite, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ISqliteOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when ISqliteOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "driver: Caller-owned native connection, exclusive to one installed store until that store drains.\ntable: Physical table prefix, quoted as complete SQL identifiers.\nmigaia, with separate channel and control tables.\nconcurrency: Default policy resolved by the shared concurrency owner.\nThe shared default concurrency policy.\nChoose a logical acquisition budget instead of changing native SQLite timeouts.\nowner: Optional diagnostic owner label; it grants no authority.\nNo custom owner label.\nmaxLockMs: Maximum native WAL lock lease; expiration rejects continued transaction use.\n30000 milliseconds.\nwal: Select native cross-connection WAL locks or the original in-process shared lock port.\ntrue for file databases; false for memory databases. A requested WAL mode must be confirmed by SQLite."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-sqlite/dist/types.d.ts:ISqliteOptions:export type ISqliteOptions = { readonly driver: ISqliteDriver; readonly table?: string; readonly concurrency?: IConcurrencyPolicy; readonly owner?: { readonly label?: string; }; readonly maxLockMs?: number; readonly wal?: boolean; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-sqlite-index--ISqliteOptions"
+        },
+        {
+          "name": "ISqliteRow",
+          "kind": "type",
+          "signature": "export type ISqliteRow = Readonly<Record<string, ISqliteValue>>;",
+          "declarationLine": 6,
+          "source": "packages/storage-plugin-sqlite/dist/types.d.ts",
+          "purpose": "A readonly dynamic column record. Safe integer columns become numbers; larger integers remain exact bigint; returned binary values are copied.",
+          "core": "A readonly dynamic column record. Safe integer columns become numbers; larger integers remain exact bigint; returned binary values are copied.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": ["Record"],
+          "aliasOf": "ISqliteRow",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ISqliteRow = Readonly<Record<string, ISqliteValue>>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "A readonly dynamic column record. Safe integer columns become numbers; larger integers remain exact bigint; returned binary values are copied."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ISqliteRow from @migaia/storage-plugin-sqlite, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ISqliteRow when its type contract and declared inputs match the result you need. Choose a different public symbol when ISqliteRow does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "A readonly dynamic column record. Safe integer columns become numbers; larger integers remain exact bigint; returned binary values are copied."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-sqlite/dist/types.d.ts:ISqliteRow:export type ISqliteRow = Readonly<Record<string, ISqliteValue>>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-sqlite-index--ISqliteRow"
+        },
+        {
+          "name": "ISqliteRunResult",
+          "kind": "type",
+          "signature": "export type ISqliteRunResult = ISqlRunResult & { readonly lastInsertRowid: number | bigint; };",
+          "declarationLine": 8,
+          "source": "packages/storage-plugin-sqlite/dist/types.d.ts",
+          "purpose": "A native mutation result with changes and a required lastInsertRowid, preserving large integer identities.",
+          "core": "changes: Number of rows changed by the native statement.\nlastInsertRowid: Native insertion rowid, normalized to number only when safely representable.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "lastInsertRowid",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly lastInsertRowid: number | bigint;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number | bigint"
+            }
+          ],
+          "composes": ["ISqlRunResult"],
+          "aliasOf": "ISqliteRunResult",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ISqliteRunResult = ISqlRunResult & { readonly lastInsertRowid: number | bigint; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "A native mutation result with changes and a required lastInsertRowid, preserving large integer identities."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ISqliteRunResult from @migaia/storage-plugin-sqlite, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ISqliteRunResult when its type contract and declared inputs match the result you need. Choose a different public symbol when ISqliteRunResult does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "changes: Number of rows changed by the native statement.\nlastInsertRowid: Native insertion rowid, normalized to number only when safely representable."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-sqlite/dist/types.d.ts:ISqliteRunResult:export type ISqliteRunResult = ISqlRunResult & { readonly lastInsertRowid: number | bigint; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-sqlite-index--ISqliteRunResult"
+        },
+        {
+          "name": "ISqliteStatement",
+          "kind": "type",
+          "signature": "export type ISqliteStatement = { run(...values: readonly ISqliteValue[]): ISqliteRunResult; get(...values: readonly ISqliteValue[]): ISqliteRow | undefined; all(...values: readonly ISqliteValue[]): readonly ISqliteRow[]; };",
+          "declarationLine": 19,
+          "source": "packages/storage-plugin-sqlite/dist/types.d.ts",
+          "purpose": "A synchronous prepared native statement borrowed from its connection. Disposal of that connection seals captured statements too.",
+          "core": "run: Execute a mutation with positional bindings.\nrun.values: Native column values in placeholder order.\nNative changes and insertion identity; native failures retain their cause.\nget: Read the first row with copied native column values.\nget.values: Native positional bindings.\nThe first row, or undefined when no row matches.\nall: Read all rows without leaving a native cursor open.\nall.values: Native positional bindings.\nA detached array of rows, empty when no row matches.",
+          "advanced": "Bind values through a caller-owned prepared statement and read exact native integers.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "run",
+              "kind": "method",
+              "optional": false,
+              "signature": "run(...values: readonly ISqliteValue[]): ISqliteRunResult;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "values",
+                  "type": "readonly ISqliteValue[]",
+                  "optional": false
+                }
+              ],
+              "returns": "ISqliteRunResult"
+            },
+            {
+              "name": "get",
+              "kind": "method",
+              "optional": false,
+              "signature": "get(...values: readonly ISqliteValue[]): ISqliteRow | undefined;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "values",
+                  "type": "readonly ISqliteValue[]",
+                  "optional": false
+                }
+              ],
+              "returns": "ISqliteRow | undefined"
+            },
+            {
+              "name": "all",
+              "kind": "method",
+              "optional": false,
+              "signature": "all(...values: readonly ISqliteValue[]): readonly ISqliteRow[];",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "values",
+                  "type": "readonly ISqliteValue[]",
+                  "optional": false
+                }
+              ],
+              "returns": "readonly ISqliteRow[]"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "ISqliteStatement",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ISqliteStatement = { run(...values: readonly ISqliteValue[]): ISqliteRunResult; get(...values: readonly ISqliteValue[]): ISqliteRow | undefined; all(...values: readonly ISqliteValue[]): readonly ISqliteRow[]; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Bind values through a caller-owned prepared statement and read exact native integers.",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "A synchronous prepared native statement borrowed from its connection. Disposal of that connection seals captured statements too."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ISqliteStatement from @migaia/storage-plugin-sqlite, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ISqliteStatement when its type contract and declared inputs match the result you need. Choose a different public symbol when ISqliteStatement does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "run: Execute a mutation with positional bindings.\nrun.values: Native column values in placeholder order.\nNative changes and insertion identity; native failures retain their cause.\nget: Read the first row with copied native column values.\nget.values: Native positional bindings.\nThe first row, or undefined when no row matches.\nall: Read all rows without leaving a native cursor open.\nall.values: Native positional bindings.\nA detached array of rows, empty when no row matches."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "Bind values through a caller-owned prepared statement and read exact native integers."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-sqlite/dist/types.d.ts:ISqliteStatement:export type ISqliteStatement = { run(...values: readonly ISqliteValue[]): ISqliteRunResult; get(...values: readonly ISqliteValue[]): ISqliteRow | undefined; all(...values: readonly ISqliteValue[]): readonly ISqliteRow[]; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-sqlite-index--ISqliteStatement"
+        },
+        {
+          "name": "ISqliteStore",
+          "kind": "type",
+          "signature": "export type ISqliteStore<TValue = unknown> = ICapabilityStore<ISqliteNativeStore<TValue>, ISqliteCapabilities, readonly [ ICapabilityImpl<typeof kv>, ICapabilityImpl<typeof records, IRecordsApi<TValue>>, ICapabilityImpl<typeof sql, ISqliteExecutor>, ICapabilityImpl<typeof ttl, ITtlApi>, ICapabilityImpl<typeof counter, ICounterApi> ]>;",
+          "declarationLine": 38,
+          "source": "packages/storage-plugin-sqlite/dist/types.d.ts",
+          "purpose": "The installed native store combines text, bytes, typed records, sync access, private metadata, SQL and kv/records/sql/ttl/counter capabilities. Root access rejects while a transaction owns its connection.",
+          "core": "The installed native store combines text, bytes, typed records, sync access, private metadata, SQL and kv/records/sql/ttl/counter capabilities. Root access rejects while a transaction owns its connection.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": ["ICapabilityStore"],
+          "aliasOf": "ISqliteStore",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ISqliteStore<TValue = unknown> = ICapabilityStore<ISqliteNativeStore<TValue>, ISqliteCapabilities, readonly [ ICapabilityImpl<typeof kv>, ICapabilityImpl<typeof records, IRecordsApi<TValue>>, ICapabilityImpl<typeof sql, ISqliteExecutor>, ICapabilityImpl<typeof ttl, ITtlApi>, ICapabilityImpl<typeof counter, ICounterApi> ]>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The installed native store combines text, bytes, typed records, sync access, private metadata, SQL and kv/records/sql/ttl/counter capabilities. Root access rejects while a transaction owns its connection."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ISqliteStore from @migaia/storage-plugin-sqlite, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ISqliteStore when its type contract and declared inputs match the result you need. Choose a different public symbol when ISqliteStore does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The installed native store combines text, bytes, typed records, sync access, private metadata, SQL and kv/records/sql/ttl/counter capabilities. Root access rejects while a transaction owns its connection."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-sqlite/dist/types.d.ts:ISqliteStore:export type ISqliteStore<TValue = unknown> = ICapabilityStore<ISqliteNativeStore<TValue>, ISqliteCapabilities, readonly [ ICapabilityImpl<typeof kv>, ICapabilityImpl<typeof records, IRecordsApi<TValue>>, ICapabilityImpl<typeof sql, ISqliteExecutor>, ICapabilityImpl<typeof ttl, ITtlApi>, ICapabilityImpl<typeof counter, ICounterApi> ]>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-sqlite-index--ISqliteStore"
+        },
+        {
+          "name": "ISqliteTransactionScope",
+          "kind": "type",
+          "signature": "export type ISqliteTransactionScope<TValue = unknown> = ITransactionScope<TValue, ISqliteCapabilities> & ISqliteExecutor;",
+          "declarationLine": 29,
+          "source": "packages/storage-plugin-sqlite/dist/types.d.ts",
+          "purpose": "An authentic short transaction view with complete shared transaction operations, selected Feature API and native SQL on the same connection. Derived record queries retain selected chain methods. A caught operation failure still rolls back the whole transaction.",
+          "core": "An authentic short transaction view with complete shared transaction operations, selected Feature API and native SQL on the same connection. Derived record queries retain selected chain methods. A caught operation failure still rolls back the whole transaction.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": ["ITransactionScope", "ISqliteExecutor"],
+          "aliasOf": "ISqliteTransactionScope",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type ISqliteTransactionScope<TValue = unknown> = ITransactionScope<TValue, ISqliteCapabilities> & ISqliteExecutor;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "An authentic short transaction view with complete shared transaction operations, selected Feature API and native SQL on the same connection. Derived record queries retain selected chain methods. A caught operation failure still rolls back the whole transaction."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ISqliteTransactionScope from @migaia/storage-plugin-sqlite, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ISqliteTransactionScope when its type contract and declared inputs match the result you need. Choose a different public symbol when ISqliteTransactionScope does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "An authentic short transaction view with complete shared transaction operations, selected Feature API and native SQL on the same connection. Derived record queries retain selected chain methods. A caught operation failure still rolls back the whole transaction."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-sqlite/dist/types.d.ts:ISqliteTransactionScope:export type ISqliteTransactionScope<TValue = unknown> = ITransactionScope<TValue, ISqliteCapabilities> & ISqliteExecutor;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-sqlite-index--ISqliteTransactionScope"
+        },
+        {
+          "name": "ISqliteValue",
+          "kind": "type",
+          "signature": "export type ISqliteValue = Exclude<ISqlValue, boolean>;",
+          "declarationLine": 4,
+          "source": "packages/storage-plugin-sqlite/dist/types.d.ts",
+          "purpose": "A native SQLite column value: null, number, bigint, string or bytes. SQL inputs also accept booleans, which bind as integers.",
+          "core": "A native SQLite column value: null, number, bigint, string or bytes. SQL inputs also accept booleans, which bind as integers.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": ["Exclude"],
+          "aliasOf": "ISqliteValue",
+          "exportPath": ".",
+          "overloadSignatures": ["export type ISqliteValue = Exclude<ISqlValue, boolean>;"],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "A native SQLite column value: null, number, bigint, string or bytes. SQL inputs also accept booleans, which bind as integers."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ISqliteValue from @migaia/storage-plugin-sqlite, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ISqliteValue when its type contract and declared inputs match the result you need. Choose a different public symbol when ISqliteValue does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "A native SQLite column value: null, number, bigint, string or bytes. SQL inputs also accept booleans, which bind as integers."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-sqlite/dist/types.d.ts:ISqliteValue:export type ISqliteValue = Exclude<ISqlValue, boolean>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-sqlite-index--ISqliteValue"
+        },
+        {
+          "name": "sqliteBackendKind",
+          "kind": "const",
+          "signature": "export declare const sqliteBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"sqlite\", ISqliteStore, ISqliteDriver, { getTransactionClient(scope: ISqliteTransactionScope): ISqliteDriver; }>;",
+          "declarationLine": 4,
+          "source": "packages/storage-plugin-sqlite/dist/plugin.d.ts",
+          "purpose": "Authenticate SQLite Feature targets by exact kind identity.",
+          "core": "A neutral kind token; it owns no connection and grants no close authority.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "sqliteBackendKind",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const sqliteBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"sqlite\", ISqliteStore, ISqliteDriver, { getTransactionClient(scope: ISqliteTransactionScope): ISqliteDriver; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Authenticate SQLite Feature targets by exact kind identity."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import sqliteBackendKind from @migaia/storage-plugin-sqlite, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use sqliteBackendKind when its const contract and declared inputs match the result you need. Choose a different public symbol when sqliteBackendKind does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "A neutral kind token; it owns no connection and grants no close authority."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-sqlite/dist/plugin.d.ts:sqliteBackendKind:export declare const sqliteBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"sqlite\", ISqliteStore, ISqliteDriver, { getTransactionClient(scope: ISqliteTransactionScope): ISqliteDriver; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-sqlite-index--sqliteBackendKind"
+        },
+        {
+          "name": "sqliteBackendPlugin",
+          "kind": "function",
+          "signature": "export declare function sqliteBackendPlugin<TValue = unknown, const TId extends string = 'sqlite', const F extends IStorageFeatureRecord = {}>(options: ISqliteOptions & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof sqliteBackendKind, NoInfer<F>, ISqliteStore<TValue>>): IStorageBackendPlugin<typeof sqliteBackendKind, NoInfer<TId>, F, ISqliteStore<TValue>>;",
+          "declarationLine": 8,
+          "source": "packages/storage-plugin-sqlite/dist/plugin.d.ts",
+          "purpose": "Define one caller-owned driver backend for the storage host.",
+          "core": "options: Captured driver and backend configuration.\nfeatures: Optional exact-kind Feature definitions keyed by installed API name.\nAn exact-id backend plugin. File databases verify WAL by default; memory defaults to wal:false and can reserve private native log namespaces.\ndriver: Caller-owned native connection, exclusive to one installed store until that store drains.\ntable: Physical table prefix, quoted as complete SQL identifiers.\nmigaia, with separate channel and control tables.\nconcurrency: Default policy resolved by the shared concurrency owner.\nThe shared default concurrency policy.\nChoose a logical acquisition budget instead of changing native SQLite timeouts.\nowner: Optional diagnostic owner label; it grants no authority.\nNo custom owner label.\nmaxLockMs: Maximum native WAL lock lease; expiration rejects continued transaction use.\n30000 milliseconds.\nwal: Select native cross-connection WAL locks or the original in-process shared lock port.\ntrue for file databases; false for memory databases. A requested WAL mode must be confirmed by SQLite.\nid: Literal backend id selected by host.backend.\nsqlite.\nowner.label: Diagnostic text for the existing concurrency owner.\nNo custom label.",
+          "advanced": "",
+          "parameters": [
+            "options: ISqliteOptions & { readonly id?: TId; }",
+            "features: F & IStorageFeatureStoreCompatibility<typeof sqliteBackendKind, NoInfer<F>, ISqliteStore<TValue>> (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "ISqliteOptions & { readonly id?: TId; }",
+              "optional": false
+            },
+            {
+              "name": "features",
+              "type": "F & IStorageFeatureStoreCompatibility<typeof sqliteBackendKind, NoInfer<F>, ISqliteStore<TValue>>",
+              "optional": true
+            }
+          ],
+          "returns": "IStorageBackendPlugin<typeof sqliteBackendKind, NoInfer<TId>, F, ISqliteStore<TValue>>",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { kv, records, ttl, counter } from '@migaia/storage-contract'\nimport { lockKey } from '@migaia/storage-host/authoring/concurrency'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nawait using connection = nodeSqliteDriver('./example-settings.sqlite')\nawait using host = await createStorageHost({\n  plugins: [sqliteBackendPlugin({ driver: connection })] as const\n})\nconst store = host.org('10000000-0000-4000-8000-000000000001').backend('sqlite')\nawait store\n  .tx()\n  .lock(lockKey.text('example:status'))\n  .run(async (tx) => {\n    await tx.use(kv).setMany([\n      { key: 'example:status', value: 'ready' },\n      { key: ['example', 1], value: 'first', ttlMs: 60000 }\n    ])\n    await tx.putRecord({ name: 'Ada' }, 'example:user')\n    await tx.use(ttl).expire(lockKey.text('example:status'), 60000)\n    await tx.set('example:count', '0')\n    await tx.use(counter).increment('example:count')\n  })\nconsole.log(await store.get('example:status'))\nconsole.log(await store.get('example:count'))\nconsole.log((await store.use(records).query().all()).length >= 1)",
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { sqlFragment } from '@migaia/storage-host/authoring/sql'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nawait using connection = nodeSqliteDriver(':memory:')\nawait using host = await createStorageHost({\n  plugins: [sqliteBackendPlugin({ driver: connection })] as const\n})\nconst store = host.backend('sqlite')\nawait store.sql`CREATE TABLE app_users(id INTEGER PRIMARY KEY, name TEXT)`.run()\nawait store.transaction(async (tx) => {\n  await tx.sql`INSERT INTO app_users VALUES(${1}, ${'Ada'})`.run()\n  await tx.set('user-count', '1')\n})\nconst row = await store.sql<{ name: string }>`\n  SELECT name FROM ${sqlFragment.id('app_users')} WHERE id=${1}\n`.get()\nconsole.log(row?.name)\nconsole.log(store.sync!.get('user-count'))",
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nimport { sqliteMaintenanceFeature } from '@migaia/storage-plugin-sqlite/features/maintenance'\nawait using connection = nodeSqliteDriver('./example-settings.sqlite')\nawait using host = await createStorageHost({\n  plugins: [\n    sqliteBackendPlugin({ driver: connection }, { maintenance: sqliteMaintenanceFeature() })\n  ] as const\n})\nconst store = host.backend('sqlite')\nawait store.set('example:backup', 'ready')\nawait store.api.maintenance.backup(`./example-backup-${crypto.randomUUID()}.sqlite`)\nconsole.log(await store.get('example:backup'))",
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nawait using connection = nodeSqliteDriver(':memory:')\nawait using host = await createStorageHost({\n  plugins: [sqliteBackendPlugin({ driver: connection })] as const\n})\nconst store = host.backend('sqlite')\nawait store.set('theme', 'dark')\nconsole.log(await store.get('theme'))"
+          ],
+          "members": [],
+          "composes": [],
+          "aliasOf": "sqliteBackendPlugin",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function sqliteBackendPlugin<TValue = unknown, const TId extends string = 'sqlite', const F extends IStorageFeatureRecord = {}>(options: ISqliteOptions & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof sqliteBackendKind, NoInfer<F>, ISqliteStore<TValue>>): IStorageBackendPlugin<typeof sqliteBackendKind, NoInfer<TId>, F, ISqliteStore<TValue>>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "ISqliteOptions & { readonly id?: TId; }",
+                "optional": false
+              },
+              {
+                "name": "features",
+                "type": "F & IStorageFeatureStoreCompatibility<typeof sqliteBackendKind, NoInfer<F>, ISqliteStore<TValue>>",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "IStorageBackendPlugin<typeof sqliteBackendKind, NoInfer<TId>, F, ISqliteStore<TValue>>"
+          ],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Define one caller-owned driver backend for the storage host."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import sqliteBackendPlugin from @migaia/storage-plugin-sqlite, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use sqliteBackendPlugin when its function contract and declared inputs match the result you need. Choose a different public symbol when sqliteBackendPlugin does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "options: Captured driver and backend configuration.\nfeatures: Optional exact-kind Feature definitions keyed by installed API name.\nAn exact-id backend plugin. File databases verify WAL by default; memory defaults to wal:false and can reserve private native log namespaces.\ndriver: Caller-owned native connection, exclusive to one installed store until that store drains.\ntable: Physical table prefix, quoted as complete SQL identifiers.\nmigaia, with separate channel and control tables.\nconcurrency: Default policy resolved by the shared concurrency owner.\nThe shared default concurrency policy.\nChoose a logical acquisition budget instead of changing native SQLite timeouts.\nowner: Optional diagnostic owner label; it grants no authority.\nNo custom owner label.\nmaxLockMs: Maximum native WAL lock lease; expiration rejects continued transaction use.\n30000 milliseconds.\nwal: Select native cross-connection WAL locks or the original in-process shared lock port.\ntrue for file databases; false for memory databases. A requested WAL mode must be confirmed by SQLite.\nid: Literal backend id selected by host.backend.\nsqlite.\nowner.label: Diagnostic text for the existing concurrency owner.\nNo custom label."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "id",
+              "type": "TId",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "driver",
+              "type": "ISqliteDriver",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "table",
+              "type": "string",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "concurrency",
+              "type": "IConcurrencyPolicy",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "owner",
+              "type": "{ readonly label?: string; }",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "owner.label",
+              "type": "string",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "maxLockMs",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "wal",
+              "type": "boolean",
+              "optional": true,
+              "description": ""
+            }
+          ],
+          "identity": "packages/storage-plugin-sqlite/dist/plugin.d.ts:sqliteBackendPlugin:export declare function sqliteBackendPlugin<TValue = unknown, const TId extends string = 'sqlite', const F extends IStorageFeatureRecord = {}>(options: ISqliteOptions & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof sqliteBackendKind, NoInfer<F>, ISqliteStore<TValue>>): IStorageBackendPlugin<typeof sqliteBackendKind, NoInfer<TId>, F, ISqliteStore<TValue>>;",
+          "guidance": [],
+          "usageScore": 54,
+          "configuration": [
+            {
+              "name": "id",
+              "type": "TId",
+              "optional": true,
+              "description": "组织 ID 是 UUID。所有组织共用连接和物理表；逻辑键、期限、修订与锁按组织隔离。访问组织不会开新连接或创建新表。`host.dropOrg(id)` 只删除相应组织的托管数据，不删除应用表。显式组织视图不提供任意 SQL 或数据库维护。",
+              "descriptionEn": "",
+              "descriptionZh": "组织 ID 是 UUID。所有组织共用连接和物理表；逻辑键、期限、修订与锁按组织隔离。访问组织不会开新连接或创建新表。`host.dropOrg(id)` 只删除相应组织的托管数据，不删除应用表。显式组织视图不提供任意 SQL 或数据库维护。"
+            },
+            {
+              "name": "driver",
+              "type": "ISqliteDriver",
+              "optional": false,
+              "description": "`sqliteBackendPlugin({ driver, table?, wal? })` — 安装 SQLite 存储",
+              "descriptionEn": "",
+              "descriptionZh": "`sqliteBackendPlugin({ driver, table?, wal? })` — 安装 SQLite 存储"
+            },
+            {
+              "name": "table",
+              "type": "string",
+              "optional": true,
+              "description": "`sqliteBackendPlugin({ driver, table?, wal? })` — 安装 SQLite 存储",
+              "descriptionEn": "",
+              "descriptionZh": "`sqliteBackendPlugin({ driver, table?, wal? })` — 安装 SQLite 存储"
+            },
+            {
+              "name": "concurrency",
+              "type": "IConcurrencyPolicy",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "owner",
+              "type": "{ readonly label?: string; }",
+              "optional": true,
+              "description": "Groups `owner.label`; configure the nested fields below.",
+              "descriptionEn": "Groups `owner.label`; configure the nested fields below.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "owner.label",
+              "type": "string",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "maxLockMs",
+              "type": "number",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "wal",
+              "type": "boolean",
+              "optional": true,
+              "description": "`sqliteBackendPlugin({ driver, table?, wal? })` — 安装 SQLite 存储",
+              "descriptionEn": "",
+              "descriptionZh": "`sqliteBackendPlugin({ driver, table?, wal? })` — 安装 SQLite 存储"
+            }
+          ],
+          "fragment": "storage-plugin-sqlite-index--sqliteBackendPlugin"
+        },
+        {
+          "name": "SqliteErrorCode",
+          "kind": "const",
+          "signature": "export declare const SqliteErrorCode: { /** Native opening, SQL, schema or close failed; inspect the preserved cause. */ readonly sqliteFailed: 'SQLITE_FAILED'; /** Transaction callback, ownership, commit or rollback failed. */ readonly transactionFailed: 'TRANSACTION_FAILED'; /** Another public channel owns the same key; explicitly request replacement. */ readonly duplicateKey: 'DUPLICATE_KEY'; /** Persisted data is damaged; preserve it and inspect the decoder cause. */ readonly decodeFailed: 'DECODE_FAILED'; };",
+          "declarationLine": 4,
+          "source": "packages/storage-plugin-sqlite/dist/error-code.d.ts",
+          "purpose": "Identify SQLite native, transaction, channel-conflict and decode failures.",
+          "core": "SQLITE_FAILED, TRANSACTION_FAILED, DUPLICATE_KEY and DECODE_FAILED, retaining original errors through cause or AggregateError.errors.\nsqliteFailed: A native operation or connection operation failed; inspect cause.\ntransactionFailed: A transaction failed or root access met an occupied connection; inspect cause and cleanup errors.\nduplicateKey: A write collides with another public storage channel under reject policy.\ndecodeFailed: Persisted key or value decoding failed; inspect cause without discarding the stored data.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "sqliteFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly sqliteFailed: 'SQLITE_FAILED';",
+              "description": "Native opening, SQL, schema or close failed; inspect the preserved cause.",
+              "parameterDetails": [],
+              "returns": "'SQLITE_FAILED'"
+            },
+            {
+              "name": "transactionFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly transactionFailed: 'TRANSACTION_FAILED';",
+              "description": "Transaction callback, ownership, commit or rollback failed.",
+              "parameterDetails": [],
+              "returns": "'TRANSACTION_FAILED'"
+            },
+            {
+              "name": "duplicateKey",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly duplicateKey: 'DUPLICATE_KEY';",
+              "description": "Another public channel owns the same key; explicitly request replacement.",
+              "parameterDetails": [],
+              "returns": "'DUPLICATE_KEY'"
+            },
+            {
+              "name": "decodeFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly decodeFailed: 'DECODE_FAILED';",
+              "description": "Persisted data is damaged; preserve it and inspect the decoder cause.",
+              "parameterDetails": [],
+              "returns": "'DECODE_FAILED'"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "SqliteErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const SqliteErrorCode: { /** Native opening, SQL, schema or close failed; inspect the preserved cause. */ readonly sqliteFailed: 'SQLITE_FAILED'; /** Transaction callback, ownership, commit or rollback failed. */ readonly transactionFailed: 'TRANSACTION_FAILED'; /** Another public channel owns the same key; explicitly request replacement. */ readonly duplicateKey: 'DUPLICATE_KEY'; /** Persisted data is damaged; preserve it and inspect the decoder cause. */ readonly decodeFailed: 'DECODE_FAILED'; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Identify SQLite native, transaction, channel-conflict and decode failures."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import SqliteErrorCode from @migaia/storage-plugin-sqlite, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use SqliteErrorCode when its const contract and declared inputs match the result you need. Choose a different public symbol when SqliteErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "SQLITE_FAILED, TRANSACTION_FAILED, DUPLICATE_KEY and DECODE_FAILED, retaining original errors through cause or AggregateError.errors.\nsqliteFailed: A native operation or connection operation failed; inspect cause.\ntransactionFailed: A transaction failed or root access met an occupied connection; inspect cause and cleanup errors.\nduplicateKey: A write collides with another public storage channel under reject policy.\ndecodeFailed: Persisted key or value decoding failed; inspect cause without discarding the stored data."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-sqlite/dist/error-code.d.ts:SqliteErrorCode:export declare const SqliteErrorCode: { /** Native opening, SQL, schema or close failed; inspect the preserved cause. */ readonly sqliteFailed: 'SQLITE_FAILED'; /** Transaction callback, ownership, commit or rollback failed. */ readonly transactionFailed: 'TRANSACTION_FAILED'; /** Another public channel owns the same key; explicitly request replacement. */ readonly duplicateKey: 'DUPLICATE_KEY'; /** Persisted data is damaged; preserve it and inspect the decoder cause. */ readonly decodeFailed: 'DECODE_FAILED'; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-sqlite-index--SqliteErrorCode"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "storage-plugin-sqlite:bun",
+      "library": "storage-plugin-sqlite",
+      "module": "bun",
+      "exportPath": "./bun",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/storage-plugin-sqlite/getting-started",
+      "architecturePath": "/en/docs/storage-plugin-sqlite",
+      "symbols": [
+        {
+          "name": "bunSqliteDriver",
+          "kind": "function",
+          "signature": "export declare function bunSqliteDriver(path: string): ISqliteConnection;",
+          "declarationLine": 3,
+          "source": "packages/storage-plugin-sqlite/dist/bun.d.ts",
+          "purpose": "Open bun:sqlite with safeIntegers enabled before statements run.",
+          "core": "path: Native database filename or :memory: for a private memory database.\nA caller-owned connection; disposal uses native close(true).",
+          "advanced": "",
+          "parameters": ["path: string"],
+          "parameterDetails": [
+            {
+              "name": "path",
+              "type": "string",
+              "optional": false
+            }
+          ],
+          "returns": "ISqliteConnection",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "exportPath": "./bun",
+          "overloadSignatures": [
+            "export declare function bunSqliteDriver(path: string): ISqliteConnection;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "path",
+                "type": "string",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["ISqliteConnection"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Open bun:sqlite with safeIntegers enabled before statements run."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import bunSqliteDriver from @migaia/storage-plugin-sqlite/bun, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use bunSqliteDriver when its function contract and declared inputs match the result you need. Choose a different public symbol when bunSqliteDriver does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "path: Native database filename or :memory: for a private memory database.\nA caller-owned connection; disposal uses native close(true)."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-sqlite/dist/bun.d.ts:bunSqliteDriver:export declare function bunSqliteDriver(path: string): ISqliteConnection;",
+          "guidance": [],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "storage-plugin-sqlite-bun--bunSqliteDriver"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "storage-plugin-sqlite:features/maintenance",
+      "library": "storage-plugin-sqlite",
+      "module": "features/maintenance",
+      "exportPath": "./features/maintenance",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/storage-plugin-sqlite/getting-started",
+      "architecturePath": "/en/docs/storage-plugin-sqlite",
+      "symbols": [
+        {
+          "name": "sqliteMaintenanceFeature",
+          "kind": "function",
+          "signature": "export declare function sqliteMaintenanceFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"sqlite\", import(\"../types.js\").ISqliteStore, import(\"../types.js\").ISqliteDriver, { getTransactionClient(scope: import(\"../types.js\").ISqliteTransactionScope): import(\"../types.js\").ISqliteDriver; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly maintenance: ISqliteMaintenanceApi; }; readonly transaction: {}; }>, {}>;",
+          "declarationLine": 4,
+          "source": "packages/storage-plugin-sqlite/dist/features/maintenance.d.ts",
+          "purpose": "Add backup and vacuum only to the installed store API.",
+          "core": "A SQLite Feature. Transactions expose neither maintenance operation.",
+          "advanced": "",
+          "parameters": ["This function declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"sqlite\", import(\"../types.js\").ISqliteStore, import(\"../types.js\").ISqliteDriver, { getTransactionClient(scope: import(\"../types.js\").ISqliteTransactionScope): import(\"../types.js\").ISqliteDriver; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly maintenance: ISqliteMaintenanceApi; }; readonly transaction: {}; }>, {}>",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nimport { sqliteMaintenanceFeature } from '@migaia/storage-plugin-sqlite/features/maintenance'\nawait using connection = nodeSqliteDriver('./example-settings.sqlite')\nawait using host = await createStorageHost({\n  plugins: [\n    sqliteBackendPlugin({ driver: connection }, { maintenance: sqliteMaintenanceFeature() })\n  ] as const\n})\nconst store = host.backend('sqlite')\nawait store.set('example:backup', 'ready')\nawait store.api.maintenance.backup(`./example-backup-${crypto.randomUUID()}.sqlite`)\nconsole.log(await store.get('example:backup'))"
+          ],
+          "members": [],
+          "composes": [],
+          "exportPath": "./features/maintenance",
+          "overloadSignatures": [
+            "export declare function sqliteMaintenanceFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"sqlite\", import(\"../types.js\").ISqliteStore, import(\"../types.js\").ISqliteDriver, { getTransactionClient(scope: import(\"../types.js\").ISqliteTransactionScope): import(\"../types.js\").ISqliteDriver; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly maintenance: ISqliteMaintenanceApi; }; readonly transaction: {}; }>, {}>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [
+            "import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"sqlite\", import(\"../types.js\").ISqliteStore, import(\"../types.js\").ISqliteDriver, { getTransactionClient(scope: import(\"../types.js\").ISqliteTransactionScope): import(\"../types.js\").ISqliteDriver; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly maintenance: ISqliteMaintenanceApi; }; readonly transaction: {}; }>, {}>"
+          ],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Add backup and vacuum only to the installed store API."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import sqliteMaintenanceFeature from @migaia/storage-plugin-sqlite/features/maintenance, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use sqliteMaintenanceFeature when its function contract and declared inputs match the result you need. Choose a different public symbol when sqliteMaintenanceFeature does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "A SQLite Feature. Transactions expose neither maintenance operation."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-sqlite/dist/features/maintenance.d.ts:sqliteMaintenanceFeature:export declare function sqliteMaintenanceFeature(): import(\"@migaia/storage-host\").IStorageFeature<import(\"@migaia/storage-host\").IStorageBackendKind<\"sqlite\", import(\"../types.js\").ISqliteStore, import(\"../types.js\").ISqliteDriver, { getTransactionClient(scope: import(\"../types.js\").ISqliteTransactionScope): import(\"../types.js\").ISqliteDriver; }>, IStorageFeatureOutput<readonly [], {}, { readonly store: { readonly maintenance: ISqliteMaintenanceApi; }; readonly transaction: {}; }>, {}>;",
+          "guidance": [],
+          "usageScore": 16,
+          "configuration": [],
+          "fragment": "storage-plugin-sqlite-features/maintenance--sqliteMaintenanceFeature"
+        }
+      ],
+      "aliases": []
+    },
+    {
+      "id": "storage-plugin-sqlite:node",
+      "library": "storage-plugin-sqlite",
+      "module": "node",
+      "exportPath": "./node",
+      "sections": [
+        "introduction",
+        "getting-started",
+        "when-to-use",
+        "quick-implementation",
+        "core-usage",
+        "advanced-usage"
+      ],
+      "guidePath": "/en/docs/storage-plugin-sqlite/getting-started",
+      "architecturePath": "/en/docs/storage-plugin-sqlite",
+      "symbols": [
+        {
+          "name": "nodeSqliteDriver",
+          "kind": "function",
+          "signature": "export declare function nodeSqliteDriver(path: string): ISqliteConnection;",
+          "declarationLine": 3,
+          "source": "packages/storage-plugin-sqlite/dist/node.d.ts",
+          "purpose": "Open the native Node/Deno SQLite connection with exact integers.",
+          "core": "path: Native database filename or :memory: for a private memory database.\nA caller-owned synchronous driver and storage resource, without a public native Database or close method.",
+          "advanced": "",
+          "parameters": ["path: string"],
+          "parameterDetails": [
+            {
+              "name": "path",
+              "type": "string",
+              "optional": false
+            }
+          ],
+          "returns": "ISqliteConnection",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { kv, records, ttl, counter } from '@migaia/storage-contract'\nimport { lockKey } from '@migaia/storage-host/authoring/concurrency'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nawait using connection = nodeSqliteDriver('./example-settings.sqlite')\nawait using host = await createStorageHost({\n  plugins: [sqliteBackendPlugin({ driver: connection })] as const\n})\nconst store = host.org('10000000-0000-4000-8000-000000000001').backend('sqlite')\nawait store\n  .tx()\n  .lock(lockKey.text('example:status'))\n  .run(async (tx) => {\n    await tx.use(kv).setMany([\n      { key: 'example:status', value: 'ready' },\n      { key: ['example', 1], value: 'first', ttlMs: 60000 }\n    ])\n    await tx.putRecord({ name: 'Ada' }, 'example:user')\n    await tx.use(ttl).expire(lockKey.text('example:status'), 60000)\n    await tx.set('example:count', '0')\n    await tx.use(counter).increment('example:count')\n  })\nconsole.log(await store.get('example:status'))\nconsole.log(await store.get('example:count'))\nconsole.log((await store.use(records).query().all()).length >= 1)",
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { sqlFragment } from '@migaia/storage-host/authoring/sql'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nawait using connection = nodeSqliteDriver(':memory:')\nawait using host = await createStorageHost({\n  plugins: [sqliteBackendPlugin({ driver: connection })] as const\n})\nconst store = host.backend('sqlite')\nawait store.sql`CREATE TABLE app_users(id INTEGER PRIMARY KEY, name TEXT)`.run()\nawait store.transaction(async (tx) => {\n  await tx.sql`INSERT INTO app_users VALUES(${1}, ${'Ada'})`.run()\n  await tx.set('user-count', '1')\n})\nconst row = await store.sql<{ name: string }>`\n  SELECT name FROM ${sqlFragment.id('app_users')} WHERE id=${1}\n`.get()\nconsole.log(row?.name)\nconsole.log(store.sync!.get('user-count'))",
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nimport { sqliteMaintenanceFeature } from '@migaia/storage-plugin-sqlite/features/maintenance'\nawait using connection = nodeSqliteDriver('./example-settings.sqlite')\nawait using host = await createStorageHost({\n  plugins: [\n    sqliteBackendPlugin({ driver: connection }, { maintenance: sqliteMaintenanceFeature() })\n  ] as const\n})\nconst store = host.backend('sqlite')\nawait store.set('example:backup', 'ready')\nawait store.api.maintenance.backup(`./example-backup-${crypto.randomUUID()}.sqlite`)\nconsole.log(await store.get('example:backup'))",
+            "import { createStorageHost } from '@migaia/storage-host'\nimport { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'\nimport { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'\nawait using connection = nodeSqliteDriver(':memory:')\nawait using host = await createStorageHost({\n  plugins: [sqliteBackendPlugin({ driver: connection })] as const\n})\nconst store = host.backend('sqlite')\nawait store.set('theme', 'dark')\nconsole.log(await store.get('theme'))"
+          ],
+          "members": [],
+          "composes": [],
+          "exportPath": "./node",
+          "overloadSignatures": [
+            "export declare function nodeSqliteDriver(path: string): ISqliteConnection;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "path",
+                "type": "string",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["ISqliteConnection"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Open the native Node/Deno SQLite connection with exact integers."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import nodeSqliteDriver from @migaia/storage-plugin-sqlite/node, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use nodeSqliteDriver when its function contract and declared inputs match the result you need. Choose a different public symbol when nodeSqliteDriver does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "path: Native database filename or :memory: for a private memory database.\nA caller-owned synchronous driver and storage resource, without a public native Database or close method."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-sqlite/dist/node.d.ts:nodeSqliteDriver:export declare function nodeSqliteDriver(path: string): ISqliteConnection;",
+          "guidance": [],
+          "usageScore": 54,
+          "configuration": [],
+          "fragment": "storage-plugin-sqlite-node--nodeSqliteDriver"
+        }
+      ],
+      "aliases": []
+    }
+  ]
+}

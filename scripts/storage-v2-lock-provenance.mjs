@@ -154,6 +154,8 @@ function parseStrictLockDocument(lockfile) {
  *     string,
  *     {
  *       readonly name?: string
+ *       readonly peerDependencies: ReadonlyMap<string, string>
+ *       readonly peerDependenciesMeta: ReadonlyMap<string, { readonly optional?: boolean }>
  *       readonly resolution: ReadonlyMap<string, string>
  *       readonly version: string
  *     }
@@ -161,6 +163,7 @@ function parseStrictLockDocument(lockfile) {
  *   readonly snapshots: ReadonlyMap<string, ReadonlyMap<string, string>>
  * }}
  *   Typed provenance rows
+ * @throws {Error} The lockfile violates the closed YAML or pnpm schema
  */
 export function parseStorageV2PnpmLockfile(lockfile) {
   /** Root mapping is accepted only after strict whole-document parsing. */
@@ -230,10 +233,17 @@ export function parseStorageV2PnpmLockfile(lockfile) {
         requireString(resolutionKey, `packages.${identity}.resolution key`),
         requireString(resolutionValue, `packages.${identity}.resolution.${String(resolutionKey)}`)
       )
-    for (const field of ['engines', 'peerDependencies']) {
-      if (packageRow.has(field))
-        requireStringMap(packageRow.get(field), `packages.${identity}.${field}`)
-    }
+    if (packageRow.has('engines'))
+      requireStringMap(packageRow.get('engines'), `packages.${identity}.engines`)
+    /** Peer declarations remain authorization facts rather than unchecked package metadata. */
+    const peerDependencies = packageRow.has('peerDependencies')
+      ? requireStringMap(
+          packageRow.get('peerDependencies'),
+          `packages.${identity}.peerDependencies`
+        )
+      : new Map()
+    /** Optional peer admission is owned by the independently packed manifest. */
+    const peerDependenciesMeta = new Map()
     for (const field of ['cpu', 'os', 'libc']) {
       if (!packageRow.has(field)) continue
       /** Platform selector arrays remain strings and are not interpreted by provenance admission. */
@@ -262,6 +272,10 @@ export function parseStorageV2PnpmLockfile(lockfile) {
           throw new Error(
             `packages.${identity}.peerDependenciesMeta.${String(peerName)}.optional must be boolean`
           )
+        peerDependenciesMeta.set(
+          peerName,
+          meta.has('optional') ? { optional: meta.get('optional') } : {}
+        )
       }
     }
     for (const field of ['hasBin', 'requiresBuild']) {
@@ -274,6 +288,8 @@ export function parseStorageV2PnpmLockfile(lockfile) {
       ...(packageRow.has('name')
         ? { name: requireString(packageRow.get('name'), `packages.${identity}.name`) }
         : {}),
+      peerDependencies,
+      peerDependenciesMeta,
       resolution: resolutionFields,
       version: requireString(packageRow.get('version'), `packages.${identity}.version`)
     })
@@ -282,28 +298,32 @@ export function parseStorageV2PnpmLockfile(lockfile) {
   /** Snapshot output contains only exact runtime dependency edges. */
   const snapshots = new Map()
   for (const [identityValue, snapshotValue] of requireMap(root.get('snapshots'), 'snapshots')) {
-    /** Snapshot identity must equal its package identity when used by graph authorization. */
+    /** Snapshot identity includes pnpm's resolved peer suffix when the package has peers. */
     const identity = requireString(identityValue, 'snapshot identity')
     /** Snapshot row rejects unknown groups and non-map dependencies. */
     const snapshot = requireMap(snapshotValue, `snapshots.${identity}`)
     requireClosedKeys(snapshot, snapshotRowKeys, `snapshots.${identity}`)
-    if (snapshot.has('optionalDependencies'))
-      requireStringMap(
+    /** Resolved optional peers are runtime edges and use the same exact authorization below. */
+    const dependencies = snapshot.has('dependencies')
+      ? requireStringMap(snapshot.get('dependencies'), `snapshots.${identity}.dependencies`)
+      : new Map()
+    if (snapshot.has('optionalDependencies')) {
+      for (const [name, locator] of requireStringMap(
         snapshot.get('optionalDependencies'),
         `snapshots.${identity}.optionalDependencies`
-      )
+      )) {
+        if (dependencies.has(name) && dependencies.get(name) !== locator)
+          throw new Error(`snapshots.${identity} contains conflicting dependency edge: ${name}`)
+        dependencies.set(name, locator)
+      }
+    }
     if (snapshot.has('transitivePeerDependencies')) {
       /** Transitive peer names are metadata and cannot become hidden graph edges. */
       const peers = snapshot.get('transitivePeerDependencies')
       if (!Array.isArray(peers) || peers.some((value) => typeof value !== 'string'))
         throw new Error(`snapshots.${identity}.transitivePeerDependencies must be a string array`)
     }
-    snapshots.set(
-      identity,
-      snapshot.has('dependencies')
-        ? requireStringMap(snapshot.get('dependencies'), `snapshots.${identity}.dependencies`)
-        : new Map()
-    )
+    snapshots.set(identity, dependencies)
   }
   return { importers, overrides, packages, snapshots }
 }
@@ -361,8 +381,12 @@ export function storageV2TarballIntegrity(tarballBytes) {
  *   readonly tarballPath: string
  *   readonly integrity: string
  *   readonly dependencies: Readonly<Record<string, string>>
+ *   readonly peerDependencies?: Readonly<Record<string, string>>
+ *   readonly peerDependenciesMeta?: Readonly<Record<string, { readonly optional?: boolean }>>
  * }[]} artifacts
  *   independently packed release facts
+ * @param {readonly string[]} [importerRoots] Exact direct package roots; omitted callers retain the
+ *   storage-web-only profile
  * @returns {ReadonlyMap<
  *   string,
  *   {
@@ -373,34 +397,85 @@ export function storageV2TarballIntegrity(tarballBytes) {
  *   }
  * >}
  *   Immutable authorization facts keyed by package name
+ * @throws {Error} The importer, packed graph, peer instance, or tarball provenance differs
  */
-export function authorizeStorageV2LockProvenance(lockfile, canonicalConsumerDirectory, artifacts) {
+export function authorizeStorageV2LockProvenance(
+  lockfile,
+  canonicalConsumerDirectory,
+  artifacts,
+  importerRoots = ['@migaia/storage-web']
+) {
   /** Strict parsed value is the sole lockfile authority. */
   const parsed = parseStorageV2PnpmLockfile(lockfile)
   if ([...parsed.importers.keys()].join('\0') !== '.')
     throw new Error('fresh consumer importer set must equal [.]')
-  /** Root importer must contain only storage-web. */
+  /** Root importer must contain exactly the consumer's independently declared package roots. */
   const rootImporter = parsed.importers.get('.')
   if (rootImporter === undefined) throw new Error('root importer is missing')
-  if ([...rootImporter.keys()].join('\0') !== '@migaia/storage-web')
-    throw new Error('root importer dependency set must equal [@migaia/storage-web]')
+  if (
+    importerRoots.length === 0 ||
+    new Set(importerRoots).size !== importerRoots.length ||
+    JSON.stringify([...rootImporter.keys()].sort()) !== JSON.stringify([...importerRoots].sort())
+  )
+    throw new Error(`root importer dependency set must equal [${importerRoots.join(',')}]`)
   /** Artifact map rejects duplicate package facts before graph traversal. */
   const artifactByName = new Map(artifacts.map((artifact) => [artifact.name, artifact]))
   if (artifactByName.size !== artifacts.length)
     throw new Error('packed artifact names must be unique')
-  /** Root artifact provides exact absolute specifier and consumer-relative resolved locator. */
-  const rootArtifact = artifactByName.get('@migaia/storage-web')
-  if (rootArtifact === undefined) throw new Error('storage-web packed artifact is missing')
-  /** Root locator is the only graph seed. */
-  const rootLocator = `file:${relative(canonicalConsumerDirectory, rootArtifact.tarballPath)}`
-  /** Root edge binds declaration and resolution before any package row is inspected. */
-  const rootEdge = rootImporter.get('@migaia/storage-web')
-  if (
-    rootEdge?.specifier !== `file:${rootArtifact.tarballPath}` ||
-    rootEdge.version !== rootLocator
-  )
-    throw new Error('root importer storage-web edge does not match the packed artifact')
-  /** Every non-root packed artifact must be pinned by one exact absolute file override. */
+  /** One canonical packed artifact must have one peer instance throughout this finite graph. */
+  const instanceLocators = new Map()
+  /** Active peer derivation rejects a cyclic identity rather than authorizing a partial suffix. */
+  const derivingPeers = new Set()
+  /**
+   * Derives the exact pnpm snapshot locator from packed peer declarations and pinned artifacts.
+   * Optional peers absent from the packed graph remain absent; required peers cannot disappear.
+   *
+   * @param {string} name Packed package whose resolved peer instance is needed
+   * @returns {string} Consumer-relative file locator with its complete peer suffix
+   * @throws {Error} A required peer is missing, has a mismatched version, or forms a cycle
+   */
+  const instanceLocator = (name) => {
+    /** Memoized locator is shared by importer, dependency, peer, and snapshot validation. */
+    const prior = instanceLocators.get(name)
+    if (prior !== undefined) return prior
+    /** Every peer identity is anchored in a packed artifact, never in an installed link. */
+    const artifact = artifactByName.get(name)
+    if (artifact === undefined) throw new Error(`${name} has no packed artifact`)
+    if (derivingPeers.has(name)) throw new Error(`${name} has cyclic packed peer identities`)
+    derivingPeers.add(name)
+    /** Sorted peers reproduce pnpm's canonical peer suffix ordering. */
+    const peers = []
+    for (const [peerName, version] of Object.entries(artifact.peerDependencies ?? {}).sort()) {
+      /** Only manifest-declared optional peers may be absent from this release graph. */
+      const peerArtifact = artifactByName.get(peerName)
+      if (peerArtifact === undefined) {
+        if (artifact.peerDependenciesMeta?.[peerName]?.optional === true) continue
+        throw new Error(`${name} has unknown packed peer ${peerName}`)
+      }
+      if (version !== `^${peerArtifact.version}` && version !== peerArtifact.version)
+        throw new Error(`${name} peer version mismatch for ${peerName}`)
+      peers.push(`(${peerName}@${instanceLocator(peerName)})`)
+    }
+    /** Package rows use the base locator; only resolved instances include this peer suffix. */
+    const locator = `file:${relative(canonicalConsumerDirectory, artifact.tarballPath)}${peers.join('')}`
+    derivingPeers.delete(name)
+    instanceLocators.set(name, locator)
+    return locator
+  }
+  /** Importer edges bind both direct roots before any package row is inspected. */
+  for (const name of importerRoots) {
+    /** Each independently declared root must have exact packed facts and an absolute specifier. */
+    const artifact = artifactByName.get(name)
+    if (artifact === undefined) throw new Error(`${name} packed artifact is missing`)
+    /** Importer resolution includes its peer suffix, unlike the tarball package row. */
+    const edge = rootImporter.get(name)
+    if (
+      edge?.specifier !== `file:${artifact.tarballPath}` ||
+      edge.version !== instanceLocator(name)
+    )
+      throw new Error(`root importer ${name} edge does not match the packed artifact`)
+  }
+  /** Preserve the original override profile, including a directly installed storage-host pin. */
   const expectedOverrides = artifacts
     .filter(({ name }) => name !== '@migaia/storage-web')
     .map(({ name, tarballPath }) => [name, `file:${tarballPath}`])
@@ -411,14 +486,14 @@ export function authorizeStorageV2LockProvenance(lockfile, canonicalConsumerDire
   /** Authorization map records the first exact locator reaching each package. */
   const authorized = new Map()
   /** FIFO traversal covers every packed dependency edge reachable from the root importer. */
-  const pending = [{ name: '@migaia/storage-web', locator: rootLocator }]
+  const pending = importerRoots.map((name) => ({ name, locator: instanceLocator(name) }))
   while (pending.length > 0) {
     /** Current edge is an exact parent-to-child resolved locator. */
     const edge = pending.shift()
     /** Previously reached packages must resolve through the same locator on every path. */
     const prior = authorized.get(edge.name)
     if (prior !== undefined) {
-      if (prior.tarballLocator !== edge.locator)
+      if (prior.lockIdentity !== `${edge.name}@${edge.locator}`)
         throw new Error(`${edge.name} resolves through multiple locators`)
       continue
     }
@@ -427,25 +502,38 @@ export function authorizeStorageV2LockProvenance(lockfile, canonicalConsumerDire
     if (artifact === undefined) throw new Error(`${edge.name} has no packed artifact`)
     /** Edge locator must identify exactly that artifact relative to the consumer. */
     const expectedLocator = `file:${relative(canonicalConsumerDirectory, artifact.tarballPath)}`
-    if (edge.locator !== expectedLocator) throw new Error(`${edge.name} resolved locator mismatch`)
-    /** Package identity is formed only from the importer-reachable edge. */
+    if (edge.locator !== instanceLocator(edge.name))
+      throw new Error(`${edge.name} resolved locator mismatch`)
+    /** Snapshot identity is the importer-reachable instance, including its validated peer suffix. */
     const lockIdentity = `${edge.name}@${edge.locator}`
+    /** Package identity binds the independently packed tarball without the instance peer suffix. */
+    const packageIdentity = `${edge.name}@${expectedLocator}`
     /** Same-name package rows cannot introduce alternate or orphan identities. */
     const packageIdentities = [...parsed.packages.keys()].filter((identity) =>
       identity.startsWith(`${edge.name}@`)
     )
-    if (packageIdentities.length !== 1 || packageIdentities[0] !== lockIdentity)
+    if (packageIdentities.length !== 1 || packageIdentities[0] !== packageIdentity)
       throw new Error(`${edge.name} package identity set mismatch`)
     /** Package metadata binds exact version and optional explicit name. */
-    const packageRow = parsed.packages.get(lockIdentity)
+    const packageRow = parsed.packages.get(packageIdentity)
     if (packageRow?.version !== artifact.version)
       throw new Error(`${edge.name} package version mismatch`)
     if (packageRow.name !== undefined && packageRow.name !== edge.name)
       throw new Error(`${edge.name} package name mismatch`)
-    if (packageRow.resolution.get('tarball') !== edge.locator)
+    if (packageRow.resolution.get('tarball') !== expectedLocator)
       throw new Error(`${edge.name} package tarball resolution mismatch`)
     if (packageRow.resolution.get('integrity') !== artifact.integrity)
       throw new Error(`${edge.name} package integrity mismatch`)
+    if (
+      JSON.stringify([...packageRow.peerDependencies.entries()].sort()) !==
+      JSON.stringify(Object.entries(artifact.peerDependencies ?? {}).sort())
+    )
+      throw new Error(`${edge.name} package peer declarations mismatch`)
+    if (
+      JSON.stringify([...packageRow.peerDependenciesMeta.entries()].sort()) !==
+      JSON.stringify(Object.entries(artifact.peerDependenciesMeta ?? {}).sort())
+    )
+      throw new Error(`${edge.name} package peer metadata mismatch`)
 
     /** Packed manifest dependencies define the exact expected graph edges. */
     const expectedDependencies = new Map()
@@ -454,12 +542,14 @@ export function authorizeStorageV2LockProvenance(lockfile, canonicalConsumerDire
       const dependencyArtifact = artifactByName.get(dependencyName)
       if (dependencyArtifact === undefined)
         throw new Error(`${edge.name} has unknown packed dependency ${dependencyName}`)
-      if (version !== `^${dependencyArtifact.version}`)
+      if (version !== `^${dependencyArtifact.version}` && version !== dependencyArtifact.version)
         throw new Error(`${edge.name} dependency version mismatch for ${dependencyName}`)
-      expectedDependencies.set(
-        dependencyName,
-        `file:${relative(canonicalConsumerDirectory, dependencyArtifact.tarballPath)}`
-      )
+      expectedDependencies.set(dependencyName, instanceLocator(dependencyName))
+    }
+    /** Pnpm records resolved peers as runtime snapshot edges alongside normal dependencies. */
+    for (const peerName of Object.keys(artifact.peerDependencies ?? {})) {
+      if (!artifactByName.has(peerName)) continue
+      expectedDependencies.set(peerName, instanceLocator(peerName))
     }
     /** Snapshot identity must be absent for a leaf or exact for a dependency-bearing package. */
     const snapshotIdentities = [...parsed.snapshots.keys()].filter((identity) =>
@@ -495,7 +585,7 @@ export function authorizeStorageV2LockProvenance(lockfile, canonicalConsumerDire
         'node_modules',
         ...edge.name.split('/')
       ),
-      tarballLocator: edge.locator,
+      tarballLocator: expectedLocator,
       version: artifact.version
     })
   }
@@ -506,13 +596,21 @@ export function authorizeStorageV2LockProvenance(lockfile, canonicalConsumerDire
   )
     throw new Error('importer-reachable package set mismatch')
   /** Every package row must belong to the exact reachable identity set. */
-  const reachableIdentities = [...authorized.values()]
-    .map(({ lockIdentity }) => lockIdentity)
+  const reachablePackageIdentities = [...authorized.entries()]
+    .map(([name, { tarballLocator }]) => `${name}@${tarballLocator}`)
     .sort()
-  if (JSON.stringify([...parsed.packages.keys()].sort()) !== JSON.stringify(reachableIdentities))
+  if (
+    JSON.stringify([...parsed.packages.keys()].sort()) !==
+    JSON.stringify(reachablePackageIdentities)
+  )
     throw new Error('orphan package rows are forbidden')
   /** Every snapshot row must also belong to the reachable identity set. */
-  if ([...parsed.snapshots.keys()].some((identity) => !reachableIdentities.includes(identity)))
+  const reachableSnapshotIdentities = [...authorized.values()].map(
+    ({ lockIdentity }) => lockIdentity
+  )
+  if (
+    [...parsed.snapshots.keys()].some((identity) => !reachableSnapshotIdentities.includes(identity))
+  )
     throw new Error('orphan snapshot rows are forbidden')
   return authorized
 }

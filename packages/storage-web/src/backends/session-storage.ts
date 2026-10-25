@@ -1,11 +1,17 @@
+import type { ITextRedoStore } from './text-redo.js'
 import {
   createWebStorageBackend,
-  snapshotWebStorageOptions,
+  assertWebStorageOptions,
   type IWebStorageOptions
 } from './web-storage.js'
 import type { IKeyValueStore, ISyncCapableStore, IWebStorageLike } from '../types/storage.js'
 import { StorageError, StorageErrorCode } from '../types/errors.js'
 import { StorageBackend } from '../constants.js'
+import type {
+  IBackendConstruction,
+  IBackendRuntime,
+  IKeyValueBackendStore
+} from './construction.js'
 
 /** Namespace and optional borrowed Storage port for a session-storage backend. */
 export type ISessionStorageOptions = IWebStorageOptions & {
@@ -23,20 +29,16 @@ export type ISessionStorageOptions = IWebStorageOptions & {
  * Dispose releases this store's listeners without clearing the borrowed Storage data.
  */
 export const sessionStorageHost = (
-  options: ISessionStorageOptions = {}
-): ISyncCapableStore<IKeyValueStore> => {
+  options: ISessionStorageOptions,
+  runtime: IBackendRuntime
+): IBackendConstruction<
+  IKeyValueBackendStore<ISyncCapableStore<IKeyValueStore> & ITextRedoStore>,
+  IWebStorageLike
+> => {
   /** Capture namespace configuration before admitting either an injected or ambient port. */
-  const optionsSnapshot = snapshotWebStorageOptions(options, StorageBackend.session)
-  /** Keep option-getter failure distinct from the host refusing access to its default port. */
-  let storage: IWebStorageLike | undefined
-  try {
-    storage = options.storage
-  } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidConfig, {
-      backend: StorageBackend.session,
-      cause
-    })
-  }
+  assertWebStorageOptions(options)
+  /** The native port stays borrowed; ambient access may be denied by browser policy. */
+  let storage = options.storage
   try {
     storage ??= globalThis.sessionStorage
   } catch (cause) {
@@ -45,9 +47,5 @@ export const sessionStorageHost = (
       cause
     })
   }
-  return createWebStorageBackend(
-    StorageBackend.session,
-    storage,
-    optionsSnapshot
-  ) as ISyncCapableStore<IKeyValueStore>
+  return createWebStorageBackend(StorageBackend.session, storage, options, runtime)
 }

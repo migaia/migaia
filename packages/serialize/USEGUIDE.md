@@ -387,7 +387,7 @@ streamBase64Chunks(bytes) 为同步惰性 Generator，逐块 yield 而不拼完�
 
 `ICodec<TValue, TEncoded, TId, TVersion>` 含只读 id、version、encodedType、encode、decode；后两项是函数属性，保留严格参数方差。TId 默认 string、TVersion 默认 number。encodedType 只能 unknown/string/uint8array，codec 的同步函数不等于 registry 的异步 parser。identityCodec 固定 id=identity、version=1、encodedType=unknown，encode/decode 原样返回同一值及具体类型；旧 alias 和无版本 identity 子入口已删除。
 
-defineJsonCodec、defineMessagePackCodec、defineCBORCodec 的 options.version 必填，为正安全整数；工厂返回冻结 codec，id 分别为 json、message-pack、cbor，输出分别为 string、Uint8Array、Uint8Array。三者先做同一 portable 投影/校验；JSON 稳定排序，MessagePack 不使用扩展并排序键；CBOR 关闭 records 和宿主扩展，解码 bigint 整数仅在可精确表示为安全整数时转 number，否则拒绝。
+defineJsonCodec、defineMessagePackCodec、defineCBORCodec 的 options.version 必填，为正安全整数；工厂返回冻结 codec，id 分别为 json、message-pack、cbor，输出分别为 string、Uint8Array、Uint8Array。三者先做同一 portable 投影/校验；JSON、集合 JSON、CBOR 与 MessagePack 按 Object.keys 属性枚举顺序投影，不做比较排序，getter 每次按该顺序读取；MessagePack 不使用扩展；CBOR 关闭 records 和宿主扩展，解码 bigint 整数仅在可精确表示为安全整数时转 number，否则拒绝。
 
 defineProtobufCodec 的 options 必含 version、schema、binding。schema.id 符合 /^[a-z][a-z0-9.-]*$/u，schema.version 为正安全整数，与 codec.version 独立；binding 必须为生成的 Buf DescMessage，不能传自定义 encode/decode hook。返回冻结 schema 身份，业务值为 `MessageShape<TBinding>`；encodedType=uint8array，encode/decode 验证真实 Uint8Array，并保留 Buf 原错误原因。格式工厂自身不提供存储或网络信封。
 
@@ -445,6 +445,9 @@ SerializeCodecError(message, details) 的 details 必含 code、type、phase、c
 | aborted                 | ABORTED：协作式取消；可能为 SerializeCodecError 或 tagged 原生错误，取决于边界。 |
 | invalidOption           | INVALID_OPTION：插件、版本、portable、scheduler、流选项、Base64 或输出准入非法。 |
 | envUnsupported          | ENV_UNSUPPORTED：Encoding 等必需宿主能力缺失。                                   |
+| tagMissing              | TAG_MISSING：无标签输入缺少显式 untagged 读取器。                                |
+| tagInvalid              | TAG_INVALID：保留头部损坏，不回退。                                              |
+| tagUnknown              | TAG_UNKNOWN：合法标签没有对应的登记版本。                                        |
 
 tagSerializeError(error, code, context?) 返回原错误并附只读 source/code，context 未提供保持未设；同身份重复附加幂等，context 仅补一次。冲突委托 utils，抛 (@migaia/utils, ERROR_IDENTITY_CONFLICT)，原错误在 cause，不能静默改写身份。
 
@@ -453,3 +456,42 @@ ISerializeTaggedError 为原生错误附 source/code/context 的类型；ISerial
 value 不能转文本/字节或混用时应回到业务对象处理；CODEC_NOT_FOUND 先检查 types 与存档的 type；REGISTRY_DISPOSED 需要新 registry；collectStream 合并含 bytes 的多段须显式 encoder。大数据仍阻塞时检查初始片大小、上下限与 yieldTo，不能把切片当作抢占式终止。
 
 完整组合顺序为：创建 registry；逐片 encode 并交实际 sink；接收端逐片 decode；旧格式用记录的 type 读取，新写默认 primaryType；需要文本边界时再显式做 UTF-8/Base64；最后 await dispose，若设 deadline，记住它只限排空。包提供 fmt、lint、typecheck、typecheck:test、test 与单独 build，不把未复核历史测量当作性能结论。
+
+### 在 JSON 中保留 Map 与 Set
+
+值含 Map 或 Set 时显式选集合 codec。它复用严格 JSON 的 portable 规则，增加递归集合，投影类实例的可枚举字段，拒绝非有限数字、undefined、Date 与循环引用。保留的 $rpc 记录须符合 bytes/map/set 的精确形状。集合按插入顺序遍历，使用内部槽及内建迭代器。字节解码后仍为 bytes 记录；旧集合元组按普通数据读取。
+
+```ts
+import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
+
+const codec = defineCollectionsJsonCodec({ version: 1 })
+const source = new Map([['roles', new Set(['read', 'write'])]])
+const text = codec.encode(source)
+console.log(text) // {"$rpc":"map","entries":[["roles",{"$rpc":"set","values":["read","write"]}]]}
+console.log(codec.decode(text)) // Map { 'roles' => Set { 'read', 'write' } }
+```
+
+格式 codec 先枚举整数索引，再按字符串插入顺序输出，getter 遍历顺序相同。公开 toPortableValue 仍提供按键排序的中间投影。RPC owned 快照与普通对象、字节 JSON 路径均保持对象自身的 key 顺序；RPC 私有快照仍由原单遍遍历同时完成复制与字节上限计算，并跳过已经编码的二进制子树。
+
+### 编码结果自带格式标签
+
+首项 codec 写新值，列表内各 id/version 读取自己的带标签载荷。可选 untagged 只读取原始旧数据。未知标签报 TAG_UNKNOWN；保留头部损坏报 TAG_INVALID，不回退。无标签文本若以 mgt1: 开头，也会当作有标签输入，即使它来自 untagged codec。
+
+```ts
+import { createTaggedCodec } from '@migaia/serialize/tagged'
+import { defineJsonCodec } from '@migaia/serialize/codecs/json'
+
+const current = defineJsonCodec({ version: 2 })
+const previous = defineJsonCodec({ version: 1 })
+const tagged = createTaggedCodec({ codecs: [current, previous], untagged: previous })
+console.log(tagged.encode({ count: 2 })) // mgt1:json@2;{"count":2}
+console.log(tagged.decode('mgt1:json@1;{"count":1}')) // { count: 1 }
+console.log(tagged.decode('{"count":1}')) // { count: 1 }
+try {
+  tagged.decode('mgt1:json@3;{"count":3}')
+} catch (error) {
+  console.log((error as Error & { code: string }).code) // TAG_UNKNOWN
+}
+```
+
+字符串载体前置 mgt1:<id>@<version>;。字节载体前置 00 4d 47 54、格式字节 01、两字节大端 UTF-8 标签长度与标签。unknown 载体返回带自有 $migaia.codec 和 value 的冻结对象，内层值不冻结。所有 codec 声明同一载体，外层身份为 tagged@1，与存储 envelope 版本独立。ICodecEncodedType、ITaggedCodecOptions、ITaggedEncoded、ITaggedValue 与 ITaggedCodec 保留载体及业务值推断。

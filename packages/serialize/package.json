@@ -55,6 +55,14 @@
     "./codecs/protobuf": {
       "types": "./dist/codecs/protobuf.d.ts",
       "default": "./dist/codecs/protobuf.js"
+    },
+    "./codecs/collections-json": {
+      "types": "./dist/codecs/collections-json.d.ts",
+      "default": "./dist/codecs/collections-json.js"
+    },
+    "./tagged": {
+      "types": "./dist/tagged.d.ts",
+      "default": "./dist/tagged.js"
     }
   },
   "scripts": {

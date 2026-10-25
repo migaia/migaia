@@ -16289,12 +16289,12 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'bash',
-                code: 'pnpm add @migaia/store-persist @migaia/store-light @migaia/storage-web'
+                code: 'pnpm add @migaia/store-persist @migaia/store-light @migaia/storage-host'
               },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\nimport { persist } from '@migaia/store-persist/light'\n\nconst storage = memoryStorageHost()\nconst settings = createStore({ theme: 'light' })\nconst handle = persist(settings, { key: 'settings', storage })\nawait handle.ready\nsettings.theme = 'dark'\nawait handle.flush()\nconsole.log('已保存：', (await storage.get('settings')) !== null)\nhandle.dispose()\nawait settings.$dispose()\nstorage.dispose()"
+                code: "import { createStore } from '@migaia/store-light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { persist } from '@migaia/store-persist/light'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst settings = createStore({ theme: 'light' })\nconst handle = persist(settings, { key: 'settings', storage })\nawait handle.ready\nsettings.theme = 'dark'\nawait handle.flush()\nconsole.log('已保存：', (await storage.get('settings')) !== null)\nhandle.dispose()\nawait settings.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -16408,12 +16408,12 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'bash',
-                code: 'pnpm add @migaia/store-persist @migaia/store-light @migaia/storage-web'
+                code: 'pnpm add @migaia/store-persist @migaia/store-light @migaia/storage-host'
               },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\nimport { persist } from '@migaia/store-persist/light'\n\nconst storage = memoryStorageHost()\nconst settings = createStore({ theme: 'light' })\nconst handle = persist(settings, { key: 'settings', storage })\nawait handle.ready\nsettings.theme = 'dark'\nawait handle.flush()\nconsole.log('saved:', (await storage.get('settings')) !== null)\nhandle.dispose()\nawait settings.$dispose()\nstorage.dispose()"
+                code: "import { createStore } from '@migaia/store-light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { persist } from '@migaia/store-persist/light'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst settings = createStore({ theme: 'light' })\nconst handle = persist(settings, { key: 'settings', storage })\nawait handle.ready\nsettings.theme = 'dark'\nawait handle.flush()\nconsole.log('saved:', (await storage.get('settings')) !== null)\nhandle.dispose()\nawait settings.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -16497,7 +16497,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'bash',
-                code: 'pnpm add @migaia/store-persist @migaia/store-light @migaia/storage-web'
+                code: 'pnpm add @migaia/store-persist @migaia/store-light @migaia/storage-host'
               }
             ]
           },
@@ -16508,7 +16508,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { defaultJsonCodec, readEnvelope } from '@migaia/store-persist'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst settings = createStore({ theme: 'light' as string })\nconst storage = memoryStorageHost()\nconst persistence = persist(settings, { key: 'settings', storage })\nawait persistence.ready\nsettings.theme = 'dark'\nawait persistence.flush()\nconsole.log('已保存设置:', await readEnvelope(storage, 'settings', defaultJsonCodec, {}))\n\npersistence.dispose()\nawait settings.$dispose()\nawait storage.dispose()"
+                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { defaultJsonCodec, readEnvelope } from '@migaia/store-persist'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst settings = createStore({ theme: 'light' as string })\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst persistence = persist(settings, { key: 'settings', storage })\nawait persistence.ready\nsettings.theme = 'dark'\nawait persistence.flush()\nconsole.log('已保存设置:', await readEnvelope(storage, 'settings', defaultJsonCodec, {}))\n\npersistence.dispose()\nawait settings.$dispose()"
               },
               {
                 type: 'code',
@@ -16627,7 +16627,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 type: 'table',
                 headers: ['入口或字段', '说明'],
                 rows: [
-                  ['`memoryStorageHost()`', '每次创建一个独立后端，只在当前进程中保存数据。'],
+                  ['`memoryBackendPlugin()`', '每次创建一个独立后端，只在当前进程中保存数据。'],
                   [
                     '`localStorageHost()` / `indexedDbHost()`',
                     '在浏览器中接入 Web Storage 或 IndexedDB。创建方式见 [storage-web 指南](/zh/docs/storage-web/getting-started)。'
@@ -16673,7 +16673,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'bash',
-                code: 'pnpm add @migaia/store-persist @migaia/store-light @migaia/storage-web'
+                code: 'pnpm add @migaia/store-persist @migaia/store-light @migaia/storage-host'
               }
             ]
           },
@@ -16684,7 +16684,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { defaultJsonCodec, readEnvelope } from '@migaia/store-persist'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst settings = createStore({ theme: 'light' as string })\nconst storage = memoryStorageHost()\nconst persistence = persist(settings, { key: 'settings', storage })\nawait persistence.ready\nsettings.theme = 'dark'\nawait persistence.flush()\nconsole.log('Saved settings:', await readEnvelope(storage, 'settings', defaultJsonCodec, {}))\n\npersistence.dispose()\nawait settings.$dispose()\nawait storage.dispose()"
+                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { defaultJsonCodec, readEnvelope } from '@migaia/store-persist'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nconst settings = createStore({ theme: 'light' as string })\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst persistence = persist(settings, { key: 'settings', storage })\nawait persistence.ready\nsettings.theme = 'dark'\nawait persistence.flush()\nconsole.log('Saved settings:', await readEnvelope(storage, 'settings', defaultJsonCodec, {}))\n\npersistence.dispose()\nawait settings.$dispose()"
               },
               {
                 type: 'code',
@@ -16813,7 +16813,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 headers: ['Entry or field', 'Behavior'],
                 rows: [
                   [
-                    '`memoryStorageHost()`',
+                    '`memoryBackendPlugin()`',
                     'Creates an isolated backend that retains data only in this process.'
                   ],
                   [
@@ -16884,7 +16884,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               },
               {
                 type: 'paragraph',
-                text: '只安装使用的状态包。下面的集合示例还需要 pnpm add @migaia/store-indexed @migaia/storage-web；Light 示例需要 @migaia/store-light，Keyed 示例需要 @migaia/store-keyed。'
+                text: '只安装使用的状态包。下面的集合示例还需要 pnpm add @migaia/store-indexed @migaia/storage-host；Light 示例需要 @migaia/store-light，Keyed 示例需要 @migaia/store-keyed。'
               }
             ]
           },
@@ -16895,7 +16895,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { ObservableArray } from '@migaia/store-indexed'\nimport { persistCollection } from '@migaia/store-persist/indexed'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst storage = memoryStorageHost()\nawait storage.set('cart', '{\"version\":0,\"state\":[\"tea\",\"rice\"]}')\nconst cart = new ObservableArray<string>()\nconst persistence = persistCollection(cart, { key: 'cart', storage })\nawait persistence.ready\nconsole.log('购物清单:', cart.snapshot().join(', '))\n\npersistence.dispose()\ncart.dispose()\nawait storage.dispose()"
+                code: "import { ObservableArray } from '@migaia/store-indexed'\nimport { persistCollection } from '@migaia/store-persist/indexed'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nawait storage.set('cart', '{\"version\":0,\"state\":[\"tea\",\"rice\"]}')\nconst cart = new ObservableArray<string>()\nconst persistence = persistCollection(cart, { key: 'cart', storage })\nawait persistence.ready\nconsole.log('购物清单:', cart.snapshot().join(', '))\n\npersistence.dispose()\ncart.dispose()"
               },
               {
                 type: 'code',
@@ -17073,7 +17073,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               },
               {
                 type: 'paragraph',
-                text: 'The collection example needs `pnpm add @migaia/store-indexed @migaia/storage-web`.'
+                text: 'The collection example needs `pnpm add @migaia/store-indexed @migaia/storage-host`.'
               },
               {
                 type: 'paragraph',
@@ -17088,7 +17088,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { ObservableArray } from '@migaia/store-indexed'\nimport { persistCollection } from '@migaia/store-persist/indexed'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst storage = memoryStorageHost()\nawait storage.set('cart', '{\"version\":0,\"state\":[\"tea\",\"rice\"]}')\nconst cart = new ObservableArray<string>()\nconst persistence = persistCollection(cart, { key: 'cart', storage })\nawait persistence.ready\nconsole.log('Shopping list:', cart.snapshot().join(', '))\n\npersistence.dispose()\ncart.dispose()\nawait storage.dispose()"
+                code: "import { ObservableArray } from '@migaia/store-indexed'\nimport { persistCollection } from '@migaia/store-persist/indexed'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nawait storage.set('cart', '{\"version\":0,\"state\":[\"tea\",\"rice\"]}')\nconst cart = new ObservableArray<string>()\nconst persistence = persistCollection(cart, { key: 'cart', storage })\nawait persistence.ready\nconsole.log('Shopping list:', cart.snapshot().join(', '))\n\npersistence.dispose()\ncart.dispose()"
               },
               {
                 type: 'code',
@@ -17206,7 +17206,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     '`IPersistKeyedOptions<T>`',
-                    'Uses namespace instead of key and has no migrate option. See keyed persistence for every option and the id parameter.'
+                    'Uses namespace instead of key and has no migrations option. See keyed persistence for every option and the id parameter.'
                   ],
                   [
                     '`INVALID_OPTION`',
@@ -17259,7 +17259,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nexport const storage = memoryStorageHost()\nexport const store = createStore({ title: 'New draft', count: 0 })"
+                code: "import { createStore } from '@migaia/store-light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nexport const host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nexport const storage = host.backend('memory')\nexport const store = createStore({ title: 'New draft', count: 0 })"
               },
               {
                 type: 'paragraph',
@@ -17268,7 +17268,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persist } from '@migaia/store-persist/light'\nimport { storage, store } from './settings.ts'\n\nawait storage.set(\n  'draft',\n  JSON.stringify({\n    version: 0,\n    state: { title: 'Saved draft', count: 7 }\n  })\n)\nconst handle = persist(store, { key: 'draft', storage })\nstore.title = 'Edited at startup'\nstore.$runtime.flush()\nawait handle.ready\n\nconsole.log('恢复后的标题:', store.title)\nconsole.log('恢复后的数量:', store.count)\nawait handle.flush()\nhandle.dispose()\nawait store.$dispose()\nawait storage.dispose()"
+                code: "import { persist } from '@migaia/store-persist/light'\nimport { host, storage, store } from './settings.ts'\n\nawait storage.set(\n  'draft',\n  JSON.stringify({\n    version: 0,\n    state: { title: 'Saved draft', count: 7 }\n  })\n)\nconst handle = persist(store, { key: 'draft', storage })\nstore.title = 'Edited at startup'\nstore.$runtime.flush()\nawait handle.ready\n\nconsole.log('恢复后的标题:', store.title)\nconsole.log('恢复后的数量:', store.count)\nawait handle.flush()\nhandle.dispose()\nawait store.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -17281,7 +17281,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               },
               {
                 type: 'paragraph',
-                text: '这里使用真实的 `memoryStorageHost()` 后端。它适合服务端内存保存，不会跨进程或页面刷新保存数据。`$runtime.flush()` 执行待处理的 Store 订阅，使编辑在恢复完成前被观察到。'
+                text: '这里使用真实的 `memoryBackendPlugin()` 后端。它适合服务端内存保存，不会跨进程或页面刷新保存数据。`$runtime.flush()` 执行待处理的 Store 订阅，使编辑在恢复完成前被观察到。'
               },
               {
                 type: 'table',
@@ -17370,7 +17370,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nexport const storage = memoryStorageHost()\nexport const store = createStore({ title: 'New draft', count: 0 })"
+                code: "import { createStore } from '@migaia/store-light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nexport const host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nexport const storage = host.backend('memory')\nexport const store = createStore({ title: 'New draft', count: 0 })"
               },
               {
                 type: 'paragraph',
@@ -17379,7 +17379,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persist } from '@migaia/store-persist/light'\nimport { storage, store } from './settings.ts'\n\nawait storage.set(\n  'draft',\n  JSON.stringify({\n    version: 0,\n    state: { title: 'Saved draft', count: 7 }\n  })\n)\nconst handle = persist(store, { key: 'draft', storage })\nstore.title = 'Edited at startup'\nstore.$runtime.flush()\nawait handle.ready\n\nconsole.log('Restored title:', store.title)\nconsole.log('Restored count:', store.count)\nawait handle.flush()\nhandle.dispose()\nawait store.$dispose()\nawait storage.dispose()"
+                code: "import { persist } from '@migaia/store-persist/light'\nimport { host, storage, store } from './settings.ts'\n\nawait storage.set(\n  'draft',\n  JSON.stringify({\n    version: 0,\n    state: { title: 'Saved draft', count: 7 }\n  })\n)\nconst handle = persist(store, { key: 'draft', storage })\nstore.title = 'Edited at startup'\nstore.$runtime.flush()\nawait handle.ready\n\nconsole.log('Restored title:', store.title)\nconsole.log('Restored count:', store.count)\nawait handle.flush()\nhandle.dispose()\nawait store.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -17465,7 +17465,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   'store-persist:partialize-merge-and-migrations': {
     zh: {
       title: '筛选保存字段并升级旧格式',
-      lede: 'partialize 决定保存哪些值，migrate 转换不同版本的存档，merge 把读回数据放进当前状态。三个函数都同步返回，不能返回 Promise。',
+      lede: 'partialize 选择保存字段，migrations 提供连续同步升级步骤或一次 reset，merge 合并状态。未来版本被拒绝；升级本身不写回。',
       document: {
         sections: [
           {
@@ -17475,7 +17475,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { assertEnvelope, defaultJsonCodec, readEnvelope } from '@migaia/store-persist'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst storage = memoryStorageHost()\nconst session = createStore({ theme: 'dark', token: 'temporary' })\nconst selectTheme = (state: Record<string, unknown>) => ({ theme: state.theme })\nconst persistence = persist(session, { key: 'settings', storage, partialize: selectTheme })\nawait persistence.ready\nawait persistence.flush()\nconst saved = await readEnvelope(storage, 'settings', defaultJsonCodec, {})\nconst envelope = assertEnvelope<Record<string, unknown>>(saved, 'settings')\nconsole.log('保存的字段:', Object.keys(envelope.state).join(', '))\npersistence.dispose()\nawait session.$dispose()\nawait storage.dispose()"
+                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { defaultJsonCodec, readEnvelope } from '@migaia/store-persist'\nimport { assertVersionedEnvelope } from '@migaia/storage-contract'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst session = createStore({ theme: 'dark', token: 'temporary' })\nconst selectTheme = (state: Record<string, unknown>) => ({ theme: state.theme })\nconst persistence = persist(session, { key: 'settings', storage, partialize: selectTheme })\nawait persistence.ready\nawait persistence.flush()\nconst saved = await readEnvelope(storage, 'settings', defaultJsonCodec, {})\nconst envelope = assertVersionedEnvelope(saved)\nconsole.log('保存的字段:', Object.keys(envelope.state as object).join(', '))\npersistence.dispose()\nawait session.$dispose()"
               },
               {
                 type: 'code',
@@ -17495,7 +17495,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst storage = memoryStorageHost()\nawait storage.set('settings', '{\"version\":1,\"state\":{\"color\":\"dark\"}}')\nconst settings = createStore({ theme: 'light' as string })\nconst migrate = (saved: Record<string, unknown>) => ({ theme: saved.color })\nconst options = { key: 'settings', storage, version: 2, migrate }\nconst persistence = persist(settings, options)\nawait persistence.ready\nconsole.log('迁移后的主题:', settings.theme)\npersistence.dispose()\nawait settings.$dispose()\nawait storage.dispose()"
+                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nawait storage.set('settings', '{\"version\":1,\"state\":{\"color\":\"dark\"}}')\nconst settings = createStore({ theme: 'light' as string })\nconst migrations = { 2: (saved: unknown) => ({ theme: (saved as Record<string, unknown>).color }) }\nconst options = { key: 'settings', storage, version: 2, migrations }\nconst persistence = persist(settings, options)\nawait persistence.ready\nconsole.log('迁移后的主题:', settings.theme)\npersistence.dispose()\nawait settings.$dispose()"
               },
               {
                 type: 'code',
@@ -17504,7 +17504,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               },
               {
                 type: 'paragraph',
-                text: '版本只比较是否相等，不比较谁更新。migrate 接收存档里的 state 和旧版本号，因此也要决定如何处理比当前版本更大的数值。migrate 本身只返回转换结果。需要确认新格式已保存时，等待 flush 完成。'
+                text: '共享冻结计划以连续同步步骤升级可达旧档。未来版本在恢复前被拒绝并阻止写入；升级本身不写回，等待 flush 保存新格式。'
               }
             ]
           },
@@ -17522,9 +17522,9 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     '写入前选择数据。省略时返回完整状态。Light 适配器使用 Record<string, unknown>。'
                   ],
                   [
-                    '`migrate(persisted, fromVersion)`',
+                    '`migrations: { [targetVersion]: step }`',
                     '`TState`',
-                    '版本不一致时运行，省略时抛 ENVELOPE_INVALID。实际 persisted 可能是之前 partialize 保存的部分数据。Keyed 入口没有此选项。'
+                    '只升级可达旧档，步骤接收 unknown 与 { fromVersion, toVersion }；未来或不可达版本报 VERSION_UNSUPPORTED，步骤失败为 MIGRATION_FAILED。Keyed 没有此选项。'
                   ],
                   [
                     '`merge(persisted, current)`',
@@ -17539,7 +17539,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   [
                     '`INVALID_OPTION`',
                     '—',
-                    '函数返回 Promise 或读取 then 时抛错，会使当前恢复或写入失败。回调自己抛出的错误会保留。'
+                    'partialize/merge 返回 thenable 时为 INVALID_OPTION；同步迁移步骤抛错或返回 thenable 时为 contract MIGRATION_FAILED，原始错误位于 cause。'
                   ]
                 ]
               }
@@ -17588,7 +17588,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
     },
     en: {
       title: 'Select saved fields and upgrade old formats',
-      lede: 'partialize selects values to save, migrate converts archives from another version, and merge combines loaded data with current state. All three callbacks return synchronously, never a Promise.',
+      lede: 'partialize selects saved values, migrations provides contiguous synchronous upgrade steps or one reset, and merge reconciles loaded state. Future versions fail before restoration; upgrading does not write back.',
       document: {
         sections: [
           {
@@ -17598,7 +17598,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { assertEnvelope, defaultJsonCodec, readEnvelope } from '@migaia/store-persist'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst storage = memoryStorageHost()\nconst session = createStore({ theme: 'dark', token: 'temporary' })\nconst selectTheme = (state: Record<string, unknown>) => ({ theme: state.theme })\nconst persistence = persist(session, { key: 'settings', storage, partialize: selectTheme })\nawait persistence.ready\nawait persistence.flush()\nconst saved = await readEnvelope(storage, 'settings', defaultJsonCodec, {})\nconst envelope = assertEnvelope<Record<string, unknown>>(saved, 'settings')\nconsole.log('Saved fields:', Object.keys(envelope.state).join(', '))\npersistence.dispose()\nawait session.$dispose()\nawait storage.dispose()"
+                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { defaultJsonCodec, readEnvelope } from '@migaia/store-persist'\nimport { assertVersionedEnvelope } from '@migaia/storage-contract'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst session = createStore({ theme: 'dark', token: 'temporary' })\nconst selectTheme = (state: Record<string, unknown>) => ({ theme: state.theme })\nconst persistence = persist(session, { key: 'settings', storage, partialize: selectTheme })\nawait persistence.ready\nawait persistence.flush()\nconst saved = await readEnvelope(storage, 'settings', defaultJsonCodec, {})\nconst envelope = assertVersionedEnvelope(saved)\nconsole.log('Saved fields:', Object.keys(envelope.state as object).join(', '))\npersistence.dispose()\nawait session.$dispose()"
               },
               {
                 type: 'code',
@@ -17618,7 +17618,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst storage = memoryStorageHost()\nawait storage.set('settings', '{\"version\":1,\"state\":{\"color\":\"dark\"}}')\nconst settings = createStore({ theme: 'light' as string })\nconst migrate = (saved: Record<string, unknown>) => ({ theme: saved.color })\nconst options = { key: 'settings', storage, version: 2, migrate }\nconst persistence = persist(settings, options)\nawait persistence.ready\nconsole.log('Migrated theme:', settings.theme)\npersistence.dispose()\nawait settings.$dispose()\nawait storage.dispose()"
+                code: "import { createStore } from '@migaia/store-light'\nimport { persist } from '@migaia/store-persist/light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nawait storage.set('settings', '{\"version\":1,\"state\":{\"color\":\"dark\"}}')\nconst settings = createStore({ theme: 'light' as string })\nconst migrations = { 2: (saved: unknown) => ({ theme: (saved as Record<string, unknown>).color }) }\nconst options = { key: 'settings', storage, version: 2, migrations }\nconst persistence = persist(settings, options)\nawait persistence.ready\nconsole.log('Migrated theme:', settings.theme)\npersistence.dispose()\nawait settings.$dispose()"
               },
               {
                 type: 'code',
@@ -17627,7 +17627,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               },
               {
                 type: 'paragraph',
-                text: 'Versions are compared for equality, not age. migrate receives saved state and its version, so it must also decide how to handle a version newer than the current one. migrate itself returns converted state. Await flush when you need confirmation that the new format has been saved.'
+                text: 'A shared immutable plan upgrades reachable older archives through contiguous synchronous steps. Future versions are rejected before restoration and block writes. Upgrading alone does not write back; await flush to save the new format.'
               }
             ]
           },
@@ -17645,7 +17645,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Selects data before writing. Defaults to the full state. The Light adapter uses Record<string, unknown>.'
                   ],
                   [
-                    '`migrate(persisted, fromVersion)`',
+                    '`migrations: { [targetVersion]: step }`',
                     '`TState`',
                     'Runs on a version mismatch; omission produces ENVELOPE_INVALID. persisted may contain only fields saved by an earlier partialize. The Keyed entry has no migration option.'
                   ],
@@ -17717,6 +17717,21 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       document: {
         sections: [
           {
+            id: 'atomic-save',
+            heading: '快照与其他写入共同提交',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'persistTransaction 先暂停并排空真实句柄，再借用原 store 的事务；flush(tx) 读取调用瞬间的状态并启动编码，只等待请求，外层成功才表示提交。失败不撤销内存，普通 debounce 镜像随后恢复。参与期间直接 flush/clear/retryHydrate 拒绝；dispose 请求中止且不发最终旁路写入。IndexedDB 必须先取外部数据，再开始事务，不能在回调中等待 fetch、定时器或跨任务 codec。'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createStore } from '@migaia/store-light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { persistTransaction } from '@migaia/store-persist'\nimport { persist } from '@migaia/store-persist/light'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst settings = createStore({ count: 0 })\nconst handle = persist(settings, { key: 'settings', storage })\nawait handle.ready\ntry {\n  await persistTransaction(storage, [handle], async (tx) => {\n    settings.count = 1\n    await handle.flush(tx)\n    await tx.set('settings-source', 'user', { conflictPolicy: 'replace' })\n  })\n} finally {\n  await handle.disposeAsync()\n  await settings.$dispose()\n}"
+              }
+            ]
+          },
+          {
             id: 'operations',
             heading: '离开编辑页前保存草稿',
             blocks: [
@@ -17731,7 +17746,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nexport const storage = memoryStorageHost()\nexport const store = createStore({ title: 'New draft', count: 0 })"
+                code: "import { createStore } from '@migaia/store-light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nexport const host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nexport const storage = host.backend('memory')\nexport const store = createStore({ title: 'New draft', count: 0 })"
               },
               {
                 type: 'paragraph',
@@ -17740,7 +17755,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persist } from '@migaia/store-persist/light'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { storage, store } from './settings.ts'\n\nexport { storage, store }\nexport const handle = persist(store, {\n  key: 'draft',\n  storage,\n  debounceMs: 60_000,\n  maxWaitMs: 30_000,\n  scheduler: systemScheduler\n})\nawait handle.ready"
+                code: "import { persist } from '@migaia/store-persist/light'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { host, storage, store } from './settings.ts'\n\nexport { host, storage, store }\nexport const handle = persist(store, {\n  key: 'draft',\n  storage,\n  debounceMs: 60_000,\n  maxWaitMs: 30_000,\n  scheduler: systemScheduler\n})\nawait handle.ready"
               },
               {
                 type: 'paragraph',
@@ -17749,7 +17764,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { handle, storage, store } from './debounced.ts'\n\nstore.title = 'Final draft'\nstore.count = 2\nstore.$runtime.flush()\nawait handle.flush()\nconsole.log('导航前保存:', await storage.get('draft'))\n\nhandle.dispose()\nawait store.$dispose()\nawait storage.dispose()"
+                code: "import { handle, host, storage, store } from './debounced.ts'\n\nstore.title = 'Final draft'\nstore.count = 2\nstore.$runtime.flush()\nawait handle.flush()\nconsole.log('导航前保存:', await storage.get('draft'))\n\nhandle.dispose()\nawait store.$dispose()\nawait host.dispose()"
               },
               {
                 type: 'paragraph',
@@ -17823,7 +17838,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { handle, storage, store } from './debounced.ts'\n\nconst saved = new Promise<void>((resolve) => {\n  const stop = storage.subscribeChanges((change) => {\n    if (change.kind === 'put' && change.keys?.includes('draft')) {\n      stop()\n      resolve()\n    }\n  })\n})\nstore.title = 'Closed draft'\nstore.$runtime.flush()\nhandle.dispose()\nawait saved\n\nconsole.log('关闭后提交:', await storage.get('draft'))\nconsole.log('持久化状态:', handle.status.value)\nawait store.$dispose()\nawait storage.dispose()"
+                code: "import { handle, host, storage, store } from './debounced.ts'\n\nconst saved = new Promise<void>((resolve) => {\n  const stop = storage.subscribeChanges((change) => {\n    if (change.kind === 'put' && change.keys?.includes('draft')) {\n      stop()\n      resolve()\n    }\n  })\n})\nstore.title = 'Closed draft'\nstore.$runtime.flush()\nhandle.dispose()\nawait saved\n\nconsole.log('关闭后提交:', await storage.get('draft'))\nconsole.log('持久化状态:', handle.status.value)\nawait store.$dispose()\nawait host.dispose()"
               },
               {
                 type: 'paragraph',
@@ -17885,6 +17900,21 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       document: {
         sections: [
           {
+            id: 'atomic-save',
+            heading: 'Commit snapshots with other writes',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'persistTransaction pauses and drains authentic handles before borrowing the original store transaction. flush(tx) reads state and starts encoding at invocation; it waits for its request, and outer success means commit. Failure does not undo memory; ordinary debounce mirroring resumes. Direct flush/clear/retryHydrate reject during participation. Disposal requests abort without a final side write. Load external data before an IndexedDB transaction; do not await fetch, timers or a codec spanning tasks inside it.'
+              },
+              {
+                type: 'code',
+                language: 'ts',
+                code: "import { createStore } from '@migaia/store-light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { persistTransaction } from '@migaia/store-persist'\nimport { persist } from '@migaia/store-persist/light'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst settings = createStore({ count: 0 })\nconst handle = persist(settings, { key: 'settings', storage })\nawait handle.ready\ntry {\n  await persistTransaction(storage, [handle], async (tx) => {\n    settings.count = 1\n    await handle.flush(tx)\n    await tx.set('settings-source', 'user', { conflictPolicy: 'replace' })\n  })\n} finally {\n  await handle.disposeAsync()\n  await settings.$dispose()\n}"
+              }
+            ]
+          },
+          {
             id: 'operations',
             heading: 'Save a draft before navigation',
             blocks: [
@@ -17899,7 +17929,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nexport const storage = memoryStorageHost()\nexport const store = createStore({ title: 'New draft', count: 0 })"
+                code: "import { createStore } from '@migaia/store-light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nexport const host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nexport const storage = host.backend('memory')\nexport const store = createStore({ title: 'New draft', count: 0 })"
               },
               {
                 type: 'paragraph',
@@ -17908,7 +17938,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persist } from '@migaia/store-persist/light'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { storage, store } from './settings.ts'\n\nexport { storage, store }\nexport const handle = persist(store, {\n  key: 'draft',\n  storage,\n  debounceMs: 60_000,\n  maxWaitMs: 30_000,\n  scheduler: systemScheduler\n})\nawait handle.ready"
+                code: "import { persist } from '@migaia/store-persist/light'\nimport { systemScheduler } from '@migaia/utils/scheduler'\nimport { host, storage, store } from './settings.ts'\n\nexport { host, storage, store }\nexport const handle = persist(store, {\n  key: 'draft',\n  storage,\n  debounceMs: 60_000,\n  maxWaitMs: 30_000,\n  scheduler: systemScheduler\n})\nawait handle.ready"
               },
               {
                 type: 'paragraph',
@@ -17917,7 +17947,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { handle, storage, store } from './debounced.ts'\n\nstore.title = 'Final draft'\nstore.count = 2\nstore.$runtime.flush()\nawait handle.flush()\nconsole.log('Saved before navigation:', await storage.get('draft'))\n\nhandle.dispose()\nawait store.$dispose()\nawait storage.dispose()"
+                code: "import { handle, host, storage, store } from './debounced.ts'\n\nstore.title = 'Final draft'\nstore.count = 2\nstore.$runtime.flush()\nawait handle.flush()\nconsole.log('Saved before navigation:', await storage.get('draft'))\n\nhandle.dispose()\nawait store.$dispose()\nawait host.dispose()"
               },
               {
                 type: 'paragraph',
@@ -17991,7 +18021,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { handle, storage, store } from './debounced.ts'\n\nconst saved = new Promise<void>((resolve) => {\n  const stop = storage.subscribeChanges((change) => {\n    if (change.kind === 'put' && change.keys?.includes('draft')) {\n      stop()\n      resolve()\n    }\n  })\n})\nstore.title = 'Closed draft'\nstore.$runtime.flush()\nhandle.dispose()\nawait saved\n\nconsole.log('Committed after close:', await storage.get('draft'))\nconsole.log('Persistence status:', handle.status.value)\nawait store.$dispose()\nawait storage.dispose()"
+                code: "import { handle, host, storage, store } from './debounced.ts'\n\nconst saved = new Promise<void>((resolve) => {\n  const stop = storage.subscribeChanges((change) => {\n    if (change.kind === 'put' && change.keys?.includes('draft')) {\n      stop()\n      resolve()\n    }\n  })\n})\nstore.title = 'Closed draft'\nstore.$runtime.flush()\nhandle.dispose()\nawait saved\n\nconsole.log('Committed after close:', await storage.get('draft'))\nconsole.log('Persistence status:', handle.status.value)\nawait store.$dispose()\nawait host.dispose()"
               },
               {
                 type: 'paragraph',
@@ -18064,34 +18094,33 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 rows: [
                   [
                     '`defaultJsonCodec.name` / `output`',
-                    '名称是 migaia-collections-json-v1，输出形式为 text。对象本身已冻结。'
+                    '名称为 collections-json@1，output 为 text；对象冻结，默认就保留 Map/Set。'
                   ],
                   [
                     '`encode(value, ctx?)`',
-                    '返回 Promise<string>。使用 storage-contract 的集合 JSON 格式保存 Map 和 Set。失败时抛 ENCODE_FAILED，并在 cause 中保留原因。'
+                    '返回 Promise<string>，通过 serialize 集合 codec 与 contract adapter 保存 Map/Set；非法 portable 值报本包 ENCODE_FAILED，cause 保留两个拥有者的完整错误链。'
                   ],
                   [
                     '`decode(raw, ctx?)`',
-                    '返回 Promise<unknown>，raw 接收字符串。普通 JSON 和旧集合标签仍可读取，格式错误为 ENVELOPE_INVALID。此实现不使用 ctx。'
+                    '返回 Promise<unknown>，raw 必须为字符串。历史标记与元组为普通数据；非字符串或坏 JSON 为本包 ENVELOPE_INVALID TypeError。envelope 结构与版本由 contract 校验。'
                   ],
-                  ['`IEnvelope<TState>.version`', '非负安全整数，用于选择是否调用 migrate。'],
                   [
-                    '`IEnvelope<TState>.state`',
+                    '`IVersionedEnvelope<TState>.version`',
+                    '非负安全整数；共享计划比较版本并决定逐步升级、重置或拒绝。'
+                  ],
+                  [
+                    '`IVersionedEnvelope<TState>.state`',
                     '保存的状态，不能缺失或为 null、undefined。其他内容仍由应用检查。'
                   ],
                   [
-                    '`assertEnvelope<TState>(value, key)`',
-                    '返回新的 { version, state } 对象。key 只用于错误信息，不检查业务字段，也不冻结结果。'
-                  ],
-                  [
-                    '`new PersistEnvelopeError(message)`',
-                    '创建带 source 与 ENVELOPE_INVALID 的 TypeError，message 用作错误文字。assertEnvelope 失败时使用此类。'
+                    '`assertVersionedEnvelope(value) from @migaia/storage-contract`',
+                    '从 storage-contract 导入；只接受普通对象的自有 version/state，分别读取一次，返回新 envelope 并保留 state 引用，不检查业务 schema。'
                   ]
                 ]
               },
               {
                 type: 'paragraph',
-                text: '读取旧格式时，只识别 __migaia_persist_map__ 或 __migaia_persist_set__ 属性且对应值为数组的对象。新的集合格式使用版本标记，普通对象不会按新的集合格式随意转换。'
+                text: '历史集合标记和元组形数组均按普通数据读取，不恢复成集合。新格式使用 $rpc map/entries 与 set/values 记录。'
               }
             ]
           },
@@ -18125,7 +18154,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { assertEnvelope, readEnvelope, writeEnvelope } from '@migaia/store-persist'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\nimport { utf8EnvelopeCodec } from './utf8-envelope-codec.ts'\n\nconst storage = memoryStorageHost()\nconst saved = { version: 0, state: { theme: 'dark' } }\nawait writeEnvelope(storage, 'settings', utf8EnvelopeCodec, saved, {})\nconst raw = await readEnvelope(storage, 'settings', utf8EnvelopeCodec, {})\nconst envelope = assertEnvelope<{ theme: string }>(raw, 'settings')\nconsole.log('字节存档主题:', envelope.state.theme)\nawait storage.dispose()"
+                code: "import { readEnvelope, writeEnvelope } from '@migaia/store-persist'\nimport { assertVersionedEnvelope } from '@migaia/storage-contract'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { utf8EnvelopeCodec } from './utf8-envelope-codec.ts'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst saved = { version: 0, state: { theme: 'dark' } }\nawait writeEnvelope(storage, 'settings', utf8EnvelopeCodec, saved, {})\nconst raw = await readEnvelope(storage, 'settings', utf8EnvelopeCodec, {})\nconst envelope = assertVersionedEnvelope(raw)\nconsole.log('字节存档主题:', (envelope.state as { theme: string }).theme)"
               },
               {
                 type: 'code',
@@ -18173,7 +18202,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   [
                     '`writeEnvelope(storage, key, codec, value, ctx)`',
                     '`Promise<void>`',
-                    '编码 value 并等待 set 或 setBytes。此工具不添加 version、不调用 assertEnvelope，也不创建订阅或写队列。'
+                    '编码 value 并等待 set 或 setBytes。此工具不添加 version、不调用 assertVersionedEnvelope，也不创建订阅或写队列。'
                   ],
                   [
                     '`readEnvelope(storage, key, codec, ctx)`',
@@ -18242,7 +18271,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                 rows: [
                   [
                     '`defaultJsonCodec.name` / `output`',
-                    'The name is migaia-collections-json-v1 and output is text. The codec object is frozen.'
+                    'The frozen codec is named collections-json@1 with text output and preserves Map/Set by default.'
                   ],
                   [
                     '`encode(value, ctx?)`',
@@ -18253,26 +18282,22 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                     'Returns Promise<unknown> and accepts a string raw value. Plain JSON and legacy collection tags remain readable. Invalid input produces ENVELOPE_INVALID. This implementation does not use ctx.'
                   ],
                   [
-                    '`IEnvelope<TState>.version`',
-                    'A non-negative safe integer used to decide whether migrate runs.'
+                    '`IVersionedEnvelope<TState>.version`',
+                    'A nonnegative safe integer; the shared plan selects upgrade/reset or rejects unsupported versions.'
                   ],
                   [
-                    '`IEnvelope<TState>.state`',
+                    '`IVersionedEnvelope<TState>.state`',
                     'The saved state. It cannot be absent, null, or undefined. Application code checks its remaining contents.'
                   ],
                   [
-                    '`assertEnvelope<TState>(value, key)`',
+                    '`assertVersionedEnvelope(value) from @migaia/storage-contract`',
                     'Returns a new { version, state } object. key is used in error messages. It neither validates domain fields nor freezes the result.'
-                  ],
-                  [
-                    '`new PersistEnvelopeError(message)`',
-                    'Creates a TypeError with source and ENVELOPE_INVALID, using message as its text. assertEnvelope uses this class on failure.'
                   ]
                 ]
               },
               {
                 type: 'paragraph',
-                text: 'Legacy reads recognize objects with __migaia_persist_map__ or __migaia_persist_set__ whose value is an array. New collection encoding uses a versioned marker to distinguish collections from ordinary objects.'
+                text: 'Historical collection markers and tuple-shaped arrays remain ordinary data. New collections use $rpc map/entries and set/values records.'
               }
             ]
           },
@@ -18306,7 +18331,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { assertEnvelope, readEnvelope, writeEnvelope } from '@migaia/store-persist'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\nimport { utf8EnvelopeCodec } from './utf8-envelope-codec.ts'\n\nconst storage = memoryStorageHost()\nconst saved = { version: 0, state: { theme: 'dark' } }\nawait writeEnvelope(storage, 'settings', utf8EnvelopeCodec, saved, {})\nconst raw = await readEnvelope(storage, 'settings', utf8EnvelopeCodec, {})\nconst envelope = assertEnvelope<{ theme: string }>(raw, 'settings')\nconsole.log('Theme in byte archive:', envelope.state.theme)\nawait storage.dispose()"
+                code: "import { readEnvelope, writeEnvelope } from '@migaia/store-persist'\nimport { assertVersionedEnvelope } from '@migaia/storage-contract'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { utf8EnvelopeCodec } from './utf8-envelope-codec.ts'\n\nawait using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nconst storage = host.backend('memory')\nconst saved = { version: 0, state: { theme: 'dark' } }\nawait writeEnvelope(storage, 'settings', utf8EnvelopeCodec, saved, {})\nconst raw = await readEnvelope(storage, 'settings', utf8EnvelopeCodec, {})\nconst envelope = assertVersionedEnvelope(raw)\nconsole.log('Theme in byte archive:', (envelope.state as { theme: string }).theme)"
               },
               {
                 type: 'code',
@@ -18354,7 +18379,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   [
                     '`writeEnvelope(storage, key, codec, value, ctx)`',
                     '`Promise<void>`',
-                    'Encodes value and waits for set or setBytes. It does not add version, call assertEnvelope, or create a subscription or write queue.'
+                    'Encodes value and waits for set or setBytes. It does not add version, call assertVersionedEnvelope, or create a subscription or write queue.'
                   ],
                   [
                     '`readEnvelope(storage, key, codec, ctx)`',
@@ -18430,7 +18455,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, familyDef } from '@migaia/store-keyed'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nexport const runtime = createRuntime()\nexport const atomStore = createAtomStore(runtime)\nexport const draft = familyDef((id: string) => ({ text: id }))\nexport const storage = memoryStorageHost()"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, familyDef } from '@migaia/store-keyed'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nexport const runtime = createRuntime()\nexport const atomStore = createAtomStore(runtime)\nexport const draft = familyDef((id: string) => ({ text: id }))\nexport const host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nexport const storage = host.backend('memory')"
               },
               {
                 type: 'paragraph',
@@ -18439,7 +18464,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persistKeyed } from '@migaia/store-persist/keyed'\nimport { atomStore, draft, storage } from './family.ts'\n\nawait storage.set('drafts:u1', '{\"version\":0,\"state\":{\"text\":\"Saved draft\"}}')\nconst definition = draft('u1')\nconst handle = persistKeyed(\n  atomStore,\n  definition,\n  'u1',\n  {\n    namespace: 'drafts',\n    storage\n  }\n)\nawait handle.ready\nconsole.log('打开时的值:', handle.value.text)\nconsole.log('读取后的值:', atomStore.get(definition).text)\nhandle.dispose()\natomStore.dispose()\nawait storage.dispose()"
+                code: "import { persistKeyed } from '@migaia/store-persist/keyed'\nimport { atomStore, draft, storage } from './family.ts'\n\nawait storage.set('drafts:u1', '{\"version\":0,\"state\":{\"text\":\"Saved draft\"}}')\nconst definition = draft('u1')\nconst handle = persistKeyed(\n  atomStore,\n  definition,\n  'u1',\n  {\n    namespace: 'drafts',\n    storage\n  }\n)\nawait handle.ready\nconsole.log('打开时的值:', handle.value.text)\nconsole.log('读取后的值:', atomStore.get(definition).text)\nhandle.dispose()\natomStore.dispose()"
               },
               {
                 type: 'paragraph',
@@ -18476,7 +18501,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     '`version?: number`',
-                    '默认 `0`，采用安全非负整数。keyed 没有 `migrate` 选项，版本不匹配时恢复失败。'
+                    '默认 `0`，采用安全非负整数。keyed 没有 `migrations` 选项，版本不匹配时恢复失败。'
                   ],
                   [
                     '`debounceMs?: number`',
@@ -18525,7 +18550,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persistKeyed, clearFamily } from '@migaia/store-persist/keyed'\nimport { atomStore, draft, storage } from './family.ts'\n\nconst definition = draft('u1')\nconst handle = persistKeyed(\n  atomStore,\n  definition,\n  'u1',\n  {\n    namespace: 'drafts',\n    storage\n  }\n)\nawait handle.ready\natomStore.set(definition, { text: 'Complete' })\nawait handle.flush()\nhandle.dispose()\nconsole.log('删除的草稿数:', await clearFamily(storage, 'drafts'))\nconsole.log('内存中的草稿:', atomStore.get(definition).text)\natomStore.dispose()\nawait storage.dispose()"
+                code: "import { persistKeyed, clearFamily } from '@migaia/store-persist/keyed'\nimport { atomStore, draft, storage } from './family.ts'\n\nconst definition = draft('u1')\nconst handle = persistKeyed(\n  atomStore,\n  definition,\n  'u1',\n  {\n    namespace: 'drafts',\n    storage\n  }\n)\nawait handle.ready\natomStore.set(definition, { text: 'Complete' })\nawait handle.flush()\nhandle.dispose()\nconsole.log('删除的草稿数:', await clearFamily(storage, 'drafts'))\nconsole.log('内存中的草稿:', atomStore.get(definition).text)\natomStore.dispose()"
               },
               {
                 type: 'paragraph',
@@ -18593,7 +18618,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, familyDef } from '@migaia/store-keyed'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nexport const runtime = createRuntime()\nexport const atomStore = createAtomStore(runtime)\nexport const draft = familyDef((id: string) => ({ text: id }))\nexport const storage = memoryStorageHost()"
+                code: "import { createRuntime } from '@migaia/reactive'\nimport { createAtomStore, familyDef } from '@migaia/store-keyed'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nexport const runtime = createRuntime()\nexport const atomStore = createAtomStore(runtime)\nexport const draft = familyDef((id: string) => ({ text: id }))\nexport const host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nexport const storage = host.backend('memory')"
               },
               {
                 type: 'paragraph',
@@ -18602,7 +18627,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persistKeyed } from '@migaia/store-persist/keyed'\nimport { atomStore, draft, storage } from './family.ts'\n\nawait storage.set('drafts:u1', '{\"version\":0,\"state\":{\"text\":\"Saved draft\"}}')\nconst definition = draft('u1')\nconst handle = persistKeyed(\n  atomStore,\n  definition,\n  'u1',\n  {\n    namespace: 'drafts',\n    storage\n  }\n)\nawait handle.ready\nconsole.log('Value at opening:', handle.value.text)\nconsole.log('Value after reading:', atomStore.get(definition).text)\nhandle.dispose()\natomStore.dispose()\nawait storage.dispose()"
+                code: "import { persistKeyed } from '@migaia/store-persist/keyed'\nimport { atomStore, draft, storage } from './family.ts'\n\nawait storage.set('drafts:u1', '{\"version\":0,\"state\":{\"text\":\"Saved draft\"}}')\nconst definition = draft('u1')\nconst handle = persistKeyed(\n  atomStore,\n  definition,\n  'u1',\n  {\n    namespace: 'drafts',\n    storage\n  }\n)\nawait handle.ready\nconsole.log('Value at opening:', handle.value.text)\nconsole.log('Value after reading:', atomStore.get(definition).text)\nhandle.dispose()\natomStore.dispose()"
               },
               {
                 type: 'paragraph',
@@ -18639,7 +18664,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
                   ],
                   [
                     '`version?: number`',
-                    'Defaults to 0 and accepts safe nonnegative integers. Keyed has no migrate option, so version mismatch fails hydration.'
+                    'Defaults to 0 and accepts safe nonnegative integers. Keyed has no migrations option, so version mismatch fails hydration.'
                   ],
                   [
                     '`debounceMs?: number`',
@@ -18688,7 +18713,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persistKeyed, clearFamily } from '@migaia/store-persist/keyed'\nimport { atomStore, draft, storage } from './family.ts'\n\nconst definition = draft('u1')\nconst handle = persistKeyed(\n  atomStore,\n  definition,\n  'u1',\n  {\n    namespace: 'drafts',\n    storage\n  }\n)\nawait handle.ready\natomStore.set(definition, { text: 'Complete' })\nawait handle.flush()\nhandle.dispose()\nconsole.log('Removed drafts:', await clearFamily(storage, 'drafts'))\nconsole.log('Draft in memory:', atomStore.get(definition).text)\natomStore.dispose()\nawait storage.dispose()"
+                code: "import { persistKeyed, clearFamily } from '@migaia/store-persist/keyed'\nimport { atomStore, draft, storage } from './family.ts'\n\nconst definition = draft('u1')\nconst handle = persistKeyed(\n  atomStore,\n  definition,\n  'u1',\n  {\n    namespace: 'drafts',\n    storage\n  }\n)\nawait handle.ready\natomStore.set(definition, { text: 'Complete' })\nawait handle.flush()\nhandle.dispose()\nconsole.log('Removed drafts:', await clearFamily(storage, 'drafts'))\nconsole.log('Draft in memory:', atomStore.get(definition).text)\natomStore.dispose()"
               },
               {
                 type: 'paragraph',
@@ -18758,7 +18783,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nexport const storage = memoryStorageHost()\nexport const store = createStore({ title: 'New draft', count: 0 })"
+                code: "import { createStore } from '@migaia/store-light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nexport const host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nexport const storage = host.backend('memory')\nexport const store = createStore({ title: 'New draft', count: 0 })"
               },
               {
                 type: 'paragraph',
@@ -18767,7 +18792,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persist } from '@migaia/store-persist/light'\nimport { storage, store } from './settings.ts'\n\nawait storage.set('draft', '{}')\nconst handle = persist(store, { key: 'draft', storage })\nawait handle.settled\nconsole.log('首次读取:', handle.hydrationStatus.value)\nstore.title = 'Local repair'\nstore.$runtime.flush()\nawait storage.set('draft', '{\"version\":0,\"state\":{\"title\":\"Saved\",\"count\":4}}')\nawait handle.retryHydrate()\nawait handle.flush()\nconsole.log('修复后的草稿:', store.title, store.count)\nawait handle.ready.catch((error: { code: string }) => {\n  console.log('首次 ready 的错误:', error.code)\n})\nhandle.dispose()\nawait store.$dispose()\nawait storage.dispose()"
+                code: "import { persist } from '@migaia/store-persist/light'\nimport { host, storage, store } from './settings.ts'\n\nawait storage.set('draft', '{}')\nconst handle = persist(store, { key: 'draft', storage })\nawait handle.settled\nconsole.log('首次读取:', handle.hydrationStatus.value)\nstore.title = 'Local repair'\nstore.$runtime.flush()\nawait storage.set('draft', '{\"version\":0,\"state\":{\"title\":\"Saved\",\"count\":4}}')\nawait handle.retryHydrate()\nawait handle.flush()\nconsole.log('修复后的草稿:', store.title, store.count)\nawait handle.ready.catch((error: { code: string }) => {\n  console.log('首次 ready 的错误:', error.code)\n})\nhandle.dispose()\nawait store.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -18833,7 +18858,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persist } from '@migaia/store-persist/light'\nimport { storage, store } from './settings.ts'\n\nconst handle = persist(store, { key: 'draft', storage })\nawait handle.ready\nhandle.dispose()\nawait handle.flush().catch((error: Error & { code: string }) => {\n  console.log('关闭后保存的错误:', error.name, error.code)\n})\nconsole.log('仍可读取的草稿:', store.title)\nawait store.$dispose()\nawait storage.dispose()"
+                code: "import { persist } from '@migaia/store-persist/light'\nimport { host, storage, store } from './settings.ts'\n\nconst handle = persist(store, { key: 'draft', storage })\nawait handle.ready\nhandle.dispose()\nawait handle.flush().catch((error: Error & { code: string }) => {\n  console.log('关闭后保存的错误:', error.name, error.code)\n})\nconsole.log('仍可读取的草稿:', store.title)\nawait store.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -18962,7 +18987,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStore } from '@migaia/store-light'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nexport const storage = memoryStorageHost()\nexport const store = createStore({ title: 'New draft', count: 0 })"
+                code: "import { createStore } from '@migaia/store-light'\nimport { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\n\nexport const host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })\nexport const storage = host.backend('memory')\nexport const store = createStore({ title: 'New draft', count: 0 })"
               },
               {
                 type: 'paragraph',
@@ -18971,7 +18996,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persist } from '@migaia/store-persist/light'\nimport { storage, store } from './settings.ts'\n\nawait storage.set('draft', '{}')\nconst handle = persist(store, { key: 'draft', storage })\nawait handle.settled\nconsole.log('Initial read:', handle.hydrationStatus.value)\nstore.title = 'Local repair'\nstore.$runtime.flush()\nawait storage.set('draft', '{\"version\":0,\"state\":{\"title\":\"Saved\",\"count\":4}}')\nawait handle.retryHydrate()\nawait handle.flush()\nconsole.log('Repaired draft:', store.title, store.count)\nawait handle.ready.catch((error: { code: string }) => {\n  console.log('Original ready error:', error.code)\n})\nhandle.dispose()\nawait store.$dispose()\nawait storage.dispose()"
+                code: "import { persist } from '@migaia/store-persist/light'\nimport { host, storage, store } from './settings.ts'\n\nawait storage.set('draft', '{}')\nconst handle = persist(store, { key: 'draft', storage })\nawait handle.settled\nconsole.log('Initial read:', handle.hydrationStatus.value)\nstore.title = 'Local repair'\nstore.$runtime.flush()\nawait storage.set('draft', '{\"version\":0,\"state\":{\"title\":\"Saved\",\"count\":4}}')\nawait handle.retryHydrate()\nawait handle.flush()\nconsole.log('Repaired draft:', store.title, store.count)\nawait handle.ready.catch((error: { code: string }) => {\n  console.log('Original ready error:', error.code)\n})\nhandle.dispose()\nawait store.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -19037,7 +19062,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { persist } from '@migaia/store-persist/light'\nimport { storage, store } from './settings.ts'\n\nconst handle = persist(store, { key: 'draft', storage })\nawait handle.ready\nhandle.dispose()\nawait handle.flush().catch((error: Error & { code: string }) => {\n  console.log('Save after close error:', error.name, error.code)\n})\nconsole.log('Draft remains readable:', store.title)\nawait store.$dispose()\nawait storage.dispose()"
+                code: "import { persist } from '@migaia/store-persist/light'\nimport { host, storage, store } from './settings.ts'\n\nconst handle = persist(store, { key: 'draft', storage })\nawait handle.ready\nhandle.dispose()\nawait handle.flush().catch((error: Error & { code: string }) => {\n  console.log('Save after close error:', error.name, error.code)\n})\nconsole.log('Draft remains readable:', store.title)\nawait store.$dispose()"
               },
               {
                 type: 'paragraph',
@@ -47768,7 +47793,7 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   'storage-web:index': {
     zh: {
       title: '按数据种类保存记录，并明确升级与释放',
-      lede: '选择内存、Web Storage、cookie 或 IndexedDB 后端，用实体定义集中管理主键、校验、迁移和索引，需要时交给宿主统一管理生命周期。',
+      lede: '把浏览器后端安装到存储宿主，按需要选择文本设置、IndexedDB 记录或 Cookie；应用结束时关闭宿主。',
       document: {
         sections: [
           {
@@ -47778,11 +47803,9 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'list',
                 items: [
-                  '保存后的字节和资料对象继续被本地修改，下一次读取却意外变了，[查看复制边界](/zh/docs/storage-web/api/memory/memoryStorageHost#storage-web-memory--memoryStorageHost--case-1)。',
-                  '多记录操作失败后留下半成品，整体恢复快照还会抹掉无关成功写入，[查看事务草稿](/zh/docs/storage-web/api/memory/memoryStorageHost#storage-web-memory--memoryStorageHost--case-2)。',
-                  '两个仓储各自检查邮箱，仍把同一邮箱分配给不同记录，[查看唯一约束](/zh/docs/storage-web/api/entity/defineEntity#storage-web-entity--defineEntity--case-2)。',
-                  '字段改名后旧记录仍在后端，读取时顺手写回又造成隐藏修改，[查看显式迁移](/zh/docs/storage-web/api/entity/defineEntity#storage-web-entity--defineEntity--case-3)。',
-                  '页面持有旧存储引用，应用退出时漏关实例后仍能继续操作，[查看统一释放](/zh/docs/storage-web/api/host/createStorageHost#storage-web-host--createStorageHost--case-1)。'
+                  '多个页面共用 localStorage 键，互相覆盖。为每个应用选择独立命名空间。',
+                  '数据库更新只完成一半。把相关写入放在同一个 IndexedDB 事务中。',
+                  '页面关闭后仍持续刷新。先释放持续查询，再关闭宿主。'
                 ]
               }
             ]
@@ -47792,14 +47815,8 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             heading: '为什么选它',
             blocks: [
               {
-                type: 'list',
-                items: [
-                  '字节和记录在读写边界复制，修改原始输入或读取副本都不改变已存值，[查看输出](/zh/docs/storage-web/api/memory/memoryStorageHost#storage-web-memory--memoryStorageHost--case-1)。',
-                  '失败只丢弃事务记录草稿，期间无关的成功写入仍然保留，[查看输出](/zh/docs/storage-web/api/memory/memoryStorageHost#storage-web-memory--memoryStorageHost--case-2)。',
-                  '唯一约束跨仓储连接生效，批处理按最终草稿允许合法转移所有者，[查看输出](/zh/docs/storage-web/api/entity/defineEntity#storage-web-entity--defineEntity--case-2)。',
-                  '读取升级与保存升级明确分开，重复读取不会替调用者写回新版本，[查看输出](/zh/docs/storage-web/api/entity/defineEntity#storage-web-entity--defineEntity--case-3)。',
-                  '宿主关闭插件创建的后端，已保留的存储引用随后拒绝操作，[查看输出](/zh/docs/storage-web/api/host/createStorageHost#storage-web-host--createStorageHost--case-1)。'
-                ]
+                type: 'paragraph',
+                text: '宿主统一管理安装的连接与监听器。能力声明说明每个后端实际支持什么；响应式特性需要显式选择。不同后端不会自动组成原子事务。'
               }
             ]
           },
@@ -47809,25 +47826,12 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: '先在同一个真实内存后端保存两类记录，复用同一个主键；安装 `@migaia/storage-web` 后，可直接在 Node 24 运行。'
+                text: '在浏览器 ESM 应用中运行此例。输出 dark；关闭宿主后仍保留设置。'
               },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { defineEntity } from '@migaia/storage-web/entity'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\ntype IRow = { id: string; name: string }\nconst store = memoryStorageHost()\nconst users = defineEntity<IRow>({ name: 'users', key: 'id' }).connect(store)\nconst teams = defineEntity<IRow>({ name: 'teams', key: 'id' }).connect(store)\ntry {\n  await users.put({ id: '1', name: '艾达' })\n  await teams.put({ id: '1', name: '研发' })\n  console.log((await users.get('1'))?.name, (await teams.get('1'))?.name)\n} finally {\n  await store.dispose()\n}"
-              },
-              {
-                type: 'paragraph',
-                text: '输出：'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '艾达 研发'
-              },
-              {
-                type: 'paragraph',
-                text: '遇到唯一值冲突看 [最终草稿约束](/zh/docs/storage-web/api/entity/defineEntity#storage-web-entity--defineEntity--case-2)，旧记录升级看 [显式迁移](/zh/docs/storage-web/api/entity/defineEntity#storage-web-entity--defineEntity--case-3)，多个后端清理看 [宿主所有权](/zh/docs/storage-web/api/host/createStorageHost#storage-web-host--createStorageHost--case-1)。'
+                code: "import { createStorageHost } from '@migaia/storage-host'\nimport { localStorageBackendPlugin } from '@migaia/storage-web/local-storage'\n\nconst host = await createStorageHost({\n  plugins: [localStorageBackendPlugin({ id: 'settings', namespace: 'my-app' })]\n})\ntry {\n  const settings = host.backend('settings')\n  await settings.set('theme', 'dark')\n  console.log(await settings.get('theme'))\n} finally {\n  await host.dispose()\n}"
               }
             ]
           },
@@ -47837,31 +47841,20 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'table',
-                headers: ['问题', 'API 与场景'],
+                headers: ['问题', 'API'],
                 rows: [
                   [
-                    '输入或返回对象的修改泄漏到存储',
-                    '[memoryStorageHost：复制隔离](/zh/docs/storage-web/api/memory/memoryStorageHost#storage-web-memory--memoryStorageHost--case-1)'
+                    '保存文本偏好',
+                    '[localStorageBackendPlugin](/zh/docs/storage-web/api/plugins/local-storage/localStorageBackendPlugin)'
                   ],
                   [
-                    '失败后不应提交半份记录',
-                    '[memoryStorageHost：事务草稿](/zh/docs/storage-web/api/memory/memoryStorageHost#storage-web-memory--memoryStorageHost--case-2)'
+                    '一并提交相关记录',
+                    '[indexedDbBackendPlugin](/zh/docs/storage-web/api/plugins/indexed-db/indexedDbBackendPlugin)'
                   ],
+                  ['校验业务记录', '[defineEntity](/zh/docs/storage-host/api/entity/defineEntity)'],
                   [
-                    '不同记录种类使用相同主键',
-                    '[defineEntity：实体记录空间](/zh/docs/storage-web/api/entity/defineEntity#storage-web-entity--defineEntity--case-1)'
-                  ],
-                  [
-                    '跨仓储唯一约束与批量转移',
-                    '[defineEntity：唯一值所有权](/zh/docs/storage-web/api/entity/defineEntity#storage-web-entity--defineEntity--case-2)'
-                  ],
-                  [
-                    '先读取升级结果，再安排写回',
-                    '[defineEntity：显式迁移](/zh/docs/storage-web/api/entity/defineEntity#storage-web-entity--defineEntity--case-3)'
-                  ],
-                  [
-                    '按 ID 选择后端并统一释放',
-                    '[createStorageHost：后端所有权](/zh/docs/storage-web/api/host/createStorageHost#storage-web-host--createStorageHost--case-1)'
+                    '观察查询结果',
+                    '[reactiveFeature](/zh/docs/storage-web/api/features/reactive/reactiveFeature)'
                   ]
                 ]
               }
@@ -47872,21 +47865,21 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       next: [
         {
           path: 'getting-started',
-          label: '安装并保存设置'
+          label: '安装并保存第一项设置'
+        },
+        {
+          path: 'indexeddb-and-transactions',
+          label: '记录与事务'
         },
         {
           path: 'entity-schema-and-codecs',
-          label: '校验与记录查询'
-        },
-        {
-          path: 'host-and-plugins',
-          label: '管理多个存储'
+          label: '实体与编解码器'
         }
       ]
     },
     en: {
       title: 'Store record kinds with explicit upgrades and cleanup',
-      lede: 'Choose memory, Web Storage, cookies, or IndexedDB, then define record keys, validation, migrations, and indexes; use a host when several backends need one owner.',
+      lede: 'Install browser backends in a storage host. Choose text settings, IndexedDB records or cookies, then close the host when the application ends.',
       document: {
         sections: [
           {
@@ -47896,11 +47889,9 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
               {
                 type: 'list',
                 items: [
-                  'Saved bytes and profile objects change when a preview edits its local copies, [check copying boundaries](/en/docs/storage-web/api/memory/memoryStorageHost#storage-web-memory--memoryStorageHost--case-1).',
-                  'A failed multi-record operation leaves partial data, while restoring a whole snapshot erases unrelated writes, [use a transaction draft](/en/docs/storage-web/api/memory/memoryStorageHost#storage-web-memory--memoryStorageHost--case-2).',
-                  'Separate repository caches admit two records with the same email, [enforce one owner](/en/docs/storage-web/api/entity/defineEntity#storage-web-entity--defineEntity--case-2).',
-                  'A renamed field needs an upgrade, but an ordinary read must not become a hidden write, [migrate explicitly](/en/docs/storage-web/api/entity/defineEntity#storage-web-entity--defineEntity--case-3).',
-                  'A screen retains a store after application shutdown because one disposer was missed, [close owned backends together](/en/docs/storage-web/api/host/createStorageHost#storage-web-host--createStorageHost--case-1).'
+                  'Several pages share localStorage keys and overwrite each other. Use a namespace for each application.',
+                  'A database update succeeds halfway. Use one IndexedDB transaction for related writes.',
+                  'A page keeps refreshing after closure. Dispose its live query, then its host.'
                 ]
               }
             ]
@@ -47910,14 +47901,8 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             heading: 'Why choose it',
             blocks: [
               {
-                type: 'list',
-                items: [
-                  'Copies at byte and record boundaries keep edits to original inputs and returned values out of stored state, [see the output](/en/docs/storage-web/api/memory/memoryStorageHost#storage-web-memory--memoryStorageHost--case-1).',
-                  'A failed record draft is discarded while an unrelated successful write survives, [see the output](/en/docs/storage-web/api/memory/memoryStorageHost#storage-web-memory--memoryStorageHost--case-2).',
-                  'Unique ownership spans repository connections and validates the final batch draft for a valid transfer, [see the output](/en/docs/storage-web/api/entity/defineEntity#storage-web-entity--defineEntity--case-2).',
-                  'Reading an upgraded shape and saving its new version are separate operations, [see the output](/en/docs/storage-web/api/entity/defineEntity#storage-web-entity--defineEntity--case-3).',
-                  'The host closes stores created by its plugins so retained references reject further operations, [see the output](/en/docs/storage-web/api/host/createStorageHost#storage-web-host--createStorageHost--case-1).'
-                ]
+                type: 'paragraph',
+                text: 'The host manages the installed connections and listeners together. Capabilities describe what each backend actually provides; adding a reactive Feature is an explicit choice. Separate backends do not become one atomic transaction.'
               }
             ]
           },
@@ -47927,59 +47912,38 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Start with two record kinds sharing one real memory backend and primary key; install `@migaia/storage-web` and run this with Node 24.'
+                text: 'Run this example in a browser ESM application. The output is dark; closing the host keeps the saved setting.'
               },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { defineEntity } from '@migaia/storage-web/entity'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\ntype IRow = { id: string; name: string }\nconst store = memoryStorageHost()\nconst users = defineEntity<IRow>({ name: 'users', key: 'id' }).connect(store)\nconst teams = defineEntity<IRow>({ name: 'teams', key: 'id' }).connect(store)\ntry {\n  await users.put({ id: '1', name: 'Ada' })\n  await teams.put({ id: '1', name: 'Research' })\n  console.log((await users.get('1'))?.name, (await teams.get('1'))?.name)\n} finally {\n  await store.dispose()\n}"
-              },
-              {
-                type: 'paragraph',
-                text: 'Output:'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'Ada Research'
-              },
-              {
-                type: 'paragraph',
-                text: 'For duplicate values, see [final-draft uniqueness](/en/docs/storage-web/api/entity/defineEntity#storage-web-entity--defineEntity--case-2); for old records, see [explicit migration](/en/docs/storage-web/api/entity/defineEntity#storage-web-entity--defineEntity--case-3); for cleanup, see [host ownership](/en/docs/storage-web/api/host/createStorageHost#storage-web-host--createStorageHost--case-1).'
+                code: "import { createStorageHost } from '@migaia/storage-host'\nimport { localStorageBackendPlugin } from '@migaia/storage-web/local-storage'\n\nconst host = await createStorageHost({\n  plugins: [localStorageBackendPlugin({ id: 'settings', namespace: 'my-app' })]\n})\ntry {\n  const settings = host.backend('settings')\n  await settings.set('theme', 'dark')\n  console.log(await settings.get('theme'))\n} finally {\n  await host.dispose()\n}"
               }
             ]
           },
           {
             id: 'api-map',
-            heading: 'Find an API for your problem',
+            heading: 'Choose an API for the task',
             blocks: [
               {
                 type: 'table',
-                headers: ['Problem', 'API and case'],
+                headers: ['Task', 'API'],
                 rows: [
                   [
-                    'Edits to inputs or results leak into storage',
-                    '[memoryStorageHost: copied boundaries](/en/docs/storage-web/api/memory/memoryStorageHost#storage-web-memory--memoryStorageHost--case-1)'
+                    'Save text preferences',
+                    '[localStorageBackendPlugin](/en/docs/storage-web/api/plugins/local-storage/localStorageBackendPlugin)'
                   ],
                   [
-                    'A failed operation must not commit partial records',
-                    '[memoryStorageHost: transaction drafts](/en/docs/storage-web/api/memory/memoryStorageHost#storage-web-memory--memoryStorageHost--case-2)'
+                    'Commit related records',
+                    '[indexedDbBackendPlugin](/en/docs/storage-web/api/plugins/indexed-db/indexedDbBackendPlugin)'
                   ],
                   [
-                    'Record kinds reuse a primary key',
-                    '[defineEntity: record spaces](/en/docs/storage-web/api/entity/defineEntity#storage-web-entity--defineEntity--case-1)'
+                    'Validate domain records',
+                    '[defineEntity](/en/docs/storage-host/api/entity/defineEntity)'
                   ],
                   [
-                    'Unique ownership across repositories and batch transfers',
-                    '[defineEntity: final-draft checks](/en/docs/storage-web/api/entity/defineEntity#storage-web-entity--defineEntity--case-2)'
-                  ],
-                  [
-                    'Read an upgraded shape before scheduling writes',
-                    '[defineEntity: explicit migration](/en/docs/storage-web/api/entity/defineEntity#storage-web-entity--defineEntity--case-3)'
-                  ],
-                  [
-                    'Select stores by ID and close them together',
-                    '[createStorageHost: backend ownership](/en/docs/storage-web/api/host/createStorageHost#storage-web-host--createStorageHost--case-1)'
+                    'Observe query results',
+                    '[reactiveFeature](/en/docs/storage-web/api/features/reactive/reactiveFeature)'
                   ]
                 ]
               }
@@ -47993,12 +47957,12 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
           label: 'Install and save a setting'
         },
         {
-          path: 'entity-schema-and-codecs',
-          label: 'Validation and record queries'
+          path: 'indexeddb-and-transactions',
+          label: 'Records and transactions'
         },
         {
-          path: 'host-and-plugins',
-          label: 'Manage several stores'
+          path: 'entity-schema-and-codecs',
+          label: 'Entities and codecs'
         }
       ]
     }
@@ -48006,235 +47970,39 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   'storage-web:getting-started': {
     zh: {
       title: '安装并保存第一项设置',
-      lede: '先完成一次真正的内存读写。需要刷新后保留数据时，再选择对应浏览器存储。',
+      lede: '选择真实浏览器后端，为业务键指定命名空间。',
       document: {
         sections: [
           {
             id: 'install',
-            heading: '安装与导入',
+            heading: '安装浏览器依赖',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'migaia 的包发布在 GitHub Packages，不在公共 npm。第一次安装前，在项目根目录的 .npmrc 中加入 @migaia:registry=https://npm.pkg.github.com，并用带 read:packages 权限的 GitHub 令牌登录，否则会报 404。'
+                text: '通过已配置的包仓库安装 @migaia/storage-web、@migaia/storage-host 与 @migaia/storage-contract。示例要求对应的原生浏览器接口；Node 默认不提供 localStorage、document.cookie 或 IndexedDB。'
               },
-              {
-                type: 'code',
-                language: 'bash',
-                code: 'pnpm add @migaia/storage-web'
-              },
-              {
-                type: 'paragraph',
-                text: '示例使用 ESM 和 Node.js 24。只导入公开子路径，不从 `backends/` 等源码目录导入。认证令牌放在环境变量或包管理器配置中。'
-              }
-            ]
-          },
-          {
-            id: 'memory',
-            heading: '保存一次主题设置',
-            blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst settings = memoryStorageHost()\nawait settings.set('theme', 'dark')\nconsole.log('保存的主题:', await settings.get('theme'))\nconsole.log('同步读取的主题:', settings.sync.get('theme'))\nawait settings.dispose()"
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '保存的主题: dark\n同步读取的主题: dark'
-              },
-              {
-                type: 'table',
-                headers: ['入口或字段', '说明'],
-                rows: [
-                  [
-                    '`memoryStorageHost<TValue = unknown>()`',
-                    '无参数。每次创建独立的 `IRecordStore<TValue>`，带 `sync` 和 `subscribeChanges`，没有命名空间选项。'
-                  ],
-                  [
-                    '`backend / capabilities`',
-                    '名称为 `memory`。同步读取、字节、记录、事务、迭代、变更通知为 `true`，原生二级索引为 `false`，不声明单值大小上限。'
-                  ],
-                  [
-                    '`dispose(): Promise<void>`',
-                    '关闭内存实例并清空数据。服务端渲染时按请求创建，避免不同用户共用数据。'
-                  ],
-                  [
-                    '`putRecord / getRecord / iterateRecords / transaction`',
-                    '内存支持记录和事务；字节及记录读写隔离可变输入。完整方法见记录专题。'
-                  ]
-                ]
-              },
-              {
-                type: 'table',
-                headers: ['入口或字段', '说明'],
-                rows: [
-                  [
-                    '`syncRead / binary / records / transactions / iteration`',
-                    '这五项在内存后端均为 `true`，分别支持同步读取、字节、记录、事务和迭代。'
-                  ],
-                  [
-                    '`secondaryIndexes / changeFeed`',
-                    '内存分别为 `false / true`，没有原生二级索引，但提供实例内变更通知。'
-                  ],
-                  [
-                    '`maxValueBytes / opaqueEntries`',
-                    '内存分别为 `undefined / false`，不声明单值字节限制，也不声明 JavaScript 不可见键。'
-                  ]
-                ]
+                code: "import { createStorageHost } from '@migaia/storage-host'\nimport { localStorageBackendPlugin } from '@migaia/storage-web/local-storage'\n\nconst host = await createStorageHost({\n  plugins: [localStorageBackendPlugin({ id: 'settings', namespace: 'my-app' })]\n})\ntry {\n  const settings = host.backend('settings')\n  await settings.set('theme', 'dark')\n  console.log(await settings.get('theme'))\n} finally {\n  await host.dispose()\n}"
               }
             ]
           },
           {
-            id: 'backend-map',
-            heading: '按数据寿命和形态选择',
+            id: 'choose',
+            heading: '按数据与保留期限选择',
             blocks: [
               {
                 type: 'table',
-                headers: ['入口或字段', '说明'],
+                headers: ['后端', '用途'],
                 rows: [
+                  ['localStorage', '同源页面间共享的文本设置。'],
+                  ['sessionStorage', '当前标签页会话的文本草稿。'],
                   [
-                    '`@migaia/storage-web/memory`',
-                    '实例存活期间保存，可在 Node/SSR 使用，不依赖浏览器对象。'
+                    'IndexedDB',
+                    '文本、字节与结构化记录。secondaryIndexes 与 changeFeed 分别说明原生索引访问及已提交变化通知。使用 putRecord 保存记录。'
                   ],
-                  [
-                    '`@migaia/storage-web/local-storage`',
-                    '`localStorageHost()` 保存小型字符串偏好，可跨刷新保留，受浏览器配额和用户清理影响。'
-                  ],
-                  [
-                    '`@migaia/storage-web/session-storage`',
-                    '`sessionStorageHost()` 保存当前标签页会话数据，不持续同步其他标签页的修改。'
-                  ],
-                  [
-                    '`@migaia/storage-web/cookies`',
-                    '`cookiesHost()` 保存请求相关小型数据，完整赋值最多 4096 字节，JavaScript 看不到 HttpOnly 条目。'
-                  ],
-                  [
-                    '`@migaia/storage-web/indexed-db`',
-                    '`indexedDbHost()` 提供异步记录、字节、迭代、事务与原生二级索引，没有同步通道。'
-                  ]
-                ]
-              },
-              {
-                type: 'paragraph',
-                text: '浏览器中的实际调用见响应式与 Cookie 专题，记录方法见 IndexedDB 专题。`StorageHost` 组合多个后端；`defineEntity()` 在后端上增加校验与查询。两者都不是新的持久化格式。'
-              }
-            ]
-          },
-          {
-            id: 'web-options',
-            heading: 'Local Storage 与 Session Storage 选项',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['入口或字段', '说明'],
-                rows: [
-                  [
-                    '`localStorageHost(options?: ILocalStorageOptions)`',
-                    '返回 `ISyncCapableStore<IKeyValueStore>`，默认宿主为 `globalThis.localStorage`。'
-                  ],
-                  [
-                    '`sessionStorageHost(options?: ISessionStorageOptions)`',
-                    '返回相同的同步字符串存储类型，默认宿主为 `globalThis.sessionStorage`。'
-                  ],
-                  [
-                    '`namespace?: string`',
-                    '默认 `default`，不能为空。枚举和清空操作仅处理此命名空间。'
-                  ],
-                  [
-                    '`namespaceCodec?: INamespaceCodec`',
-                    '默认 `lengthPrefixedNamespaceCodec`。更改格式时由应用迁移旧数据。'
-                  ],
-                  [
-                    '`storage?: IWebStorageLike`',
-                    '替换宿主 Storage。构造期真实写入并移除探测键，不可写时抛出 `BACKEND_UNAVAILABLE`。'
-                  ],
-                  ['`IWebStorageLike.length: number`', '提供可枚举键数，使用非负安全整数。'],
-                  ['`getItem(key: string): string | null`', '读取物理键，不存在时得到 `null`。'],
-                  [
-                    '`setItem(key: string, value: string): void`',
-                    '写入物理字符串值，宿主失败交给存储层处理。'
-                  ],
-                  ['`removeItem(key: string): void`', '移除指定物理键。'],
-                  ['`key(index: number): string | null`', '按索引枚举物理键。'],
-                  ['`clear(): void`', '提供宿主清空方法；库自身按命名空间逐键删除。']
-                ]
-              },
-              {
-                type: 'paragraph',
-                text: '这两个后端只有 `syncRead` 为 `true`。`binary`、`records`、`transactions`、`iteration`、`secondaryIndexes`、`changeFeed`、`opaqueEntries` 为 `false`。约 5 MiB 的 `maxValueBytes` 不是浏览器配额保证。'
-              }
-            ]
-          },
-          {
-            id: 'string-methods',
-            heading: '字符串读写与清理',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['签名', '返回', '作用'],
-                rows: [
-                  [
-                    '`get(key: string, ctx?: IOperationContext)`',
-                    '`Promise<string | null>`',
-                    '读取字符串，缺失时返回 `null`。'
-                  ],
-                  [
-                    '`set(key: string, value: string, ctx?: IWriteOptions)`',
-                    '`Promise<void>`',
-                    '保存字符串，不自动转换其他类型。'
-                  ],
-                  [
-                    '`remove(key: string, ctx?: IOperationContext)`',
-                    '`Promise<void>`',
-                    '删除一个字符串值，缺失时成功结束。'
-                  ],
-                  [
-                    '`has(key: string, ctx?: IOperationContext)`',
-                    '`Promise<boolean>`',
-                    '判断字符串键是否存在。'
-                  ],
-                  [
-                    '`keys(ctx?: IOperationContext)`',
-                    '`Promise<string[]>`',
-                    '列出字符串通道的逻辑键。'
-                  ],
-                  [
-                    '`clearValues(ctx?: IOperationContext)`',
-                    '`Promise<void>`',
-                    '只清空字符串通道。'
-                  ],
-                  [
-                    '`clearAll(ctx?: IOperationContext)`',
-                    '`Promise<void>`',
-                    '清空后端支持的数据通道；维护元数据的处理查看后端说明。'
-                  ],
-                  [
-                    '`dispose()`',
-                    '`Promise<void>`',
-                    '关闭实例，不删除浏览器持久数据；删除业务数据使用清空方法。'
-                  ]
-                ]
-              },
-              {
-                type: 'table',
-                headers: ['入口或字段', '说明'],
-                rows: [
-                  [
-                    '`sync.get(key: string): string | null`',
-                    '同步读取字符串，不存在时得到 `null`。'
-                  ],
-                  [
-                    '`sync.set(key: string, value: string, options?: ISyncWriteOptions): void`',
-                    '同步写入，不能取消或超时，`conflictPolicy` 使用 `conflict` 或 `replace`。'
-                  ],
-                  ['`sync.remove(key: string): void`', '同步删除指定字符串键。'],
-                  ['`sync.has(key: string): boolean`', '同步检查字符串键。'],
-                  ['`sync.keys(): string[]`', '同步列出字符串逻辑键。'],
-                  ['`sync.clearValues(): void`', '同步清空当前字符串通道。'],
-                  [
-                    '`IOperationContext / IWriteOptions`',
-                    '取消、超时、分页和跨通道覆盖策略见操作与错误专题，类型从 `storage-contract` 导入。'
-                  ]
+                  ['Cookie', '随匹配请求发送的小型、JavaScript 可见偏好。']
                 ]
               }
             ]
@@ -48244,26 +48012,18 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             heading: '命名空间编解码器',
             blocks: [
               {
-                type: 'table',
-                headers: ['入口或字段', '说明'],
-                rows: [
-                  [
-                    '`lengthPrefixedNamespaceCodec: INamespaceCodec`',
-                    '物理键格式为 `sw1:<UTF-8字节数>:<编码后的命名空间>:<逻辑键>`。'
-                  ],
-                  [
-                    '`encode(namespace: string, key: string): string`',
-                    '把命名空间与逻辑键组合，例如 `app` 和 `theme` 得到 `sw1:3:app:theme`。'
-                  ],
-                  [
-                    '`decode(namespace: string, physicalKey: string): string | undefined`',
-                    '匹配时取回逻辑键，不匹配返回 `undefined`。损坏的 URI 编码可能直接抛原生 `URIError`；后端调用会包装为 `EXTENSION_FAILED`。'
-                  ],
-                  [
-                    '自定义 `INamespaceCodec`',
-                    '实现这两个方法并保证可逆、不跨命名空间碰撞。错误返回类型或调用失败会由后端报 `EXTENSION_FAILED`。'
-                  ]
-                ]
+                type: 'paragraph',
+                text: 'namespace 隔离业务键，namespaceCodec 把命名空间与逻辑键映射为浏览器键。已有数据仍在使用时保留同一编解码器；更换它不会迁移旧数据。'
+              }
+            ]
+          },
+          {
+            id: 'compose',
+            heading: '组合后端',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: '临时数据使用 @migaia/storage-host 的 memoryBackendPlugin；需要持久数据时安装对应浏览器插件。关闭实例不会删除浏览器持久化数据。'
               }
             ]
           }
@@ -48271,265 +48031,54 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
+          path: 'getting-started',
+          label: '安装并保存第一项设置'
+        },
+        {
           path: 'indexeddb-and-transactions',
           label: '记录与事务'
         },
         {
-          path: 'host-and-plugins',
-          label: '组合多个后端'
-        },
-        {
-          path: 'cancellation-errors-and-shutdown',
-          label: '取消与排错'
+          path: 'entity-schema-and-codecs',
+          label: '实体与编解码器'
         }
       ]
     },
     en: {
       title: 'Install and save a setting',
-      lede: 'Complete a real memory-store write and read first. Choose browser storage when data needs to survive a reload.',
+      lede: 'Choose the native browser backend and give application keys a namespace.',
       document: {
         sections: [
           {
             id: 'install',
-            heading: 'Install and import',
+            heading: 'Install the browser packages',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'migaia packages are published to GitHub Packages, not the public npm registry. Before the first install, add @migaia:registry=https://npm.pkg.github.com to the .npmrc in your project root and authenticate with a GitHub token that has read:packages; otherwise the install fails with 404.'
+                text: 'Install @migaia/storage-web, @migaia/storage-host and @migaia/storage-contract through your configured package registry. Browser examples require the matching native APIs; Node does not provide localStorage, document.cookie or IndexedDB by default.'
               },
-              {
-                type: 'code',
-                language: 'bash',
-                code: 'pnpm add @migaia/storage-web'
-              },
-              {
-                type: 'paragraph',
-                text: 'The examples use ESM and Node.js 24. Import public subpaths rather than source directories such as `backends/`. Keep authentication tokens in environment variables or package-manager settings.'
-              }
-            ]
-          },
-          {
-            id: 'memory',
-            heading: 'Save a theme setting',
-            blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst settings = memoryStorageHost()\nawait settings.set('theme', 'dark')\nconsole.log('Saved theme:', await settings.get('theme'))\nconsole.log('Theme read synchronously:', settings.sync.get('theme'))\nawait settings.dispose()"
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'Saved theme: dark\nTheme read synchronously: dark'
-              },
-              {
-                type: 'table',
-                headers: ['Entry or field', 'Behavior'],
-                rows: [
-                  [
-                    '`memoryStorageHost<TValue = unknown>()`',
-                    'Takes no arguments. Creates an independent `IRecordStore<TValue>` with sync and subscribeChanges, without namespace options.'
-                  ],
-                  [
-                    '`backend / capabilities`',
-                    'The backend is memory. Synchronous reads, bytes, records, transactions, iteration, and change notifications are true; native secondary indexes are false, with no declared per-value limit.'
-                  ],
-                  [
-                    '`dispose(): Promise<void>`',
-                    'Closes the memory instance and clears its data. Create one per server-rendered request to keep users separate.'
-                  ],
-                  [
-                    '`putRecord / getRecord / iterateRecords / transaction`',
-                    'Memory supports records and transactions, isolating mutable byte and record inputs. See the record topic for complete methods.'
-                  ]
-                ]
-              },
-              {
-                type: 'table',
-                headers: ['Entry or field', 'Behavior'],
-                rows: [
-                  [
-                    '`syncRead / binary / records / transactions / iteration`',
-                    'All five are true in memory, indicating synchronous reads, bytes, records, transactions, and iteration.'
-                  ],
-                  [
-                    '`secondaryIndexes / changeFeed`',
-                    'Memory uses false and true respectively: no native secondary indexes, but instance-local change notifications.'
-                  ],
-                  [
-                    '`maxValueBytes / opaqueEntries`',
-                    'Memory uses undefined and false respectively: no declared per-value byte limit and no invisible keys.'
-                  ]
-                ]
+                code: "import { createStorageHost } from '@migaia/storage-host'\nimport { localStorageBackendPlugin } from '@migaia/storage-web/local-storage'\n\nconst host = await createStorageHost({\n  plugins: [localStorageBackendPlugin({ id: 'settings', namespace: 'my-app' })]\n})\ntry {\n  const settings = host.backend('settings')\n  await settings.set('theme', 'dark')\n  console.log(await settings.get('theme'))\n} finally {\n  await host.dispose()\n}"
               }
             ]
           },
           {
-            id: 'backend-map',
-            heading: 'Choose lifetime and data shape',
+            id: 'choose',
+            heading: 'Choose storage by data and lifetime',
             blocks: [
               {
                 type: 'table',
-                headers: ['Entry or field', 'Behavior'],
+                headers: ['Backend', 'Use it for'],
                 rows: [
+                  ['localStorage', 'Text settings shared by tabs of this origin.'],
+                  ['sessionStorage', 'Text drafts for this tab session.'],
                   [
-                    '`@migaia/storage-web/memory`',
-                    'Stores data for this instance’s lifetime and works in Node or SSR without browser objects.'
+                    'IndexedDB',
+                    'Text, bytes and structured records. secondaryIndexes and changeFeed describe native index access and committed change notifications. Use putRecord to save a record.'
                   ],
-                  [
-                    '`@migaia/storage-web/local-storage`',
-                    '`localStorageHost()` keeps small text preferences across reloads, subject to quotas and user cleanup.'
-                  ],
-                  [
-                    '`@migaia/storage-web/session-storage`',
-                    '`sessionStorageHost()` keeps tab-session data without continuously synchronizing changes from another tab.'
-                  ],
-                  [
-                    '`@migaia/storage-web/cookies`',
-                    '`cookiesHost()` keeps small request-associated data. The full assignment is limited to 4096 bytes, and JavaScript cannot see HttpOnly entries.'
-                  ],
-                  [
-                    '`@migaia/storage-web/indexed-db`',
-                    '`indexedDbHost()` provides asynchronous records, bytes, iteration, transactions, and native indexes without a synchronous channel.'
-                  ]
-                ]
-              },
-              {
-                type: 'paragraph',
-                text: 'See the reactive and cookie topics for real browser calls, and the IndexedDB topic for record methods. `StorageHost` composes backends; `defineEntity()` adds validation and queries. Neither is a new persistence format.'
-              }
-            ]
-          },
-          {
-            id: 'web-options',
-            heading: 'Local Storage and Session Storage options',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Entry or field', 'Behavior'],
-                rows: [
-                  [
-                    '`localStorageHost(options?: ILocalStorageOptions)`',
-                    'Returns `ISyncCapableStore<IKeyValueStore>`, using `globalThis.localStorage` by default.'
-                  ],
-                  [
-                    '`sessionStorageHost(options?: ISessionStorageOptions)`',
-                    'Returns the same synchronous string-store type, using `globalThis.sessionStorage` by default.'
-                  ],
-                  [
-                    '`namespace?: string`',
-                    'Defaults to default and cannot be empty. Enumeration and clearing stay within this namespace.'
-                  ],
-                  [
-                    '`namespaceCodec?: INamespaceCodec`',
-                    'Defaults to `lengthPrefixedNamespaceCodec`; the application migrates old data when changing formats.'
-                  ],
-                  [
-                    '`storage?: IWebStorageLike`',
-                    'Replaces the host Storage object. Construction writes and removes a real probe key, throwing `BACKEND_UNAVAILABLE` when writing fails.'
-                  ],
-                  [
-                    '`IWebStorageLike.length: number`',
-                    'Supplies the enumerable key count as a nonnegative safe integer.'
-                  ],
-                  [
-                    '`getItem(key: string): string | null`',
-                    'Reads a physical key, returning null when absent.'
-                  ],
-                  [
-                    '`setItem(key: string, value: string): void`',
-                    'Writes physical text, leaving host-failure handling to the storage layer.'
-                  ],
-                  ['`removeItem(key: string): void`', 'Removes the specified physical key.'],
-                  ['`key(index: number): string | null`', 'Enumerates a physical key by index.'],
-                  [
-                    '`clear(): void`',
-                    'Provides the host clear method; the library removes namespaced keys individually.'
-                  ]
-                ]
-              },
-              {
-                type: 'paragraph',
-                text: 'For these two backends, syncRead is true. The binary, records, transactions, iteration, secondaryIndexes, changeFeed, and opaqueEntries flags are false. Their approximate 5 MiB maxValueBytes does not guarantee browser quota.'
-              }
-            ]
-          },
-          {
-            id: 'string-methods',
-            heading: 'String access and cleanup',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Signature', 'Returns', 'Effect'],
-                rows: [
-                  [
-                    '`get(key: string, ctx?: IOperationContext)`',
-                    '`Promise<string | null>`',
-                    'Read text, returning null when absent.'
-                  ],
-                  [
-                    '`set(key: string, value: string, ctx?: IWriteOptions)`',
-                    '`Promise<void>`',
-                    'Save text without converting other input types.'
-                  ],
-                  [
-                    '`remove(key: string, ctx?: IOperationContext)`',
-                    '`Promise<void>`',
-                    'Remove a string value; an absent value succeeds.'
-                  ],
-                  [
-                    '`has(key: string, ctx?: IOperationContext)`',
-                    '`Promise<boolean>`',
-                    'Check whether a string key exists.'
-                  ],
-                  [
-                    '`keys(ctx?: IOperationContext)`',
-                    '`Promise<string[]>`',
-                    'List logical keys from the string channel.'
-                  ],
-                  [
-                    '`clearValues(ctx?: IOperationContext)`',
-                    '`Promise<void>`',
-                    'Clear only the string channel.'
-                  ],
-                  [
-                    '`clearAll(ctx?: IOperationContext)`',
-                    '`Promise<void>`',
-                    'Clear supported data channels; consult the backend for maintenance metadata.'
-                  ],
-                  [
-                    '`dispose()`',
-                    '`Promise<void>`',
-                    'Close the instance without deleting browser-persistent data; use clear methods to delete business data.'
-                  ]
-                ]
-              },
-              {
-                type: 'table',
-                headers: ['Entry or field', 'Behavior'],
-                rows: [
-                  [
-                    '`sync.get(key: string): string | null`',
-                    'Reads text synchronously and returns null when absent.'
-                  ],
-                  [
-                    '`sync.set(key: string, value: string, options?: ISyncWriteOptions): void`',
-                    'Writes synchronously without cancellation or timeout; conflictPolicy accepts conflict or replace.'
-                  ],
-                  [
-                    '`sync.remove(key: string): void`',
-                    'Removes the specified string key synchronously.'
-                  ],
-                  ['`sync.has(key: string): boolean`', 'Checks a string key synchronously.'],
-                  ['`sync.keys(): string[]`', 'Lists logical string keys synchronously.'],
-                  [
-                    '`sync.clearValues(): void`',
-                    'Clears the current string channel synchronously.'
-                  ],
-                  [
-                    '`IOperationContext / IWriteOptions`',
-                    'See operations and errors for cancellation, timeout, pagination, and cross-channel replacement; import these types from storage-contract.'
-                  ]
+                  ['Cookie', 'Small JavaScript-visible preferences sent with matching requests.']
                 ]
               }
             ]
@@ -48539,26 +48088,18 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
             heading: 'Namespace codec',
             blocks: [
               {
-                type: 'table',
-                headers: ['Entry or field', 'Behavior'],
-                rows: [
-                  [
-                    '`lengthPrefixedNamespaceCodec: INamespaceCodec`',
-                    'Uses `sw1:<UTF-8 byte count>:<encoded namespace>:<logical key>` for physical keys.'
-                  ],
-                  [
-                    '`encode(namespace: string, key: string): string`',
-                    'Combines namespace and logical key; app and theme produce `sw1:3:app:theme`.'
-                  ],
-                  [
-                    '`decode(namespace: string, physicalKey: string): string | undefined`',
-                    'Returns the logical key for a matching namespace, or undefined otherwise. Malformed URI encoding can throw native URIError directly; backend calls wrap it as `EXTENSION_FAILED`.'
-                  ],
-                  [
-                    'Custom `INamespaceCodec`',
-                    'Implement both methods with reversible encoding and no namespace collisions. Invalid results or call failures become `EXTENSION_FAILED` through the backend.'
-                  ]
-                ]
+                type: 'paragraph',
+                text: 'namespace separates application keys. namespaceCodec maps that namespace and a logical key to a browser key. Keep the same codec while saved data remains; changing it does not migrate existing data.'
+              }
+            ]
+          },
+          {
+            id: 'compose',
+            heading: 'Compose backends',
+            blocks: [
+              {
+                type: 'paragraph',
+                text: 'Use memoryBackendPlugin from @migaia/storage-host for temporary data. Install persistent browser plugins only when needed. Close the instance without deleting browser-persistent data.'
               }
             ]
           }
@@ -48566,16 +48107,16 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
+          path: 'getting-started',
+          label: 'Install and save a setting'
+        },
+        {
           path: 'indexeddb-and-transactions',
           label: 'Records and transactions'
         },
         {
-          path: 'host-and-plugins',
-          label: 'Compose backends'
-        },
-        {
-          path: 'cancellation-errors-and-shutdown',
-          label: 'Cancellation and troubleshooting'
+          path: 'entity-schema-and-codecs',
+          label: 'Entities and codecs'
         }
       ]
     }
@@ -48583,296 +48124,50 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   'storage-web:indexeddb-and-transactions': {
     zh: {
       title: 'IndexedDB：记录、分页与事务',
-      lede: '保存结构化数据，按键读取，并把关联更新一起提交。',
+      lede: '在同一个原生事务内提交相关文本与记录。',
       document: {
         sections: [
           {
-            id: 'mental-model',
-            heading: '为离线任务保存记录',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '示例在浏览器中运行，使用打包工具处理包名导入。IndexedDB、cookie 和事件来自真实浏览器宿主；Node 本身不提供这些接口。'
-              },
-              {
-                type: 'paragraph',
-                text: 'IndexedDB 适合结构化记录、字节和批量更新。它的全部方法都是异步的。写入 Promise 完成表示事务已提交，不只是单个请求成功。'
-              },
-              {
-                type: 'paragraph',
-                text: '`binary`、`records`、`transactions`、`iteration`、`secondaryIndexes` 为 `true`，`syncRead` 和 `opaqueEntries` 为 `false`。`maxValueBytes` 没有固定值，仍受浏览器配额限制。`changeFeed` 只在同源协调可用时为 `true`。'
-              }
-            ]
-          },
-          {
             id: 'records',
-            heading: '保存和删除一项任务',
+            heading: '同时提交计数与记录',
             blocks: [
-              {
-                type: 'paragraph',
-                text: '保存为 `records.ts`。'
-              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst db = indexedDbHost<{ title: string }>({ dbName: 'docs-tasks' })\nawait db.putRecord({ title: 'Send invoice' }, 'task-1')\nconst task = await db.getRecord('task-1')\nconsole.log('任务:', task?.title)\nawait db.deleteRecord('task-1')\nconsole.log('删除后:', await db.getRecord('task-1'))\nawait db.dispose()"
+                code: "import { indexedDbBatchFeature } from '@migaia/storage-web/features/indexed-db-batch'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { kv, records } from '@migaia/storage-contract'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\n\nconst host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin({ dbName: 'app' }, { batch: indexedDbBatchFeature() }),\n  ],\n})\ntry {\n  const db = host.backend('indexed-db')\n  await db.transaction(async (tx) => {\n    await tx.use(kv).setMany([{ key: 'count', value: '1' }])\n    await tx.putRecord({ id: 1, email: 'ada@example.com' }, 1)\n  })\n  console.log(await db.get('count'))\n  console.log(await db.use(records).query().all())\n} finally {\n  await host.dispose()\n}"
               },
               {
                 type: 'paragraph',
-                text: '浏览器输出：'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '任务: Send invoice\n删除后: undefined'
+                text: '计数为 1，记录列表包含 Ada 的邮箱。只有通过 tx 发起的操作参与此原生事务。回调内不要等待定时器、网络请求或独立的根写入。'
               }
             ]
           },
           {
             id: 'options',
-            heading: '数据库与宿主选项',
+            heading: '选择原生存储名称',
             blocks: [
               {
                 type: 'table',
-                headers: ['成员与选项', '说明'],
+                headers: ['选项', '说明'],
                 rows: [
+                  ['dbName', '数据库名称，默认 storage-web；同名实例访问同一持久数据库。'],
                   [
-                    '`indexedDbHost<T>(options?): IRecordStore<T> & ISecondaryIndexRecordStore<T> & IChangeFeedStore`',
-                    '创建异步浏览器存储。第一次操作时才打开数据库，没有 `sync` 入口。'
+                    'kvStoreName / bytesStoreName / recordsStoreName',
+                    '三个通道的原生对象仓库名称；数据仍在使用时保持稳定。'
                   ],
-                  [
-                    '`dbName?: string`',
-                    "数据库名称，默认 `'storage-web'`。不同实例使用相同名称会读取同一个数据库。"
-                  ],
-                  ['`kvStoreName?: string`', "字符串值的 object store 名称，默认 `'kv'`。"],
-                  ['`bytesStoreName?: string`', "字节的 object store 名称，默认 `'bytes'`。"],
-                  [
-                    '`recordsStoreName?: string`',
-                    "记录的 object store 名称，默认 `'records'`。三个 store 名称要非空且互不相同，不能使用内部保留名。"
-                  ],
-                  [
-                    '`cleanupLegacyRecords?: boolean`',
-                    '默认 `false`。设为 `true` 后，只在确认旧 `documents` 记录完整迁移后删除旧 store。仍需要旧版客户端时不要开启。'
-                  ],
-                  [
-                    '`factory?: IDBFactory`',
-                    '默认使用 `globalThis.indexedDB`。注入其他实现时要提供 `open()`，不会自动退回内存。'
-                  ],
-                  [
-                    '`keyRange?: typeof IDBKeyRange`',
-                    '默认使用 `globalThis.IDBKeyRange`。注入环境中与 `factory` 配套提供，包含 `bound()`、`lowerBound()`、`upperBound()`。'
-                  ]
+                  ['cleanupLegacyRecords', '准备阶段是否清理旧记录；启用前先确认旧数据的用途。'],
+                  ['factory / keyRange', '所属浏览器环境提供的可选原生 IDBFactory 与 IDBKeyRange。']
                 ]
               }
             ]
           },
           {
-            id: 'bytes-and-values',
-            heading: '按通道选择读写方法',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['成员与选项', '说明'],
-                rows: [
-                  [
-                    '`get(key, ctx?)` / `set(key, value, ctx?)`',
-                    '读取或写入字符串值。缺失时 `get()` 返回 `null`，写入完成后才返回。'
-                  ],
-                  [
-                    '`remove(key, ctx?)` / `has(key, ctx?)` / `keys(ctx?)`',
-                    '删除一个字符串键、检查它或列出字符串通道的键。它们不查询记录或字节通道。'
-                  ],
-                  [
-                    '`getBytes(key, ctx?)` / `setBytes(key, bytes, ctx?)`',
-                    '读取或保存 `Uint8Array`。缺失时返回 `null`，写入先复制字节，之后修改调用方缓冲区不会改变已提交值。'
-                  ],
-                  [
-                    '`getRecord(key, ctx?)` / `putRecord(value, key?, ctx?)`',
-                    '记录采用 structured clone。缺失时返回 `undefined`；省略写入键时生成键并返回它。不能保存函数或 DOM 节点。'
-                  ],
-                  [
-                    '`deleteRecord(key, ctx?)` / `clearRecords(ctx?)`',
-                    '删除指定记录或清空记录通道，并更新并发检查所需的记录版本。'
-                  ],
-                  ['`clearValues(ctx?)` / `clearBytes(ctx?)`', '分别只清空字符串或字节通道。'],
-                  [
-                    '`clearAll(ctx?)`',
-                    '在同一个事务里清空字符串、字节和记录通道。已读取记录的旧事务不能在清空后把旧内容写回来。'
-                  ],
-                  [
-                    '`ctx.conflictPolicy?: IConflictPolicy`',
-                    "默认 `'conflict'`，同一键占用另一通道时抛 `DUPLICATE_KEY`。`'replace'` 在写入时删除其他通道的同名内容。"
-                  ],
-                  [
-                    '`metadata?.get(key, ctx?)` / `set(key, value, ctx?)` / `delete(key, ctx?)`',
-                    'IndexedDB 提供持久迁移检查点。键使用字符串，`set()` 接受写入选项；普通业务记录放在记录通道。'
-                  ],
-                  [
-                    '`subscribeChanges(listener): () => void`',
-                    '监听本库提交后的变化，返回取消监听的函数。不会把失败或回滚的事务当成成功写入。'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'iteration',
-            heading: '按键导出队列',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '保存为 `iteration.ts`。'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst db = indexedDbHost<string>({ dbName: 'docs-queue' })\nawait db.putRecord('Invoice', 'task-a')\nawait db.putRecord('Receipt', 'task-b')\nconst range = { lower: 'task-a', upper: 'task-z' }\nfor await (const [key, title] of db.iterateRecords(range, { pageSize: 64 })) {\n  console.log('导出:', key, title)\n}\nawait db.dispose()"
-              },
-              {
-                type: 'paragraph',
-                text: '浏览器输出：'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '导出: task-a Invoice\n导出: task-b Receipt'
-              },
-              {
-                type: 'table',
-                headers: ['成员与选项', '说明'],
-                rows: [
-                  [
-                    '`iterateRecords(range?, ctx?)`',
-                    '按键顺序异步返回 `[key, value]`。每页使用短只读事务，整次迭代不是固定快照。'
-                  ],
-                  [
-                    '`range.lower?` / `range.upper?: IStorageKey`',
-                    '限制起止键，省略一端表示该方向不限。两端顺序错误或相等的开放区间会抛 `INVALID_ARGUMENT`。'
-                  ],
-                  [
-                    '`range.lowerOpen?` / `range.upperOpen?: boolean`',
-                    '设为 `true` 时排除对应端点，默认包含端点。'
-                  ],
-                  [
-                    '`ctx.pageSize?: number`',
-                    '默认每页 `128` 条，范围是整数 `1` 到 `4096`。结束本页后再开下一页事务，避免长期占用连接。'
-                  ],
-                  [
-                    '`ctx.signal?` / `ctx.timeoutMs?`',
-                    '取消或超时会以 `ABORTED` 结束等待和迭代。完整操作选项见取消与关闭页。'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'transaction',
-            heading: '一起提交购物车数量',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '保存为 `transaction.ts`。'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst db = indexedDbHost<number>({ dbName: 'docs-cart' })\nawait db.putRecord(2, 'quantity')\nawait db.transaction(async (tx) => {\n  const current = await tx.get('quantity')\n  await tx.put((current ?? 0) + 1, 'quantity')\n})\nconsole.log('购物车数量:', await db.getRecord('quantity'))\nawait db.dispose()"
-              },
-              {
-                type: 'paragraph',
-                text: '浏览器输出：'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '购物车数量: 3'
-              },
-              {
-                type: 'table',
-                headers: ['成员与选项', '说明'],
-                rows: [
-                  [
-                    '`transaction(run, ctx?): Promise<T>`',
-                    '执行回调后检查读过的记录版本，再原子提交草稿。返回值就是回调结果。默认限制回调等待 `5_000` 毫秒。'
-                  ],
-                  [
-                    '`tx.get(key)` / `tx.put(value, key?, options?)` / `tx.delete(key)`',
-                    '回调中读写草稿，不是立刻落盘。回调结束后作用域失效，没有 `tx.commit()` 方法。'
-                  ],
-                  [
-                    '`options.conflictPolicy?: IConflictPolicy`',
-                    '控制记录与字符串、字节通道的同名键冲突，默认 `conflict`。跨通道冲突可能直到提交时才发现。'
-                  ],
-                  [
-                    '`TRANSACTION_CONFLICT`',
-                    '读取版本或清空计数改变时，提交失败。重新读取并重试整个业务回调，不能只重试最后一次 `put()`。'
-                  ],
-                  [
-                    '`TRANSACTION_FAILED`',
-                    '回调抛出外部错误时保留在 `cause`。不要在回调内发送不能撤回的外部请求，再假定数据库回滚也能撤回它。'
-                  ]
-                ]
-              },
-              {
-                type: 'paragraph',
-                text: '实体仓储通常替应用管理二级索引。直接实现后端扩展时，下面是 IndexedDB 返回对象额外支持的索引操作。'
-              },
-              {
-                type: 'table',
-                headers: ['成员与选项', '说明'],
-                rows: [
-                  [
-                    '`ensureRecordIndexes(scope, definitions, ctx?)`',
-                    '为该实体范围安装索引定义，返回供后续操作使用的索引对象。定义改变后重新取得它。'
-                  ],
-                  ['`definitions[].name: string`', '在该实体范围内区分索引。'],
-                  [
-                    '`definitions[].unique: boolean`',
-                    '为 `true` 时，同一索引值不能属于两个不同记录。'
-                  ],
-                  ['`definitions[].multiEntry: boolean`', '声明一条记录是否能产生多个索引键。'],
-                  [
-                    '`definitions[].revision: number`',
-                    '区分索引提取规则的版本。规则变化时更新版本并重新准备索引。'
-                  ],
-                  [
-                    '`handle.scope` / `generation` / `fingerprint`',
-                    '一起标识当前索引对象，不要自己拼造，也不要跨重新安装复用。'
-                  ],
-                  [
-                    '`getRecordIndexReadiness(handle, ctx?)`',
-                    '返回 `status`、`scanned` 和 `indexed`。状态包括 `pending`、`running`、`complete`、`failed`。'
-                  ],
-                  [
-                    '`putIndexedRecord(value, key, handle, projection, ctx?)`',
-                    '在同一个提交里更新记录和索引。每个投影值使用 `{ kind: single, key }` 或 `{ kind: multiple, keys }`；`undefined` 表示没有该索引值。'
-                  ],
-                  [
-                    '`iterateRecordIndex(query, ctx?)`',
-                    '按索引返回记录。`query.handle` 选择索引对象，`query.index` 选择索引名称。分页间数据改变会抛 `INDEX_QUERY_INVALIDATED`。'
-                  ],
-                  ['`query.range?: IKeyRange`', '限制索引值范围，字段与上面的记录范围相同。'],
-                  ['`query.direction?: next | prev`', "默认 `'next'`，`'prev'` 反向读取。"],
-                  ['`query.limit?: number`', '限制返回条数，省略时不额外限制结果数量。'],
-                  [
-                    '`transactionIndexed(handle, run, ctx?)`',
-                    '批量更新记录与索引，回调中的 `get()`、`delete()` 与普通事务相同。`put(value, key, projection)` 同时提供索引投影。'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'upgrade-and-shutdown',
+            id: 'close',
             heading: '让升级和关闭完成',
             blocks: [
               {
                 type: 'paragraph',
-                text: '连接被复用，开库失败后可在下次操作重新连接。收到 `versionchange` 时关闭旧连接，让其他页面升级。旧数据库中的 `documents` 会分批迁移，默认保留旧 store。'
-              },
-              {
-                type: 'paragraph',
-                text: '`dispose()` 不删除持久数据，但会停止接收新操作并等待清理。需要再次读取时创建新的访问对象。清理可能报告 `BACKEND_DISPOSE_FAILED`，不要因此继续使用已关闭对象。'
+                text: '升级受阻时关闭仍使用旧数据库版本的其它标签页。丢弃应用引用前等待 host.dispose()。TRANSACTION_CONFLICT 表示请求的隔离条件未能提交，应按应用的并发策略处理。'
               }
             ]
           }
@@ -48880,328 +48175,74 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          path: 'entity-schema-and-codecs',
-          label: '校验和查询记录'
+          path: 'getting-started',
+          label: '安装并保存第一项设置'
         },
         {
-          path: 'host-and-plugins',
-          label: '组合存储后端'
+          path: 'indexeddb-and-transactions',
+          label: '记录与事务'
+        },
+        {
+          path: 'entity-schema-and-codecs',
+          label: '实体与编解码器'
         }
       ]
     },
     en: {
       title: 'IndexedDB records, scans, and transactions',
-      lede: 'Store structured data, scan by key, and commit related changes together.',
+      lede: 'Keep related text and record writes inside the same native transaction.',
       document: {
         sections: [
           {
-            id: 'mental-model',
-            heading: 'Store offline task records',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'Run these modules in a browser with package imports handled by a bundler. IndexedDB, cookies, and events come from the browser host, not native Node APIs.'
-              },
-              {
-                type: 'paragraph',
-                text: 'IndexedDB handles structured records, bytes, and batch changes. Its methods are asynchronous. A completed write means its transaction committed, beyond an individual request succeeding.'
-              },
-              {
-                type: 'paragraph',
-                text: 'Binary values, records, transactions, iteration, and secondary indexes are supported. `syncRead` and `opaqueEntries` are false. No fixed `maxValueBytes` is declared, but browser quota still applies. `changeFeed` is true only when same-origin coordination is available.'
-              }
-            ]
-          },
-          {
             id: 'records',
-            heading: 'Save and remove a task',
+            heading: 'Commit a count with its record',
             blocks: [
-              {
-                type: 'paragraph',
-                text: 'Save as `records.ts`.'
-              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst db = indexedDbHost<{ title: string }>({ dbName: 'docs-tasks' })\nawait db.putRecord({ title: 'Send invoice' }, 'task-1')\nconst task = await db.getRecord('task-1')\nconsole.log('Task:', task?.title)\nawait db.deleteRecord('task-1')\nconsole.log('After deletion:', await db.getRecord('task-1'))\nawait db.dispose()"
+                code: "import { indexedDbBatchFeature } from '@migaia/storage-web/features/indexed-db-batch'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { kv, records } from '@migaia/storage-contract'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\n\nconst host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin({ dbName: 'app' }, { batch: indexedDbBatchFeature() }),\n  ],\n})\ntry {\n  const db = host.backend('indexed-db')\n  await db.transaction(async (tx) => {\n    await tx.use(kv).setMany([{ key: 'count', value: '1' }])\n    await tx.putRecord({ id: 1, email: 'ada@example.com' }, 1)\n  })\n  console.log(await db.get('count'))\n  console.log(await db.use(records).query().all())\n} finally {\n  await host.dispose()\n}"
               },
               {
                 type: 'paragraph',
-                text: 'Browser output:'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'Task: Send invoice\nAfter deletion: undefined'
+                text: 'The count is 1 and the record list contains Ada’s email. Only calls through tx join this native transaction. Do not await a timer, network request or an independent root write inside its callback.'
               }
             ]
           },
           {
             id: 'options',
-            heading: 'Database and host options',
+            heading: 'Choose native storage names',
             blocks: [
               {
                 type: 'table',
-                headers: ['Member or option', 'Description'],
+                headers: ['Option', 'Meaning'],
                 rows: [
                   [
-                    '`indexedDbHost<T>(options?): IRecordStore<T> & ISecondaryIndexRecordStore<T> & IChangeFeedStore`',
-                    'Creates asynchronous browser storage. It opens the database on the first operation and has no `sync` channel.'
+                    'dbName',
+                    'Database name, default storage-web; the same name shares one persisted database.'
                   ],
                   [
-                    '`dbName?: string`',
-                    "Names the database, defaulting to `'storage-web'`. Instances using the same name access the same database."
+                    'kvStoreName / bytesStoreName / recordsStoreName',
+                    'Physical object-store names for the three channels. Keep the names stable while data remains.'
                   ],
                   [
-                    '`kvStoreName?: string`',
-                    "Names the string-value object store, defaulting to `'kv'`."
+                    'cleanupLegacyRecords',
+                    'Explicitly select legacy-record cleanup during preparation; do not enable it without checking the old data.'
                   ],
                   [
-                    '`bytesStoreName?: string`',
-                    "Names the byte object store, defaulting to `'bytes'`."
-                  ],
-                  [
-                    '`recordsStoreName?: string`',
-                    "Names the record object store, defaulting to `'records'`. All three store names must be nonempty, distinct, and outside reserved internal names."
-                  ],
-                  [
-                    '`cleanupLegacyRecords?: boolean`',
-                    'Defaults to `false`. When enabled, deletes the old `documents` store only after complete migration. Leave disabled while older clients still need it.'
-                  ],
-                  [
-                    '`factory?: IDBFactory`',
-                    'Defaults to `globalThis.indexedDB`. An injected factory must provide `open()`; there is no automatic memory fallback.'
-                  ],
-                  [
-                    '`keyRange?: typeof IDBKeyRange`',
-                    'Defaults to `globalThis.IDBKeyRange`. Inject it alongside a custom factory, with `bound()`, `lowerBound()`, and `upperBound()` methods.'
+                    'factory / keyRange',
+                    'Optional native IDBFactory and IDBKeyRange from the owning browser realm.'
                   ]
                 ]
               }
             ]
           },
           {
-            id: 'bytes-and-values',
-            heading: 'Choose methods by data channel',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Member or option', 'Description'],
-                rows: [
-                  [
-                    '`get(key, ctx?)` / `set(key, value, ctx?)`',
-                    'Reads or writes strings. Missing values return `null`; writes return after persistence completes.'
-                  ],
-                  [
-                    '`remove(key, ctx?)` / `has(key, ctx?)` / `keys(ctx?)`',
-                    'Removes, checks, or lists string-channel keys. These methods do not query record or byte channels.'
-                  ],
-                  [
-                    '`getBytes(key, ctx?)` / `setBytes(key, bytes, ctx?)`',
-                    'Reads or stores `Uint8Array` values. Missing bytes return `null`; writes copy the bytes before asynchronous work.'
-                  ],
-                  [
-                    '`getRecord(key, ctx?)` / `putRecord(value, key?, ctx?)`',
-                    'Records use structured clone. Missing records return `undefined`; omitted write keys are generated and returned. Functions and DOM nodes cannot be stored.'
-                  ],
-                  [
-                    '`deleteRecord(key, ctx?)` / `clearRecords(ctx?)`',
-                    'Deletes a record or clears the record channel, updating versions used for concurrent-write detection.'
-                  ],
-                  [
-                    '`clearValues(ctx?)` / `clearBytes(ctx?)`',
-                    'Clears only the string or byte channel, respectively.'
-                  ],
-                  [
-                    '`clearAll(ctx?)`',
-                    'Clears string, byte, and record channels atomically. Transactions that already read records cannot restore stale contents afterward.'
-                  ],
-                  [
-                    '`ctx.conflictPolicy?: IConflictPolicy`',
-                    "Defaults to `'conflict'`, reporting `DUPLICATE_KEY` for another channel using the same key. `'replace'` removes other-channel contents atomically."
-                  ],
-                  [
-                    '`metadata?.get(key, ctx?)` / `set(key, value, ctx?)` / `delete(key, ctx?)`',
-                    'IndexedDB supplies persistent migration checkpoints. Keys are strings, and `set()` accepts write options. Keep application records in the record channel.'
-                  ],
-                  [
-                    '`subscribeChanges(listener): () => void`',
-                    'Observes changes after this library commits and returns an unsubscribe function. Failed or rolled-back transactions publish no successful write.'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'iteration',
-            heading: 'Export a queue by key',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'Save as `iteration.ts`.'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst db = indexedDbHost<string>({ dbName: 'docs-queue' })\nawait db.putRecord('Invoice', 'task-a')\nawait db.putRecord('Receipt', 'task-b')\nconst range = { lower: 'task-a', upper: 'task-z' }\nfor await (const [key, title] of db.iterateRecords(range, { pageSize: 64 })) {\n  console.log('Export:', key, title)\n}\nawait db.dispose()"
-              },
-              {
-                type: 'paragraph',
-                text: 'Browser output:'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'Export: task-a Invoice\nExport: task-b Receipt'
-              },
-              {
-                type: 'table',
-                headers: ['Member or option', 'Description'],
-                rows: [
-                  [
-                    '`iterateRecords(range?, ctx?)`',
-                    'Yields `[key, value]` in key order using short read transactions per page. The complete iteration is not a fixed snapshot.'
-                  ],
-                  [
-                    '`range.lower?` / `range.upper?: IStorageKey`',
-                    'Bounds the scan; omitted endpoints leave that side unbounded. Reversed bounds or an empty open interval fail with `INVALID_ARGUMENT`.'
-                  ],
-                  [
-                    '`range.lowerOpen?` / `range.upperOpen?: boolean`',
-                    'Excludes an endpoint when `true`; endpoints are included by default.'
-                  ],
-                  [
-                    '`ctx.pageSize?: number`',
-                    'Defaults to `128` records, accepting integers from `1` to `4096`. Each page completes before opening the next transaction.'
-                  ],
-                  [
-                    '`ctx.signal?` / `ctx.timeoutMs?`',
-                    'Cancellation or timeout ends waiting and iteration with `ABORTED`. See cancellation and shutdown for operation options.'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'transaction',
-            heading: 'Commit cart quantity together',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'Save as `transaction.ts`.'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst db = indexedDbHost<number>({ dbName: 'docs-cart' })\nawait db.putRecord(2, 'quantity')\nawait db.transaction(async (tx) => {\n  const current = await tx.get('quantity')\n  await tx.put((current ?? 0) + 1, 'quantity')\n})\nconsole.log('Cart quantity:', await db.getRecord('quantity'))\nawait db.dispose()"
-              },
-              {
-                type: 'paragraph',
-                text: 'Browser output:'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'Cart quantity: 3'
-              },
-              {
-                type: 'table',
-                headers: ['Member or option', 'Description'],
-                rows: [
-                  [
-                    '`transaction(run, ctx?): Promise<T>`',
-                    'Runs the callback, checks read revisions, and commits its draft atomically. Returns the callback result. The callback has a default `5_000` ms deadline.'
-                  ],
-                  [
-                    '`tx.get(key)` / `tx.put(value, key?, options?)` / `tx.delete(key)`',
-                    'Reads and changes the draft rather than immediately persisting. The scope expires when the callback ends; there is no `tx.commit()` method.'
-                  ],
-                  [
-                    '`options.conflictPolicy?: IConflictPolicy`',
-                    'Controls record conflicts with string and byte channels, defaulting to `conflict`. A cross-channel conflict may be detected only at commit.'
-                  ],
-                  [
-                    '`TRANSACTION_CONFLICT`',
-                    'Commit fails when read revisions or the clear counter change. Reread and retry the complete callback rather than only its final write.'
-                  ],
-                  [
-                    '`TRANSACTION_FAILED`',
-                    'External callback failures remain reachable through `cause`. Database rollback cannot undo an external request sent from the callback.'
-                  ]
-                ]
-              },
-              {
-                type: 'paragraph',
-                text: 'Entity repositories usually manage secondary indexes for applications. Direct backend integrations can also use the following indexed operations.'
-              },
-              {
-                type: 'table',
-                headers: ['Member or option', 'Description'],
-                rows: [
-                  [
-                    '`ensureRecordIndexes(scope, definitions, ctx?)`',
-                    'Installs index definitions for a scope and returns the index object used by later operations. Reacquire it after definitions change.'
-                  ],
-                  ['`definitions[].name: string`', 'Names an index within its entity scope.'],
-                  [
-                    '`definitions[].unique: boolean`',
-                    'Prevents two records from owning the same indexed value when `true`.'
-                  ],
-                  [
-                    '`definitions[].multiEntry: boolean`',
-                    'Declares whether one record may produce multiple index keys.'
-                  ],
-                  [
-                    '`definitions[].revision: number`',
-                    'Versions the extraction rule. Change it and prepare indexes again when that rule changes.'
-                  ],
-                  [
-                    '`handle.scope` / `generation` / `fingerprint`',
-                    'Together identify the current index object. Do not fabricate it or reuse it after reinstallation.'
-                  ],
-                  [
-                    '`getRecordIndexReadiness(handle, ctx?)`',
-                    'Returns `status`, `scanned`, and `indexed`, with status `pending`, `running`, `complete`, or `failed`.'
-                  ],
-                  [
-                    '`putIndexedRecord(value, key, handle, projection, ctx?)`',
-                    'Commits the record and its indexes together. Projections use `{ kind: single, key }` or `{ kind: multiple, keys }`; `undefined` omits that index value.'
-                  ],
-                  [
-                    '`iterateRecordIndex(query, ctx?)`',
-                    'Reads records by index. `query.handle` selects the index object and `query.index` its name. Changes between pages can cause `INDEX_QUERY_INVALIDATED`.'
-                  ],
-                  [
-                    '`query.range?: IKeyRange`',
-                    'Bounds indexed values using the range fields above.'
-                  ],
-                  [
-                    '`query.direction?: next | prev`',
-                    "Defaults to `'next'`; `'prev'` scans in reverse."
-                  ],
-                  [
-                    '`query.limit?: number`',
-                    'Limits returned records; omission adds no result-count limit.'
-                  ],
-                  [
-                    '`transactionIndexed(handle, run, ctx?)`',
-                    'Updates records and indexes in a batch. Its `get()` and `delete()` match ordinary transactions; `put(value, key, projection)` also supplies index projections.'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'upgrade-and-shutdown',
+            id: 'close',
             heading: 'Allow upgrade and shutdown',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Connections are reused and failed opens can reconnect on a later operation. A `versionchange` closes the old connection so another page can upgrade. Legacy `documents` records migrate in batches while the old store remains by default.'
-              },
-              {
-                type: 'paragraph',
-                text: 'Disposal preserves persistent data while closing operations and waiting for cleanup. Create a new accessor to read again. Cleanup can report `BACKEND_DISPOSE_FAILED`; the old accessor remains closed.'
+                text: 'Close other tabs using an older database version when an upgrade is blocked. Await host.dispose() before dropping application references. TRANSACTION_CONFLICT means the requested isolation could not commit; handle it according to the application’s concurrency policy.'
               }
             ]
           }
@@ -49209,12 +48250,16 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          path: 'entity-schema-and-codecs',
-          label: 'Validate and query records'
+          path: 'getting-started',
+          label: 'Install and save a setting'
         },
         {
-          path: 'host-and-plugins',
-          label: 'Compose storage backends'
+          path: 'indexeddb-and-transactions',
+          label: 'Records and transactions'
+        },
+        {
+          path: 'entity-schema-and-codecs',
+          label: 'Entities and codecs'
         }
       ]
     }
@@ -49222,400 +48267,50 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   'storage-web:entity-schema-and-codecs': {
     zh: {
       title: '校验、查询并升级业务记录',
-      lede: '实体定义把主键、校验、迁移和索引放在一起。连接后得到的 repository 是读写这一类记录的对象，存储仍由创建它的代码关闭。',
+      lede: '实体适配器由 storage-host/entity 提供，浏览器插件负责实际保存。',
       document: {
         sections: [
           {
             id: 'entity',
-            heading: '按城市查询客户',
+            heading: '保存有类型的用户记录',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { defineEntity } from '@migaia/storage-web/entity'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\ntype ICustomer = { id: string; city: string }\nconst store = memoryStorageHost()\nconst customers = defineEntity<ICustomer>()({\n  name: 'customers',\n  key: 'id',\n  indexes: { byCity: { path: 'city' } },\n  onDiagnostic: () => console.log('查询路径:', '记录扫描')\n}).connect(store)\nawait customers.put({ id: 'ada', city: 'London' })\nconsole.log('伦敦客户编号:', (await customers.findBy('byCity', 'London'))?.id)\nawait store.dispose()"
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '查询路径: 记录扫描\n伦敦客户编号: ada'
+                code: "import { createStorageHost } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\n\ntype IUser = { id: number; email: string }\nconst host = await createStorageHost({\n  plugins: [indexedDbBackendPlugin({ dbName: 'app' })]\n})\ntry {\n  const users = defineEntity<IUser>({ name: 'users', key: 'id' })\n    .connect(host.backend('indexed-db'))\n  await users.put({ id: 1, email: 'ada@example.com' })\n  console.log((await users.get(1))?.email)\n} finally {\n  await host.dispose()\n}"
               },
               {
                 type: 'paragraph',
-                text: '使用 `defineEntity<T>()({...})` 保留索引名称和查询键的类型。这里的内存后端没有原生二级索引，实体层扫描记录得到相同查询结果，不把原生索引能力改成 `true`。'
-              },
-              {
-                type: 'table',
-                headers: ['入口或字段', '说明'],
-                rows: [
-                  [
-                    '`defineEntity<TDomain, TStored = TDomain>(options)`',
-                    '直接定义没有索引的实体，返回 `IEntityDefinition<TDomain>`。带索引时使用无参数调用返回的定义函数。'
-                  ],
-                  [
-                    '`IEntityDefinition.name / version`',
-                    '保存实体名称与版本。定义对象会冻结，可连接多个存储。'
-                  ],
-                  [
-                    '`connect(store: IKeyValueStore): IRepository<TDomain, TIndexes>`',
-                    '检查字符串存储形状并创建读写对象，不创建或关闭后端。非法存储抛出 `INVALID_CONFIG`。'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'definition-options',
-            heading: '实体定义的全部选项',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['入口或字段', '说明'],
-                rows: [
-                  ['`name: string`', '区分不同实体，不能为空或以 `__` 开头。'],
-                  [
-                    '`key: Extract<keyof TDomain, string>`',
-                    '指定从对象哪个字段取主键。写入后字段不能为 `undefined` 或 `null`，键还需通过存储键检查。'
-                  ],
-                  [
-                    '`schema?: ISchemaAdapter<TDomain, TStored>`',
-                    '默认 `passthrough()`，不校验字段。提供适配器时检查名称和方法。'
-                  ],
-                  [
-                    '`codec?: ICodec<unknown, unknown>`',
-                    '连接记录后端时默认 `structuredCodec`，纯字符串后端默认 `jsonCodec`。提供的编解码器始终经过 `selectCodec()`。'
-                  ],
-                  [
-                    '`version?: number`',
-                    '默认 `1`，使用正安全整数。读到更高版本数据会抛出 `VERSION_UNSUPPORTED`。'
-                  ],
-                  [
-                    '`migrations?: Record<number, IMigration>`',
-                    '完全省略时允许版本大于 `1`，缺少的步骤按不转换处理。提供对象后，必须恰好覆盖 `2..version` 的所有函数；例如版本 `2` 传空对象会报 `INVALID_CONFIG`。'
-                  ],
-                  [
-                    '`validateOnRead?: boolean`',
-                    '默认 `true`，读取解码后的值仍执行校验。关闭它不会跳过解码与迁移。'
-                  ],
-                  [
-                    '`onDiagnostic?: (message: string) => void`',
-                    '默认 `console.warn`，接收扫描、跳过损坏记录等提示；回调失败不改变业务结果。'
-                  ],
-                  [
-                    '`defaultOrderBy?: IRecordComparator<TDomain>`',
-                    '为列表提供默认比较函数；不提供时保留查询路径的扫描顺序。'
-                  ],
-                  [
-                    '`indexes?: TIndexes`',
-                    '声明索引名与投影配置，只在分两次调用的定义方式中使用。非法定义报 `INVALID_CONFIG`。'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'repository',
-            heading: '连接后可以调用的方法',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['签名', '返回', '作用'],
-                rows: [
-                  [
-                    '`get(id: IStorageKey, ctx?: IOperationContext)`',
-                    '`Promise<TDomain | undefined>`',
-                    '按主键读取并解码、迁移和校验，缺失时得到 `undefined`。'
-                  ],
-                  [
-                    '`put(value: TDomain, ctx?: IOperationContext)`',
-                    '`Promise<IStorageKey>`',
-                    '处理并写入记录，返回业务主键。'
-                  ],
-                  [
-                    '`remove(id: IStorageKey, ctx?: IOperationContext)`',
-                    '`Promise<void>`',
-                    '删除此实体记录，并清理它可能遗留的旧存储位置。'
-                  ],
-                  [
-                    '`list(options?: IListOptions<TDomain> | IIndexedListOptions<TDomain, TIndexes>, ctx?: IOperationContext)`',
-                    '`Promise<TDomain[]>`',
-                    '按筛选和排序要求返回数组。'
-                  ],
-                  [
-                    '`stream(options?: IListOptions<TDomain> | IIndexedListOptions<TDomain, TIndexes>, ctx?: IOperationContext)`',
-                    '`AsyncIterableIterator<TDomain>`',
-                    '逐条提供记录；需要比较排序时会缓冲结果。'
-                  ],
-                  [
-                    '`findBy<TName extends keyof TIndexes & string>(index: TName, key: TIndexes[TName], ctx?: IOperationContext)`',
-                    '`Promise<TDomain | undefined>`',
-                    '精确匹配索引值，返回第一项或 `undefined`。非唯一索引有多项时发出提示。'
-                  ],
-                  [
-                    '`findManyBy<TName extends keyof TIndexes & string>(index: TName, range?: IKeyRange<TIndexes[TName]>, options?: Omit<IListOptions<TDomain>, "range">, ctx?: IOperationContext)`',
-                    '`Promise<TDomain[]>`',
-                    '按索引范围返回记录数组。'
-                  ],
-                  [
-                    '`streamBy<TName extends keyof TIndexes & string>(index: TName, range?: IKeyRange<TIndexes[TName]>, options?: Omit<IListOptions<TDomain>, "range">, ctx?: IOperationContext)`',
-                    '`AsyncIterableIterator<TDomain>`',
-                    '按索引范围迭代记录，条件允许时使用后端索引游标。'
-                  ],
-                  [
-                    '`migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext)`',
-                    '`Promise<IMigrateResult>`',
-                    '升级记录并搬迁旧存储位置，返回统计结果。'
-                  ],
-                  [
-                    '`batch<T>(run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>, ctx?: IOperationContext)`',
-                    '`Promise<T>`',
-                    '在记录后端事务内执行回调。纯字符串后端报 `UNSUPPORTED_CAPABILITY`；并发冲突需要重读后重试整个回调。'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'list-options',
-            heading: '列表、索引查询与坏记录处理',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['入口或字段', '说明'],
-                rows: [
-                  [
-                    '`IListOptions.range?: IKeyRange`',
-                    '筛选业务主键；带 `index` 时筛选该索引的键。上下限与开区间规则见共享存储类型。'
-                  ],
-                  ['`limit?: number`', '非负安全整数，`0` 返回空结果；省略时不限制数量。'],
-                  [
-                    '`orderBy?: (left: TDomain, right: TDomain) => number`',
-                    '覆盖默认比较函数，结果必须为非 `NaN` 的数字，否则报 `EXTENSION_FAILED`。排序后再应用数量限制。'
-                  ],
-                  [
-                    '`direction?: "next" | "prev"`',
-                    '用于索引顺序或比较排序，`prev` 反向；省略时沿用查询或比较函数的顺序。'
-                  ],
-                  [
-                    '`IIndexedListOptions.index: TName`',
-                    '让 `list()` 和 `stream()` 改走命名索引，范围键类型随索引推导；普通列表不传此字段。'
-                  ],
-                  [
-                    '`onInvalid?: "skip" | "throw" | IInvalidRecordHandler<TDomain>`',
-                    '默认 `skip` 并发出诊断。`throw` 结束当前查询；处理函数逐项返回 `skip` 或 `throw`。'
-                  ],
-                  [
-                    '`IInvalidRecordIssue.key / raw / record?`',
-                    '提供原存储键、原数据及已经能取得的业务记录。'
-                  ],
-                  [
-                    '`stage: "decode" | "migrate" | "validate" / cause: unknown`',
-                    '指出失败步骤并保留原始原因。处理函数自身抛出非存储错误时为 `VALIDATION_FAILED`；返回非法动作报 `INVALID_CONFIG`。'
-                  ]
-                ]
-              },
-              {
-                type: 'paragraph',
-                text: '字符串后端需要扫描全部键，结构化后端还会扫描旧记录位置以兼容历史数据。`orderBy` 会增加缓冲成本，不能把所有 `stream()` 调用都当成恒定内存读取。'
-              }
-            ]
-          },
-          {
-            id: 'indexes',
-            heading: '索引定义与查询键',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '每个索引在 `path`、`paths`、`select` 中恰好选择一种，不能混配。索引名不能为空或以 `__` 开头。'
-              },
-              {
-                type: 'table',
-                headers: ['入口或字段', '说明'],
-                rows: [
-                  ['`IEntityIndex.path`', '使用点分路径或路径元组读取一个字段。'],
-                  ['`paths`', '组合非空路径列表形成复合键，不能同时启用 `multiEntry: true`。'],
-                  [
-                    '`select(value: TDomain)`',
-                    '返回 `{ kind: "single", key }`、`{ kind: "multiple", keys }` 或 `undefined`，供自定义投影使用。'
-                  ],
-                  ['`unique?: boolean`', '默认 `false`，声明预期索引键唯一。'],
-                  [
-                    '`multiEntry?: boolean`',
-                    '单路径默认 `false`；为 `true` 时将数组的各项作为索引键。自定义 `select` 不使用此字段。'
-                  ],
-                  [
-                    '`revision?: number`',
-                    '路径索引默认 `1`。自定义选择器要提供正安全整数版本，选择逻辑改变后递增以重建投影。'
-                  ],
-                  [
-                    '`IEntityIndexMap<TDomain, TIndexes>`',
-                    '从各项投影推导索引名称到查询键的类型映射。'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'schema',
-            heading: '校验表单值并编码成 JSON',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { fromStandardSchema } from '@migaia/storage-web/schema'\nimport { jsonCodec } from '@migaia/storage-web/serialize'\n\nconst schema = fromStandardSchema({\n  '~standard': {\n    version: 1,\n    vendor: 'theme-form',\n    validate: (value) => typeof value === 'string'\n      ? { value: value.trim() }\n      : { issues: [{ message: 'Theme must be text' }] }\n  }\n})\nconst theme = await schema.validate(' dark ')\nconsole.log('设置文件内容:', await jsonCodec.encode({ theme }))"
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '设置文件内容: {"theme":"dark"}'
-              },
-              {
-                type: 'paragraph',
-                text: '写入顺序是 `validate → normalize → schema.encode → codec.encode`。读取先 `codec.decode`，需要时做版本迁移，再 `schema.decode`，最后按 `validateOnRead` 决定是否校验。'
-              },
-              {
-                type: 'table',
-                headers: ['入口或字段', '说明'],
-                rows: [
-                  [
-                    '`ISchemaAdapter<TDomain, TStored = TDomain>.name: string`',
-                    '给校验适配器命名，不能为空。'
-                  ],
-                  [
-                    '`validate(value: unknown, ctx?: IOperationContext): Promise<TDomain>`',
-                    '检查输入并返回业务值，写入总会调用。'
-                  ],
-                  [
-                    '`normalize?(value: TDomain, ctx?: IOperationContext): Promise<TDomain>`',
-                    '在写入前整理已校验的值；省略时保留原值。'
-                  ],
-                  [
-                    '`encode?(value: TDomain, ctx?: IOperationContext): Promise<TStored>`',
-                    '把业务表示转换为存储字段表示，不负责 JSON 或二进制格式。'
-                  ],
-                  [
-                    '`decode?(raw: TStored, ctx?: IOperationContext): Promise<TDomain>`',
-                    '从存储字段恢复业务值；省略时直接使用原值。'
-                  ],
-                  [
-                    '`passthrough<T = unknown>(): ISchemaAdapter<T, T>`',
-                    '无参数，名称为 `passthrough`，`validate()` 不做检查而返回输入。'
-                  ],
-                  [
-                    '`fromStandardSchema<T>(schema: IStandardSchemaV1<unknown, T>): ISchemaAdapter<T, T>`',
-                    '适配现有校验器，名称为 `standard-schema:<vendor>`。配置错误报 `INVALID_CONFIG`；非法校验结果或 issues 报 `VALIDATION_FAILED`。'
-                  ],
-                  [
-                    '`IStandardSchemaV1["~standard"].version / vendor / validate`',
-                    '版本固定为 `1`，提供非空来源名和同步或异步校验函数。结果使用 `{ value }` 或 `{ issues: [{ message }] }`。'
-                  ],
-                  [
-                    '`issues[].message: string`',
-                    '多项消息用 `; ` 合并到原始错误说明，保存在 `cause` 中。'
-                  ]
-                ]
+                text: '输出 ada@example.com。defineEntity 声明记录名称与主键字段；connect 借用已安装后端，不负责关闭后端。'
               }
             ]
           },
           {
             id: 'codecs',
-            heading: '把附件保存为字节',
+            heading: '区分业务校验与保存格式',
             blocks: [
               {
-                type: 'code',
-                language: 'ts',
-                code: "import { memoryStorageHost } from '@migaia/storage-web/memory'\nimport { binaryCodec, selectCodec } from '@migaia/storage-web/serialize'\n\nconst store = memoryStorageHost()\nconst codec = selectCodec(binaryCodec, store.capabilities)\nconst encoded = await codec.encode(new TextEncoder().encode('draft'))\nawait store.setBytes('attachment', encoded as Uint8Array)\nconst saved = await store.getBytes('attachment')\nconsole.log('附件内容:', new TextDecoder().decode(saved ?? undefined))\nawait store.dispose()"
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '附件内容: draft'
+                type: 'paragraph',
+                text: 'schema 校验并转换业务记录，codec 选择保存格式。写入顺序为校验、规范化、schema.encode、codec.encode。读取先解码保存值并升级版本，再执行 schema.decode 与业务校验。'
               },
               {
                 type: 'table',
-                headers: ['入口或字段', '说明'],
+                headers: ['Codec', '用途'],
                 rows: [
-                  [
-                    '`jsonCodec: ICodec<unknown, string>`',
-                    '输出为 `text`。`encode()` 使用 JSON，根值编码结果为 `undefined` 时返回文本 `null`。失败码分别为 `SERIALIZE_FAILED`、`DESERIALIZE_FAILED`。'
-                  ],
-                  [
-                    '`structuredCodec: ICodec<unknown, unknown>`',
-                    '输出为 `structured`，两方法返回传入的值，不制作副本。真正复制由内存或 IndexedDB 后端完成。'
-                  ],
-                  [
-                    '`binaryCodec: ICodec<Uint8Array, Uint8Array>`',
-                    '输出为 `binary`，两方法只接受 `Uint8Array`，返回原字节对象；类型不符分别报编码或解码失败。'
-                  ],
-                  [
-                    '`ICodec<TValue, TRaw>.name / output`',
-                    '名称标记格式，输出取 `text`、`structured` 或 `binary`，用于选择后端通道。'
-                  ],
-                  [
-                    '`encode(value: TValue, ctx?: IOperationContext): Promise<TRaw>`',
-                    '把业务值转换为编码表示；内置三个编解码器不执行上下文取消。'
-                  ],
-                  [
-                    '`decode(raw: TRaw, ctx?: IOperationContext): Promise<TValue>`',
-                    '从编码表示恢复值；字段检查仍由 Schema 完成。'
-                  ],
-                  [
-                    '`selectCodec(codec: ICodec, capabilities: IStorageCapabilities, onDiagnostic?: (message: string) => void): ISelectedCodec`',
-                    '捕获描述对象后选路。非法描述报 `INVALID_ARGUMENT`；非法诊断函数报 `INVALID_CONFIG`。'
-                  ],
-                  [
-                    '`structured / binary / text`',
-                    '结构化输出需要记录能力，否则 `UNSUPPORTED_CAPABILITY`。二进制能力不足时转为 base64 并提示一次，体积约增加三分之一。文本直接使用。'
-                  ],
-                  [
-                    '`ISelectedCodec.encode(value: unknown, ctx?: { signal?: IAbortSignal })`',
-                    '返回 `Promise<unknown>` 表示本次选路的文本、字节或对象结果。匹配能力时使用捕获的方法，二进制回退包装会复制字节再编码。'
-                  ],
-                  [
-                    '`ISelectedCodec.decode(raw: unknown, ctx?: { signal?: IAbortSignal }): Promise<unknown>`',
-                    '将本次路由结果交回原编解码器；base64 输入损坏时使用 `DESERIALIZE_FAILED`。'
-                  ]
+                  ['jsonCodec', '严格的可移植 JSON 文本，不支持的值在后端读写前失败。'],
+                  ['structuredCodec', '含受支持内建类型及循环引用的结构化记录，由原生后端复制。'],
+                  ['binaryCodec', 'Uint8Array 数据；优先使用字节通道，文本后端使用 base64。']
                 ]
               }
             ]
           },
           {
-            id: 'migrations',
+            id: 'migration',
             heading: '版本升级与迁移统计',
             blocks: [
               {
-                type: 'table',
-                headers: ['入口或字段', '说明'],
-                rows: [
-                  [
-                    '`runMigrations(value: unknown, fromVersion: number, toVersion: number, migrations: Record<number, IMigration> | undefined, signal?: IAbortSignal): Promise<unknown>`',
-                    '两个版本使用非负安全整数；按升序执行步骤，缺失步骤保留值。起始版本不小于目标时原样返回，仍先检查参数与取消。'
-                  ],
-                  [
-                    '`IMigration(previous: unknown, ctx: IMigrationContext): Promise<unknown>`',
-                    '转换一步数据；`ctx.fromVersion` 与 `toVersion` 是当前这一步的前后版本，`signal?` 用于合作取消。失败为 `MIGRATION_FAILED`，取消为 `ABORTED`。'
-                  ],
-                  ['`IMigrateOptions.batchSize?: number`', '默认 `100`，使用正安全整数。'],
-                  [
-                    '`onInvalid?: IInvalidRecordAction | IInvalidRecordHandler<TDomain>`',
-                    '使用列表同样的跳过或抛错选择。'
-                  ],
-                  [
-                    '`IMigrateResult.scanned / eligible / migrated`',
-                    '分别统计扫描总数、需要升级的数量与已成功迁移数量。'
-                  ],
-                  [
-                    '`skipped / alreadyCurrent / conflicted`',
-                    '分别统计跳过坏记录、已是当前版本、与并发写入冲突后未迁移的数量。'
-                  ],
-                  [
-                    '`IEntityTransactionScope.get(id) / put(value) / remove(id)`',
-                    '分别返回 `Promise<TDomain | undefined>`、`Promise<IStorageKey>`、`Promise<void>`，仅在 `batch()` 回调内使用。'
-                  ]
-                ]
-              },
-              {
                 type: 'paragraph',
-                text: 'IndexedDB 的维护元数据可以保存迁移检查点，恢复后续调用。内存和纯字符串后端没有该通道，每次重新扫描。结构化后端一批提交冲突后逐条重试，仍冲突的记录计入 `conflicted`。'
+                text: '在实体定义上设置 version 与 migrations。迁移步骤必须组成以 version 结束的连续受支持区间；区间内部缺步会拒绝该定义。读取只升级返回状态，不会悄悄写回。需要重写已保存记录时显式调用 repository.migrate()，并检查 scanned、migrated、skipped 与 conflicted 数量。后端作者从 storage-host/authoring/migration 使用 createMigrationPlan 与 migrateEnvelope。'
               }
             ]
           }
@@ -49623,423 +48318,74 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          path: 'indexeddb-and-transactions',
-          label: '记录后端的方法'
+          path: 'getting-started',
+          label: '安装并保存第一项设置'
         },
         {
-          path: 'cancellation-errors-and-shutdown',
-          label: '排查失败原因'
+          path: 'indexeddb-and-transactions',
+          label: '记录与事务'
+        },
+        {
+          path: 'entity-schema-and-codecs',
+          label: '实体与编解码器'
         }
       ]
     },
     en: {
       title: 'Validate, query, and upgrade application records',
-      lede: 'An entity definition combines its key, validation, migrations, and indexes. Connecting it returns a repository for that record type; the store’s creator still closes the store.',
+      lede: 'The entity adapter belongs to storage-host/entity; browser plugins provide its actual storage.',
       document: {
         sections: [
           {
             id: 'entity',
-            heading: 'Find a customer by city',
+            heading: 'Store a typed user',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { defineEntity } from '@migaia/storage-web/entity'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\ntype ICustomer = { id: string; city: string }\nconst store = memoryStorageHost()\nconst customers = defineEntity<ICustomer>()({\n  name: 'customers',\n  key: 'id',\n  indexes: { byCity: { path: 'city' } },\n  onDiagnostic: () => console.log('Query path:', 'record scan')\n}).connect(store)\nawait customers.put({ id: 'ada', city: 'London' })\nconsole.log('London customer ID:', (await customers.findBy('byCity', 'London'))?.id)\nawait store.dispose()"
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'Query path: record scan\nLondon customer ID: ada'
+                code: "import { createStorageHost } from '@migaia/storage-host'\nimport { defineEntity } from '@migaia/storage-host/entity'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\n\ntype IUser = { id: number; email: string }\nconst host = await createStorageHost({\n  plugins: [indexedDbBackendPlugin({ dbName: 'app' })]\n})\ntry {\n  const users = defineEntity<IUser>({ name: 'users', key: 'id' })\n    .connect(host.backend('indexed-db'))\n  await users.put({ id: 1, email: 'ada@example.com' })\n  console.log((await users.get(1))?.email)\n} finally {\n  await host.dispose()\n}"
               },
               {
                 type: 'paragraph',
-                text: 'Use `defineEntity<T>()({...})` to preserve index names and query-key types. Memory has no native secondary indexes, so the entity layer scans records for matching results without changing that capability to true.'
-              },
-              {
-                type: 'table',
-                headers: ['Entry or field', 'Behavior'],
-                rows: [
-                  [
-                    '`defineEntity<TDomain, TStored = TDomain>(options)`',
-                    'Defines an entity without indexes and returns `IEntityDefinition<TDomain>`. Use the no-argument form’s returned builder when declaring indexes.'
-                  ],
-                  [
-                    '`IEntityDefinition.name / version`',
-                    'Retain the entity name and version. The definition is frozen and can connect to multiple stores.'
-                  ],
-                  [
-                    '`connect(store: IKeyValueStore): IRepository<TDomain, TIndexes>`',
-                    'Checks the string-store shape and creates a repository without creating or closing a backend. Invalid stores throw `INVALID_CONFIG`.'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'definition-options',
-            heading: 'All entity-definition options',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Entry or field', 'Behavior'],
-                rows: [
-                  ['`name: string`', 'Separates entities and cannot be empty or start with `__`.'],
-                  [
-                    '`key: Extract<keyof TDomain, string>`',
-                    'Selects the field used as the primary key. Its written value cannot be undefined or null and must pass storage-key validation.'
-                  ],
-                  [
-                    '`schema?: ISchemaAdapter<TDomain, TStored>`',
-                    'Defaults to `passthrough()` without field validation. Supplied adapters have their names and methods checked.'
-                  ],
-                  [
-                    '`codec?: ICodec<unknown, unknown>`',
-                    'Defaults to structuredCodec for record backends and jsonCodec for text-only backends at connection time. A supplied codec always passes through selectCodec.'
-                  ],
-                  [
-                    '`version?: number`',
-                    'Defaults to 1 and uses a positive safe integer. Reading newer-version data throws `VERSION_UNSUPPORTED`.'
-                  ],
-                  [
-                    '`migrations?: Record<number, IMigration>`',
-                    'Omission is accepted even above version 1, with missing steps leaving data unchanged. A supplied object must contain exactly every function from 2 through version; an empty object at version 2 throws `INVALID_CONFIG`.'
-                  ],
-                  [
-                    '`validateOnRead?: boolean`',
-                    'Defaults to true, validating decoded reads. Disabling it does not skip decoding or migration.'
-                  ],
-                  [
-                    '`onDiagnostic?: (message: string) => void`',
-                    'Defaults to console.warn and receives scan or skipped-record diagnostics. Callback failures do not alter the operation result.'
-                  ],
-                  [
-                    '`defaultOrderBy?: IRecordComparator<TDomain>`',
-                    'Supplies a default list comparator; omission retains the query path’s scan order.'
-                  ],
-                  [
-                    '`indexes?: TIndexes`',
-                    'Declares index names and projection settings through the curried definition form. Invalid declarations throw `INVALID_CONFIG`.'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'repository',
-            heading: 'Methods on a connected repository',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Signature', 'Returns', 'Effect'],
-                rows: [
-                  [
-                    '`get(id: IStorageKey, ctx?: IOperationContext)`',
-                    '`Promise<TDomain | undefined>`',
-                    'Read by primary key, decode, migrate, and validate; absence returns undefined.'
-                  ],
-                  [
-                    '`put(value: TDomain, ctx?: IOperationContext)`',
-                    '`Promise<IStorageKey>`',
-                    'Process and write a record, returning its application key.'
-                  ],
-                  [
-                    '`remove(id: IStorageKey, ctx?: IOperationContext)`',
-                    '`Promise<void>`',
-                    'Remove the entity record and its possible legacy storage position.'
-                  ],
-                  [
-                    '`list(options?: IListOptions<TDomain> | IIndexedListOptions<TDomain, TIndexes>, ctx?: IOperationContext)`',
-                    '`Promise<TDomain[]>`',
-                    'Return an array using the selected filtering and ordering.'
-                  ],
-                  [
-                    '`stream(options?: IListOptions<TDomain> | IIndexedListOptions<TDomain, TIndexes>, ctx?: IOperationContext)`',
-                    '`AsyncIterableIterator<TDomain>`',
-                    'Yield records; comparator-based ordering buffers results.'
-                  ],
-                  [
-                    '`findBy<TName extends keyof TIndexes & string>(index: TName, key: TIndexes[TName], ctx?: IOperationContext)`',
-                    '`Promise<TDomain | undefined>`',
-                    'Match an exact index key and return the first result or undefined. Multiple matches on a nonunique index emit a diagnostic.'
-                  ],
-                  [
-                    '`findManyBy<TName extends keyof TIndexes & string>(index: TName, range?: IKeyRange<TIndexes[TName]>, options?: Omit<IListOptions<TDomain>, "range">, ctx?: IOperationContext)`',
-                    '`Promise<TDomain[]>`',
-                    'Return records matching an index-key range.'
-                  ],
-                  [
-                    '`streamBy<TName extends keyof TIndexes & string>(index: TName, range?: IKeyRange<TIndexes[TName]>, options?: Omit<IListOptions<TDomain>, "range">, ctx?: IOperationContext)`',
-                    '`AsyncIterableIterator<TDomain>`',
-                    'Iterate an index range, using a backend index cursor when available.'
-                  ],
-                  [
-                    '`migrate(options?: IMigrateOptions<TDomain>, ctx?: IOperationContext)`',
-                    '`Promise<IMigrateResult>`',
-                    'Upgrade records and move legacy storage positions, returning counts.'
-                  ],
-                  [
-                    '`batch<T>(run: (tx: IEntityTransactionScope<TDomain>) => Promise<T>, ctx?: IOperationContext)`',
-                    '`Promise<T>`',
-                    'Run the callback in a record-backend transaction. Text-only backends throw `UNSUPPORTED_CAPABILITY`; concurrent conflicts require rereading and retrying the whole callback.'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'list-options',
-            heading: 'Lists, index queries, and invalid records',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Entry or field', 'Behavior'],
-                rows: [
-                  [
-                    '`IListOptions.range?: IKeyRange`',
-                    'Filters application keys, or index keys when index is selected. Shared storage types describe bounds and open endpoints.'
-                  ],
-                  [
-                    '`limit?: number`',
-                    'A nonnegative safe integer; zero returns no results, while omission imposes no count limit.'
-                  ],
-                  [
-                    '`orderBy?: (left: TDomain, right: TDomain) => number`',
-                    'Overrides the default comparator and must return a number other than NaN, or `EXTENSION_FAILED` is raised. Limits apply after ordering.'
-                  ],
-                  [
-                    '`direction?: "next" | "prev"`',
-                    'Controls index or comparator ordering; prev reverses it. Omission follows the query or comparator order.'
-                  ],
-                  [
-                    '`IIndexedListOptions.index: TName`',
-                    'Makes list and stream use a named index, with its range-key type inferred from that index. Ordinary lists omit this field.'
-                  ],
-                  [
-                    '`onInvalid?: "skip" | "throw" | IInvalidRecordHandler<TDomain>`',
-                    'Defaults to skip with a diagnostic. Throw ends the query; a handler chooses skip or throw per invalid record.'
-                  ],
-                  [
-                    '`IInvalidRecordIssue.key / raw / record?`',
-                    'Provide the stored key, raw data, and an application record when available.'
-                  ],
-                  [
-                    '`stage: "decode" | "migrate" | "validate" / cause: unknown`',
-                    'Identify the failed step and retain its cause. A handler’s own nonstorage exception becomes `VALIDATION_FAILED`; an invalid action throws `INVALID_CONFIG`.'
-                  ]
-                ]
-              },
-              {
-                type: 'paragraph',
-                text: 'Text backends scan all keys, and structured backends also scan legacy record positions. An orderBy comparator adds buffering, so stream does not always mean constant-memory reading.'
-              }
-            ]
-          },
-          {
-            id: 'indexes',
-            heading: 'Index definitions and query keys',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'Choose exactly one of path, paths, or select for each index. Index names cannot be empty or start with `__`.'
-              },
-              {
-                type: 'table',
-                headers: ['Entry or field', 'Behavior'],
-                rows: [
-                  ['`IEntityIndex.path`', 'Reads one field using a dotted path or path tuple.'],
-                  [
-                    '`paths`',
-                    'Combines a nonempty path list into a compound key and cannot use multiEntry:true.'
-                  ],
-                  [
-                    '`select(value: TDomain)`',
-                    'Returns a single-key projection, a multiple-key projection, or undefined for a custom selector.'
-                  ],
-                  [
-                    '`unique?: boolean`',
-                    'Defaults to false and declares the expectation of unique index keys.'
-                  ],
-                  [
-                    '`multiEntry?: boolean`',
-                    'Defaults to false for a single path; true indexes each array element. Custom selectors do not use this field.'
-                  ],
-                  [
-                    '`revision?: number`',
-                    'Defaults to 1 for path indexes. Custom selectors supply a positive safe-integer revision and increase it when selection logic changes.'
-                  ],
-                  [
-                    '`IEntityIndexMap<TDomain, TIndexes>`',
-                    'Infers the mapping from index names to query-key types from their projections.'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'schema',
-            heading: 'Validate a form value and encode JSON',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { fromStandardSchema } from '@migaia/storage-web/schema'\nimport { jsonCodec } from '@migaia/storage-web/serialize'\n\nconst schema = fromStandardSchema({\n  '~standard': {\n    version: 1,\n    vendor: 'theme-form',\n    validate: (value) => typeof value === 'string'\n      ? { value: value.trim() }\n      : { issues: [{ message: 'Theme must be text' }] }\n  }\n})\nconst theme = await schema.validate(' dark ')\nconsole.log('Settings file contents:', await jsonCodec.encode({ theme }))"
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'Settings file contents: {"theme":"dark"}'
-              },
-              {
-                type: 'paragraph',
-                text: 'Writes run `validate → normalize → schema.encode → codec.encode`. Reads run codec.decode, any needed version migration, schema.decode, then validation when validateOnRead is enabled.'
-              },
-              {
-                type: 'table',
-                headers: ['Entry or field', 'Behavior'],
-                rows: [
-                  [
-                    '`ISchemaAdapter<TDomain, TStored = TDomain>.name: string`',
-                    'Names the schema adapter and cannot be empty.'
-                  ],
-                  [
-                    '`validate(value: unknown, ctx?: IOperationContext): Promise<TDomain>`',
-                    'Checks input and returns a domain value; writes always call it.'
-                  ],
-                  [
-                    '`normalize?(value: TDomain, ctx?: IOperationContext): Promise<TDomain>`',
-                    'Normalizes a validated value before writing, preserving it when omitted.'
-                  ],
-                  [
-                    '`encode?(value: TDomain, ctx?: IOperationContext): Promise<TStored>`',
-                    'Converts domain representation to stored fields, rather than choosing JSON or binary format.'
-                  ],
-                  [
-                    '`decode?(raw: TStored, ctx?: IOperationContext): Promise<TDomain>`',
-                    'Restores a domain value from stored fields, using the original value when omitted.'
-                  ],
-                  [
-                    '`passthrough<T = unknown>(): ISchemaAdapter<T, T>`',
-                    'Takes no arguments, is named passthrough, and returns input from validate without checking it.'
-                  ],
-                  [
-                    '`fromStandardSchema<T>(schema: IStandardSchemaV1<unknown, T>): ISchemaAdapter<T, T>`',
-                    'Adapts a validator under the name standard-schema:<vendor>. Invalid configuration throws `INVALID_CONFIG`; invalid results or issues throw `VALIDATION_FAILED`.'
-                  ],
-                  [
-                    '`IStandardSchemaV1["~standard"].version / vendor / validate`',
-                    'Uses version 1, a nonempty vendor name, and a synchronous or asynchronous validator returning value or issues with message fields.'
-                  ],
-                  [
-                    '`issues[].message: string`',
-                    'Issue messages are joined with a semicolon and preserved on the error cause.'
-                  ]
-                ]
+                text: 'The output is ada@example.com. defineEntity declares the record name and primary-key field; connect borrows the installed backend and does not close it.'
               }
             ]
           },
           {
             id: 'codecs',
-            heading: 'Save an attachment as bytes',
+            heading: 'Separate domain validation from storage format',
             blocks: [
               {
-                type: 'code',
-                language: 'ts',
-                code: "import { memoryStorageHost } from '@migaia/storage-web/memory'\nimport { binaryCodec, selectCodec } from '@migaia/storage-web/serialize'\n\nconst store = memoryStorageHost()\nconst codec = selectCodec(binaryCodec, store.capabilities)\nconst encoded = await codec.encode(new TextEncoder().encode('draft'))\nawait store.setBytes('attachment', encoded as Uint8Array)\nconst saved = await store.getBytes('attachment')\nconsole.log('Attachment contents:', new TextDecoder().decode(saved ?? undefined))\nawait store.dispose()"
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'Attachment contents: draft'
+                type: 'paragraph',
+                text: 'schema checks and converts domain records. A codec chooses the saved representation. Writes follow validate → normalize → schema.encode → codec.encode. Reads decode the saved value, migrate its version, call schema.decode and validate the domain value.'
               },
               {
                 type: 'table',
-                headers: ['Entry or field', 'Behavior'],
+                headers: ['Codec', 'Use it for'],
                 rows: [
                   [
-                    '`jsonCodec: ICodec<unknown, string>`',
-                    'Uses text output. Encode uses JSON and returns the text null when encoding produces undefined. Failures use `SERIALIZE_FAILED` or `DESERIALIZE_FAILED`.'
+                    'jsonCodec',
+                    'Strict portable JSON text. Unsupported values fail before storage I/O.'
                   ],
                   [
-                    '`structuredCodec: ICodec<unknown, unknown>`',
-                    'Uses structured output and returns the supplied value without copying it. Memory or IndexedDB performs the actual cloning.'
+                    'structuredCodec',
+                    'Structured records including supported built-ins and cycles; the native backend copies them.'
                   ],
                   [
-                    '`binaryCodec: ICodec<Uint8Array, Uint8Array>`',
-                    'Uses binary output and accepts only Uint8Array, returning that byte object. Wrong types produce encode or decode failure codes.'
-                  ],
-                  [
-                    '`ICodec<TValue, TRaw>.name / output`',
-                    'The name identifies a format; text, structured, or binary output selects the backend channel.'
-                  ],
-                  [
-                    '`encode(value: TValue, ctx?: IOperationContext): Promise<TRaw>`',
-                    'Converts an application value into its encoded representation; the three built-in codecs do not implement context cancellation.'
-                  ],
-                  [
-                    '`decode(raw: TRaw, ctx?: IOperationContext): Promise<TValue>`',
-                    'Restores a value from its representation; Schema remains responsible for field validation.'
-                  ],
-                  [
-                    '`selectCodec(codec: ICodec, capabilities: IStorageCapabilities, onDiagnostic?: (message: string) => void): ISelectedCodec`',
-                    'Captures descriptors and selects a route. Invalid descriptors throw `INVALID_ARGUMENT`; an invalid diagnostic callback throws `INVALID_CONFIG`.'
-                  ],
-                  [
-                    '`structured / binary / text`',
-                    'Structured output needs records or throws `UNSUPPORTED_CAPABILITY`. Missing binary support selects base64 with one diagnostic and about one-third more space. Text is used directly.'
-                  ],
-                  [
-                    '`ISelectedCodec.encode(value: unknown, ctx?: { signal?: IAbortSignal })`',
-                    'Returns Promise<unknown> containing the selected text, bytes, or object. Matching routes use captured methods; the binary fallback copies bytes before encoding.'
-                  ],
-                  [
-                    '`ISelectedCodec.decode(raw: unknown, ctx?: { signal?: IAbortSignal }): Promise<unknown>`',
-                    'Passes the selected representation to the original codec, with `DESERIALIZE_FAILED` for malformed base64 input.'
+                    'binaryCodec',
+                    'Uint8Array data, using bytes when available or base64 for text backends.'
                   ]
                 ]
               }
             ]
           },
           {
-            id: 'migrations',
+            id: 'migration',
             heading: 'Version upgrades and migration counts',
             blocks: [
               {
-                type: 'table',
-                headers: ['Entry or field', 'Behavior'],
-                rows: [
-                  [
-                    '`runMigrations(value: unknown, fromVersion: number, toVersion: number, migrations: Record<number, IMigration> | undefined, signal?: IAbortSignal): Promise<unknown>`',
-                    'Uses nonnegative safe-integer versions and applies steps in ascending order. Missing steps leave values unchanged. An equal or higher starting version returns the value after input and cancellation checks.'
-                  ],
-                  [
-                    '`IMigration(previous: unknown, ctx: IMigrationContext): Promise<unknown>`',
-                    'Converts one step; context versions describe that step and signal supports cooperative cancellation. Failures use `MIGRATION_FAILED`, and cancellation uses `ABORTED`.'
-                  ],
-                  [
-                    '`IMigrateOptions.batchSize?: number`',
-                    'Defaults to 100 and uses a positive safe integer.'
-                  ],
-                  [
-                    '`onInvalid?: IInvalidRecordAction | IInvalidRecordHandler<TDomain>`',
-                    'Uses the same skip-or-throw selection as lists.'
-                  ],
-                  [
-                    '`IMigrateResult.scanned / eligible / migrated`',
-                    'Count scanned records, records needing an upgrade, and successful migrations.'
-                  ],
-                  [
-                    '`skipped / alreadyCurrent / conflicted`',
-                    'Count invalid records skipped, already-current records, and records left unmigrated after concurrent conflicts.'
-                  ],
-                  [
-                    '`IEntityTransactionScope.get(id) / put(value) / remove(id)`',
-                    'Return Promise<TDomain | undefined>, Promise<IStorageKey>, and Promise<void>, and are used only inside the batch callback.'
-                  ]
-                ]
-              },
-              {
                 type: 'paragraph',
-                text: 'IndexedDB maintenance metadata can retain a migration checkpoint across calls. Memory and text-only backends lack that channel and rescan. A conflicted structured batch retries records individually; unresolved conflicts contribute to conflicted.'
+                text: 'Set version and migrations on the entity definition. Migration steps form one continuous supported interval ending at version; missing steps inside that interval reject the definition. A read upgrades the returned state without silently writing it back. Use repository.migrate() when the application explicitly wants saved records rewritten, and inspect its scanned, migrated, skipped and conflicted counts. Backend authors use createMigrationPlan and migrateEnvelope from storage-host/authoring/migration.'
               }
             ]
           }
@@ -50047,12 +48393,16 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          path: 'indexeddb-and-transactions',
-          label: 'Record-backend methods'
+          path: 'getting-started',
+          label: 'Install and save a setting'
         },
         {
-          path: 'cancellation-errors-and-shutdown',
-          label: 'Troubleshoot failures'
+          path: 'indexeddb-and-transactions',
+          label: 'Records and transactions'
+        },
+        {
+          path: 'entity-schema-and-codecs',
+          label: 'Entities and codecs'
         }
       ]
     }
@@ -50060,246 +48410,41 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   'storage-web:host-and-plugins': {
     zh: {
       title: '按名称组合存储并统一关闭',
-      lede: '一个页面要同时使用多份存储时，让 Host 安装插件并保存实例。通过 ID 取得后端，页面结束后等待 Host 关闭。',
+      lede: '由一个存储宿主拥有应用选择的插件。',
       document: {
         sections: [
           {
             id: 'install',
-            heading: '一次安装页面需要的存储',
+            heading: '只安装实际使用的后端',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStorageHost } from '@migaia/storage-web/host'\nimport { memoryBackendPlugin } from '@migaia/storage-web/plugins/memory'\n\nconst host = await createStorageHost({\n  plugins: [\n    memoryBackendPlugin({ id: 'drafts' }),\n    memoryBackendPlugin({ id: 'preview' })\n  ] as const\n})\ntry {\n  await host.backend('drafts').set('title', 'Release notes')\n  console.log('页面草稿标题:', await host.backend('drafts').get('title'))\n} finally {\n  await host.dispose()\n}"
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '页面草稿标题: Release notes'
+                code: "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { localStorageBackendPlugin } from '@migaia/storage-web/local-storage'\n\nconst host = await createStorageHost({\n  plugins: [\n    memoryBackendPlugin({ id: 'drafts' }),\n    localStorageBackendPlugin({ id: 'settings', namespace: 'my-app' })\n  ] as const\n})\ntry {\n  await host.backend('drafts').set('title', 'Release notes')\n  await host.backend('settings').set('theme', 'dark')\n  console.log(await host.backend('drafts').get('title'))\n} finally {\n  await host.dispose()\n}"
               },
               {
                 type: 'paragraph',
-                text: '`createStorageHost()` 总是返回 Promise，初始插件全部成功后才返回 Host。后续追加使用 `use()`。同一批失败时会回收已创建的资源，不发布这一批的部分存储。'
+                text: 'createStorageHost 等待初始安装并返回有类型的后端访问。失败批次不会发布部分存储。后续通过 host.use() 追加；并发安装请求以 STORAGE_HOST_BUSY 拒绝。'
               }
             ]
           },
           {
-            id: 'options',
-            heading: '创建选项与返回对象',
+            id: 'feature',
+            heading: '独立选择可选特性',
             blocks: [
-              {
-                type: 'table',
-                headers: ['入口或字段', '说明'],
-                rows: [
-                  [
-                    '`createStorageHost(options?: IStorageHostCreateOptions<TPlugins>)`',
-                    '返回 `Promise<IStorageHost<...>>`，按插件元组推导 ID、存储、扩展及响应式能力。'
-                  ],
-                  [
-                    '`new StorageHostFacade(options?: IStorageHostOptions)`',
-                    '同步创建空 Host，不安装插件；使用后续 `use()` 返回的对象取得新增类型信息。'
-                  ],
-                  [
-                    '`plugins?: readonly IStorageBackendPluginHandle[]`',
-                    '首次安装的插件元组，省略时为空。`as const` 保留 ID，重复字面量 ID 会被类型检查发现。'
-                  ],
-                  [
-                    '`installTimeoutMs?: number`',
-                    '默认 `30000`，接受包含 `0` 的非负有限数，限制整批安装等待，不限制后续读写。'
-                  ],
-                  [
-                    '`scheduler?: IScheduler`',
-                    '默认使用系统调度器；提供时捕获其时钟与调度方法，用于安装时限和清理。'
-                  ],
-                  [
-                    '`report?: (error: unknown) => void | PromiseLike<void>`',
-                    '接收迟到失败和清理诊断；省略时不提供调用方输出，诊断函数失败不覆盖主要错误。'
-                  ]
-                ]
-              },
-              {
-                type: 'table',
-                headers: ['签名', '返回', '作用'],
-                rows: [
-                  [
-                    '`backend<TId extends keyof TStores & string>(id: TId)`',
-                    '`TStores[TId]`',
-                    '取得已发布的原存储对象，没有默认后端。不存在时报 `BACKEND_NOT_INSTALLED`。'
-                  ],
-                  [
-                    '`hasBackend(id: string)`',
-                    '`id is keyof TStores & string`',
-                    '检查当前已发布的存储 ID。'
-                  ],
-                  [
-                    '`backends()`',
-                    '`ReadonlyMap<keyof TStores & string, TStores[keyof TStores]>`',
-                    '返回独立 Map 副本，TS 类型只读但运行时未冻结；修改副本不影响 Host。'
-                  ],
-                  [
-                    '`use(...plugins)`',
-                    '`Promise<IStorageHost<...>>`',
-                    '追加安装，成功返回同一个 Host，并扩展返回对象类型。安装中再次调用会同步抛出 `STORAGE_HOST_BUSY`。'
-                  ],
-                  [
-                    '`extensions`',
-                    '`Readonly<TExtensions>`',
-                    '读取已提交插件公开的扩展对象，随整批安装一起发布。'
-                  ],
-                  [
-                    '`hasReactiveBackend(id: string)`',
-                    '`id is TReactiveIds`',
-                    '判断该 ID 是否已安装变更适配器。'
-                  ],
-                  [
-                    '`reactiveBackend(id: string)`',
-                    '`IReactiveBackendHandle<IKeyValueStore, string> | undefined`',
-                    '返回带 `id`、`store`、`liveQuery(options)` 的对象，缺少适配器时为 `undefined`；查询参数见响应式专题。'
-                  ],
-                  [
-                    '`dispose()`',
-                    '`Promise<void>`',
-                    '立即停止接收新工作，取消进行中的安装并等待清理。重复调用返回同一个 Promise。'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'plugins',
-            heading: '内置后端插件的入口和选项',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['入口或字段', '说明'],
-                rows: [
-                  [
-                    '`plugins/memory: memoryBackendPlugin(options?)`',
-                    '默认 ID 为 `memory`，只读取 `id`；安装时创建独立内存存储。'
-                  ],
-                  [
-                    '`plugins/local-storage: localStorageBackendPlugin(options?)`',
-                    '默认 ID 为 `local`，转交 `namespace`、`namespaceCodec`、`storage`，默认值与直接工厂一致。'
-                  ],
-                  [
-                    '`plugins/session-storage: sessionStorageBackendPlugin(options?)`',
-                    '默认 ID 为 `session`，转交 Session Storage 的三个构造选项。'
-                  ],
-                  [
-                    '`plugins/cookies: cookieBackendPlugin(options?)`',
-                    '默认 ID 为 `cookies`，转交 `namespace`、`namespaceCodec`、`scope`、`document`。'
-                  ],
-                  [
-                    '`plugins/indexed-db: indexedDbBackendPlugin(options?)`',
-                    '默认 ID 为 `indexed-db`，转交数据库、三个存储名、`cleanupLegacyRecords`、`factory`、`keyRange`。安装会等待数据库准备完成。'
-                  ],
-                  [
-                    '`id?: string`',
-                    '给此存储实例选择唯一查找名；省略使用各工厂默认值。不同 ID 可以使用相同后端种类。'
-                  ],
-                  [
-                    '`prepareIndexedDbStore(store: IKeyValueStore): Promise<void>`',
-                    '供 Host 在登记清理后调用；只接受本包实际 IndexedDB 存储，否则 `BACKEND_PLUGIN_INVALID`。'
-                  ]
-                ]
-              },
               {
                 type: 'paragraph',
-                text: '每个插件保存如何创建存储的说明，真正访问浏览器宿主发生在安装阶段。后端细项分别在入门、Cookie 和 IndexedDB 页说明；普通后端插件没有 `liveQuery` 能力。需要自动刷新时使用对应 `*Reactive` 插件。'
+                text: 'Feature 表示针对明确后端种类的额外能力。把选定的特性放在插件第二参数；单独定义特性不会打开数据库。reactiveFeature 仅为受支持的查询链添加 live()。host.api 暴露已安装方法，host.backend(id) 则选择原存储。'
               }
             ]
           },
           {
-            id: 'dynamic',
-            heading: '需要时再添加搜索缓存',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { StorageHostFacade } from '@migaia/storage-web/host'\nimport { memoryBackendPlugin } from '@migaia/storage-web/plugins/memory'\n\nconst empty = new StorageHostFacade()\nconst host = await empty.use(memoryBackendPlugin({ id: 'cache' }))\nawait host.backend('cache').set('search', 'offline')\nconsole.log('后来添加的搜索缓存:', await host.backend('cache').get('search'))\nawait host.dispose()"
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '后来添加的搜索缓存: offline'
-              },
-              {
-                type: 'paragraph',
-                text: '关闭 Host 不删除浏览器持久数据；内存数据会随实例关闭而清空。关闭后读取扩展、查找后端或追加安装都会以 `STORAGE_HOST_DISPOSED` 失败。下一次页面使用新 Host。'
-              }
-            ]
-          },
-          {
-            id: 'custom',
-            heading: '自定义插件增加应用查询',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { createStorageHost, defineFeature, definePlugin } from '@migaia/storage-web/host'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst theme = defineFeature((core) => ({\n  read: () => core.featureExpose.getStore().get('theme')\n}))\nconst plugin = definePlugin(\n  'settings',\n  (core) => ({\n    install: () => {\n      core.registerStore(memoryStorageHost())\n      return { readTheme: () => core.features.theme.read() }\n    }\n  }),\n  { theme }\n)\nconst host = await createStorageHost({ plugins: [plugin] as const })\nawait host.backend('settings').set('theme', 'dark')\nconsole.log('插件提供的主题:', await host.extensions.readTheme())\nawait host.dispose()"
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '插件提供的主题: dark'
-              },
-              {
-                type: 'table',
-                headers: ['入口或字段', '说明'],
-                rows: [
-                  [
-                    '`definePlugin(name, descriptorFactory, features?)`',
-                    '返回本包创建的插件对象，`id` 为 `name`。工厂在注册时收到 `IStoragePluginCore`，不能用普通对象伪造该插件。'
-                  ],
-                  [
-                    '`IStoragePluginCore.registerStore(store): void`',
-                    '只在安装回调执行期间转交一次有效存储，Host 随后负责清理。重复、过早或过晚调用报 `BACKEND_PLUGIN_INVALID`。'
-                  ],
-                  [
-                    '`getStore(): TStore / getBackendId(): string`',
-                    '读取本次注册对应的存储与 ID，存储尚未登记时不能使用 `getStore()`。'
-                  ],
-                  [
-                    '`features: IFeatureOutputs<TFeatures> / featureExpose`',
-                    '读取已声明功能的结果，向功能提供本次存储的 `getStore()` 和 `getBackendId()`。'
-                  ],
-                  [
-                    '`IStorageNativePluginDescriptor.install?(): Record<string, unknown> | PromiseLike<Record<string, unknown>>`',
-                    '安装存储并返回公开扩展。省略这个回调不会自动创建存储。'
-                  ],
-                  [
-                    '`expose?(): Record<string, unknown>`',
-                    '返回额外公开扩展，与安装输出一起出现在 `host.extensions`。'
-                  ],
-                  [
-                    '`featureExpose?(): object`',
-                    '向功能提供额外方法，不能替换 Host 注入的 `getStore` 或 `getBackendId`。'
-                  ],
-                  [
-                    '`defineFeature(factory, dependencies?)`',
-                    '返回可复用功能。工厂收到含 `featureExpose` 的 core 和已声明依赖的结果，返回功能对象；依赖规则沿用 PluginHost。'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'helpers',
+            id: 'ids',
             heading: '检查自定义后端 ID',
             blocks: [
               {
-                type: 'table',
-                headers: ['入口或字段', '说明'],
-                rows: [
-                  [
-                    '`assertStorageBackendId(id: unknown): asserts id is string`',
-                    '检查大小写敏感的 ID，以 ASCII 字母开头，后接字母、数字、点、下划线或连字符，总长 `1..64`。失败为带 `BACKEND_ID_INVALID` 的原生 `TypeError`。'
-                  ]
-                ]
-              },
-              {
                 type: 'paragraph',
-                text: '自定义后端 ID 是区分存储实现的标识，且区分大小写。选好 ID 后，可用 `assertStorageBackendId` 检查格式。它只检查传入的值，不会创建或安装插件；省略调用时，也不会得到这次独立检查。之后如果安装返回的 Promise 以 `BACKEND_INSTALL_FAILED` 拒绝，可从错误的 `cause` 读取最初的配置或插件失败。处理方式见[关闭与排错](/zh/docs/storage-web/cancellation-errors-and-shutdown)。'
+                text: '为每个已安装后端选择不同的非空 id。安装前可用 @migaia/storage-host 的 assertStorageBackendId 检查输入。namespace 隔离保存键，与宿主查找使用的 id 相互独立。'
               }
             ]
           }
@@ -50307,257 +48452,56 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          path: 'reactive-live-queries',
-          label: '自动刷新查询'
+          path: 'getting-started',
+          label: '安装并保存第一项设置'
         },
         {
-          path: 'cancellation-errors-and-shutdown',
-          label: '处理安装与关闭失败'
+          path: 'indexeddb-and-transactions',
+          label: '记录与事务'
+        },
+        {
+          path: 'entity-schema-and-codecs',
+          label: '实体与编解码器'
         }
       ]
     },
     en: {
       title: 'Compose named stores and close them together',
-      lede: 'Let a Host install plugins and retain their stores when a page needs several instances. Retrieve a backend by ID and await Host cleanup when the page closes.',
+      lede: 'One storage host owns the plugins selected by the application.',
       document: {
         sections: [
           {
             id: 'install',
-            heading: 'Install the page’s stores together',
+            heading: 'Install only the backends in use',
             blocks: [
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createStorageHost } from '@migaia/storage-web/host'\nimport { memoryBackendPlugin } from '@migaia/storage-web/plugins/memory'\n\nconst host = await createStorageHost({\n  plugins: [\n    memoryBackendPlugin({ id: 'drafts' }),\n    memoryBackendPlugin({ id: 'preview' })\n  ] as const\n})\ntry {\n  await host.backend('drafts').set('title', 'Release notes')\n  console.log('Page draft title:', await host.backend('drafts').get('title'))\n} finally {\n  await host.dispose()\n}"
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'Page draft title: Release notes'
+                code: "import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'\nimport { localStorageBackendPlugin } from '@migaia/storage-web/local-storage'\n\nconst host = await createStorageHost({\n  plugins: [\n    memoryBackendPlugin({ id: 'drafts' }),\n    localStorageBackendPlugin({ id: 'settings', namespace: 'my-app' })\n  ] as const\n})\ntry {\n  await host.backend('drafts').set('title', 'Release notes')\n  await host.backend('settings').set('theme', 'dark')\n  console.log(await host.backend('drafts').get('title'))\n} finally {\n  await host.dispose()\n}"
               },
               {
                 type: 'paragraph',
-                text: '`createStorageHost()` always returns a Promise and returns the Host after all initial plugins succeed. Use use() for later additions. A failed batch releases created resources without publishing part of that batch.'
+                text: 'createStorageHost waits for initial installation and returns typed backend access. A failed batch does not publish partial storage. Append plugins with host.use(); simultaneous installation requests reject with STORAGE_HOST_BUSY.'
               }
             ]
           },
           {
-            id: 'options',
-            heading: 'Creation options and returned Host',
+            id: 'feature',
+            heading: 'Choose optional Features separately',
             blocks: [
-              {
-                type: 'table',
-                headers: ['Entry or field', 'Behavior'],
-                rows: [
-                  [
-                    '`createStorageHost(options?: IStorageHostCreateOptions<TPlugins>)`',
-                    'Returns Promise<IStorageHost<...>>, inferring IDs, stores, extensions, and reactive capability from the plugin tuple.'
-                  ],
-                  [
-                    '`new StorageHostFacade(options?: IStorageHostOptions)`',
-                    'Synchronously creates an empty Host without installing plugins. Use the object returned by use() to retain newly inferred types.'
-                  ],
-                  [
-                    '`plugins?: readonly IStorageBackendPluginHandle[]`',
-                    'Supplies initial plugins, empty when omitted. An as-const tuple preserves IDs and exposes duplicate literal IDs to type checking.'
-                  ],
-                  [
-                    '`installTimeoutMs?: number`',
-                    'Defaults to 30000 and accepts a nonnegative finite number including zero. It limits batch installation, not later reads or writes.'
-                  ],
-                  [
-                    '`scheduler?: IScheduler`',
-                    'Defaults to the system scheduler. A supplied scheduler’s time and scheduling methods drive installation deadlines and cleanup.'
-                  ],
-                  [
-                    '`report?: (error: unknown) => void | PromiseLike<void>`',
-                    'Receives late failures and cleanup diagnostics. Omission supplies no caller output, and reporter failure cannot replace the primary error.'
-                  ]
-                ]
-              },
-              {
-                type: 'table',
-                headers: ['Signature', 'Returns', 'Effect'],
-                rows: [
-                  [
-                    '`backend<TId extends keyof TStores & string>(id: TId)`',
-                    '`TStores[TId]`',
-                    'Retrieve an installed store without an implicit default. A missing ID throws `BACKEND_NOT_INSTALLED`.'
-                  ],
-                  [
-                    '`hasBackend(id: string)`',
-                    '`id is keyof TStores & string`',
-                    'Check IDs in the currently published store registry.'
-                  ],
-                  [
-                    '`backends()`',
-                    '`ReadonlyMap<keyof TStores & string, TStores[keyof TStores]>`',
-                    'Return an independent Map copy. Its TypeScript type is readonly, but it is not frozen; modifying the copy cannot change the Host.'
-                  ],
-                  [
-                    '`use(...plugins)`',
-                    '`Promise<IStorageHost<...>>`',
-                    'Add plugins, returning the same Host with an expanded type. Calling again during installation throws `STORAGE_HOST_BUSY` synchronously.'
-                  ],
-                  [
-                    '`extensions`',
-                    '`Readonly<TExtensions>`',
-                    'Read public plugin extensions published with their committed batch.'
-                  ],
-                  [
-                    '`hasReactiveBackend(id: string)`',
-                    '`id is TReactiveIds`',
-                    'Check whether the ID has an installed change adapter.'
-                  ],
-                  [
-                    '`reactiveBackend(id: string)`',
-                    '`IReactiveBackendHandle<IKeyValueStore, string> | undefined`',
-                    'Return an object with id, store, and liveQuery(options), or undefined without an adapter. See the reactive topic for query options.'
-                  ],
-                  [
-                    '`dispose()`',
-                    '`Promise<void>`',
-                    'Immediately stop new work, cancel active installation, and await cleanup. Repeated calls return the same Promise.'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'plugins',
-            heading: 'Built-in backend plugin entries and options',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Entry or field', 'Behavior'],
-                rows: [
-                  [
-                    '`plugins/memory: memoryBackendPlugin(options?)`',
-                    'Defaults its ID to memory and reads only id, creating an independent store at installation.'
-                  ],
-                  [
-                    '`plugins/local-storage: localStorageBackendPlugin(options?)`',
-                    'Defaults to local and forwards namespace, namespaceCodec, and storage with the direct factory’s defaults.'
-                  ],
-                  [
-                    '`plugins/session-storage: sessionStorageBackendPlugin(options?)`',
-                    'Defaults to session and forwards the three Session Storage constructor options.'
-                  ],
-                  [
-                    '`plugins/cookies: cookieBackendPlugin(options?)`',
-                    'Defaults to cookies and forwards namespace, namespaceCodec, scope, and document.'
-                  ],
-                  [
-                    '`plugins/indexed-db: indexedDbBackendPlugin(options?)`',
-                    'Defaults to indexed-db and forwards database and store names, cleanupLegacyRecords, factory, and keyRange. Installation awaits database preparation.'
-                  ],
-                  [
-                    '`id?: string`',
-                    'Selects a unique lookup name, defaulting to the factory’s ID. Different IDs may use the same backend kind.'
-                  ],
-                  [
-                    '`prepareIndexedDbStore(store: IKeyValueStore): Promise<void>`',
-                    'Used by the Host after cleanup registration. A value other than this package’s IndexedDB store throws `BACKEND_PLUGIN_INVALID`.'
-                  ]
-                ]
-              },
               {
                 type: 'paragraph',
-                text: 'A plugin records how to create a store; browser access occurs during installation. Backend-specific fields are covered in getting started, Cookies, and IndexedDB. Ordinary backend plugins do not add liveQuery; choose the corresponding Reactive plugin for automatic refresh.'
+                text: 'A Feature describes extra capability for one exact backend kind. Pass selected Features as the plugin’s second argument; declaring a Feature alone opens no database. reactiveFeature adds live() only to supported query chains. host.api exposes installed methods, while host.backend(id) selects the original store.'
               }
             ]
           },
           {
-            id: 'dynamic',
-            heading: 'Add a search cache when needed',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { StorageHostFacade } from '@migaia/storage-web/host'\nimport { memoryBackendPlugin } from '@migaia/storage-web/plugins/memory'\n\nconst empty = new StorageHostFacade()\nconst host = await empty.use(memoryBackendPlugin({ id: 'cache' }))\nawait host.backend('cache').set('search', 'offline')\nconsole.log('Added search cache:', await host.backend('cache').get('search'))\nawait host.dispose()"
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'Added search cache: offline'
-              },
-              {
-                type: 'paragraph',
-                text: 'Closing a Host does not delete browser-persistent data; its memory stores lose their contents. Reading extensions, looking up backends, or adding plugins after closure fails with `STORAGE_HOST_DISPOSED`. Create a new Host for the next page.'
-              }
-            ]
-          },
-          {
-            id: 'custom',
-            heading: 'Add an application query with a custom plugin',
-            blocks: [
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { createStorageHost, defineFeature, definePlugin } from '@migaia/storage-web/host'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst theme = defineFeature((core) => ({\n  read: () => core.featureExpose.getStore().get('theme')\n}))\nconst plugin = definePlugin(\n  'settings',\n  (core) => ({\n    install: () => {\n      core.registerStore(memoryStorageHost())\n      return { readTheme: () => core.features.theme.read() }\n    }\n  }),\n  { theme }\n)\nconst host = await createStorageHost({ plugins: [plugin] as const })\nawait host.backend('settings').set('theme', 'dark')\nconsole.log('Theme from plugin:', await host.extensions.readTheme())\nawait host.dispose()"
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'Theme from plugin: dark'
-              },
-              {
-                type: 'table',
-                headers: ['Entry or field', 'Behavior'],
-                rows: [
-                  [
-                    '`definePlugin(name, descriptorFactory, features?)`',
-                    'Returns a package-created plugin object whose id equals name. The descriptor factory receives IStoragePluginCore at registration; a plain object cannot forge a trusted plugin.'
-                  ],
-                  [
-                    '`IStoragePluginCore.registerStore(store): void`',
-                    'Transfers one valid store during installation, after which the Host owns cleanup. Duplicate, early, or late calls throw `BACKEND_PLUGIN_INVALID`.'
-                  ],
-                  [
-                    '`getStore(): TStore / getBackendId(): string`',
-                    'Read this registration’s store and ID; getStore cannot be used before registration.'
-                  ],
-                  [
-                    '`features: IFeatureOutputs<TFeatures> / featureExpose`',
-                    'Read declared feature outputs and expose this registration’s getStore and getBackendId to features.'
-                  ],
-                  [
-                    '`IStorageNativePluginDescriptor.install?(): Record<string, unknown> | PromiseLike<Record<string, unknown>>`',
-                    'Installs the store and returns public extensions. Omitting this callback does not create a store automatically.'
-                  ],
-                  [
-                    '`expose?(): Record<string, unknown>`',
-                    'Returns additional public extensions merged into host.extensions.'
-                  ],
-                  [
-                    '`featureExpose?(): object`',
-                    'Supplies extra feature methods without replacing the injected getStore or getBackendId.'
-                  ],
-                  [
-                    '`defineFeature(factory, dependencies?)`',
-                    'Returns a reusable feature. Its factory receives core.featureExpose and declared dependency outputs, then returns a feature object using PluginHost dependency rules.'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'helpers',
+            id: 'ids',
             heading: 'Validate custom backend IDs',
             blocks: [
               {
-                type: 'table',
-                headers: ['Entry or field', 'Behavior'],
-                rows: [
-                  [
-                    '`assertStorageBackendId(id: unknown): asserts id is string`',
-                    'Checks a case-sensitive ID: an ASCII letter followed by letters, digits, dots, underscores, or hyphens, with length 1..64. Failure is a native TypeError carrying `BACKEND_ID_INVALID`.'
-                  ]
-                ]
-              },
-              {
                 type: 'paragraph',
-                text: 'A backend ID distinguishes a storage implementation and is case-sensitive. After choosing an ID for a custom plugin, call `assertStorageBackendId` to check its format. This helper only checks the supplied value; it does not create or install a plugin. Omit the call if you do not need this separate check. If a later installation Promise rejects with `BACKEND_INSTALL_FAILED`, inspect its `cause` for the original configuration or plugin failure. See [shutdown and troubleshooting](/en/docs/storage-web/cancellation-errors-and-shutdown) for handling details.'
+                text: 'Choose a distinct nonempty id for every installed backend. assertStorageBackendId from @migaia/storage-host checks a supplied ID before installation. Namespace isolates saved keys and is independent of this host lookup ID.'
               }
             ]
           }
@@ -50565,12 +48509,16 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          path: 'reactive-live-queries',
-          label: 'Automatically refresh queries'
+          path: 'getting-started',
+          label: 'Install and save a setting'
         },
         {
-          path: 'cancellation-errors-and-shutdown',
-          label: 'Handle installation and cleanup failures'
+          path: 'indexeddb-and-transactions',
+          label: 'Records and transactions'
+        },
+        {
+          path: 'entity-schema-and-codecs',
+          label: 'Entities and codecs'
         }
       ]
     }
@@ -50578,330 +48526,41 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   'storage-web:reactive-live-queries': {
     zh: {
       title: '持续查询：让页面跟随存储变化',
-      lede: '安装对应后端的变化观察器，重新查询，并在页面关闭时释放。',
+      lede: '安装响应式特性，再把有界记录查询变成持续结果。',
       document: {
         sections: [
           {
-            id: 'purpose',
-            heading: '让页面重新读取已变化的数据',
+            id: 'query',
+            heading: '跟随记录列表变化',
             blocks: [
-              {
-                type: 'paragraph',
-                text: '示例在浏览器中运行，使用打包工具处理包名导入。IndexedDB、cookie 和事件来自真实浏览器宿主；Node 本身不提供这些接口。'
-              },
-              {
-                type: 'paragraph',
-                text: '持续查询把后端变化转换成重新读取，不替代数据库，也不把变化通知当作完整业务数据。下面使用真实 IndexedDB；先保存准备模块，再运行查询模块。'
-              },
-              {
-                type: 'paragraph',
-                text: '保存为 `reactive-setup.ts`。'
-              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRuntime } from '@migaia/reactive'\nimport { createStorageHost } from '@migaia/storage-web/host'\nimport { indexedDbReactive } from '@migaia/storage-web/plugins/reactive/indexed-db'\n\nexport const runtime = createRuntime()\nexport const host = await createStorageHost({\n  plugins: [indexedDbReactive({ id: 'users', dbName: 'docs-live-users' })] as const\n})\nexport const store = host.backend('users')\nawait store.putRecord('Ada', 'selected')"
+                code: "import { indexedDbNotificationsFeature } from '@migaia/storage-web/features/indexed-db-notifications'\nimport { createRuntime } from '@migaia/reactive'\nimport { records } from '@migaia/storage-contract'\nimport { createStorageHost } from '@migaia/storage-host'\nimport {\n  indexedDbBackendKind,\n  indexedDbBackendPlugin,\n} from '@migaia/storage-web/indexed-db'\nimport { reactiveFeature } from '@migaia/storage-web/features/reactive'\n\nconst runtime = createRuntime()\nconst host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin(\n      { dbName: 'app' },\n      {\n        notifications: indexedDbNotificationsFeature(),\n        reactive: reactiveFeature(indexedDbBackendKind),\n      },\n    ),\n  ],\n})\ntry {\n  const store = host.backend('indexed-db')\n  await store.putRecord({ id: 1, name: 'Ada' }, 1)\n  const users = store.use(records).query().limit(20).live({\n    runtime,\n    keepPreviousData: true,\n  })\n  try {\n    await users.ready\n    console.log(users.state.value)\n  } finally {\n    await users.dispose()\n  }\n} finally {\n  await host.dispose()\n}"
               },
               {
                 type: 'paragraph',
-                text: '保存为 `reactive.ts`。'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { host, runtime, store } from './reactive-setup.ts'\n\nconst user = host.liveQuery({\n  backendId: 'users',\n  runtime,\n  query: ({ store, signal }) => store.getRecord('selected', { signal }),\n  keepPreviousData: true,\n  timeoutMs: 5_000\n})\nawait user.ready\nconsole.log('当前用户:', user.state.value.value)\nawait store.putRecord('Grace', 'selected')\nawait user.refresh()\nconsole.log('刷新后:', user.state.value.value)\nawait user.dispose()\nawait host.dispose()"
-              },
-              {
-                type: 'paragraph',
-                text: '浏览器输出：'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '当前用户: Ada\n刷新后: Grace'
+                text: 'ready 等待首次查询。state.value 报告加载、就绪、刷新或错误以及当前结果。keepPreviousData 在刷新期间保留上次结果；失效通知触发重新读取，并不携带完整记录。'
               }
             ]
           },
           {
-            id: 'state-model',
-            heading: '状态、参数与返回对象',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['成员与选项', '说明'],
-                rows: [
-                  [
-                    '`host.liveQuery(options): ILiveQuery<T>`',
-                    '创建一个持续查询，读取指定后端的当前值。需要先安装对应 reactive plugin。'
-                  ],
-                  [
-                    '`backendId: TBackendId`',
-                    '选择已安装且带变化观察器的后端 ID，不自动选择其他后端。'
-                  ],
-                  [
-                    '`runtime: IRuntime`',
-                    '提供状态计算使用的 reactive runtime。查询状态留在这个 runtime 中。'
-                  ],
-                  [
-                    '`query({ store, signal, scope? }): T | PromiseLike<T>`',
-                    '执行实际读取。把信号传给存储操作，旧查询取消后不要继续提交它的结果。'
-                  ],
-                  [
-                    '`scope?: string`',
-                    '标记实体范围，帮助排除无关变化。它不是数据库名称，也不自动修改查询键。'
-                  ],
-                  [
-                    '`matches?(change): boolean`',
-                    '进一步筛选变化。不能证明无关时仍会重新查询；筛选函数失败会报告并保守刷新。'
-                  ],
-                  [
-                    '`keepPreviousData?: boolean`',
-                    '默认 `true`。后台刷新时保留上次结果并显示 `refreshing`；设为 `false` 时重新显示 `loading`。'
-                  ],
-                  [
-                    '`equals?(previous, next): boolean`',
-                    '比较成功结果，避免用相等的新结果替换可见值。比较失败进入 `report`。'
-                  ],
-                  [
-                    '`timeoutMs?: number`',
-                    '每次查询的时限，要求有限非负数。省略时没有额外查询时限。'
-                  ],
-                  ['`signal?: IAbortSignal`', '取消整个持续查询，不只是本次读取。'],
-                  [
-                    '`report?(error): void | PromiseLike<void>`',
-                    '接收迟到结果或清理中的失败。保留原始错误供诊断。'
-                  ],
-                  [
-                    '`state.value` / `state.peek()`',
-                    '读取当前状态。`value` 可以建立 reactive 依赖，`peek()` 只读取。这个状态视图不能自行 `dispose()`。'
-                  ],
-                  [
-                    '`ready: Promise<void>`',
-                    '首次查询成功时完成。查询失败、取消或关闭时以错误结束，调用方要处理失败。'
-                  ],
-                  [
-                    '`refresh(): Promise<void>`',
-                    '请求重新读取，旧结果不会覆盖较新的结果。关闭后调用会失败。'
-                  ],
-                  [
-                    '`dispose(): Promise<void>`',
-                    '停止刷新、取消当前读取并释放订阅。重复调用没有额外效果。'
-                  ],
-                  [
-                    '`consistency.mode` / `visibility` / `pollIntervalMs?`',
-                    '读取实际观察方式、可见范围和轮询间隔。该对象被冻结，不能靠修改它增强后端能力。'
-                  ],
-                  [
-                    '`reactiveBackend(id)`',
-                    '返回含 `id`、`store` 和 `liveQuery()` 的对象，或 `undefined`。这个对象用于为同一后端创建查询。'
-                  ],
-                  [
-                    '`state.runtime` / `debugName` / `observed`',
-                    '分别读取所属 runtime、调试名称和是否被观察。这些信息不启动一次新的存储查询。'
-                  ]
-                ]
-              },
-              {
-                type: 'table',
-                headers: ['成员与选项', '说明'],
-                rows: [
-                  ['`loading`', '首次读取或不保留旧值时正在读取。'],
-                  ['`ready`', '最近一次读取成功，包含 `value`。'],
-                  ['`refreshing`', '保留旧 `value` 的同时读取新值。'],
-                  ['`error`', '读取失败，包含 `error`，也可能保留旧值。'],
-                  ['`disposed`', '查询已经关闭，不会重新启动。']
-                ]
-              }
-            ]
-          },
-          {
-            id: 'memory',
-            heading: '内存变化',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['成员与选项', '说明'],
-                rows: [
-                  [
-                    '`memoryReactive({ id? })`',
-                    "默认 ID 是 `'memory'`。使用 `push` 和 `instance`，只观察这个内存实例。"
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'local-storage',
-            heading: 'Local Storage 变化',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['成员与选项', '说明'],
-                rows: [
-                  [
-                    '`localStorageReactive(options?)`',
-                    "默认 ID 是 `'local'`。接受 Local Storage 构造选项并安装变化观察器。"
-                  ],
-                  [
-                    '`hybrid` / `document-eventual`',
-                    '结合本页通知、浏览器事件和每 `1000` 毫秒轮询。其他标签页的变化不是同步复制。'
-                  ]
-                ]
-              },
-              {
-                type: 'paragraph',
-                text: '保存为 `local-reactive.ts`。'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { createRuntime } from '@migaia/reactive'\nimport { createStorageHost } from '@migaia/storage-web/host'\nimport { localStorageReactive } from '@migaia/storage-web/plugins/reactive/local-storage'\n\nconst plugin = localStorageReactive({\n  id: 'preferences',\n  namespace: 'docs-local'\n})\nconst host = await createStorageHost({ plugins: [plugin] as const })\nawait host.backend('preferences').set('theme', 'dark')\nconst theme = host.liveQuery({\n  backendId: 'preferences',\n  runtime: createRuntime(),\n  query: ({ store, signal }) => store.get('theme', { signal })\n})\nawait theme.ready\nconsole.log('本地偏好:', theme.state.value.value)\nawait theme.dispose()\nawait host.dispose()"
-              },
-              {
-                type: 'paragraph',
-                text: '浏览器输出：'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '本地偏好: dark'
-              }
-            ]
-          },
-          {
-            id: 'session-storage',
-            heading: '会话变化',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['成员与选项', '说明'],
-                rows: [
-                  [
-                    '`sessionStorageReactive(options?)`',
-                    "默认 ID 是 `'session'`。接受 Session Storage 构造选项。"
-                  ],
-                  [
-                    '`hybrid` / `top-level-context-eventual`',
-                    '每 `1000` 毫秒轮询，观察范围受同一顶层页面的会话存储限制。'
-                  ]
-                ]
-              },
-              {
-                type: 'paragraph',
-                text: '保存为 `session-reactive.ts`。'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { createRuntime } from '@migaia/reactive'\nimport { createStorageHost } from '@migaia/storage-web/host'\nimport { sessionStorageReactive } from '@migaia/storage-web/plugins/reactive/session-storage'\n\nconst plugin = sessionStorageReactive({\n  id: 'checkout',\n  namespace: 'docs-session'\n})\nconst host = await createStorageHost({ plugins: [plugin] as const })\nawait host.backend('checkout').set('step', 'payment')\nconst step = host.liveQuery({\n  backendId: 'checkout',\n  runtime: createRuntime(),\n  query: ({ store, signal }) => store.get('step', { signal })\n})\nawait step.ready\nconsole.log('本页会话:', step.state.value.value)\nawait step.dispose()\nawait host.dispose()"
-              },
-              {
-                type: 'paragraph',
-                text: '浏览器输出：'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '本页会话: payment'
-              }
-            ]
-          },
-          {
-            id: 'cookies',
-            heading: 'Cookie 变化',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['成员与选项', '说明'],
-                rows: [
-                  [
-                    '`cookiesReactive(options?)`',
-                    "默认 ID 是 `'cookies'`，接受本包 Cookie 页的构造选项。"
-                  ],
-                  [
-                    '`hybrid` / `origin-js-visible-eventual`',
-                    '每 `1000` 毫秒轮询 JS 可见内容，观察不到 `HttpOnly`。'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'indexed-db',
-            heading: '数据库提交后的变化',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['成员与选项', '说明'],
-                rows: [
-                  [
-                    '`indexedDbReactive(options?)`',
-                    "默认 ID 是 `'indexed-db'`，接受上页全部 IndexedDB 构造选项。"
-                  ],
-                  [
-                    '`hybrid` / `origin-eventual`',
-                    '提交后才发布变化，结合每 `1000` 毫秒轮询与同源协调。不能承诺捕获绕过本库的任意原生写入。'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'consistency',
-            heading: '自定义观察来源',
+            id: 'visibility',
+            heading: '观察实际保存数据的后端',
             blocks: [
               {
                 type: 'paragraph',
-                text: '上面五个工厂都同时创建后端和观察器。普通 `*BackendPlugin` 只提供存储，不会自动获得 `liveQuery()`。自定义来源使用 `@migaia/storage-web/reactive-adapter`。'
-              },
-              {
-                type: 'table',
-                headers: ['成员与选项', '说明'],
-                rows: [
-                  [
-                    '`defineReactiveAdapterFeature(definition)`',
-                    '为自定义 backend 定义变化来源。安装时由 Host 提供同一个实际存储实例。'
-                  ],
-                  [
-                    '`mode: push | hybrid | polling`',
-                    '分别表示通知、通知加轮询、轮询。声明不会自行实现观察功能。'
-                  ],
-                  [
-                    '`pollIntervalMs?: number`',
-                    '`hybrid` 和 `polling` 要求有限正数；`push` 不能提供这个字段。'
-                  ],
-                  [
-                    '`visibility: IStorageReactiveVisibility`',
-                    '选择实际可观察范围：实例、文档、顶层上下文、同源 JS 可见数据或同源数据。公开状态值见下方后端表。'
-                  ],
-                  [
-                    '`subscribe(context)`',
-                    '当前实现要求同步返回清理函数。虽然类型允许 `PromiseLike`，返回 Promise 会使安装以 `REACTIVE_FEATURE_INVALID` 失败，迟到的清理函数仍会执行。'
-                  ],
-                  [
-                    '`context.store` / `scheduler` / `signal`',
-                    '分别提供当前存储、Host 的调度器和来源取消信号。用这个调度器管理轮询并响应取消。'
-                  ],
-                  [
-                    '`context.invalidate(change?)`',
-                    '传入变化记录来触发查询刷新。当前实现不处理没有参数的调用。'
-                  ],
-                  ['`context.report(error)`', '报告来源读取或清理失败，不替换原始错误。'],
-                  [
-                    '`IStorageChange.channel` / `kind` / `keys?` / `scope?` / `unknown?`',
-                    '说明变化影响的通道、动作、键、实体范围及是否无法判断细节。不包含可替代重新读取的业务值。'
-                  ]
-                ]
+                text: '选定后端种类必须与插件匹配。浏览器变化通知的可见范围因后端而异：其它标签页的 localStorage 事件可以触发查询失效，但绕过已安装适配器的原生 IndexedDB 写入不构成完整跨标签页变化流。'
               }
             ]
           },
           {
-            id: 'cleanup',
+            id: 'stop',
             heading: '页面关闭时停止查询',
             blocks: [
               {
                 type: 'paragraph',
-                text: '先等待 `query.dispose()`，再等待 `host.dispose()`。Host 也负责关闭它仍持有的查询。清理失败可能以 `AggregateError` 返回，检查其中每个原始错误；旧查询保持关闭。'
+                text: '先释放持续结果，再关闭宿主，使订阅与未完成读取一同停止。响应式 Runtime 由应用拥有，此特性只借用它。'
               }
             ]
           }
@@ -50909,347 +48568,56 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          path: 'cancellation-errors-and-shutdown',
-          label: '处理失败与关闭'
+          path: 'getting-started',
+          label: '安装并保存第一项设置'
         },
         {
-          path: 'host-and-plugins',
-          label: '管理存储后端'
+          path: 'indexeddb-and-transactions',
+          label: '记录与事务'
+        },
+        {
+          path: 'entity-schema-and-codecs',
+          label: '实体与编解码器'
         }
       ]
     },
     en: {
       title: 'Live queries that follow storage changes',
-      lede: 'Observe the selected backend, reread its values, and release queries when the page closes.',
+      lede: 'Install a reactive Feature, then turn a bounded record query into a live result.',
       document: {
         sections: [
           {
-            id: 'purpose',
-            heading: 'Reread data when it changes',
+            id: 'query',
+            heading: 'Follow a list of records',
             blocks: [
-              {
-                type: 'paragraph',
-                text: 'Run these modules in a browser with package imports handled by a bundler. IndexedDB, cookies, and events come from the browser host, not native Node APIs.'
-              },
-              {
-                type: 'paragraph',
-                text: 'A live query converts backend changes into fresh reads. It replaces neither the database nor its authoritative values. Save the setup module, then run the query module against real IndexedDB.'
-              },
-              {
-                type: 'paragraph',
-                text: 'Save as `reactive-setup.ts`.'
-              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createRuntime } from '@migaia/reactive'\nimport { createStorageHost } from '@migaia/storage-web/host'\nimport { indexedDbReactive } from '@migaia/storage-web/plugins/reactive/indexed-db'\n\nexport const runtime = createRuntime()\nexport const host = await createStorageHost({\n  plugins: [indexedDbReactive({ id: 'users', dbName: 'docs-live-users' })] as const\n})\nexport const store = host.backend('users')\nawait store.putRecord('Ada', 'selected')"
+                code: "import { indexedDbNotificationsFeature } from '@migaia/storage-web/features/indexed-db-notifications'\nimport { createRuntime } from '@migaia/reactive'\nimport { records } from '@migaia/storage-contract'\nimport { createStorageHost } from '@migaia/storage-host'\nimport {\n  indexedDbBackendKind,\n  indexedDbBackendPlugin,\n} from '@migaia/storage-web/indexed-db'\nimport { reactiveFeature } from '@migaia/storage-web/features/reactive'\n\nconst runtime = createRuntime()\nconst host = await createStorageHost({\n  plugins: [\n    indexedDbBackendPlugin(\n      { dbName: 'app' },\n      {\n        notifications: indexedDbNotificationsFeature(),\n        reactive: reactiveFeature(indexedDbBackendKind),\n      },\n    ),\n  ],\n})\ntry {\n  const store = host.backend('indexed-db')\n  await store.putRecord({ id: 1, name: 'Ada' }, 1)\n  const users = store.use(records).query().limit(20).live({\n    runtime,\n    keepPreviousData: true,\n  })\n  try {\n    await users.ready\n    console.log(users.state.value)\n  } finally {\n    await users.dispose()\n  }\n} finally {\n  await host.dispose()\n}"
               },
               {
                 type: 'paragraph',
-                text: 'Save as `reactive.ts`.'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { host, runtime, store } from './reactive-setup.ts'\n\nconst user = host.liveQuery({\n  backendId: 'users',\n  runtime,\n  query: ({ store, signal }) => store.getRecord('selected', { signal }),\n  keepPreviousData: true,\n  timeoutMs: 5_000\n})\nawait user.ready\nconsole.log('Current user:', user.state.value.value)\nawait store.putRecord('Grace', 'selected')\nawait user.refresh()\nconsole.log('After refresh:', user.state.value.value)\nawait user.dispose()\nawait host.dispose()"
-              },
-              {
-                type: 'paragraph',
-                text: 'Browser output:'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'Current user: Ada\nAfter refresh: Grace'
+                text: 'ready waits for the first query. state.value reports loading, ready, refreshing or error with the current result. keepPreviousData keeps the last result during refresh; invalidation requests a fresh read rather than delivering complete records.'
               }
             ]
           },
           {
-            id: 'state-model',
-            heading: 'State, options, and returned object',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Member or option', 'Description'],
-                rows: [
-                  [
-                    '`host.liveQuery(options): ILiveQuery<T>`',
-                    'Creates a query that reads the selected backend repeatedly. Install its reactive plugin first.'
-                  ],
-                  [
-                    '`backendId: TBackendId`',
-                    'Selects an installed backend with a reactive adapter; it never substitutes another backend.'
-                  ],
-                  [
-                    '`runtime: IRuntime`',
-                    'Provides the reactive runtime that owns the computed query state.'
-                  ],
-                  [
-                    '`query({ store, signal, scope? }): T | PromiseLike<T>`',
-                    'Performs the authoritative read. Pass its signal to storage operations so canceled work can stop.'
-                  ],
-                  [
-                    '`scope?: string`',
-                    'Names an entity scope to filter unrelated changes. It neither selects a database nor rewrites query keys.'
-                  ],
-                  [
-                    '`matches?(change): boolean`',
-                    'Further filters changes. Uncertain changes still refresh; predicate failures are reported and refresh conservatively.'
-                  ],
-                  [
-                    '`keepPreviousData?: boolean`',
-                    'Defaults to `true`, retaining data while status is `refreshing`. Set `false` to return to `loading` during refresh.'
-                  ],
-                  [
-                    '`equals?(previous, next): boolean`',
-                    'Compares successful values to avoid replacing the visible value with an equivalent result. Failures reach `report`.'
-                  ],
-                  [
-                    '`timeoutMs?: number`',
-                    'Sets a finite nonnegative per-query deadline. Omission adds no query deadline.'
-                  ],
-                  [
-                    '`signal?: IAbortSignal`',
-                    'Cancels the whole live query rather than only one read.'
-                  ],
-                  [
-                    '`report?(error): void | PromiseLike<void>`',
-                    'Receives late-result and cleanup failures. Retain the original error for diagnosis.'
-                  ],
-                  [
-                    '`state.value` / `state.peek()`',
-                    'Reads current state. `value` can establish reactive dependencies; `peek()` only reads. The view has no independent `dispose()`.'
-                  ],
-                  [
-                    '`ready: Promise<void>`',
-                    'Completes on the first successful query. Query failure, cancellation, or disposal makes it fail; handle that failure.'
-                  ],
-                  [
-                    '`refresh(): Promise<void>`',
-                    'Requests a fresh read and prevents older results from replacing newer ones. It fails after disposal.'
-                  ],
-                  [
-                    '`dispose(): Promise<void>`',
-                    'Stops refreshes, cancels the current read, and releases subscriptions. Repeated calls have no extra effect.'
-                  ],
-                  [
-                    '`consistency.mode` / `visibility` / `pollIntervalMs?`',
-                    'Reports actual observation mode, visibility, and polling interval. The frozen object cannot be edited to strengthen backend support.'
-                  ],
-                  [
-                    '`reactiveBackend(id)`',
-                    'Returns an object with `id`, `store`, and `liveQuery()`, or `undefined`, for creating queries on that backend.'
-                  ],
-                  [
-                    '`state.runtime` / `debugName` / `observed`',
-                    'Reports its runtime, debug name, and observed status without starting another storage read.'
-                  ]
-                ]
-              },
-              {
-                type: 'table',
-                headers: ['Member or option', 'Description'],
-                rows: [
-                  ['`loading`', 'Reading initially or after discarding the previous value.'],
-                  ['`ready`', 'The latest read succeeded and supplies `value`.'],
-                  ['`refreshing`', 'Reads a new value while retaining the old one.'],
-                  ['`error`', 'The read failed with `error`, possibly retaining a previous value.'],
-                  ['`disposed`', 'The query is closed and will not restart.']
-                ]
-              }
-            ]
-          },
-          {
-            id: 'memory',
-            heading: 'Memory changes',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Member or option', 'Description'],
-                rows: [
-                  [
-                    '`memoryReactive({ id? })`',
-                    "Defaults to ID `'memory'`, with `push` and `instance` visibility for that memory instance only."
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'local-storage',
-            heading: 'Local Storage changes',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Member or option', 'Description'],
-                rows: [
-                  [
-                    '`localStorageReactive(options?)`',
-                    "Defaults to ID `'local'`. Accepts Local Storage constructor options and installs its reactive adapter."
-                  ],
-                  [
-                    '`hybrid` / `document-eventual`',
-                    'Combines local notifications, browser events, and `1000` ms polling. Other tabs are not synchronously replicated.'
-                  ]
-                ]
-              },
-              {
-                type: 'paragraph',
-                text: 'Save as `local-reactive.ts`.'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { createRuntime } from '@migaia/reactive'\nimport { createStorageHost } from '@migaia/storage-web/host'\nimport { localStorageReactive } from '@migaia/storage-web/plugins/reactive/local-storage'\n\nconst plugin = localStorageReactive({\n  id: 'preferences',\n  namespace: 'docs-local'\n})\nconst host = await createStorageHost({ plugins: [plugin] as const })\nawait host.backend('preferences').set('theme', 'dark')\nconst theme = host.liveQuery({\n  backendId: 'preferences',\n  runtime: createRuntime(),\n  query: ({ store, signal }) => store.get('theme', { signal })\n})\nawait theme.ready\nconsole.log('Local preference:', theme.state.value.value)\nawait theme.dispose()\nawait host.dispose()"
-              },
-              {
-                type: 'paragraph',
-                text: 'Browser output:'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'Local preference: dark'
-              }
-            ]
-          },
-          {
-            id: 'session-storage',
-            heading: 'Session changes',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Member or option', 'Description'],
-                rows: [
-                  [
-                    '`sessionStorageReactive(options?)`',
-                    "Defaults to ID `'session'` and accepts Session Storage constructor options."
-                  ],
-                  [
-                    '`hybrid` / `top-level-context-eventual`',
-                    'Polls every `1000` ms within the session-storage scope of the same top-level browsing context.'
-                  ]
-                ]
-              },
-              {
-                type: 'paragraph',
-                text: 'Save as `session-reactive.ts`.'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { createRuntime } from '@migaia/reactive'\nimport { createStorageHost } from '@migaia/storage-web/host'\nimport { sessionStorageReactive } from '@migaia/storage-web/plugins/reactive/session-storage'\n\nconst plugin = sessionStorageReactive({\n  id: 'checkout',\n  namespace: 'docs-session'\n})\nconst host = await createStorageHost({ plugins: [plugin] as const })\nawait host.backend('checkout').set('step', 'payment')\nconst step = host.liveQuery({\n  backendId: 'checkout',\n  runtime: createRuntime(),\n  query: ({ store, signal }) => store.get('step', { signal })\n})\nawait step.ready\nconsole.log('Page session:', step.state.value.value)\nawait step.dispose()\nawait host.dispose()"
-              },
-              {
-                type: 'paragraph',
-                text: 'Browser output:'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'Page session: payment'
-              }
-            ]
-          },
-          {
-            id: 'cookies',
-            heading: 'Cookie changes',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Member or option', 'Description'],
-                rows: [
-                  [
-                    '`cookiesReactive(options?)`',
-                    "Defaults to ID `'cookies'` and accepts the Cookie constructor options."
-                  ],
-                  [
-                    '`hybrid` / `origin-js-visible-eventual`',
-                    'Polls JS-visible values every `1000` ms and cannot observe `HttpOnly` cookies.'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'indexed-db',
-            heading: 'Changes after database commit',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Member or option', 'Description'],
-                rows: [
-                  [
-                    '`indexedDbReactive(options?)`',
-                    "Defaults to ID `'indexed-db'` and accepts every IndexedDB constructor option."
-                  ],
-                  [
-                    '`hybrid` / `origin-eventual`',
-                    'Publishes after commit with `1000` ms polling and same-origin coordination. It cannot promise every raw write made outside this library.'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'consistency',
-            heading: 'Custom observation sources',
+            id: 'visibility',
+            heading: 'Observe the backend that owns the data',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'The five factories create both storage and its observer. Ordinary `*BackendPlugin` factories supply storage alone. Define custom sources through `@migaia/storage-web/reactive-adapter`.'
-              },
-              {
-                type: 'table',
-                headers: ['Member or option', 'Description'],
-                rows: [
-                  [
-                    '`defineReactiveAdapterFeature(definition)`',
-                    'Defines a change source for a custom backend. Installation supplies the actual store owned by the host.'
-                  ],
-                  [
-                    '`mode: push | hybrid | polling`',
-                    'Selects notifications, notifications plus polling, or polling. Declaring a mode does not implement observation.'
-                  ],
-                  [
-                    '`pollIntervalMs?: number`',
-                    'Requires a finite positive interval for `hybrid` and `polling`; omit it for `push`.'
-                  ],
-                  [
-                    '`visibility: IStorageReactiveVisibility`',
-                    'Selects actual observation scope: instance, document, top-level context, JS-visible origin data, or origin data. The backend table gives public values.'
-                  ],
-                  [
-                    '`subscribe(context)`',
-                    'The current implementation requires a synchronous disposer. Although its type permits `PromiseLike`, returning a promise fails installation with `REACTIVE_FEATURE_INVALID`; a late disposer is still released.'
-                  ],
-                  [
-                    '`context.store` / `scheduler` / `signal`',
-                    'Supplies the exact store, host scheduler, and source cancellation signal. Use that scheduler for polling and honor cancellation.'
-                  ],
-                  [
-                    '`context.invalidate(change?)`',
-                    'Pass a change record to trigger refresh. The current implementation ignores calls without an argument.'
-                  ],
-                  [
-                    '`context.report(error)`',
-                    'Reports source-read and cleanup failures while preserving the original error.'
-                  ],
-                  [
-                    '`IStorageChange.channel` / `kind` / `keys?` / `scope?` / `unknown?`',
-                    'Describes affected channel, operation, keys, scope, and uncertain detail. It carries no application value that replaces a fresh read.'
-                  ]
-                ]
+                text: 'The selected backend kind must match the plugin. Browser change notifications have backend-specific visibility: another tab’s localStorage event can invalidate a query, but raw IndexedDB writes outside the installed adapter are not a complete cross-tab feed.'
               }
             ]
           },
           {
-            id: 'cleanup',
+            id: 'stop',
             heading: 'Stop querying when the page closes',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Await `query.dispose()` and then `host.dispose()`. The host also closes queries it still owns. Cleanup can fail with `AggregateError`; inspect each original failure. The old query remains closed.'
+                text: 'Dispose the live result before closing the host so subscriptions and outstanding reads stop together. The application owns the reactive Runtime; this Feature borrows it.'
               }
             ]
           }
@@ -51257,12 +48625,16 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          path: 'cancellation-errors-and-shutdown',
-          label: 'Handle failures and shutdown'
+          path: 'getting-started',
+          label: 'Install and save a setting'
         },
         {
-          path: 'host-and-plugins',
-          label: 'Manage storage backends'
+          path: 'indexeddb-and-transactions',
+          label: 'Records and transactions'
+        },
+        {
+          path: 'entity-schema-and-codecs',
+          label: 'Entities and codecs'
         }
       ]
     }
@@ -51270,181 +48642,31 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   'storage-web:cookies-and-security': {
     zh: {
       title: 'Cookie：路径、删除与可见范围',
-      lede: '保存少量可见偏好，用同一范围删除，并了解浏览器隐藏的数据。',
+      lede: '为小型可见偏好明确配置 Cookie 路径与安全设置。',
       document: {
         sections: [
           {
-            id: 'scope',
-            heading: '保存站点语言偏好',
+            id: 'preferences',
+            heading: '保存并删除一项偏好',
             blocks: [
-              {
-                type: 'paragraph',
-                text: '示例在浏览器中运行，使用打包工具处理包名导入。IndexedDB、cookie 和事件来自真实浏览器宿主；Node 本身不提供这些接口。'
-              },
-              {
-                type: 'paragraph',
-                text: '保存为 `cookie.ts`。'
-              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { cookiesHost } from '@migaia/storage-web/cookies'\n\nconst preferences = cookiesHost({\n  namespace: 'site-preferences',\n  scope: {\n    path: '/',\n    secure: true,\n    sameSite: 'lax'\n  }\n})\nawait preferences.set('locale', 'zh-CN', { maxAge: 3600 })\nconsole.log('语言:', await preferences.get('locale'))\nawait preferences.remove('locale')\nawait preferences.dispose()"
+                code: "import { createStorageHost } from '@migaia/storage-host'\nimport { cookieBackendPlugin } from '@migaia/storage-web/cookies'\n\nconst host = await createStorageHost({\n  plugins: [cookieBackendPlugin({\n    namespace: 'preferences',\n    scope: { path: '/', sameSite: 'lax', secure: location.protocol === 'https:' }\n  })]\n})\ntry {\n  const preferences = host.backend('cookies')\n  await preferences.set('theme', 'dark')\n  console.log(await preferences.get('theme'))\n  await preferences.remove('theme')\n} finally {\n  await host.dispose()\n}"
               },
               {
                 type: 'paragraph',
-                text: '浏览器输出：'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '语言: zh-CN'
-              },
-              {
-                type: 'table',
-                headers: ['成员与选项', '说明'],
-                rows: [
-                  [
-                    '`cookiesHost(options?): ISyncCapableStore<ICookieStore>`',
-                    '使用真实 `document.cookie`。构造时读取可见 cookie，不在服务端替你解析请求头。'
-                  ],
-                  [
-                    '`namespace?: string`',
-                    "默认 `'default'`，按前缀区分不同应用。使用不同路径时也推荐使用不同命名空间。"
-                  ],
-                  [
-                    '`namespaceCodec?: INamespaceCodec`',
-                    '默认使用 `lengthPrefixedNamespaceCodec`。更换编码会改变持久名称，旧值不会自动迁移。'
-                  ],
-                  [
-                    '`document?: ICookieDocument`',
-                    '默认使用 `globalThis.document`。缺少宿主时报 `BACKEND_UNAVAILABLE`，注入对象需提供字符串 `cookie`。'
-                  ],
-                  [
-                    '`scope?: ICookieScope`',
-                    "构造后固定，默认 `{ path: '/' }`。写入和删除始终使用同一份范围。"
-                  ],
-                  [
-                    '`scope.path?: string`',
-                    "省略整个 `scope` 时使用 `'/'`。已传入 `scope` 时不补路径。路径要以 `/` 开头且不包含分号，控制哪些页面发送和显示 cookie。"
-                  ],
-                  [
-                    '`scope.domain?: string`',
-                    '省略时由浏览器使用当前主机。提供时不能是空字符串，也不能含空白或分号。'
-                  ],
-                  [
-                    '`scope.sameSite?: strict | lax | none`',
-                    '传给浏览器的跨站发送设置。`none` 要同时开启 `secure`，库不替你判断所有浏览器隐私策略。'
-                  ],
-                  [
-                    '`scope.secure?: boolean`',
-                    '为 `true` 时设置 `Secure`，正常部署需要 HTTPS。此属性不让 cookie 变成 `HttpOnly`。'
-                  ],
-                  [
-                    '`scope.partitioned?: boolean`',
-                    '为 `true` 时开启分区属性，也要求 `secure: true`。实际支持由浏览器决定。'
-                  ],
-                  [
-                    '`set(key, value, ctx?): Promise<void>`',
-                    '保存字符串，随后回读可见值。浏览器没有保存时抛 `WRITE_FAILED`，超过含属性的 `4096` 字节时抛 `VALUE_TOO_LARGE`。'
-                  ],
-                  ['`ctx.expires?: Date`', '设置有效的到期时间。时间已到时执行删除。'],
-                  ['`ctx.maxAge?: number`', '设置有效秒数，要求安全整数。值为零或负数时执行删除。'],
-                  [
-                    '`ctx.signal?` / `ctx.timeoutMs?`',
-                    '异步方法接受取消和时限。`set()` 不接受普通写入选项的 `conflictPolicy`。'
-                  ],
-                  [
-                    '`remove(key, ctx?)`',
-                    '用构造时的路径和域写删除状态。只能删除与这些属性匹配的 cookie。'
-                  ],
-                  [
-                    '`get()` / `has()` / `keys()`',
-                    '只读 JS 当前可见的内容。同一个物理名称出现多个可见值时抛 `COOKIE_SCOPE_AMBIGUOUS`。'
-                  ],
-                  [
-                    '`clearValues(ctx?)` / `clearAll(ctx?)`',
-                    '对可见名称拍快照，再按固定路径和域逐个删除。不会清除其他应用命名空间。'
-                  ],
-                  [
-                    '`sync.get()` / `set()` / `remove()` / `has()` / `keys()` / `clearValues()`',
-                    '直接同步访问。`sync.set()` 接受 `expires`、`maxAge`、`conflictPolicy`，不接受 `signal` 或 `timeoutMs`。'
-                  ],
-                  [
-                    '`dispose(): Promise<void>`',
-                    '关闭这个访问对象，不清空 cookie。再次操作会报 `STORE_DISPOSED`。'
-                  ]
-                ]
+                text: '输出 dark。删除使用与创建相同的 path 与 domain。如果同名可见 Cookie 无法区分，COOKIE_SCOPE_AMBIGUOUS 要求应用明确范围，不会随意删除一个值。'
               }
             ]
           },
           {
-            id: 'path-matching',
-            heading: '路径匹配按目录分段',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '路径 `/account` 在 `/account` 和 `/account/settings` 可见，在 `/accounting` 不可见。`path` 不会让 JavaScript 绕过浏览器的可见范围，也不是应用权限检查。'
-              }
-            ]
-          },
-          {
-            id: 'different-paths',
-            heading: '给不同范围不同名称',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '站点偏好与账户偏好分别使用 `site-preferences` 和 `account-preferences`。同名 cookie 在不同路径同时可见时，浏览器不向 JS 提供每个值的路径；库会报 `COOKIE_SCOPE_AMBIGUOUS`。'
-              }
-            ]
-          },
-          {
-            id: 'path-removal',
-            heading: '删除时使用原来的路径',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '下面两个文件在 `/account/settings` 页面运行。根路径删除没有移除 `/account` 的值，原值仍然存在；使用相同路径后才删除成功。这里故意复用命名空间来展示这个结果。'
-              },
-              {
-                type: 'paragraph',
-                text: '保存为 `cookie-scope.ts`。'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { cookiesHost } from '@migaia/storage-web/cookies'\n\nexport function accountCookies(path: string) {\n  return cookiesHost({\n    namespace: 'account-preferences',\n    scope: {\n      path,\n      secure: true,\n      sameSite: 'lax'\n    }\n  })\n}"
-              },
-              {
-                type: 'paragraph',
-                text: '保存为 `cookie-removal.ts`。'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { accountCookies } from './cookie-scope.ts'\n\nconst account = accountCookies('/account')\nconst site = accountCookies('/')\nawait account.set('theme', 'dark')\nawait site.remove('theme')\nconsole.log('不同路径删除后:', await account.get('theme'))\nawait account.remove('theme')\nconsole.log('同一路径删除后:', await account.get('theme'))\nawait site.dispose()\nawait account.dispose()"
-              },
-              {
-                type: 'paragraph',
-                text: '浏览器输出：'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '不同路径删除后: dark\n同一路径删除后: null'
-              }
-            ]
-          },
-          {
-            id: 'opaque',
+            id: 'security',
             heading: '区分可见偏好与认证数据',
             blocks: [
               {
                 type: 'paragraph',
-                text: '`opaqueEntries: true` 表示可能存在 JS 看不到的条目。`has()` 返回 `false` 不证明服务端 `HttpOnly` cookie 不存在，`remove()` 也不能让它失效。认证 cookie 的创建和清除由服务端负责。'
-              },
-              {
-                type: 'paragraph',
-                text: 'Cookie 只有字符串通道，`syncRead` 为 `true`；记录、字节、事务、迭代、二级索引和 `changeFeed` 为 `false`。不要把 Cookie 用来存大量数据或把 `Secure` 当成脚本隔离。'
+                text: 'document.cookie 无法读取或创建 HttpOnly Cookie。认证秘密应由服务端管理 HttpOnly Cookie；此插件只处理 JavaScript 可见值。sameSite 与 secure 决定浏览器何时发送 Cookie，不控制谁能读取 JavaScript 状态。'
               }
             ]
           }
@@ -51452,198 +48674,46 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          path: 'cancellation-errors-and-shutdown',
-          label: '排查读写失败'
+          path: 'getting-started',
+          label: '安装并保存第一项设置'
         },
         {
-          path: 'getting-started',
-          label: '选择其他后端'
+          path: 'indexeddb-and-transactions',
+          label: '记录与事务'
+        },
+        {
+          path: 'entity-schema-and-codecs',
+          label: '实体与编解码器'
         }
       ]
     },
     en: {
       title: 'Cookie paths, deletion, and visibility',
-      lede: 'Store small visible preferences, delete at the same scope, and account for hidden cookies.',
+      lede: 'Use JavaScript-visible cookies for small preferences with explicit path and security settings.',
       document: {
         sections: [
           {
-            id: 'scope',
-            heading: 'Save a site language preference',
+            id: 'preferences',
+            heading: 'Save and remove one preference',
             blocks: [
-              {
-                type: 'paragraph',
-                text: 'Run these modules in a browser with package imports handled by a bundler. IndexedDB, cookies, and events come from the browser host, not native Node APIs.'
-              },
-              {
-                type: 'paragraph',
-                text: 'Save as `cookie.ts`.'
-              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { cookiesHost } from '@migaia/storage-web/cookies'\n\nconst preferences = cookiesHost({\n  namespace: 'site-preferences',\n  scope: {\n    path: '/',\n    secure: true,\n    sameSite: 'lax'\n  }\n})\nawait preferences.set('locale', 'zh-CN', { maxAge: 3600 })\nconsole.log('Locale:', await preferences.get('locale'))\nawait preferences.remove('locale')\nawait preferences.dispose()"
+                code: "import { createStorageHost } from '@migaia/storage-host'\nimport { cookieBackendPlugin } from '@migaia/storage-web/cookies'\n\nconst host = await createStorageHost({\n  plugins: [cookieBackendPlugin({\n    namespace: 'preferences',\n    scope: { path: '/', sameSite: 'lax', secure: location.protocol === 'https:' }\n  })]\n})\ntry {\n  const preferences = host.backend('cookies')\n  await preferences.set('theme', 'dark')\n  console.log(await preferences.get('theme'))\n  await preferences.remove('theme')\n} finally {\n  await host.dispose()\n}"
               },
               {
                 type: 'paragraph',
-                text: 'Browser output:'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'Locale: zh-CN'
-              },
-              {
-                type: 'table',
-                headers: ['Member or option', 'Description'],
-                rows: [
-                  [
-                    '`cookiesHost(options?): ISyncCapableStore<ICookieStore>`',
-                    'Uses real `document.cookie`, reading visible cookies at construction. It does not parse server request headers.'
-                  ],
-                  [
-                    '`namespace?: string`',
-                    "Defaults to `'default'` and prefixes application keys. Prefer separate namespaces for separate paths too."
-                  ],
-                  [
-                    '`namespaceCodec?: INamespaceCodec`',
-                    'Defaults to `lengthPrefixedNamespaceCodec`. Changing it changes persisted names without migrating existing values.'
-                  ],
-                  [
-                    '`document?: ICookieDocument`',
-                    'Defaults to `globalThis.document`. A missing host gives `BACKEND_UNAVAILABLE`; injected objects must expose a string `cookie` property.'
-                  ],
-                  [
-                    '`scope?: ICookieScope`',
-                    "Fixed at construction, defaulting to `{ path: '/' }`. Writes and deletions reuse that scope."
-                  ],
-                  [
-                    '`scope.path?: string`',
-                    "Omitting the whole scope uses `'/'`; supplying a scope does not fill in its path. A supplied path must start with `/` without semicolons and controls which paths send and expose the cookie."
-                  ],
-                  [
-                    '`scope.domain?: string`',
-                    'Omission uses the browser’s current host. A supplied domain must be nonempty without whitespace or semicolons.'
-                  ],
-                  [
-                    '`scope.sameSite?: strict | lax | none`',
-                    'Controls cross-site sending. `none` requires `secure`; the library cannot override browser privacy policy.'
-                  ],
-                  [
-                    '`scope.secure?: boolean`',
-                    'Sets `Secure` when true; normal deployment requires HTTPS. This does not make the cookie `HttpOnly`.'
-                  ],
-                  [
-                    '`scope.partitioned?: boolean`',
-                    'Requests a partitioned cookie and requires `secure: true`. Browser support determines the actual result.'
-                  ],
-                  [
-                    '`set(key, value, ctx?): Promise<void>`',
-                    'Writes a string and verifies its visible value. A discarded write gives `WRITE_FAILED`; an assignment over `4096` bytes including attributes gives `VALUE_TOO_LARGE`.'
-                  ],
-                  [
-                    '`ctx.expires?: Date`',
-                    'Sets a valid expiry date; a date already reached deletes the cookie.'
-                  ],
-                  [
-                    '`ctx.maxAge?: number`',
-                    'Sets lifetime in seconds as a safe integer. Zero or a negative value deletes the cookie.'
-                  ],
-                  [
-                    '`ctx.signal?` / `ctx.timeoutMs?`',
-                    'Asynchronous methods accept cancellation and deadlines. Cookie `set()` does not accept ordinary writes’ `conflictPolicy`.'
-                  ],
-                  [
-                    '`remove(key, ctx?)`',
-                    'Deletes using the path and domain captured at construction. Other scopes are unaffected.'
-                  ],
-                  [
-                    '`get()` / `has()` / `keys()`',
-                    'Reads only values currently visible to JavaScript. Duplicate visible physical names give `COOKIE_SCOPE_AMBIGUOUS`.'
-                  ],
-                  [
-                    '`clearValues(ctx?)` / `clearAll(ctx?)`',
-                    'Snapshots visible names and deletes them at the fixed path and domain, leaving other namespaces alone.'
-                  ],
-                  [
-                    '`sync.get()` / `set()` / `remove()` / `has()` / `keys()` / `clearValues()`',
-                    'Accesses cookies synchronously. `sync.set()` accepts `expires`, `maxAge`, and `conflictPolicy`, with no cancellation or timeout fields.'
-                  ],
-                  [
-                    '`dispose(): Promise<void>`',
-                    'Closes this accessor without clearing cookies. Later operations give `STORE_DISPOSED`.'
-                  ]
-                ]
+                text: 'The output is dark. Removal uses the same configured path and domain as creation. If visible cookies with the same name cannot be distinguished, COOKIE_SCOPE_AMBIGUOUS asks the application to resolve the scope instead of deleting an arbitrary value.'
               }
             ]
           },
           {
-            id: 'path-matching',
-            heading: 'Paths match directory segments',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'A cookie at `/account` is visible at `/account` and `/account/settings`, but hidden at `/accounting`. A path neither bypasses browser visibility nor implements application authorization.'
-              }
-            ]
-          },
-          {
-            id: 'different-paths',
-            heading: 'Use different names for different scopes',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'Use `site-preferences` for site settings and `account-preferences` for account settings. When multiple paths expose the same physical name, JavaScript cannot identify each value’s path; the library reports `COOKIE_SCOPE_AMBIGUOUS`.'
-              }
-            ]
-          },
-          {
-            id: 'path-removal',
-            heading: 'Delete at the original path',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'Run these two files at `/account/settings`. Removing at the root leaves the `/account` cookie intact; using its original path removes it. This example deliberately reuses a namespace to show that behavior.'
-              },
-              {
-                type: 'paragraph',
-                text: 'Save as `cookie-scope.ts`.'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { cookiesHost } from '@migaia/storage-web/cookies'\n\nexport function accountCookies(path: string) {\n  return cookiesHost({\n    namespace: 'account-preferences',\n    scope: {\n      path,\n      secure: true,\n      sameSite: 'lax'\n    }\n  })\n}"
-              },
-              {
-                type: 'paragraph',
-                text: 'Save as `cookie-removal.ts`.'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { accountCookies } from './cookie-scope.ts'\n\nconst account = accountCookies('/account')\nconst site = accountCookies('/')\nawait account.set('theme', 'dark')\nawait site.remove('theme')\nconsole.log('After removal at another path:', await account.get('theme'))\nawait account.remove('theme')\nconsole.log('After matching-path removal:', await account.get('theme'))\nawait site.dispose()\nawait account.dispose()"
-              },
-              {
-                type: 'paragraph',
-                text: 'Browser output:'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'After removal at another path: dark\nAfter matching-path removal: null'
-              }
-            ]
-          },
-          {
-            id: 'opaque',
+            id: 'security',
             heading: 'Separate visible preferences from authentication data',
             blocks: [
               {
                 type: 'paragraph',
-                text: '`opaqueEntries: true` acknowledges entries hidden from JavaScript. A false `has()` result does not prove an HttpOnly cookie is absent, and `remove()` cannot invalidate it. Servers create and clear authentication cookies.'
-              },
-              {
-                type: 'paragraph',
-                text: 'Cookies supply strings with `syncRead: true`, without records, bytes, transactions, iteration, secondary indexes, or `changeFeed`. Avoid large payloads and do not treat Secure as script isolation.'
+                text: 'document.cookie cannot read or create HttpOnly cookies. Authentication secrets belong in server-managed HttpOnly cookies; this plugin handles only values available to JavaScript. sameSite and secure control when the browser sends the cookie, not who may read JavaScript state.'
               }
             ]
           }
@@ -51651,12 +48721,16 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       },
       next: [
         {
-          path: 'cancellation-errors-and-shutdown',
-          label: 'Troubleshoot reads and writes'
+          path: 'getting-started',
+          label: 'Install and save a setting'
         },
         {
-          path: 'getting-started',
-          label: 'Choose another backend'
+          path: 'indexeddb-and-transactions',
+          label: 'Records and transactions'
+        },
+        {
+          path: 'entity-schema-and-codecs',
+          label: 'Entities and codecs'
         }
       ]
     }
@@ -51664,259 +48738,41 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
   'storage-web:cancellation-errors-and-shutdown': {
     zh: {
       title: '取消、错误与关闭',
-      lede: '按原因处理失败，停止不需要的工作，关闭后保留持久数据。',
+      lede: '取消调用方不再需要的工作，并保留原失败原因。',
       document: {
         sections: [
           {
-            id: 'decision-map',
-            heading: '先区分取消、容量和数据问题',
+            id: 'cancel',
+            heading: '取消已关闭面板的读取',
             blocks: [
-              {
-                type: 'paragraph',
-                text: '示例在浏览器中运行，使用打包工具处理包名导入。IndexedDB、cookie 和事件来自真实浏览器宿主；Node 本身不提供这些接口。'
-              },
-              {
-                type: 'paragraph',
-                text: '用户离开页面时取消本次等待。容量不足先释放空间，数据格式错误先修正数据，关闭后的对象则换成新对象。不要把所有错误都作为临时故障不停重试。'
-              },
-              {
-                type: 'table',
-                headers: ['成员与选项', '说明'],
-                rows: [
-                  [
-                    '`signal?: IAbortSignal`',
-                    '取消当前操作。原始取消原因保留在 `StorageContractError.cause`。省略时没有外部取消信号。'
-                  ],
-                  [
-                    '`timeoutMs?: number`',
-                    '要求非负安全整数。与外部信号同时存在时，先发生的取消生效；省略时不增加该操作的超时。'
-                  ],
-                  [
-                    '`pageSize?: number`',
-                    '迭代器每页条数，整数范围 `1` 到 `4096`。普通单条读写不靠它拆分。'
-                  ],
-                  [
-                    '`conflictPolicy?: IConflictPolicy`',
-                    '普通字符串、字节、记录写入接受此字段，默认 `conflict`。Cookie 的异步写入有自己独立的选项。'
-                  ],
-                  [
-                    '`ISyncWriteOptions.conflictPolicy?`',
-                    '同步写入只接收冲突设置，传入取消信号或超时会报 `INVALID_ARGUMENT`。'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'user-cancellation',
-            heading: '用户关闭搜索面板',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: '保存为 `cancellation.ts`。'
-              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { StorageContractError } from '@migaia/storage-contract'\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst db = indexedDbHost({ dbName: 'docs-search' })\nconst controller = new AbortController()\ncontroller.abort('search panel closed')\ntry {\n  await db.get('results', { signal: controller.signal })\n} catch (error) {\n  if (error instanceof StorageContractError) {\n    console.log('搜索取消:', error.code, error.cause)\n  }\n}\nawait db.dispose()"
+                code: "import { StorageContractError } from '@migaia/storage-contract'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\n\nconst host = await createStorageHost({\n  plugins: [indexedDbBackendPlugin({ dbName: 'app' })]\n})\nconst controller = new AbortController()\ncontroller.abort('panel closed')\ntry {\n  await host.backend('indexed-db').get('results', { signal: controller.signal })\n} catch (error) {\n  if (!(error instanceof StorageContractError)) throw error\n  console.log(error.code, error.cause)\n} finally {\n  await host.dispose()\n}"
               },
               {
                 type: 'paragraph',
-                text: '浏览器输出：'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '搜索取消: ABORTED search panel closed'
+                text: '代码报告 ABORTED 与原始 panel closed 原因。timeoutMs 限制一次异步操作；同步方法不接受信号或操作期限。'
               }
             ]
           },
           {
-            id: 'timeout',
-            heading: '限制一次保存的等待时间',
+            id: 'failure',
+            heading: '依据来源与错误码处理',
             blocks: [
               {
                 type: 'paragraph',
-                text: '这个例子给包含异步等待的事务设置很短的操作期限，实际输出来自超时取消。业务中可根据需要使用 `timeoutMs: 2_000` 等期限；同步 API 不接收这些选项。'
-              },
-              {
-                type: 'paragraph',
-                text: '保存为 `timeout.ts`。'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { StorageContractError } from '@migaia/storage-contract'\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst db = indexedDbHost({ dbName: 'docs-deadline' })\ntry {\n  await db.transaction(\n    async (tx) => {\n      await tx.get('draft')\n      await new Promise((resolve) => setTimeout(resolve, 30))\n    },\n    { timeoutMs: 1 }\n  )\n} catch (error) {\n  if (error instanceof StorageContractError) {\n    console.log('保存超时:', error.code)\n  }\n}\nawait db.dispose()"
-              },
-              {
-                type: 'paragraph',
-                text: '浏览器输出：'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '保存超时: ABORTED'
+                text: 'StorageContractError 表示共享契约失败。后端错误带自己的 source 与 code；原生失败通过 cause 查看。QUOTA_EXCEEDED 需要处理容量，格式错误需要修正数据，两者都不应无限重试。'
               }
             ]
           },
           {
-            id: 'error-handling',
-            heading: '按错误码决定下一步',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['成员与选项', '说明'],
-                rows: [
-                  [
-                    '`BACKEND_UNAVAILABLE`',
-                    '宿主缺失、探测失败或开库受阻。检查浏览器访问权限，必要时由应用选择内存存储。'
-                  ],
-                  [
-                    '`QUOTA_EXCEEDED`',
-                    '浏览器配额已满。删除无用数据后重试，不要循环重复同一写入。'
-                  ],
-                  [
-                    '`VALUE_TOO_LARGE`',
-                    'Cookie 名称、值和属性合计超过上限。缩短内容或改存 IndexedDB。'
-                  ],
-                  ['`SERIALIZE_FAILED`', '值不能序列化或复制。检查函数、DOM 节点和自定义编码。'],
-                  ['`DESERIALIZE_FAILED`', '已保存内容不能解码。检查旧格式或外部写入。'],
-                  ['`VALIDATION_FAILED`', '数据没有通过 schema。修正内容或数据版本。'],
-                  ['`MIGRATION_FAILED`', '迁移函数失败。修复该条记录的迁移，并保留原始原因。'],
-                  ['`TRANSACTION_FAILED`', '事务创建、回调或提交失败。读取 `cause` 查出原始失败。'],
-                  ['`DUPLICATE_KEY`', '同名键占用其他通道。换键或选择 `replace`。'],
-                  ['`VERSION_UNSUPPORTED`', '数据版本高于代码支持的版本。升级代码后再读写。'],
-                  [
-                    '`EXTENSION_FAILED`',
-                    '扩展回调失败。根据 `extensionStage` 检查 schema、codec 或比较器。'
-                  ],
-                  ['`TRANSACTION_CONFLICT`', '记录在回调期间变化。重新读取并重试完整事务。'],
-                  ['`WRITE_FAILED`', '写入后 cookie 不可见。检查路径、域、Secure 和浏览器策略。'],
-                  [
-                    '`COOKIE_SCOPE_AMBIGUOUS`',
-                    '同名 cookie 有多个可见范围。换命名空间或统一范围。'
-                  ],
-                  ['`INVALID_CONFIG`', 'Web 后端选项不合法。修正名称、宿主注入点或 cookie 属性。'],
-                  ['`INDEX_ORPHAN`', '索引指向的记录不存在。修复或重建索引。'],
-                  ['`INDEX_UNIQUE_CONFLICT`', '唯一索引值已属于另一条记录。更换值或删除冲突记录。'],
-                  ['`INDEX_QUERY_INVALIDATED`', '分页期间记录改变。从头重新查询。'],
-                  ['`INDEX_BACKFILL_STALE`', '索引准备使用的对象已过期。重新取得当前索引对象。'],
-                  ['`BACKEND_ID_INVALID`', '后端 ID 格式不合法。修正 ID。'],
-                  ['`BACKEND_DUPLICATE`', '安装批次或 Host 中已存在同名 ID。使用不同 ID。'],
-                  ['`BACKEND_NOT_INSTALLED`', '查询了未安装的后端。先安装准确的 ID。'],
-                  ['`BACKEND_PLUGIN_INVALID`', '后端或 plugin 结构检查失败。修复定义。'],
-                  [
-                    '`BACKEND_INSTALL_FAILED`',
-                    '创建或准备后端失败。修正 `cause` 指向的问题后重试。'
-                  ],
-                  ['`STORAGE_HOST_BUSY`', '已有安装正在进行。等它结束后再发起安装或关闭。'],
-                  ['`STORAGE_HOST_DISPOSED`', 'Host 已关闭。创建新 Host。'],
-                  [
-                    '`STORAGE_HOST_DISPOSE_FAILED`',
-                    'Host 清理收集到失败。它仍已关闭，检查 `AggregateError.errors`。'
-                  ],
-                  ['`LIVE_QUERY_DISPOSED`', '查询已关闭。创建新查询。'],
-                  ['`LIVE_QUERY_DISPOSE_FAILED`', '查询释放失败。检查聚合错误，不重新使用旧查询。'],
-                  [
-                    '`REACTIVE_FEATURE_INVALID`',
-                    '变化观察器定义不合法。检查同步清理函数与对应后端。'
-                  ],
-                  ['`REACTIVE_TOPOLOGY_INVALID`', '扩展中有未知、重复或循环引用。修正扩展组合。'],
-                  [
-                    '`REACTIVE_SERVICE_NOT_INSTALLED`',
-                    'Host 没有持续查询服务。先安装 reactive plugin。'
-                  ],
-                  [
-                    '`REACTIVE_ADAPTER_NOT_INSTALLED`',
-                    '指定后端没有变化观察器。选择已安装的 reactive 后端。'
-                  ],
-                  ['`REACTIVE_ADAPTER_FAILED`', '变化监听或重新读取失败。观察错误状态并修复来源。'],
-                  [
-                    '`REACTIVE_ADAPTER_DISPOSE_FAILED`',
-                    '观察器清理失败。检查聚合错误，旧对象保持关闭。'
-                  ],
-                  ['`BACKEND_DISPOSE_FAILED`', '后端连接或变化通道清理失败。检查所有聚合错误。']
-                ]
-              }
-            ]
-          },
-          {
-            id: 'cause-chain',
-            heading: '保留原始失败',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['成员与选项', '说明'],
-                rows: [
-                  [
-                    '`StorageError(code, details?, message?, stage?)`',
-                    '用于 Web 后端和扩展失败，实例被冻结。业务处理优先比较 `source` 与 `code`，不按消息文字分支。'
-                  ],
-                  [
-                    '`source` / `code`',
-                    "`StorageError` 的来源为 `'@migaia/storage-web'`。纯存储操作错误来自 `'@migaia/storage-contract'`，不要混为一个来源。"
-                  ],
-                  [
-                    '`details.backend?` / `key?` / `operation?`',
-                    '指出失败的后端、逻辑键和操作。保留实际存在的字段，不给外部错误补造数据。'
-                  ],
-                  [
-                    '`details.existingChannel?` / `attemptedChannel?`',
-                    '指出冲突双方的 `value`、`bytes` 或 `record` 通道。'
-                  ],
-                  [
-                    '`details.extensionStage?`',
-                    '区分 `schema`、`codec`、`migration`、`comparator` 和 `diagnostic` 扩展。'
-                  ],
-                  [
-                    '`details.cause?` / `error.cause`',
-                    '保留原始错误或取消原因。多个清理失败还要读取原生 `AggregateError.errors`。'
-                  ],
-                  [
-                    '`message?` / `stage?`',
-                    '消息用于诊断。第四个参数标记内部 `decode`、`migrate`、`validate` 阶段，普通业务通常不自行构造它。'
-                  ],
-                  [
-                    '`StorageContractErrorCode.invalidArgument` / `invalidKey`',
-                    '分别表示操作选项不合法和记录键超出支持范围。修正参数后重试。'
-                  ],
-                  [
-                    '`unsupported` / `disposed` / `aborted`',
-                    '分别是 `UNSUPPORTED_CAPABILITY`、`STORE_DISPOSED`、`ABORTED`。选择支持能力的后端、创建新对象或结束本次等待。'
-                  ],
-                  [
-                    '`STORAGE_WEB_SOURCE` / `StorageErrorCode` / `StorageErrorText`',
-                    '提供错误来源、代码和固定消息。自定义后端使用它们保持诊断可追踪。'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'terminal',
+            id: 'shutdown',
             heading: '关闭访问对象，保留持久数据',
             blocks: [
               {
                 type: 'paragraph',
-                text: '`dispose()` 不删除持久数据。下面关闭第一个 IndexedDB 访问对象，再用同一数据库名称创建新对象，已经保存的偏好仍然可读。'
-              },
-              {
-                type: 'paragraph',
-                text: '保存为 `shutdown.ts`。'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { StorageContractError } from '@migaia/storage-contract'\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst firstStore = indexedDbHost({ dbName: 'docs-preferences' })\nawait firstStore.set('theme', 'dark')\nawait firstStore.dispose()\ntry {\n  await firstStore.get('theme')\n} catch (error) {\n  if (error instanceof StorageContractError) {\n    console.log('关闭后读取:', error.code)\n  }\n}\nconst nextStore = indexedDbHost({ dbName: 'docs-preferences' })\nconsole.log('重新打开:', await nextStore.get('theme'))\nawait nextStore.dispose()"
-              },
-              {
-                type: 'paragraph',
-                text: '浏览器输出：'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: '关闭后读取: STORE_DISPOSED\n重新打开: dark'
+                text: '释放查询资源后等待 host.dispose()。它结束已接受工作并关闭拥有的监听器或连接，不清空浏览器保存数据；确实要删除数据时再显式调用删除操作。'
               }
             ]
           }
@@ -51925,335 +48781,55 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       next: [
         {
           path: 'getting-started',
-          label: '返回入门'
+          label: '安装并保存第一项设置'
         },
         {
-          path: 'host-and-plugins',
-          label: '统一关闭存储'
+          path: 'indexeddb-and-transactions',
+          label: '记录与事务'
+        },
+        {
+          path: 'entity-schema-and-codecs',
+          label: '实体与编解码器'
         }
       ]
     },
     en: {
       title: 'Cancellation, errors, and shutdown',
-      lede: 'Handle failures by cause, stop unwanted work, and retain data after closing.',
+      lede: 'Cancel work that no longer serves the caller and retain the original failure cause.',
       document: {
         sections: [
           {
-            id: 'decision-map',
-            heading: 'Distinguish cancellation, quota, and bad data',
+            id: 'cancel',
+            heading: 'Cancel a closed panel’s read',
             blocks: [
-              {
-                type: 'paragraph',
-                text: 'Run these modules in a browser with package imports handled by a bundler. IndexedDB, cookies, and events come from the browser host, not native Node APIs.'
-              },
-              {
-                type: 'paragraph',
-                text: 'Cancel a wait when the user leaves. Free space for quota failures, correct malformed data, and replace closed accessors. Do not retry every failure as though it were transient.'
-              },
-              {
-                type: 'table',
-                headers: ['Member or option', 'Description'],
-                rows: [
-                  [
-                    '`signal?: IAbortSignal`',
-                    'Cancels the current operation, preserving the original reason in `StorageContractError.cause`. Omission supplies no external signal.'
-                  ],
-                  [
-                    '`timeoutMs?: number`',
-                    'Requires a nonnegative safe integer. When combined with a signal, the first cancellation wins. Omission adds no operation timeout.'
-                  ],
-                  [
-                    '`pageSize?: number`',
-                    'Controls iterator page size from `1` through `4096`. It does not split ordinary single-key operations.'
-                  ],
-                  [
-                    '`conflictPolicy?: IConflictPolicy`',
-                    'Ordinary string, byte, and record writes accept this field, defaulting to `conflict`. Asynchronous cookie writes have separate options.'
-                  ],
-                  [
-                    '`ISyncWriteOptions.conflictPolicy?`',
-                    'Synchronous writes accept conflict policy only. Cancellation or timeout fields give `INVALID_ARGUMENT`.'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'user-cancellation',
-            heading: 'The user closes a search panel',
-            blocks: [
-              {
-                type: 'paragraph',
-                text: 'Save as `cancellation.ts`.'
-              },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { StorageContractError } from '@migaia/storage-contract'\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst db = indexedDbHost({ dbName: 'docs-search' })\nconst controller = new AbortController()\ncontroller.abort('search panel closed')\ntry {\n  await db.get('results', { signal: controller.signal })\n} catch (error) {\n  if (error instanceof StorageContractError) {\n    console.log('Search canceled:', error.code, error.cause)\n  }\n}\nawait db.dispose()"
+                code: "import { StorageContractError } from '@migaia/storage-contract'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'\n\nconst host = await createStorageHost({\n  plugins: [indexedDbBackendPlugin({ dbName: 'app' })]\n})\nconst controller = new AbortController()\ncontroller.abort('panel closed')\ntry {\n  await host.backend('indexed-db').get('results', { signal: controller.signal })\n} catch (error) {\n  if (!(error instanceof StorageContractError)) throw error\n  console.log(error.code, error.cause)\n} finally {\n  await host.dispose()\n}"
               },
               {
                 type: 'paragraph',
-                text: 'Browser output:'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'Search canceled: ABORTED search panel closed'
+                text: 'The code reports ABORTED and the original panel closed reason. timeoutMs limits an individual asynchronous operation. Synchronous methods do not accept signals or operation deadlines.'
               }
             ]
           },
           {
-            id: 'timeout',
-            heading: 'Bound the wait for a save',
+            id: 'failure',
+            heading: 'Choose the response from source and code',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'This example gives a transaction with asynchronous work a short deadline and records actual timeout cancellation. Choose an application deadline such as `timeoutMs: 2_000` for real work; synchronous APIs accept no timeout fields.'
-              },
-              {
-                type: 'paragraph',
-                text: 'Save as `timeout.ts`.'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { StorageContractError } from '@migaia/storage-contract'\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst db = indexedDbHost({ dbName: 'docs-deadline' })\ntry {\n  await db.transaction(\n    async (tx) => {\n      await tx.get('draft')\n      await new Promise((resolve) => setTimeout(resolve, 30))\n    },\n    { timeoutMs: 1 }\n  )\n} catch (error) {\n  if (error instanceof StorageContractError) {\n    console.log('Save timed out:', error.code)\n  }\n}\nawait db.dispose()"
-              },
-              {
-                type: 'paragraph',
-                text: 'Browser output:'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'Save timed out: ABORTED'
+                text: 'A StorageContractError describes a shared contract failure. Backend errors include their own source and code; inspect cause for the original native failure. QUOTA_EXCEEDED needs capacity handling, while malformed data needs correction. Neither is a reason for an unlimited retry loop.'
               }
             ]
           },
           {
-            id: 'error-handling',
-            heading: 'Choose the next action by error code',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Member or option', 'Description'],
-                rows: [
-                  [
-                    '`BACKEND_UNAVAILABLE`',
-                    'The host is missing, probing failed, or opening is blocked. Check browser access or have the application select memory storage.'
-                  ],
-                  [
-                    '`QUOTA_EXCEEDED`',
-                    'Browser quota is full. Remove unneeded data before retrying.'
-                  ],
-                  [
-                    '`VALUE_TOO_LARGE`',
-                    'The complete cookie assignment is too large. Shorten it or use IndexedDB.'
-                  ],
-                  [
-                    '`SERIALIZE_FAILED`',
-                    'A value cannot be serialized or cloned. Check functions, DOM nodes, and custom encoding.'
-                  ],
-                  [
-                    '`DESERIALIZE_FAILED`',
-                    'Stored content cannot be decoded. Check old formats and external writers.'
-                  ],
-                  [
-                    '`VALIDATION_FAILED`',
-                    'Data failed its schema. Correct the value or data version.'
-                  ],
-                  [
-                    '`MIGRATION_FAILED`',
-                    'A migration failed. Repair it for the affected record and retain the cause.'
-                  ],
-                  [
-                    '`TRANSACTION_FAILED`',
-                    'Transaction creation, callback, or commit failed. Inspect `cause`.'
-                  ],
-                  [
-                    '`DUPLICATE_KEY`',
-                    'Another channel uses the key. Choose another key or `replace`.'
-                  ],
-                  [
-                    '`VERSION_UNSUPPORTED`',
-                    'Data is newer than this code supports. Upgrade before writing.'
-                  ],
-                  [
-                    '`EXTENSION_FAILED`',
-                    'An extension callback failed. Use `extensionStage` to locate the schema, codec, or comparator.'
-                  ],
-                  [
-                    '`TRANSACTION_CONFLICT`',
-                    'Records changed during the callback. Reread and retry the whole transaction.'
-                  ],
-                  [
-                    '`WRITE_FAILED`',
-                    'The cookie is invisible after writing. Check its scope, Secure setting, and browser policy.'
-                  ],
-                  [
-                    '`COOKIE_SCOPE_AMBIGUOUS`',
-                    'Multiple visible scopes share a cookie name. Change namespace or use one scope.'
-                  ],
-                  [
-                    '`INVALID_CONFIG`',
-                    'Web-backend configuration is invalid. Correct names, host injection, or cookie attributes.'
-                  ],
-                  [
-                    '`INDEX_ORPHAN`',
-                    'An index points to a missing record. Repair or rebuild the index.'
-                  ],
-                  [
-                    '`INDEX_UNIQUE_CONFLICT`',
-                    'A unique value belongs to another record. Change it or remove the competing record.'
-                  ],
-                  [
-                    '`INDEX_QUERY_INVALIDATED`',
-                    'Records changed between index pages. Restart the query.'
-                  ],
-                  [
-                    '`INDEX_BACKFILL_STALE`',
-                    'Index preparation uses a stale object. Acquire the current one.'
-                  ],
-                  ['`BACKEND_ID_INVALID`', 'The backend ID is invalid. Correct it.'],
-                  [
-                    '`BACKEND_DUPLICATE`',
-                    'The batch or host already contains this ID. Use another ID.'
-                  ],
-                  [
-                    '`BACKEND_NOT_INSTALLED`',
-                    'The requested backend is not installed. Install that exact ID first.'
-                  ],
-                  [
-                    '`BACKEND_PLUGIN_INVALID`',
-                    'Backend or plugin validation failed. Repair its definition.'
-                  ],
-                  [
-                    '`BACKEND_INSTALL_FAILED`',
-                    'Backend creation or preparation failed. Correct the cause before retrying.'
-                  ],
-                  [
-                    '`STORAGE_HOST_BUSY`',
-                    'An installation is active. Wait for it before installing or disposing.'
-                  ],
-                  ['`STORAGE_HOST_DISPOSED`', 'The host is closed. Create another host.'],
-                  [
-                    '`STORAGE_HOST_DISPOSE_FAILED`',
-                    'Host cleanup collected failures. The host remains closed; inspect `AggregateError.errors`.'
-                  ],
-                  ['`LIVE_QUERY_DISPOSED`', 'The query is closed. Create another query.'],
-                  [
-                    '`LIVE_QUERY_DISPOSE_FAILED`',
-                    'Query cleanup failed. Inspect aggregate errors and do not reuse the query.'
-                  ],
-                  [
-                    '`REACTIVE_FEATURE_INVALID`',
-                    'The reactive adapter is invalid. Check its synchronous disposer and backend pairing.'
-                  ],
-                  [
-                    '`REACTIVE_TOPOLOGY_INVALID`',
-                    'Features contain unknown, duplicate, or cyclic dependencies. Repair the composition.'
-                  ],
-                  [
-                    '`REACTIVE_SERVICE_NOT_INSTALLED`',
-                    'The host has no live-query service. Install a reactive plugin first.'
-                  ],
-                  [
-                    '`REACTIVE_ADAPTER_NOT_INSTALLED`',
-                    'The backend has no reactive adapter. Select an installed reactive backend.'
-                  ],
-                  [
-                    '`REACTIVE_ADAPTER_FAILED`',
-                    'Change observation or rereading failed. Inspect query state and repair the source.'
-                  ],
-                  [
-                    '`REACTIVE_ADAPTER_DISPOSE_FAILED`',
-                    'Adapter cleanup failed. Inspect aggregate errors; the old adapter remains closed.'
-                  ],
-                  [
-                    '`BACKEND_DISPOSE_FAILED`',
-                    'Backend connection or change-channel cleanup failed. Inspect all aggregate errors.'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'cause-chain',
-            heading: 'Keep the original failure',
-            blocks: [
-              {
-                type: 'table',
-                headers: ['Member or option', 'Description'],
-                rows: [
-                  [
-                    '`StorageError(code, details?, message?, stage?)`',
-                    'Represents web-backend and extension failures and freezes the instance. Branch on `source` and `code`, not message text.'
-                  ],
-                  [
-                    '`source` / `code`',
-                    "StorageError uses `'@migaia/storage-web'`; shared operation errors use `'@migaia/storage-contract'`. Keep those sources distinct."
-                  ],
-                  [
-                    '`details.backend?` / `key?` / `operation?`',
-                    'Identifies the backend, logical key, and operation when present. Do not invent missing fields for external failures.'
-                  ],
-                  [
-                    '`details.existingChannel?` / `attemptedChannel?`',
-                    'Identifies the existing and attempted `value`, `bytes`, or `record` channels.'
-                  ],
-                  [
-                    '`details.extensionStage?`',
-                    'Distinguishes `schema`, `codec`, `migration`, `comparator`, and `diagnostic` extensions.'
-                  ],
-                  [
-                    '`details.cause?` / `error.cause`',
-                    'Preserves the original error or cancellation reason. Multiple cleanup failures also appear in native `AggregateError.errors`.'
-                  ],
-                  [
-                    '`message?` / `stage?`',
-                    'The message supports diagnosis. The fourth argument marks internal `decode`, `migrate`, or `validate` stages; applications rarely construct it.'
-                  ],
-                  [
-                    '`StorageContractErrorCode.invalidArgument` / `invalidKey`',
-                    'Reports invalid operation options or unsupported record keys. Correct the input before retrying.'
-                  ],
-                  [
-                    '`unsupported` / `disposed` / `aborted`',
-                    'Means `UNSUPPORTED_CAPABILITY`, `STORE_DISPOSED`, or `ABORTED`. Select a capable backend, create a new accessor, or end this wait.'
-                  ],
-                  [
-                    '`STORAGE_WEB_SOURCE` / `StorageErrorCode` / `StorageErrorText`',
-                    'Provides source, codes, and stable messages for traceable custom-backend diagnostics.'
-                  ]
-                ]
-              }
-            ]
-          },
-          {
-            id: 'terminal',
+            id: 'shutdown',
             heading: 'Close the accessor and keep persisted data',
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Disposal does not delete persistent data. Close the first IndexedDB accessor, reopen the same database name, and read the saved preference.'
-              },
-              {
-                type: 'paragraph',
-                text: 'Save as `shutdown.ts`.'
-              },
-              {
-                type: 'code',
-                language: 'ts',
-                code: "import { StorageContractError } from '@migaia/storage-contract'\nimport { indexedDbHost } from '@migaia/storage-web/indexed-db'\n\nconst firstStore = indexedDbHost({ dbName: 'docs-preferences' })\nawait firstStore.set('theme', 'dark')\nawait firstStore.dispose()\ntry {\n  await firstStore.get('theme')\n} catch (error) {\n  if (error instanceof StorageContractError) {\n    console.log('Read after close:', error.code)\n  }\n}\nconst nextStore = indexedDbHost({ dbName: 'docs-preferences' })\nconsole.log('Reopened:', await nextStore.get('theme'))\nawait nextStore.dispose()"
-              },
-              {
-                type: 'paragraph',
-                text: 'Browser output:'
-              },
-              {
-                type: 'code',
-                language: 'text',
-                code: 'Read after close: STORE_DISPOSED\nReopened: dark'
+                text: 'Await host.dispose() after releasing query resources. It stops accepted work and closes owned listeners or connections. It does not clear saved browser data; call an explicit removal operation when deletion is intended.'
               }
             ]
           }
@@ -52262,11 +48838,15 @@ const guideJourneys: Readonly<Record<string, Readonly<Partial<Record<ILocale, IG
       next: [
         {
           path: 'getting-started',
-          label: 'Return to getting started'
+          label: 'Install and save a setting'
         },
         {
-          path: 'host-and-plugins',
-          label: 'Close stores together'
+          path: 'indexeddb-and-transactions',
+          label: 'Records and transactions'
+        },
+        {
+          path: 'entity-schema-and-codecs',
+          label: 'Entities and codecs'
         }
       ]
     }
@@ -74641,7 +71221,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createSerializeRegistry, jsonPlugin, SerializeCodecError } from '@migaia/serialize'\n\nconst drafts = createSerializeRegistry([jsonPlugin()])\ntry {\n  await drafts.decode(['text', '{broken'], { context: 'draft-load' })\n} catch (error) {\n  if (!(error instanceof SerializeCodecError)) throw error\n  console.log('读取失败:', error.code, error.context)\n  console.log('原始原因是 SyntaxError:', error.cause instanceof SyntaxError)\n}\nawait drafts.dispose()"
+                code: "import { createSerializeRegistry, jsonPlugin, SerializeCodecError } from '@migaia/serialize'\n\nconst drafts = createSerializeRegistry([jsonPlugin()])\ntry {\n  await drafts.decode(['text', '{broken'], { context: 'draft-load' })\n} catch (error) {\n  if (!(error instanceof SerializeCodecError)) throw error\n  console.log('读取失败:', error.code, error.context)\n  console.log('原始原因是 SyntaxError:', (error.cause as Error)?.cause instanceof SyntaxError)\n}\nawait drafts.dispose()"
               },
               {
                 type: 'paragraph',
@@ -74906,7 +71486,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { createSerializeRegistry, jsonPlugin, SerializeCodecError } from '@migaia/serialize'\n\nconst drafts = createSerializeRegistry([jsonPlugin()])\ntry {\n  await drafts.decode(['text', '{broken'], { context: 'draft-load' })\n} catch (error) {\n  if (!(error instanceof SerializeCodecError)) throw error\n  console.log('Read failed:', error.code, error.context)\n  console.log('Cause is SyntaxError:', error.cause instanceof SyntaxError)\n}\nawait drafts.dispose()"
+                code: "import { createSerializeRegistry, jsonPlugin, SerializeCodecError } from '@migaia/serialize'\n\nconst drafts = createSerializeRegistry([jsonPlugin()])\ntry {\n  await drafts.decode(['text', '{broken'], { context: 'draft-load' })\n} catch (error) {\n  if (!(error instanceof SerializeCodecError)) throw error\n  console.log('Read failed:', error.code, error.context)\n  console.log('Cause is SyntaxError:', (error.cause as Error)?.cause instanceof SyntaxError)\n}\nawait drafts.dispose()"
               },
               {
                 type: 'paragraph',
@@ -75065,8 +71645,8 @@ class CheckoutElement extends HTMLElement {
   },
   'storage-contract:index': {
     zh: {
-      title: '在存储边界固定输入与错误语义',
-      lede: '接入既有存储时，先把键、操作选项、能力和数据格式讲清楚。本包提供中立契约与校验工具，实际读写由具体后端执行。',
+      title: '用同一契约连接存储实现',
+      lede: '用能力令牌、实现定义、纯校验与带码错误描述存储边界。具体后端执行读写；需要输入快照、执行队列或事务运行时的作者使用 storage-host/authoring。',
       document: {
         sections: [
           {
@@ -75075,23 +71655,23 @@ class CheckoutElement extends HTMLElement {
             blocks: [
               {
                 type: 'paragraph',
-                text: '异步操作使用复合键前，调用方已改动其中日期或字节，见 [捕获复合键](/zh/docs/storage-contract/api/snapshotStorageKey#storage-contract-index--snapshotStorageKey--case-1)。'
+                text: '多个后端的方法名称相同，但支持的操作不同，见 [能力令牌 kv](/zh/docs/storage-contract/api/kv) 与 [records](/zh/docs/storage-contract/api/records)。'
               },
               {
                 type: 'paragraph',
-                text: '同一次存储操作在不同层读到不同的选项值，见 [只捕获一次操作选项](/zh/docs/storage-contract/api/snapshotOperationContext#storage-contract-index--snapshotOperationContext--case-1)。'
+                text: '插件返回了一组方法，却没有对应的能力定义，见 [implement](/zh/docs/storage-contract/api/implement)。定义实现不会安装插件或打开连接。'
               },
               {
                 type: 'paragraph',
-                text: '权限数据中的 `Map`、`Set` 经普通 JSON 编码后变成空对象，见 [恢复嵌套集合](/zh/docs/storage-contract/api/collectionsJsonCodec#storage-contract-index--collectionsJsonCodec--case-1)。'
+                text: '无效键或超时进入后端后才失败，见 [键校验](/zh/docs/storage-contract/api/assertStorageKey) 与 [操作选项校验](/zh/docs/storage-contract/api/assertOperationContext)。'
               },
               {
                 type: 'paragraph',
-                text: '旧版后端缺少新增能力标志，应用无法直接据此选择通道，见 [规范化旧版能力描述](/zh/docs/storage-contract/api/snapshotStorageCapabilities#storage-contract-index--snapshotStorageCapabilities--case-1)。'
+                text: '异步读写需要保存调用时的复合键，见 host authoring 的 [键快照](/zh/docs/storage-host/api/authoring/key/snapshotStorageKey)。纯校验本身不复制输入。'
               },
               {
                 type: 'paragraph',
-                text: '错误只剩一段消息，调用方无法检查最初失败，见 [保留原始失败](/zh/docs/storage-contract/api/StorageContractError#storage-contract-index--StorageContractError--case-1)。'
+                text: '错误只剩一段消息，调用方无法检查最初失败，见 [契约错误](/zh/docs/storage-contract/api/StorageContractError) 与 [错误识别](/zh/docs/storage-contract/api/isStorageContractError)。'
               }
             ]
           },
@@ -75101,23 +71681,23 @@ class CheckoutElement extends HTMLElement {
             blocks: [
               {
                 type: 'paragraph',
-                text: '递归复制复合键组件，使原键后续修改不影响已捕获的值，见 [复合键隔离示例](/zh/docs/storage-contract/api/snapshotStorageKey#storage-contract-index--snapshotStorageKey--case-1)。'
+                text: '标准能力由同一令牌标识，方法实现通过 [implement](/zh/docs/storage-contract/api/implement) 定义；名称或能力标志不能代替令牌身份。'
               },
               {
                 type: 'paragraph',
-                text: '冻结的操作选项快照可以跨层按同一对象复用，避免重复读取访问器，见 [一次捕获示例](/zh/docs/storage-contract/api/snapshotOperationContext#storage-contract-index--snapshotOperationContext--case-1)。'
+                text: '[assertOperationContext](/zh/docs/storage-contract/api/assertOperationContext) 检查普通输入边界，不创建计时器、订阅或执行任务。'
               },
               {
                 type: 'paragraph',
-                text: '同一版本格式同时拥有编码与解码规则，使嵌套集合可通过文本往返，见 [集合类型恢复示例](/zh/docs/storage-contract/api/collectionsJsonCodec#storage-contract-index--collectionsJsonCodec--case-1)。'
+                text: '[assertCodec](/zh/docs/storage-contract/api/assertCodec) 检查格式描述；真正的转换由 codec 执行，适配工作由 [host authoring](/zh/docs/storage-host/api/authoring/codec/fromValueCodec) 提供。'
               },
               {
                 type: 'paragraph',
-                text: '能力描述按明确规则补齐旧版标志，并与原描述后续修改分离，见 [能力快照示例](/zh/docs/storage-contract/api/snapshotStorageCapabilities#storage-contract-index--snapshotStorageCapabilities--case-1)。'
+                text: '[isRecordStore](/zh/docs/storage-contract/api/isRecordStore) 与 [asRecordStore](/zh/docs/storage-contract/api/asRecordStore) 检查已有存储的方法和能力；它们不增加后端能力。'
               },
               {
                 type: 'paragraph',
-                text: '契约错误同时保留稳定来源、错误码与同一个原始原因，见 [错误原因链示例](/zh/docs/storage-contract/api/StorageContractError#storage-contract-index--StorageContractError--case-1)。'
+                text: '[StorageContractError](/zh/docs/storage-contract/api/StorageContractError) 保留稳定来源、语义错误码与原始原因，调用方可按来源和错误码分支。'
               }
             ]
           },
@@ -75127,12 +71707,12 @@ class CheckoutElement extends HTMLElement {
             blocks: [
               {
                 type: 'paragraph',
-                text: '这个起点无需创建后端。`Map` 以成员键关联值，`Set` 保存不重复的值；这里把它们编码为文本再恢复。安装包后，把完整代码保存为 example.ts，在 Node.js 24 中运行 node example.ts。'
+                text: '下面的完整例子区分契约与执行：storage-contract 定义 codec 形状，host authoring 把 serialize 的集合编码器适配为该形状。安装 storage-host 与 serialize 后，把代码保存为 example.ts，在 Node.js 24 中运行 node example.ts；这里不创建后端。'
               },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { collectionsJsonCodec } from '@migaia/storage-contract'\n\nconst settings = { roles: new Map([['Ada', new Set(['read', 'write'])]]) }\nconst raw = await collectionsJsonCodec.encode(settings)\nconst restored = await collectionsJsonCodec.decode(raw) as typeof settings\nconsole.log('输出形式:', collectionsJsonCodec.output)\nconsole.log('Map:', restored.roles instanceof Map)\nconsole.log('Set:', restored.roles.get('Ada') instanceof Set)\nconsole.log('权限:', [...(restored.roles.get('Ada') ?? [])].join(', '))"
+                code: "import { fromValueCodec } from '@migaia/storage-host/authoring/codec'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst collectionsCodec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\n\nconst settings = { roles: new Map([['Ada', new Set(['read', 'write'])]]) }\nconst raw = await collectionsCodec.encode(settings)\nconst restored = await collectionsCodec.decode(raw) as typeof settings\nconsole.log('输出形式:', collectionsCodec.output)\nconsole.log('Map:', restored.roles instanceof Map)\nconsole.log('Set:', restored.roles.get('Ada') instanceof Set)\nconsole.log('权限:', [...(restored.roles.get('Ada') ?? [])].join(', '))"
               },
               {
                 type: 'code',
@@ -75151,75 +71731,47 @@ class CheckoutElement extends HTMLElement {
             blocks: [
               {
                 type: 'paragraph',
-                text: '应用从具体实现取得存储对象后再做能力收窄；后端或适配器作者可复用输入快照工具。类型契约不会替后端执行读写、取消或清理。'
+                text: '应用使用能力令牌选择接口，作者通过 implement 定义实现。下列纯校验只检查输入；需要复制异步输入、适配 codec 或执行事务时，进入明确标出的 host authoring 入口。契约不会替后端执行读写、取消或清理。'
               },
               {
                 type: 'table',
                 headers: ['入口', '何时使用'],
                 rows: [
                   [
-                    '[collectionsJsonCodec](/zh/docs/storage-contract/api/collectionsJsonCodec)',
-                    '用版本化文本往返 `Map`、`Set`；不打开存储。'
+                    '[kv](/zh/docs/storage-contract/api/kv) / [records](/zh/docs/storage-contract/api/records)',
+                    '用标准令牌选择文本或记录接口。'
                   ],
                   [
-                    '[snapshotStorageKey](/zh/docs/storage-contract/api/snapshotStorageKey)',
-                    '校验、复制复合键，并拒绝无效键。'
-                  ],
-                  [
-                    '[snapshotOperationContext](/zh/docs/storage-contract/api/snapshotOperationContext)',
-                    '捕获取消、超时、分页与冲突意图；执行交给后端。'
-                  ],
-                  [
-                    '[snapshotStorageCapabilities](/zh/docs/storage-contract/api/snapshotStorageCapabilities)',
-                    '校验能力字段并兼容两个旧版缺失标志。'
-                  ],
-                  [
-                    '[StorageContractError](/zh/docs/storage-contract/api/StorageContractError)',
-                    '为契约失败保留来源、错误码和原因链。'
-                  ],
-                  [
-                    '[snapshotKeyValueStore](/zh/docs/storage-contract/api/snapshotKeyValueStore)',
-                    '检查外部提供的字符串存储并捕获能力事实。'
-                  ],
-                  [
-                    '[isRecordStore](/zh/docs/storage-contract/api/isRecordStore) / [asRecordStore](/zh/docs/storage-contract/api/asRecordStore)',
-                    '使用字节、记录、范围迭代或事务前检查实际后端。'
-                  ],
-                  [
-                    '[asSecondaryIndexRecordStore](/zh/docs/storage-contract/api/asSecondaryIndexRecordStore)',
-                    '接纳支持完整二级索引扩展的记录存储。'
-                  ],
-                  [
-                    '[asChangeFeedStore](/zh/docs/storage-contract/api/asChangeFeedStore)',
-                    '接纳提交后变更流；订阅和退订仍由调用方持有。'
-                  ],
-                  [
-                    '[snapshotKeyValueStoreDetailed](/zh/docs/storage-contract/api/snapshotKeyValueStoreDetailed)',
-                    '取得精确读取失败原因、捕获释放函数及原接收者。'
+                    '[implement](/zh/docs/storage-contract/api/implement)',
+                    '定义令牌对应的实现；安装与执行仍由宿主和后端负责。'
                   ],
                   [
                     '[assertStorageKey](/zh/docs/storage-contract/api/assertStorageKey) / [assertStringStorageKey](/zh/docs/storage-contract/api/assertStringStorageKey)',
-                    '仅校验记录键或纯字符串键，不复制。'
+                    '仅校验键，不复制。'
                   ],
                   [
-                    '[compareStorageKeys](/zh/docs/storage-contract/api/compareStorageKeys)',
-                    '比较已经有效的记录键，不代替键接纳。'
+                    '[assertOperationContext](/zh/docs/storage-contract/api/assertOperationContext) / [assertCodec](/zh/docs/storage-contract/api/assertCodec)',
+                    '检查操作选项或 codec 形状，不启动任务或执行转换。'
                   ],
                   [
-                    '[assertTransactionCallback](/zh/docs/storage-contract/api/assertTransactionCallback) / [readTransactionConflictPolicy](/zh/docs/storage-contract/api/readTransactionConflictPolicy)',
-                    '检查事务回调并读取冲突策略，不启动事务。'
+                    '[isRecordStore](/zh/docs/storage-contract/api/isRecordStore) / [asRecordStore](/zh/docs/storage-contract/api/asRecordStore)',
+                    '使用记录接口前检查已有存储；不添加后端能力。'
                   ],
                   [
-                    '[snapshotCodec](/zh/docs/storage-contract/api/snapshotCodec) / [assertCodec](/zh/docs/storage-contract/api/assertCodec)',
-                    '检查编解码器名称、输出形式及两个方法。'
+                    '[StorageContractError](/zh/docs/storage-contract/api/StorageContractError) / [isStorageContractError](/zh/docs/storage-contract/api/isStorageContractError)',
+                    '识别带来源、错误码与原因链的契约失败。'
                   ],
                   [
-                    '[snapshotSyncWriteOptions](/zh/docs/storage-contract/api/snapshotSyncWriteOptions) / [assertSyncWriteOptions](/zh/docs/storage-contract/api/assertSyncWriteOptions)',
-                    '检查同步写入选项，拒绝非空的信号或超时。'
+                    '[host authoring: snapshotStorageKey](/zh/docs/storage-host/api/authoring/key/snapshotStorageKey)',
+                    '复制异步操作需要保留的键值；不冻结副本。'
                   ],
                   [
-                    '[isArrayBuffer](/zh/docs/utils/api/bytes/isArrayBuffer) / [isUint8Array](/zh/docs/utils/api/bytes/isUint8Array) / [intrinsicConstructorName](/zh/docs/storage-contract/api/intrinsicConstructorName)',
-                    '由 utils 检查二进制品牌，或取得诊断用构造器名称。'
+                    '[host authoring: snapshotOperationContext](/zh/docs/storage-host/api/authoring/context/snapshotOperationContext)',
+                    '保存操作标量意图并借用原信号；不启动计时器。'
+                  ],
+                  [
+                    '[host authoring: fromValueCodec](/zh/docs/storage-host/api/authoring/codec/fromValueCodec)',
+                    '适配 serialize 编解码器，实际转换由该编解码器执行。'
                   ]
                 ]
               }
@@ -75243,8 +71795,8 @@ class CheckoutElement extends HTMLElement {
       ]
     },
     en: {
-      title: 'Capture inputs and failures at storage boundaries',
-      lede: 'When connecting an existing store, make keys, options, capabilities and formats explicit. This package supplies neutral contracts and validation tools; concrete backends perform I/O.',
+      title: 'Connect storage implementations through one contract',
+      lede: 'Describe storage boundaries with capability tokens, implementation definitions, pure guards and coded errors. Backends perform I/O; authors use storage-host/authoring for input snapshots and execution runtimes.',
       document: {
         sections: [
           {
@@ -75253,23 +71805,23 @@ class CheckoutElement extends HTMLElement {
             blocks: [
               {
                 type: 'paragraph',
-                text: 'A caller changes a Date or binary component before async work uses its composite key; see [capture the key](/en/docs/storage-contract/api/snapshotStorageKey#storage-contract-index--snapshotStorageKey--case-1).'
+                text: 'Backends expose similar method names but support different operations; see the [kv](/en/docs/storage-contract/api/kv) and [records](/en/docs/storage-contract/api/records) capability tokens.'
               },
               {
                 type: 'paragraph',
-                text: 'Different layers read different option values for the same storage operation; see [capture options once](/en/docs/storage-contract/api/snapshotOperationContext#storage-contract-index--snapshotOperationContext--case-1).'
+                text: 'A plugin returns methods without a matching capability definition; see [implement](/en/docs/storage-contract/api/implement). Defining an implementation does not install a plugin or open a connection.'
               },
               {
                 type: 'paragraph',
-                text: 'Ordinary JSON turns the Map and Set in permissions data into empty objects; see [restore nested collections](/en/docs/storage-contract/api/collectionsJsonCodec#storage-contract-index--collectionsJsonCodec--case-1).'
+                text: 'Invalid keys or timeouts reach a backend before failing; see [key validation](/en/docs/storage-contract/api/assertStorageKey) and [operation validation](/en/docs/storage-contract/api/assertOperationContext).'
               },
               {
                 type: 'paragraph',
-                text: 'An older backend omits new capability flags that the application needs to choose a channel; see [normalize its descriptor](/en/docs/storage-contract/api/snapshotStorageCapabilities#storage-contract-index--snapshotStorageCapabilities--case-1).'
+                text: 'Async I/O needs the composite key supplied at call time; see the host authoring [key snapshot](/en/docs/storage-host/api/authoring/key/snapshotStorageKey). Pure validation does not copy inputs.'
               },
               {
                 type: 'paragraph',
-                text: 'An error reduced to a message leaves callers unable to inspect the original failure; see [retain the cause](/en/docs/storage-contract/api/StorageContractError#storage-contract-index--StorageContractError--case-1).'
+                text: 'An error reduced to a message leaves callers unable to inspect the original failure; see [contract errors](/en/docs/storage-contract/api/StorageContractError) and [error recognition](/en/docs/storage-contract/api/isStorageContractError).'
               }
             ]
           },
@@ -75279,23 +71831,23 @@ class CheckoutElement extends HTMLElement {
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Recursive copies detach composite key components from later caller mutations; see [the key snapshot case](/en/docs/storage-contract/api/snapshotStorageKey#storage-contract-index--snapshotStorageKey--case-1).'
+                text: 'One token identifies each standard capability. [implement](/en/docs/storage-contract/api/implement) defines its methods; names and capability flags do not replace token identity.'
               },
               {
                 type: 'paragraph',
-                text: 'Layers reuse the same frozen option snapshot without rereading its original getters; see [the one-read case](/en/docs/storage-contract/api/snapshotOperationContext#storage-contract-index--snapshotOperationContext--case-1).'
+                text: '[assertOperationContext](/en/docs/storage-contract/api/assertOperationContext) checks ordinary inputs without creating timers, subscriptions or tasks.'
               },
               {
                 type: 'paragraph',
-                text: 'One versioned format owns both encoding and decoding so nested collections survive a text round trip; see [the collection case](/en/docs/storage-contract/api/collectionsJsonCodec#storage-contract-index--collectionsJsonCodec--case-1).'
+                text: '[assertCodec](/en/docs/storage-contract/api/assertCodec) checks the format descriptor. The codec performs conversion, while [host authoring](/en/docs/storage-host/api/authoring/codec/fromValueCodec) supplies adaptation.'
               },
               {
                 type: 'paragraph',
-                text: 'Explicit legacy defaults and a separate capability record keep later descriptor changes out of captured facts; see [the capability snapshot case](/en/docs/storage-contract/api/snapshotStorageCapabilities#storage-contract-index--snapshotStorageCapabilities--case-1).'
+                text: '[isRecordStore](/en/docs/storage-contract/api/isRecordStore) and [asRecordStore](/en/docs/storage-contract/api/asRecordStore) inspect an existing store and its capabilities; they do not add backend support.'
               },
               {
                 type: 'paragraph',
-                text: 'Contract errors retain a stable source, semantic code and the exact original cause; see [the cause identity case](/en/docs/storage-contract/api/StorageContractError#storage-contract-index--StorageContractError--case-1).'
+                text: '[StorageContractError](/en/docs/storage-contract/api/StorageContractError) retains a stable source, semantic code and original cause so callers can branch on source and code.'
               }
             ]
           },
@@ -75305,12 +71857,12 @@ class CheckoutElement extends HTMLElement {
             blocks: [
               {
                 type: 'paragraph',
-                text: 'This starting point needs no backend. A Map associates keys with values and a Set keeps distinct values; encode both to text and restore them. After installing the package, save this complete code as example.ts and run node example.ts with Node.js 24.'
+                text: 'This complete example separates the contract from execution: storage-contract defines the codec shape, and host authoring adapts a serialize collections codec to that shape. After installing storage-host and serialize, save the code as example.ts and run node example.ts with Node.js 24. No backend is created.'
               },
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { collectionsJsonCodec } from '@migaia/storage-contract'\n\nconst settings = { roles: new Map([['Ada', new Set(['read', 'write'])]]) }\nconst raw = await collectionsJsonCodec.encode(settings)\nconst restored = await collectionsJsonCodec.decode(raw) as typeof settings\nconsole.log('output:', collectionsJsonCodec.output)\nconsole.log('Map:', restored.roles instanceof Map)\nconsole.log('Set:', restored.roles.get('Ada') instanceof Set)\nconsole.log('permissions:', [...(restored.roles.get('Ada') ?? [])].join(', '))"
+                code: "import { fromValueCodec } from '@migaia/storage-host/authoring/codec'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst collectionsCodec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\n\nconst settings = { roles: new Map([['Ada', new Set(['read', 'write'])]]) }\nconst raw = await collectionsCodec.encode(settings)\nconst restored = await collectionsCodec.decode(raw) as typeof settings\nconsole.log('output:', collectionsCodec.output)\nconsole.log('Map:', restored.roles instanceof Map)\nconsole.log('Set:', restored.roles.get('Ada') instanceof Set)\nconsole.log('permissions:', [...(restored.roles.get('Ada') ?? [])].join(', '))"
               },
               {
                 type: 'code',
@@ -75329,75 +71881,47 @@ class CheckoutElement extends HTMLElement {
             blocks: [
               {
                 type: 'paragraph',
-                text: 'Applications narrow stores obtained from concrete implementations; backend and adapter authors can reuse input snapshots. Type contracts do not execute I/O, cancellation or cleanup.'
+                text: 'Applications select APIs with capability tokens, while authors define implementations with implement. Pure guards only inspect inputs. Use the explicitly marked host authoring entries for async input copies, codec adaptation and transaction execution; contracts do not perform I/O, cancellation or cleanup.'
               },
               {
                 type: 'table',
                 headers: ['Entry', 'When to use it'],
                 rows: [
                   [
-                    '[collectionsJsonCodec](/en/docs/storage-contract/api/collectionsJsonCodec)',
-                    'Round-trip Map and Set through versioned text without opening a store.'
+                    '[kv](/en/docs/storage-contract/api/kv) / [records](/en/docs/storage-contract/api/records)',
+                    'Select text or record APIs using standard tokens.'
                   ],
                   [
-                    '[snapshotStorageKey](/en/docs/storage-contract/api/snapshotStorageKey)',
-                    'Validate and copy composite keys, rejecting invalid input.'
-                  ],
-                  [
-                    '[snapshotOperationContext](/en/docs/storage-contract/api/snapshotOperationContext)',
-                    'Capture cancellation, timeout, paging and conflict intent for the backend.'
-                  ],
-                  [
-                    '[snapshotStorageCapabilities](/en/docs/storage-contract/api/snapshotStorageCapabilities)',
-                    'Validate capabilities and normalize two older omissions.'
-                  ],
-                  [
-                    '[StorageContractError](/en/docs/storage-contract/api/StorageContractError)',
-                    'Retain source, code and the cause chain of a contract failure.'
-                  ],
-                  [
-                    '[snapshotKeyValueStore](/en/docs/storage-contract/api/snapshotKeyValueStore)',
-                    'Inspect a supplied string store and capture its capability facts.'
-                  ],
-                  [
-                    '[isRecordStore](/en/docs/storage-contract/api/isRecordStore) / [asRecordStore](/en/docs/storage-contract/api/asRecordStore)',
-                    'Check a backend before using bytes, records, range iteration or transactions.'
-                  ],
-                  [
-                    '[asSecondaryIndexRecordStore](/en/docs/storage-contract/api/asSecondaryIndexRecordStore)',
-                    'Admit a record store with the complete secondary-index extension.'
-                  ],
-                  [
-                    '[asChangeFeedStore](/en/docs/storage-contract/api/asChangeFeedStore)',
-                    'Admit a post-commit change feed; the caller owns subscription and cleanup.'
-                  ],
-                  [
-                    '[snapshotKeyValueStoreDetailed](/en/docs/storage-contract/api/snapshotKeyValueStoreDetailed)',
-                    'Capture the exact read failure, disposer and original receiver.'
+                    '[implement](/en/docs/storage-contract/api/implement)',
+                    'Define an implementation; the host and backend own installation and execution.'
                   ],
                   [
                     '[assertStorageKey](/en/docs/storage-contract/api/assertStorageKey) / [assertStringStorageKey](/en/docs/storage-contract/api/assertStringStorageKey)',
-                    'Validate record or string-only keys without copying.'
+                    'Validate keys without copying them.'
                   ],
                   [
-                    '[compareStorageKeys](/en/docs/storage-contract/api/compareStorageKeys)',
-                    'Compare already-valid record keys without admitting them.'
+                    '[assertOperationContext](/en/docs/storage-contract/api/assertOperationContext) / [assertCodec](/en/docs/storage-contract/api/assertCodec)',
+                    'Check operation options or codec shapes without starting tasks or converting data.'
                   ],
                   [
-                    '[assertTransactionCallback](/en/docs/storage-contract/api/assertTransactionCallback) / [readTransactionConflictPolicy](/en/docs/storage-contract/api/readTransactionConflictPolicy)',
-                    'Validate the callback and read conflict policy without starting a transaction.'
+                    '[isRecordStore](/en/docs/storage-contract/api/isRecordStore) / [asRecordStore](/en/docs/storage-contract/api/asRecordStore)',
+                    'Inspect an existing store before using records; no backend support is added.'
                   ],
                   [
-                    '[snapshotCodec](/en/docs/storage-contract/api/snapshotCodec) / [assertCodec](/en/docs/storage-contract/api/assertCodec)',
-                    'Check a codec name, output form and both methods.'
+                    '[StorageContractError](/en/docs/storage-contract/api/StorageContractError) / [isStorageContractError](/en/docs/storage-contract/api/isStorageContractError)',
+                    'Recognize contract failures with a source, code and cause chain.'
                   ],
                   [
-                    '[snapshotSyncWriteOptions](/en/docs/storage-contract/api/snapshotSyncWriteOptions) / [assertSyncWriteOptions](/en/docs/storage-contract/api/assertSyncWriteOptions)',
-                    'Check sync write options and reject supplied signal or timeout values.'
+                    '[host authoring: snapshotStorageKey](/en/docs/storage-host/api/authoring/key/snapshotStorageKey)',
+                    'Copy key values required by deferred work without freezing the copy.'
                   ],
                   [
-                    '[isArrayBuffer](/en/docs/utils/api/bytes/isArrayBuffer) / [isUint8Array](/en/docs/utils/api/bytes/isUint8Array) / [intrinsicConstructorName](/en/docs/storage-contract/api/intrinsicConstructorName)',
-                    'Use utils for binary brands, or inspect a diagnostic constructor name.'
+                    '[host authoring: snapshotOperationContext](/en/docs/storage-host/api/authoring/context/snapshotOperationContext)',
+                    'Capture scalar operation intent and borrow the original signal without starting a timer.'
+                  ],
+                  [
+                    '[host authoring: fromValueCodec](/en/docs/storage-host/api/authoring/codec/fromValueCodec)',
+                    'Adapt a serialize codec, whose implementation performs conversion.'
                   ]
                 ]
               }
@@ -75458,7 +71982,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { snapshotKeyValueStore } from '@migaia/storage-contract'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst store = memoryStorageHost()\nconst checked = snapshotKeyValueStore(store)\nif (!checked) throw new TypeError('Preferences store is unavailable')\nawait checked.store.set('theme', 'dark')\nconsole.log('主题设置:', await checked.store.get('theme'))\nconsole.log('未保存的字体:', await checked.store.get('font'))\nawait store.dispose()"
+                code: "import { snapshotKeyValueStore } from '@migaia/storage-host/authoring/store'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst store = memoryStorageHost()\nconst checked = snapshotKeyValueStore(store)\nif (!checked) throw new TypeError('Preferences store is unavailable')\nawait checked.store.set('theme', 'dark')\nconsole.log('主题设置:', await checked.store.get('theme'))\nconsole.log('未保存的字体:', await checked.store.get('font'))\nawait store.dispose()"
               },
               {
                 type: 'code',
@@ -75616,7 +72140,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { snapshotKeyValueStore } from '@migaia/storage-contract'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst store = memoryStorageHost()\nconst checked = snapshotKeyValueStore(store)\nif (!checked) throw new TypeError('Preferences store is unavailable')\nawait checked.store.set('theme', 'dark')\nconsole.log('Theme setting:', await checked.store.get('theme'))\nconsole.log('Missing font:', await checked.store.get('font'))\nawait store.dispose()"
+                code: "import { snapshotKeyValueStore } from '@migaia/storage-host/authoring/store'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst store = memoryStorageHost()\nconst checked = snapshotKeyValueStore(store)\nif (!checked) throw new TypeError('Preferences store is unavailable')\nawait checked.store.set('theme', 'dark')\nconsole.log('Theme setting:', await checked.store.get('theme'))\nconsole.log('Missing font:', await checked.store.get('font'))\nawait store.dispose()"
               },
               {
                 type: 'code',
@@ -75837,7 +72361,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { snapshotStorageCapabilities } from '@migaia/storage-contract'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst store = memoryStorageHost()\nconst older = { ...store.capabilities }\ndelete (older as Partial<typeof older>).secondaryIndexes\ndelete (older as Partial<typeof older>).changeFeed\nconst checked = snapshotStorageCapabilities(older)\nconsole.log('旧描述的索引能力:', checked?.secondaryIndexes)\nconsole.log('旧描述的变更通知:', checked?.changeFeed)\nawait store.dispose()"
+                code: "import { snapshotStorageCapabilities } from '@migaia/storage-host/authoring/store'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst store = memoryStorageHost()\nconst older = { ...store.capabilities }\ndelete (older as Partial<typeof older>).secondaryIndexes\ndelete (older as Partial<typeof older>).changeFeed\nconst checked = snapshotStorageCapabilities(older)\nconsole.log('旧描述的索引能力:', checked?.secondaryIndexes)\nconsole.log('旧描述的变更通知:', checked?.changeFeed)\nawait store.dispose()"
               },
               {
                 type: 'code',
@@ -75995,7 +72519,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { snapshotStorageCapabilities } from '@migaia/storage-contract'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst store = memoryStorageHost()\nconst older = { ...store.capabilities }\ndelete (older as Partial<typeof older>).secondaryIndexes\ndelete (older as Partial<typeof older>).changeFeed\nconst checked = snapshotStorageCapabilities(older)\nconsole.log('Older descriptor indexes:', checked?.secondaryIndexes)\nconsole.log('Older descriptor changes:', checked?.changeFeed)\nawait store.dispose()"
+                code: "import { snapshotStorageCapabilities } from '@migaia/storage-host/authoring/store'\nimport { memoryStorageHost } from '@migaia/storage-web/memory'\n\nconst store = memoryStorageHost()\nconst older = { ...store.capabilities }\ndelete (older as Partial<typeof older>).secondaryIndexes\ndelete (older as Partial<typeof older>).changeFeed\nconst checked = snapshotStorageCapabilities(older)\nconsole.log('Older descriptor indexes:', checked?.secondaryIndexes)\nconsole.log('Older descriptor changes:', checked?.changeFeed)\nawait store.dispose()"
               },
               {
                 type: 'code',
@@ -76071,7 +72595,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { snapshotOperationContext, snapshotStorageKey } from '@migaia/storage-contract'\n\nconst key = ['orders', new Date('2026-10-15T00:00:00Z')]\nconst options = { pageSize: 20 }\nconst stableKey = snapshotStorageKey(key, 'memory')\nconst context = snapshotOperationContext(options)\nkey[0] = 'drafts'\noptions.pageSize = 100\nconsole.log('已保存的查询键:', JSON.stringify(stableKey))\nconsole.log('已保存的分页大小:', context?.pageSize)\nconsole.log('查询参数已冻结:', Object.isFrozen(context))"
+                code: "import { snapshotOperationContext } from '@migaia/storage-host/authoring/context'\nimport { snapshotStorageKey } from '@migaia/storage-host/authoring/key'\n\nconst key = ['orders', new Date('2026-10-15T00:00:00Z')]\nconst options = { pageSize: 20 }\nconst stableKey = snapshotStorageKey(key, 'memory')\nconst context = snapshotOperationContext(options)\nkey[0] = 'drafts'\noptions.pageSize = 100\nconsole.log('已保存的查询键:', JSON.stringify(stableKey))\nconsole.log('已保存的分页大小:', context?.pageSize)\nconsole.log('查询参数已冻结:', Object.isFrozen(context))"
               },
               {
                 type: 'code',
@@ -76109,7 +72633,7 @@ class CheckoutElement extends HTMLElement {
                     '异步写入额外接受 `conflict` 或 `replace`。两个快照函数都保留缺省值 `undefined`，不会在此自动改成 `conflict`。'
                   ],
                   [
-                    '`ConflictPolicy / StorageContractConflictPolicy`',
+                    '`ConflictPolicy`',
                     '公开 `conflict` 和 `replace` 两个同名成员：前者遇到已有值时冲突，后者替换值；具体执行由写入后端负责。'
                   ],
                   [
@@ -76139,7 +72663,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { snapshotSyncWriteOptions } from '@migaia/storage-contract'\n\nconst options = snapshotSyncWriteOptions({\n  signal: undefined,\n  timeoutMs: undefined,\n  conflictPolicy: 'replace'\n})\nconsole.log('同步覆盖策略:', options.conflictPolicy)\nconsole.log('同步选项已冻结:', Object.isFrozen(options))"
+                code: "import { snapshotSyncWriteOptions } from '@migaia/storage-host/authoring/context'\n\nconst options = snapshotSyncWriteOptions({\n  signal: undefined,\n  timeoutMs: undefined,\n  conflictPolicy: 'replace'\n})\nconsole.log('同步覆盖策略:', options.conflictPolicy)\nconsole.log('同步选项已冻结:', Object.isFrozen(options))"
               },
               {
                 type: 'code',
@@ -76261,7 +72785,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { snapshotOperationContext, snapshotStorageKey } from '@migaia/storage-contract'\n\nconst key = ['orders', new Date('2026-10-15T00:00:00Z')]\nconst options = { pageSize: 20 }\nconst stableKey = snapshotStorageKey(key, 'memory')\nconst context = snapshotOperationContext(options)\nkey[0] = 'drafts'\noptions.pageSize = 100\nconsole.log('Captured query key:', JSON.stringify(stableKey))\nconsole.log('Captured page size:', context?.pageSize)\nconsole.log('Query options frozen:', Object.isFrozen(context))"
+                code: "import { snapshotOperationContext } from '@migaia/storage-host/authoring/context'\nimport { snapshotStorageKey } from '@migaia/storage-host/authoring/key'\n\nconst key = ['orders', new Date('2026-10-15T00:00:00Z')]\nconst options = { pageSize: 20 }\nconst stableKey = snapshotStorageKey(key, 'memory')\nconst context = snapshotOperationContext(options)\nkey[0] = 'drafts'\noptions.pageSize = 100\nconsole.log('Captured query key:', JSON.stringify(stableKey))\nconsole.log('Captured page size:', context?.pageSize)\nconsole.log('Query options frozen:', Object.isFrozen(context))"
               },
               {
                 type: 'code',
@@ -76299,7 +72823,7 @@ class CheckoutElement extends HTMLElement {
                     'Asynchronous writes also accept `conflict` or `replace`. Both option snapshot helpers preserve an omitted value as `undefined`.'
                   ],
                   [
-                    '`ConflictPolicy / StorageContractConflictPolicy`',
+                    '`ConflictPolicy`',
                     'Expose matching `conflict` and `replace` members for reporting an existing-value conflict or replacing a value. The backend implements the write.'
                   ],
                   [
@@ -76329,7 +72853,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { snapshotSyncWriteOptions } from '@migaia/storage-contract'\n\nconst options = snapshotSyncWriteOptions({\n  signal: undefined,\n  timeoutMs: undefined,\n  conflictPolicy: 'replace'\n})\nconsole.log('Synchronous overwrite policy:', options.conflictPolicy)\nconsole.log('Synchronous options frozen:', Object.isFrozen(options))"
+                code: "import { snapshotSyncWriteOptions } from '@migaia/storage-host/authoring/context'\n\nconst options = snapshotSyncWriteOptions({\n  signal: undefined,\n  timeoutMs: undefined,\n  conflictPolicy: 'replace'\n})\nconsole.log('Synchronous overwrite policy:', options.conflictPolicy)\nconsole.log('Synchronous options frozen:', Object.isFrozen(options))"
               },
               {
                 type: 'code',
@@ -77228,7 +73752,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { collectionsJsonCodec } from '@migaia/storage-contract'\n\nconst preferences = new Map([['theme', 'dark']])\nconst saved = await collectionsJsonCodec.encode(preferences)\nconst restored = await collectionsJsonCodec.decode(saved)\nconsole.log('恢复为 Map:', restored instanceof Map)\nif (restored instanceof Map) console.log('恢复的主题:', restored.get('theme'))"
+                code: "import { fromValueCodec } from '@migaia/storage-host/authoring/codec'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst collectionsCodec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\n\nconst preferences = new Map([['theme', 'dark']])\nconst saved = await collectionsCodec.encode(preferences)\nconst restored = await collectionsCodec.decode(saved)\nconsole.log('恢复为 Map:', restored instanceof Map)\nif (restored instanceof Map) console.log('恢复的主题:', restored.get('theme'))"
               },
               {
                 type: 'code',
@@ -77240,13 +73764,10 @@ class CheckoutElement extends HTMLElement {
                 headers: ['签名或字段', '行为与处理'],
                 rows: [
                   [
-                    '`collectionsJsonCodec: ICodec<unknown, string>`',
+                    '`fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))`',
                     '冻结的编解码器对象，`output` 为 `text`；使用普通 JSON，并用保留的三元素数组保存 Map 和 Set。'
                   ],
-                  [
-                    '`COLLECTIONS_JSON_CODEC_NAME`',
-                    '固定值为 `migaia-collections-json-v1`，同时用于编解码器名称与集合格式标记。'
-                  ],
+
                   [
                     '`encode(value: unknown, ctx?: IOperationContext): Promise<string>`',
                     '返回编码文本；根值为 `undefined`、循环结构、不能编码的值等会抛出 `INVALID_ARGUMENT` 并保留原因。该内置实现不处理操作上下文。'
@@ -77266,7 +73787,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { snapshotCodec } from '@migaia/storage-contract'\n\nclass SettingsCodec {\n  name = 'settings-json'\n  output = 'text' as const\n  async encode(value: unknown) {\n    return JSON.stringify(value)\n  }\n  async decode(raw: string) {\n    return JSON.parse(raw)\n  }\n}\nconst codec = snapshotCodec(new SettingsCodec())\nconsole.log('通过检查的编解码器:', codec.name)\nconsole.log('设置文件内容:', await codec.encode({ theme: 'dark' }))"
+                code: "import { snapshotCodec } from '@migaia/storage-host/authoring/codec'\n\nclass SettingsCodec {\n  name = 'settings-json'\n  output = 'text' as const\n  async encode(value: unknown) {\n    return JSON.stringify(value)\n  }\n  async decode(raw: string) {\n    return JSON.parse(raw)\n  }\n}\nconst codec = snapshotCodec(new SettingsCodec())\nconsole.log('通过检查的编解码器:', codec.name)\nconsole.log('设置文件内容:', await codec.encode({ theme: 'dark' }))"
               },
               {
                 type: 'code',
@@ -77317,7 +73838,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { collectionsJsonCodec, isStorageContractError } from '@migaia/storage-contract'\n\ntry {\n  await collectionsJsonCodec.decode('{broken')\n} catch (error) {\n  if (!isStorageContractError(error)) throw error\n  console.log('设置文件错误码:', error.code)\n  console.log('原始原因是 SyntaxError:', error.cause instanceof SyntaxError)\n}"
+                code: "import { isStorageContractError } from '@migaia/storage-contract'\nimport { fromValueCodec } from '@migaia/storage-host/authoring/codec'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst collectionsCodec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\n\ntry {\n  await collectionsCodec.decode('{broken')\n} catch (error) {\n  if (!isStorageContractError(error)) throw error\n  console.log('设置文件错误码:', error.code)\n  console.log('原始原因是 SyntaxError:', (error.cause as Error)?.cause instanceof SyntaxError)\n}"
               },
               {
                 type: 'code',
@@ -77451,7 +73972,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { collectionsJsonCodec } from '@migaia/storage-contract'\n\nconst preferences = new Map([['theme', 'dark']])\nconst saved = await collectionsJsonCodec.encode(preferences)\nconst restored = await collectionsJsonCodec.decode(saved)\nconsole.log('Restored as Map:', restored instanceof Map)\nif (restored instanceof Map) console.log('Restored theme:', restored.get('theme'))"
+                code: "import { fromValueCodec } from '@migaia/storage-host/authoring/codec'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst collectionsCodec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\n\nconst preferences = new Map([['theme', 'dark']])\nconst saved = await collectionsCodec.encode(preferences)\nconst restored = await collectionsCodec.decode(saved)\nconsole.log('Restored as Map:', restored instanceof Map)\nif (restored instanceof Map) console.log('Restored theme:', restored.get('theme'))"
               },
               {
                 type: 'code',
@@ -77463,13 +73984,10 @@ class CheckoutElement extends HTMLElement {
                 headers: ['Signature or field', 'Behavior and action'],
                 rows: [
                   [
-                    '`collectionsJsonCodec: ICodec<unknown, string>`',
+                    '`fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))`',
                     'A frozen codec object with text output. It uses JSON and reserves a three-element tuple format for Map and Set values.'
                   ],
-                  [
-                    '`COLLECTIONS_JSON_CODEC_NAME`',
-                    'Equals `migaia-collections-json-v1`, used as both the codec name and the collection-format marker.'
-                  ],
+
                   [
                     '`encode(value: unknown, ctx?: IOperationContext): Promise<string>`',
                     'Returns encoded text. An undefined root, circular data, or an encoding failure throws `INVALID_ARGUMENT` with its cause. This built-in implementation does not process the operation context.'
@@ -77489,7 +74007,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { snapshotCodec } from '@migaia/storage-contract'\n\nclass SettingsCodec {\n  name = 'settings-json'\n  output = 'text' as const\n  async encode(value: unknown) {\n    return JSON.stringify(value)\n  }\n  async decode(raw: string) {\n    return JSON.parse(raw)\n  }\n}\nconst codec = snapshotCodec(new SettingsCodec())\nconsole.log('Validated codec:', codec.name)\nconsole.log('Settings file contents:', await codec.encode({ theme: 'dark' }))"
+                code: "import { snapshotCodec } from '@migaia/storage-host/authoring/codec'\n\nclass SettingsCodec {\n  name = 'settings-json'\n  output = 'text' as const\n  async encode(value: unknown) {\n    return JSON.stringify(value)\n  }\n  async decode(raw: string) {\n    return JSON.parse(raw)\n  }\n}\nconst codec = snapshotCodec(new SettingsCodec())\nconsole.log('Validated codec:', codec.name)\nconsole.log('Settings file contents:', await codec.encode({ theme: 'dark' }))"
               },
               {
                 type: 'code',
@@ -77543,7 +74061,7 @@ class CheckoutElement extends HTMLElement {
               {
                 type: 'code',
                 language: 'ts',
-                code: "import { collectionsJsonCodec, isStorageContractError } from '@migaia/storage-contract'\n\ntry {\n  await collectionsJsonCodec.decode('{broken')\n} catch (error) {\n  if (!isStorageContractError(error)) throw error\n  console.log('Settings file error code:', error.code)\n  console.log('Cause is SyntaxError:', error.cause instanceof SyntaxError)\n}"
+                code: "import { isStorageContractError } from '@migaia/storage-contract'\nimport { fromValueCodec } from '@migaia/storage-host/authoring/codec'\nimport { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'\nconst collectionsCodec = fromValueCodec(defineCollectionsJsonCodec({ version: 1 }))\n\ntry {\n  await collectionsCodec.decode('{broken')\n} catch (error) {\n  if (!isStorageContractError(error)) throw error\n  console.log('Settings file error code:', error.code)\n  console.log('Cause is SyntaxError:', (error.cause as Error)?.cause instanceof SyntaxError)\n}"
               },
               {
                 type: 'code',

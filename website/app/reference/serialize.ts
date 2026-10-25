@@ -1295,6 +1295,22 @@ const enumDocs = {
         'Used when a format decoder fails; inspect the cause for format-specific detail.',
         '格式解码器执行失败时使用，可检查原因链中的具体格式失败。'
       ),
+      taggedOptionsInvalid: t(
+        'A tagged router needs nonempty unique codec revisions with one encoded carrier; correct the descriptors.',
+        '标签路由要求非空且不重复的编解码器版本，并使用同一种编码载体；需要修正描述符。'
+      ),
+      tagMissing: t(
+        'An input has no tag and no read-only legacy fallback is configured.',
+        '输入没有格式标签，且没有配置只读的旧格式回退读取器。'
+      ),
+      tagInvalid: t(
+        'A recognized tag header is malformed; it never falls back to the legacy reader.',
+        '已识别的标签格式头不合法；不会回退到旧格式读取器。'
+      ),
+      tagUnknown: t(
+        'A well-formed tag identifies an unregistered codec revision.',
+        '标签结构合法，但标识了尚未注册的编解码器版本。'
+      ),
       portableValueInvalid: t(
         'Used when input or decoded output lies outside the accepted portable profile.',
         '输入或解码输出不符合当前接受的可移植数据约束时使用。'
@@ -1335,6 +1351,18 @@ const enumDocs = {
         'A registration, scheduler, version, frame option or portable output input is invalid.',
         '注册、调度器、版本、切片选项或可移植文本输出输入不合法。'
       ),
+      tagMissing: t(
+        'Untagged input requires an explicitly configured legacy reader.',
+        '无标签输入要求显式配置旧格式读取器，否则拒绝读取。'
+      ),
+      tagInvalid: t(
+        'A recognized tagged header has invalid shape or identity and is never treated as raw legacy data.',
+        '已识别的标签格式头形状或身份非法，不会作为无标签旧数据处理。'
+      ),
+      tagUnknown: t(
+        'The tag is valid but its codec id and version are not registered; retain the needed reader.',
+        '标签合法，但对应编解码器 id 与版本未注册；需要保留所需读取器。'
+      ),
       envUnsupported: t(
         'Required host encoding capability is absent; inject a compatible encoder or decoder.',
         '必需的宿主编码能力缺失，需要注入兼容的编码器或解码器。'
@@ -1374,6 +1402,20 @@ export const serializeReference: ILibraryReference = {
         '定义同步编解码器，或在交给格式编解码器前检查数据时，使用此入口。`asCodecValue` 校验支持的普通数据而不复制输入；`createPortableWalker` 创建遍历器，由回调决定如何检查或转换数据。\n\n此子路径提供编解码契约与校验工具，范围比根入口的部分导出更完整。它不选择数据格式，也不注册解析器；这些任务分别由 `codecs/*` 和 `registry` 负责。'
       ),
       example: walkerExample
+    },
+    tagged: {
+      summary: t(
+        'Synchronous format router with embedded text, binary or unknown-carrier tags. The first codec writes, registered revisions read, and untagged is an explicit legacy reader.',
+        '内嵌文本、字节或 unknown 载体标签的同步格式路由器。首项写入，登记版本读取，untagged 显式读取旧值。'
+      ),
+      example: serializeCases.createTaggedCodec![0]!.example
+    },
+    'codecs/collections-json': {
+      summary: t(
+        'Synchronous strict portable JSON with recursive Map/Set records and insertion-order projection. No optional format peer is required.',
+        '保留递归 Map/Set 记录及属性顺序的同步严格 portable JSON，无需可选格式 peer。'
+      ),
+      example: serializeCases.defineCollectionsJsonCodec![0]!.example
     },
     'codecs/cbor': {
       summary: t(
@@ -1606,6 +1648,45 @@ console.log(toPortableValue({ bytes: new Uint8Array([1, 2]) }))`
       exampleResult: serializeCases.defineJsonCodec![0]!.result,
       cases: serializeCases.defineJsonCodec
     },
+    createTaggedCodec: {
+      options: 'ITaggedCodecOptions',
+      role: 'factory',
+      purpose: t(
+        'Creates a frozen tagged@1 codec from unique id/version descriptors sharing one encodedType. Fixed write headers are cached at construction. Missing, malformed and unknown tags use TAG_MISSING, TAG_INVALID and TAG_UNKNOWN.',
+        '从唯一 id/version 且 encodedType 相同的描述器创建冻结 tagged@1 codec，创建时缓存写入头部。缺失、损坏、未知标签分别报 TAG_MISSING、TAG_INVALID、TAG_UNKNOWN。'
+      ),
+      params: {
+        options: t(
+          'Required nonempty codecs tuple; first writes and all read. Optional untagged only reads raw input. Each id follows the serialize type pattern and each version is a positive safe integer.',
+          '必填非空 codecs 元组，首项写入且全部可读。可选 untagged 只读原始输入，id 符合 serialize 类型规则，version 为正安全整数。'
+        )
+      },
+      returns: t(
+        'Precise string, Uint8Array or frozen ITaggedValue output according to the declared carrier. Decode also accepts raw legacy input. Inner serialize errors keep identity; external failures retain cause.',
+        '按声明载体返回精确 string、Uint8Array 或冻结 ITaggedValue。decode 也接纳无标签原始值。内层 serialize 错误保留身份，外部错误保留 cause。'
+      ),
+      exampleIntro: serializeCases.createTaggedCodec![0]!.problem,
+      example: serializeCases.createTaggedCodec![0]!.example,
+      exampleResult: serializeCases.createTaggedCodec![0]!.result,
+      cases: serializeCases.createTaggedCodec
+    },
+    defineCollectionsJsonCodec: {
+      options: 'IJsonCodecOptions',
+      role: 'factory',
+      purpose: t(
+        'Creates a frozen collections-json codec preserving recursive Map/Set order. Other inputs share strict portable rules; bytes decode as records, class fields are projected, and malformed reserved records reject.',
+        '创建冻结的 collections-json codec，保留递归 Map/Set 顺序，其余输入复用严格 portable 规则。字节解码为记录，类实例投影字段，非法保留记录被拒绝。'
+      ),
+      params: { options: t('Required positive safe-integer version.', '必填正安全整数版本。') },
+      returns: t(
+        'String codec with literal id and version. Format failures carry ENCODE_FAILED or DECODE_FAILED and the original error on cause.',
+        '字符串 codec，保留 id 与 version 字面量。格式失败携带 ENCODE_FAILED 或 DECODE_FAILED，原错在 cause。'
+      ),
+      exampleIntro: serializeCases.defineCollectionsJsonCodec![0]!.problem,
+      example: serializeCases.defineCollectionsJsonCodec![0]!.example,
+      exampleResult: serializeCases.defineCollectionsJsonCodec![0]!.result,
+      cases: serializeCases.defineCollectionsJsonCodec
+    },
     defineCBORCodec: {
       options: 'ICborCodecOptions',
       role: 'factory',
@@ -1631,8 +1712,8 @@ console.log(codec.decode(codec.encode({ count: 2 })))`
       options: 'IMessagePackCodecOptions',
       role: 'factory',
       purpose: t(
-        'Creates a frozen synchronous MessagePack codec using @msgpack/msgpack, sorted record keys and no custom extensions. Portable admission is shared with the JSON and CBOR codecs.',
-        '使用 `@msgpack/msgpack` 创建冻结同步 `MessagePack` 编解码器，对记录键排序且不使用自定义扩展，与 `JSON` 和 `CBOR` 共用可移植接纳规则。'
+        'Creates a frozen synchronous MessagePack codec using @msgpack/msgpack, property enumeration order and no custom extensions. Portable admission is shared with the JSON and CBOR codecs.',
+        '使用 `@msgpack/msgpack` 创建冻结同步 `MessagePack` 编解码器，按属性枚举顺序投影且不使用自定义扩展，与 `JSON` 和 `CBOR` 共用可移植接纳规则。'
       ),
       params: {
         options: t(
@@ -2175,6 +2256,121 @@ console.log(${name})`
     )
   },
   types: {
+    ICodecEncodedType: {
+      summary: t(
+        'Declared encoded carrier: unknown, string or uint8array. Tagged framing uses this declaration even when an unknown-carrier codec happens to return a string.',
+        '声明的编码载体：unknown、string 或 uint8array。标签封装按此声明选择，即使 unknown 载体恰好返回字符串也不改用文本封装。'
+      ),
+      example: codecExample,
+      members: {}
+    },
+    ICollectionsCodecValue: {
+      summary: t(
+        'Recursive portable values extended with Uint8Array, readonly Map and Set, arrays and records. Collections preserve insertion order; decoded bytes use the reserved portable record representation.',
+        '在递归可移植值之上接纳 Uint8Array、只读 Map 与 Set、数组和记录。集合保留插入顺序；解码字节使用保留的可移植记录表示。'
+      ),
+      example: `import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
+
+const codec = defineCollectionsJsonCodec({ version: 1 })
+const value = new Map([['roles', new Set(['reader', 'writer'])]])
+console.log(codec.decode(codec.encode(value)))`,
+      members: {}
+    },
+    ITaggedCodecOptions: {
+      summary: t(
+        'Captured synchronous router descriptors: the first codec writes and all registered revisions read. The optional untagged codec reads only raw legacy input and must use the same encoded carrier.',
+        '一次捕获的同步路由描述符：首个编解码器负责写入，所有注册版本负责读取。可选 untagged 编解码器只读取无标签旧数据，且必须使用相同编码载体。'
+      ),
+      optionCases: [
+        {
+          title: t(
+            'Write the current revision and keep legacy readers',
+            '写入当前版本并保留旧读取器'
+          ),
+          problem: t(
+            'A deployment must read earlier tagged revisions and raw legacy data while writing only its current revision.',
+            '部署后需要读取早先的带标签版本及无标签旧数据，同时只写入当前版本。'
+          ),
+          example: serializeCases.createTaggedCodec![0]!.example,
+          result: serializeCases.createTaggedCodec![0]!.result,
+          covers: ['codecs', 'untagged']
+        }
+      ],
+      members: {
+        codecs: {
+          summary: t(
+            'Nonempty tuple of codec descriptors, with unique id/version pairs and one carrier. The first writes; every entry reads its exact tag.',
+            '非空编解码器元组，id/version 不重复且载体一致。首个用于写入，每个条目读取自己的精确标签。'
+          )
+        },
+        untagged: {
+          summary: t(
+            'Read-only fallback for input with no tagged header, using the same encoded carrier.',
+            '使用相同编码载体的只读回退读取器，只处理没有标签头的输入。'
+          ),
+          default: t(
+            'No fallback; untagged input throws TAG_MISSING.',
+            '没有回退读取器；无标签输入抛出 TAG_MISSING。'
+          )
+        }
+      }
+    },
+    ITaggedCodec: {
+      summary: t(
+        'Frozen synchronous routing codec with id tagged and version 1. encode adds the first writer tag; decode routes by the exact registered revision, retaining inner failure identity or cause.',
+        '冻结的同步路由编解码器，id 为 tagged，version 为 1。encode 添加首个写入器标签；decode 按精确注册版本路由，保留内部失败身份或 cause。'
+      ),
+      scenarios: [
+        t(
+          'Deploy a new writer without losing readers for earlier saved revisions.',
+          '部署新写入版本时，继续保留已有保存版本的读取能力。'
+        )
+      ],
+      example: serializeCases.createTaggedCodec![0]!.example,
+      members: {
+        ...codecMembers,
+        id: {
+          summary: t(
+            'Stable router identity tagged, independent of the inner writer id.',
+            '稳定路由身份 tagged，与内部写入器 id 无关。'
+          )
+        },
+        version: {
+          summary: t(
+            'Stable framing revision 1; inner codec revisions remain in their own tags.',
+            '稳定封装版本 1；内部编解码器版本保留在各自标签中。'
+          )
+        }
+      }
+    },
+    ITaggedEncoded: {
+      summary: t(
+        'Conditional encoded result selected by the declared carrier: string framing, Uint8Array framing, or a frozen ITaggedValue wrapper for unknown. It never guesses from an individual encoded value.',
+        '根据声明载体选择的条件编码结果：文本封装、Uint8Array 封装，或 unknown 载体的冻结 ITaggedValue 包装。不会按单次编码值推测载体。'
+      ),
+      example: serializeCases.createTaggedCodec![0]!.example,
+      members: {}
+    },
+    ITaggedValue: {
+      summary: t(
+        'Readonly wrapper for an unknown encoded carrier. Only the wrapper is frozen; the inner value keeps its original reference and ownership.',
+        'unknown 编码载体使用的只读包装。只冻结包装本身；内部编码值保留原引用与所有权。'
+      ),
+      members: {
+        '$migaia.codec': {
+          summary: t(
+            'Exact inner codec id and positive version joined as the routing tag.',
+            '由内部编解码器精确 id 与正整数版本组成的路由标签。'
+          )
+        },
+        value: {
+          summary: t(
+            'Original encoded payload retained without cloning or freezing it.',
+            '保持原引用的编码载荷，不额外复制或冻结该载荷。'
+          )
+        }
+      }
+    },
     ICodec: {
       summary: t(
         'Generic synchronous codec object containing format identity, explicit version, encoded representation and two callbacks. Format factories freeze the codec object; they do not freeze decoded application data.',

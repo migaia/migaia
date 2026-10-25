@@ -2,6 +2,9 @@ import { createCodecError } from './internal/codec.js'
 import { SerializeErrorCode } from './error-code.js'
 import { SERIALIZE_SOURCE } from './errors.js'
 
+/** Encoded carrier selected by a codec, independent of its business value type. */
+export type ICodecEncodedType = 'unknown' | 'string' | 'uint8array'
+
 /** Generic codec contract; callback properties preserve strict function variance. */
 export type ICodec<
   TValue,
@@ -14,7 +17,7 @@ export type ICodec<
   /** Explicit format revision; built-in factories require a positive safe integer. */
   version: TVersion
   /** Unknown preserves arbitrary values, string carries text, and uint8array carries binary frames. */
-  encodedType: 'unknown' | 'string' | 'uint8array'
+  encodedType: ICodecEncodedType
   /**
    * Synchronously converts a domain value to the declared representation; format failures are
    * thrown.

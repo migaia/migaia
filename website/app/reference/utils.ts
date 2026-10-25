@@ -1,9 +1,9 @@
 /**
  * Reference documentation of `@migaia/utils`. Rules: `app/reference/contract.ts`. Verified against
  * `packages/utils/src` (promise.ts, scheduler.ts, error.ts, error-chain*.ts, bytes.ts, object.ts,
- * object-path.ts, config.ts, function.ts, number.ts, string.ts, value.ts, url.ts, collector.ts),
- * README and USEGUIDE on 2026-10-17. Source correction: `withTimeout` with zero timeout and `start`
- * still schedules a zero-delay deadline; it does not disable the deadline.
+ * object-path.ts, config.ts, function.ts, number.ts, runtime.ts, string.ts, value.ts, url.ts,
+ * collector.ts), README and USEGUIDE on 2026-10-17. Source correction: `withTimeout` with zero
+ * timeout and `start` still schedules a zero-delay deadline; it does not disable the deadline.
  */
 import type { ILibraryReference, IMemberDoc, IOptionCaseDoc, IText, ITypeDoc } from './contract.js'
 import { utilsCases } from './utils-cases.js'
@@ -1370,8 +1370,8 @@ const getRegistry = once(() => buildRegistry())`
     },
     number: {
       summary: t(
-        'Use this entry to display numbers in a chosen locale, including money and percentages. Choose `@migaia/utils/number` when formatting is the task, rather than the root collection of general utilities.\n\n`formatCurrency()` formats a value with the currency you specify; `createNumberFormatter()` creates a formatter you can reuse across many values. The functions use `Intl.NumberFormat`, the platform number formatter, and leave currency and precision choices to you; they do not parse numeric text.',
-        '需要按指定地区的习惯显示数字、金额或百分比时，使用此入口。专门处理数字展示时，可从 `@migaia/utils/number` 导入，不必从汇集多类工具的根入口选择。\n\n`formatCurrency()` 按你指定的货币格式化数值；`createNumberFormatter()` 创建可反复处理多个数值的格式器。它们使用平台提供的数字格式器 `Intl.NumberFormat`，货币和精度仍由你决定，也不负责把文本解析成数字。'
+        'Use this entry to display numbers in a chosen locale, including money and percentages, or shorten deadlines with `jitter()`.\n\n`formatCurrency()` formats a value with the currency you specify; `createNumberFormatter()` creates a formatter you can reuse across many values. The formatters use `Intl.NumberFormat` and leave currency and precision choices to you. `jitter()` spreads expiration times without exceeding the original deadline.',
+        '需要按指定地区的习惯显示数字、金额或百分比，或用 `jitter()` 缩短期限时，使用此入口。\n\n`formatCurrency()` 按你指定的货币格式化数值；`createNumberFormatter()` 创建可反复处理多个数值的格式器。格式器使用平台提供的 `Intl.NumberFormat`，货币和精度仍由你决定。`jitter()` 分散到期时间，且不超过原始期限。'
       ),
       example: `import { formatCurrency } from '@migaia/utils/number'
 
@@ -1462,6 +1462,143 @@ isEmptyValue(0) // false`
     }
   },
   symbols: {
+    isSome: {
+      role: 'operation',
+      purpose: t(
+        'Narrow to present values without treating undefined as absence.',
+        '按 some 标签收窄到存在值分支，不把有效载荷中的 undefined 误认为缺失。'
+      ),
+      params: {
+        value: t(
+          'Typed IMaybe<T>; no additional runtime shape validation is performed.',
+          'typed IMaybe<T>，不附加运行时形状验证。'
+        )
+      },
+      returns: t(
+        'Boolean type predicate narrowing the discriminated union.',
+        '收窄判别联合的布尔类型谓词。'
+      ),
+      example: utilsCases.mapMaybe![0]!.example
+    },
+    isNone: {
+      role: 'operation',
+      purpose: t(
+        'Narrow to the absent branch without reading a payload.',
+        '按 some 标签收窄到缺失分支，无需读取或复制任何应用有效载荷。'
+      ),
+      params: {
+        value: t(
+          'Typed IMaybe<T>; no additional runtime shape validation is performed.',
+          'typed IMaybe<T>，不附加运行时形状验证。'
+        )
+      },
+      returns: t(
+        'Boolean type predicate narrowing the discriminated union.',
+        '收窄判别联合的布尔类型谓词。'
+      ),
+      example: utilsCases.mapMaybe![0]!.example
+    },
+    unwrapOr: {
+      role: 'operation',
+      purpose: t(
+        'Return the exact present value or a fallback in the same value domain.',
+        '有值时保持原有效载荷身份，缺失时返回调用方提供的同值域后备值，不扩大类型。'
+      ),
+      params: {
+        value: t(
+          'Typed IMaybe<T>; no additional runtime shape validation is performed.',
+          'typed IMaybe<T>，不附加运行时形状验证。'
+        ),
+        fallback: t(
+          'NoInfer<T>: fallback cannot widen the original value domain.',
+          'NoInfer<T>：缺省值不能扩大原值域。'
+        )
+      },
+      returns: t(
+        'The original T payload when present, otherwise the supplied fallback.',
+        '存在时返回原 T 值，否则返回提供的缺省值。'
+      ),
+      example: utilsCases.mapMaybe![0]!.example
+    },
+    mapMaybe: {
+      role: 'operation',
+      purpose: t(
+        'Map one present payload synchronously and retain the exact mapped result.',
+        '仅对存在分支同步调用映射一次，保留映射结果身份，不等待可能返回的承诺。'
+      ),
+      params: {
+        value: t(
+          'Typed IMaybe<T>; no additional runtime shape validation is performed.',
+          'typed IMaybe<T>，不附加运行时形状验证。'
+        ),
+        mapper: t(
+          'Called once only for presence; not awaited. Existing coded failures survive; uncoded native failures receive utils INVALID_ARGUMENT, preserving identity when attachable.',
+          '仅存在值调用一次，不等待结果。原带码失败保留；未编码原生失败附 utils INVALID_ARGUMENT，可附加时保留原身份。'
+        )
+      },
+      returns: t(
+        'IMaybe<N>; missing input is reused, mapped results retain identity.',
+        'IMaybe<N>；缺失输入复用，映射结果保留身份。'
+      ),
+      example: utilsCases.mapMaybe![0]!.example,
+      cases: utilsCases.mapMaybe
+    },
+    toUndefined: {
+      role: 'operation',
+      purpose: t(
+        'Convert an optional value when collapsing absence and present undefined is intentional.',
+        '仅在应用有意合并缺失与存在的 undefined 时，将带标签结果转换为可选值。'
+      ),
+      params: {
+        value: t(
+          'Typed IMaybe<T>; no additional runtime shape validation is performed.',
+          'typed IMaybe<T>，不附加运行时形状验证。'
+        )
+      },
+      returns: t(
+        'T or undefined; presence of undefined is intentionally collapsed.',
+        'T 或 undefined；有意合并值为 undefined 的存在性。'
+      ),
+      example: utilsCases.mapMaybe![0]!.example
+    },
+    jitter: {
+      role: 'operation',
+      cases: utilsCases.jitter,
+      purpose: t(
+        'Shortens a finite non-negative deadline by a bounded random fraction without extending it.',
+        '使用一次随机采样，按有界比例缩短有限非负期限，结果不超过原期限，也不延长期限。'
+      ),
+      params: {
+        value: t('Finite non-negative starting value.', '有限且非负的原始值。'),
+        ratio: t('Maximum reduction fraction in [0, 1].', '最大缩短比例，范围为 [0, 1]。'),
+        random: t(
+          'Optional sampler, default Math.random. Called once after argument validation; must return a finite value in [0, 1].',
+          '可选随机源，默认 Math.random。参数校验后调用一次；必须返回 [0, 1] 内的有限值。'
+        )
+      },
+      returns: t(
+        'A value in [value * (1 - ratio), value]. Invalid inputs or a failing sampler throw RangeError with utils INVALID_ARGUMENT; callback failures remain on cause.',
+        '返回 [value * (1 - ratio), value] 内的值。输入无效或随机源失败时抛出带 `@migaia/utils` / `INVALID_ARGUMENT` 的 `RangeError`；回调原错保留在 `cause`。'
+      ),
+      example: `import { jitter } from '@migaia/utils/number'
+
+const ttlMs = jitter(60_000, 0.2)`
+    },
+    detectServerRuntime: {
+      role: 'operation',
+      cases: utilsCases.detectServerRuntime,
+      purpose: t(
+        'Identifies the server runtime without importing host APIs, checking Deno before Bun before Node.',
+        '不导入平台宿主接口，按 Deno、Bun、Node 的固定优先级检查全局身份并识别服务端运行时。'
+      ),
+      returns: t(
+        '`deno`, `bun` or `node`; `undefined` in browsers without server globals.',
+        '`deno`、`bun` 或 `node`；没有服务端全局的浏览器返回 `undefined`。'
+      ),
+      example: `import { detectServerRuntime } from '@migaia/utils'
+
+const runtime = detectServerRuntime()`
+    },
     ...utilsFacadeSymbols,
     yieldToHost: {
       ...utilsFacadeSymbols.yieldToHost!,
@@ -2945,6 +3082,33 @@ const text = converted.threw ? '[无法显示]' : converted.value`
     }
   },
   types: {
+    IMaybe: {
+      scenarios: [
+        t(
+          'Preserve the distinction between an absent result and a present undefined payload.',
+          '保留没有结果与存在但有效载荷为 undefined 的区别。'
+        )
+      ],
+      example: utilsCases.mapMaybe![0]!.example,
+      summary: t(
+        'Presence union that distinguishes absent values from a present undefined.',
+        '区分缺失与存在 undefined 的判别联合。'
+      ),
+      members: {
+        some: {
+          summary: t(
+            'True for presence, false for absence; narrow before reading value.',
+            '存在为 true，缺失为 false；读取 value 前先收窄。'
+          )
+        },
+        value: {
+          summary: t(
+            'Exact T payload, available only on the some:true variant.',
+            '原始且精确的应用有效载荷，仅 some:true 分支允许读取。'
+          )
+        }
+      }
+    },
     ...utilsFacadeTypes,
     IIdentifyErrorOptions: {
       ...utilsFacadeTypes.IIdentifyErrorOptions!,

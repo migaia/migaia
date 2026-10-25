@@ -75,77 +75,66 @@ test('resource overview teaches capabilities, production use, and lifecycle boun
   assert.doesNotMatch(resourceOverview, /场景 1|核心设计原则和使用哲学|相比其他方案的优势/)
 })
 
-test('storage-web defineEntity imports its concrete IndexedDB backend', () => {
+test('storage-host entity guide connects the concrete IndexedDB backend', () => {
   for (const locale of ['zh', 'en'] as const) {
-    const guide = findApiGuide('storage-web', 'entity', 'defineEntity', locale)
+    const guide = findApiGuide('storage-host', 'entity', 'defineEntity', locale)
     assert.ok(guide?.quickStart)
+    assert.match(guide.quickStart, /import \{ defineEntity \} from '@migaia\/storage-host\/entity'/)
     assert.match(
       guide.quickStart,
-      /import \{ indexedDbHost \} from '@migaia\/storage-web\/indexed-db'/
+      /import \{ indexedDbBackendPlugin \} from '@migaia\/storage-web\/indexed-db'/
     )
     assert.match(guide.quickStart, /type IUser = \{ id: number; email: string \}/)
     assert.match(guide.quickStart, /defineEntity<IUser>/)
-    assert.match(guide.quickStart, /users\.connect\(indexedDbHost\(\{ dbName: 'app' \}\)\)/)
+    assert.match(guide.quickStart, /users\.connect\(host\.backend\('indexed-db'\)\)/)
+    assert.match(
+      guide.quickStart,
+      /indexedDbBackendPlugin\(\{ dbName: 'app' \}, \{ indexes: indexedDbIndexesFeature\(\) \}\)/
+    )
+    assert.match(
+      guide.quickStart,
+      /features: \[entityQueryFeature\(\), entityIndexesFeature\(\), entityUniqueFeature\(\)\]/
+    )
+    assert.match(guide.quickStart, /repository\.put\(/)
+    assert.match(guide.quickStart, /await host\.dispose\(\)/)
     assert.doesNotMatch(guide.quickStart, /\buserSchema\b|\bmigrateUserV2\b|\bUser\b/)
   }
 })
 
-// c8d24f68 replaced the parallel backend Feature/Kind/Plugin factories with native composition.
-test('storage-web feature example defines every custom backend prerequisite', () => {
+test('storage-host Feature example declares its target and consumes the installed API', () => {
   for (const locale of ['zh', 'en'] as const) {
-    const guide = findApiGuide('storage-web', 'host', 'defineFeature', locale)
+    const guide = findApiGuide('storage-host', 'index', 'defineFeature', locale)
     assert.ok(guide?.quickStart)
-    assert.match(guide.quickStart, /import \{ memoryStorageHost \}/)
-    assert.match(guide.quickStart, /const metrics = defineFeature\(\(core\) =>/)
-    assert.match(guide.quickStart, /core\.featureExpose\.getStore\(\)\.keys\(\)/)
-    assert.match(guide.quickStart, /const cachePlugin = definePlugin\('cache'/)
-    assert.match(guide.quickStart, /core\.registerStore\(memoryStorageHost\(\)\)/)
-    assert.match(guide.quickStart, /\}, \{ metrics \}\)/)
-    assert.match(guide.quickStart, /const cache = await host\.use\(cachePlugin\)/)
-    assert.match(guide.quickStart, /console\.assert\(await cache\.extensions\.count\(\) === 1\)/)
+    assert.match(
+      guide.quickStart,
+      /import \{ createStorageHost, defineFeature, memoryBackendKind, memoryBackendPlugin \}/
+    )
+    assert.match(guide.quickStart, /defineFeature\(memoryBackendKind,/)
+    assert.match(guide.quickStart, /this\.store\.use\(kv\)\.keys\(\)/)
+    assert.match(guide.quickStart, /memoryBackendPlugin\(\{ id: 'cache' \}, \{ metrics \}\)/)
+    assert.match(guide.quickStart, /host\.backend\('cache'\)/)
+    assert.match(guide.quickStart, /cache\.set\('user:1', 'Ada'\)/)
+    assert.match(guide.quickStart, /cache\.api\.count\(\)/)
+    assert.match(guide.quickStart, /featureExpose\.getBackendId\(\)/)
     assert.match(guide.quickStart, /finally \{\s+await host\.dispose\(\)/)
     assert.doesNotMatch(guide.quickStart, /\bsubscribe\s*:|\bonChange\s*[,}]/)
   }
 })
 
-test('storage-web feature guide explains the Host effect in plain language', () => {
+test('storage-host Feature guide distinguishes declaration, installation and ownership', () => {
   for (const locale of ['zh', 'en'] as const) {
-    const guide = findApiGuide('storage-web', 'host', 'defineFeature', locale)
+    const guide = findApiGuide('storage-host', 'index', 'defineFeature', locale)
     assert.ok(guide)
+    assert.match(guide.purpose, locale === 'zh' ? /后端种类/ : /backend kind/)
+    assert.match(guide.purpose, locale === 'zh' ? /第二参数/ : /second argument/)
     assert.match(
       guide.purpose,
-      locale === 'zh' ? /给存储插件定义一项可选能力/ : /optional capability for a storage plugin/
+      locale === 'zh' ? /仅定义特性不会取得存储/ : /defining it alone acquires no store/
     )
+    assert.match(guide.scenarios.join(' '), /store\.api/)
     assert.match(
-      guide.purpose,
-      locale === 'zh'
-        ? /Feature.*Plugin.*两者不是一回事/
-        : /Feature describes.*Plugin is the backend plugin/
-    )
-    assert.match(
-      guide.purpose,
-      locale === 'zh'
-        ? /不会创建 Host、不会打开数据库，也不会启用任何能力/
-        : /creates no Host, opens no database, and activates no capability/
-    )
-    assert.match(guide.purpose, /definePlugin\(\)/)
-    assert.match(guide.purpose, /createStorageHost\(\{ plugins \}\).*host\.use\(\)/)
-    assert.match(
-      guide.purpose,
-      locale === 'zh'
-        ? /每次安装都使用各自的后端存储和能力输出/
-        : /Each installation receives its own backend store and Feature output/
-    )
-    assert.match(
-      guide.purpose,
-      locale === 'zh' ? /插件句柄读取数量/ : /count through the installed plugin handle/
-    )
-    assert.match(guide.scenarios.join('\n'), /1 cache/)
-    assert.match(
-      guide.avoidWhen.join('\n'),
-      locale === 'zh'
-        ? /直接创建并使用 memoryStorageHost\(\) 即可/
-        : /Use memoryStorageHost\(\) directly/
+      guide.avoidWhen.join(' '),
+      locale === 'zh' ? /单独安装后端插件/ : /install its backend plugin alone/
     )
   }
 })
@@ -541,69 +530,55 @@ test('every Logger plugin explains and demonstrates the capability added to its 
   }
 })
 
-test('every storage-web backend plugin demonstrates the capability added to its Host', () => {
+test('every browser backend guide installs and consumes its actual Host capability', () => {
   const plugins = [
-    ['plugins/memory', 'memoryBackendPlugin', 'memory', 'cache'],
-    ['plugins/local-storage', 'localStorageBackendPlugin', 'local-storage', 'settings'],
-    ['plugins/session-storage', 'sessionStorageBackendPlugin', 'session-storage', 'draft'],
-    ['plugins/cookies', 'cookieBackendPlugin', 'cookies', 'prefs'],
-    ['plugins/indexed-db', 'indexedDbBackendPlugin', 'indexed-db', 'records']
+    ['storage-host', 'index', 'memoryBackendPlugin', '@migaia/storage-host', 'cache'],
+    [
+      'storage-web',
+      'local-storage',
+      'localStorageBackendPlugin',
+      '@migaia/storage-web/local-storage',
+      'settings'
+    ],
+    [
+      'storage-web',
+      'session-storage',
+      'sessionStorageBackendPlugin',
+      '@migaia/storage-web/session-storage',
+      'draft'
+    ],
+    ['storage-web', 'cookies', 'cookieBackendPlugin', '@migaia/storage-web/cookies', 'prefs'],
+    [
+      'storage-web',
+      'indexed-db',
+      'indexedDbBackendPlugin',
+      '@migaia/storage-web/indexed-db',
+      'records'
+    ]
   ] as const
-
-  for (const [moduleName, pluginName, importPath, backendId] of plugins) {
-    const guide = findApiGuide('storage-web', moduleName, pluginName, 'zh')
-    assert.ok(guide?.quickStart, `${pluginName} must have a maintained quick start`)
-    assert.match(guide.purpose, /use\(\)/, `${pluginName} must explain installation`)
-    assert.match(guide.purpose, /Host/, `${pluginName} must identify the capability owner`)
+  for (const [library, module, plugin, importPath, backendId] of plugins) {
+    const guide = findApiGuide(library, module, plugin, 'zh')
+    assert.ok(guide?.quickStart, `${plugin} has no maintained quick start`)
     assert.match(
       guide.quickStart,
-      /import \{ createStorageHost \} from '@migaia\/storage-web\/host'/,
-      `${pluginName} must show the Host import`
+      /import \{[^}]*createStorageHost[^}]*\} from '@migaia\/storage-host'/
     )
-    assert.match(
-      guide.quickStart,
-      new RegExp(`import \\{ ${pluginName} \\} from '@migaia/storage-web/plugins/${importPath}'`),
-      `${pluginName} must show its plugin import`
-    )
-    assert.match(guide.quickStart, /await createStorageHost\(\)/, `${pluginName}: create Host`)
-    assert.match(
-      guide.quickStart,
-      new RegExp(`host\\.hasBackend\\('${backendId}'\\)`),
-      `${pluginName}: installation baseline`
-    )
-    assert.match(
-      guide.quickStart,
-      new RegExp(`await host\\.use\\(\\s*${pluginName}\\(`),
-      `${pluginName}: install into Host`
-    )
-    assert.match(
-      guide.quickStart,
-      new RegExp(`appStorage\\.hasBackend\\('${backendId}'\\)`),
-      `${pluginName}: published capability`
-    )
-    assert.match(
-      guide.quickStart,
-      new RegExp(`appStorage\\.hasReactiveBackend\\('${backendId}'\\)`),
-      `${pluginName}: non-reactive boundary`
-    )
-    assert.match(
-      guide.quickStart,
-      new RegExp(`appStorage\\.backend\\('${backendId}'\\)`),
-      `${pluginName}: consume capability`
-    )
-    assert.match(guide.quickStart, /\.set\(/, `${pluginName}: real write`)
-    assert.match(guide.quickStart, /\.get\(/, `${pluginName}: real read`)
-    assert.match(guide.quickStart, /await appStorage\.dispose\(\)/, `${pluginName}: cleanup`)
+    assert.ok(guide.quickStart.includes(importPath))
+    assert.match(guide.quickStart, /await createStorageHost\(\{ plugins:/)
+    assert.ok(guide.quickStart.includes(`${plugin}({ id: '${backendId}'`))
+    assert.ok(guide.quickStart.includes(`host.backend('${backendId}')`))
+    assert.match(guide.quickStart, /storage\.set\(/)
+    assert.match(guide.quickStart, /storage\.get\(/)
+    assert.match(guide.quickStart, /finally \{\s+await host\.dispose\(\)/)
+    assert.ok(guide.options.some((option) => option.name === 'features'))
   }
-
-  const cookieGuide = findApiGuide('storage-web', 'plugins/cookies', 'cookieBackendPlugin', 'zh')
-  assert.ok(cookieGuide?.quickStart)
+  const cookie = findApiGuide('storage-web', 'cookies', 'cookieBackendPlugin', 'zh')
+  assert.ok(cookie?.quickStart)
   assert.match(
-    cookieGuide.quickStart,
+    cookie.quickStart,
     /scope: \{ path: '\/', sameSite: 'lax', secure: location\.protocol === 'https:' \}/
   )
-  assert.match(cookieGuide.quickStart, /await prefs\.remove\('theme'\)/)
-  assert.match(cookieGuide.purpose, /HttpOnly/)
+  assert.match(cookie.avoidWhen.join(' '), /HttpOnly/)
 })
 
 test('Logger custom plugin guide covers extension, Host use, async completion, and cleanup', () => {

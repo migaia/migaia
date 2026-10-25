@@ -101,3 +101,30 @@ export function snapshotTopologyIndexNode(
     dependencies: snapshotTopologyDependencies(dependencies, nodeId, onInvalid)
   })
 }
+
+/** Creates a mutation-incapable map facade over an immutable entry snapshot. */
+export function createTopologyReadonlyMap<K, V>(
+  entries: readonly (readonly [K, V])[]
+): ReadonlyMap<K, V> {
+  /** Private lookup hidden behind the frozen facade. */
+  const lookup = new Map(entries)
+  /** Read-only map implementation returned to callers. */
+  const facade = {
+    get: (key: K): V | undefined => lookup.get(key),
+    has: (key: K): boolean => lookup.has(key),
+    get size(): number {
+      return lookup.size
+    },
+    entries: (): MapIterator<[K, V]> => lookup.entries(),
+    keys: (): MapIterator<K> => lookup.keys(),
+    values: (): MapIterator<V> => lookup.values(),
+    forEach: (
+      callback: (value: V, key: K, map: ReadonlyMap<K, V>) => void,
+      thisArg?: unknown
+    ): void => {
+      for (const [key, value] of lookup) Reflect.apply(callback, thisArg, [value, key, facade])
+    },
+    [Symbol.iterator]: (): MapIterator<[K, V]> => lookup[Symbol.iterator]()
+  } as ReadonlyMap<K, V>
+  return Object.freeze(facade)
+}

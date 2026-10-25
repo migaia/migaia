@@ -1,0 +1,85 @@
+{
+  "name": "@migaia/storage-plugin-redis",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Native Redis and Valkey storage backend",
+  "files": [
+    "dist",
+    "README.md",
+    "README.en.md",
+    "USEGUIDE.md",
+    "USEGUIDE.en.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./ioredis": {
+      "types": "./dist/adapters/ioredis.d.ts",
+      "default": "./dist/ioredis.js"
+    },
+    "./node-redis": {
+      "types": "./dist/adapters/node-redis.d.ts",
+      "default": "./dist/node-redis.js"
+    },
+    "./bun": {
+      "types": "./dist/adapters/bun.d.ts",
+      "default": "./dist/bun.js"
+    },
+    "./features/streams": {
+      "types": "./dist/features/streams.d.ts",
+      "default": "./dist/features/streams.js"
+    },
+    "./features/pubsub": {
+      "types": "./dist/features/pubsub.d.ts",
+      "default": "./dist/features/pubsub.js"
+    },
+    "./features/sorted-sets": {
+      "types": "./dist/features/sorted-sets.d.ts",
+      "default": "./dist/features/sorted-sets.js"
+    },
+    "./features/rate-limit": {
+      "types": "./dist/features/rate-limit.d.ts",
+      "default": "./dist/features/rate-limit.js"
+    },
+    "./features/change-stream": {
+      "types": "./dist/features/change-stream.d.ts",
+      "default": "./dist/features/change-stream.js"
+    },
+    "./features/search": {
+      "types": "./dist/features/search.d.ts",
+      "default": "./dist/features/search.js"
+    }
+  },
+  "scripts": {
+    "fmt": "oxfmt src test README.md README.en.md USEGUIDE.md USEGUIDE.en.md package.json",
+    "lint": "oxlint src test",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
+    "build": "node ../../scripts/dist-stamp.mjs clean && vite build && tsc -p tsconfig.json --emitDeclarationOnly && node ../../scripts/dist-stamp.mjs write",
+    "test": "pnpm run build && vitest run"
+  },
+  "dependencies": {
+    "@migaia/serialize": "workspace:^",
+    "@migaia/storage-contract": "workspace:^",
+    "@migaia/utils": "workspace:^"
+  },
+  "devDependencies": {
+    "@migaia/logger": "workspace:^",
+    "@migaia/storage-plugin-postgres": "workspace:^",
+    "@types/bun": "1.4.3",
+    "ioredis": "6.0.0",
+    "redis": "6.3.0"
+  },
+  "peerDependencies": {
+    "@migaia/storage-host": "workspace:^",
+    "ioredis": "^6.0.0",
+    "redis": "^6.3.0"
+  },
+  "engines": {
+    "node": ">=24.0.0"
+  }
+}

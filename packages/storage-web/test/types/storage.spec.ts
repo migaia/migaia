@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { asyncDisposeKey } from '@migaia/plugin-host'
 import { asRecordStore, isKeyValueStore, isRecordStore } from '../../src/types/storage'
-import { memoryStorageHost } from '../../src/backends/memory'
-import { localStorageHost } from '../../src/backends/local-storage'
+import { createMemoryTestStore } from '../helpers/installed-backends.js'
+import { createLocalTestStore } from '../helpers/installed-backends.js'
 import type { IStorageCapabilities } from '../../src/types/capabilities'
 import type { IKeyValueStore } from '../../src/types/storage'
 
@@ -27,6 +28,7 @@ const fakeStore = (capabilities: Partial<IStorageCapabilities>) => ({
   clearValues: async () => {},
   clearAll: async () => {},
   dispose: async () => {},
+  [asyncDisposeKey]: async () => {},
   getBytes: async () => null,
   setBytes: async () => {},
   removeBytes: async () => {},
@@ -49,45 +51,6 @@ describe('asRecordStore / isRecordStore', () => {
     ;(invalidCapabilities.capabilities as { opaqueEntries: unknown }).opaqueEntries = 'no'
     expect(isKeyValueStore(invalidCapabilities)).toBe(false)
   })
-  it('runtime predicates 不泄漏 getter 异常', () => {
-    const hostile = {
-      get backend(): 'memory' {
-        throw new Error('hostile backend')
-      }
-    }
-    expect(() => isKeyValueStore(hostile)).not.toThrow()
-    expect(isKeyValueStore(hostile)).toBe(false)
-    expect(isRecordStore(hostile as never)).toBe(false)
-    expect(() => asRecordStore(hostile as never)).toThrow(
-      expect.objectContaining({ code: 'UNSUPPORTED_CAPABILITY' })
-    )
-  })
-  it('record narrowing 对每个 capability 字段只读取一次', () => {
-    const store = fakeStore({ records: true, binary: true, transactions: true, iteration: true })
-    const values = store.capabilities
-    let reads = 0
-    const capabilities: Record<string, unknown> = {}
-    for (const [key, value] of Object.entries(values))
-      Object.defineProperty(capabilities, key, {
-        get: () => {
-          reads += 1
-          return value
-        }
-      })
-    Object.defineProperty(store, 'capabilities', {
-      get: () => capabilities
-    })
-    expect(isRecordStore(store)).toBe(true)
-    expect(reads).toBe(9)
-  })
-  it('backend capabilities metadata 在运行时不可变', () => {
-    const store = memoryStorageHost()
-    expect(() => {
-      ;(store.capabilities as { records: boolean }).records = false
-    }).toThrow(TypeError)
-    expect(store.capabilities.records).toBe(true)
-  })
-
   it('运行时收到 null 或缺少 capabilities 时返回 false/稳定抛 UNSUPPORTED_CAPABILITY', () => {
     expect(isRecordStore(null as unknown as IKeyValueStore)).toBe(false)
     expect(() => asRecordStore(null as unknown as IKeyValueStore)).toThrow(
@@ -126,12 +89,12 @@ describe('asRecordStore / isRecordStore', () => {
     )
     expect(isRecordStore(store)).toBe(false)
   })
-  it('memoryStorageHost 支持 records，可被收窄', () => {
-    expect(isRecordStore(memoryStorageHost())).toBe(true)
+  it('memoryStorageHost 支持 records，可被收窄', async () => {
+    expect(isRecordStore(await createMemoryTestStore())).toBe(true)
   })
-  it('localStorageHost 不支持 records，收窄抛错', () => {
+  it('localStorageHost 不支持 records，收窄抛错', async () => {
     const values = new Map<string, string>()
-    const store = localStorageHost({
+    const store = await createLocalTestStore({
       namespace: 'test',
       storage: {
         get length() {

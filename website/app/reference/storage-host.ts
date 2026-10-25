@@ -1,0 +1,1276 @@
+import {
+  storageHostAssemblyModules,
+  storageHostAssemblySymbols,
+  storageHostAssemblyTypes,
+  storageHostAssemblyEnhancers
+} from './storage-optional-assembly.js'
+import { storageContractCases } from './storage-contract-cases.ts'
+import type { ILibraryReference, IText } from './contract.js'
+import { storageHostCases } from './storage-host-cases.js'
+import {
+  storageHostAuthoringSymbols,
+  storageHostAuthoringTypes,
+  storageHostChangeIteratorOptions
+} from './storage-host-authoring.js'
+import { storageHostJournalTypes } from './storage-host-journal.js'
+import {
+  storageHostRuntimeSymbols,
+  storageHostRuntimeTypes,
+  storageHostInstanceTypes,
+  storageHostRuntimeEnums,
+  storageHostFactoryOptionDocs
+} from './storage-host-runtime.js'
+import { storageHostPluginTypes } from './storage-host-plugins.js'
+import { storageHostHookTypes } from './storage-host-hooks.js'
+import {
+  storageHostBackfillSymbols,
+  storageHostBackfillTypes,
+  storageHostBackfillEnums
+} from './storage-host-backfill.js'
+import { storageHostNativeAuthorTypes } from './storage-host-native-authors.js'
+import { storageHostEntitySymbols, storageHostEntityTypes } from './storage-host-entity.js'
+import {
+  storageHostVectorSymbols,
+  storageHostVectorTypes,
+  storageHostMmrExample
+} from './storage-host-vector.js'
+/** Shared bilingual text keeps the reference descriptions aligned. */
+const t = (en: string, zh: string): IText => ({ en, zh })
+/** Neutral host and authoring entry, with no browser or native driver import. */
+export const storageHostReference: ILibraryReference = {
+  modules: {
+    ...storageHostAssemblyModules,
+    'authoring/migration': {
+      summary: t(
+        'Execute contiguous envelope recovery with the original cancellation and observation ports.',
+        '复用原取消与观察端口执行连续版本存档恢复。'
+      ),
+      example: storageContractCases.createMigrationPlan![0]!.example
+    },
+    'authoring/codec': {
+      summary: t(
+        'Adapt serialize codecs for asynchronous storage conversion without a second value format.',
+        '将 serialize codec 适配为异步存储转换，不增加值格式。'
+      ),
+      example: storageContractCases.fromValueCodec![0]!.example
+    },
+    'vector/mmr': {
+      summary: t(
+        'Create a pure MMR scorer for portable vector rerank using engine relevance and explicitly requested vectors. Start with mmr and a withVector().topK(k) query; this independent entry performs no retrieval or network work.',
+        '使用引擎相关性与显式请求的向量创建纯 MMR 重排评分器，从 mmr 及 withVector().topK(k) 查询开始；此独立入口不执行检索或网络操作。'
+      ),
+      example: storageHostMmrExample
+    },
+    journal: {
+      summary: t(
+        'Select storageJournalPlugin before opening fixed-organization private logs or configuring automatic journaling. The base host does not include journal runtime.',
+        '先选择 `storageJournalPlugin`，再打开固定组织私有日志或配置自动日志；基础宿主不包含日志运行时。'
+      ),
+      example: storageHostCases.storageLogStore![0]!.example
+    },
+    'authoring/vector': {
+      summary: t(
+        'Expose only standard query vector synthesis; memory scoring and ranking remain private.',
+        '只公开标准查询向量合成；内存后端的评分与排名算法仍保留在原私有拥有者。'
+      ),
+      example: storageHostCases.recommendStorageVector![0]!.example
+    },
+    'authoring/backend': {
+      summary: t(
+        'Share channel, unique-index, error and cancellation rules through finite backend functions. Controller and local key-lock construction stay on the original core; only their types are public through this entry. Features retain only controller lookup. The controller closing signal cancels its own pending lock admission without closing the shared provider. Its key-lock port excludes only the exact original live attempt lease when requested and probes canonical point identities directly, scans only selected channel buckets for ranges, and runs synchronous root writes after a final conflict recheck in the original attempt/FIFO.',
+        '通过有限后端函数共享通道、唯一索引、错误和取消规则。controller和本地键锁构造归原core，本入口只公开其类型；Feature只保留controller读取。controller关闭信号只取消自身尚未启动的锁准入，不关闭共享provider。'
+      ),
+      example: `import { createStorageOperationReporter, reportCleanupError } from '@migaia/storage-host/authoring/backend'
+
+const report = createStorageOperationReporter()
+reportCleanupError(report, new Error('cleanup failed'))`
+    },
+    entity: {
+      summary: t(
+        'Define and connect entities for basic reads and writes with neutral schema adapters and portable codecs. Import query, indexes, unique, migration and keyset factories from their own entity subpaths before selecting those operations.',
+        '定义并连接实体，以中立校验与可移植编解码执行基础读写；查询、索引、唯一约束、迁移和分页需从各自子路径导入工厂并显式选择。'
+      ),
+      example: `import { jsonCodec } from '@migaia/storage-host/entity'
+
+const encoded = await jsonCodec.encode({ active: true })
+console.log(await jsonCodec.decode(encoded))`
+    },
+    index: {
+      summary: t(
+        'Install exact backend plugins and application extensions with one runtime-neutral host. Installation-scoped borrowing reads committed dependencies without acquiring close authority. Browser adapters and native clients remain in their owning packages.',
+        '用同一个运行时中立宿主安装精确后端插件和业务扩展。安装窗口借用已提交依赖，不授予关闭权。浏览器适配与原生客户端由各自包拥有。'
+      ),
+      example: `import { createStorageHost, definePlugin } from '@migaia/storage-host'
+
+const labels = definePlugin('labels', () => ({
+  install: () => ({ label: (value: string) => value.toUpperCase() })
+}))
+await using host = await createStorageHost({ plugins: [labels] })
+console.log(host.extensions.label('draft'))`
+    }
+  },
+  symbols: {
+    ...storageHostAssemblySymbols,
+    createMigrationPlan: {
+      role: 'operation',
+      optionDocs: {
+        version: {
+          summary: t(
+            'Application’s current nonnegative safe integer archive version.',
+            '应用定义的当前存档版本，必须为非负安全整数。'
+          ),
+          example:
+            "import { createMigrationPlan, migrateEnvelopeSync } from '@migaia/storage-host/authoring/migration'\nconst plan = createMigrationPlan({\n  version: 1, steps: { 1: previous => ({ previous }) }\n})\nconsole.log(migrateEnvelopeSync(plan, { version: 0, state: 'old' }))"
+        },
+        reset: {
+          summary: t(
+            'Exclusive reset-plan callback returning one fresh state for any supported older archive; do not combine with steps.',
+            '重置计划专用回调，为受支持旧存档返回一次新状态，与逐步迁移配置互斥。'
+          ),
+          whenToUse: t(
+            'Discard old state instead of applying individual version transitions.',
+            '需要舍弃旧状态而不逐个执行版本转换时使用。'
+          ),
+          example:
+            "import { createMigrationPlan, migrateEnvelopeSync } from '@migaia/storage-host/authoring/migration'\nconst plan = createMigrationPlan({ version: 1, reset: () => ({ settings: {} }) })\nconsole.log(migrateEnvelopeSync(plan, { version: 0, state: 'old' }))",
+          returns: t(
+            'One replacement state, or a Promise used through migrateEnvelope.',
+            '一个替换状态，或通过异步迁移入口使用的承诺。'
+          )
+        },
+        steps: {
+          summary: t(
+            'Own canonical target-version keys mapped to conversion callbacks; the suffix through version must be continuous.',
+            '以自有规范目标版本为键的转换回调表，直到当前版本的后缀必须连续。'
+          ),
+          default: t(
+            'No steps supports only an archive already at the current version.',
+            '没有步骤时只支持已经处于当前版本的存档。'
+          ),
+          example:
+            "import { createMigrationPlan, migrateEnvelopeSync } from '@migaia/storage-host/authoring/migration'\nconst plan = createMigrationPlan({\n  version: 1, steps: { 1: previous => ({ previous }) }\n})\nconsole.log(migrateEnvelopeSync(plan, { version: 0, state: 'old' }))"
+        }
+      },
+      purpose: t(
+        'Capture canonical continuous version steps before asynchronous execution, or a constant-space reset callback.',
+        '在执行前检查并保存连续的版本升级步骤，或选择返回全新状态的重置回调。创建的计划可复用，不会读取或修改存储。'
+      ),
+      params: {
+        options: t(
+          'Current nonnegative safe version plus optional steps, or an exclusive reset callback.',
+          '当前非负安全版本，加可选 steps 或互斥的 reset 回调。'
+        )
+      },
+      returns: t(
+        'A reusable plan; gaps throw MIGRATION_GAP and malformed options throw INVALID_ARGUMENT.',
+        '返回可复用计划；断档抛 MIGRATION_GAP，配置形态错误抛 INVALID_ARGUMENT。'
+      ),
+      example: `const plan = createMigrationPlan({ version: 2, steps: { 2: value => ({ previous: value }) } })
+console.log(plan.baseVersion, Object.keys(plan.steps)) // 1 ['2']`
+    },
+    migrateEnvelopeSync: {
+      role: 'operation',
+      optionDocs: {
+        observe: {
+          summary: t(
+            'Optional beforeStep/afterStep observations share each actual conversion context; their results never veto migration.',
+            '可选的步骤前后观察共用实际转换上下文，其返回结果不会否决迁移。'
+          ),
+          default: t('No migration step observations.', '省略时不发送迁移步骤观察。'),
+          example: storageContractCases.migrationSyncOptions![0]!.example
+        }
+      },
+      purpose: t(
+        'Run synchronous steps in target-version order. Refuse newer archives and preserve original errors as cause.',
+        '按目标版本顺序执行同步升级步骤，返回当前状态或转换后的状态。拒绝未来版本存档；步骤失败时将原始错误保留在 cause。'
+      ),
+      params: {
+        plan: t('Plan from createMigrationPlan.', 'createMigrationPlan 创建的计划。'),
+        envelope: t('Validated version/state archive.', '已校验的版本/状态存档。'),
+        options: t(
+          'Optional observation-only beforeStep, afterStep and synchronous report callbacks.',
+          '可选的只观察 beforeStep、afterStep 与同步 report 回调。'
+        )
+      },
+      returns: t(
+        'Current state reference or migration result. Thenables fail with MIGRATION_FAILED; observer promises are not awaited.',
+        '返回当前状态引用或迁移结果；thenable 导致 MIGRATION_FAILED，观察 Promise 不等待。'
+      ),
+      example: `const plan = createMigrationPlan({ version: 1, steps: { 1: value => ({ previous: value }) } })
+console.log(migrateEnvelopeSync(plan, { version: 0, state: 'old' })) // { previous: 'old' }`
+    },
+    migrateEnvelope: {
+      role: 'operation',
+      optionDocs: {
+        observe: {
+          summary: t(
+            'Optional beforeStep/afterStep observations share each actual conversion context; their results never veto migration.',
+            '可选的步骤前后观察共用实际转换上下文，其返回结果不会否决迁移。'
+          ),
+          default: t('No migration step observations.', '省略时不发送迁移步骤观察。'),
+          example: storageContractCases.migrationAsyncOptions![0]!.example
+        },
+        signal: {
+          summary: t(
+            'Borrow the caller’s cancellation signal for waiting and per-step checks, including the unchanged-version path.',
+            '借用调用方取消信号进行等待与逐步检查，同版直接返回前也检查取消。'
+          ),
+          default: t('No external cancellation signal.', '省略时没有外部取消信号。'),
+          example: storageContractCases.migrationAsyncOptions![0]!.example
+        },
+        report: {
+          summary: t(
+            'Original utility reporter receives late rejections and cleanup/reporter context without changing the migration result.',
+            '原工具报告函数接收迟到拒绝及清理或报告阶段上下文，不改变迁移结果。'
+          ),
+          default: t('Use the original host rethrow reporter.', '省略时使用原宿主重抛报告器。'),
+          whenToUse: t(
+            'Observe failures that arrive after a cancelled migration has already settled.',
+            '需要观察已取消迁移结算后到达的迟到失败时使用。'
+          ),
+          example: storageContractCases.migrationAsyncOptions![0]!.example,
+          params: {
+            error: t('Original asynchronous failure.', '原异步失败值。'),
+            context: t('Original utility operation and failure phase.', '原工具操作名与失败阶段。')
+          },
+          returns: t('No result; reporting stays observation-only.', '无返回结果，报告只作观察。')
+        }
+      },
+      purpose: t(
+        'Run asynchronous migrations with shared cancellation and late-rejection reporting, including cancellation before unchanged-version returns.',
+        '借用共享取消与迟到拒绝报告执行异步迁移，同版返回前仍检查取消。'
+      ),
+      params: {
+        plan: t('Reusable migration plan.', '可复用迁移计划。'),
+        envelope: t(
+          'Validated archive; user state mutations are not rolled back.',
+          '已校验存档；用户对状态的修改不会回滚。'
+        ),
+        options: t(
+          'Optional signal, utils reporter and observation-only step callbacks.',
+          '可选 signal、utils reporter 和只观察的步骤回调。'
+        )
+      },
+      returns: t(
+        'Promise for current or migrated state; cancellation rejects ABORTED with the signal reason as cause.',
+        '返回当前或升级后状态的 Promise；取消以 ABORTED 拒绝，cause 为信号原因。'
+      ),
+      example: `const plan = createMigrationPlan({ version: 1, steps: { 1: async value => ({ previous: value }) } })
+console.log(await migrateEnvelope(plan, { version: 0, state: 'old' })) // { previous: 'old' }`
+    },
+
+    fromValueCodec: {
+      role: 'operation',
+      purpose: t(
+        'Validate a serialize codec and adapt its independently typed callbacks to asynchronous storage conversion. The adapter owns no value format or resource.',
+        '校验 serialize codec，将独立类型的两条回调适配为异步存储转换；适配器不拥有值格式或资源。'
+      ),
+      params: {
+        codec: t(
+          'Concrete value codec with id, positive safe version, encodedType, encode and decode.',
+          '包含 id、正安全版本、encodedType、encode 与 decode 的具体值 codec。'
+        )
+      },
+      returns: t(
+        'Exact-name/route adapter. Callback failures become INVALID_ARGUMENT with original cause; encode and decode preserve their separate inputs and Awaited results.',
+        '返回保留精确名称与路由的适配器；回调失败以保留原 cause 的 INVALID_ARGUMENT 报告，两条回调保留各自输入与 Awaited 结果。'
+      ),
+      exampleIntro: storageContractCases.fromValueCodec![0]!.problem,
+      example: storageContractCases.fromValueCodec![0]!.example,
+      exampleResult: storageContractCases.fromValueCodec![0]!.result,
+      cases: storageContractCases.fromValueCodec
+    },
+
+    asyncDisposeKey: {
+      role: 'constant',
+      purpose: t(
+        'The original plugin-host disposal symbol, re-exported through the backend authoring entry. It preserves the same identity on runtimes with or without native Symbol.asyncDispose.',
+        '通过后端作者入口重导出的原plugin-host释放symbol；无论运行时是否提供原生Symbol.asyncDispose，都保留同一身份。'
+      ),
+      example: storageHostCases.asyncDisposeKey![0]!.example,
+      cases: storageHostCases.asyncDisposeKey
+    },
+    storageLogStore: {
+      optionDocs: {
+        prefix: {
+          summary: t(
+            'Nonempty private prefix selected for this exact backend and org. Nonexclusive native namespaces read the current index per operation.',
+            '为本准确后端及组织选择的非空私有前缀，非独占原生命名空间逐操作读取当前索引。'
+          ),
+          example: storageHostCases.storageLogStore![0]!.example
+        }
+      },
+      role: 'factory',
+      purpose: t(
+        'Recover a caller-closeable private ILogStore without granting raw backend or host authority. Native selection certifies the exact original registration, including across hosts with matching ids and orgs.',
+        '恢复可由调用方释放的私有 ILogStore，不授予 raw 后端或宿主权；原生选择认证精确原 registration，跨宿主的同名 id/org 也不能替代。'
+      ),
+      params: {
+        host: t(
+          'The original host or its immutable organization view.',
+          '原宿主或不可变组织视图。'
+        ),
+        id: t(
+          'An exact installed backend ID with an authentic private journal binding.',
+          '具备真实私有 journal binding 的准确已安装后端 ID。'
+        ),
+        options: t(
+          'A nonempty private prefix in this backend/org. Cached mode reserves it for the handle lifetime; current-index mode serializes each operation in its original native transaction.',
+          '本后端及组织内的非空私有前缀；缓存模式保留资源期独占，现读索引模式逐操作沿原生事务串行化。'
+        )
+      },
+      returns: t(
+        'Promise<ILogStore> after recovery; uncertain writes seal the handle, and reopening reads the durable head.',
+        '恢复后的 Promise<ILogStore>；未确认写入停止句柄准入，重开读取持久 head。'
+      ),
+      example: storageHostCases.storageLogStore![0]!.example,
+      cases: storageHostCases.storageLogStore
+    },
+    recommendStorageVector: {
+      role: 'operation',
+      purpose: t(
+        'Compute positive mean minus negative mean for native retrieval.',
+        '为原生检索计算正样本均值减负样本均值，不另行实现后端的评分与排名算法。'
+      ),
+      params: {
+        positive: t(
+          'Nonempty readonly sample vectors with common finite dimensions.',
+          '具有相同有限维度的非空只读样本向量。'
+        ),
+        negative: t(
+          'Optional readonly samples; omission or empty input contributes zero.',
+          '可选只读样本；省略或空输入贡献零。'
+        )
+      },
+      returns: t(
+        'Independent readonly vector; invalid samples reject with INVALID_ARGUMENT and retain original causes. The collection validates cosine zero direction.',
+        '独立只读向量；非法样本报 INVALID_ARGUMENT 并保留原 cause；cosine 零方向由 collection 校验。'
+      ),
+      example: storageHostCases.recommendStorageVector![0]!.example,
+      cases: storageHostCases.recommendStorageVector
+    },
+    createBackendChangeIterator: {
+      optionDocs: storageHostChangeIteratorOptions,
+      role: 'operation',
+      purpose: t(
+        'Bridge the installed controller to its original iterator lifetime with one pending invalidation slot.',
+        '把已安装 controller 接到原 iterator 生命周期，仅保留一个待消费失效提示。'
+      ),
+      params: {
+        controller: t(
+          'The exact installed controller borrowed through the original core or Feature port.',
+          '沿原 core 或 Feature 接点借用的准确已安装 controller。'
+        ),
+        options: t(
+          'Fixed orgId/channel, optional text key/context, and optional original per-next execute callback. Context is captured once and supplied to execute.',
+          '固定 orgId/channel，可选文本 key/context 与原逐 next execute 回调；context 单次捕获并传给 execute。'
+        )
+      },
+      returns: t(
+        'The native IStorageIterator<IStorageChange>. Multiple unconsumed matches coalesce to the latest sequence with channel all and no keys/scope. Disposal wakes pending reads before draining and unsubscribes once.',
+        '原生 IStorageIterator<IStorageChange>；多个未消费匹配提示合并为最新 sequence 的 all，省略 keys/scope。释放先唤醒 pending read 再排空，只取消订阅一次。'
+      ),
+      example: storageHostCases.createBackendChangeIterator![0]!.example,
+      cases: storageHostCases.createBackendChangeIterator
+    },
+    storageJournalLockKey: {
+      role: 'operation',
+      purpose: t(
+        'Return the original canonical journal head or resource lock identity without acquiring it.',
+        '返回原日志头记录或资源的规范锁身份，编码复用原拥有者且本函数不获取锁。'
+      ),
+      params: {
+        prefix: t('Nonempty private namespace prefix.', '非空私有 namespace prefix。'),
+        part: t(
+          'StorageJournalLock.head or StorageJournalLock.resource.',
+          '由 `StorageJournalLock.head` 或 `StorageJournalLock.resource` 选择头记录或资源身份。'
+        )
+      },
+      returns: t(
+        'ILockKey from the original key codec; invalid arguments reject with INVALID_ARGUMENT.',
+        '原 key codec 的 ILockKey，非法入参报 INVALID_ARGUMENT。'
+      )
+    },
+    StorageJournalLock: {
+      role: 'constant',
+      purpose: t(
+        'Canonical head and resource roles for the existing journal lock owner.',
+        '既有日志锁拥有者的头记录与资源规范角色，读取角色本身不获取锁或提交权限。'
+      )
+    },
+    encodeStorageJournalImage: {
+      role: 'operation',
+      purpose: t(
+        'Encode an absent or portable value through the original durable image codec.',
+        '沿原持久镜像编解码器编码缺失或可移植值，保留唯一编码身份与版本。'
+      ),
+      params: {
+        present: t(
+          'Preserve absence independently from a present null.',
+          '缺失与存在的 null 独立保留。'
+        ),
+        value: t('The original portable value or byte array.', '原可移植值或字节数组。'),
+        bytes: t('Use the original base64 representation for bytes.', '字节使用原 base64 表示。')
+      },
+      returns: t(
+        'A frozen present/absent image with the original codec identity and version.',
+        '保留原 codec 身份和版本的冻结存在/缺失镜像。'
+      ),
+      example: storageHostCases.encodeStorageJournalImage![0]!.example,
+      cases: storageHostCases.encodeStorageJournalImage
+    },
+    decodeStorageJournalImage: {
+      role: 'operation',
+      purpose: t(
+        'Decode only the original versioned durable image and preserve codec failures on cause.',
+        '仅解码原版本化持久镜像，并在原因链保留编解码器原错误，不重新解释另一种格式。'
+      ),
+      params: {
+        image: t('One original present/absent image.', '一个原存在/缺失镜像。'),
+        bytes: t('Decode the original base64 byte representation.', '解码原 base64 字节表示。')
+      },
+      returns: t(
+        'Absence or the decoded portable value; malformed owned wire reports JOURNAL_RECORD_INVALID.',
+        '缺失或解码后的可移植值；损坏的自有 wire 报 JOURNAL_RECORD_INVALID。'
+      ),
+      example: storageHostCases.decodeStorageJournalImage![0]!.example,
+      cases: storageHostCases.decodeStorageJournalImage
+    },
+    createBackendJournalNamespace: {
+      options: 'IBackendJournalNamespaceOptions',
+      role: 'operation',
+      purpose: t(
+        'Reuse the original private namespace resource lifetime; backend owners retain data and actual native terminal decisions.',
+        '复用原私有 namespace 资源生命周期，数据与实际原生终态仍归后端拥有者。'
+      ),
+      params: {
+        options: t(
+          'Original assertLive/closingSignal/report, native facts, reservation, authenticated private transaction and native transaction entry.',
+          '原 assertLive/closingSignal/report、native 事实、reservation、认证私有事务与原生事务入口。'
+        )
+      },
+      returns: t(
+        'Promise of IStorageJournalNamespace. run and terminal subscriptions retain accepted work until actual onEnd; transactionInfo is a pure authenticated fact. No raw client, installer or backend close rights.',
+        'Promise<IStorageJournalNamespace>；run 与终态订阅保留已接纳工作直到实际 onEnd，transactionInfo 仅返回认证事实，不外露 raw client、installer 或后端关闭权。'
+      ),
+      example: storageHostCases.storageLogStore![0]!.example,
+      cases: storageHostCases.storageLogStore
+    },
+    observeStorageBatch: {
+      role: 'operation',
+      purpose: t(
+        'Observe one already-admitted native batch through the original operation stages and scheduler.',
+        '借用原操作观察与调度器观察一个已准入原生批量操作，既不重跑也不取得提交权。'
+      ),
+      params: {
+        stages: t(
+          'Original store or authenticated transaction operation observer.',
+          '原store或真实事务的操作观察接点。'
+        ),
+        scheduler: t(
+          'Original host scheduler used only for elapsed time.',
+          '原宿主scheduler，仅用于测量耗时。'
+        ),
+        operation: t('Owning backend operation name.', '所属后端的操作名。'),
+        count: t(
+          'Input entry count, or undefined for a prefix operation.',
+          '输入条目数，前缀操作可为undefined。'
+        ),
+        invoke: t(
+          'Already-admitted native work, invoked exactly once.',
+          '已准入的原生工作，仅调用一次。'
+        )
+      },
+      returns: t(
+        'Promise of the unchanged native result; original errors reject unchanged.',
+        '返回原生结果的Promise；拒绝保持原异常对象。'
+      )
+    },
+    registerRecordIndexBackfillStore: {
+      role: 'operation',
+      purpose: t(
+        'Register the existing native backfill provider in its moved neutral owner.',
+        '在迁入的中立拥有者登记已有原生补录 provider。'
+      ),
+      params: {
+        backend: t('Original constructed backend object.', '原构造后端对象。'),
+        provider: t(
+          'Captured native backfill protocol; no methods are called during registration.',
+          '捕获的原生补录协议；登记不调用其方法。'
+        )
+      },
+      returns: t(
+        'void; no transaction or close authority is granted.',
+        'void；不授予事务或关闭权限。'
+      )
+    },
+    markRecordIndexBackfillContentionFailure: {
+      role: 'operation',
+      purpose: t(
+        'Mark an original coded native contention error without replacing it.',
+        '标记原 coded 原生争用错误，不替换原对象。'
+      ),
+      params: { error: t('Original coded native error object.', '原 coded 原生错误对象。') },
+      returns: t(
+        'void; entity orchestration recognizes this same identity for its existing fallback.',
+        'void；实体编排按同一身份识别已有回退。'
+      )
+    },
+    RecordIndexBackfillPhase: {
+      role: 'constant',
+      purpose: t(
+        'Retain canonical and legacy persisted scan phase values.',
+        '保留 canonical 与 legacy 持久化扫描阶段值。'
+      ),
+      returns: t(
+        'The existing phase vocabulary with no new backend state.',
+        '已有阶段词汇，不新增后端状态。'
+      )
+    },
+    memoryBackendPlugin: {
+      params: {
+        options: t(
+          'Caller-selected native memory options; no backend opens until installation.',
+          '调用方选择的原生内存选项，安装之前不打开后端。'
+        ),
+        features: t(
+          'Explicit named Feature record from defineFeature, passed as the separate final argument.',
+          '来自 `defineFeature` 的显式具名特性记录，作为独立最后参数传入。'
+        )
+      },
+      optionDocs: storageHostFactoryOptionDocs.memory,
+      role: 'factory',
+      purpose: t(
+        'Define an isolated memory backend without acquiring data before installation. Optional namespace-local capacity captures positive maxEntries/maxBytes and lru (default) or lfu once. Linked policy nodes and the original deadline radix select committed victims; native transactions and root writes share the original owner, budget and victim locks. onEvict reports only per-channel counts after commit. Explicit maxBytes requires a real canonical encoding; unsupported records reject before mutation. Omitted capacity and maxEntries preserve the original structuredClone domain.',
+        '定义独立内存后端，安装前不获取数据。可选 namespace 容量单次捕获正 maxEntries/maxBytes 与 lru（缺省）或 lfu。策略双链节点和原 deadline radix 选择提交后的驱逐项，原生事务、根写共用原 owner、预算与目标锁。onEvict 只在提交后报告逐通道数量。显式 maxBytes 必须有真实 canonical 编码，不能编码的 record 修改前拒绝；省略容量及 maxEntries 保留原 structuredClone 值域。'
+      ),
+      returns: t(
+        'A literal-id memory plugin retaining selected Features from the separate final argument memoryBackendPlugin(options, features). Native RDF uses six fixed canonical-term radix indexes, fixed-org graphs and the original transaction draft. Pattern matching is native; traversal and paging retain the shared query reader. Records use the shared records query core. Native blob keeps independent fixed-org object entries, conditional final commits, snapshot ranges and prefix pages, sharing original capacity and content resources without transaction projection.',
+        '通过独立最后参数memoryBackendPlugin(options, features)保留所选Feature的字面量id内存插件。原生RDF以六个固定term radix索引、固定org图与原事务draft执行；pattern原生匹配，traversal和分页沿共享query reader；records复用原查询核心。原生blob保持独立固定org对象条目、条件最终提交、范围快照与前缀分页，复用原容量与内容资源，不提供事务投影。'
+      ),
+      cases: [
+        ...(storageHostCases.memoryBackendPlugin ?? []),
+        ...storageHostCases.createBackendChangeIterator!,
+        ...storageHostCases.memoryNativeVector!
+      ]
+    },
+    memoryBackendKind: {
+      role: 'constant',
+      purpose: t(
+        'Target memory Features using exact backend kind identity.',
+        '以准确后端种类身份绑定内存特性，同名种类对象不能代替真实的目标身份。'
+      ),
+      returns: t(
+        'The authentic memory kind; its client is undefined and its transaction client checks the original scope and returns undefined.',
+        '真实memory种类；client为undefined，事务client校验原scope后返回undefined。'
+      )
+    },
+    resolveStorageNamespace: {
+      params: {
+        configured: t(
+          'Namespace or database name captured from native plugin options.',
+          '来自原生插件配置选项的命名空间或数据库名称。'
+        ),
+        orgId: t(
+          'Canonical organization id returned by the original host context.',
+          '来自原宿主上下文返回的规范组织编号。'
+        ),
+        defaultOrgId: t(
+          'Default organization id from the original host installation.',
+          '来自原宿主安装过程捕获的缺省组织编号。'
+        )
+      },
+      role: 'operation',
+      purpose: t(
+        'Resolve one configured backend namespace while keeping each instance prefix and canonical organization identity.',
+        '解析后端配置namespace，保留各实例前缀与规范组织身份。'
+      ),
+      returns: t(
+        'One argument validates and returns the configured target. Three arguments return the configured default target, or configured/orgId for another organization. A slash UUID configuration suffix rejects before I/O.',
+        '单参校验并返回原配置；三参在缺省组织返回原配置目标，其它组织返回configured/orgId。配置的slash UUID后缀在I/O前拒绝。'
+      ),
+      cases: storageHostCases.resolveStorageNamespace
+    },
+    createOrgId: {
+      role: 'factory',
+      purpose: t(
+        'Generate a lowercase UUID using the host native crypto.randomUUID capability.',
+        '通过宿主原生 `crypto.randomUUID` 能力生成规范小写组织编号，不使用自制随机替代算法。'
+      ),
+      returns: t(
+        'A canonical UUID string. Missing native UUID support rejects with UNSUPPORTED_CAPABILITY and preserves the original cause.',
+        '规范UUID字符串。缺少原生UUID能力时以UNSUPPORTED_CAPABILITY拒绝，并保留原cause。'
+      ),
+      example: `import { createOrgId } from '@migaia/storage-host'
+
+console.log(createOrgId())`,
+      cases: storageHostCases.createOrgId
+    },
+    createStorageHost: {
+      params: {
+        options: t(
+          'Initial plugin tuple and captured lifecycle/configuration options.',
+          '初始插件元组以及单次捕获的生命周期与配置选项。'
+        )
+      },
+      options: 'IStorageHostCreateOptions',
+      role: 'factory',
+      purpose: t(
+        'Create the original PluginHost-backed storage lifecycle and atomically install its initial tuple. Backend lookup retains the exact admitted object.',
+        '建立复用原PluginHost的存储生命周期，并原子安装初始插件元组。后端查找保留准入的原对象。'
+      ),
+      returns: t(
+        'A Promise of the exact installed host after default environment detection; a failed install or check is cleaned up before rejection. Set autoDetect:false for explicit host.detect().',
+        '完成默认环境检查后返回精确宿主的Promise；安装或检查失败后完成清理再拒绝。autoDetect:false改为显式host.detect()。'
+      ),
+      example: `import { createStorageHost, definePlugin } from '@migaia/storage-host'
+
+const labels = definePlugin('labels', () => ({
+  install: () => ({ label: (value: string) => value.toUpperCase() })
+}))
+await using host = await createStorageHost({ plugins: [labels] })
+console.log(host.extensions.label('draft'))`,
+      cases: storageHostCases.createStorageHost
+    },
+    definePlugin: {
+      role: 'factory',
+      purpose: t(
+        'Capture a named descriptor factory and selected Features without opening a backend. Named generic descriptor factories retain the actual store and extension types. The original core reads the captured defaultOrgId and creates revision facts for a physical backend through createRevisionPort(). Explicit contextualExtensions keys opt one level of own API methods into the original org call context; unselected data objects retain their identity.',
+        '捕获具名descriptor工厂与选中的Feature，不提前打开后端。具名泛型工厂保留实际store和扩展类型。原core读取已捕获的defaultOrgId，并经createRevisionPort()创建物理后端修订事实。显式contextualExtensions键只让一层自有API方法取得原组织调用上下文；未选数据对象保持原身份。'
+      ),
+      returns: t(
+        'An opaque literal-id plugin handle consumed by createStorageHost or host.use.',
+        '由createStorageHost或host.use消费的字面量id插件句柄。'
+      )
+    },
+    defineFeature: {
+      role: 'factory',
+      purpose: t(
+        'Bind a synchronous Feature definition to authentic backend kind identities. Its selected capabilities, chain methods and grouped API retain precise author types. Original scope factories project transaction methods before freezing; original query and builder branches retain fluent methods and their receivers.',
+        '把同步Feature定义绑定到真实后端种类身份，保留所选能力、链方法和分组API的作者类型；原scope工厂冻结前投影事务方法，原query和builder分支保留链方法与receiver。'
+      ),
+      returns: t(
+        'The original opaque PluginHost Feature with private storage target metadata.',
+        '带私有存储目标元数据的原PluginHost Feature。'
+      )
+    },
+    defineStorageBackendKind: {
+      role: 'factory',
+      purpose: t(
+        'Create an identity token describing the backend store, native client and extra function expose. Equal names do not make two tokens interchangeable.',
+        '创建描述后端store、原生client与额外函数暴露面的身份令牌。同名令牌不能互换。'
+      ),
+      returns: t(
+        'A kind factory whose result is checked by exact object identity at installation.',
+        '种类工厂；安装时按结果对象的准确身份校验。'
+      )
+    },
+    assertStorageBackendId: {
+      params: {
+        id: t('Candidate backend id supplied by the plugin author.', '插件作者提供的候选后端编号。')
+      },
+      role: 'operation',
+      purpose: t(
+        'Reject an invalid bounded ASCII backend id before installation changes membership.',
+        '在安装改变成员之前拒绝非法的有界后端编号，调用方应修正编号后重试。'
+      ),
+      returns: t(
+        'Returns void for valid input; invalid input throws a coded native TypeError.',
+        '合法输入返回void；非法输入抛带语义码的原生TypeError。'
+      )
+    },
+    ...storageHostAuthoringSymbols,
+    ...storageHostRuntimeSymbols,
+    ...storageHostBackfillSymbols,
+    ...storageHostEntitySymbols,
+    ...storageHostVectorSymbols
+  },
+  types: {
+    ...storageHostAssemblyTypes,
+    IStorageJournalRedoAttempt: {
+      summary: t(
+        'Exact text-only txId and record(scope), authenticated by the original transaction owner without record/bytes placeholders.',
+        '精确 text-only txId 与 record(scope)，由原事务拥有者认证，不伪造 record/bytes 方法。'
+      ),
+      example: storageHostCases.IStorageJournalRedoAttempt![0]!.example,
+      members: {}
+    },
+    IStorageJournalRedoBinding: {
+      summary: t(
+        'Original text scope authentication, native protect/apply/replay/seal callbacks. No new queue, raw store, native transaction or close authority is returned.',
+        '原文本 scope 认证及物理 protect/apply/replay/seal 回调，不返回新队列、raw store、原生事务或关闭权。'
+      ),
+      example: storageHostCases.IStorageJournalRedoBinding![0]!.example,
+      members: {}
+    },
+    IStorageJournalOptions: {
+      summary: t(
+        'Borrow a logger with a stable namespace and explicit same-registration atomicBinlog/atomicUndo handles by backend id. telemetry=true requires the actual level plugin atLevel port and emits ordinary storage-category entries without changing payload/Error references, including the first org endpoint after its original preparation. Global journal selects an async bootstrap stage, so sync methods reject with the original ASYNC_STAGE_IN_SYNC_ENTRY before their terminal.',
+        '借用 logger，固定 namespace，按 backend id 显式选择同 registration 的 atomicBinlog/atomicUndo；telemetry=true 要求真实 level 插件 atLevel 接点，沿普通 storage 分类条目交付 payload 与原 Error 引用，首组织终点也在原准备后记录；全局 journal 选择异步 bootstrap stage，同步方法在终点前报原 ASYNC_STAGE_IN_SYNC_ENTRY。'
+      ),
+      members: {
+        redoWal: {
+          summary: t(
+            'Explicitly select the exact logger.wal object whose latest pending index all redo participants share. Independent caches and matching namespace strings are insufficient.',
+            '显式选择所有 redo 参与者共享最新 pending 的精确 logger.wal 对象；独立缓存与同名 namespace 不够。'
+          )
+        }
+      }
+    },
+    IStorageJournalInitializerContext: {
+      summary: t(
+        'Fixed orgId and original private storageLogStore helper for one-time organization preparation; no raw backend or host mutation rights.',
+        '一次性组织准备所用的固定 orgId 与原私有 storageLogStore helper，不返回 raw 后端或宿主修改权。'
+      ),
+      members: {}
+    },
+    IStorageJournalConfiguration: {
+      summary: t(
+        'Direct borrowed options or an async initializer. The default org prepares in the final original install batch, and later orgs share one preparation Promise before supported asynchronous endpoints.',
+        '直接借用配置或异步 initializer；缺省组织在原安装批次末尾准备，后续组织在受支持异步终点前共享一次准备 Promise。'
+      ),
+      members: {}
+    },
+    IUndoableStore: {
+      summary: t(
+        'undo(txId, ctx?) returns a new committed txId after all original afterRevision/value checks; duplicate persisted image identities reject as damaged owned records. Selected logger inference adds it only to journal-enabled backend and borrowed org results.',
+        'undo(txId, ctx?) 在全部原 afterRevision/值检查后返回新的已提交 txId，重复持久镜像身份按自有记录损坏拒绝；仅真实所选 logger 推断向启用 journal 的后端和组织借用结果增加该类型。'
+      ),
+      members: {}
+    },
+    IStorageJournalUndoRunner: {
+      summary: t(
+        'Backend-author callback invokes the original tx().lock(...).run with all canonical targets and no new transaction owner.',
+        '后端作者回调用全部规范目标调用原 tx().lock(...).run，不增加事务拥有者。'
+      ),
+      members: {}
+    },
+    IStorageJournalAttempt: {
+      summary: t(
+        'Original authenticated txId, pre-commit record(scope), and optional settle() for terminal-started external append. No new transaction or terminal authority.',
+        '原认证 txId、提交前 record(scope)，以及仅排空原 terminal 外置追加的可选 settle()；不授予新事务或终态权。'
+      ),
+      members: {}
+    },
+    IStorageJournalExecutionPort: {
+      summary: t(
+        'Fixed-org preparation plus original first-acquisition head locks, active fact, and native-scope capture. Backends keep their original concurrency, draft, commit and lifecycle owners.',
+        '固定组织准备、原第一次取锁的 head 锁、active 事实与 native scope 捕获；后端保留原并发、draft、提交和生命周期拥有者。'
+      ),
+      members: {}
+    },
+    IStorageHostOptions: {
+      summary: t('Captured host construction options.', '单次捕获的宿主构造选项。'),
+      members: {
+        journal: {
+          summary: t(
+            'Optional global journal configuration; omitted configurations leave the original execution path unchanged. Memory external WAL uses the original intent/marker protocol when its binding explicitly supports external awaits. Native memory undo checks all original revisions and values before restoring through the original locked transaction. External undo uses the same full-image WAL/marker protocol with exact-only repeated mirror publication. Redo, blob capture and other-backend wiring remain unfinished.',
+            '可选全局 journal；省略时保持原路径。memory 外置 WAL 在原 binding 显式允许外部等待时使用原 intent/marker 协议；memory 原生 undo 比较全部原修订和值，再沿原加锁事务恢复；外置 undo 复用完整镜像 WAL/marker 协议，仅完整相同的已发布镜像可幂等略过；redo、blob 捕获和其它后端接线尚未完成。'
+          )
+        }
+      }
+    },
+    IStorageJournalNamespaceView: {
+      summary: t(
+        'Six original string KV methods plus actual private keys; business bulk and TTL capabilities are absent.',
+        '原六个字符串 KV 方法与真实私有 keys，不继承业务批量和 TTL。'
+      ),
+      members: {
+        getOrInsert: {
+          summary: t(
+            'Optional original native row initialization and lock in the current transaction. PostgreSQL uses its existing primary key and SELECT FOR UPDATE; no table, lifetime lock or commit authority is added.',
+            '可选的原生行初始化与当前事务内锁定；PostgreSQL 复用现有主键和 SELECT FOR UPDATE，不新增表、资源期锁或提交权限。'
+          )
+        }
+      }
+    },
+    IStorageJournalNamespace: {
+      summary: t(
+        'Private native run, actual commit/rollback callbacks and accepted-work disposal; it never closes its backend.',
+        '私有原生 run、真实 commit/rollback 回调和已接纳工作清理，不关闭其后端。'
+      ),
+      members: {
+        nativeAtomic: {
+          summary: t(
+            'Remains a strict original backend fact. False is admitted only for pure external commit-only binlog without WAL, undo or selected native log stores; their requirements remain true.',
+            '保留原后端严格事实；false 只用于没有 WAL、undo 或所选 native 日志载体的纯外置 commit-only binlog，其它保证仍要求 true。'
+          )
+        },
+        indexExclusive: {
+          summary: t(
+            'Optional false selects current state reads in each original native transaction without a cross-operation index. Omission preserves the exclusive cached path; nativeAtomic remains independent.',
+            '可选 false 使每次日志操作在原生事务内读取当前状态，不保留跨操作索引；省略时保留独占缓存路径，nativeAtomic 仍独立。'
+          )
+        },
+        assertLive: {
+          summary: t(
+            'Optional original generation check, captured once by storageLogStore and reused before cached reads and native ports. Memory drop invalidates old handles; it never silently reuses deleted indexes.',
+            '可选原 generation 检查，由 storageLogStore 单次捕获，在缓存读取及 native port 前复用；memory drop 使旧句柄失效，不静默复用已删除索引。'
+          )
+        },
+        runCommitted: {
+          summary: t(
+            'Optionally publish an ordinary result inside the original actual commit terminal, before its head lease ends. Native append composition requires this port; ordinary logs do not.',
+            '可选地在原真实提交 terminal 内、head lease 释放前发布普通操作结果；原生追加组合需要此接点，普通日志不需要。'
+          )
+        },
+        transactionInfo: {
+          summary: t(
+            'Read the original authenticated transaction identity for this exact native namespace.',
+            '读取精确原生 namespace 的原认证事务身份。'
+          )
+        }
+      }
+    },
+    IStorageJournalBackendBinding: {
+      summary: t(
+        'Descriptor-captured original native I/O with immutable forOrg projection, never public KV prefixes.',
+        'descriptor 捕获的原生 I/O 与不可变 forOrg 投影，不使用公开 KV 前缀。'
+      ),
+      members: {
+        requiresIndexedDbUndo: {
+          summary: t(
+            'Optional true native fact captured once. A logger with undo requires indexedDbUndo:true before terminal I/O; absent facts preserve other backends.',
+            '可选 true 原生事实，单读捕获；logger 含 undo 时原生终点 I/O 前要求 indexedDbUndo:true，缺省保持其它后端语义。'
+          )
+        },
+        lockTarget: {
+          summary: t(
+            'Map a private image identity back onto the original canonical point lock. Native undo requires the backend-owned mapping and never builds a parallel lock registry.',
+            '把私有镜像身份映射回原规范点锁；原生 undo 要求后端自己的映射，不建立平行锁登记。'
+          )
+        },
+        externalWal: {
+          summary: t(
+            'Optional true fact from the original backend owner permits external waits after final images, together with its existing native commit-marker ports. It does not change nativeAtomic or certify cached-index exclusivity.',
+            '原后端拥有者可选的 true 事实，配合原 native marker 接点允许最终镜像后等待外部 I/O；不改变 nativeAtomic，也不证明缓存索引独占。'
+          )
+        },
+        changes: {
+          summary: t(
+            'Memory enables ordered draft capture on the first call before business writes. Later reads return immutable images with final per-key revisions; late activation rejects instead of inventing history.',
+            'memory 首次调用在业务写前开启原 draft 按序捕获；后续返回不可变镜像与每键最终修订，迟到开启明确拒绝而不猜历史。'
+          )
+        },
+        writeCommitMarker: {
+          summary: t(
+            'Memory writes only its authentic native transaction id into the same private draft. Actual commit exposes the marker; rollback leaves none.',
+            'memory 只把原认证 native 事务 id 写入同一私有 draft；真实 commit 后可见，rollback 不留 marker。'
+          )
+        },
+        hasCommitMarker: {
+          summary: t(
+            'Read fixed-org private commit evidence through the original native owner, isolated from business clear and arbitrary user log prefixes.',
+            '经原 native owner 读取固定组织的私有提交证据，与业务 clear 及任意用户日志 prefix 隔离。'
+          )
+        },
+        removeCommitMarker: {
+          summary: t(
+            'Remove only terminal intent evidence in this original org through its existing native transaction path.',
+            '沿本组织既有 native 事务路径仅回收已终态 intent 的提交证据。'
+          )
+        },
+        readImage: {
+          summary: t(
+            'Read a missing/present durable image from the exact authenticated org scope. Memory uses the existing versioned portable JSON codec, original bytes encoding and logical RDF identity.',
+            '从精确认证组织 scope 读取缺失或存在的持久镜像；memory 复用已有版本化 portable JSON codec、字节编码与逻辑 RDF 身份。'
+          )
+        },
+        writeImage: {
+          summary: t(
+            'Restore through the original native draft and write validators; the same transaction commits or rolls back every restored channel and deadline.',
+            '经原 native draft 与写入校验恢复；同一事务提交或回滚各恢复通道与 deadline。'
+          )
+        },
+        readRevision: {
+          summary: t(
+            'Read complete original revision facts, including clear epochs and tombstones; memory own writes predict its one final per-key commit increment.',
+            '读取含 clear epoch 与墓碑的完整原修订；memory 自有写入沿每键最终一次提交递增。'
+          )
+        }
+      }
+    },
+    IStorageJournalTarget: {
+      summary: t(
+        'Original lock identity or backend-private metadata target.',
+        '原锁身份或后端私有 metadata 目标。'
+      ),
+      members: {}
+    },
+    IStorageJournalImage: {
+      summary: t(
+        'Missing versus present encoded wire value; null never substitutes absence.',
+        '区分缺失与存在的编码值，null 不替代缺失。'
+      ),
+      members: {}
+    },
+    IStorageJournalChange: {
+      summary: t(
+        'Original transaction before/after images with complete committed revision.',
+        '原事务 before/after 镜像及完整已提交修订。'
+      ),
+      members: {}
+    },
+    IRecordIndexBackfillPhase: {
+      summary: t(
+        'Existing canonical or legacy persisted scan phase.',
+        '已有 canonical 或 legacy 持久化扫描阶段。'
+      ),
+      members: {}
+    },
+    IRecordIndexBackfillCandidate: {
+      summary: t(
+        'Native candidate retaining key, raw value, revision and optional phase.',
+        '保留 key、原值、revision 与可选阶段的原生候选。'
+      ),
+      members: {}
+    },
+    IRecordIndexBackfillPreparation: {
+      summary: t(
+        'Entity preparation result retaining decoded byte budget and projection outcome.',
+        '保留解码字节预算与投影结果的实体准备记录。'
+      ),
+      members: {}
+    },
+    IRecordIndexBackfillReadOptions: {
+      summary: t(
+        'Optional asynchronous preparation outside the original native transaction.',
+        '在原生事务外执行的可选异步准备。'
+      ),
+      members: {}
+    },
+    IRecordIndexBackfillProjection: {
+      summary: t(
+        'Prepared projection with expected native revision for the same commit.',
+        '具备同次提交所需预期原生 revision 的已准备投影。'
+      ),
+      members: {}
+    },
+    IRecordIndexBackfillBatch: {
+      summary: t(
+        'Existing generation, owner token, checkpoints and native batch projections.',
+        '已有 generation、owner token、checkpoint 与原生批投影。'
+      ),
+      members: {}
+    },
+    IRecordIndexBackfillRetryReceipt: {
+      summary: t(
+        'Durable receipt permitting the original exact batch retry.',
+        '允许原精确批次重试的持久化回执。'
+      ),
+      members: {}
+    },
+    IRecordIndexBackfillSession: {
+      summary: t(
+        'Original native backfill renew/read/commit/fail/release protocol.',
+        '原生补录原有 renew/read/commit/fail/release 协议。'
+      ),
+      members: {}
+    },
+    IRecordIndexBackfillStore: {
+      summary: t(
+        'Captured native provider owning preparation, index readiness and backfill sessions.',
+        '拥有准备、索引就绪与补录会话的捕获原生 provider。'
+      ),
+      members: {}
+    },
+    IStorageOrgView: {
+      summary: t(
+        'Immutable business access to one organization under the root host lifecycle. Native backends retain their own data and transaction owners.',
+        '在根宿主生命周期内固定访问单个组织；原生后端保留自己的数据与事务owner。'
+      ),
+      example: storageHostCases.storageOrganizations?.[0]?.example,
+      members: {
+        orgId: {
+          summary: t(
+            'Canonical UUID captured when the view is created.',
+            '创建视图时捕获的规范UUID。'
+          )
+        },
+        org: {
+          summary: t(
+            'Create another immutable business view with the same plugin inference.',
+            '创建保留相同插件推断的另一个不可变业务视图。'
+          ),
+          params: {
+            orgId: t(
+              'Canonical UUID from createOrgId or the application default configuration.',
+              '由createOrgId生成或应用缺省配置提供的规范UUID。'
+            )
+          },
+          returns: t(
+            'Another business view without installation or close authority.',
+            '返回没有安装与关闭权的业务视图。'
+          ),
+          example: storageHostCases.storageOrganizations?.[0]?.example
+        },
+        backend: {
+          summary: t(
+            'Resolve this organization through the installed native registration and remove close ownership.',
+            '通过已安装原生registration解析本组织后端，并移除关闭所有权。'
+          ),
+          params: {
+            id: t(
+              'Literal id of a plugin installed on the root host.',
+              '根宿主已安装插件的字面量id。'
+            )
+          },
+          returns: t(
+            'Precisely typed borrowed backend; extracted methods retain this organization.',
+            '精确类型的借用后端；提取的方法保持本组织。'
+          ),
+          example: storageHostCases.storageOrganizations?.[0]?.example
+        },
+        backends: {
+          summary: t(
+            'Return a detached map of this organization business backends.',
+            '返回本组织业务后端的脱离Map。'
+          ),
+          returns: t(
+            'A readonly map whose mutation cannot change the host registry.',
+            '返回readonly Map，修改副本不会影响宿主registry。'
+          ),
+          example: storageHostCases.storageOrganizations?.[0]?.example
+        },
+        api: {
+          summary: t(
+            'Selected Feature APIs bound to the immutable organization and original native scope.',
+            '绑定不可变组织与原生scope的已选Feature API。'
+          )
+        },
+        extensions: {
+          summary: t(
+            'Original extension definitions with immutable organization call contexts and captured dependencies.',
+            '拥有不可变组织调用上下文与已捕获依赖的原扩展定义。'
+          )
+        },
+        hooks: {
+          summary: t(
+            'Original host observations filtered by this organization identity.',
+            '按本组织身份过滤的原宿主观察。'
+          )
+        }
+      }
+    },
+    IStorageOrgBinding: {
+      summary: t(
+        'Installation-only native target and deletion callbacks owned by the exact store cell. No second registry or lifecycle is introduced.',
+        '由精确storeCell拥有的安装期原生目标与删除回调，不建立第二registry或生命周期。'
+      ),
+      members: {
+        backend: {
+          summary: t(
+            'Resolve a canonical organization to its existing native physical target.',
+            '将规范组织解析到既有原生物理目标。'
+          ),
+          params: {
+            orgId: t(
+              'Canonical UUID from the host organization boundary.',
+              '来自宿主组织边界校验的规范组织编号。'
+            )
+          },
+          returns: t(
+            'Original native provider store for that organization.',
+            '该组织的原生provider store。'
+          )
+        },
+        drop: {
+          summary: t(
+            'Delete only the requested physical organization without changing other targets.',
+            '只删除请求的物理组织，不改变其它目标。'
+          ),
+          params: {
+            orgId: t(
+              'Canonical UUID from the caller supplied to host.dropOrg.',
+              '来自调用方并传给 `host.dropOrg` 的规范组织编号。'
+            )
+          },
+          returns: t(
+            'Completion of that native target deletion; failures retain the original error.',
+            '返回该原生目标删除的完成结果，失败保留原错误。'
+          )
+        }
+      }
+    },
+    IStorageFeatureClientResolver: {
+      summary: t(
+        'Explicit backend-owned native client selection registered through core.registerFeatureClientResolver only during the original exact-store installation. No selection preserves original getters; async preparation retains admission, and transaction selection is synchronous on the authentic scope.',
+        '后端仅在精确store原安装窗口通过core.registerFeatureClientResolver登记原生客户端选择；未登记保持原getter，异步准备后仍检查原准入，事务选择同步使用认证scope。'
+      ),
+      example: storageHostCases.IStorageFeatureClientResolver![0]!.example,
+      members: {
+        getClient: {
+          summary: t(
+            'Prepare and return the original native client for this immutable organization.',
+            '为本不可变组织准备并返回原生客户端。'
+          )
+        },
+        getTransactionClient: {
+          summary: t(
+            'Return the already-active original native transaction synchronously; never open or await another transaction.',
+            '同步返回已活跃的原生事务，不另开或等待事务。'
+          )
+        }
+      }
+    },
+    IStorageOrgAuthoringPort: {
+      summary: t(
+        'Backend-only authority captured by core.createOrgAuthoringPort during installation. Lazy physical children share the original controller, key-lock, independent createRevisionPort factory and exact-store registry implementations and existing registration cleanup. Revocation seals this port; business views never receive it.',
+        '后端作者在安装窗口通过core.createOrgAuthoringPort捕获的有限权限；按需物理子后端复用原controller、键锁、独立createRevisionPort工厂和精确store登记及原registration清理。撤销后拒绝，业务视图不接收此端口。'
+      ),
+      members: {
+        createChangeController: {
+          summary: t(
+            'Construct the original controller under this registration cleanup.',
+            '由本registration清理拥有原controller构造。'
+          )
+        },
+        createKeyLockPort: {
+          summary: t(
+            'Construct the original shared key-lock port; its physical backend retains final ownership.',
+            '构造原共享键锁接点，最终关闭权仍归物理后端。'
+          )
+        },
+        registerChangeController: {
+          summary: t(
+            'Register the exact child store in the original controller registry.',
+            '将精确子store登记到原controller登记表。'
+          )
+        },
+        registerValueCommit: {
+          summary: t(
+            'Register the child native atomic value writer in the same exact-store row.',
+            '在同一精确store行登记子后端原子value写端点。'
+          )
+        }
+      }
+    },
+    IStorageBackendOrgContext: {
+      summary: t(
+        'Read-only immutable invocation ports from the original registration. The context grants no store registration, provider installation or close authority.',
+        '来自原registration的只读不可变调用接点；不授予store登记、provider安装或关闭权。'
+      ),
+      members: {
+        journal: {
+          summary: t(
+            'Optional fixed-org journal execution port.',
+            '可选的固定组织 journal 执行接点。'
+          )
+        },
+        orgId: {
+          summary: t(
+            'Canonical organization fixed for every derived invocation.',
+            '固定用于所有派生调用的规范组织身份。'
+          )
+        },
+        execution: {
+          summary: t(
+            'Original shared sync and async runners with original registration admission.',
+            '保留原registration准入的共享同步与异步runner。'
+          )
+        },
+        stageBindings: {
+          summary: t(
+            'Original observation factories emitting the captured organization identity.',
+            '发出已捕获组织身份的原观察工厂。'
+          )
+        },
+        callContext: {
+          summary: t(
+            'Immutable orgId and projection of installation-captured borrowed dependencies.',
+            '不可变orgId与安装时已捕获借用依赖的投影。'
+          )
+        },
+        createTransactionApi: {
+          summary: t(
+            'Bind selected API methods to one authentic native scope before freeze.',
+            '在冻结前将已选API方法绑定到真实原生scope。'
+          ),
+          params: {
+            scope: t(
+              'Fresh scope created and registered by the native transaction owner.',
+              '由原生事务owner构造并登记的新scope。'
+            )
+          },
+          returns: t(
+            'Original Feature transaction projection or undefined when absent.',
+            '返回原Feature事务投影，未选时返回undefined。'
+          )
+        }
+      }
+    },
+    IStorageHooks: {
+      summary: t(
+        'One synchronous registry shared by constructor hooks, host listeners and original plugin installation scopes. Optional native core.emit diagnostics skip closing without evaluating payloads; closed handles still reject.',
+        '构造 hooks、宿主监听器与原插件安装 scope 共用同步注册表。可选原生 core.emit 在 closing 时跳过且不构造载荷；closed 旧句柄仍拒绝。'
+      ),
+      example: `import { createStorageHost } from '@migaia/storage-host'
+
+await using host = await createStorageHost()
+const off = host.hooks.on('beforeHostClose', ({ backendCount }) => console.log(backendCount))
+await host.dispose()
+off()`,
+      scenarios: [
+        t(
+          'Observe cleanup or storage stage counts while retaining the original lifecycle owner.',
+          '观察清理或存储阶段数量，保留原生命周期owner。'
+        )
+      ],
+      members: {
+        on: {
+          summary: t(
+            'Register one synchronous observer on the original host channel. Listener failures are reported without changing storage results.',
+            '在原宿主通道登记同步observer。监听失败只报告，不改变存储结果。'
+          ),
+          params: {
+            name: t(
+              'An event key from the single augmentable hook map.',
+              '唯一可扩充hook map中的事件键。'
+            ),
+            handler: t(
+              'Receives the exact payload for that event; its return value is not awaited.',
+              '接收该事件的精确载荷；不等待其返回值。'
+            )
+          },
+          returns: t(
+            'The original idempotent unsubscribe handle. Registration after host closure rejects.',
+            '原幂等取消句柄。宿主关闭后登记会被拒绝。'
+          ),
+          example: `import { createStorageHost } from '@migaia/storage-host'
+
+await using host = await createStorageHost()
+const off = host.hooks.on('beforeHostClose', ({ backendCount }) => console.log(backendCount))
+await host.dispose()
+off()`
+        }
+      }
+    },
+    ...storageHostAuthoringTypes,
+    ...storageHostJournalTypes,
+    ...storageHostRuntimeTypes,
+    ...storageHostInstanceTypes,
+    ...storageHostPluginTypes,
+    ...storageHostHookTypes,
+    ...storageHostBackfillTypes,
+    ...storageHostNativeAuthorTypes,
+    ...storageHostEntityTypes,
+    ...storageHostVectorTypes
+  },
+  enums: {
+    StorageErrorCode: {
+      summary: t(
+        'Stable host errors retain native types and original causes.',
+        '宿主稳定错误保留原生类型与原错误cause。'
+      ),
+      values: {
+        orgDeleteFailed: t(
+          'At least one organization target failed after every backend was attempted. Inspect all original errors and retry without rolling back successful deletions.',
+          '尝试全部后端后仍有组织目标删除失败；检查所有原错误并重试，不回滚已成功删除。'
+        )
+      }
+    },
+    ...storageHostRuntimeEnums,
+    ...storageHostBackfillEnums
+  },
+  enhancers: storageHostAssemblyEnhancers
+}

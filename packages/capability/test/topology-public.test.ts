@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { buildCapabilityTopology as graphBuildCapabilityTopology } from '../src/graph/index.js'
 import {
   buildCapabilityTopology,
@@ -267,6 +267,138 @@ describe('public capability topology primitive', () => {
       provider: nodeCount - 1,
       required: nodeCount - 1
     })
+  })
+
+  it('builds a static graph without comparison sorting', () => {
+    /** Sorting would hide a superlinear static projection even when getter reads stay linear. */
+    const sorting = vi.spyOn(Array.prototype, 'sort')
+    try {
+      buildCapabilityTopology(
+        [
+          { id: 'consumer', ordinal: 0, dependencies: [{ provider: 'provider', required: true }] },
+          { id: 'provider', ordinal: 1, dependencies: [] }
+        ],
+        () => {
+          throw new Error('unknown provider')
+        },
+        () => {
+          throw new Error('cycle')
+        },
+        () => {
+          throw new Error('invalid topology')
+        }
+      )
+      expect(sorting).not.toHaveBeenCalled()
+    } finally {
+      sorting.mockRestore()
+    }
+  })
+
+  it.each([false, true])('handles long chains in either registration direction (%s)', (reverse) => {
+    /** Larger than ordinary host recursion limits; no timing threshold is needed. */
+    const size = 20000
+    /** Dense ordinals may follow providers or consumers. */
+    const nodes: ITopologyNode[] = Array.from({ length: size }, (_, index) => ({
+      id: `node-${index}`,
+      ordinal: reverse ? size - index - 1 : index,
+      dependencies: index === 0 ? [] : [{ provider: `node-${index - 1}`, required: true }]
+    }))
+    const topology = buildCapabilityTopology(
+      nodes,
+      () => {
+        throw new Error('unknown provider')
+      },
+      () => {
+        throw new Error('cycle')
+      },
+      () => {
+        throw new Error('invalid topology')
+      }
+    )
+    expect(topology.ordered.map((node) => node.id)).toEqual(nodes.map((node) => node.id))
+    expect(topology.level.get(`node-${size - 1}`)).toBe(size - 1)
+  })
+
+  it('keeps shared providers, diamonds and wide levels in ordinal order', () => {
+    /** Two same-level consumers share one root, and the final consumer joins their paths. */
+    const nodes: ITopologyNode[] = [
+      {
+        id: 'join',
+        ordinal: 0,
+        dependencies: [
+          { provider: 'left', required: true },
+          { provider: 'right', required: true }
+        ]
+      },
+      { id: 'right', ordinal: 1, dependencies: [{ provider: 'root', required: true }] },
+      { id: 'left', ordinal: 2, dependencies: [{ provider: 'root', required: true }] },
+      { id: 'root', ordinal: 3, dependencies: [] },
+      ...Array.from({ length: 64 }, (_, index) => ({
+        id: `wide-${index}`,
+        ordinal: index + 4,
+        dependencies: []
+      }))
+    ]
+    const topology = buildCapabilityTopology(
+      nodes,
+      () => {
+        throw new Error('unknown provider')
+      },
+      () => {
+        throw new Error('cycle')
+      },
+      () => {
+        throw new Error('invalid topology')
+      }
+    )
+    expect(topology.ordered.slice(0, 65).map((node) => node.id)).toEqual([
+      'root',
+      ...nodes.slice(4).map((node) => node.id)
+    ])
+    expect(topology.ordered.slice(-3).map((node) => node.id)).toEqual(['right', 'left', 'join'])
+    expect(topology.providers.get('root')?.map((node) => node.id)).toEqual(['right', 'left'])
+    expect(topology.level.get('join')).toBe(2)
+  })
+
+  it('reports the first DFS cycle by root ordinal and declared edge order', () => {
+    /** The first root reaches the later cycle first; insertion order must not choose another. */
+    const nodes: ITopologyNode[] = [
+      { id: 'other', ordinal: 4, dependencies: [{ provider: 'other', required: true }] },
+      {
+        id: 'root',
+        ordinal: 0,
+        dependencies: [
+          { provider: 'right', required: true },
+          { provider: 'left', required: true }
+        ]
+      },
+      { id: 'left', ordinal: 1, dependencies: [{ provider: 'left', required: true }] },
+      { id: 'right', ordinal: 2, dependencies: [{ provider: 'tail', required: true }] },
+      { id: 'tail', ordinal: 3, dependencies: [{ provider: 'right', required: true }] }
+    ]
+    /** Caller-owned shell retains its native type and public code. */
+    const failure = Object.assign(new TypeError('cycle'), {
+      code: 'CUSTOM_CYCLE',
+      path: [] as readonly string[]
+    })
+    expect(() =>
+      buildCapabilityTopology(
+        nodes,
+        () => {
+          throw new Error('unknown provider')
+        },
+        (path) => {
+          failure.path = path
+          throw failure
+        },
+        () => {
+          throw new Error('invalid topology')
+        }
+      )
+    ).toThrow(failure)
+    expect(failure.path).toEqual(['right', 'tail', 'right'])
+    expect(Object.isFrozen(failure.path)).toBe(true)
+    expect(failure.code).toBe('CUSTOM_CYCLE')
   })
 
   it('declares the exact public topology export', () => {
