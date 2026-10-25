@@ -8,10 +8,18 @@ import {
 } from '@migaia/supervision'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { deferred, type IAbortSignal } from '@migaia/utils/promise'
-import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
 import {
+  createRpcHost,
+  type IRpcHost,
+  type IRpcHostOptions,
+  type IRpcNamespace
+} from '@migaia/rpc-host'
+import {
+  defineFlowFeature,
   defineTransportPlugin,
   RpcMemberGeneration,
+  RpcFlowPoint,
+  type IRpcFlowStage,
   type IRpcMemberSource,
   type IRpcTransportSetupContext
 } from '@migaia/rpc-host/sdk'
@@ -21,7 +29,11 @@ import type {
   IRpcSessionHandle
 } from '@migaia/rpc-contract/interfaces'
 import { RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
+import type { IRpcPortableValue } from '@migaia/rpc-contract/protocol'
+import { retry } from '@migaia/rpc-host/features/retry'
+import { timeout } from '@migaia/rpc-host/features/timeout'
 import { SessionTable } from '../../dist/session/table.js'
+import { CallTable } from '../../dist/call/table.js'
 import {
   nativeManagedMemoryUnits,
   openManagedMemoryCarrier,
@@ -33,6 +45,14 @@ type ICarrierReceipt = Readonly<{
   source: IRpcMemberSource
   originalClose: IRpcCarrier['close']
   close: MockInstance<IRpcCarrier['close']>
+}>
+
+/** Cold recipes configure existing real owners; no test-side call or generation port is added. */
+type INativeMemberFixtureOptions = Readonly<{
+  provide?: Parameters<typeof nativeManagedMemoryUnits>[0]['provide']
+  contract?: IRpcHostOptions['contract']
+  features?: readonly unknown[]
+  restart?: Parameters<typeof createSupervisor>[0]['restart']
 }>
 
 /** Only genuine owners and passive acquisition/cleanup receipts belong to this bounded fixture. */
@@ -62,14 +82,19 @@ class NativeMemberFixture {
   ) => IRpcMemberSource | Promise<IRpcMemberSource>
   /** One installed public Host supplies the genuine native context and SessionTable. */
   #host: Pick<IRpcHost, 'close'> | undefined
+  /** The published namespace is borrowed directly from the actual public Host. */
+  #namespace: IRpcNamespace | undefined
   /** This is the actual public SDK owner, with no registration/invoke/events facade. */
   #member: RpcMemberGeneration<IManagedMemoryUnit, string> | undefined
   /** Native installation uses a distinct fixed identity per case. */
   readonly #name: string
+  /** Optional native/feature recipes are retained only for genuine cold construction. */
+  readonly #options: INativeMemberFixtureOptions
 
   /** Construct only cold native recipes; no Host, Session or accepted generation exists yet. */
-  constructor(name: string, reports: unknown[] = []) {
+  constructor(name: string, reports: unknown[] = [], options: INativeMemberFixtureOptions = {}) {
     this.#name = name
+    this.#options = options
     this.reports = reports
     this.budget = createUnitBudget({
       kind: name,
@@ -79,7 +104,8 @@ class NativeMemberFixture {
     })
     this.native = nativeManagedMemoryUnits({
       kind: name,
-      provide: () => ({ value: () => 'result' })
+      provide: options.provide ?? (() => ({ value: () => 'result' })),
+      contract: options.contract
     })
     this.supervisor = createSupervisor({
       id: name,
@@ -89,29 +115,39 @@ class NativeMemberFixture {
       budget: this.budget,
       scheduler: this.scheduler,
       report: this.report,
-      restart: { mode: 'never' }
+      restart: options.restart ?? { mode: 'never' }
     })
   }
 
   /** Install the original native context before explicitly opening its actual member lifecycle. */
   async start(): Promise<void> {
-    this.#host = await createRpcHost({
+    /** Retain the original root and its actual namespace without manufacturing an invocation API. */
+    const host = await createRpcHost({
       self: { name: this.#name, instanceId: this.#name },
       plugins: [
         defineTransportPlugin({
           name: this.#name,
           namespace: 'memory',
+          features: this.#options.features,
           open: this.#install
         })
       ],
       report: this.report
     })
+    this.#host = host
+    this.#namespace = host.memory
   }
 
   /** Read the same SDK instance that the genuine native installation owns and disposes. */
   get member(): RpcMemberGeneration<IManagedMemoryUnit, string> {
     assert(this.#member)
     return this.#member
+  }
+
+  /** Calls execute on the real namespace, while the SDK member supplies lifecycle only. */
+  get namespace(): IRpcNamespace {
+    assert(this.#namespace)
+    return this.#namespace
   }
 
   /** Keep the original reporter receiver and exact diagnostic values. */
@@ -464,5 +500,365 @@ it('preserves native aggregate release errors and exact primary rollback error o
     expect(rollback?.errors).toEqual([primary, rollbackFailure])
   } finally {
     await second.cleanup()
+  }
+})
+
+/** One real handshake stage holds admission; it does not replace Session readiness or its handle. */
+class NativeHandshakeGate {
+  /** The actual installed inbound handshake stage signals entry before its original continuation. */
+  readonly entered = deferred<void>()
+  /** A case releases this one input gate without completing a counterfeit Session. */
+  readonly resume = deferred<void>()
+  /** Genuine native Feature construction uses the same grouped pipeline as application features. */
+  readonly feature = defineFlowFeature({
+    name: 'proxy-native-handshake-gate',
+    setup: () => ({ stages: { [RpcFlowPoint.handshakeInbound]: this.#wait } })
+  })
+
+  /** Caller preparation cancellation is checked after the real late handshake completes. */
+  readonly #wait: IRpcFlowStage<typeof RpcFlowPoint.handshakeInbound> = async (payload, next) => {
+    this.entered.resolve()
+    await this.resume.promise
+    await next(payload)
+  }
+}
+
+// RPC-TEST-19CE78390954-C002: R8 removes the automatic default; explicit retry owns the same replay.
+it('replays a written idempotent public request through the complete retry feature', async () => {
+  /** The first real provider invocation remains unsettled until after its native generation leaves. */
+  const first = deferred<string>()
+  /** Real provider entry proves that the request crossed its original physical carrier. */
+  const entered = deferred<void>()
+  /** Only the replacement generation's original recorded request window is counted. */
+  const replacementRequest = vi.fn(() => 'result')
+  /** Native, Host and origin retry diagnostics retain one unfiltered original report window. */
+  const reports: unknown[] = []
+  /** A genuine policy may await explicit replacement without immediately entering terminal. */
+  const fixture = new NativeMemberFixture('proxy-public-retry', reports, {
+    restart: { mode: 'always', initialDelayMs: 0, maxDelayMs: 0 },
+    contract: {
+      schemaVersion: 1,
+      plugin: 'p',
+      features: { f: { methods: { request: { mode: 'request', idempotent: true } } } }
+    },
+    provide: (ordinal) => ({
+      p: {
+        f: {
+          request:
+            ordinal === 1
+              ? () => {
+                  entered.resolve()
+                  return first.promise
+                }
+              : replacementRequest
+        }
+      }
+    })
+  })
+  try {
+    await fixture.start()
+    await fixture.member.open()
+    /** The actual selected origin feature alone may wait and replay after native departure. */
+    const result = fixture.namespace.send('remote', 'p.f.request', [], {
+      retry: retry({ scheduler: fixture.scheduler, report: fixture.report })
+    })
+    await entered.promise
+    /** The original synchronous exit preceded replacement; join that same real native event here. */
+    const departed = deferred<unknown>()
+    fixture.member.onLeave(fixture.member.current().generation, departed.resolve)
+    fixture.native.units[0]!.exit({ error: new Error('gone') })
+    await departed.promise
+    await fixture.supervisor.restart()
+    await fixture.member.rebind()
+    await expect(result).resolves.toBe('result')
+    expect(replacementRequest).toHaveBeenCalledTimes(1)
+    first.reject(new Error('late failure'))
+    for (let turn = 0; turn < 5; turn++) await Promise.resolve()
+    expect(reports).toHaveLength(1)
+  } finally {
+    first.resolve('result')
+    await fixture.cleanup()
+  }
+})
+
+// RPC-TEST-19CE78390954-C003: preserve the original release trigger and unknown-result code.
+it('settles a physically written public request when its actual member is released', async () => {
+  /** Real request dispatch supplies the physical-write checkpoint without a synthetic sent flag. */
+  const entered = deferred<void>()
+  /** This is original provider work, independent from the caller's canonical reply record. */
+  const finish = deferred<string>()
+  /** Explicit member release must be distinguished from a manufactured native crash. */
+  const fixture = new NativeMemberFixture('proxy-written-release', [], {
+    provide: () => ({
+      p: {
+        f: {
+          request: () => {
+            entered.resolve()
+            return finish.promise
+          }
+        }
+      }
+    })
+  })
+  try {
+    await fixture.start()
+    await fixture.member.open()
+    /** Observe the same actual public rejection, retaining the old unknown-result oracle. */
+    const result = fixture.namespace
+      .send('remote', 'p.f.request', [])
+      .catch((error: unknown) => error)
+    await entered.promise
+    /** The real resource holder owns release; native departure is not substituted for this input. */
+    const released = fixture.member.close()
+    expect(await result).toMatchObject({ code: RpcRemoteLayerErrorCode.resultUnknown })
+    await released
+  } finally {
+    finish.resolve('result')
+    await fixture.cleanup()
+  }
+})
+
+// RPC-TEST-19CE78390954-C004: public publication/rebind and the actual held callable stay distinct.
+it('publishes real ready generations and fences an actual held callable across native rebind', async () => {
+  /** The original business values and payloads belong to each real provider invocation. */
+  const request = vi.fn((_payload: IRpcPortableValue | undefined) => 'result')
+  /** The same namespace survives replacement while its accepted capability objects do not. */
+  const fixture = new NativeMemberFixture('proxy-public-rebind', [], {
+    provide: () => ({ p: { f: { request } } })
+  })
+  try {
+    await fixture.start()
+    await fixture.member.open()
+    /** Native authority supplies the first accepted generation, not a second test counter. */
+    const first = fixture.member.current().generation
+    expect(first).toBe(1)
+    /** Reflection reads only the existing public nested capability tree. */
+    const namespace = fixture.namespace
+    /** The currently published peer object belongs to the first actual accepted Session. */
+    const peer = namespace.peers.remote!
+    /** The original plugin group and Feature group are public directory projections. */
+    const plugin = Reflect.get(peer, 'p')
+    /** The real method group is never replaced by a compatibility invocation facade. */
+    const feature = Reflect.get(plugin, 'f')
+    /** Keep this exact original callable after the display name is accepted again. */
+    const held: (payload: IRpcPortableValue) => Promise<unknown> = Reflect.get(feature, 'request')
+    await expect(held(['first'])).resolves.toBe('result')
+    /** Passive leave receipts preserve exact once and ordering before real Session detach. */
+    const leaves: string[] = []
+    /** This observation records only how many actual Session disposals have begun at leave time. */
+    let detachesAtLeave = -1
+    fixture.member.onLeave(first, () => {
+      leaves.push('leave')
+      detachesAtLeave = fixture.sessionCleanupCount()
+    })
+    fixture.native.units[0]!.exit({ error: new Error('gone') })
+    await fixture.member.whenClosed(first)
+    expect(leaves).toEqual(['leave'])
+    expect(detachesAtLeave).toBe(0)
+    expect(fixture.member.current()).toEqual({ generation: first, active: false })
+    /** Only real accepted later readiness may authorize a newly obtained public callable. */
+    const ready = fixture.member.whenReady(first)
+    /** Explicit native restart supplies its actual possibly non-contiguous attempt generation. */
+    const outcome = await fixture.supervisor.restart()
+    assert(outcome.state === 'ready')
+    await fixture.member.rebind()
+    await expect(ready).resolves.toBe(outcome.generation)
+    expect(outcome.generation).toBeGreaterThan(first)
+    expect(fixture.namespace).toBe(namespace)
+    await expect(namespace.send('remote', 'p.f.request', ['second'])).resolves.toBe('result')
+    /** R20/BC11 item24 preserves the held-generation fence; readiness alone cannot prove it. */
+    await expect(held(['closed'])).rejects.toMatchObject({ code: 'TARGET_UNKNOWN' })
+    expect(request.mock.calls.map(([payload]) => payload)).toEqual([['first'], ['second']])
+    await fixture.member.close()
+    expect(fixture.sessionCleanupCount()).toBe(2)
+    expect(fixture.physicalCleanupCount()).toBe(2)
+  } finally {
+    await fixture.cleanup()
+  }
+})
+
+// RPC-TEST-19CE78390954-C006: actual handshake replaces only the removed describe stimulus.
+it('rejects native departure during a real handshake and closes its actual candidate', async () => {
+  /** The genuine inbound handshake remains pending when native departure occurs. */
+  const gate = new NativeHandshakeGate()
+  /** A nonterminal native policy preserves the original pending readiness until explicit release. */
+  const fixture = new NativeMemberFixture('proxy-departed-native-handshake', [], {
+    features: [gate.feature],
+    restart: { mode: 'always', initialDelayMs: 0, maxDelayMs: 0 }
+  })
+  try {
+    await fixture.start()
+    /** Actual accepted readiness cannot be fabricated by the test or the native launch outcome. */
+    const ready = fixture.member.whenReady(0)
+    /** Final original resource release must settle this waiter with the same closed code. */
+    const releasedReady = expect(ready).rejects.toMatchObject({
+      code: RpcRemoteLayerErrorCode.closed
+    })
+    /** The actual SDK initial preparation owns acquisition, attach, ready failure and rollback. */
+    const pending = fixture.member.open()
+    /** Preserve the original code/detail oracle even if the new canonical phase exposes a defect. */
+    const rejected = expect(pending).rejects.toMatchObject({
+      code: RpcRemoteLayerErrorCode.closed,
+      detail: { generation: 1 }
+    })
+    await gate.entered.promise
+    fixture.native.units[0]!.exit({ error: new Error('gone') })
+    gate.resume.resolve()
+    await rejected
+    expect(fixture.member.current().active).toBe(false)
+    /** Find the genuine failed Session by the exact acquired local carrier identity. */
+    const attachedAt = fixture.attach.mock.calls.findIndex(
+      ([, carrier]) => carrier === fixture.carriers[0]!.source.carrier
+    )
+    /** The actual original attach result remains observable even when onReady never publishes it. */
+    const candidate = fixture.attach.mock.results[attachedAt]!.value as IRpcSessionHandle
+    expect(fixture.detach.mock.calls.some(([handle]) => handle === candidate)).toBe(true)
+    expect(fixture.carriers[0]!.close).toHaveBeenCalled()
+    await fixture.member.close()
+    await releasedReady
+  } finally {
+    gate.resume.resolve()
+    await fixture.cleanup()
+  }
+})
+
+// RPC-TEST-19CE78390954-C008: the removed endpointFactory is not used to simulate late setup.
+it('cancels original native preparation after a genuinely late handshake and closes its resources', async () => {
+  /** The caller's original cancellation object remains the direct setup rejection oracle. */
+  const controller = new AbortController()
+  /** A real installed handshake stage delays only its original continuation. */
+  const gate = new NativeHandshakeGate()
+  /** Native acquisition and Session attach occur before the original late handshake gate. */
+  const fixture = new NativeMemberFixture('proxy-late-native-setup', [], {
+    features: [gate.feature]
+  })
+  try {
+    await fixture.start()
+    /** Public rebind(signal) uses the original resource holder even for its first actual candidate. */
+    const pending = fixture.member.rebind(controller.signal)
+    /** The late preparation result must reject with the original top-level cancellation message. */
+    const rejected = expect(pending).rejects.toThrow('setup cancelled')
+    await gate.entered.promise
+    controller.abort(new Error('setup cancelled'))
+    gate.resume.resolve()
+    await rejected
+    /** Failed candidates are observed by their exact actual attach result, not accepted onReady. */
+    const attachedAt = fixture.attach.mock.calls.findIndex(
+      ([, carrier]) => carrier === fixture.carriers[0]!.source.carrier
+    )
+    /** This is the original Session handle returned by the real table before readiness. */
+    const candidate = fixture.attach.mock.results[attachedAt]!.value as IRpcSessionHandle
+    expect(fixture.detach.mock.calls.filter(([handle]) => handle === candidate)).toHaveLength(1)
+    expect(fixture.physicalCleanupCount()).toBe(1)
+  } finally {
+    gate.resume.resolve()
+    await fixture.cleanup()
+  }
+})
+
+// RPC-TEST-19CE78390954-C009-A002/A003: old unavailable REMOTE_CLOSED atom remains pending.
+it('keeps unavailable public work off the wire and reports the original native leave listener error', async () => {
+  /** This actual listener error is retained without stringifying it at the reporting boundary. */
+  const failure = new Error('listener')
+  /** The genuine namespace exists before any native unit or Session has been acquired. */
+  const fixture = new NativeMemberFixture('proxy-native-listener-error')
+  try {
+    await fixture.start()
+    /** Observe, but do not relabel, the unsupported old synchronous REMOTE_CLOSED guard result. */
+    const unavailable = await fixture.namespace
+      .send('remote', 'value', [])
+      .catch((error: unknown) => error)
+    expect(unavailable).toBeInstanceOf(Error)
+    expect(fixture.carriers).toHaveLength(0)
+    await fixture.member.open()
+    /** Actual SDK listener isolation owns this failure and continues its normal native cleanup. */
+    fixture.member.onLeave(fixture.member.current().generation, () => {
+      throw failure
+    })
+    fixture.native.units[0]!.exit({})
+    await fixture.member.whenClosed(fixture.supervisor.generation)
+    expect(fixture.reports.some((error) => String(error).includes('Error: listener'))).toBe(true)
+    expect(fixture.reports).toContain(failure)
+  } finally {
+    await fixture.cleanup()
+  }
+})
+
+// RPC-TEST-19CE78390954-C013: real complete timeout features replace removed private options DTOs.
+it('caps public scalar and stream deadlines while one notify creates no scalar request record', async () => {
+  /**
+   * Remote notification entry is the actual business completion checkpoint, not a local write
+   * guess.
+   */
+  const notified = deferred<void>()
+  /** The real one-way provider owns its original invocation count. */
+  const oneWay = vi.fn(() => notified.resolve())
+  /** Real native declaration supplies the execution wall cap outside optional call policies. */
+  const fixture = new NativeMemberFixture('proxy-native-call-cap', [], {
+    provide: () => ({
+      p: {
+        f: {
+          request: () => 'result',
+          async *generator() {
+            yield 'item'
+          },
+          oneWay
+        }
+      }
+    })
+  })
+  fixture.prepareSource = (source) => ({
+    ...source,
+    localSourceFacts: {
+      ...source.localSourceFacts,
+      callTimeoutCap: timeout({ ms: 50, scheduler: fixture.scheduler })
+    }
+  })
+  /** Passthrough scheduler observation records actual armed policy budgets, not a parallel limiter. */
+  const scheduled = vi.spyOn(fixture.scheduler, 'schedule')
+  /** The canonical call entry distinguishes physical notify from scalar request admission. */
+  const invoked = vi.spyOn(CallTable.prototype, 'invoke')
+  try {
+    await fixture.start()
+    await fixture.member.open()
+    scheduled.mockClear()
+    await fixture.namespace.send('remote', 'p.f.request', [], {
+      timeout: timeout({ ms: 90, scheduler: fixture.scheduler })
+    })
+    expect(scheduled.mock.calls.map(([, ms]) => ms)).toEqual([50, 50])
+    scheduled.mockClear()
+    await fixture.namespace.send('remote', 'p.f.request', [], {
+      timeout: timeout({ ms: 20, scheduler: fixture.scheduler })
+    })
+    expect(scheduled.mock.calls.map(([, ms]) => ms)).toEqual([50, 20])
+    scheduled.mockClear()
+    /** The actual public lazy iterator runs through the original stream owner and timeout policies. */
+    const stream = fixture.namespace.stream('p.f.generator', [], {
+      targetId: 'remote',
+      timeout: timeout({ ms: 90, scheduler: fixture.scheduler })
+    })
+    try {
+      expect(await stream.next()).toEqual({ value: 'item', done: false })
+      expect(scheduled.mock.calls.map(([, ms]) => ms)).toEqual([50, 50])
+    } finally {
+      await stream.return?.()
+    }
+    /** Count the original scalar calls before one actual public notification is admitted. */
+    const beforeOneWay = invoked.mock.calls.filter(
+      ([, command]) => command.mode === 'request'
+    ).length
+    scheduled.mockClear()
+    await fixture.namespace.notify('p.f.oneWay', [], { targetId: 'remote' })
+    await notified.promise
+    expect(scheduled.mock.calls.map(([, ms]) => ms)).toEqual([50])
+    expect(oneWay).toHaveBeenCalledTimes(1)
+    expect(invoked.mock.calls.filter(([, command]) => command.mode === 'request')).toHaveLength(
+      beforeOneWay
+    )
+    expect(invoked.mock.calls.filter(([, command]) => command.mode === 'notify')).toHaveLength(1)
+  } finally {
+    scheduled.mockRestore()
+    invoked.mockRestore()
+    await fixture.cleanup()
   }
 })

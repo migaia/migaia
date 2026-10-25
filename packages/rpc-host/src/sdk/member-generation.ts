@@ -270,6 +270,8 @@ export class RpcMemberGeneration<TUnit, TSpec> {
       /** Only Session's actual reject receipt preserves its original handshake phase and error. */
       const failure = candidate.session?.handshakeFailure
       if (failure && cause === failure.error) throw cause
+      /** Native departure or caller cancellation keeps its original preparation checkpoint error. */
+      this.#assertPreparing(signal, outcome.generation)
       throw createRemoteLayerError(RpcRemoteLayerErrorCode.startFailed, cause)
     } finally {
       stopPreparing()
