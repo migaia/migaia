@@ -1,39 +1,35 @@
 import { createRpcSchemaValidationError } from '../../dist/host/error-owner.js'
 import { describe, expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { defineFlowPlugin, defineTransportPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { RpcWireKind, type IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
 import { validateContractData } from '../../dist/plugins/schema/validate.js'
 import { coreMemoryServer } from '../host/core-fixture.js'
 
 describe('safeString failure reporting', () => {
-  it('preserves a registration failure before its conversion failure', async () => {
-    const conversion = new Error('string conversion')
+  it('preserves the original public provider registration failure', async () => {
+    /** The actual descriptor compiler must retain this exact original registration failure. */
     const primary = new Error('registration')
-    Object.defineProperty(primary, 'message', {
-      value: {
-        toString() {
-          throw conversion
+    /** Provider registration owns reflection before any native transport resource is acquired. */
+    const provide = new Proxy(
+      {},
+      {
+        ownKeys() {
+          throw primary
         }
       }
-    })
-    /** The actual native installation now owns the original resource-acquisition rejection. */
-    const transport = defineTransportPlugin({
-      name: 'registration-failure',
-      namespace: 'memory',
-      open() {
-        throw primary
-      }
-    })
+    )
+    /** A genuine cold transport supplies the same public root options without a fake installer. */
+    const server = coreMemoryServer('registration-failure')
+    /** Only the public entry constructs and classifies the failure received by the application. */
     let received: unknown
     try {
-      await createRpcHost({ plugins: [transport], report: () => undefined })
+      await createRpcHost({ ...server.options, provide, report: () => undefined })
     } catch (error) {
       received = error
     }
     expect(received).toMatchObject({ code: 'INVALID_CONFIG' })
-    const cause = (received as Error).cause as AggregateError
-    expect(cause.errors).toEqual([primary, conversion])
+    expect((received as Error).cause).toBe(primary)
   })
 
   it('keeps schema parser and conversion failures in order', () => {
@@ -90,11 +86,9 @@ describe('safeString failure reporting', () => {
     const validation = defineFlowPlugin({
       name: 'original-schema-failure',
       setup: () => ({
-        hooks: {
-          dispatch: {
-            inbound() {
-              throw primary
-            }
+        stages: {
+          dispatchInbound() {
+            throw primary
           }
         }
       })
