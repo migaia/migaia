@@ -48,13 +48,11 @@ jobs:
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.4.3'
-      - name: Authenticate the website's published packages
-        # The root postinstall installs the website, whose @migaia dependencies come from GitHub
-        # Packages. GITHUB_TOKEN cannot read them, so reuse the read:packages PAT of the image build.
-        env:
-          NPM_TOKEN: ${{ secrets.MIGAIA_PACKAGES_TOKEN }}
-        run: printf '//npm.pkg.github.com/:_authToken=%s\n' "$NPM_TOKEN" >> website/.npmrc
-      - run: pnpm install --frozen-lockfile
+      - name: Install workspace packages without the website
+        # The root postinstall installs the website from GitHub Packages, which this job cannot
+        # read yet and does not test. Skip lifecycle scripts, then build the Linux entries of
+        # pnpm-workspace.yaml allowBuilds by name; `rebuild --pending` would rerun the root postinstall.
+        run: pnpm install --frozen-lockfile --ignore-scripts && pnpm rebuild esbuild cbor-extract msgpackr-extract
       - name: Build the original service image
         continue-on-error: true
         run: node scripts/exclusive-window.mjs run --window storage-images --wait 2700 -- node scripts/storage-services.mts build
