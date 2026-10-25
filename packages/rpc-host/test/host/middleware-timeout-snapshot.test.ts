@@ -6,13 +6,15 @@ import { expect, it, vi } from 'vitest'
 import { coreMemoryServer } from './core-fixture.js'
 
 // C063/C064: BC3 captures configuration at the complete feature factory, before installation.
-it.each([
-  {
-    title: 'timeout config getter is read once and legacy middleware remains callable',
-    ms: 0
-  },
-  { title: 'native timeout install snapshots only after factory creation', ms: 10 }
-])('$title', async ({ ms }) => {
+it.each(
+  [
+    {
+      title: 'timeout config getter is read once and legacy middleware remains callable',
+      ms: 0
+    },
+    { title: 'native timeout install snapshots only after factory creation', ms: 10 }
+  ].map((row) => [row.title, row] as const)
+)('%s', async (_title, { ms }) => {
   /** Exactly one acquisition is retained; the obsolete install-time capture boundary is retired. */
   let reads = 0
   /** The new public duration field is acquired by the actual feature, not a private install shim. */

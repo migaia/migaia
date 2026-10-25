@@ -22,20 +22,22 @@ function physicalTransport(carrier: MemoryCarrier) {
 function releaseNativeResource(): void {}
 
 // C069/C093: deleted role wrappers are replaced by genuine ordinary native installation hooks.
-it.each([
-  {
-    title: 'injected timeout async rejection preserves primary and full rollback residue',
-    name: 'middleware:timeout',
-    message: 'timeout async install primary',
-    ownResource: false
-  },
-  {
-    title: 'native abort async hostile install preserves the primary and zero residue',
-    name: 'middleware:abort',
-    message: 'native abort hostile install',
-    ownResource: true
-  }
-])('$title', async ({ name, message, ownResource }) => {
+it.each(
+  [
+    {
+      title: 'injected timeout async rejection preserves primary and full rollback residue',
+      name: 'middleware:timeout',
+      message: 'timeout async install primary',
+      ownResource: false
+    },
+    {
+      title: 'native abort async hostile install preserves the primary and zero residue',
+      name: 'middleware:abort',
+      message: 'native abort hostile install',
+      ownResource: true
+    }
+  ].map((row) => [row.title, row] as const)
+)('%s', async (_title, { name, message, ownResource }) => {
   /** The original exact error must survive the native installation wrapper. */
   const primary = new Error(message)
   /** This original physical medium remains unattached while the earlier native hook rejects. */
