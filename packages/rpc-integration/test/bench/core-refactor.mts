@@ -28,6 +28,7 @@ type ICarrierModule = { dedicatedWorkerPlugin(options: unknown): unknown }
 type IAuthentication = {
   sign(value: unknown): unknown
   verify(value: unknown): unknown
+  onRejected?(rejection: unknown): void
 }
 /** Only the BC3 public factory names differ between the two measured versions. */
 type IFlowModule = {
@@ -86,8 +87,12 @@ const output = process.argv[2]
 const samples = Number(process.env.CORE_PERF_SAMPLES ?? 300)
 /** Preparation exchanges exercise the same path before every recorded cell. */
 const warmup = Number(process.env.CORE_PERF_WARMUP ?? 30)
+/** Identity mode isolates fixture HMAC cost in diagnostics; acceptance always keeps HMAC. */
+const authenticationMode = process.env.CORE_PERF_AUTH_MODE === 'identity' ? 'identity' : 'hmac'
 /** All reported failures include their semantic classification rather than only a code. */
 const failures: unknown[] = []
+/** The existing auth observer supplies replay-capacity reasons before information is lost. */
+const rejections: unknown[] = []
 
 /** Retain a redacted semantic failure; fixture payloads contain no credentials or user data. */
 function classify(error: unknown, seen = new WeakSet<object>()): unknown {
@@ -170,6 +175,16 @@ class CorePerformanceCell {
     this.counters.verified += 1
     return envelope.value
   }
+  /** Preserve the real auth sign stage while excluding fixture HMAC work in diagnostics. */
+  #identitySign = (value: unknown): unknown => {
+    this.counters.signed += 1
+    return value
+  }
+  /** Preserve the real auth verify stage and its count in the identity diagnostic. */
+  #identityVerify = (value: unknown): unknown => {
+    this.counters.verified += 1
+    return value
+  }
   /** HMAC uses a public fixture-only key, never a credential from the environment. */
   #signature(value: unknown): string {
     return createHmac('sha256', 'core-refactor-public-fixture-key')
@@ -226,7 +241,13 @@ class CorePerformanceCell {
         )) as unknown as IFlowModule)
       : undefined
     /** Old and new transforms receive the exact same public authentication options. */
-    const authentication: IAuthentication = { sign: this.#sign, verify: this.#verify }
+    const authentication: IAuthentication = {
+      sign: authenticationMode === 'identity' ? this.#identitySign : this.#sign,
+      verify: authenticationMode === 'identity' ? this.#identityVerify : this.#verify,
+      onRejected: (rejection) => {
+        rejections.push(rejection)
+      }
+    }
     /** Real reporting retains every failure with its complete available classification. */
     const report = (error: unknown): void => {
       failures.push(classify(error))
@@ -415,6 +436,8 @@ async function main(): Promise<void> {
     node: process.version,
     samples,
     warmup,
+    authenticationMode,
+    diagnosticOnly: authenticationMode === 'identity' || Boolean(process.env.CORE_PERF_CPU_DIR),
     head: execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(),
     dirty: execFileSync('git', ['status', '--porcelain'], { encoding: 'utf8' }).trim(),
     fixtureSha256: createHash('sha256')
@@ -424,16 +447,17 @@ async function main(): Promise<void> {
       distProvenance(join(packageRoot, name, 'dist'))
     ),
     observedRejectionCodes:
-      'none expected; all observed failures retain source/code/name/reason/message',
+      'none expected; auth OVERLOADED shares replay-ledger/group-replay capacity branches; onRejected retains their original reason; all failures retain source/code/name/reason/message',
+    rejections,
     clientConcurrency: 1,
     burstSize: 1,
     results,
     failures,
-    status: failures.length ? 'failed' : 'measured'
+    status: failures.length || rejections.length ? 'failed' : 'measured'
   }
   if (output) writeFileSync(output, `${JSON.stringify(receipt, null, 2)}\n`)
   console.log(JSON.stringify({ status: receipt.status, output, cells: results.length, failures }))
-  if (failures.length) process.exitCode = 1
+  if (failures.length || rejections.length) process.exitCode = 1
 }
 
 await main()
