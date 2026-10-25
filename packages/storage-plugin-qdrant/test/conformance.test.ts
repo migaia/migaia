@@ -1,4 +1,3 @@
-import { PLUGIN_HOST_SOURCE } from '@migaia/plugin-host'
 import { ERROR_SOURCE } from '../src/error-code.js'
 import type { Schemas } from '@qdrant/js-client-rest'
 import { deferred } from '@migaia/utils/promise'
@@ -597,7 +596,7 @@ describe('real native vector backend', () => {
         await host.dispose()
         const disposedCalls = fixture.calls.length
         await expect(async () => saved('clock')).rejects.toMatchObject({
-          source: PLUGIN_HOST_SOURCE,
+          source: 'plugin.host',
           code: 'PLUGIN_NOT_INSTALLED'
         })
         expect(fixture.calls).toHaveLength(disposedCalls)
