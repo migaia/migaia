@@ -1,3 +1,7 @@
+/**
+ * Owns one managed Host claim and its canonical composition/graph bridge. Creation rollback,
+ * publication and disposal share those owners; bounded waits retain the original physical cleanup.
+ */
 import { TrayShutdownMode } from '../state-constants.js'
 import { mergeCleanupResults } from '@migaia/lifecycle'
 import {
@@ -296,7 +300,7 @@ class HostCreation<
     return entries.map((entry) => {
       const record = entry.binding
       if (!record) throw createTrayError(TrayErrorCode.invalidEntry)
-      return { value: record.plugin, release: async () => undefined }
+      return { value: record.plugin, release: releaseGraphValue }
     })
   }
   /** Release graph frontiers in reverse dependency order with the original quiescence budget. */
@@ -317,7 +321,7 @@ class HostCreation<
     const bounded =
       this.#captured.shutdown.mode === TrayShutdownMode['strict-drain']
         ? { complete: true as const, value: await removalPromise }
-        : await settleWithin(removalPromise, this.#captured.quiescenceMs)
+        : await new LogicalCleanupWait(removalPromise, this.#captured.quiescenceMs).promise
     if (!bounded.complete) {
       this.#cleanup.complete = false
       this.#cleanup.physical.push(mergeCleanupResults([removalPromise]))
@@ -507,6 +511,11 @@ function snapshotOptions<
   })
 }
 
+/** Graph value leases own no physical cleanup; the composition release batch retains that duty. */
+async function releaseGraphValue(): Promise<void> {
+  return undefined
+}
+
 /** Converts one Tray descriptor into the sole Graph lifecycle node projection. */
 function toGraphNode(admission: IAdmissionRecord): IDynamicGraphNodeDefinition<unknown> {
   const id = admission.snapshot.name as IGraphId
@@ -520,7 +529,7 @@ function toGraphNode(admission: IAdmissionRecord): IDynamicGraphNodeDefinition<u
     start: async () => {
       return {
         value: admission.plugin,
-        release: async () => undefined
+        release: releaseGraphValue
       }
     }
   }
@@ -596,6 +605,16 @@ function resolveAdmissionLevels(
   return { levels, readyNames, presentNames }
 }
 
+/** Test the original required-edge predicate without nesting it inside the admission-wave scan. */
+function hasMissingRequiredProvider(
+  record: IAdmissionRecord,
+  presentNames: ReadonlySet<string>
+): boolean {
+  return record.snapshot.dependencies.some(
+    ({ provider, required }) => required && !presentNames.has(provider)
+  )
+}
+
 /** Preserve original per-wave input order with stable buckets instead of repeated global scans. */
 function orderAdmissions(records: readonly IAdmissionRecord[]): IAdmissionRecord[] {
   /** Every present provider, including optional providers, precedes its consumers. */
@@ -616,13 +635,7 @@ function orderAdmissions(records: readonly IAdmissionRecord[]): IAdmissionRecord
   /** Flattening walks each record once and retains original ordering inside a wave. */
   const ordered = waves.flat()
   if (remaining.length > 0) {
-    if (
-      !remaining.some((record) =>
-        record.snapshot.dependencies.some(
-          ({ provider, required }) => required && !presentNames.has(provider)
-        )
-      )
-    )
+    if (!remaining.some((record) => hasMissingRequiredProvider(record, presentNames)))
       throw createTrayError(TrayErrorCode.invalidEntry)
     ordered.push(...remaining)
   }
@@ -1018,7 +1031,8 @@ class ManagedTrayHost {
   ): Promise<boolean> => {
     if (this.#context.activeRuntimeNames.size === 0) return false
     const runtimeFence = this.#context.waitForRuntimeQuiescence()
-    const bounded = await settleWithin(runtimeFence, this.#context.options.quiescenceMs)
+    const bounded = await new LogicalCleanupWait(runtimeFence, this.#context.options.quiescenceMs)
+      .promise
     if (bounded.complete) return false
     this.#context.cleanup.complete = false
     const delayed = runtimeFence.then(
@@ -1154,33 +1168,56 @@ function removalFailure(name: string, error: unknown, view: unknown, committed =
   })
 }
 
-/** Bounds Tray's logical wait while preserving the original physical cleanup promise. */
-function settleWithin<T>(
-  value: Promise<T>,
-  budgetMs: number
-): Promise<{ readonly complete: true; readonly value: T } | { readonly complete: false }> {
-  return new Promise((resolve, reject) => {
-    let settled = false
-    const timer = scheduleTimer(() => {
-      if (settled) return
-      settled = true
-      resolve({ complete: false })
-    }, budgetMs)
-    value.then(
-      (result) => {
-        if (settled) return
-        settled = true
-        cancelTimer(timer)
-        resolve({ complete: true, value: result })
-      },
-      (error) => {
-        if (settled) return
-        settled = true
-        cancelTimer(timer)
-        reject(error)
-      }
-    )
-  })
+/** Logical expiry never substitutes for the separately retained physical cleanup receipt. */
+type ILogicalCleanupResult<T> =
+  | { readonly complete: true; readonly value: T }
+  | { readonly complete: false }
+
+/** Owns the original single logical deadline and its first settlement, without cancelling cleanup. */
+class LogicalCleanupWait<T> {
+  /** The first deadline or original Promise reaction alone may publish the logical outcome. */
+  #settled = false
+  /** This same host timer is cancelled only when physical settlement wins before expiry. */
+  #timer: unknown
+  /** The sole returned Promise receives the original complete/expired result shape. */
+  #resolve!: (value: ILogicalCleanupResult<T>) => void
+  /** Physical rejection retains its exact reason when it wins the logical wait. */
+  #reject!: (reason?: unknown) => void
+  /** Callers retain this same native Promise without an additional asynchronous wrapper. */
+  readonly promise: Promise<ILogicalCleanupResult<T>>
+
+  /** Install the original timer before subscribing to the unchanged physical Promise. */
+  constructor(value: Promise<T>, budgetMs: number) {
+    this.promise = new Promise((resolve, reject) => {
+      this.#resolve = resolve
+      this.#reject = reject
+      this.#timer = scheduleTimer(this.#expire, budgetMs)
+      value.then(this.#complete, this.#fail)
+    })
+  }
+
+  /** Expiry publishes only logical incompleteness; the original physical work keeps running. */
+  #expire = (): void => {
+    if (this.#settled) return
+    this.#settled = true
+    this.#resolve({ complete: false })
+  }
+
+  /** A winning physical result clears the original timer before resolving with that exact value. */
+  #complete = (result: T): void => {
+    if (this.#settled) return
+    this.#settled = true
+    cancelTimer(this.#timer)
+    this.#resolve({ complete: true, value: result })
+  }
+
+  /** A winning physical failure clears the same timer and rejects with its original identity. */
+  #fail = (error: unknown): void => {
+    if (this.#settled) return
+    this.#settled = true
+    cancelTimer(this.#timer)
+    this.#reject(error)
+  }
 }
 
 /** Reads the host timer capability without coupling Tray's declarations to DOM or Node libs. */
