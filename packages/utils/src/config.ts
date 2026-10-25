@@ -900,6 +900,9 @@ function readonlyTarget(value: object, callable: boolean): object {
   return target
 }
 
+/** Map and Set iteration callbacks receive readonly values and the canonical facade identity. */
+type IReadonlyCollectionCallback = (value: unknown, key: unknown, collection: unknown) => void
+
 /** One readonly facade owns its raw value, independent target and reflection/iteration behavior. */
 class ReadonlyFacade implements ProxyHandler<object> {
   /** The owned raw graph supplies internal slots and original descriptors. */
@@ -932,9 +935,6 @@ class ReadonlyFacade implements ProxyHandler<object> {
     const value = this.#value
     /** Callable reflection must use the independent target. */
     const callable = this.#callable
-    /** Collection callbacks receive the canonical facade, never its raw graph node. */
-    const proxy = this.#proxy
-
     /** Built-in methods need the owned object's internal slots, never the facade target. */
     const target = value
     if (
@@ -1003,15 +1003,9 @@ class ReadonlyFacade implements ProxyHandler<object> {
     if (target instanceof Set && hasBuiltinBrand(target, 'set') && key === 'has')
       return (setValue: unknown) => target.has(unwrapReadonly(setValue))
     if (target instanceof Map && hasBuiltinBrand(target, 'map') && key === 'forEach')
-      return (callback: (value: unknown, mapKey: unknown, map: unknown) => void) =>
-        target.forEach((mapValue, mapKey) =>
-          callback(readonlyValue(mapValue), readonlyValue(mapKey), proxy)
-        )
+      return (callback: IReadonlyCollectionCallback) => this.#forEachMap(target, callback)
     if (target instanceof Set && hasBuiltinBrand(target, 'set') && key === 'forEach')
-      return (callback: (value: unknown, setValue: unknown, set: unknown) => void) =>
-        target.forEach((setValue) =>
-          callback(readonlyValue(setValue), readonlyValue(setValue), proxy)
-        )
+      return (callback: IReadonlyCollectionCallback) => this.#forEachSet(target, callback)
     if (
       target instanceof Map &&
       hasBuiltinBrand(target, 'map') &&
@@ -1046,6 +1040,20 @@ class ReadonlyFacade implements ProxyHandler<object> {
     return result && (typeof result === 'object' || typeof result === 'function')
       ? readonlyWrap(result)
       : result
+  }
+
+  /** Delegate to this exact Map's iteration while projecting every callback value once per slot. */
+  #forEachMap(target: Map<unknown, unknown>, callback: IReadonlyCollectionCallback): void {
+    target.forEach((mapValue, mapKey) =>
+      callback(readonlyValue(mapValue), readonlyValue(mapKey), this.#proxy)
+    )
+  }
+
+  /** Preserve native Set callback order and its identical value/key facade arguments. */
+  #forEachSet(target: Set<unknown>, callback: IReadonlyCollectionCallback): void {
+    target.forEach((setValue) =>
+      callback(readonlyValue(setValue), readonlyValue(setValue), this.#proxy)
+    )
   }
 
   /** Callable own-data reflection belongs to the independent target. */

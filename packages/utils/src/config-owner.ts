@@ -1,3 +1,4 @@
+/** Own immutable configuration snapshots, validation, asynchronous loading and scoped watchers. */
 import { ERROR_SOURCE, UtilsErrorCode, type IUtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
 import { attachErrorIdentity, safeErrorReason } from './error.js'
@@ -142,6 +143,36 @@ function ownerError(
   return attachErrorIdentity(
     new Constructor(message, cause === undefined ? undefined : { cause }),
     { source: ERROR_SOURCE, code }
+  )
+}
+
+/** Source throws and rejections share one coded boundary while retaining the original cause. */
+function configSourceFailure(cause: unknown): Error {
+  return ownerError(
+    Error,
+    UtilsErrorCode.configSourceFailed,
+    UtilsErrorText.configSourceFailed,
+    cause
+  )
+}
+
+/** Resolve only the supplied source; parsing, owner construction and cancellation stay outside. */
+function loadConfigSource<T extends IConfigRecord>(
+  source: IConfigAsyncSource<T>,
+  context: { readonly signal: IAbortSignal }
+): Promise<unknown> {
+  /** Preserve the original factory and thenable observation before source error normalization. */
+  let produced: unknown
+  try {
+    produced = typeof source === 'function' ? source(context) : source
+  } catch (cause) {
+    return Promise.reject(configSourceFailure(cause))
+  }
+  return Promise.resolve(produced).then(
+    (value) => value,
+    (cause: unknown) => {
+      throw configSourceFailure(cause)
+    }
   )
 }
 
@@ -467,34 +498,9 @@ export class ConfigOwner<T extends IConfigRecord = IConfigRecord> {
     source: IConfigAsyncSource<T>,
     options?: IConfigOwnerAsyncOptions<T>
   ): Promise<ConfigOwner<T>> {
-    /** Resolves the source and codes only failures that come from the source itself. */
-    const load = (context: { readonly signal: IAbortSignal }): Promise<unknown> => {
-      /** Value or thenable produced by the source. */
-      let produced: unknown
-      try {
-        produced = typeof source === 'function' ? source(context) : source
-      } catch (cause) {
-        return Promise.reject(
-          ownerError(
-            Error,
-            UtilsErrorCode.configSourceFailed,
-            UtilsErrorText.configSourceFailed,
-            cause
-          )
-        )
-      }
-      return Promise.resolve(produced).then(
-        (value) => value,
-        (cause: unknown) => {
-          throw ownerError(
-            Error,
-            UtilsErrorCode.configSourceFailed,
-            UtilsErrorText.configSourceFailed,
-            cause
-          )
-        }
-      )
-    }
+    /** The operation borrows explicit source input; its normalization belongs to the loader. */
+    const load = (context: { readonly signal: IAbortSignal }): Promise<unknown> =>
+      loadConfigSource(source, context)
     /** Loaded root, raced against the optional deadline and signal. */
     const loaded =
       options?.timeoutMs !== undefined
