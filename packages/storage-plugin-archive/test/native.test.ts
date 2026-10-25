@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, readdir, readFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Pool } from 'pg'
@@ -25,6 +25,40 @@ for (const backend of ['memory', 'sqlite', 'postgres'] as const)
       const directory = await mkdtemp(join(tmpdir(), 'archive-native-')),
         pool = new Pool({ connectionString }),
         prefix = 'archive_' + crypto.randomUUID().replaceAll('-', '')
+      /** Successful archive calls are observed on the original published hot/cold ports. */
+      const ports: { backend: string; operation: string; stream: boolean; key?: unknown }[] = []
+      /**
+       * Native SQLite statement execution proves hot records/transactions reach the physical
+       * engine.
+       */
+      const statements: string[] = []
+      const nativeSqlite =
+        backend === 'sqlite' ? nodeSqliteDriver(join(directory, 'hot.sqlite')) : undefined
+      const observedSqlite: typeof nativeSqlite = nativeSqlite && {
+        ...nativeSqlite,
+        exec(text) {
+          statements.push(text)
+          nativeSqlite.exec(text)
+        },
+        prepare(text) {
+          /** Forward each real invocation; preparation alone is not execution evidence. */
+          const statement = nativeSqlite.prepare(text)
+          return {
+            run(...values) {
+              statements.push(text)
+              return statement.run(...values)
+            },
+            get(...values) {
+              statements.push(text)
+              return statement.get(...values)
+            },
+            all(...values) {
+              statements.push(text)
+              return statement.all(...values)
+            }
+          }
+        }
+      }
       let hold = false
       const entered = deferred<void>(),
         resume = deferred<void>()
@@ -37,6 +71,16 @@ for (const backend of ['memory', 'sqlite', 'postgres'] as const)
               await resume.promise
             }
             await next(input)
+            ports.push({
+              backend: input.backendId,
+              operation: input.operation,
+              stream:
+                input.operation === 'blob.put' &&
+                (input.input as { body: unknown }).body instanceof ReadableStream,
+              ...(input.operation === 'putRecord'
+                ? { key: (input.input as { key: unknown }).key }
+                : {})
+            })
           })
           return {}
         }
@@ -48,7 +92,7 @@ for (const backend of ['memory', 'sqlite', 'postgres'] as const)
             : backend === 'sqlite'
               ? sqliteBackendPlugin({
                   id: 'hot',
-                  driver: nodeSqliteDriver(join(directory, 'hot.sqlite'))
+                  driver: observedSqlite!
                 })
               : postgresBackendPlugin({ id: 'hot', driver: pgDriver(pool), prefix }),
           objectBackendPlugin({
@@ -69,6 +113,8 @@ for (const backend of ['memory', 'sqlite', 'postgres'] as const)
       await host.detect()
       try {
         await host.backend('hot').putRecord({ old: true, value: 'actual' }, 'event:a')
+        ports.length = 0
+        statements.length = 0
         hold = true
         const run = host.extensions.archiveRun()
         await entered.promise
@@ -82,11 +128,56 @@ for (const backend of ['memory', 'sqlite', 'postgres'] as const)
         resume.resolve()
         expect(await run).toEqual({ archived: 1, skipped: 0, segments: 1 })
         expect((await sweeping).removed).toBe(0)
+        expect(ports).toEqual(
+          expect.arrayContaining([
+            {
+              backend: 'hot',
+              operation: backend === 'memory' ? 'iterateRecords' : 'iterateRecords.next',
+              stream: false
+            },
+            { backend: 'hot', operation: 'deleteRecord', stream: false },
+            { backend: 'cold', operation: 'blob.put', stream: true },
+            { backend: 'cold', operation: 'blob.head', stream: false }
+          ])
+        )
+        /** The uploaded native file contains the actual gzip archive stream. */
+        const dataFiles = (await readdir(join(directory, 'cold'), { recursive: true })).filter(
+          (file) => file.endsWith('.data')
+        )
+        expect(dataFiles).toHaveLength(1)
+        expect([
+          ...(await readFile(join(directory, 'cold', dataFiles[0]!))).subarray(0, 2)
+        ]).toEqual([31, 139])
+        if (backend === 'sqlite') {
+          expect(statements).toEqual(
+            expect.arrayContaining([
+              expect.stringMatching(/SELECT key,value,expires_at FROM "?migaia_records/),
+              expect.stringMatching(/DELETE FROM "?migaia_records/),
+              expect.stringContaining('BEGIN'),
+              expect.stringContaining('COMMIT')
+            ])
+          )
+        }
+        ports.length = 0
         expect(await host.extensions.archiveGet('event:a', { restore: true })).toEqual({
           old: true,
           value: 'actual'
         })
+        expect(ports).toContainEqual({ backend: 'cold', operation: 'blob.get', stream: false })
+        expect(ports).toContainEqual({
+          backend: 'hot',
+          operation: 'putRecord',
+          stream: false,
+          key: 'event:a'
+        })
+        ports.length = 0
         expect((await host.extensions.archiveSweep()).removed).toBe(1)
+        expect(ports).toContainEqual({ backend: 'cold', operation: 'blob.remove', stream: false })
+        expect(
+          (await readdir(join(directory, 'cold'), { recursive: true })).filter((file) =>
+            file.endsWith('.data')
+          )
+        ).toEqual([])
         const org = host.org('11111111-1111-4111-8111-111111111111')
         await org.backend('hot').putRecord({ old: true, value: 'org' }, 'event:a')
         expect((await org.extensions.archiveRun()).archived).toBe(1)
@@ -102,6 +193,7 @@ for (const backend of ['memory', 'sqlite', 'postgres'] as const)
       } finally {
         resume.resolve()
         await host.dispose()
+        await nativeSqlite?.dispose()
         await pool.end()
         await rm(directory, { recursive: true, force: true })
       }
