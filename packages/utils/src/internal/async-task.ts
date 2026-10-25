@@ -334,6 +334,9 @@ type ITaskMessageChannel = {
   readonly port2: { postMessage(value: unknown): void; close(): void }
 }
 
+/** Native idle context remains borrowed so its remaining-time method keeps the original receiver. */
+type ITaskIdleDeadline = { readonly didTimeout?: unknown; timeRemaining?: () => number }
+
 /** One concrete dispatch owns its native registration, cancellation marker and optional delay stage. */
 class TaskDispatch {
   /** One host snapshot pairs native registration and cancellation. */
@@ -494,18 +497,22 @@ class TaskDispatch {
   #registerIdle(): () => void {
     /** Cancellation uses the exact id returned by native registration. */
     const id = this.#call('requestIdleCallback', [
-      (deadline: { readonly didTimeout?: unknown; timeRemaining?: () => number }) =>
-        this.#run({
-          ...this.#base,
-          didTimeout: deadline?.didTimeout === true,
-          timeRemaining: () =>
-            typeof deadline?.timeRemaining === 'function' ? deadline.timeRemaining() : 0
-        }),
+      (deadline: ITaskIdleDeadline) => this.#runIdle(deadline),
       ...(this.#idleTimeout === undefined ? [] : [{ timeout: this.#idleTimeout }])
     ])
     return () => {
       this.#call('cancelIdleCallback', [id])
     }
+  }
+
+  /** Project the native idle deadline while leaving timeRemaining lazy and receiver-preserving. */
+  #runIdle(deadline: ITaskIdleDeadline): void {
+    this.#run({
+      ...this.#base,
+      didTimeout: deadline?.didTimeout === true,
+      timeRemaining: () =>
+        typeof deadline?.timeRemaining === 'function' ? deadline.timeRemaining() : 0
+    })
   }
 
   /** Native postTask owns cancellation; unexpected native rejections still reach the host. */
@@ -526,18 +533,21 @@ class TaskDispatch {
         { priority: POST_TASK_PRIORITY[strategy], delay: this.#delay, signal: controller.signal }
       ]
     ) as PromiseLike<unknown> | undefined
-    posted?.then(undefined, (error: unknown) => {
-      if (!this.#cancelled)
-        this.#call('queueMicrotask', [
-          () => {
-            throw error
-          }
-        ])
-    })
+    posted?.then(undefined, (error: unknown) => this.#reportPosted(error))
     return () => {
       this.#cancelled = true
       controller.abort()
     }
+  }
+
+  /** Unexpected postTask rejection reaches the same host queue without replacing the thrown value. */
+  #reportPosted(error: unknown): void {
+    if (!this.#cancelled)
+      this.#call('queueMicrotask', [
+        () => {
+          throw error
+        }
+      ])
   }
 }
 
