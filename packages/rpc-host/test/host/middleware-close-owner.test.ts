@@ -1,7 +1,7 @@
 /** Original middleware disposal assertions now exercise the public Host and its real native IO. */
 import { expect, it, vi } from 'vitest'
 import { defineHost } from '@migaia/plugin-host'
-import { createRpcHost, type IRpcHostOptions } from '@migaia/rpc-host'
+import { createRpcHost, RpcLifecycleError, type IRpcHostOptions } from '@migaia/rpc-host'
 import { auth } from '@migaia/rpc-host/plugins/auth'
 import { defineFlowPlugin, rpcHostPipelines, RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { coreMemoryServer } from './core-fixture.js'
@@ -210,6 +210,65 @@ it('C117 preserves both owned flow cleanup failures on the native disposal bound
     expect(releases.filter((entry) => entry === 'consumer')).toHaveLength(1)
     expect(releases.filter((entry) => entry === 'native')).toHaveLength(1)
     expect(host.dispose()).toBe(dispose)
+  } finally {
+    await host.dispose()
+  }
+})
+
+// RPC-TEST-49A21590A74A-C003: BC11 retires only the native disposal translation shell.
+it('C003 retains a lifecycle diagnostic beside an independent native cleanup failure', async () => {
+  /** This public diagnostic is one original leaf, never proof of the whole cleanup transaction. */
+  const diagnostic = new RpcLifecycleError('application resource closed')
+  /** Native cleanup must retain the diagnostic's original semantic identity as well as its class. */
+  const identity = { source: diagnostic.source, code: diagnostic.code }
+  /** A different acquired resource owns this independent original failure. */
+  const original = new Error('other resource cleanup failed')
+  /** The original two release labels expose exact LIFO order and exclude duplicate execution. */
+  const released: string[] = []
+  /** This first acquired flow gives native disposal its own original cleanup callback. */
+  const first = observedCleanupFlow(
+    'audit-cleanup-first',
+    () => undefined,
+    () => {
+      released.push('first')
+      throw original
+    }
+  )
+  /** The later callback throws the typed diagnostic before the earlier resource must still run. */
+  const second = observedCleanupFlow(
+    'audit-cleanup-second',
+    () => undefined,
+    () => {
+      released.push('second')
+      throw diagnostic
+    }
+  )
+  /** The existing native listener supplies the same genuine namespace and transport owner. */
+  const server = coreMemoryServer('audit-typed-cleanup')
+  /** All original cleanup callbacks share one native Host and its real named pipeline groups. */
+  const rpc = rpcHostPipelines(
+    () => host,
+    (key) => host.pipeline(key),
+    ['memory']
+  )
+  /** No public RPC Root.close translates or substitutes this original native disposal boundary. */
+  const host = defineHost({
+    ...rpc,
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+  })
+  await host.use(first, second, server.transport)
+  try {
+    /** The actual native result must keep both leaves, even when one is already a lifecycle error. */
+    const result = await host.dispose()
+    expect(released).toEqual(['second', 'first'])
+    expect(result.cleanupErrors).toHaveLength(2)
+    expect(containsCleanupIdentity(result.cleanupErrors[0], diagnostic)).toBe(true)
+    expect(containsCleanupIdentity(result.cleanupErrors[1], original)).toBe(true)
+    /** Each ordered native entry belongs only to its original failing callback. */
+    expect(containsCleanupIdentity(result.cleanupErrors[0], original)).toBe(false)
+    expect(containsCleanupIdentity(result.cleanupErrors[1], diagnostic)).toBe(false)
+    expect(diagnostic).toBeInstanceOf(RpcLifecycleError)
+    expect(diagnostic).toMatchObject(identity)
   } finally {
     await host.dispose()
   }

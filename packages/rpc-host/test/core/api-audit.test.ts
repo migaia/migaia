@@ -6,8 +6,6 @@ import { RpcCapability } from '@migaia/rpc-contract'
 import { systemScheduler } from '@migaia/utils'
 import { connect } from '../../dist/core/middleware/connect.js'
 
-import { defineMiddleware } from '../../dist/core/middleware.js'
-import { RpcLifecycleError } from '@migaia/rpc-contract/errors'
 import { uuid } from '../fixtures/core-role/uuid.js'
 import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { createRuntimePeer } from '../../dist/remote/runtime-api/peer.js'
@@ -74,55 +72,6 @@ it('releases the operation parent listener when the UUID callback throws synchro
     add.mockRestore()
     remove.mockRestore()
     await endpoint.dispose()
-    left.close()
-    right.close()
-  }
-})
-
-it('retains independent cleanup failures beside a public lifecycle diagnostic', async () => {
-  /** A diagnostic is application data, not proof that it contains the whole cleanup transaction. */
-  const diagnostic = new RpcLifecycleError('application resource closed')
-  /** The other resource has an independent original failure that must remain reachable. */
-  const original = new Error('other resource cleanup failed')
-  /** Observe the real middleware resource owner's LIFO release order. */
-  const released: string[] = []
-  /** Both resources are installed through the supported endpoint composition. */
-  const middleware = defineMiddleware('audit-cleanup', (core) => ({
-    install() {
-      core.own({}, () => {
-        released.push('first')
-        throw original
-      })
-      core.own({}, () => {
-        released.push('second')
-        throw diagnostic
-      })
-      return {}
-    }
-  }))
-  /** The canonical memory transport supplies the endpoint's actual physical resource. */
-  const [left, right] = createMemoryTransportPair()
-  try {
-    /** This endpoint owns the middleware cleanup transaction. */
-    const endpoint = await createRuntimeEndpointComposition(
-      {
-        id: 'audit-cleanup',
-        transport: left,
-        middlewares: [connect({ transport: left }), middleware]
-      },
-      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
-    ).installing
-    /** The boundary diagnostic must expose both original leaves in release order. */
-    const failure = await endpoint.dispose().catch((error: unknown) => error)
-    expect(released).toEqual(['second', 'first'])
-    expect(failure).toBeInstanceOf(RpcLifecycleError)
-    expect((failure as RpcLifecycleError).cause).toBe(diagnostic)
-    expect((failure as RpcLifecycleError).cleanupErrors?.map(({ error }) => error)).toEqual([
-      diagnostic,
-      original
-    ])
-    expect((failure as Error & { readonly errors?: readonly unknown[] }).errors).toEqual([original])
-  } finally {
     left.close()
     right.close()
   }
