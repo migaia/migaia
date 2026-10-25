@@ -1,3 +1,4 @@
+import { PLUGIN_HOST_SOURCE } from '@migaia/plugin-host'
 import { describe, expect, it } from 'vitest'
 import { walkErrorCauses } from '@migaia/utils/error'
 import {
@@ -200,7 +201,7 @@ describe('installation-scoped backend borrowing', () => {
     )
     expect(call()).toBe(original.state().nativePromise)
     await host.dispose()
-    expect(() => call()).toThrowError(expect.objectContaining({ source: '@migaia/plugin-host' }))
+    expect(() => call()).toThrowError(expect.objectContaining({ source: PLUGIN_HOST_SOURCE }))
     expect(original.state().cleanup).toHaveBeenCalledOnce()
   })
 })

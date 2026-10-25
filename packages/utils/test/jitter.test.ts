@@ -25,7 +25,7 @@ describe('jitter', () => {
     expect(() => jitter(value, 0.2, random)).toThrowError(
       expect.objectContaining({
         name: 'RangeError',
-        source: '@migaia/utils',
+        source: 'foundation.utils',
         code: 'INVALID_ARGUMENT'
       })
     )
@@ -38,7 +38,7 @@ describe('jitter', () => {
     expect(() => jitter(100, ratio, random)).toThrowError(
       expect.objectContaining({
         name: 'RangeError',
-        source: '@migaia/utils',
+        source: 'foundation.utils',
         code: 'INVALID_ARGUMENT'
       })
     )
@@ -49,7 +49,7 @@ describe('jitter', () => {
     expect(() => jitter(100, 0.2, () => sample)).toThrowError(
       expect.objectContaining({
         name: 'RangeError',
-        source: '@migaia/utils',
+        source: 'foundation.utils',
         code: 'INVALID_ARGUMENT'
       })
     )
@@ -72,7 +72,7 @@ describe('jitter', () => {
       failure = error
     }
     expect(failure).toBeInstanceOf(RangeError)
-    expect(failure).toMatchObject({ source: '@migaia/utils', code: 'INVALID_ARGUMENT' })
+    expect(failure).toMatchObject({ source: 'foundation.utils', code: 'INVALID_ARGUMENT' })
     expect((failure as RangeError).cause).toBe(cause)
     expect(random).toHaveBeenCalledOnce()
     expect(cause.stack).toBe(stack)

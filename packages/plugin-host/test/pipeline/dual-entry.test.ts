@@ -89,7 +89,7 @@ describe('dual pipeline entries', () => {
         })
       ).toThrowError(
         expect.objectContaining({
-          source: '@migaia/plugin-host',
+          source: 'plugin.host',
           code: 'ASYNC_STAGE_IN_SYNC_ENTRY'
         })
       )

@@ -38,7 +38,7 @@ describe('durable package entries', () => {
   it('loads the browser file entry safely and rejects unsupported opening explicitly', async () => {
     const { fileLogStore } = await import('../dist/plugins/durable/file.browser.js')
     await expect(fileLogStore('local.sqlite')).rejects.toMatchObject({
-      source: '@migaia/logger',
+      source: 'logging',
       code: 'LOG_STORE_UNAVAILABLE'
     })
   })

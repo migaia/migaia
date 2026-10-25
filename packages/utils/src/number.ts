@@ -6,7 +6,7 @@ import { orderStringKeys } from './internal/string-order.js'
 /** Builds a native argument error while retaining an injected random callback's thrown value. */
 function jitterArgumentError(message: string, cause?: unknown): RangeError {
   return attachErrorIdentity(new RangeError(message, { cause }), {
-    source: '@migaia/utils',
+    source: ERROR_SOURCE,
     code: UtilsErrorCode.invalidArgument
   })
 }

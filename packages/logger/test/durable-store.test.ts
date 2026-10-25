@@ -298,7 +298,7 @@ it('codes reflection failures without admitting a record and retains the origina
     }
   )
   await expect(store.append([{ kind: 'bad', payload }])).rejects.toMatchObject({
-    source: '@migaia/logger',
+    source: 'logging',
     code: 'LOG_PAYLOAD_INVALID',
     cause: original
   })

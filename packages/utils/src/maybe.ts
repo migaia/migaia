@@ -1,5 +1,5 @@
 import { toError, attachErrorIdentity, IdentifyError } from './error.js'
-import { UtilsErrorCode } from './error-code.js'
+import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
 
 /** Presence stays distinct from absence even when the present value itself is undefined. */
@@ -36,7 +36,7 @@ export function mapMaybe<T, N>(value: IMaybe<T>, mapper: (value: T) => N): IMayb
      * Identity is attached to mutable native errors; frozen/conflicting targets retain the original
      * cause.
      */
-    const identity = { source: '@migaia/utils', code: UtilsErrorCode.invalidArgument }
+    const identity = { source: ERROR_SOURCE, code: UtilsErrorCode.invalidArgument }
     throw attachErrorIdentity(failure, identity, {
       onConflict: ({ target }) =>
         attachErrorIdentity(

@@ -56,7 +56,7 @@ describe('collection-preserving JSON codec', () => {
     ]) {
       expect(() => codec.encode(input as never)).toThrowError(
         expect.objectContaining({
-          source: '@migaia/serialize',
+          source: 'serialization',
           code: 'ENCODE_FAILED',
           cause: expect.objectContaining({ code: 'INVALID_OPTION' })
         })

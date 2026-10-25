@@ -254,7 +254,7 @@ describe('tagged codec', () => {
           expect.fail('must fail')
         } catch (error) {
           if (failure === serialized) expect(error).toBe(failure)
-          else expect(error).toMatchObject({ source: '@migaia/serialize', code, cause: original })
+          else expect(error).toMatchObject({ source: 'serialization', code, cause: original })
         }
       }
     }

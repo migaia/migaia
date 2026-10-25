@@ -104,7 +104,7 @@ import { REPOSITORY_KEY_PREFIX, repositoryMigrationKey } from '@migaia/storage-h
 import { isArrayBuffer, isUint8Array } from '@migaia/utils/bytes'
 import { normalizeError } from './errors.js'
 import { UtilsAbortError } from '@migaia/utils/promise'
-import { UtilsErrorCode } from '@migaia/utils/error'
+import { UTILS_SOURCE, UtilsErrorCode } from '@migaia/utils/error'
 import { utf8ByteLength } from '@migaia/utils/bytes'
 import {
   fromIdbRequest,
@@ -466,7 +466,7 @@ export const normalizeIndexedDbOperationError = (
     error !== null &&
     typeof error === 'object' &&
     'source' in error &&
-    error.source === '@migaia/utils' &&
+    error.source === UTILS_SOURCE &&
     'code' in error &&
     error.code === UtilsErrorCode.deadlineExceeded
   )

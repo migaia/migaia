@@ -60,7 +60,7 @@ describe('versioned persistence', () => {
         persist(store, { key: 'invalid', storage, version: 3, migrations } as never)
       ).toThrowError(
         expect.objectContaining({
-          source: '@migaia/store-persist',
+          source: 'store.persist',
           code: 'INVALID_OPTION',
           cause: expect.objectContaining({ source: '@migaia/storage-contract' })
         })
@@ -200,7 +200,7 @@ describe('versioned persistence', () => {
     }
     expect(() => persist(store, { key: 'getter', storage, codecStages: badObserver })).toThrowError(
       expect.objectContaining({
-        source: '@migaia/store-persist',
+        source: 'store.persist',
         code: 'INVALID_OPTION',
         cause: metadataFailure
       })

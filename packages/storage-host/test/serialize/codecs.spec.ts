@@ -1,3 +1,4 @@
+import { SERIALIZE_SOURCE } from '@migaia/serialize/core'
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
 import { jsonCodec, structuredCodec, binaryCodec } from '../../src/entity.js'
@@ -18,7 +19,7 @@ describe('jsonCodec', () => {
         cause: {
           source: '@migaia/storage-contract',
           code: 'INVALID_ARGUMENT',
-          cause: { source: '@migaia/serialize' }
+          cause: { source: SERIALIZE_SOURCE }
         }
       })
   })

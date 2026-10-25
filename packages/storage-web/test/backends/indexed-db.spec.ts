@@ -25,7 +25,8 @@ import type { IKeyValueStore } from '@migaia/storage-contract'
 import { createOrgId, createStorageHost, STORAGE_HOST_SOURCE } from '@migaia/storage-host'
 import { STORAGE_WEB_SOURCE } from '../../src/index.js'
 import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
-import { walkErrorCauses } from '@migaia/utils/error'
+import { UTILS_SOURCE, UtilsTimeoutError, walkErrorCauses } from '@migaia/utils/error'
+import { normalizeIndexedDbOperationError } from '../../src/backends/indexed-db.js'
 import { encodeFlatStorageKey } from '@migaia/storage-host/authoring/backend'
 import { captureOperationCleanup } from '../helpers/operation-reporter.js'
 import {
@@ -3170,6 +3171,16 @@ describe('indexedDbHost backend', () => {
     } finally {
       IDBObjectStore.prototype.openCursor = originalOpenCursor
     }
+  })
+
+  it('maps a utils deadline to ABORTED while retaining the original error', () => {
+    /** The utils owner supplies the real current source used by deadline failures. */
+    const deadline = new UtilsTimeoutError('operation', 0)
+    /** IndexedDB must normalize the deadline without replacing its original cause. */
+    const failure = normalizeIndexedDbOperationError(deadline)
+    expect(deadline.source).toBe(UTILS_SOURCE)
+    expect(failure).toMatchObject({ code: 'ABORTED', cause: deadline })
+    expect(failure.cause).toBe(deadline)
   })
 
   it('悬挂 cursor 在 timeout 到期后主动唤醒并以 ABORTED 结束', async () => {

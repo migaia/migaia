@@ -72,23 +72,23 @@ describe('defaultJsonCodec Map/Set 往返', () => {
   it('preserves each owning error in invalid writes and malformed JSON', async () => {
     for (const value of [NaN, Infinity, undefined]) {
       await expect(defaultJsonCodec.encode(value)).rejects.toMatchObject({
-        source: '@migaia/store-persist',
+        source: 'store.persist',
         code: 'ENCODE_FAILED',
         cause: {
           source: '@migaia/storage-contract',
           code: 'INVALID_ARGUMENT',
-          cause: { source: '@migaia/serialize', code: 'ENCODE_FAILED' }
+          cause: { source: 'serialization', code: 'ENCODE_FAILED' }
         }
       })
     }
     await expect(defaultJsonCodec.decode('{bad')).rejects.toMatchObject({
-      source: '@migaia/store-persist',
+      source: 'store.persist',
       code: 'ENVELOPE_INVALID',
       cause: {
         source: '@migaia/storage-contract',
         code: 'INVALID_ARGUMENT',
         cause: {
-          source: '@migaia/serialize',
+          source: 'serialization',
           code: 'DECODE_FAILED',
           cause: expect.any(SyntaxError)
         }

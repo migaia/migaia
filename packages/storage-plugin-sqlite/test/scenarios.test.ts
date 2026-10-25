@@ -1,3 +1,4 @@
+import { UTILS_SOURCE } from '@migaia/utils/error'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -291,7 +292,7 @@ it('shares the original attempt context with cancellable transaction composition
     cause: cancelledWorkFailure
   })
   expect(cancelledWorkFailure).toMatchObject({
-    source: '@migaia/utils',
+    source: UTILS_SOURCE,
     code: 'ABORTED',
     cause: cancellation.signal.reason
   })

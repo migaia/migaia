@@ -71,7 +71,7 @@ describe('explicit optional values', () => {
         throw original
       })
     ).toThrow(original)
-    expect(original).toMatchObject({ source: '@migaia/utils', code: 'INVALID_ARGUMENT' })
+    expect(original).toMatchObject({ source: 'foundation.utils', code: 'INVALID_ARGUMENT' })
     expect(original.stack).toBe(stack)
   })
 
@@ -84,7 +84,7 @@ describe('explicit optional values', () => {
       throw new Error('expected failure')
     } catch (error) {
       expect(error).toBeInstanceOf(AggregateError)
-      expect(error).toMatchObject({ source: '@migaia/utils', code: 'INVALID_ARGUMENT' })
+      expect(error).toMatchObject({ source: 'foundation.utils', code: 'INVALID_ARGUMENT' })
       expect((error as AggregateError).errors[0]).toBe(original)
     }
     expect(() =>
@@ -92,7 +92,7 @@ describe('explicit optional values', () => {
         throw 42
       })
     ).toThrowError(
-      expect.objectContaining({ source: '@migaia/utils', code: 'NON_ERROR_VALUE', cause: 42 })
+      expect.objectContaining({ source: 'foundation.utils', code: 'NON_ERROR_VALUE', cause: 42 })
     )
   })
 })

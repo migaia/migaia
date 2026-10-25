@@ -1,3 +1,4 @@
+import { SERIALIZE_SOURCE } from '@migaia/serialize/core'
 import { fromValueCodec } from '../src/authoring/codec.js'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
@@ -21,11 +22,11 @@ describe('value codec adaptation', () => {
     expectTypeOf(codec.output).toEqualTypeOf<'text'>()
     await expect(codec.encode({ a: NaN })).rejects.toMatchObject({
       code: StorageContractErrorCode.invalidArgument,
-      cause: { source: '@migaia/serialize', code: 'INVALID_OPTION' }
+      cause: { source: SERIALIZE_SOURCE, code: 'INVALID_OPTION' }
     })
     await expect(codec.decode('{bad')).rejects.toMatchObject({
       code: StorageContractErrorCode.invalidArgument,
-      cause: { source: '@migaia/serialize', code: 'DECODE_FAILED', cause: expect.any(SyntaxError) }
+      cause: { source: SERIALIZE_SOURCE, code: 'DECODE_FAILED', cause: expect.any(SyntaxError) }
     })
   })
 
