@@ -288,7 +288,8 @@ async function business(
     (frame) => frame.kind === 'error' && frame.task.method === 'peer.error'
   )?.error
   expect(failedWire).toBeDefined()
-  assertWireGraph((receivedError as { cause: unknown }).cause, failedWire)
+  /** The sole current receiver restores wire.root directly, including every original cause edge. */
+  assertWireGraph(receivedError, failedWire)
   const controller = new AbortController()
   const waiting = namespace.request('peer.wait', [], { signal: controller.signal })
   await new Promise((resolve) => setTimeout(resolve, 20))

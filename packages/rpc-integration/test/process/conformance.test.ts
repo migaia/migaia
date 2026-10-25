@@ -32,9 +32,16 @@ beforeAll(async () => {
   if (!receipt.accepted) throw new Error(JSON.stringify(receipt))
 })
 
+/** Foreign peers have one current native profile; the retired dual-facade CLI is not replayed. */
+function hostProfiles(peer: (typeof peers)[number]): readonly boolean[] {
+  return peer.language === 'node' || peer.language === 'bun'
+    ? (businessVectors.hostProfiles as boolean[])
+    : [false]
+}
+
 describe('independent native business peers through public process facades', () => {
   for (const peer of peers)
-    for (const host of businessVectors.hostProfiles as boolean[]) {
+    for (const host of hostProfiles(peer)) {
       it(`${peer.language} owned stdio Host=${host}`, async () => {
         const active = await client(peer, host, randomUUID())
         /** Freeze sent bytes when native exit is observed, excluding any later teardown writes. */
@@ -49,8 +56,8 @@ describe('independent native business peers through public process facades', () 
             )
             expect(request.id).toEqual(expect.any(String))
             expect(request.options.idempotencyKey).toBe('h-bridge-key')
-            expect(request.options.remainingMs).toBeGreaterThan(0)
-            expect(request.options.remainingMs).toBeLessThanOrEqual(1000)
+            expect(request.route.remainingMs).toBeGreaterThan(0)
+            expect(request.route.remainingMs).toBeLessThanOrEqual(1000)
             expect(
               native
                 .filter((frame) => frame.kind === 'call' && frame.task.method === 'peer.trace')
