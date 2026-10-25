@@ -185,9 +185,11 @@ func nativeBusinessChecks(suite *vectorSuite) {
 	suite.check("u41/bridge/baseline", acceptErr == nil && field(accept)["step"] == "accept" && field(accept)["profile"] == protocol)
 	first, firstErr := receive(&output, false)
 	second, secondErr := receive(&output, false)
+	// BC12 appends one final close after every original business response and before EOF.
+	closing, closingErr := receive(&output, false)
 	_, eof := receive(&output, false)
 	received := field(field(second)["result"])
-	suite.check("u41/bridge/v2-batch-notification-isolation", err == nil && firstErr == nil && secondErr == nil && eof == io.EOF && field(first)["id"] == "missing" && errorRoot(field(first)["error"])["code"] == "PROVIDER_NOT_FOUND" && field(second)["id"] == "received" && integerField(received, "count") == 1 && runtimeSchemaEqual(received["values"], []any{"receipt"}))
+	suite.check("u41/bridge/v2-batch-notification-isolation", err == nil && firstErr == nil && secondErr == nil && closingErr == nil && field(closing)["kind"] == "control" && field(closing)["operation"] == controlClose && errorRoot(field(closing)["reason"])["code"] == "ENDPOINT_DISPOSED" && eof == io.EOF && field(first)["id"] == "missing" && errorRoot(field(first)["error"])["code"] == "PROVIDER_NOT_FOUND" && field(second)["id"] == "received" && integerField(received, "count") == 1 && runtimeSchemaEqual(received["values"], []any{"receipt"}))
 	// Both old directories advertised echo request/notify and peer.wait request-only; schema3 preserves that rule.
 	echo, wait := false, false
 	for _, raw := range entries(description["methods"]) {
@@ -224,8 +226,10 @@ func siblingChecks(suite *vectorSuite) {
 		first, firstErr := receive(&output, false)
 		missing, missingErr := receive(&output, false)
 		last, lastErr := receive(&output, false)
+		// Keep the original ordered sibling assertions and strengthen the final native close boundary.
+		closing, closingErr := receive(&output, false)
 		_, eof := receive(&output, false)
-		suite.check(fmt.Sprintf("u36/batch/member-isolation-business-%t", business), sessionErr == nil && firstErr == nil && missingErr == nil && lastErr == nil && eof == io.EOF && field(first)["id"] == "first" && field(first)["result"] == "one" && field(missing)["id"] == "missing" && errorRoot(field(missing)["error"])["code"] == "PROVIDER_NOT_FOUND" && field(last)["id"] == "last" && field(last)["result"] == "two")
+		suite.check(fmt.Sprintf("u36/batch/member-isolation-business-%t", business), sessionErr == nil && firstErr == nil && missingErr == nil && lastErr == nil && closingErr == nil && field(closing)["kind"] == "control" && field(closing)["operation"] == controlClose && errorRoot(field(closing)["reason"])["code"] == "ENDPOINT_DISPOSED" && eof == io.EOF && field(first)["id"] == "first" && field(first)["result"] == "one" && field(missing)["id"] == "missing" && errorRoot(field(missing)["error"])["code"] == "PROVIDER_NOT_FOUND" && field(last)["id"] == "last" && field(last)["result"] == "two")
 	}
 }
 

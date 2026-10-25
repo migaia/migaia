@@ -789,6 +789,9 @@ func validStream(value any) bool {
 	return validFlatError(member)
 }
 
+// controlClose is the sole final lifecycle operation; no response operation is added.
+const controlClose = "close"
+
 // validFrame is the only operational grammar used by actual dispatch and independent vector checks.
 func validFrame(value any) bool {
 	fields := field(value)
@@ -871,7 +874,7 @@ func validFrame(value any) bool {
 	case "stream":
 		return task["mode"] == "stream" && validStream(fields["stream"])
 	case "control":
-		return fields["operation"] == "ping" || fields["operation"] == "pong" || fields["operation"] == "drain"
+		return fields["operation"] == "ping" || fields["operation"] == "pong" || fields["operation"] == "drain" || fields["operation"] == controlClose
 	case "directory":
 		return validRuntimeDescription(fields["directory"], stringField(field(field(fields["directory"])["self"]), "instanceId"))
 	case "outcome":

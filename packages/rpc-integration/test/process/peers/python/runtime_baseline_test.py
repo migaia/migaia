@@ -66,6 +66,10 @@ class RuntimeBaseline(unittest.TestCase):
         self.assertEqual([reply["id"] for reply in responses], ["missing", "received"])
         self.assertEqual(responses[0]["error"]["nodes"][0]["code"], "PROVIDER_NOT_FOUND")
         self.assertEqual(responses[1]["result"], {"count": 1, "values": ["receipt"]})
+        # BC12 retains every original response and adds the final close before physical EOF.
+        closing = peer.decode_frame(peer.read_frame(writer))
+        self.assertEqual(closing["operation"], peer.CONTROL_CLOSE)
+        self.assertEqual(closing["reason"]["nodes"][0]["code"], "ENDPOINT_DISPOSED")
         self.assertIsNone(peer.read_frame(writer))
 
     def test_reverse_mode_whitelist(self):

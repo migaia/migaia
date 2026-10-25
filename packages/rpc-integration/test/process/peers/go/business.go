@@ -19,6 +19,9 @@ const runtimeMethodUnavailable = "Runtime method is not provided by this peer"
 const runtimeCapabilityUnavailable = "Runtime operation is not supported by this peer"
 const runtimePayloadInvalid = "Runtime method payload is invalid"
 
+// Normal native teardown uses the same lifecycle reason as the Host.
+const sessionClosedText = "Endpoint disposed"
+
 // businessStream borrows its fixed task header and the remaining credited generator values only.
 type businessStream struct {
 	request *orderedRecord
@@ -32,6 +35,10 @@ type businessState struct {
 	remote   *orderedRecord
 	business bool
 	closing  bool
+	// Retain the original admitted close/drain graph through final native teardown.
+	closeReason *orderedRecord
+	// Receiving a final close suppresses an echo or acknowledgement.
+	closeReceived bool
 	// Only admitted work may arm a native fault after the response handoff.
 	pendingFault     string
 	pongs, closes    int
@@ -198,7 +205,17 @@ func (state *businessState) native(message *orderedRecord) ([]*orderedRecord, er
 			state.pongs++
 			return []*orderedRecord{object("profile", protocol, "kind", "control", "id", id, "route", businessRoute(message), "operation", "pong")}, nil
 		}
+		if value["operation"] == controlClose {
+			state.closes++
+			state.closing = true
+			state.closeReceived = true
+			state.closeReason, _ = value["reason"].(*orderedRecord)
+			clear(state.waiting)
+			clear(state.streams)
+			return nil, nil
+		}
 		if value["operation"] == "drain" {
+			state.closeReason, _ = value["reason"].(*orderedRecord)
 			state.closes++
 			state.closing = true
 		}
@@ -370,6 +387,21 @@ func readNative(reader io.Reader, inbound chan<- nativeRead, done <-chan struct{
 	}
 }
 
+// finish writes one local close reason after earlier replies; remote close never receives an echo.
+func (state *businessState) finish(writer io.Writer) error {
+	if state.closeReceived {
+		return nil
+	}
+	// Preserve an admitted graph verbatim; only absence selects the lifecycle default.
+	reason := state.closeReason
+	if reason == nil {
+		reason = wireError("ENDPOINT_DISPOSED", sessionClosedText, "rpc.endpoint")
+	}
+	return send(writer, object("profile", protocol, "kind", "control", "id", controlClose,
+		"route", route(stringField(field(state.identity), "instanceId"), stringField(field(field(state.remote)["self"]), "instanceId"), nil),
+		"operation", controlClose, "reason", reason))
+}
+
 // serveBusiness migrates the original reader/drain select loop; native work still owns one pending table.
 func serveBusiness(reader io.Reader, writer io.Writer, identity *orderedRecord, token, parent string, business bool) error {
 	remote, err := handshake(reader, writer, localOffer(identity, business), token, parent)
@@ -395,10 +427,10 @@ func serveBusiness(reader io.Reader, writer io.Writer, identity *orderedRecord, 
 		select {
 		case received = <-inbound:
 		case <-deadline:
-			return nil
+			return state.finish(writer)
 		}
 		if received.err == io.EOF {
-			return nil
+			return state.finish(writer)
 		}
 		if received.err != nil {
 			return received.err
@@ -432,12 +464,12 @@ func serveBusiness(reader io.Reader, writer io.Writer, identity *orderedRecord, 
 		}
 		if state.closing {
 			if len(state.waiting) == 0 && len(state.streams) == 0 {
-				return nil
+				return state.finish(writer)
 			}
 			if timer == nil {
 				remaining, _ := field(field(message)["route"])["remainingMs"].(float64)
 				if remaining <= 0 {
-					return nil
+					return state.finish(writer)
 				}
 				timer = time.NewTimer(time.Duration(remaining * float64(time.Millisecond)))
 				deadline = timer.C

@@ -3,12 +3,15 @@ use crate::{
     error_node, handshake, hello, invalid, items,
     json::{number, object, string, Value},
     read_json, reply_route, runtime_schema_equal, set, text, valid_frame, value, wire_error,
-    write_frame, METHOD_UNAVAILABLE,
+    write_frame, CONTROL_CLOSE, METHOD_UNAVAILABLE,
 };
 use std::{
     collections::HashMap,
     io::{self, Read, Write},
 };
+
+/// Normal native teardown retains the Host lifecycle reason text.
+const SESSION_CLOSED_TEXT: &str = "Endpoint disposed";
 
 /// The original declaration switch is fixed before any native session is admitted.
 pub static REQUEST_IDEMPOTENT: std::sync::atomic::AtomicBool =
@@ -125,6 +128,10 @@ pub(super) struct Business {
     business: bool,
     /// Original drain policy stops new work while allowing existing work/abort/finish to settle.
     closing: bool,
+    /// The complete admitted close/drain graph stays intact until this native connection ends.
+    close_reason: Option<Value>,
+    /// A received final close never creates a response close or acknowledgement.
+    close_received: bool,
     /// Actual control replies and drain admissions remain observable through peer.stats.
     pongs: u64,
     closes: u64,
@@ -148,6 +155,8 @@ impl Business {
             remote: remote.clone(),
             business,
             closing: false,
+            close_reason: None,
+            close_received: false,
             pongs: 0,
             closes: 0,
             one_way_receipts: 0,
@@ -305,7 +314,16 @@ impl Business {
                     }
                     return Ok(vec![pong]);
                 }
+                CONTROL_CLOSE => {
+                    self.closing = true;
+                    self.closes += 1;
+                    self.close_received = true;
+                    self.close_reason = message.get("reason").cloned();
+                    self.waiting.clear();
+                    self.streams.clear();
+                }
                 "drain" => {
+                    self.close_reason = message.get("reason").cloned();
                     self.closing = true;
                     self.closes += 1;
                 }
@@ -407,6 +425,32 @@ impl Business {
             Ok(vec![response(message, result, error)])
         }
     }
+    /// The existing native writer emits this final control only after all prior reply writes.
+    fn close_frame(&self) -> Value {
+        object(&[
+            ("profile", string(crate::PROFILE)),
+            ("kind", string("control")),
+            ("id", string(CONTROL_CLOSE)),
+            (
+                "route",
+                object(&[
+                    ("applicationVersion", string("1")),
+                    ("senderId", value(&self.own, "instanceId").clone()),
+                    ("receiverId", value(&self.remote, "instanceId").clone()),
+                    ("targetId", value(&self.remote, "instanceId").clone()),
+                    ("sentAt", number(0)),
+                ]),
+            ),
+            ("operation", string(CONTROL_CLOSE)),
+            (
+                "reason",
+                self.close_reason.clone().unwrap_or_else(|| {
+                    wire_error("rpc.endpoint", "ENDPOINT_DISPOSED", SESSION_CLOSED_TEXT)
+                }),
+            ),
+        ])
+    }
+
     /// Canonical groups use one fail-stop outcome sequence; the original independent physical batch is retired.
     fn group(&mut self, message: &Value) -> Value {
         let mut outcomes = Vec::new();
@@ -489,5 +533,8 @@ pub fn serve(
     }
     state.waiting.clear();
     state.streams.clear();
+    if !state.close_received {
+        write_frame(output, &state.close_frame())?;
+    }
     Ok(())
 }

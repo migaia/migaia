@@ -320,7 +320,11 @@ fn native_baseline(counts: &mut Counts) {
             profile,
             &object(&[("id", string("batch-isolation"))]),
             result.is_ok()
-                && replies.len() == 6
+                // BC12 retains all six original frames and appends the final native close.
+                && replies.len() == 7
+                && text(&replies[6], "kind") == "control"
+                && text(&replies[6], "operation") == crate::CONTROL_CLOSE
+                && text(error_root(field(&replies[6], "reason")), "code") == "ENDPOINT_DISPOSED"
                 && text(&replies[3], "id") == "first"
                 && field(&replies[3], "result") == &string("first")
                 && text(&replies[4], "id") == "missing"
@@ -417,7 +421,11 @@ fn notification_and_cancel(counts: &mut Counts) {
         "u41",
         "bridge",
         &object(&[("id", string("v2-batch-notification-isolation"))]),
-        replies.len() == 6
+        // Every original receipt/error/cancellation frame remains before the R21 final close.
+        replies.len() == 7
+            && text(&replies[6], "kind") == "control"
+            && text(&replies[6], "operation") == crate::CONTROL_CLOSE
+            && text(error_root(field(&replies[6], "reason")), "code") == "ENDPOINT_DISPOSED"
             && text(missing, "id") == "missing"
             && text(error_root(field(missing, "error")), "code") == "PROVIDER_NOT_FOUND"
             && crate::safe_integer(field(received, "count")) == Some(1)

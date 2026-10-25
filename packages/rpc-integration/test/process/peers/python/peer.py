@@ -20,6 +20,8 @@ MAX_HANDSHAKE = 65_536
 # The route carries its origin plus at most sixteen forwarding hosts, also retained in error provenance.
 MAX_FORWARD_ROUTE_NODES = 17
 PROTOCOL = "migaia.rpc/2"
+# Final close is a lifecycle control, never a provider method or an ACK exchange.
+CONTROL_CLOSE = "close"
 CODEC_RE = re.compile(r"^[a-z][a-z0-9.-]{0,31}$")
 EXTENSION_RE = re.compile(r"^[a-z][a-z0-9.-]*@[1-9][0-9]*$")
 NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]{0,39}$")
@@ -660,7 +662,7 @@ def validate_frame(value: Any) -> dict[str, Any]:
         validate_stream(value["stream"])
     if kind == "outcome":
         validate_outcome(value)
-    if kind == "control" and value["operation"] not in ("ping", "pong", "drain"):
+    if kind == "control" and value["operation"] not in ("ping", "pong", "drain", CONTROL_CLOSE):
         raise PeerFailure("PROTOCOL_INVALID")
     if kind == "directory":
         directory(value["directory"])

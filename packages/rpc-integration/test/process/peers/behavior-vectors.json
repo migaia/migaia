@@ -121,6 +121,23 @@
             "kind": "result",
             "id": "echo-1",
             "result": "still-open"
+          },
+          {
+            "profile": "migaia.rpc/2",
+            "kind": "control",
+            "operation": "close",
+            "reason": {
+              "root": 0,
+              "nodes": [
+                {
+                  "source": "rpc.endpoint",
+                  "code": "ENDPOINT_DISPOSED",
+                  "name": "Error",
+                  "message": "Endpoint disposed",
+                  "stack": "Error: Endpoint disposed"
+                }
+              ]
+            }
           }
         ],
         "stderr": {
@@ -129,6 +146,9 @@
       },
       "retiredAssertions": [
         "BC2 unknown-kind warning classification replaced by closed-frame rejection; same following echo and connection continuity remain required."
+      ],
+      "behaviorChanges": [
+        "BC12/R21 appends the final close control after every original expected reply; all original frame and stderr assertions remain unchanged."
       ]
     },
     {
@@ -200,11 +220,31 @@
             "kind": "result",
             "id": "echo-2",
             "result": 2
+          },
+          {
+            "profile": "migaia.rpc/2",
+            "kind": "control",
+            "operation": "close",
+            "reason": {
+              "root": 0,
+              "nodes": [
+                {
+                  "source": "rpc.endpoint",
+                  "code": "ENDPOINT_DISPOSED",
+                  "name": "Error",
+                  "message": "Endpoint disposed",
+                  "stack": "Error: Endpoint disposed"
+                }
+              ]
+            }
           }
         ]
       },
       "retiredAssertions": [
         "BC2 removed optional ping capability gate; retain original echo/wait/finish result/count/order, without sending the formerly ignored control."
+      ],
+      "behaviorChanges": [
+        "BC12/R21 appends the final close control after every original expected reply; all original frame and stderr assertions remain unchanged."
       ]
     },
     {
@@ -309,11 +349,31 @@
             "profile": "migaia.rpc/2",
             "kind": "result",
             "id": "finish-1"
+          },
+          {
+            "profile": "migaia.rpc/2",
+            "kind": "control",
+            "operation": "close",
+            "reason": {
+              "root": 0,
+              "nodes": [
+                {
+                  "source": "rpc.endpoint",
+                  "code": "ENDPOINT_DISPOSED",
+                  "name": "Error",
+                  "message": "Endpoint disposed",
+                  "stack": "Error: Endpoint disposed"
+                }
+              ]
+            }
           }
         ]
       },
       "retiredAssertions": [
         "BC2 removed optional abort capability gate; retain original echo/wait/finish result/count/order, without sending the formerly ignored control."
+      ],
+      "behaviorChanges": [
+        "BC12/R21 appends the final close control after every original expected reply; all original frame and stderr assertions remain unchanged."
       ]
     },
     {
@@ -369,11 +429,31 @@
             "kind": "result",
             "id": "echo-4",
             "result": "open"
+          },
+          {
+            "profile": "migaia.rpc/2",
+            "kind": "control",
+            "operation": "close",
+            "reason": {
+              "root": 0,
+              "nodes": [
+                {
+                  "source": "rpc.endpoint",
+                  "code": "ENDPOINT_DISPOSED",
+                  "name": "Error",
+                  "message": "Endpoint disposed",
+                  "stack": "Error: Endpoint disposed"
+                }
+              ]
+            }
           }
         ]
       },
       "retiredAssertions": [
         "BC2 removed optional close capability gate; retain original echo/wait/finish result/count/order, without sending the formerly ignored control."
+      ],
+      "behaviorChanges": [
+        "BC12/R21 appends the final close control after every original expected reply; all original frame and stderr assertions remain unchanged."
       ]
     },
     {
@@ -493,12 +573,32 @@
             "kind": "result",
             "id": "echo-5",
             "result": "continued"
+          },
+          {
+            "profile": "migaia.rpc/2",
+            "kind": "control",
+            "operation": "close",
+            "reason": {
+              "root": 0,
+              "nodes": [
+                {
+                  "source": "rpc.endpoint",
+                  "code": "ENDPOINT_DISPOSED",
+                  "name": "Error",
+                  "message": "Endpoint disposed",
+                  "stack": "Error: Endpoint disposed"
+                }
+              ]
+            }
           }
         ],
         "stderr": {
           "PEER_ERROR PROTOCOL_INVALID": 3
         }
-      }
+      },
+      "behaviorChanges": [
+        "BC12/R21 appends the final close control after every original expected reply; all original frame and stderr assertions remain unchanged."
+      ]
     },
     {
       "id": "close-drain-abort",
@@ -592,12 +692,32 @@
             "profile": "migaia.rpc/2",
             "kind": "handshake",
             "step": "accept"
+          },
+          {
+            "profile": "migaia.rpc/2",
+            "kind": "control",
+            "operation": "close",
+            "reason": {
+              "root": 0,
+              "nodes": [
+                {
+                  "source": "rpc.endpoint",
+                  "code": "ENDPOINT_DISPOSED",
+                  "name": "Error",
+                  "message": "Endpoint disposed",
+                  "stack": "Error: Endpoint disposed"
+                }
+              ]
+            }
           }
         ],
         "stderr": {
           "PEER_EVENT ABORT_DURING_DRAIN": 1
         }
-      }
+      },
+      "behaviorChanges": [
+        "BC12/R21 appends the final close control after every original expected reply; all original frame and stderr assertions remain unchanged."
+      ]
     },
     {
       "id": "invalid-hello",
@@ -805,9 +925,29 @@
                 }
               ]
             }
+          },
+          {
+            "profile": "migaia.rpc/2",
+            "kind": "control",
+            "operation": "close",
+            "reason": {
+              "root": 0,
+              "nodes": [
+                {
+                  "source": "rpc.endpoint",
+                  "code": "ENDPOINT_DISPOSED",
+                  "name": "Error",
+                  "message": "Endpoint disposed",
+                  "stack": "Error: Endpoint disposed"
+                }
+              ]
+            }
           }
         ]
-      }
+      },
+      "behaviorChanges": [
+        "BC12/R21 appends the final close control after every original expected reply; all original frame and stderr assertions remain unchanged."
+      ]
     },
     {
       "id": "abort-before-reused-id",
@@ -907,9 +1047,29 @@
             "kind": "result",
             "id": "reuse-1",
             "result": "reused"
+          },
+          {
+            "profile": "migaia.rpc/2",
+            "kind": "control",
+            "operation": "close",
+            "reason": {
+              "root": 0,
+              "nodes": [
+                {
+                  "source": "rpc.endpoint",
+                  "code": "ENDPOINT_DISPOSED",
+                  "name": "Error",
+                  "message": "Endpoint disposed",
+                  "stack": "Error: Endpoint disposed"
+                }
+              ]
+            }
           }
         ]
-      }
+      },
+      "behaviorChanges": [
+        "BC12/R21 appends the final close control after every original expected reply; all original frame and stderr assertions remain unchanged."
+      ]
     },
     {
       "id": "hello-then-bad-header-same-chunk",
@@ -1105,9 +1265,29 @@
             "kind": "result",
             "id": "echo-after-abort",
             "result": "alive"
+          },
+          {
+            "profile": "migaia.rpc/2",
+            "kind": "control",
+            "operation": "close",
+            "reason": {
+              "root": 0,
+              "nodes": [
+                {
+                  "source": "rpc.endpoint",
+                  "code": "ENDPOINT_DISPOSED",
+                  "name": "Error",
+                  "message": "Endpoint disposed",
+                  "stack": "Error: Endpoint disposed"
+                }
+              ]
+            }
           }
         ]
-      }
+      },
+      "behaviorChanges": [
+        "BC12/R21 appends the final close control after every original expected reply; all original frame and stderr assertions remain unchanged."
+      ]
     },
     {
       "id": "post-handshake-error-marker",
@@ -1133,6 +1313,252 @@
         "stderrContains": ["PEER_FAIL "],
         "stderrNot": ["ERROR peer session failed"]
       }
+    },
+    {
+      "id": "r21-final-close-no-echo",
+      "steps": [
+        {
+          "frame": {
+            "profile": "migaia.rpc/2",
+            "kind": "control",
+            "id": "r21-remote-close",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "behavior-caller",
+              "targetId": "provider",
+              "receiverId": "provider",
+              "sentAt": 0
+            },
+            "operation": "close",
+            "reason": {
+              "root": 0,
+              "nodes": [
+                {
+                  "source": "rpc.endpoint",
+                  "code": "ENDPOINT_DISPOSED",
+                  "name": "AggregateError",
+                  "message": "closing",
+                  "stack": "AggregateError: closing\n    at remote:1:1",
+                  "cause": 1,
+                  "errors": [1, 2]
+                },
+                {
+                  "source": "business",
+                  "code": "STOPPED",
+                  "name": "TypeError",
+                  "message": "inner",
+                  "stack": "TypeError: inner\n    at remote:2:1",
+                  "cause": 2
+                },
+                {
+                  "source": "native",
+                  "code": "NATIVE_STOP",
+                  "name": "Error",
+                  "message": "native",
+                  "stack": "Error: native\n    at remote:3:1",
+                  "cause": 0
+                }
+              ]
+            }
+          }
+        },
+        {
+          "frame": {
+            "profile": "migaia.rpc/2",
+            "kind": "call",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "behavior-caller",
+              "targetId": "provider",
+              "sentAt": 0,
+              "receiverId": "provider"
+            },
+            "id": "r21-must-not-run",
+            "task": {
+              "mode": "request",
+              "callerId": "behavior-caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "behavior-caller"
+              },
+              "targetGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "provider"
+              },
+              "method": "echo"
+            },
+            "options": {},
+            "payload": "must-not-run"
+          }
+        }
+      ],
+      "expect": {
+        "exit": 0,
+        "frames": [
+          {
+            "profile": "migaia.rpc/2",
+            "kind": "handshake",
+            "step": "hello"
+          },
+          {
+            "profile": "migaia.rpc/2",
+            "kind": "handshake",
+            "step": "accept"
+          }
+        ],
+        "stderr": {
+          "PEER_ERROR PROTOCOL_INVALID": 0
+        }
+      },
+      "requirements": [
+        "R21 receives the complete admitted close reason and stops this existing native reader; no ACK, no echo close, and no later provider execution."
+      ]
+    },
+    {
+      "id": "r21-drain-sends-complete-close-reason",
+      "steps": [
+        {
+          "frame": {
+            "profile": "migaia.rpc/2",
+            "kind": "call",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "behavior-caller",
+              "targetId": "provider",
+              "sentAt": 0,
+              "receiverId": "provider"
+            },
+            "id": "r21-before-close",
+            "task": {
+              "mode": "request",
+              "callerId": "behavior-caller",
+              "callerGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "behavior-caller"
+              },
+              "targetGeneration": {
+                "kind": "session",
+                "value": 0,
+                "providerId": "provider"
+              },
+              "method": "echo"
+            },
+            "options": {},
+            "payload": "before-close"
+          }
+        },
+        {
+          "frame": {
+            "profile": "migaia.rpc/2",
+            "kind": "control",
+            "id": "r21-local-drain",
+            "route": {
+              "applicationVersion": "1",
+              "senderId": "behavior-caller",
+              "targetId": "provider",
+              "receiverId": "provider",
+              "sentAt": 0,
+              "remainingMs": 0
+            },
+            "operation": "drain",
+            "reason": {
+              "root": 0,
+              "nodes": [
+                {
+                  "source": "rpc.endpoint",
+                  "code": "ENDPOINT_DISPOSED",
+                  "name": "AggregateError",
+                  "message": "closing",
+                  "stack": "AggregateError: closing\n    at remote:1:1",
+                  "cause": 1,
+                  "errors": [1, 2]
+                },
+                {
+                  "source": "business",
+                  "code": "STOPPED",
+                  "name": "TypeError",
+                  "message": "inner",
+                  "stack": "TypeError: inner\n    at remote:2:1",
+                  "cause": 2
+                },
+                {
+                  "source": "native",
+                  "code": "NATIVE_STOP",
+                  "name": "Error",
+                  "message": "native",
+                  "stack": "Error: native\n    at remote:3:1",
+                  "cause": 0
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "expect": {
+        "exit": 0,
+        "frames": [
+          {
+            "profile": "migaia.rpc/2",
+            "kind": "handshake",
+            "step": "hello"
+          },
+          {
+            "profile": "migaia.rpc/2",
+            "kind": "handshake",
+            "step": "accept"
+          },
+          {
+            "profile": "migaia.rpc/2",
+            "kind": "result",
+            "id": "r21-before-close",
+            "result": "before-close"
+          },
+          {
+            "profile": "migaia.rpc/2",
+            "kind": "control",
+            "operation": "close",
+            "reason": {
+              "root": 0,
+              "nodes": [
+                {
+                  "source": "rpc.endpoint",
+                  "code": "ENDPOINT_DISPOSED",
+                  "name": "AggregateError",
+                  "message": "closing",
+                  "stack": "AggregateError: closing\n    at remote:1:1",
+                  "cause": 1,
+                  "errors": [1, 2]
+                },
+                {
+                  "source": "business",
+                  "code": "STOPPED",
+                  "name": "TypeError",
+                  "message": "inner",
+                  "stack": "TypeError: inner\n    at remote:2:1",
+                  "cause": 2
+                },
+                {
+                  "source": "native",
+                  "code": "NATIVE_STOP",
+                  "name": "Error",
+                  "message": "native",
+                  "stack": "Error: native\n    at remote:3:1",
+                  "cause": 0
+                }
+              ]
+            }
+          }
+        ],
+        "stderr": {
+          "PEER_ERROR PROTOCOL_INVALID": 0
+        }
+      },
+      "requirements": [
+        "R21 preserves drain as drain, writes its original result first, then emits exactly one actual close carrying every field and edge of the complete reason graph."
+      ]
     }
   ],
   "history": {

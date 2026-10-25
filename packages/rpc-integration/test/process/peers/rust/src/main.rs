@@ -267,6 +267,8 @@ fn valid_runtime_schema(value: &Value) -> bool {
 
 /// The only semantic profile is independent from the native launch record's version.
 const PROFILE: &str = "migaia.rpc/2";
+/// Final lifecycle notification is distinct from drain and has no ACK.
+const CONTROL_CLOSE: &str = "close";
 /// The route carries its origin plus at most sixteen forwarding hosts; error provenance carries the same forwarded route.
 const MAX_FORWARD_ROUTE_NODES: usize = 17;
 const METHOD_UNAVAILABLE: &str = "Runtime method is not provided by this peer";
@@ -922,7 +924,10 @@ fn valid_frame(input: &Value) -> bool {
             .get("result")
             .is_none_or(|result| portable_bytes(result, 0).is_some()),
         "stream" => mode == "stream" && valid_stream(value(input, "stream")),
-        "control" => matches!(text(input, "operation"), "ping" | "pong" | "drain"),
+        "control" => matches!(
+            text(input, "operation"),
+            "ping" | "pong" | "drain" | CONTROL_CLOSE
+        ),
         "directory" => valid_runtime_description(
             value(input, "directory"),
             text(value(value(input, "directory"), "self"), "instanceId"),

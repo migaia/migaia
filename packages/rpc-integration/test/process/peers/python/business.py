@@ -26,6 +26,8 @@ REQUEST_IDEMPOTENT = True
 NATIVE_CONNECTION_KIND = "rpc-process-connection"
 NATIVE_CONNECTION_VERSION = 1
 NATIVE_CONNECTION_REJECTED = "PROCESS_CHANNEL_AUTH_REJECTED"
+# Ordinary native teardown uses the same canonical lifecycle reason as the Host.
+SESSION_CLOSED_TEXT = "Endpoint disposed"
 
 
 def error_graph() -> dict[str, Any]:
@@ -77,6 +79,10 @@ class Business:
         self.pongs = 0
         self.closes = 0
         self.closing = False
+        # The original admitted graph is retained until this connection finishes teardown.
+        self.close_reason: dict[str, Any] | None = None
+        # An inbound final close never produces a reply close or ACK.
+        self.close_received = False
         self.remote: dict[str, Any] | None = None
         self.reverse: ReverseCalls | None = None
         self.pending_fault: str | None = None
@@ -145,7 +151,15 @@ class Business:
             if message["operation"] == "ping":
                 self.pongs += 1
                 return [{"profile": peer.PROTOCOL, "kind": "control", "id": identifier, "route": reply_route(message), "operation": "pong"}]
+            if message["operation"] == peer.CONTROL_CLOSE:
+                self.closes += 1
+                self.closing = True
+                self.close_received = True
+                self.close_reason = message.get("reason")
+                self.close()
+                return []
             if message["operation"] == "drain":
+                self.close_reason = message.get("reason")
                 self.closes += 1
                 self.closing = True
                 if message["route"].get("remainingMs") == 0:
@@ -219,6 +233,14 @@ class Business:
         result, failure = self.invoke(method, payload, message["route"].get("trace"))
         return [] if mode == "notify" else [native_response(message, result, failure)]
 
+    def close_frame(self) -> dict[str, Any]:
+        """Write the final local lifecycle reason through the same native framing owner."""
+        # Preserve an admitted graph verbatim; only an absent reason receives the lifecycle default.
+        reason = self.close_reason or peer.wire_error("ENDPOINT_DISPOSED", SESSION_CLOSED_TEXT)
+        return {"profile": peer.PROTOCOL, "kind": "control", "id": peer.CONTROL_CLOSE,
+                "route": peer.route(self.identity["instanceId"], self.remote["self"]["instanceId"]),
+                "operation": peer.CONTROL_CLOSE, "reason": reason}
+
     def close(self) -> None:
         """EOF releases each existing lifecycle table; no close ACK or second owner is created."""
         self.waiting.clear()
@@ -247,7 +269,9 @@ def serve(reader: BinaryIO, writer: BinaryIO, token: str | None = None, identity
                 fault, business.pending_fault = business.pending_fault, None
                 perform_fault(fault)
             if business.closing and not business.waiting and not business.streams and not business.reverse.pending:
-                return
+                break
+        if not business.close_received:
+            peer.write_json(writer, business.close_frame())
     finally:
         business.close()
 
