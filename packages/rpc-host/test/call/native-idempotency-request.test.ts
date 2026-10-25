@@ -13,6 +13,7 @@ import {
   type IRpcMessageIO
 } from '@migaia/rpc-host/sdk'
 import type { IRpcCarrierWriteOptions } from '@migaia/rpc-contract/interfaces'
+import type { IRpcEnvelope } from '@migaia/rpc-contract/protocol'
 import { idempotency } from '@migaia/rpc-host/features/idempotency'
 import { createRpcIdempotencyStore } from '@migaia/rpc-host/features/idempotency'
 import { retry } from '@migaia/rpc-host/features/retry'
@@ -348,6 +349,58 @@ it('replays original sequential keys and rejects invalid keys before any real bu
       dispatching.mockRestore()
     }
   } finally {
+    await Promise.all([client.host.close(), host.close()])
+  }
+})
+
+// RPC-TEST-7376FBDEF575-C001: explicit key bypasses allocation and reaches the actual native write.
+it('retains the original explicit key through genuine retry and the physical request', async () => {
+  /** Original explicit-key admission must never ask the complete retry feature for a new key. */
+  const keyFactory = vi.fn(() => 'factory-key')
+  /** This real executing feature is installed at the originating native transport scope. */
+  const strategy = retry({ keyFactory })
+  /** The existing bridge lends the same genuine Session and physical frame ownership. */
+  const server = coreMemoryServer('explicit-key-caller', 'explicit-key-caller', 'memory', [
+    strategy
+  ])
+  /** No legacy registration, retry controller or generation fixture originates this request. */
+  const host = await createRpcHost(server.options)
+  /** Real accepted metadata supplies idempotency authority independently from the caller key. */
+  const client = await server.connect('explicit-key-provider', {
+    plugins: [idempotency()],
+    provide: { api: { request: () => 'result' } },
+    contract: {
+      schemaVersion: 1,
+      plugin: 'api',
+      features: { f: { methods: { request: { mode: 'request', idempotent: true } } } }
+    }
+  })
+  /** Borrow only the actual accepted view; no fake numeric generation is assigned. */
+  const accepted = server.lookup('explicit-key-provider')!
+  /** This pass-through observation begins after startup and never parses or rewrites a frame. */
+  const writing = vi.spyOn(client.pair[0], 'write')
+  try {
+    await expect(
+      host.memory.request('api.request', ['x'], { idempotencyKey: 'explicit' })
+    ).resolves.toBe('result')
+    expect(keyFactory).toHaveBeenCalledTimes(0)
+    /** One actual write retains the original one-dispatch effect without the deleted retry DTO. */
+    expect(writing).toHaveBeenCalledTimes(1)
+    /** The bridge's real identity codec exposes its original semantic frame, without another decode. */
+    const envelope = writing.mock.calls[0]![0].data as Extract<IRpcEnvelope, { kind: 'call' }>
+    expect(envelope.kind).toBe('call')
+    expect({
+      key: envelope.options.idempotencyKey,
+      idempotent: accepted.view.methods.get('api.request')!.idempotent,
+      targetGeneration: envelope.task.targetGeneration
+    }).toEqual({
+      key: 'explicit',
+      idempotent: true,
+      targetGeneration: accepted.view.generation
+    })
+    expect(envelope.options).toMatchObject({ idempotencyKey: 'explicit' })
+  } finally {
+    writing.mockRestore()
     await Promise.all([client.host.close(), host.close()])
   }
 })
