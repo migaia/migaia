@@ -42,6 +42,12 @@ import type { IRpcSessionHandle, IRpcSessionView } from '@migaia/rpc-contract/in
 import { RpcProcessErrorCode } from '@migaia/rpc-contract/error-code'
 import { createProcessError } from '../error.js'
 import { createProcessCarrier } from '../carrier.js'
+import {
+  acceptProcessConnectionBootstrap,
+  openProcessConnectionBootstrap
+} from '../connection-bootstrap.js'
+import { PROCESS_CONNECTION_RUNTIME } from '../constants.js'
+import type { IRpcConnectionContext } from '@migaia/rpc-contract/interfaces'
 import type { IProcessByteChannel, IProcessMessageChannel } from '../types.js'
 import {
   DEFAULT_HEALTH_FAILURE_THRESHOLD,
@@ -145,6 +151,8 @@ type IProcessBindingOptions<TUnit extends object, TSpec> = Readonly<{
   expectedPeerId?(unit: TUnit): string
   prepareReplacement?(spec: unknown): TSpec
   stderr?: (listener: (chunk: Uint8Array) => void) => () => void
+  /** Original native source configuration supplies its connection token only to private admission. */
+  token?: string
 }>
 
 /** Process owns native acquisition/control; SDK alone owns generation publish/rebind/rollback. */
@@ -291,9 +299,46 @@ export class ProcessBinding<TUnit extends object, TSpec> {
   /** Adopt one original native channel and roll it back if carrier construction fails. */
   readonly #openCarrier = async (unit: TUnit, signal: IAbortSignal) => {
     /** Acquired raw IO stays with this exact native execution unit. */
-    const raw = await this.#options.openRaw(unit, signal)
+    let raw = await this.#options.openRaw(unit, signal)
     try {
       if (signal.aborted) throw resolveAbortReason(signal)
+      /**
+       * Only native byte connections perform token admission; custom messages retain their own
+       * trust.
+       */
+      let connectionContext: IRpcConnectionContext | undefined
+      if (raw.kind === 'byte') {
+        /** Every native byte recipe was checked for this original configured token before launch. */
+        const token = this.#options.token!
+        /**
+         * Original native cancellation and the original scheduler own complete connection
+         * admission.
+         */
+        const options = {
+          signal,
+          scheduler: this.#options.scheduler,
+          report: this.#options.context.report
+        }
+        /** Parent/child proof and external socket proof share the same native bootstrap owner. */
+        const admitted =
+          this.#options.kind === 'connect'
+            ? await openProcessConnectionBootstrap(
+                raw,
+                token,
+                {
+                  id: this.#options.context.self().instanceId,
+                  runtime: PROCESS_CONNECTION_RUNTIME
+                },
+                options
+              )
+            : await acceptProcessConnectionBootstrap(
+                raw,
+                { token, expectedPeerId: this.#options.expectedPeerId?.(unit) },
+                options
+              )
+        raw = admitted.channel
+        connectionContext = admitted.connectionContext
+      }
       /** Nonsecret labels are separate from both native PID and the original launch credential. */
       const id = defaultRpcId()
       return {
@@ -307,6 +352,7 @@ export class ProcessBinding<TUnit extends object, TSpec> {
             log: () => undefined
           }
         }),
+        connectionContext,
         localSourceFacts: {
           expectedPeerId: this.#options.expectedPeerId?.(unit),
           sessionId: id,
@@ -478,6 +524,7 @@ export function createSpawnProcessBinding<THandle extends IProcessHandle>(
     events,
     scheduler,
     kind: 'spawn',
+    token: source.token,
     stderr: stderr.subscribe,
     openRaw: async (unit, signal) => {
       /** Full native recipes retain the original physical-kind admission and rollback. */
@@ -654,6 +701,7 @@ export function createConnectProcessBinding(
     events,
     scheduler,
     kind: 'connect',
+    token: source.token,
     openRaw: async (unit) => unit.channel,
     create: (ports) => createConnectProcessSupervisor({ ...native, ports })
   })

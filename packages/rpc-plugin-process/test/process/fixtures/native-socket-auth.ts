@@ -2,9 +2,9 @@
 import { vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
+import { auth, type IRpcAuthenticationOptions } from '@migaia/rpc-host/plugins/auth'
 import { processPlugin } from '@migaia/rpc-plugin-process'
-import type { IRpcTransportSetupContext } from '@migaia/rpc-host/sdk'
+import { defaultRpcId, type IRpcTransportSetupContext } from '@migaia/rpc-host/sdk'
 import { RpcProbeDirection } from '@migaia/rpc-contract/interfaces'
 import * as carrierOwner from '../../../dist/process/carrier.js'
 import {
@@ -14,7 +14,8 @@ import {
 import type {
   IProcessByteListener,
   IProcessPendingByteConnection,
-  IListenProcessByteChannel
+  IListenProcessByteChannel,
+  IProcessByteChannel
 } from '../../../dist/process/types.js'
 
 /** Observation retains original native objects and operations; it implements no old channel API. */
@@ -58,9 +59,18 @@ export class NativeSocketAuth {
   readonly #opening: Promise<unknown>[] = []
   /** Only the exact factory spy installed by this fixture is restored at final cleanup. */
   readonly #restore: () => void
+  /** Native token tests can omit application authentication without changing the real transport. */
+  readonly #applicationAuth: boolean
+  /** The optional existing application verifier observes per-Session resolver output independently. */
+  readonly #applicationVerifier: IRpcAuthenticationOptions['verifyCredentials']
 
   /** Observe the genuine carrier factory while returning every original carrier unchanged. */
-  constructor() {
+  constructor(
+    applicationAuth = true,
+    applicationVerifier?: IRpcAuthenticationOptions['verifyCredentials']
+  ) {
+    this.#applicationAuth = applicationAuth
+    this.#applicationVerifier = applicationVerifier
     /** This original factory alone installs native Process IO and its complete features. */
     const create = carrierOwner.createProcessCarrier
     /** The observer borrows original context and media facts, without replacing an SDK port. */
@@ -72,22 +82,40 @@ export class NativeSocketAuth {
         if (context.self().instanceId === 'listener-route') {
           this.context = context
           this.nativeAttached.resolve()
-          if (carrier.observation)
-            this.#removers.push(
-              carrier.observation.subscribe((event) => {
-                if (event.direction === RpcProbeDirection.inbound) this.inbound.resolve()
-                if (
-                  event.direction === RpcProbeDirection.outbound &&
-                  event.content instanceof Uint8Array
-                )
-                  this.writes.push(event.content.slice())
-              })
-            )
+          this.#observeRaw(raw)
         } else if (context.self().instanceId === 'dialer-route') this.clientContext = context
         return carrier
       })
     this.#restore = () => observer.mockRestore()
     void this.connection.catch(() => undefined)
+  }
+  /**
+   * Existing trusted native observation sees actual gate rejection before a carrier can be
+   * admitted.
+   */
+  #observeRaw(
+    raw: IProcessByteChannel | Parameters<typeof carrierOwner.createProcessCarrier>[0]
+  ): void {
+    if (raw.kind !== 'byte' || !raw.observation) return
+    this.#removers.push(
+      raw.observation.subscribe((event) => {
+        if (event.direction === RpcProbeDirection.inbound) this.inbound.resolve()
+        if (event.direction === RpcProbeDirection.outbound && event.content instanceof Uint8Array)
+          this.writes.push(event.content.slice())
+      })
+    )
+  }
+  /** Observe the same raw pending handoff before the complete native token gate starts reading. */
+  #observePending(pending: IProcessPendingByteConnection): IProcessPendingByteConnection {
+    return {
+      accept: <T>(adopt: (raw: IProcessByteChannel) => Promise<T>): Promise<T> =>
+        pending.accept((raw) => {
+          this.nativeAttached.resolve()
+          this.#observeRaw(raw)
+          return adopt(raw)
+        }),
+      close: pending.close
+    }
   }
   /** Hold only the next real pending callback before invoking the original native admission owner. */
   holdNextPending(): void {
@@ -110,16 +138,27 @@ export class NativeSocketAuth {
       self: { name: 'listener-route', instanceId: 'listener-route' },
       provide: { echo: (value: unknown) => value },
       plugins: [
-        auth({ encodedType: 'string', sign: (value) => value, verify: (value) => value }),
+        ...(this.#applicationAuth
+          ? [
+              auth({
+                encodedType: 'string',
+                sign: (value) => value,
+                verify: (value) => value,
+                credentials: (context) => context.credentials,
+                verifyCredentials: this.#applicationVerifier
+              })
+            ]
+          : []),
         processPlugin({
           listen: {
             kind: 'listener',
             address: 'tcp://127.0.0.1:0',
             verify,
-            createConnectionContext: () => ({
-              peerId: 'dialer-route',
-              ipc: { connectionId: 'responder', sessionId: 'responder', log: () => undefined }
-            }),
+            createConnectionContext: () => {
+              /** Multiple real connections retain unique original native labels in the same owner. */
+              const id = defaultRpcId()
+              return { peerId: id, ipc: { connectionId: id, sessionId: id, log: () => undefined } }
+            },
             listen: async (options) => {
               this.listener = await listenProcessByteChannel({
                 ...options,
@@ -128,10 +167,10 @@ export class NativeSocketAuth {
                   if (this.#holdNext) {
                     this.#holdNext = false
                     return this.#releasePending.promise.then(() =>
-                      this.#forwardPending(pending, options.onConnection)
+                      this.#forwardPending(this.#observePending(pending), options.onConnection)
                     )
                   }
-                  return this.#forwardPending(pending, options.onConnection)
+                  return this.#forwardPending(this.#observePending(pending), options.onConnection)
                 }
               })
               return this.listener
@@ -149,13 +188,22 @@ export class NativeSocketAuth {
     return server
   }
   /** The actual independent client lends its native token through the current Process recipe. */
-  connect(token: string) {
+  connect(token: string, name = 'dialer-route') {
     /** The public client and its genuine dialer own all actual acquisition and failure wrapping. */
     const opening = createRpcHost({
-      self: { name: 'dialer-route', instanceId: 'dialer-route' },
+      self: { name, instanceId: name },
       provide: { echo: (value: unknown) => value },
       plugins: [
-        auth({ encodedType: 'string', sign: (value) => value, verify: (value) => value }),
+        ...(this.#applicationAuth
+          ? [
+              auth({
+                encodedType: 'string',
+                sign: (value) => value,
+                verify: (value) => value,
+                credentials: (context) => context.credentials
+              })
+            ]
+          : []),
         processPlugin({
           connect: {
             target: {

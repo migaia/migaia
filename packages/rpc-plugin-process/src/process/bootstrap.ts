@@ -3,9 +3,13 @@
  * subscriptions. Any coalesced tail is handed to the original channel before Session reading
  * begins.
  */
-import { deferred, hostRethrowReporter } from '@migaia/utils/promise'
+import { deferred, hostRethrowReporter, type IAbortSignal } from '@migaia/utils/promise'
 import { systemScheduler, type IScheduledTask, type IScheduler } from '@migaia/utils/scheduler'
-import { createRpcStreamFrameDecoderWithLimit, IpcReporterContext } from '@migaia/rpc-host/sdk'
+import {
+  createRpcStreamFrameDecoderWithLimit,
+  IpcReporterContext,
+  resolveAbortReason
+} from '@migaia/rpc-host/sdk'
 import { RpcCoreErrorCode, RpcProcessErrorCode } from '@migaia/rpc-contract/error-code'
 import { tagRpcError } from '@migaia/rpc-contract/errors'
 import { PROCESS_HANDSHAKE_MAX_FRAME_BYTES } from './constants.js'
@@ -18,7 +22,17 @@ class ProcessBootstrap {
   /** The exact acquired stdin/stdout owner retains physical close and native backpressure. */
   readonly #raw: IProcessByteChannel
   /** One first-frame result owns discovery success and failure. */
-  readonly #received = deferred<Uint8Array>()
+  readonly #received = deferred<void>()
+  /**
+   * Secret first-frame bytes transfer to the caller once and are then cleared from this channel
+   * owner.
+   */
+  #bootstrap: Uint8Array | undefined
+  /**
+   * Native preparation cancellation closes the same physical reader and never creates a second
+   * pump.
+   */
+  readonly #signal: IAbortSignal | undefined
   /** The sole framing implementation stops synchronously after this native bootstrap. */
   readonly #decoder
   /** Bootstrap completion detaches native byte delivery before Session assumes ownership. */
@@ -37,19 +51,30 @@ class ProcessBootstrap {
   readonly channel: IProcessByteChannel
 
   /** Acquire one bounded bootstrap without decoding or consuming the following semantic frame. */
-  constructor(raw: IProcessByteChannel, timeoutMs: number | undefined, scheduler: IScheduler) {
+  constructor(
+    raw: IProcessByteChannel,
+    timeoutMs: number | undefined,
+    scheduler: IScheduler,
+    signal?: IAbortSignal
+  ) {
     this.#raw = raw
+    this.#signal = signal
     this.#decoder = createRpcStreamFrameDecoderWithLimit(
       { onFrame: this.#frame, onError: this.#fail },
       () => PROCESS_HANDSHAKE_MAX_FRAME_BYTES
     )
     this.channel = Object.freeze({
       kind: raw.kind,
+      observation: raw.observation,
+      isExclusive: raw.isExclusive,
       write: (chunk, options) => raw.write(chunk, options),
       close: (reason) => raw.close(reason),
       onClose: (listener) => raw.onClose(listener),
       onData: this.#subscribe
     })
+    signal?.addEventListener('abort', this.#abort, { once: true })
+    if (signal?.aborted) this.#abort()
+    if (this.#settled) return
     this.#removeClose = raw.onClose(() => {
       this.#decoder.finish()
       this.#fail(createProcessError(RpcProcessErrorCode.channelClosed))
@@ -63,13 +88,21 @@ class ProcessBootstrap {
       )
   }
 
+  /** Cancellation retains its original reason while the one native reader is physically released. */
+  readonly #abort = (): void => {
+    this.#fail(
+      createProcessError(RpcProcessErrorCode.channelClosed, resolveAbortReason(this.#signal!))
+    )
+  }
+
   /** Preserve original bytes until the receiver resolves; no peer DTO is created. */
   readonly #frame = (frame: Uint8Array): void => {
     if (this.#settled) return
     this.#settled = true
     this.#decoder.close()
     this.#detach()
-    this.#received.resolve(frame.slice())
+    this.#bootstrap = frame.slice()
+    this.#received.resolve()
   }
   /** Decode once; a coalesced hello tail precedes every later native read. */
   readonly #data = (chunk: Uint8Array): void => {
@@ -88,6 +121,7 @@ class ProcessBootstrap {
   }
   /** Release acquisition observers and deadline on every terminal path. */
   #detach(): void {
+    this.#signal?.removeEventListener('abort', this.#abort)
     this.#removeData?.()
     this.#removeData = undefined
     this.#removeClose?.()
@@ -112,7 +146,11 @@ class ProcessBootstrap {
   /** Join physical rollback before rejecting the original first-frame receipt. */
   async read(): Promise<Readonly<{ channel: IProcessByteChannel; bootstrap: Uint8Array }>> {
     try {
-      return Object.freeze({ channel: this.channel, bootstrap: await this.#received.promise })
+      await this.#received.promise
+      /** Only the caller retains this private payload after the single handoff. */
+      const bootstrap = this.#bootstrap!
+      this.#bootstrap = undefined
+      return Object.freeze({ channel: this.channel, bootstrap })
     } catch (error) {
       await this.close()
       throw error
@@ -124,7 +162,11 @@ class ProcessBootstrap {
 export async function receiveAdapterBootstrap(
   channel: IProcessByteChannel,
   bootstrap: 'stdin' | 'none',
-  options: Readonly<{ bootstrapTimeoutMs?: number; scheduler?: IScheduler }> = {}
+  options: Readonly<{
+    bootstrapTimeoutMs?: number
+    scheduler?: IScheduler
+    signal?: IAbortSignal
+  }> = {}
 ): Promise<Readonly<{ channel: IProcessByteChannel; bootstrap?: Uint8Array }>> {
   if (
     options.bootstrapTimeoutMs !== undefined &&
@@ -138,6 +180,7 @@ export async function receiveAdapterBootstrap(
   return new ProcessBootstrap(
     channel,
     options.bootstrapTimeoutMs,
-    options.scheduler ?? systemScheduler
+    options.scheduler ?? systemScheduler,
+    options.signal
   ).read()
 }

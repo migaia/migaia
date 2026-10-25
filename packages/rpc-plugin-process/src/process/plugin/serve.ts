@@ -7,11 +7,17 @@ import type {
   IRpcLocalSourceFacts,
   IRpcSessionHandle
 } from '@migaia/rpc-contract/interfaces'
+import type { IRpcConnectionContext } from '@migaia/rpc-contract/interfaces'
 import type { IRpcTransportSetupContext } from '@migaia/rpc-host/sdk'
 import { defaultRpcId, resolveAbortReason, RpcNativeMembers } from '@migaia/rpc-host/sdk'
 import { createProcessCarrier } from '../carrier.js'
 import { createProcessChannelClosedError, createProcessCleanupError } from '../error.js'
 import { decodeProcessRuntimeBootstrap } from '../runtime-bootstrap.js'
+import {
+  acceptProcessConnectionBootstrap,
+  openProcessConnectionBootstrap
+} from '../connection-bootstrap.js'
+import { PROCESS_CONNECTION_RUNTIME } from '../constants.js'
 import { DEFAULT_DRAIN_MS } from '../resilience/constants.js'
 import type {
   IProcessByteChannel,
@@ -246,17 +252,10 @@ class ProcessSessionOwner {
       this.#assertOpen()
       lease = this.#connections.claim()
       if (this.#ingress.kind !== 'listener') invalidOption('ingress.kind')
-      /** Diagnostic labels stay outside business/handshake payloads. */
-      const selected = this.#ingress.createConnectionContext(pending)
-      /** The callback borrows one attachment operation while the same outer lease keeps rollback. */
-      const attachment = { owner: this, selected }
+      /** Native verification precedes user context side effects and any semantic Session. */
+      const attachment = { owner: this, ingress: this.#ingress, pending }
       await pending.accept(async (raw) => {
-        await attachment.owner.#attach(
-          raw,
-          lease!,
-          attachment.selected.ipc.connectionId,
-          attachment.selected.ipc
-        )
+        await attachment.owner.#attachListener(raw, lease!, attachment.ingress, attachment.pending)
         lease = undefined
       })
     } catch (error) {
@@ -268,6 +267,36 @@ class ProcessSessionOwner {
       }
       this.#report(error)
     }
+  }
+
+  /** The original pending owner lends raw bytes only after native token/principal verification. */
+  async #attachListener(
+    raw: IProcessByteChannel,
+    lease: IProcessConnectionLease,
+    ingress: IProcessServeListenerIngress,
+    pending: IProcessPendingByteConnection
+  ): Promise<void> {
+    /** This single existing bootstrap reader hands its unconsumed semantic tail to Session. */
+    const admitted = await acceptProcessConnectionBootstrap(
+      raw,
+      { verify: (credential, peer) => ingress.verify(credential, peer) },
+      {
+        signal: this.#controller.signal,
+        scheduler: this.#scheduler,
+        report: this.#report
+      }
+    )
+    this.#assertOpen()
+    /** Only an admitted connection may execute the original user metadata callback. */
+    const selected = ingress.createConnectionContext(pending)
+    await this.#attach(
+      admitted.channel,
+      lease,
+      selected.ipc.connectionId,
+      selected.ipc,
+      { expectedPeerId: admitted.peer?.id },
+      admitted.connectionContext
+    )
   }
 
   /** Create the sole guard before openRaw can wait for bootstrap or native EOF. */
@@ -307,6 +336,8 @@ class ProcessSessionOwner {
       this.#removeParentClose = raw.onClose(this.#parentLost)
       /** Only native bootstrap fields are projected, with no business metadata authority. */
       let facts: IRpcLocalSourceFacts | undefined
+      /** Credentials remain separate from nonsecret source identity throughout this native lifetime. */
+      let connectionContext: IRpcConnectionContext | undefined
       if (ingress.channelKind === 'byte') {
         if (!('raw' in opened) || raw.kind !== 'byte') invalidOption('ingress.bootstrap')
         const bootstrap = decodeProcessRuntimeBootstrap(opened.bootstrap)
@@ -315,10 +346,19 @@ class ProcessSessionOwner {
           generation: bootstrap.generation,
           expectedPeerId: bootstrap.parentInstanceId
         }
+        /** The child proves the original private launch token before Session consumes its peer. */
+        const admitted = await openProcessConnectionBootstrap(
+          raw,
+          bootstrap.token,
+          { id: bootstrap.self.instanceId, runtime: PROCESS_CONNECTION_RUNTIME },
+          { signal: this.#controller.signal, scheduler: this.#scheduler, report: this.#report }
+        )
+        raw = admitted.channel
+        connectionContext = admitted.connectionContext
       } else if ('raw' in opened || raw.kind !== 'message') invalidOption('ingress.channelKind')
       /** Real connection labels are allocated once and never copied into authentication metadata. */
       const ipc = { connectionId: defaultRpcId(), sessionId: defaultRpcId(), log: () => undefined }
-      await this.#attach(raw, lease, ipc.connectionId, ipc, facts)
+      await this.#attach(raw, lease, ipc.connectionId, ipc, facts, connectionContext)
       lease = undefined
       raw = undefined
       return this.#handle()
@@ -343,7 +383,8 @@ class ProcessSessionOwner {
     lease: IProcessConnectionLease,
     id: string,
     ipc?: IProcessCommonOptions['ipc'],
-    facts?: IRpcLocalSourceFacts
+    facts?: IRpcLocalSourceFacts,
+    connectionContext?: IRpcConnectionContext
   ): Promise<void> {
     /** Failed native carrier construction leaves this original raw resource with its caller. */
     let carrier: IRpcCarrier | undefined
@@ -363,11 +404,15 @@ class ProcessSessionOwner {
         ipc,
         features: this.#options.features
       })
-      handle = this.#context.attach(carrier, {
-        ...facts,
-        sessionId: ipc?.sessionId ?? id,
-        isExclusive: raw.kind === 'byte' ? raw.isExclusive : undefined
-      })
+      handle = this.#context.attach(
+        carrier,
+        {
+          ...facts,
+          sessionId: ipc?.sessionId ?? id,
+          isExclusive: raw.kind === 'byte' ? raw.isExclusive : undefined
+        },
+        connectionContext
+      )
       const view = await raceWithAbort(() => handle!.ready, {
         signals: [this.#controller.signal],
         report: this.#report

@@ -28,6 +28,21 @@ export const PROCESS_RUNTIME_API_FINGERPRINT_PREFIX = 'rpc-process-'
 /** Discovery has a bounded wait before the original ordinary handshake deadline starts. */
 export const PROCESS_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS = 10_000
 
+/** This private native token gate precedes Session codec/handshake and carries no RPC negotiation. */
+export const PROCESS_CONNECTION_BOOTSTRAP_KIND = 'rpc-process-connection'
+/** Native admission has one fixed record version independent of the semantic RPC profile. */
+export const PROCESS_CONNECTION_BOOTSTRAP_VERSION = 1
+/** Connection bootstrap requests/replies use fixed steps without owning a second RPC handshake. */
+export const ProcessConnectionBootstrapStep = {
+  hello: 'hello',
+  accept: 'accept',
+  reject: 'reject'
+} as const
+/** The fixed native admission steps do not grant any semantic RPC negotiation authority. */
+export type ProcessConnectionBootstrapStep = keyof typeof ProcessConnectionBootstrapStep
+/** Native peer metadata matches the current Host's portable JavaScript runtime label. */
+export const PROCESS_CONNECTION_RUNTIME = 'javascript'
+
 /** Fixed session log quota; USEGUIDE documents normal records separately from one overflow summary. */
 export const PROCESS_STDERR_EVENT_BUDGET = 32
 /** Session diagnostics reset every second using the connection's existing monotonic scheduler. */

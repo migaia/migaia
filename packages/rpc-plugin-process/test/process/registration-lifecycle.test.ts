@@ -7,6 +7,8 @@ import { createRpcHost } from '@migaia/rpc-host'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import { defineTransportPlugin, type IRpcTransportSetupContext } from '@migaia/rpc-host/sdk'
 import { serveProcessSessions } from '../../dist/process/plugin/serve.js'
+import { openProcessConnectionBootstrap } from '../../dist/process/connection-bootstrap.js'
+import { PROCESS_CONNECTION_RUNTIME } from '../../dist/process/constants.js'
 import { createProcessResilience } from '../../dist/process/resilience/index.js'
 import {
   dialProcessByteChannel,
@@ -240,6 +242,13 @@ it('reports the original application preparation failure and releases each nativ
         closes[index]! += 1
         closed.resolve()
       })
+      /** The existing native admission must finish before the application callback can fail. */
+      await openProcessConnectionBootstrap(
+        raw,
+        'token',
+        { id: `native-failing-${index}`, runtime: PROCESS_CONNECTION_RUNTIME },
+        { signal: new AbortController().signal, report: (error) => reports.push(error) }
+      )
       await closed.promise
     }
     await reported.promise
