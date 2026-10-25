@@ -53,6 +53,8 @@ export type IRecordIndexBackfillPreparation = {
   readonly outcome: 'indexed' | 'skipped'
   /** False only for physically scanned records outside the entity scope. */
   readonly counted?: boolean
+  /** Entity-owned legacy records, including shadows, prevent migration-free completion. */
+  readonly legacy?: true
 }
 
 /** Optional entity projection hook; execution remains outside IndexedDB transactions. */

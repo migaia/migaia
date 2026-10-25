@@ -109,19 +109,19 @@ export class EntityIndexesOwner<
     const allowComplete =
       migrationState?.status === StorageMigrationStatus.complete &&
       migrationState.schemaFingerprint === this.#context.migrationFingerprint
-    let session = await capability.openBackfillSession(
-      handle,
-      {
-        range: repositoryEntityRange(this.#context.name),
-        // Legacy keys can contain arbitrarily nested valid array IDs; the backend scans bounded
-        // pages and this preparation classifies entity ownership without a lossy prefix range.
-        legacyRange: undefined,
-        includeLegacy: true,
-        allowComplete
-      },
-      ctx
-    )
+    /** This owner updates completion permission only after observing the entire clean scan. */
+    const backfillOptions = {
+      range: repositoryEntityRange(this.#context.name),
+      // Legacy keys can contain arbitrarily nested valid array IDs; the backend scans bounded
+      // pages and this preparation classifies entity ownership without a lossy prefix range.
+      legacyRange: undefined,
+      includeLegacy: true,
+      allowComplete
+    }
+    let session = await capability.openBackfillSession(handle, backfillOptions, ctx)
     let sessionReleased = false
+    /** Undefined precedes the first batch; resumed scans cannot prove earlier records were clean. */
+    let canonicalOnlyScan: boolean | undefined
     try {
       let finished = false
       while (!finished) {
@@ -136,6 +136,15 @@ export class EntityIndexesOwner<
           throw new StorageError(StorageErrorCode.invalidConfig, {
             backend: this.#context.store.backend
           })
+        if (canonicalOnlyScan === undefined)
+          canonicalOnlyScan =
+            (batch.phase ?? RecordIndexBackfillPhase.canonical) ===
+              RecordIndexBackfillPhase.canonical && batch.checkpoint === undefined
+        canonicalOnlyScan &&= batch.preparations.every(
+          (preparation) =>
+            preparation.legacy !== true &&
+            (preparation.counted === false || preparation.outcome !== 'skipped')
+        )
         const projections = batch.candidates.map((candidate, index) => {
           const preparation = batch.preparations![index]!
           return {
@@ -147,6 +156,11 @@ export class EntityIndexesOwner<
           }
         })
         const nextCheckpoint = batch.candidates.at(-1)?.key
+        finished =
+          (batch.phase ?? RecordIndexBackfillPhase.canonical) === RecordIndexBackfillPhase.legacy &&
+          batch.endOfScan
+        backfillOptions.allowComplete =
+          allowComplete || (migrationState === undefined && finished && canonicalOnlyScan)
         await session.renew(ctx)
         await session.commitBatch(
           {
@@ -160,22 +174,10 @@ export class EntityIndexesOwner<
           },
           ctx
         )
-        finished =
-          (batch.phase ?? RecordIndexBackfillPhase.canonical) === RecordIndexBackfillPhase.legacy &&
-          batch.endOfScan
         if (!finished) {
           session.release()
           sessionReleased = true
-          session = await capability.openBackfillSession(
-            handle,
-            {
-              range: repositoryEntityRange(this.#context.name),
-              legacyRange: undefined,
-              includeLegacy: true,
-              allowComplete
-            },
-            ctx
-          )
+          session = await capability.openBackfillSession(handle, backfillOptions, ctx)
           sessionReleased = false
         }
       }
@@ -617,6 +619,8 @@ export class EntityIndexesOwner<
     await session.renew(ctx)
     const runtime = createStorageOperationRuntime()
     let domain: TDomain | undefined
+    /** Legacy ownership is observed before a canonical shadow can make the candidate uncounted. */
+    let legacy: true | undefined
     try {
       if (candidate.phase === RecordIndexBackfillPhase.legacy) {
         const canonicalId = decodeRepositoryKey(this.#context.name, candidate.key)
@@ -632,13 +636,14 @@ export class EntityIndexesOwner<
         if (canonicalId !== undefined)
           return { decodedBytes: 0, outcome: 'skipped', counted: false }
         if (legacyId !== undefined) {
+          legacy = true
           const id = legacyId
           const canonicalRaw = await this.#context.recordStore!.getRecord(
             composeRepositoryKey(this.#context.name, id),
             ctx
           )
           if (canonicalRaw !== undefined)
-            return { decodedBytes: 0, outcome: 'skipped', counted: false }
+            return { decodedBytes: 0, outcome: 'skipped', counted: false, legacy }
         }
       }
       const envelope = await this.#context.decodeEnvelope(candidate.raw, ctx, runtime)
@@ -654,10 +659,11 @@ export class EntityIndexesOwner<
           String(cause)
         )
       )
-      return { decodedBytes: 0, outcome: 'skipped' }
+      return { decodedBytes: 0, outcome: 'skipped', legacy }
     }
     return {
       decodedBytes: safeJsonPayloadByteLength(domain),
+      legacy,
       outcome: domain === undefined ? 'skipped' : 'indexed',
       projection:
         domain === undefined

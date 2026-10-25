@@ -1,6 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
-import { records } from '@migaia/storage-contract'
+import {
+  asSecondaryIndexRecordStore,
+  records,
+  STORAGE_CONTRACT_SOURCE,
+  StorageContractErrorCode
+} from '@migaia/storage-contract'
 import { createStorageHost, STORAGE_HOST_SOURCE, StorageErrorCode } from '@migaia/storage-host'
 import { defineEntity } from '@migaia/storage-host/entity'
 import { entityQueryFeature } from '@migaia/storage-host/entity/query'
@@ -172,6 +177,101 @@ describe('explicit entity Features over the web IndexedDB entry', () => {
       code: WebErrorCode.indexedDbFeatureNotInstalled,
       message: expect.stringContaining('indexedDbKeysetFeature')
     })
+  })
+
+  it('uses the native cursor for current-format records without a migration Feature or marker', async () => {
+    /** The backend receives only its native index unit; entity migration remains unassembled. */
+    await using host = await createStorageHost({
+      plugins: [indexedDbBackendPlugin(options(), { indexes: indexedDbIndexesFeature() })]
+    })
+    /** This certified view shares the provider registered on the original native store. */
+    const store = host.backend('indexed-db')
+    /** Current envelopes can be proved by a full clean backfill without installing migration. */
+    const repository = defineEntity<IRow>()({
+      name: 'current-only',
+      key: 'id',
+      features: [entityQueryFeature(), entityIndexesFeature()],
+      indexes: { group: { path: 'group' } }
+    }).connect(store)
+    await repository.put({ id: 'a', group: 'one' })
+    await repository.put({ id: 'b', group: 'two' })
+    /** The first strict terminal must invoke the selected backend port, without a warm-up scan. */
+    const native = vi.spyOn(store, 'iterateRecordIndex')
+    expect(await repository.query().index('group', 'one').requirePushdown().all()).toEqual([
+      { id: 'a', group: 'one' }
+    ])
+    expect(native).toHaveBeenCalledOnce()
+    expect(native.mock.calls[0]?.[0]).toMatchObject({
+      index: 'group',
+      range: { lower: 'one', upper: 'one' }
+    })
+    expect(() => repository.migrate()).toThrow(expect.objectContaining(missing('migration')))
+  })
+
+  it('keeps readiness running and strict queries rejected when the clean scan skips an invalid record', async () => {
+    /** This isolated native backend receives no migration completion metadata. */
+    await using host = await createStorageHost({
+      plugins: [indexedDbBackendPlugin(options(), { indexes: indexedDbIndexesFeature() })]
+    })
+    /** The same public backend supplies raw records and its real secondary-index port. */
+    const store = host.backend('indexed-db')
+    /** Public diagnostics distinguish the skipped row from the authoritative query fallback. */
+    const diagnostics: string[] = []
+    /** Only query and indexes are selected, matching the migration-free current-format case. */
+    const repository = defineEntity<IRow>()({
+      name: 'invalid-current-only',
+      key: 'id',
+      features: [entityQueryFeature(), entityIndexesFeature()],
+      onDiagnostic: (message) => diagnostics.push(message),
+      schema: {
+        name: 'current-row',
+        validate: async (value) => value as IRow,
+        /** A current envelope with malformed state fails decoding without needing migration. */
+        decode: async (value) => {
+          /** The decoder checks the stored representation before returning the domain row. */
+          const row = value as IRow
+          if (typeof row.group !== 'string') throw new TypeError('invalid row group')
+          return row
+        }
+      },
+      indexes: { group: { path: 'group' } }
+    }).connect(store)
+    await repository.put({ id: 'a', group: 'one' })
+    await store.putRecord(
+      { version: 1, state: { id: 'invalid', group: 1 } },
+      repository.lockKey('invalid').key
+    )
+    /** Fallback keeps its public invalid-record policy and cannot silently use an incomplete index. */
+    const native = vi.spyOn(store, 'iterateRecordIndex')
+    expect(await repository.query().index('group', 'one').all()).toEqual([
+      { id: 'a', group: 'one' }
+    ])
+    expect(diagnostics).toContain(
+      '[storage-web] entity "invalid-current-only" index "group" uses authoritative full-scan fallback'
+    )
+    expect(diagnostics).toContain(
+      '[storage-web] entity "invalid-current-only" skipped invalid record invalid'
+    )
+    /** The backend-issued handle used by writes exposes the authoritative readiness receipt. */
+    const capability = asSecondaryIndexRecordStore(store)
+    /** Captured writes and the query share this existing opaque native index identity. */
+    const handle = await capability.ensureRecordIndexes('invalid-current-only', [
+      { name: 'group', unique: false, multiEntry: false, revision: 1 }
+    ])
+    await expect(capability.getRecordIndexReadiness(handle)).resolves.toMatchObject({
+      status: 'running'
+    })
+    await expect(
+      repository.query().index('group', 'one').requirePushdown().all()
+    ).rejects.toMatchObject({
+      source: STORAGE_CONTRACT_SOURCE,
+      code: StorageContractErrorCode.queryNotPushable
+    })
+    await expect(repository.query().index('group').onInvalid('throw').all()).rejects.toMatchObject({
+      source: STORAGE_HOST_SOURCE,
+      code: StorageErrorCode.extensionFailed
+    })
+    expect(native).not.toHaveBeenCalled()
   })
 
   it('rejects missing definition owners with their exact host source and code before connection', () => {

@@ -262,3 +262,5 @@ await host.dispose()
 ### 严格索引查询迁移
 
 旧版 `.index(...).requirePushdown()` 在没有客户端步骤时允许全表扫描。现在显式索引来源若为 `fullScan`，或原生索引准备遇到竞争而只能扫描，终端读取会拒绝 `@migaia/storage-contract / QUERY_NOT_PUSHABLE`。需要原生索引时同时装配 `entityIndexesFeature()` 和后端索引 Feature；允许权威扫描时移除 `requirePushdown()`。普通查询继续保留扫描回退。IndexedDB 的借用视图与原生 store 共用能力身份；未迁移的旧格式记录使 readiness 保持 running；查询继续全表扫描并发出回退诊断，直到迁移状态完成且与当前定义一致。
+
+没有迁移元数据时，只有从 canonical 起点开始、完整结束两个扫描阶段，且未遇到任何旧格式记录、未跳过任何无效 entity 记录的回填，才可变为 complete。当前格式数据因此无需 `entityMigrationFeature()` 也可使用原生 cursor。旧格式记录（含已有 canonical 副本的 shadow）或被跳过的无效记录使 readiness 保持 running；普通查询全表扫描并发出回退诊断，显式索引 strict 查询拒绝 `QUERY_NOT_PUSHABLE`。从持久 checkpoint 续跑不能证明前面的扫描干净。已有迁移元数据仍只接受 complete 状态和匹配的 schema fingerprint。
