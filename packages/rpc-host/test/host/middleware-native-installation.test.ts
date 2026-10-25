@@ -1,5 +1,6 @@
 /** Original native installation and rollback receipts use one real receiving PluginHost. */
 import { defineHost, definePlugin, type IPluginHostCore } from '@migaia/plugin-host'
+import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { expect, it } from 'vitest'
 import { coreMemoryServer } from './core-fixture.js'
 
@@ -24,9 +25,18 @@ function failingRelease(releases: string[], name: string, error: unknown) {
 
 /** The canonical native Host owns transactions, resource callbacks and its disposal completion. */
 function receivingHost() {
-  return defineHost({
+  /** Every original transport in this receiver declares the same actual memory namespace. */
+  const rpc = rpcHostPipelines(
+    () => host,
+    (key) => host.pipeline(key),
+    ['memory']
+  )
+  /** The original native Host owns both these authentic pipelines and the existing transaction. */
+  const host = defineHost({
+    ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
+  return host
 }
 
 /** SUP021–023 preserve the original shared completion and successful terminal cleanup summary. */
