@@ -525,6 +525,15 @@ export class StreamConsumer {
     if (this.#terminal) return
     this.#terminal = terminal
     this.#admission = undefined
+    /** The actual wire receipt remains distinct from this consumer's logical settlement below. */
+    if (received)
+      this.#observe(
+        received,
+        RpcProbeOutcome.received,
+        RpcProbeDirection.inbound,
+        'error' in terminal ? undefined : terminal.value,
+        'error' in terminal ? terminal.error : undefined
+      )
     if (this.#prepared)
       this.#observe(
         received ?? this.#prepared.envelope,

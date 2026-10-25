@@ -6,7 +6,7 @@ import { childService, type IParentApi } from './service.ts'
 const opening: Promise<IRpcHost<IParentApi>> = createRpcHost<IParentApi>({
   self: { name: 'socket-service', instanceId: 'socket-service' },
   plugins: [processPlugin({ listen: process.argv[2]!, token: process.argv[3]! })],
-  provide: childService(() => opening)
+  provide: childService(() => opening, 'process')
 })
 /** Native stdout readiness is setup-only and never carries an RPC request or stream. */
 const host = await opening

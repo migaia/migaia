@@ -15,7 +15,7 @@ export type IChildApi = {
 }
 
 /** The actual caller identity directs reverse work back to that same accepted connection. */
-export function childService(opening: () => Promise<IRpcHost<IParentApi>>) {
+export function childService(opening: () => Promise<IRpcHost<IParentApi>>, namespace: string) {
   return {
     /** Distinguishable scalar work proves provider execution rather than handshake success. */
     childRequest: (value: number) => value * 2,
@@ -26,7 +26,7 @@ export function childService(opening: () => Promise<IRpcHost<IParentApi>>) {
     },
     /** The remote provider originates a new genuine request on its existing parent connection. */
     reverseRequest: async (value: number, context: IRpcContext) =>
-      (await opening()).send(context.senderId, 'parentRequest', value),
+      (await opening())[namespace]!.send(context.senderId, 'parentRequest', value),
     /** The remote provider consumes the parent's genuine stream before forwarding its items. */
     reverseValues: async function* (value: number, context: IRpcContext) {
       const host = await opening()
@@ -34,15 +34,7 @@ export function childService(opening: () => Promise<IRpcHost<IParentApi>>) {
        * Explicit streaming selects the generator mode without relying on optional directory
        * schemas.
        */
-      const streams = host.stream('parentValues', value)
-      /**
-       * A listener has two direct clients; only the current caller's lazy public iterator is
-       * consumed.
-       */
-      const stream =
-        'fulfilled' in streams
-          ? streams.fulfilled[JSON.stringify(['target', context.senderId])]!
-          : streams
+      const stream = host[namespace]!.stream('parentValues', value, { targetId: context.senderId })
       for await (const item of stream) yield item
     }
   }

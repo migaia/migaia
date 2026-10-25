@@ -6,12 +6,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
-import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
+import { createRpcHost, type IRpcHost, type IRpcNamespace } from '@migaia/rpc-host'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import { dedicatedWorkerPlugin } from '@migaia/rpc-plugin-browser'
 import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'
-import { poolPlugin } from '@migaia/rpc-plugin-pool'
+import { pool } from '@migaia/rpc-plugin-pool'
 import { devtoolsPlugin, type IDevtoolsPlugin } from '@migaia/rpc-plugin-devtools'
 import { childService, type IChildApi, type IParentApi } from './fixtures/service.js'
 
@@ -42,7 +42,7 @@ function observer(): IDevtoolsPlugin {
 }
 
 /** Scalar and generator callbacks originate new work in the opposite direction on the real carrier. */
-async function business(host: IRpcHost<IChildApi>): Promise<void> {
+async function business(host: IRpcNamespace<IChildApi>): Promise<void> {
   expect(await host.request('childRequest', 21)).toBe(42)
   expect(await host.request('reverseRequest', 21)).toBe(121)
   expect(await values(host.stream('childValues', 2) as AsyncIterableIterator<number>)).toEqual([
@@ -131,7 +131,8 @@ function correlated(value: IDevtoolsPlugin, host: IRpcHost<IChildApi>): void {
 async function survives(
   value: IDevtoolsPlugin,
   first: IRpcHost<IChildApi>,
-  second: IRpcHost<IChildApi>
+  second: IRpcHost<IChildApi>,
+  namespace: string
 ): Promise<void> {
   await first.close()
   /** A sequence cursor distinguishes new surviving-host observations from earlier history. */
@@ -144,7 +145,7 @@ async function survives(
   try {
     /** The pending iterator is fulfilled only by the existing collector subscription. */
     const next = watch.next()
-    expect(await second.request('childRequest', 25)).toBe(50)
+    expect(await second[namespace]!.request('childRequest', 25)).toBe(50)
     /** The emitted batch belongs to the surviving host endpoint rather than a synthetic probe. */
     const batch = await next
     expect(batch.done).toBe(false)
@@ -177,10 +178,10 @@ it('observes bidirectional parent and child process requests and streams through
         })
       )
     for (const host of hosts) {
-      await business(host)
+      await business(host.process!)
       correlated(value, host)
     }
-    await survives(value, hosts[0]!, hosts[1]!)
+    await survives(value, hosts[0]!, hosts[1]!, 'process')
   } finally {
     await Promise.all(hosts.map((host) => host.close()))
     value.close()
@@ -237,10 +238,10 @@ it('observes an unrelated socket service and two independent public client hosts
         })
       )
     for (const host of hosts) {
-      await business(host)
+      await business(host.process!)
       correlated(value, host)
     }
-    await survives(value, hosts[0]!, hosts[1]!)
+    await survives(value, hosts[0]!, hosts[1]!, 'process')
   } finally {
     await Promise.all(hosts.map((host) => host.close()))
     if (server.exitCode === null && server.signalCode === null) server.kill('SIGTERM')
@@ -265,10 +266,10 @@ it('observes genuine Node Worker requests and streams through the public thread 
         })
       )
     for (const host of hosts) {
-      await business(host)
+      await business(host.thread!)
       correlated(value, host)
     }
-    await survives(value, hosts[0]!, hosts[1]!)
+    await survives(value, hosts[0]!, hosts[1]!, 'thread')
   } finally {
     await Promise.all(hosts.map((host) => host.close()))
     value.close()
@@ -292,7 +293,7 @@ it('observes public dedicated Worker plugins over two actual borrowed MessageCha
       /** The child retains its own genuine provider and remote callable directory. */
       const child: Promise<IRpcHost<IParentApi>> = createRpcHost<IParentApi>({
         plugins: [dedicatedWorkerPlugin({ worker: pair.port2 })],
-        provide: childService(() => child)
+        provide: childService(() => child, 'worker')
       })
       /** Both endpoints prepare concurrently through the same public browser carrier plugin. */
       const parent = createRpcHost<IChildApi>({
@@ -305,10 +306,10 @@ it('observes public dedicated Worker plugins over two actual borrowed MessageCha
       children.push(openedChild)
     }
     for (const host of hosts) {
-      await business(host)
+      await business(host.worker!)
       correlated(value, host)
     }
-    await survives(value, hosts[0]!, hosts[1]!)
+    await survives(value, hosts[0]!, hosts[1]!, 'worker')
   } finally {
     await Promise.all([...hosts, ...children].map((host) => host.close()))
     for (const pair of pairs) {
@@ -329,7 +330,7 @@ it('observes explicit coroutine task handles and keeps the other host collector 
     /** The exact supervisor-provided handle opens a child public host within this actual task. */
     const opening: Promise<IRpcHost<IParentApi>> = createRpcHost<IParentApi>({
       plugins: [coroutinePlugin({ connectToParent: connect })],
-      provide: childService(() => opening)
+      provide: childService(() => opening, 'coroutine')
     })
     /** The task keeps its child host alive until the original cooperative abort is delivered. */
     const child = await opening
@@ -352,10 +353,10 @@ it('observes explicit coroutine task handles and keeps the other host collector 
         })
       )
     for (const host of hosts) {
-      await business(host)
+      await business(host.coroutine!)
       correlated(value, host)
     }
-    await survives(value, hosts[0]!, hosts[1]!)
+    await survives(value, hosts[0]!, hosts[1]!, 'coroutine')
   } finally {
     await Promise.all(hosts.map((host) => host.close()))
     value.close()
@@ -372,17 +373,17 @@ it('observes scalar process pool work while each public host retains one logical
       hosts.push(
         await createRpcHost<IChildApi>({
           self: { name, instanceId: name },
-          plugins: [processPlugin({ spawn: processEntry }), poolPlugin({ size: 2 }), value],
+          plugins: [processPlugin({ spawn: processEntry, features: [pool({ size: 2 })] }), value],
           provide: parentService
         })
       )
     for (const host of hosts) {
-      expect(Object.keys(host.peers)).toEqual(['pool'])
-      await business(host)
+      expect(Object.keys(host.process!.peers)).toEqual(['pool'])
+      await business(host.process!)
       correlated(value, host)
-      expect(await host.send('pool', 'childRequest', 21)).toBe(42)
+      expect(await host.process!.send('pool', 'childRequest', 21)).toBe(42)
     }
-    await survives(value, hosts[0]!, hosts[1]!)
+    await survives(value, hosts[0]!, hosts[1]!, 'process')
   } finally {
     await Promise.all(hosts.map((host) => host.close()))
     value.close()
