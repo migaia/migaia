@@ -314,7 +314,12 @@ class ProcessSessionOwner {
 
   /** Capture deadline once before triggering the existing idempotent supervision shutdown. */
   readonly #parentLost = (reason?: unknown): void => {
-    if (this.#closing && this.#parentDeadline === undefined) return
+    // Native registration disposal revokes lifetime before Session-first cleanup closes local stdio.
+    if (
+      (this.#closing || this.#context.owner.lifecycle.signal.aborted) &&
+      this.#parentDeadline === undefined
+    )
+      return
     if (this.#parentDeadline === undefined && this.#ingress.kind === 'child')
       this.#parentDeadline =
         this.#scheduler.now() + (this.#ingress.parentLoss.graceMs ?? parentLossGraceMs)
