@@ -14,6 +14,10 @@ use std::{
 };
 const MAX_FRAME: usize = 16_777_216;
 const MAX_HANDSHAKE: usize = 65_536;
+/// Private native admission precedes the unchanged RPC hello and never appears in public diagnostics.
+const NATIVE_CONNECTION_KIND: &str = "rpc-process-connection";
+const NATIVE_CONNECTION_VERSION: u64 = 1;
+const NATIVE_CONNECTION_REJECTED: &str = "PROCESS_CHANNEL_AUTH_REJECTED";
 /// Optional method metadata uses the same closed schema vocabulary as the TS directory owner.
 const SCHEMA_FIELDS: [&str; 3] = ["input", "output", "yield"];
 const SCHEMA_KEYS: [&str; 9] = [
@@ -1379,6 +1383,73 @@ fn bootstrap(input: &mut impl Read) -> io::Result<(Value, String, String)> {
     ))
 }
 
+/// Read exactly one original bounded frame, leaving any coalesced RPC tail with the same reader.
+fn read_native_connection(input: &mut impl Read) -> io::Result<Value> {
+    let raw =
+        read_frame(input, MAX_HANDSHAKE)?.ok_or_else(|| invalid(NATIVE_CONNECTION_REJECTED))?;
+    let record = json::parse(&raw).map_err(|_| invalid(NATIVE_CONNECTION_REJECTED))?;
+    if !has_fields(&record, &["kind", "version", "step"])
+        || text(&record, "kind") != NATIVE_CONNECTION_KIND
+        || safe_integer(value(&record, "version")) != Some(NATIVE_CONNECTION_VERSION)
+    {
+        return Err(invalid(NATIVE_CONNECTION_REJECTED));
+    }
+    Ok(record)
+}
+
+/// Prove the actual launch identity; the parent retains the sole admission deadline and close owner.
+fn connect_native(
+    input: &mut impl Read,
+    output: &mut impl Write,
+    token: &str,
+    own: &Value,
+) -> io::Result<()> {
+    write_frame(
+        output,
+        &object(&[
+            ("kind", string(NATIVE_CONNECTION_KIND)),
+            ("version", number(NATIVE_CONNECTION_VERSION)),
+            ("step", string("hello")),
+            ("token", string(token)),
+            ("peer", value(&hello(own, true, None), "peer").clone()),
+        ]),
+    )?;
+    if text(&read_native_connection(input)?, "step") != "accept" {
+        return Err(invalid(NATIVE_CONNECTION_REJECTED));
+    }
+    Ok(())
+}
+
+/// Reject a borrowed native connection before the RPC directory or providers are published.
+fn accept_native(input: &mut impl Read, output: &mut impl Write, token: &str) -> io::Result<()> {
+    let record = read_native_connection(input)?;
+    let remote = value(&record, "peer");
+    if text(&record, "step") != "hello"
+        || text(&record, "token") != token
+        || !identifier(value(remote, "id"))
+        || !identifier(value(remote, "runtime"))
+    {
+        write_frame(
+            output,
+            &object(&[
+                ("kind", string(NATIVE_CONNECTION_KIND)),
+                ("version", number(NATIVE_CONNECTION_VERSION)),
+                ("step", string("reject")),
+                ("code", string(NATIVE_CONNECTION_REJECTED)),
+            ]),
+        )?;
+        return Err(invalid(NATIVE_CONNECTION_REJECTED));
+    }
+    write_frame(
+        output,
+        &object(&[
+            ("kind", string(NATIVE_CONNECTION_KIND)),
+            ("version", number(NATIVE_CONNECTION_VERSION)),
+            ("step", string("accept")),
+        ]),
+    )
+}
+
 /// Consume the dedicated inherited auth descriptor exactly once without exposing credential text.
 fn read_auth(auth_fd: Option<i32>) -> io::Result<Option<String>> {
     let auth = if let Some(fd) = auth_fd {
@@ -1405,9 +1476,18 @@ fn serve_socket(
     role: &str,
     auth: Option<&str>,
     business: bool,
+    native_admission: bool,
 ) -> io::Result<()> {
     let mut input = stream.try_clone()?;
     let mut output = stream;
+    if native_admission {
+        accept_native(
+            &mut input,
+            &mut output,
+            auth.ok_or_else(|| invalid(NATIVE_CONNECTION_REJECTED))?,
+        )?;
+        return self::business::serve(&mut input, &mut output, &identity(), None, None, business);
+    }
     if role == "initiator" {
         initiate(&mut input, &mut output, auth)
     } else {
@@ -1482,7 +1562,13 @@ fn run() -> io::Result<()> {
         eprintln!("READY pid={}", std::process::id());
         loop {
             let (stream, _) = listener.accept()?;
-            let result = serve_socket(stream, role, auth.as_deref(), business_profile);
+            let result = serve_socket(
+                stream,
+                role,
+                auth.as_deref(),
+                business_profile,
+                business_profile && role == "responder",
+            );
             if role == "initiator" {
                 let _ = std::fs::remove_file(&path);
                 return result;
@@ -1495,7 +1581,7 @@ fn run() -> io::Result<()> {
     if let Some(path) = connect_path {
         let stream = UnixStream::connect(path)?;
         eprintln!("READY pid={}", std::process::id());
-        return serve_socket(stream, role, auth.as_deref(), business_profile);
+        return serve_socket(stream, role, auth.as_deref(), business_profile, false);
     }
     eprintln!("READY pid={}", std::process::id());
     let mut input = io::stdin().lock();
@@ -1508,7 +1594,8 @@ fn run() -> io::Result<()> {
     if business_profile && bootstrap_stdin {
         let (next, token, owner) = bootstrap(&mut input)?;
         own = next;
-        auth = Some(token);
+        connect_native(&mut input, &mut output, &token, &own)?;
+        auth = None;
         parent = Some(owner);
     }
     if business_profile {

@@ -446,6 +446,11 @@ func serveBusiness(reader io.Reader, writer io.Writer, identity *orderedRecord, 
 	}
 }
 
+// Native connection admission carries the original launch token before any RPC negotiation.
+const nativeConnectionKind = "rpc-process-connection"
+const nativeConnectionVersion = 1
+const nativeConnectionRejected = "PROCESS_CHANNEL_AUTH_REJECTED"
+
 // nativeBootstrap adopts only the actual private version1 launch record, never semantic v1.
 func nativeBootstrap(reader io.Reader) (*orderedRecord, string, string, error) {
 	value, err := receive(reader, true)
@@ -465,6 +470,51 @@ func nativeBootstrap(reader io.Reader) (*orderedRecord, string, string, error) {
 		return nil, "", "", errProtocol
 	}
 	return object("name", identity["name"], "instanceId", identity["instanceId"], "generation", generation), stringField(fields, "token"), stringField(fields, "parentInstanceId"), nil
+}
+
+// readNativeConnection borrows the bounded original reader without consuming its coalesced RPC tail.
+func readNativeConnection(reader io.Reader) (*orderedRecord, error) {
+	value, err := receive(reader, true)
+	if err != nil {
+		return nil, err
+	}
+	fields := field(value)
+	if !hasFields(value, []string{"kind", "version", "step"}) || fields["kind"] != nativeConnectionKind || integerField(fields, "version") != nativeConnectionVersion {
+		return nil, errHandshakeInvalid
+	}
+	return value, nil
+}
+
+// connectNative proves the actual launch identity; the parent retains the sole admission deadline.
+func connectNative(reader io.Reader, writer io.Writer, token string, identity *orderedRecord) error {
+	if err := send(writer, object("kind", nativeConnectionKind, "version", nativeConnectionVersion, "step", "hello", "token", token, "peer", field(localOffer(identity, true))["peer"])); err != nil {
+		return err
+	}
+	reply, err := readNativeConnection(reader)
+	if err != nil {
+		return err
+	}
+	if field(reply)["step"] != "accept" {
+		return errHandshakeInvalid
+	}
+	return nil
+}
+
+// acceptNative validates the listener credential before the same connection reaches RPC providers.
+func acceptNative(reader io.Reader, writer io.Writer, token string) error {
+	value, err := readNativeConnection(reader)
+	if err != nil {
+		return err
+	}
+	fields := field(value)
+	remote := field(fields["peer"])
+	if fields["step"] != "hello" || fields["token"] != token || !identifier(remote["id"]) || !identifier(remote["runtime"]) {
+		if err := send(writer, object("kind", nativeConnectionKind, "version", nativeConnectionVersion, "step", "reject", "code", nativeConnectionRejected)); err != nil {
+			return err
+		}
+		return errHandshakeInvalid
+	}
+	return send(writer, object("kind", nativeConnectionKind, "version", nativeConnectionVersion, "step", "accept"))
 }
 
 // runBusiness preserves original owned stdio/descendant and reusable borrowed listener lifetimes.
@@ -491,6 +541,10 @@ func runBusiness(stdio bool, address, bootstrap string, authFD int, descendant, 
 			if err != nil {
 				return err
 			}
+			if err := connectNative(os.Stdin, os.Stdout, token, identity); err != nil {
+				return err
+			}
+			token = ""
 		}
 		if descendant {
 			child := exec.Command("/bin/sleep", "600")
@@ -516,7 +570,9 @@ func runBusiness(stdio bool, address, bootstrap string, authFD int, descendant, 
 		if err != nil {
 			return err
 		}
-		if err := serveBusiness(connection, connection, localIdentity(), token, "", true); err != nil {
+		if err := acceptNative(connection, connection, token); err != nil {
+			fmt.Fprintln(os.Stderr, "PEER_FAIL BUSINESS_SESSION")
+		} else if err := serveBusiness(connection, connection, localIdentity(), "", "", true); err != nil {
 			fmt.Fprintln(os.Stderr, "PEER_FAIL BUSINESS_SESSION")
 		}
 		connection.Close()

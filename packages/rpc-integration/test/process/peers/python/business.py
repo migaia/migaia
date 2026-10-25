@@ -22,6 +22,10 @@ METHODS = {
 }
 # CLI captures actual provider idempotency before any connection is accepted.
 REQUEST_IDEMPOTENT = True
+# Native connection admission carries launch credentials before the unchanged RPC profile.
+NATIVE_CONNECTION_KIND = "rpc-process-connection"
+NATIVE_CONNECTION_VERSION = 1
+NATIVE_CONNECTION_REJECTED = "PROCESS_CHANNEL_AUTH_REJECTED"
 
 
 def error_graph() -> dict[str, Any]:
@@ -267,13 +271,46 @@ def read_bootstrap(reader: BinaryIO) -> dict[str, Any]:
     raw = peer.read_frame(reader, peer.MAX_HANDSHAKE)
     if raw is None:
         raise peer.PeerFailure("BOOTSTRAP_INVALID")
-    value = peer.record(peer.decode_frame(raw), {"kind", "version", "self", "parentInstanceId", "token"}, {"generation"})
+    value = peer.record(peer.decode_frame(raw), {"kind", "version", "self", "parentInstanceId", "token"})
     identity = peer.record(value["self"], {"name", "instanceId"})
     if value["kind"] != "rpc-runtime-api-bootstrap" or value["version"] != 1 or not all(peer.identifier(identity[field]) for field in ("name", "instanceId")) or not peer.identifier(value["parentInstanceId"]) or not isinstance(value["token"], str) or not value["token"]:
         raise peer.PeerFailure("BOOTSTRAP_INVALID")
     if "generation" in value:
         peer.generation(value["generation"])
     return value
+
+
+def read_native_connection(reader: BinaryIO) -> dict[str, Any]:
+    """Read exactly one bounded native record, leaving coalesced RPC bytes in the original reader."""
+    raw = peer.read_frame(reader, peer.MAX_HANDSHAKE)
+    if raw is None:
+        raise peer.PeerFailure(NATIVE_CONNECTION_REJECTED)
+    value = peer.record(peer.decode_frame(raw), {"kind", "version", "step"})
+    if value["kind"] != NATIVE_CONNECTION_KIND or type(value["version"]) is not int or value["version"] != NATIVE_CONNECTION_VERSION:
+        raise peer.PeerFailure(NATIVE_CONNECTION_REJECTED)
+    return value
+
+
+def connect_native(reader: BinaryIO, writer: BinaryIO, token: str, identity: dict[str, Any]) -> None:
+    """Prove the actual launch identity once; the parent owns admission timeout and physical close."""
+    local = peer.own_offer(identity["instanceId"])["peer"]
+    peer.write_json(writer, {"kind": NATIVE_CONNECTION_KIND, "version": NATIVE_CONNECTION_VERSION,
+                             "step": "hello", "token": token,
+                             "peer": {"id": local["id"], "runtime": local["runtime"]}})
+    if read_native_connection(reader)["step"] != "accept":
+        raise peer.PeerFailure(NATIVE_CONNECTION_REJECTED)
+
+
+def accept_native(reader: BinaryIO, writer: BinaryIO, token: str) -> None:
+    """Authenticate this borrowed connection before publishing any RPC directory or provider."""
+    value = read_native_connection(reader)
+    remote = value.get("peer")
+    if value["step"] != "hello" or value.get("token") != token or not isinstance(remote, dict) or not all(peer.identifier(remote.get(field)) for field in ("id", "runtime")):
+        peer.write_json(writer, {"kind": NATIVE_CONNECTION_KIND, "version": NATIVE_CONNECTION_VERSION,
+                                 "step": "reject", "code": NATIVE_CONNECTION_REJECTED})
+        raise peer.PeerFailure(NATIVE_CONNECTION_REJECTED)
+    peer.write_json(writer, {"kind": NATIVE_CONNECTION_KIND, "version": NATIVE_CONNECTION_VERSION,
+                             "step": "accept"})
 
 
 def run_business(args: Any) -> int:
@@ -294,6 +331,8 @@ def run_business(args: Any) -> int:
             bootstrap = read_bootstrap(sys.stdin.buffer)
             token, parent = bootstrap["token"], bootstrap["parentInstanceId"]
             identity = {**bootstrap["self"], "generation": bootstrap.get("generation", {"kind": "session", "value": 0, "providerId": bootstrap["self"]["instanceId"]})}
+            connect_native(sys.stdin.buffer, sys.stdout.buffer, token, identity)
+            token = None
         child = subprocess.Popen(["/bin/sleep", "600"], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL) if args.descendant else None
         print(f"READY pid={os.getpid()}", file=sys.stderr, flush=True)
         try:
@@ -313,6 +352,7 @@ def run_business(args: Any) -> int:
             conn, _ = listener.accept()
             try:
                 with conn, conn.makefile("rb") as reader, conn.makefile("wb") as writer:
-                    serve(reader, writer, token)
+                    accept_native(reader, writer, token)
+                    serve(reader, writer)
             except (peer.PeerFailure, BrokenPipeError, ConnectionResetError):
                 print("PEER_FAIL BUSINESS_SESSION", file=sys.stderr, flush=True)
