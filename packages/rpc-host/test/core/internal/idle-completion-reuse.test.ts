@@ -1,121 +1,118 @@
+/** Public request settlement retains native idle write order and recovery after physical failure. */
 import assert from 'node:assert/strict'
-import { it } from 'vitest'
-import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
-import { normalizeRpcEnvelope, rpcProtocolV1, type IRpcEnvelope } from '@migaia/rpc-contract'
-import { messageFramerV1 } from '@migaia/rpc-contract/framing'
+import { expect, it, vi } from 'vitest'
+import { createRpcHost } from '@migaia/rpc-host'
+import {
+  defineFlowFeature,
+  RpcFlowLayer,
+  RpcFlowPoint,
+  type IRpcCarrierFrame,
+  type IRpcFlowStage
+} from '@migaia/rpc-host/sdk'
+import { RpcWireKind, type IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
 import { RpcTransportError } from '@migaia/rpc-contract/errors'
-import { RpcOutboundSender } from '../../../dist/core/internal/outbound-sender.js'
-import type { IRpcSelectedComponents } from '../../../dist/core/internal/endpoint-options.js'
+import { coreMemoryServer } from '../../host/core-fixture.js'
+import { MemoryCarrier } from '../../fixtures/core-carrier.js'
 
-/** Ordinary requests exercise the canonical idle sender without introducing another queue. */
-function request(id: string): IRpcEnvelope {
-  return normalizeRpcEnvelope({
-    kind: 'request',
-    id,
-    method: 'echo',
-    data: {
-      route: {
-        profile: 'migaia.rpc.route',
-        type: 'request',
-        applicationVersion: '1',
-        senderId: 'a',
-        targetId: 'b',
-        receiverId: 'b',
-        sentAt: 0
-      },
-      payload: id
-    }
-  })
-}
-
-/** Observe synchronous reaction registration while retaining the native Promise operation. */
-function recordedSend(sender: RpcOutboundSender, message: IRpcEnvelope) {
-  /** The last synchronous reaction belongs to idle completion, after the transport error owner. */
-  const reactions: (readonly [unknown, unknown])[] = []
-  /** Native delegation preserves completion, rejection and Promise construction semantics. */
-  const original = Promise.prototype.then
-  /** Preserve the native property's full descriptor during temporary observation. */
-  const descriptor = Object.getOwnPropertyDescriptor(Promise.prototype, 'then')!
-  /** Restore immediately after send so awaiting work and other callers are not instrumented. */
-  // eslint-disable-next-line unicorn/no-thenable -- Observe the existing native method for one synchronous send.
-  Object.defineProperty(Promise.prototype, 'then', {
-    ...descriptor,
-    value: function (this: Promise<unknown>, fulfilled: unknown, rejected: unknown) {
-      reactions.push([fulfilled, rejected])
-      return Reflect.apply(original, this, [fulfilled, rejected])
-    }
-  })
-  try {
-    /** The synchronous physical invocation must register a real pair before observation succeeds. */
-    const pending = sender.send(message)
-    assert.ok(reactions.length > 0, 'native reaction positive control')
-    return { pending, completion: reactions.at(-1)! }
-  } finally {
-    // eslint-disable-next-line unicorn/no-thenable -- Restore the original native descriptor before awaiting.
-    Object.defineProperty(Promise.prototype, 'then', descriptor)
-  }
-}
-
-it('idle completions reuse owner callbacks and preserve failure recovery', async () => {
-  /** Canonical components keep the original identity payload and whole-frame path. */
-  const components: IRpcSelectedComponents = {
-    protocol: rpcProtocolV1,
-    codec: identityCodec as unknown as IRpcSelectedComponents['codec'],
-    framer: messageFramerV1,
-    ingressPrepare: (frame) => ({ frame, messageId: 'whole' }),
-    shadowed: []
-  }
-  /** Actual host invocations prove idle sends remain synchronous and ordered. */
-  const written: string[] = []
-  /** Only the next physical send consumes this fixture failure. */
-  let nextFailure: Error | undefined
-  /** The real sender retains all admission, encoding, busy-state and error ownership. */
-  const sender = new RpcOutboundSender(
-    {
-      platform: 'Memory',
-      send(value) {
-        written.push((value as IRpcEnvelope).id)
-        if (nextFailure) {
-          const failure = nextFailure
-          nextFailure = undefined
-          return Promise.reject(failure)
-        }
+/** Observe original physical handoff through a genuine native Feature, never an old sender facade. */
+class IdleWriteWitness {
+  /** Original semantic labels remain visible even though current call IDs belong to CallTable. */
+  readonly written: string[] = []
+  /** Every public request still owns its independently allocated actual native correlation ID. */
+  readonly callIds: string[] = []
+  /** Exactly the next physical business write consumes this original native failure. */
+  #failure: Error | undefined
+  /** Native registration remains the original opaque Feature in its one declared namespace. */
+  readonly feature = defineFlowFeature({
+    name: 'idle-physical-write-witness',
+    setup: () => ({
+      stages: {
+        [RpcFlowPoint.frameOutbound]: { layer: RpcFlowLayer.wire, stage: this.#outbound }
       }
-    },
-    'a',
-    components,
-    undefined,
-    'Memory',
-    undefined,
-    undefined,
-    true,
-    true
-  )
-  /** Successful dependent sends have one callback pair throughout this sender's lifetime. */
-  const pairs: (readonly [unknown, unknown])[] = []
-  for (const id of ['first', 'second', 'third']) {
-    const observed = recordedSend(sender, request(id))
-    assert.equal(written.at(-1), id, 'idle physical send remains synchronous')
-    pairs.push(observed.completion)
-    await observed.pending
-  }
-  assert.equal(new Set(pairs.map((pair) => pair[0])).size, 1, 'reuse success callback')
-  assert.equal(new Set(pairs.map((pair) => pair[1])).size, 1, 'reuse failure callback')
-  /** A rejected physical write retains its native cause and releases busy before the next call. */
-  const reason = new Error('fixture physical write failure')
-  nextFailure = reason
-  const failed = recordedSend(sender, request('failed'))
-  assert.equal(failed.completion[0], pairs[0]![0])
-  assert.equal(failed.completion[1], pairs[0]![1])
-  await assert.rejects(Promise.resolve(failed.pending), (error: unknown) => {
-    assert.ok(error instanceof RpcTransportError)
-    assert.equal(error.cause, reason)
-    return true
+    })
   })
-  const recovered = recordedSend(sender, request('recovered'))
-  assert.equal(written.at(-1), 'recovered', 'failure releases busy before continuation')
-  assert.equal(recovered.completion[0], pairs[0]![0])
-  assert.equal(recovered.completion[1], pairs[0]![1])
-  await recovered.pending
-  assert.deepEqual(written, ['first', 'second', 'third', 'failed', 'recovered'])
+
+  /** Native next starts an idle physical write synchronously at the current media boundary. */
+  readonly #outbound: IRpcFlowStage<'frameOutbound'> = (payload, next) => {
+    const pending = next(payload)
+    /** This medium's original identity codec supplies its already-prepared semantic frame. */
+    const message = payload.frame.data as IRpcSemanticFrame
+    if (payload.frame.kind === 'message' && message.kind === RpcWireKind.call)
+      assert.equal(this.written.at(-1), message.payload, 'idle physical send remains synchronous')
+    return pending
+  }
+
+  /** Fail one actual write without closing the real carrier or inventing a caller settlement. */
+  failNext(reason: Error): void {
+    this.#failure = reason
+  }
+
+  /** Delegate every physical IO except the single original failure injected at this boundary. */
+  observe(carrier: MemoryCarrier) {
+    /** One explicit observation context keeps the stable native arrow and this witness together. */
+    const operation = { owner: this, write: carrier.write }
+    return vi.spyOn(carrier, 'write').mockImplementation((frame, options) => {
+      const failure = operation.owner.#record(frame)
+      return failure ? Promise.reject(failure) : operation.write(frame, options)
+    })
+  }
+
+  /** Record only actual public call frames; handshake, replies and close controls stay unchanged. */
+  #record(frame: IRpcCarrierFrame): Error | undefined {
+    /** Codec admission already supplied this exact current semantic call to the physical medium. */
+    const message = frame.data as IRpcSemanticFrame
+    if (frame.kind !== 'message' || message.kind !== RpcWireKind.call) return
+    this.written.push(message.payload as string)
+    this.callIds.push(message.id)
+    /** Consuming before rejection allows the next original public request to recover normally. */
+    const failure = this.#failure
+    this.#failure = undefined
+    return failure
+  }
+}
+
+it('public idle writes preserve order, native failure identity and recovery', async () => {
+  /** One real transport introduces the namespace and physical pair used by every original request. */
+  const server = coreMemoryServer('a')
+  /** The actual native Feature observes only the current source's physical boundary. */
+  const witness = new IdleWriteWitness()
+  /** The receiving native Host remains the sole caller runtime and actual pipeline owner. */
+  const caller = await createRpcHost({
+    ...server.options,
+    plugins: [witness.feature, server.transport]
+  })
+  /** Real provider effects independently prove the failed native write executed no business. */
+  const effects: string[] = []
+  /** The counterpart supplies genuine responses with the original request's payload label. */
+  const provider = await server.connect('b', {
+    provide: {
+      echo: (value: string) => {
+        effects.push(value)
+        return value
+      }
+    }
+  })
+  /** Recording starts after both real handshakes, excluding cold setup and codec negotiation. */
+  const writing = witness.observe(provider.pair[0])
+  try {
+    for (const id of ['first', 'second', 'third'])
+      assert.equal(await caller.memory.send('b', 'echo', id), id)
+    /** The same original Error becomes the direct cause of the actual public transport rejection. */
+    const reason = new Error('fixture physical write failure')
+    witness.failNext(reason)
+    await assert.rejects(caller.memory.send('b', 'echo', 'failed'), (error: unknown) => {
+      assert.ok(error instanceof RpcTransportError)
+      assert.equal(error.cause, reason)
+      return true
+    })
+    assert.equal(await caller.memory.send('b', 'echo', 'recovered'), 'recovered')
+    assert.equal(witness.written.at(-1), 'recovered', 'failure releases busy before continuation')
+    assert.deepEqual(witness.written, ['first', 'second', 'third', 'failed', 'recovered'])
+    expect(new Set(witness.callIds).size).toBe(5)
+    expect(effects).toEqual(['first', 'second', 'third', 'recovered'])
+  } finally {
+    writing.mockRestore()
+    await Promise.all([caller.close(), provider.host.close()])
+    await Promise.all([provider.pair[0].close(), provider.pair[1].close()])
+  }
 })
