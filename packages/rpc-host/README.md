@@ -49,6 +49,12 @@ try {
 
 协程不提供 Worker 隔离。独立进程、原生线程和浏览器场景分别选择 [process](../rpc-plugin-process/README.md)、[thread](../rpc-plugin-thread/README.md) 和 [browser](../rpc-plugin-browser/README.md) 的传输 plugin。
 
+## 初始化与自定义宿主
+
+`createRpcHost` 在同一个原生 plugin-host 上先提交信息流 plugin、链路策略 plugin 及其 feature，再安装传输 plugin 及其 feature。传输开始握手时，auth 等 stage 已经可用；后续安装失败由同一生命周期 owner 回滚并释放已取得的资源。
+
+已有 `defineHost` 或 class 宿主通过 `@migaia/rpc-host/sdk` 的 `rpcHostPipelines(getHost, pipeline)` 一次取得管道声明和 `domainCore`。回调延后到安装时才读取真实宿主，并借用它自己的管道执行权。先提交信息流与链路策略，再安装传输；无需手写七条管道。具体接法见[使用指南](./USEGUIDE.md#在已有宿主中安装-rpc)。
+
 ## 调用与归属
 
 | 入口                                                       | 完成含义                                                  |
@@ -89,6 +95,10 @@ export const perCallDeadline = timeoutFromSubpath({ ms: 100 })
 
 汇总入口与默认子路径导入均可 tree-shake。其他信息流 plugin 为 `auth`、`chunk`、`batch`、`idempotency`、`schema`、`typegen`。推荐安装 `limits`；省略它就不启用这些配额。安装 `idempotency` 后，才有 `host.<ns>.outcome(key)`。`auth` 独立拥有请求 ID 重放账本；`maxReplayEntriesPerPeer` 限制每个已接纳对端保留的身份数量，`onRejected` 接收重放容量拒绝原因。
 
+自定义信息流通过 `defineFlowPlugin` 的 `setup` 返回 `stages`；stage 接收该管道的 payload 和原生 `next(payload)`。观察事件单独放在 `observe`。frame 管道允许多次提交，各成员独立：捕获并报告一个成员失败后可以继续交出下一个；忽略失败的 `next()` Promise 会使管道拒绝。被取消的 batch 成员由原调用以 `CANCELLED` 结算，原 reason 保留在 `cause`，其他成员照常完成。
+
+自定义载体可以提供可选的 `reserveWrite`，借用已有流控容量。每次逻辑写出只预留一次；chunk 的分片共用凭据，batch 保留各成员的凭据，完成后释放。`write` 的完成仍表示实际物理接纳，`close` 必须结算载体拥有的排队写入。
+
 [pool](../rpc-plugin-pool/README.md) 是传输的 `pool({ size })` feature，同一池只包含同载体成员，只公开一个逻辑对端。成员打开、调度和关闭属于 pool；`host.<ns>.members` 由传输提供原生控制。
 
 ## 期限、取消与错误
@@ -99,19 +109,21 @@ export const perCallDeadline = timeoutFromSubpath({ ms: 100 })
 
 按 `source/code` 识别错误，保留原生类型、`stack`、`cause` 和 `AggregateError.errors`。超时或断开不证明业务未执行；非幂等操作须先对账再考虑重试。
 
+公开 provider 注册失败以 `INVALID_CONFIG` 拒绝，原注册错误直接保留在 `cause`；错误说明不通过调用异常的字符串转换来生成。关闭后，待决调用以 `ENDPOINT_DISPOSED` 结算，实际载体关闭会拒绝仍被挂住的写入；不要求任意业务 Promise 因关闭而强行完成。
+
 自定义 plugin 作者从 `@migaia/rpc-host/sdk` 开始。观察入口是 `/plugins/probe`；旧 `/plugin`、`/probe`、endpoint、per-session Peer 和 v1/JSON-RPC profile 已删除。rpc 家族可以直接依赖 `@migaia/rpc-contract`；只需错误码时导入 `/error-code`，不会带入协议与编解码执行代码。
 
-## C6 公开行为变更
+## 公开行为与迁移
 
 未分类的 provider 异常使用 `INTERNAL`，原生异常保留在错误图中。标量调用直接以还原的远端 Error 拒绝；不再增加 `RpcRemoteError` 外壳，调用方须改用真实错误的 `source/code`。协程远端 `context.signal.reason` 接收原 abort reason，不合成取消码；`stream.return(value)` 返回 runtime 的真实结束结果，不回传调用者传入的 `value`。
 
 无目标调用按调用时已接受的会话选择；从 `peers` 保存的函数绑定原代次，退场后拒绝且不转向替代连接。即时 process 启动失败只保留一层 `PROCESS_CHANNEL_CLOSED`，原生 EPIPE 在 cause 图中；没有真实原生错误的 thread 关闭诊断不合成 message-port cause。
 
-旧 RPC scope 的回滚 AggregateError 外壳与原生 host dispose 翻译层已退役。原生 host 的 dispose 返回其实际结果；清理叶子错误的身份、顺序、只清理一次和共享完成 Promise 保留。`RpcRoot.close` 的错误契约独立，不替代原生 dispose 的结果。
+自行构造的原生宿主保留 `dispose()` 的原生 cleanup summary 与共享 Promise，不再附加 RPC 清理外壳。原失败叶对象、errors 顺序、cause 可达性和 disposer 一次执行保持；`createRpcHost` 返回的 `host.close()` 则保持自己的公开关闭语义。
 
 幂等指纹使用对象自身的键序；同一 body 改变键序后是不同请求，同键冲突以 `CONTRACT_INVALID` 拒绝，原 store 的字符串指纹 ABI 保持不变。
 
-普通 NativeHost 的 dispose() 保留其原生 cleanup summary 与共享 Promise，不再翻译成 RPC dispose 错误。安装回滚也直接借原生 cleanup entries；不再添加旧 RPC resource-scope AggregateError 外壳。原失败叶对象、errors 顺序、cause 可达性和 disposer 一次执行不变。RpcRoot.close() 是独立的公共关闭 owner，不能用 NativeHost.dispose() 的结果替代其契约。原生 Feature 的 descriptors 每次冷编译只捕获一次，首次 selector 的校验及错误顺序保持；后续 selector 不再重复触发 Proxy reflection。
+原生 Feature 的 descriptors 每次冷编译只捕获一次，首次 selector 的校验及错误顺序保持；后续 selector 不再重复触发 Proxy reflection。
 
 auth() 的已完成请求 ID 仅在实际原生 owner 证明来源独占时立即释放；其他来源继续按有界 TTL 保留。活动请求与 stream 仍保留到实际业务及迭代器清理完成。
 

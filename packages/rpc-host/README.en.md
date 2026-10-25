@@ -49,6 +49,12 @@ try {
 
 Coroutines do not provide Worker isolation. Choose the [process](../rpc-plugin-process/README.en.md), [thread](../rpc-plugin-thread/README.en.md), or [browser](../rpc-plugin-browser/README.en.md) transport for those native environments.
 
+## Initialization and custom hosts
+
+`createRpcHost` first commits flow plugins, link-policy plugins and their features, then installs transport plugins and their features on the same native plugin-host. Stages such as auth are available before transport handshake begins. The same lifecycle owner rolls back and releases acquired resources if a later installation fails.
+
+An existing `defineHost` or class owner uses `rpcHostPipelines(getHost, pipeline)` from `@migaia/rpc-host/sdk` to obtain both pipeline declarations and `domainCore`. Its callbacks read the real host only at installation and borrow that host's own execution authority. Commit flow and link-policy plugins before installing transports; do not copy seven declarations. See the [usage guide](./USEGUIDE.en.md#install-rpc-in-an-existing-host).
+
 ## Calls and ownership
 
 | Entry                                                      | Completion                                                                            |
@@ -89,6 +95,10 @@ export const perCallDeadline = timeoutFromSubpath({ ms: 100 })
 
 Aggregate and default subpath imports support tree-shaking. Other flow plugins are `auth`, `chunk`, `batch`, `idempotency`, `schema`, and `typegen`. Installing `limits` is recommended; omitting it enables no such quotas. `host.<ns>.outcome(key)` exists only with `idempotency` installed. `auth` independently owns request-ID replay retention; `maxReplayEntriesPerPeer` bounds retained identities per admitted peer, and `onRejected` receives replay-capacity refusal reasons.
 
+A custom flow returns `stages` from `defineFlowPlugin` setup. Each stage receives its pipeline payload and native `next(payload)`; readonly events belong in the separate `observe` field. Frame pipelines allow independent submissions: after catching and reporting one member's failure, a stage can submit another. Ignoring a failed `next()` Promise rejects the pipeline. The original call settles a cancelled batch member with `CANCELLED` and its original reason on `cause`; other members complete normally.
+
+A custom carrier may implement optional `reserveWrite` by borrowing its existing flow-control capacity. Reserve once per logical write: chunk fragments share its receipt, while a batch retains each member's receipt until completion. `write` still completes at actual physical acceptance, and `close` must settle carrier-owned queued writes.
+
 [Pool](../rpc-plugin-pool/README.en.md) is the transport's `pool({ size })` feature. Members use one carrier kind and expose one logical peer. Pool owns member acquisition, scheduling, and closure; the transport contributes native `host.<ns>.members` controls.
 
 ## Deadlines, cancellation, and errors
@@ -99,19 +109,21 @@ Every call kind supports `signal`, including cancellation propagated after a one
 
 Branch on `source/code`; preserve native classes, `stack`, `cause`, and `AggregateError.errors`. Timeout or disconnection does not prove that business work never executed. Reconcile uncertain non-idempotent work before retrying.
 
+Public provider registration rejects with `INVALID_CONFIG` and retains the exact registration failure directly on `cause`; diagnostic text does not invoke the thrown value's string conversion. Closing settles pending calls with `ENDPOINT_DISPOSED`, and actual carrier closure rejects held writes. Closing does not force an arbitrary business Promise to finish.
+
 Plugin authors start at `@migaia/rpc-host/sdk`; observation lives under `/plugins/probe`. Old `/plugin`, `/probe`, endpoint, per-session Peer, and v1/JSON-RPC profile entries are removed. RPC packages can depend directly on `@migaia/rpc-contract`. Import only `/error-code` when only codes are needed, without retaining protocol or codec execution code.
 
-## C6 public behavior changes
+## Public behavior and migration
 
 Unhandled provider exceptions use `INTERNAL` and retain the native exception in the error graph. Scalar calls reject with the restored remote Error directly, without an extra `RpcRemoteError`; callers must inspect the actual error's `source/code`. A coroutine provider receives the original abort reason through `context.signal.reason`, without an invented cancellation code. `stream.return(value)` returns the runtime's actual terminal result rather than echoing the caller's `value`.
 
 Untargeted calls select the sessions accepted at call time. Functions saved from `peers` remain bound to their original generation and reject after departure rather than switching to a replacement. Immediate process startup failure has one `PROCESS_CHANNEL_CLOSED` boundary with native EPIPE reachable through its cause graph. A thread closure with no native error does not invent a message-port cause.
 
-The old RPC scope rollback AggregateError shell and native host dispose translation have retired. Native host dispose returns its actual outcome; cleanup leaf identity, order, once-only release, and the shared completion Promise remain intact. `RpcRoot.close` has its own error contract and does not substitute for native dispose.
+An independently constructed native host retains its native `dispose()` cleanup summary and shared Promise without an additional RPC cleanup shell. Original failure leaves, errors order, cause reachability and once-only disposal remain intact. The `host.close()` returned by `createRpcHost` retains its own public close semantics.
 
 Idempotency fingerprints follow the object's own key order. Changing key order creates a different request; reuse of the same key conflicts with `CONTRACT_INVALID`. The store's string fingerprint ABI is unchanged.
 
-An ordinary NativeHost retains its native dispose() cleanup summary and shared Promise instead of RPC disposal translation. Installation rollback borrows native cleanup entries without the former RPC resource-scope AggregateError shell. Original failure leaves, errors order, cause reachability and once-only disposal remain intact. RpcRoot.close() is a separate public close owner; NativeHost.dispose() is not a substitute. Native Feature descriptors are captured once per cold compilation while preserving the first selector validation and error order; later selectors do not repeat Proxy reflection.
+Native Feature descriptors are captured once per cold compilation while preserving the first selector validation and error order; later selectors do not repeat Proxy reflection.
 
 auth() releases a completed request ID immediately only when the actual native owner proves exclusive source custody; other sources retain the bounded completed TTL. Active requests and streams remain held through actual business and iterator cleanup.
 

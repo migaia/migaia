@@ -6,9 +6,13 @@ contract 只定义协议、接口、可移植值和错误契约。host 负责 RP
 
 一个 host 支持多个传输命名空间，但通常选择一种传输，不建议混用。所有调用写成 `host.<ns>.*`；`provide` 与整个 host 的 `close` 留在根上。完整可运行的双向协程示例见 [README](./README.md#开始使用)。
 
+`createRpcHost` 先在同一个原生宿主上提交信息流 plugin、链路策略 plugin 及其 feature，再安装传输 plugin 及其 feature。这样 auth 等 stage 在首次握手前已经可见。两次安装共用生命周期 owner；传输安装失败时，已提交的前缀也由该 owner 回滚和清理。
+
 ## 注册普通方法与生成器
 
 `provide` 接受嵌套函数对象。返回值成为业务结果，异常保留原错误链；重复方法名拒绝。运行中新增的方法通过原会话目录更新发布。
+
+注册配置的反射或编译过程抛出异常时，公开入口以 `INVALID_CONFIG` 拒绝，并在 `cause` 上保留这个原异常。错误说明使用稳定文本，不调用异常的字符串转换，也不人为增加一项转换失败。
 
 ```ts doc-test=check
 import type { IRpcHost, IRpcContext } from '@migaia/rpc-host'
@@ -80,6 +84,90 @@ export const callOptions = { timeout: timeout({ ms: 100 }), retry: false } as co
 解析顺序唯一：单次调用完整实例或 `false`，然后传输 plugin 的 feature，最后链路策略 plugin。把 `callOptions` 传给 `host.thread.request(method, payload, callOptions)` 即可覆盖本次调用。不能写 `{ timeout: 100 }`、`timeoutMs` 或 `defaultTimeoutMs`。
 
 `timeout: false` 不启用 feature 超时，持续等待响应；已经继承的上游剩余期限仍递减。`retry: false` 禁用重试。下游只得到剩余预算，转发不能延期。只有发起方的标量调用和 group 重试，stream 从不重放、只使用 timeout；超时或失联不证明业务未执行，非幂等操作须先对账。传输提供的握手准备期限是另一项配置，不是业务 timeout feature。
+
+## 在已有宿主中安装 RPC
+
+已有 `defineHost` 宿主使用 `rpcHostPipelines(getHost, pipeline)`，同时获得管道声明和 `domainCore`。helper 构造时不调用回调、不创建宿主或资源；安装时，`domainCore` 才读取真实宿主并借用其管道执行权。不要复制七条声明，也不要把另一个宿主的执行权交进来。
+
+```ts doc-test=check
+import { defineHost } from '@migaia/plugin-host'
+import {
+  rpcHostPipelines,
+  type IRpcFlowPlugin,
+  type IRpcTransportPlugin
+} from '@migaia/rpc-host/sdk'
+
+/** Capture lazy authority callbacks before the real host is assigned. */
+const rpc = rpcHostPipelines(
+  () => host,
+  (name) => host.pipeline(name)
+)
+/** One native owner supplies both stage registration and execution. */
+export const host = defineHost({
+  ...rpc,
+  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+})
+
+/** Commit reusable flow definitions before opening any transport resource. */
+export async function installRpc(
+  flows: readonly IRpcFlowPlugin[],
+  transports: readonly IRpcTransportPlugin[]
+) {
+  await host.use(...flows)
+  await host.use(...transports)
+}
+```
+
+class 宿主同样通过 helper 延迟读取 `this`。构造时把声明交给 `super`，之后由 `createPluginDomainCore` 提供同一份接法；无需公开原本受保护的 `pipeline`。构造完成后再按上面的顺序安装 plugin。
+
+```ts doc-test=check
+import { PluginHost } from '@migaia/plugin-host'
+import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
+
+/** Keep the helper's declaration and domain-core axes together. */
+type IRpcSetup = ReturnType<typeof rpcHostPipelines>
+/** Native installation receives only this owner's declared RPC core. */
+type IRpcCore = ReturnType<IRpcSetup['domainCore']>
+
+export class NativeRpcHost extends PluginHost<
+  IRpcCore,
+  unknown,
+  readonly [],
+  IRpcSetup['pipelines']
+> {
+  /** The setup lends this exact owner's protected pipeline without another executor. */
+  readonly #rpc: IRpcSetup
+
+  /** Register lazy callbacks before super without reading an unconstructed this. */
+  constructor() {
+    /** The same setup supplies declarations now and authority only after construction. */
+    const rpc = rpcHostPipelines(
+      () => this,
+      (name) => this.pipeline(name)
+    )
+    super({
+      pipelines: rpc.pipelines,
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+    this.#rpc = rpc
+  }
+
+  /** Each install borrows this exact constructed owner's pipeline execution authority. */
+  protected override createPluginDomainCore(): IRpcCore {
+    return this.#rpc.domainCore()
+  }
+}
+```
+
+## 编写信息流与载体
+
+`defineFlowPlugin` 的每次 `setup` 返回本次安装的 `stages`、独立的 `observe` 与可选 `dispose`。stage 使用 SDK 的 `RpcFlowPoint` 和推导出的 payload 类型，转发时调用原生 `next(payload)`。握手、信封和 frame 的替换值分别放在 `handshake`、`prepared` 和 `frame`；dispatch 转发后从同一个 `payload.outcome.value` 读取结果，短路时也写入这个 cell。
+
+frame 管道允许多次提交。每次 `await next(payload)` 的失败交给当前 stage：捕获并 report 后可以继续下一个成员；stage 不观察失败的 Promise 时，管道在所有已启动遍历结算后拒绝，多个未观察失败按提交顺序汇总。观察回调不负责执行或推进这些 stage。
+
+`batch` 中取消的成员不再向下游提交，原调用以 `CANCELLED` 结算，原 reason 保留在 `cause`；同批其他成员继续完成。入站某个成员失败只 report 该成员，不阻止后续成员。
+
+载体可选实现 `reserveWrite(options)`，借用原有流控 owner，返回带 `release()` 的容量凭据。Session 在编码之后为一次逻辑写出预留一次，等这次 frame 管道实际结算后释放；chunk 的所有分片借用同一凭据，batch 各成员保留各自凭据，合并的物理写出借用仍存活成员的凭据。载体的 `write` 仍在实际物理接纳后完成，不应再把分片或 batch 重复计为新的逻辑调用。凭据不进入线上数据。
 
 ## 通知、分组与结果查询
 
@@ -156,19 +244,21 @@ export const declarations = typegen({
 
 `host.close()` 与 `host[Symbol.asyncDispose]()` 共享原关闭 Promise；`host.<ns>.close()` 只关闭对应命名空间。拥有的原生资源由其原 owner 释放，借用资源仍按原生所有权处理。
 
+公开关闭会以 `ENDPOINT_DISPOSED` 结算待决调用，并关闭真实载体。载体的 `close` 要结算自己拥有的排队写入，因此被挂住的原生写入也会拒绝；它不等于强行完成任意业务 Promise。已有 `defineHost` 或 class 宿主的 `dispose()` 仍返回其原生 cleanup summary 与共享 Promise，不套另一层 RPC 清理外壳。
+
 按 `source/code` 识别错误，保留原生类型、stack、cause 与 errors。不要把超时、取消或未知结果当成业务未执行证明。原生成员控制位于传输贡献的 `host.<ns>.members`，池控制位于其 feature 贡献的 `host.<ns>.pool`；这些控制不替代调用入口。
 
-## C6 公开行为变更
+## 公开行为与迁移
 
 未分类的 provider 异常使用 `INTERNAL`，原生异常保留在错误图中。标量调用直接以还原的远端 Error 拒绝；不再增加 `RpcRemoteError` 外壳，调用方须改用真实错误的 `source/code`。协程远端 `context.signal.reason` 接收原 abort reason，不合成取消码；`stream.return(value)` 返回 runtime 的真实结束结果，不回传调用者传入的 `value`。
 
 无目标调用按调用时已接受的会话选择；从 `peers` 保存的函数绑定原代次，退场后拒绝且不转向替代连接。即时 process 启动失败只保留一层 `PROCESS_CHANNEL_CLOSED`，原生 EPIPE 在 cause 图中；没有真实原生错误的 thread 关闭诊断不合成 message-port cause。
 
-旧 RPC scope 的回滚 AggregateError 外壳与原生 host dispose 翻译层已退役。原生 host 的 dispose 返回其实际结果；清理叶子错误的身份、顺序、只清理一次和共享完成 Promise 保留。`RpcRoot.close` 的错误契约独立，不替代原生 dispose 的结果。
+自行构造的原生宿主保留 `dispose()` 的原生 cleanup summary 与共享 Promise，不再附加 RPC 清理外壳。原失败叶对象、errors 顺序、cause 可达性和 disposer 一次执行保持；`createRpcHost` 返回的 `host.close()` 则保持自己的公开关闭语义。
 
 幂等指纹使用对象自身的键序；同一 body 改变键序后是不同请求，同键冲突以 `CONTRACT_INVALID` 拒绝，原 store 的字符串指纹 ABI 保持不变。
 
-普通 NativeHost 的 dispose() 保留其原生 cleanup summary 与共享 Promise，不再翻译成 RPC dispose 错误。安装回滚也直接借原生 cleanup entries；不再添加旧 RPC resource-scope AggregateError 外壳。原失败叶对象、errors 顺序、cause 可达性和 disposer 一次执行不变。RpcRoot.close() 是独立的公共关闭 owner，不能用 NativeHost.dispose() 的结果替代其契约。原生 Feature 的 descriptors 每次冷编译只捕获一次，首次 selector 的校验及错误顺序保持；后续 selector 不再重复触发 Proxy reflection。
+原生 Feature 的 descriptors 每次冷编译只捕获一次，首次 selector 的校验及错误顺序保持；后续 selector 不再重复触发 Proxy reflection。
 
 auth() 的已完成请求 ID 仅在实际原生 owner 证明来源独占时立即释放；其他来源继续按有界 TTL 保留。活动请求与 stream 仍保留到实际业务及迭代器清理完成。
 

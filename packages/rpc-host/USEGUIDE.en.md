@@ -6,9 +6,13 @@ Contract defines protocol, interfaces, portable values, and errors. Host owns RP
 
 A host supports multiple transport namespaces, but normally choose one transport kind; mixing kinds is not recommended. Calls live under `host.<ns>.*`; provider registration and whole-host closure remain on the root. See the [README](./README.en.md#start-here) for a complete runnable coroutine connection.
 
+`createRpcHost` first commits flow plugins, link-policy plugins and their features on the same native host, then installs transports and their features. Stages such as auth are visible before the first handshake. Both installations share one lifecycle owner, which also rolls back and cleans up the committed prefix if transport installation fails.
+
 ## Register functions and generators
 
 `provide` accepts nested function objects. Return values become business results and exceptions retain their error chain. Duplicate method names reject. Later registrations publish through the existing session directory update.
+
+If reflection or compilation of provider registration throws, the public entry rejects with `INVALID_CONFIG` and retains that exact original exception on `cause`. Stable diagnostic text does not invoke the thrown value's string conversion or manufacture another conversion failure.
 
 ```ts doc-test=check
 import type { IRpcHost, IRpcContext } from '@migaia/rpc-host'
@@ -80,6 +84,90 @@ export const callOptions = { timeout: timeout({ ms: 100 }), retry: false } as co
 Selection has one order: complete per-call instance or `false`, then the transport plugin's feature, then the link-policy default. Pass `callOptions` to `host.thread.request(method, payload, callOptions)` to override one call. Numeric `{ timeout: 100 }`, `timeoutMs`, and `defaultTimeoutMs` are removed.
 
 `timeout: false` waits for the response without a feature timeout; an upstream remaining deadline still decreases. `retry: false` disables retry. Downstream hops receive only the remaining budget and cannot extend it. Only the origin retries scalar calls and groups; streams never replay and use timeout only. Timeout or disconnection does not prove that business work never executed; reconcile uncertain non-idempotent work first. Transport handshake preparation deadlines are separate from the business timeout feature.
+
+## Install RPC in an existing host
+
+An existing `defineHost` owner uses `rpcHostPipelines(getHost, pipeline)` to obtain both pipeline declarations and `domainCore`. Creating the helper calls neither callback and creates no host or resource. At installation, `domainCore` reads the real owner and borrows its pipeline execution authority. Do not copy seven declarations or supply another host's execution authority.
+
+```ts doc-test=check
+import { defineHost } from '@migaia/plugin-host'
+import {
+  rpcHostPipelines,
+  type IRpcFlowPlugin,
+  type IRpcTransportPlugin
+} from '@migaia/rpc-host/sdk'
+
+/** Capture lazy authority callbacks before the real host is assigned. */
+const rpc = rpcHostPipelines(
+  () => host,
+  (name) => host.pipeline(name)
+)
+/** One native owner supplies both stage registration and execution. */
+export const host = defineHost({
+  ...rpc,
+  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+})
+
+/** Commit reusable flow definitions before opening any transport resource. */
+export async function installRpc(
+  flows: readonly IRpcFlowPlugin[],
+  transports: readonly IRpcTransportPlugin[]
+) {
+  await host.use(...flows)
+  await host.use(...transports)
+}
+```
+
+A class owner also reads `this` lazily through the helper. Pass its declarations to `super`, then supply the same setup from `createPluginDomainCore` without exposing protected `pipeline`. Install plugins in the same order after construction finishes.
+
+```ts doc-test=check
+import { PluginHost } from '@migaia/plugin-host'
+import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
+
+/** Keep the helper's declaration and domain-core axes together. */
+type IRpcSetup = ReturnType<typeof rpcHostPipelines>
+/** Native installation receives only this owner's declared RPC core. */
+type IRpcCore = ReturnType<IRpcSetup['domainCore']>
+
+export class NativeRpcHost extends PluginHost<
+  IRpcCore,
+  unknown,
+  readonly [],
+  IRpcSetup['pipelines']
+> {
+  /** The setup lends this exact owner's protected pipeline without another executor. */
+  readonly #rpc: IRpcSetup
+
+  /** Register lazy callbacks before super without reading an unconstructed this. */
+  constructor() {
+    /** The same setup supplies declarations now and authority only after construction. */
+    const rpc = rpcHostPipelines(
+      () => this,
+      (name) => this.pipeline(name)
+    )
+    super({
+      pipelines: rpc.pipelines,
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    })
+    this.#rpc = rpc
+  }
+
+  /** Each install borrows this exact constructed owner's pipeline execution authority. */
+  protected override createPluginDomainCore(): IRpcCore {
+    return this.#rpc.domainCore()
+  }
+}
+```
+
+## Author flows and carriers
+
+Each `defineFlowPlugin` setup returns installation-local `stages`, a separate `observe` callback and optional `dispose`. Stages use SDK `RpcFlowPoint` keys with inferred payload types and forward through native `next(payload)`. Handshake, envelope and frame replacements belong in `handshake`, `prepared` and `frame`. Dispatch reads the same `payload.outcome.value` after forwarding, and writes that cell when short-circuiting.
+
+Frame pipelines accept multiple submissions. The stage receives each `await next(payload)` failure and may catch, report and continue with another member. If it does not observe a failed Promise, the pipeline rejects after all started traversals settle; multiple unobserved failures are collected in submission order. Observation callbacks do not execute or advance stages.
+
+A cancelled `batch` member submits no further downstream work. Its call settles with `CANCELLED` and the original reason on `cause`; other members complete normally. An inbound member failure reports only that member and does not prevent later members from being processed.
+
+A carrier may implement `reserveWrite(options)` by borrowing its existing flow-control owner and returning a receipt with `release()`. Session reserves once per logical write after encoding and releases when that frame pipeline actually settles. Chunk fragments share the same receipt; a batch retains each member's receipt and borrows a surviving member's receipt for its coalesced physical write. `write` still completes at actual physical acceptance, without counting fragments or batches as new logical calls. Receipts never enter wire data.
 
 ## Notifications, groups, and retained outcomes
 
@@ -156,19 +244,21 @@ Aggregate and individual default subpaths support tree-shaking. Import codes fro
 
 `host.close()` and `host[Symbol.asyncDispose]()` share the original close Promise. `host.<ns>.close()` closes only that namespace. Original owners release owned native resources, while borrowed resources retain their native ownership policy.
 
+Public close settles pending calls with `ENDPOINT_DISPOSED` and closes the actual carrier. Carrier `close` settles its own queued writes, so a held native write also rejects; it does not force an arbitrary business Promise to finish. An existing `defineHost` or class owner's `dispose()` retains its native cleanup summary and shared Promise without another RPC cleanup shell.
+
 Branch on `source/code`; preserve native classes, stack, cause, and errors. Timeout, cancellation, or an unknown result is not proof that work never executed. Native controls live under transport-owned `host.<ns>.members`; Pool controls live under feature-owned `host.<ns>.pool`. These controls do not replace RPC calls.
 
-## C6 public behavior changes
+## Public behavior and migration
 
 Unhandled provider exceptions use `INTERNAL` and retain the native exception in the error graph. Scalar calls reject with the restored remote Error directly, without an extra `RpcRemoteError`; callers must inspect the actual error's `source/code`. A coroutine provider receives the original abort reason through `context.signal.reason`, without an invented cancellation code. `stream.return(value)` returns the runtime's actual terminal result rather than echoing the caller's `value`.
 
 Untargeted calls select the sessions accepted at call time. Functions saved from `peers` remain bound to their original generation and reject after departure rather than switching to a replacement. Immediate process startup failure has one `PROCESS_CHANNEL_CLOSED` boundary with native EPIPE reachable through its cause graph. A thread closure with no native error does not invent a message-port cause.
 
-The old RPC scope rollback AggregateError shell and native host dispose translation have retired. Native host dispose returns its actual outcome; cleanup leaf identity, order, once-only release, and the shared completion Promise remain intact. `RpcRoot.close` has its own error contract and does not substitute for native dispose.
+An independently constructed native host retains its native `dispose()` cleanup summary and shared Promise without an additional RPC cleanup shell. Original failure leaves, errors order, cause reachability and once-only disposal remain intact. The `host.close()` returned by `createRpcHost` retains its own public close semantics.
 
 Idempotency fingerprints follow the object's own key order. Changing key order creates a different request; reuse of the same key conflicts with `CONTRACT_INVALID`. The store's string fingerprint ABI is unchanged.
 
-An ordinary NativeHost retains its native dispose() cleanup summary and shared Promise instead of RPC disposal translation. Installation rollback borrows native cleanup entries without the former RPC resource-scope AggregateError shell. Original failure leaves, errors order, cause reachability and once-only disposal remain intact. RpcRoot.close() is a separate public close owner; NativeHost.dispose() is not a substitute. Native Feature descriptors are captured once per cold compilation while preserving the first selector validation and error order; later selectors do not repeat Proxy reflection.
+Native Feature descriptors are captured once per cold compilation while preserving the first selector validation and error order; later selectors do not repeat Proxy reflection.
 
 auth() releases a completed request ID immediately only when the actual native owner proves exclusive source custody; other sources retain the bounded completed TTL. Active requests and streams remain held through actual business and iterator cleanup.
 
