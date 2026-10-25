@@ -1,3 +1,4 @@
+/** Own parent admission, subscriptions and Tray lifecycle; RPC retains native generations and IO. */
 import { SupervisorState } from '@migaia/supervision'
 import { deferred, type IAbortSignal } from '@migaia/utils/promise'
 import { defineHost } from '@migaia/plugin-host'
@@ -426,7 +427,7 @@ class TrayRuntime<
     const family = record.id
     const outlet = outletOf(this.#host, record.definition, record.id)
     if (this.#subscriptions.get(family)?.outlet === outlet) return
-    for (const release of this.#subscriptions.get(family)?.release ?? []) release()
+    this.#releaseSubscription(family)
     const release = [
       outlet.members.on(RpcMemberEventName.ready, (event) => this.#memberReady(outlet, event)),
       outlet.members.on(RpcMemberEventName.exit, (event) => {
@@ -451,6 +452,15 @@ class TrayRuntime<
     this.#subscriptions.set(family, { outlet, release })
   }
 
+  /** Logical removal drops the exact retained outlet before invoking its original native removers. */
+  #releaseSubscription(family: string): void {
+    /** An absent receipt has no remaining native callback or map ownership to release. */
+    const subscription = this.#subscriptions.get(family)
+    if (!subscription) return
+    this.#subscriptions.delete(family)
+    for (const release of subscription.release) release()
+  }
+
   /** Only a genuine later native ready event may enqueue background initialization. */
   #memberReady(outlet: ITrayRuntimeOutlet, event: IRpcMemberEvent): void {
     /** The original admission must still own this safe registered member name. */
@@ -470,7 +480,13 @@ class TrayRuntime<
       generation: event.generation,
       instanceId: event.instanceId
     }
-    void admitted.queue.run(() => this.#reinitialize(admitted, outlet, receipt)).catch(this.#report)
+    /** One queued input retains the original admission and its exact native ready receipt. */
+    const initialization = { admitted, outlet, receipt }
+    void admitted.queue
+      .run(() =>
+        this.#reinitialize(initialization.admitted, initialization.outlet, initialization.receipt)
+      )
+      .catch(this.#report)
   }
 
   /** Recheck the exact ready receipt after native event publication and before application init. */
@@ -543,6 +559,7 @@ class TrayRuntime<
     const wasReady = record.state === TrayInstanceState.ready
     this.#topics.remove(record)
     this.#registry.revoke(record)
+    this.#releaseSubscription(record.id)
     if (record.install) {
       try {
         await record.install
@@ -577,7 +594,10 @@ class TrayRuntime<
     operation: 'restart' | 'replace',
     replacement?: { config?: unknown }
   ): Promise<ITrayInstance> => {
+    /** Queue admission captures this operation's inputs without sharing mutable closure state. */
+    const management = { record, operation, replacement }
     return record.queue.run(async () => {
+      const { record, operation, replacement } = management
       this.#current(record)
       const config =
         operation === 'replace' && replacement && Object.hasOwn(replacement, 'config')
@@ -773,7 +793,10 @@ class TrayRuntime<
   #stopEntry = async (id: string, stopOptions?: { graceMs?: number }) => {
     this.#assertActive()
     const record = this.#registry.get(id)
+    /** Stop options belong to this admitted queue entry, even if execution begins later. */
+    const operation = { record, id, stopOptions }
     await record.queue.run(async () => {
+      const { record, id, stopOptions } = operation
       this.#current(record)
       record.management = TrayManagementMode.manual
       try {
@@ -824,8 +847,7 @@ class TrayRuntime<
     const records = [...this.#registry.records.values()]
     for (const record of records) record.queue.close(createTrayError(TrayErrorCode.disposed))
     await Promise.all(records.map((record) => this.#disposeRecord(record, graceMs)))
-    for (const subscription of this.#subscriptions.values())
-      for (const release of subscription.release) release()
+    for (const family of this.#subscriptions.keys()) this.#releaseSubscription(family)
     /** Parent-only topic users can close before relay installation commits. */
     await this.#relayReady
     await this.#host.dispose()

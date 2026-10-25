@@ -1,4 +1,5 @@
 import { TrayInternal } from '../../src/hosts/constants.js'
+import type { ITrayRecord } from '../../src/hosts/parent/registry.js'
 import { describe, expect, it, vi } from 'vitest'
 import { setTimeout as delay } from 'node:timers/promises'
 import { execFileSync, spawnSync } from 'node:child_process'
@@ -80,6 +81,8 @@ describe('Tray lifecycle management', () => {
       const entered = new Promise<void>((resolve) => {
         started = resolve
       })
+      /** Preserve the real removed record for the post-disposal init-index resource assertion. */
+      let retainedRecord: ITrayRecord | undefined
       try {
         /** First generation init is already complete before the queue-race starts. */
         const remote = await tray.spawn(api.hosts[index].name, {
@@ -90,8 +93,10 @@ describe('Tray lifecycle management', () => {
         const registry = observation.mock.results.at(-1)!.value
         /** The real record is neither cloned nor replaced by this observation. */
         const record = registry.records.get('stale')
+        retainedRecord = record
         /** Captured generation proves which receipt later becomes superseded. */
         const g1 = (await tray.get('stale')).generation
+        expect([...record.inits.keys()]).toEqual([g1])
         /** Actual RPC ready, rather than early native unit readiness, admits the background receipt. */
         let readyGeneration = 0
         /** Parent queue has observed this same exact ready before this later listener records it. */
@@ -124,6 +129,7 @@ describe('Tray lifecycle management', () => {
         const replacement = await replacing
         await record.queue.whenIdle()
         expect(replacement.generation).toBe(g1 + 2)
+        expect([...record.inits.keys()]).toEqual([g1 + 2])
         expect(lines(initMarker)).toEqual([`init:stale:${g1}:old`, `init:stale:${g1 + 2}:new`])
         expect(await tray.get('stale')).toMatchObject({
           generation: g1 + 2,
@@ -133,6 +139,7 @@ describe('Tray lifecycle management', () => {
       } finally {
         release()
         await tray.dispose()
+        if (retainedRecord) expect(retainedRecord.inits.size).toBe(0)
         observation.mockRestore()
       }
     },

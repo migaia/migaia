@@ -1,3 +1,7 @@
+/**
+ * Index Tray admissions, relay receipts and current-generation init; RPC retains native work
+ * ownership.
+ */
 import { createConcurrencyLimiter, type IConcurrencyLimiter } from '@migaia/utils/promise'
 import { createTrayError } from '../../errors.js'
 import { TrayErrorCode } from '../../error-code.js'
@@ -17,6 +21,7 @@ export type ITrayRecord = {
   queue: IConcurrencyLimiter
   management?: TrayManagementMode
   install?: Promise<void>
+  /** Only the current generation shares init; old waiters retain their own original Promise. */
   inits: Map<number, Promise<void>>
   receipts: Set<string>
   /** Pending business sends belong to this admission even after its id is re-admitted. */
@@ -92,6 +97,7 @@ class TrayRegistry {
     if (record.instanceId) this.#instanceIds.delete(record.instanceId)
     for (const receipt of record.receipts) this.#receipts.delete(receipt)
     record.receipts.clear()
+    record.inits.clear()
   }
 
   /** Count one original business operation without replacing its native sender. */
@@ -120,15 +126,21 @@ class TrayRegistry {
     options?: Parameters<ITraySender['request']>[1]
   ): Promise<unknown> | AsyncIterableIterator<unknown> {
     if (kind === TrayCallKind.stream) return this.#sendStream(record, input, options)
-    /** Promise settlement, including a synchronous send failure, releases this admission only. */
-    return (async () => {
-      record.inFlight += 1
-      try {
-        return await this.#send(record)[kind](input, options)
-      } finally {
-        record.inFlight -= 1
-      }
-    })()
+    return this.#sendUnary(record, kind, input, options)
+  }
+  /** Count the original unary send synchronously and release this admission on either terminal. */
+  async #sendUnary(
+    record: ITrayRecord,
+    kind: 'request' | 'notify',
+    input: ITrayInvocation,
+    options?: Parameters<ITraySender['request']>[1]
+  ): Promise<unknown> {
+    record.inFlight += 1
+    try {
+      return await this.#send(record)[kind](input, options)
+    } finally {
+      record.inFlight -= 1
+    }
   }
   /** Lazy generator counts the original stream until terminal settlement, return or throw. */
   async *#sendStream(
@@ -166,6 +178,7 @@ class TrayRegistry {
   identify = (record: ITrayRecord, generation: number, instanceId: string): void => {
     this.assertCurrent(record)
     if (record.instanceId) this.#instanceIds.delete(record.instanceId)
+    if (record.generation !== generation) record.inits.clear()
     record.generation = generation
     record.instanceId = instanceId
     this.#instanceIds.set(instanceId, { record, generation })
