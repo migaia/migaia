@@ -179,22 +179,19 @@ it('queued cancellation removes only its member and transfer/opaque frames remai
     .run({ frame: { kind: 'message', data: 'first' }, ...f.context() }, write)
   /** A cancelled queued call must emit no frame and no started callback. */
   const caller = new AbortController()
-  /** Observe rejection before cancellation to preserve ordinary unhandled-rejection rules. */
-  const cancelled = f.flow
-    .pipeline(RpcFlowPoint.frameOutbound)
-    .run(
-      {
-        frame: { kind: 'message', data: 'cancelled' },
-        ...f.context({
-          signal: caller.signal,
-          onWriteStart: () => {
-            starts.push('cancelled')
-          }
-        })
-      },
-      write
-    )
-    .catch((error: unknown) => error)
+  /** The public CallRecord owns CANCELLED; a cancelled member's stage completes normally. */
+  const cancelled = f.flow.pipeline(RpcFlowPoint.frameOutbound).run(
+    {
+      frame: { kind: 'message', data: 'cancelled' },
+      ...f.context({
+        signal: caller.signal,
+        onWriteStart: () => {
+          starts.push('cancelled')
+        }
+      })
+    },
+    write
+  )
   /** The original backing frame keeps its exact identity instead of joining a metadata aggregate. */
   const native: IRpcCarrierFrame = { kind: 'message', data: 'native', sidecars: transfer }
   /** Transfer is actual physical authority, never inferred from an encoded member. */
@@ -227,7 +224,7 @@ it('queued cancellation removes only its member and transfer/opaque frames remai
   caller.abort(new Error('fixture queued abort'))
   held.resolve()
   await Promise.all([first, boundary, last])
-  expect(await cancelled).toMatchObject({ code: 'CANCELLED', cause: caller.signal.reason })
+  expect(await cancelled).toBeUndefined()
   expect(frames).toEqual([{ kind: 'message', data: 'first' }, native, opaque])
   expect(frames[1]).toBe(native)
   expect(options[1]?.transfer).toBe(transfer)
@@ -236,39 +233,42 @@ it('queued cancellation removes only its member and transfer/opaque frames remai
   await f.flow.dispose()
 })
 
-it('one inbound physical batch preserves independent correlations and reports every failed member', async () => {
-  /** The old response-settlement and refusal-custody assertions belong to the actual frame owner. */
-  const f = await fixture()
-  /** These final encoded values retain distinct original ids and group semantics unchanged. */
-  const members: IRpcCarrierFrame[] = [
-    { kind: 'message', data: '{"id":"one"}' },
-    { kind: 'message', data: '{"id":"two"}' }
-  ]
-  /** The same physical batch delivers both exact codec inputs in order. */
-  const values: IRpcCarrierFrame[] = []
-  /** Original per-member downstream failure must not prevent the second correlation from arriving. */
-  const cause = new Error('fixture refusal write failure')
-  await f.flow
-    .pipeline(RpcFlowPoint.frameInbound)
-    .run(
-      {
-        frame: { kind: 'extension', extension: 'batch@1', data: { frames: members } },
-        ...f.context(undefined, 'inbound')
-      },
-      async ({ frame }) => {
-        values.push(frame)
-        throw cause
-      }
-    )
-  expect(values).toEqual(members)
-  expect(values[0]).toBe(members[0])
-  expect(f.errors).toEqual([cause, cause])
-  await f.installation.dispose?.()
-  await f.flow.dispose()
-})
+it.each([1, 2])(
+  'reports %i independent inbound member failures and continues every member',
+  async (failures) => {
+    /** Public independent-request settlement also runs through host/named-flow-composition.test.ts. */
+    const f = await fixture()
+    /** These final encoded values retain distinct original ids and group semantics unchanged. */
+    const members: IRpcCarrierFrame[] = [
+      { kind: 'message', data: '{"id":"one"}' },
+      { kind: 'message', data: '{"id":"two"}' }
+    ]
+    /** The same physical batch delivers both exact codec inputs in order. */
+    const values: IRpcCarrierFrame[] = []
+    /** Each original refusal is reported once without contaminating any sibling's traversal. */
+    const cause = new Error('fixture refusal write failure')
+    await expect(
+      f.flow.pipeline(RpcFlowPoint.frameInbound).run(
+        {
+          frame: { kind: 'extension', extension: 'batch@1', data: { frames: members } },
+          ...f.context(undefined, 'inbound')
+        },
+        async ({ frame }) => {
+          values.push(frame)
+          if (values.length <= failures) throw cause
+        }
+      )
+    ).resolves.toBeUndefined()
+    expect(values).toEqual(members)
+    expect(values[0]).toBe(members[0])
+    expect(f.errors).toEqual(failures === 1 ? [cause] : [cause, cause])
+    await f.installation.dispose?.()
+    await f.flow.dispose()
+  }
+)
 
-it('physical retirement rejects queued members and releases the held source before a late native drain', async () => {
-  /** Close uses the same actual lane and physical connection signal as ordinary Session integration. */
+it('physical retirement rejects queued members and joins the already started native branch', async () => {
+  /** Actual carrier-close rejection is received by host/named-flow-composition.test.ts. */
   const f = await fixture()
   /** A real pending physical write must not prevent plugin cleanup from rejecting logical members. */
   const held = deferred<void>()
@@ -293,11 +293,12 @@ it('physical retirement rejects queued members and releases the held source befo
   /** Both members keep the exact source reason, independent from a later native drain. */
   const reason = new Error('fixture physical close')
   f.source.abort(reason)
+  /** This terminal has no carrier.close; native R1 joins its started branch before settling. */
+  held.resolve()
   expect(await first).toBe(reason)
   expect(await queued).toBe(reason)
   await f.installation.dispose?.()
   await f.installation.dispose?.()
-  held.resolve()
   await Promise.resolve()
   expect(frames).toHaveLength(1)
   await f.flow.dispose()
@@ -328,14 +329,13 @@ it('cancellation during an async downstream hook falls back once without writing
     .run({ frame: { kind: 'message', data: 'first' }, ...f.context() }, write)
   /** The caller remains cancellable until its actual original start callback. */
   const caller = new AbortController()
-  /** A rejected logical member is observed before cancellation occurs. */
+  /** Cancellation finishes the stage; the separate public case retains CANCELLED and its cause. */
   const cancelled = f.flow
     .pipeline(RpcFlowPoint.frameOutbound)
     .run(
       { frame: { kind: 'message', data: 'cancelled' }, ...f.context({ signal: caller.signal }) },
       write
     )
-    .catch((error: unknown) => error)
   /** This unrelated member must still cross the original physical continuation exactly once. */
   const survivor = f.flow
     .pipeline(RpcFlowPoint.frameOutbound)
@@ -346,7 +346,7 @@ it('cancellation during an async downstream hook falls back once without writing
   caller.abort(new Error('fixture async hook abort'))
   hookDrain.resolve()
   await survivor
-  expect(await cancelled).toMatchObject({ code: 'CANCELLED', cause: caller.signal.reason })
+  expect(await cancelled).toBeUndefined()
   expect(state.aggregateAttempts).toBe(1)
   expect(state.frames).toEqual([
     { kind: 'message', data: 'first' },

@@ -73,18 +73,14 @@ export class RpcBatchLane {
       resolve: completion.resolve,
       reject: completion.reject
     }
-    /** Direct Set deletion never scans or copies another member's queued prefix. */
-    const cancel = (reason: unknown): void => {
-      if (entry.started || entry.cancelled) return
-      entry.cancelled = true
-      this.#queued.delete(entry)
-      entry.remove()
-      entry.reject(reason)
-    }
     /** Native admission can withdraw the same queued member before physical process writing. */
-    const releaseAdmission = write?.admission?.guard?.(cancel)
-    /** Signal and native admission share this entry's original cancellation operation. */
-    const abort = (): void => cancel(createRpcAbortError(undefined, undefined, signal.reason))
+    const releaseAdmission = write?.admission?.guard?.((reason) => {
+      if (this.#withdraw(entry)) entry.reject(reason)
+    })
+    /** CallRecord already owns CANCELLED; this member's stage ends without rejecting its siblings. */
+    const abort = (): void => {
+      if (this.#withdraw(entry)) entry.resolve()
+    }
     entry.remove = () => {
       signal.removeEventListener('abort', abort)
       releaseAdmission?.()
@@ -99,6 +95,15 @@ export class RpcBatchLane {
       }
     } else if (!this.#writing) this.#releaseLane()
     return completion.promise
+  }
+
+  /** Remove only this unstarted member; its caller or native queue decides the settlement. */
+  #withdraw(entry: IRpcBatchEntry): boolean {
+    if (entry.started || entry.cancelled) return false
+    entry.cancelled = true
+    this.#queued.delete(entry)
+    entry.remove()
+    return true
   }
 
   /** One ready prefix is consumed once; opaque/transfer boundaries remain independent singletons. */
