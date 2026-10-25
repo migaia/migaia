@@ -7,7 +7,6 @@ x-storage-test-environment:
   MIGAIA_REDIS_STACK_URL: redis://127.0.0.1:${MIGAIA_REDIS_STACK_PORT:-17381}
   MIGAIA_PG_URL: postgresql://storage:storage-local@127.0.0.1:${MIGAIA_PG_PORT:-15432}/storage
   MIGAIA_PG_PUBLICATION: migai_storage_publication
-  MIGAIA_PG_SLOT: migai_storage_slot
   MIGAIA_QDRANT_URL: http://127.0.0.1:${MIGAIA_QDRANT_PORT:-16333}
   MIGAIA_SPARQL_QUERY_URL: http://127.0.0.1:${MIGAIA_FUSEKI_PORT:-13030}/storage/sparql
   MIGAIA_SPARQL_UPDATE_URL: http://127.0.0.1:${MIGAIA_FUSEKI_PORT:-13030}/storage/update
@@ -119,8 +118,9 @@ configs:
     content: |
       CREATE EXTENSION IF NOT EXISTS vector;
       ALTER ROLE storage WITH REPLICATION;
-      CREATE PUBLICATION migai_storage_publication FOR ALL TABLES;
-      SELECT pg_create_logical_replication_slot('migai_storage_slot', 'pgoutput');
+      -- This disposable fixture keeps only storage tables in public. Production deployments
+      -- should use their own storage schema or publish the required storage tables explicitly.
+      CREATE PUBLICATION migai_storage_publication FOR TABLES IN SCHEMA public;
 
 volumes:
   redis-data:
