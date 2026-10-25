@@ -26,8 +26,8 @@ jobs:
       MIGAIA_VALKEY_URL: redis://127.0.0.1:17380
       MIGAIA_REDIS_STACK_URL: redis://127.0.0.1:17381
       MIGAIA_PG_URL: postgresql://storage:storage-local@127.0.0.1:15432/storage
+      MIGAIA_PG_REPLICATION_URL: postgresql://storage:storage-local@127.0.0.1:15433/storage
       MIGAIA_PG_PUBLICATION: migai_storage_publication
-      MIGAIA_PG_SLOT: migai_storage_slot
       MIGAIA_QDRANT_URL: http://127.0.0.1:16333
       MIGAIA_SPARQL_QUERY_URL: http://127.0.0.1:13030/storage/sparql
       MIGAIA_SPARQL_UPDATE_URL: http://127.0.0.1:13030/storage/update
@@ -68,7 +68,7 @@ jobs:
         if: ${{ !cancelled() }}
         shell: bash
         run: |
-          for name in MIGAIA_REDIS_URL MIGAIA_VALKEY_URL MIGAIA_REDIS_STACK_URL MIGAIA_PG_URL MIGAIA_PG_PUBLICATION MIGAIA_PG_SLOT MIGAIA_QDRANT_URL MIGAIA_SPARQL_QUERY_URL MIGAIA_SPARQL_UPDATE_URL MIGAIA_SPARQL_GRAPH_STORE_URL MIGAIA_S3_ENDPOINT; do
+          for name in MIGAIA_REDIS_URL MIGAIA_VALKEY_URL MIGAIA_REDIS_STACK_URL MIGAIA_PG_URL MIGAIA_PG_REPLICATION_URL MIGAIA_PG_PUBLICATION MIGAIA_QDRANT_URL MIGAIA_SPARQL_QUERY_URL MIGAIA_SPARQL_UPDATE_URL MIGAIA_SPARQL_GRAPH_STORE_URL MIGAIA_S3_ENDPOINT; do
             if [ -z "${!name}" ]; then
               echo "::error::$name is required by the declared storage services"
               exit 1
