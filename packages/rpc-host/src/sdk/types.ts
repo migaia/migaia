@@ -10,10 +10,11 @@ import type { IRpcCallOptions } from '../namespace/types.js'
 import type {
   IRpcCallFeature,
   IRpcDispose,
-  IRpcFlowPluginDefinition,
-  IRpcObservation
+  IRpcObservation,
+  IRpcProbeDescriptor
 } from '@migaia/rpc-contract/interfaces'
 import type { IRpcTransportContext } from '@migaia/rpc-contract/interfaces'
+import type { IRpcFlowStages } from './flow-pipelines.js'
 
 /** Native source policy borrows its genuine installation core, including dependency liquidation. */
 export type IRpcTransportSetupContext = IRpcTransportContext &
@@ -69,16 +70,18 @@ export type IRpcFlowSetupContext = Readonly<{
   retire(carrierId: string, reason?: unknown): Promise<void>
 }>
 
-/** Each installation returns its own complete hooks and exact cleanup, never shared live state. */
-export type IRpcFlowInstallation<E extends object = Record<never, never>> = Omit<
-  IRpcFlowPluginDefinition,
-  'name' | 'namespaces'
-> &
-  Readonly<{
-    dispose?: IRpcDispose
-    /** Native namespace publication rejects collisions with host methods. */
-    namespaceExtensions?(namespace: string): Readonly<E>
-  }>
+/** Each installation contributes native stages and exact cleanup, never an RPC-owned runner. */
+export type IRpcFlowInstallation<E extends object = Record<never, never>> = Readonly<{
+  stages?: IRpcFlowStages
+  observe?(event: IRpcObservation): void
+  extensions?: readonly string[]
+  requiredExtensions?: readonly string[]
+  /** Only a genuine installed protection owner describes its observable authentication mode. */
+  observationFacts?: Readonly<Pick<IRpcProbeDescriptor, 'authentication'>>
+  dispose?: IRpcDispose
+  /** Native namespace publication rejects collisions with host methods. */
+  namespaceExtensions?(namespace: string): Readonly<E>
+}>
 
 /** Cold reusable flow configuration constructs installation-local resources in its native hook. */
 export type IRpcFlowDefinition<E extends object = Record<never, never>> = Readonly<{

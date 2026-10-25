@@ -1,9 +1,8 @@
 /**
- * Defines the fixed RPC flow intervention points and immutable observation surface. The host
- * compiles order once; optional plugins own their own callbacks, state, and cleanup.
+ * Defines pure RPC flow payloads and readonly observations. Native plugin-host owns every stage
+ * convention and execution; this module creates no runner or registration state.
  */
 import type { IAbortSignal } from '@migaia/utils/promise'
-import type { IRpcProbeDescriptor } from './observation.js'
 import type {
   IRpcCompletion,
   IRpcEnvelope,
@@ -36,14 +35,15 @@ export type IRpcFlowContext = Readonly<{
   signal: IAbortSignal
   /** Actual Session lifetime remains authoritative when a batch removes one member's cancellation. */
   connectionSignal?: IAbortSignal
-  /** Outbound frame plugins retain each member's actual physical write facts until handoff. */
-  write?: IRpcFrameWriteOptions
   /** Uncorrelated hook and cleanup failures remain observable. */
   report(error: unknown): void
 }>
 
 /** Only frame transformations can replace local physical options; these never enter the wire. */
-export type IRpcFrameWriteOptions = Pick<IRpcCarrierWriteOptions, 'sendClass' | 'trace'> &
+export type IRpcFrameWriteOptions = Pick<
+  IRpcCarrierWriteOptions,
+  'sendClass' | 'trace' | 'admission'
+> &
   Readonly<{
     /** False removes one logical member's signal while retaining the Session's close fence. */
     signal?: IAbortSignal | false
@@ -61,12 +61,6 @@ export type IRpcEnvelopeContext = IRpcFlowContext &
       prepared: IRpcPreparedMessage
     ): IRpcSemanticFrame | undefined | Promise<IRpcSemanticFrame | undefined>
   }>
-
-/** Frame continuations preserve actual write completion and local options through transformations. */
-export type IRpcFrameNext = (
-  frame: IRpcCarrierFrame,
-  write?: IRpcFrameWriteOptions
-) => Promise<void>
 
 /** An admitted duplicate ends locally without executing or sending another physical terminal. */
 export const RpcDispatchDrop = Object.freeze({ kind: 'drop' } as const)
@@ -105,65 +99,30 @@ export type IRpcObservation = Readonly<{
   data?: unknown
 }>
 
-/** Only these intervention points may be registered before host startup. */
-export type IRpcFlowHooks = Readonly<{
-  /** Outbound and inbound handshake values use context.direction to select plugin behavior. */
-  handshake?: (
-    value: IRpcHandshake,
-    context: IRpcFlowContext
-  ) => IRpcHandshake | Promise<IRpcHandshake>
-  /** Authentication and schema hooks see prepared metadata outside physical codec operations. */
-  envelope?: Readonly<{
-    /** Runs after carrier.prepare and before carrier.encode. */
-    outbound?: (
-      value: IRpcPreparedMessage,
-      context: IRpcEnvelopeContext
-    ) => IRpcPreparedMessage | Promise<IRpcPreparedMessage>
-    /** Runs after carrier.decode and before carrier.restore. */
-    inbound?: (
-      value: IRpcPreparedMessage,
-      context: IRpcEnvelopeContext
-    ) => IRpcPreparedMessage | Promise<IRpcPreparedMessage>
-  }>
-  /** Chunk and batch hooks may emit zero or several frames through the ordered continuation. */
-  frame?: Readonly<{
-    /** Settles only when all frames for this input are written or rejected. */
-    outbound?: (
-      value: IRpcCarrierFrame,
-      context: IRpcFlowContext,
-      next: IRpcFrameNext
-    ) => Promise<void>
-    /** Calls next for each complete admitted inner frame in carrier order. */
-    inbound?: (
-      value: IRpcCarrierFrame,
-      context: IRpcFlowContext,
-      next: IRpcFrameNext
-    ) => Promise<void>
-  }>
-  /** An installed plugin can reject, replay, or surround actual provider execution. */
-  dispatch?: Readonly<{
-    /** Invoke next at most once; completion remains owned by ProviderDispatcher. */
-    inbound: (
-      context: IRpcDispatchContext,
-      next: () => Promise<IRpcDispatchOutcome>
-    ) => Promise<IRpcDispatchOutcome>
-  }>
-  /** Observer failures are reported; readonly observation cannot alter the message flow. */
-  observe?: (event: IRpcObservation) => void
+/** A handshake transformation retains the same host-owned negotiation context. */
+export type IRpcHandshakePayload = Readonly<{
+  handshake: IRpcHandshake
+  context: IRpcFlowContext
 }>
 
-/** Flow registration carries complete behavior and optional explicit namespace scope. */
-export type IRpcFlowPluginDefinition = Readonly<{
-  /** Actual installed ownership supplies these cold readonly facts, never decoded messages. */
-  observationFacts?: Readonly<Pick<IRpcProbeDescriptor, 'authentication'>>
-  /** Native plugin name determines dependency and installation ordering. */
-  name: string
-  /** Omission covers the host; a supplied list restricts every declared hook. */
-  namespaces?: readonly string[]
-  /** Frame extension names actually implemented by this plugin, proposed during handshake. */
-  extensions?: readonly string[]
-  /** An unavailable required extension rejects handshake; optional absence does not. */
-  requiredExtensions?: readonly string[]
-  /** Only fixed host-owned stages can be registered during installation. */
-  hooks: IRpcFlowHooks
+/** Metadata transformation occurs between the actual carrier preparation and restoration. */
+export type IRpcEnvelopePayload = Readonly<{
+  prepared: IRpcPreparedMessage
+  context: IRpcEnvelopeContext
+}>
+
+/** Physical options and logical admission stay local while stages may emit several frames. */
+export type IRpcFramePayload = Readonly<{
+  frame: IRpcCarrierFrame
+  context: IRpcFlowContext
+  write?: IRpcFrameWriteOptions
+}>
+
+/**
+ * One invocation owns the outcome cell. Forwarding a replacement payload retains this cell, so
+ * replay and post-provider stages observe the same result without a custom next convention.
+ */
+export type IRpcDispatchPayload = Readonly<{
+  context: IRpcDispatchContext
+  outcome: { value: IRpcDispatchOutcome }
 }>

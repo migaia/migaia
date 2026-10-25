@@ -2,7 +2,8 @@
 import { raceWithAbort } from '@migaia/utils/promise'
 import type { IRpcCompletion, IRpcOutcome, IRpcPortableValue } from '@migaia/rpc-contract/protocol'
 import { RpcCallMode } from '@migaia/rpc-contract/protocol'
-import type { IRpcDispatchContext, IRpcDispatchOutcome } from '@migaia/rpc-contract/interfaces'
+import type { IRpcDispatchPayload, IRpcDispatchOutcome } from '@migaia/rpc-contract/interfaces'
+import type { IRpcFlowStage } from '../../sdk/flow-pipelines.js'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 import { createRpcError } from '../../host/error-owner.js'
@@ -15,12 +16,12 @@ import type { IRpcIdempotencyClaim, IRpcIdempotencyOutcome, IRpcIdempotencyStore
 
 /** The invocation supplies its original signal, completion and provider continuation. */
 type IIdempotencyExecution = Readonly<{
-  context: IRpcDispatchContext
+  payload: IRpcDispatchPayload
   envelope: IIdempotentEnvelope
   store: IRpcIdempotencyStore
   scope: string
   key: string
-  next(): Promise<IRpcDispatchOutcome>
+  next: Parameters<IRpcFlowStage<'dispatchInbound'>>[1]
 }>
 
 /** Original streams retain only final completion; yields never become an outcome buffer. */
@@ -42,13 +43,14 @@ export class RpcIdempotencyExecution {
   }
 
   /** Claim once, await an existing owner, or replay its actual sealed terminal without executing. */
-  async run(): Promise<IRpcDispatchOutcome> {
+  async run(): Promise<void> {
     /** Capture all business fields before a complete-backing digest can suspend. */
     const fingerprint = invocationFingerprint(this.#input.envelope)
     /** Ordinary fingerprints retain the original synchronous claim point. */
     const prepared = typeof fingerprint === 'string' ? fingerprint : await fingerprint
     while (true) {
-      if (this.#input.context.signal.aborted) throw resolveAbortReason(this.#input.context.signal)
+      if (this.#input.payload.context.signal.aborted)
+        throw resolveAbortReason(this.#input.payload.context.signal)
       /** Only the original bounded store owns correlation, body collision and waiter admission. */
       const claim = this.#input.store.claim(
         this.#input.scope,
@@ -58,25 +60,33 @@ export class RpcIdempotencyExecution {
       )
       if (claim.status === State.full)
         throw createRpcError(RpcCoreErrorCode.overloaded, RpcCoreErrorText.idempotencyStoreFull)
-      if (claim.status === State.done) return this.#replay(claim.outcome)
+      if (claim.status === State.done) {
+        this.#input.payload.outcome.value = this.#replay(claim.outcome)
+        return
+      }
       if (claim.status === State.pending) {
         /** Existing utility cancellation withdraws this observer without cancelling the owner. */
         const outcome = await raceWithAbort(() => claim.outcome, {
-          signals: [this.#input.context.signal],
+          signals: [this.#input.payload.context.signal],
           report: this.#report,
           cleanupPolicy: 'report'
         })
-        if (outcome !== undefined) return this.#replay(outcome)
+        if (outcome !== undefined) {
+          this.#input.payload.outcome.value = this.#replay(outcome)
+          return
+        }
         continue
       }
       this.#claim = claim
-      void this.#input.context.completion.then(this.#settle).catch(this.#report)
+      void this.#input.payload.context.completion.then(this.#settle).catch(this.#report)
       /** Keyed replies retain owned result storage rather than detaching the original provider. */
       const next = this.#input.next
-      const outcome = await next()
-      return outcome.kind === 'value' && outcome.transfer
-        ? { ...outcome, transfer: undefined }
-        : outcome
+      await next(this.#input.payload)
+      /** All native stages observe the same cell, including transfer ownership normalization. */
+      const outcome = this.#input.payload.outcome.value
+      if (outcome.kind === 'value' && outcome.transfer)
+        this.#input.payload.outcome.value = { ...outcome, transfer: undefined }
+      return
     }
   }
 
@@ -128,7 +138,7 @@ export class RpcIdempotencyExecution {
 
   /** The original report callback retains its receiver-independent public callable contract. */
   readonly #report = (error: unknown): void => {
-    const report = this.#input.context.report
+    const report = this.#input.payload.context.report
     report(error)
   }
 }

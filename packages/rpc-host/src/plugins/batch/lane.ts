@@ -48,21 +48,22 @@ export class RpcBatchLane {
     /** This original logical Promise settles only on its own physical write result. */
     const completion = deferred<void>()
     /** Only original write options can carry caller transfer and started authority. */
-    const write = input.context.write
+    const write = input.payload.write
     /** Explicit false means only the held physical lifecycle can cancel this write. */
-    const signal = write?.signal === false ? this.#signal : (write?.signal ?? input.context.signal)
+    const signal =
+      write?.signal === false ? this.#signal : (write?.signal ?? input.payload.context.signal)
     /** Snapshot final codec shape only; neither semantic ids nor business payloads are inspected. */
     const entry: IRpcBatchEntry = {
-      frame: input.frame,
+      payload: input.payload,
       next: input.next,
       write,
       signal,
       bound:
-        input.frame.kind === K.message &&
-        typeof input.frame.data === 'string' &&
-        !input.frame.sidecars?.length &&
+        input.payload.frame.kind === K.message &&
+        typeof input.payload.frame.data === 'string' &&
+        !input.payload.frame.sidecars?.length &&
         !write?.transfer?.length
-          ? RPC_BATCH_FIXED_BYTES + input.frame.data.length * RPC_BATCH_STRING_BYTE_BOUND
+          ? RPC_BATCH_FIXED_BYTES + input.payload.frame.data.length * RPC_BATCH_STRING_BYTE_BOUND
           : Infinity,
       cancelled: false,
       failed: false,
@@ -73,14 +74,21 @@ export class RpcBatchLane {
       reject: completion.reject
     }
     /** Direct Set deletion never scans or copies another member's queued prefix. */
-    const abort = (): void => {
+    const cancel = (reason: unknown): void => {
       if (entry.started || entry.cancelled) return
       entry.cancelled = true
       this.#queued.delete(entry)
       entry.remove()
-      entry.reject(createRpcAbortError(undefined, undefined, entry.signal.reason))
+      entry.reject(reason)
     }
-    entry.remove = () => signal.removeEventListener('abort', abort)
+    /** Native admission can withdraw the same queued member before physical process writing. */
+    const releaseAdmission = write?.admission?.guard?.(cancel)
+    /** Signal and native admission share this entry's original cancellation operation. */
+    const abort = (): void => cancel(createRpcAbortError(undefined, undefined, signal.reason))
+    entry.remove = () => {
+      signal.removeEventListener('abort', abort)
+      releaseAdmission?.()
+    }
     signal.addEventListener('abort', abort, { once: true })
     if (signal.aborted) abort()
     if (!entry.cancelled) {
@@ -137,7 +145,10 @@ export class RpcBatchLane {
   async #single(entry: IRpcBatchEntry): Promise<void> {
     if (entry.cancelled || this.#closed) return
     try {
-      await entry.next(entry.frame, { ...entry.write, onWriteStart: () => this.#start([entry]) })
+      await entry.next({
+        ...entry.payload,
+        write: { ...entry.write, onWriteStart: () => this.#start([entry]) }
+      })
     } catch (error) {
       entry.failed = true
       entry.failure = error
@@ -168,14 +179,24 @@ export class RpcBatchLane {
       return
     }
     try {
-      await survivors[0]!.next(
-        {
+      await survivors[0]!.next({
+        ...survivors[0]!.payload,
+        context: {
+          ...survivors[0]!.payload.context,
+          signal:
+            survivors[0]!.payload.context.connectionSignal ?? survivors[0]!.payload.context.signal
+        },
+        frame: {
           kind: K.extension,
           extension: RpcBatchExtension,
-          data: { frames: survivors.map((entry) => entry.frame) }
+          data: { frames: survivors.map((entry) => entry.payload.frame) }
         },
-        { signal: false, onWriteStart: () => this.#start(survivors) }
-      )
+        write: {
+          admission: survivors[0]!.write?.admission,
+          signal: false,
+          onWriteStart: () => this.#start(survivors)
+        }
+      })
     } catch (error) {
       if (error === RpcBatchAdmissionChanged) {
         /** One bounded fallback handles cancellation during downstream async hooks, without retry. */

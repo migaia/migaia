@@ -24,7 +24,9 @@ import {
   type IRpcDispose,
   type IRpcEnvelopeContext,
   type IRpcFlowContext,
-  type IRpcFrameNext,
+  type IRpcFramePayload,
+  type IRpcFrameWriteOptions,
+  type IRpcPreparedMessage,
   type IRpcPingOptions,
   type IRpcPrivateSession,
   type IRpcSessionSelection,
@@ -74,6 +76,7 @@ import { hostErrorWireMetadata } from '../host/error-wire-metadata.js'
 import { SessionText } from './text.js'
 import { carrierSizeBytes } from '../sdk/wire/probe-content.js'
 import { isRpcCarrierAdmissionFailure } from '../sdk/carrier/admission.js'
+import { RpcFlowPoint } from '../sdk/flow-pipelines.js'
 import type { IRpcSessionOptions, IRpcSessionWriteOptions } from './types.js'
 
 /** A live control record holds settlement only, never a business payload or request facade. */
@@ -534,10 +537,7 @@ export class Session {
       directory
     }
     /** Handshake hooks are installed cold and can attach or validate auth-owned fields. */
-    const selected = normalizeRpcHandshake(
-      await this.#options.flow.handshake(hello, this.#handshakeContext('outbound')),
-      hostErrorWireMetadata
-    )
+    const selected = await this.#transformHandshake(hello, 'outbound')
     if (selected.step !== H.hello) throw createRpcProtocolError(SessionText.handshakeUnexpected)
     this.#assertOpen()
     this.#offer = selected
@@ -556,7 +556,12 @@ export class Session {
       .then(async () => {
         this.#assertOpen()
         if (this.#view)
-          await this.#options.flow.frame(frame, this.#context('inbound'), this.#decode)
+          await this.#options
+            .pipelines()
+            .pipeline(RpcFlowPoint.frameInbound)
+            .run({ frame, context: this.#context('inbound') }, async (payload) =>
+              this.#decode(payload.frame)
+            )
         else await this.#decode(frame)
       })
       .catch((error) => {
@@ -596,9 +601,13 @@ export class Session {
     /** Envelope hooks may reject before native business values become observable. */
     let message: IRpcSemanticFrame | undefined
     try {
-      const prepared = await this.#options.flow.envelope(decoded, envelopeContext)
-      /** Codec restore returns a frame already admitted through the sole pure wire grammar. */
-      message = await envelopeContext.restore(prepared)
+      await this.#options
+        .pipelines()
+        .pipeline(RpcFlowPoint.envelopeInbound)
+        .run({ prepared: decoded, context: envelopeContext }, async (payload) => {
+          /** Codec restore returns a frame admitted through the sole pure wire grammar. */
+          message = await payload.context.restore(payload.prepared)
+        })
     } catch (error) {
       const admitted = operation.admitted
       if (
@@ -664,10 +673,7 @@ export class Session {
   /** Bilateral accepts confirm both admission decisions before either side reports readiness. */
   async #handshake(message: IRpcHandshake): Promise<void> {
     /** Hooks see a pure-admitted handshake before any accepted identity can be indexed. */
-    const remote = normalizeRpcHandshake(
-      await this.#options.flow.handshake(message, this.#handshakeContext('inbound')),
-      hostErrorWireMetadata
-    )
+    const remote = await this.#transformHandshake(message, 'inbound')
     if (remote.step === H.reject) {
       /** Native startup consumes only this received rejection's original restored error. */
       const error = deserializeRpcWireError(remote.error, hostErrorWireMetadata)
@@ -818,10 +824,24 @@ export class Session {
     /** Binary capture occurs once before outbound envelope authentication. */
     const captured = await this.#options.carrier.codec.prepare(message, context)
     /** Auth/schema plugins see prepared metadata outside physical codec execution. */
-    const prepared = await this.#options.flow.envelope(captured, {
-      ...this.#context('outbound', options?.signal),
-      restore: (value) => this.#options.carrier.codec.restore(value, context)
-    })
+    /** Only a native terminal may publish transformed metadata to physical encoding. */
+    let prepared: IRpcPreparedMessage | undefined
+    await this.#options
+      .pipelines()
+      .pipeline(RpcFlowPoint.envelopeOutbound)
+      .run(
+        {
+          prepared: captured,
+          context: {
+            ...this.#context('outbound', options?.signal),
+            restore: (value) => this.#options.carrier.codec.restore(value, context)
+          }
+        },
+        async (payload) => {
+          prepared = payload.prepared
+        }
+      )
+    if (prepared === undefined) return
     /** Encoding owns its original serialization failure; prepare and authentication stay outside. */
     let encoded: IRpcCarrierFrame
     try {
@@ -832,10 +852,14 @@ export class Session {
     }
     this.#media(S.encoded, D.outbound, encoded.data, message, options?.transfer)
     this.#assertOpen()
+    /** A single logical reservation belongs to this whole run, including all native next branches. */
+    const admission = this.#options.carrier.reserveWrite?.(options)
     /** This write borrows the prepared operation's exact options, message and bootstrap boundary. */
-    const writeContext = { options, message, bootstrap }
+    const writeContext = { options: { ...options, admission }, message, bootstrap }
     /** The continuation is the sole physical handoff point, including optional chunk/batch output. */
-    const write: IRpcFrameNext = async (frame, physical = writeContext.options) => {
+    const write = async (payload: IRpcFramePayload): Promise<void> => {
+      /** Replacement frame payloads carry the matching physical options through every branch. */
+      const { frame, write: physical = writeContext.options } = payload
       this.#assertOpen()
       /** A batch may clear only its first logical signal, never the held Session's terminal fence. */
       const signal = physical?.signal === false ? this.#controller.signal : physical?.signal
@@ -849,22 +873,28 @@ export class Session {
           trace: physical?.trace ?? writeContext.options?.trace,
           signal: signal ?? this.#controller.signal,
           transfer: physical?.transfer,
-          onWriteStart: physical?.onWriteStart
+          onWriteStart: physical?.onWriteStart,
+          admission: physical?.admission
         },
         writeContext.bootstrap
       )
     }
-    if (bootstrap) await write(encoded)
-    else
-      await this.#options.flow.frame(
-        encoded,
-        {
+    try {
+      /** Each physical descendant borrows the same reservation without releasing it early. */
+      const physical: IRpcFrameWriteOptions = writeContext.options
+      const payload: IRpcFramePayload = {
+        frame: encoded,
+        context: {
           ...this.#context('outbound', options?.signal),
-          connectionSignal: this.#controller.signal,
-          write: options
+          connectionSignal: this.#controller.signal
         },
-        write
-      )
+        write: physical
+      }
+      if (bootstrap) await write(payload)
+      else await this.#options.pipelines().pipeline(RpcFlowPoint.frameOutbound).run(payload, write)
+    } finally {
+      admission?.release()
+    }
     if (message.kind === K.control)
       this.#observe({
         ...rpcProbeEnvelopeFacts(message),
@@ -1039,7 +1069,7 @@ export class Session {
   /** Outbound accept/reject hooks use the same bootstrap codec without a second agreement layer. */
   async #writeHandshake(message: IRpcHandshake): Promise<void> {
     /** Actual handshake plugins may attach rejection/auth data before semantic encoding. */
-    const prepared = await this.#options.flow.handshake(message, this.#handshakeContext('outbound'))
+    const prepared = await this.#transformHandshake(message, 'outbound')
     this.#assertOpen()
     const selected = normalizeRpcHandshake(
       prepared.step === H.pending
@@ -1048,6 +1078,24 @@ export class Session {
       hostErrorWireMetadata
     )
     await this.#encode(selected, undefined, true)
+  }
+
+  /** Captures only the native terminal's transformed handshake before pure grammar admission. */
+  async #transformHandshake(
+    handshake: IRpcHandshake,
+    direction: IRpcFlowContext['direction']
+  ): Promise<IRpcHandshake> {
+    /** A swallowed continuation has no admitted handshake to publish or encode. */
+    let selected: IRpcHandshake | undefined
+    await this.#options
+      .pipelines()
+      .pipeline(
+        direction === 'outbound' ? RpcFlowPoint.handshakeOutbound : RpcFlowPoint.handshakeInbound
+      )
+      .run({ handshake, context: this.#handshakeContext(direction) }, async (payload) => {
+        selected = payload.handshake
+      })
+    return normalizeRpcHandshake(selected, hostErrorWireMetadata)
   }
 
   /** Register control correlation before sending so a synchronous remote pong cannot be lost. */

@@ -44,6 +44,8 @@ class RpcMessageCarrier implements IRpcCarrier {
   readonly nativeBinary: boolean
   /** The four executing media stages are held by this same physical resource. */
   readonly codec
+  /** Native logical capacity remains owned by the original process feature. */
+  readonly reserveWrite: IRpcCarrier['reserveWrite']
   /** Original native resource and error policy are captured without a legacy adapter wrapper. */
   readonly #options: IRpcMessageCarrierOptions
   /** Only Session's current receiver may observe frames or terminal delivery. */
@@ -70,6 +72,7 @@ class RpcMessageCarrier implements IRpcCarrier {
     this.id = options.id
     this.nativeBinary = options.nativeBinary ?? false
     this.codec = options.codec ?? new RpcJsonCarrierCodec({ digest: options.digest })
+    this.reserveWrite = options.reserveWrite
     try {
       this.#removers.push(options.io.onMessage(this.#receive))
       this.#removers.push(options.io.onClose(this.#ended))

@@ -28,7 +28,7 @@ function setupDevtools(
     () => context.self!().instanceId,
     context.report
   )
-  return { hooks: { observe: emitter.observe }, dispose: () => emitter.dispose() }
+  return { observe: emitter.observe, dispose: () => emitter.dispose() }
 }
 
 /** Construct one original collector and publish its methods on the actual frozen native definition. */

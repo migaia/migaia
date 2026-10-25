@@ -1,4 +1,5 @@
 import { expect, it, vi } from 'vitest'
+import { defineHost, definePlugin } from '@migaia/plugin-host'
 import { deferred, type IAbortSignal } from '@migaia/utils/promise'
 import type { IRpcEnvelopeContext, IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
 import type { IRpcEnvelope, IRpcHello } from '@migaia/rpc-contract/protocol'
@@ -7,7 +8,8 @@ import { auth, type IRpcAuthenticationOptions } from '../../../dist/plugins/auth
 import { setAuthenticationReplayCounter } from '../../../dist/plugins/auth/counter.js'
 import { readRpcDefinition } from '../../../dist/sdk/metadata.js'
 import { RpcJsonCarrierCodec } from '../../../dist/sdk/carrier/json-codec.js'
-import { FlowPipeline } from '../../../dist/flow/pipeline.js'
+import { FlowRegistry } from '../../../dist/flow/registry.js'
+import { RpcFlowPipelines, RpcFlowPoint } from '../../../dist/sdk/flow-pipelines.js'
 
 /** Original correlations and own-key order are ordinary semantic fixtures, not another codec. */
 function message(id: string, payload: unknown = id): IRpcEnvelope {
@@ -34,7 +36,7 @@ function message(id: string, payload: unknown = id): IRpcEnvelope {
   }
 }
 
-/** Exercise genuine native setup, FlowPipeline and executing codec rather than a legacy capability. */
+/** Exercise genuine native setup, named pipelines and the actual executing codec. */
 async function fixture(options: IRpcAuthenticationOptions, nativeBinary = false) {
   /** The real public factory captures original callback identity and paired-transform validation. */
   const metadata = readRpcDefinition(auth(options))
@@ -70,16 +72,25 @@ async function fixture(options: IRpcAuthenticationOptions, nativeBinary = false)
     retire: async () => undefined,
     call: async () => undefined
   })
-  /** The fixed real hook runner supplies actual direction and original prepared objects. */
-  const flow = new FlowPipeline((error) => {
+  /** Native plugin-host alone owns actual stage execution and immutable snapshots. */
+  const flow = defineHost({
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } },
+    pipelines: RpcFlowPipelines
+  })
+  /** Production registration attaches the authentic setup's stages to this native install core. */
+  const registry = new FlowRegistry((error) => {
     reports.push(error)
   })
-  flow.register({
-    name: metadata.definition.name,
-    namespaces: metadata.definition.namespaces,
-    ...installation
-  })
-  flow.start()
+  await flow.use(
+    definePlugin({
+      name: metadata.definition.name,
+      install(core) {
+        registry.register(core, metadata.definition, installation)
+        return {}
+      }
+    })
+  )
+  registry.start()
   /** Physical facts and the exact codec operation are explicit inputs to tiny fixture callbacks. */
   const ports = { source, reports, codec, codecContext }
   /** The required restore port is the actual codec, never a successful admission stub. */
@@ -101,27 +112,33 @@ async function fixture(options: IRpcAuthenticationOptions, nativeBinary = false)
   /** The fixture owns its actual executing path rather than several shared callback captures. */
   const path = { codec, flow, codecContext, context }
   /** One ordinary outbound path runs prepare, hooks and encode with original identities. */
-  const send = async (value: IRpcEnvelope): Promise<IRpcCarrierFrame> =>
-    path.codec.encode(
-      await path.flow.envelope(
-        await path.codec.prepare(value, path.codecContext),
-        path.context('outbound')
-      ),
-      path.codecContext
+  const send = async (value: IRpcEnvelope): Promise<IRpcCarrierFrame> => {
+    /** Native terminal returns the actual transformed prepared identity to the codec owner. */
+    const prepared = await path.flow.pipeline(RpcFlowPoint.envelopeOutbound).run(
+      {
+        prepared: await path.codec.prepare(value, path.codecContext),
+        context: path.context('outbound')
+      },
+      async (payload) => payload.prepared
     )
+    return path.codec.encode(prepared!, path.codecContext)
+  }
   /** One ordinary receive path runs decode, hooks and the same cached final restore. */
   const receive = async (
     value: IRpcCarrierFrame,
     signal = path.context('inbound').signal,
     id = 'source'
-  ) =>
-    path.codec.restore(
-      await path.flow.envelope(
-        path.codec.decode(value, path.codecContext),
-        path.context('inbound', signal, id)
-      ),
-      path.codecContext
+  ) => {
+    /** Restoration receives the same forwarded prepared object used by authentication. */
+    const prepared = await path.flow.pipeline(RpcFlowPoint.envelopeInbound).run(
+      {
+        prepared: path.codec.decode(value, path.codecContext),
+        context: path.context('inbound', signal, id)
+      },
+      async (payload) => payload.prepared
     )
+    return path.codec.restore(prepared!, path.codecContext)
+  }
 
   return {
     source,
@@ -172,7 +189,7 @@ it('preserves default JSON text, encrypt-before-sign, verify-before-decrypt and 
   expect(calls).toEqual(['encrypt', 'sign', 'verify', 'decrypt'])
   expect(categories).toEqual(['string'])
   await f.installation.dispose?.()
-  f.flow.close()
+  await f.flow.dispose()
 })
 
 it.each(['string', 'uint8array'] as const)(
@@ -197,7 +214,7 @@ it.each(['string', 'uint8array'] as const)(
     expect(await f.receive(await f.send(original))).toEqual(original)
     expect(categories).toEqual([encodedType, encodedType])
     await f.installation.dispose?.()
-    f.flow.close()
+    await f.flow.dispose()
   }
 )
 
@@ -222,7 +239,7 @@ it('retains the original 64-slot window, concurrent single commit and physical-s
   expect(concurrent.map((entry) => entry.status).sort()).toEqual(['fulfilled', 'rejected'])
   sibling.abort()
   await f.installation.dispose?.()
-  f.flow.close()
+  await f.flow.dispose()
 })
 
 it('finishes original native integrity before replay commit and reuses the exact cached restore Promise', async () => {
@@ -244,7 +261,7 @@ it('finishes original native integrity before replay commit and reuses the exact
   expect(await f.receive(packet)).toMatchObject({ id: 'binary', payload: new Uint8Array([2, 3]) })
   expect(f.hashes.count).toBe(3)
   await f.installation.dispose?.()
-  f.flow.close()
+  await f.flow.dispose()
 })
 
 it('rejects verification after physical retirement and preserves custom verification failure cause', async () => {
@@ -272,7 +289,7 @@ it('rejects verification after physical retirement and preserves custom verifica
   wait.resolve()
   expect(await pending).toMatchObject({ code: 'AUTHENTICATION_FAILED' })
   await f.installation.dispose?.()
-  f.flow.close()
+  await f.flow.dispose()
   /**
    * A native user callback error is preserved unless the separate credential-redaction rule
    * applies.
@@ -290,7 +307,7 @@ it('rejects verification after physical retirement and preserves custom verifica
     cause
   })
   await bad.installation.dispose?.()
-  bad.flow.close()
+  await bad.flow.dispose()
 })
 
 it('retains the last uint64 allocation and sanitizes actual handshake verifier credentials', async () => {
@@ -304,7 +321,7 @@ it('retains the last uint64 allocation and sanitizes actual handshake verifier c
     message: 'Authentication replay counter is exhausted'
   })
   await f.installation.dispose?.()
-  f.flow.close()
+  await f.flow.dispose()
   /** A real native credential callback is independent from the optional frame protection policy. */
   const secret = 'fixture-private-token'
   /** User verifier errors may contain credentials and must not enter cause/report paths. */
@@ -333,19 +350,28 @@ it('retains the last uint64 allocation and sanitizes actual handshake verifier c
       methods: []
     }
   } as IRpcHello
-  /** Outbound and inbound use the same actual native FlowPipeline handshake owner. */
-  const offered = await credentials.flow.handshake(hello, credentials.context('outbound'))
+  /** Outbound and inbound run the corresponding native handshake declarations. */
+  const offered = await credentials.flow
+    .pipeline(RpcFlowPoint.handshakeOutbound)
+    .run(
+      { handshake: hello, context: credentials.context('outbound') },
+      async (payload) => payload.handshake
+    )
   expect(offered).toMatchObject({ auth: secret })
   /** The sanitized rejection deliberately withholds the original secret-bearing native exception. */
   const rejected = await credentials.flow
-    .handshake(offered, credentials.context('inbound'))
+    .pipeline(RpcFlowPoint.handshakeInbound)
+    .run(
+      { handshake: offered!, context: credentials.context('inbound') },
+      async (payload) => payload.handshake
+    )
     .catch((error: unknown) => error)
   expect(rejected).toMatchObject({ code: 'AUTHENTICATION_FAILED' })
   expect((rejected as Error).cause).toBeUndefined()
   expect(String(rejected)).not.toContain(secret)
   expect(credentials.reports).toEqual([])
   await credentials.installation.dispose?.()
-  credentials.flow.close()
+  await credentials.flow.dispose()
   /** Native credential resolution keeps independent carrier tokens without inspecting wire identity. */
   const verify = vi.fn()
   /** The same actual optional flow resolves both native sources through its fixed handshake hook. */
@@ -359,23 +385,39 @@ it('retains the last uint64 allocation and sanitizes actual handshake verifier c
   /** Exact original context identity is also lent to the inbound native verifier. */
   const sourceOne = perSource.context('inbound', undefined, 'source-one')
   expect(
-    await perSource.flow.handshake(hello, perSource.context('outbound', undefined, 'source-one'))
+    await perSource.flow
+      .pipeline(RpcFlowPoint.handshakeOutbound)
+      .run(
+        { handshake: hello, context: perSource.context('outbound', undefined, 'source-one') },
+        async (payload) => payload.handshake
+      )
   ).toMatchObject({ auth: 'source-one' })
   expect(
-    await perSource.flow.handshake(hello, perSource.context('outbound', undefined, 'source-two'))
+    await perSource.flow
+      .pipeline(RpcFlowPoint.handshakeOutbound)
+      .run(
+        { handshake: hello, context: perSource.context('outbound', undefined, 'source-two') },
+        async (payload) => payload.handshake
+      )
   ).toMatchObject({ auth: 'source-two' })
-  await perSource.flow.handshake(hello, sourceOne)
+  await perSource.flow
+    .pipeline(RpcFlowPoint.handshakeInbound)
+    .run({ handshake: hello, context: sourceOne }, async (payload) => payload.handshake)
   expect(verify.mock.calls[0]?.[2]).toBe(sourceOne)
   /** Resolver failures follow the same privacy boundary as native credential verification. */
   const resolverFailure = await perSource.flow
-    .handshake(hello, perSource.context('outbound', undefined, 'failed-source'))
+    .pipeline(RpcFlowPoint.handshakeOutbound)
+    .run(
+      { handshake: hello, context: perSource.context('outbound', undefined, 'failed-source') },
+      async (payload) => payload.handshake
+    )
     .catch((error: unknown) => error)
   expect(resolverFailure).toMatchObject({ code: 'AUTHENTICATION_FAILED' })
   expect((resolverFailure as Error).cause).toBeUndefined()
   expect(String(resolverFailure)).not.toContain(secret)
   expect(perSource.reports).toEqual([])
   await perSource.installation.dispose?.()
-  perSource.flow.close()
+  await perSource.flow.dispose()
 })
 
 it.each([
@@ -413,7 +455,7 @@ it('fails closed for absent/throwing secure entropy while preserving the origina
   } finally {
     vi.unstubAllGlobals()
     await missing.installation.dispose?.()
-    missing.flow.close()
+    await missing.flow.dispose()
   }
   /**
    * This exact native failure must remain reachable, with its original stack, rather than weak
@@ -437,6 +479,6 @@ it('fails closed for absent/throwing secure entropy while preserving the origina
   } finally {
     vi.unstubAllGlobals()
     await throwing.installation.dispose?.()
-    throwing.flow.close()
+    await throwing.flow.dispose()
   }
 })

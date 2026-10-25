@@ -12,12 +12,11 @@ import type {
 } from '@migaia/rpc-contract/protocol'
 import type {
   IRpcCarrierWriteOptions,
-  IRpcDispatchContext,
-  IRpcDispatchOutcome,
   IRpcFlowContext,
   IRpcObservation,
   IRpcTargetSource
 } from '@migaia/rpc-contract/interfaces'
+import type { IRpcPipelineOwner } from '../sdk/flow-pipelines.js'
 import type {
   IRpcProviderDeclaration,
   IRpcProviderMethodDeclaration
@@ -159,10 +158,8 @@ export type IProviderDispatcherOptions = Readonly<{
     options?: IRpcCarrierWriteOptions,
     source?: IRpcTargetSource
   ): Promise<void>
-  dispatch(
-    context: IRpcDispatchContext,
-    next: () => Promise<IRpcDispatchOutcome>
-  ): Promise<IRpcDispatchOutcome>
+  /** The provider terminal runs inside this Host's genuine dispatchInbound pipeline. */
+  pipelines(): IRpcPipelineOwner
   notify(
     namespace: string,
     input: Readonly<{ id?: string; method: string; data: unknown }>,

@@ -17,6 +17,9 @@ export const HostErrorText = {
   featureCombinationConflict: 'RPC plugin installs the same call feature kind more than once',
   /** Fixed flow hooks cannot be changed after transport startup. */
   flowStarted: 'RPC flow hooks cannot be installed after transport startup',
+  /** Native SDK installations require declarations and execution authority from their actual host. */
+  nativePipelinesRequired:
+    'RPC native host must declare RpcFlowPipelines and lend its pipeline owner',
   /** Synchronous admission requires one transport before any resource opens. */
   transportMissing: 'RPC host requires one transport plugin',
   /** Only the exact SDK-created plugin object carries registration identity. */

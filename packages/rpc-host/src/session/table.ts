@@ -334,6 +334,7 @@ export class SessionTable {
       sessionId: facts?.sessionId,
       isExclusive: facts?.isExclusive,
       flow: this.#options.flow,
+      pipelines: this.#options.pipelines,
       self: this.#options.self,
       directory: () => this.#options.directory(namespace),
       track: (promise) => this.#draining.track(carrier.id, promise),

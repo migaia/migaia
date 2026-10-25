@@ -1,10 +1,13 @@
 import { expect, it } from 'vitest'
+import { defineHost, definePlugin } from '@migaia/plugin-host'
 import type { IRpcDispatchContext } from '@migaia/rpc-contract/interfaces'
+import { RpcDispatchDrop } from '@migaia/rpc-contract/interfaces'
 import type { IRpcEnvelope, IRpcOutcome } from '@migaia/rpc-contract/protocol'
 import { RpcWireProfile } from '@migaia/rpc-contract/protocol'
 import { idempotency, createRpcIdempotencyStore } from '../../../dist/plugins/idempotency/index.js'
 import { readRpcDefinition } from '../../../dist/sdk/metadata.js'
-import { FlowPipeline } from '../../../dist/flow/pipeline.js'
+import { FlowRegistry } from '../../../dist/flow/registry.js'
+import { RpcFlowPipelines, RpcFlowPoint } from '../../../dist/sdk/flow-pipelines.js'
 
 it('actual optional idempotency dispatch observes sealed outcome and publishes only the native namespace lookup', async () => {
   /** The original store owns the only claim/seal/retention records. */
@@ -34,13 +37,22 @@ it('actual optional idempotency dispatch observes sealed outcome and publishes o
     }
   })
   /** Query dispatch uses the actual fixed slot, without executing another provider or claim path. */
-  const flow = new FlowPipeline(() => undefined)
-  flow.register({
-    name: metadata.definition.name,
-    namespaces: metadata.definition.namespaces,
-    ...installation
+  const flow = defineHost({
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } },
+    pipelines: RpcFlowPipelines
   })
-  flow.start()
+  /** Production registration borrows this genuine native install core and its generation. */
+  const registry = new FlowRegistry(() => undefined)
+  await flow.use(
+    definePlugin({
+      name: metadata.definition.name,
+      install(core) {
+        registry.register(core, metadata.definition, installation)
+        return {}
+      }
+    })
+  )
+  registry.start()
   /** This selected generation was already admitted by the real Dispatcher before plugin dispatch. */
   const generation = { kind: 'session', value: 1, providerId: 'target-provider' } as const
   /**
@@ -97,11 +109,16 @@ it('actual optional idempotency dispatch observes sealed outcome and publishes o
   /** Count only the actual fallback, not an invented provider registry. */
   let fallbacks = 0
   /** The installed owner must short-circuit before the ordinary unsupported/provider terminal. */
-  const result = await flow.dispatch(context, async () => {
-    fallbacks += 1
-    return { kind: 'value', value: 'unexpected-provider' }
-  })
-  expect(result).toEqual({
+  const result = {
+    value: RpcDispatchDrop as import('@migaia/rpc-contract/interfaces').IRpcDispatchOutcome
+  }
+  await flow
+    .pipeline(RpcFlowPoint.dispatchInbound)
+    .run({ context, outcome: result }, async (payload) => {
+      fallbacks += 1
+      payload.outcome.value = { kind: 'value', value: 'unexpected-provider' }
+    })
+  expect(result.value).toEqual({
     kind: 'value',
     value: {
       state: 'done',
@@ -124,13 +141,13 @@ it('actual optional idempotency dispatch observes sealed outcome and publishes o
     }
   ])
   /** Existing scope compilation prevents this owner from adding query behavior to another namespace. */
-  expect(
-    await flow.dispatch({ ...context, namespace: 'other' }, async () => ({
-      kind: 'value',
-      value: 'other'
-    }))
-  ).toEqual({ kind: 'value', value: 'other' })
+  await flow
+    .pipeline(RpcFlowPoint.dispatchInbound)
+    .run({ context: { ...context, namespace: 'other' }, outcome: result }, async (payload) => {
+      payload.outcome.value = { kind: 'value', value: 'other' }
+    })
+  expect(result.value).toEqual({ kind: 'value', value: 'other' })
   await installation.dispose?.()
   await installation.dispose?.()
-  flow.close()
+  await flow.dispose()
 })

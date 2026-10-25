@@ -4,6 +4,13 @@
  */
 export { defineTransportPlugin, defineFlowPlugin, defineLinkPolicy } from './define.js'
 export type * from './types.js'
+export { RpcFlowPoint, RpcFlowPipelines, rpcPipelineOwner } from './flow-pipelines.js'
+export type {
+  IRpcFlowStage,
+  IRpcFlowStages,
+  IRpcPipelineOwner,
+  IRpcNativePipelineCore
+} from './flow-pipelines.js'
 export type * from '@migaia/rpc-contract/interfaces'
 export { HostObservationKind, RpcProtocolEvent } from '../host/state-constants.js'
 

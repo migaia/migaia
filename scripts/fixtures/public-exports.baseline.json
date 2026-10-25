@@ -608,6 +608,8 @@
         "RpcBytePump",
         "RpcCarrierObservation",
         "RpcEventByteIO",
+        "RpcFlowPipelines",
+        "RpcFlowPoint",
         "RpcJsonCarrierCodec",
         "RpcMemberConnectionDirection",
         "RpcMemberEventName",
@@ -657,6 +659,7 @@
         "rpcMemberMetric",
         "rpcMemberResources",
         "rpcMemberUnavailable",
+        "rpcPipelineOwner",
         "splitRpcPreparedMetadata",
         "withRpcLaunchFacts"
       ],

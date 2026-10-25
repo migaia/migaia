@@ -8,14 +8,12 @@ import type {
   IRpcTargetSource
 } from '@migaia/rpc-contract/interfaces'
 import type { IRpcDirectory, IRpcEnvelope, IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
-import type { FlowPipeline } from '../flow/pipeline.js'
+import type { FlowRegistry } from '../flow/registry.js'
+import type { IRpcPipelineOwner } from '../sdk/flow-pipelines.js'
 
 /** Only these flow operations participate in carrier preparation and session negotiation. */
-export type IRpcSessionFlow = Pick<
-  FlowPipeline,
-  'handshake' | 'envelope' | 'frame' | 'extensions' | 'requiredExtensions'
-> &
-  Partial<Pick<FlowPipeline, 'observe' | 'observationFacts' | 'observing'>>
+export type IRpcSessionFlow = Pick<FlowRegistry, 'extensions' | 'requiredExtensions'> &
+  Partial<Pick<FlowRegistry, 'observe' | 'observationFacts' | 'observing'>>
 
 /** A native registration holds only this opaque table-owned publication token. */
 export type IRpcSessionScope = Readonly<object>
@@ -27,6 +25,8 @@ export type IRpcSessionWriteOptions = IRpcCarrierWriteOptions &
 /** Global identity and business work remain separate from physical connection ownership. */
 export type IRpcSessionTableOptions = Readonly<{
   flow: IRpcSessionFlow
+  /** Execution authority is borrowed only after the one native Host has been constructed. */
+  pipelines(): IRpcPipelineOwner
   self(): IRpcDirectory['self']
   directory(namespace: string): IRpcDirectory
   admitSourceFacts?(facts: IRpcLocalSourceFacts): void
@@ -84,6 +84,8 @@ export type IRpcSessionOptions = Readonly<{
   track<T>(promise: Promise<T>): Promise<T>
   draining(remainingMs: number, announce: (remainingMs: number) => Promise<void>): Promise<void>
   flow: IRpcSessionFlow
+  /** The receiving Host lends its genuine named pipeline owner; Session has no runner. */
+  pipelines(): IRpcPipelineOwner
   self(): IRpcDirectory['self']
   directory(): IRpcDirectory
   admit(

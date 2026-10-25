@@ -63,6 +63,7 @@ import { ProviderContext } from './context.js'
 import { callTarget } from '../call/target.js'
 import { readProviderCommitGate, readProviderPreflight } from './catalog.js'
 import { completeProviderReturn } from './return.js'
+import { RpcFlowPoint } from '../sdk/flow-pipelines.js'
 import type { IProviderOrderReceipt, ProviderOrdering } from './ordering.js'
 import type {
   IProviderCommitGate,
@@ -228,17 +229,29 @@ export class ProviderInvocation {
     try {
       if (this.#input.admission) throw this.#input.admission.error
       /** Plugins may replay without calling next; completion still belongs to this operation. */
-      const outcome = await this.#input.ports.dispatch(
-        {
-          ...this.#input.source,
-          signal: this.signal,
-          connectionSignal: this.#input.source.signal,
-          envelope: this.#input.envelope,
-          completion: this.completion,
-          started: () => this.#started
-        },
-        () => this.#executeOrdered()
-      )
+      /** Replay and the actual provider share one explicit result cell under native void-next. */
+      const result: { value: IRpcDispatchOutcome } = { value: RpcDispatchDrop }
+      await this.#input.ports
+        .pipelines()
+        .pipeline(RpcFlowPoint.dispatchInbound)
+        .run(
+          {
+            context: {
+              ...this.#input.source,
+              signal: this.signal,
+              connectionSignal: this.#input.source.signal,
+              envelope: this.#input.envelope,
+              completion: this.completion,
+              started: () => this.#started
+            },
+            outcome: result
+          },
+          async (payload) => {
+            payload.outcome.value = await this.#executeOrdered()
+          }
+        )
+      /** Omitted continuation leaves an admitted local drop, never an invented provider result. */
+      const outcome = result.value
       if (outcome.kind === RpcDispatchDrop.kind) return
       if (outcome.kind === 'stream') {
         if (this.#forwarded) await this.#input.ports.streams.prepare(outcome.value)

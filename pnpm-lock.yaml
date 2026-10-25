@@ -433,9 +433,6 @@ importers:
       '@migaia/capability':
         specifier: workspace:^
         version: link:../capability
-      '@migaia/middleware-pipeline':
-        specifier: workspace:^
-        version: link:../middleware-pipeline
       '@types/node':
         specifier: 24.13.2
         version: 24.13.2

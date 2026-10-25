@@ -34,7 +34,7 @@ function setupProbe(
     () => self().instanceId,
     context.report
   )
-  return { hooks: { observe: emitter.observe }, dispose: () => emitter.dispose() }
+  return { observe: emitter.observe, dispose: () => emitter.dispose() }
 }
 
 /** Install real readonly observation; each receiving host owns an independent emitter. */

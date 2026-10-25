@@ -36,17 +36,14 @@ import type { ProviderRegistration } from '../dispatch/registration.js'
 import type { IRpcProvide, IRpcProvideOptions } from '../dispatch/types.js'
 import { createProviderCommitGate, exposedProvide } from '../dispatch/exposure.js'
 import { FeatureScope } from '../feature/scope.js'
-import { FlowPipeline } from '../flow/pipeline.js'
+import { FlowRegistry } from '../flow/registry.js'
 import { Forwarder } from '../forward/forwarder.js'
 import { Namespace } from '../namespace/namespace.js'
 import { SessionTable } from '../session/table.js'
 import type { IRpcSessionScope, IRpcSessionWriteOptions } from '../session/types.js'
 import { StreamChannel } from '../stream/channel.js'
-import type {
-  IRpcFlowInstallation,
-  IRpcHostPlugin,
-  IRpcTransportSetupContext
-} from '../sdk/types.js'
+import type { IRpcHostPlugin, IRpcTransportSetupContext } from '../sdk/types.js'
+import { RpcFlowPipelines, type IRpcPipelineOwner } from '../sdk/flow-pipelines.js'
 import type { IRpcDefinitionMetadata } from '../sdk/metadata.js'
 import { HostIdentity, defaultRpcId } from './identity.js'
 import {
@@ -95,11 +92,6 @@ type ITransportRegistration = {
   provider: ProviderRegistration
   surface?: Record<PropertyKey, unknown>
 }
-/** Flow extensions are cold installation contributions projected only by the native namespace slot. */
-type IFlowExtension = Readonly<{
-  namespaces?: ReadonlySet<string>
-  create: NonNullable<IRpcFlowInstallation['namespaceExtensions']>
-}>
 /** Only these native lifetime operations are borrowed by the RPC close owner. */
 type INativeHost = Readonly<{
   dispose(): Promise<Readonly<{ cleanupErrors: readonly unknown[] }>>
@@ -122,6 +114,8 @@ export class RpcHost {
    * host.
    */
   #native: INativeHost | undefined
+  /** The genuine native owner lends execution authority separately from plugin registration. */
+  #pipelineOwner: IRpcPipelineOwner | undefined
   /** Each unique namespace owns its registration resources and public method projection. */
   readonly #namespaces = new Map<string, ITransportRegistration>()
   /** Candidate registrations reserve names without replacing the currently committed namespace. */
@@ -129,7 +123,7 @@ export class RpcHost {
   /** Each native shared facade retains its last committed surface for held lifecycle operations. */
   readonly #publications = new WeakMap<object, { surface: Record<PropertyKey, unknown> }>()
   /** Fixed flow composition has no concrete optional implementations. */
-  readonly #flow: FlowPipeline
+  readonly #flow: FlowRegistry
   /** Call feature precedence is compiled once per namespace. */
   readonly #features = new FeatureScope()
   /** The only physical/accepted session registry. */
@@ -142,8 +136,6 @@ export class RpcHost {
   readonly #forwarder: Forwarder
   /** The only local provider catalog and actual business execution owner. */
   readonly #providers: ProviderDispatcher
-  /** Installed namespace extension factories carry no access to mutable RPC work tables. */
-  readonly #extensions = new Map<IRpcFlowInstallation, IFlowExtension>()
   /** Only failed first startup may reopen cold hooks; committed traffic permanently fixes order. */
   #everCommittedTransport = false
   /** The external signal receipt is removed at global close. */
@@ -157,16 +149,19 @@ export class RpcHost {
   constructor(
     options: IRpcRuntimeOptions,
     nodeId = defaultRpcId().replace(/-/gu, ''),
-    configuredSelf = options.self !== undefined
+    configuredSelf = options.self !== undefined,
+    pipelineOwner?: IRpcPipelineOwner
   ) {
     this.#identity = new HostIdentity(options.self, configuredSelf)
     this.#nodeId = nodeId
     this.#configuredReport = options.report
     this.#reporter = this.#configuredReport ?? defaultRpcReporter
     this.#externalSignal = options.signal
-    this.#flow = new FlowPipeline(this.#report)
+    this.#pipelineOwner = pipelineOwner
+    this.#flow = new FlowRegistry(this.#report)
     this.#sessions = new SessionTable({
       flow: this.#flow,
+      pipelines: () => this.#pipelineOwner!,
       self: () => this.#identity.directorySelf,
       directory: (namespace) => this.#directory(namespace),
       admitSourceFacts: (facts) => this.#identity.admit(facts),
@@ -216,7 +211,7 @@ export class RpcHost {
     this.#providers = new ProviderDispatcher({
       ...work,
       calls: this.#calls,
-      dispatch: (context, next) => this.#flow.dispatch(context, next),
+      pipelines: () => this.#pipelineOwner!,
       notify: async (namespace, input, signal, excludePeerId) =>
         this.#namespace(namespace).notifyFrom(input, signal, excludePeerId),
       forward: this.#forwarder,
@@ -252,6 +247,7 @@ export class RpcHost {
     const publicContext = { owner: this }
     /** The surface borrows this explicit owner; no root RPC invocation methods are exposed. */
     const native = defineHost({
+      pipelines: RpcFlowPipelines,
       host: {
         identity: { name: this.self.name },
         execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
@@ -267,6 +263,7 @@ export class RpcHost {
       domainCore: () => ({ [rpcInstallationOwner]: this })
     })
     this.#native = native
+    this.#pipelineOwner = native
     try {
       await native.use(...plugins)
       /**
@@ -302,25 +299,7 @@ export class RpcHost {
       observe: this.#flow.observe,
       retire: (carrierId, reason) => this.#sessions.detach(carrierId, reason)
     })
-    /** One native receipt withdraws exactly this installation on rollback or ordinary unUse. */
-    const registration = { owner: this, installed, withdraw: undefined as (() => void) | undefined }
-    core.onDispose(() => {
-      registration.withdraw?.()
-      registration.owner.#extensions.delete(registration.installed)
-    })
-    registration.withdraw = this.#flow.register({
-      ...installed,
-      name: metadata.definition.name,
-      namespaces: metadata.definition.namespaces
-    })
-    if (installed.namespaceExtensions)
-      this.#extensions.set(installed, {
-        namespaces:
-          metadata.definition.namespaces === undefined
-            ? undefined
-            : new Set(metadata.definition.namespaces),
-        create: installed.namespaceExtensions
-      })
+    this.#flow.register(core, metadata.definition, installed)
   }
 
   /** Global close seals admission, joins native origin drains, then retires physical work. */
@@ -713,9 +692,7 @@ export class RpcHost {
     const surface: Record<PropertyKey, unknown> = {}
     for (const key of reservedMethods)
       surface[key] = key === Symbol.asyncDispose ? namespace.close : Reflect.get(namespace, key)
-    for (const extension of this.#extensions.values())
-      if (!extension.namespaces || extension.namespaces.has(name))
-        this.#extend(surface, extension.create(name))
+    for (const extension of this.#flow.namespaceExtensions(name)) this.#extend(surface, extension)
     if (transportExtensions)
       this.#extend(surface, transportExtensions as Readonly<Record<string, unknown>>)
     return Object.freeze(surface)
@@ -822,7 +799,6 @@ export class RpcHost {
     this.#forwarder.close()
     this.#features.close()
     this.#flow.close()
-    this.#extensions.clear()
     if (failures.length)
       throw createRpcLifecycleError(
         RpcCoreErrorText.endpointDisposed,

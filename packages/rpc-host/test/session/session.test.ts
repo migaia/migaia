@@ -8,6 +8,8 @@ import { createProbeEmitter } from '../../dist/plugins/probe/emitter.js'
 import { MemoryCarrier } from '../fixtures/core-carrier.js'
 import { describe, expect, it, vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
+import { defineHost, definePlugin, type IPluginHostCore } from '@migaia/plugin-host'
+import { RpcFlowPipelines, type IRpcFlowInstallation } from '@migaia/rpc-host/sdk'
 import { TOKEN, leaks } from '../../../rpc-contract/test/fixtures/handshake-privacy.js'
 
 import {
@@ -17,7 +19,7 @@ import {
 } from '@migaia/rpc-contract/protocol'
 import { RpcCoreErrorCode, RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
 import { SessionTable } from '../../dist/session/table.js'
-import { FlowPipeline } from '../../dist/flow/pipeline.js'
+import { FlowRegistry } from '../../dist/flow/registry.js'
 import type { IRpcSessionTableOptions } from '../../dist/session/types.js'
 
 /** One bounded host fixture owns the actual SessionTable and its narrow work callbacks. */
@@ -37,16 +39,30 @@ class Host {
   constructor(
     id: string,
     name = id,
-    configure?: (flow: FlowPipeline) => void,
+    installed: IRpcFlowInstallation<object> = {},
     options?: Pick<IRpcSessionTableOptions, 'scheduler' | 'handshakeTimeoutMs'>
   ) {
     this.directory = directory(id, name)
-    /** Flow composition is production code rather than a handwritten forwarding facade. */
-    const flow = new FlowPipeline(this.report)
-    configure?.(flow)
+    /** Native construction declares the same seven payload/mode specifications as the real Host. */
+    const native = defineHost({
+      pipelines: RpcFlowPipelines,
+      host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+    })
+    /** Facts and stages are registered from the actual installing native core, never a fake core. */
+    const flow = new FlowRegistry(this.report)
+    native.useSync(
+      definePlugin({
+        name: 'session-flow',
+        install(core: IPluginHostCore) {
+          flow.register(core, { name: 'session-flow', setup: () => installed }, installed)
+          return {}
+        }
+      })
+    )
     flow.start()
     this.table = new SessionTable({
       flow,
+      pipelines: () => native,
       self: () => this.directory.self,
       directory: () => this.directory,
       receive: this.receive,
@@ -123,39 +139,27 @@ describe('C2 Session and SessionTable owners', () => {
     /** Inbound trace belongs to the physical restoring carrier. */
     let b!: MemoryCarrier
     /** Auth hooks see prepared metadata before native restoration. */
-    const left = new Host('a', 'alpha', (flow) =>
-      flow.register({
-        name: 'trace',
-        hooks: {
-          envelope: {
-            outbound: (value) => {
-              a?.trace.push('envelope')
-              return value
-            }
-          },
-          frame: {
-            outbound: (value, _ctx, next) => {
-              a.trace.push('frame')
-              return next(value)
-            }
-          }
+    const left = new Host('a', 'alpha', {
+      stages: {
+        envelopeOutbound: async (payload, next) => {
+          a?.trace.push('envelope')
+          await next(payload)
+        },
+        frameOutbound: async (payload, next) => {
+          a.trace.push('frame')
+          await next(payload)
         }
-      })
-    )
+      }
+    })
     /** Receiver instrumentation observes the inverse protected-metadata seam. */
-    const right = new Host('b', 'beta', (flow) =>
-      flow.register({
-        name: 'trace',
-        hooks: {
-          envelope: {
-            inbound: (value) => {
-              b?.trace.push('envelope')
-              return value
-            }
-          }
+    const right = new Host('b', 'beta', {
+      stages: {
+        envelopeInbound: async (payload, next) => {
+          b?.trace.push('envelope')
+          await next(payload)
         }
-      })
-    )
+      }
+    })
     /** Responder accept is held at the actual native handoff. */
     const pair = connect(left, right, 'process', true)
     a = pair.a
@@ -543,14 +547,10 @@ it.each(['batch@1', 'abort@1', 'wire-error@1'])(
   'rejects absent required handler %s through one real handshake and closes once',
   async (extension) => {
     /** Actual cold hook registration is the sole source of required handler negotiation. */
-    const left = new Host('a', 'a', (flow) =>
-      flow.register({
-        name: 'required-handler',
-        extensions: [extension],
-        requiredExtensions: [extension],
-        hooks: {}
-      })
-    )
+    const left = new Host('a', 'a', {
+      extensions: [extension],
+      requiredExtensions: [extension]
+    })
     /** The counterpart genuinely installs no handler for this required extension. */
     const right = new Host('b')
     /** Both sides exchange real profile2 frames over the original physical pair. */
@@ -628,9 +628,7 @@ it('records the original control.sent assertion through the real native Session 
     'a'
   )
   /** Existing Session fixtures retain the original native ping owner and physical carrier. */
-  const left = new Host('a', 'alpha', (flow) =>
-    flow.register({ name: 'probe', hooks: { observe: emitter.observe } })
-  )
+  const left = new Host('a', 'alpha', { observe: emitter.observe })
   /** A genuine counterpart answers the same physical ping with its real pong. */
   const right = new Host('b', 'beta')
   /** Both real subscriptions precede the original hello/accept exchange. */

@@ -11,14 +11,7 @@ import {
   rpcProbeEnvelopeFacts,
   rpcProbeEnvelopeKind
 } from '@migaia/rpc-contract/interfaces'
-import type {
-  IRpcDispatchContext,
-  IRpcDispatchOutcome,
-  IRpcObservation,
-  IRpcFlowContext,
-  IRpcCarrierFrame,
-  IRpcFrameNext
-} from '@migaia/rpc-contract/interfaces'
+import type { IRpcDispatchContext, IRpcObservation } from '@migaia/rpc-contract/interfaces'
 import { RpcWireKind, RpcCallMode } from '@migaia/rpc-contract/protocol'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcCoreErrorText, RpcProviderRejectionReason } from '@migaia/rpc-contract/errors'
@@ -28,6 +21,7 @@ import { reportDiagnostic } from '../../host/report.js'
 import { registerLocalErrorWireSummary } from '../../host/error-wire-metadata.js'
 import { HostObservationKind } from '../../host/state-constants.js'
 import type { IRpcFlowInstallation, IRpcFlowSetupContext } from '../../sdk/types.js'
+import { RpcFlowPoint, type IRpcFlowStage } from '../../sdk/flow-pipelines.js'
 import { ProviderAdmissionRegistry } from './provider-admission.js'
 import { LimitsGovernor, type ILimitsGovernorPorts } from './governor.js'
 import { LimitsLease } from './lease.js'
@@ -76,11 +70,11 @@ export class RpcLimitsFlow {
     this.#signal = context.signal
     this.#publish = context.observe
     this.value = {
-      hooks: {
-        frame: { inbound: this.#inbound },
-        dispatch: { inbound: this.#dispatch },
-        observe: this.#observe
+      stages: {
+        [RpcFlowPoint.frameInbound]: this.#inbound,
+        [RpcFlowPoint.dispatchInbound]: this.#dispatch
       },
+      observe: this.#observe,
       dispose: this.#close
     }
     this.#signal.addEventListener('abort', this.#close, { once: true })
@@ -88,13 +82,11 @@ export class RpcLimitsFlow {
   }
 
   /** Dispatch admission is synchronous and atomic before any actual group member can start. */
-  readonly #dispatch = (
-    context: IRpcDispatchContext,
-    next: () => Promise<IRpcDispatchOutcome>
-  ): Promise<IRpcDispatchOutcome> => {
-    if (this.#signal.aborted) return next()
+  readonly #dispatch: IRpcFlowStage<'dispatchInbound'> = async (payload, next) => {
+    const { context } = payload
+    if (this.#signal.aborted) return next(payload)
     if (context.envelope.kind !== RpcWireKind.call && context.envelope.kind !== RpcWireKind.group)
-      return next()
+      return next(payload)
     /** Principal-shared outcomes never merge two actually acquired Sessions' concurrency capacity. */
     const peerKey = JSON.stringify([
       context.namespace,
@@ -153,17 +145,13 @@ export class RpcLimitsFlow {
     /** Rate credit is reserved once; actual original group progress later refunds unstarted members. */
     const window = governor.reserve(payloads)
     lease.begin(window, context.envelope.kind === RpcWireKind.group ? context.started : undefined)
-    return next()
+    return next(payload)
   }
 
   /** Physical activity refreshes the existing idle clock while preserving frame/write identity. */
-  readonly #inbound = (
-    frame: IRpcCarrierFrame,
-    context: IRpcFlowContext,
-    next: IRpcFrameNext
-  ): Promise<void> => {
-    this.#connections.get(context.carrierId)?.touch()
-    return next(frame)
+  readonly #inbound: IRpcFlowStage<'frameInbound'> = (payload, next) => {
+    this.#connections.get(payload.context.carrierId)?.touch()
+    return next(payload)
   }
 
   /** Only real public readiness starts idle; real retirement ends that exact governor. */

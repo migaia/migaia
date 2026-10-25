@@ -5,6 +5,7 @@
  */
 import type {
   IRpcCarrierCodec,
+  IRpcCarrier,
   IRpcCarrierObservation,
   IRpcCarrierWriteOptions,
   IRpcDispose
@@ -26,6 +27,8 @@ export type IRpcMessageIO = Readonly<{
 }>
 /** Shared media ownership uses no peer, request, retry, bootstrap or negotiation facade. */
 export type IRpcMessageCarrierOptions = Readonly<{
+  /** The original native flow owner reserves logical capacity before optional frame transforms. */
+  reserveWrite?: IRpcCarrier['reserveWrite']
   /** Native acquisition supplies its actual raw observer, independent of the selected codec. */
   observation?: IRpcCarrierObservation
   /** The native owner lends its original synchronous transfer-capability rejection, if distinct. */

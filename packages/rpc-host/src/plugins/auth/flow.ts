@@ -8,8 +8,7 @@ import type {
   IRpcFlowContext,
   IRpcEnvelopeContext,
   IRpcPreparedMessage,
-  IRpcDispatchContext,
-  IRpcDispatchOutcome
+  IRpcDispatchContext
 } from '@migaia/rpc-contract/interfaces'
 import {
   RpcProbeStage,
@@ -36,6 +35,7 @@ import {
 import { registerLocalErrorWireSummary } from '../../host/error-wire-metadata.js'
 import { splitRpcPreparedMetadata, joinRpcPreparedMetadata } from '../../sdk/carrier/prepared.js'
 import type { IRpcFlowInstallation, IRpcFlowSetupContext } from '../../sdk/types.js'
+import { RpcFlowPoint, type IRpcFlowStage } from '../../sdk/flow-pipelines.js'
 import { AuthenticationRepresentation } from './representation.js'
 import { RpcAuthenticationEnvelope as Format } from './constants.js'
 import { RpcAuthenticationText as Text } from './text.js'
@@ -104,10 +104,18 @@ export class RpcAuthenticationFlow {
             ? RpcProbeAuthentication.sign
             : RpcProbeAuthentication.none
       },
-      hooks: {
-        handshake: this.#handshake,
-        envelope: { outbound: this.#outbound, inbound: this.#inbound },
-        dispatch: { inbound: this.#dispatch }
+      stages: {
+        [RpcFlowPoint.handshakeOutbound]: this.#handshake,
+        [RpcFlowPoint.handshakeInbound]: this.#handshake,
+        [RpcFlowPoint.envelopeOutbound]: async (payload, next) => {
+          const prepared = await this.#protectEnvelope(payload.prepared, payload.context)
+          await next({ ...payload, prepared })
+        },
+        [RpcFlowPoint.envelopeInbound]: async (payload, next) => {
+          const prepared = await this.#restoreEnvelope(payload.prepared, payload.context)
+          await next({ ...payload, prepared })
+        },
+        [RpcFlowPoint.dispatchInbound]: this.#dispatch
       },
       dispose: this.close
     }
@@ -119,10 +127,8 @@ export class RpcAuthenticationFlow {
   }
 
   /** Keep an admitted request ID until actual business/stream completion and bounded retention. */
-  readonly #dispatch = (
-    context: IRpcDispatchContext,
-    next: () => Promise<IRpcDispatchOutcome>
-  ): Promise<IRpcDispatchOutcome> => {
+  readonly #dispatch: IRpcFlowStage<'dispatchInbound'> = async (payload, next) => {
+    const { context } = payload
     this.#assert(context)
     /** Only the existing accepted physical source owns this correlation and its retirement. */
     const source = this.#source(context)
@@ -136,7 +142,10 @@ export class RpcAuthenticationFlow {
     ])
     /** Lazy expiry uses the same monotonic clock for admission and actual completion. */
     const now = performance.now()
-    if (this.#requests.has(key, now)) return Promise.resolve(RpcDispatchDrop)
+    if (this.#requests.has(key, now)) {
+      payload.outcome.value = RpcDispatchDrop
+      return
+    }
     /** Original entry identity prevents late completion from touching a reused correlation. */
     const entry = this.#requests.admit(source, peerKey, key, now, context.exclusive === true)
     if (!entry) {
@@ -160,7 +169,7 @@ export class RpcAuthenticationFlow {
     void context.completion
       .then(() => this.#requests.settle(key, entry, performance.now()))
       .catch(context.report)
-    return next()
+    return next(payload)
   }
 
   /** Replay refusal preserves the original local observer contract without changing its reply. */
@@ -195,10 +204,17 @@ export class RpcAuthenticationFlow {
    * Native credentials are checked only by the real handshake verifier; no principal grants
    * dispatch.
    */
-  readonly #handshake = async (
+  readonly #handshake: IRpcFlowStage<'handshakeOutbound'> = async (payload, next) => {
+    /** Only the authentication transform is classified as an authentication failure. */
+    const handshake = await this.#transformHandshake(payload.handshake, payload.context)
+    await next({ ...payload, handshake })
+  }
+
+  /** Transform credentials before native continuation so downstream errors keep their identity. */
+  async #transformHandshake(
     frame: IRpcHandshake,
     context: IRpcFlowContext
-  ): Promise<IRpcHandshake> => {
+  ): Promise<IRpcHandshake> {
     this.#assert(context)
     if (frame.step === RpcWireHandshakeStep.reject) return frame
     try {
@@ -267,7 +283,7 @@ export class RpcAuthenticationFlow {
    * Allocate replay binding before encryption, then sign the entire original metadata/manifest
    * once.
    */
-  readonly #outbound = async (
+  readonly #protectEnvelope = async (
     value: IRpcPreparedMessage,
     context: IRpcEnvelopeContext
   ): Promise<IRpcPreparedMessage> => {
@@ -307,7 +323,7 @@ export class RpcAuthenticationFlow {
   }
 
   /** Verify/decrypt and complete the sole SDK restore before committing the original replay bitmap. */
-  readonly #inbound = async (
+  readonly #restoreEnvelope = async (
     value: IRpcPreparedMessage,
     context: IRpcEnvelopeContext
   ): Promise<IRpcPreparedMessage> => {

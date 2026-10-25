@@ -68,7 +68,7 @@ export function typegen(options: ITypegenOptions): IRpcFlowPlugin {
     setup(context) {
       /** Every receiving host gets an independent observer and exact disposal receipt. */
       const observer = new TypegenObserver(options.out, context.report)
-      return { hooks: { observe: observer.observe }, dispose: observer.dispose }
+      return { observe: observer.observe, dispose: observer.dispose }
     }
   })
 }

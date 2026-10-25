@@ -9,12 +9,9 @@ import type { IAbortSignal } from '@migaia/utils/promise'
 import { RpcCarrierFrameKind as K } from '@migaia/rpc-contract/protocol'
 import { createContractError } from '@migaia/rpc-contract/errors'
 import { RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
-import type {
-  IRpcCarrierFrame,
-  IRpcFlowContext,
-  IRpcFrameNext
-} from '@migaia/rpc-contract/interfaces'
+import type { IRpcFlowContext } from '@migaia/rpc-contract/interfaces'
 import type { IRpcFlowInstallation } from '../../sdk/types.js'
+import { RpcFlowPoint, type IRpcFlowStage } from '../../sdk/flow-pipelines.js'
 import { createStringChunkAssembler, createBinaryChunkAssembler } from './assembly.js'
 import {
   RpcChunkExtension,
@@ -54,7 +51,10 @@ export class RpcChunkFlow {
     this.value = {
       extensions: [RpcChunkExtension],
       requiredExtensions: required ? [RpcChunkExtension] : [],
-      hooks: { frame: { outbound: this.#outbound, inbound: this.#inbound } },
+      stages: {
+        [RpcFlowPoint.frameOutbound]: this.#outbound,
+        [RpcFlowPoint.frameInbound]: this.#inbound
+      },
       dispose: this.close
     }
     signal.addEventListener('abort', this.close, { once: true })
@@ -62,11 +62,8 @@ export class RpcChunkFlow {
   }
 
   /** Actual negotiated membership permits chunks; native sidecars keep one original transfer write. */
-  readonly #outbound = async (
-    frame: IRpcCarrierFrame,
-    context: IRpcFlowContext,
-    next: IRpcFrameNext
-  ): Promise<void> => {
+  readonly #outbound: IRpcFlowStage<'frameOutbound'> = async (payload, next) => {
+    const { frame, context } = payload
     if (context.signal.aborted) throw context.signal.reason
     if (this.#closed)
       throw createContractError(RpcContractErrorCode.invalidFrame, undefined, hostErrorWireMetadata)
@@ -76,7 +73,7 @@ export class RpcChunkFlow {
       frame.sidecars?.length ||
       (typeof frame.data !== 'string' && !isUint8Array(frame.data))
     )
-      return next(frame)
+      return next(payload)
     /** Existing source-qualified lookup keeps equal ordinals on unrelated physical peers isolated. */
     const address = {
       source: context.carrierId,
@@ -90,25 +87,25 @@ export class RpcChunkFlow {
         ? this.#strings.frame(frame.data as string, address)
         : this.#bytes.frame(frame.data as Uint8Array, address)
     if (parts.length === 1 && (typeof parts[0] === 'string' || isUint8Array(parts[0])))
-      return next(frame)
+      return next(payload)
     for (const fragment of parts) {
       if (context.signal.aborted) throw context.signal.reason
       await next({
-        kind: K.extension,
-        extension: RpcChunkExtension,
-        data: { encoding, ...(fragment as IRpcStringChunk | IRpcBinaryChunk) }
+        ...payload,
+        frame: {
+          kind: K.extension,
+          extension: RpcChunkExtension,
+          data: { encoding, ...(fragment as IRpcStringChunk | IRpcBinaryChunk) }
+        }
       })
     }
   }
 
   /** Only this installed negotiated extension may retain fragments and emit a completed message. */
-  readonly #inbound = async (
-    frame: IRpcCarrierFrame,
-    context: IRpcFlowContext,
-    next: IRpcFrameNext
-  ): Promise<void> => {
+  readonly #inbound: IRpcFlowStage<'frameInbound'> = async (payload, next) => {
+    const { frame, context } = payload
     if (context.signal.aborted) throw context.signal.reason
-    if (frame.kind !== K.extension || frame.extension !== RpcChunkExtension) return next(frame)
+    if (frame.kind !== K.extension || frame.extension !== RpcChunkExtension) return next(payload)
     if (
       this.#closed ||
       !context.session?.extensions.has(RpcChunkExtension) ||
@@ -140,7 +137,8 @@ export class RpcChunkFlow {
       throw context.signal.reason
     }
     if (result.status === 'rejected') throw result.error
-    if (result.status === 'complete') await next({ kind: K.message, data: result.value })
+    if (result.status === 'complete')
+      await next({ ...payload, frame: { kind: K.message, data: result.value } })
   }
 
   /** One inbound Session signal owns cleanup for this actual physical source's retained assemblies. */

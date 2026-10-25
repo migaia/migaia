@@ -3,7 +3,6 @@
  * invocation borrows claim/completion rights from the same owner; namespace queries add no second
  * pending table, retry loop or result cache.
  */
-import type { IRpcDispatchContext, IRpcDispatchOutcome } from '@migaia/rpc-contract/interfaces'
 import type {
   IRpcOutcome,
   IRpcOutcomeStore,
@@ -11,6 +10,7 @@ import type {
 } from '@migaia/rpc-contract/protocol'
 import { RpcWireKind, RpcWireProfile } from '@migaia/rpc-contract/protocol'
 import type { IRpcFlowInstallation, IRpcFlowSetupContext } from '../../sdk/types.js'
+import { RpcFlowPoint, type IRpcFlowStage } from '../../sdk/flow-pipelines.js'
 import { createRpcLifecycleError } from '../../host/error-owner.js'
 import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 import { createRpcIdempotencyStore, type IRpcIdempotencyStore } from './store.js'
@@ -40,7 +40,7 @@ export class RpcIdempotencyFlow {
     this.#defaultMemory = options.store === undefined
     this.#store = options.store ?? createRpcIdempotencyStore(options)
     this.value = {
-      hooks: { dispatch: { inbound: this.#dispatch } },
+      stages: { [RpcFlowPoint.dispatchInbound]: this.#dispatch },
       namespaceExtensions: this.#namespace,
       dispose: this.close
     }
@@ -49,25 +49,23 @@ export class RpcIdempotencyFlow {
   }
 
   /** Actual lookup neither claims a key nor allocates a waiter or provider execution. */
-  readonly #dispatch = async (
-    context: IRpcDispatchContext,
-    next: () => Promise<IRpcDispatchOutcome>
-  ): Promise<IRpcDispatchOutcome> => {
+  readonly #dispatch: IRpcFlowStage<'dispatchInbound'> = async (payload, next) => {
+    const { context } = payload
     if (this.#closed) throw createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
     if (
       context.envelope.kind !== RpcWireKind.outcome &&
       context.envelope.kind !== RpcWireKind.call &&
       context.envelope.kind !== RpcWireKind.group
     )
-      return next()
+      return next(payload)
     if (context.envelope.kind === RpcWireKind.outcome && context.envelope.operation !== 'lookup')
-      return next()
+      return next(payload)
     /** Read the original admitted key once before any scope callback or body fingerprint work. */
     const key =
       context.envelope.kind === RpcWireKind.outcome
         ? undefined
         : context.envelope.options.idempotencyKey
-    if (context.envelope.kind !== RpcWireKind.outcome && key === undefined) return next()
+    if (context.envelope.kind !== RpcWireKind.outcome && key === undefined) return next(payload)
     /** Existing logical-provider and admitted direct-source identity fence the store key domain. */
     const authentication = context.session?.authentication
     /** Stable principal identity shares retained outcomes across its independently held sessions. */
@@ -83,7 +81,7 @@ export class RpcIdempotencyFlow {
     ])
     if (context.envelope.kind === RpcWireKind.call || context.envelope.kind === RpcWireKind.group) {
       return new RpcIdempotencyExecution({
-        context,
+        payload,
         envelope: context.envelope,
         scope,
         key: key!,
@@ -117,7 +115,7 @@ export class RpcIdempotencyFlow {
       lookup.outcome.data !== undefined
         ? (lookup.outcome.data as unknown as IRpcOutcome)
         : undefined
-    return {
+    payload.outcome.value = {
       kind: 'value',
       value: (outcome === undefined
         ? { state: lookup?.state === State.pending ? State.pending : State.unknown, store }

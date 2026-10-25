@@ -5,17 +5,14 @@
  */
 import { RpcCarrierFrameKind as K } from '@migaia/rpc-contract/protocol'
 import type { IAbortSignal } from '@migaia/utils/promise'
-import type {
-  IRpcCarrierFrame,
-  IRpcFlowContext,
-  IRpcFrameNext
-} from '@migaia/rpc-contract/interfaces'
+import type { IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
 import { createContractError } from '@migaia/rpc-contract/errors'
 import { RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
 import { createRpcLifecycleError } from '../../host/error-owner.js'
 import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 import { hostErrorWireMetadata } from '../../host/error-wire-metadata.js'
 import type { IRpcFlowInstallation } from '../../sdk/types.js'
+import { RpcFlowPoint, type IRpcFlowStage } from '../../sdk/flow-pipelines.js'
 import { RpcBatchExtension } from './constants.js'
 import { RpcBatchLane } from './lane.js'
 
@@ -36,7 +33,10 @@ export class RpcBatchFlow {
     this.value = {
       extensions: [RpcBatchExtension],
       requiredExtensions: required ? [RpcBatchExtension] : [],
-      hooks: { frame: { outbound: this.#outbound, inbound: this.#inbound } },
+      stages: {
+        [RpcFlowPoint.frameOutbound]: this.#outbound,
+        [RpcFlowPoint.frameInbound]: this.#inbound
+      },
       dispose: this.close
     }
     signal.addEventListener('abort', this.close, { once: true })
@@ -44,14 +44,11 @@ export class RpcBatchFlow {
   }
 
   /** Only an actually selected extension may retain ready frames behind physical backpressure. */
-  readonly #outbound = (
-    frame: IRpcCarrierFrame,
-    context: IRpcFlowContext,
-    next: IRpcFrameNext
-  ): Promise<void> => {
+  readonly #outbound: IRpcFlowStage<'frameOutbound'> = (payload, next) => {
+    const { context } = payload
     if (this.#closed)
       return Promise.reject(createRpcLifecycleError(RpcCoreErrorText.endpointDisposed))
-    if (!context.session?.extensions.has(RpcBatchExtension)) return next(frame)
+    if (!context.session?.extensions.has(RpcBatchExtension)) return next(payload)
     /** Carrier ids are host-local physical identities, not decoded route or provider addresses. */
     const id = context.carrierId
     /** An idle lane is removed immediately after its final original native write drains. */
@@ -62,16 +59,13 @@ export class RpcBatchFlow {
       })
       this.#lanes.set(id, lane)
     }
-    return lane.send({ frame, context, next })
+    return lane.send({ payload, next })
   }
 
   /** Validate shallow physical records once before independently delivering every original member. */
-  readonly #inbound = async (
-    frame: IRpcCarrierFrame,
-    context: IRpcFlowContext,
-    next: IRpcFrameNext
-  ): Promise<void> => {
-    if (frame.kind !== K.extension || frame.extension !== RpcBatchExtension) return next(frame)
+  readonly #inbound: IRpcFlowStage<'frameInbound'> = async (payload, next) => {
+    const { frame, context } = payload
+    if (frame.kind !== K.extension || frame.extension !== RpcBatchExtension) return next(payload)
     /** Encoded member data is opaque; admission does not repeat the semantic codec or validator. */
     const frames =
       frame.data && typeof frame.data === 'object'
@@ -109,7 +103,7 @@ export class RpcBatchFlow {
     for (const member of frames as IRpcCarrierFrame[]) {
       if (context.signal.aborted) throw context.signal.reason
       try {
-        await next(member)
+        await next({ ...payload, frame: member })
       } catch (error) {
         context.report(error)
       }

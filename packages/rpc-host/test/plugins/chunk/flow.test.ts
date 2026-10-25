@@ -1,9 +1,11 @@
 import { expect, it } from 'vitest'
+import { defineHost, definePlugin } from '@migaia/plugin-host'
 import { deferred } from '@migaia/utils/promise'
 import type { IRpcFlowContext, IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
 import { chunk } from '../../../dist/plugins/chunk/index.js'
 import { readRpcDefinition } from '../../../dist/sdk/metadata.js'
-import { FlowPipeline } from '../../../dist/flow/pipeline.js'
+import { FlowRegistry } from '../../../dist/flow/registry.js'
+import { RpcFlowPipelines, RpcFlowPoint } from '../../../dist/sdk/flow-pipelines.js'
 
 /** Actual accepted membership is explicit metadata; physical fragment data grants no authority. */
 function context(signal: AbortSignal, extensions: ReadonlySet<string>): IRpcFlowContext {
@@ -60,19 +62,28 @@ it('actual native chunk flow preserves negotiated split/reassembly, physical dra
     retire: async () => undefined,
     call: async () => undefined
   })
-  /** Actual FlowPipeline compiles membership and both traversal directions. */
-  const flow = new FlowPipeline((error) => {
+  /** The same native declarations own ordering, snapshots and both traversal directions. */
+  const flow = defineHost({
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } },
+    pipelines: RpcFlowPipelines
+  })
+  /** Production registration receives a genuine native generation rather than a runner facade. */
+  const registry = new FlowRegistry((error) => {
     errors.push(error)
   })
-  flow.register({
-    name: metadata.definition.name,
-    namespaces: metadata.definition.namespaces,
-    ...installation
-  })
-  flow.start()
-  expect(flow.extensions('test')).toEqual(['chunk@1'])
-  expect(flow.requiredExtensions('test')).toEqual(['chunk@1'])
-  expect(flow.extensions('other')).toEqual([])
+  await flow.use(
+    definePlugin({
+      name: metadata.definition.name,
+      install(core) {
+        registry.register(core, metadata.definition, installation)
+        return {}
+      }
+    })
+  )
+  registry.start()
+  expect(registry.extensions('test')).toEqual(['chunk@1'])
+  expect(registry.requiredExtensions('test')).toEqual(['chunk@1'])
+  expect(registry.extensions('other')).toEqual([])
   /** One accepted source owns its actual retirement signal. */
   const source = new AbortController()
   /** Native drain is deliberately held independently from the plugin Promise. */
@@ -82,14 +93,15 @@ it('actual native chunk flow preserves negotiated split/reassembly, physical dra
   /** Original encoded text matches the existing canonical assembly oracle. */
   const original: IRpcCarrierFrame = { kind: 'message', data: 'abcdefgh' }
   /** Returned completion must include all sequential writes, including the held first drain. */
-  const pending = flow.frame(
-    original,
-    context(source.signal, new Set(['chunk@1'])),
-    async (frame) => {
-      frames.push(frame)
-      if (frames.length === 1) await drain.promise
-    }
-  )
+  const pending = flow
+    .pipeline(RpcFlowPoint.frameOutbound)
+    .run(
+      { frame: original, context: context(source.signal, new Set(['chunk@1'])) },
+      async ({ frame }) => {
+        frames.push(frame)
+        if (frames.length === 1) await drain.promise
+      }
+    )
   expect(frames).toHaveLength(1)
   drain.resolve()
   await pending
@@ -100,36 +112,51 @@ it('actual native chunk flow preserves negotiated split/reassembly, physical dra
   /** Actual inbound hooks reuse the same original length/order/single-copy owner. */
   const delivered: IRpcCarrierFrame[] = []
   for (const frame of frames)
-    await flow.frame(
-      frame,
-      { ...context(source.signal, new Set(['chunk@1'])), direction: 'inbound' },
-      async (value) => {
-        delivered.push(value)
-      }
-    )
+    await flow
+      .pipeline(RpcFlowPoint.frameInbound)
+      .run(
+        {
+          frame,
+          context: { ...context(source.signal, new Set(['chunk@1'])), direction: 'inbound' }
+        },
+        async (payload) => {
+          delivered.push(payload.frame)
+        }
+      )
   expect(delivered).toEqual([original])
   expect(timers.size).toBe(0)
   /** Optional absence keeps the original whole physical frame and identity. */
   const whole: IRpcCarrierFrame[] = []
-  await flow.frame(original, context(source.signal, new Set()), async (value) => {
-    whole.push(value)
-  })
+  await flow
+    .pipeline(RpcFlowPoint.frameOutbound)
+    .run({ frame: original, context: context(source.signal, new Set()) }, async (payload) => {
+      whole.push(payload.frame)
+    })
   expect(whole[0]).toBe(original)
   /** A new real partial message retains one timer until its actual physical source retires. */
   const partial: IRpcCarrierFrame[] = []
-  await flow.frame(original, context(source.signal, new Set(['chunk@1'])), async (value) => {
-    partial.push(value)
-  })
-  await flow.frame(
-    partial[0]!,
-    { ...context(source.signal, new Set(['chunk@1'])), direction: 'inbound' },
-    async () => undefined
-  )
+  await flow
+    .pipeline(RpcFlowPoint.frameOutbound)
+    .run(
+      { frame: original, context: context(source.signal, new Set(['chunk@1'])) },
+      async (payload) => {
+        partial.push(payload.frame)
+      }
+    )
+  await flow
+    .pipeline(RpcFlowPoint.frameInbound)
+    .run(
+      {
+        frame: partial[0]!,
+        context: { ...context(source.signal, new Set(['chunk@1'])), direction: 'inbound' }
+      },
+      async () => undefined
+    )
   expect(timers.size).toBe(1)
   source.abort()
   expect(timers.size).toBe(0)
   await installation.dispose?.()
   await installation.dispose?.()
-  flow.close()
+  await flow.dispose()
   expect(errors).toEqual([])
 })

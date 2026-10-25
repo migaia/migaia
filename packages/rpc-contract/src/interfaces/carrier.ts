@@ -133,6 +133,19 @@ export type IRpcCarrierReceiver = Readonly<{
   error(error: unknown): void
 }>
 
+/** A queued batch member borrows the existing native queue's exact cancellation registration. */
+export type IRpcWriteQueueGuard = (
+  cancelQueued?: (reason: unknown) => void
+) => (() => void) | undefined
+
+/** One logical write borrows capacity until all of its actual physical work has settled. */
+export type IRpcWriteAdmission = Readonly<{
+  /** Native queue shutdown can withdraw a member that has not reached its physical flush. */
+  guard?: IRpcWriteQueueGuard
+  /** The original capacity owner releases this logical write once; repeated release is harmless. */
+  release(): void
+}>
+
 /** Local send authority is separate from the serialized physical frame. */
 export type IRpcCarrierWriteOptions = Readonly<{
   /** Session supplies the class before optional frame transformations; native IO never decodes it. */
@@ -143,6 +156,8 @@ export type IRpcCarrierWriteOptions = Readonly<{
   transfer?: readonly ArrayBuffer[]
   /** Cancellation before the actual write prevents that frame from leaving this carrier. */
   signal?: IAbortSignal
+  /** Borrowed logical capacity follows every fragment or a coalesced physical write off the wire. */
+  admission?: IRpcWriteAdmission
   /** Native IO invokes this immediately before physical handoff, never while locally queued. */
   onWriteStart?: () => void
 }>
@@ -188,6 +203,8 @@ export type IRpcCarrier = Readonly<{
   subscribe(receiver: IRpcCarrierReceiver): IRpcDispose
   /** Resolve only once the physical write accepts the frame, rather than when merely queued. */
   write(frame: IRpcCarrierFrame, options?: IRpcCarrierWriteOptions): void | Promise<void>
+  /** Optional native capacity is reserved once before frame transformations, without a second queue. */
+  reserveWrite?(options?: IRpcCarrierWriteOptions): IRpcWriteAdmission | undefined
   /** Close physical resources and settle every carrier-owned queued operation. */
   close(reason?: unknown): Promise<void>
 }>

@@ -4,25 +4,20 @@
  * semantic provider execution are not part of the batching boundary.
  */
 import type { IAbortSignal } from '@migaia/utils/promise'
-import type {
-  IRpcFlowContext,
-  IRpcCarrierFrame,
-  IRpcFrameNext,
-  IRpcFrameWriteOptions
-} from '@migaia/rpc-contract/interfaces'
+import type { IRpcFramePayload, IRpcFrameWriteOptions } from '@migaia/rpc-contract/interfaces'
+import type { IRpcFlowStage } from '../../sdk/flow-pipelines.js'
 
 /** Existing namespace/required declarations scope optional physical batching at installation. */
 export type IRpcBatchOptions = Readonly<{ namespaces?: readonly string[]; required?: boolean }>
 /** A logical member retains only its actual write facts and physical continuation until drain. */
 export type IRpcBatchInput = Readonly<{
-  frame: IRpcCarrierFrame
-  context: IRpcFlowContext
-  next: IRpcFrameNext
+  payload: IRpcFramePayload
+  next: Parameters<IRpcFlowStage<'frameOutbound'>>[1]
 }>
 /** One queued member has independent cancellation and completion inside a shared physical write. */
 export type IRpcBatchEntry = {
-  frame: IRpcCarrierFrame
-  next: IRpcFrameNext
+  payload: IRpcFramePayload
+  next: Parameters<IRpcFlowStage<'frameOutbound'>>[1]
   write: IRpcFrameWriteOptions | undefined
   signal: IAbortSignal
   bound: number
