@@ -11,6 +11,7 @@ import {
 import { createRpcError } from '../../host/error-owner.js'
 import { tagRpcError, RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
+import { RpcCarrierFrameKind } from '@migaia/rpc-contract/protocol'
 import { defaultRpcReporter, reportDiagnostic } from '../../host/report.js'
 import {
   RpcProbeDirection,
@@ -28,6 +29,37 @@ import type {
 } from './types.js'
 import { ProbeText } from './text.js'
 import { captureTransferredContent } from '../../sdk/wire/probe-content.js'
+import { RpcChunkExtension } from '../../features/chunk/constants.js'
+import { RpcBatchExtension } from '../../features/batch/constants.js'
+
+/** Project only shallow physical extension headers; codec and Feature owners retain admission. */
+function physicalFrameFacts(input: IRpcProbeObservation): IRpcProbeObservation {
+  /** The Session lends the original frame only after private bootstrap metadata is no longer used. */
+  const frame = input.carrierFrame
+  if (
+    frame?.kind !== RpcCarrierFrameKind.extension ||
+    !frame.data ||
+    typeof frame.data !== 'object'
+  )
+    return input
+  if (frame.extension === RpcChunkExtension) {
+    /** Own descriptors avoid executing untrusted accessors while observing attempted fragments. */
+    const index = Object.getOwnPropertyDescriptor(frame.data, 'index')?.value
+    /** These are the same scalar headers consumed later by the sole chunk assembler. */
+    const count = Object.getOwnPropertyDescriptor(frame.data, 'count')?.value
+    return {
+      ...input,
+      chunkIndex: Number.isInteger(index) ? index : undefined,
+      chunkCount: Number.isInteger(count) ? count : undefined
+    }
+  }
+  if (frame.extension === RpcBatchExtension) {
+    /** Reading the physical member array never decodes or restores any opaque member. */
+    const frames = Object.getOwnPropertyDescriptor(frame.data, 'frames')?.value
+    if (Array.isArray(frames)) return { ...input, members: frames.length }
+  }
+  return input
+}
 /** Each installed subscriber retains compiled callbacks and its cold mask subscription. */
 type ISubscriber = {
   state: IRpcProbeState
@@ -432,7 +464,8 @@ class ProbeEmitter {
   }
   /** Canonical readonly tags carry facts only, never execution authority. */
   readonly observe = (event: IRpcObservation): void => {
-    if (event.kind === RpcProbeObservationKind.event) this.emit(event.data as IRpcProbeObservation)
+    if (event.kind === RpcProbeObservationKind.event)
+      this.emit(physicalFrameFacts(event.data as IRpcProbeObservation))
     else if (event.kind === RpcProbeObservationKind.descriptor)
       this.describe(event.data as IRpcProbeDescriptor)
   }

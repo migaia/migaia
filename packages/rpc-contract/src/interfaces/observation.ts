@@ -6,6 +6,7 @@
 import { RpcWireKind, RpcCallMode } from '../wire/constants.js'
 import { RpcStreamEvent } from '../wire/stream-constants.js'
 import type { IRpcEnvelope, IRpcControlFrame } from '../wire/types.js'
+import type { IRpcCarrierFrame } from './carrier.js'
 /** Physical platform labels move from the retired transport owner without changing their values. */
 export const RpcCarrierPlatform = {
   /** Same-origin broadcast channel. */ broadcastChannel: 'BroadcastChannel',
@@ -216,6 +217,8 @@ export type IRpcProbeObservation = Readonly<
     Readonly<{
       /** Actual physical transfer authority is borrowed only for direct captured byte preservation. */
       transfer?: readonly ArrayBuffer[]
+      /** The observer may project physical metadata without decoding or replacing captured data. */
+      carrierFrame?: IRpcCarrierFrame
     }>
 >
 

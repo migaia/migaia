@@ -1,522 +1,426 @@
-import { createProbeEmitter, bindInstalledProbe } from '../../dist/core/internal/probe-emitter.js'
-import { systemScheduler } from '@migaia/utils/scheduler'
-import { createRuntimeEndpointComposition } from '../../dist/core/runtime-api-endpoint.js'
-import { RpcCapability } from '@migaia/rpc-contract'
-import { carrierSizeBytes } from '../../dist/sdk/wire/probe-content.js'
+/** Real Session/probe owners retain frame capture, transfer and physical write evidence. */
 import { describe, expect, it, vi } from 'vitest'
-import { identityCodec } from '@migaia/serialize/codecs/identity/v1'
-import { defineJsonCodec } from '@migaia/serialize/codecs/json'
-import { RpcRouteProfile, RpcBatchPhysical, type IRpcEnvelope } from '@migaia/rpc-contract'
-import { rpcProtocol } from '@migaia/rpc-contract/v1'
-import { bindRpcFrameIngress, createStringFramer } from '@migaia/rpc-contract/framing'
-import { messageFramer } from '@migaia/rpc-contract/framing/v1'
+import { createRpcHost } from '@migaia/rpc-host'
+import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
+import { auth } from '@migaia/rpc-host/features/auth'
+import { chunk } from '@migaia/rpc-host/features/chunk'
+import { batch } from '@migaia/rpc-host/features/batch'
 import {
+  probe,
   defineProbe,
   RpcProbeDirection,
   RpcProbeStage,
   type IRpcProbeEventView,
   type IRpcProbeStageName
-} from '../../dist/core/probe/index.js'
-import { RpcOutboundSender } from '../../dist/core/internal/outbound-sender.js'
-import type { IRpcSelectedComponents } from '../../dist/core/internal/endpoint-options.js'
-import type { IRpcOutboundTransport } from '../../dist/core/internal/outbound-sender.js'
-import type { IRpcAuthenticationCapability } from '../../dist/core/typing.js'
+} from '@migaia/rpc-host/plugins/probe'
+import type { IRpcFlowFeature } from '@migaia/rpc-host/sdk'
+import type { IRpcEnvelope } from '@migaia/rpc-contract/protocol'
+import { carrierSizeBytes } from '../../dist/sdk/wire/probe-content.js'
+import { coreMemoryServer } from '../host/core-fixture.js'
 
-import { connect } from '../../dist/core/middleware/connect.js'
-import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
-import { codec } from '../../dist/core/middleware/codec.js'
-import { framer } from '../../dist/core/middleware/framer.js'
-import { authentication } from '../../dist/core/middleware/authentication.js'
-
-/** One normalized request proves observations use the existing semantic object unchanged. */
-function request(id = 'frame-request'): IRpcEnvelope {
-  return rpcProtocol.normalize({
-    kind: 'request',
-    id,
-    method: 'echo',
-    data: {
-      route: {
-        profile: RpcRouteProfile,
-        type: 'request',
-        applicationVersion: '1',
-        senderId: 'frame-caller',
-        targetId: 'frame-provider',
-        sentAt: 0
-      },
-      payload: { secret: 'business-value' }
-    }
-  })
-}
-
-/** Codec/framer seams are the sender's existing component boundary, not another send path. */
-function components(
-  encode: (message: IRpcEnvelope) => unknown,
-  encodedType: 'string' | 'uint8array' | 'unknown' = 'string',
-  frames?: readonly unknown[]
-): IRpcSelectedComponents {
-  /** A three-frame fixture keeps chunk identities independent of semantic payload length. */
-  const framer: IRpcSelectedComponents['framer'] = frames
-    ? {
-        id: 'probe-frame-fixture',
-        version: 1,
-        inputEncodedType: encodedType,
-        outputEncodedType: encodedType,
-        frame: () => frames,
-        accept: (value) => ({ status: 'complete', value }),
-        close: () => undefined
-      }
-    : messageFramer
-  return {
-    protocol: rpcProtocol,
-    codec: {
-      id: 'probe-codec-fixture',
-      version: 1,
-      encodedType,
-      encode,
-      decode: (value) => rpcProtocol.normalize(value)
-    },
-    framer,
-    ingressPrepare: bindRpcFrameIngress(framer.accept, framer.frame),
-    shadowed: []
-  }
-}
-
-/** Installs the genuine emitter while retaining the sender's original public transport seam. */
-function observedSender(options: {
+/** The existing carrier fixture lends its actual codec, native write and current Host owners. */
+async function observedHosts(options: {
   readonly events: IRpcProbeEventView[]
-  readonly selected: IRpcSelectedComponents
-  readonly transport?: IRpcOutboundTransport
-  readonly authentication?: IRpcAuthenticationCapability
-  readonly fast?: boolean
-  readonly batch?: boolean
+  readonly incoming?: IRpcProbeEventView[]
   readonly capture?: readonly IRpcProbeStageName[]
   readonly redact?: (stage: RpcProbeStage, content: unknown) => unknown
+  readonly features?: readonly IRpcFlowFeature[]
+  readonly json?: boolean
+  readonly echo?: (value: unknown) => unknown
 }) {
-  /** Explicit snapshotProbeEvent is required when retaining the reusable view in a test. */
-  const probe = defineProbe({
+  /** Each retained event copies only the production emitter's reusable view. */
+  const callerProbe = defineProbe({
     stages: ['envelope', 'encoded', 'frame', 'protected'],
     capture: options.capture,
     redact: options.redact,
     emit: (view) => options.events.push(Object.freeze({ ...view }))
   })
-  /** Only the fixture clock is substituted; dispatch is the production emitter. */
-  const emitter = createProbeEmitter([probe], () => 1, 'frame-caller')
-  /** The optional writer exposes exact physical calls and transfer behavior without an adapter. */
-  const transport = options.transport ?? { platform: 'Memory' as const, send: vi.fn() }
-  return {
-    sender: new RpcOutboundSender(
-      transport,
-      'frame-caller',
-      options.selected,
-      options.authentication,
-      transport.platform,
-      undefined,
-      undefined,
-      options.fast,
-      options.batch,
-      undefined,
-      undefined,
-      undefined,
-      emitter
-    ),
-    emitter,
-    probe,
-    transport
+  /** Real JSON preparation is selected only when the scenario requires text/chunk/batch encoding. */
+  const listener = coreMemoryServer(
+    'frame-caller',
+    'frame-caller',
+    'memory',
+    [],
+    [],
+    options.json ? { create: () => new RpcJsonCarrierCodec(), nativeBinary: false } : undefined
+  )
+  /** Observation is installed through the same native public plugin path as other Host consumers. */
+  const caller = await createRpcHost({
+    ...listener.options,
+    plugins: [...(options.features ?? []), probe(callerProbe), listener.transport]
+  })
+  try {
+    /** The provider probe sees actual codec restoration and genuine provider invocation. */
+    const providerProbe =
+      options.incoming &&
+      probe({
+        stages: ['envelope', 'encoded', 'frame', 'protected'],
+        capture: options.capture,
+        emit: (view) => options.incoming!.push(Object.freeze({ ...view }))
+      })
+    /** Both real installations receive independent state from the same cold Feature definitions. */
+    const connected = await listener.connect('frame-provider', {
+      plugins: [...(options.features ?? []), ...(providerProbe ? [providerProbe] : [])],
+      provide: { echo: options.echo ?? ((value: unknown) => value) }
+    })
+    options.events.length = 0
+    if (options.incoming) options.incoming.length = 0
+    return { caller, provider: connected.host, pair: connected.pair }
+  } catch (error) {
+    await caller.close()
+    throw error
   }
+}
+
+/** Direction remains an actual Session fact, including opaque protection events without task ids. */
+function outbound(events: readonly IRpcProbeEventView[]): IRpcProbeEventView[] {
+  return events.filter((event) => event.direction === RpcProbeDirection.outbound)
+}
+
+/** Each real transform preserves the original encrypt-before-sign and verify-before-decrypt order. */
+function security() {
+  return auth({
+    encodedType: 'string',
+    encrypt: (value) => `encrypted:${JSON.stringify(value)}`,
+    decrypt: (value) => JSON.parse(String(value).slice('encrypted:'.length)),
+    sign: (value) => `signed:${String(value)}`,
+    verify: (value) => String(value).slice('signed:'.length)
+  })
 }
 
 describe('probe-core outbound frames', () => {
   it('keeps every string size unknown while intrinsic byte extents stay exact', async () => {
     expect(carrierSizeBytes('ascii')).toBe(-1)
     expect(carrierSizeBytes('é😀\ud800')).toBe(-1)
-    /** Byte views retain their exact selected span independently of string wire representation. */
+    /** The original native view extents remain independent of selected string representation. */
     const backing = new ArrayBuffer(8)
     expect(carrierSizeBytes(backing)).toBe(8)
     expect(carrierSizeBytes(new Uint8Array(backing, 2, 3))).toBe(3)
     expect(carrierSizeBytes(new DataView(backing, 1, 4))).toBe(4)
-    for (const encodedType of ['string', 'any'] as const) {
-      /** String sizes remain unknown in both supported transport representations. */
+    for (const json of [true, false]) {
+      /** Genuine JSON and native-any media retain the same unknown string/structured size policy. */
       const events: IRpcProbeEventView[] = []
-      /** This representation includes non-ASCII UTF-8 and a lone surrogate's replacement width. */
-      const fixture = observedSender({
-        events,
-        selected: components(() => 'é😀\ud800'),
-        transport: { platform: 'Memory', encodedType, send: vi.fn() }
-      })
-      await fixture.sender.send(request())
-      expect(
-        events
-          .filter(
-            (event) => event.stage === RpcProbeStage.encoded || event.stage === RpcProbeStage.frame
-          )
-          .map((event) => event.sizeBytes)
-      ).toEqual([-1, -1])
-      fixture.emitter.dispose()
+      const fixture = await observedHosts({ events, json })
+      try {
+        await fixture.caller.memory!.send('frame-provider', 'echo', 'é😀\ud800')
+        expect(
+          outbound(events)
+            .filter(
+              (event) =>
+                event.stage === RpcProbeStage.encoded || event.stage === RpcProbeStage.frame
+            )
+            .map((event) => event.sizeBytes)
+        ).toEqual([-1, -1])
+      } finally {
+        await Promise.all([fixture.caller.close(), fixture.provider.close()])
+      }
     }
   })
 
   it('observes a real authenticated three-chunk receive before the unchanged provider result', async () => {
-    /** Consumer snapshots retain both genuine endpoint timelines without changing the pipeline. */
-    const callerEvents: IRpcProbeEventView[] = [],
-      providerEvents: IRpcProbeEventView[] = []
-    /** The public probes capture only the existing pre/post authentication values. */
-    const callerProbe = defineProbe({
-      stages: ['envelope', 'encoded', 'frame', 'protected'],
-      capture: ['frame', 'protected'],
-      emit: (view) => callerEvents.push(Object.freeze({ ...view }))
-    })
-    /** Provider-side stages exercise actual unprotect, reassembly and decoding. */
-    const providerProbe = defineProbe({
-      stages: ['envelope', 'encoded', 'frame', 'protected'],
-      capture: ['frame', 'protected'],
-      emit: (view) => providerEvents.push(Object.freeze({ ...view }))
-    })
-    /** Each endpoint retains its own real replay/authentication capability and transform order. */
-    const security = () =>
-      authentication({
-        encodedType: 'string',
-        encrypt: (value) => `encrypted:${JSON.stringify(value)}`,
-        decrypt: (value) => JSON.parse(String(value).slice('encrypted:'.length)),
-        sign: (value) => `signed:${String(value)}`,
-        verify: (value) => String(value).slice('signed:'.length)
-      })
-    /** Core's own reference adapter supplies a real inbound transport boundary. */
-    const [left, right] = createMemoryTransportPair()
-    /** Actual endpoint emitters observe this same authenticated physical transport pair. */
-    bindInstalledProbe(
-      right,
-      createProbeEmitter([providerProbe], systemScheduler.now, 'paired-provider')
-    )
-    bindInstalledProbe(
-      left,
-      createProbeEmitter([callerProbe], systemScheduler.now, 'paired-caller')
-    )
-    /** One provider invocation must see and return the original business payload. */
+    const callerEvents: IRpcProbeEventView[] = []
+    const providerEvents: IRpcProbeEventView[] = []
     let calls = 0
-    /** The canonical JSON codec and canonical string framer create exactly three physical chunks. */
-    const server = await createRuntimeEndpointComposition(
-      {
-        id: 'paired-provider',
-        transport: right,
-        middlewares: [
-          connect(),
-          codec(defineJsonCodec({ version: 1 })),
-          framer(createStringFramer({ chunkBytes: 512, maxMessageBytes: 8192 })),
-          security()
-        ],
-        provider: {
-          echo: (context) => {
-            calls += 1
-            return context.success(context.data)
-          }
-        }
-      },
-      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
-    ).installing
-    /** The independent caller owns matching public component and authentication ports. */
-    const client = await createRuntimeEndpointComposition(
-      {
-        id: 'paired-caller',
-        transport: left,
-        middlewares: [
-          connect(),
-          codec(defineJsonCodec({ version: 1 })),
-          framer(createStringFramer({ chunkBytes: 512, maxMessageBytes: 8192 })),
-          security()
-        ]
-      },
-      { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
-    ).installing
+    /** Current profile geometry uses real whole-message authentication before negotiated chunks. */
+    const fixture = await observedHosts({
+      events: callerEvents,
+      incoming: providerEvents,
+      capture: ['frame', 'protected'],
+      features: [security(), chunk({ chunkBytes: 1024, maxMessageBytes: 8192 })],
+      json: true,
+      echo: (value) => {
+        calls += 1
+        return value
+      }
+    })
     try {
-      /** Padding exceeds two chunk widths after route encoding, while staying below three widths. */
       const payload = { business: 'unchanged', padding: 'x'.repeat(1024) }
-      expect(await client.send('paired-provider', 'echo', payload)).toEqual(payload)
+      expect(await fixture.caller.memory!.send('frame-provider', 'echo', payload)).toEqual(payload)
       expect(calls).toBe(1)
-      /** Outbound protection retains the sender's existing concurrent chunk preparation. */
-      const outbound = callerEvents.filter(
-        (event) => event.direction === RpcProbeDirection.outbound && event.method === 'echo'
-      )
-      expect(outbound.map((event) => event.stage)).toEqual([
+      const sent = outbound(callerEvents)
+      /** BC13 protects once at envelopeOutbound; frameOutbound then emits the three real chunks. */
+      expect(sent.map((event) => event.stage)).toEqual([
         RpcProbeStage.envelope,
+        RpcProbeStage.protected,
         RpcProbeStage.encoded,
         RpcProbeStage.frame,
         RpcProbeStage.frame,
-        RpcProbeStage.frame,
-        RpcProbeStage.protected,
-        RpcProbeStage.protected,
-        RpcProbeStage.protected
+        RpcProbeStage.frame
       ])
-      /** Opaque protected events have no ID yet; exact transmitted values select this request. */
-      const protectedValues = new Set(
-        outbound
-          .filter((event) => event.stage === RpcProbeStage.protected)
-          .map((event) => event.content)
-      )
-      /** Actual microtask delivery starts all unprotect operations before reassembly completes. */
       const inbound = providerEvents.filter(
-        (event) =>
-          event.direction === RpcProbeDirection.inbound &&
-          (event.stage === RpcProbeStage.protected
-            ? protectedValues.has(event.content)
-            : event.messageId === outbound[0]!.messageId)
+        (event) => event.direction === RpcProbeDirection.inbound
       )
       expect(inbound.map((event) => event.stage)).toEqual([
-        RpcProbeStage.protected,
-        RpcProbeStage.protected,
-        RpcProbeStage.protected,
         RpcProbeStage.frame,
         RpcProbeStage.frame,
         RpcProbeStage.frame,
         RpcProbeStage.encoded,
+        RpcProbeStage.protected,
         RpcProbeStage.envelope
       ])
+      const protectedSent = sent[1]!.content as { payload: string }
+      const protectedReceived = inbound[4]!.content as { payload: string }
+      expect(protectedReceived.payload).toBe(protectedSent.payload)
       for (let index = 0; index < 3; index += 1) {
-        /** The same physical protected value crosses the adapter and precedes its plaintext frame. */
-        const protectedEvent = inbound[index]!,
-          frameEvent = inbound[3 + index]!
-        expect(protectedEvent.content).toBe(outbound[5 + index]!.content)
-        expect(frameEvent.content).toEqual(outbound[2 + index]!.content)
-        expect(protectedEvent.content).not.toEqual(frameEvent.content)
-        expect(protectedEvent.seq).toBeLessThan(frameEvent.seq)
+        const frameEvent = inbound[index]!
+        const sentFrame = sent[3 + index]!
+        expect(frameEvent.content).toBe(sentFrame.content)
+        expect(frameEvent.content).not.toEqual(protectedSent)
+        expect(frameEvent.seq).toBeLessThan(inbound[4]!.seq)
         expect(frameEvent.content).toMatchObject({
-          messageId: outbound[0]!.messageId,
+          messageId: (sent[3]!.content as { messageId: string }).messageId,
           index,
           count: 3
         })
+        /** These public metadata oracles remain applicable to current negotiated chunk records. */
+        expect(sentFrame).toMatchObject({ chunkIndex: index, chunkCount: 3 })
       }
-      expect(inbound[6]!.seq).toBeGreaterThan(inbound[5]!.seq)
-      expect(inbound[7]).toMatchObject({
-        messageId: outbound[0]!.messageId,
+      expect(inbound[3]!.seq).toBeGreaterThan(inbound[2]!.seq)
+      expect(inbound[5]).toMatchObject({
+        messageId: sent[0]!.messageId,
         method: 'echo',
-        senderId: 'paired-caller'
+        senderId: 'frame-caller'
       })
     } finally {
-      await Promise.all([client.dispose(), server.dispose()])
-      left.close()
-      right.close()
+      await Promise.all([fixture.caller.close(), fixture.provider.close()])
     }
   })
 
   it('observes each actual chunk before protection and its result without changing writes', async () => {
-    /** Retained snapshots make the positional fields and chronological stage order inspectable. */
     const events: IRpcProbeEventView[] = []
-    /** Each plaintext chunk has a distinct protected representation. */
-    const frames = ['plain-a', 'plain-b', 'plain-c']
-    /** This transform uses the same async boundary and concurrency as real authentication. */
+    /**
+     * The transform is still the real auth Feature callback; the obsolete per-chunk hook is
+     * retired.
+     */
     const protect = vi.fn((value: unknown) => `protected:${String(value)}`)
-    /** Physical sends remain separately countable and preserve their original order. */
-    const send = vi.fn()
-    /** A minimal capability isolates the sender's actual protect stage from authentication grammar. */
-    const authentication: IRpcAuthenticationCapability = {
-      enabled: true,
-      encodedType: 'string',
-      protect,
-      unprotect: (value) => value
-    }
-    /** Content capture is deliberately limited to the two physical stages. */
-    const fixture = observedSender({
+    const fixture = await observedHosts({
       events,
-      selected: components(() => 'encoded', 'string', frames),
-      authentication,
-      transport: { platform: 'Memory', encodedType: 'string', send },
-      capture: ['frame', 'protected']
+      capture: ['frame', 'protected'],
+      json: true,
+      features: [
+        auth({
+          encodedType: 'string',
+          sign: protect,
+          verify: (value) => String(value).slice('protected:'.length)
+        }),
+        chunk({ chunkBytes: 768, maxMessageBytes: 8192 })
+      ]
     })
-    await fixture.sender.send(request())
-    expect(events.map((event) => event.stage)).toEqual([
-      RpcProbeStage.envelope,
-      RpcProbeStage.encoded,
-      RpcProbeStage.frame,
-      RpcProbeStage.frame,
-      RpcProbeStage.frame,
-      RpcProbeStage.protected,
-      RpcProbeStage.protected,
-      RpcProbeStage.protected
-    ])
-    for (let index = 0; index < frames.length; index += 1) {
-      /** Frame pairing follows chunk identity, while existing concurrent preparation stays intact. */
-      const before = events[2 + index]!,
-        after = events[5 + index]!
-      expect(before).toMatchObject({
-        direction: RpcProbeDirection.outbound,
-        messageId: 'frame-request',
-        chunkIndex: index,
-        chunkCount: 3,
-        content: frames[index]
-      })
-      expect(after).toMatchObject({ chunkIndex: index, chunkCount: 3 })
-      expect(after.content).toBe(`protected:${frames[index]}`)
-      expect(before.seq).toBeLessThan(after.seq)
-      expect(before.content).not.toBe(after.content)
+    /** Original carrier writes remain genuine and independently countable. */
+    const send = vi.spyOn(fixture.pair[0], 'write')
+    protect.mockClear()
+    try {
+      const payload = { secret: 'business-value', padding: 'x'.repeat(1024) }
+      expect(await fixture.caller.memory!.send('frame-provider', 'echo', payload)).toEqual(payload)
+      const selected = outbound(events)
+      expect(selected.map((event) => event.stage)).toEqual([
+        RpcProbeStage.envelope,
+        RpcProbeStage.protected,
+        RpcProbeStage.encoded,
+        RpcProbeStage.frame,
+        RpcProbeStage.frame,
+        RpcProbeStage.frame
+      ])
+      const frames = selected.filter((event) => event.stage === RpcProbeStage.frame)
+      const protectedEvents = selected.filter((event) => event.stage === RpcProbeStage.protected)
+      expect(protectedEvents).toHaveLength(1)
+      expect(frames).toHaveLength(3)
+      expect(protect).toHaveBeenCalledTimes(2)
+      /** Each endpoint signs its one whole request or reply, without per-chunk protection calls. */
+      expect(protectedEvents[0]!.content).toMatchObject({ payload: protect.mock.results[0]!.value })
+      expect(selected[0]!.seq).toBeLessThan(protectedEvents[0]!.seq)
+      for (let index = 0; index < frames.length; index += 1) {
+        const frame = frames[index]!
+        expect(frame).toMatchObject({
+          direction: RpcProbeDirection.outbound,
+          messageId: selected[0]!.messageId,
+          chunkIndex: index,
+          chunkCount: frames.length
+        })
+        expect(frame.content).toBe(send.mock.calls[index]![0].data)
+        expect(protectedEvents[0]!.seq).toBeLessThan(frame.seq)
+        expect(frame.content).not.toBe(protectedEvents[0]!.content)
+      }
+      expect(send).toHaveBeenCalledTimes(frames.length)
+    } finally {
+      send.mockRestore()
+      await Promise.all([fixture.caller.close(), fixture.provider.close()])
     }
-    expect(protect.mock.calls.map(([value]) => value)).toEqual(frames)
-    expect(send.mock.calls.map(([value]) => value)).toEqual(
-      frames.map((frame) => `protected:${frame}`)
-    )
-    fixture.emitter.dispose()
   })
 
   it('keeps content absent without capture and passes the normalized envelope by reference', async () => {
-    /** Envelope identity must survive observation, including a second capture-enabled send. */
-    const message = request()
-    /** The first sender opts into metadata alone. */
     const metadata: IRpcProbeEventView[] = []
-    /** The canonical identity codec accepts exactly the existing normalized object. */
-    const encode = vi.fn((value: IRpcEnvelope) => value)
-    /** A plain object transport keeps the existing identity-codec path. */
-    const absent = observedSender({ events: metadata, selected: components(encode, 'unknown') })
-    await absent.sender.send(message)
-    expect(metadata).toHaveLength(3)
-    expect(metadata.every((event) => event.content === undefined)).toBe(true)
-    expect(encode).toHaveBeenCalledExactlyOnceWith(message)
-    absent.emitter.dispose()
-    /** The second sender captures only envelope; other stage values stay absent. */
+    const absent = await observedHosts({ events: metadata })
+    /**
+     * The actual prepare boundary now receives the unchanged semantic input; encode receives
+     * preparation.
+     */
+    const encode = vi.spyOn(absent.pair[0].codec, 'prepare')
+    /** Notify admission precedes physical completion; the original write receipt fences assertions. */
+    const absentWrite = vi.spyOn(absent.pair[0], 'write')
+    try {
+      await absent.caller.memory!.dispatch('frame-provider', 'echo', { secret: 'business-value' })
+      await vi.waitFor(() => expect(absentWrite).toHaveBeenCalledTimes(1))
+      await absentWrite.mock.results[0]!.value
+      expect(outbound(metadata)).toHaveLength(3)
+      expect(outbound(metadata).every((event) => event.content === undefined)).toBe(true)
+      expect(encode).toHaveBeenCalledExactlyOnceWith(
+        absentWrite.mock.calls[0]![0].data,
+        expect.anything()
+      )
+    } finally {
+      encode.mockRestore()
+      absentWrite.mockRestore()
+      await Promise.all([absent.caller.close(), absent.provider.close()])
+    }
     const captured: IRpcProbeEventView[] = []
-    /** No copy or second normalization may replace this semantic value. */
-    const present = observedSender({
-      events: captured,
-      selected: components((value) => value, 'unknown'),
-      capture: ['envelope']
-    })
-    await present.sender.send(message)
-    expect(captured[0]?.content).toBe(message)
-    expect(captured.slice(1).every((event) => event.content === undefined)).toBe(true)
-    present.emitter.dispose()
+    const present = await observedHosts({ events: captured, capture: ['envelope'] })
+    const prepare = vi.spyOn(present.pair[0].codec, 'prepare')
+    /** This is the actual Session's physical write, not the early notify admission Promise. */
+    const presentWrite = vi.spyOn(present.pair[0], 'write')
+    try {
+      await present.caller.memory!.dispatch('frame-provider', 'echo', { secret: 'business-value' })
+      await vi.waitFor(() => expect(presentWrite).toHaveBeenCalledTimes(1))
+      await presentWrite.mock.results[0]!.value
+      const selected = outbound(captured)
+      expect(selected[0]?.content).toBe(prepare.mock.calls[0]![0])
+      expect(selected.slice(1).every((event) => event.content === undefined)).toBe(true)
+    } finally {
+      prepare.mockRestore()
+      presentWrite.mockRestore()
+      await Promise.all([present.caller.close(), present.provider.close()])
+    }
   })
 
   it('redacts only captured content while the original codec and transport retain business data', async () => {
-    /** An explicitly requested redaction result may differ from the business envelope. */
     const redacted = { secret: '[masked]' }
-    /** The exact original semantic object remains available to codec and physical writer. */
-    const message = request()
-    /** Snapshot retention is confined to the observer fixture. */
     const events: IRpcProbeEventView[] = []
-    /** The business writer must still receive the original object, not the redacted result. */
-    const send = vi.fn()
-    /** Redaction records its exact original input to catch a second normalization or clone. */
     const redact = vi.fn(() => redacted)
-    /** The production emitter owns redaction rather than sender call-site helpers. */
-    const fixture = observedSender({
-      events,
-      selected: components((value) => value, 'unknown'),
-      transport: { platform: 'Memory', send },
-      capture: ['envelope'],
-      redact
-    })
-    await fixture.sender.send(message)
-    expect(redact).toHaveBeenCalledExactlyOnceWith(RpcProbeStage.envelope, message)
-    expect(events[0]?.content).toBe(redacted)
-    expect(send.mock.calls[0]?.[0]).toBe(message)
-    expect(message.data.payload).toEqual({ secret: 'business-value' })
-    fixture.emitter.dispose()
+    const fixture = await observedHosts({ events, capture: ['envelope'], redact })
+    const send = vi.spyOn(fixture.pair[0], 'write')
+    const prepare = vi.spyOn(fixture.pair[0].codec, 'prepare')
+    /** Bootstrap and directory observations finish before the original single business redaction. */
+    redact.mockClear()
+    try {
+      await fixture.caller.memory!.dispatch('frame-provider', 'echo', { secret: 'business-value' })
+      await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1))
+      await send.mock.results[0]!.value
+      const message = prepare.mock.calls[0]![0] as IRpcEnvelope
+      expect(redact).toHaveBeenCalledExactlyOnceWith(RpcProbeStage.envelope, message)
+      expect(outbound(events)[0]?.content).toBe(redacted)
+      expect(send.mock.calls[0]?.[0].data).toBe(message)
+      expect('payload' in message && message.payload).toEqual({ secret: 'business-value' })
+    } finally {
+      send.mockRestore()
+      prepare.mockRestore()
+      await Promise.all([fixture.caller.close(), fixture.provider.close()])
+    }
   })
 
   it('copies captured bytes only when their original backing will transfer', async () => {
-    /** One backing contains a prefix and suffix outside the captured view. */
     const backing = new ArrayBuffer(8)
-    /** The transferred view proves capture honors byte offset and length. */
     const bytes = new Uint8Array(backing, 2, 3)
     bytes.set([4, 5, 6])
-    /** Retained snapshots must survive the real detachment performed by the physical writer. */
     const events: IRpcProbeEventView[] = []
-    /** Applies only to the actual transfer list consumed by this writer. */
-    const send = vi.fn((value: unknown, options?: { transfer?: readonly unknown[] }) => {
-      structuredClone(value, { transfer: options?.transfer as Transferable[] })
+    const fixture = await observedHosts({ events, capture: ['encoded', 'frame'] })
+    /**
+     * This existing codec's output seam supplies the same opaque byte representation as the old
+     * test.
+     */
+    const encode = vi
+      .spyOn(fixture.pair[0].codec, 'encode')
+      .mockReturnValue({ kind: 'message', data: bytes })
+    /** Native structuredClone is the actual terminal; captures are never fed into delivery. */
+    const send = vi.spyOn(fixture.pair[0], 'write').mockImplementation(async (frame, options) => {
+      options?.onWriteStart?.()
+      structuredClone(frame, { transfer: options?.transfer as Transferable[] | undefined })
     })
-    /** All byte stages share the same original view before physical transfer. */
-    const fixture = observedSender({
-      events,
-      selected: components(() => bytes, 'uint8array'),
-      transport: { platform: 'Memory', encodedType: 'uint8array', send },
-      capture: ['encoded', 'frame']
-    })
-    await fixture.sender.send(request(), { transfer: [backing] })
-    expect(backing.byteLength).toBe(0)
-    for (const event of events.slice(1)) {
-      expect(event.content).toBeInstanceOf(Uint8Array)
-      /** Boolean identity avoids Vitest's deep-equality hint walking the detached original view. */
-      expect(event.content === bytes).toBe(false)
-      expect(Array.from(event.content as Uint8Array)).toEqual([4, 5, 6])
+    try {
+      await fixture.caller.memory!.dispatch('frame-provider', 'echo', null, { transfer: [backing] })
+      await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1))
+      await send.mock.results[0]!.value
+      expect(backing.byteLength).toBe(0)
+      expect(outbound(events)).toHaveLength(3)
+      for (const event of outbound(events).slice(1)) {
+        expect(event.content).toBeInstanceOf(Uint8Array)
+        expect(event.content === bytes).toBe(false)
+        expect(Array.from(event.content as Uint8Array)).toEqual([4, 5, 6])
+      }
+      const retained = new Uint8Array([7, 8, 9])
+      events.length = 0
+      encode.mockReturnValue({ kind: 'message', data: retained })
+      await fixture.caller.memory!.dispatch('frame-provider', 'echo', null)
+      await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(2))
+      await send.mock.results[1]!.value
+      const references = outbound(events)
+      expect(references[1]?.content).toBe(retained)
+      expect(references[2]?.content).toBe(retained)
+      expect(send).toHaveBeenCalledTimes(2)
+    } finally {
+      encode.mockRestore()
+      send.mockRestore()
+      await Promise.all([fixture.caller.close(), fixture.provider.close()])
     }
-    fixture.emitter.dispose()
-    /** A non-transferred byte view must remain the original reference. */
-    const retained = new Uint8Array([7, 8, 9])
-    /** This fixture opts into the same stages without any transfer list. */
-    const references: IRpcProbeEventView[] = []
-    /** Identity, rather than only equal bytes, proves the no-copy path. */
-    const ordinary = observedSender({
-      events: references,
-      selected: components(() => retained, 'uint8array'),
-      capture: ['encoded', 'frame']
-    })
-    await ordinary.sender.send(request())
-    expect(references[1]?.content).toBe(retained)
-    expect(references[2]?.content).toBe(retained)
-    ordinary.emitter.dispose()
   })
 
-  it('emits no frame stage on the existing fast send path', async () => {
-    /** The real fast owner omits framing; installing a probe may not restore it. */
-    const events: IRpcProbeEventView[] = []
-    /** Codec output alone reaches the same physical writer. */
-    const fixture = observedSender({ events, selected: components(() => 'encoded'), fast: true })
-    await fixture.sender.send(request())
-    expect(events.map((event) => event.stage)).toEqual([
-      RpcProbeStage.envelope,
-      RpcProbeStage.encoded
-    ])
-    fixture.emitter.dispose()
-  })
+  // BC3/R10 deletes the private fast path; its only no-frame oracle is retired in the receipt, not passed.
 
   it('emits one envelope event for every physical batch member', async () => {
-    /** Busy transport holds one write so the existing sender collects a real two-member batch. */
-    let release: (() => void) | undefined
-    /** Every physical invocation retains its original exact wire object. */
-    const writes: unknown[] = []
-    /** Only the initial physical write waits; the queued batch completes normally. */
-    const send = (value: unknown) => {
-      writes.push(value)
-      if (writes.length === 1)
-        return new Promise<void>((resolve) => {
-          release = resolve
-        })
-    }
-    /** The canonical identity codec provides the sender's actual private batching qualification. */
-    const selected = components((value) => value, 'unknown')
-    /** Exact codec identity keeps the ordinary batching size proof intact. */
-    const canonical: IRpcSelectedComponents = {
-      ...selected,
-      codec: identityCodec as IRpcSelectedComponents['codec']
-    }
-    /** The retained metadata reveals semantic members independently of physical write count. */
     const events: IRpcProbeEventView[] = []
-    /** Batch and fast switches select the same existing owner, without another grouping fixture. */
-    const fixture = observedSender({
+    const fixture = await observedHosts({
       events,
-      selected: canonical,
-      transport: { platform: 'Memory', send },
-      fast: true,
-      batch: true,
-      capture: ['envelope']
+      capture: ['envelope', 'frame'],
+      features: [batch()],
+      json: true
     })
-    /** The initial send immediately owns the idle transport. */
-    const first = fixture.sender.send(request('first'))
-    /** Both later messages queue while that actual physical write remains pending. */
-    const second = fixture.sender.send(request('second')),
-      third = fixture.sender.send(request('third'))
-    await vi.waitFor(() => expect(release).toBeTypeOf('function'))
-    release!()
-    await Promise.all([first, second, third])
-    expect(writes).toHaveLength(2)
-    expect(writes[1]).toMatchObject({ kind: RpcBatchPhysical.kind })
-    /** Semantic observation count follows physical membership, never only the first member. */
-    const envelopes = events.filter((event) => event.stage === RpcProbeStage.envelope)
-    expect(envelopes.map((event) => [event.messageId, event.members])).toEqual([
-      ['first', -1],
-      ['second', 2],
-      ['third', 2]
-    ])
-    expect(envelopes[1]?.content).toBe((writes[1] as { envelopes: IRpcEnvelope[] }).envelopes[0])
-    expect(envelopes[2]?.content).toBe((writes[1] as { envelopes: IRpcEnvelope[] }).envelopes[1])
-    fixture.emitter.dispose()
+    const send = vi.spyOn(fixture.pair[0], 'write')
+    const prepare = vi.spyOn(fixture.pair[0].codec, 'prepare')
+    const encode = vi.spyOn(fixture.pair[0].codec, 'encode')
+    try {
+      fixture.pair[0].holdWrites()
+      const first = fixture.caller.memory!.send('frame-provider', 'echo', 'first', {
+        trace: 'first'
+      })
+      await vi.waitFor(() => expect(send).toHaveBeenCalledTimes(1))
+      const second = fixture.caller.memory!.send('frame-provider', 'echo', 'second', {
+        trace: 'second'
+      })
+      const third = fixture.caller.memory!.send('frame-provider', 'echo', 'third', {
+        trace: 'third'
+      })
+      await vi.waitFor(() => expect(encode).toHaveBeenCalledTimes(3))
+      fixture.pair[0].releaseWrites()
+      expect(await Promise.all([first, second, third])).toEqual(['first', 'second', 'third'])
+      expect(send).toHaveBeenCalledTimes(2)
+      const writes = send.mock.calls.map(([frame]) => frame)
+      expect(writes[1]).toMatchObject({ kind: 'extension', extension: 'batch@1' })
+      const envelopes = outbound(events).filter((event) => event.stage === RpcProbeStage.envelope)
+      /** BC2/R16 observes each semantic input once before physical batch membership exists. */
+      const ids = prepare.mock.calls.map(([message]) => ('id' in message ? message.id : undefined))
+      expect(prepare).toHaveBeenCalledTimes(3)
+      expect(new Set(ids).size).toBe(3)
+      expect(envelopes.map((event) => [event.messageId, event.members])).toEqual([
+        [ids[0], -1],
+        [ids[1], -1],
+        [ids[2], -1]
+      ])
+      for (let index = 0; index < envelopes.length; index += 1)
+        expect(envelopes[index]?.content).toBe(prepare.mock.calls[index]![0])
+      /** The actual physical batch alone owns its two-member observation and borrowed data root. */
+      const frames = outbound(events).filter((event) => event.stage === RpcProbeStage.frame)
+      expect(frames.map((event) => event.members)).toEqual([-1, 2])
+      expect(frames[0]?.content).toBe(writes[0]!.data)
+      expect(frames[1]?.content).toBe(writes[1]!.data)
+      const members = (writes[1]!.data as { frames: unknown[] }).frames
+      expect(members).toHaveLength(2)
+      expect(members[0]).toBe(encode.mock.results[1]!.value)
+      expect(members[1]).toBe(encode.mock.results[2]!.value)
+    } finally {
+      fixture.pair[0].releaseWrites()
+      send.mockRestore()
+      prepare.mockRestore()
+      encode.mockRestore()
+      await Promise.all([fixture.caller.close(), fixture.provider.close()])
+    }
   })
 })

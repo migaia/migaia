@@ -742,7 +742,7 @@ export class Session {
    */
   readonly #onFrame = (frame: IRpcCarrierFrame): void => {
     if (this.#controller.signal.aborted) return
-    this.#media(S.frame, D.inbound, frame.data)
+    this.#media(S.frame, D.inbound, frame)
     this.#receiving = this.#receiving
       .then(() => this.#receiveFrame(frame))
       .catch((error) => this.#fail(error, true))
@@ -1044,7 +1044,7 @@ export class Session {
       this.#assertOpen(writeContext.continuing, writeContext.final)
       /** A batch may clear only its first logical signal, never the held Session's terminal fence. */
       const signal = physical?.signal === false ? this.#controller.signal : physical?.signal
-      this.#media(S.frame, D.outbound, frame.data, writeContext.message, physical?.transfer)
+      this.#media(S.frame, D.outbound, frame, writeContext.message, physical?.transfer)
       this.#assertOpen(writeContext.continuing, writeContext.final)
       if (signal?.aborted) throw createRpcAbortError(undefined, undefined, signal.reason)
       await this.#write(
@@ -1186,6 +1186,10 @@ export class Session {
   ): void {
     /** Admitted semantic routes may annotate outbound media and restored inbound envelopes only. */
     const routed = message && message.kind !== K.handshake ? message : undefined
+    /** Only the existing frame stage lends its original opaque outer frame to readonly observers. */
+    const frame = stage === S.frame ? (content as IRpcCarrierFrame) : undefined
+    /** Captured bytes and extension data retain their original identity and representation. */
+    const media = frame ? frame.data : content
     this.#observe({
       stage,
       direction,
@@ -1195,9 +1199,10 @@ export class Session {
       targetId: routed?.route.targetId,
       receiverId: routed?.route.receiverId,
       peerId: this.#view?.peerId,
-      sizeBytes: stage === S.envelope ? -1 : carrierSizeBytes(content),
+      sizeBytes: stage === S.envelope ? -1 : carrierSizeBytes(media),
       // A not-yet-accepted handshake can carry private connection credentials.
-      content: this.#view ? content : undefined,
+      content: this.#view ? media : undefined,
+      carrierFrame: this.#view ? frame : undefined,
       transfer
     })
   }
