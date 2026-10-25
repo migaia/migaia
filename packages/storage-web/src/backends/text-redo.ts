@@ -421,7 +421,9 @@ type ITextDraftContext<R> = {
   values: Map<string, string | null>
 
   /** WAL changes kept in the original native assignment order. */
-  changed: IStorageJournalChange[]
+  changed: Array<
+    IStorageJournalChange & { readonly target: Extract<ILockKey, { readonly channel: 'text' }> }
+  >
 
   /** Prepared synchronous assignments applied only by the existing redo commit. */
   writes: Array<() => void>
@@ -530,7 +532,6 @@ function visible<R>(draftState: ITextDraftContext<R>): readonly IStorageKey[] {
     draftState.redoContext.input.keys().map((key) => [encodeFlatStorageKey(key), key])
   )
   for (const change of draftState.changed) {
-    if (change.target.channel !== 'text') continue
     const id = encodeFlatStorageKey(change.target.key)
     if (draftState.values.get(id) === null) keys.delete(id)
     else keys.set(id, change.target.key)

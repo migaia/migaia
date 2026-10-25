@@ -1055,10 +1055,6 @@ function admitReactiveQuery<T>(queryState: IReactiveQueryContext<T>): void {
 function initializeReactiveQuery<T>(queryState: IReactiveQueryContext<T>): void {
   queryState.computedStateDisposed = false
 
-  queryState.removeExternalAbort = (_recordFailure?: (error: unknown) => void): void => undefined
-
-  queryState.disposeQuery = () => Promise.resolve()
-
   queryState.externalAbortObserved = false
 
   queryState.externalAbortRegistrationAttempted = false

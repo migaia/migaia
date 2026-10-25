@@ -1376,7 +1376,6 @@ async function migrateLegacyRecords<TValue>(
     indexedDbContext,
     async () => {
       if (!database.objectStoreNames.contains(LEGACY_RECORDS_STORE_NAME)) return
-      if (!database.objectStoreNames.contains(indexedDbContext.recordsStoreName)) return
       if (indexedDbContext.recordsStoreName === LEGACY_RECORDS_STORE_NAME) return
       const state = (await readFromMetadata(
         indexedDbContext,

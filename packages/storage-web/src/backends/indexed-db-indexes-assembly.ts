@@ -1992,8 +1992,6 @@ export const toIdbRecordIndexRange = (
   continuation: readonly IDBValidKey[] | undefined
 ): IDBKeyRange => {
   const snapshot = range
-  if (typeof prefix[2] !== 'string' || prefix[2].includes('\u0000'))
-    throw new StorageError(StorageErrorCode.invalidConfig, { backend: StorageBackend.indexedDb })
   let lower: IDBValidKey[] =
     snapshot?.lower === undefined ? [...prefix] : [...prefix, toIdbKey(snapshot.lower)]
   let upper: IDBValidKey[] =
