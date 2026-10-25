@@ -570,6 +570,9 @@
         {
           "type": "object",
           "required": ["ok"],
+          "not": {
+            "required": ["streamTerminal"]
+          },
           "properties": {
             "ok": {
               "const": true
@@ -588,6 +591,9 @@
             },
             "error": {
               "$ref": "#/$defs/errorGraph"
+            },
+            "streamTerminal": {
+              "const": "cancelled"
             }
           }
         }
@@ -770,6 +776,26 @@
       ]
     },
     "outcome": {
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "stream"
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "completion": {
+                "not": {
+                  "required": ["streamTerminal"]
+                }
+              }
+            }
+          }
+        }
+      ],
       "oneOf": [
         {
           "type": "object",

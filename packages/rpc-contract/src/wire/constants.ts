@@ -96,6 +96,8 @@ export const RpcWireField = {
   stream: 'stream',
   /** Selects the completion slot in the wire shape and its diagnostic pointer. */
   completion: 'completion',
+  /** Retains the actual cancelled stream terminal independently from its public error labels. */
+  streamTerminal: 'streamTerminal',
   /** Selects the idempotencyKey slot in the wire shape and its diagnostic pointer. */
   idempotencyKey: 'idempotencyKey',
   /** Selects the state slot in the wire shape and its diagnostic pointer. */

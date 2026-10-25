@@ -1,6 +1,7 @@
 /** Public single-profile grammar cases for core R6, R8, R15 and BC2/BC6. */
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
+import { RpcStreamEvent } from '@migaia/rpc-contract'
 import {
   RpcProbeStage,
   RpcProbeStageName,
@@ -584,6 +585,38 @@ const records: IRecordCase[] = [
 ]
 
 describe('R17 direct record fields', () => {
+  it('[CORE-C004-TERMINAL] retains only actual failed-stream terminal facts after original field admission', () => {
+    /** The complete original graph and unknown metadata retain their input identities. */
+    const completion = Object.freeze({
+      ok: false,
+      error: graph(),
+      streamTerminal: RpcStreamEvent.cancelled,
+      future: { retained: true }
+    })
+    expect(normalizeRpcCompletion(completion, 'stream')).toBe(completion)
+    // The three fixed non-stream modes cannot claim a stream cancellation terminal.
+    for (const mode of ['request', 'notify', 'group'] as const)
+      expect(() => normalizeRpcCompletion(completion, mode)).toThrowError(
+        expect.objectContaining({ code: 'INVALID_ENVELOPE', pointer: '/outcome/streamTerminal' })
+      )
+    expect(() =>
+      normalizeRpcCompletion({ ok: true, streamTerminal: RpcStreamEvent.cancelled }, 'stream')
+    ).toThrowError(
+      expect.objectContaining({ code: 'INVALID_ENVELOPE', pointer: '/outcome/streamTerminal' })
+    )
+    // Each fixed invalid value exercises this one newly meaningful field, without a new parser.
+    for (const streamTerminal of [RpcStreamEvent.fail, 'other', null])
+      expect(() =>
+        normalizeRpcCompletion({ ...completion, streamTerminal }, 'stream')
+      ).toThrowError(
+        expect.objectContaining({ code: 'INVALID_ENVELOPE', pointer: '/outcome/streamTerminal' })
+      )
+    /** Missing original error remains the first failure even when the new optional fact is bad. */
+    expect(() =>
+      normalizeRpcCompletion({ ok: false, streamTerminal: 'other' }, 'stream')
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_ENVELOPE', pointer: '/outcome/error' }))
+  })
+
   it.each(records)(
     '[CORE-A19-FIELD] $name retains native code and first missing/bad known pointer',
     (entry) => {

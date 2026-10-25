@@ -116,7 +116,8 @@ export class StreamChannel {
     iterable: AsyncIterable<IRpcPortableValue> | Iterable<IRpcPortableValue>,
     signal: IAbortSignal,
     complete: (completion: IRpcCompletion) => void,
-    targetSource?: IRpcTargetSource
+    targetSource?: IRpcTargetSource,
+    completion?: IRpcCompletion
   ): Promise<void> {
     if (this.#closing) this.#assertOpen()
     /** Iterator factory runs once before open; failed construction stays under Dispatcher reporting. */
@@ -126,7 +127,8 @@ export class StreamChannel {
       iterable,
       signal,
       complete,
-      targetSource
+      targetSource,
+      completion
     })
     this.#register(this.#producers, source.carrierId, envelope.id, producer)
     this.#track(this.#activeProducers, source.carrierId, producer)

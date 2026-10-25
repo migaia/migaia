@@ -20,6 +20,7 @@ import {
   RpcRuntimeOutcomeState
 } from './outcome-constants.js'
 import { normalizeRpcWireError } from './errors.js'
+import { RpcStreamEvent } from './stream-constants.js'
 import {
   RpcCallMode,
   RpcWireField as F,
@@ -73,6 +74,22 @@ export function normalizeRpcGroupResult(
   return value as readonly IRpcStepOutcome[]
 }
 
+/** Read the new terminal fact only after original required fields and their values are admitted. */
+function validateStreamTerminal(
+  input: Record<string, unknown>,
+  mode: IRpcTask['mode'],
+  failed: boolean,
+  metadata: IRpcErrorWireMetadata | undefined
+): void {
+  /** A stored cancellation classifies a failed stream, never another mode or successful result. */
+  const streamTerminal = input[F.streamTerminal]
+  if (
+    streamTerminal !== undefined &&
+    (!failed || mode !== RpcCallMode.stream || streamTerminal !== RpcStreamEvent.cancelled)
+  )
+    invalid(`${P.outcome}/${F.streamTerminal}`, undefined, metadata)
+}
+
 /** Successful groups require a complete report; other actual undefined results stay omitted. */
 export function normalizeRpcCompletion(
   value: unknown,
@@ -83,17 +100,19 @@ export function normalizeRpcCompletion(
   /** Captured fields remain separate from the source object or external result-store owner. */
   if (!value || typeof value !== 'object' || Array.isArray(value))
     invalid(P.outcome, undefined, metadata)
-  /** Only ok/result/error have completion meaning. */
+  /** Retained cancellation is explicit stream data, never inferred from an error code or name. */
   const input = value as Record<string, unknown>
   if (input.ok === undefined) invalid(`${P.outcome}/ok`, undefined, metadata)
   if (input.ok === false) {
     if (input.error === undefined) invalid(`${P.outcome}/error`, undefined, metadata)
     normalizeRpcWireError(input.error, metadata)
+    validateStreamTerminal(input, mode, true, metadata)
     return value as IRpcCompletion
   }
   if (input.ok !== true) invalid(`${P.outcome}/ok`, undefined, metadata)
   if (mode === RpcCallMode.group) normalizeRpcGroupResult(input.result, metadata, portable)
   else if (Object.hasOwn(input, F.result)) portable(input.result, metadata)
+  validateStreamTerminal(input, mode, false, metadata)
   return value as IRpcCompletion
 }
 

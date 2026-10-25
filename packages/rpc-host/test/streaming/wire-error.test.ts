@@ -1,11 +1,54 @@
 /** Original stream error graphs cross actual public namespaces and the canonical shared wire owner. */
 import { describe, expect, it } from 'vitest'
 import { RpcError } from '@migaia/rpc-contract/errors'
+import { RpcStreamEvent } from '@migaia/rpc-contract'
+import type { IRpcContext } from '@migaia/rpc-host'
+import type { IAbortSignal } from '@migaia/utils/promise'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { connectedCoreHosts } from '../host/core-fixture.js'
 
 /** Preserves delivered values and then a sticky restored failure graph. */
 describe('streaming error graph', () => {
+  it('keeps a business CANCELLED label as a failed terminal without aborting its provider signal', async () => {
+    /** A public business error label grants no native cancellation or cached terminal authority. */
+    const original = new RpcError(
+      RpcCoreErrorCode.cancelled,
+      'business-labelled cancellation',
+      new TypeError('business cause')
+    )
+    /** This is the real provider invocation's original signal, not a caller substitute. */
+    let signal: IAbortSignal | undefined
+    /** The existing native pair owns actual public stream dispatch, restore and cleanup. */
+    const fixture = await connectedCoreHosts(
+      {
+        labelled: function* (_payload: unknown, context: IRpcContext) {
+          signal = context.signal
+          throw original
+        }
+      },
+      {},
+      () => undefined
+    )
+    try {
+      /** The genuine lazy iterator starts the original business and receives its exact diagnostic. */
+      const iterator = fixture.b.memory.stream('labelled') as AsyncIterableIterator<unknown>
+      await expect(iterator.next()).rejects.toMatchObject({
+        code: RpcCoreErrorCode.cancelled,
+        message: original.message,
+        stack: original.stack,
+        cause: { name: 'TypeError', message: 'business cause' }
+      })
+      /** Original semantic write data already passed the codec; observation performs no decode. */
+      const terminal = fixture.pair[0].written.find(
+        (frame) => frame.kind === 'stream' && frame.stream.event !== RpcStreamEvent.open
+      )
+      expect(terminal).toMatchObject({ kind: 'stream', stream: { event: 'fail' } })
+      expect(signal?.aborted).toBe(false)
+    } finally {
+      await fixture.close()
+    }
+  })
+
   it('retains the producer cause and rejects later next with the same remote instance', async () => {
     const original = new RpcError(RpcCoreErrorCode.internal, 'producer failed', new Error('root'))
     /** The actual provider is compiled before this pair's one native handshake. */

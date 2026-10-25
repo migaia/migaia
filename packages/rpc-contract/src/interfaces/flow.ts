@@ -70,7 +70,12 @@ export const RpcDispatchDrop = Object.freeze({ kind: 'drop' } as const)
 /** Dispatch may expose a scalar/stream terminal or quietly finish an admitted duplicate. */
 export type IRpcDispatchOutcome = Readonly<
   | { kind: 'value'; value?: IRpcPortableValue; transfer?: readonly ArrayBuffer[] }
-  | { kind: 'stream'; value: AsyncIterable<IRpcPortableValue> }
+  | {
+      kind: 'stream'
+      value: AsyncIterable<IRpcPortableValue>
+      /** Retained terminal facts reach the sole producer without changing its new signal. */
+      completion?: IRpcCompletion
+    }
   | typeof RpcDispatchDrop
 >
 

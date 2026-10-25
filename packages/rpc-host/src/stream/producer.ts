@@ -276,7 +276,10 @@ export class StreamProducer {
   /** Terminal cleanup preserves the original primary if iterator.return also fails. */
   async #fail(primary: unknown): Promise<void> {
     if (this.#terminal) return
-    this.#mark(this.#failure(primary))
+    /** Only the retained canonical completion can select cancellation without aborting new work. */
+    const streamTerminal =
+      this.#input.completion?.ok === false ? this.#input.completion.streamTerminal : undefined
+    this.#mark(this.#failure(primary, streamTerminal))
     /** Original failures stay first when cleanup produces a different secondary failure. */
     let failure = primary
     try {
@@ -285,10 +288,14 @@ export class StreamProducer {
       if (error !== primary)
         failure = new AggregateError([primary, error], RpcStreamErrorText.cleanupFailed)
     }
-    this.#completion = this.#failure(failure)
+    this.#completion = this.#failure(failure, streamTerminal)
     try {
       await this.#send(
-        { event: RpcStreamEvent.fail, seq: this.#seq, error: this.#wire(failure) },
+        {
+          event: streamTerminal ?? RpcStreamEvent.fail,
+          seq: this.#seq,
+          error: this.#wire(failure)
+        },
         failure
       )
     } catch (error) {
@@ -300,7 +307,7 @@ export class StreamProducer {
   close(reason: unknown): Promise<void> {
     if (this.#closing) return this.#finished.promise
     if (this.#terminal) return this.#finished.promise
-    this.#mark(this.#failure(reason))
+    this.#mark(this.#failure(reason, RpcStreamEvent.cancelled))
     this.#pending += 1
     this.#closing = this.#cancel(reason).finally(() => this.#release())
     return this.#finished.promise
@@ -324,7 +331,7 @@ export class StreamProducer {
           : new AggregateError([reason, failure], RpcStreamErrorText.cleanupFailed)
       this.#owner.report(failure)
     }
-    if (cleanup !== undefined) this.#completion = this.#failure(cleanup)
+    if (cleanup !== undefined) this.#completion = this.#failure(cleanup, RpcStreamEvent.cancelled)
     try {
       await this.#send(
         {
@@ -360,8 +367,15 @@ export class StreamProducer {
     })
   }
   /** Failure completion is selected from one original primary graph. */
-  #failure(error: unknown): Extract<IRpcCompletion, { ok: false }> {
-    return { ok: false, error: this.#wire(error) }
+  #failure(
+    error: unknown,
+    streamTerminal?: typeof RpcStreamEvent.cancelled
+  ): Extract<IRpcCompletion, { ok: false }> {
+    return {
+      ok: false,
+      error: this.#wire(error),
+      ...(streamTerminal === undefined ? {} : { streamTerminal })
+    }
   }
   /** Reverse routing changes only immediate media identity; selected task/id remain original. */
   async #send(stream: IRpcStreamEvent, error?: unknown, onWriteStart?: () => void): Promise<void> {

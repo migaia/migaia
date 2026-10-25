@@ -8,6 +8,7 @@ import type {
   IRpcErrorWireMetadata
 } from '../contract/types.js'
 import type { IRpcMethodSchema } from './method-schema.js'
+import type { RpcStreamEvent } from './stream-constants.js'
 
 import type {
   RpcCallMode,
@@ -80,7 +81,12 @@ export type IRpcStepOutcome = Readonly<
 /** One completion is stored by its actual idempotency owner, not inferred from missing lookups. */
 export type IRpcCompletion = Readonly<
   | { ok: true; result?: IRpcPortableValue | readonly IRpcStepOutcome[] }
-  | { ok: false; error: IRpcWireError }
+  | {
+      ok: false
+      error: IRpcWireError
+      /** Actual stream cancellation survives retained-outcome cloning without aborting replay. */
+      streamTerminal?: typeof RpcStreamEvent.cancelled
+    }
 >
 /** One group step is a request with an optional portable payload. */
 export type IRpcStep = Readonly<{ method: string; payload?: IRpcPortableValue }>

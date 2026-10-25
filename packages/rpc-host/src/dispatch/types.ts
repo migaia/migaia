@@ -145,7 +145,9 @@ export type IProviderStreamPort = Readonly<{
     iterable: AsyncIterable<IRpcPortableValue> | Iterable<IRpcPortableValue>,
     signal: IAbortSignal,
     complete: (completion: IRpcCompletion) => void,
-    targetSource?: IRpcTargetSource
+    targetSource?: IRpcTargetSource,
+    /** The actual retained completion carries terminal classification, never cancellation intent. */
+    completion?: IRpcCompletion
   ): Promise<void>
 }>
 /** Root supplies actual IO/flow/namespace ports without optional plugin capabilities. */

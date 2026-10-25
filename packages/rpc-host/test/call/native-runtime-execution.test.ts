@@ -5,16 +5,25 @@ import { createRpcHost } from '@migaia/rpc-host'
 import {
   createRpcIdempotencyStore,
   idempotency,
+  type IRpcIdempotencyClaim,
+  type IRpcIdempotencyOutcome,
   type IRpcIdempotencyStore
 } from '@migaia/rpc-host/features/idempotency'
 import limits from '@migaia/rpc-host/features/limits'
-import { RpcContractErrorCode, RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
+import { timeout } from '@migaia/rpc-host/features/timeout'
+import {
+  RPC_ENDPOINT_ERROR_SOURCE,
+  RpcContractErrorCode,
+  RpcCoreErrorCode
+} from '@migaia/rpc-contract/error-code'
 import { RpcWireProfile, type IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
+import { RpcStreamEvent } from '@migaia/rpc-contract'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { deferred } from '@migaia/utils/promise'
 import { assert, expect, it, vi } from 'vitest'
 import { ProviderAdmissionRegistry } from '../../dist/features/limits/provider-admission.js'
 import { ProviderDispatcher } from '../../dist/dispatch/dispatcher.js'
+import { ProviderInvocation } from '../../dist/dispatch/invocation.js'
 import { coreMemoryServer } from '../host/core-fixture.js'
 
 /** A17's in-process engine inspection retains only this case's genuine provider operation owner. */
@@ -67,6 +76,30 @@ class IncomingInspector {
       this.#session.disconnect()
     }
   }
+}
+
+/** The original custom-store boundary returns a real cloned retained body, without local brands. */
+function cloneStoredStreamOutcome(
+  outcome: IRpcIdempotencyOutcome | 'unavailable' | undefined
+): IRpcIdempotencyOutcome | 'unavailable' | undefined {
+  return structuredClone(outcome)
+}
+
+/** Delegate the sole real claim algorithm, then clone only its exposed retained outcome snapshots. */
+function clonedStreamClaim(
+  store: IRpcIdempotencyStore,
+  scope: string,
+  key: string,
+  now: number,
+  fingerprint?: string
+): IRpcIdempotencyClaim {
+  /** The original store alone grants execution, waits, rejects capacity or supplies a done body. */
+  const claim = store.claim(scope, key, now, fingerprint)
+  return claim.status === 'done'
+    ? { status: 'done', outcome: structuredClone(claim.outcome) }
+    : claim.status === 'pending'
+      ? { status: 'pending', outcome: claim.outcome.then(cloneStoredStreamOutcome) }
+      : claim
 }
 
 // RPC-TEST-3CA7BB5939FE-C005: all original retained-completion predicates remain unchanged.
@@ -241,3 +274,176 @@ it('an original pending keyed claim prevents duplicate execution and seals the c
     }
   }
 })
+
+/**
+ * One original cancellation variant keeps the same real source, store and FIFO through replay and
+ * recovery. This single end-to-end lifetime owns its shared cleanup; splitting it would scatter
+ * resource ownership or replace the operation whose retained completion is under assertion.
+ */
+async function clonedStreamReplay(
+  code: typeof RpcCoreErrorCode.cancelled | typeof RpcCoreErrorCode.deadlineExceeded
+): Promise<void> {
+  /** Only the real memory store owns claim, waiter and retained-outcome mutation. */
+  const originalStore = createRpcIdempotencyStore()
+  /** Cancellation follows the real synchronous claim, preserving the original admitted-store seam. */
+  const claiming = vi.fn<IRpcIdempotencyStore['claim']>((scope, key, now, fingerprint) =>
+    clonedStreamClaim(originalStore, scope, key, now, fingerprint)
+  )
+  /** These are the same original custom-store clone boundaries, without a second store algorithm. */
+  const store: IRpcIdempotencyStore = {
+    claim: claiming,
+    lookup: (scope, key, now) => structuredClone(originalStore.lookup!(scope, key, now))
+  }
+  /** Actual limits occupancy includes the held predecessor and the queued stream until completion. */
+  const admitting = vi.spyOn(ProviderAdmissionRegistry.prototype, 'acquireMany')
+  /** Original run contexts expose the genuine replay invocation's existing readonly signal getter. */
+  const executing = vi.spyOn(ProviderInvocation.prototype, 'run')
+  /** A17's fixed engine-read follows the real dispatcher that accepted these original operations. */
+  const dispatching = vi.spyOn(ProviderDispatcher.prototype, 'accept')
+  /** This application-owned predecessor holds the actual native orderKey permission. */
+  const release = deferred<void>()
+  /** Only real hold-provider entry proves the predecessor acquired the shared original FIFO. */
+  const entered = deferred<void>()
+  /** No initial or replayed stream may invoke the original value provider. */
+  let effects = 0
+  /** Actual source admission supplies genuine task IDs and immutable caller/provider generations. */
+  const server = coreMemoryServer('provider')
+  /** Existing feature factories own idempotency, six original leases and all native execution. */
+  const host = await createRpcHost({
+    ...server.options,
+    plugins: [
+      idempotency({ store, scope: () => 'peer' }),
+      limits({ maxGlobal: 6, maxPerPeer: 6 }),
+      ...server.options.plugins
+    ],
+    provide: {
+      hold: async (_payload, context) => {
+        entered.resolve()
+        await release.promise
+        return context.success(1)
+      },
+      value: (_payload, context) => {
+        effects += 1
+        return context.success(3)
+      }
+    }
+  })
+  /** The same physical connection carries initial cancellation, cached replay and later recovery. */
+  const client = await server.connect('caller')
+  /** This ordinary caller controller delivers actual before-start intent, never a provider facade. */
+  const controller = new AbortController()
+  /** Observe every original caller outcome immediately, including cleanup after an assertion fails. */
+  const pending: Promise<unknown>[] = []
+  /** The test retains only its actual accepted dispatcher for the final zero-operation sample. */
+  let inspector: IncomingInspector | undefined
+  try {
+    /** The predecessor is an actual public group, matching the original scalar hold member. */
+    const first = client.host.memory.group([{ method: 'hold' }], {
+      orderKey: 'queue',
+      timeout: false
+    })
+    pending.push(first.catch((error: unknown) => error))
+    await entered.promise
+    /** A complete5ms timeout replaces only the old numeric option; real native owners run it. */
+    const initial = client.host.memory.stream('value', undefined, {
+      orderKey: 'queue',
+      idempotencyKey: 'stream-key',
+      cancel: 'before-start',
+      signal: controller.signal,
+      timeout: code === RpcCoreErrorCode.deadlineExceeded ? timeout({ ms: 5 }) : false
+    }) as AsyncIterableIterator<unknown>
+    /** First next starts the genuine lazy stream and its original selected timeout/cancellation. */
+    const initialOutcome = initial.next().catch((error: unknown) => error)
+    pending.push(initialOutcome)
+    await vi.waitFor(() => expect(claiming).toHaveBeenCalledTimes(1))
+    if (code === RpcCoreErrorCode.cancelled) controller.abort()
+    await initialOutcome
+    /** Real initial completion must seal before the cloned done claim can serve replay. */
+    const scope = JSON.stringify([RpcWireProfile, 'provider', 'peer'])
+    await vi.waitFor(() =>
+      expect(store.lookup!(scope, 'stream-key', performance.now()).state).toBe('done')
+    )
+    /** The replay has a new genuine operation signal and no caller cancellation or timeout. */
+    const cached = client.host.memory.stream('value', undefined, {
+      orderKey: 'queue',
+      idempotencyKey: 'stream-key',
+      cancel: 'before-start',
+      timeout: false
+    }) as AsyncIterableIterator<unknown>
+    /** Cache presentation must settle through the real producer rather than running business again. */
+    const cachedOutcome = cached.next().catch((error: unknown) => error)
+    pending.push(cachedOutcome)
+    await vi.waitFor(() => expect(executing).toHaveBeenCalledTimes(3))
+    /**
+     * This exact third invocation follows predecessor and initial stream, without a fake
+     * controller.
+     */
+    const replay = executing.mock.contexts[2]
+    assert(replay instanceof ProviderInvocation)
+    /** Preserve the original observation before finishing the held predecessor. */
+    const signal = replay.signal
+    release.resolve()
+    await first
+    await cachedOutcome
+    /** The original identity carrier lends already-prepared request metadata, with no extra decode. */
+    const request = client.pair[1].written.findLast(
+      (frame) => frame.kind === 'call' && frame.task.mode === 'stream'
+    )
+    assert(request?.kind === 'call')
+    /** Only the correlated genuine non-open stream response can satisfy the original terminal. */
+    const terminal = client.pair[0].written.find(
+      (frame) =>
+        frame.kind === 'stream' &&
+        frame.id === request.id &&
+        frame.stream.event !== RpcStreamEvent.open
+    )
+    assert(terminal?.kind === 'stream')
+    /** Keep cancelled as a real business assertion; soft records RED while other original atoms run. */
+    expect.soft(terminal.stream.event).toBe(RpcStreamEvent.cancelled)
+    /** Read the original flat root graph directly; diagnostic observation does not restore it again. */
+    const error = 'error' in terminal.stream ? terminal.stream.error : undefined
+    assert.equal(error?.nodes[error.root]?.source, RPC_ENDPOINT_ERROR_SOURCE)
+    assert.equal(error?.nodes[error.root]?.code, code)
+    assert.equal(signal.aborted, false, 'cache presentation cannot cancel the new operation')
+    assert.equal(effects, 0)
+    /** The exact installed limits owner retains real lease membership, never a claimed zero. */
+    const admission = admitting.mock.contexts.find(
+      (owner): owner is ProviderAdmissionRegistry => owner instanceof ProviderAdmissionRegistry
+    )
+    assert(admission)
+    /** Inspect the authentic accepted dispatcher through the same finite A17 descriptor pattern. */
+    const dispatcher = dispatching.mock.contexts.find(
+      (owner): owner is ProviderDispatcher => owner instanceof ProviderDispatcher
+    )
+    assert(dispatcher)
+    inspector = new IncomingInspector(dispatcher)
+    await vi.waitFor(async () => assert.equal(await inspector!.pending(), 0))
+    await vi.waitFor(() => assert.equal(admission.size, 0))
+    /** Actual recovery invokes the original scalar value3 after the zero-stream-effects window. */
+    await client.host.memory.group([{ method: 'value' }])
+    /** The fresh public group receives its own real response on the same admitted provider. */
+    const after = client.pair[1].written.findLast((frame) => frame.kind === 'group')
+    assert(after?.kind === 'group')
+    assert.ok(
+      client.pair[0].written.some((reply) => reply.kind === 'result' && reply.id === after.id)
+    )
+  } finally {
+    controller.abort()
+    release.resolve()
+    try {
+      await Promise.all(pending)
+      await Promise.all([client.host.close(), host.close()])
+    } finally {
+      admitting.mockRestore()
+      executing.mockRestore()
+      dispatching.mockRestore()
+      await inspector?.close()
+    }
+  }
+}
+
+// RPC-TEST-3CA7BB5939FE-C004: exact wire/brand spellings retire; all business atoms remain asserted.
+it.each([RpcCoreErrorCode.cancelled, RpcCoreErrorCode.deadlineExceeded] as const)(
+  'genuine stored %s stream replay restores only wire cancellation after store cloning',
+  clonedStreamReplay
+)

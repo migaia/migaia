@@ -131,7 +131,11 @@ export class RpcIdempotencyExecution {
     /** The unchanged store ABI retains the original complete protocol outcome in its data slot. */
     const saved = outcome.data as unknown as IRpcOutcome
     if (this.#input.envelope.task.mode === RpcCallMode.stream)
-      return { kind: 'stream', value: replayCompletion(saved.completion) }
+      return {
+        kind: 'stream',
+        value: replayCompletion(saved.completion),
+        completion: saved.completion
+      }
     if (!saved.completion.ok) throw deserializeHostWireError(saved.completion.error)
     return { kind: 'value', value: saved.completion.result as IRpcPortableValue }
   }

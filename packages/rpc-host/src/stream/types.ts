@@ -57,6 +57,8 @@ export type IStreamProducerInput = Readonly<{
   envelope: IRpcEnvelope
   iterable: AsyncIterable<IRpcPortableValue> | Iterable<IRpcPortableValue>
   signal: IAbortSignal
+  /** Original retained terminal data is descriptive and cannot abort this producer's signal. */
+  completion?: IRpcCompletion
   complete(completion: IRpcCompletion): void
 }>
 /** Consumer terminals are sticky and preserve the original final value or exact failure object. */

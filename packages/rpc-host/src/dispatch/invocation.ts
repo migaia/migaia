@@ -265,7 +265,8 @@ export class ProviderInvocation {
             ? this.#input.source.signal
             : this.signal,
           (completion) => this.#finish(completion),
-          this.#input.targetSource
+          this.#input.targetSource,
+          outcome.completion
         )
         return
       }
@@ -572,13 +573,17 @@ export class ProviderInvocation {
     if (!this.signal.aborted || (this.#forwarded && this.#started)) return undefined
     /** Actual cancellation already won; admitted deadline diagnostics retain their original family. */
     const reason = this.signal.reason
-    return this.#failure(
+    /** Only this actual aborted stream decision records a cancellation terminal for later replay. */
+    const completion = this.#failure(
       localRpcErrorCode(reason) === RpcCoreErrorCode.deadlineExceeded ||
         (safeRead(reason, 'source') === RPC_ENDPOINT_ERROR_SOURCE &&
           safeRead(reason, 'code') === RpcCoreErrorCode.deadlineExceeded)
         ? reason
         : createRpcAbortError(undefined, undefined, reason)
     )
+    return this.#input.envelope.task.mode === RpcCallMode.stream
+      ? { ...completion, streamTerminal: RpcStreamEvent.cancelled }
+      : completion
   }
 
   /** The pure bounded serializer preserves the complete original native error graph. */
@@ -713,7 +718,11 @@ export class ProviderInvocation {
           kind: RpcWireKind.stream,
           stream: completion.ok
             ? { event: RpcStreamEvent.end, seq: 0 }
-            : { event: RpcStreamEvent.fail, seq: 0, error: completion.error }
+            : {
+                event: completion.streamTerminal ?? RpcStreamEvent.fail,
+                seq: 0,
+                error: completion.error
+              }
         })
         return
       }
