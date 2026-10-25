@@ -87,3 +87,46 @@ it('classifies the original native flow setup failure without replacing its Erro
     await host?.close()
   }
 })
+
+it('retains the default nodeId native randomUUID failure before cold acquisition', async () => {
+  /** The current mandatory nodeId producer must preserve this exact native entropy failure. */
+  const original = new Error('native nodeId entropy unavailable')
+  /** Actual source acquisition must remain cold when default identity construction fails. */
+  const open = vi.fn(() => ({ dispose: () => undefined }))
+  /** Valid SDK metadata reaches the real public constructor without a resource facade. */
+  const transport = defineTransportPlugin({
+    name: 'native-nodeid-source',
+    namespace: 'identity',
+    open
+  })
+  /** Fail only the native method actually selected by defaultRpcId; no fallback is injected. */
+  const entropy = vi.spyOn(globalThis.crypto, 'randomUUID').mockImplementation(() => {
+    throw original
+  })
+  /** Unexpected successful construction still retains its real public cleanup owner. */
+  let host: { close(): Promise<void> } | undefined
+  /** Capture the public native failure without tagging or translating it in the fixture. */
+  let failure: unknown
+  try {
+    try {
+      host = await createRpcHost({
+        self: { name: 'local', instanceId: 'local' },
+        plugins: [transport],
+        report: () => undefined
+      })
+    } catch (error) {
+      failure = error
+    }
+    expect.soft(failure).toMatchObject({
+      source: 'rpc.endpoint',
+      code: 'INVALID_CONFIG',
+      cause: original
+    })
+    expect.soft((failure as Error | undefined)?.cause).toBe(original)
+    /** Zero real acquisition is a current fact, never credit for the deleted close-one oracle. */
+    expect(open).not.toHaveBeenCalled()
+  } finally {
+    entropy.mockRestore()
+    await host?.close()
+  }
+})

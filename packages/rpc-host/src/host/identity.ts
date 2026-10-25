@@ -6,7 +6,7 @@ import type { IRpcDirectory, IRpcGeneration } from '@migaia/rpc-contract/protoco
 import type { IRpcLocalSourceFacts } from '@migaia/rpc-contract/interfaces'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcCoreErrorText, RuntimeApiErrorText } from '@migaia/rpc-contract/errors'
-import { createRpcError } from './error-owner.js'
+import { createRpcConfigurationError, createRpcError } from './error-owner.js'
 import { sameGeneration } from '../call/envelope.js'
 
 /** Public identity is global to the host; a transport never creates a second public self. */
@@ -14,15 +14,19 @@ export type IRpcSelf = Readonly<{ name: string; instanceId: string }>
 
 /** Preserve the original secure fallback allocator without depending on an authentication plugin. */
 export function defaultRpcId(): string {
-  /** Native crypto is optional only when an explicit identity was supplied. */
+  /** Native entropy supplies host identities before any cold transport can acquire resources. */
   const cryptoApi = globalThis.crypto as
     | { randomUUID?: () => string; getRandomValues?: (array: Uint8Array) => Uint8Array }
     | undefined
-  if (cryptoApi?.randomUUID) return cryptoApi.randomUUID()
-  if (cryptoApi?.getRandomValues) {
-    /** Fixed 16-byte entropy preserves the existing identifier domain. */
-    const bytes = cryptoApi.getRandomValues(new Uint8Array(16))
-    return [...bytes].map((value) => value.toString(16).padStart(2, '0')).join('')
+  try {
+    if (cryptoApi?.randomUUID) return cryptoApi.randomUUID()
+    if (cryptoApi?.getRandomValues) {
+      /** Fixed 16-byte entropy preserves the existing identifier domain. */
+      const bytes = cryptoApi.getRandomValues(new Uint8Array(16))
+      return [...bytes].map((value) => value.toString(16).padStart(2, '0')).join('')
+    }
+  } catch (cause) {
+    throw createRpcConfigurationError(RpcCoreErrorText.uuidUnavailable, cause)
   }
   throw createRpcError(RpcCoreErrorCode.invalidConfig, RpcCoreErrorText.uuidUnavailable)
 }
