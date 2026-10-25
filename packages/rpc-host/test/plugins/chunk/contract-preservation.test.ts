@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   createStringChunkAssembler,
   createBinaryChunkAssembler
-} from '../../../dist/plugins/chunk/assembly.js'
+} from '../../../dist/features/chunk/assembly.js'
 
 /** Original native source and message fixture, without a second assembler. */
 const context = { source: 'audit', messageId: 'one' }

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
 
-import { RequestReplayLedger } from '../../dist/plugins/auth/request-replay.js'
+import { RequestReplayLedger } from '../../dist/features/auth/request-replay.js'
 
 it('default replay owner keeps global 4096 capacity and isolated endpoint ownership', () => {
   /** Zero-argument construction decides the real default owner, not explicit fixture capacities. */

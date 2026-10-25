@@ -13,26 +13,26 @@ export const RpcAuthenticationText = {
   authenticationNonceUnavailable: 'Authentication replay nonce is unavailable',
   /** Entropy failure keeps the original cause on a coded configuration error. */
   authenticationNonceFailed: 'Authentication replay nonce generation failed',
-  /** Stable core error text consumed by plugins/auth; preserves its existing caller-facing wording. */
+  /** Stable core error text consumed by features/auth; preserves its existing caller-facing wording. */
   authenticationDescriptorIsInvalid: 'authentication descriptor is invalid',
-  /** Stable core error text consumed by plugins/auth; preserves its existing caller-facing wording. */
+  /** Stable core error text consumed by features/auth; preserves its existing caller-facing wording. */
   authenticationDescriptorIsUnreadable: 'authentication descriptor is unreadable',
-  /** Stable core error text consumed by plugins/auth; preserves its existing caller-facing wording. */
+  /** Stable core error text consumed by features/auth; preserves its existing caller-facing wording. */
   authenticationTransformInvalid: (name: string): string =>
     `authentication.${name} must be a function`,
-  /** Stable core error text consumed by plugins/auth; preserves its existing caller-facing wording. */
+  /** Stable core error text consumed by features/auth; preserves its existing caller-facing wording. */
   authenticationEncryptDecryptMustBeConfiguredTogether:
     'authentication encrypt/decrypt must be configured together',
-  /** Stable core error text consumed by plugins/auth; preserves its existing caller-facing wording. */
+  /** Stable core error text consumed by features/auth; preserves its existing caller-facing wording. */
   authenticationSignVerifyMustBeConfiguredTogether:
     'authentication sign/verify must be configured together',
-  /** Stable core error text consumed by plugins/auth; preserves its existing caller-facing wording. */
+  /** Stable core error text consumed by features/auth; preserves its existing caller-facing wording. */
   authenticationRequiresEncryptionOrSigningTransforms:
     'authentication requires encryption or signing transforms',
-  /** Stable core error text consumed by plugins/auth; preserves its existing caller-facing wording. */
+  /** Stable core error text consumed by features/auth; preserves its existing caller-facing wording. */
   authenticationEncodedTypeIsInvalid: 'authentication.encodedType is invalid',
-  /** Stable core error text consumed by plugins/auth; preserves its existing caller-facing wording. */
+  /** Stable core error text consumed by features/auth; preserves its existing caller-facing wording. */
   outboundFrameAuthenticationFailed: 'Outbound frame authentication failed',
-  /** Stable core error text consumed by plugins/auth; preserves its existing caller-facing wording. */
+  /** Stable core error text consumed by features/auth; preserves its existing caller-facing wording. */
   inboundFrameAuthenticationFailed: 'Inbound frame authentication failed'
 } as const

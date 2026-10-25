@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { describe, expect, it } from 'vitest'
-import { ProviderAdmissionRegistry } from '../../../dist/plugins/limits/provider-admission.js'
+import { ProviderAdmissionRegistry } from '../../../dist/features/limits/provider-admission.js'
 
 describe('ProviderAdmissionRegistry', () => {
   it('rejects non-positive or unsafe admission limits', () => {

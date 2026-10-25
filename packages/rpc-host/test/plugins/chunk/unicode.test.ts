@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createStringChunkAssembler } from '../../../dist/plugins/chunk/assembly.js'
+import { createStringChunkAssembler } from '../../../dist/features/chunk/assembly.js'
 
 describe('canonical framing contract', () => {
   it('frames and reassembles unicode without a WebRPC middleware splitter', () => {

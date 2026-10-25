@@ -1,8 +1,8 @@
 /** Preserve the original application schema normalization assertions at their executing owner. */
 import { describe, expect, it } from 'vitest'
 import { RpcSchemaValidationError } from '@migaia/rpc-contract/errors'
-import { validateContractData } from '../../../dist/plugins/schema/validate.js'
-import type { IRpcSchemaOptions } from '../../../dist/plugins/schema/types.js'
+import { validateContractData } from '../../../dist/features/schema/validate.js'
+import type { IRpcSchemaOptions } from '../../../dist/features/schema/types.js'
 
 describe('contract error normalization', () => {
   it('does not let hostile issue getters replace the stable schema error', () => {

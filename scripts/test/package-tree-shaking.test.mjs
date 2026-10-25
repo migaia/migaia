@@ -321,9 +321,9 @@ for (const style of ['named', 'default']) {
       const result = await buildConsumer(fixture.consumer, source)
       /** Only the chosen plugin may contribute optional implementation bytes. */
       const retained = packageModules({ ...result, modules: result.retainedModules }, 'rpc-host')
-      assert.ok(retained.some((name) => name.startsWith('dist/plugins/chunk/')))
+      assert.ok(retained.some((name) => name.startsWith('dist/features/chunk/')))
       assert.deepEqual(
-        retained.filter((name) => /^dist\/plugins\/(?!chunk\/)|^dist\/features\//.test(name)),
+        retained.filter((name) => /^dist\/plugins\/|^dist\/features\/(?!chunk\/)/.test(name)),
         []
       )
       /**

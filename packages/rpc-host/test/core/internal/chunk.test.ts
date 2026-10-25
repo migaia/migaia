@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createStringChunkAssembler } from '../../../dist/plugins/chunk/assembly.js'
+import { createStringChunkAssembler } from '../../../dist/features/chunk/assembly.js'
 
 /** Retains WebRPC coverage at the physical framing boundary. */
 describe('canonical physical framing', () => {

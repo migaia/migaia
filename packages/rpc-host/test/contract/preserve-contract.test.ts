@@ -8,9 +8,9 @@ import { RpcJsonCarrierCodec } from '../../dist/sdk/carrier/json-codec.js'
 import {
   wrapAuthenticationEnvelope,
   readAuthenticationEnvelope
-} from '../../dist/plugins/auth/envelope.js'
-import { AuthenticationRepresentation } from '../../dist/plugins/auth/representation.js'
-import { RpcAuthenticationEnvelope } from '../../dist/plugins/auth/constants.js'
+} from '../../dist/features/auth/envelope.js'
+import { AuthenticationRepresentation } from '../../dist/features/auth/representation.js'
+import { RpcAuthenticationEnvelope } from '../../dist/features/auth/constants.js'
 import { codecContext, request } from '../core/fixtures/outbound-proof-candidate.js'
 
 /** The standalone public serialize parser receives its actual immutable fixture context. */

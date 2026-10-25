@@ -4,7 +4,7 @@ import { createRpcHost } from '@migaia/rpc-host'
 import { auth } from '@migaia/rpc-host/plugins/auth'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { coreMemoryServer } from '../../../rpc-host/test/host/core-fixture.js'
-import { RpcAuthenticationEnvelope } from '../../../rpc-host/dist/plugins/auth/constants.js'
+import { RpcAuthenticationEnvelope } from '../../../rpc-host/dist/features/auth/constants.js'
 
 describe('replay-window r12 authentication break', () => {
   it('rejects a successfully verified legacy frame without replay binding', async () => {

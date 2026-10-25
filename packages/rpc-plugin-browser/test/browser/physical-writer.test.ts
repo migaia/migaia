@@ -4,7 +4,7 @@ import { createRpcHost } from '@migaia/rpc-host'
 import { batch } from '@migaia/rpc-host/plugins/batch'
 import { dedicatedWorkerPlugin } from '@migaia/rpc-plugin-browser'
 import { RpcCarrierFrameKind } from '@migaia/rpc-contract/protocol'
-import { RpcBatchExtension } from '../../../rpc-host/dist/plugins/batch/constants.js'
+import { RpcBatchExtension } from '../../../rpc-host/dist/features/batch/constants.js'
 import { portPair } from './message-fixture.js'
 
 describe('optimal physical writer', () => {

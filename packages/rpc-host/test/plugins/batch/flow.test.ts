@@ -6,7 +6,7 @@ import type {
   IRpcFramePayload,
   IRpcFrameWriteOptions
 } from '@migaia/rpc-contract/interfaces'
-import { batch } from '../../../dist/plugins/batch/index.js'
+import { batch } from '../../../dist/features/batch/index.js'
 import { readRpcDefinition } from '../../../dist/sdk/metadata.js'
 import { FlowRegistry } from '../../../dist/flow/registry.js'
 import { RpcFlowPipelines, RpcFlowPoint } from '../../../dist/sdk/flow-pipelines.js'

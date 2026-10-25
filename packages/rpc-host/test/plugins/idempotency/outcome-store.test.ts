@@ -4,7 +4,7 @@ import {
   createRpcIdempotencyStore,
   type IRpcIdempotencyClaim,
   type IRpcIdempotencyOutcome
-} from '../../../dist/plugins/idempotency/store.js'
+} from '../../../dist/features/idempotency/store.js'
 
 /**
  * The actual read-only extension observes the original store without creating another claim or

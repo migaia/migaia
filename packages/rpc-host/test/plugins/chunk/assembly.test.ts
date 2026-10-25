@@ -3,8 +3,8 @@ import { it, vi } from 'vitest'
 import {
   createBinaryChunkAssembler,
   createStringChunkAssembler
-} from '../../../dist/plugins/chunk/assembly.js'
-import type { IRpcBinaryChunk } from '../../../dist/plugins/chunk/types.js'
+} from '../../../dist/features/chunk/assembly.js'
+import type { IRpcBinaryChunk } from '../../../dist/features/chunk/types.js'
 
 for (const chunks of [2, 4]) {
   it(`${chunks} binary chunks preserve source order and copy each final byte once`, () => {

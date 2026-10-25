@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import { RpcWireKind, type IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
-import { validateContractData } from '../../dist/plugins/schema/validate.js'
+import { validateContractData } from '../../dist/features/schema/validate.js'
 import { coreMemoryServer } from '../host/core-fixture.js'
 
 describe('safeString failure reporting', () => {

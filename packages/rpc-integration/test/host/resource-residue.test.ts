@@ -21,8 +21,8 @@ import {
   type IRpcTransportSetupContext
 } from '@migaia/rpc-host/sdk'
 import { RpcHost } from '../../../rpc-host/dist/host/rpc-host.js'
-import { RpcBatchFlow } from '../../../rpc-host/dist/plugins/batch/flow.js'
-import { RpcLimitsFlow } from '../../../rpc-host/dist/plugins/limits/flow.js'
+import { RpcBatchFlow } from '../../../rpc-host/dist/features/batch/flow.js'
+import { RpcLimitsFlow } from '../../../rpc-host/dist/features/limits/flow.js'
 import { coreMemoryServer } from '../../../rpc-host/test/host/core-fixture.js'
 import { MemoryCarrier } from '../../../rpc-host/test/fixtures/core-carrier.js'
 
