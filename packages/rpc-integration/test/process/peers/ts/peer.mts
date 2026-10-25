@@ -2,6 +2,7 @@ import { createRpcHost, type IRpcContext, type IRpcProvide } from '@migaia/rpc-h
 import { auth } from '@migaia/rpc-host/plugins/auth'
 import { timeout } from '@migaia/rpc-host/features/timeout'
 import { processPlugin } from '@migaia/rpc-plugin-process'
+import { defineFlowFeature, RpcFlowPoint } from '@migaia/rpc-host/sdk'
 import {
   RpcCoreErrorCode,
   RPC_ENDPOINT_ERROR_SOURCE,
@@ -17,10 +18,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parseArgs } from 'node:util'
 import { openProcessStdioChannel } from '../../../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
-import {
-  dialProcessByteChannel,
-  listenProcessByteChannel
-} from '../../../../../rpc-plugin-process/dist/process/adapters/node-socket.js'
+import { dialProcessByteChannel } from '../../../../../rpc-plugin-process/dist/process/adapters/node-socket.js'
 import { decodeProcessRuntimeBootstrap } from '../../../../../rpc-plugin-process/dist/process/runtime-bootstrap.js'
 import type { IProcessByteChannel } from '../../../../../rpc-plugin-process/dist/process/types.js'
 import { PeerMethod, PeerText } from './text.js'
@@ -164,6 +162,37 @@ class PeerBusinessState {
 /** One executable retains its original shared business state across connections. */
 const business = new PeerBusinessState()
 
+/** Application verification remains independent from native token admission on every real source. */
+function peerAuthentication(token: string | undefined) {
+  return token === undefined
+    ? []
+    : [
+        auth({
+          credentials: token,
+          verifyCredentials(received) {
+            if (received !== token)
+              throw peerDiagnosticError(
+                RpcCoreErrorCode.authenticationFailed,
+                PeerText.authRejected
+              )
+          }
+        })
+      ]
+}
+
+/** The canonical listener owns physical IO; its real frame completion retains delayed native faults. */
+const listenerFaults = defineFlowFeature({
+  name: 'ts-peer-after-write',
+  setup: () => ({
+    stages: {
+      [RpcFlowPoint.frameOutbound]: async (payload, next) => {
+        await next(payload)
+        business.afterWrite()
+      }
+    }
+  })
+})
+
 /** One actual native channel owns one production Host and its original EOF cleanup receipt. */
 class ForeignPeerSession {
   /** This is the genuine createRpcHost opening operation, never an endpoint projection. */
@@ -198,20 +227,7 @@ class ForeignPeerSession {
       provide: { p: business.provide.p! },
       contract,
       plugins: [
-        ...(token === undefined
-          ? []
-          : [
-              auth({
-                credentials: token,
-                verifyCredentials(received) {
-                  if (received !== token)
-                    throw peerDiagnosticError(
-                      RpcCoreErrorCode.authenticationFailed,
-                      PeerText.authRejected
-                    )
-                }
-              })
-            ]),
+        ...peerAuthentication(token),
         processPlugin({
           name: 'foreign-native-peer',
           connect: {
@@ -276,16 +292,20 @@ async function main(): Promise<void> {
       process.exitCode = 2
       return
     }
-    await listenProcessByteChannel({
-      address: values['listen-unix'],
-      serviceId: 'rpc-peer-ts',
-      report,
-      onConnection: (pending) =>
-        pending.accept(async (raw) => {
-          const session = new ForeignPeerSession(raw, token)
-          await session.ready()
-        })
+    /** Listener admission must accept the client's native proof, rather than initiate another proof. */
+    const host = await createRpcHost({
+      self: { name: 'ts-peer', instanceId: 'ts-peer' },
+      provide: { p: business.provide.p! },
+      contract,
+      plugins: [
+        ...peerAuthentication(token),
+        listenerFaults,
+        processPlugin({ name: 'foreign-native-peer', listen: values['listen-unix'], token })
+      ],
+      report
     })
+    /** The same independent business providers enter the real directory before readiness is printed. */
+    host.provide({ echo: business.provide.echo!, peer: business.provide.peer! })
     process.stderr.write(`${PeerText.ready}${process.pid}\n`)
     return
   }

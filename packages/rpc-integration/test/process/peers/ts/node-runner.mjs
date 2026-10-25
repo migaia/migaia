@@ -12,7 +12,7 @@ const key = createHash('sha256').update(source).digest('hex').slice(0, 12)
 /** Stripped files and public-package links stay outside the repository. */
 const output = join(tmpdir(), `rpc-public-ts-${key}`)
 mkdirSync(join(output, 'node_modules/@migaia'), { recursive: true })
-for (const name of ['runtime.ts', 'text.ts', 'peer.mts']) {
+for (const name of ['text.ts', 'peer.mts']) {
   /** Type erasure changes no protocol behavior and requires no compiler dependency. */
   const contents = stripTypeScriptTypes(readFileSync(join(source, name), 'utf8'))
   /** Private built owners remain anchored to the source fixture after its copy moves to tmp. */
