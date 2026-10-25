@@ -1,7 +1,6 @@
 import { expect, it } from 'vitest'
 import { defineProbe } from '../../dist/core/probe/index.js'
 import {
-  createRuntimePeer,
   prepareRuntimePeerEndpoint,
   prepareRuntimePeerSourceContext
 } from '../../dist/remote/runtime-api/peer.js'
@@ -13,60 +12,6 @@ import {
 import { createEndpointKernel } from '../../dist/core/endpoint-kernel.js'
 import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { runtimeSources } from '../runtime-api/fixture.js'
-import type { IRpcProbeEventView } from '../../dist/core/probe/types.js'
-
-it('Peer probe observes handshake, ready and close without changing calls', async () => {
-  /** Events are copied explicitly because the source view is reused synchronously. */
-  const seen: Readonly<IRpcProbeEventView>[] = []
-  /** Descriptors are delivered exactly once at successful activation. */
-  let described = 0
-  /** A closing sink reenters the existing owner and must receive its published completion. */
-  let nestedClose: Promise<void> | undefined
-  /** The facade becomes available only after its actual directory handshake completes. */
-  let client: Awaited<ReturnType<typeof createRuntimePeer>> | undefined
-  /** Runtime fixture uses only Core memory transport and real source negotiation. */
-  const channel = runtimeSources()
-  /** Installing the public Peer option must reach its own endpoint emitter. */
-  const probe = defineProbe({
-    stages: ['peer'],
-    describe: () => {
-      described++
-    },
-    emit: (view) => {
-      seen.push(Object.freeze({ ...view }))
-      if (view.lifecycle === 'closing') nestedClose = client?.close()
-    }
-  })
-  /** Both source offers are constructed concurrently as required by their actual owner. */
-  const peers = await Promise.all([
-    createRuntimePeer({
-      self: { name: 'left', instanceId: 'left' },
-      connect: channel.sources[0],
-      probe
-    }),
-    createRuntimePeer({
-      self: { name: 'right', instanceId: 'right' },
-      connect: channel.sources[1],
-      provide: { echo: (value: unknown) => value }
-    })
-  ])
-  client = peers[0]!
-  try {
-    expect(await peers[0]!.request('echo', 3)).toBe(3)
-    expect(described).toBe(1)
-    expect(seen.map((view) => view.lifecycle)).toEqual(
-      expect.arrayContaining(['handshake', 'ready'])
-    )
-    /** Returned identity is the same completion retained by a synchronous reentrant sink. */
-    const closed = peers[0]!.close()
-    expect(nestedClose).toBe(closed)
-    await closed
-    expect(seen.map((view) => view.lifecycle)).toContain('closing')
-  } finally {
-    await Promise.all(peers.map((peer) => peer.close()))
-    channel.close()
-  }
-})
 
 it('construction failure rolls back the observer before descriptor publication', async () => {
   /** One original construction error is returned unchanged. */

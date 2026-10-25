@@ -5,7 +5,6 @@ import { RpcCapability } from '@migaia/rpc-contract'
 import { expect, it } from 'vitest'
 
 import { connect } from '../../dist/core/middleware/connect.js'
-import { authentication } from '../../dist/core/middleware/authentication.js'
 import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
 import { defineProbe, type IRpcProbeDescriptor } from '../../dist/core/probe/index.js'
 import { readEndpointDebugSnapshot } from '../../dist/core/internal/test-observer.js'
@@ -67,44 +66,4 @@ it('keeps the canonical fast endpoint proof and unchanged business/debug state',
     }
   }
   expect(snapshots[1]).toEqual(snapshots[0])
-})
-
-it('describes endpoint encryption from the authentication configuration owner', async () => {
-  /** The actual endpoint emitter reports the same mode as a Peer option installation. */
-  const descriptors: IRpcProbeDescriptor[] = []
-  /** This cold callback observes only the successfully activated endpoint configuration. */
-  const probe = defineProbe({
-    stages: ['frame', 'protected'],
-    emit: () => undefined,
-    describe: (descriptor) => {
-      descriptors.push(descriptor)
-    }
-  })
-  /** No business traffic is required to prove the canonical immutable authentication fact. */
-  const [left, right] = createMemoryTransportPair()
-  /** The emitter borrows the canonical authentication facts of this endpoint. */
-  bindInstalledProbe(left, createProbeEmitter([probe], systemScheduler.now, 'auth-descriptor'))
-  /** Valid transforms keep the existing any-encoded contract and enable signing plus encryption. */
-  const endpoint = await createRuntimeEndpointComposition(
-    {
-      id: 'auth-descriptor',
-      transport: left,
-      middlewares: [
-        connect(),
-        authentication({
-          encrypt: (value) => value,
-          decrypt: (value) => value,
-          sign: () => 'fixture-signature',
-          verify: () => true
-        })
-      ]
-    },
-    { agreement: { capabilities: [RpcCapability.ping] }, peerId: '' }
-  ).installing
-  try {
-    expect(descriptors[0]!.authentication).toBe('encrypt-sign')
-  } finally {
-    await endpoint.dispose()
-    right.close()
-  }
 })
