@@ -196,3 +196,238 @@ describe('audit-probe2 actual codec sentinel receivers', () => {
     }
   )
 })
+
+/** Construct only the original synthetic input nesting, without traversing or normalizing a graph. */
+function nestedInput(depth: number, leaf: unknown): unknown {
+  /** Each fixed fixture edge points to the previous exact leaf, matching the original cause chain. */
+  let value = leaf
+  for (let index = 0; index < depth; index++) value = { ...W, cause: value }
+  return value
+}
+
+/** Fixed fixture nodes encode the original cause edges directly in the current raw wire grammar. */
+function errorChain(depth: number, leaf: unknown): unknown {
+  /**
+   * These are synthetic raw nodes, including intentionally invalid fields; no serializer repairs
+   * them.
+   */
+  const nodes: unknown[] = Array.from({ length: depth }, (_, index) => ({
+    ...W,
+    cause: index + 1
+  }))
+  nodes.push(leaf)
+  return { root: 0, nodes }
+}
+
+/** The original four accepted variants remain the entire fixed acceptance exception set. */
+const acceptedSentinels = new Set([
+  'proto in peer',
+  'proto in version entry',
+  'reject nest 17 token msg',
+  'reject-surrogate-free-bytes(:402)'
+])
+/** Only the current reject discriminator is shared; each raw error below remains unnormalized. */
+const REJECT = { profile: OFFER.profile, kind: 'handshake', step: 'reject' }
+
+describe('audit-probe1 current flat error sentinel receivers', () => {
+  /** All four remaining original variants retain their exact scalar values and byte counts. */
+  const cases: Record<string, () => unknown> = {
+    'reject-unknown(:402)': normalization({
+      ...REJECT,
+      error: { root: 0, nodes: [{ [T]: 1 }] }
+    }),
+    'reject-field(:402)': normalization({
+      ...REJECT,
+      error: { root: 0, nodes: [{ ...W, code: 5, message: T }] }
+    }),
+    'reject-data(:402)': normalization({
+      ...REJECT,
+      error: { root: 0, nodes: [{ ...W, data: { $rpc: 'x', v: T } }] }
+    }),
+    'reject-surrogate-free-bytes(:402)': normalization({
+      ...REJECT,
+      error: { root: 0, nodes: [{ ...W, message: T.repeat(3000) }] }
+    })
+  }
+  it.each(Object.entries(cases))(
+    '%s preserves historical acceptance or redacted rejection',
+    (_name, run) => {
+      /** Admission is the actual Contract operation, not a fixture-side error reconstruction. */
+      let caught: unknown
+      try {
+        run()
+      } catch (error) {
+        caught = error
+      }
+      if (acceptedSentinels.has(_name)) {
+        expect(caught).toBeUndefined()
+      } else {
+        expect(caught).toBeInstanceOf(Error)
+        assertPrivate(caught)
+      }
+    }
+  )
+})
+
+describe('audit-probe2 current graph and portable sentinel receivers', () => {
+  /**
+   * Peer stays last solely to preserve the original raw-JSON constructor/prototype insertion
+   * geometry. All fields come from the same already-admitted current hello.
+   */
+  const H = {
+    profile: OFFER.profile,
+    kind: OFFER.kind,
+    step: OFFER.step,
+    versions: OFFER.versions,
+    codecs: OFFER.codecs,
+    extensions: OFFER.extensions,
+    requiredExtensions: OFFER.requiredExtensions,
+    directory: OFFER.directory,
+    peer: OFFER.peer
+  }
+  /** The original 3000 hostile key names remain present on each independently constructed input. */
+  const manyKeys = (count: number) =>
+    Object.fromEntries(Array.from({ length: count }, (_, index) => [T + index, 1]))
+  /** The original JSON constructors are fixture input formation, never a second decoder. */
+  const J = (value: unknown) => JSON.stringify(value)
+  /** Original input values/order/depth survive the required wire2 discriminator and graph shape. */
+  const cases: Record<string, () => unknown> = {
+    'proto top-level': () =>
+      decodeHandshake(
+        `{"__proto__":{"${T}":1},"kind":"x","step":"hello","profile":"${OFFER.profile}"}`
+      ),
+    'proto key name kind': () =>
+      decodeHandshake(`{"__proto__":"${T}","constructor":"${T}","kind":"x","profile":"p"}`),
+    'constructor key in peer': () =>
+      decodeHandshake(
+        `${J({ ...H, peer: { id: 'a', runtime: 'BAD' } }).slice(0, -2)},"constructor":{"${T}":1}}}`
+      ),
+    'proto in peer': () =>
+      decodeHandshake(
+        J({ ...H }).replace('"peer":{', `"peer":{"__proto__":{"${T}":1},"runtime":"BAD",`)
+      ),
+    'proto in version entry': () =>
+      decodeHandshake(J(H).replace('"versions":[{', `"versions":[{"__proto__":"${T}","major":0,`)),
+    'proto in implementation': () =>
+      decodeHandshake(
+        J({ ...H, peer: { id: 'a', runtime: 'node', implementation: { name: 1 } } }).replace(
+          '"implementation":{',
+          `"implementation":{"__proto__":{"${T}":[1]},`
+        )
+      ),
+    'deep nest in peer': normalization({
+      ...H,
+      peer: { id: 'a', runtime: 'BAD', x: nestedInput(50, T) }
+    }),
+    'array of objects codecs': normalization({ ...H, codecs: [{ [T]: T }, { a: [T] }] }),
+    'array of objects capabilities': normalization({
+      ...H,
+      extensions: Array.from({ length: 5 }, () => ({ [T]: T }))
+    }),
+    'array of objects versions': normalization({
+      ...H,
+      versions: [{ major: 1, minor: 0 }, [T], { [T]: { [T]: T } }]
+    }),
+    'huge unknown keys top': normalization({ ...manyKeys(3000), kind: 'x', profile: 'p' }),
+    'huge unknown keys peer': normalization({
+      ...H,
+      peer: { id: 'a', runtime: 'BAD', ...manyKeys(3000) }
+    }),
+    'huge versions array': normalization({
+      ...H,
+      versions: Array.from({ length: 5000 }, () => T)
+    }),
+    'reject nest 15 token msg invalid code': normalization({
+      ...REJECT,
+      error: errorChain(15, { ...W, code: 5, message: T })
+    }),
+    'reject nest 17 token msg': normalization({
+      ...REJECT,
+      error: errorChain(17, { ...W, message: T })
+    }),
+    'reject nest 40': normalization({
+      ...REJECT,
+      error: errorChain(40, { ...W, message: T, name: 5 })
+    }),
+    'reject data token key': normalization({
+      ...REJECT,
+      error: { root: 0, nodes: [{ ...W, data: { [T]: { $rpc: 'x' } } }] }
+    }),
+    'reject data array': normalization({
+      ...REJECT,
+      error: { root: 0, nodes: [{ ...W, data: [{ [T]: { $rpc: 'bad' } }] }] }
+    }),
+    'reject cause data non-portable': normalization({
+      ...REJECT,
+      error: {
+        root: 0,
+        nodes: [
+          { ...W, cause: 1 },
+          { ...W, data: { $rpc: 'x', v: T } }
+        ]
+      }
+    }),
+    'reject errors array token': normalization({
+      ...REJECT,
+      error: {
+        root: 0,
+        nodes: [
+          { ...W, errors: [1] },
+          { ...W, code: 5, message: T }
+        ]
+      }
+    }),
+    'reject errors array data': normalization({
+      ...REJECT,
+      error: {
+        root: 0,
+        nodes: [
+          { ...W, errors: [1] },
+          { ...W, data: { $rpc: 'x', [T]: T } }
+        ]
+      }
+    }),
+    'reject proto key in error': () =>
+      decodeHandshake(
+        `{"profile":"${OFFER.profile}","kind":"handshake","step":"reject","error":{"root":0,"nodes":[{"__proto__":{"${T}":1},"source":5}]}}`
+      ),
+    'reject proto key raw': () =>
+      decodeHandshake(
+        `{"profile":"${OFFER.profile}","kind":"handshake","step":"reject","error":{"root":0,"nodes":[{"__proto__":{"${T}":1},"source":5,"message":"${T}"}]}}`
+      ),
+    'reject error is string': normalization({ ...REJECT, error: T }),
+    'reject error array': normalization({ ...REJECT, error: [T] }),
+    'reject huge unknown keys': normalization({
+      ...REJECT,
+      error: { root: 0, nodes: [{ ...W, code: 5, ...manyKeys(3000) }] }
+    }),
+    'auth non-portable $rpc': normalization({ ...H, auth: { $rpc: 'x', secret: T } }),
+    'auth non-portable key': normalization({ ...H, auth: { [T]: { $rpc: 'y' } } }),
+    'auth deep nest': normalization({ ...H, auth: nestedInput(200, T) }),
+    'complete accept deep peer': () =>
+      completeRpcHandshake(OFFER, {
+        ...ACC,
+        peer: { id: 'b', runtime: 'BAD', deep: nestedInput(30, T) }
+      }),
+    'accept hello deep caps': () =>
+      acceptRpcHandshake(OFFER, { ...H, extensions: [{ [T]: [T] }] } as never)
+  }
+  it.each(Object.entries(cases))(
+    '%s preserves historical acceptance or redacted rejection',
+    async (_name, run) => {
+      /** The actual codec may suspend restore; no late failure is mistaken for acceptance. */
+      let caught: unknown
+      try {
+        await run()
+      } catch (error) {
+        caught = error
+      }
+      if (acceptedSentinels.has(_name)) {
+        expect(caught).toBeUndefined()
+      } else {
+        expect(caught).toBeInstanceOf(Error)
+        assertPrivate(caught)
+      }
+    }
+  )
+})
