@@ -45,6 +45,7 @@ import { StreamChannel } from '../stream/channel.js'
 import type { IRpcHostPlugin, IRpcTransportSetupContext } from '../sdk/types.js'
 import { RpcFlowPipelines, type IRpcPipelineOwner } from '../sdk/flow-pipelines.js'
 import type { IRpcDefinitionMetadata } from '../sdk/metadata.js'
+import { readRpcDefinition } from '../sdk/metadata.js'
 import { HostIdentity, defaultRpcId } from './identity.js'
 import {
   createRpcAbortError,
@@ -241,7 +242,7 @@ export class RpcHost {
     void this.#sessions.announceDirectory().catch(this.#report)
   }
 
-  /** Create exactly one native host; its install transaction owns ordering and reverse rollback. */
+  /** One native host commits the cold flow prefix before carriers can perform protected startup. */
   async open(plugins: readonly IRpcHostPlugin[]): Promise<IRpcHost> {
     /** Native publication supplies namespaces through its canonical extension slots. */
     const publicContext = { owner: this }
@@ -265,7 +266,13 @@ export class RpcHost {
     this.#native = native
     this.#pipelineOwner = native
     try {
-      await native.use(...plugins)
+      /** Candidate stages are invisible until native commit; no transport can negotiate before it. */
+      await native.use(
+        ...plugins.filter((plugin) => readRpcDefinition(plugin)?.kind !== 'transport')
+      )
+      await native.use(
+        ...plugins.filter((plugin) => readRpcDefinition(plugin)?.kind === 'transport')
+      )
       /**
        * Publish the complete cold batch after child sources have contributed their accepted
        * methods.
