@@ -17,6 +17,7 @@ import type {
   IRpcDirectory,
   IRpcGeneration,
   IRpcMethodDescription,
+  IRpcPortableValue,
   IRpcSemanticFrame
 } from '../wire/types.js'
 import { RpcWireKind } from '../wire/constants.js'
@@ -279,6 +280,14 @@ export type IRpcLocalSourceFacts = Readonly<{
   nativeGeneration?: IRpcNativeGeneration
 }>
 
+/** Trusted connection secrets stay with Session and never enter descriptive source facts. */
+export type IRpcConnectionContext = Readonly<{
+  /** Only the configured auth credential resolver receives this native connection's value. */
+  credentials?: IRpcPortableValue
+  /** The native bootstrap verifier may attest identity before application authentication runs. */
+  authentication?: Readonly<{ principalId: string }>
+}>
+
 /** Explicit session/control methods give transports no business request facade. */
 export type IRpcTransportContext = Readonly<{
   /** Namespace declared by this installed transport plugin. */
@@ -294,13 +303,18 @@ export type IRpcTransportContext = Readonly<{
    * must agree with real source facts; first default child facts may supply it, later facts must
    * agree. Pool member carriers remain outside SessionTable, and facts never include auth tokens.
    */
-  attach(carrier: IRpcCarrier, localSourceFacts?: IRpcLocalSourceFacts): IRpcSessionHandle
+  attach(
+    carrier: IRpcCarrier,
+    localSourceFacts?: IRpcLocalSourceFacts,
+    connection?: IRpcConnectionContext
+  ): IRpcSessionHandle
   /** Private members use the same physical Session without entering public identity indexes. */
   openPrivateSession(
     carrier: IRpcCarrier,
     facts: IRpcLocalSourceFacts | undefined,
     source: IRpcTargetSource,
-    changed?: () => void
+    changed?: () => void,
+    connection?: IRpcConnectionContext
   ): IRpcPrivateSession
   /** Publish one local origin projection after its genuine native resources are ready. */
   attachOrigin(binding: IRpcOriginBinding): IRpcOriginHandle
