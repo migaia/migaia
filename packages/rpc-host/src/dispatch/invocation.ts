@@ -19,7 +19,7 @@ import { RpcWireCancel } from '@migaia/rpc-contract/protocol'
  */
 import { createGenerationController } from '@migaia/lifecycle'
 import { deferred, type INativeAbortSignal } from '@migaia/utils/promise'
-import { systemScheduler, type IScheduledTask } from '@migaia/utils/scheduler'
+import { systemScheduler, systemWallClock, type IScheduledTask } from '@migaia/utils/scheduler'
 import {
   normalizeRpcPortable,
   RpcWireKind,
@@ -684,7 +684,7 @@ export class ProviderInvocation {
         senderId: self.instanceId,
         receiverId: this.#input.envelope.route.senderId,
         targetId: this.#input.envelope.route.senderId,
-        sentAt: Date.now(),
+        sentAt: systemWallClock.timestamp(),
         ...(this.#input.envelope.route.trace === undefined
           ? {}
           : { trace: this.#input.envelope.route.trace }),
