@@ -35,7 +35,7 @@ import { sameTask } from '../call/envelope.js'
 import { resolveAbortReason } from '../host/abort-reason.js'
 import { callTarget } from '../call/target.js'
 import type { ICallLocalOptions, ICallTargetRef, IPreparedCall } from '../call/types.js'
-import type { IStreamOwner, IStreamTerminal } from './types.js'
+import type { IStreamOwner, IStreamTerminal, IStreamAdmissionFailure } from './types.js'
 
 /** One lazy public iterator owns its input until first physical handoff, then only compact state. */
 export class StreamConsumer {
@@ -49,6 +49,8 @@ export class StreamConsumer {
   #payload: IRpcPortableValue | undefined
   /** Original options are read at first next; transfer/input are not retained after handoff. */
   #options: ICallLocalOptions | undefined
+  /** Namespace directory refusal waits for this consumer's ordinary first-pull terminal path. */
+  #admission: IStreamAdmissionFailure | undefined
   /** One inherited deadline is captured only at the actual lazy start. */
   #deadline: number | undefined
   /** First lazy start is the original duration origin, independent from inherited timeouts. */
@@ -94,13 +96,15 @@ export class StreamConsumer {
     target: ICallTargetRef,
     method: string,
     payload?: IRpcPortableValue,
-    options?: ICallLocalOptions
+    options?: ICallLocalOptions,
+    admission?: IStreamAdmissionFailure
   ) {
     this.#owner = owner
     this.#target = target
     this.#method = method
     this.#payload = payload
     this.#options = options
+    this.#admission = admission
     this.value = Object.freeze({
       next: this.#next,
       return: (value?: IRpcPortableValue) => this.#return(value),
@@ -178,6 +182,7 @@ export class StreamConsumer {
     /** Options are read once at the actual first next, preserving lazy caller observation. */
     const options = this.#options ?? {}
     this.#beforeStart = options.cancel === RpcWireCancel
+    if (this.#admission) throw this.#admission.error
     this.#deadline =
       options.remainingMs === undefined ? undefined : this.#now() + options.remainingMs
     this.#controller = createGenerationController({
@@ -501,6 +506,7 @@ export class StreamConsumer {
   #finish(terminal: IStreamTerminal, received?: IRpcEnvelope): void {
     if (this.#terminal) return
     this.#terminal = terminal
+    this.#admission = undefined
     if (this.#prepared)
       this.#observe(
         received ?? this.#prepared.envelope,

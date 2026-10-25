@@ -589,8 +589,8 @@ export class RpcHost {
       assertOpen: () => this.#assertOpen(),
       sessions: this.#sessions,
       calls: this.#calls,
-      stream: (target, method, payload, local) =>
-        this.#streams.open(target, method, payload, local),
+      stream: (target, method, payload, local, admission) =>
+        this.#streams.open(target, method, payload, local, admission),
       hold: (selection, method) => this.#forwarder.hold(selection, method),
       close: (reason) => this.#releaseNamespace(registration, reason),
       report: this.#report

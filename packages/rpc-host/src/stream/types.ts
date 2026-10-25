@@ -21,6 +21,9 @@ import type {
   IPreparedCall
 } from '../call/types.js'
 
+/** An already-failed directory check is consumed only by the original lazy stream owner. */
+export type IStreamAdmissionFailure = Readonly<{ error: unknown }>
+
 /** The Host supplies actual write, global identity and the canonical call header/id allocator. */
 export type IStreamChannelOptions = Readonly<{
   /** Borrow the same physical capability check before a lazy iterator reads any caller option. */

@@ -105,6 +105,26 @@ describe('thread Host facade', () => {
         code: 'PROVIDER_NOT_FOUND'
       })
       expect(first.frames).toHaveLength(frames)
+      /** One-way methods obey the same current-directory refusal before their physical write. */
+      await expect(left.notify('unknown.read', undefined, { targetId: 'p' })).rejects.toMatchObject(
+        {
+          code: 'PROVIDER_NOT_FOUND'
+        }
+      )
+      /** A missing stream remains a plain lazy iterator and never sends its opening frame. */
+      const unavailable = left.stream('unknown.read')
+      expect(first.frames).toHaveLength(frames)
+      /** The first local failure remains the exact sticky error on a repeated pull. */
+      const failure = await unavailable.next().catch((error: unknown) => error)
+      expect(failure).toMatchObject({ code: 'PROVIDER_NOT_FOUND' })
+      await expect(unavailable.next()).rejects.toBe(failure)
+      expect(await unavailable.return('local')).toEqual({ done: true, value: 'local' })
+      /** An unopened return closes locally before a scheduled first pull can start. */
+      const unopened = left.stream('unknown.read')
+      const pull = unopened.next()
+      expect(await unopened.return('unopened')).toEqual({ done: true, value: 'unopened' })
+      expect(await pull).toEqual({ done: true, value: undefined })
+      expect(first.frames).toHaveLength(frames)
       await first.close()
       expect(await right.send('p', 'p.read', 'still live')).toBe('still live')
       expect(first.handles[0]!.identity.fingerprint).not.toBe(

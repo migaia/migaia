@@ -20,6 +20,7 @@ import { StreamProducer } from './producer.js'
 import { RpcStreamErrorText } from './error-text.js'
 import type {
   IStreamChannelOptions,
+  IStreamAdmissionFailure,
   IStreamConsumer,
   IStreamOwner,
   IStreamProducer
@@ -70,13 +71,14 @@ export class StreamChannel {
     target: ICallTargetRef,
     method: string,
     payload?: IRpcPortableValue,
-    options?: ICallLocalOptions
+    options?: ICallLocalOptions,
+    admission?: IStreamAdmissionFailure
   ): AsyncIterableIterator<IRpcPortableValue> {
     this.#assertOpen()
     if (target.source && !target.origin) target.source.assertTransfer(target.carrierId, options)
     else this.#ports.assertTransfer(target.carrierId, options)
     /** Relay metadata is attached only to this original public iterator, never a copyable token. */
-    const consumer = new StreamConsumer(this.#owner, target, method, payload, options)
+    const consumer = new StreamConsumer(this.#owner, target, method, payload, options, admission)
     this.#iterators.set(consumer.value, consumer)
     return consumer.value
   }

@@ -24,6 +24,7 @@ import type { SessionTable } from '../session/table.js'
 import type { IRpcSessionSelection } from '@migaia/rpc-contract/interfaces'
 import { callTarget } from '../call/target.js'
 import type { IRpcCallOptions, IRpcFanoutResult, IRpcNotifyOptions } from './types.js'
+import type { IStreamAdmissionFailure } from '../stream/types.js'
 
 /** Preserve synchronous local trace admission while the one Contract validator owns its grammar. */
 function assertTrace(options: IRpcCallOptions): void {
@@ -48,7 +49,8 @@ export type INamespaceOptions = Readonly<{
     target: ICallTargetRef,
     method: string,
     payload?: IRpcPortableValue,
-    options?: IRpcCallOptions
+    options?: IRpcCallOptions,
+    admission?: IStreamAdmissionFailure
   ): AsyncIterableIterator<IRpcPortableValue>
   hold(selection: IRpcSessionSelection, method: IRpcMethodDescription): Function
   close(reason: unknown): Promise<void>
@@ -194,20 +196,14 @@ export class Namespace {
     /** One snapshot fixes target identity before any iterator starts. */
     const selected = this.#targets()
     this.#assertTransfer(selected, options)
-    if (selected.length === 1)
-      return this.#options.stream(callTarget(selected[0]!), method, payload, options)
+    if (selected.length === 1) return this.#stream(selected[0]!, method, payload, options)
     /** Stream fanout contains iterators, never promises masquerading as an iterator. */
     const result = fanout<AsyncIterableIterator<IRpcPortableValue>>()
     for (const selection of selected) {
       /** Established tagged keys remain stable for unusual application peer names. */
       const key = JSON.stringify(['target', selection.view.name])
       try {
-        result.fulfilled[key] = this.#options.stream(
-          callTarget(selection),
-          method,
-          payload,
-          options
-        )
+        result.fulfilled[key] = this.#stream(selection, method, payload, options)
       } catch (error) {
         result.rejected[key] = error
       }
@@ -280,27 +276,48 @@ export class Namespace {
     return this.#options.sessions.values(this.#options.name)
   }
 
-  /** Admission uses the accepted method Map, while explicit forwarded paths reach Forwarder. */
+  /** Current advertised methods are the sole admission source, including qualified forward paths. */
+  #assertMethod(
+    selection: IRpcSessionSelection,
+    method: string,
+    mode: IRpcMethodDescription['supportedModes'][number]
+  ): void {
+    assertCallMethod(method)
+    /** Cold directory compilation made every method/mode lookup O(1). */
+    const description = selection.view.methods.get(method)
+    if (!description)
+      throw createRpcError(RpcCoreErrorCode.providerNotFound, RuntimeApiErrorText.methodUnavailable)
+    if (!description.supportedModes.includes(mode))
+      throw createRpcError(
+        RpcCoreErrorCode.capabilityUnsupported,
+        RuntimeApiErrorText.methodUnavailable
+      )
+  }
+
+  /** Unknown methods return a lazy local terminal without entering the stream's physical owner. */
+  #stream(
+    selection: IRpcSessionSelection,
+    method: string,
+    payload: IRpcPortableValue | undefined,
+    options: IRpcCallOptions
+  ): AsyncIterableIterator<IRpcPortableValue> {
+    /** The original consumer owns lazy start and sticky settlement for this local admission error. */
+    let admission: IStreamAdmissionFailure | undefined
+    try {
+      this.#assertMethod(selection, method, 'stream')
+    } catch (error) {
+      admission = { error }
+    }
+    return this.#options.stream(callTarget(selection), method, payload, options, admission)
+  }
+
+  /** Directed and broadcast calls share the accepted target's current directory admission. */
   readonly #invoke = (
     selection: IRpcSessionSelection,
     command: ICallCommand,
     options: IRpcCallOptions
   ): Promise<unknown> => {
-    if ('method' in command) {
-      assertCallMethod(command.method)
-      /** Cold directory compilation made every method/mode lookup O(1). */
-      const description = selection.view.methods.get(command.method)
-      if (!description && command.mode !== 'notify' && !command.method.includes('.'))
-        throw createRpcError(
-          RpcCoreErrorCode.providerNotFound,
-          RuntimeApiErrorText.methodUnavailable
-        )
-      if (description && !description.supportedModes.includes(command.mode))
-        throw createRpcError(
-          RpcCoreErrorCode.capabilityUnsupported,
-          RuntimeApiErrorText.methodUnavailable
-        )
-    }
+    if ('method' in command) this.#assertMethod(selection, command.method, command.mode)
     return this.#options.calls.invoke(callTarget(selection), command, options)
   }
 

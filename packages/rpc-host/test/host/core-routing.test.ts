@@ -108,8 +108,9 @@ describe('RPC namespace routing', () => {
         await expect(a.host.memory.send('b', 'c.missing', 1)).rejects.toMatchObject({
           code: 'PROVIDER_NOT_FOUND'
         })
+        /** A method absent from the current direct directory is refused locally before forwarding. */
         await expect(a.host.memory.send('b', 'nobody.render', 1)).rejects.toMatchObject({
-          code: 'TARGET_UNKNOWN'
+          code: 'PROVIDER_NOT_FOUND'
         })
         await c.host.close()
         await expect(a.host.memory.send('b', 'c.render', 1)).rejects.toMatchObject({
