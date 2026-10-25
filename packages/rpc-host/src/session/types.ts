@@ -14,10 +14,7 @@ import type { IRpcPipelineOwner } from '../sdk/flow-pipelines.js'
 import type { IProviderCommitGate } from '../dispatch/types.js'
 
 /** Only these flow operations participate in carrier preparation and session negotiation. */
-export type IRpcSessionFlow = Pick<FlowRegistry, 'extensions' | 'requiredExtensions'> &
-  Partial<
-    Pick<FlowRegistry, 'observe' | 'observationFacts' | 'observing' | 'transferRequiresIntegrity'>
-  >
+export type IRpcSessionFlow = Pick<FlowRegistry, 'facts'> & Partial<Pick<FlowRegistry, 'observe'>>
 
 /** A native registration holds only this opaque table-owned publication token. */
 export type IRpcSessionScope = Readonly<object>

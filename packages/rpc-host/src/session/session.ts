@@ -236,7 +236,7 @@ export class Session {
   start(): void {
     try {
       /** Subscribe before handshake traffic; the native owner supplies raw facts before any decode. */
-      if (this.#options.flow.observing?.(this.#options.namespace))
+      if (this.#options.flow.facts(this.#options.namespace).observing)
         this.#unobserve = this.#options.carrier.observation?.subscribe((event) => {
           this.#observe({
             ...event,
@@ -355,7 +355,7 @@ export class Session {
   assertTransfer(options?: object): void {
     if (options && Object.hasOwn(options, 'transfer'))
       this.#options.carrier.assertTransfer(
-        this.#options.flow.transferRequiresIntegrity?.(this.#options.namespace)
+        this.#options.flow.facts(this.#options.namespace).transferRequiresIntegrity
       )
   }
 
@@ -717,8 +717,8 @@ export class Session {
       step: H.hello,
       versions: [RpcWireVersion],
       codecs: this.#options.carrier.codecs,
-      extensions: this.#options.flow.extensions(this.#options.namespace),
-      requiredExtensions: this.#options.flow.requiredExtensions(this.#options.namespace),
+      extensions: this.#options.flow.facts(this.#options.namespace).extensions,
+      requiredExtensions: this.#options.flow.facts(this.#options.namespace).required,
       peer: { id: this.#options.self().instanceId, runtime: 'javascript' },
       directory
     }
@@ -1131,7 +1131,7 @@ export class Session {
       peerId: this.#view?.peerId,
       data: Object.freeze({
         ...observation.facts,
-        ...this.#options.flow.observationFacts?.(this.#options.namespace),
+        ...this.#options.flow.facts(this.#options.namespace).observationFacts,
         endpointId: this.#options.self().instanceId,
         namespace: this.#options.namespace,
         carrierId: this.#options.carrier.id,

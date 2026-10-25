@@ -105,9 +105,9 @@ it('actual native chunk flow preserves negotiated split/reassembly, physical dra
   registry.start()
   /** The same genuine owner retains each point payload axis while lending native execution. */
   const pipelines = rpc.domainCore()[rpcPipelineOwner]
-  expect(registry.extensions('test')).toEqual(['chunk@1'])
-  expect(registry.requiredExtensions('test')).toEqual(['chunk@1'])
-  expect(registry.extensions('other')).toEqual([])
+  expect(registry.facts('test').extensions).toEqual(['chunk@1'])
+  expect(registry.facts('test').required).toEqual(['chunk@1'])
+  expect(registry.facts('other').extensions).toEqual([])
   /** One accepted source owns its actual retirement signal. */
   const source = new AbortController()
   /** Native drain is deliberately held independently from the plugin Promise. */

@@ -109,9 +109,9 @@ async function fixture() {
 it('one physical batch settles every original member only at actual native drain and preserves failure identity', async () => {
   /** The original held-first/failed-batch oracle now reaches the actual optional plugin owner. */
   const f = await fixture()
-  expect(f.registry.extensions('test')).toEqual(['batch@1'])
-  expect(f.registry.requiredExtensions('test')).toEqual(['batch@1'])
-  expect(f.registry.extensions('other')).toEqual([])
+  expect(f.registry.facts('test').extensions).toEqual(['batch@1'])
+  expect(f.registry.facts('test').required).toEqual(['batch@1'])
+  expect(f.registry.facts('other').extensions).toEqual([])
   /** Real backpressure creates batching; no microtask scheduler forces idle requests to wait. */
   const firstDrain = deferred<void>()
   /** Every coalesced member must retain this second physical settlement. */

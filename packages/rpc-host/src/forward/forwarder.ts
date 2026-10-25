@@ -46,7 +46,7 @@ export type IProviderMethodCallable = (
 export type IForwarderOptions = Readonly<{
   maxHops?: number
   observation?: Readonly<{
-    observing(namespace: string): boolean
+    facts(namespace: string): Readonly<{ observing: boolean }>
     observe(event: IRpcObservation): void
   }>
   nodeId(): string
@@ -235,7 +235,7 @@ export class Forwarder {
 
   /** Lookup or mode admission may refuse forwarding before any downstream invocation exists. */
   reject(source: IRpcFlowContext, envelope: IRpcEnvelope, error: unknown): void {
-    if (!this.#ports.observation?.observing(source.namespace)) return
+    if (!this.#ports.observation?.facts(source.namespace).observing) return
     /** Failed admission has no later invocation; publish its one arrival and actual refusal here. */
     const route = envelope.route.forwardRoute ?? [this.#origin(source)!]
     this.#observe(source, envelope, route, RpcProbeOutcome.received)
@@ -455,7 +455,7 @@ export class Forwarder {
     /** The same required route is borrowed for observations; absence of observers creates no events. */
     const route = context.route ?? [origin!]
     /** One namespace check dominates all forward event construction and handoff callback allocation. */
-    const observing = this.#ports.observation?.observing(source.namespace) ?? false
+    const observing = this.#ports.observation?.facts(source.namespace).observing ?? false
     if (observing && envelope) this.#observe(source, envelope, route, RpcProbeOutcome.received)
     try {
       /** Resolve through the same direct identity before constructing this hop's bounded proof. */

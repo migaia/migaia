@@ -58,11 +58,7 @@ export class FlowRegistry {
   }
 
   /** The cold transport inventory alone determines which genuine native lanes may exist. */
-  declarations(
-    ...options: Parameters<typeof rpcHostPipelines>
-  ): ReturnType<typeof rpcHostPipelines> {
-    return rpcHostPipelines(...options)
-  }
+  readonly declarations = rpcHostPipelines
 
   /** Register directly on the installing core; native generation rollback removes every stage. */
   register(core: IPluginHostCore, installed: IRpcFlowInstallation<object>): void {
@@ -105,16 +101,6 @@ export class FlowRegistry {
     this.#started = true
   }
 
-  /** Propose only installed handlers for this namespace. */
-  extensions(namespace: string): readonly string[] {
-    return this.#scope(namespace).extensions
-  }
-
-  /** Session owns negotiation against this cached installed requirement set. */
-  requiredExtensions(namespace: string): readonly string[] {
-    return this.#scope(namespace).required
-  }
-
   /** Namespace publication borrows the original installation factories in native install order. */
   namespaceExtensions(namespace: string): readonly Readonly<Record<string, unknown>>[] {
     /** Each selected installation produces its own public extension surface once at publication. */
@@ -136,21 +122,6 @@ export class FlowRegistry {
         this.#report(error)
       }
     }
-  }
-
-  /** Session subscribes only when a genuine selected observation installation exists. */
-  observing(namespace: string): boolean {
-    return this.#scope(namespace).observing
-  }
-
-  /** Protection facts originate from the installed owner rather than decoded peer data. */
-  observationFacts(namespace: string): IRpcFlowInstallation['observationFacts'] {
-    return this.#scope(namespace).observationFacts
-  }
-
-  /** Transfer preflight borrows the selected installation's cold integrity requirement. */
-  transferRequiresIntegrity(namespace: string): boolean {
-    return this.#scope(namespace).transferRequiresIntegrity
   }
 
   /** Drop installation references after native cleanup has removed its own stages. */
@@ -236,7 +207,7 @@ export class FlowRegistry {
   }
 
   /** Collect only negotiation/observation membership; native snapshots never enter this cache. */
-  #scope(namespace: string): IFlowFacts {
+  facts(namespace: string): IFlowFacts {
     /** Existing namespace facts are invalidated only when real installation membership changes. */
     const existing = this.#scopes.get(namespace)
     if (existing) return existing
