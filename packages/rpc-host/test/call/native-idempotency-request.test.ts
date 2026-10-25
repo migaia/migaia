@@ -14,8 +14,10 @@ import {
 } from '@migaia/rpc-host/sdk'
 import type { IRpcCarrierWriteOptions } from '@migaia/rpc-contract/interfaces'
 import { idempotency } from '@migaia/rpc-host/features/idempotency'
+import { createRpcIdempotencyStore } from '@migaia/rpc-host/features/idempotency'
 import { retry } from '@migaia/rpc-host/features/retry'
 import { coreMemoryServer } from '../host/core-fixture.js'
+import { CallInvocation } from '../../dist/call/invocation.js'
 
 /** Native postMessage owns transfer and subscription removal; SDK retains the only carrier. */
 class KeyedMessageIO implements IRpcMessageIO {
@@ -228,6 +230,124 @@ it('keeps the original key factory failure as a rejected Promise without a busin
     expect(business).not.toHaveBeenCalled()
   } finally {
     writing.mockRestore()
+    await Promise.all([client.host.close(), host.close()])
+  }
+})
+
+// RPC-TEST-17D89AA0779A-C003: the executing original claim owns the sole bounded store slot.
+it('rejects a new key while the real bounded store owns an executing request', async () => {
+  /** Only the real provider enters and increments this original execution count. */
+  let count = 0
+  /** Genuine provider entry proves the original store claim is executing. */
+  const entered = deferred<void>()
+  /** The original provider alone releases its result seven and the retained claim. */
+  const finish = deferred<number>()
+  /** The same supported public factory supplies the original one-entry capacity. */
+  const store = createRpcIdempotencyStore({ maxEntries: 1 })
+  /** Native Session admission and optional store installation remain independent real owners. */
+  const server = coreMemoryServer('executing-key-server')
+  /** No quota facade or replacement store can reject this second genuine call. */
+  const host = await createRpcHost({
+    ...server.options,
+    plugins: [idempotency({ store }), server.transport],
+    provide: {
+      count: () => {
+        count++
+        entered.resolve()
+        return finish.promise
+      }
+    }
+  })
+  /** The genuine caller originates both original keys on one accepted physical connection. */
+  const client = await server.connect('executing-key-client')
+  /** Observe the real held operation through all assertions and physical cleanup. */
+  const first = client.host.memory.send('executing-key-server', 'count', null, {
+    idempotencyKey: 'first'
+  })
+  void first.catch(() => undefined)
+  try {
+    await entered.promise
+    await expect(
+      client.host.memory.send('executing-key-server', 'count', null, {
+        idempotencyKey: 'second'
+      })
+    ).rejects.toMatchObject({ code: 'OVERLOADED' })
+    expect(count).toBe(1)
+    finish.resolve(7)
+    expect(await first).toBe(7)
+  } finally {
+    finish.resolve(7)
+    await first.catch(() => undefined)
+    await Promise.all([client.host.close(), host.close()])
+  }
+})
+
+// RPC-TEST-17D89AA0779A-C004: malformed store input fails construction before any provider work.
+it('rejects the original malformed injected store during native construction', async () => {
+  /** This cold listener owns no provider or physical Session before genuine native installation. */
+  const server = coreMemoryServer('invalid-key-store-server')
+  /** The original invalid value must reach the real installed Feature's configuration boundary. */
+  const opening = createRpcHost({
+    ...server.options,
+    plugins: [idempotency({ store: 1 as never }), server.transport]
+  })
+  try {
+    await expect(opening.then(() => undefined)).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
+  } finally {
+    /** A regression that incorrectly constructs a Host must still release its original resources. */
+    const settled = await Promise.allSettled([opening])
+    for (const result of settled) if (result.status === 'fulfilled') await result.value.close()
+  }
+})
+
+// RPC-TEST-17D89AA0779A-C006 and RPC-TEST-7376FBDEF575-C002: original caller key errors stay local.
+it('replays original sequential keys and rejects invalid keys before any real business write', async () => {
+  /** Actual execution alone supplies the original one/two count and returned values. */
+  let count = 0
+  /** The native listener and optional store own all genuine key admission and retained outcomes. */
+  const server = coreMemoryServer('sequential-key-server')
+  /** Both original repeated and independent keys use the same true provider and real store. */
+  const host = await createRpcHost({
+    ...server.options,
+    plugins: [idempotency(), server.transport],
+    provide: { count: () => ++count }
+  })
+  /** Accepted public namespace methods are the sole entry, without a legacy endpoint wrapper. */
+  const client = await server.connect('sequential-key-client')
+  try {
+    expect(
+      await client.host.memory.send('sequential-key-server', 'count', null, {
+        idempotencyKey: 'k1'
+      })
+    ).toBe(1)
+    expect(
+      await client.host.memory.send('sequential-key-server', 'count', null, {
+        idempotencyKey: 'k1'
+      })
+    ).toBe(1)
+    expect(count).toBe(1)
+    expect(
+      await client.host.memory.send('sequential-key-server', 'count', null, {
+        idempotencyKey: 'k2'
+      })
+    ).toBe(2)
+    /** Startup and valid business are complete before observing each original invalid caller input. */
+    const writing = vi.spyOn(client.pair[1], 'write')
+    /** The canonical invocation owner must not start policy execution for an invalid caller key. */
+    const dispatching = vi.spyOn(CallInvocation.prototype, 'start')
+    try {
+      // These are the three fixed original malformed keys from the two independent old cases.
+      for (const idempotencyKey of ['', 'has space', 'bad key'])
+        await expect(
+          client.host.memory.send('sequential-key-server', 'count', null, { idempotencyKey })
+        ).rejects.toMatchObject({ code: 'CONTRACT_INVALID' })
+      expect(writing).not.toHaveBeenCalled()
+      expect(dispatching).not.toHaveBeenCalled()
+    } finally {
+      writing.mockRestore()
+      dispatching.mockRestore()
+    }
+  } finally {
     await Promise.all([client.host.close(), host.close()])
   }
 })

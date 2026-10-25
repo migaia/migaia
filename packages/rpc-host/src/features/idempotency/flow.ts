@@ -11,7 +11,7 @@ import type {
 import { RpcWireKind, RpcWireProfile } from '@migaia/rpc-contract/protocol'
 import type { IRpcFlowInstallation, IRpcFlowSetupContext } from '../../sdk/types.js'
 import { RpcFlowPoint, type IRpcFlowStage } from '../../sdk/flow-pipelines.js'
-import { createRpcLifecycleError } from '../../host/error-owner.js'
+import { createRpcLifecycleError, createRpcConfigurationError } from '../../host/error-owner.js'
 import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 import { createRpcIdempotencyStore, type IRpcIdempotencyStore } from './store.js'
 import { RpcIdempotencyState as State, RpcIdempotencyStoreFact as Fact } from './constants.js'
@@ -35,6 +35,8 @@ export class RpcIdempotencyFlow {
 
   /** Move original store policy into its actual optional owner, without creating another ledger. */
   constructor(options: IRpcIdempotencyOptions, setup: IRpcFlowSetupContext) {
+    if (options.store !== undefined && typeof options.store?.claim !== 'function')
+      throw createRpcConfigurationError(RpcCoreErrorText.idempotencyConfigInvalid)
     this.#options = options
     this.#setup = setup
     this.#defaultMemory = options.store === undefined

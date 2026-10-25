@@ -7,6 +7,9 @@ import {
   normalizeRpcCallOptions,
   normalizeRpcTrace,
   normalizeRpcSteps,
+  RpcWireField,
+  RpcWirePointer,
+  rpcWirePointer,
   type IRpcEnvelope,
   type IRpcStep
 } from '@migaia/rpc-contract/protocol'
@@ -22,6 +25,7 @@ import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   createRpcAbortError,
   createRpcError,
+  createRpcContractError,
   createRpcLifecycleError,
   isLocalRpcError,
   createRpcPhysicalTransportError
@@ -74,6 +78,24 @@ function normalizeLocalGroupSteps(steps: readonly IRpcStep[]): readonly IRpcStep
       RpcCoreErrorText.runtimeGroupStepsInvalid,
       cause
     )
+  }
+}
+
+/** Keep the caller's key error family while the sole Contract validator admits its exact grammar. */
+function validateLocalCallOptions(
+  options: Parameters<typeof normalizeRpcCallOptions>[0],
+  mode: Parameters<typeof normalizeRpcCallOptions>[1]
+): void {
+  try {
+    normalizeRpcCallOptions(options, mode, hostErrorWireMetadata)
+  } catch (cause) {
+    if (
+      cause instanceof Error &&
+      (cause as Error & { readonly pointer?: unknown }).pointer ===
+        rpcWirePointer(RpcWirePointer.options, RpcWireField.idempotencyKey)
+    )
+      throw createRpcContractError(RpcCoreErrorText.idempotencyKeyInvalid, cause)
+    throw cause
   }
 }
 
@@ -529,7 +551,7 @@ export class CallTable {
         RpcCoreErrorCode.capabilityUnsupported,
         RpcCoreErrorText.capabilityUnsupported
       )
-    normalizeRpcCallOptions(wireOptions, command.mode, hostErrorWireMetadata)
+    validateLocalCallOptions(wireOptions, command.mode)
     return command.mode === RpcCallMode.group
       ? { ...command, steps: normalizeLocalGroupSteps(command.steps) }
       : command
