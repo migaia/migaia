@@ -57,8 +57,8 @@ describe('error boundary helpers', () => {
   it('keeps unique registered codes and a constant source', () => {
     /** Count the public code contract independently from the generated registry. */
     const codes = Object.values(RpcCoreErrorCode)
-    /** BC1 removes mutual exclusion; namespace and feature conflicts add two distinct identities. */
-    expect(codes).toHaveLength(40)
+    /** Namespace/feature conflicts and the closing keepalive quota each retain a distinct identity. */
+    expect(codes).toHaveLength(41)
     expect(new Set(codes).size).toBe(codes.length)
     /** Public native families share one stable source without merging their semantic codes. */
     const samples: ReadonlyArray<{ readonly source: string; readonly code: string }> = [
