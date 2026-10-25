@@ -1,3 +1,4 @@
+/** Own the Worker bridge's stable routes, identities and serializer frame domains; IO stays in RPC. */
 /** Worker serialization diagnostic source kind. */
 export const WorkerDiagnosticType = {
   /** Default parser name and serializer diagnostic type when no format label is supplied. */

@@ -214,9 +214,11 @@ class WorkerContractEndpoint implements IWorkerContractEndpoint {
     const methodHandlers = this.#handlers.get(method) ?? new Set<IWorkerHandler>()
     methodHandlers.add(handler)
     this.#handlers.set(method, methodHandlers)
+    /** The original registration owns the exact set, callback and method removed together. */
+    const registration = { methodHandlers, handler, method }
     return () => {
-      methodHandlers.delete(handler)
-      if (methodHandlers.size === 0) this.#handlers.delete(method)
+      registration.methodHandlers.delete(registration.handler)
+      if (registration.methodHandlers.size === 0) this.#handlers.delete(registration.method)
     }
   }
 
@@ -323,10 +325,15 @@ function decodeWorkerValue(value: unknown): unknown {
   return output
 }
 
+/** Preserve the bridge's native btoa alphabet and iterator semantics with one final linear join. */
 function encodeBytes(value: Uint8Array): { readonly $rpc: 'bytes'; readonly base64url: string } {
-  let binary = ''
-  for (const byte of value) binary += String.fromCharCode(byte)
-  const base64 = btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '')
+  /** Each original byte contributes one character, avoiding repeated whole-prefix concatenation. */
+  const characters: string[] = []
+  for (const byte of value) characters.push(String.fromCharCode(byte))
+  const base64 = btoa(characters.join(''))
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replaceAll('=', '')
   return { $rpc: 'bytes', base64url: base64 }
 }
 

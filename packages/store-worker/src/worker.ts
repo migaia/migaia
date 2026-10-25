@@ -1,3 +1,7 @@
+/**
+ * Bridge worker computations to the canonical RPC endpoint; physical Worker lifetime stays
+ * borrowed.
+ */
 import { WorkerMessagePort, type IWorkerMessagePort } from './worker-message-event.js'
 import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import type { IRuntime } from '@migaia/reactive'
@@ -138,13 +142,13 @@ export class WorkerAdapter {
     } catch (error) {
       return Promise.reject(error)
     }
-    return this.#endpoint.then((endpoint) => {
+    return this.#endpoint.then(async (endpoint) => {
       if (this.#disposed)
         throw createStoreWorkerError(
           StoreWorkerErrorCode.adapterDisposed,
           StoreWorkerErrorText.disposed
         )
-      return endpoint.request(payload, requestOptions).then((result) => result as Output)
+      return (await endpoint.request(payload, requestOptions)) as Output
     })
   }
 
@@ -202,31 +206,64 @@ export function createWorkerHandler<Input, Output>(
       StoreWorkerErrorText.workerHandlerCallback('postMessage')
     )
   }
-  /** Raw delivery and native listener identity share one explicit bridge owner. */
-  const port = new WorkerMessagePort(postMessage)
-  /** Capture options before asynchronous endpoint assembly begins. */
-  const endpointOptions = snapshotWorkerClientOptions(options)
-  /** Managed preparation completes independently of the remote handshake. */
-  const endpointPromise = createWorkerContractEndpoint(
-    port,
-    {
-      id: WorkerRpcIdentity.worker,
-      targetId: endpointOptions.clientId ?? WorkerRpcIdentity.main,
-      timeoutMs: endpointOptions.timeoutMs
-    },
-    (readyEndpoint) => {
-      const unsubscribe = readyEndpoint.onRequest(WorkerRpcIdentity.call, (payload, signal) =>
-        compute(payload as Input, { signal })
-      )
-      return {
-        dispose: async () => {
-          unsubscribe()
-          await readyEndpoint.close()
-        }
-      }
-    }
-  )
-  return toManagedRpcHandler(endpointPromise, port.deliver)
+  return new WorkerHandler(compute, postMessage, snapshotWorkerClientOptions(options)).handler
+}
+
+/** One managed computation owns its provider registration, while RPC owns the borrowed native port. */
+class WorkerHandler<Input, Output> {
+  /** The application computation receives each original payload and cooperative provider signal. */
+  readonly #compute: (
+    payload: Input,
+    context: { signal: INativeAbortSignal }
+  ) => Output | Promise<Output>
+  /** Local preparation lends the exact endpoint later joined by managed cleanup. */
+  #endpoint!: IWorkerContractEndpoint
+  /** Remove the original computation before closing its endpoint. */
+  #unsubscribe!: () => void
+  /** Callable delivery and disposal retain the original managed handler's identities. */
+  readonly handler: IManagedRpcHandler
+
+  /** Capture computation before starting the same synchronous provider preparation and native IO. */
+  constructor(
+    compute: (payload: Input, context: { signal: INativeAbortSignal }) => Output | Promise<Output>,
+    postMessage: (message: unknown) => void,
+    options: { readonly clientId?: string; readonly timeoutMs?: number }
+  ) {
+    this.#compute = compute
+    /** Raw delivery and native listener identity share one explicit bridge owner. */
+    const port = new WorkerMessagePort(postMessage)
+    /** Managed preparation completes independently of the remote handshake. */
+    const endpointPromise = createWorkerContractEndpoint(
+      port,
+      {
+        id: WorkerRpcIdentity.worker,
+        targetId: options.clientId ?? WorkerRpcIdentity.main,
+        timeoutMs: options.timeoutMs
+      },
+      this.#prepare
+    )
+    this.handler = toManagedRpcHandler(endpointPromise, port.deliver)
+  }
+
+  /** Advertise the one original computation before the remote handshake begins. */
+  readonly #prepare = (endpoint: IWorkerContractEndpoint): { dispose(): Promise<void> } => {
+    this.#endpoint = endpoint
+    this.#unsubscribe = endpoint.onRequest(WorkerRpcIdentity.call, this.#request)
+    return { dispose: this.#dispose }
+  }
+
+  /** Preserve direct computation invocation and its original provider cancellation signal. */
+  readonly #request = (payload: unknown, signal: INativeAbortSignal): Output | Promise<Output> => {
+    /** The original standalone callback receives no managed-owner receiver. */
+    const compute = this.#compute
+    return compute(payload as Input, { signal })
+  }
+
+  /** Release the same registration before joining the actual endpoint close result. */
+  readonly #dispose = async (): Promise<void> => {
+    this.#unsubscribe()
+    await this.#endpoint.close()
+  }
 }
 
 /**

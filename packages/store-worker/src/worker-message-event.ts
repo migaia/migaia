@@ -1,3 +1,7 @@
+/**
+ * Adapt managed raw delivery to the Browser transport's native listener shape without owning a
+ * Worker.
+ */
 import type { IWorkerPluginOptions } from '@migaia/rpc-plugin-browser'
 
 /** Borrow the actual native port accepted by the dedicated Worker transport's public factory. */

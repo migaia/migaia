@@ -1,3 +1,7 @@
+/**
+ * Bridge borrowed serializers through Worker RPC with the original credit, iterator and disposal
+ * owners.
+ */
 import { attachErrorIdentity, attachSecondaryErrors, isNativeErrorValue } from '@migaia/utils/error'
 import { WorkerMessagePort, type IWorkerMessagePort } from '../worker-message-event.js'
 import {
@@ -288,6 +292,9 @@ function assertWorkerParserOptions(options: unknown): asserts options is IWorker
   }
 }
 
+/** A parser closed before readiness has no remaining frame registration to remove. */
+function emptyFrameSubscription(): void {}
+
 /**
  * Creates the main-side serialization parser for a caller-supplied Worker and remote parser. encode
  * returns a streamed sequence of worker chunks with consumer acknowledgements; decode requests one
@@ -327,7 +334,7 @@ class WorkerParser implements ISerializeParser {
   /** Disposal callers receive the exact same promise, including rejection. */
   #disposePromise: Promise<void> | undefined
   /** Native setup advertises the frame provider before discovery starts. */
-  #unsubscribeFrame: () => void = () => undefined
+  #unsubscribeFrame: () => void = emptyFrameSubscription
   /** The one canonical Host owns connection readiness and physical delivery. */
   #client: Promise<IWorkerContractEndpoint>
   /** Registry-visible name retains the captured format default. */
@@ -387,25 +394,32 @@ class WorkerParser implements ISerializeParser {
         id: this.#clientId ?? WorkerRpcIdentity.main,
         targetId: WorkerRpcIdentity.worker
       },
-      (endpoint) => {
-        if (this.#disposePromise === undefined)
-          this.#unsubscribeFrame = endpoint.onRequest(WorkerSerializeFrameMethod, (payload) => {
-            const frame = payload as IWorkerSerializeFrame
-            const stream = this.#streams.get(frame.streamId)
-            if (!stream) return
-            stream.push(frame)
-            if (frame.kind === WorkerSerializeFrameKind.end) this.#streams.delete(frame.streamId)
-          })
-        return endpoint
-      }
+      this.#prepareEndpoint
     )
     this.name = optionType ?? WorkerDiagnosticType.worker
+  }
+
+  /** Advertise the original frame provider during native endpoint preparation, before discovery. */
+  readonly #prepareEndpoint = (endpoint: IWorkerContractEndpoint): IWorkerContractEndpoint => {
+    if (this.#disposePromise === undefined)
+      this.#unsubscribeFrame = endpoint.onRequest(WorkerSerializeFrameMethod, this.#onFrame)
+    return endpoint
+  }
+
+  /** Route each actual frame to its one stream and retire its entry on the original end frame. */
+  readonly #onFrame = (payload: unknown): void => {
+    /** The worker protocol retains its original frame shape admission in the stream owner. */
+    const frame = payload as IWorkerSerializeFrame
+    const stream = this.#streams.get(frame.streamId)
+    if (!stream) return
+    stream.push(frame)
+    if (frame.kind === WorkerSerializeFrameKind.end) this.#streams.delete(frame.streamId)
   }
 
   /** Join the one original frame subscription after local bridge preparation. */
   #ensureFrameSubscription = (): Promise<() => void> => {
     this.#frameSubscription ??= this.#client.then(() => {
-      if (this.#disposePromise !== undefined) return () => undefined
+      if (this.#disposePromise !== undefined) return emptyFrameSubscription
       return this.#unsubscribeFrame
     })
     return this.#frameSubscription
@@ -473,34 +487,12 @@ class WorkerParser implements ISerializeParser {
     /** This output stream alone owns its buffered consumer prefix. */
     const queue = new WorkerFrameQueue(
       streamId,
-      () => {
-        void this.#client.then((endpoint) => {
-          if (this.#disposePromise !== undefined) return
-          return endpoint.notify(
-            {
-              streamId,
-              kind: WorkerSerializeFrameKind.cancel,
-              sequence: -1
-            },
-            WorkerSerializeFrameMethod
-          )
-        })
-      },
-      (sequence) => {
-        void this.#client.then((endpoint) => {
-          if (this.#disposePromise !== undefined) return
-          return endpoint.notify(
-            {
-              streamId,
-              kind: WorkerSerializeFrameKind.ack,
-              sequence
-            },
-            WorkerSerializeFrameMethod
-          )
-        })
-      }
+      () => this.#cancelStream(streamId),
+      (sequence) => this.#acknowledgeStream(streamId, sequence)
     )
     this.#streams.set(streamId, queue)
+    /** One request retains its original payload, stream id and cancellation context until readiness. */
+    const request = { chunk, streamId, context }
     void this.#ensureFrameSubscription()
       .then(() => this.#client)
       .then((endpoint) => {
@@ -509,11 +501,11 @@ class WorkerParser implements ISerializeParser {
         return endpoint.request(
           {
             phase: WorkerSerializePhase.encode,
-            chunk,
-            streamId,
+            chunk: request.chunk,
+            streamId: request.streamId,
             clientId: this.#clientId ?? WorkerRpcIdentity.main
           },
-          { signal: context.signal }
+          { signal: request.context.signal }
         )
       })
       .then(
@@ -524,6 +516,28 @@ class WorkerParser implements ISerializeParser {
         }
       )
     return queue.output
+  }
+
+  /** Consumer return sends the original cancellation frame after the same endpoint readiness. */
+  #cancelStream(streamId: string): void {
+    void this.#client.then((endpoint) => {
+      if (this.#disposePromise !== undefined) return
+      return endpoint.notify(
+        { streamId, kind: WorkerSerializeFrameKind.cancel, sequence: -1 },
+        WorkerSerializeFrameMethod
+      )
+    })
+  }
+
+  /** Consuming one original sequence returns exactly one remote credit. */
+  #acknowledgeStream(streamId: string, sequence: number): void {
+    void this.#client.then((endpoint) => {
+      if (this.#disposePromise !== undefined) return
+      return endpoint.notify(
+        { streamId, kind: WorkerSerializeFrameKind.ack, sequence },
+        WorkerSerializeFrameMethod
+      )
+    })
   }
 
   /** Fail streams, close the endpoint, then attempt explicitly owned physical termination. */
