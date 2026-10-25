@@ -208,6 +208,7 @@ for (const url of [
         expect(await api.streams.range('jobs')).toEqual([
           { id, fields: { body: new Uint8Array([255, 0, 128]) } }
         ])
+        expect(commands.at(-1)?.command).toBe('XRANGE')
         await api.streams.createGroup('jobs', 'workers')
         await api.streams.createGroup('jobs', 'workers')
         expect(
@@ -223,6 +224,9 @@ for (const url of [
         expect(claim.entries.map((row) => row.id)).toEqual([id])
         expect(claim.deletedIds).toEqual([])
         expect(await api.streams.ack('jobs', 'workers', [id])).toBe(1)
+        expect(commands.map((entry) => entry.command)).toEqual(
+          expect.arrayContaining(['XGROUP', 'XREADGROUP', 'XAUTOCLAIM', 'XACK'])
+        )
         await expect(
           api.streams.readGroup(
             'jobs',
@@ -240,6 +244,9 @@ for (const url of [
         expect(subscription.dispose()).toBe(subscription.dispose())
         await subscription.dispose()
         expect(await api.pubsub.publish('channel', new Uint8Array())).toBe(0)
+        expect(commands.map((entry) => entry.command)).toEqual(
+          expect.arrayContaining(['SUBSCRIBE', 'PUBLISH'])
+        )
         expect(
           await api.sortedSets.add('scores', [
             { member: '\ue000', score: 1 },
@@ -254,16 +261,23 @@ for (const url of [
         ])
         expect(await api.sortedSets.rank('scores', '\ud800')).toBe(1)
         expect(await api.sortedSets.rank('scores', 'missing')).toBeUndefined()
+        expect(commands.map((entry) => entry.command)).toEqual(
+          expect.arrayContaining(['ZADD', 'ZRANGE', 'ZRANK'])
+        )
+        commands.length = 0
         const results = await Promise.all(
           Array.from({ length: 4 }, () => api.rateLimit.consume('quota'))
         )
         expect(results.filter((row) => row.allowed)).toHaveLength(3)
         expect((await api.rateLimit.consume('quota')).remaining).toBe(0)
+        expect(commands.filter((entry) => entry.command === 'EVAL')).toHaveLength(5)
+        commands.length = 0
         const feed = store.use(durableChangeFeed)
         await store.set('history', 'first')
         const initial = await feed.readChanges()
         expect(initial.changes).toHaveLength(1)
         expect(counts.get('changes.read')).toBe(1)
+        expect(commands.map((entry) => entry.command)).toContain('XRANGE')
         const org = createOrgId(),
           peer = host.org(org).backend('redis')
         expect(peer.has(durableChangeFeed)).toBe(true)
@@ -288,6 +302,9 @@ for (const url of [
         ).toBe(true)
         expect(tail.dispose()).toBe(tail.dispose())
         await tail.dispose()
+        expect(commands.map((entry) => entry.command)).toEqual(
+          expect.arrayContaining(['XREVRANGE', 'XREAD'])
+        )
         const failed = deferred<void>(),
           callbackFailure = new RangeError('fixture tail callback'),
           observerFailure = new Error('fixture error observer'),
