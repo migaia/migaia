@@ -677,7 +677,16 @@ export class Session {
         // Observe late successful acquisition only when its original release step is reached.
         const unobserve = this.#unobserve
         this.#unobserve = undefined
-        return unobserve?.()
+        try {
+          return unobserve?.()
+        } catch (error) {
+          this.#options.flow.observe?.({
+            kind: RpcProbeObservationKind.cleanupFailure,
+            namespace: this.#options.namespace,
+            data: error
+          })
+          throw error
+        }
       }
     ]) {
       try {

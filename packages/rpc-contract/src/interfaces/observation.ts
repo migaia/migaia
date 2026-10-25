@@ -117,7 +117,9 @@ export const RpcProbeObservationKind = {
   /** A completed owner stage exposes borrowed facts without an intervention continuation. */
   event: 'probe-event',
   /** Only actual installed source facts may describe the available observer capabilities. */
-  descriptor: 'probe-descriptor'
+  descriptor: 'probe-descriptor',
+  /** An actual native observation disposer failed; installed probes retain their report policy. */
+  cleanupFailure: 'probe-cleanup-failure'
 } as const
 
 /** Forward refusals retain their actual owner reason independently of their public error code. */

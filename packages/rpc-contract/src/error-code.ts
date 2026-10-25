@@ -140,8 +140,9 @@ export const RpcCoreErrorCode = {
   invalidConfig: 'INVALID_CONFIG',
 
   /**
-   * A probe emit, describe or redact callback fails. Probe-core reports it with the original cause
-   * and isolates it from business execution; callers should repair or disable the diagnostic sink.
+   * A probe emit, describe or redact callback, or a native observation disposer, fails. The
+   * installed probe retains the original cause and isolates diagnostic failure from business
+   * execution; callers should repair or disable the diagnostic sink or its cleanup callback.
    */
   probeFailed: 'PROBE_FAILED',
 

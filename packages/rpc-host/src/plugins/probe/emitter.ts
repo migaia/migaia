@@ -468,5 +468,6 @@ class ProbeEmitter {
       this.emit(physicalFrameFacts(event.data as IRpcProbeObservation))
     else if (event.kind === RpcProbeObservationKind.descriptor)
       this.describe(event.data as IRpcProbeDescriptor)
+    else if (event.kind === RpcProbeObservationKind.cleanupFailure) this.report(event.data)
   }
 }
