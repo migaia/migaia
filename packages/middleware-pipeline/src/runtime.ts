@@ -7,6 +7,7 @@ import {
   runMultipleAsyncGeneratorPipeline
 } from './execution-runtime.js'
 import type { IAbortSignal } from '@migaia/utils/promise'
+import { throwMiddlewarePipelineDownstreamFailures } from './errors.js'
 import {
   admit,
   check,
@@ -158,7 +159,17 @@ export const adaptSyncStageToAsync =
     } finally {
       submissions.close()
     }
-    for (let index = 0; index < submissions.count; index += 1) await next(submissions.at(index))
+    /** A lifted sync stage cannot handle suffix errors, so all its registered values still run. */
+    const failures: unknown[] = []
+    for (let index = 0; index < submissions.count; index += 1) {
+      try {
+        await next(submissions.at(index))
+      } catch (error) {
+        if (nextPolicy === MiddlewarePipelineNext.single) throw error
+        failures.push(error)
+      }
+    }
+    throwMiddlewarePipelineDownstreamFailures(failures)
   }
 
 /** Adapts sync submissions through the same generator continuation protocol. */
@@ -180,7 +191,17 @@ export const adaptSyncStageToGenerator = <
       submissions.close()
     }
     if (submissions.count === 0) return signals.halt
-    for (let index = 0; index < submissions.count; index += 1) yield submissions.at(index)
+    /** Throw-back belongs to the adapter because the originating sync stage has already returned. */
+    const failures: unknown[] = []
+    for (let index = 0; index < submissions.count; index += 1) {
+      try {
+        yield submissions.at(index)
+      } catch (error) {
+        if (nextPolicy === MiddlewarePipelineNext.single) throw error
+        failures.push(error)
+      }
+    }
+    throwMiddlewarePipelineDownstreamFailures(failures)
     return signals.continue
   }
 

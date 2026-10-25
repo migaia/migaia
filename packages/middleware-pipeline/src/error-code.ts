@@ -22,8 +22,8 @@ export const MiddlewarePipelineErrorCode = {
    */
   executionFailed: 'EXECUTION_FAILED',
   /**
-   * Several already-started async downstream traversals failed. Inspect errors in submission order;
-   * each entry is the original failure, independent of its settlement order.
+   * Several independent sync traversals or unobserved async traversals failed. Inspect submission
+   * order; each entry is the original failure, independent of its settlement order.
    */
   multipleDownstreamFailed: 'MULTIPLE_DOWNSTREAM_FAILED',
   /**

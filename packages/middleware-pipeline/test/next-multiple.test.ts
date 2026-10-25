@@ -41,7 +41,7 @@ describe('multiple downstream submissions', () => {
     }
   })
 
-  it('retains an earlier business failure when a later started branch observes cancellation', async () => {
+  it('keeps active cancellation after the caller observes both branch failures', async () => {
     /** An ordinary downstream failure must not disappear behind a later active-control failure. */
     const businessError = new Error('business failure')
     /** Exact cooperative abort reason remains the second original aggregate entry. */
@@ -65,10 +65,7 @@ describe('multiple downstream submissions', () => {
           throw businessError
         }
       )
-    ).rejects.toMatchObject({
-      code: 'MULTIPLE_DOWNSTREAM_FAILED',
-      errors: [businessError, abortError]
-    })
+    ).rejects.toBe(abortError)
   })
   it('single guards a reentrant captured next before entering its downstream stage', async () => {
     /** Downstream retains the upstream continuation to exercise synchronous reentry. */
@@ -119,7 +116,7 @@ describe('multiple downstream submissions', () => {
         [
           (_value, next) => {
             upstream = next
-            return next(1)
+            void next(1)
           },
           (value, next) => {
             if (value === 1) void upstream(2)
@@ -154,10 +151,7 @@ describe('multiple downstream submissions', () => {
           throw value === 1 ? first : second
         }
       )
-    ).rejects.toMatchObject({
-      code: 'MULTIPLE_DOWNSTREAM_FAILED',
-      errors: [first, second]
-    })
+    ).rejects.toBe(first)
   })
   it('sync traverses every submitted value after the submitting stage returns', () => {
     /** Interleaving proves local submission and one terminal per traversal. */
@@ -183,10 +177,10 @@ describe('multiple downstream submissions', () => {
     expect(events).toEqual(['returned', 1, 'done:1', 2, 'done:2', 3, 'done:3'])
   })
 
-  it('sync stops remaining submissions after the second traversal fails', () => {
+  it('sync keeps later submissions independent after the second traversal fails', () => {
     /** The original downstream failure must escape without a replacement shell. */
     const failure = new Error('second traversal')
-    /** Only the first traversal can reach the terminal. */
+    /** Independent later submissions still reach the same terminal. */
     const completed: number[] = []
     expect(() =>
       createPipeline<number>({ mode: 'sync', next: 'multiple' }).run(
@@ -207,7 +201,7 @@ describe('multiple downstream submissions', () => {
         }
       )
     ).toThrow(failure)
-    expect(completed).toEqual([1])
+    expect(completed).toEqual([1, 3])
   })
 
   it('async starts each traversal immediately and awaits every started traversal', async () => {
@@ -280,27 +274,171 @@ describe('multiple downstream submissions', () => {
     })
   })
 
-  it('async rejects later next calls with the first failure without entering downstream', async () => {
-    /** The exact first failure also rejects later submissions. */
-    const failure = new Error('failed branch')
-    /** Entry count proves later submissions never start. */
+  it('async catches one branch failure and still traverses later values', async () => {
+    /** The submitting stage owns the exact failed branch after awaiting it. */
+    const failure = new Error('second traversal failure')
+    /** Every independent traversal must enter its original terminal. */
     const received: number[] = []
-    await expect(
-      createPipeline<number>({ mode: 'async', next: 'multiple' }).run(
+    /** Reporting is caller policy after the rejected next is observed. */
+    const reported: unknown[] = []
+    await createPipeline<number>({ mode: 'async', next: 'multiple' }).run(
+      [
+        async (_value, next) => {
+          await next(1)
+          try {
+            await next(2)
+          } catch (error) {
+            reported.push(error)
+          }
+          await next(3)
+        }
+      ],
+      0,
+      (value) => {
+        received.push(value)
+        if (value === 2) throw failure
+      }
+    )
+    expect(received).toEqual([1, 2, 3])
+    expect(reported).toEqual([failure])
+  })
+
+  it('async counts a caller then as observation while still joining its traversal', async () => {
+    /** This failure is deliberately handled through then instead of await. */
+    const failure = new Error('then observed failure')
+    /** Only the caller's rejection callback records the original object. */
+    const reported: unknown[] = []
+    await createPipeline<number>({ mode: 'async', next: 'multiple' }).run(
+      [
+        (_value, next) => {
+          void next(2).then(undefined, (error) => {
+            reported.push(error)
+          })
+          void next(3)
+        }
+      ],
+      0,
+      (value) => {
+        if (value === 2) throw failure
+      }
+    )
+    expect(reported).toEqual([failure])
+  })
+
+  it('sync aggregates independent failures in registration order', () => {
+    /** The second and third submissions fail with these original objects. */
+    const second = new Error('second sync failure')
+    /** Registration order must not be replaced by a shared first-error fence. */
+    const third = new Error('third sync failure')
+    /** Every registered payload enters its own traversal. */
+    const received: number[] = []
+    expect(() =>
+      createPipeline<number>({ mode: 'sync', next: 'multiple' }).run(
         [
-          async (_value, next) => {
-            await expect(next(1)).rejects.toBe(failure)
-            await expect(next(2)).rejects.toBe(failure)
+          (_value, next) => {
+            next(1)
+            next(2)
+            next(3)
           }
         ],
         0,
         (value) => {
           received.push(value)
-          throw failure
+          if (value > 1) throw value === 2 ? second : third
+        }
+      )
+    ).toThrowError(
+      expect.objectContaining({
+        code: MiddlewarePipelineErrorCode.multipleDownstreamFailed,
+        errors: [second, third]
+      })
+    )
+    expect(received).toEqual([1, 2, 3])
+  })
+
+  it('async rejects with the one unobserved original failure after later branches finish', async () => {
+    /** A discarded next promise remains owned by the runner until actual settlement. */
+    const failure = new Error('unobserved branch failure')
+    /** Later branches must remain independent even after a failure settled. */
+    const received: number[] = []
+    await expect(
+      createPipeline<number>({ mode: 'async', next: 'multiple' }).run(
+        [
+          async (_value, next) => {
+            void next(2)
+            await Promise.resolve()
+            await next(3)
+          }
+        ],
+        0,
+        (value) => {
+          received.push(value)
+          if (value === 2) throw failure
         }
       )
     ).rejects.toBe(failure)
-    expect(received).toEqual([1])
+    expect(received).toEqual([2, 3])
+  })
+
+  it('generator throws a failed traversal back to yield so its stage can continue', () => {
+    /** Catching the exact downstream error is the generator's normal observation boundary. */
+    const failure = new Error('caught generator traversal')
+    /** Three ordinary traversals must enter despite the second rejecting. */
+    const received: number[] = []
+    /** Explicit caller reporting retains original error identity. */
+    const reported: unknown[] = []
+    createPipeline<number>({ mode: 'generator', next: 'multiple' }).run(
+      [
+        function* () {
+          yield 1
+          try {
+            yield 2
+          } catch (error) {
+            reported.push(error)
+          }
+          yield 3
+          return GENERATOR_CONTINUE
+        }
+      ],
+      0,
+      (value) => {
+        received.push(value)
+        if (value === 2) throw failure
+      }
+    )
+    expect(received).toEqual([1, 2, 3])
+    expect(reported).toEqual([failure])
+  })
+
+  it('async-generator throws a failed traversal back to yield so its stage can continue', async () => {
+    /** The async iterator must receive its own original downstream rejection. */
+    const failure = new Error('caught async generator traversal')
+    /** Awaiting suffix completion preserves the three independent payloads' order. */
+    const received: number[] = []
+    /** Caller reporting proves the failure entered catch at the original yield. */
+    const reported: unknown[] = []
+    await createPipeline<number>({ mode: 'async-generator', next: 'multiple' }).run(
+      [
+        async function* () {
+          yield 1
+          try {
+            yield 2
+          } catch (error) {
+            reported.push(error)
+          }
+          yield 3
+          return GENERATOR_CONTINUE
+        }
+      ],
+      0,
+      async (value) => {
+        await Promise.resolve()
+        received.push(value)
+        if (value === 2) throw failure
+      }
+    )
+    expect(received).toEqual([1, 2, 3])
+    expect(reported).toEqual([failure])
   })
 
   it('generator traverses each yield before resuming and traverses its ordinary return', () => {
@@ -681,5 +819,61 @@ describe('multiple downstream submissions', () => {
       expect(values).toEqual([1])
       expect(violations).toEqual(['duplicate'])
     }
+  })
+  it('lifted sync submissions retain later values and their ordered failures in every mode', async () => {
+    /** All registered values belong to the sync stage even when a suffix rejects. */
+    const stage: ISyncMiddlewareStage<number> = (_value, next) => {
+      next(1)
+      next(2)
+      next(3)
+    }
+    /** Each complete adapter owns the same linear-reduce submission contract. */
+    for (const mode of ['async', 'generator', 'async-generator'] as const) {
+      /** These original errors identify the second and third suffix independently. */
+      const second = new Error('second lifted failure')
+      /** The third must remain reachable after the earlier suffix rejects. */
+      const third = new Error('third lifted failure')
+      /** Entry count proves the adapter did not stop at its first rejected traversal. */
+      const received: number[] = []
+      /** Generic mode keeps the public stage inference without an adapter shim. */
+      const pipeline = createPipeline<number, typeof mode>({ mode, next: 'multiple' })
+      /** The actual public runner keeps its mode-specific throw or rejection timing. */
+      const run = () =>
+        pipeline.run([pipeline.lift(stage, 'sync')], 0, (value) => {
+          received.push(value)
+          if (value > 1) throw value === 2 ? second : third
+        })
+      if (mode === 'generator')
+        expect(run).toThrowError(expect.objectContaining({ errors: [second, third] }))
+      else await expect(run()).rejects.toMatchObject({ errors: [second, third] })
+      expect(received).toEqual([1, 2, 3])
+    }
+  })
+
+  it('internally handles an unobserved rejection while its submitting stage remains pending', async () => {
+    /** The stage deliberately does not consume its failed next promise. */
+    const failure = new Error('pending unobserved rejection')
+    /** Release is caller-owned work rather than another runner cancellation mechanism. */
+    let release!: () => void
+    /** Holding stage settlement allows a native unhandled-rejection turn to elapse. */
+    const barrier = new Promise<void>((resolve) => {
+      release = resolve
+    })
+    /** Runner ownership must keep this original rejection handled before stage completion. */
+    const task = createPipeline<number>({ mode: 'async', next: 'multiple' }).run(
+      [
+        async (_value, next) => {
+          void next(1)
+          await barrier
+        }
+      ],
+      0,
+      () => {
+        throw failure
+      }
+    )
+    await new Promise<void>((resolve) => setTimeout(resolve, 0))
+    release()
+    await expect(task).rejects.toBe(failure)
   })
 })

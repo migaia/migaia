@@ -48,6 +48,12 @@ export const createMiddlewarePipelineMultipleDownstreamError = (
     }
   ) as AggregateError
 
+/** Finish independent sync or lifted submissions without replacing a lone original failure. */
+export function throwMiddlewarePipelineDownstreamFailures(failures: readonly unknown[]): void {
+  if (failures.length === 1) throw failures[0]
+  if (failures.length > 1) throw createMiddlewarePipelineMultipleDownstreamError(failures)
+}
+
 /** Owns all package invalid-option errors while preserving each caller's cause shape. */
 export const createMiddlewarePipelineInvalidOptionError = (
   message: string,

@@ -24,7 +24,8 @@ import {
 } from './state-constants.js'
 import {
   createMiddlewarePipelineExecutionError,
-  createMiddlewarePipelineMultipleDownstreamError
+  createMiddlewarePipelineMultipleDownstreamError,
+  throwMiddlewarePipelineDownstreamFailures
 } from './errors.js'
 
 /** Records local sync submissions without allocating an array for a single value. */
@@ -79,9 +80,44 @@ export class PipelineSubmissions<TValue> {
 /** One branch completion retains active-control provenance and original rejection identity. */
 type IAsyncBranch = {
   completion?: Promise<void>
+  promise?: ObservedTraversalPromise
   active: boolean
   failed: boolean
   error?: unknown
+}
+
+/** A real Promise subclass makes native await enter the same public observation hook as then. */
+class ObservedTraversalPromise extends Promise<void> {
+  /** Only caller consumption, never the runner's internal rejection handler, observes this branch. */
+  #observed = false
+
+  /** Borrow the original traversal while immediately handling its native rejection. */
+  constructor(pending: Promise<void>) {
+    super((resolve, reject) => {
+      void pending.then(resolve, reject)
+    })
+  }
+  /** Chained results are ordinary promises, so their ownership belongs entirely to their caller. */
+  static get [Symbol.species](): PromiseConstructor {
+    return Promise
+  }
+  /** Native await and explicit then both transfer failure handling to the submitting stage. */
+  // oxlint-disable-next-line unicorn/no-thenable -- This genuine Promise subclass must observe native await through then.
+  override then<TResult1 = void, TResult2 = never>(
+    onfulfilled?: ((value: void) => TResult1 | PromiseLike<TResult1>) | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
+  ): Promise<TResult1 | TResult2> {
+    this.#observed = true
+    return super.then(onfulfilled, onrejected)
+  }
+  /** The runner joins and consumes original rejection without pretending the caller observed it. */
+  consume(onRejected: (error: unknown) => void): Promise<void> {
+    return super.then(undefined, onRejected)
+  }
+  /** Observation is sampled only after the stage and all its started traversals settle. */
+  get observed(): boolean {
+    return this.#observed
+  }
 }
 /** One deep request waits for the run-owned synchronous spill cursor. */
 type IAsyncRequest<TValue> = {
@@ -185,11 +221,6 @@ class AsyncPipelineFrame<TValue> {
   readonly #branches: IAsyncBranch[] = []
   /** Stops retained callbacks once the stage settles. */
   #returned = false
-  /** First observed downstream failure prevents additional multiple submissions. */
-  #hasFailure = false
-  /** Exact first observed rejection is returned to later next callers. */
-  #firstFailure: unknown
-
   /** Captures one frame's continuation position and parent provenance channel. */
   constructor(run: AsyncPipelineRun<TValue>, index: number, parent?: IAsyncBranch) {
     this.#run = run
@@ -206,22 +237,25 @@ class AsyncPipelineFrame<TValue> {
       this.#run.options.onViolation(MiddlewarePipelineViolation.duplicate)
       return Promise.resolve()
     }
-    if (this.#hasFailure) return Promise.reject(this.#firstFailure)
     /** Placeholder keeps the control record stable while synchronous downstream entry begins. */
     const branch: IAsyncBranch = { active: false, failed: false }
     // Publish admission before dispatch: downstream may reenter this captured next synchronously.
     this.#branches.push(branch)
     /** Caller receives the exact started branch promise; the observer never rejects. */
     const pending = this.#run.dispatch(this.#index + 1, value, branch)
-    branch.completion = pending.then(undefined, (error) => {
+    /** The original single path retains its native Promise and existing failure composition. */
+    const observed =
+      this.#run.options.next === MiddlewarePipelineNext.multiple
+        ? new ObservedTraversalPromise(pending)
+        : undefined
+    branch.promise = observed
+    /** This exact record consumes rejection without calling the public observation hook. */
+    const failed = (error: unknown): void => {
       branch.failed = true
       branch.error = error
-      if (!this.#hasFailure) {
-        this.#hasFailure = true
-        this.#firstFailure = error
-      }
-    })
-    return pending
+    }
+    branch.completion = observed ? observed.consume(failed) : pending.then(undefined, failed)
+    return observed ?? pending
   }
   /** Awaits stage and started branches, preserving active control and original failure order. */
   async run(value: TValue): Promise<void> {
@@ -250,7 +284,7 @@ class AsyncPipelineFrame<TValue> {
         this.#markParent(branch.error)
         throw branch.error
       }
-      if (branch.failed) {
+      if (branch.failed && !branch.promise?.observed) {
         failures.push(branch.error)
         if (
           stageFailed &&
@@ -321,35 +355,57 @@ export const runMultipleSyncPipeline = <TValue>(
   const snapshot = stages.slice()
   /** LIFO suffix requests preserve each stage's submission order. */
   const pending: ISyncBranch<TValue>[] = [{ index: 0, value }]
+  /** Independent failures retain registration order while every accepted suffix is traversed. */
+  const failures: unknown[] = []
   while (pending.length > 0) {
     const branch = pending.pop()!
-    check(context)
-    options.assertActive?.()
-    if (branch.index === snapshot.length) {
-      invokeWithContext(done, [branch.value], context)
-      continue
-    }
-    /** This stage owns its retained callback independently of later branch entries. */
-    const submissions = new PipelineSubmissions<TValue>(
-      MiddlewarePipelineNext.multiple,
-      options.onViolation
-    )
     try {
-      invokeWithContext(snapshot[branch.index]!, [branch.value, submissions.next], context)
-    } finally {
-      submissions.close()
+      check(context)
+      options.assertActive?.()
+      if (branch.index === snapshot.length) {
+        invokeWithContext(done, [branch.value], context)
+        continue
+      }
+      /** This stage owns its retained callback independently of later branch entries. */
+      const submissions = new PipelineSubmissions<TValue>(
+        MiddlewarePipelineNext.multiple,
+        options.onViolation
+      )
+      try {
+        invokeWithContext(snapshot[branch.index]!, [branch.value, submissions.next], context)
+      } finally {
+        submissions.close()
+      }
+      check(context)
+      options.assertActive?.()
+      for (let index = submissions.count - 1; index >= 0; index -= 1)
+        pending.push({ index: branch.index + 1, value: submissions.at(index) })
+    } catch (error) {
+      failures.push(error)
     }
-    check(context)
-    options.assertActive?.()
-    for (let index = submissions.count - 1; index >= 0; index -= 1)
-      pending.push({ index: branch.index + 1, value: submissions.at(index) })
   }
+  throwMiddlewarePipelineDownstreamFailures(failures)
 }
 
 /** A suffix is entered once; an iterator resumes only after that suffix completes. */
 type IGeneratorTask<TValue, TIterator> =
   | { readonly index: number; readonly value: TValue }
-  | { readonly index: number; readonly iterator: TIterator }
+  | {
+      readonly index: number
+      readonly iterator: TIterator
+      readonly failure?: { readonly error: unknown }
+    }
+
+/** The nearest suspended yield alone receives its failed suffix; no new traversal is fenced. */
+function returnGeneratorFailure<TValue, TIterator>(
+  pending: IGeneratorTask<TValue, TIterator>[],
+  error: unknown
+): void {
+  /** Below a running suffix the stack contains only its suspended ancestor iterators. */
+  const parent = pending.pop()
+  if (!parent || !('iterator' in parent)) throw error
+  pending.push({ index: parent.index, iterator: parent.iterator, failure: { error } })
+}
 
 /** Maps the explicit-undefined control to its payload without copying ordinary values. */
 const yieldedValue = <TValue>(
@@ -374,11 +430,9 @@ export const runMultipleGeneratorPipeline = <TValue>(
     TValue,
     Generator<TValue | symbol, TValue | symbol | undefined, void>
   >[] = [{ index: 0, value }]
-  /** Suspended iterators are released inner-first on failure. */
-  const active: Generator<TValue | symbol, TValue | symbol | undefined, void>[] = []
-  try {
-    while (pending.length > 0) {
-      const task = pending.pop()!
+  while (pending.length > 0) {
+    const task = pending.pop()!
+    try {
       check(context)
       options.assertActive?.()
       if (!('iterator' in task)) {
@@ -386,39 +440,39 @@ export const runMultipleGeneratorPipeline = <TValue>(
           invokeWithContext(done, [task.value], context)
           continue
         }
+        /** The factory and all yielded suffixes stay under this one task stack. */
         const iterator = invokeWithContext(snapshot[task.index]!, [task.value], context)
-        active.push(iterator)
         pending.push({ index: task.index, iterator })
         continue
       }
-      const step = task.iterator.next()
+      /** A failed suffix resumes exactly its originating yield through the native throw method. */
+      const step = task.failure ? task.iterator.throw(task.failure.error) : task.iterator.next()
       check(context)
       options.assertActive?.()
       if (step.done) {
-        active.pop()
         if (
           step.value === undefined ||
           step.value === signals.continue ||
           step.value === signals.halt
         )
           continue
-      } else pending.push(task)
+      } else pending.push({ index: task.index, iterator: task.iterator })
       pending.push({
         index: task.index + 1,
         value: yieldedValue<TValue>(step.value as TValue | symbol, signals)
       })
-    }
-  } catch (error) {
-    /** The original downstream error remains primary through generator cleanup failures. */
-    let primary = error
-    while (active.length > 0) {
-      try {
-        cleanupSyncIterator(active.pop()!, primary)
-      } catch (cleanup) {
-        primary = cleanup
+    } catch (error) {
+      /** Interrupted iterators drain their original cleanup before failure reaches an ancestor. */
+      let primary = error
+      if ('iterator' in task) {
+        try {
+          cleanupSyncIterator(task.iterator, primary)
+        } catch (cleanup) {
+          primary = cleanup
+        }
       }
+      returnGeneratorFailure(pending, primary)
     }
-    throw primary
   }
 }
 
@@ -439,11 +493,9 @@ export const runMultipleAsyncGeneratorPipeline = async <TValue>(
     TValue,
     AsyncGenerator<TValue | symbol, TValue | symbol | undefined, void>
   >[] = [{ index: 0, value }]
-  /** Suspended iterators are released inner-first on failure. */
-  const active: AsyncGenerator<TValue | symbol, TValue | symbol | undefined, void>[] = []
-  try {
-    while (pending.length > 0) {
-      const task = pending.pop()!
+  while (pending.length > 0) {
+    const task = pending.pop()!
+    try {
       check(context)
       options.assertActive?.()
       if (!('iterator' in task)) {
@@ -451,38 +503,40 @@ export const runMultipleAsyncGeneratorPipeline = async <TValue>(
           await invokeWithContext(done, [task.value], context)
           continue
         }
+        /** One native iterator owns this stage and each subsequent yielded suffix. */
         const iterator = invokeWithContext(snapshot[task.index]!, [task.value], context)
-        active.push(iterator)
         pending.push({ index: task.index, iterator })
         continue
       }
-      const step = await task.iterator.next()
+      /** Await failure delivery at the original yield before the stage may submit another value. */
+      const step = task.failure
+        ? await task.iterator.throw(task.failure.error)
+        : await task.iterator.next()
       check(context)
       options.assertActive?.()
       if (step.done) {
-        active.pop()
         if (
           step.value === undefined ||
           step.value === signals.continue ||
           step.value === signals.halt
         )
           continue
-      } else pending.push(task)
+      } else pending.push({ index: task.index, iterator: task.iterator })
       pending.push({
         index: task.index + 1,
         value: yieldedValue<TValue>(step.value as TValue | symbol, signals)
       })
-    }
-  } catch (error) {
-    /** Started iterators close without replacing the original failure. */
-    let primary = error
-    while (active.length > 0) {
-      try {
-        await cleanupAsyncIterator(active.pop()!, primary)
-      } catch (cleanup) {
-        primary = cleanup
+    } catch (error) {
+      /** The stage owns thrown-back errors; actual return-cleanup failures retain this primary. */
+      let primary = error
+      if ('iterator' in task) {
+        try {
+          await cleanupAsyncIterator(task.iterator, primary)
+        } catch (cleanup) {
+          primary = cleanup
+        }
       }
+      returnGeneratorFailure(pending, primary)
     }
-    throw primary
   }
 }
