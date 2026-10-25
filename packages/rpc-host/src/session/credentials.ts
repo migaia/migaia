@@ -5,19 +5,21 @@ import type { IRpcPortableValue } from '@migaia/rpc-contract/protocol'
 /** The physical Session clears its original cell when its lifetime ends. */
 export type ISessionCredentials = { value: IRpcPortableValue | undefined }
 
-/** Weak context keys grant no public metadata and cannot retain a completed handshake context. */
-const credentials = new WeakMap<IRpcFlowContext, ISessionCredentials>()
+/** Only the Session's original handshake output slot can identify its private credential cell. */
+const credentials = new WeakMap<
+  NonNullable<IRpcFlowContext['handshakeResult']>,
+  ISessionCredentials
+>()
 
-/** Associate this exact handshake context with its Session's original clearable secret cell. */
+/** Bind once to the original slot so forwarding an immutable context copy retains its authority. */
 export function bindSessionCredentials(
-  context: IRpcFlowContext,
+  result: NonNullable<IRpcFlowContext['handshakeResult']>,
   connection: ISessionCredentials
-): IRpcFlowContext {
-  credentials.set(context, connection)
-  return context
+): void {
+  credentials.set(result, connection)
 }
 
 /** Only auth calls this when preparing the configured credentials resolver. */
 export function readSessionCredentials(context: IRpcFlowContext): IRpcPortableValue | undefined {
-  return credentials.get(context)?.value
+  return context.handshakeResult && credentials.get(context.handshakeResult)?.value
 }

@@ -56,7 +56,8 @@ it.each([false, true])(
         stages: {
           handshakeOutbound(payload, next) {
             observed.contexts.push(JSON.stringify(payload.context))
-            return next(payload)
+            // A stage may forward an immutable copy while preserving the original result slot.
+            return next({ ...payload, context: { ...payload.context } })
           }
         }
       })

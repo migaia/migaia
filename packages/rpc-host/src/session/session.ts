@@ -138,6 +138,7 @@ export class Session {
     const { connection, ...collaborators } = options
     this.#options = collaborators
     this.#credentials = { value: connection?.credentials }
+    bindSessionCredentials(this.#handshakeResult, this.#credentials)
     this.#handshakeResult.authentication = connection?.authentication
     /** The readonly handle getter borrows only this Session's actual readiness-failure fact. */
     const handshakeFailure = () => this.#handshakeFailure
@@ -1073,10 +1074,7 @@ export class Session {
 
   /** The verifier output slot exists only at the already-declared handshake intervention point. */
   #handshakeContext(direction: IRpcFlowContext['direction']): IRpcFlowContext {
-    return bindSessionCredentials(
-      { ...this.#context(direction), handshakeResult: this.#handshakeResult },
-      this.#credentials
-    )
+    return { ...this.#context(direction), handshakeResult: this.#handshakeResult }
   }
 
   /** Freeze verified identity with the acquired Session id before Table publication can observe it. */
