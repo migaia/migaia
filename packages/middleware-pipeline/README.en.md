@@ -63,7 +63,7 @@ const run = (index: number, value: number): void => {
 run(0, 2)
 ```
 
-The sync runner commits only the first next value and starts downstream after the stage returns normally. Duplicate or late next calls go to `onViolation` without rerunning downstream; provide that callback when you need diagnostics.
+The default single sync runner commits only the first next value and starts downstream after the stage returns normally. Duplicate or late next calls go to `onViolation` without rerunning downstream; provide that callback when you need diagnostics.
 
 ## The model in three minutes
 
@@ -95,6 +95,12 @@ The sync runner commits only the first next value and starts downstream after th
 | Stop a generator pipeline before a rejected value is saved | `generator + GENERATOR_HALT`      | [Runnable example](./USEGUIDE.en.md#stop-a-generator-pipeline-before-a-rejected-value-is-saved) |
 | Deliver undefined instead of accidentally halting          | `generator + GENERATOR_UNDEFINED` | [Runnable example](./USEGUIDE.en.md#deliver-undefined-instead-of-accidentally-halting)          |
 
+## Independent multiple submissions
+
+Choose `next: 'multiple'` when one stage splits an input into several downstream values. Sync traverses all registered values after normal stage return and aggregates failures in order. Async returns an independent Promise for each next; caller `then` or `await` observes that failure, while ignored rejected branches still reject run. Generators receive suffix errors through `throw()` at their yield and can catch them before yielding again; async-generators await the same protocol. Every started traversal is joined.
+
+The default remains `next: 'single'`: duplicate calls are violations and generators select a terminal value. Read the [four-mode table and failure examples](./USEGUIDE.en.md#submit-several-independent-values-from-one-stage) before choosing multiple.
+
 ## Install
 
 ```bash
@@ -115,16 +121,16 @@ There is one root entry. Its only runtime dependency is `@migaia/utils`; it need
 
 A pipeline contains only read-only mode, lift and run, with no mutable execution state. Values, indices and cancellation contexts are isolated per run. Stage arrays are copied at entry. Construction options and custom signal fields are read once and frozen; getter failures retain their original cause under `INVALID_OPTION`.
 
-The four modes are sync, async, generator and async-generator. Sync next only commits a value; downstream begins after the stage returns, and no next means short-circuit. Async next immediately starts downstream and returns its original Promise; the runner waits even when the stage does not await it. Sync and generator throw synchronously; async and async-generator run return Promises.
+The four modes are sync, async, generator and async-generator. Sync next only commits a value; downstream begins after the stage returns, and no next means short-circuit. Each accepted async next immediately starts downstream and returns a Promise for that traversal; the runner waits even when the stage does not await it. Sync and generator throw synchronously; async and async-generator run return Promises.
 
 Lifts allow the same mode, sync to async/generator/async-generator, and generator to async-generator. Async-to-async-generator is unsupported. Same-mode lifts preserve function identity. A lifted sync step finishes synchronous code after next before entering downstream, and a throwing step never starts downstream.
 
-Generator return values continue; `GENERATOR_CONTINUE` selects the last yield or input when there was no yield. `GENERATOR_HALT` and implicit undefined halt. `GENERATOR_UNDEFINED` explicitly continues with undefined and requires `TValue` to include undefined. Three custom symbols must be distinct, are snapshotted on construction, and also control sync lifts. Control symbols do not reach done as payloads. Public `TSignals` stays separate from `TValue`; default signals retain unique-symbol types.
+With the default single policy, generator return values continue; `GENERATOR_CONTINUE` selects the last yield or input when there was no yield. `GENERATOR_HALT` and implicit undefined halt. `GENERATOR_UNDEFINED` explicitly continues with undefined and requires `TValue` to include undefined. Three custom symbols must be distinct, are snapshotted on construction, and also control sync lifts. Control symbols do not reach done as payloads. Public `TSignals` stays separate from `TValue`; default signals retain unique-symbol types.
 
 Run-level `control.signal` overrides construction signal, falling back when omitted. Context is appended to stage/done only when a valid signal exists. All modes check cancellation at entry, before/after stages and before done; generators also check after iterations. Started user code is not forcibly interrupted. Host `assertActive` runs at entry and after stages; returning async outer stages still recheck after done, without undoing done. Controllers and hosts belong to the caller.
 
-Duplicate or post-completion next calls report duplicate and late, with a no-op default handler. Native Errors keep type, identity and stack when possible; unclassified execution failures receive `EXECUTION_FAILED` and complete external source/code identities stay unchanged. Cancellation uses `ABORTED`; other reason values remain on cause and need not produce a native AbortError. Later cancellation never replaces an ordinary user failure.
+Under single, duplicate next calls report duplicate; post-completion calls under either policy report late, with a no-op default handler. Native Errors keep type, identity and stack when possible; unclassified execution failures receive `EXECUTION_FAILED` and complete external source/code identities stay unchanged. Cancellation uses `ABORTED`; other reason values remain on cause and need not produce a native AbortError. Later cancellation never replaces an ordinary user failure.
 
-Independent stage/downstream failures are aggregated by default or passed to `combineStageAndDownstreamError`. The same object propagated through await next appears only once; equal primitives can be independent failures. A throwing combiner retains itself and both originals. A successfully returned custom combination must keep both originals reachable. Generator cancellation drives finally cleanup; a second cleanup failure uses `ABORT_CLEANUP_FAILED` with abort first.
+Independent stage/runner-owned downstream failures are aggregated by default; in multiple mode, observed branch rejections belong to the stage. Remaining independent failures are aggregated or passed to `combineStageAndDownstreamError`. The same object propagated through await next appears only once; equal primitives can be independent failures. A throwing combiner retains itself and both originals. A successfully returned custom combination must keep both originals reachable. Generator cancellation drives finally cleanup; a second cleanup failure uses `ABORT_CLEANUP_FAILED` with abort first.
 
-The root exports the factory, modes, generator signals, public stage/control/context types, error codes and source. Executors and adapters remain internal. Import `IAbortSignal` from `@migaia/utils/promise`. `IMiddlewarePipelineSyncMode` is an internal helper withdrawn from the root without an alias; use `IMiddlewarePipelineDone`/`IMiddlewarePipelineRunResult`. See the [usage guide](./USEGUIDE.en.md#construction-options-and-every-default) for every option, mode and lift table, and all four error codes.
+The root exports the factory, modes, `MiddlewarePipelineNext`, generator signals, public stage/control/context types, error codes and source. Executors and adapters remain internal. Import `IAbortSignal` from `@migaia/utils/promise`. `IMiddlewarePipelineSyncMode` is an internal helper withdrawn from the root without an alias; use `IMiddlewarePipelineDone`/`IMiddlewarePipelineRunResult`. See the [usage guide](./USEGUIDE.en.md#construction-options-and-every-default) for every option, mode and lift table, and all five error codes, including `MULTIPLE_DOWNSTREAM_FAILED`.

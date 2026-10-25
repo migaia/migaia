@@ -63,7 +63,7 @@ const run = (index: number, value: number): void => {
 run(0, 2)
 ```
 
-上一节的 sync 模式只提交第一次 next 的值，当前步骤正常返回后才执行下游。重复或迟到的 next 会交给 `onViolation`，默认不重新执行下游；需要记录这些错误调用时显式提供回调。
+上一节默认 single 的 sync 模式只提交第一次 next 的值，当前步骤正常返回后才执行下游。重复或迟到的 next 会交给 `onViolation`，默认不重新执行下游；需要记录这些错误调用时显式提供回调。
 
 ## 三分钟心智模型
 
@@ -95,6 +95,12 @@ run(0, 2)
 | 生成器校验不通过时停止保存             | `generator + GENERATOR_HALT`      | [完整示例](./USEGUIDE.md#生成器校验不通过时停止保存)           |
 | 把 undefined 交给终点，而不是意外终止  | `generator + GENERATOR_UNDEFINED` | [完整示例](./USEGUIDE.md#把-undefined-交给终点而不是意外终止)  |
 
+## 独立地交出多个值
+
+一个步骤需要拆分输入时，选择 `next: 'multiple'`。sync 在 stage 正常返回后遍历全部登记值，最后按顺序汇总失败；async 每次 next 返回独立遍历的 Promise，调用方的 `then` 或 `await` 表示观察，未观察的失败仍让 run 拒绝。生成器用 `throw()` 把下游失败交回 yield，可捕获后继续；异步生成器等待同一协议。runner 始终等待全部已启动遍历。
+
+默认仍是 `next: 'single'`：重复 next 属于违约，生成器采用终值。完整规则及可运行示例见[四模式与失败处理](./USEGUIDE.md#一个步骤交出多个独立值)。
+
 ## 安装
 
 ```bash
@@ -115,16 +121,16 @@ pnpm add @migaia/middleware-pipeline
 
 pipeline 只含只读 mode、lift 和 run，自身没有可变运行状态。每次 run 的值、索引和取消上下文隔离；stage 列表在入口复制，之后修改调用方数组不会改写当前轮。构造选项和自定义信号字段只读取一次并冻结，getter 失败以 `INVALID_OPTION` 保留原始原因。
 
-四种模式是 sync、async、generator、async-generator。同步 next 只提交值，stage 返回后下游才开始；不调用就短路。异步 next 立即启动下游并返回同一个下游 Promise，即使 stage 没有 await，runner 也等待已经启动的下游。同步和 generator 同步抛错，async 和 async-generator 的 run 返回 Promise。
+四种模式是 sync、async、generator、async-generator。同步 next 只提交值，stage 返回后下游才开始；不调用就短路。每次获准的异步 next 立即启动下游并返回该次遍历的 Promise，即使 stage 没有 await，runner 也等待已经启动的下游。同步和 generator 同步抛错，async 和 async-generator 的 run 返回 Promise。
 
 lift 只允许同模式、sync 到 async/generator/async-generator，以及 generator 到 async-generator；不支持 async 到 async-generator。同模式保持函数身份。被提升的 sync 步骤仍先执行完 next 后的同步代码再进入下游，抛错时不启动下游。
 
-生成器普通 return 值继续，`GENERATOR_CONTINUE` 使用最后一个 yield（没有 yield 时使用输入），`GENERATOR_HALT` 和隐式 undefined 终止，`GENERATOR_UNDEFINED` 显式以 undefined 继续且要求 `TValue` 包含 undefined。自定义三个 symbol 必须互不相同，在创建时快照，也用于 sync lift；控制符不作为业务值传到 done。公开类型的 `TSignals` 与 `TValue` 分离，默认控制集保留精确 unique symbol 类型。
+默认 single 下，生成器普通 return 值继续，`GENERATOR_CONTINUE` 使用最后一个 yield（没有 yield 时使用输入），`GENERATOR_HALT` 和隐式 undefined 终止，`GENERATOR_UNDEFINED` 显式以 undefined 继续且要求 `TValue` 包含 undefined。自定义三个 symbol 必须互不相同，在创建时快照，也用于 sync lift；控制符不作为业务值传到 done。公开类型的 `TSignals` 与 `TValue` 分离，默认控制集保留精确 unique symbol 类型。
 
 run 的 `control.signal` 覆盖构造 signal；未提供时回退。只有有效信号存在时才向 stage/done 追加 context。四种模式在入口、每步开始前/返回后、done 前检查取消；生成器每次迭代后也检查。已开始的用户代码不会被强制打断。`assertActive` 复用宿主规则，入口和每步后检查；异步外层返回时即使 done 已执行也复核，但不会撤销已发生的 done。控制器和宿主仍由调用方持有。
 
-同一步重复或结束后调用 next 分别报告 duplicate、late，默认回调为空操作。原生 Error 尽量保留类型、身份与 stack；未分类执行失败附 `EXECUTION_FAILED`，已有完整外部 source/code 不覆盖。取消 reason 使用 `ABORTED`；其他值通过 cause 保留，不保证是原生 AbortError。普通业务失败不会被之后的取消替换。
+single 下同一步重复 next 报告 duplicate；两种策略在 stage 结束后调用 next 都报告 late，默认回调为空操作。原生 Error 尽量保留类型、身份与 stack；未分类执行失败附 `EXECUTION_FAILED`，已有完整外部 source/code 不覆盖。取消 reason 使用 `ABORTED`；其他值通过 cause 保留，不保证是原生 AbortError。普通业务失败不会被之后的取消替换。
 
-独立 stage/downstream 失败默认聚合，或交给 `combineStageAndDownstreamError`；await next 传播的同一个对象只保留一次，相等 primitive 仍可能独立。组合器自身失败时保留它和两个原错；组合器成功返回的自定义结果需要调用方履行原错可达契约。生成器取消时驱动 finally 清理；清理再次失败使用 `ABORT_CLEANUP_FAILED`，取消主错在前。
+独立 stage 与 runner 负责的 downstream 失败默认聚合；multiple 中已观察的分支拒绝由 stage 负责，其余独立失败仍聚合，或交给 `combineStageAndDownstreamError`；await next 传播的同一个对象只保留一次，相等 primitive 仍可能独立。组合器自身失败时保留它和两个原错；组合器成功返回的自定义结果需要调用方履行原错可达契约。生成器取消时驱动 finally 清理；清理再次失败使用 `ABORT_CLEANUP_FAILED`，取消主错在前。
 
-根入口公开工厂、模式、生成器信号与阶段/控制/上下文类型，以及错误码和 source；具体执行器和适配器不公开。`IAbortSignal` 从 `@migaia/utils/promise` 导入；`IMiddlewarePipelineSyncMode` 只是包内中间类型，已从根入口撤回，没有兼容别名，使用 `IMiddlewarePipelineDone`/`IMiddlewarePipelineRunResult`。完整字段、模式表、提升矩阵和四个错误码见[使用指南](./USEGUIDE.md#创建选项及全部默认值)。
+根入口公开工厂、模式、`MiddlewarePipelineNext`、生成器信号与阶段/控制/上下文类型，以及错误码和 source；具体执行器和适配器不公开。`IAbortSignal` 从 `@migaia/utils/promise` 导入；`IMiddlewarePipelineSyncMode` 只是包内中间类型，已从根入口撤回，没有兼容别名，使用 `IMiddlewarePipelineDone`/`IMiddlewarePipelineRunResult`。完整字段、模式表、提升矩阵和五个错误码（含 `MULTIPLE_DOWNSTREAM_FAILED`）见[使用指南](./USEGUIDE.md#创建选项及全部默认值)。

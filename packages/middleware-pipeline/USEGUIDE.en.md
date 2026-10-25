@@ -246,6 +246,82 @@ explicit empty value delivered: true
 
 Prints `ordinary return completes: false`, then `explicit empty value delivered: true`. The default explicit-undefined symbol delivers the payload rather than becoming the payload. It is used only by generator and async-generator modes; a custom signal set supplies its own `undefined` symbol.
 
+## Submit several independent values from one stage
+
+The default `next: 'single'` keeps the existing one-submission rule. Choose `next: 'multiple'` at construction when one input needs to produce several values. The policy applies to the whole pipeline, including lifted stages. Each submitted value traverses the remaining stages independently and calls `done` if it reaches the end.
+
+| Mode              | Submission and failure handling                                                                                                                                                                                                                        |
+| ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `sync`            | After the stage returns normally, traverse every value in registration order. One failure does not stop later values. Throw one original failure directly, or aggregate several originals in registration order.                                       |
+| `async`           | Every `next(value)` starts an independent traversal immediately. Awaiting its Promise or calling its `then` counts as observation. A stage can catch and handle a rejection, then submit another value; run does not rethrow an observed branch error. |
+| `generator`       | Finish each yielded suffix before resuming. A suffix failure is thrown back at that yield with `throw()`, where the stage can catch it and continue.                                                                                                   |
+| `async-generator` | The same yield protocol, awaiting both suffix completion and error delivery before resuming.                                                                                                                                                           |
+
+The async runner still joins every started traversal. If a stage completes normally without ever observing a rejected next Promise, run rejects with that original failure. Several unobserved failures form an aggregate in start order with code `MULTIPLE_DOWNSTREAM_FAILED`. Calling `then` transfers responsibility for its resulting Promise chain to the caller; it does not itself report an error. Cancellation and host activity checks still apply.
+
+```ts doc-test=run
+import { createPipeline } from '@migaia/middleware-pipeline'
+
+const failure = new Error('second value failed')
+const received: number[] = []
+const reported: unknown[] = []
+const pipeline = createPipeline<number>({ mode: 'async', next: 'multiple' })
+await pipeline.run(
+  [
+    async (_value, next) => {
+      await next(1)
+      try {
+        await next(2)
+      } catch (error) {
+        reported.push(error)
+      }
+      await next(3)
+    }
+  ],
+  0,
+  (value) => {
+    received.push(value)
+    if (value === 2) throw failure
+  }
+)
+console.log(received.join(','), reported[0] === failure)
+```
+
+Prints `1,2,3 true`. The stage handles the second traversal's failure, and the third still runs. Without a catch around `await next(2)`, JavaScript exits that stage and never executes its later `next(3)` statement.
+
+A multiple generator catches a suffix failure at its own yield:
+
+```ts doc-test=run
+import { createPipeline, GENERATOR_CONTINUE } from '@migaia/middleware-pipeline'
+
+const failure = new Error('yielded suffix failed')
+const reported: unknown[] = []
+const completed: number[] = []
+const pipeline = createPipeline<number>({ mode: 'generator', next: 'multiple' })
+pipeline.run(
+  [
+    function* () {
+      yield 1
+      try {
+        yield 2
+      } catch (error) {
+        reported.push(error)
+      }
+      yield 3
+      return GENERATOR_CONTINUE
+    }
+  ],
+  0,
+  (value) => {
+    if (value === 2) throw failure
+    completed.push(value)
+  }
+)
+console.log(completed.join(','), reported[0] === failure)
+```
+
+Prints `1,3 true`. Async-generator uses the same rule and awaits traversal and error delivery. An uncaught failure ends the stage and runs cleanup. An ordinary `return value` adds another traversal. `GENERATOR_CONTINUE`, `GENERATOR_HALT`, and ordinary `undefined` add none and do not undo completed traversals. `yield GENERATOR_UNDEFINED` explicitly submits undefined. A sync stage lifted into another mode still returns normally before traversing every registered value and aggregating failures.
+
 ## Entry point, ownership and execution model
 
 The package has one entry, `@migaia/middleware-pipeline`, and one runtime dependency, `@migaia/utils`. It depends on neither DOM nor Node nor a lifecycle host. The root exports `createPipeline()`, mode and generator-signal constants, public stage/control/context types, and error codes. Concrete executors and adapters are internal and cannot be imported from the root.
@@ -261,30 +337,33 @@ A stage receives the current value and chooses whether to continue, stop or fail
 | Field                                               | Default                              | Meaning and accepted values                                                                                                                                                                                                                                                  |
 | --------------------------------------------------- | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `mode`                                              | Required; no default                 | `'sync'`, `'async'`, `'generator'` or `'async-generator'`, exposed as `MiddlewarePipelineMode.sync`, `async`, `generator` and `asyncGenerator`. Fixed after creation.                                                                                                        |
+| `next`                                              | `'single'`                           | `'single'` or `'multiple'`, also exposed by `MiddlewarePipelineNext`. Fixed for every stage and lift; multiple allows independent suffix traversals in all four modes.                                                                                                       |
 | `onViolation(kind)`                                 | A no-op function                     | Synchronously receives `'duplicate'` or `'late'`, also exposed as `MiddlewarePipelineViolation.duplicate` and `late`. Reports an invalid next call without restarting downstream.                                                                                            |
 | `assertActive()`                                    | `undefined`                          | A synchronous host lifecycle assertion, checked at entry and after each stage. Async downstream entry also checks it. A throw prevents continuation; the pipeline does not change host state.                                                                                |
 | `signal`                                            | `undefined`                          | Default cancellation signal for runs without their own signal. Signal shape and state are admitted when run starts, not during pipeline creation.                                                                                                                            |
 | `signals`                                           | `MiddlewarePipelineGeneratorSignals` | Three distinct generator-control symbols under `undefined`, `halt` and `continue`. The default set is frozen.                                                                                                                                                                |
 | `signals.undefined`                                 | `GENERATOR_UNDEFINED`                | Continues with an explicit undefined payload rather than stopping.                                                                                                                                                                                                           |
-| `signals.halt`                                      | `GENERATOR_HALT`                     | Stops the entire chain without later stages or done.                                                                                                                                                                                                                         |
-| `signals.continue`                                  | `GENERATOR_CONTINUE`                 | Continues with the last yielded value, or the input when nothing was yielded.                                                                                                                                                                                                |
+| `signals.halt`                                      | `GENERATOR_HALT`                     | Under single, stops the chain. Under multiple, adds no terminal traversal or rollback of earlier yields.                                                                                                                                                                     |
+| `signals.continue`                                  | `GENERATOR_CONTINUE`                 | Under single, continues with the last yield or input. Under multiple, adds no terminal traversal.                                                                                                                                                                            |
 | `combineStageAndDownstreamError(stage, downstream)` | `undefined`                          | Only for independent failures in an async stage and its started downstream. Receives the stage failure first, downstream failure second. Its return value is thrown as the combined failure. The caller must preserve both originals through cause or AggregateError.errors. |
 
-Construction options must be an object, never null or an array. Supported option fields and the three custom signal properties are read once, then retained in a frozen internal snapshot. Later mutation of the caller's object cannot change the pipeline. The read-only mode publishes that same validated value. Invalid modes, callbacks, controls, signal shapes, signal sets and lift directions produce a native `TypeError` with `INVALID_OPTION`. Original option-getter failures remain on `cause`.
+Construction options must be an object, never null or an array. Supported option fields and the three custom signal properties are read once, then retained in a frozen internal snapshot. Later mutation of the caller's object cannot change the pipeline. The read-only mode publishes that same validated value. Invalid modes, next policies, callbacks, controls, signal shapes, signal sets and lift directions produce a native `TypeError` with `INVALID_OPTION`. Original option-getter failures remain on `cause`.
 
 ## run, next and the four modes
 
 The common call is `pipeline.run(stages, value, done, control?)`.
 
-| Input or member         | Meaning                                                                                                                                                                                  |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `stages`                | Read-only array of stages for this mode. An entry snapshot fixes function identities for the current run; later array edits affect later runs.                                           |
-| `value`                 | Caller-supplied initial payload. Each later stage receives the previous stage's committed value.                                                                                         |
-| `done(value, context?)` | Receives the final value only when no stage stopped or failed. An empty stage array reaches done directly. Sync modes require a synchronous callback; async modes also accept a Promise. |
-| `control`               | Defaults to `undefined`. Currently has only optional `signal`; the object cannot be null or an array.                                                                                    |
-| `control.signal`        | Defaults to `undefined`, falling back to construction signal. A supplied valid signal replaces the default rather than merging with it.                                                  |
-| `context.signal`        | The signal actually selected for this run. With no signal, no additional context argument is passed.                                                                                     |
-| `pipeline.mode`         | Read-only mode for inspection or selecting matching stage types.                                                                                                                         |
+| Input or member         | Meaning                                                                                                                                                                                               |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `stages`                | Read-only array of stages for this mode. An entry snapshot fixes function identities for the current run; later array edits affect later runs.                                                        |
+| `value`                 | Caller-supplied initial payload. Each later stage receives the previous stage's committed value.                                                                                                      |
+| `done(value, context?)` | Receives the final value of each traversal that neither stopped nor failed. An empty stage array reaches done directly. Sync modes require a synchronous callback; async modes also accept a Promise. |
+| `control`               | Defaults to `undefined`. Currently has only optional `signal`; the object cannot be null or an array.                                                                                                 |
+| `control.signal`        | Defaults to `undefined`, falling back to construction signal. A supplied valid signal replaces the default rather than merging with it.                                                               |
+| `context.signal`        | The signal actually selected for this run. With no signal, no additional context argument is passed.                                                                                                  |
+| `pipeline.mode`         | Read-only mode for inspection or selecting matching stage types.                                                                                                                                      |
+
+The following mode table describes the default single policy. Multiple behavior is described in [independent submissions](#submit-several-independent-values-from-one-stage).
 
 | Mode              | Stage shape                                        | When downstream starts                                                             | run result                                            |
 | ----------------- | -------------------------------------------------- | ---------------------------------------------------------------------------------- | ----------------------------------------------------- |
@@ -293,15 +372,15 @@ The common call is `pipeline.run(stages, value, done, control?)`.
 | `generator`       | `(value, context?) => Generator`                   | After the generator finishes and its return value is interpreted.                  | `void`, with synchronous throws.                      |
 | `async-generator` | `(value, context?) => AsyncGenerator`              | After the async generator finishes and its return value is interpreted.            | `Promise<void>`; done may also be async.              |
 
-A synchronous stage commits at most one `next(value)`. Not calling next short-circuits the chain, skipping later stages and done. This is a linear transformation: synchronous code after next still runs before downstream. A throwing stage never starts downstream.
+With the default `next: 'single'`, a synchronous stage commits at most one `next(value)`. Not calling next short-circuits the chain, skipping later stages and done. This is a linear transformation: synchronous code after next still runs before downstream. A throwing stage never starts downstream.
 
-An asynchronous stage's `next(value)` immediately starts downstream and returns that downstream call's original Promise. Code after `await next(value)` wraps downstream completion. Even if the stage does not await a started next, the runner waits for downstream settlement before finishing. Normal completion without next also short-circuits.
+An asynchronous stage's accepted `next(value)` immediately starts downstream and returns a Promise for that traversal. Code after `await next(value)` wraps downstream completion. Even if the stage does not await a started next, the runner waits for downstream settlement before finishing. Normal completion without next also short-circuits.
 
-`duplicate` means another next call before the stage completes; `late` means calling a captured next after completion. Neither overwrites the first committed value nor starts downstream again. The default handler ignores violations; use `onViolation` to report them. A callback throw inside run follows that mode's failure channel. A reporter throw triggered by calling captured next after run has ended is thrown directly from that next call.
+With `next: 'single'`, `duplicate` means another next call before the stage completes; `late` means calling a captured next after completion. Neither overwrites the first committed value nor starts downstream again. The default handler ignores violations; use `onViolation` to report them. A callback throw inside run follows that mode's failure channel. A reporter throw triggered by calling captured next after run has ended is thrown directly from that next call.
 
 ## Generator terminal values and signals
 
-A stage may yield several times, but intermediate values are not individually delivered downstream. Only its final return chooses the next value.
+With the default `next: 'single'`, a stage may yield several times, but intermediate values are not individually delivered downstream. Only its final return chooses the next value.
 
 | Generator return                        | Result                                                                     |
 | --------------------------------------- | -------------------------------------------------------------------------- |
@@ -344,22 +423,23 @@ Each returning outer async stage rechecks cancellation and host activity even wh
 
 `MIDDLEWARE_PIPELINE_SOURCE` is `'middleware.pipeline'`. `MiddlewarePipelineErrorCode` is the public error table.
 
-| Member               | Code                   | What causes it                                                                                                                                                    |
-| -------------------- | ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `executionFailed`    | `EXECUTION_FAILED`     | Unclassified stage, done, host assertion, violation-handler or combiner failure. Independent async stage/downstream failures become an AggregateError by default. |
-| `invalidOption`      | `INVALID_OPTION`       | Invalid options, mode, callback, signal/control, signal set or lift direction; a native TypeError, with cause when there is an original failure.                  |
-| `aborted`            | `ABORTED`              | Cooperative cancellation: an attachable, unclassified Error reason receives this code; other original reasons remain on cause.                                    |
-| `abortCleanupFailed` | `ABORT_CLEANUP_FAILED` | Abort and generator cleanup both fail, aggregated with abort first.                                                                                               |
+| Member                     | Code                         | What causes it                                                                                                                                                              |
+| -------------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `executionFailed`          | `EXECUTION_FAILED`           | Unclassified stage, done, host assertion, violation-handler or combiner failure. Independent async stage/downstream failures become an AggregateError by default.           |
+| `multipleDownstreamFailed` | `MULTIPLE_DOWNSTREAM_FAILED` | Several sync or lifted-sync traversals fail, or several async traversals reject without observation. `AggregateError.errors` retains originals in registration/start order. |
+| `invalidOption`            | `INVALID_OPTION`             | Invalid options, mode, callback, signal/control, signal set or lift direction; a native TypeError, with cause when there is an original failure.                            |
+| `aborted`                  | `ABORTED`                    | Cooperative cancellation: an attachable, unclassified Error reason receives this code; other original reasons remain on cause.                                              |
+| `abortCleanupFailed`       | `ABORT_CLEANUP_FAILED`       | Abort and generator cleanup both fail, aggregated with abort first.                                                                                                         |
 
 Native stage, done and `assertActive` Errors keep their object, type and stack when identity can be attached. Without a complete semantic source/code they receive `EXECUTION_FAILED`; complete external identities remain unchanged. Immutable errors and non-Error values remain on a wrapper's cause. Error abort reasons are likewise preserved when possible; strings, undefined and other reasons remain on an ordinary Error's cause, which need not be a native AbortError. If the reason getter throws, its thrown value is treated as the reason.
 
-When an async stage and its started downstream fail independently, the default `EXECUTION_FAILED` AggregateError.errors retain stage then downstream. Merely awaiting next and receiving the same object failure does not create two duplicate error entries. Equal primitive values can still represent independent failures and are not deduplicated by value.
+When an async stage and its runner-owned downstream fail independently (in multiple mode, only unobserved branch rejections remain runner-owned), the default `EXECUTION_FAILED` AggregateError.errors retain stage then downstream. Merely awaiting next and receiving the same object failure does not create two duplicate error entries. Equal primitive values can still represent independent failures and are not deduplicated by value.
 
 A custom combiner's returned value becomes the propagated failure. The caller must keep both original failures reachable through cause or errors. If the combiner throws, its original failure stays primary where possible, with both preexisting failures attached to the errors/cause chain.
 
 ## Public types and build commands
 
-The root exports `ICreatePipelineOptions`, `IMiddlewarePipeline`, `IMiddlewarePipelineStage`, `IMiddlewarePipelineDone`, `IMiddlewarePipelineRunResult`, `IMiddlewarePipelineLiftSource`, the four stage types, context/control types, violation types and signal types. Applications reach executors through `createPipeline`, run and lift.
+The root exports `MiddlewarePipelineNext`, `ICreatePipelineOptions`, `IMiddlewarePipeline`, `IMiddlewarePipelineStage`, `IMiddlewarePipelineDone`, `IMiddlewarePipelineRunResult`, `IMiddlewarePipelineLiftSource`, the four stage types, context/control types, violation types and signal types. Applications reach executors through `createPipeline`, run and lift.
 
 `IMiddlewarePipelineSyncMode` is only an internal conditional-type helper for Done/RunResult. It was withdrawn from the root with no compatibility alias. Use public `IMiddlewarePipelineDone` and `IMiddlewarePipelineRunResult` instead.
 

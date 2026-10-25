@@ -313,6 +313,75 @@ Prints `PREREQUISITE_MISSING` and `0`. The missing provider is rejected directly
 
 Use getFeature(name, { optional: true }) only when the consumer deliberately handles an absent output as undefined. Required and optional references both contribute ordering when a provider exists; this example intentionally uses the required default.
 
+## Declare separate pipelines for different payloads
+
+Put numeric processing and text splitting in separate pipelines. Names infer each stage parameter and next payload. Declarations belong at defineHost's top level; plugins register stages, while the host handle owner starts execution.
+
+```ts doc-test=run
+import {
+  defineHost,
+  definePlugin,
+  pipelineSpec,
+  type IPluginHostCoreFor
+} from '@migaia/plugin-host'
+
+const pipelines = {
+  count: pipelineSpec<number>()({ mode: 'sync' }),
+  text: pipelineSpec<{ text: string }>()({ mode: 'async', next: 'multiple', order: 'reverse' })
+}
+const host = defineHost({
+  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } },
+  pipelines
+})
+const format = definePlugin({
+  name: 'format',
+  install(core: IPluginHostCoreFor<typeof host>) {
+    core.pipeline('count').use((value, next) => next(value + 1))
+    core.pipeline('text').use(async (value, next) => {
+      await next({ text: value.text.toUpperCase() })
+      await next({ text: value.text.toLowerCase() })
+    })
+    return {}
+  }
+})
+await host.use(format)
+const count = host.pipeline('count').run(1, (value) => value)
+const texts: string[] = []
+await host.pipeline('text').run({ text: 'Hi' }, (value) => {
+  texts.push(value.text)
+})
+console.log(count, texts.join(','))
+await host.unUse('format')
+console.log(host.pipeline('count').run(1, (value) => value))
+await host.dispose()
+```
+
+Prints `2 HI,hi`, then `1`. Removing the plugin withdraws its stages from both pipelines together. The plugin's core.pipeline('text') has no run, and misspelled names or numeric text payloads fail type checking. Owners register their own stages with host.pipeline(name).use(stage); those stages belong to no plugin, and registration is forbidden during execution.
+
+### Explicit generic calls
+
+If existing code supplies explicit defineHost generics, place the named axis after the previous four. Reuse the declaration object's type:
+
+```ts doc-test=check
+import { defineHost, pipelineSpec } from '@migaia/plugin-host'
+
+const pipelines = { count: pipelineSpec<number>()({}) }
+const host = defineHost<
+  Record<never, never>,
+  number,
+  readonly [],
+  Record<never, never>,
+  typeof pipelines
+>({
+  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } },
+  pipelines
+})
+host.pipeline('count').use((value, next) => next(value + 1))
+await host.dispose()
+```
+
+Old explicit generic calls without pipelines need no new axis. The class entry is `PluginHost<TDomainCore, TValue, TInstalled, TPipelines>`; pass the same map in constructor options and invoke protected pipeline from subclass domain methods.
+
 ## Contract details
 
 ### Ownership, entries, and type parameters
@@ -321,7 +390,7 @@ This package owns plugin installation, Feature dependencies, configuration, stag
 
 The public entries are `@migaia/plugin-host` and `@migaia/plugin-host/composition`. Do not import internal files. Applications normally use the root Host, plugin, Feature, handle, and error APIs. Composition is a narrow protocol for one composition owner rather than an alternative application Host.
 
-The class `PluginHost<TDomainCore, TValue, TInstalled>` requires its first type parameter, TDomainCore. Its runtime createPluginDomainCore implementation returns an empty object by default. The pipeline value type defaults to `never` and the declared installed tuple to `readonly []`; defineHost separately provides a default domain type. TInstalled informs installation constraints and configuration types. Runtime use() returns an exact input-order handle tuple; it does not change the static type of the Host variable. Published declarations cover the type-only extraction and merging helpers. `IPluginHostCoreFor<THost>` extracts a Host's domain and pipeline axes; type metadata adds no runtime capability.
+The class `PluginHost<TDomainCore, TValue, TInstalled, TPipelines>` requires its first type parameter, TDomainCore. Its runtime createPluginDomainCore implementation returns an empty object by default. The final TPipelines axis defaults to `Record<never, never>`. The pipeline value type defaults to `never` and the declared installed tuple to `readonly []`; defineHost separately provides a default domain type. TInstalled informs installation constraints and configuration types. Runtime use() returns an exact input-order handle tuple; it does not change the static type of the Host variable. Published declarations cover the type-only extraction and merging helpers. `IPluginHostCoreFor<THost>` extracts a Host's domain and pipeline axes; type metadata adds no runtime capability.
 
 Simple options or composed functions can suffice for a few static extension points. Use middleware-pipeline directly when only middleware execution is needed. This Host is useful when a library or application needs consistent plugin resources, dependencies, configuration, and reachability. Logger is an existing repository consumer.
 
@@ -337,6 +406,7 @@ The class entry can override `createPluginDomainCore()` to create a domain core 
 | `translateDisposalError(error)` | Optional; omission preserves the original PluginHostError. Default structured disposal does not invoke this hook or translate individual cleanupErrors |
 | `dispose(next)`                 | Optional disposal middleware; it must call next itself to include core cleanup. Repeated core disposal shares the original promise                     |
 | `surface`                       | Optional; no domain public members by default, and the fourth type parameter defaults to an empty surface                                              |
+| `pipelines`                     | Optional fixed map of authentic `pipelineSpec<TPayload>()(config)` values; use this top-level option for defineHost.                                   |
 
 Own surface descriptors are captured once before Runtime acquisition; accessors remain live. Domain members, Host identity, shared outlets, and fluent pipeline methods belong to the same frozen handle. Canonical Host keys, including identity, take precedence. Composing packages should supply their methods here rather than copy a frozen handle. A surface option or descriptor-read failure retains the original through CALLBACK_FAILED. Existing calls with three type parameters remain valid.
 
@@ -433,6 +503,26 @@ Lifecycle hooks, including setup, install, Feature/expose, update, beforeRelease
 
 Synchronous activate reentry is rejected before consulting a shared request. The runtime has no async-context tracking: after an await, same-name activate can share the active promise just like an external caller. Awaiting one's own activation self-deadlocks. A finite mutationTimeoutMs eventually rejects and rolls back with MUTATION_EXECUTION_TIMEOUT; false can leave it pending indefinitely. Start activation outside hooks.
 
+### Named pipelines: types, authority, and lifecycle
+
+Declare a fixed name-to-spec map in the functional entry's top-level `pipelines`, or in class constructor options. Each value is created by `pipelineSpec<TPayload>()(config)` and independently infers its payload and mode. Names are nonempty enumerable own string keys. A structurally similar plain object is not an authentic spec. Descriptions are frozen, and the pipeline set cannot change after construction.
+
+| config field | Default     | Accepted values and behavior                                                                                           |
+| ------------ | ----------- | ---------------------------------------------------------------------------------------------------------------------- |
+| `mode`       | `'sync'`    | `'sync'`, `'async'`, `'generator'`, or `'async-generator'`; determines stages and run results.                         |
+| `next`       | `'single'`  | `'single'` or `'multiple'`; uses middleware-pipeline's four-mode continuation and failure rules directly.              |
+| `order`      | `'install'` | Allocation order, or its reverse with `'reverse'`. One plugin shares its original ordering slot across every pipeline. |
+
+The functional handle owner can use `host.pipeline(name).use(stage)` and `.run(value, done)`. Class owners use protected `pipeline(name)`. An installing plugin receives only `core.pipeline(name).use(stage)`, with no run authority. Derive its type with `IPluginHostCoreFor<typeof host>` rather than repeating the payload map. Unknown names are rejected by the type checker; bypassing it produces a synchronous `PIPELINE_UNKNOWN`.
+
+Named sync/generator runs return `TResult | undefined`; async/async-generator runs return `Promise<Awaited<TResult> | undefined>`. Short-circuiting returns undefined, and each traversal that reaches the end invokes done once. Multiple mode does not return a result array: collect per-traversal results explicitly in done. Async next errors observed through then/await belong to the stage; unobserved failures still reject the runner, with several originals retained in start order under `MULTIPLE_DOWNSTREAM_FAILED`. Generators receive suffix failures through throw at yield; sync processes all registered values before aggregating failures.
+
+Pipeline publication belongs to the same Host commit. Each pipeline reuses its compiled snapshot within a visible stage revision; reverse ordering is also compiled once. Empty lanes call the terminal directly without a snapshot or lease. Nonempty lanes reuse the same registration, ordering, and quiescence/lease owners. Rollback, unUse, replace, disablement, and suspension affect all of a plugin's pipelines in one commit. Existing runs retain their original snapshots and generation leases distinguished by pipeline; drain joins that actual work under the existing lifecycle budgets. Owner registration on any pipeline while another is executing throws `PIPELINE_EXECUTING`.
+
+Without pipelines, the final named axis defaults to `Record<never, never>` and allocates no extra named runner, lane, or lease key. Existing TValue, pipeline.mode, use*Pipeline, runPipeline/runPipelineSync/runPipelineAsync, and pipelineMode still address only the default pipeline; old explicit generic calls remain valid. Its private symbol occupies no string name. When explicitly supplying defineHost generics together with named declarations, pass `typeof pipelines` as the fifth parameter. Omitting that axis keeps it empty, so pipeline(name) accepts only never.
+
+Invalid maps, names, specs, and order fail synchronously during construction as a native TypeError / `INVALID_PIPELINE_OPTION`, without returning a handle. Invalid mode retains `INVALID_PIPELINE_MODE`. Invalid next uses outer `INVALID_PIPELINE_OPTION` with middleware-pipeline's TypeError / `INVALID_OPTION` on cause. A spec configuration getter failure also keeps its original cause under `INVALID_PIPELINE_OPTION`.
+
 ### Pipelines, captured stages, and cancellation
 
 Host stage registration returns this; plugin core registration returns the core. Unsupported lifts synchronously throw PIPELINE_MODE_MISMATCH with the upstream middleware-pipeline TypeError / INVALID_OPTION on cause.
@@ -444,9 +534,9 @@ Host stage registration returns this; plugin core registration returns the core.
 | useGeneratorPipeline(stage)      | generator / async-generator                |
 | useAsyncGeneratorPipeline(stage) | async-generator                            |
 
-Class owners invoke protected runPipeline(value, done) from a domain entry; functional handles expose it directly. Both value and done are required. Sync next records a value and starts downstream after the current stage returns. Async next starts downstream immediately; awaiting it supports after-downstream logic. Omitting next is normal short-circuiting: done is skipped while the run can complete successfully. Duplicate next produces PIPELINE_NEXT_DUPLICATE; late next is ignored and reported as PIPELINE_NEXT_LATE.
+For the default pipeline, class owners invoke protected runPipeline(value, done) from a domain entry; functional handles expose it directly. Both value and done are required. Sync next records a value and starts downstream after the current stage returns. Async next starts downstream immediately; awaiting it supports after-downstream logic. Omitting next is normal short-circuiting: done is skipped while the run can complete successfully. Duplicate next under the default single policy produces PIPELINE_NEXT_DUPLICATE; late next is ignored and reported as PIPELINE_NEXT_LATE.
 
-Generator modes drain the current stage before passing its ordinary return value onward. Implicit undefined or GENERATOR_HALT stops the chain. GENERATOR_CONTINUE selects the last yield, or the input if nothing yielded. GENERATOR_UNDEFINED forwards an actual undefined payload only when its type permits it. Async-generator awaits serially; it provides neither streaming fan-out nor onion execution. Import modes, stage types, and these unique symbols directly from middleware-pipeline, and install that dependency directly when importing it.
+With the default single policy, generator modes drain the current stage before passing its ordinary return value onward. Implicit undefined or GENERATOR_HALT stops the chain. GENERATOR_CONTINUE selects the last yield, or the input if nothing yielded. GENERATOR_UNDEFINED forwards an actual undefined payload only when its type permits it. Async-generator awaits serially; it provides neither streaming fan-out nor onion execution. Import modes, stage types, and these unique symbols directly from middleware-pipeline, and install that dependency directly when importing it.
 
 Registering stages while any nested run remains active throws PIPELINE_EXECUTING. A run captures its admitted stages. Host stages and plugin slots follow first-allocation order; disabling, restoring, and replacing retain positions. New runs do not acquire revoked generations; old runs retain their leases until completion or cooperative exit.
 
@@ -488,52 +578,55 @@ diagnostic's third argument retains the original contained failure. Reporter fai
 
 PluginHostDisposalNodeKind distinguishes Host errors, aggregates, and disposer wrappers. readPluginHostDisposalProvenance(error) reads only provenance registered by this physical package instance. Unknown errors and another package copy return undefined rather than structural guesses. This supports diagnostics, not a replacement for source/code/cause handling.
 
-| code                               | Meaning and response                                                                                   |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| `HOST_DISPOSED`                    | The Host is terminal; create another Host.                                                             |
-| `HOST_DISPOSING`                   | The Host is closing and rejects new mutations.                                                         |
-| `PLUGIN_DUPLICATE`                 | A name is occupied or duplicated in the batch.                                                         |
-| `PLUGIN_NOT_INSTALLED`             | The named registration is absent.                                                                      |
-| `PLUGIN_DISABLED`                  | The registration is disabled; enable it before use.                                                    |
-| `PLUGIN_SUSPENDED`                 | A required provider is unavailable; restore the dependency.                                            |
-| `PLUGIN_NOT_ACTIVATED`             | A lazy registration needs activation.                                                                  |
-| `FEATURE_NOT_DECLARED`             | The requested Feature name was not declared.                                                           |
-| `PREREQUISITE_MISSING`             | A required provider was never installed; preflight rejects.                                            |
-| `PREREQUISITE_DISABLED`            | A required provider is disabled; enable it first.                                                      |
-| `PREREQUISITE_REMOVED`             | A required provider was removed; reinstall it.                                                         |
-| `DEPENDENCY_CYCLE`                 | Feature references form a cycle; no installer runs.                                                    |
-| `DEPENDENCY_BLOCKED`               | The mutation would strand required dependents; inspect detail.blockedBy.                               |
-| `REPLACE_NAME_MISMATCH`            | The replacement name differs; the candidate is not installed.                                          |
-| `DEPENDENT_RESTART_FAILED`         | The replacement committed but dependents failed to restart; cause.errors starts with that failure.     |
-| `PLUGIN_DEFINITION_INVALID`        | A retired definition field, invalid dependency, or noncanonical core is rejected as TypeError.         |
-| `PLUGIN_INSTALL_FAILED`            | Installation/publication failed; cause preserves the primary and detail retains rollback failures.     |
-| `SETUP_REQUIRES_ASYNC_INSTALL`     | Immediate useSync installation cannot run setup; use the async path.                                   |
-| `PLUGIN_INSTALL_ROLLBACK_FAILED`   | Diagnostic only: rollback also failed without replacing the installation primary.                      |
-| `INSTALL_RESULT_THENABLE`          | An own then key or async result on the sync path prevents extension publication.                       |
-| `PLUGIN_DISPOSE_FAILED`            | A beforeRelease or plugin cleanup step failed; cause retains it and cleanup continues.                 |
-| `EXTENSION_DUPLICATE`              | An extension key is occupied; canonical Host keys take EXTENSION_RESERVED precedence.                  |
-| `EXTENSION_OBJECT_PROTOTYPE`       | An extension key conflicts with Object.prototype.                                                      |
-| `EXTENSION_RESERVED`               | An extension uses a Host key, then, or disposal symbol.                                                |
-| `EXTENSION_NON_ENUMERABLE_IGNORED` | Diagnostic only: a non-enumerable extension key was skipped.                                           |
-| `RESOURCE_OUTSIDE_INSTALL`         | Core rejects late registration without ownership; a late setup resource is released before rejection.  |
-| `LIFECYCLE_MUTATION`               | A lifecycle reentry or mutation during setup / beforeRelease is forbidden.                             |
-| `INVALID_PIPELINE_MODE`            | The constructor received an unsupported pipeline mode.                                                 |
-| `PIPELINE_MODE_MISMATCH`           | A stage cannot be lifted to the Host mode; cause retains the upstream TypeError.                       |
-| `PIPELINE_NEXT_DUPLICATE`          | A stage calls next twice; downstream does not run twice.                                               |
-| `PIPELINE_NEXT_LATE`               | Diagnostic only: next is ignored after stage completion.                                               |
-| `PIPELINE_EXECUTING`               | A stage is registered during pipeline execution.                                                       |
-| `PIPELINE_FAILED`                  | Async stage and downstream both fail; AggregateError.errors is [stage, downstream].                    |
-| `MUTATION_QUEUE_TIMEOUT`           | A configured admission deadline removes queued work before it executes.                                |
-| `DISPOSE_STEP_TIMEOUT`             | A beforeRelease or cleanup step exceeds its wait budget; cleanup continues without preemption.         |
-| `INVALID_OPTION`                   | An invalid input shape remains a native TypeError; correct the input.                                  |
-| `INVALID_CONFIG_VALUE`             | A configuration value violates its data grammar; detail includes path/reason.                          |
-| `CONFIG_CYCLE_REJECTED`            | Configuration contains a reference cycle.                                                              |
-| `CALLBACK_FAILED`                  | An unclassified config, surface-read, or defineHost disposal callback failed; identity/cause survives. |
-| `MUTATION_EXECUTION_TIMEOUT`       | A hook exceeded its execution budget and lost commit authority.                                        |
-| `REGISTRATION_REVOKED`             | A captured extension belongs to a removed or replaced registration.                                    |
-| `PIPELINE_DRAIN_TIMEOUT`           | Ordinary removal exceeded its drain budget; it returns ok false and continues bounded cleanup.         |
-| `CLEANUP_INCOMPLETE`               | Logical closure committed while cleanup failed or remains pending; inspect its continuation.           |
-| `COMPOSITION_TARGET_UNMANAGED`     | The composition target is not a Host registered by this physical package instance.                     |
+| code                               | Meaning and response                                                                                                            |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `HOST_DISPOSED`                    | The Host is terminal; create another Host.                                                                                      |
+| `HOST_DISPOSING`                   | The Host is closing and rejects new mutations.                                                                                  |
+| `PLUGIN_DUPLICATE`                 | A name is occupied or duplicated in the batch.                                                                                  |
+| `PLUGIN_NOT_INSTALLED`             | The named registration is absent.                                                                                               |
+| `PLUGIN_DISABLED`                  | The registration is disabled; enable it before use.                                                                             |
+| `PLUGIN_SUSPENDED`                 | A required provider is unavailable; restore the dependency.                                                                     |
+| `PLUGIN_NOT_ACTIVATED`             | A lazy registration needs activation.                                                                                           |
+| `FEATURE_NOT_DECLARED`             | The requested Feature name was not declared.                                                                                    |
+| `PREREQUISITE_MISSING`             | A required provider was never installed; preflight rejects.                                                                     |
+| `PREREQUISITE_DISABLED`            | A required provider is disabled; enable it first.                                                                               |
+| `PREREQUISITE_REMOVED`             | A required provider was removed; reinstall it.                                                                                  |
+| `DEPENDENCY_CYCLE`                 | Feature references form a cycle; no installer runs.                                                                             |
+| `DEPENDENCY_BLOCKED`               | The mutation would strand required dependents; inspect detail.blockedBy.                                                        |
+| `REPLACE_NAME_MISMATCH`            | The replacement name differs; the candidate is not installed.                                                                   |
+| `DEPENDENT_RESTART_FAILED`         | The replacement committed but dependents failed to restart; cause.errors starts with that failure.                              |
+| `PLUGIN_DEFINITION_INVALID`        | A retired definition field, invalid dependency, or noncanonical core is rejected as TypeError.                                  |
+| `PLUGIN_INSTALL_FAILED`            | Installation/publication failed; cause preserves the primary and detail retains rollback failures.                              |
+| `SETUP_REQUIRES_ASYNC_INSTALL`     | Immediate useSync installation cannot run setup; use the async path.                                                            |
+| `PLUGIN_INSTALL_ROLLBACK_FAILED`   | Diagnostic only: rollback also failed without replacing the installation primary.                                               |
+| `INSTALL_RESULT_THENABLE`          | An own then key or async result on the sync path prevents extension publication.                                                |
+| `PLUGIN_DISPOSE_FAILED`            | A beforeRelease or plugin cleanup step failed; cause retains it and cleanup continues.                                          |
+| `EXTENSION_DUPLICATE`              | An extension key is occupied; canonical Host keys take EXTENSION_RESERVED precedence.                                           |
+| `EXTENSION_OBJECT_PROTOTYPE`       | An extension key conflicts with Object.prototype.                                                                               |
+| `EXTENSION_RESERVED`               | An extension uses a Host key, then, or disposal symbol.                                                                         |
+| `EXTENSION_NON_ENUMERABLE_IGNORED` | Diagnostic only: a non-enumerable extension key was skipped.                                                                    |
+| `RESOURCE_OUTSIDE_INSTALL`         | Core rejects late registration without ownership; a late setup resource is released before rejection.                           |
+| `LIFECYCLE_MUTATION`               | A lifecycle reentry or mutation during setup / beforeRelease is forbidden.                                                      |
+| `INVALID_PIPELINE_MODE`            | The constructor received an unsupported pipeline mode.                                                                          |
+| `INVALID_PIPELINE_OPTION`          | Invalid named map, name, spec, next, or order; construction throws native TypeError, preserving an upstream cause when present. |
+| `PIPELINE_UNKNOWN`                 | The requested name was not declared; correct the lookup or construction map.                                                    |
+| `ASYNC_STAGE_IN_SYNC_ENTRY`        | A visible async stage prevents the default synchronous entry before any stage or terminal executes.                             |
+| `PIPELINE_MODE_MISMATCH`           | A stage cannot be lifted to the Host mode; cause retains the upstream TypeError.                                                |
+| `PIPELINE_NEXT_DUPLICATE`          | A stage calls next twice; downstream does not run twice.                                                                        |
+| `PIPELINE_NEXT_LATE`               | Diagnostic only: next is ignored after stage completion.                                                                        |
+| `PIPELINE_EXECUTING`               | A stage is registered during pipeline execution.                                                                                |
+| `PIPELINE_FAILED`                  | Async stage and downstream both fail; AggregateError.errors is [stage, downstream].                                             |
+| `MUTATION_QUEUE_TIMEOUT`           | A configured admission deadline removes queued work before it executes.                                                         |
+| `DISPOSE_STEP_TIMEOUT`             | A beforeRelease or cleanup step exceeds its wait budget; cleanup continues without preemption.                                  |
+| `INVALID_OPTION`                   | An invalid input shape remains a native TypeError; correct the input.                                                           |
+| `INVALID_CONFIG_VALUE`             | A configuration value violates its data grammar; detail includes path/reason.                                                   |
+| `CONFIG_CYCLE_REJECTED`            | Configuration contains a reference cycle.                                                                                       |
+| `CALLBACK_FAILED`                  | An unclassified config, surface-read, or defineHost disposal callback failed; identity/cause survives.                          |
+| `MUTATION_EXECUTION_TIMEOUT`       | A hook exceeded its execution budget and lost commit authority.                                                                 |
+| `REGISTRATION_REVOKED`             | A captured extension belongs to a removed or replaced registration.                                                             |
+| `PIPELINE_DRAIN_TIMEOUT`           | Ordinary removal exceeded its drain budget; it returns ok false and continues bounded cleanup.                                  |
+| `CLEANUP_INCOMPLETE`               | Logical closure committed while cleanup failed or remains pending; inspect its continuation.                                    |
+| `COMPOSITION_TARGET_UNMANAGED`     | The composition target is not a Host registered by this physical package instance.                                              |
 
 ### Host requirements and maintenance
 
