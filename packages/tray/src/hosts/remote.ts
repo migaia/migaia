@@ -1,3 +1,4 @@
+/** Project validated Tray calls through an admitted sender; registry and RPC own lifecycle state. */
 import { createTrayError } from '../errors.js'
 import { TrayErrorCode } from '../error-code.js'
 import { toWire } from './portable.js'

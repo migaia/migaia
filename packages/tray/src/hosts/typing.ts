@@ -1,3 +1,7 @@
+/**
+ * Public Tray types correlate host definitions and calls; runtime ownership remains in host
+ * modules.
+ */
 import type {
   IDefinedPluginConstraint,
   IFeature,

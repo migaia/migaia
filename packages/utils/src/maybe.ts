@@ -1,3 +1,4 @@
+/** Pure presence/result helpers preserve payload identity; they own no runtime resources or IO. */
 import { toError, attachErrorIdentity, IdentifyError } from './error.js'
 import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'

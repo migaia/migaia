@@ -1,3 +1,4 @@
+/** Assemble one child Tray host and its RPC exit lifetime; transport protocols stay in plugins. */
 import { defineHost } from '@migaia/plugin-host'
 import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { probe } from '@migaia/rpc-host/plugins/probe'

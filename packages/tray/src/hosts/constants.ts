@@ -1,3 +1,4 @@
+/** Stable Tray runtime, lifecycle and command domains are shared by parent and child owners. */
 /** Internal construction mode distinguishes parent launch from child connection. */
 export const TrayRuntimeMode = { parent: 'parent', child: 'child' } as const
 /** Construction mode stays private to host composition modules. */

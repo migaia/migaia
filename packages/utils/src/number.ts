@@ -1,3 +1,4 @@
+/** Numeric and stable-key calculations own their validation; scheduling and IO remain external. */
 import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
 import { UtilsErrorText } from './error-text.js'
 import { attachErrorIdentity } from './error.js'

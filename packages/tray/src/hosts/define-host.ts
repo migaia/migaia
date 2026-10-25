@@ -1,3 +1,7 @@
+/**
+ * Validate and brand immutable Tray host declarations; launch and per-generation plugins stay
+ * deferred.
+ */
 import { isUrlObject, readUrlHref, type IUrlLike } from '@migaia/utils'
 import { TrayErrorCode } from '../error-code.js'
 import { createTrayError } from '../errors.js'

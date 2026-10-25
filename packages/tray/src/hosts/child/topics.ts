@@ -1,3 +1,4 @@
+/** Own generation-local topic membership; EventSubscriber owns delivery and RPC owns parent IO. */
 import { createEventHub } from '@migaia/event-subscriber'
 import { TrayInternal } from '../constants.js'
 import { toWire } from '../portable.js'
