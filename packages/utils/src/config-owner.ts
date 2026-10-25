@@ -1006,6 +1006,8 @@ export class ConfigOwner<T extends IConfigRecord = IConfigRecord> {
   /** Runs watchers once per commit; failures are reported and never stop the other watchers. */
   #notify(previous: IOwnedConfig<T>, next: IOwnedConfig<T>): void {
     if (this.#watchers.size === 0) return
+    /** Completed branch comparisons are shared only within this commit, never across notifications. */
+    const comparisons = new WeakMap<object, WeakMap<object, boolean>>()
     this.#notifying = true
     try {
       // Snapshot so watchers added during notification wait for the next commit.
@@ -1019,11 +1021,33 @@ export class ConfigOwner<T extends IConfigRecord = IConfigRecord> {
           /** Raw values on each side of the commit. */
           const before = rawAt(previous, watcher.path)
           const after = rawAt(next, watcher.path)
-          /** Collected differences under the watched path. */
-          const changes: IConfigDiffEntry[] = []
-          if (before.found !== after.found) changes.push({ path: watcher.path, kind: 'changed' })
-          else collectDiff(before.value, after.value, watcher.path, changes, 0)
-          if (changes.length === 0) continue
+          /** Object-only identity keys leave primitive Object.is semantics, including signed zero. */
+          const objects =
+            before.value !== null &&
+            typeof before.value === 'object' &&
+            after.value !== null &&
+            typeof after.value === 'object'
+          /** A prior listener may already have compared this exact immutable branch pair. */
+          const previousComparisons = objects ? comparisons.get(before.value as object) : undefined
+          /** Undefined is a cache miss; both changed and unchanged comparisons are reusable. */
+          let changed = previousComparisons?.get(after.value as object)
+          if (changed === undefined) {
+            /** Only a completed comparison is cached; thrown failures retain per-listener reporting. */
+            const changes: IConfigDiffEntry[] = []
+            if (before.found !== after.found) changes.push({ path: watcher.path, kind: 'changed' })
+            else collectDiff(before.value, after.value, watcher.path, changes, 0)
+            changed = changes.length > 0
+            if (objects) {
+              /**
+               * The same left branch can be paired with several independently selected right
+               * branches.
+               */
+              const results = previousComparisons ?? new WeakMap<object, boolean>()
+              results.set(after.value as object, changed)
+              comparisons.set(before.value as object, results)
+            }
+          }
+          if (!changed) continue
           /** Readonly views of both values. */
           const read = (snapshot: IOwnedConfig<T>): unknown => {
             /** Discriminated read through the canonical readonly path reader. */
