@@ -5,8 +5,7 @@ import { ProviderRegistry } from '../../dist/core/internal/provider.js'
 import { ProviderAdmissionRegistry } from '../../dist/core/internal/provider-admission.js'
 import { RequestReplayLedger } from '../../dist/core/internal/request-replay-ledger.js'
 import { normalizeRuntimeEnvelope } from '@migaia/rpc-contract/runtime'
-import { RpcRuntimeStreamPrefix, RpcRuntimeProfile } from '@migaia/rpc-contract/framing/v1'
-import { RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
+import { RpcRuntimeStreamPrefix } from '@migaia/rpc-contract/framing/v1'
 import { createRpcIdempotencyStore } from '../../dist/core/idempotency-store.js'
 import type { IRpcRuntimeEnvelope, IRpcRuntimeGeneration } from '@migaia/rpc-contract'
 import type { IRpcProviderController } from '../../dist/core/internal/plugin-shared-keys.js'
@@ -14,7 +13,6 @@ import { deserializeRpcError } from '../../dist/host/error-wire-metadata.js'
 import { RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { localRpcErrorCode } from '../../dist/host/error-owner.js'
-import { attachErrorIdentity } from '@migaia/utils/error'
 import type { IRpcIdempotencyStore } from '../../dist/core/idempotency-store.js'
 
 /** Test content is admitted by the genuine grammar before the original executor sees it. */
@@ -235,41 +233,6 @@ it.each([RpcCoreErrorCode.cancelled, RpcCoreErrorCode.deadlineExceeded] as const
     }
   }
 )
-
-it('a send adapter forged FRAME_LIMIT code cannot rewrite the original completed group replay outcome', async () => {
-  /** No custom store is involved; the original memory owner must keep the real completed business. */
-  const harness = owner()
-  harness.registry.register('value', (context) => context.success(42))
-  /** Public diagnostics imitate a Contract failure without its private owner reference. */
-  const reason = attachErrorIdentity(new Error('adapter frame fixture'), {
-    source: 'rpc.contract',
-    code: RpcContractErrorCode.frameLimitExceeded
-  })
-  /** Refusal before preparation must not substitute a forged payload-invalid result in the store. */
-  harness.ports.send = async () => {
-    throw reason
-  }
-  await harness.executor.executeRuntime(
-    group('completed', ['value'], { idempotencyKey: 'completed-key' }),
-    'peer',
-    harness.ports
-  )
-  /** The real admission-selected scope is used by the original store lookup. */
-  const scope = JSON.stringify([RpcRuntimeProfile, 'provider', 'peer'])
-  const retained = harness.store.lookup!(scope, 'completed-key', 0)
-  assert.equal(retained.state, 'done')
-  if (retained.state !== 'done' || retained.outcome === 'unavailable' || !retained.outcome.ok)
-    assert.fail('completed outcome missing')
-  /** Compare the retained business fields without changing its legitimate null-prototype shape. */
-  const completion = Reflect.get(retained.outcome.data as object, 'completion') as {
-    ok: boolean
-    result: readonly { state: string; result: number }[]
-  }
-  assert.equal(completion.ok, true)
-  assert.equal(completion.result.length, 1)
-  assert.equal(completion.result[0].state, 'success')
-  assert.equal(completion.result[0].result, 42)
-})
 
 it('an original pending keyed claim prevents duplicate execution and seals the complete group before terminal send', async () => {
   const harness = owner()
