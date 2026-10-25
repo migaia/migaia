@@ -11,6 +11,7 @@ import {
   attachErrorIdentity,
   attachSecondaryErrors,
   isNativeErrorValue,
+  toError,
   tryReadProperty
 } from '@migaia/utils/error'
 export { RpcCoreErrorCode, type IRpcCoreErrorCode, RPC_CORE_ERROR_SOURCE }
@@ -63,31 +64,40 @@ export function tagRpcError<E extends Error>(
     Pick<IRpcError, 'source' | 'code'>
 }
 
-/** Classify one boundary failure without replacing a mutable native error or a foreign identity. */
+/** Read the existing diagnostic identity once, in the same source-then-code order for every error. */
+function hasSemanticIdentity(error: object): boolean {
+  /** A complete semantic identity remains owned by the package that supplied it. */
+  const source = tryReadProperty(error as { source?: unknown }, 'source')
+  /** Numeric native DOM codes alone do not constitute a semantic package identity. */
+  const existingCode = tryReadProperty(error as { code?: unknown }, 'code')
+  return (
+    !source.threw &&
+    !existingCode.threw &&
+    typeof source.value === 'string' &&
+    source.value.length > 0 &&
+    typeof existingCode.value === 'string' &&
+    existingCode.value.length > 0
+  )
+}
+
+/** Classify one boundary failure without replacing a native error or complete coded error-like. */
 export function identifyRpcBoundaryFailure(
   error: unknown,
   code: IRpcCoreErrorCode,
   message: string
 ): Error {
   if (isNativeErrorValue(error)) {
-    /** A complete semantic identity remains owned by the package that supplied it. */
-    const source = tryReadProperty(error as { source?: unknown }, 'source')
-    /** Numeric native DOM codes alone do not constitute a semantic package identity. */
-    const existingCode = tryReadProperty(error as { code?: unknown }, 'code')
-    if (
-      !source.threw &&
-      !existingCode.threw &&
-      typeof source.value === 'string' &&
-      source.value.length > 0 &&
-      typeof existingCode.value === 'string' &&
-      existingCode.value.length > 0
-    )
-      return error
+    if (hasSemanticIdentity(error)) return error
     try {
       return tagRpcError(error, code)
     } catch (attachmentError) {
       return attachSecondaryErrors(new RpcError(code, message, error), [attachmentError]) as Error
     }
+  }
+  if (error !== null && typeof error === 'object' && hasSemanticIdentity(error)) {
+    /** Utils owns complete error-like detection and contains hostile presentation getters. */
+    const errorLike = toError(error)
+    if (errorLike === error) return errorLike
   }
   return new RpcError(code, message, error)
 }
