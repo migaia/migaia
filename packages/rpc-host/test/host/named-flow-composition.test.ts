@@ -12,6 +12,7 @@ import {
   type IRpcFlowFeature
 } from '@migaia/rpc-host/sdk'
 import { coreMemoryServer } from './core-fixture.js'
+import { RuntimeApiFixtureText } from '../fixtures/runtime-api-text.js'
 
 /** Keep all three genuine transformations installed on both actual public host owners. */
 async function composition(
@@ -51,9 +52,9 @@ async function composition(
   }
 }
 
-/** A synchronous native prefix witnesses all three logical sends entering the genuine batch lane. */
-function admissionWitness() {
-  /** The first held write plus two queued members make batching independent of scheduler timing. */
+/** A synchronous native prefix witnesses the selected logical sends entering the genuine batch lane. */
+function admissionWitness(expected = 3) {
+  /** The first held write and queued members make batching independent of scheduler timing. */
   const entered = deferred<void>()
   /** Count only whole message submissions; chunk fragments have their own extension frames. */
   let count = 0
@@ -65,7 +66,7 @@ function admissionWitness() {
         [RpcFlowPoint.frameOutbound]: (payload, next) => {
           /** Short messages synchronously enter the genuine Chunk/Batch suffix before this count. */
           const traversal = next(payload)
-          if (payload.frame.kind === 'message' && ++count === 3) entered.resolve()
+          if (payload.frame.kind === 'message' && ++count === expected) entered.resolve()
           return traversal
         }
       }
@@ -258,5 +259,48 @@ it('public late batch cancellation keeps CANCELLED cause while the surviving mem
     f.client.pair[1].releaseWrites()
     writing.mockRestore()
     await expect(Promise.all([f.client.host.close(), f.host.close()])).resolves.toHaveLength(2)
+  }
+})
+
+it('a cancelled one-way item leaves the canonical send queue without a frame or retry', async () => {
+  /** Two original logical notifications must enter the genuine installed batch lane. */
+  const witness = admissionWitness(2)
+  /** Reuse the real public owner and physical carrier; no fixture queue handles notifications. */
+  const f = await composition({ ready: () => 'ready' }, [witness.plugin])
+  /** The original physical write implementation remains the only handoff and drain owner. */
+  const writing = vi.spyOn(f.client.pair[1], 'write')
+  try {
+    f.client.pair[1].holdWrites()
+    /** The first accepted notification holds the actual physical writer without a result waiter. */
+    const first = f.client.host.memory.notify('ready', null)
+    await vi.waitFor(() => expect(writing).toHaveBeenCalledTimes(1))
+    /** Only the queued notification owns this original cancellation reason. */
+    const reason = new Error(RuntimeApiFixtureText.queuedAbort)
+    /** Its lifetime remains independent from the live first physical write. */
+    const controller = new AbortController()
+    /** Observe settlement before cancelling the already queued original notification. */
+    const cancelled = Promise.allSettled([
+      f.client.host.memory.notify('ready', null, { signal: controller.signal })
+    ])
+    await witness.entered
+    controller.abort(reason)
+    /** Cancellation must complete before the held native write is released. */
+    const [result] = await cancelled
+    expect(result?.status, 'queued cancellation is local and immediate').toBe('rejected')
+    if (result?.status === 'rejected') {
+      expect(result.reason.code).toBe('CANCELLED')
+      expect(result.reason.cause).toBe(reason)
+    }
+    f.client.pair[1].releaseWrites()
+    await first
+    await f.client.host.memory.notify('ready', null)
+    expect(
+      writing.mock.calls.length,
+      'only the original and explicit later sends reach the carrier'
+    ).toBe(2)
+  } finally {
+    f.client.pair[1].releaseWrites()
+    writing.mockRestore()
+    await Promise.all([f.client.host.close(), f.host.close()])
   }
 })
