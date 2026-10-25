@@ -33,7 +33,7 @@ describe('Tray child topology', () => {
       )
       try {
         /** A genuine PluginHost handle supplies the live dispatcher Feature. */
-        const installed = await local.use(dispatcher)
+        const installed = await local.use(dispatcher.plugin)
         /** Direct Feature access isolates the first-init guard from the native handshake cases. */
         const control = (installed[0] as any).getFeature('control')
         await expect(

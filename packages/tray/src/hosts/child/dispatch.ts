@@ -22,8 +22,8 @@ export function createChildDispatcher(
   outlet: () => ITrayRuntimeOutlet,
   exit: (error?: unknown) => void,
   report: (error: unknown) => void
-): IPluginConstraint<any, any, any> {
-  return new ChildDispatcher(definition, host, outlet, exit, report).plugin
+): ChildDispatcher {
+  return new ChildDispatcher(definition, host, outlet, exit, report)
 }
 /** Owns one accepted child generation while PluginHost retains business installation and cleanup. */
 class ChildDispatcher {
@@ -116,22 +116,10 @@ class ChildDispatcher {
           deliver: this.#topics.deliver,
           /** Bounded logical wait lets the caller terminate a hung realm; cleanup keeps its owner. */
           shutdown: async ({ graceMs }: { graceMs: number }) => {
-            this.#shutdown ??= (async () => {
-              this.#topics.close()
-              for (const name of [...this.#installed].reverse()) {
-                if (!this.#handles.has(name)) continue
-                const result = await this.#host.unUse(name, { policy: DependencyPolicy.cascade })
-                for (const step of result.affected.steps) {
-                  if (step.action !== DependencyAction.release) continue
-                  this.#handles.delete(step.name)
-                  this.#installed.delete(step.name)
-                }
-                if (!result.ok) for (const error of result.errors) this.#report(error)
-              }
-              this.#installed.clear()
-            })()
+            /** Cleanup starts before the caller's logical deadline is validated or awaited. */
+            const shutdown = this.shutdown()
             try {
-              await withTimeout(() => this.#shutdown!, { timeoutMs: graceMs, report: this.#report })
+              await withTimeout(() => shutdown, { timeoutMs: graceMs, report: this.#report })
             } catch (error) {
               this.#report(error)
               throw error
@@ -141,6 +129,26 @@ class ChildDispatcher {
       },
       install: () => ({})
     })
+  }
+  /** Share the original business cleanup, including rejection, without adding a realm deadline. */
+  readonly shutdown = (): Promise<void> => {
+    this.#shutdown ??= this.#removeInstalled()
+    return this.#shutdown
+  }
+  /** Remove business plugins and their client in the original reverse dependency order. */
+  #removeInstalled = async (): Promise<void> => {
+    this.#topics.close()
+    for (const name of [...this.#installed].reverse()) {
+      if (!this.#handles.has(name)) continue
+      const result = await this.#host.unUse(name, { policy: DependencyPolicy.cascade })
+      for (const step of result.affected.steps) {
+        if (step.action !== DependencyAction.release) continue
+        this.#handles.delete(step.name)
+        this.#installed.delete(step.name)
+      }
+      if (!result.ok) for (const error of result.errors) this.#report(error)
+    }
+    this.#installed.clear()
   }
   /** Resolve only declared live Feature paths, preserving the receiver of each method. */
   #invoke = (input: ITrayInvocation, context?: IRpcContext): unknown => {

@@ -41,7 +41,7 @@ import {
   type ITrayRuntimeOutlet,
   type ITrayRuntimeMembers
 } from '../runtime.js'
-import { serveChild } from '../child/serve.js'
+import { disposeChildHost, serveChild } from '../child/serve.js'
 import { createRegistry, type ITrayRecord } from './registry.js'
 import { createTrayEvents } from './events.js'
 import { createRelay } from './relay.js'
@@ -562,7 +562,7 @@ class TrayRuntime<
       await Promise.race([aborted.promise, child.exited])
     } finally {
       release?.()
-      await child.host.dispose()
+      await disposeChildHost(child.host, child.shutdown, this.#report)
     }
   }
 

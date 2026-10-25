@@ -12,14 +12,42 @@ import {
   type ITrayRuntimeHost,
   type ITrayRuntimeOptions
 } from '../runtime.js'
-import { TrayRuntime, TrayRuntimeMode } from '../constants.js'
+import { TrayInternal, TrayRuntime, TrayRuntimeMode } from '../constants.js'
 import type { IAnyTrayHost } from '../typing.js'
+
+/** Finish business cleanup before retiring transport while native pipelines remain admitted. */
+export async function disposeChildHost(
+  host: ITrayRuntimeHost,
+  shutdown: () => Promise<void>,
+  report: (error: unknown) => void
+): Promise<void> {
+  /** Original errors are reported after both pre-disposal cleanup steps have been attempted. */
+  const failures: unknown[] = []
+  try {
+    await shutdown()
+  } catch (error) {
+    failures.push(error)
+  }
+  try {
+    /** This is the original runtime registration, distinct from its public namespace name. */
+    const removed = await host.unUse(TrayInternal.connection)
+    if (!removed.ok) failures.push(...removed.errors)
+  } catch (error) {
+    failures.push(error)
+  }
+  try {
+    for (const error of failures) report(error)
+  } finally {
+    await host.dispose()
+  }
+}
+
 /** One child Host serves init before any business plugin is installed and retains the exit outcome. */
 export async function serveChild(
   definition: Parameters<typeof readHost>[0],
   options: ITrayRuntimeOptions,
   connect?: ICoroutineConnect
-): Promise<{ host: ITrayRuntimeHost; exited: Promise<void> }> {
+): Promise<{ host: ITrayRuntimeHost; exited: Promise<void>; shutdown: () => Promise<void> }> {
   /** Branding must come from the same shared host-definition module in this realm. */
   const admitted = readHost(definition)
   /** Native construction receives declarations and lazy execution authority through one SDK call. */
@@ -52,14 +80,22 @@ export async function serveChild(
     else outcome.reject(error)
   }
   try {
+    /** The dispatcher retains its original shutdown Promise while its Feature serves RPC. */
+    const dispatcher = createChildDispatcher(
+      admitted,
+      host,
+      () => outletOf(host, admitted),
+      exit,
+      options.report
+    )
     await host.use(
       ...(options.probe === undefined
         ? []
         : [probe(...(Array.isArray(options.probe) ? options.probe : [options.probe]))]),
-      createChildDispatcher(admitted, host, () => outletOf(host, admitted), exit, options.report)
+      dispatcher.plugin
     )
     await host.use(runtimePlugin(admitted, TrayRuntimeMode.child, { ...options, connect }))
-    return { host, exited: outcome.promise }
+    return { host, exited: outcome.promise, shutdown: dispatcher.shutdown }
   } catch (primary) {
     await host.dispose()
     throw primary
@@ -94,7 +130,7 @@ export async function serveTrayHost(
     report(error)
     code = 1
   } finally {
-    await child.host.dispose()
+    await disposeChildHost(child.host, child.shutdown, report)
   }
   /** Thread and process entries are Node realms; the structural read keeps Tray free of Node types. */
   const realm = Reflect.get(globalThis, 'process') as { exit(code: number): never } | undefined

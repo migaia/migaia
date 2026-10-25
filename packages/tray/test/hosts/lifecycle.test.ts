@@ -209,7 +209,11 @@ describe('Tray lifecycle management', () => {
       /** Read-only lifecycle events are the restart oracle. */
       const events: any[] = []
       /** Native supervision runs on-failure in every runtime. */
-      const tray = api.createTray({ hosts: [api.hosts[index]] })
+      const { tray, host } = await assembled({ hosts: [api.hosts[index]] })
+      /** Only the admitted replacement's genuine peer-close receipts supply these wire facts. */
+      const closeFrames: boolean[] = []
+      /** The original scoped listener is released even when the clean-exit assertion fails. */
+      let removePeerClosed: (() => void) | undefined
       for (const event of ['ready', 'restarting', 'stopped', 'failed'])
         tray.on(event, (value: any) => events.push(value))
       try {
@@ -227,6 +231,12 @@ describe('Tray lifecycle management', () => {
           initCount: 1,
           generation: expect.any(Number)
         })
+        /** Observe the actual parent namespace after restart, excluding the prior crash receipt. */
+        removePeerClosed = host[TrayInternal.connection].onPeerClosed(
+          (event: Readonly<{ closeFrame: boolean }>) => {
+            closeFrames.push(event.closeFrame)
+          }
+        )
         await remote.notify('node.svc.exitClean', undefined)
         await until(
           () => tray.list()[0],
@@ -238,7 +248,9 @@ describe('Tray lifecycle management', () => {
           'ready',
           'stopped'
         ])
+        expect(closeFrames).toContain(true)
       } finally {
+        removePeerClosed?.()
         await tray.dispose()
       }
     },
