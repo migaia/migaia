@@ -469,12 +469,19 @@ export class Session {
     /** Listener cleanup cannot replace the primary reason or prevent physical close. */
     const remove = this.#unsubscribe
     this.#unsubscribe = undefined
-    void this.#cleanup(remove, timerFailures).then(this.#closed.resolve, this.#closed.reject)
+    void this.#cleanup(remove, timerFailures, physicalFailure).then(
+      this.#closed.resolve,
+      this.#closed.reject
+    )
     return this.#closed.promise
   }
 
   /** Physical close settles queued writes before joining the reply; ingress never waits on itself. */
-  async #cleanup(remove: IRpcDispose | undefined, timerFailures: unknown[]): Promise<void> {
+  async #cleanup(
+    remove: IRpcDispose | undefined,
+    timerFailures: unknown[],
+    physicalFailure: boolean
+  ): Promise<void> {
     /** Keep all original cleanup values reachable if multiple native releases fail. */
     const failures: unknown[] = [...timerFailures]
     try {
@@ -503,6 +510,8 @@ export class Session {
     } catch (error) {
       if (error !== this.#reason) this.#options.report(error)
     }
+    /** External close joins admitted ingress before its native stage owner is revoked. */
+    if (!physicalFailure) await this.#receiving
     this.#view = undefined
     if (timerFailures.length)
       throw tagRpcError(

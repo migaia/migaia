@@ -100,6 +100,7 @@ function classify(error: unknown, seen = new WeakSet<object>()): unknown {
     name: Reflect.get(error, 'name') ?? null,
     reason: Reflect.get(error, 'reason') ?? null,
     message: String(Reflect.get(error, 'message') ?? error),
+    stack: Reflect.get(error, 'stack') ?? null,
     cause: Reflect.has(error, 'cause') ? classify(Reflect.get(error, 'cause'), seen) : null,
     errors: error instanceof AggregateError ? error.errors.map((item) => classify(item, seen)) : []
   }

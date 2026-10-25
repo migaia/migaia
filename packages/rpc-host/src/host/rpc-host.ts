@@ -790,17 +790,17 @@ export class RpcHost {
     const streamResult = streamClosing.catch((error: unknown) => {
       failures.push(error)
     })
+    try {
+      await this.#sessions.close(this.#reason)
+    } catch (error) {
+      failures.push(error)
+    }
     if (this.#native) {
       try {
         failures.push(...(await this.#native.dispose()).cleanupErrors)
       } catch (error) {
         failures.push(error)
       }
-    }
-    try {
-      await this.#sessions.close(this.#reason)
-    } catch (error) {
-      failures.push(error)
     }
     await streamResult
     this.#forwarder.close()
