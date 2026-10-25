@@ -141,13 +141,25 @@ class ProcessSessionOwner {
     if (this.#ingress.kind === 'child') return this.#serveChild(this.#ingress)
     try {
       this.#assertOpen()
-      this.#listener = await this.#ingress.listen({
+      /** A pending bind keeps ownership until this still-open service can accept its receipt. */
+      const listener = await this.#ingress.listen({
         address: this.#ingress.address,
         signal: this.#controller.signal,
         report: this.#report,
         onConnection: this.#acceptListener
       })
-      this.#assertOpen()
+      try {
+        this.#assertOpen()
+      } catch (error) {
+        // Shutdown may already have drained the service before this native acquisition settles.
+        try {
+          await listener.close()
+        } catch (cleanup) {
+          this.#report(cleanup)
+        }
+        throw error
+      }
+      this.#listener = listener
       return this.#handle()
     } catch (error) {
       try {
