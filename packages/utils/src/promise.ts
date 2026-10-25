@@ -1306,12 +1306,15 @@ function runWithAbort<T>(
   return new RetryAbortOperation<T>(operation, signals, controller, report).promise
 }
 
-/** A queued admission owns its original callback, settlement and cancellation receipt. */
+/** Cleared queue tombstones retain no caller callback or cancellation closure. */
+function concurrencyNoop(): void {}
+
+/** A live admission owns callbacks only until its original terminal completion point. */
 type IConcurrencyEntry = {
-  readonly task: (context: { readonly signal?: IAbortSignal }) => unknown
-  readonly signal?: IAbortSignal
-  readonly resolve: (value: unknown) => void
-  readonly reject: (error: unknown) => void
+  task: (context: { readonly signal?: IAbortSignal }) => unknown
+  signal?: IAbortSignal
+  resolve: (value: unknown) => void
+  reject: (error: unknown) => void
   cancelled: boolean
   pending: boolean
   cleanup: () => void
@@ -1323,7 +1326,7 @@ class ConcurrencyLimiter implements IConcurrencyLimiter {
   #concurrency: number
   /** Cleanup diagnostics use the same captured reporter as every queued admission. */
   #report: IUtilsReporter
-  /** Consumed slots remain until amortized compaction releases their callback references. */
+  /** Scalar tombstones retain original cursor ordering until amortized compaction removes them. */
   #queue: IConcurrencyEntry[] = []
   /** The cursor avoids moving the remaining queue for each admitted task. */
   #queueHead = 0
@@ -1400,8 +1403,9 @@ class ConcurrencyLimiter implements IConcurrencyLimiter {
       if (entry.cancelled) continue
       entry.cancelled = true
       this.#releasePending(entry)
-      this.#cleanup(entry)
+      this.#cleanup(entry.cleanup)
       entry.reject(this.#closeReason)
+      this.#releaseCallbacks(entry)
     }
     this.#queueHead = this.#queue.length
     this.#compact()
@@ -1432,7 +1436,7 @@ class ConcurrencyLimiter implements IConcurrencyLimiter {
       reject,
       cancelled: false,
       pending: false,
-      cleanup: () => undefined
+      cleanup: concurrencyNoop
     }
     /** The callback reads explicit admission state; native listener identity survives removal. */
     const onAbort = (): void => this.#cancel(entry)
@@ -1445,6 +1449,7 @@ class ConcurrencyLimiter implements IConcurrencyLimiter {
         entry.cancelled = true
         entry.cleanup()
         reject(after.kind === 'failed' ? after.error : (after.reason ?? new UtilsAbortError()))
+        this.#releaseCallbacks(entry)
         this.#signalIdle()
         return
       }
@@ -1452,13 +1457,15 @@ class ConcurrencyLimiter implements IConcurrencyLimiter {
         entry.cancelled = true
         entry.cleanup()
         reject(this.#closeReason)
+        this.#releaseCallbacks(entry)
         this.#signalIdle()
         return
       }
     } catch (error) {
       entry.cancelled = true
-      this.#cleanup(entry)
+      this.#cleanup(entry.cleanup)
       reject(error)
+      this.#releaseCallbacks(entry)
       this.#signalIdle()
       return
     }
@@ -1466,25 +1473,30 @@ class ConcurrencyLimiter implements IConcurrencyLimiter {
     if (!entry.cancelled) {
       entry.pending = true
       this.#pending++
-    }
+    } else this.#releaseCallbacks(entry)
     this.#drain()
   }
 
   /** Queued cancellation rejects only its own admission and does not cancel another running task. */
   #cancel(entry: IConcurrencyEntry): void {
     if (entry.cancelled) return
+    /** A reason getter may close and clear this entry before this original callback resumes. */
+    const { reject, cleanup } = entry
     /** Abort state is read before terminal marking, matching the original failure precedence. */
     const observation = observeAbort(entry.signal === undefined ? [] : [entry.signal])
+    /** Registration and selected-entry cleanup may reenter before a task is actually queued. */
+    const pending = entry.pending
     entry.cancelled = true
     this.#releasePending(entry)
-    entry.reject(
+    reject(
       observation.kind === 'failed'
         ? observation.error
         : observation.kind === 'aborted'
           ? (observation.reason ?? new UtilsAbortError())
           : new UtilsAbortError()
     )
-    this.#cleanup(entry)
+    this.#cleanup(cleanup)
+    if (pending) this.#releaseCallbacks(entry)
     this.#signalIdle()
   }
 
@@ -1496,12 +1508,21 @@ class ConcurrencyLimiter implements IConcurrencyLimiter {
   }
 
   /** Cleanup diagnostics never replace the original task/admission rejection. */
-  #cleanup(entry: IConcurrencyEntry): void {
+  #cleanup(cleanup: IConcurrencyEntry['cleanup']): void {
     try {
-      entry.cleanup()
+      cleanup()
     } catch (error) {
       reportDiagnostic(this.#report, error, { operation: 'limiter', phase: 'cleanup' })
     }
+  }
+
+  /** Retire references after original user callbacks; scalar queue and idle state stay unchanged. */
+  #releaseCallbacks(entry: IConcurrencyEntry): void {
+    entry.task = concurrencyNoop
+    entry.signal = undefined
+    entry.resolve = concurrencyNoop
+    entry.reject = concurrencyNoop
+    entry.cleanup = concurrencyNoop
   }
 
   /** Admit callbacks in FIFO order; settlement releases capacity before starting the next member. */
@@ -1516,7 +1537,7 @@ class ConcurrencyLimiter implements IConcurrencyLimiter {
       if (!entry || entry.cancelled) continue
       this.#releasePending(entry)
       this.#compact()
-      this.#cleanup(entry)
+      this.#cleanup(entry.cleanup)
       this.#active++
       Promise.resolve()
         .then(() => entry.task({ signal: entry.signal }))
@@ -1525,6 +1546,7 @@ class ConcurrencyLimiter implements IConcurrencyLimiter {
           this.#active--
           this.#drain()
           this.#signalIdle()
+          this.#releaseCallbacks(entry)
         })
     }
   }
