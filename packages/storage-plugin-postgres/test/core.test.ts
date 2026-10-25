@@ -8,6 +8,8 @@ import { lockKey, ConcurrencyPolicy } from '@migaia/storage-host/authoring/concu
 import { postgresBackendPlugin } from '../src/index.js'
 import { pgDriver } from '../src/pg.js'
 import { postgresJsDriver } from '../src/postgres-js.js'
+import { PgNotificationChannel } from '../src/constants.js'
+import type { IPgDriver } from '../src/types.js'
 /** The original service wrapper supplies the real owned PostgreSQL fixture address. */
 const connectionString = process.env.MIGAIA_PG_URL
 /** Missing service setup is an explicit failure rather than an unverified passing skip. */
@@ -17,7 +19,33 @@ if (!connectionString)
 async function installed(adapter: 'pg' | 'postgres-js') {
   const pool = new Pool({ connectionString })
   const client = postgres(connectionString!, { max: 8 })
-  const driver = adapter === 'pg' ? pgDriver(pool) : postgresJsDriver(client)
+  /** Observe executed SQL on both pool queries and the original transaction connections. */
+  const nativeQueries: string[] = []
+  /** Native subscription admission is separate from host-local commit listeners. */
+  const subscriptions: string[] = []
+  const native = adapter === 'pg' ? pgDriver(pool) : postgresJsDriver(client)
+  const driver: IPgDriver = {
+    ...native,
+    query: (...args) => {
+      nativeQueries.push(args[0])
+      return native.query(...args)
+    },
+    connect: async (...args) => {
+      /** Each borrowed connection keeps its original release and native SQL methods. */
+      const connection = await native.connect(...args)
+      return {
+        ...connection,
+        query: (...queryArgs) => {
+          nativeQueries.push(queryArgs[0])
+          return connection.query(...queryArgs)
+        }
+      }
+    },
+    listen: (...args) => {
+      subscriptions.push(args[0])
+      return native.listen!(...args)
+    }
+  }
   const host = await createStorageHost({
     plugins: [
       postgresBackendPlugin({ driver, prefix: 'pg_core_' + randomUUID().slice(0, 8) })
@@ -28,13 +56,17 @@ async function installed(adapter: 'pg' | 'postgres-js') {
     await pool.end()
     await client.end()
   })
-  return { host, store: host.backend('postgres'), driver }
+  nativeQueries.length = 0
+  return { host, store: host.backend('postgres'), driver, nativeQueries, subscriptions }
 }
 describe.each(['pg', 'postgres-js'] as const)('%s real native core', (adapter) => {
   it('preserves canonical values, native batches, channel conflicts and bytea order', async () => {
-    const { store } = await installed(adapter)
+    const { store, nativeQueries, subscriptions } = await installed(adapter)
     await store.set('nul\0\ud800', 'value\0\ud800')
+    expect(nativeQueries).toContainEqual(expect.stringMatching(/^INSERT INTO .*_kv"/))
+    nativeQueries.length = 0
     expect(await store.get('nul\0\ud800')).toBe('value\0\ud800')
+    expect(nativeQueries).toContainEqual(expect.stringMatching(/^SELECT value.*_kv"/))
     await store.use(kv).setMany([
       { key: ['batch', 1], value: 'one' },
       { key: ['batch', 2], value: 'two' },
@@ -65,9 +97,21 @@ describe.each(['pg', 'postgres-js'] as const)('%s real native core', (adapter) =
         .orderBy((value) => value.n)
         .all()
     ).toEqual([{ n: 1 }, { n: 2 }])
+    expect(nativeQueries).toContainEqual(expect.stringMatching(/^INSERT INTO .*_bytes"/))
+    expect(nativeQueries).toContainEqual(expect.stringMatching(/^INSERT INTO .*_records"/))
+    expect(nativeQueries).toContainEqual(expect.stringMatching(/^DELETE FROM .*_kv"/))
+    expect(nativeQueries).toContainEqual(expect.stringContaining('unnest('))
+    expect(nativeQueries).toContain('SELECT pg_notify($1,$2)')
+    expect(subscriptions).toContain(PgNotificationChannel)
+    nativeQueries.length = 0
+    /** Public iteration must reopen the actual record table rather than reuse query results. */
+    const iterated: unknown[] = []
+    for await (const entry of store.iterateRecords()) iterated.push(entry)
+    expect(iterated).toHaveLength(3)
+    expect(nativeQueries).toContainEqual(expect.stringMatching(/^SELECT key,value,.*_records"/))
   })
   it('owns READ COMMITTED, rollback and first failure through the original transaction views', async () => {
-    const { store } = await installed(adapter)
+    const { store, nativeQueries } = await installed(adapter)
     const marker = new Error('rollback-original')
     await expect(
       store.transaction(async (scope) => {
@@ -76,6 +120,9 @@ describe.each(['pg', 'postgres-js'] as const)('%s real native core', (adapter) =
         throw marker
       })
     ).rejects.toMatchObject({ code: 'TRANSACTION_FAILED', cause: marker })
+    expect(nativeQueries).toContain('SELECT 1')
+    expect(nativeQueries).toContain('ROLLBACK')
+    nativeQueries.length = 0
     expect(await store.get('rollback')).toBeNull()
     await expect(
       store.transaction(async (scope) => {
@@ -96,19 +143,25 @@ describe.each(['pg', 'postgres-js'] as const)('%s real native core', (adapter) =
       void scope.set('unawaited', 'accepted')
     })
     expect(await store.get('unawaited')).toBe('accepted')
+    expect(nativeQueries).toContain('SHOW transaction_isolation')
+    expect(nativeQueries).toContain('COMMIT')
     await expect(old!.get('unawaited')).rejects.toMatchObject({ code: 'TRANSACTION_FAILED' })
   })
   it('uses database-clock TTL and atomic safe decimal counters', async () => {
-    const { store } = await installed(adapter)
+    const { store, nativeQueries } = await installed(adapter)
     await store.set('expiry', 'live')
     expect(await store.use(ttl).expire(lockKey.text('expiry'), 10000)).toBe(true)
+    expect(nativeQueries).toContainEqual(expect.stringMatching(/^UPDATE .*_kv" SET expires_at=/))
+    expect(nativeQueries).toContainEqual(expect.stringContaining('clock_timestamp()'))
     await store.set('expiry', 'updated')
     expect(await store.use(ttl).remaining(lockKey.text('expiry'))).toBeGreaterThan(0)
     expect(await store.use(ttl).persist(lockKey.text('expiry'))).toBe(true)
     expect(await store.use(ttl).remaining(lockKey.text('expiry'))).toBeUndefined()
     await store.use(ttl).expire(lockKey.text('expiry'), 0)
     expect(await store.get('expiry')).toBeNull()
+    nativeQueries.length = 0
     expect(await store.use(counter).increment('counter', 3)).toBe(3)
+    expect(nativeQueries).toContainEqual(expect.stringMatching(/^INSERT INTO .*_kv"/))
     expect(await store.use(counter).increment('counter', -1)).toBe(2)
     await store.set('malformed', '01')
     await expect(store.use(counter).increment('malformed')).rejects.toMatchObject({

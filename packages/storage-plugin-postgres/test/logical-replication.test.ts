@@ -21,10 +21,14 @@ it('resets root and routed consumers on TRUNCATE and exposes read-only WAL healt
   /** Deployment warnings use the backend's existing non-fatal diagnostic reporter. */
   const reports = vi.spyOn(console, 'error').mockImplementation(() => {})
   await pool.query('SELECT pg_create_logical_replication_slot($1,$2)', [slot, 'pgoutput'])
+  /** The selected pgoutput port stays real while its public polling and tail admission are observed. */
+  const driver = pgDriver(pool)
+  const read = vi.spyOn(driver.logicalReplication!, 'read')
+  const open = vi.spyOn(driver.logicalReplication!, 'open')
   const host = await createStorageHost({
     plugins: [
       postgresBackendPlugin(
-        { driver: pgDriver(pool), prefix },
+        { driver, prefix },
         {
           replication: pgLogicalReplicationFeature({ slot, publication })
         }
@@ -40,6 +44,7 @@ it('resets root and routed consumers on TRUNCATE and exposes read-only WAL healt
   const store = host.backend('postgres')
   const feed = store.use(durableChangeFeed)
   const initial = await feed.readChanges()
+  expect(read.mock.calls[0]![0]).toMatchObject({ slot, publication, prefix, schema: 'public' })
   await store.transaction(async (scope) => {
     await scope.set('before-truncate', 'discarded')
     await scope.sql`TRUNCATE ${scope.sql.id('public', prefix + '_kv')}, ${scope.sql.id('public', prefix + '_records')}`.run()
@@ -85,6 +90,7 @@ it('resets root and routed consumers on TRUNCATE and exposes read-only WAL healt
       await finish.promise
     }
   })
+  expect(open.mock.calls[0]![0]).toMatchObject({ slot, publication, prefix, from: 'now' })
   await store.sql`TRUNCATE ${store.sql.id('public', prefix + '_kv')}`.run()
   const before = await received.promise
   expect(
