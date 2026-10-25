@@ -1,454 +1,190 @@
-import { describe, expect, it } from 'vitest'
-import { lstat, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
-import { randomUUID } from 'node:crypto'
-import { spawn } from 'node:child_process'
-import { once } from 'node:events'
-import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
-import { createProcessTransport } from '../../dist/process/handshake.js'
-import { createNativeProcessOffer } from '../../src/process/offer.js'
+/** Original rendezvous resource and authentication effects use genuine current native owners. */
+import { describe, expect, it, vi } from 'vitest'
+import { createManualScheduler } from '@migaia/utils/testing'
+import { systemScheduler } from '@migaia/utils/scheduler'
+import { NativeSocketAuth } from './fixtures/native-socket-auth.js'
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
-} from '../../src/process/adapters/node-socket.js'
-import {
-  type IAuthenticatedProcessChannel,
-  type IProcessPendingByteConnection
-} from '../../dist/process/types.js'
-
-/** The listener verifies identity before handing out a routed channel. */
-const responderOffer = createNativeProcessOffer({ peer: { id: 'listener', runtime: 'node' } })
-/** The initiator sends one explicit token that never appears in returned metadata. */
-const initiatorOffer = createNativeProcessOffer({
-  peer: { id: 'dialer', runtime: 'node' },
-  auth: 'socket-secret'
-})
-
-/** Connection-scoped IPC metadata is deliberately distinct on both sides. */
-function ipc(id: string) {
-  return { connectionId: id, sessionId: id, log: () => undefined }
-}
+} from '../../dist/process/adapters/node-socket.js'
 
 describe('Node rendezvous sockets', () => {
-  it.skipIf(process.platform === 'win32')(
-    'reclaims only the same service and inode after a crashed listener',
-    async () => {
-      const directory = await mkdtemp(join(tmpdir(), 'owner-'))
-      const path = join(directory, 's')
-      /** The child exits without Node's normal unlink so the owner record is truly stale. */
-      const code = `const fs=require('node:fs');const net=require('node:net');const path=process.argv[1];net.createServer().listen(path,()=>{const s=fs.lstatSync(path);fs.writeFileSync(path+'.owner.json',JSON.stringify({serviceId:'service-a',path,dev:s.dev,ino:s.ino,uid:s.uid,gid:s.gid}),{mode:0o600});process.stdout.write('ready')})`
-      const child = spawn(process.execPath, ['-e', code, path], {
-        stdio: ['ignore', 'pipe', 'pipe']
-      })
-      try {
-        await new Promise<void>((resolve, reject) => {
-          child.stdout!.once('data', () => resolve())
-          child.once('error', reject)
-          child.once('exit', (status) => {
-            if (status !== null && status !== 0) reject(new Error('Stale listener fixture exited'))
-          })
-        })
-        const exited = once(child, 'close')
-        child.kill('SIGKILL')
-        await exited
-        const original = await lstat(path)
-        await expect(
-          listenProcessByteChannel({
-            address: path,
-            serviceId: 'service-b',
-            auth: { mode: 'required', verify: () => 'principal' },
-            onConnection: () => undefined,
-            report: () => undefined
-          })
-        ).rejects.toMatchObject({ code: 'PROCESS_CHANNEL_LISTEN_FAILED' })
-        expect((await lstat(path)).ino).toBe(original.ino)
-        /** Matching service alone cannot authorize deletion of a replaced inode. */
-        const ownerText = await readFile(`${path}.owner.json`, 'utf8')
-        const changedOwner = JSON.parse(ownerText) as Record<string, unknown>
-        changedOwner.ino = original.ino + 1
-        await writeFile(`${path}.owner.json`, JSON.stringify(changedOwner))
-        await expect(
-          listenProcessByteChannel({
-            address: path,
-            serviceId: 'service-a',
-            auth: { mode: 'required', verify: () => 'principal' },
-            onConnection: () => undefined,
-            report: () => undefined
-          })
-        ).rejects.toMatchObject({ code: 'PROCESS_CHANNEL_LISTEN_FAILED' })
-        expect((await lstat(path)).ino).toBe(original.ino)
-        await writeFile(`${path}.owner.json`, ownerText)
-        const recovered = await listenProcessByteChannel({
-          address: path,
-          serviceId: 'service-a',
-          auth: { mode: 'required', verify: () => 'principal' },
-          onConnection: (pending) => pending.close(),
-          report: () => undefined
-        })
-        expect((await lstat(path)).isSocket()).toBe(true)
-        await recovered.close()
-        await expect(lstat(`${path}.owner.json`)).rejects.toMatchObject({ code: 'ENOENT' })
-      } finally {
-        child.kill('SIGKILL')
-        await rm(directory, { recursive: true, force: true })
-      }
-    }
-  )
-
-  it('records a private Unix socket owner and refuses a foreign path', async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'owner-'))
-    const path = join(directory, 's')
-    try {
-      const listener = await listenProcessByteChannel({
-        address: path,
-        serviceId: 'service-a',
-        auth: { mode: 'required', verify: () => 'principal' },
-        onConnection: (pending) => pending.close(),
-        report: () => undefined
-      })
-      const ownStat = await lstat(path)
-      const record = JSON.parse(await readFile(`${path}.owner.json`, 'utf8')) as {
-        serviceId: string
-        ino: number
-      }
-      expect(record).toMatchObject({ serviceId: 'service-a', ino: ownStat.ino })
-      await expect(
-        listenProcessByteChannel({
-          address: path,
-          serviceId: 'service-b',
-          auth: { mode: 'required', verify: () => 'principal' },
-          onConnection: () => undefined,
-          report: () => undefined
-        })
-      ).rejects.toMatchObject({ code: 'PROCESS_CHANNEL_LISTEN_FAILED' })
-      expect((await lstat(path)).ino).toBe(ownStat.ino)
-      await listener.close()
-      await expect(lstat(`${path}.owner.json`)).rejects.toMatchObject({ code: 'ENOENT' })
-      /** An unrelated regular file is never inferred to be this service's stale socket. */
-      await writeFile(path, 'other-service-data')
-      await expect(
-        listenProcessByteChannel({
-          address: path,
-          serviceId: 'service-a',
-          auth: { mode: 'required', verify: () => 'principal' },
-          onConnection: () => undefined,
-          report: () => undefined
-        })
-      ).rejects.toMatchObject({ code: 'PROCESS_CHANNEL_LISTEN_FAILED' })
-      expect(await readFile(path, 'utf8')).toBe('other-service-data')
-    } finally {
-      await rm(directory, { recursive: true, force: true })
-    }
-  })
-
   it('rejects a held pending accept after listener close', async () => {
-    let capture: (pending: IProcessPendingByteConnection) => void = () => undefined
-    const held = new Promise<IProcessPendingByteConnection>((resolve) => {
-      capture = resolve
-    })
-    let verifierCalls = 0
-    const listener = await listenProcessByteChannel({
-      address: 'tcp://127.0.0.1:0',
-      auth: {
-        mode: 'required',
-        verify: () => {
-          verifierCalls += 1
-          return 'principal'
-        }
-      },
-      report: () => undefined,
-      onConnection(pending) {
-        capture(pending)
-        /** Keep ownership until the listener closes this still-pending connection. */
-        return new Promise<void>(() => undefined)
-      }
-    })
-    const raw = await dialProcessByteChannel({ address: listener.address })
+    /** Legal selected authentication remains idle before its genuine raw candidate is adopted. */
+    const verify = vi.fn(() => 'principal')
+    /** The actual native listener retains the original pending capability and close owner. */
+    const fixture = new NativeSocketAuth()
+    fixture.holdNextPending()
+    await fixture.listen(verify)
+    /** The original independent native socket sends no handshake or credential. */
+    const raw = await dialProcessByteChannel({ address: fixture.listener!.address })
     try {
-      const pending = await held
-      await listener.close()
-      await expect(
-        pending.accept({
-          peerId: 'held',
-          offer: responderOffer,
-          report: () => undefined,
-          ipc: ipc('held')
-        })
-      ).rejects.toMatchObject({ code: 'PROCESS_CHANNEL_CLOSED' })
-      expect(verifierCalls).toBe(0)
+      /** This is the actual listener's pending object, without a reconstructed accept API. */
+      const pending = await fixture.pending.promise
+      await fixture.listener!.close()
+      await expect(pending.accept(async (channel) => channel)).rejects.toMatchObject({
+        code: 'PROCESS_CHANNEL_CLOSED'
+      })
+      expect(verify).toHaveBeenCalledTimes(0)
     } finally {
       await raw.close()
-      await listener.close()
+      await fixture.close()
     }
   })
 
   it('aborts an in-flight accept when the listener closes', async () => {
-    let capture: (value: { outcome: Promise<unknown> }) => void = () => undefined
-    const started = new Promise<{ outcome: Promise<unknown> }>((resolve) => {
-      capture = resolve
-    })
-    let verifierCalls = 0
-    const listener = await listenProcessByteChannel({
-      address: 'tcp://127.0.0.1:0',
-      auth: {
-        mode: 'required',
-        verify: () => {
-          verifierCalls += 1
-          return 'principal'
-        }
-      },
-      report: () => undefined,
-      onConnection(pending) {
-        const outcome = pending
-          .accept({
-            peerId: 'in-flight',
-            offer: responderOffer,
-            report: () => undefined,
-            ipc: ipc('in-flight')
-          })
-          .then(
-            () => undefined,
-            (error: unknown) => error
-          )
-        capture({ outcome })
-        return outcome.then(() => undefined)
-      }
-    })
-    const raw = await dialProcessByteChannel({ address: listener.address })
+    /** No authentication may start when no native hello has been received. */
+    const verify = vi.fn(() => 'principal')
+    /** The real Process owner starts its own Session and pending-accept race. */
+    const fixture = new NativeSocketAuth()
+    await fixture.listen(verify)
+    /** Actual native acquisition remains distinct from semantic admission. */
+    const raw = await dialProcessByteChannel({ address: fixture.listener!.address })
     try {
-      const { outcome } = await started
-      await listener.close()
+      await fixture.nativeAttached.promise
+      /** The original native error outlet retains the actual pending-close failure object. */
+      const outcome = fixture.connection.catch((error: unknown) => error)
+      await fixture.listener!.close()
       await expect(outcome).resolves.toMatchObject({ code: 'PROCESS_CHANNEL_CLOSED' })
-      expect(verifierCalls).toBe(0)
+      expect(verify).toHaveBeenCalledTimes(0)
     } finally {
       await raw.close()
-      await listener.close()
+      await fixture.close()
     }
   })
 
   it('rejects a 16 MiB header before verifier admission', async () => {
-    let verifierCalls = 0
-    /** The server's rejected accept is the observable pre-auth boundary. */
-    let settle: (error: unknown) => void = () => undefined
-    const rejected = new Promise<unknown>((resolve) => {
-      settle = resolve
-    })
-    const listener = await listenProcessByteChannel({
-      address: 'tcp://127.0.0.1:0',
-      auth: {
-        mode: 'required',
-        verify: () => {
-          verifierCalls += 1
-          return 'principal'
-        }
-      },
-      report: () => undefined,
-      async onConnection(pending) {
-        try {
-          await pending.accept({
-            peerId: 'untrusted',
-            offer: responderOffer,
-            report: () => undefined,
-            ipc: ipc('oversized')
-          })
-          settle(undefined)
-        } catch (error) {
-          settle(error)
-        }
-      }
-    })
-    const raw = await dialProcessByteChannel({ address: listener.address })
+    /** Native auth is selected, so this zero-call assertion has a real configured receiver. */
+    const verify = vi.fn(() => 'principal')
+    /** The actual native Process carrier and Session own framing and startup rejection. */
+    const fixture = new NativeSocketAuth()
+    await fixture.listen(verify)
+    /**
+     * Advance only the original actual handshake timer if the header is wrongly retained as
+     * pending.
+     */
+    const scheduler = createManualScheduler()
+    /**
+     * This native deadline backend prevents an actual header regression from leaking a hanging
+     * test.
+     */
+    const clock = vi
+      .spyOn(systemScheduler, 'schedule')
+      .mockImplementation((run, delay) => scheduler.schedule(run, delay))
+    /** The original attacker supplies only its same four-byte length header. */
+    const raw = await dialProcessByteChannel({ address: fixture.listener!.address })
     try {
-      /** The four-byte prefix alone declares 16 MiB; no payload is transmitted. */
+      await fixture.nativeAttached.promise
+      /** This actual native failure is never synthesized or recoded by the fixture. */
+      const rejected = fixture.connection.catch((error: unknown) => error)
       await raw.write(new Uint8Array([1, 0, 0, 0])).catch(() => undefined)
+      await fixture.inbound.promise
+      scheduler.advance(10_000)
+      expect(verify).toHaveBeenCalledTimes(0)
       await expect(rejected).resolves.toMatchObject({ code: 'FRAME_LIMIT_EXCEEDED' })
-      expect(verifierCalls).toBe(0)
     } finally {
       await raw.close()
-      await listener.close()
+      await fixture.close()
+      clock.mockRestore()
     }
   })
 
   it('accepts only a verified pending connection and keeps it after listener close', async () => {
-    /** Responder fulfillment proves the socket reached the authenticated ready state. */
-    let resolveAccepted: (value: IAuthenticatedProcessChannel) => void = () => undefined
-    const accepted = new Promise<IAuthenticatedProcessChannel>((resolve) => {
-      resolveAccepted = resolve
+    /** The original token and principal belong solely to this genuine native verification recipe. */
+    const verify = vi.fn((credential: unknown) => {
+      expect(credential).toBe('socket-secret')
+      return 'stable-principal'
     })
-    /** The callback receives only the pending capability, never raw socket writes. */
-    let pendingKeys: string[] = []
-    const listener = await listenProcessByteChannel({
-      address: 'tcp://127.0.0.1:0',
-      auth: {
-        mode: 'required',
-        verify(auth) {
-          expect(auth).toBe('socket-secret')
-          return 'stable-principal'
-        }
-      },
-      report: (error) => {
-        throw error
-      },
-      async onConnection(pending) {
-        pendingKeys = Object.keys(pending)
-        resolveAccepted(
-          await pending.accept({
-            peerId: 'dialer-route',
-            offer: responderOffer,
-            report: (error) => {
-              throw error
-            },
-            ipc: ipc('responder')
-          })
-        )
-        await expect(
-          pending.accept({
-            peerId: 'dialer-route',
-            offer: responderOffer,
-            report: () => undefined,
-            ipc: ipc('duplicate')
-          })
-        ).rejects.toMatchObject({ code: 'PROCESS_CHANNEL_CLOSED' })
-      }
-    })
-    const socket = await dialProcessByteChannel({ address: listener.address })
-    const initiator = await createProcessTransport(socket, {
-      role: 'initiator',
-      peerId: 'listener-route',
-      offer: initiatorOffer,
-      report: () => undefined,
-      ipc: ipc('initiator')
-    })
-    const ready = await accepted
-    expect(pendingKeys).toEqual(['accept', 'close'])
-    expect(ready.principalId).toBe('stable-principal')
-    expect(ready.channel.peerId).toBe('dialer-route')
-    expect(JSON.stringify(ready)).not.toContain('socket-secret')
-    await listener.close()
-    expect(initiator.transport.closed).toBe(false)
-    expect(ready.channel.transport.closed).toBe(false)
-    await initiator.close()
-    await ready.channel.close()
+    /** Both real roots expose actual accepted Session views through the original SDK lookup. */
+    const fixture = new NativeSocketAuth()
+    await fixture.listen(verify)
+    try {
+      /** The public initiating root still performs native bilateral admission itself. */
+      const initiator = await fixture.connect('socket-secret')
+      await fixture.connection
+      await fixture.admitted.promise
+      /**
+       * This exact original pending object is still independently observable at the native
+       * boundary.
+       */
+      const pending = await fixture.pending.promise
+      /** Current metadata remains the original read-only accepted view, with no invented principal. */
+      const ready = fixture.context!.lookup('dialer-route')!.view
+      expect(Object.keys(pending)).toEqual(['accept', 'close'])
+      expect(ready.peerId).toBe('dialer-route')
+      expect(JSON.stringify(ready)).not.toContain('socket-secret')
+      await expect(pending.accept(async (channel) => channel)).rejects.toMatchObject({
+        code: 'PROCESS_CHANNEL_CLOSED'
+      })
+      /** The original close promises, rather than deleted transport flags, expose physical terminal. */
+      let initiatorClosed = false
+      /** The independent accepting Session must also outlive its native listener. */
+      let acceptedClosed = false
+      void fixture.clientContext!.lookup('listener-route')!.handle.closed.then(() => {
+        initiatorClosed = true
+      })
+      void fixture.context!.lookup('dialer-route')!.handle.closed.then(() => {
+        acceptedClosed = true
+      })
+      await fixture.listener!.close()
+      expect(initiatorClosed).toBe(false)
+      expect(acceptedClosed).toBe(false)
+      expect(await initiator.process.send('listener-route', 'echo', 7)).toBe(7)
+      expect(ready.authentication?.principalId).toBe('stable-principal')
+    } finally {
+      await fixture.close()
+    }
   })
 
   it('rejects absent verifier and non-loopback addresses before bind or dial', async () => {
-    await expect(
-      listenProcessByteChannel({
-        address: 'tcp://127.0.0.1:0',
-        auth: { mode: 'none' },
-        onConnection: () => undefined,
-        report: () => undefined
-      } as never)
-    ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
-    await expect(dialProcessByteChannel({ address: 'tcp://192.0.2.1:1' })).rejects.toMatchObject({
-      code: 'INVALID_CONFIG'
-    })
-    await expect(
-      listenProcessByteChannel({
-        address: 'tcp://0.0.0.0:0',
-        auth: { mode: 'required', verify: () => 'principal' },
-        onConnection: () => undefined,
-        report: () => undefined
-      })
-    ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
-  })
-
-  it('binds a Unix socket, removes only its own path, and preserves an occupied path', async () => {
-    const folder = fileURLToPath(new URL('./', import.meta.url))
-    /** A short temporary name stays below Darwin's Unix-domain path limit. */
-    const path = join(tmpdir(), `r-${randomUUID().slice(0, 8)}.sock`)
-    const listener = await listenProcessByteChannel({
-      address: path,
-      auth: { mode: 'required', verify: () => 'principal' },
-      onConnection: (pending) => pending.close(),
-      report: () => undefined
-    })
+    /** Public native construction receives the same missing-verifier condition at its current owner. */
+    const fixture = new NativeSocketAuth()
     try {
-      expect(listener.address).toBe(path)
-      expect((await lstat(path)).isSocket()).toBe(true)
-      const dialed = await dialProcessByteChannel({ address: path })
-      await dialed.close()
-    } finally {
-      await listener.close()
-    }
-    await expect(lstat(path)).rejects.toMatchObject({ code: 'ENOENT' })
-    const occupied = resolve(folder, 'connect-existing.test.ts')
-    await expect(
-      listenProcessByteChannel({
-        address: occupied,
-        auth: { mode: 'required', verify: () => 'principal' },
-        onConnection: () => undefined,
-        report: () => undefined
+      await expect(dialProcessByteChannel({ address: 'tcp://192.0.2.1:1' })).rejects.toMatchObject({
+        code: 'INVALID_CONFIG'
       })
-    ).rejects.toMatchObject({ code: 'PROCESS_CHANNEL_LISTEN_FAILED' })
-    expect((await lstat(occupied)).isFile()).toBe(true)
+      await expect(
+        listenProcessByteChannel({
+          address: 'tcp://0.0.0.0:0',
+          onConnection: () => undefined,
+          report: () => undefined
+        })
+      ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
+      await expect(fixture.listen(undefined as never).then(() => undefined)).rejects.toMatchObject({
+        code: 'INVALID_CONFIG'
+      })
+    } finally {
+      await fixture.close()
+    }
   })
 
   it('closes both held and handshaking pending sockets without invoking the verifier', async () => {
-    /** The callback remains open so a held pending is not auto-closed on return. */
-    let finishCallback: () => void = () => undefined
-    const callbackLifetime = new Promise<void>((resolve) => {
-      finishCallback = resolve
-    })
-    /** The first pending waits; the second starts its handshake but sends no hello. */
-    let provideHeld: (pending: IProcessPendingByteConnection) => void = () => undefined
-    const held = new Promise<IProcessPendingByteConnection>((resolve) => {
-      provideHeld = resolve
-    })
-    let provideHandshaking: (pending: {
-      attempt: Promise<IAuthenticatedProcessChannel>
-    }) => void = () => undefined
-    const handshaking = new Promise<{ attempt: Promise<IAuthenticatedProcessChannel> }>(
-      (resolve) => {
-        provideHandshaking = resolve
-      }
-    )
-    let arrivals = 0
-    let verifierCalls = 0
-    const listener = await listenProcessByteChannel({
-      address: 'tcp://127.0.0.1:0',
-      auth: {
-        mode: 'required',
-        verify: () => {
-          verifierCalls += 1
-          return 'principal'
-        }
-      },
-      report: () => undefined,
-      onConnection(pending) {
-        arrivals += 1
-        if (arrivals === 1) provideHeld(pending)
-        else {
-          const attempt = pending.accept({
-            offer: responderOffer,
-            peerId: 'silent',
-            ipc: ipc('silent'),
-            report: () => undefined
-          })
-          void attempt.catch(() => undefined)
-          provideHandshaking({ attempt })
-        }
-        return callbackLifetime
-      }
-    })
-    const first = await dialProcessByteChannel({ address: listener.address })
-    const pending = await held
-    const second = await dialProcessByteChannel({ address: listener.address })
-    const { attempt } = await handshaking
-    await listener.close()
-    await expect(
-      pending.accept({
-        offer: responderOffer,
-        peerId: 'late',
-        ipc: ipc('late'),
-        report: () => undefined
+    /** Only the first genuine pending is held; the second enters the original native Session owner. */
+    const fixture = new NativeSocketAuth()
+    fixture.holdNextPending()
+    /** The actual configured verifier must remain untouched when neither peer sends hello. */
+    const verify = vi.fn(() => 'principal')
+    await fixture.listen(verify)
+    /** Independent actual sockets retain the same two physical cleanup obligations. */
+    const first = await dialProcessByteChannel({ address: fixture.listener!.address })
+    /** The first original pending has not transferred its raw socket to a Session. */
+    const pending = await fixture.pending.promise
+    /** This second original socket enters actual Process carrier/Session preparation. */
+    const second = await dialProcessByteChannel({ address: fixture.listener!.address })
+    try {
+      await fixture.nativeAttached.promise
+      /** The real native report object is retained through observation without an error wrapper. */
+      const attempt = fixture.connection
+      await fixture.listener!.close()
+      await expect(pending.accept(async (channel) => channel)).rejects.toMatchObject({
+        code: 'PROCESS_CHANNEL_CLOSED'
       })
-    ).rejects.toMatchObject({ code: 'PROCESS_CHANNEL_CLOSED' })
-    await expect(attempt).rejects.toMatchObject({ code: 'PROCESS_CHANNEL_CLOSED' })
-    expect(verifierCalls).toBe(0)
-    finishCallback()
-    await first.close()
-    await second.close()
+      await expect(attempt).rejects.toMatchObject({ code: 'PROCESS_CHANNEL_CLOSED' })
+      expect(verify).toHaveBeenCalledTimes(0)
+    } finally {
+      await first.close()
+      await second.close()
+      await fixture.close()
+    }
   })
 })

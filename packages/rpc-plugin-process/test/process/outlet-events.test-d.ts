@@ -1,9 +1,16 @@
 import { expectTypeOf } from 'vitest'
-import { runtimeTestHost } from '../../../rpc-host/test/runtime-api/fixture.js'
+import { createRpcHost } from '@migaia/rpc-host'
+import { processPlugin } from '@migaia/rpc-plugin-process'
 
-/** The ordinary native fixture declares its actual static process/thread registration inventory. */
-declare const host: ReturnType<typeof runtimeTestHost>
+/** Construction is typechecked but never executed in this declaration-only contract fixture. */
+async function nativeHost() {
+  return createRpcHost({
+    plugins: [processPlugin({ spawn: { entry: 'process-events-fixture.mjs' } })]
+  })
+}
+/** Native member controls belong to the declared Process namespace's members projection. */
+declare const host: Awaited<ReturnType<typeof nativeHost>>
 
-expectTypeOf(host.process!.on).toBeFunction()
-expectTypeOf(host.process!.watch).toBeFunction()
-host.process!.on('ready', () => undefined)
+expectTypeOf(host.process.members.on).toBeFunction()
+expectTypeOf(host.process.members.watch).toBeFunction()
+host.process.members.on('ready', () => undefined)

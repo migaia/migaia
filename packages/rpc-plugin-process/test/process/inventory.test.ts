@@ -1,8 +1,13 @@
 import { asCodecValue } from '@migaia/serialize/codec'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { describe, expect, it } from 'vitest'
-import { messageFramerV1 } from '@migaia/rpc-contract/framing'
-import { RpcCapability, RpcCodecId, RpcProtocol } from '@migaia/rpc-contract'
+import {
+  RpcWireControlOperation,
+  RpcWireKind,
+  RpcWireJsonCodec,
+  RpcWireProfile,
+  RpcWireVersion
+} from '@migaia/rpc-contract/protocol'
 
 describe('process channel upstream inventory', () => {
   it('uses the existing portable-value guard before the JSON codec', () => {
@@ -16,14 +21,13 @@ describe('process channel upstream inventory', () => {
     )
   })
 
-  it('records why the default framer cannot feed a string-only byte transport', () => {
-    expect(messageFramerV1.outputEncodedType).toBe('unknown')
-    expect(RpcProtocol).toMatchObject({ major: 1, minor: 1 })
-    expect(RpcCodecId.json).toBe('json')
-    expect([RpcCapability.ping, RpcCapability.close, RpcCapability.stream]).toEqual([
-      'ping@1',
-      'close@1',
-      'stream@1'
-    ])
+  it('records the sole v2 carrier protocol and retained native capability vocabulary', () => {
+    // BC2 retires the v1 framer outputEncodedType oracle; this is the actual canonical v2 profile.
+    expect(RpcWireProfile).toBe('migaia.rpc/2')
+    expect(RpcWireVersion).toMatchObject({ major: 2, minor: 0 })
+    expect(RpcWireJsonCodec).toBe('json')
+    // BC2 makes control and stream core grammar rather than opt-in v1 capability strings.
+    expect(RpcWireControlOperation).toEqual({ ping: 'ping', pong: 'pong', drain: 'drain' })
+    expect(RpcWireKind.stream).toBe('stream')
   })
 })

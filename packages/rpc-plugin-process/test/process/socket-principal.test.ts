@@ -1,56 +1,26 @@
+/** Original verifier principal failures use actual current Process/native authentication owners. */
 import { describe, expect, it } from 'vitest'
-import {
-  dialProcessByteChannel,
-  listenProcessByteChannel
-} from '../../src/process/adapters/node-socket.js'
-import { createProcessTransport } from '../../dist/process/handshake.js'
-import { createNativeProcessOffer } from '../../src/process/offer.js'
+import { NativeSocketAuth } from './fixtures/native-socket-auth.js'
 
-/** Verifier output is a stable principal rather than arbitrary truthy metadata. */
 describe('process socket principal admission', () => {
   it.each(['', { unexpected: true }] as const)(
     'refuses a principal that is not a nonempty string',
     async (principal) => {
-      let settle: (error: unknown) => void = () => undefined
-      const rejected = new Promise<unknown>((resolve) => {
-        settle = resolve
-      })
-      const listener = await listenProcessByteChannel({
-        address: 'tcp://127.0.0.1:0',
-        auth: { mode: 'required', verify: () => principal as string },
-        report: () => undefined,
-        async onConnection(pending) {
-          try {
-            await pending.accept({
-              peerId: 'dialer',
-              offer: createNativeProcessOffer({ peer: { id: 'listener', runtime: 'node' } }),
-              report: () => undefined,
-              ipc: { connectionId: 'server', sessionId: 'server', log: () => undefined }
-            })
-            settle(undefined)
-          } catch (error) {
-            settle(error)
-          }
-        }
-      })
-      const raw = await dialProcessByteChannel({ address: listener.address })
+      /** Real public roots retain native verification, readiness and exact original failure objects. */
+      const fixture = new NativeSocketAuth()
+      await fixture.listen(() => principal as string)
       try {
-        await expect(
-          createProcessTransport(raw, {
-            role: 'initiator',
-            peerId: 'listener',
-            offer: createNativeProcessOffer({
-              peer: { id: 'dialer', runtime: 'node' },
-              auth: 'token'
-            }),
-            report: () => undefined,
-            ipc: { connectionId: 'client', sessionId: 'client', log: () => undefined }
-          })
-        ).rejects.toBeDefined()
+        /** The actual server readiness/error outlet independently observes native admission. */
+        const rejected = fixture.connection.then(
+          () => undefined,
+          (error: unknown) => error
+        )
+        /** Success has no asserted payload; avoid formatting a disposed Host proxy on a real RED. */
+        const opening = fixture.connect('token').then(() => undefined)
+        await expect(opening).rejects.toBeDefined()
         await expect(rejected).resolves.toMatchObject({ code: 'PROCESS_CHANNEL_AUTH_REJECTED' })
       } finally {
-        await raw.close()
-        await listener.close()
+        await fixture.close()
       }
     }
   )

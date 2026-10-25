@@ -1,93 +1,146 @@
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
-import { createNativeProcessOffer } from '../../dist/process/offer.js'
-import { createProcessTransport } from '../../dist/process/handshake.js'
-import { type IProcessByteChannel, type IProcessCommonOptions } from '../../dist/process/types.js'
+import { createRpcHost } from '@migaia/rpc-host'
+import { processPlugin } from '@migaia/rpc-plugin-process'
+import { ipcLog, type IIpcLogRecord } from '@migaia/rpc-plugin-process/features'
+import * as nativeIO from '../../dist/process/node-io.js'
+import * as carrierOwner from '../../dist/process/carrier.js'
+import * as stderrOwner from '../../dist/process/stderr.js'
+import type { IProcessCommonOptions } from '../../dist/process/types.js'
 
-/** Real framed handshake bytes connect two public transport owners in this process. */
-async function openBytePair(options: IProcessCommonOptions, close: () => void) {
-  /** Each native port owns only its currently subscribed byte reader. */
-  const readers: Array<((chunk: Uint8Array) => void) | undefined> = []
-  /** In-process delivery preserves each writer's ordering without a second framing layer. */
-  const port = (index: 0 | 1): IProcessByteChannel => ({
-    kind: 'byte',
-    async write(chunk) {
-      await Promise.resolve()
-      readers[1 - index]?.(chunk)
-    },
-    onData(listener) {
-      readers[index] = listener
-      return () => {
-        readers[index] = undefined
+/** Preserve the actual native constructors before observational spies are installed. */
+const createChild = nativeIO.createAdapterChildStdio
+/** All carrier construction and rollback continue through the canonical production owner. */
+const createCarrier = carrierOwner.createProcessCarrier
+/** The original stderr owner alone counts intervals, redacts and retires its reader. */
+const attachStderr = stderrOwner.attachIpcStderr
+/** An unchanged genuine child completes the same Process source bootstrap as ordinary callers. */
+const entry = new URL('./fixtures/core-session-child.ts', import.meta.url)
+
+/** Observe original native lifetime and lend only its clock and stderr callback to each case. */
+class NativeStderrFixture {
+  /** One monotonic clock controls the original fixed stderr interval. */
+  readonly scheduler = createManualScheduler()
+  /** Only the actual selected log feature publishes records into this original sink. */
+  readonly records: IIpcLogRecord[] = []
+  /** Exact native unsubscription remains observable independently of physical close. */
+  readonly unsubscribe = vi.fn()
+  /** The same original raw close is invoked after its acquired stderr subscription retires. */
+  readonly physicalClose = vi.fn()
+  /** Actual carrier construction publishes its original receipt after feature installation. */
+  channel: ReturnType<typeof createCarrier> | undefined
+  /** The public Host owns its real supervisor, child and accepted Session. */
+  #host: Awaited<ReturnType<typeof createRpcHost>> | undefined
+  /** The original native stderr registration belongs to the actual spawned generation. */
+  #subscribe: IProcessCommonOptions['ipc']['stderr']
+  /** A retained original callback proves that retired stderr delivery cannot revive state. */
+  #callback: ((chunk: Uint8Array) => void) | undefined
+  /** An optional actual registration failure is thrown before native subscription acquisition. */
+  readonly #failure: Error | undefined
+  /** Only this fixture's observational spies are restored after native teardown. */
+  readonly #restore: (() => void)[] = []
+
+  /** Install observation without replacing native acquisition, framing, handshake or cleanup. */
+  constructor(failure?: Error) {
+    this.#failure = failure
+    /** The real child factory remains responsible for its original native streams. */
+    const byte = vi.spyOn(nativeIO, 'createAdapterChildStdio').mockImplementation(this.#child)
+    /** The same production carrier receives the original native resource and complete feature. */
+    const carrier = vi.spyOn(carrierOwner, 'createProcessCarrier').mockImplementation(this.#create)
+    /** Only the supported original stderr clock/subscription inputs are lent to its same owner. */
+    const stderr = vi.spyOn(stderrOwner, 'attachIpcStderr').mockImplementation(this.#attach)
+    this.#restore.push(
+      () => stderr.mockRestore(),
+      () => carrier.mockRestore(),
+      () => byte.mockRestore()
+    )
+  }
+  /** Count original native close entry while preserving its shared Promise and native failure. */
+  readonly #child = (...args: Parameters<typeof createChild>): ReturnType<typeof createChild> => {
+    /** This is the real acquired native child IO, with all original methods retained. */
+    const raw = createChild(...args)
+    return {
+      ...raw,
+      close: (reason) => {
+        this.physicalClose()
+        return raw.close(reason)
       }
-    },
-    onClose: () => () => undefined,
-    close: index === 0 ? close : () => undefined
-  })
-  /** Both public operations finish their real hello/accept before stderr ownership is installed. */
-  const results = await Promise.allSettled([
-    createProcessTransport(port(0), {
-      ...options,
-      role: 'initiator',
-      offer: createNativeProcessOffer({ peer: { id: 'stderr-parent', runtime: 'node' } })
-    }),
-    createProcessTransport(port(1), {
-      role: 'responder',
-      peerId: 'stderr-parent',
-      auth: { mode: 'none' },
-      offer: createNativeProcessOffer({ peer: { id: 'stderr-peer', runtime: 'node' } }),
-      scheduler: options.scheduler,
-      report: () => undefined,
-      ipc: { connectionId: 'stderr-peer', sessionId: 'stderr-peer', log: () => undefined }
-    })
-  ])
-  for (const result of results) {
-    if (result.status === 'rejected') {
-      await Promise.all(
-        results.map((entry) => (entry.status === 'fulfilled' ? entry.value.close() : undefined))
-      )
-      throw result.reason
     }
   }
-  if (results[0]!.status !== 'fulfilled' || results[1]!.status !== 'fulfilled')
-    throw new Error('both transport owners must be ready')
-  return { channel: results[0]!.value, peer: results[1]!.value }
-}
-
-/** Open a public byte channel with caller-owned stderr delivery and diagnostics. */
-async function fixture() {
-  /** The connection uses its existing scheduler for both logging and fixed stderr intervals. */
-  const scheduler = createManualScheduler()
-  /** Diagnostic records expose only the redacted session contract. */
-  const records: Parameters<IProcessCommonOptions['ipc']['log']>[0][] = []
-  /** Unsubscription is observable without reaching into the channel or log queue. */
-  const unsubscribe = vi.fn()
-  /** A retained native callback can prove late delivery is ignored after public close. */
-  let stderr!: (chunk: Uint8Array) => void
-  /** The actual byte channel owns physical close separately from stderr subscription. */
-  const physicalClose = vi.fn()
-  /** Production construction installs its own diagnostic owner over the supplied native ports. */
-  const { channel, peer } = await openBytePair(
-    {
-      peerId: 'stderr-peer',
-      scheduler,
-      report: () => undefined,
+  /** Fixture labels remain caller-owned diagnostics, independent of native identity or secrets. */
+  readonly #create = (
+    ...args: Parameters<typeof createCarrier>
+  ): ReturnType<typeof createCarrier> => {
+    /** The same native options retain the actual generation's original stderr subscription. */
+    const [raw, context, options] = args
+    this.channel = createCarrier(raw, context, {
+      ...options,
       ipc: {
+        ...options.ipc!,
         connectionId: 'stderr-connection',
         sessionId: 'stderr-session',
-        processId: 'stderr-process',
-        log: (record) => {
-          records.push(record)
-        },
-        stderr: (listener) => {
-          stderr = listener
-          return unsubscribe
-        }
+        processId: 'stderr-process'
       }
-    },
-    physicalClose
-  )
-  return { scheduler, records, unsubscribe, physicalClose, channel, peer, stderr }
+    })
+    return this.channel
+  }
+  /** Borrow the original native source while passing the existing scheduler seam to stderr. */
+  readonly #attach = (
+    ...args: Parameters<typeof attachStderr>
+  ): ReturnType<typeof attachStderr> => {
+    /** The production installation and report hook stay exactly the same original objects. */
+    const [install, ipc, report] = args
+    this.#subscribe = ipc.stderr
+    return attachStderr(install, { ...ipc, stderr: this.#receive }, report, this.scheduler)
+  }
+  /** Capture the real owner callback and remove its genuine native observer exactly once. */
+  readonly #receive = (listener: (chunk: Uint8Array) => void): (() => void) => {
+    if (this.#failure) throw this.#failure
+    this.#callback = listener
+    /** The original native source acquires the actual generation's stderr observer. */
+    const unsubscribe = this.#subscribe!(listener)
+    return () => {
+      this.unsubscribe()
+      unsubscribe()
+    }
+  }
+  /** Exercise the original retained native callback without bypassing its stderr owner. */
+  readonly stderr = (chunk: Uint8Array): void => {
+    this.#callback!(chunk)
+  }
+  /** Genuine public construction completes native bootstrap and the accepted Host Session. */
+  async open(): Promise<this> {
+    this.#host = await createRpcHost({
+      plugins: [
+        processPlugin({
+          spawn: entry,
+          features: [
+            ipcLog({
+              report: (record) => {
+                this.records.push(record)
+              }
+            })
+          ]
+        })
+      ],
+      report: () => undefined
+    })
+    return this
+  }
+  /** Join actual native teardown before restoring the original observational methods. */
+  async close(): Promise<void> {
+    try {
+      await this.channel?.close()
+      await this.#host?.close()
+    } finally {
+      for (const restore of this.#restore) restore()
+    }
+  }
+}
+
+/** Open one real Process source with only the old case's existing diagnostic inputs observed. */
+function fixture(): Promise<NativeStderrFixture> {
+  return new NativeStderrFixture().open()
 }
 
 describe('public process stderr lifetime', () => {
@@ -123,8 +176,8 @@ describe('public process stderr lifetime', () => {
       expect(owner.records.at(-1)).not.toHaveProperty('droppedChunks')
       expect(JSON.stringify(owner.records)).not.toContain('private stderr payload')
     } finally {
-      await owner.channel.close()
-      await owner.peer.close()
+      await owner.channel!.close()
+      await owner.close()
     }
     expect(owner.unsubscribe).toHaveBeenCalledOnce()
     expect(owner.scheduler.pendingCount).toBe(0)
@@ -137,13 +190,13 @@ describe('public process stderr lifetime', () => {
     const chunk = new Uint8Array([1])
     for (let index = 0; index < 34; index++) owner.stderr(chunk)
     owner.scheduler.advance(0)
-    await owner.channel.close()
-    await owner.peer.close()
+    await owner.channel!.close()
+    await owner.close()
     expect(owner.records).toHaveLength(33)
     expect(owner.records.at(-1)).toMatchObject({ droppedChunks: 2 })
     owner.stderr(chunk)
     owner.scheduler.advance(2000)
-    await owner.channel.close()
+    await owner.channel!.close()
     expect(owner.records).toHaveLength(33)
     expect(owner.unsubscribe).toHaveBeenCalledOnce()
     expect(owner.physicalClose).toHaveBeenCalledOnce()
@@ -151,27 +204,15 @@ describe('public process stderr lifetime', () => {
   })
 
   it('rolls back the acquired byte carrier if native stderr subscription fails', async () => {
-    /** The original subscription error must remain the public construction failure. */
+    /** The original subscription failure must retain its public construction identity. */
     const failure = new Error('native stderr subscription failed')
-    /** Physical close proves rollback covers the carrier acquired before this extension runs. */
-    const close = vi.fn()
-    await expect(
-      openBytePair(
-        {
-          peerId: 'stderr-peer',
-          report: () => undefined,
-          ipc: {
-            connectionId: 'stderr',
-            sessionId: 'stderr',
-            log: () => undefined,
-            stderr: () => {
-              throw failure
-            }
-          }
-        },
-        close
-      )
-    ).rejects.toBe(failure)
-    expect(close).toHaveBeenCalledOnce()
+    /** Actual source rollback must release its original acquired child byte resource. */
+    const owner = new NativeStderrFixture(failure)
+    try {
+      await expect(owner.open()).rejects.toBe(failure)
+    } finally {
+      expect(owner.physicalClose).toHaveBeenCalledOnce()
+      await owner.close()
+    }
   })
 })

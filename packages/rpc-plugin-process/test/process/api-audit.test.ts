@@ -127,7 +127,6 @@ it('classifies the managed Unix parent read failure before binding', async () =>
     listenProcessByteChannel({
       address,
       serviceId: 'audit',
-      auth: { mode: 'required', verify: () => 'audit' },
       onConnection: () => undefined,
       report: () => undefined
     })
@@ -140,9 +139,8 @@ it('classifies the managed Unix parent read failure before binding', async () =>
 it('classifies actual bind reports and shares the native listener close Promise', async () => {
   /** The public listener occupies an ephemeral loopback port without filesystem side effects. */
   const errors: unknown[] = []
-  /** Both bind attempts retain the normal authenticated public listener configuration. */
+  /** Raw bind ownership is independent of the Host's authenticated Session admission. */
   const options = {
-    auth: { mode: 'required' as const, verify: () => 'audit' },
     onConnection: () => undefined,
     report: (error: unknown) => {
       errors.push(error)

@@ -1,190 +1,87 @@
-import { describe, expect, it } from 'vitest'
-import { RpcCapability } from '@migaia/rpc-contract'
-import { createNativeProcessOffer } from '../../dist/process/offer.js'
-import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
+/** Native calls and authentication remain after retiring v1 stream/empty-capability offers. */
+import { expect, it, vi } from 'vitest'
+import { createRpcHost } from '@migaia/rpc-host'
+import { auth } from '@migaia/rpc-host/plugins/auth'
 import { processPlugin } from '@migaia/rpc-plugin-process'
-import { createProcessTransport } from '../../dist/process/handshake.js'
-import { type IProcessByteListener } from '../../dist/process/types.js'
+import type { IProcessByteListener } from '../../dist/process/types.js'
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
 } from '../../dist/process/adapters/node-socket.js'
 
-/** The same local socket token authenticates the public listener and connect sources. */
+/** The original credential must reach the real listener verifier before publication. */
 const token = 'listener-capability-fixture'
 
-describe('Process listener runtime capabilities', () => {
-  it.each([false, true])(
-    'derives runtime capabilities for a plain native listener offer (stream=%s)',
-    async (stream) => {
-      /** The actual bound address is acquired through the public listener adapter. */
-      let listener: IProcessByteListener | undefined
-      /** Every asynchronous report remains available to the assertion and final cleanup. */
-      const reports: unknown[] = []
-      /** The actual completed public handshake proves whether the listener preserved stream policy. */
-      let negotiatedCapabilities: readonly string[] | undefined
-      /**
-       * Both sides use the actual public Host lifecycle and matching authenticated offer
-       * identities.
-       */
-      let client: IRpcHost<{ math: { double(value: number): number } }> | undefined
-      /** A plain offer deliberately omits the internal runtime capability list. */
-      const server = await createRpcHost({
-        self: { name: 'fixture-server', instanceId: 'fixture-server' },
-        provide: { math: { double: (value: number) => value * 2 } },
-        report: (error) => reports.push(error),
-        plugins: [
-          processPlugin({
-            listen: {
-              kind: 'listener',
-              address: 'tcp://127.0.0.1:0',
-              listen: async (options) => {
-                listener = await listenProcessByteChannel(options)
-                return listener
-              },
-              verify: (auth) => {
-                expect(auth).toBe(token)
-                return 'fixture-client'
-              },
-              offer: createNativeProcessOffer({
-                peer: { id: 'fixture-server', runtime: 'node' },
-                stream
-              }),
-              createConnectionContext: () => ({
-                peerId: 'fixture-client',
-                ipc: {
-                  connectionId: 'listener-capability',
-                  sessionId: 'listener-capability',
-                  log: () => undefined
-                }
-              })
+it('retains public native listener calls and the original credential verification', async () => {
+  /** The real native adapter alone supplies the bound loopback address. */
+  let listener: IProcessByteListener | undefined
+  /** All original background failures stay observable at the public diagnostic outlet. */
+  const reports: unknown[] = []
+  /** The original verifier assertion must actually execute, rather than becoming a dead callback. */
+  const verify = vi.fn((auth: unknown) => {
+    expect(auth).toBe(token)
+    return 'fixture-client'
+  })
+  /** Current native Host owns the real listener and its accepted Sessions. */
+  const server = await createRpcHost({
+    self: { name: 'fixture-server', instanceId: 'fixture-server' },
+    provide: { math: { double: (value: number) => value * 2 } },
+    report: (error) => {
+      reports.push(error)
+    },
+    plugins: [
+      auth({ encodedType: 'string', sign: (value) => value, verify: (value) => value }),
+      processPlugin({
+        listen: {
+          kind: 'listener',
+          address: 'tcp://127.0.0.1:0',
+          listen: async (options) => {
+            listener = await listenProcessByteChannel(options)
+            return listener
+          },
+          verify,
+          createConnectionContext: () => ({
+            peerId: 'fixture-client',
+            ipc: {
+              connectionId: 'listener-capability',
+              sessionId: 'listener-capability',
+              log: () => undefined
             }
           })
-        ]
+        }
       })
-      try {
-        client = await createRpcHost<{ math: { double(value: number): number } }>({
-          self: { name: 'fixture-client', instanceId: 'fixture-client' },
-          report: (error) => reports.push(error),
-          plugins: [
-            processPlugin({
-              connect: {
-                target: {
-                  kind: 'connect',
-                  address: listener!.address,
-                  token,
-                  supervision: { restart: { mode: 'never' } },
-                  dial: (address, signal) =>
-                    dialProcessByteChannel({ address, signal: signal as AbortSignal }),
-                  establish: async (raw, prepared) => {
-                    if (raw.kind !== 'byte') throw new TypeError('Expected socket byte channel')
-                    /**
-                     * Record the actual negotiated channel, never an inferred local capability
-                     * offer.
-                     */
-                    const channel = await createProcessTransport(raw, {
-                      role: 'initiator',
-                      peerId: 'fixture-server',
-                      offer: prepared.offer!,
-                      scheduler: prepared.scheduler,
-                      signal: prepared.signal as AbortSignal,
-                      ipc: { ...prepared.session, log: () => undefined },
-                      report: (error) => reports.push(error)
-                    })
-                    negotiatedCapabilities = channel.agreement.capabilities
-                    return channel
-                  }
-                }
-              }
-            })
-          ]
-        })
-        expect(await client.request('math.double', 21)).toBe(42)
-        expect(negotiatedCapabilities?.includes(RpcCapability.stream)).toBe(stream)
-        expect(reports).toEqual([])
-      } finally {
-        await client?.close()
-        await server.close()
-      }
-    }
-  )
-
-  it('keeps an explicitly narrow listener offer narrow', async () => {
-    /** Capture the real bound address without opening another listener owner. */
-    let listener: IProcessByteListener | undefined
-    /** A caller-specified empty extension list is an explicit control-only proposal. */
-    const offer = createNativeProcessOffer({
-      peer: { id: 'narrow-server', runtime: 'node' },
-      capabilities: []
-    })
-    /** Rejection reporting proves no runtime capability was silently added. */
-    const reports: unknown[] = []
-    const server = await createRpcHost({
-      self: { name: 'narrow-server', instanceId: 'narrow-server' },
-      provide: { echo: (value: string) => value },
-      report: (error) => reports.push(error),
+    ]
+  })
+  /** This actual client retains the original independent source and native close ownership. */
+  let client: Awaited<ReturnType<typeof createRpcHost>> | undefined
+  try {
+    client = await createRpcHost({
+      self: { name: 'fixture-client', instanceId: 'fixture-client' },
+      report: (error) => {
+        reports.push(error)
+      },
       plugins: [
+        auth({ encodedType: 'string', sign: (value) => value, verify: (value) => value }),
         processPlugin({
-          listen: {
-            kind: 'listener',
-            address: 'tcp://127.0.0.1:0',
-            listen: async (options) => {
-              listener = await listenProcessByteChannel(options)
-              return listener
-            },
-            verify: () => 'narrow-client',
-            offer,
-            createConnectionContext: () => ({
-              peerId: 'narrow-client',
-              ipc: { connectionId: 'narrow', sessionId: 'narrow', log: () => undefined }
-            })
+          connect: {
+            target: {
+              kind: 'connect',
+              address: listener!.address,
+              token,
+              supervision: { restart: { mode: 'never' } },
+              dial: (address, signal) =>
+                dialProcessByteChannel({ address, signal: signal as AbortSignal })
+            }
           }
         })
       ]
     })
-    try {
-      await expect(
-        createRpcHost({
-          self: { name: 'narrow-client', instanceId: 'narrow-client' },
-          report: (error) => reports.push(error),
-          plugins: [
-            processPlugin({
-              connect: {
-                target: {
-                  kind: 'connect',
-                  address: listener!.address,
-                  token,
-                  supervision: { restart: { mode: 'never' } },
-                  dial: (address, signal) =>
-                    dialProcessByteChannel({ address, signal: signal as AbortSignal }),
-                  establish: (raw, prepared) => {
-                    if (raw.kind !== 'byte') throw new TypeError('Expected socket byte channel')
-                    return createProcessTransport(raw, {
-                      role: 'initiator',
-                      peerId: 'narrow-server',
-                      offer: prepared.offer!,
-                      scheduler: prepared.scheduler,
-                      signal: prepared.signal as AbortSignal,
-                      ipc: { ...prepared.session, log: () => undefined },
-                      report: (error) => reports.push(error)
-                    })
-                  }
-                }
-              }
-            })
-          ]
-        })
-      ).rejects.toMatchObject({ code: 'REMOTE_START_FAILED' })
-      expect(reports).toContainEqual(
-        expect.objectContaining({
-          source: 'rpc.contract',
-          code: 'HANDSHAKE_INCOMPATIBLE',
-          reason: 'protocol'
-        })
-      )
-      expect(offer.capabilities).not.toContain('runtime-api@1')
-    } finally {
-      await server.close()
-    }
-  })
+    expect(await client.process.send('fixture-server', 'math.double', 21)).toBe(42)
+    expect(reports).toEqual([])
+    /** A never-invoked callback must not falsely prove the original auth-value assertion. */
+    expect(verify).toHaveBeenCalled()
+  } finally {
+    await client?.close()
+    await server.close()
+  }
 })

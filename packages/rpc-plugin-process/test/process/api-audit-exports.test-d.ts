@@ -1,5 +1,5 @@
 import { processPlugin } from '@migaia/rpc-plugin-process'
-import type { IRpcTransportPlugin } from '@migaia/rpc-host/plugin'
+import type { IRpcTransportPlugin } from '@migaia/rpc-host/sdk'
 
 /** The sole public process factory returns the registered transport definition. */
 type ITransportDefinition<T extends IRpcTransportPlugin> = T
