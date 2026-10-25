@@ -290,3 +290,53 @@ it(
   'keeps activation primary while ordered owned close cleanup remains reachable',
   retainPrimaryAndCloseLeaf
 )
+
+/** Later native failure rolls back one actually attached Session and its original subscription. */
+async function rollbackAttachedSubscription(): Promise<void> {
+  /** The exact original activation failure must survive native rollback unchanged. */
+  const primary = new Error('activation participant failed')
+  /** One real physical endpoint supplies the original receiver and its native unsubscribe receipt. */
+  const carrier = new MemoryCarrier('outbound-publication-rollback')
+  /** Passthrough observation counts actual Session acquisition without a substitute active counter. */
+  const subscribed = vi.spyOn(carrier, 'subscribe')
+  /** The existing receiving runtime owns source staging, publication and final disposal. */
+  const host = receivingHost('outbound-publication-rollback')
+  /** Genuine source acquisition attaches this exact endpoint before the later native failure. */
+  const transport = defineTransportPlugin({
+    name: 'outbound-publication-source',
+    namespace: 'memory',
+    open: (context) => {
+      /** No remote readiness is invented; the actual pending Session owns its normal lifetime. */
+      const session = context.attach(carrier)
+      return { dispose: session.close }
+    }
+  })
+  /** This is an actual later native install participant, not a deleted activation-port proxy. */
+  const activation = definePlugin({
+    name: 'activation',
+    install: () => {
+      throw primary
+    }
+  })
+  try {
+    /** Native rejection is observed only after the real rollback has joined source cleanup. */
+    const failure = await host.use(transport, activation).catch((error: unknown) => error)
+    expect(failure).toMatchObject({ code: 'PLUGIN_INSTALL_FAILED', cause: primary })
+    expect((failure as { readonly cause?: unknown }).cause).toBe(primary)
+    expect(subscribed.mock.calls.length).toBe(1)
+    expect(subscribed.mock.calls.length - carrier.unsubscribed).toBe(0)
+    expect(carrier.closed).toBe(true)
+    /** The true public namespace cannot escape the native batch's failed atomic publication. */
+    expect(Reflect.get(host, 'memory')).toBeUndefined()
+  } finally {
+    await host.dispose()
+    subscribed.mockRestore()
+    if (!carrier.closed) await carrier.close()
+  }
+}
+
+// RPC-TEST-FB075BDD690B-C139: preserve actual failure/subscription business; old ports get no credit.
+it(
+  'later activation failure rolls back outbound publication and leaves zero subscription residue',
+  rollbackAttachedSubscription
+)

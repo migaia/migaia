@@ -795,33 +795,6 @@ describe('atomic middleware and claim contracts', () => {
 describe('outbound feature production-seam matrix', () => {
   /** Builds a frozen temporary facade around the real broad owner for compatibility-only tests. */
 
-  it('later activation failure rolls back outbound publication and leaves zero subscription residue', async () => {
-    const primary = new Error('activation participant failed')
-    const batch = await createProductionBatch({
-      injectInstall: (role, install) => {
-        if (role.kind !== 'activation') return install
-        return async (scope) => {
-          await install(scope)
-          throw primary
-        }
-      }
-    })
-    try {
-      const failure = await batch.host
-        .installBatch(batch.translated.map(({ definition }) => definition))
-        .catch((error: unknown) => error)
-      expect(failure).toMatchObject({ code: 'PLUGIN_INSTALL_FAILED', cause: primary })
-      expect(batch.stats.subscribeCalls).toBe(1)
-      expect(batch.stats.activeSubscriptions).toBe(0)
-      expect(batch.host.getPort(RpcPortName.outboundAttachment)).toBeUndefined()
-      expect(batch.host.getPort(RpcPortName.outboundOperations)).toBeUndefined()
-      expect(batch.host.getPort(RpcPortName.inboundIdentity)).toBeUndefined()
-      expect(batch.host.getPort(RpcPortName.variationCoordinator)).toBeUndefined()
-    } finally {
-      await batch.host.dispose()
-    }
-  })
-
   it('outbound cleanup proves exact order, failure identity, and terminal idempotence', async () => {
     const successTrace: IProductionLifecycleTraceEntry[] = []
     const successResources = new Map<string, object>()
