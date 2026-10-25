@@ -239,7 +239,8 @@ describe('CallTable owner transitions (public Namespace migration is tracked sep
     const reason = new Error('fixture retirement')
     /** Attach the rejection assertion before the terminal operation. */
     const rejected = expect(first).rejects.toBe(reason)
-    fixture.table.retire('carrier-1', reason)
+    /** This source-departure oracle supplies the actual physical fact, distinct from local close. */
+    fixture.table.retire('carrier-1', reason, true)
     await rejected
     fixture.table.accept('carrier-2', fixture.reply(fixture.frames[1]!, 19))
     await expect(second).resolves.toBe(19)

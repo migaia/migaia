@@ -72,7 +72,8 @@ export type IRpcSessionTableOptions = Readonly<{
     error: unknown,
     physicalFailure?: boolean,
     published?: boolean,
-    source?: IRpcTargetSource
+    source?: IRpcTargetSource,
+    native?: boolean
   ): void
   report(error: unknown): void
   scheduler?: IScheduler

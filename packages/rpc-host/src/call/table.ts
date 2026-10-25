@@ -286,11 +286,16 @@ export class CallTable {
   }
 
   /** Retire exactly this accepted binding; replacement never receives an older call's response. */
-  retire(sourceKey: string, reason: unknown, physicalFailure = false): void {
+  retire(
+    sourceKey: string,
+    reason: unknown,
+    physicalFailure = false,
+    nativeGeneration?: number
+  ): void {
     /** Removing the index first prevents reentrant source retirement from revisiting its records. */
     const records = this.#bySource.get(sourceKey)
     this.#bySource.delete(sourceKey)
-    /** All written calls from one physical source share its exact original transport diagnostic. */
+    /** Generic physical loss shares one diagnostic; native loss retains each task's own details. */
     let failure: Error | undefined
     /** Explicit close keeps the default lifecycle identity; custom close reasons remain its cause. */
     const closing = isLocalRpcError(reason, RpcLifecycleError)
@@ -300,7 +305,12 @@ export class CallTable {
       for (const record of records)
         record.reject(
           physicalFailure && record.written
-            ? (failure ??= createRpcPhysicalTransportError(reason))
+            ? nativeGeneration === undefined
+              ? (failure ??= createRpcPhysicalTransportError(reason))
+              : createRemoteLayerError(RpcRemoteLayerErrorCode.resultUnknown, reason, {
+                  method: record.task.method,
+                  generation: nativeGeneration
+                })
             : closing
         )
   }

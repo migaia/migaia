@@ -488,10 +488,17 @@ export class RpcHost {
     view: IRpcSessionView | undefined,
     reason: unknown,
     physicalFailure = false,
-    published = true
+    published = true,
+    _source?: IRpcTargetSource,
+    native = false
   ): void => {
     this.#forwarder.retired(carrierId)
-    this.#calls.retire(carrierId, reason, physicalFailure)
+    this.#calls.retire(
+      carrierId,
+      reason,
+      physicalFailure,
+      native ? view?.generation.value : undefined
+    )
     this.#providers.retire(carrierId, reason)
     void this.#streams.retire(carrierId, reason, physicalFailure).catch(this.#report)
     if (!published) return

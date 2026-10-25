@@ -436,6 +436,7 @@ export class SessionTable {
       carrier,
       source,
       changed,
+      native: facts?.nativeGeneration !== undefined,
       scope: scope === undefined ? undefined : this.#scopes.get(scope)
     }
     const session = this.#createSession(namespace, carrier, facts, scope, {
@@ -455,7 +456,15 @@ export class SessionTable {
       publish: () => undefined,
       retire: (view, error, physicalFailure, closeFrame) => {
         this.#draining.retire(input.carrier.id)
-        this.#options.retired?.(input.carrier.id, view, error, physicalFailure, false, input.source)
+        this.#options.retired?.(
+          input.carrier.id,
+          view,
+          error,
+          physicalFailure,
+          false,
+          input.source,
+          input.native
+        )
         if ((physicalFailure || closeFrame) && view)
           this.#notifyPeerClosed(input.scope, view, error, closeFrame)
         input.changed?.()
@@ -1002,7 +1011,9 @@ export class SessionTable {
       selection?.view ?? view,
       error,
       physicalFailure,
-      input.published
+      input.published,
+      undefined,
+      input.native
     )
     if ((physicalFailure || closeFrame) && (selection?.view ?? view))
       this.#notifyPeerClosed(input.scope, (selection?.view ?? view)!, error, closeFrame)

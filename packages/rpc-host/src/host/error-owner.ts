@@ -217,7 +217,10 @@ export function createRpcTransportError(
   return mintLocalRpcError(error, error.code, RpcTransportError)
 }
 
-/** Physical departure owns a transport diagnostic, while an executing retry owns result uncertainty. */
+/**
+ * Retain generic physical diagnostics; CallTable classifies native result loss, while an executing
+ * retry policy independently owns its generation/replay decision.
+ */
 export function createRpcPhysicalTransportError(reason: unknown): Error {
   /** Existing native classification preserves uncoded Error identity and unknown reasons on cause. */
   const error = identifyRpcBoundaryFailure(
