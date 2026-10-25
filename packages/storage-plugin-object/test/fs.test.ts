@@ -1,4 +1,4 @@
-import { mkdtemp, rm, readdir, writeFile, readFile } from 'node:fs/promises'
+import { mkdtemp, rm, readdir, writeFile, readFile, realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { describe, it, expect, onTestFinished, vi } from 'vitest'
@@ -8,6 +8,8 @@ import { runConformance } from '@migaia/storage-contract/conformance'
 import { objectBackendPlugin } from '../src/index.js'
 import { fsObjectDriver } from '../src/fs.js'
 import { objectPresignFeature } from '../src/features/presign.js'
+import { fileIo } from '../src/fs/node.js'
+import { ObjectNames } from '../src/constants.js'
 
 /** Each business case owns a real native directory and closes the host before fixture cleanup. */
 async function installed() {
@@ -44,7 +46,14 @@ runConformance(
 
 describe('native filesystem objects', () => {
   it('publishes immutable data/metadata snapshots, inclusive ranges and one content right', async () => {
-    const { api } = await installed()
+    const { api, directory } = await installed()
+    /** Native reads retain real file handles; the spy forwards every stream unchanged. */
+    const nativeRead = vi.spyOn(fileIo, 'read')
+    const nativeMetadata = vi.spyOn(fileIo, 'readText')
+    onTestFinished(() => {
+      nativeRead.mockRestore()
+      nativeMetadata.mockRestore()
+    })
     const bytes = new Uint8Array([1, 2, 3, 4])
     const metadata = { owner: 'Ada' }
     const pending = api.put('file', bytes, { contentType: 'application/octet-stream', metadata })
@@ -54,17 +63,37 @@ describe('native filesystem objects', () => {
     expect(info).toMatchObject({ key: 'file', size: 4, metadata: { owner: 'Ada' } })
     expect(info.etag).toMatch(/^[0-9a-f]{64}$/)
     expect(info.updatedAt).toBeGreaterThan(0)
+    /** The committed pointer and immutable generation must physically contain the accepted snapshot. */
+    const physical = join(await realpath(directory), (await readdir(directory))[0]!)
+    const pointer = JSON.parse(await readFile(join(physical, ObjectNames.pointer), 'utf8')) as {
+      generation: string
+    }
+    const data = join(physical, pointer.generation + ObjectNames.data)
+    const sidecar = join(physical, pointer.generation + ObjectNames.metadata)
+    expect(new Uint8Array(await readFile(data))).toEqual(new Uint8Array([1, 2, 3, 4]))
+    expect(JSON.parse(await readFile(sidecar, 'utf8')).info).toEqual(info)
+    nativeMetadata.mockClear()
     expect(await api.head('file')).toEqual(info)
+    expect(nativeMetadata).toHaveBeenCalledWith(join(physical, ObjectNames.pointer))
+    expect(nativeMetadata).toHaveBeenCalledWith(sidecar)
     const snapshot = await api.get('file')
     const range = await api.get('file', { range: { start: 1, end: 2 } })
+    expect(nativeRead).toHaveBeenCalledWith(data, 0, 3)
+    expect(nativeRead).toHaveBeenCalledWith(data, 1, 2)
     expect(await range!.bytes()).toEqual(new Uint8Array([2, 3]))
     expect(range!.info.size).toBe(4)
+    /** A public stream consumes the same native generation instead of a separate byte-value cache. */
+    const streamed = await api.get('file')
+    expect(new Uint8Array(await new Response(streamed!.stream()).arrayBuffer())).toEqual(
+      new Uint8Array([1, 2, 3, 4])
+    )
     const empty = await api.get('file', { range: { start: 4 } })
     expect(await empty!.bytes()).toEqual(new Uint8Array())
     await api.put('file', new Uint8Array([7]))
     expect(await snapshot!.bytes()).toEqual(new Uint8Array([1, 2, 3, 4]))
     await expect(snapshot!.bytes()).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' })
     expect(await api.remove('file')).toBe(true)
+    expect(await readdir(physical)).not.toContain(ObjectNames.pointer)
     expect(await api.remove('file')).toBe(false)
     expect(await api.head('file')).toBeUndefined()
     expect(await api.get('file')).toBeUndefined()
@@ -145,13 +174,17 @@ describe('native filesystem objects', () => {
   })
 
   it('orders UTF-16 logical keys, binds cursors and isolates organization prefix deletion', async () => {
-    const { host, api } = await installed()
+    const { host, api, directory } = await installed()
     const org = createOrgId()
     const other = host.org(org).backend('object').use(blob)
     const keys = ['prefix/\uffff', 'prefix/\ud800', 'prefix/aa', 'prefix/a', 'other']
     for (const key of keys) await api.put(key, new Uint8Array([1]))
     await other.put('prefix/a', new Uint8Array([2]))
+    /** Public paging must enumerate the actual directory rather than an in-process key catalogue. */
+    const entries = vi.spyOn(fileIo, 'entries')
+    onTestFinished(() => entries.mockRestore())
     const first = await api.list({ prefix: 'prefix/', limit: 2 })
+    expect(entries).toHaveBeenCalledWith(await realpath(directory))
     expect(first.items.map((item) => item.key)).toEqual(['prefix/a', 'prefix/aa'])
     expect(first.next).toEqual(expect.any(String))
     const second = await api.list({ prefix: 'prefix/', limit: 2, after: first.next })
@@ -164,6 +197,11 @@ describe('native filesystem objects', () => {
       code: 'INVALID_ARGUMENT'
     })
     expect(await api.removeByPrefix('prefix/')).toBe(4)
+    /** Only the root's unselected object and the other organization's object remain committed. */
+    const remaining = await Promise.all(
+      (await readdir(directory)).map((name) => readdir(join(directory, name)))
+    )
+    expect(remaining.filter((names) => names.includes(ObjectNames.pointer))).toHaveLength(2)
     expect((await other.list()).items).toHaveLength(1)
     await host.dropOrg(org)
     expect((await other.list()).items).toHaveLength(0)

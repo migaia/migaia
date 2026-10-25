@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, onTestFinished, vi } from 'vitest'
+import { S3Client } from '@aws-sdk/client-s3'
 import { createStorageHost } from '@migaia/storage-host'
 import { blob } from '@migaia/storage-contract'
 import { objectBackendPlugin } from '../src/index.js'
@@ -14,6 +15,12 @@ describe('real S3-compatible object service', () => {
     'runs bytes, streams, ranges, conditions and paging against the configured service',
     async () => {
       const prefix = `storage-object-test/${crypto.randomUUID()}/`
+      /**
+       * Observe the real SDK send method without replacing the service or configured-client
+       * ownership.
+       */
+      const native = vi.spyOn(S3Client.prototype, 'send')
+      onTestFinished(() => native.mockRestore())
       const host = await createStorageHost({
         plugins: [
           objectBackendPlugin({
@@ -36,6 +43,7 @@ describe('real S3-compatible object service', () => {
         ] as const
       })
       const objects = host.backend('object').use(blob)
+      native.mockClear()
       try {
         const initial = await objects.put('file', new Uint8Array([1, 2, 3]), {
           metadata: { owner: 'ada' },
@@ -64,6 +72,21 @@ describe('real S3-compatible object service', () => {
           (await objects.list({ limit: 1, after: first.next })).items.map((item) => item.key)
         ).toEqual(['stream'])
         expect(await objects.removeByPrefix('')).toBe(2)
+        expect(native.mock.calls.map(([command]) => command.constructor.name)).toEqual(
+          expect.arrayContaining([
+            'PutObjectCommand',
+            'HeadObjectCommand',
+            'GetObjectCommand',
+            'ListObjectsV2Command',
+            'DeleteObjectCommand'
+          ])
+        )
+        expect(native.mock.calls.map(([command]) => command.input)).toContainEqual(
+          expect.objectContaining({ Range: 'bytes=1-2' })
+        )
+        expect(native.mock.calls.map(([command]) => command.input)).toContainEqual(
+          expect.objectContaining({ IfMatch: initial.etag })
+        )
       } finally {
         try {
           await objects.removeByPrefix('')
