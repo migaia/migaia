@@ -126,15 +126,20 @@ export function normalizeRpcRoute(value: unknown, metadata?: IRpcErrorWireMetada
     if (route[field] === undefined) invalid(`/route/${field}`, undefined, metadata)
   if (route.sentAt === undefined) invalid('/route/sentAt', undefined, metadata)
   validateRpcRouteFields(route, metadata)
+  if (Object.hasOwn(route, F.remainingMs)) normalizeRpcRemainingMs(route.remainingMs, metadata)
+  return value as IRpcRoute
+}
+
+/** Admit one relative wire budget before a native drain can allocate its deadline or barrier. */
+export function normalizeRpcRemainingMs(value: unknown, metadata?: IRpcErrorWireMetadata): number {
   if (
-    Object.hasOwn(route, F.remainingMs) &&
-    (typeof route.remainingMs !== 'number' ||
-      !Number.isFinite(route.remainingMs) ||
-      route.remainingMs < 0 ||
-      route.remainingMs > RpcWireLimit.maxDurationMs)
+    typeof value !== 'number' ||
+    !Number.isFinite(value) ||
+    value < 0 ||
+    value > RpcWireLimit.maxDurationMs
   )
     invalid('/route/remainingMs', undefined, metadata)
-  return value as IRpcRoute
+  return value
 }
 /** This existing route proof admits the bounded ordered native node identities. */
 export function isForwardRoute(value: unknown): boolean {

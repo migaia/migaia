@@ -1,5 +1,8 @@
 /** Per-carrier business completion barriers remain owned by the canonical Session table. */
 import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
+import { normalizeRpcRemainingMs } from '@migaia/rpc-contract/protocol'
+import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
+import { createRpcContractError } from '../host/error-owner.js'
 
 /** A single physical generation retains only counts and its original drain completion. */
 type IDrainRecord = {
@@ -56,6 +59,11 @@ export class SessionDrain {
     remainingMs: number,
     announce: (remainingMs: number) => void | Promise<void>
   ): Promise<void> {
+    try {
+      normalizeRpcRemainingMs(remainingMs)
+    } catch (error) {
+      throw createRpcContractError(RpcCoreErrorText.drainInvalid, error)
+    }
     /** Per-carrier records are independent even when display names or native units are reused. */
     const record = this.#record(carrierId)
     if (record.promise) {

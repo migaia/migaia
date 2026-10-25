@@ -9,6 +9,7 @@ export type { IRpcErrorWireMetadata } from '../contract/types.js'
 export { normalizeRpcFrame, isRpcOperationalFrame } from './envelope.js'
 export {
   normalizeRpcRoute,
+  normalizeRpcRemainingMs,
   normalizeRpcTrace,
   normalizeRpcCallOptions,
   normalizeRpcTask,

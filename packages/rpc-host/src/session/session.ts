@@ -60,6 +60,8 @@ import {
   identifyRpcBoundaryFailure,
   RpcLifecycleError,
   RpcSerializationError,
+  RPC_CONTRACT_SOURCE,
+  safeRead,
   tagRpcError
 } from '@migaia/rpc-contract/errors'
 import {
@@ -783,7 +785,20 @@ export class Session {
     const envelopeContext: IRpcEnvelopeContext = {
       ...this.#context('inbound'),
       restore: async (prepared) => {
-        const message = await this.#options.carrier.codec.restore(prepared, context)
+        /** Accepted-channel grammar failures retain the receiving endpoint's protocol family. */
+        let message: IRpcSemanticFrame
+        try {
+          message = await this.#options.carrier.codec.restore(prepared, context)
+        } catch (error) {
+          if (
+            this.#view &&
+            error instanceof TypeError &&
+            safeRead(error, 'source') === RPC_CONTRACT_SOURCE &&
+            safeRead(error, 'code') === RpcContractErrorCode.invalidEnvelope
+          )
+            throw createRpcProtocolError(error.message, error)
+          throw error
+        }
         if (!this.#admitRoute(message)) return undefined
         admitted = message
         if (this.#closing && this.#view && !isSessionReply(message))
