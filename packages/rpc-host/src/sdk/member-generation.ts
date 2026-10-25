@@ -370,13 +370,16 @@ export class RpcMemberGeneration<TUnit, TSpec> {
       if (receipt.listeners.size === 0) this.#listeners.delete(receipt.generation)
     }
   }
-  /** Join actual retired cleanup without treating an already-reported physical failure as a new one. */
+  /**
+   * Lookup after synchronous leave observers return, when retirement has registered its cleanup.
+   * Join that original Promise without treating an already-reported physical failure as a new one.
+   */
   whenClosed(generation: number): Promise<void> {
-    return (
+    return Promise.resolve().then(() =>
       this.#closing.get(generation)?.then(
         () => undefined,
         () => undefined
-      ) ?? Promise.resolve()
+      )
     )
   }
   /**
