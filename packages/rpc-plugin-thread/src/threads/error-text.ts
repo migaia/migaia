@@ -21,6 +21,8 @@ export const ThreadErrorText = {
   browserMessagePortDeserializeFailed: '[rpc] browser message port could not deserialize a message',
   /** A reasonless native Thread port close preserves the original plain TRANSPORT Error. */
   messagePortClosed: '[rpc] message port closed',
+  /** Native Worker ErrorEvent diagnostics retain their original text and independent error cause. */
+  workerFailed: (detail?: string): string => `[rpc] worker failed: ${detail || 'failed'}`,
   /** Thread raw observer failures preserve the original probe error with its callback on cause. */
   probeFailed: '[rpc] carrier probe failed'
 } as const

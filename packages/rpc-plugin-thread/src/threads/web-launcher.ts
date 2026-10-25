@@ -15,7 +15,7 @@ import { ThreadEvent, THREAD_FINGERPRINT_PREFIX } from './constants.js'
 import { absoluteThreadEntry, portableThreadSpec } from './error.js'
 import { ThreadErrorText } from './error-text.js'
 import { createThreadBootstrap } from './bootstrap.js'
-import { createWebThreadCarrier } from './channel.js'
+import { createWebThreadCarrier, threadTransportError } from './channel.js'
 import type {
   IThreadWebPort,
   IThreadLaunchOptions,
@@ -97,9 +97,13 @@ class WebThreadGeneration {
     this.#failure = undefined
   }
   /** Keep the original failure observable before retiring messaging and requesting termination. */
-  readonly #onError = (event: { preventDefault(): void; error?: unknown }): void => {
+  readonly #onError = (event: {
+    preventDefault(): void
+    error?: unknown
+    message?: string
+  }): void => {
     event.preventDefault()
-    this.#failure = event.error ?? event
+    this.#failure = threadTransportError(ThreadErrorText.workerFailed(event.message), event.error)
     void this.#carrier.close(this.#failure).catch(this.#report)
     try {
       this.#report(this.#failure)

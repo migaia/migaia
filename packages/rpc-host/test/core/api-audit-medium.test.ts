@@ -6,7 +6,6 @@ import { connect } from '../../dist/core/middleware/connect.js'
 import { createRuntimeApiEndpoint } from '../../dist/core/runtime-api-endpoint.js'
 import { defineMiddleware } from '../../dist/core/middleware.js'
 import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
-import { createWebWorkerTransport } from '../../dist/core/adapters/web-worker.js'
 
 it('publishes the binding disposal settlement before one synchronous reentry', async () => {
   /** The bound operation is allowed to synchronously join disposal before returning its Promise. */
@@ -61,45 +60,6 @@ it('classifies the original middleware installation failure at the endpoint boun
   } finally {
     left.close()
     right.close()
-  }
-})
-
-it('retains the original native error event cause in the worker transport diagnostic', async () => {
-  /** Native event dispatch supplies the supported Worker-like callback surface. */
-  const events = new EventTarget()
-  /** The actual event cause is distinct from its presentation message. */
-  const original = new Error('audit worker cause')
-  /** This complete structural port uses real EventTarget add/remove/dispatch behavior. */
-  const port = {
-    postMessage() {},
-    addEventListener: (type: string, listener: EventListener) =>
-      events.addEventListener(type, listener),
-    removeEventListener: (type: string, listener: EventListener) =>
-      events.removeEventListener(type, listener)
-  }
-  /** Error listeners attach through the public adapter operation. */
-  const transport = createWebWorkerTransport(port)
-  /** Observe the real diagnostic delivered by the native error event. */
-  const observed: unknown[] = []
-  transport.onTransportError?.((error) => {
-    observed.push(error)
-  })
-  /** Node's Event carries the same supported error/message fields as a browser ErrorEvent. */
-  const event = new Event('error')
-  Object.defineProperties(event, {
-    error: { value: original },
-    message: { value: original.message }
-  })
-  try {
-    events.dispatchEvent(event)
-    expect(observed).toHaveLength(1)
-    expect(observed[0]).toMatchObject({
-      source: 'rpc.endpoint',
-      code: 'TRANSPORT',
-      cause: original
-    })
-  } finally {
-    await transport.close?.()
   }
 })
 

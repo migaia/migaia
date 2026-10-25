@@ -153,8 +153,11 @@ class ThreadNativeIO implements IRpcMessageIO {
 }
 
 /** Native diagnostic tagging preserves the original plain Error family and stable Thread text. */
-function threadTransportError(message: string): Error {
-  return tagRpcError(new Error(message), RpcCoreErrorCode.transport)
+export function threadTransportError(message: string, cause?: unknown): Error {
+  return tagRpcError(
+    new Error(message, cause === undefined ? undefined : { cause }),
+    RpcCoreErrorCode.transport
+  )
 }
 
 /** Node and Web acquisitions share exactly one SDK carrier and observation construction path. */

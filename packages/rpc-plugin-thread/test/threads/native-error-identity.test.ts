@@ -1,6 +1,7 @@
 import { MessageChannel } from 'node:worker_threads'
 import { describe, expect, it } from 'vitest'
 import { createWebThreadCarrier, createNodeThreadCarrier } from '../../dist/threads/channel.js'
+import { createWebThreadLauncher } from '../../dist/threads/web-launcher.js'
 
 /** Confirms tagging preserves the native error and its stable public text. */
 function expectTransportIdentity(value: unknown, message: string): void {
@@ -72,4 +73,74 @@ describe('control message-port transport error identity', () => {
       channel.port2.close()
     }
   })
+})
+
+// RPC-TEST-00776736DCA7-C005: preserve the original Worker error event, report count and native cause.
+it('retains the original Worker ErrorEvent cause through the actual native Web launcher', async () => {
+  /** The actual native cause must survive independently of the event's presentation message. */
+  const original = new Error('audit worker cause')
+  /** The existing launcher rollback fixture publishes each actual acquired native resource. */
+  const workers: OwnedErrorWorker[] = []
+  /**
+   * Same public constructor injection as api-audit-rollback, with real native event and port
+   * owners.
+   */
+  class OwnedErrorWorker extends EventTarget {
+    /** Real postMessage owns bootstrap cloning; no send failure or expected diagnostic is supplied. */
+    readonly ports = new MessageChannel()
+    /** Actual native resource release, rather than a fabricated Worker exit, completes this receipt. */
+    readonly closed = new Promise<void>((resolve) => this.ports.port1.once('close', resolve))
+
+    /** Only the production launcher constructs and publishes the Worker used by this event. */
+    constructor() {
+      super()
+      workers.push(this)
+    }
+
+    /** Forward the launcher's real bootstrap into its original physical native port. */
+    postMessage(value: unknown): void {
+      this.ports.port1.postMessage(value)
+    }
+
+    /** Original Worker termination releases real ports without inventing an exit guarantee. */
+    terminate(): void {
+      this.ports.port1.close()
+      this.ports.port2.close()
+    }
+  }
+  /** Only the actual native Worker error owner may produce a diagnostic from this event. */
+  const observed: unknown[] = []
+  /** The production launcher installs WebThreadGeneration's actual error and carrier lifetimes. */
+  const launcher = createWebThreadLauncher({
+    Worker: OwnedErrorWorker,
+    report: (error) => {
+      observed.push(error)
+    }
+  })
+  /** Node's real Event carries the original supported ErrorEvent error and message fields. */
+  const event = new Event('error')
+  Object.defineProperties(event, {
+    error: { value: original },
+    message: { value: original.message }
+  })
+  try {
+    /** Use the same original native launch context accepted by the existing rollback receiver. */
+    const handle = await launcher.launch(
+      { entry: new URL(import.meta.url).href },
+      { signal: new AbortController().signal }
+    )
+    /** This EventTarget is the exact Worker acquired by the actual production generation owner. */
+    workers[0]!.dispatchEvent(event)
+    expect.soft(observed).toHaveLength(1)
+    expect.soft(observed[0]).toMatchObject({
+      source: 'rpc.endpoint',
+      code: 'TRANSPORT',
+      cause: original
+    })
+    expect((observed[0] as Error | undefined)?.cause).toBe(original)
+    handle.terminate()
+  } finally {
+    for (const worker of workers) worker.terminate()
+    await Promise.all(workers.map((worker) => worker.closed))
+  }
 })
