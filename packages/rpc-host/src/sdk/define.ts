@@ -34,10 +34,12 @@ class RpcDefinition {
 export function defineTransportPlugin<
   const N extends string,
   F,
-  E extends object = Record<never, never>
+  E extends object = Record<never, never>,
+  A extends boolean = false
 >(
-  definition: IRpcTransportDefinition<F, E, IRpcTransportSetupContext> & Readonly<{ namespace: N }>
-): IRpcTransportPlugin<N, E> {
+  definition: IRpcTransportDefinition<F, E, IRpcTransportSetupContext> &
+    Readonly<{ namespace: N; closingWrites?: A }>
+): IRpcTransportPlugin<N, E, A> {
   /** Capture the caller's array once; installed feature instances retain their original identity. */
   const captured = Object.freeze({
     ...definition,
@@ -50,7 +52,7 @@ export function defineTransportPlugin<
   /** Native admission determines definition identity and public metadata semantics. */
   const plugin = definePlugin({ name: captured.name, install: new RpcDefinition(metadata).install })
   registerRpcDefinition(plugin, metadata)
-  return plugin as unknown as IRpcTransportPlugin<N, E>
+  return plugin as unknown as IRpcTransportPlugin<N, E, A>
 }
 
 /** Each native flow install invokes setup anew, preventing cross-host sharing of optional state. */

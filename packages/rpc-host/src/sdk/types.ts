@@ -11,7 +11,8 @@ import type {
   IRpcCallFeature,
   IRpcDispose,
   IRpcObservation,
-  IRpcProbeDescriptor
+  IRpcProbeDescriptor,
+  RpcSessionRetirement
 } from '@migaia/rpc-contract/interfaces'
 import type { IRpcTransportContext } from '@migaia/rpc-contract/interfaces'
 import type { IRpcFlowStages } from './flow-pipelines.js'
@@ -34,21 +35,25 @@ declare const rpcNamespaceSurface: unique symbol
 export type IRpcNamespacePlugin<
   N extends string = string,
   E extends object = object,
-  K extends 'transport' | 'flow' = 'transport' | 'flow'
+  K extends 'transport' | 'flow' = 'transport' | 'flow',
+  A extends boolean = boolean
 > = IDefinedPluginConstraint<Record<never, never>, never, Record<never, never>> &
-  Readonly<{ [rpcNamespaceSurface]: Readonly<{ kind: K; namespace: N; extensions: E }> }>
+  Readonly<{
+    [rpcNamespaceSurface]: Readonly<{ kind: K; namespace: N; extensions: E; closingWrites: A }>
+  }>
 
 /** A transport remains an actual native plugin definition with one host-local namespace. */
 export type IRpcTransportPlugin<
   N extends string = string,
-  E extends object = Record<never, never>
-> = IRpcNamespacePlugin<N, E, 'transport'>
+  E extends object = Record<never, never>,
+  A extends boolean = boolean
+> = IRpcNamespacePlugin<N, E, 'transport', A>
 
 /** Native flow/link-policy definitions participate in the same installation and rollback. */
 export type IRpcFlowPlugin<
   E extends object = Record<never, never>,
   N extends string = string
-> = IRpcNamespacePlugin<N, E, 'flow'>
+> = IRpcNamespacePlugin<N, E, 'flow', false>
 
 /**
  * Host accepts genuine SDK registrations only; structural metadata grants no installation
@@ -67,7 +72,7 @@ export type IRpcFlowSetupContext = Readonly<{
   /** Namespace extensions can originate a normal host call without accessing mutable work tables. */
   call(namespace: string, command: ICallCommand, options?: IRpcCallOptions): Promise<unknown>
   /** Policy owners retire an observed exact carrier through the actual Session lifecycle owner. */
-  retire(carrierId: string, reason?: unknown): Promise<void>
+  retire(carrierId: string, reason?: unknown, kind?: RpcSessionRetirement): Promise<void>
 }>
 
 /** Each installation contributes native stages and exact cleanup, never an RPC-owned runner. */

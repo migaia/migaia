@@ -1,7 +1,11 @@
 /** Native carrier lifecycle receivers replace the removed bootstrap/ACK resource shapes. */
 import { EventEmitter } from 'node:events'
 import { expect, it, vi } from 'vitest'
-import { createRpcMessageCarrier, type IRpcMessageIO } from '@migaia/rpc-host/sdk'
+import {
+  createRpcByteCarrier,
+  createRpcMessageCarrier,
+  type IRpcMessageIO
+} from '@migaia/rpc-host/sdk'
 import { createRpcHost } from '@migaia/rpc-host'
 import { createUnitBudget } from '@migaia/supervision'
 import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
@@ -10,7 +14,7 @@ import { managedMemoryTransport } from '../host/managed-memory-fixture.js'
 import { createSharedWorkerCarrier } from '../../../rpc-plugin-browser/dist/browser/adapters/shared-worker.js'
 import { createDedicatedWorkerCarrier } from '../../../rpc-plugin-browser/dist/browser/adapters/dedicated-worker.js'
 import { reaches } from './audit-byte-fixture.js'
-import type { IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
+import type { IRpcCarrier, IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
 
 /** Only native callback registration and physical close belong to this fixture. */
 class NativeMessageIO implements IRpcMessageIO {
@@ -51,6 +55,8 @@ it('preserves the original close Promise and removes every original native liste
   const report = vi.fn()
   /** No initial, capability offer, ACK or preparation DTO participates in construction. */
   const carrier = createRpcMessageCarrier({ id: 'shared-close', io, report })
+  expect(carrier.closingWrites).toBeUndefined()
+  expect(carrier.mapRetirement).toBeUndefined()
   /** One native close joins all concurrent and repeated callers. */
   const closed = carrier.close()
   expect(carrier.close()).toBe(closed)
@@ -60,6 +66,52 @@ it('preserves the original close Promise and removes every original native liste
   expect(io.events.listenerCount('error')).toBe(0)
   expect(io.close).toHaveBeenCalledTimes(1)
   expect(report).not.toHaveBeenCalled()
+})
+
+it('lends only explicit native closing capabilities through both generic carrier factories', async () => {
+  /** The mapping remains the transport's exact original function and is never called by a factory. */
+  const mapRetirement = vi.fn<NonNullable<IRpcCarrier['mapRetirement']>>((_kind, error) => error)
+  /** Both factories borrow their original native IO without acquiring another close owner. */
+  const message = new NativeMessageIO()
+  /** The byte factory preserves the same optional native capability while composing framing. */
+  const bytes = {
+    kind: 'byte' as const,
+    write: async () => undefined,
+    onData: () => () => undefined,
+    onClose: () => () => undefined,
+    close: async () => undefined
+  }
+  /** Omitting an opt-in on the byte path grants no capability either. */
+  const ordinary = createRpcByteCarrier({ id: 'ordinary-byte', io: bytes, report: () => undefined })
+  /** Each explicit native declaration is lent unchanged through its original generic factory. */
+  const supported = [
+    createRpcMessageCarrier({
+      id: 'native-message',
+      io: message,
+      report: () => undefined,
+      closingWrites: true,
+      mapRetirement
+    }),
+    createRpcByteCarrier({
+      id: 'native-byte',
+      io: bytes,
+      report: () => undefined,
+      closingWrites: true,
+      mapRetirement
+    })
+  ]
+  try {
+    expect(ordinary.closingWrites).toBeUndefined()
+    expect(ordinary.mapRetirement).toBeUndefined()
+    for (const carrier of supported) {
+      expect(carrier.closingWrites).toBe(true)
+      expect(carrier.mapRetirement).toBe(mapRetirement)
+    }
+    expect(mapRetirement).not.toHaveBeenCalled()
+  } finally {
+    await ordinary.close()
+    await Promise.all(supported.map((carrier) => carrier.close()))
+  }
 })
 
 it('hands off one cold frame exactly once and removes only the current native receiver', async () => {

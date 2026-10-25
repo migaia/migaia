@@ -34,6 +34,12 @@ type ICarrierWrite = ReturnType<typeof deferred<void>>
  * Promise.
  */
 class RpcMessageCarrier implements IRpcCarrier {
+  /** Native opt-in is lent unchanged; the generic factory grants no closing capability by default. */
+  readonly closingWrites: IRpcCarrier['closingWrites']
+  /** Only the actual transport may project a typed retirement onto its own error vocabulary. */
+  readonly mapRetirement: IRpcCarrier['mapRetirement']
+  /** Borrow original native completion without introducing another terminal wait or timeout. */
+  readonly terminalReason: IRpcCarrier['terminalReason']
   /** Raw observation belongs to the native IO owner rather than this decoded frame boundary. */
   readonly observation: IRpcCarrierObservation | undefined
   /** Host-local connection identity remains supplied by the actual platform resource. */
@@ -68,6 +74,9 @@ class RpcMessageCarrier implements IRpcCarrier {
   /** Acquire original native subscriptions and rollback them if partial registration fails. */
   constructor(options: IRpcMessageCarrierOptions) {
     this.#options = options
+    this.closingWrites = options.closingWrites
+    this.mapRetirement = options.mapRetirement
+    this.terminalReason = options.terminalReason
     this.observation = options.observation
     this.id = options.id
     this.nativeBinary = options.nativeBinary ?? false

@@ -27,6 +27,12 @@ export type IRpcMessageIO = Readonly<{
 }>
 /** Shared media ownership uses no peer, request, retry, bootstrap or negotiation facade. */
 export type IRpcMessageCarrierOptions = Readonly<{
+  /** Only an actual native owner may promise writes until Session's closing budget finishes. */
+  closingWrites?: IRpcCarrier['closingWrites']
+  /** The owning transport may map a typed retirement without guessing its kind from a namespace. */
+  mapRetirement?: IRpcCarrier['mapRetirement']
+  /** Native exit facts may arrive after physical EOF; Session applies its same bounded close wait. */
+  terminalReason?: IRpcCarrier['terminalReason']
   /** The original native flow owner reserves logical capacity before optional frame transforms. */
   reserveWrite?: IRpcCarrier['reserveWrite']
   /** Native acquisition supplies its actual raw observer, independent of the selected codec. */
