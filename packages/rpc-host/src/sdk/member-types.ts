@@ -8,6 +8,7 @@ import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import type {
   IRpcCarrier,
+  IRpcConnectionContext,
   IRpcLocalSourceFacts,
   IRpcSessionView,
   IRpcSessionHandle,
@@ -18,6 +19,8 @@ import type {
 export type IRpcMemberSource = Readonly<{
   carrier: IRpcCarrier
   localSourceFacts?: IRpcLocalSourceFacts
+  /** Original private bootstrap credentials bypass descriptive source facts and observations. */
+  connectionContext?: IRpcConnectionContext
   onRetire?(listener: (reason: unknown) => void): () => void
 }>
 /** All execution and clock authority stays with the exact original native supervisor and scheduler. */

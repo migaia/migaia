@@ -78,6 +78,7 @@ import { carrierSizeBytes } from '../sdk/wire/probe-content.js'
 import { isRpcCarrierAdmissionFailure } from '../sdk/carrier/admission.js'
 import { RpcFlowPoint } from '../sdk/flow-pipelines.js'
 import type { IRpcSessionOptions, IRpcSessionWriteOptions } from './types.js'
+import { bindSessionCredentials, type ISessionCredentials } from './credentials.js'
 
 /** A live control record holds settlement only, never a business payload or request facade. */
 type IControlPending = { completion: IDeferred<void>; signal: IAbortSignal }
@@ -86,6 +87,8 @@ type IControlPending = { completion: IDeferred<void>; signal: IAbortSignal }
 export class Session {
   /** Explicit collaborators own identity, indexing and actual business execution elsewhere. */
   readonly #options: IRpcSessionOptions
+  /** Native secrets belong to this physical connection and are cleared on retirement. */
+  readonly #credentials: ISessionCredentials
   /** All plugin and control work observes this connection's terminal signal. */
   readonly #controller = new AbortController()
   /** The original readiness Promise is published through the lifecycle handle. */
@@ -131,7 +134,11 @@ export class Session {
 
   /** Allocate terminal/readiness identity before any listener can reenter this owner. */
   constructor(options: IRpcSessionOptions) {
-    this.#options = options
+    /** Retained lifecycle collaborators never retain the original secret-bearing context. */
+    const { connection, ...collaborators } = options
+    this.#options = collaborators
+    this.#credentials = { value: connection?.credentials }
+    this.#handshakeResult.authentication = connection?.authentication
     /** The readonly handle getter borrows only this Session's actual readiness-failure fact. */
     const handshakeFailure = () => this.#handshakeFailure
     this.handle = Object.freeze({
@@ -186,6 +193,8 @@ export class Session {
         this.#unobserve = this.#options.carrier.observation?.subscribe((event) => {
           this.#observe({
             ...event,
+            // Bootstrap may contain private credentials; its physical facts remain observable.
+            content: this.#view ? event.content : undefined,
             stage: S.carrier,
             carrier: this.#options.carrier.observation!.facts.platform
           })
@@ -458,6 +467,7 @@ export class Session {
     this.#candidate = undefined
     this.#admissionDeadline = undefined
     this.#handshakeResult.authentication = undefined
+    this.#credentials.value = undefined
     try {
       this.#options.retire(this.#view, this.#reason, physicalFailure)
     } catch (error) {
@@ -1029,7 +1039,8 @@ export class Session {
       receiverId: routed?.route.receiverId,
       peerId: this.#view?.peerId,
       sizeBytes: stage === S.envelope ? -1 : carrierSizeBytes(content),
-      content,
+      // A not-yet-accepted handshake can carry private connection credentials.
+      content: this.#view ? content : undefined,
       transfer
     })
   }
@@ -1062,7 +1073,10 @@ export class Session {
 
   /** The verifier output slot exists only at the already-declared handshake intervention point. */
   #handshakeContext(direction: IRpcFlowContext['direction']): IRpcFlowContext {
-    return { ...this.#context(direction), handshakeResult: this.#handshakeResult }
+    return bindSessionCredentials(
+      { ...this.#context(direction), handshakeResult: this.#handshakeResult },
+      this.#credentials
+    )
   }
 
   /** Freeze verified identity with the acquired Session id before Table publication can observe it. */

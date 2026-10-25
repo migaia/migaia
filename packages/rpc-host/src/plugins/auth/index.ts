@@ -13,6 +13,7 @@ import type { IRpcAuthenticationOptions } from './types.js'
 export type {
   IRpcAuthenticationOptions,
   IRpcAuthenticationTransform,
+  IRpcAuthenticationCredentialsContext,
   IRpcAuthenticationCredentials
 } from './types.js'
 

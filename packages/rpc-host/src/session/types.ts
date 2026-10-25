@@ -2,6 +2,7 @@
 import type { IScheduler } from '@migaia/utils/scheduler'
 import type {
   IRpcCarrier,
+  IRpcConnectionContext,
   IRpcCarrierWriteOptions,
   IRpcLocalSourceFacts,
   IRpcSessionView,
@@ -71,6 +72,8 @@ export type IRpcSessionTableOptions = Readonly<{
 export type IRpcSessionOptions = Readonly<{
   namespace: string
   carrier: IRpcCarrier
+  /** Secrets are removed from retained options and held only by the physical Session. */
+  connection?: IRpcConnectionContext
   expectedPeerId?: string
   /** Borrow existing acquired native Session identity and current sole-reader qualification. */
   sessionId?: string

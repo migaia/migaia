@@ -3,14 +3,37 @@ import { createHmac } from 'node:crypto'
 import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { auth } from '@migaia/rpc-host/plugins/auth'
-import { probe } from '@migaia/rpc-host/plugins/probe'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
-import { RpcProbeDirection, type IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
+import type {
+  IRpcCarrierFrame,
+  IRpcCodecContext,
+  IRpcPreparedMessage
+} from '@migaia/rpc-contract/interfaces'
 import { MemoryCarrier } from '../../fixtures/core-carrier.js'
 import { coreMemoryServer } from '../../host/core-fixture.js'
 
 /** Public test data signs complete Auth transform inputs; this is not a deployed credential. */
 const signingKey = 'auth-source-freshness-public-fixture'
+
+/** Capture the original JSON encoder's actual output without publishing bootstrap through probe. */
+class CapturedJsonCodec extends RpcJsonCarrierCodec {
+  /** Only the original caller endpoint lends physical frames to the replay fixture. */
+  readonly #captured: IRpcCarrierFrame[] | undefined
+
+  /** Borrow an optional output receipt; the same canonical codec performs the only encoding. */
+  constructor(captured?: IRpcCarrierFrame[]) {
+    super()
+    this.#captured = captured
+  }
+
+  /** Retain the exact frame returned to Session; no second encoder or handshake is constructed. */
+  override encode(message: IRpcPreparedMessage, context: IRpcCodecContext): IRpcCarrierFrame {
+    /** This exact result is the one handed to the native carrier by the existing Session. */
+    const frame = super.encode(message, context)
+    this.#captured?.push(frame)
+    return frame
+  }
+}
 
 /** Real HMAC callbacks protect the existing Auth wrapper without parsing semantic or native frames. */
 function authentication() {
@@ -31,15 +54,15 @@ function authentication() {
 }
 
 it('rejects a captured signed handshake and call after the original physical source retires', async () => {
+  /** The existing fixture constructs exactly two codecs per pair, server first and caller second. */
+  const capture = { ordinal: 0, frames: [] as IRpcCarrierFrame[] }
   /** All connections borrow the same installed receiver Auth and real selected JSON codec. */
   const server = coreMemoryServer('server', 'server', 'memory', [], [], {
-    create: () => new RpcJsonCarrierCodec(),
+    create: () => new CapturedJsonCodec(++capture.ordinal % 2 === 0 ? capture.frames : undefined),
     nativeBinary: false
   })
   /** Only genuine provider entry changes this observation. */
   let providerCalls = 0
-  /** Probe capture lends the original physical frames; no second encoder or handshake is built. */
-  const captured: IRpcCarrierFrame[] = []
   /** The public host owns its one Auth installation throughout retirement and reconstruction. */
   const host = await createRpcHost({
     ...server.options,
@@ -66,19 +89,9 @@ it('rejects a captured signed handshake and call after the original physical sou
   /** A successful fresh control is retained only for normal final cleanup. */
   let fresh: Awaited<ReturnType<typeof server.connect>> | undefined
   try {
-    /** Sender capture is active before the original source's first physical hello. */
+    /** The caller's original encoder capture is active before its first physical hello. */
     first = await server.connect('caller', {
-      plugins: [
-        authentication(),
-        probe({
-          stages: ['carrier'],
-          capture: ['carrier'],
-          emit: (event) => {
-            if (event.direction === RpcProbeDirection.outbound)
-              captured.push(event.content as IRpcCarrierFrame)
-          }
-        })
-      ]
+      plugins: [authentication()]
     })
     expect(await first.host.memory.send('server', 'echo', 'original')).toBe('original')
     /** Retire the real accepted receipt before reconstructing the physical route. */
@@ -89,7 +102,7 @@ it('rejects a captured signed handshake and call after the original physical sou
     const accepted = server.accept(receiver)
     /** Observe handshake rejection before replay delivery can reject the original ready promise. */
     const rejected = accepted.ready.catch((error: unknown) => error)
-    for (const frame of captured) await sender.write(frame)
+    for (const frame of capture.frames) await sender.write(frame)
     expect(await rejected).toMatchObject({ source: 'rpc.endpoint', code: 'AUTHENTICATION_FAILED' })
     expect(providerCalls).toBe(1)
     await accepted.closed

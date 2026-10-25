@@ -8,6 +8,7 @@ import type {
   IRpcCarrierCodec,
   IRpcAttachedSession,
   IRpcCarrier,
+  IRpcConnectionContext,
   IRpcSessionHandle
 } from '@migaia/rpc-contract/interfaces'
 import { MemoryCarrier } from '../fixtures/core-carrier.js'
@@ -134,9 +135,9 @@ class CoreMemoryServer {
   }
 
   /** Admit a native remote endpoint without attaching its independently owned local endpoint. */
-  accept(carrier: IRpcCarrier): IRpcSessionHandle {
+  accept(carrier: IRpcCarrier, connection?: IRpcConnectionContext): IRpcSessionHandle {
     if (!this.#context || this.#closed) throw new Error('core memory listener is not installed')
-    return this.#context.attach(carrier)
+    return this.#context.attach(carrier, undefined, connection)
   }
 
   /** Join only genuine installed native contexts through the same original pair/attach owner. */

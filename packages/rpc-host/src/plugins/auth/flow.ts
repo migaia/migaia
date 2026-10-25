@@ -53,6 +53,7 @@ import { registerAuthenticationCounterSetter } from './counter.js'
 import type { IAuthenticationCounterWindow, IRpcAuthenticationOptions } from './types.js'
 import { RequestReplayLedger, type IRequestReplaySource } from './request-replay.js'
 import { readAuthenticationHandshake, wrapAuthenticationHandshake } from './handshake.js'
+import { readSessionCredentials } from '../../session/credentials.js'
 
 /** One original physical source owns its pinned nonce/window and exact retirement receipt. */
 type IAuthenticationSource = IRequestReplaySource & {
@@ -227,7 +228,9 @@ export class RpcAuthenticationFlow {
         const configured = this.#config.credentials
         /** Static credentials retain their original value; resolver completion cannot outlive close. */
         const credentials =
-          typeof configured === 'function' ? await configured(context) : configured
+          typeof configured === 'function'
+            ? await configured({ ...context, credentials: readSessionCredentials(context) })
+            : configured
         this.#assert(context)
         if (!this.#config.sign)
           return credentials === undefined ? frame : { ...frame, auth: credentials }
@@ -425,7 +428,8 @@ export class RpcAuthenticationFlow {
         direction:
           context.direction === 'outbound' ? RpcProbeDirection.outbound : RpcProbeDirection.inbound,
         peerId: context.session?.peerId,
-        content
+        // Authentication bootstrap inputs may contain the native connection's original secret.
+        content: context.session ? content : undefined
       }
     })
   }

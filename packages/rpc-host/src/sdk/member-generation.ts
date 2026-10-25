@@ -235,7 +235,9 @@ export class RpcMemberGeneration<TUnit, TSpec> {
       throw createRemoteLayerError(RpcRemoteLayerErrorCode.startFailed, cause)
     }
     /** This exact cleanup callback is registered before attach/handshake can fail. */
-    const candidate = new MemberCandidate(source, this.#options.context)
+    /** The candidate owns physical cleanup without retaining a second copy of connection secrets. */
+    const { connectionContext, ...physicalSource } = source
+    const candidate = new MemberCandidate(physicalSource, this.#options.context)
     own(candidate.close)
     this.#assertPreparing(signal, outcome.generation)
     candidate.observe((reason) => this.#leave(outcome.generation, reason, true))
@@ -247,10 +249,11 @@ export class RpcMemberGeneration<TUnit, TSpec> {
     /** Attach and readiness share the same original native startup error boundary as acquisition. */
     let view: IRpcSessionView
     try {
-      candidate.session = this.#options.context.attach(source.carrier, {
-        ...source.localSourceFacts,
-        nativeGeneration: this
-      })
+      candidate.session = this.#options.context.attach(
+        source.carrier,
+        { ...source.localSourceFacts, nativeGeneration: this },
+        connectionContext
+      )
       view = await candidate.session.ready
     } catch (cause) {
       /** Only Session's actual reject receipt preserves its original handshake phase and error. */

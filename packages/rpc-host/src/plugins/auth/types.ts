@@ -12,9 +12,12 @@ export type IRpcAuthenticationTransform = (
   value: unknown,
   context: IRpcFlowContext
 ) => unknown | Promise<unknown>
+/** Only the configured resolver receives private material from its exact native connection. */
+export type IRpcAuthenticationCredentialsContext = IRpcFlowContext &
+  Readonly<{ credentials?: IRpcPortableValue }>
 /** A native owner resolves credentials from its exact carrier, never decoded self or payload fields. */
 export type IRpcAuthenticationCredentials = (
-  context: IRpcFlowContext
+  context: IRpcAuthenticationCredentialsContext
 ) => IRpcPortableValue | undefined | Promise<IRpcPortableValue | undefined>
 /** The original paired-transform contract remains independent from native handshake credentials. */
 export type IRpcAuthenticationOptions = Readonly<{

@@ -3,6 +3,7 @@ import { deferred, type IDeferred, type IAbortSignal } from '@migaia/utils/promi
 import { systemScheduler, systemWallClock } from '@migaia/utils/scheduler'
 import type {
   IRpcCarrier,
+  IRpcConnectionContext,
   IRpcLocalSourceFacts,
   IRpcNativeGeneration,
   IRpcPingOptions,
@@ -198,7 +199,8 @@ export class SessionTable {
     namespace: string,
     carrier: IRpcCarrier,
     facts?: IRpcLocalSourceFacts,
-    scope?: IRpcSessionScope
+    scope?: IRpcSessionScope,
+    connection?: IRpcConnectionContext
   ): IRpcSessionHandle {
     if (this.#closing) throw createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
     if (this.#sessions.has(carrier.id))
@@ -216,6 +218,7 @@ export class SessionTable {
     }
     /** Native resources receive only this Session's lifecycle handle. */
     const session = this.#createSession(namespace, carrier, facts, scope, {
+      connection,
       admit: (directory, codec, extensions, authentication) =>
         this.#admit(input, directory, codec, extensions, authentication),
       publish: (view) => this.#publish(input, view),
@@ -242,11 +245,13 @@ export class SessionTable {
     facts: IRpcLocalSourceFacts | undefined,
     source: IRpcTargetSource,
     changed?: () => void,
-    scope?: IRpcSessionScope
+    scope?: IRpcSessionScope,
+    connection?: IRpcConnectionContext
   ): IRpcPrivateSession {
     /** Private retirement borrows original inputs, including the native carrier's live id read. */
     const input = { carrier, source, changed }
     const session = this.#createSession(namespace, carrier, facts, scope, {
+      connection,
       source,
       changed,
       admit: async (directory, codec, extensions, authentication) =>
@@ -321,7 +326,7 @@ export class SessionTable {
     scope: IRpcSessionScope | undefined,
     callbacks: Pick<
       IRpcSessionOptions,
-      'admit' | 'publish' | 'receive' | 'rejected' | 'retire' | 'source' | 'changed'
+      'admit' | 'publish' | 'receive' | 'rejected' | 'retire' | 'source' | 'changed' | 'connection'
     >
   ): Session {
     if (this.#closing) throw createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)

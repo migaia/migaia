@@ -4,6 +4,7 @@ import type {
   IRpcCarrier,
   IRpcCarrierWriteOptions,
   IRpcLocalSourceFacts,
+  IRpcConnectionContext,
   IRpcPrivateSession,
   IRpcSessionSelection,
   IRpcTargetSource
@@ -69,8 +70,18 @@ export class PoolMedia implements IRpcTargetSource {
   }
 
   /** Initial Session publication can precede the native generation pointer's commit. */
-  readonly #attach = (carrier: IRpcCarrier, facts?: IRpcLocalSourceFacts): IRpcPrivateSession => {
-    this.#handle = this.#context.openPrivateSession(carrier, facts, this, this.#announce)
+  readonly #attach = (
+    carrier: IRpcCarrier,
+    facts?: IRpcLocalSourceFacts,
+    connection?: IRpcConnectionContext
+  ): IRpcPrivateSession => {
+    this.#handle = this.#context.openPrivateSession(
+      carrier,
+      facts,
+      this,
+      this.#announce,
+      connection
+    )
     return this.#handle
   }
   /** Native preparation decides future readiness; the pool adds no restart or retry policy. */

@@ -14,6 +14,7 @@ import type {
   IRpcCarrier,
   IRpcFlowContext,
   IRpcLocalSourceFacts,
+  IRpcConnectionContext,
   IRpcSessionHandle,
   IRpcSessionView,
   IRpcTransportDefinition,
@@ -612,15 +613,17 @@ export class RpcHost {
       signal: controller.signal,
       self: () => this.#identity.directorySelf,
       lookup: (address) => this.#sessions.lookup(definition.namespace, address),
-      attach: (carrier, facts) => this.#attach(registration, carrier, facts),
-      openPrivateSession: (carrier, facts, source, changed) =>
+      attach: (carrier, facts, connection) =>
+        this.#attach(registration, carrier, facts, connection),
+      openPrivateSession: (carrier, facts, source, changed, connection) =>
         this.#sessions.openPrivateSession(
           definition.namespace,
           carrier,
           facts,
           source,
           changed,
-          sessionScope
+          sessionScope,
+          connection
         ),
       attachOrigin: (binding) =>
         this.#sessions.attachOrigin(definition.namespace, binding, sessionScope),
@@ -670,7 +673,8 @@ export class RpcHost {
   #attach(
     context: ITransportRegistration,
     carrier: IRpcCarrier,
-    facts?: IRpcLocalSourceFacts
+    facts?: IRpcLocalSourceFacts,
+    connection?: IRpcConnectionContext
   ): IRpcSessionHandle {
     if (context.controller.signal.aborted) throw context.controller.signal.reason
     if (facts === undefined) this.#identity.admit({})
@@ -678,7 +682,13 @@ export class RpcHost {
      * SessionTable creates and owns the one physical Session; the scope borrows only its cleanup
      * handle.
      */
-    const handle = this.#sessions.attach(context.name, carrier, facts, context.sessionScope)
+    const handle = this.#sessions.attach(
+      context.name,
+      carrier,
+      facts,
+      context.sessionScope,
+      connection
+    )
     context.resources.own(handle, { force: () => handle.close(this.#reason) })
     void handle.closed.then(
       () => context.resources.release(handle),
