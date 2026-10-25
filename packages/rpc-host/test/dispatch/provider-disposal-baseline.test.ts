@@ -1,5 +1,6 @@
 import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
+import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { expect, it, vi } from 'vitest'
 import { connectedCoreHosts, coreMemoryServer } from '../host/core-fixture.js'
 
@@ -21,6 +22,19 @@ const nativeFixture = {
   method: 'provider.echo'
 }
 
+/** Installed native subjects lend authentic execution authority for their real memory transports. */
+function receivingHost() {
+  /** Each independent original Host receives its own cold declarations and lazy native handles. */
+  const rpc = rpcHostPipelines(
+    () => host,
+    (key) => host.pipeline(key),
+    ['memory']
+  )
+  /** Original native lifecycle options remain unchanged on the sole transaction owner. */
+  const host = defineHost({ ...rpc, ...nativeFixture.options })
+  return host
+}
+
 it('cold native Host disposal preserves the original Promise before any installation', async () => {
   /** C049 creates the actual native owner but never installs its prepared descriptor inventory. */
   const native = defineHost(nativeFixture.options)
@@ -32,7 +46,7 @@ it('cold native Host disposal preserves the original Promise before any installa
 
 it('installed native Host disposal preserves its Promise and removes the original subscription', async () => {
   /** One ordinary native Host receives the same SDK installation as a public RPC Root. */
-  const native = defineHost(nativeFixture.options)
+  const native = receivingHost()
   /** This genuine listener lends its original carrier to the native installation. */
   const server = coreMemoryServer(
     'native-disposal',
@@ -68,9 +82,9 @@ it('installed native Host disposal preserves its Promise and removes the origina
 
 it('separate native Hosts keep consumer ping absent and both disposal identities without failures', async () => {
   /** Original owner and consumer transactions use distinct native Hosts, not RPC Root substitutes. */
-  const owner = defineHost(nativeFixture.options)
+  const owner = receivingHost()
   /** The consumer remains an ordinary NativeHost whose control stays under its RPC namespace. */
-  const consumer = defineHost(nativeFixture.options)
+  const consumer = receivingHost()
   /** Independent listeners retain the two actual installation and physical cleanup boundaries. */
   const ownerServer = coreMemoryServer(
     'disposal-owner',
@@ -160,9 +174,9 @@ it('provider failure preserves INTERNAL and complete RPC Root close identity and
     await expect(endpointDispose).resolves.toBeUndefined()
     expect(fixture.pair[1].unsubscribed).toBe(1)
     expect(fixture.pair[1].closed).toBe(true)
-    /** The same real caller can no longer select its original accepted provider after Root close. */
+    /** R21 retains the remote close reason for later named calls to the retired provider. */
     await expect(fixture.a.memory.send('b', 'fail', null)).rejects.toMatchObject({
-      code: RpcCoreErrorCode.targetUnknown
+      code: RpcCoreErrorCode.endpointDisposed
     })
   } finally {
     await fixture.close()

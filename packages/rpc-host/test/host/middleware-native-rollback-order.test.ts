@@ -1,15 +1,24 @@
 /** Original native rollback preserves exact cleanup leaves, reverse order and terminal promises. */
 import { defineHost, definePlugin } from '@migaia/plugin-host'
-import { defineTransportPlugin } from '@migaia/rpc-host/sdk'
+import { defineTransportPlugin, rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { expect, it, vi } from 'vitest'
 import { coreMemoryServer } from './core-fixture.js'
 import { MemoryCarrier } from '../fixtures/core-carrier.js'
 
 /** The one native Host owns all original registration cleanup and transaction rollback. */
 function receivingHost() {
-  return defineHost({
+  /** Every real listener and partial source in this receiver declares the memory namespace. */
+  const rpc = rpcHostPipelines(
+    () => host,
+    (key) => host.pipeline(key),
+    ['memory']
+  )
+  /** Original transactions and their genuine pipelines belong to this one receiving runtime. */
+  const host = defineHost({
+    ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
+  return host
 }
 
 /** Exact original cleanup errors leave the native callback unchanged. */

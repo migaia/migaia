@@ -1,7 +1,7 @@
 /** Original native cleanup and rollback errors retain their exact observable owner boundaries. */
 import { defineHost, definePlugin } from '@migaia/plugin-host'
 import { createRpcHost } from '@migaia/rpc-host'
-import { defineTransportPlugin } from '@migaia/rpc-host/sdk'
+import { defineTransportPlugin, rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { expect, it, vi } from 'vitest'
 import { coreMemoryServer } from './core-fixture.js'
@@ -9,9 +9,18 @@ import { MemoryCarrier } from '../fixtures/core-carrier.js'
 
 /** Native disposal remains the native owner's API, separate from public RPC Root.close. */
 function receivingHost() {
-  return defineHost({
+  /** Both the listener fixture and partial native source declare this actual cold namespace. */
+  const rpc = rpcHostPipelines(
+    () => host,
+    (key) => host.pipeline(key),
+    ['memory']
+  )
+  /** The same native runtime owns authentic pipeline handles, rollback and final disposal. */
+  const host = defineHost({
+    ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
+  return host
 }
 
 /** Register one original resource on the actual native registration without an old scope facade. */

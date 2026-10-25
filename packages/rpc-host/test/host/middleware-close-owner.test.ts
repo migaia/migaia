@@ -1,8 +1,9 @@
 /** Original middleware disposal assertions now exercise the public Host and its real native IO. */
 import { expect, it, vi } from 'vitest'
-import { createRpcHost, RpcLifecycleError, type IRpcHostOptions } from '@migaia/rpc-host'
+import { defineHost } from '@migaia/plugin-host'
+import { createRpcHost, type IRpcHostOptions } from '@migaia/rpc-host'
 import { auth } from '@migaia/rpc-host/plugins/auth'
-import { defineFlowPlugin, RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin, rpcHostPipelines, RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { coreMemoryServer } from './core-fixture.js'
 
 /** Install the original identity authentication over the existing physical carrier and JSON codec. */
@@ -143,11 +144,11 @@ function containsCleanupIdentity(failure: unknown, expected: unknown): boolean {
   return false
 }
 
-// C117: old role/publication/debug shapes retire; both genuine owned callbacks remain on Root.close.
-it('C117 preserves both owned flow cleanup failures on the original factory close boundary', async () => {
+// C117: BC11 retires the native disposal translator, retaining both actual owned cleanup leaves.
+it('C117 preserves both owned flow cleanup failures on the native disposal boundary', async () => {
   /** The original role label now identifies fixture errors, without recreating an RPC role. */
   const role = 'hooks'
-  /** The later original cleanup is the expected primary, without weakening its direct-cause matcher. */
+  /** The later original cleanup remains the first released native failure. */
   const primary = new Error(`${role}-endpoint-primary`)
   /** The first owned callback supplies the other original cleanup identity. */
   const nativeCleanup = new Error(`${role}-native-cleanup`)
@@ -181,41 +182,35 @@ it('C117 preserves both owned flow cleanup failures on the original factory clos
   )
   /** The existing listener is the only real native carrier source; no peer or ACK is invented. */
   const server = coreMemoryServer('t89-hooks')
-  /** This is the original factory endpoint subject, mapped to the public BC1 Root.close spelling. */
-  const host = await createRpcHost({
-    ...server.options,
-    plugins: [native, consumer, ...server.options.plugins]
+  /** The same native owner lends genuine execution authority for the listener's memory namespace. */
+  const rpc = rpcHostPipelines(
+    () => host,
+    (key) => host.pipeline(key),
+    ['memory']
+  )
+  /** C0 endpoint.dispose delegated to this native boundary before its retired RPC translator. */
+  const host = defineHost({
+    ...rpc,
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
+  await host.use(native, consumer, server.transport)
   try {
     expect(nativeInstallCalls).toBe(1)
     expect(consumerInstallCalls).toBe(1)
-    /** The public factory publishes its one completion before either owned cleanup executes. */
-    const endpointDispose = host.close()
-    expect(host.close()).toBe(endpointDispose)
-    /**
-     * Retain the actual failure without translating NativeHost.dispose or reconstructing its
-     * errors.
-     */
-    const failure = await endpointDispose.catch((error: unknown) => error)
-    expect(failure).toBeInstanceOf(RpcLifecycleError)
-    expect(failure).toMatchObject({
-      source: 'rpc.endpoint',
-      code: 'ENDPOINT_DISPOSED',
-      cause: primary
-    })
-    expect(containsCleanupIdentity(failure, primary)).toBe(true)
-    expect(containsCleanupIdentity(failure, nativeCleanup)).toBe(true)
-    /** Original entry objects, resource labels and order remain observable expectations. */
-    const cleanupErrors = (failure as { readonly cleanupErrors?: readonly unknown[] }).cleanupErrors
-    expect(cleanupErrors).toEqual([
-      { resource: 'resource disposer', error: primary },
-      { resource: 'resource disposer', error: nativeCleanup }
-    ])
+    /** The native owner publishes its one completion before either owned cleanup executes. */
+    const dispose = host.dispose()
+    expect(host.dispose()).toBe(dispose)
+    /** The native result keeps its actual cleanup graph without an RPC translation shell. */
+    const result = await dispose
+    expect(result.logicalTerminal).toBe(true)
+    expect(result.cleanupErrors).toHaveLength(2)
+    expect(containsCleanupIdentity(result.cleanupErrors[0], primary)).toBe(true)
+    expect(containsCleanupIdentity(result.cleanupErrors[1], nativeCleanup)).toBe(true)
     expect(releases).toEqual(['consumer', 'native'])
     expect(releases.filter((entry) => entry === 'consumer')).toHaveLength(1)
     expect(releases.filter((entry) => entry === 'native')).toHaveLength(1)
-    expect(host.close()).toBe(endpointDispose)
+    expect(host.dispose()).toBe(dispose)
   } finally {
-    await host.close().catch(() => undefined)
+    await host.dispose()
   }
 })
