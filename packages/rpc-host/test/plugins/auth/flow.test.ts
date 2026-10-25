@@ -218,6 +218,36 @@ it.each(['string', 'uint8array'] as const)(
   }
 )
 
+it('keeps native sign-only any bindings as objects with the original backing integrity', async () => {
+  /** The original native sign-only path hands its complete manifest to the actual signer. */
+  const categories: string[] = []
+  /** Native sidecars stay owned by the codec, rather than entering an extra JSON text envelope. */
+  const f = await fixture(
+    {
+      sign: (value) => {
+        categories.push(typeof value)
+        return value
+      },
+      verify: (value) => value
+    },
+    true
+  )
+  try {
+    /** The genuine codec's manifest must hash this exact native backing in both directions. */
+    const bytes = new Uint8Array([1, 2, 3, 4])
+    /** This is the normal prepare/stage/encode/decode/stage/restore path on a native carrier. */
+    const frame = await f.send(message('native-signing', bytes))
+    expect(categories).toEqual(['object'])
+    expect(frame.sidecars).toEqual([bytes.buffer])
+    expect(await f.receive(frame)).toMatchObject({ payload: bytes })
+    expect(f.hashes.count).toBe(2)
+    expect(f.reports).toEqual([])
+  } finally {
+    await f.installation.dispose?.()
+    await f.flow.dispose()
+  }
+})
+
 it('retains the original 64-slot window, concurrent single commit and physical-source isolation', async () => {
   /** Actual signed frames allocate counters synchronously before any receive order is selected. */
   const f = await fixture({ sign: (value) => value, verify: (value) => value })

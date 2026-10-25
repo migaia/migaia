@@ -32,7 +32,9 @@ export class AuthenticationRepresentation {
   }
 
   /** Preserve the original signed replay marker for explicit string and byte callback categories. */
-  bound(value: IAuthenticationEnvelope): unknown {
+  bound(value: IAuthenticationEnvelope, native = false): unknown {
+    /** Native sign-only any originally signs the complete manifest object without text wrapping. */
+    if (native && this.#encoding === Encoding.any) return value
     /** The real selected JSON codec supplies the same original text category for default any. */
     const json = this.#json.encode(value.payload)[1]
     /** Explicit byte transforms keep the original byte payload spelling within the signed binding. */
@@ -45,6 +47,8 @@ export class AuthenticationRepresentation {
 
   /** Restore only the once-encoded metadata after the signed binding and its category are verified. */
   metadata(value: unknown): unknown {
+    /** An opaque native binding restores its object through the same sole codec admission. */
+    if (this.#encoding === Encoding.any && value !== null && typeof value === 'object') return value
     /** Original explicit byte payloads are restored only after their dense scalar domain is checked. */
     const text =
       this.#encoding === Encoding.bytes
