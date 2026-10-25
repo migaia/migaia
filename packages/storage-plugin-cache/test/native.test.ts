@@ -486,7 +486,29 @@ describe('native borrowed cache tiers', () => {
       await cache.remove('answer')
       for (const id of ['memory', 'sqlite', 'redis', 'postgres'] as const)
         expect(nativePorts).toContainEqual({ backend: id, operation: 'remove' })
+      await cache.set('port-native', 'value')
+      nativePorts.length = 0
+      expect(await cache.has('port-native')).toBe(true)
+      expect(nativePorts).toContainEqual({ backend: 'memory', operation: 'get' })
+      nativePorts.length = 0
+      expect(await cache.keys()).toContain('port-native')
+      expect(nativePorts).toContainEqual({ backend: 'memory', operation: 'keys' })
+      nativePorts.length = 0
+      expect(await cache.removeMany(['port-native'])).toBe(1)
+      for (const id of ['memory', 'sqlite', 'redis', 'postgres'] as const)
+        expect(nativePorts).toContainEqual({ backend: id, operation: 'remove' })
+      await cache.set('clear-native', 'value')
+      nativePorts.length = 0
+      await cache.clearValues()
+      for (const id of ['memory', 'sqlite', 'redis', 'postgres'] as const)
+        expect(nativePorts).toContainEqual({ backend: id, operation: 'removeByPrefix' })
+      expect(await cache.get('clear-native')).toBeNull()
+      await cache.set('all-native', 'value')
+      nativePorts.length = 0
       await cache.clearAll()
+      for (const id of ['memory', 'sqlite', 'redis', 'postgres'] as const)
+        expect(nativePorts).toContainEqual({ backend: id, operation: 'removeByPrefix' })
+      expect(await cache.get('all-native')).toBeNull()
     } finally {
       await host.dispose()
       await pool.close()
