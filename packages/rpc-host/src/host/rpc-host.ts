@@ -221,7 +221,7 @@ export class RpcHost {
     if (options.provide !== undefined)
       this.#providers.provide(options.provide, { contract: options.contract })
     if (options.signal?.aborted)
-      throw createRpcAbortError(undefined, undefined, options.signal.reason)
+      throw createRpcAbortError(undefined, undefined, resolveAbortReason(options.signal))
     options.signal?.addEventListener('abort', this.#abort, { once: true })
   }
 
