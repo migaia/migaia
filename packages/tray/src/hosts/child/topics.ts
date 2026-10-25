@@ -92,11 +92,17 @@ class ChildTopics {
     const previous = this.#memberships.get(topic)
     /** Actual remote completion remains distinct from the local listener's idempotent off result. */
     const leaving = this.#unsubscribe(topic, previous)
+    /** This exact transition is published before its native finally reaction may remove it. */
+    const transition: { topic: string; completion?: Promise<void> } = { topic }
     /** A later first listener must never have its replacement membership erased by this cleanup. */
     const completion = leaving.finally(() => {
-      if (this.#hub.size(topic) === 0 && this.#memberships.get(topic) === completion)
-        this.#memberships.delete(topic)
+      if (
+        this.#hub.size(transition.topic) === 0 &&
+        this.#memberships.get(transition.topic) === transition.completion
+      )
+        this.#memberships.delete(transition.topic)
     })
+    transition.completion = completion
     this.#memberships.set(topic, completion)
     await completion
   }
