@@ -379,6 +379,21 @@ describe('native borrowed cache tiers', () => {
     const pool = createClientPool({ url: redisUrl }, { maximum: 8 }),
       pg = new Pool({ connectionString: pgUrl })
     await pool.connect()
+    /**
+     * Successful calls on published tier ports prove the cache delegates instead of retaining its
+     * own map.
+     */
+    const nativePorts: { backend: string; operation: string }[] = []
+    const observer = definePlugin('native-tier-proof', (core) => ({
+      install() {
+        core.useAsyncPipeline(async (input, next) => {
+          await next(input)
+          if (input.backendId !== 'cache' && input.backendId !== 'back')
+            nativePorts.push({ backend: input.backendId, operation: input.operation })
+        })
+        return {}
+      }
+    }))
     const prefix = 'cache_native_' + crypto.randomUUID().replaceAll('-', '')
     const base = await createStorageHost({
       plugins: [
@@ -386,7 +401,8 @@ describe('native borrowed cache tiers', () => {
         sqliteBackendPlugin({ id: 'sqlite', driver: nodeSqliteDriver(':memory:') }),
         sqliteBackendPlugin({ id: 'tail', driver: nodeSqliteDriver(':memory:') }),
         redisBackendPlugin({ id: 'redis', driver: nodeRedisDriver(pool), prefix }),
-        postgresBackendPlugin({ id: 'postgres', driver: pgDriver(pg), prefix })
+        postgresBackendPlugin({ id: 'postgres', driver: pgDriver(pg), prefix }),
+        observer
       ]
     })
     const host = await base.use(
@@ -407,8 +423,11 @@ describe('native borrowed cache tiers', () => {
       expect(await cache.getOrLoad('answer', async () => ({ value: 'native' }))).toEqual({
         value: 'native'
       })
-      for (const id of ['memory', 'sqlite', 'redis', 'postgres'] as const)
+      for (const id of ['memory', 'sqlite', 'redis', 'postgres'] as const) {
+        expect(nativePorts).toContainEqual({ backend: id, operation: 'get' })
+        expect(nativePorts).toContainEqual({ backend: id, operation: 'set' })
         expect(await host.backend(id).get('cache:cache:answer')).toContain('native')
+      }
       await host.backend('memory').remove('cache:cache:answer')
       await host.backend('sqlite').remove('cache:cache:answer')
       expect(await cache.getOrLoad('answer', async () => 'wrong')).toEqual({ value: 'native' })
@@ -463,6 +482,10 @@ describe('native borrowed cache tiers', () => {
       expect(await cache.get('answer')).toBeNull()
       expect(await org.get('answer')).toBe('isolated')
       await org.clearAll()
+      nativePorts.length = 0
+      await cache.remove('answer')
+      for (const id of ['memory', 'sqlite', 'redis', 'postgres'] as const)
+        expect(nativePorts).toContainEqual({ backend: id, operation: 'remove' })
       await cache.clearAll()
     } finally {
       await host.dispose()

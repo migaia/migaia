@@ -17,6 +17,8 @@ async function fixture() {
   const created: string[] = []
   /** Wire observations prove which native count/deletion strategy the semantic call actually used. */
   const events: string[] = []
+  /** Actual ranking requests prove semantic reads use the selected vector engine. */
+  const rankings: Parameters<IQdrantHttp['query']>[] = []
   /** A selected real result can admit one concurrent writer before the backend resumes. */
   let afterCount: (() => Promise<void>) | undefined
   let afterScroll: (() => Promise<void>) | undefined
@@ -27,6 +29,10 @@ async function fixture() {
       const result = await native.createCollection(...args)
       created.push(args[0])
       return result
+    },
+    async query(...args) {
+      rankings.push(args)
+      return native.query(...args)
     },
     async upsert(...args) {
       events.push('upsert')
@@ -81,6 +87,7 @@ async function fixture() {
     native,
     created,
     events,
+    rankings,
     semantic: host.backend('cache').api.semantic,
     foreign: host.org('11111111-1111-4111-8111-111111111111').backend('cache').api.semantic,
     afterCount: (write: () => Promise<void>) => {
@@ -123,9 +130,20 @@ describe('semantic invalidation over real Qdrant', () => {
             where: { kind: 'missing' },
             ttlMs: 0
           })
+          current.rankings.length = 0
           expect(await current.semantic.get('live', { where: { kind: 'live' } })).toMatchObject({
             value: 'local live'
           })
+          expect(current.rankings).toHaveLength(1)
+          expect(current.rankings[0]?.[1]).toMatchObject({
+            query: [1, 0],
+            using: 'migaia_search',
+            limit: 1,
+            score_threshold: 0.5,
+            filter: { must: expect.any(Array) }
+          })
+          expect(JSON.stringify(current.rankings[0]?.[1])).toContain('live')
+          expect(JSON.stringify(current.rankings[0]?.[1])).toContain('$expiresAt')
           expect(
             await current.semantic.get('expired', { where: { kind: 'expired' } })
           ).toBeUndefined()
