@@ -1,8 +1,14 @@
 import { expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { auth } from '@migaia/rpc-host/plugins/auth'
+import { batch } from '@migaia/rpc-host/features/batch'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
-import { RPC_CORE_ERROR_SOURCE, RpcError } from '@migaia/rpc-contract/errors'
+import {
+  RPC_CORE_ERROR_SOURCE,
+  RpcAuthenticationError,
+  RpcError
+} from '@migaia/rpc-contract/errors'
+import { IpcSendClass, type IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { deferred } from '@migaia/utils/promise'
@@ -249,6 +255,108 @@ it('preserves the original inbound decrypt failure through the public authentica
     } finally {
       state.armed = false
       await client.host.close()
+    }
+  } finally {
+    await server.close()
+  }
+})
+
+it('isolates a public signing failure while the native batch writer is busy and recovers later calls', async () => {
+  /** The selected original user transform failure remains the public classified failure's cause. */
+  const cause = new Error('fixture queued protection failure')
+  /** Only the next actual envelope fails; later protection keeps its original executing owner. */
+  const state = { failNext: false }
+  /** Real provider effects identify delivered traffic without decoding physical frames again. */
+  const calls: string[] = []
+  /** Both native endpoints use the existing JSON codec before their genuine physical Batch owner. */
+  const listener = coreMemoryServer('busy-auth-provider', undefined, 'memory', [], [], {
+    create: () => new RpcJsonCarrierCodec(),
+    nativeBinary: false
+  })
+  /** The original receiving Auth/Batch installations own their nonce, replay and physical state. */
+  const server = await createRpcHost({
+    ...listener.options,
+    plugins: [
+      auth({ encodedType: 'string', sign: (value) => value, verify: (value) => value }),
+      batch(),
+      listener.transport
+    ],
+    provide: {
+      echo: (value: string) => {
+        calls.push(value)
+        return value
+      }
+    }
+  })
+  try {
+    /** Real handshakes complete before the selected per-envelope signing rejection is armed. */
+    const client = await listener.connect('busy-auth-client', {
+      plugins: [
+        auth({
+          encodedType: 'string',
+          sign: (value) => {
+            if (!state.failNext) return value
+            state.failNext = false
+            return Promise.reject(cause)
+          },
+          verify: (value) => value
+        }),
+        batch()
+      ]
+    })
+    /** Existing native write facts exclude directory/control traffic without inspecting ciphertext. */
+    const output = { send: client.pair[1].write, frames: [] as IRpcCarrierFrame[] }
+    /** This passthrough preserves the real MemoryCarrier write gate and exact physical frame. */
+    const writing = vi.spyOn(client.pair[1], 'write').mockImplementation((frame, options) => {
+      if (options?.sendClass === IpcSendClass.data) output.frames.push(frame)
+      return output.send(frame, options)
+    })
+    /** Original caller operations are joined during cleanup if a later business assertion fails. */
+    const pending: Promise<unknown>[] = []
+    try {
+      client.pair[1].holdWrites()
+      /** The first genuine public call reaches the real native writer and remains physically held. */
+      const first = client.host.memory
+        .send('busy-auth-provider', 'echo', 'first')
+        .catch((error: unknown) => error)
+      pending.push(first)
+      await vi.waitFor(() => expect(output.frames).toHaveLength(1))
+      state.failNext = true
+      /** Current Auth protects this envelope before Batch, so its failure owns only this call. */
+      const failure = await client.host.memory
+        .send('busy-auth-provider', 'echo', 'failed')
+        .catch((error: unknown) => error)
+      expect(failure).toBeInstanceOf(RpcAuthenticationError)
+      expect(failure).toMatchObject({
+        source: RPC_CORE_ERROR_SOURCE,
+        code: RpcCoreErrorCode.authenticationFailed,
+        cause
+      })
+      expect((failure as Error).cause).toBe(cause)
+      expect(output.frames).toHaveLength(1)
+      expect(calls).toEqual([])
+      /** A later real request is submitted while that same original physical writer is still held. */
+      const boundary = client.host.memory
+        .send('busy-auth-provider', 'echo', 'boundary')
+        .catch((error: unknown) => error)
+      pending.push(boundary)
+      client.pair[1].releaseWrites()
+      expect(await first).toBe('first')
+      expect(await boundary).toBe('boundary')
+      expect(calls).toEqual(['first', 'boundary'])
+      expect(output.frames).toHaveLength(2)
+      /** The same public namespace, Auth instance and physical source remain usable after failure. */
+      expect(await client.host.memory.send('busy-auth-provider', 'echo', 'recovered')).toBe(
+        'recovered'
+      )
+      expect(calls).toEqual(['first', 'boundary', 'recovered'])
+      expect(output.frames).toHaveLength(3)
+    } finally {
+      state.failNext = false
+      client.pair[1].releaseWrites()
+      writing.mockRestore()
+      await client.host.close()
+      await Promise.all(pending)
     }
   } finally {
     await server.close()
