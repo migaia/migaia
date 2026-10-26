@@ -13,10 +13,15 @@ it.each(['carrier', 'principal', 'custom'] as const)(
     const server = coreMemoryServer('retirement-server')
     /** Provider effects distinguish carrier re-execution from shared-scope replay. */
     let calls = 0
+    /** A custom domain may deliberately keep the first real token across replacement connections. */
+    let customScope: string | undefined
     const host = await createRpcHost({
       ...server.options,
       plugins: [
-        idempotency({ store, ...(mode === 'custom' ? { scope: () => 'shared-scope' } : {}) }),
+        idempotency({
+          store,
+          ...(mode === 'custom' ? { scope: ({ token }) => (customScope ??= token) } : {})
+        }),
         ...(mode === 'principal'
           ? [auth({ verifyCredentials: () => ({ principalId: 'verified-owner' }) })]
           : []),

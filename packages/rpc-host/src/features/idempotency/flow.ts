@@ -91,7 +91,7 @@ export class RpcIdempotencyFlow {
       selected
     ])
     if (context.envelope.kind === RpcWireKind.call || context.envelope.kind === RpcWireKind.group) {
-      if (!authentication && selected === context.carrierId && this.#store.releaseScope) {
+      if (!authentication && this.#options.scope === undefined && this.#store.releaseScope) {
         /** One carrier may contribute multiple admitted provider scopes, all retired together. */
         let scopes = this.#carrierScopes.get(context.carrierId)
         if (!scopes) this.#carrierScopes.set(context.carrierId, (scopes = new Set()))
