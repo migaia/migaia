@@ -256,7 +256,12 @@ class RpcMessageCarrier implements IRpcCarrier {
     } catch (error) {
       failures.push(error)
     }
-    if (failures.length === 1) throw failures[0]
+    if (failures.length === 1)
+      throw identifyRpcBoundaryFailure(
+        failures[0],
+        RpcCoreErrorCode.transport,
+        RpcCoreErrorText.endpointDisposalCleanupFailed
+      )
     if (failures.length > 1)
       throw attachSecondaryErrors(
         createRpcLifecycleError(RpcCoreErrorText.endpointDisposalCleanupFailed, this.#reason),

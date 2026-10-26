@@ -68,6 +68,27 @@ it('preserves the original close Promise and removes every original native liste
   expect(report).not.toHaveBeenCalled()
 })
 
+it('classifies one native cleanup failure without replacing its Error identity', async () => {
+  /** The maintained native IO fixture supplies the same acquired listener and close boundary. */
+  const io = new NativeMessageIO()
+  /** A native RangeError must retain its class, original stack and exact object identity. */
+  const failure = new RangeError('native resource cleanup failed')
+  const stack = failure.stack
+  io.close.mockImplementation(() => {
+    throw failure
+  })
+  const carrier = createRpcMessageCarrier({
+    id: 'single-cleanup-failure',
+    io,
+    report: () => undefined
+  })
+  await expect(carrier.close()).rejects.toBe(failure)
+  expect(failure).toMatchObject({ source: 'rpc.endpoint', code: 'TRANSPORT' })
+  expect(failure.stack).toBe(stack)
+  expect(io.events.listenerCount('message')).toBe(0)
+  expect(io.close).toHaveBeenCalledTimes(1)
+})
+
 it('lends only explicit native closing capabilities through both generic carrier factories', async () => {
   /** The mapping remains the transport's exact original function and is never called by a factory. */
   const mapRetirement = vi.fn<NonNullable<IRpcCarrier['mapRetirement']>>((_kind, error) => error)
