@@ -1,4 +1,5 @@
-import { PluginHost } from '@migaia/plugin-host'
+import { defineHost } from '@migaia/plugin-host'
+import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import {
   createRpcHost,
   type IRpcHost,
@@ -149,9 +150,17 @@ export function service(label: string, report: (error: unknown) => void) {
 
 /** Ordinary plugin-host retains its real mutation, slot and disposer owners. */
 export function ordinaryHost() {
-  return new PluginHost<Record<string, never>>({
-    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+  /** Lazy pipeline authority reads this case's own native host only at installation. */
+  const rpc = rpcHostPipelines(
+    () => host,
+    (name) => host.pipeline(name),
+    ['coroutine']
+  )
+  const host = defineHost({
+    ...rpc,
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
+  return host
 }
 
 /** Read the actual namespace and native member extension without creating a facade. */
