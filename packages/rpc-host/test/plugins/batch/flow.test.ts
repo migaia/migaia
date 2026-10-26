@@ -1,4 +1,7 @@
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
+import { createRpcHost } from '@migaia/rpc-host'
+import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
+import { coreMemoryServer } from '../../host/core-fixture.js'
 import { defineHost, definePlugin } from '@migaia/plugin-host'
 import { deferred } from '@migaia/utils/promise'
 import type {
@@ -287,7 +290,7 @@ it('queued cancellation removes only its member and transfer/opaque frames remai
 })
 
 it.each([1, 2])(
-  'reports %i independent inbound member failures and continues every member',
+  'propagates the first physical member failure with %i failing members available',
   async (failures) => {
     /** Public independent-request settlement also runs through host/named-flow-composition.test.ts. */
     const f = await fixture()
@@ -298,7 +301,7 @@ it.each([1, 2])(
     ]
     /** The same physical batch delivers both exact codec inputs in order. */
     const values: IRpcCarrierFrame[] = []
-    /** Each original refusal is reported once without contaminating any sibling's traversal. */
+    /** A physical continuation failure stays the original Session failure, without duplicate report. */
     const cause = new Error('fixture refusal write failure')
     await expect(
       f.pipelines.pipeline(RpcFlowPoint.frameInbound, 'test').run(
@@ -311,10 +314,10 @@ it.each([1, 2])(
           if (values.length <= failures) throw cause
         }
       )
-    ).resolves.toBeUndefined()
-    expect(values).toEqual(members)
+    ).rejects.toBe(cause)
+    expect(values).toEqual([members[0]])
     expect(values[0]).toBe(members[0])
-    expect(f.errors).toEqual(failures === 1 ? [cause] : [cause, cause])
+    expect(f.errors).toEqual([])
     await f.installation.dispose?.()
     await f.flow.dispose()
   }
@@ -408,3 +411,31 @@ it('cancellation during an async downstream hook falls back once without writing
   await f.installation.dispose?.()
   await f.flow.dispose()
 })
+
+it.each(['single', 'batch'] as const)(
+  'retires a real accepted Session after malformed encoded input in a %s frame',
+  async (mode) => {
+    /** A genuine text codec makes batch members opaque encoded messages until Session admission. */
+    const server = coreMemoryServer('malformed-batch', 'malformed-batch', 'memory', [], [], {
+      create: () => new RpcJsonCarrierCodec(),
+      nativeBinary: false
+    })
+    /** The real optional extension is negotiated by both public hosts. */
+    const host = await createRpcHost({ ...server.options, plugins: [batch(), server.transport] })
+    const client = await server.connect('malformed-source', { plugins: [batch()] })
+    try {
+      /** The existing native write port injects one malformed message without a fake Session. */
+      const malformed = { kind: 'message', data: '{malformed-batch' } as const
+      await client.pair[1].write(
+        mode === 'single'
+          ? malformed
+          : { kind: 'extension', extension: 'batch@1', data: { frames: [malformed] } }
+      )
+      await vi.waitFor(() => expect(client.pair[0].closed).toBe(true))
+      expect(client.pair[0].unsubscribed).toBe(1)
+    } finally {
+      await client.host.close()
+      await host.close()
+    }
+  }
+)

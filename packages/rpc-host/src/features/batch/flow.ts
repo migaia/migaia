@@ -104,12 +104,8 @@ export class RpcBatchFlow {
     }
     for (const member of frames as IRpcCarrierFrame[]) {
       if (context.signal.aborted) throw context.signal.reason
-      try {
-        /** Each observed failure belongs to this member; native multiple keeps later members live. */
-        await next({ ...payload, frame: member })
-      } catch (error) {
-        context.report(error)
-      }
+      /** Codec/grammar failures must reach Session retirement; dispatch handles business terminals. */
+      await next({ ...payload, frame: member })
     }
   }
 
