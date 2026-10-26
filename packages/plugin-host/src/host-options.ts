@@ -1,4 +1,11 @@
-import { createPluginHostTypeError, PluginHostInternalText } from './error-text.js'
+import { snapshotScheduler } from '@migaia/lifecycle'
+import type { IScheduler } from '@migaia/utils/scheduler'
+import ERROR_TEXT, {
+  createPluginHostTypeError,
+  PluginHostInternalText,
+  tagPluginHostError
+} from './error-text.js'
+import { PluginHostErrorCode } from './error-code.js'
 
 /**
  * Option validation for the host's timeout budgets.
@@ -24,4 +31,33 @@ export const assertRequiredTimeoutOption = (
   if (value === undefined)
     throw createPluginHostTypeError(PluginHostInternalText.TIMEOUT_REQUIRED(label))
   assertTimeoutOption(value, label)
+}
+
+/**
+ * Reads the optional scheduler option once and returns its admitted snapshot, or undefined when the
+ * caller left it to the default. A scheduler without `now()` and `schedule()` functions is
+ * rejected; an accessor failure keeps the caller's original error as the INVALID_OPTION cause.
+ */
+export const admitHostScheduler = (option: unknown): IScheduler | undefined => {
+  if (option === undefined) return undefined
+  /** Validated snapshot; undefined means the structure lacks the required functions. */
+  let snapshot: IScheduler | undefined
+  try {
+    snapshot = snapshotScheduler(option)
+  } catch (error) {
+    /** Lifecycle wraps accessor failures; the caller's own error is the meaningful cause. */
+    const lifecycleCause =
+      error && typeof error === 'object' && 'cause' in error
+        ? (error as { readonly cause?: unknown }).cause
+        : undefined
+    throw tagPluginHostError(
+      new TypeError(ERROR_TEXT.SCHEDULER_GETTER_FAILED, {
+        cause: lifecycleCause !== undefined ? lifecycleCause : error
+      }),
+      PluginHostErrorCode.invalidOption
+    )
+  }
+  if (snapshot === undefined)
+    throw createPluginHostTypeError(PluginHostInternalText.SCHEDULER_FUNCTIONS)
+  return snapshot
 }

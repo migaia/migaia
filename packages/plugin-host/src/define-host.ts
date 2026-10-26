@@ -247,73 +247,184 @@ export function defineHost<
   } catch (error) {
     throw identifyPluginHostCallbackFailure(error)
   }
-  /** Per-batch admission counters, keyed by the batch token the core runtime supplies. */
-  const batchCounters = new WeakMap<object, number>()
-  class Runtime extends PluginHost<TDomainCore, TValue, TInstalled, TPipelines> {
-    protected override createPluginDomainCore(request?: IHostCoreConstructionRequest): TDomainCore {
-      if (!options.domainCore) return {} as TDomainCore
-      const batch = request?.batch ?? Runtime
-      const batchIndex = batchCounters.get(batch) ?? 0
-      batchCounters.set(batch, batchIndex + 1)
-      return options.domainCore({
-        pluginName: request?.pluginName ?? '',
-        batchIndex,
-        batch
-      })
-    }
-    protected override translateDisposalError(error: PluginHostError): Error {
-      return options.translateDisposalError ? options.translateDisposalError(error) : error
-    }
-    /** `useSync` and `runPipeline` are protected on the class; the handle is their only caller. */
-    useSyncPublic(plugins: readonly IPluginConstraint<any>[]) {
-      return this.useSync(plugins)
-    }
-    runPipelinePublic(value: TValue, done: (value: TValue) => void) {
-      return this.runPipeline(value, done)
-    }
-    /** Exposes only the existing protected owner authority on the functional handle. */
-    pipelinePublic<TName extends keyof TPipelines & string>(
-      name: TName
-    ): IPipelineOwner<TPipelines[TName]> {
-      return this.pipeline(name)
-    }
-    /** Owner handle forwards the sync entry without another execution owner. */
-    runPipelineSyncPublic<TResult>(value: TValue, done: (value: TValue) => TResult) {
-      return this.runPipelineSync(value, done)
-    }
-    /** Owner handle preserves the empty-lane terminal Promise identity. */
-    runPipelineAsyncPublic<TResult>(value: TValue, done: (value: TValue) => Promise<TResult>) {
-      return this.runPipelineAsync(value, done)
-    }
-    /** Only the package-owned frozen surface receives this committed-publication read capability. */
-    readRuntimeSharedExtensionPublic(key: PropertyKey): object | undefined {
-      return this.readRuntimeSharedExtension(key)
+  const runtime = new DefinedHostRuntime<TDomainCore, TValue, TInstalled, TPipelines>(options)
+  /** The fluent pipeline entries return the public proxy, which exists only after the surface. */
+  const reference: IHandleReference = { handle: undefined }
+  const handleSurface = createHandleSurface(runtime, options, reference)
+  if (surfaceDescriptors) {
+    for (const key of Reflect.ownKeys(surfaceDescriptors)) {
+      // Host methods and the issued identity remain canonical even at a plain-JS boundary.
+      if (key !== 'identity' && !Object.hasOwn(handleSurface, key))
+        Object.defineProperty(handleSurface, key, surfaceDescriptors[key])
     }
   }
-  const runtime = new Runtime(
-    { ...options.host, pipelines: options.pipelines },
-    readDefinedPluginDefinition
-  )
+  /** Shared outlets are read through original state while the existing public protocol stays frozen. */
+  const handle = new Proxy(handleSurface, {
+    get: (target, key, receiver) =>
+      Reflect.has(target, key)
+        ? Reflect.get(target, key, receiver)
+        : runtime.readRuntimeSharedExtensionPublic(key)
+  })
+  reference.handle = handle
+  /** Identity and managed-host provenance belong to the exact public proxy rather than its target. */
+  const identity = issueHostIdentity(handle, options.host.identity?.name, runtime)
+  Object.defineProperty(handleSurface, 'identity', {
+    value: identity,
+    enumerable: true,
+    configurable: false,
+    writable: false
+  })
+  Object.freeze(handleSurface)
+  aliasManagedHost(handle, runtime)
+  return handle as unknown as IHostHandle<
+    TDomainCore,
+    TValue,
+    TInstalled,
+    TPublicSurface,
+    TPipelines
+  >
+}
+
+/** Holds the public proxy once it exists, so fluent entries can return it. */
+type IHandleReference = { handle: object | undefined }
+
+/**
+ * Runtime behind one functional Host. It replaces the four protected class hooks with the options'
+ * callbacks and exposes the protected owner entries only to the handle created alongside it.
+ */
+class DefinedHostRuntime<
+  TDomainCore extends object,
+  TValue,
+  TInstalled extends readonly IPluginConstraint<any>[],
+  TPipelines extends IPipelineDefinitions
+> extends PluginHost<TDomainCore, TValue, TInstalled, TPipelines> {
+  /** Functional entry options; read on each hook call, as the original per-call class did. */
+  readonly #options: IDefineHostOptions<TDomainCore, any, TPipelines>
+  /** Per-batch admission counters, keyed by the batch token the core runtime supplies. */
+  readonly #batchCounters = new WeakMap<object, number>()
+  /** Batch identity used when a construction request carries none; stable for this Host. */
+  readonly #defaultBatch: object = Object.freeze({})
+
+  /** Creates the runtime with the trusted functional-definition reader. */
+  constructor(options: IDefineHostOptions<TDomainCore, any, TPipelines>) {
+    super({ ...options.host, pipelines: options.pipelines }, readDefinedPluginDefinition)
+    this.#options = options
+  }
+
+  /** Builds a domain core through the options' callback, numbering requests within a batch. */
+  protected override createPluginDomainCore(request?: IHostCoreConstructionRequest): TDomainCore {
+    const domainCore = this.#options.domainCore
+    if (!domainCore) return {} as TDomainCore
+    const batch = request?.batch ?? this.#defaultBatch
+    const batchIndex = this.#batchCounters.get(batch) ?? 0
+    this.#batchCounters.set(batch, batchIndex + 1)
+    return domainCore({ pluginName: request?.pluginName ?? '', batchIndex, batch })
+  }
+
+  /** Uses the options' translator when supplied. */
+  protected override translateDisposalError(error: PluginHostError): Error {
+    const translate = this.#options.translateDisposalError
+    return translate ? translate(error) : error
+  }
+
+  /** `useSync` and `runPipeline` are protected on the class; the handle is their only caller. */
+  useSyncPublic(plugins: readonly IPluginConstraint<any>[]) {
+    return this.useSync(plugins)
+  }
+
+  /** Forwards the default selected-mode entry for the owner handle. */
+  runPipelinePublic(value: TValue, done: (value: TValue) => void) {
+    return this.runPipeline(value, done)
+  }
+
+  /** Exposes only the existing protected owner authority on the functional handle. */
+  pipelinePublic<TName extends keyof TPipelines & string>(
+    name: TName
+  ): IPipelineOwner<TPipelines[TName]> {
+    return this.pipeline(name)
+  }
+
+  /** Owner handle forwards the sync entry without another execution owner. */
+  runPipelineSyncPublic<TResult>(value: TValue, done: (value: TValue) => TResult) {
+    return this.runPipelineSync(value, done)
+  }
+
+  /** Owner handle preserves the empty-lane terminal Promise identity. */
+  runPipelineAsyncPublic<TResult>(value: TValue, done: (value: TValue) => Promise<TResult>) {
+    return this.runPipelineAsync(value, done)
+  }
+
+  /** Only the package-owned frozen surface receives this committed-publication read capability. */
+  readRuntimeSharedExtensionPublic(key: PropertyKey): object | undefined {
+    return this.readRuntimeSharedExtension(key)
+  }
+}
+
+/**
+ * Owns the functional Host's memoized disposal: the optional middleware and the runtime cleanup
+ * each run exactly once, and every caller receives the same Promise.
+ */
+class DefinedHostDisposal {
+  /** Runtime that performs canonical cleanup. */
+  readonly #runtime: { dispose(): Promise<IPluginHostDisposalResult> }
+  /** Optional disposal middleware from the options. */
+  readonly #middleware: IDefineHostOptions<object>['dispose']
+  /** Shared completion, published before middleware can call dispose again. */
+  #disposal: Promise<IPluginHostDisposalResult> | undefined
+
+  /** Captures the runtime and the optional middleware. */
+  constructor(
+    runtime: { dispose(): Promise<IPluginHostDisposalResult> },
+    middleware: IDefineHostOptions<object>['dispose']
+  ) {
+    this.#runtime = runtime
+    this.#middleware = middleware
+  }
+
+  /** Starts disposal once; middleware failures keep their identity under CALLBACK_FAILED. */
+  readonly dispose = (): Promise<IPluginHostDisposalResult> => {
+    if (this.#disposal) return this.#disposal
+    /** Publish before user middleware can synchronously call this same public method again. */
+    const completion = deferred<IPluginHostDisposalResult>()
+    this.#disposal = completion.promise
+    try {
+      /** One existing runtime owns cleanup; the facade only adopts its selected middleware result. */
+      const result = this.#middleware
+        ? this.#middleware(() => this.#runtime.dispose())
+        : this.#runtime.dispose()
+      void Promise.resolve(result).then(completion.resolve, (error: unknown) =>
+        completion.reject(identifyPluginHostCallbackFailure(error))
+      )
+    } catch (error) {
+      completion.reject(identifyPluginHostCallbackFailure(error))
+    }
+    return this.#disposal
+  }
+}
+
+/**
+ * Builds the mutable handle surface: Host getters plus forwarding entries. The caller adds domain
+ * descriptors and the identity, then freezes it behind the public proxy.
+ */
+function createHandleSurface<
+  TDomainCore extends object,
+  TValue,
+  TInstalled extends readonly IPluginConstraint<any>[],
+  TPipelines extends IPipelineDefinitions
+>(
+  runtime: DefinedHostRuntime<TDomainCore, TValue, TInstalled, TPipelines>,
+  options: IDefineHostOptions<TDomainCore, any, TPipelines>,
+  reference: IHandleReference
+): Record<PropertyKey, unknown> {
   /** Routes each literal dry-run form to the matching class overload. */
-  function unUse(
-    name: string,
-    mutationOptions: IPluginDependencyMutationOptions & Readonly<{ readonly dryRun: true }>
-  ): Promise<IPluginDependencyPlan>
-  function unUse(
-    name: string,
-    mutationOptions?: IPluginDependencyMutationOptions & Readonly<{ readonly dryRun?: false }>
-  ): Promise<IPluginRemoval>
-  function unUse(
+  const unUse = (
     name: string,
     mutationOptions?: IPluginDependencyMutationOptions
-  ): Promise<IPluginRemoval | IPluginDependencyPlan> {
-    return mutationOptions?.dryRun === true
+  ): Promise<IPluginRemoval | IPluginDependencyPlan> =>
+    mutationOptions?.dryRun === true
       ? runtime.unUse(name, { ...mutationOptions, dryRun: true })
       : runtime.unUse(name, { ...mutationOptions, dryRun: false })
-  }
-  /** Memoized disposal chain, so the middleware and the runtime each run exactly once. */
-  let disposal: Promise<IPluginHostDisposalResult> | undefined
-  const handleSurface = {
+  return {
     get revision() {
       return runtime.revision
     },
@@ -334,19 +445,19 @@ export function defineHost<
     replace: (name: string, next: IPluginConstraint<any>) => runtime.replace(name, next),
     usePipeline: (stage: ISyncMiddlewareStage<TValue>) => {
       runtime.usePipeline(stage)
-      return handle
+      return reference.handle
     },
     useAsyncPipeline: (stage: IAsyncMiddlewareStage<TValue>) => {
       runtime.useAsyncPipeline(stage)
-      return handle
+      return reference.handle
     },
     useGeneratorPipeline: (stage: IGeneratorMiddlewareStage<TValue>) => {
       runtime.useGeneratorPipeline(stage)
-      return handle
+      return reference.handle
     },
     useAsyncGeneratorPipeline: (stage: IAsyncGeneratorMiddlewareStage<TValue>) => {
       runtime.useAsyncGeneratorPipeline(stage)
-      return handle
+      return reference.handle
     },
     pipeline: <TName extends keyof TPipelines & string>(name: TName) =>
       runtime.pipelinePublic(name),
@@ -356,54 +467,6 @@ export function defineHost<
       runtime.runPipelineSyncPublic(value, done),
     runPipelineAsync: <TResult>(value: TValue, done: (value: TValue) => Promise<TResult>) =>
       runtime.runPipelineAsyncPublic(value, done),
-    dispose: (): Promise<IPluginHostDisposalResult> => {
-      if (disposal) return disposal
-      /** Publish before user middleware can synchronously call this same public method again. */
-      const completion = deferred<IPluginHostDisposalResult>()
-      disposal = completion.promise
-      try {
-        /** One existing runtime owns cleanup; the facade only adopts its selected middleware result. */
-        const result = options.dispose
-          ? options.dispose(() => runtime.dispose())
-          : runtime.dispose()
-        void Promise.resolve(result).then(completion.resolve, (error: unknown) =>
-          completion.reject(identifyPluginHostCallbackFailure(error))
-        )
-      } catch (error) {
-        completion.reject(identifyPluginHostCallbackFailure(error))
-      }
-      return disposal
-    }
+    dispose: new DefinedHostDisposal(runtime, options.dispose).dispose
   }
-  if (surfaceDescriptors) {
-    for (const key of Reflect.ownKeys(surfaceDescriptors)) {
-      // Host methods and the issued identity remain canonical even at a plain-JS boundary.
-      if (key !== 'identity' && !Object.hasOwn(handleSurface, key))
-        Object.defineProperty(handleSurface, key, surfaceDescriptors[key])
-    }
-  }
-  /** Shared outlets are read through original state while the existing public protocol stays frozen. */
-  const handle = new Proxy(handleSurface, {
-    get: (target, key, receiver) =>
-      Reflect.has(target, key)
-        ? Reflect.get(target, key, receiver)
-        : runtime.readRuntimeSharedExtensionPublic(key)
-  })
-  /** Identity and managed-host provenance belong to the exact public proxy rather than its target. */
-  const identity = issueHostIdentity(handle, options.host.identity?.name, runtime)
-  Object.defineProperty(handleSurface, 'identity', {
-    value: identity,
-    enumerable: true,
-    configurable: false,
-    writable: false
-  })
-  Object.freeze(handleSurface)
-  aliasManagedHost(handle, runtime)
-  return handle as unknown as IHostHandle<
-    TDomainCore,
-    TValue,
-    TInstalled,
-    TPublicSurface,
-    TPipelines
-  >
 }

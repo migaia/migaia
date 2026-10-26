@@ -172,6 +172,115 @@ export class PluginHostEnablementRuntime<TDomainCore extends object, TValue> {
   }
 }
 
+/** Restore token returned by one disable call; enabling it restores exactly that disabled set. */
+class PluginHostEnablementToken<TDomainCore extends object, TValue> {
+  /** Name the disable call targeted. */
+  readonly name: string
+  /** Facade-owned restore, run under the facade's admission and queue. */
+  readonly #restore: (disabled: readonly IRegistration<TDomainCore, TValue>[]) => Promise<void>
+  /** Registrations this disable call actually disabled, in disable order. */
+  readonly #disabled: readonly IRegistration<TDomainCore, TValue>[]
+
+  /** Captures the target name and the registrations it disabled. */
+  constructor(
+    restore: (disabled: readonly IRegistration<TDomainCore, TValue>[]) => Promise<void>,
+    name: string,
+    disabled: readonly IRegistration<TDomainCore, TValue>[]
+  ) {
+    this.#restore = restore
+    this.name = name
+    this.#disabled = disabled
+  }
+
+  /** Re-enables the captured set in reverse order after checking every provider first. */
+  readonly enable = async (): Promise<void> => this.#restore(this.#disabled)
+}
+
+/** Typed enablement facade: the runtime owns transitions and the Host keeps FIFO admission. */
+class PluginHostEnablementFacade<THost, TDomainCore extends object, TValue> {
+  /** Enablement transitions and disabled-name bookkeeping. */
+  readonly #runtime: PluginHostEnablementRuntime<TDomainCore, TValue>
+  /** Host admission, queue and dependent-recovery ports. */
+  readonly #port: IPluginHostEnablementFacadePort<THost, TDomainCore, TValue>
+
+  /** Captures the runtime and Host ports. */
+  constructor(
+    runtime: PluginHostEnablementRuntime<TDomainCore, TValue>,
+    port: IPluginHostEnablementFacadePort<THost, TDomainCore, TValue>
+  ) {
+    this.#runtime = runtime
+    this.#port = port
+  }
+
+  /** Rejects terminal or reentrant calls before they enter the mutation queue. */
+  #admit(): void {
+    this.#port.assertActive()
+    this.#port.assertMutationAllowed()
+  }
+
+  /** Disables a registration and its planned dependents, or returns the dry-run plan. */
+  readonly disable = async (name: string, options: IPluginDependencyMutationOptions = {}) => {
+    this.#admit()
+    return this.#port.enqueue(async () => this.#disableNow(name, options))
+  }
+
+  /** Runs one queued disable mutation. */
+  #disableNow(name: string, options: IPluginDependencyMutationOptions) {
+    const runtime = this.#runtime
+    runtime.requireInstalled(name)
+    /** Validated breaking option shape and default reject policy. */
+    const admitted = admitDependencyMutationOptions(options)
+    /** Capability-owned decision for this disable mutation. */
+    const plan = runtime.planDisable(name, admitted.policy)
+    if (plan.blockedBy.length > 0)
+      throw new PluginHostError(
+        PluginHostErrorCode.dependencyBlocked,
+        ERROR_TEXT.DEPENDENCY_BLOCKED(name),
+        { detail: { blockedBy: plan.blockedBy } }
+      )
+    if (admitted.dryRun) return toPluginPlan(plan, admitted.policy)
+    const disabled: IRegistration<TDomainCore, TValue>[] = []
+    for (const step of plan.steps) {
+      const dependent = runtime.requireInstalled(step.id)
+      if (step.action === DependencyAction.suspend) runtime.suspend(dependent)
+      else if (step.action === DependencyAction.disable && runtime.disable(dependent))
+        disabled.push(dependent)
+    }
+    return Object.freeze({
+      token: Object.freeze(new PluginHostEnablementToken(this.#restore, name, disabled))
+    })
+  }
+
+  /** Queues the restore of one disable call's registrations; only issued tokens receive it. */
+  readonly #restore = (disabled: readonly IRegistration<TDomainCore, TValue>[]): Promise<void> => {
+    this.#admit()
+    return this.#port.enqueue(async () => {
+      // Check the whole restore set first so a rejected token enables nothing.
+      const enabling = new Set(disabled.map((item) => item.name))
+      for (const item of disabled) this.#runtime.assertProvidersAvailable(item, enabling)
+      for (let index = disabled.length - 1; index >= 0; index -= 1) {
+        const item = disabled[index]!
+        this.#runtime.enable(item)
+        await this.#port.resumeAfterProvider(item.name, false)
+      }
+    })
+  }
+
+  /** Enables one registration after its providers are available. */
+  readonly enable = async (name: string) => {
+    this.#admit()
+    return this.#port.enqueue(async () => {
+      const registration = this.#runtime.requireInstalled(name)
+      this.#runtime.assertProvidersAvailable(registration)
+      this.#runtime.enable(registration)
+      await this.#port.resumeAfterProvider(name, false)
+    })
+  }
+
+  /** Names currently disabled, in transition order. */
+  readonly disabled = () => this.#runtime.disabled()
+}
+
 /** Exposes typed enablement while the runtime owns transitions and Host keeps FIFO admission. */
 export const createPluginHostEnablementFacade = <
   THost,
@@ -181,63 +290,7 @@ export const createPluginHostEnablementFacade = <
 >(
   runtime: PluginHostEnablementRuntime<TDomainCore, TValue>,
   port: IPluginHostEnablementFacadePort<THost, TDomainCore, TValue>
-): IPluginEnablement<THost, TInstalled, TDomainCore, TValue> => {
-  /** Rejects terminal or reentrant calls before they enter the mutation queue. */
-  const admit = (): void => {
-    port.assertActive()
-    port.assertMutationAllowed()
-  }
-  return Object.freeze({
-    disable: async (name: string, options: IPluginDependencyMutationOptions = {}) => {
-      admit()
-      return port.enqueue(async () => {
-        runtime.requireInstalled(name)
-        /** Validated breaking option shape and default reject policy. */
-        const admitted = admitDependencyMutationOptions(options)
-        /** Capability-owned decision for this disable mutation. */
-        const plan = runtime.planDisable(name, admitted.policy)
-        if (plan.blockedBy.length > 0)
-          throw new PluginHostError(
-            PluginHostErrorCode.dependencyBlocked,
-            ERROR_TEXT.DEPENDENCY_BLOCKED(name),
-            { detail: { blockedBy: plan.blockedBy } }
-          )
-        if (admitted.dryRun) return toPluginPlan(plan, admitted.policy)
-        const disabled: IRegistration<TDomainCore, TValue>[] = []
-        for (const step of plan.steps) {
-          const dependent = runtime.requireInstalled(step.id)
-          if (step.action === DependencyAction.suspend) runtime.suspend(dependent)
-          else if (step.action === DependencyAction.disable && runtime.disable(dependent))
-            disabled.push(dependent)
-        }
-        return Object.freeze({
-          token: Object.freeze({
-            name,
-            enable: async () => {
-              admit()
-              return port.enqueue(async () => {
-                // Check the whole restore set first so a rejected token enables nothing.
-                const enabling = new Set(disabled.map((item) => item.name))
-                for (const item of disabled) runtime.assertProvidersAvailable(item, enabling)
-                for (const item of [...disabled].reverse()) {
-                  runtime.enable(item)
-                  await port.resumeAfterProvider(item.name, false)
-                }
-              })
-            }
-          })
-        })
-      })
-    },
-    enable: async (name: string) => {
-      admit()
-      return port.enqueue(async () => {
-        const registration = runtime.requireInstalled(name)
-        runtime.assertProvidersAvailable(registration)
-        runtime.enable(registration)
-        await port.resumeAfterProvider(name, false)
-      })
-    },
-    disabled: () => runtime.disabled()
-  }) as unknown as IPluginEnablement<THost, TInstalled, TDomainCore, TValue>
-}
+): IPluginEnablement<THost, TInstalled, TDomainCore, TValue> =>
+  Object.freeze(
+    new PluginHostEnablementFacade<THost, TDomainCore, TValue>(runtime, port)
+  ) as unknown as IPluginEnablement<THost, TInstalled, TDomainCore, TValue>

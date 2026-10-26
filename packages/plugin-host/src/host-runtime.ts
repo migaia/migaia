@@ -20,14 +20,17 @@ import { PluginHostState } from './host-state.js'
 import type { IHostCoreConstructionRequest } from './define-host.js'
 import { reportQueueWait, translateQueueRejection } from './host-queue.js'
 import { drainPipelineLeases } from './pipeline-runtime.js'
-import { assertRequiredTimeoutOption, assertTimeoutOption } from './host-options.js'
+import {
+  admitHostScheduler,
+  assertRequiredTimeoutOption,
+  assertTimeoutOption
+} from './host-options.js'
 import { asyncDisposeKey } from './symbols.js'
 import {
   createMutationQueue,
   createAbortController,
   createPendingTracker,
   createTerminalController,
-  snapshotScheduler,
   type IMutationQueue,
   type IAbortController,
   type IPendingTracker,
@@ -46,6 +49,10 @@ export {
   type IPluginHostDisposalProvenance
 } from './cleanup-runtime.js'
 import { PluginHostPipelines } from './named-pipelines.js'
+import {
+  PluginHostRuntimeIntegration,
+  type IPluginHostRuntimeIntegrationPort
+} from './runtime-integration.js'
 import type { IPipelineDefinitions, IPipelineOwner } from './pipeline-spec.js'
 import { PluginHostRemovalRuntime } from './removal-runtime.js'
 import { PluginHostReplaceRuntime } from './replace-runtime.js'
@@ -319,29 +326,7 @@ class PluginHostConstructor<
       ['disposeStepTimeoutMs', options.disposeStepTimeoutMs]
     ] as const)
       assertTimeoutOption(value, label)
-    // 只读取一次 scheduler 快照：校验、保存、传给 queue/dispose scope 都用这个局部快照。
-    const schedulerOption = options.scheduler
-    let schedulerSnapshot: IScheduler | undefined
-    if (schedulerOption !== undefined) {
-      try {
-        schedulerSnapshot = snapshotScheduler(schedulerOption)
-      } catch (error) {
-        const lifecycleCause =
-          error && typeof error === 'object' && 'cause' in error
-            ? (error as { readonly cause?: unknown }).cause
-            : undefined
-        throw tagPluginHostError(
-          new TypeError(ERROR_TEXT.SCHEDULER_GETTER_FAILED, {
-            cause: lifecycleCause !== undefined ? lifecycleCause : error
-          }),
-          PluginHostErrorCode.invalidOption
-        )
-      }
-      if (schedulerSnapshot === undefined) {
-        throw createPluginHostTypeError(PluginHostInternalText.SCHEDULER_FUNCTIONS)
-      }
-    }
-    this.#scheduler = schedulerSnapshot ?? systemScheduler
+    this.#scheduler = admitHostScheduler(options.scheduler) ?? systemScheduler
     this.#operationRuntime = new PluginHostOperationRuntime({
       parentSignal: this.#executionController.signal,
       scheduler: this.#scheduler,
@@ -351,7 +336,88 @@ class PluginHostConstructor<
     })
     /** One admitted cleanup budget shared by the hook context and the bounded disposer. */
     const disposeStepTimeoutMs = options.disposeStepTimeoutMs ?? DEFAULT_DISPOSE_STEP_TIMEOUT_MS
-    this.#cleanupRuntime = new PluginHostCleanupRuntime({
+    this.#cleanupRuntime = this.#createCleanupRuntime(disposeStepTimeoutMs)
+    this.#removalRuntime = this.#createRemovalRuntime(disposeStepTimeoutMs)
+    this.#installRuntime = this.#createInstallRuntime()
+    this.#replaceRuntime = new PluginHostReplaceRuntime({
+      invokeHook: this.#invokeHook,
+      state: this.#state,
+      publish: (installed, batch) => this.#publishInstallBatch(installed, batch),
+      drainLeases: (registration) => this.#drainRegistrationLeases(registration),
+      diagnostic: this.#diagnostic,
+      decorateError: (error) => attachPluginHostIdentity(error, this),
+      installation: this.#installRuntime,
+      removal: this.#removalRuntime,
+      enablement: this.#enablementRuntime
+    })
+    this.#resumeRuntime = new PluginHostResumeRuntime({
+      invokeHook: this.#invokeHook,
+      state: this.#state,
+      drainLeases: (registration) => this.#drainRegistrationLeases(registration),
+      diagnostic: this.#diagnostic,
+      installation: this.#installRuntime,
+      removal: this.#removalRuntime,
+      enablement: this.#enablementRuntime
+    })
+    this.#coreRuntime = this.#createCoreRuntime(domainReport)
+    this.#state.configureSharedPublication({
+      assertActive: () => this.#assertActive(),
+      report: (error) => reportTerminalFailure(error, this.#diagnostic),
+      publish: (key) => this.#publishSharedKey(key)
+    })
+    this.#configRuntime = new PluginHostConfigRuntime({
+      invokeHook: this.#invokeHook,
+      assertActive: () => this.#assertActive(),
+      isSetupPending: () => this.#setupPending !== undefined,
+      isReleasePending: () => this.#releasePending !== undefined,
+      decorateError: (error) => attachPluginHostIdentity(error, this),
+      enqueue: (task) => this.#enqueue(task),
+      setHookRegistration: (registration) => {
+        this.#hookRegistration = registration
+      },
+      state: this.#state,
+      operations: this.#operationRuntime,
+      core: this.#coreRuntime
+    })
+    this.#hostDisposalRuntime = this.#createDisposalRuntime(pipelineDrainTimeoutMs)
+    this.#pipelineDrainTimeoutMs = pipelineDrainTimeoutMs
+    this.#queueAdmissionTimeoutMs = options.queueAdmissionTimeoutMs
+    this.#queue = this.#createQueue(options)
+    // 托管协议不再挂在 Host 实例表面：它是组合方专用的出口，放在实例上会让每个普通消费者都看见
+    // 八个它永远不该调用的方法。登记发生在构造函数末尾，此时 Host 已完整。
+    registerManagedHost(
+      this,
+      this.#compositionPort(pipelineDrainTimeoutMs),
+      () => this.revision,
+      () => {
+        this.#assertActive()
+        return this.#createView()
+      }
+    )
+  }
+
+  /**
+   * Builds the FIFO mutation queue. Queue diagnostics default to 1000 ms; `false` turns them off,
+   * and the admission timeout stays optional.
+   */
+  #createQueue(options: IPluginHostOptions<TPipelines>): IMutationQueue {
+    return createMutationQueue({
+      scheduler: this.#scheduler,
+      queueAdmissionTimeoutMs: options.queueAdmissionTimeoutMs,
+      admissionDiagnosticMs:
+        options.queueAdmissionDiagnosticMs === false
+          ? undefined
+          : (options.queueAdmissionDiagnosticMs ?? DEFAULT_QUEUE_ADMISSION_DIAGNOSTIC_MS),
+      onAdmissionDiagnostic:
+        options.queueAdmissionDiagnosticMs === false
+          ? undefined
+          : (info) => reportQueueWait(this.#diagnostic, info)
+    })
+  }
+
+  /** Builds the cleanup owner that bounds each disposer and wraps disposer failures. */
+  #createCleanupRuntime(disposeStepTimeoutMs: number | false): PluginHostCleanupRuntime {
+    return new PluginHostCleanupRuntime({
       scheduler: this.#scheduler,
       pending: this.#pending,
       disposeStepTimeoutMs,
@@ -374,7 +440,13 @@ class PluginHostConstructor<
         )
       }
     })
-    this.#removalRuntime = new PluginHostRemovalRuntime({
+  }
+
+  /** Builds the removal owner; its hook ports record which registration is releasing. */
+  #createRemovalRuntime(
+    disposeStepTimeoutMs: number | false
+  ): PluginHostRemovalRuntime<TDomainCore, TValue> {
+    return new PluginHostRemovalRuntime({
       invokeHook: this.#invokeHook,
       pipelineLeases: this.#state.lanes.leases,
       executionSignal: this.#executionController.signal,
@@ -394,7 +466,11 @@ class PluginHostConstructor<
       },
       state: this.#state
     })
-    this.#installRuntime = new PluginHostInstallRuntime({
+  }
+
+  /** Builds the install owner over the already constructed core, operation and removal owners. */
+  #createInstallRuntime(): PluginHostInstallRuntime<TDomainCore, TValue> {
+    return new PluginHostInstallRuntime({
       invokeHook: this.#invokeHook,
       scheduler: this.#scheduler,
       executionSignal: this.#executionController.signal,
@@ -414,27 +490,32 @@ class PluginHostConstructor<
       operations: this.#operationRuntime,
       removal: this.#removalRuntime
     })
-    this.#replaceRuntime = new PluginHostReplaceRuntime({
-      invokeHook: this.#invokeHook,
+  }
+
+  /**
+   * Builds the plugin-facing core owner and the one integration port authority it lends to every
+   * install-scoped core.
+   */
+  #createCoreRuntime(
+    domainReport: ((error: unknown) => void) | undefined
+  ): PluginHostCoreRuntime<TDomainCore, TValue> {
+    /** One Host authority shared by every install-scoped integration port this Host issues. */
+    const integrationPort: IPluginHostRuntimeIntegrationPort<TDomainCore, TValue> = {
+      host: this,
+      identity: this.identity,
+      nodeId: readHostNodeId(this),
+      report: domainReport,
       state: this.#state,
-      publish: (installed, batch) => this.#publishInstallBatch(installed, batch),
-      drainLeases: (registration) => this.#drainRegistrationLeases(registration),
-      diagnostic: this.#diagnostic,
-      decorateError: (error) => attachPluginHostIdentity(error, this),
-      installation: this.#installRuntime,
-      removal: this.#removalRuntime,
-      enablement: this.#enablementRuntime
-    })
-    this.#resumeRuntime = new PluginHostResumeRuntime({
-      invokeHook: this.#invokeHook,
-      state: this.#state,
-      drainLeases: (registration) => this.#drainRegistrationLeases(registration),
-      diagnostic: this.#diagnostic,
-      installation: this.#installRuntime,
-      removal: this.#removalRuntime,
-      enablement: this.#enablementRuntime
-    })
-    this.#coreRuntime = new PluginHostCoreRuntime({
+      operations: this.#operationRuntime,
+      assertActive: () => this.#assertActive(),
+      matchesHost: (host) => matchesManagedHost(host, this),
+      createHandle: (name, batch) =>
+        this.#createHandle(name, batch) as unknown as ReturnType<
+          IPluginHostRuntimeIntegrationPort<TDomainCore, TValue>['createHandle']
+        >,
+      currentHookRegistration: () => this.#hookRegistration
+    }
+    return new PluginHostCoreRuntime({
       createDomainCore: (request) => this.createPluginDomainCore(request),
       assertRegistrationValid: (registration) =>
         this.#state.assertRegistrationValid(registration, (current) =>
@@ -447,189 +528,16 @@ class PluginHostConstructor<
         return Object.freeze({ use: (stage: Function) => entry.register(stage, registration) })
       },
       cleanupRuntime: this.#cleanupRuntime,
-      runtimeIntegration: (registration, batch) => {
-        /** Mutation authority belongs only to this original current install batch. */
-        const assertInstall = (): void => {
-          this.#state.assertRegistrationValid(registration, (current) =>
-            this.#operationRuntime.assertCurrent(current)
-          )
-          if (
-            !batch ||
-            batch.committed ||
-            registration.lifecycle !== PluginHostRegistrationLifecycle.install
-          )
-            throw new PluginHostError(
-              PluginHostErrorCode.resourceOutsideInstall,
-              ERROR_TEXT.RESOURCE_OUTSIDE_INSTALL
-            )
-        }
-        /** Existing handle access keeps connection enabled/suspended/activated admission canonical. */
-        const connectionHandle = this.#createHandle(registration.name) as unknown as {
-          readonly extensions: object
-        }
-        /** Exact registration is checked before a name-addressed handle can select any successor. */
-        const assertCurrent = (): void => {
-          this.#assertActive()
-          if (this.#state.registrations.get(registration.name) !== registration)
-            throw new PluginHostError(
-              PluginHostErrorCode.registrationRevoked,
-              ERROR_TEXT.REGISTRATION_REVOKED
-            )
-          void connectionHandle.extensions
-        }
-        return Object.freeze({
-          identity: this.identity,
-          nodeId: readHostNodeId(this),
-          report: domainReport,
-          matchesHost: (host: object) => matchesManagedHost(host, this),
-          assertCurrent,
-          assertPreparedRegistration: () => {
-            this.#assertActive()
-            if (registration.lifecycle === PluginHostRegistrationLifecycle.install) {
-              this.#state.assertRegistrationValid(registration, (current) =>
-                this.#operationRuntime.assertCurrent(current)
-              )
-              return
-            }
-            if (this.#state.registrations.get(registration.name) === registration) {
-              assertCurrent()
-              return
-            }
-            /** The original lifecycle owner already retains the exact active install row. */
-            const current = this.#hookRegistration
-            if (
-              batch &&
-              !batch.committed &&
-              batch.registrations.get(registration.name) === registration &&
-              registration.installed &&
-              !registration.lifecycleController?.signal.aborted &&
-              current !== undefined &&
-              batch.registrations.get(current.name) === current &&
-              current.lifecycle === PluginHostRegistrationLifecycle.install &&
-              this.#operationRuntime.isCurrent(current.operation)
-            ) {
-              /** The original candidate handle owns installed/enabled/activation checks. */
-              void this.#createHandle(registration.name, batch).extensions
-              return
-            }
-            throw new PluginHostError(
-              PluginHostErrorCode.registrationRevoked,
-              ERROR_TEXT.REGISTRATION_REVOKED
-            )
-          },
-          readSharedExtension: (key: PropertyKey) => {
-            this.#assertActive()
-            return this.#state.readSharedExtension(key)
-          },
-          acquireSharedSlot: (key, family, create) => {
-            assertInstall()
-            /** Normalize numeric PropertyKey once before entering the canonical ownership map. */
-            const slotKey = typeof key === 'number' ? String(key) : key
-            if (Reflect.has(this, slotKey) && !this.#state.ownsSharedExtension(slotKey))
-              throw new PluginHostError(
-                PluginHostErrorCode.extensionReserved,
-                ERROR_TEXT.EXTENSION_RESERVED(registration.name, slotKey)
-              )
-            return this.#state.acquireSharedSlot(
-              registration,
-              batch!,
-              slotKey,
-              family,
-              create,
-              assertInstall,
-              () => {
-                this.#assertActive()
-                this.#state.assertRegistrationValid(registration, (current) =>
-                  this.#operationRuntime.assertCurrent(current)
-                )
-              }
-            )
-          },
-          readFeatureOutputs: (name: string) => {
-            /**
-             * The original install batch owns candidates; later generations require this exact live
-             * core.
-             */
-            const candidateBatch = batch && !batch.committed ? batch : undefined
-            if (candidateBatch) assertInstall()
-            else assertCurrent()
-            /** A name is resolved only once to the exact registered Feature owner. */
-            const target =
-              candidateBatch?.registrations.get(name) ?? this.#state.registrations.get(name)
-            /** Original getFeature access enforces activation and output identity. */
-            const handle = this.#createHandle(name, candidateBatch) as unknown as {
-              readonly extensions: object
-              getFeature(feature: string): object
-            }
-            if (!target) {
-              void handle.extensions
-              throw new PluginHostError(
-                PluginHostErrorCode.pluginNotInstalled,
-                ERROR_TEXT.PLUGIN_NOT_INSTALLED(name)
-              )
-            }
-            /** Feature names come from trusted definition metadata, never arbitrary Host fields. */
-            const outputs: Record<string, object> = Object.create(null)
-            for (const feature of Object.keys(target.plugin.features))
-              outputs[feature] = handle.getFeature(feature)
-            if (Object.keys(outputs).length === 0) void handle.extensions
-            return Object.freeze({
-              outputs: Object.freeze(outputs),
-              readCurrent: (feature: string): object => {
-                assertCurrent()
-                return handle.getFeature(feature)
-              },
-              assertCurrent: (feature: string): void => {
-                assertCurrent()
-                if (
-                  this.#state.registrations.get(name) !== target ||
-                  handle.getFeature(feature) !== outputs[feature]
-                )
-                  throw new PluginHostError(
-                    PluginHostErrorCode.registrationRevoked,
-                    ERROR_TEXT.REGISTRATION_REVOKED
-                  )
-              }
-            })
-          }
-        })
-      }
+      runtimeIntegration: (registration, batch) =>
+        Object.freeze(new PluginHostRuntimeIntegration(integrationPort, registration, batch))
     })
-    this.#state.configureSharedPublication({
-      assertActive: () => this.#assertActive(),
-      report: (error) => reportTerminalFailure(error, this.#diagnostic),
-      publish: (key) => {
-        // The canonical owner retains this immutable getter across final withdrawal and reuse.
-        if (Object.hasOwn(this, key)) return
-        /** The concrete descriptor reads canonical state, never a facade-maintained registry. */
-        try {
-          Object.defineProperty(this, key, {
-            enumerable: true,
-            configurable: false,
-            get: () => this.#state.readSharedExtension(key)
-          })
-        } catch (error) {
-          // Defining this concrete Host's admitted key can fail with a native TypeError when
-          // it is non-extensible. Preserve that native failure while identifying publication.
-          throw tagPluginHostError(error as TypeError, PluginHostErrorCode.pluginInstallFailed)
-        }
-      }
-    })
-    this.#configRuntime = new PluginHostConfigRuntime({
-      invokeHook: this.#invokeHook,
-      assertActive: () => this.#assertActive(),
-      isSetupPending: () => this.#setupPending !== undefined,
-      isReleasePending: () => this.#releasePending !== undefined,
-      decorateError: (error) => attachPluginHostIdentity(error, this),
-      enqueue: (task) => this.#enqueue(task),
-      setHookRegistration: (registration) => {
-        this.#hookRegistration = registration
-      },
-      state: this.#state,
-      operations: this.#operationRuntime,
-      core: this.#coreRuntime
-    })
-    this.#hostDisposalRuntime = new PluginHostDisposalRuntime({
+  }
+
+  /** Builds the terminal disposal owner over every runtime it must close. */
+  #createDisposalRuntime(
+    pipelineDrainTimeoutMs: number | false
+  ): PluginHostDisposalRuntime<IRegistration<TDomainCore, TValue>> {
+    return new PluginHostDisposalRuntime({
       terminal: this.#terminal,
       executionController: this.#executionController,
       pipelineLeases: this.#state.lanes.leases,
@@ -639,23 +547,7 @@ class PluginHostConstructor<
       pipelineDrainTimeoutMs,
       enqueueTerminal: (task) => this.#enqueue(task, true),
       // Dependents are disposed before the providers they captured, independent of install order.
-      registrationsInReverse: () => {
-        try {
-          return planTeardown(this.#state.dependencyIndex()).order.map((name) =>
-            this.#state.registrations.get(name)!
-          )
-        } catch (error) {
-          // Terminal disposal must always proceed; admission keeps the graph acyclic, so this
-          // fallback (reverse install order) only guards an invariant breach, which is reported.
-          reportDiagnostic(
-            this.#diagnostic,
-            ERROR_TEXT.DEPENDENCY_CYCLE,
-            PluginHostErrorCode.dependencyCycle,
-            error
-          )
-          return [...this.#state.registrations.values()].reverse()
-        }
-      },
+      registrationsInReverse: () => this.#registrationsInReverse(),
       clearPipelineState: () => {
         this.#state.lanes.clear()
         for (const slot of this.#state.stageSlots.values()) slot.retired = true
@@ -665,8 +557,14 @@ class PluginHostConstructor<
       state: this.#state,
       removal: this.#removalRuntime
     })
+  }
+
+  /** Captures the composition ports now; the composition facade is created only on demand. */
+  #compositionPort(
+    pipelineDrainTimeoutMs: number | false
+  ): IPluginHostCompositionRuntimePort<TDomainCore, TValue> {
     /** Composition captures the original ports now and creates its facade only on public demand. */
-    const compositionPort = {
+    return {
       host: this,
       scheduler: this.#scheduler,
       pipelineDrainTimeoutMs,
@@ -682,31 +580,6 @@ class PluginHostConstructor<
       installation: this.#installRuntime,
       removal: this.#removalRuntime
     } satisfies IPluginHostCompositionRuntimePort<TDomainCore, TValue>
-    this.#pipelineDrainTimeoutMs = pipelineDrainTimeoutMs
-    this.#queueAdmissionTimeoutMs = options.queueAdmissionTimeoutMs
-    this.#queue = createMutationQueue({
-      scheduler: this.#scheduler,
-      queueAdmissionTimeoutMs: options.queueAdmissionTimeoutMs,
-      admissionDiagnosticMs:
-        options.queueAdmissionDiagnosticMs === false
-          ? undefined
-          : (options.queueAdmissionDiagnosticMs ?? DEFAULT_QUEUE_ADMISSION_DIAGNOSTIC_MS),
-      onAdmissionDiagnostic:
-        options.queueAdmissionDiagnosticMs === false
-          ? undefined
-          : (info) => reportQueueWait(this.#diagnostic, info)
-    })
-    // 托管协议不再挂在 Host 实例表面：它是组合方专用的出口，放在实例上会让每个普通消费者都看见
-    // 八个它永远不该调用的方法。登记发生在构造函数末尾，此时 Host 已完整。
-    registerManagedHost(
-      this,
-      compositionPort,
-      () => this.revision,
-      () => {
-        this.#assertActive()
-        return this.#createView()
-      }
-    )
   }
 
   /** Current runner mode; closing or disposed Hosts reject access with their lifecycle code. */
@@ -744,6 +617,35 @@ class PluginHostConstructor<
         new PluginHostError(PluginHostErrorCode.lifecycleMutation, ERROR_TEXT.LIFECYCLE_MUTATION),
         this
       )
+  }
+
+  /**
+   * Publishes one admitted shared-extension key as an enumerable getter on this Host. The getter
+   * reads canonical state on each access, so withdrawal and reuse need no second registry. Defining
+   * the property fails with the native TypeError when the Host was made non-extensible; that
+   * failure keeps its type and gains the install-failure code.
+   */
+  #publishSharedKey(key: PropertyKey): void {
+    if (Object.hasOwn(this, key)) return
+    try {
+      Object.defineProperty(this, key, {
+        enumerable: true,
+        configurable: false,
+        get: () => this.#state.readSharedExtension(key)
+      })
+    } catch (error) {
+      throw tagPluginHostError(error as TypeError, PluginHostErrorCode.pluginInstallFailed)
+    }
+  }
+
+  /**
+   * Returns committed registrations with dependents before the providers they captured. Admission
+   * keeps the dependency graph acyclic, so the teardown plan always exists.
+   */
+  #registrationsInReverse(): IRegistration<TDomainCore, TValue>[] {
+    return planTeardown(this.#state.dependencyIndex()).order.map((name) =>
+      this.#state.registrations.get(name)!
+    )
   }
 
   /** Rethrows a synchronous package error after attributing it to this exact Host. */
