@@ -31,7 +31,9 @@ import {
 } from '@migaia/rpc-host/sdk'
 import {
   connectionOf,
+  parentConnectionOf,
   wrapCoroutineTask,
+  type ICoroutineConnection,
   type ICoroutineMessagePort,
   type ICoroutineReplaceSpec,
   type ICoroutineUserTask,
@@ -49,6 +51,12 @@ export type ICoroutineSupervisorPolicy = Readonly<
     >
   >
 >
+
+/** The original exact-unit map retains native connection custody before accepted Session binding. */
+type ICoroutineSessionBinding = {
+  connection: ICoroutineConnection
+  session?: IRpcSessionHandle
+}
 
 /**
  * One native installation borrows the shared generation/members algorithms without another
@@ -87,7 +95,10 @@ export class CoroutineSource {
   /** Native parent EOF is an actual physical fact, independent of a stale safe view. */
   #closed = false
   /** Native stop/drain selects the exact original unit instead of a replaceable display name. */
-  readonly #sessions = new WeakMap<ICoroutineHandle<ICoroutineMessagePort>, IRpcSessionHandle>()
+  readonly #sessions = new WeakMap<
+    ICoroutineHandle<ICoroutineMessagePort>,
+    ICoroutineSessionBinding
+  >()
   /** Passive control/query/event projection borrows this one original native registration. */
   readonly members: RpcNativeMembers<'coroutine'> | undefined
   /** One installed source needs no parallel member map. */
@@ -128,7 +139,10 @@ export class CoroutineSource {
         report: this.#report,
         beforeRelease: () => this.#supervisor!.stop(),
         onReady: (view, generation, unit, session) => {
-          this.#sessions.set(unit, session)
+          /** Original carrier acquisition precedes this exact generation's accepted readiness. */
+          const binding = this.#sessions.get(unit)!
+          binding.session = session
+          binding.connection.bindParent(session)
           if (events) {
             this.#memberName ??= view.name
             events.ready(this.record, view, generation)
@@ -162,6 +176,7 @@ export class CoroutineSource {
               }
             : {}
         )
+        connection.bindChild(this.close)
       } catch (primary) {
         void carrier.close(primary).catch(this.#report)
         throw primary
@@ -269,9 +284,12 @@ export class CoroutineSource {
     }
   }
   /** Await only this native exposed port; host Session owns the one real handshake. */
-  readonly #openCarrier = async (unit: ICoroutineHandle<ICoroutineMessagePort>) => ({
-    carrier: coroutineCarrier(await unit.exposed, defaultRpcId(), this.#report)
-  })
+  readonly #openCarrier = async (unit: ICoroutineHandle<ICoroutineMessagePort>) => {
+    /** The exposed native port belongs to this task's existing private connection receipt. */
+    const port = await unit.exposed
+    this.#sessions.set(unit, { connection: parentConnectionOf(port) })
+    return { carrier: coroutineCarrier(port, defaultRpcId(), this.#report) }
+  }
   /** One native remaining grace drains actual work before the original cooperative stop hook. */
   readonly #beforeTerminate = async (
     unit: ICoroutineHandle<ICoroutineMessagePort>,
@@ -279,7 +297,7 @@ export class CoroutineSource {
     remainingMs: () => number
   ): Promise<void> => {
     /** Exact unit identity cannot accidentally drain a replacement coroutine. */
-    const session = this.#sessions.get(unit)
+    const session = this.#sessions.get(unit)?.session
     try {
       if (session) await this.#context.drain(session, remainingMs())
       if (!signal.aborted)
