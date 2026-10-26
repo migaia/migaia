@@ -267,6 +267,8 @@ export const host = await createRpcHost({ plugins: [errorMap(redact)] })
 
 Without `errorMap`, handshake refusals hide details from unauthenticated peers by default; other errors preserve the complete cause chain. Crossing a process or thread reconstructs objects and does not preserve `===` with the sender's original error. Configure mapping to hide information from peers while keeping local logs and causes available for diagnosis.
 
+When a connection or Auth installation closes during verification, inbound processing ends as cancellation instead of reporting an authentication failure. The original cancellation reason is retained, and genuine verification failures are still reported. Callers executing Auth SDK stages directly receive the existing `UtilsAbortError` with its original `cause` after installation closure, rather than `AUTHENTICATION_FAILED`.
+
 ## Binary integrity and transfer
 
 When the carrier supports native binary, an ArrayBuffer explicitly listed in `transfer` always transfers natively and the original buffer detaches on actual handoff; signing also calculates and verifies SHA-256. Only buffers without an explicit transfer follow the size rule when signed: at most 1125 bytes are copied into signed content, leaving the original usable and requiring no digest; larger buffers travel as native binary with digest verification. Without signing, binary digests are not calculated. The 1125-byte threshold is an internal SDK choice, not a public option.

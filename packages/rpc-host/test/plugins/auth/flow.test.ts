@@ -2,6 +2,7 @@
 import { expect, it, vi } from 'vitest'
 import { defineHost, definePlugin } from '@migaia/plugin-host'
 import { deferred, type IAbortSignal } from '@migaia/utils/promise'
+import { UtilsAbortError } from '@migaia/utils/error'
 import type { IRpcEnvelopeContext, IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
 import type { IRpcEnvelope, IRpcHello, IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
 import { RpcWireProfile } from '@migaia/rpc-contract/protocol'
@@ -504,16 +505,14 @@ it('rejects verification after physical retirement and preserves custom verifica
   /** Rejection remains observed during asynchronous physical shutdown. */
   const pending = f.receive(packet).catch((error: unknown) => error)
   await arrived.promise
-  /** The ruled close drops this native continuation; its late original Auth failure still reports. */
+  /** Retirement cancels the traversal without classifying its late completion as bad credentials. */
   const before = f.reports.length
   f.source.abort()
   wait.resolve()
   expect(await pending).toBeUndefined()
-  await vi.waitFor(() => expect(f.reports).toHaveLength(before + 1))
-  expect(f.reports.at(-1)).toMatchObject({
-    source: 'rpc.endpoint',
-    code: 'AUTHENTICATION_FAILED'
-  })
+  /** The released verifier and its late promise handlers settle before the next event-loop turn. */
+  await new Promise<void>((resolve) => setImmediate(resolve))
+  expect(f.reports).toHaveLength(before)
   await f.installation.dispose?.()
   await f.flow.dispose()
   /** User callback failures preserve the original local cause independently from wire mapping. */
@@ -531,6 +530,81 @@ it('rejects verification after physical retirement and preserves custom verifica
   })
   await bad.installation.dispose?.()
   await bad.flow.dispose()
+})
+
+it('drops installation cancellation during verification and preserves the original abort reason', async () => {
+  /** Installation cancellation is independent from the still-live physical source signal. */
+  const reason = new Error('Auth installation cancelled')
+  /** The callback holds actual signature verification until setup has been cancelled. */
+  const entered = deferred<void>()
+  /** Cleanup can always release the held verifier, including after a failed assertion. */
+  const released = deferred<void>()
+  /** This native Auth stage uses the same real pipeline and codec as the retention cases. */
+  const f = await fixture({
+    sign: (value) => value,
+    verify: async (value) => {
+      entered.resolve()
+      await released.promise
+      return value
+    }
+  })
+  try {
+    /** Observe rejection immediately while the installed verifier remains suspended. */
+    const pending = f
+      .receive(await f.send(message('installation-cancelled')))
+      .catch((error: unknown) => error)
+    await entered.promise
+    f.setup.abort(reason)
+    expect(f.source.signal.aborted).toBe(false)
+    released.resolve()
+    expect(await pending).toBeUndefined()
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    expect(f.reports).toEqual([])
+    /** Later callers observe cancellation with its original reason instead of an Auth failure. */
+    const failure = await f
+      .send(message('after-installation-cancelled'))
+      .catch((error: unknown) => error)
+    expect(failure).toBeInstanceOf(UtilsAbortError)
+    expect((failure as Error).cause).toBe(reason)
+  } finally {
+    released.resolve()
+    await f.installation.dispose?.()
+    await f.flow.dispose()
+  }
+})
+
+it('reports a genuine late verification failure after the connection has closed', async () => {
+  /** A verifier failure remains a failure even after the waiting Session cancels its traversal. */
+  const cause = new RangeError('late invalid signature')
+  /** Only the actual verifier is delayed; no replacement authentication stage is installed. */
+  const entered = deferred<void>()
+  /** The existing callback resumes only after the genuine physical source has closed. */
+  const released = deferred<void>()
+  /** Keep native Auth setup, codec restoration and late-result reporting under their real owners. */
+  const f = await fixture({
+    sign: (value) => value,
+    verify: async () => {
+      entered.resolve()
+      await released.promise
+      throw cause
+    }
+  })
+  try {
+    /** The pending traversal is cancelled independently from its late verifier rejection. */
+    const pending = f.receive(await f.send(message('late-verifier-failure')))
+    await entered.promise
+    f.source.abort()
+    released.resolve()
+    expect(await pending).toBeUndefined()
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    expect(f.reports).toHaveLength(1)
+    expect(f.reports[0]).toMatchObject({ code: 'AUTHENTICATION_FAILED' })
+    expect((f.reports[0] as Error).cause).toBe(cause)
+  } finally {
+    released.resolve()
+    await f.installation.dispose?.()
+    await f.flow.dispose()
+  }
 })
 
 it('retains the last uint64 allocation and original local handshake credential causes', async () => {

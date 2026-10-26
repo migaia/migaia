@@ -267,6 +267,8 @@ export const host = await createRpcHost({ plugins: [errorMap(redact)] })
 
 没有 `errorMap` 时，未认证对端收到的握手拒绝默认隐藏细节；其他错误保留完整的原因链。跨进程或线程会还原成新对象，不保证与发送方原错 `===`。需要隐藏对端可见信息时配置映射，本地日志和原因链仍可用于排查。
 
+连接或 Auth 安装在验签中途关闭时，这次入站处理按取消结束，不再报告为认证失败；原始取消原因仍保留，真正的验签失败照常报告。直接执行 Auth SDK 阶段的调用者，在安装关闭后会得到现有的 `UtilsAbortError` 及原始 `cause`，而不是 `AUTHENTICATION_FAILED`。
+
 ## 二进制完整性与 transfer
 
 载体支持原生二进制时，显式列在 `transfer` 中的 ArrayBuffer 始终原生转移，实际移交后原 buffer 被 detach；配置签名时也会计算并校验 SHA-256。没有显式转移的 buffer 在签名路径上才按大小处理：不超过 1125 字节时复制到签名内容中，原 buffer 保留可用，也不计算摘要；较大的 buffer 用原生二进制传送并校验摘要。未配置签名时不计算二进制摘要。1125 字节是 SDK 内部阈值，不是公开配置项。
