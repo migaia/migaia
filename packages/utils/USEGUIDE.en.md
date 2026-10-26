@@ -493,6 +493,8 @@ Prints `failed to load the order | lost connection underneath: true`: the outer 
 Import these functions and their constant/type domains from `@migaia/utils`. They take no arguments and return the current classification or `undefined`:
 
 ```ts
+import type { ServerRuntime, ElectronProcessType, GlobalScopeKind } from '@migaia/utils'
+
 declare function detectServerRuntime(): ServerRuntime | undefined
 declare function detectElectronProcessType(): ElectronProcessType | undefined
 declare function detectGlobalScope(): GlobalScopeKind | undefined

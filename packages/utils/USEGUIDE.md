@@ -491,6 +491,8 @@ try {
 从 `@migaia/utils` 导入这三个函数与对应常量/类型域。它们无参数，返回当前分类或 `undefined`：
 
 ```ts
+import type { ServerRuntime, ElectronProcessType, GlobalScopeKind } from '@migaia/utils'
+
 declare function detectServerRuntime(): ServerRuntime | undefined
 declare function detectElectronProcessType(): ElectronProcessType | undefined
 declare function detectGlobalScope(): GlobalScopeKind | undefined
@@ -1102,6 +1104,11 @@ const UtilsErrorCode = {
 
 ```ts
 import { IdentifyError } from '@migaia/utils/error'
+
+declare const cause: unknown
+declare const id: string
+declare const error: unknown
+declare function showEmpty(): void
 
 const OrderError = IdentifyError.define('@app/orders', {
   notFound: 'NOT_FOUND',
