@@ -88,6 +88,8 @@ type IControlPending = { completion: IDeferred<void>; signal: IAbortSignal }
 
 /** Prepared data and its codec context stay paired through the one original encoding path. */
 type ISessionPreparation = Readonly<{ prepared: IRpcPreparedMessage; context: IRpcCodecContext }>
+/** One physical frame lends its original logical emission prefix to every native next branch. */
+type IIngressPrefix = { previous: Promise<void> }
 /** One short-lived media job retains admission facts, never a second business call table. */
 type ISessionWrite = {
   frame: IRpcSemanticFrame
@@ -147,6 +149,12 @@ export class Session {
   #reply: Promise<void> | undefined
   /** Carrier delivery order is preserved without a second receive buffer or shifted array. */
   #receiving: Promise<void> = Promise.resolve()
+  /** Only actual codec/authentication work occupies the original three receive verification slots. */
+  #verifying = 0
+  /** FIFO admission wakes one arrival at a time without copying a queue or waking every waiter. */
+  #verificationAdmission: Promise<void> = Promise.resolve()
+  /** Only the head admission waits for a released slot; later arrivals wait on its original tail. */
+  #verificationAvailable: (() => void) | undefined
   /** Terminal transition synchronously stops all later writes and publication. */
   #closing = false
   /** The final close seals further writes only after all admitted closing work has drained. */
@@ -709,82 +717,139 @@ export class Session {
   readonly #onFrame = (frame: IRpcCarrierFrame): void => {
     if (this.#controller.signal.aborted) return
     this.#media(S.frame, D.inbound, frame)
-    this.#receiving = this.#receiving
-      .then(() => this.#receiveFrame(frame))
-      .catch((error) => this.#fail(error, true))
+    /** Accepted frames may verify together; bootstrap still uses its original serial agreement. */
+    const previous = this.#receiving
+    /** Parallel logical next calls from this same physical input reserve their own arrival order. */
+    const ingress = { previous }
+    /** The original physical prefix remains joined even when an authenticated control bypasses it. */
+    const receiving = (
+      this.#view
+        ? this.#receiveFrame(frame, ingress)
+        : previous.then(() => this.#receiveFrame(frame, ingress))
+    ).catch((error) => this.#fail(error, true))
+    this.#receiving = previous.then(() => receiving)
   }
 
   /** Process one admitted ingress slot through its actual accepted or bootstrap codec boundary. */
-  async #receiveFrame(frame: IRpcCarrierFrame): Promise<void> {
+  async #receiveFrame(frame: IRpcCarrierFrame, ingress: IIngressPrefix): Promise<void> {
     this.#assertOpen(true, true)
     if (this.#view)
       await this.#options
         .pipelines()
         .pipeline(RpcFlowPoint.frameInbound, this.#options.namespace)
         .run({ frame, context: this.#context('inbound') }, async (payload) =>
-          this.#decode(payload.frame)
+          this.#decode(payload.frame, ingress)
         )
-    else await this.#decode(frame)
+    else await this.#decode(frame, ingress)
+  }
+
+  /** Reserve logical emission order; the original native next Promise still owns every failure. */
+  #decode(frame: IRpcCarrierFrame, ingress: IIngressPrefix): Promise<void> {
+    /** The verification admission await precedes any user codec/hook and possible reentry. */
+    const previous = ingress.previous
+    const decoding = this.#decodeMessage(frame, previous)
+    /** A failed member releases ordering without handling its caller's original native next error. */
+    ingress.previous = previous
+      .then(() => decoding)
+      .then(
+        () => undefined,
+        () => undefined
+      )
+    return decoding
+  }
+
+  /** Reserve one slot in O(1); the same Session tail gives every queued arrival one FIFO wakeup. */
+  async #enterVerification(): Promise<boolean> {
+    /** Only this compact receipt, never a frame, is retained by admission successors. */
+    const admitted = deferred<void>()
+    /** Publish this position before suspending so reentrant arrivals cannot overtake it. */
+    const previous = this.#verificationAdmission
+    this.#verificationAdmission = admitted.promise
+    try {
+      await previous
+      if (this.#verifying === SessionText.maximumConcurrentVerifications)
+        await new Promise<void>((resolve) => {
+          this.#verificationAvailable = resolve
+        })
+      if (this.#controller.signal.aborted) return false
+      this.#verifying += 1
+      return true
+    } finally {
+      admitted.resolve()
+    }
   }
 
   /** Decode protected metadata, authenticate it, then restore original admitted binary values. */
-  readonly #decode = async (frame: IRpcCarrierFrame): Promise<void> => {
-    /** The physical codec owns the canonical semantic parser; no second business walker runs here. */
-    const context = this.#codecContext(!this.#view)
-    this.#media(S.encoded, D.inbound, frame.data)
-    /** Four-stage media boundary leaves protected metadata visible before restoration. */
-    const decoded = await this.#options.carrier.codec.decode(frame, context)
-    /** Only a restored, route-admitted frame can authorize correlated failure settlement. */
-    let admitted: IRpcSemanticFrame | undefined
-    /** Auth can join native integrity before committing replay state; codec owns its one result. */
-    const envelopeContext: IRpcEnvelopeContext = {
-      ...this.#context('inbound'),
-      restore: async (prepared) => {
-        /** Accepted-channel grammar failures retain the receiving endpoint's protocol family. */
-        let message: IRpcSemanticFrame
-        try {
-          message = await this.#options.carrier.codec.restore(prepared, context)
-        } catch (error) {
-          if (
-            this.#view &&
-            error instanceof TypeError &&
-            safeRead(error, 'source') === RPC_CONTRACT_SOURCE &&
-            safeRead(error, 'code') === RpcContractErrorCode.invalidEnvelope
-          )
-            throw createRpcProtocolError(error.message, error)
-          throw error
-        }
-        if (!this.#admitRoute(message)) return undefined
-        admitted = message
-        if (this.#closing && this.#view && !isSessionReply(message))
-          throw this.#controlError(this.#reason)
-        return message
-      }
-    }
+  async #decodeMessage(frame: IRpcCarrierFrame, previous: Promise<void>): Promise<void> {
+    if (!(await this.#enterVerification())) return
     /** Envelope hooks may reject before native business values become observable. */
     let message: IRpcSemanticFrame | undefined
     try {
-      await this.#options
-        .pipelines()
-        .pipeline(RpcFlowPoint.envelopeInbound, this.#options.namespace)
-        .run({ prepared: decoded, context: envelopeContext }, async (payload) => {
-          /** Codec restore returns a frame admitted through the sole pure wire grammar. */
-          message = await payload.context.restore(payload.prepared)
-        })
-    } catch (error) {
-      if (
-        !admitted ||
-        admitted.kind === K.handshake ||
-        admitted.kind === K.control ||
-        admitted.kind === K.directory ||
-        !this.#view ||
-        !this.#options.rejected
-      )
-        throw error
-      this.#options.rejected(this.#view, admitted, error)
-      return
+      /** The physical codec owns the canonical semantic parser; no second walker runs here. */
+      const context = this.#codecContext(!this.#view)
+      this.#media(S.encoded, D.inbound, frame.data)
+      /** Four-stage media boundary leaves protected metadata visible before restoration. */
+      const decoded = await this.#options.carrier.codec.decode(frame, context)
+      /** Only a restored, route-admitted frame can authorize correlated failure settlement. */
+      let admitted: IRpcSemanticFrame | undefined
+      /** Auth joins the original cached native integrity result before committing replay state. */
+      const envelopeContext: IRpcEnvelopeContext = {
+        ...this.#context('inbound'),
+        restore: async (prepared) => {
+          /** Accepted-channel grammar failures retain the receiving endpoint's protocol family. */
+          let message: IRpcSemanticFrame
+          try {
+            message = await this.#options.carrier.codec.restore(prepared, context)
+          } catch (error) {
+            if (
+              this.#view &&
+              error instanceof TypeError &&
+              safeRead(error, 'source') === RPC_CONTRACT_SOURCE &&
+              safeRead(error, 'code') === RpcContractErrorCode.invalidEnvelope
+            )
+              throw createRpcProtocolError(error.message, error)
+            throw error
+          }
+          if (!this.#admitRoute(message)) return undefined
+          admitted = message
+          if (this.#closing && this.#view && !isSessionReply(message))
+            throw this.#controlError(this.#reason)
+          return message
+        }
+      }
+      try {
+        await this.#options
+          .pipelines()
+          .pipeline(RpcFlowPoint.envelopeInbound, this.#options.namespace)
+          .run({ prepared: decoded, context: envelopeContext }, async (payload) => {
+            /** Codec restore returns a frame admitted through the sole pure wire grammar. */
+            message = await payload.context.restore(payload.prepared)
+          })
+      } catch (error) {
+        if (
+          !admitted ||
+          admitted.kind === K.handshake ||
+          admitted.kind === K.control ||
+          admitted.kind === K.directory ||
+          !this.#view ||
+          !this.#options.rejected
+        )
+          throw error
+        this.#options.rejected(this.#view, admitted, error)
+        return
+      }
+    } finally {
+      this.#verifying -= 1
+      /** Wake only the original head waiter; native Promise resolution cannot synchronously reenter. */
+      const available = this.#verificationAvailable
+      this.#verificationAvailable = undefined
+      available?.()
     }
     if (message === undefined) return
+    /** Only authenticated control identity may bypass earlier business verification/delivery. */
+    if (message.kind !== K.handshake && message.kind !== K.control && message.kind !== K.cancel)
+      await previous
+    if (this.#controller.signal.aborted) return
     this.#assertOpen(true, true)
     this.#media(S.envelope, D.inbound, message, message)
     if (message.kind === K.handshake) {

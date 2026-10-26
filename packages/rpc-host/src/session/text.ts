@@ -1,5 +1,7 @@
 /** Stable protocol coordination diagnostics for the actual session owner. */
 export const SessionText = {
+  /** Opaque arrivals share three verification slots until authenticated control identity is known. */
+  maximumConcurrentVerifications: 3,
   /** Closing keepalive semantic bytes are bounded independently for each physical connection. */
   defaultKeepaliveBytes: 65_536,
   /** One shared close budget covers handlers, native reason and all final physical writes. */
