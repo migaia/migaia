@@ -1,15 +1,29 @@
 /** Repeat real process-connect acquisitions over original Node byte streams and SDK codecs. */
-import { PassThrough } from 'node:stream'
+import { PassThrough, Writable } from 'node:stream'
 import { createRpcHost, type IRpcHostOptions } from '@migaia/rpc-host'
-import {
-  defineTransportPlugin,
-  createRpcByteCarrier,
-  type IRpcNativePoolMember
-} from '@migaia/rpc-host/sdk'
+import { defineTransportPlugin, type IRpcNativePoolMember } from '@migaia/rpc-host/sdk'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import { createAdapterChildStdio } from '../../rpc-plugin-process/dist/process/node-io.js'
+import { acceptProcessConnectionBootstrap } from '../../rpc-plugin-process/dist/process/connection-bootstrap.js'
+import { createProcessCarrier } from '../../rpc-plugin-process/dist/process/carrier.js'
 import { pool } from '../dist/index.js'
 import { observingPool } from './pool-fixture.js'
+
+/**
+ * In-memory stand-in for a pipe. A real pipe completes a write only after the kernel holds the
+ * bytes, so the carrier may reuse its frame buffer; PassThrough keeps the caller's memory queued,
+ * so each chunk is copied here to give the same ownership.
+ */
+function copyingWriter(target: PassThrough): Writable {
+  return new Writable({
+    write: (chunk: Uint8Array, _encoding, callback) => {
+      target.write(Buffer.from(chunk), callback)
+    },
+    final: (callback) => {
+      target.end(callback)
+    }
+  })
+}
 
 /** Original acquisition and cleanup gates remain outside real native constructors. */
 type IRepeatableConnectOptions = Readonly<{
@@ -83,8 +97,8 @@ class RepeatableConnectFixture {
     const index = this.#dials++
     const toRemote = new PassThrough()
     const fromRemote = new PassThrough()
-    const local = createAdapterChildStdio({ stdout: fromRemote, stdin: toRemote })
-    const remote = createAdapterChildStdio({ stdout: toRemote, stdin: fromRemote })
+    const local = createAdapterChildStdio({ stdout: fromRemote, stdin: copyingWriter(toRemote) })
+    const remote = createAdapterChildStdio({ stdout: toRemote, stdin: copyingWriter(fromRemote) })
     const opening = createRpcHost({
       self: { name: `member-${index}`, instanceId: `member-${crypto.randomUUID()}` },
       report: this.#report,
@@ -97,12 +111,21 @@ class RepeatableConnectFixture {
           name: `native-remote-${index}`,
           namespace: 'process',
           open: async (context) => {
+            /** The dialing process plugin proves its token before any Session frame is exchanged. */
+            const admitted = await acceptProcessConnectionBootstrap(
+              remote,
+              { token: 'fixture-credential' },
+              { signal: context.signal, report: this.#report }
+            )
+            /** The accepted side uses the same process carrier as the dialing plugin. */
+            const id = `remote-${crypto.randomUUID()}`
             const session = context.attach(
-              createRpcByteCarrier({
-                io: remote,
-                report: this.#report,
-                id: `remote-${crypto.randomUUID()}`
-              })
+              createProcessCarrier(admitted.channel, context, {
+                id,
+                ipc: { connectionId: id, sessionId: id, log: () => undefined }
+              }),
+              undefined,
+              admitted.connectionContext
             )
             await session.ready
             return { dispose: session.close }
