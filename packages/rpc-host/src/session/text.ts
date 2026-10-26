@@ -15,6 +15,8 @@ export const SessionText = {
   identityMismatch: 'RPC session identity does not match its physical source',
   /** New-profile negotiation admits one deterministic agreement on each connection. */
   handshakeUnexpected: 'RPC session handshake step is unexpected',
+  /** A scheduler failure prevented the Session's handshake deadline from being installed. */
+  handshakeScheduleFailed: 'RPC handshake scheduling failed',
   /** Default size is the retained native frame ceiling; specific carriers may configure less. */
   defaultMaxFrameBytes: 16_777_216,
   /** Existing host control pings have their own bounded health clock, separate from call features. */

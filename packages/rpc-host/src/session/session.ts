@@ -325,7 +325,7 @@ export class Session {
       throw identifyRpcBoundaryFailure(
         error,
         RpcCoreErrorCode.internal,
-        RpcCoreErrorText.endpointDisposalCleanupFailed
+        SessionText.handshakeScheduleFailed
       )
     }
   }

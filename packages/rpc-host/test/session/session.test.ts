@@ -919,6 +919,38 @@ it('A38 accepted byte Session replaces the bootstrap cap with its configured fra
   }
 })
 
+it('labels a handshake scheduler failure without calling it disposal cleanup', async () => {
+  /** A primitive thrown by the supported scheduler needs the owner's fallback diagnostic. */
+  const cause = 17
+  /** All other scheduler operations remain the original manually controlled implementation. */
+  const clock = createManualScheduler()
+  /** The original native Session starts and fails its real first handshake scheduling operation. */
+  const host = await Host.create(
+    'schedule-a',
+    'schedule-a',
+    {},
+    {
+      scheduler: {
+        ...clock,
+        schedule: () => {
+          throw cause
+        }
+      }
+    }
+  )
+  /** No fabricated peer reply is needed to reach this startup failure. */
+  const carrier = new MemoryCarrier('schedule-carrier')
+  /** Session readiness exposes the original owner-classified startup error. */
+  const handle = host.attach('process', carrier)
+  await expect(handle.ready).rejects.toMatchObject({
+    code: RpcCoreErrorCode.internal,
+    message: 'RPC handshake scheduling failed',
+    cause
+  })
+  await handle.closed
+  await host.table.close()
+})
+
 it('A40 closing keepalive queue leaves cancellation with its original caller', async () => {
   /** Real accepted native sources enter the existing closing-write grace window. */
   const left = await Host.create('keepalive-queue-a')
