@@ -37,7 +37,16 @@ type IPluginHostCoreRuntimePort<TDomainCore extends object, TValue> = Readonly<{
     kind: IMiddlewarePipelineMode
   ) => void
   /** Named registration remains scoped to the genuine native install generation. */
-  readonly pipeline: (name: string, registration: IRegistration<TDomainCore, TValue>) => object
+  readonly preparePipelines: (
+    registration: IRegistration<TDomainCore, TValue>,
+    batch?: IInstallBatchContext<TDomainCore, TValue>
+  ) => void
+  readonly pipeline: (
+    name: string,
+    registration: IRegistration<TDomainCore, TValue>,
+    batch?: IInstallBatchContext<TDomainCore, TValue>,
+    feature?: string
+  ) => object
   readonly cleanupRuntime: PluginHostCleanupRuntime
   /** The original Host constructs install-scoped authority without exposing its mutable runtime. */
   readonly runtimeIntegration: (
@@ -60,6 +69,7 @@ export class PluginHostCoreRuntime<TDomainCore extends object, TValue> {
     registration: IRegistration<TDomainCore, TValue>,
     batch?: IInstallBatchContext<TDomainCore, TValue>
   ): TDomainCore & IPluginHostCore<TValue> {
+    if (registration.scope) this.#port.preparePipelines(registration, batch)
     if (registration.core) return registration.core
     // Config updates can expose a cold lazy core before its first installation attempt.
     registration.lifecycleController ??= createAbortController()
@@ -84,7 +94,7 @@ export class PluginHostCoreRuntime<TDomainCore extends object, TValue> {
       }),
       registerResource: (resource) => this.#registerResource(registration, resource),
       registerStage: (stage, kind) => this.#port.registerStage(stage, registration, kind),
-      pipeline: (name) => this.#port.pipeline(name, registration),
+      pipeline: (name) => this.#port.pipeline(name, registration, batch),
       runtimeIntegration: () => this.#port.runtimeIntegration(registration, batch)
     })
     return registration.core

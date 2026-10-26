@@ -31,6 +31,8 @@ export type IPluginDefinition<TCore> = {
   readonly beforeRelease?: IPluginConstraint<TCore>['beforeRelease']
   /** Symbol disposer captured with the plugin admission snapshot; never re-probe owner at cleanup. */
   readonly disposer?: IPluginDisposer
+  /** Frozen own-data declarations; actual runners belong to each install generation. */
+  readonly pipelines?: import('./pipeline-spec.js').IPipelineDefinitions
   readonly features: Readonly<Record<string, object>>
   readonly featureExpose?: object | ((core: TCore) => object)
   /** New function-form definitions create this descriptor once for each registration. */

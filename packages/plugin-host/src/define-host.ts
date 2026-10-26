@@ -30,6 +30,29 @@ import type {
   IPluginHostRuntimeExtensions
 } from './typing.js'
 
+/** Each qualified name retains its own original payload rather than a union of sibling specs. */
+type IQualifiedPipelines<TPlugin> = TPlugin extends { readonly name: infer TName extends string }
+  ? {
+      readonly [K in keyof import('./typing.js').IPluginDeclaredPipelines<TPlugin> &
+        string as `${TName}.${K}`]: import('./typing.js').IPluginDeclaredPipelines<TPlugin>[K]
+    }
+  : Record<never, never>
+
+/** Installed definitions carry their actual qualified declarations without a second type table. */
+type IInstalledPipelines<TInstalled extends readonly IPluginConstraint<any>[]> = [
+  TInstalled[number]
+] extends [never]
+  ? Record<never, never>
+  : (
+        TInstalled[number] extends infer TPlugin
+          ? TPlugin extends unknown
+            ? (value: IQualifiedPipelines<TPlugin>) => void
+            : never
+          : never
+      ) extends (value: infer TVisible extends IPipelineDefinitions) => void
+    ? TVisible
+    : Record<never, never>
+
 /**
  * What the host knows when it asks for a domain core: which registration, and which batch.
  *
@@ -118,7 +141,14 @@ export type IHostHandle<
   /** Runner selected at construction; access fails while closing or disposed. */
   readonly pipelineMode: IMiddlewarePipelineMode
   /** Owner authority for one declared name, including mode-appropriate execution. */
-  pipeline<TName extends keyof TPipelines & string>(name: TName): IPipelineOwner<TPipelines[TName]>
+  pipeline<TName extends keyof (TPipelines & IInstalledPipelines<TInstalled>) & string>(
+    name: TName
+  ): IPipelineOwner<(TPipelines & IInstalledPipelines<TInstalled>)[TName]>
+  /** Construction owners can execute their genuine candidate through the same lookup entry. */
+  pipeline(
+    name: string,
+    request: IHostCoreConstructionRequest
+  ): IPipelineOwner<import('./pipeline-spec.js').IPipelineSpec<unknown>>
   /** Current committed publication revision, not a count of attempted operations. */
   readonly revision: number
   /** Stable name/path config reader and queued transactional updater. */
@@ -338,10 +368,8 @@ class DefinedHostRuntime<
   }
 
   /** Exposes only the existing protected owner authority on the functional handle. */
-  pipelinePublic<TName extends keyof TPipelines & string>(
-    name: TName
-  ): IPipelineOwner<TPipelines[TName]> {
-    return this.pipeline(name)
+  pipelinePublic(name: string, request?: IHostCoreConstructionRequest): any {
+    return request ? this.pipeline(name, request) : this.pipeline(name as keyof TPipelines & string)
   }
 
   /** Owner handle forwards the sync entry without another execution owner. */
@@ -459,8 +487,8 @@ function createHandleSurface<
       runtime.useAsyncGeneratorPipeline(stage)
       return reference.handle
     },
-    pipeline: <TName extends keyof TPipelines & string>(name: TName) =>
-      runtime.pipelinePublic(name),
+    pipeline: (name: string, request?: IHostCoreConstructionRequest) =>
+      runtime.pipelinePublic(name, request),
     runPipeline: (value: TValue, done: (value: TValue) => void) =>
       runtime.runPipelinePublic(value, done),
     runPipelineSync: <TResult>(value: TValue, done: (value: TValue) => TResult) =>

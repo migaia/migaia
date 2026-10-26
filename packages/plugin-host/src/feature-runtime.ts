@@ -117,7 +117,9 @@ export const instantiateFeatures = (
     reference: import('./feature-types.js').IFeatureReference<object, boolean>
   ) => object | undefined,
   /** Receives reporter failures that cannot be re-reported; defaults to the runtime sink. */
-  terminal: (failure: unknown) => void = reportTerminalFailure
+  terminal: (failure: unknown) => void = reportTerminalFailure,
+  /** Registration-scoped pipeline authority is borrowed from the original native core. */
+  pipeline?: (name: string, feature: object) => object
 ): Readonly<Record<string, object>> => {
   /**
    * Reports a rejected factory result. When the reporter itself fails, the rejection is re-reported
@@ -161,7 +163,7 @@ export const instantiateFeatures = (
       } else dependencies[name] = outputs.get(dependency)!
     }
     const output = invokeCaptured(definition.factory, undefined, [
-      Object.freeze({ featureExpose }),
+      Object.freeze({ featureExpose, pipeline: (name: string) => pipeline?.(name, feature) }),
       Object.freeze(dependencies)
     ])
     const thenable = output && typeof output === 'object' ? probeThenable(output) : undefined

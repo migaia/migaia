@@ -124,6 +124,8 @@ export class StageLanes<TValue> {
   readonly #key: PropertyKey
   /** Reverse traversal is compiled once with the immutable snapshot. */
   readonly #reverse: boolean
+  /** A plugin-owned lane pins its defining generation in each nonempty snapshot. */
+  readonly #ownerKey: object | undefined
   /** All declared lanes borrow the same original data-order index. */
   readonly #order: StageAllocationOrder
   /** Visible stage count maintained at mutation boundaries for the empty fast path. */
@@ -140,8 +142,10 @@ export class StageLanes<TValue> {
     key: PropertyKey,
     leases: IQuiescenceTracker<object>,
     reverse = false,
-    order = new StageAllocationOrder()
+    order = new StageAllocationOrder(),
+    ownerKey?: object
   ) {
+    this.#ownerKey = ownerKey
     this.#key = key
     this.leases = leases
     this.#reverse = reverse
@@ -215,11 +219,20 @@ export class StageLanes<TValue> {
     stage: IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>,
     ordinal: bigint,
     forms: IStageForms<TValue> = {}
-  ): void {
-    this.#order.appendHost(this.#key, ordinal, { stage, ...forms, alive: true })
+  ): () => void {
+    /** Exact host occurrence is removed without altering another identical stage. */
+    const entry: IStageEntry<TValue> = { stage, ...forms, alive: true }
+    this.#order.appendHost(this.#key, ordinal, entry)
     this.#size += 1
     if (!forms.syncStage) this.#asyncStageCount += 1
     this.invalidate()
+    return () => {
+      if (!entry.alive) return
+      entry.alive = false
+      this.#size -= 1
+      if (!forms.syncStage) this.#asyncStageCount -= 1
+      this.invalidate()
+    }
   }
 
   /** Records a candidate stage on its exact registration, invisible until publication. */
@@ -228,7 +241,7 @@ export class StageLanes<TValue> {
     slot: IDataOrderSlotState,
     stage: IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>,
     forms: IStageForms<TValue> = {}
-  ): void {
+  ): () => void {
     registration.segments.set(this.#key, this.ensureSlot(slot))
     /** Disposer toggles only its own occurrence, even when another owner uses the same function. */
     const entry: IStageEntry<TValue> = { stage, ...forms, alive: true }
@@ -236,12 +249,24 @@ export class StageLanes<TValue> {
     let entries = registration.stageEntries.get(this.#key)
     if (!entries) registration.stageEntries.set(this.#key, (entries = []))
     entries.push(entry)
-    registration.pipelineDisposers.push(() => {
+    /** The public removal handle and native cleanup share this exact idempotent disposer. */
+    const remove = (): void => {
       if (!entry.alive) return
       entry.alive = false
       if (registration.segments.get(this.#key)?.owner === registration)
         this.refreshOwner(registration)
-    })
+    }
+    registration.pipelineDisposers.push(remove)
+    return remove
+  }
+
+  /** A declared group's owner participates in the same retirement index even before adding stages. */
+  bindDefinition<TDomainCore extends object>(
+    registration: IRegistration<TDomainCore, TValue>,
+    slot: IDataOrderSlotState
+  ): void {
+    registration.segments.set(this.#key, this.ensureSlot(slot))
+    this.bindOwner(registration)
   }
 
   /** Switches a slot to the committed generation at the publication point. */
@@ -292,7 +317,7 @@ export class StageLanes<TValue> {
       if (entry.asyncStage) asyncStages.push(entry.asyncStage)
     }
     /** Lease keys belonging to registrations that contribute visible stages. */
-    const ownerKeys: object[] = []
+    const ownerKeys: object[] = this.#ownerKey ? [this.#ownerKey] : []
     for (const allocation of this.#order.values()) {
       if (allocation.kind === 'host') {
         if (allocation.key === this.#key && allocation.entry.alive) append(allocation.entry)
@@ -308,7 +333,8 @@ export class StageLanes<TValue> {
         append(entry)
         contributed = true
       }
-      if (contributed) ownerKeys.push(owner.pipelineOwnerKey)
+      if (contributed && owner.pipelineOwnerKey !== this.#ownerKey)
+        ownerKeys.push(owner.pipelineOwnerKey)
     }
     if (this.#reverse) {
       stages.reverse()
@@ -376,10 +402,10 @@ export class StageLaneCollection<TValue> {
   }
 
   /** Construction alone declares lanes; the public Host never exposes this mutation. */
-  declare(key: PropertyKey, reverse = false): StageLanes<any> {
+  declare(key: PropertyKey, reverse = false, ownerKey?: object): StageLanes<any> {
     const existing = this.#lanes.get(key)
     if (existing) return existing
-    const lanes = new StageLanes(key, this.leases, reverse, this.#order)
+    const lanes = new StageLanes(key, this.leases, reverse, this.#order, ownerKey)
     this.#lanes.set(key, lanes)
     return lanes
   }
@@ -396,12 +422,12 @@ export class StageLaneCollection<TValue> {
 
   /** Availability changes only revisit the pipelines actually owned by this registration. */
   refreshOwner<TDomainCore extends object>(registration: IRegistration<TDomainCore, TValue>): void {
-    for (const key of registration.segments.keys()) this.#lanes.get(key)!.refreshOwner(registration)
+    for (const key of registration.segments.keys()) this.#lanes.get(key)?.refreshOwner(registration)
   }
 
   /** Atomic publication switches all pipeline segments to this exact candidate generation. */
   bindOwner<TDomainCore extends object>(registration: IRegistration<TDomainCore, TValue>): void {
-    for (const key of registration.segments.keys()) this.#lanes.get(key)!.bindOwner(registration)
+    for (const key of registration.segments.keys()) this.#lanes.get(key)?.bindOwner(registration)
   }
 
   /** Withdraw every visible contribution before sealing its existing aggregate generation fence. */
@@ -410,14 +436,27 @@ export class StageLaneCollection<TValue> {
     leases: IQuiescenceTracker<object>
   ): void {
     for (const key of registration.segments.keys())
-      this.#lanes.get(key)!.retireLeaseOwner(registration, leases)
+      this.#lanes.get(key)?.retireLeaseOwner(registration, leases)
     leases.seal(registration.pipelineOwnerKey)
   }
 
   /** Exact opaque slot retirement reaches every lane without changing shared allocation order. */
   retireSlot(slot: IDataOrderSlotState): void {
-    for (const key of slot.segments?.keys() ?? []) this.#lanes.get(key)!.retireSlot(slot)
+    for (const key of slot.segments?.keys() ?? []) this.#lanes.get(key)?.retireSlot(slot)
     this.#order.retireSlot(slot)
+  }
+
+  /** Removes one group's lanes in a single pass over original sparse allocations. */
+  remove(keys: ReadonlySet<PropertyKey>): void {
+    for (const key of keys) {
+      this.#lanes.get(key)?.clear()
+      this.#lanes.delete(key)
+    }
+    for (const allocation of this.#order.values()) {
+      if (allocation.kind !== 'owner') continue
+      for (const key of allocation.slot.segments?.keys() ?? [])
+        if (keys.has(key)) allocation.slot.segments!.delete(key)
+    }
   }
 
   /** Terminal disposal releases every cached snapshot and pipeline-owned stage reference. */

@@ -64,6 +64,13 @@ type IPluginHostInstallRuntimePort<TDomainCore extends object, TValue> = Readonl
   readonly setSetupPending: (registration: IRegistration<TDomainCore, TValue> | undefined) => void
   /** Shared host state owning dependency facts and committed registration status. */
   readonly state: PluginHostState<TDomainCore, TValue>
+  /** Features borrow the same exact native pipeline registration scope. */
+  readonly pipeline: (
+    name: string,
+    registration: IRegistration<TDomainCore, TValue>,
+    batch: IInstallBatchContext<TDomainCore, TValue>,
+    feature: string
+  ) => object
   readonly createCore: (
     registration: IRegistration<TDomainCore, TValue>,
     batch: IInstallBatchContext<TDomainCore, TValue>
@@ -664,6 +671,10 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
       expose,
       () => registration.featureExposeValid === true
     )
+    /** Root labels are diagnostic only; local dependency identity stays opaque. */
+    const featureNames = new Map(
+      Object.entries(registration.plugin.features).map(([name, feature]) => [feature, name])
+    )
     registration.featureOutputs = instantiateFeatures(
       registration.plugin.features,
       registration.featureExpose,
@@ -694,7 +705,14 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
         }
         return provider.featureOutputs?.[reference.feature]
       },
-      (failure) => reportTerminalFailure(failure, this.#port.diagnostic)
+      (failure) => reportTerminalFailure(failure, this.#port.diagnostic),
+      (name, feature) =>
+        this.#port.pipeline(
+          name,
+          registration,
+          batch,
+          featureNames.get(feature) ?? '<local dependency>'
+        )
     )
     Object.defineProperty(core, 'featureExpose', {
       value: registration.featureExpose,

@@ -164,6 +164,8 @@ export type {
   IPipelineMode,
   IPipelineStage,
   IPipelineRegistration,
+  IPipelineScope,
+  IPipelineStageHandle,
   IPipelineOwner,
   IPipelineRunResult
 } from './pipeline-spec.js'

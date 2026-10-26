@@ -179,6 +179,10 @@ export const markRegistrationRevoked = (registration: object): void => {
   revokedRegistrations.add(registration)
 }
 
+/** Reads the existing revocation authority without retaining or reviving a registration. */
+export const isRegistrationRevoked = (registration: object): boolean =>
+  revokedRegistrations.has(registration)
+
 /** Creates a narrow extension-only view for one live registration token. */
 export const createRegistrationView = (
   receipt: IRegistrationToken

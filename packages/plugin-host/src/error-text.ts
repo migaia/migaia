@@ -171,7 +171,8 @@ const ERROR_TEXT = {
   /** Named construction descriptions must originate from pipelineSpec and use a valid order. */
   INVALID_PIPELINE_OPTION: prefixed('invalid named pipeline option'),
   /** Only construction-time declared names can be used by plugins or their owning Host. */
-  PIPELINE_UNKNOWN: prefixed('named pipeline is not declared'),
+  PIPELINE_UNKNOWN: (owner: string, name: string, visible: string) =>
+    prefixed(`named pipeline "${name}" is not declared for ${owner}; visible scope: ${visible}`),
 
   /** Stable text distinguishing a temporarily disabled Feature prerequisite owner. */
   PREREQUISITE_DISABLED: (key: PropertyKey, owner: string) =>

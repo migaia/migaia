@@ -314,6 +314,16 @@ class PluginHostConstructor<
         allocateSlot: () => this.#state.allocateStageSlot(),
         assertActive: () => this.#assertActive(),
         commit: () => this.#state.commit(),
+        ownCleanup: (registration, cleanup) =>
+          (registration.provisional ?? registration.scope)!.own(
+            cleanup,
+            this.#cleanupRuntime.createStepDescriptor(
+              PluginHostInternalText.RESOURCE_DISPOSER_PHASE,
+              cleanup,
+              registration
+            )
+          ),
+        registrations: this.#state.registrations,
         diagnostic: this.#pipelineDiagnostic
       },
       options.pipeline,
@@ -477,6 +487,8 @@ class PluginHostConstructor<
       scheduler: this.#scheduler,
       executionSignal: this.#executionController.signal,
       state: this.#state,
+      pipeline: (name, registration, batch, feature) =>
+        this.#pipelines.registration(name, registration, batch, feature),
       createCore: (registration, batch) => this.#coreRuntime.create(registration, batch),
       setHookRegistration: (registration) => {
         this.#hookRegistration = registration
@@ -525,10 +537,9 @@ class PluginHostConstructor<
         ),
       executionSignal: this.#executionController.signal,
       registerStage: (stage, registration, kind) => this.#registerStage(stage, registration, kind),
-      pipeline: (name, registration) => {
-        const entry = this.#pipelines.named(name)
-        return Object.freeze({ use: (stage: Function) => entry.register(stage, registration) })
-      },
+      preparePipelines: (registration, batch) => this.#pipelines.prepare(registration, batch),
+      pipeline: (name, registration, batch, feature) =>
+        this.#pipelines.registration(name, registration, batch, feature),
       cleanupRuntime: this.#cleanupRuntime,
       runtimeIntegration: (registration, batch) =>
         Object.freeze(new PluginHostRuntimeIntegration(integrationPort, registration, batch))
@@ -544,7 +555,7 @@ class PluginHostConstructor<
       executionController: this.#executionController,
       pipelineLeases: this.#state.lanes.leases,
       pending: this.#pending,
-      pipelineKeys: this.#pipelines.keys(),
+      pipelineKeys: () => this.#pipelines.keys(),
       scheduler: this.#scheduler,
       pipelineDrainTimeoutMs,
       enqueueTerminal: (task) => this.#enqueue(task, true),
@@ -709,9 +720,16 @@ class PluginHostConstructor<
   /** Typed owner authority exposes execution only to the Host's own handle or subclass. */
   protected pipeline<TName extends keyof TPipelines & string>(
     name: TName
-  ): IPipelineOwner<TPipelines[TName]> {
-    this.#assertActive()
-    return this.#pipelines.named(name).owner as IPipelineOwner<TPipelines[TName]>
+  ): IPipelineOwner<TPipelines[TName]>
+  protected pipeline(
+    name: string,
+    request: import('./define-host.js').IHostCoreConstructionRequest
+  ): IPipelineOwner<import('./pipeline-spec.js').IPipelineSpec<unknown>>
+  protected pipeline(
+    name: string,
+    request?: import('./define-host.js').IHostCoreConstructionRequest
+  ): any {
+    return this.#pipelines.owner(name, request)
   }
 
   /** Default selected-mode execution retains its established public signature. */

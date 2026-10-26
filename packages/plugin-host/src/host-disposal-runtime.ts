@@ -20,7 +20,7 @@ type IPluginHostDisposalRuntimePort<TRegistration> = Readonly<{
   readonly executionController: IAbortController
   readonly pipelineLeases: IQuiescenceTracker<object>
   readonly pending: IPendingTracker
-  readonly pipelineKeys: readonly object[]
+  readonly pipelineKeys: () => readonly object[]
   readonly scheduler: IScheduler
   readonly pipelineDrainTimeoutMs: number | false
   readonly enqueueTerminal: <T>(task: () => Promise<T>) => Promise<T>
@@ -50,7 +50,7 @@ export class PluginHostDisposalRuntime<TRegistration> {
   /** Default-only hosts retain the original drain Promise and its revocation microtask ordering. */
   #whenPipelineZero(): Promise<unknown> {
     /** Construction fixes the key set before any execution or disposal can begin. */
-    const keys = this.#port.pipelineKeys
+    const keys = this.#port.pipelineKeys()
     return keys.length === 1
       ? this.#port.pipelineLeases.whenZero(keys[0]!)
       : Promise.all(keys.map((key) => this.#port.pipelineLeases.whenZero(key)))
@@ -64,7 +64,7 @@ export class PluginHostDisposalRuntime<TRegistration> {
     this.#promise = completion.promise
     try {
       this.#port.terminal.close()
-      for (const key of this.#port.pipelineKeys) this.#port.pipelineLeases.seal(key)
+      for (const key of this.#port.pipelineKeys()) this.#port.pipelineLeases.seal(key)
       // A native abort never throws: listener failures go to the host's own error reporting.
       this.#port.executionController.abort(
         new PluginHostError(PluginHostErrorCode.hostDisposing, ERROR_TEXT.HOST_DISPOSING)

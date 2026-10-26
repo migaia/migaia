@@ -1,4 +1,8 @@
-import type { IPipelineDefinitions, IPipelineRegistration } from './pipeline-spec.js'
+import type {
+  IPipelineDefinitions,
+  IPipelineRegistration,
+  IPipelineScope
+} from './pipeline-spec.js'
 import type { INativeAbortSignal } from '@migaia/utils/promise'
 import { asyncDisposeKey } from './symbols.js'
 import type { IScheduler } from '@migaia/utils/scheduler'
@@ -207,6 +211,8 @@ export type IPluginCommon<
 > = {
   /** Nonempty dot-free registration key, unique within one Host. */
   readonly name: string
+  /** Own pipeline declarations are frozen with the trusted plugin definition. */
+  readonly pipelines?: IPipelineDefinitions
   /** Optional initial configuration; omission supplies an empty owned snapshot. */
   readonly config?: TConfig
   /** Selected Feature roots; omission selects none, and local dependencies are constructed once. */
@@ -614,15 +620,18 @@ export type IDefinedPluginConstraint<
   TName extends string = string,
   TFeatures extends IFeatureRecord = Record<never, never>,
   TExpose extends object = Record<never, never>,
-  TSetup = never
+  TSetup = never,
+  TPipelines extends IPipelineDefinitions = Record<never, never>
 > = IPlugin<any, TExtension, TConfig, TShared, TFeatures, TExpose, TSetup> &
   Readonly<{
     /** Definition's literal registration name, preserved for reference typing. */
     readonly name: TName
+    /** Exact own declaration map remains tied to its trusted definition. */
+    readonly pipelines?: TPipelines
     /** Creates a required cross-plugin reference without running the provider's Feature factory. */
     getFeature<TKey extends Extract<keyof TFeatures, string>>(
       name: TKey
-    ): IFeatureReference<IFeatureOutput<TFeatures[TKey]>, false, TName>
+    ): IFeatureReference<IFeatureOutput<TFeatures[TKey]>, false, TName, TPipelines>
     /**
      * Optional:true tolerates an absent provider; unknown declared names still throw
      * FEATURE_NOT_DECLARED.
@@ -633,9 +642,13 @@ export type IDefinedPluginConstraint<
         /** Opts into an optional reference; the dependency value can be undefined when absent. */
         readonly optional: true
       }>
-    ): IFeatureReference<IFeatureOutput<TFeatures[TKey]>, true, TName>
+    ): IFeatureReference<IFeatureOutput<TFeatures[TKey]>, true, TName, TPipelines>
     /** Required only in declarations; runtime authority remains the private WeakMap. */
-    readonly [definedPluginBrand]: { readonly core: TCore; readonly value: TValue }
+    readonly [definedPluginBrand]: {
+      readonly core: TCore
+      readonly value: TValue
+      readonly pipelines: TPipelines
+    }
   }>
 
 /** Extracts one plugin's declared extension surface; it does not instantiate or read a registration. */
@@ -764,7 +777,7 @@ export interface IPluginHostCore<
   /** Registration-only authority for a name declared by this Host. */
   pipeline<TName extends keyof TPipelines & string>(
     name: TName
-  ): IPipelineRegistration<TPipelines[TName]>
+  ): IPipelineRegistration<TPipelines[TName], TPipelines>
   /** Reads this registration's current immutable config; no mutation capability is exposed here. */
   readonly config: IPluginLifecycleConfig<TConfig>
   /** Current operation signal/deadline, separate from the registration lifetime. */
@@ -978,6 +991,23 @@ export type {
   IPipelineMode,
   IPipelineStage,
   IPipelineRegistration,
+  IPipelineScope,
+  IPipelineStageHandle,
   IPipelineOwner,
   IPipelineRunResult
 } from './pipeline-spec.js'
+
+/** A plugin's own map and actual Feature references define its extra registration names. */
+export type IPluginPipelineCore<
+  TPipelines extends IPipelineDefinitions,
+  TFeatures extends IFeatureRecord
+> = IPipelineScope<TPipelines & import('./feature-types.js').IFeatureRecordPipelines<TFeatures>>
+
+/** Extracts captured own pipeline declarations from trusted-definition provenance. */
+export type IPluginDeclaredPipelines<TPlugin> = TPlugin extends {
+  readonly [definedPluginBrand]: {
+    readonly pipelines: infer TPipelines extends IPipelineDefinitions
+  }
+}
+  ? TPipelines
+  : Record<never, never>

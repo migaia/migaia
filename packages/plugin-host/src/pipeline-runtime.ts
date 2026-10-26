@@ -69,24 +69,14 @@ type IPluginHostStageRegistrationOptions<TDomainCore extends object, TValue> = R
   readonly ensureSlot: (slot: IDataOrderSlotState) => void
 }>
 
-/** Registers one already-lifted stage while preserving definition order and disposal ownership. */
-export const registerPluginHostStage = <TDomainCore extends object, TValue>(
-  options: IPluginHostStageRegistrationOptions<TDomainCore, TValue>
-): void => {
-  const { stage, owner } = options
-  if (typeof stage !== 'function')
-    throw createPluginHostTypeError(PluginHostInternalText.PIPELINE_STAGE_FUNCTION)
-  if (owner && owner.lifecycle !== PluginHostRegistrationLifecycle.install)
-    throw new PluginHostError(
-      PluginHostErrorCode.resourceOutsideInstall,
-      ERROR_TEXT.RESOURCE_OUTSIDE_INSTALL
-    )
-  if (options.depth > 0 && !owner)
-    throw new PluginHostError(PluginHostErrorCode.pipelineExecuting, ERROR_TEXT.PIPELINE_EXECUTING)
-  if (!owner) {
-    options.lanes.appendHost(stage, options.allocateSlot(), options.forms)
-    return
-  }
+/** Reuses the original name slot for declared groups and later concrete stage occurrences. */
+export function ensurePluginHostStageSlot<TDomainCore extends object, TValue>(
+  options: Pick<
+    IPluginHostStageRegistrationOptions<TDomainCore, TValue>,
+    'host' | 'stageSlots' | 'allocateSlot' | 'ensureSlot'
+  >,
+  owner: IRegistration<TDomainCore, TValue>
+): IDataOrderSlotState {
   let slotState = options.stageSlots.get(owner.name)
   if (!slotState || slotState.retired) {
     slotState = {
@@ -98,7 +88,28 @@ export const registerPluginHostStage = <TDomainCore extends object, TValue>(
     options.stageSlots.set(owner.name, slotState)
     options.ensureSlot(slotState)
   }
-  options.lanes.registerOwner(owner, slotState, stage, options.forms)
+  return slotState
+}
+
+/** Registers one already-lifted stage while preserving definition order and disposal ownership. */
+export const registerPluginHostStage = <TDomainCore extends object, TValue>(
+  options: IPluginHostStageRegistrationOptions<TDomainCore, TValue>
+): (() => void) => {
+  const { stage, owner } = options
+  if (typeof stage !== 'function')
+    throw createPluginHostTypeError(PluginHostInternalText.PIPELINE_STAGE_FUNCTION)
+  if (owner && owner.lifecycle !== PluginHostRegistrationLifecycle.install)
+    throw new PluginHostError(
+      PluginHostErrorCode.resourceOutsideInstall,
+      ERROR_TEXT.RESOURCE_OUTSIDE_INSTALL
+    )
+  if (options.depth > 0 && !owner)
+    throw new PluginHostError(PluginHostErrorCode.pipelineExecuting, ERROR_TEXT.PIPELINE_EXECUTING)
+  if (!owner) {
+    return options.lanes.appendHost(stage, options.allocateSlot(), options.forms)
+  }
+  const slotState = ensurePluginHostStageSlot(options, owner)
+  return options.lanes.registerOwner(owner, slotState, stage, options.forms)
 }
 
 /**
@@ -111,7 +122,7 @@ export const executePluginHostPipeline = <TValue, TResult = void>(
   options: IPluginHostPipelineExecutionPort<TValue>,
   snapshot: IStageSnapshot<TValue>,
   value: TValue,
-  done: (value: TValue) => void,
+  done: (value: TValue) => unknown,
   stages = snapshot.stages,
   result?: () => TResult
 ): void | Promise<TResult | undefined> => {

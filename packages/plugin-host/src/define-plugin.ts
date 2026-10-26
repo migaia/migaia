@@ -1,3 +1,5 @@
+import type { IPipelineDefinitions } from './pipeline-spec.js'
+import { snapshotPipelineDefinitions } from './named-pipelines.js'
 import { copyConfig } from './config.js'
 import { snapshotDisposer } from './disposal.js'
 import { invokeCaptured } from './invocation.js'
@@ -41,6 +43,7 @@ const knownKeys = new Set<PropertyKey>([
   'beforeRelease',
   'shared',
   'features',
+  'pipelines',
   'featureExpose',
   'activation',
   'onDependencyReplaced',
@@ -75,6 +78,7 @@ type IDefinitionFields = Readonly<{
   dispose: unknown
   beforeRelease: unknown
   features: unknown
+  pipelines: unknown
   featureExpose: unknown
   asyncDisposer: unknown
   syncDisposer: unknown
@@ -101,6 +105,7 @@ const readDefinitionFields = (source: object): IDefinitionFields => ({
   dispose: readData(source, 'dispose'),
   beforeRelease: readData(source, 'beforeRelease'),
   features: readData(source, 'features'),
+  pipelines: readData(source, 'pipelines'),
   featureExpose: readData(source, 'featureExpose'),
   asyncDisposer: readSymbolDisposer(source, Symbol.asyncDispose),
   syncDisposer: readSymbolDisposer(source, Symbol.dispose)
@@ -236,6 +241,8 @@ const createFrozenPlugin = (
     value: fields.rawConfig === undefined ? undefined : ownedConfig,
     enumerable: true
   })
+  if (fields.pipelines !== undefined)
+    Object.defineProperty(plugin, 'pipelines', { value: fields.pipelines, enumerable: true })
   Object.defineProperty(plugin, 'install', {
     value: (...args: unknown[]) => invokeCaptured(install, source, args),
     enumerable: true
@@ -272,7 +279,8 @@ const createFrozenPlugin = (
 const createDefinition = <TPlugin extends IPluginConstraint<any>>(
   source: TPlugin & object
 ): IStoredDefinition & { readonly plugin: TPlugin } => {
-  const fields = readDefinitionFields(source)
+  const captured = readDefinitionFields(source)
+  const fields = { ...captured, pipelines: snapshotPipelineDefinitions(captured.pipelines) }
   assertDefinitionFields(fields)
   const featureRecord = snapshotFeatureRecord(fields.features)
   const metadata = snapshotDefinitionMetadata(source)
@@ -299,6 +307,7 @@ const createDefinition = <TPlugin extends IPluginConstraint<any>>(
     dispose: plugin.dispose as IPluginConstraint<any>['dispose'],
     beforeRelease: plugin.beforeRelease as IPluginConstraint<any>['beforeRelease'],
     features: Object.freeze(featureRecord),
+    pipelines: fields.pipelines,
     featureExpose: fields.featureExpose as IPluginDefinition<any>['featureExpose'],
     disposer
   }
@@ -367,23 +376,28 @@ export function definePlugin<
   TFeatures extends IFeatureRecord = Record<never, never>,
   TExpose extends object = Record<never, never>,
   TDefinition extends object = object,
-  TSetup = unknown
+  TSetup = unknown,
+  const TPipelines extends IPipelineDefinitions = Record<never, never>
 >(
   definition: IPluginCommon<
-    TCore & import('./typing.js').IPluginHostCore<TValue>,
+    TCore &
+      import('./typing.js').IPluginHostCore<TValue> &
+      import('./typing.js').IPluginPipelineCore<TPipelines, TFeatures>,
     TConfig,
     TFeatures,
     TExpose
   > &
     IPluginSetupHooks<
-      TCore & import('./typing.js').IPluginHostCore<TValue>,
+      TCore &
+        import('./typing.js').IPluginHostCore<TValue> &
+        import('./typing.js').IPluginPipelineCore<TPipelines, TFeatures>,
       TExtension,
       TConfig,
       TFeatures,
       TExpose,
       TSetup
     > &
-    Readonly<{ name: TName }> &
+    Readonly<{ name: TName; pipelines?: TPipelines }> &
     (TExpose extends IFeatureRecordRequiredExpose<TFeatures> ? unknown : never) &
     TDefinition
 ): IDefinedPluginConstraint<
@@ -395,7 +409,8 @@ export function definePlugin<
   TName,
   TFeatures,
   TExpose,
-  TSetup
+  TSetup,
+  TPipelines
 > &
   Readonly<Omit<TDefinition, keyof IPlugin<any, any, any, any, any, any, any> | 'name'>>
 
@@ -413,17 +428,20 @@ export function definePlugin<
   const TName extends string = string,
   TFeatures extends IFeatureRecord = Record<never, never>,
   TExpose extends object = Record<never, never>,
-  TDefinition extends object = object
+  TDefinition extends object = object,
+  const TPipelines extends IPipelineDefinitions = Record<never, never>
 >(
   definition: IPlugin<
-    TCore & import('./typing.js').IPluginHostCore<TValue>,
+    TCore &
+      import('./typing.js').IPluginHostCore<TValue> &
+      import('./typing.js').IPluginPipelineCore<TPipelines, TFeatures>,
     TExtension,
     TConfig,
     TShared,
     TFeatures,
     TExpose
   > &
-    Readonly<{ name: TName }> &
+    Readonly<{ name: TName; pipelines?: TPipelines }> &
     (TExpose extends IFeatureRecordRequiredExpose<TFeatures> ? unknown : never) &
     TDefinition
 ): IDefinedPluginConstraint<
@@ -434,7 +452,9 @@ export function definePlugin<
   TShared,
   TName,
   TFeatures,
-  TExpose
+  TExpose,
+  never,
+  TPipelines
 > &
   Readonly<Omit<TDefinition, keyof IPlugin<any, any, any, any> | 'name'>>
 

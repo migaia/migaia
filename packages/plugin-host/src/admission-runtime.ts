@@ -1,3 +1,4 @@
+import { snapshotPipelineDefinitions } from './named-pipelines.js'
 import { copyConfig } from './config.js'
 import { snapshotDisposer } from './disposal.js'
 import { snapshotFeatureRecord } from './define-feature.js'
@@ -53,6 +54,7 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
       readonly dispose: unknown
       readonly beforeRelease: unknown
       readonly retiredShared: unknown
+      readonly pipelines: unknown
       readonly features: unknown
       readonly featureExpose: unknown
       readonly disposer: ReturnType<typeof snapshotDisposer>
@@ -71,6 +73,7 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
         dispose: plugin?.dispose,
         beforeRelease: readPluginDefinitionData(plugin, 'beforeRelease'),
         retiredShared: (plugin as { readonly shared?: unknown })?.shared,
+        pipelines: readPluginDefinitionData(plugin, 'pipelines'),
         features: plugin?.features,
         featureExpose: plugin?.featureExpose,
         disposer: snapshotDisposer(plugin as IPluginResource)
@@ -91,6 +94,7 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
       dispose,
       beforeRelease,
       features,
+      pipelines,
       featureExpose,
       disposer
     } = captured
@@ -125,6 +129,7 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
       beforeRelease: beforeRelease as IPluginConstraint<any>['beforeRelease'],
       disposer: disposer.disposer,
       features: snapshotFeatureRecord(features),
+      pipelines: snapshotPipelineDefinitions(pipelines),
       featureExpose: featureExpose as IPluginDefinition<any>['featureExpose']
     }
   })

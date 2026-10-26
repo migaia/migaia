@@ -1,3 +1,4 @@
+import type { IPipelineDefinitions, IPipelineScope } from './pipeline-spec.js'
 /** A named root/dependency map of trusted Feature definitions. */
 export type IFeatureRecord = Readonly<Record<string, IFeature<any, any, any>>>
 
@@ -5,7 +6,8 @@ export type IFeatureRecord = Readonly<Record<string, IFeature<any, any, any>>>
 export type IFeatureReference<
   TOutput extends object,
   TOptional extends boolean = false,
-  TProvider extends string = string
+  TProvider extends string = string,
+  TPipelines extends IPipelineDefinitions = Record<never, never>
 > = Readonly<{
   /** Provider plugin name captured by the trusted definition's getFeature() method. */
   readonly plugin: TProvider
@@ -15,6 +17,8 @@ export type IFeatureReference<
   readonly optional: TOptional
   /** Declaration-only output axis; this is not an instantiated Feature value. */
   readonly __output?: TOutput
+  /** Provider declarations are inferred from its actual trusted definition. */
+  readonly __pipelines?: TPipelines
 }>
 
 /** Local feature identity or cross-plugin reference accepted as a factory dependency. */
@@ -24,10 +28,14 @@ export type IFeatureDependency = IFeature<any, any, any> | IFeatureReference<obj
 export type IFeatureDependencyRecord = Readonly<Record<string, IFeatureDependency>>
 
 /** Read-only capability surface available to one synchronous Feature factory. */
-export type IFeatureCore<TExpose extends object> = Readonly<{
-  /** Explicit guarded expose methods; no Host mutation, setup or pipeline API is granted here. */
-  readonly featureExpose: TExpose
-}>
+export type IFeatureCore<
+  TExpose extends object,
+  TPipelines extends IPipelineDefinitions = Record<never, never>
+> = IPipelineScope<TPipelines> &
+  Readonly<{
+    /** Explicit guarded expose methods; pipeline authority remains registration-only. */
+    readonly featureExpose: TExpose
+  }>
 
 /** Exact outputs for declared direct dependency aliases. */
 export type IFeatureOutputs<TDependencies extends IFeatureDependencyRecord> = Readonly<{
@@ -95,9 +103,10 @@ export type IFeatureRecordRequiredExpose<TFeatures extends IFeatureRecord> =
 export type IFeatureFactory<
   TExpose extends object,
   TDependencies extends IFeatureDependencyRecord,
-  TOutput extends object
+  TOutput extends object,
+  TPipelines extends IPipelineDefinitions = Record<never, never>
 > = (
-  core: IFeatureCore<TExpose>,
+  core: IFeatureCore<TExpose, TPipelines & IFeatureDependenciesPipelines<TDependencies>>,
   dependencies: IFeatureOutputs<TDependencies>
 ) => TOutput & (TOutput extends PromiseLike<unknown> ? never : unknown)
 
@@ -108,3 +117,27 @@ export type IFeatureInspection<TFeatures extends IFeatureRecord> = Readonly<{
   /** Frozen dependency-first local Feature closure; cross-plugin references are not local factories. */
   readonly ordered: readonly IFeature<any, any, any>[]
 }>
+
+/** Dependency-qualified names come from actual provider definitions in selected Feature references. */
+type IFeatureDependencyPipelines<TDependency> =
+  TDependency extends IFeatureReference<any, any, infer TProvider, infer TPipelines>
+    ? { readonly [K in keyof TPipelines & string as `${TProvider}.${K}`]: TPipelines[K] }
+    : TDependency extends IFeature<any, any, infer TDependencies>
+      ? IIsAny<TDependencies> extends true
+        ? Record<never, never>
+        : IFeatureDependenciesPipelines<TDependencies>
+      : Record<never, never>
+
+/** The same Feature closure supplies runtime dependencies and compile-time pipeline visibility. */
+export type IFeatureDependenciesPipelines<TDependencies extends IFeatureDependencyRecord> =
+  keyof TDependencies extends never
+    ? Record<never, never>
+    : IUnionToIntersection<
+          IFeatureDependencyPipelines<TDependencies[keyof TDependencies]>
+        > extends infer TVisible extends IPipelineDefinitions
+      ? TVisible
+      : Record<never, never>
+
+/** Selected roots infer dependency pipelines without a parallel permission declaration. */
+export type IFeatureRecordPipelines<TFeatures extends IFeatureRecord> =
+  IFeatureDependenciesPipelines<TFeatures>

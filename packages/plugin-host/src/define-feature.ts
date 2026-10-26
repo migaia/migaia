@@ -1,3 +1,4 @@
+import type { IPipelineDefinitions } from './pipeline-spec.js'
 import ERROR_TEXT, { createPluginHostTypeError } from './error-text.js'
 import type {
   IFeature,
@@ -16,10 +17,11 @@ type IFeatureDefinition = Readonly<{
 export type IFeatureDescriptor<
   TExpose extends object,
   TDependencies extends IFeatureDependencyRecord,
-  TOutput extends object
+  TOutput extends object,
+  TPipelines extends IPipelineDefinitions = Record<never, never>
 > = Readonly<{
   /** Synchronous Feature factory; returned methods may be async, the factory result may not be. */
-  readonly install: IFeatureFactory<TExpose, TDependencies, TOutput>
+  readonly install: IFeatureFactory<TExpose, TDependencies, TOutput, TPipelines>
   /**
    * Direct aliases to trusted local Features or cross-plugin references; defaults to no
    * dependencies.
@@ -81,18 +83,20 @@ export const snapshotFeatureRecord = (value: unknown): Readonly<Record<string, o
 export function defineFeature<
   TExpose extends object = Record<never, never>,
   const TDependencies extends IFeatureDependencyRecord = Record<never, never>,
-  TOutput extends object = Record<never, never>
+  TOutput extends object = Record<never, never>,
+  TPipelines extends IPipelineDefinitions = Record<never, never>
 >(
-  factory: IFeatureFactory<TExpose, TDependencies, TOutput>,
+  factory: IFeatureFactory<TExpose, TDependencies, TOutput, TPipelines>,
   dependencies?: TDependencies
 ): IFeature<TExpose, TOutput, TDependencies>
 /** Object form of the same captured factory/dependency contract; install must be an own data method. */
 export function defineFeature<
   TExpose extends object = Record<never, never>,
   const TDependencies extends IFeatureDependencyRecord = Record<never, never>,
-  TOutput extends object = Record<never, never>
+  TOutput extends object = Record<never, never>,
+  TPipelines extends IPipelineDefinitions = Record<never, never>
 >(
-  descriptor: IFeatureDescriptor<TExpose, TDependencies, TOutput>
+  descriptor: IFeatureDescriptor<TExpose, TDependencies, TOutput, TPipelines>
 ): IFeature<TExpose, TOutput, TDependencies>
 export function defineFeature(
   input: Function | Readonly<{ readonly install: Function; readonly dependencies?: object }>,

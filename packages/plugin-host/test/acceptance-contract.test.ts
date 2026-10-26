@@ -131,7 +131,7 @@ describe('acceptance contract', () => {
     }
   })
 
-  it('injects only featureExpose and declared dependencies into Feature factories', async () => {
+  it('injects featureExpose, pipeline registration and declared dependencies into Feature factories', async () => {
     /**
      * Captures the exact Feature core surface without masking assertion failures in Host lifecycle
      * wrapping.
@@ -169,7 +169,7 @@ describe('acceptance contract', () => {
     const handles = await host.use(provider, consumer)
     expect(handles[0].extensions.read).toBe(7)
     expect(handles[1].extensions.observed).toBe(true)
-    expect(observedCoreKeys).toEqual(['featureExpose'])
+    expect(observedCoreKeys).toEqual(['featureExpose', 'pipeline'])
     expect(observedForbiddenCapabilities).toBe(false)
     await host.dispose()
   })

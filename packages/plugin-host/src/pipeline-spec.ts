@@ -2,6 +2,7 @@
 import type {
   IMiddlewarePipelineMode,
   IMiddlewarePipelineStage,
+  IAsyncMiddlewareStage,
   MiddlewarePipelineNext
 } from '@migaia/middleware-pipeline'
 import ERROR_TEXT, { tagPluginHostError } from './error-text.js'
@@ -53,15 +54,52 @@ export type IPipelineMode<TSpec> = TSpec extends {
     : 'sync'
 
 /** The canonical middleware package determines each named pipeline's accepted stage shape. */
-export type IPipelineStage<TSpec> = IMiddlewarePipelineStage<
-  IPipelineMode<TSpec>,
-  IPipelinePayload<TSpec>
->
+export type IPipelineStage<TSpec> =
+  IPipelineMode<TSpec> extends 'async'
+    ? IAsyncMiddlewareStage<IPipelinePayload<TSpec>, unknown>
+    : IMiddlewarePipelineStage<IPipelineMode<TSpec>, IPipelinePayload<TSpec>>
+
+/** One exact stage occurrence; native cleanup and explicit removal share its disposer. */
+export type IPipelineStageHandle = Readonly<{
+  /** Removes this occurrence once; repeated calls have no effect. */
+  remove(): void
+}>
+
+/** Exact payload equality prevents through from hiding a conversion stage. */
+type IPipelineEqual<TLeft, TRight> =
+  (<T>() => T extends TLeft ? 1 : 2) extends <T>() => T extends TRight ? 1 : 2
+    ? (<T>() => T extends TRight ? 1 : 2) extends <T>() => T extends TLeft ? 1 : 2
+      ? true
+      : false
+    : false
+
+/** Through selects only compatible payloads; runtime owns mode and next-policy admission. */
+type IPipelineThroughName<TSpec, TVisible extends IPipelineDefinitions> = {
+  [K in keyof TVisible & string]: IPipelineEqual<
+    IPipelinePayload<TSpec>,
+    IPipelinePayload<TVisible[K]>
+  > extends true
+    ? K
+    : never
+}[keyof TVisible & string]
 
 /** Registration authority supplied to an installing plugin; deliberately omits execution. */
-export type IPipelineRegistration<TSpec> = Readonly<{
+export type IPipelineRegistration<
+  TSpec,
+  TVisible extends IPipelineDefinitions = Record<never, never>
+> = Readonly<{
   /** Registers one stage owned by this exact install generation. */
-  use(stage: IPipelineStage<TSpec>): void
+  use(stage: IPipelineStage<TSpec>): IPipelineStageHandle
+  /** Splices a visible pipeline at this occurrence using the same native stage lifetime. */
+  through<TName extends IPipelineThroughName<TSpec, TVisible>>(name: TName): IPipelineStageHandle
+}>
+
+/** One inferred lookup surface is shared by plugin and Feature registration cores. */
+export type IPipelineScope<TVisible extends IPipelineDefinitions> = Readonly<{
+  /** Resolves only declared host, own short and dependency-qualified names. */
+  pipeline<TName extends keyof TVisible & string>(
+    name: TName
+  ): IPipelineRegistration<TVisible[TName], TVisible>
 }>
 
 /** Mode-specific terminal result, including a possible halted traversal. */
@@ -71,7 +109,7 @@ export type IPipelineRunResult<TSpec, TResult> =
     : Promise<Awaited<TResult> | undefined>
 
 /** Owner authority executes or registers stages on one declared pipeline. */
-export type IPipelineOwner<TSpec> = IPipelineRegistration<TSpec> &
+export type IPipelineOwner<TSpec> = Pick<IPipelineRegistration<TSpec>, 'use'> &
   Readonly<{
     /** Delivers terminal values and returns the result appropriate to this pipeline's mode. */
     run<TResult>(
