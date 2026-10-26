@@ -148,7 +148,7 @@ export class RpcHost {
       flow: this.#flow,
       pipelines: () => this.#pipelineOwner!,
       self: () => this.#identity.directorySelf,
-      directory: (namespace) => this.#directory(namespace),
+      directory: (namespace, peerId) => this.#directory(namespace, peerId),
       admitSourceFacts: (facts) => this.#identity.admit(facts),
       receive: this.#receive,
       rejected: this.#rejected,
@@ -516,14 +516,15 @@ export class RpcHost {
    * The provider catalog is global; each carrier announces its namespace-local accepted sessions
    * separately.
    */
-  #directory(namespace: string): IRpcDirectory {
+  #directory(namespace: string, excludedPeerId?: string): IRpcDirectory {
     return {
       schemaVersion: 3,
       self: this.#identity.directorySelf,
       nodeId: this.#nodeId,
       methods: this.#forwarder.describe(
         this.#providers.describe(namespace),
-        this.#sessions.forwardTargets(namespace)
+        this.#sessions.forwardTargets(namespace),
+        excludedPeerId
       )
     }
   }

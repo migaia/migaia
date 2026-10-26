@@ -291,13 +291,19 @@ export class SessionTable {
 
   /** Native source commit publishes only that registration's original reserved physical peers. */
   commitAppend(scope: IRpcSessionScope): void {
+    /** One append transaction announces only after all of its actual public views are installed. */
+    let published = false
     for (const session of this.#scopes.get(scope)!.sessions) {
       /** Existing handle identity supplies the exact attachment without another source index. */
       const input = this.#handles.get(session.handle)!.attachment!
       /** A directory arbitration still in flight cannot publish its provisional replacement view. */
       const pending = this.#reserved.get(input.carrierId)
-      if (pending && pending.view === session.current()?.view) this.#publish(input, pending.view)
+      if (pending && pending.view === session.current()?.view) {
+        this.#publish(input, pending.view, false)
+        published ||= input.published
+      }
     }
+    if (published) void this.announceDirectory().catch(this.#options.report)
   }
 
   /** Move only transport context wiring into the existing scope and Session owners. */
@@ -555,7 +561,7 @@ export class SessionTable {
       flow: this.#options.flow,
       pipelines: this.#options.pipelines,
       self: this.#options.self,
-      directory: () => this.#options.directory(namespace),
+      directory: (peerId) => this.#options.directory(namespace, peerId),
       track: (promise) => this.#draining.track(carrier.id, promise),
       draining: (remainingMs, announce) => this.#draining.drain(carrier.id, remainingMs, announce),
       report: this.#options.report,
@@ -696,11 +702,14 @@ export class SessionTable {
   }
 
   /** Every current accepted source announces once; one failed write cannot suppress other peers. */
-  async announceDirectory(namespace?: string): Promise<void> {
+  async announceDirectory(namespace?: string, excludedCarrierId?: string): Promise<void> {
     /** Snapshot the actual current sessions before any asynchronous write can retire a source. */
     const writes: Promise<void>[] = []
     for (const { selection } of this.#accepted.values())
-      if (namespace === undefined || selection.view.namespace === namespace)
+      if (
+        selection.carrierId !== excludedCarrierId &&
+        (namespace === undefined || selection.view.namespace === namespace)
+      )
         writes.push(this.#session(selection.carrierId).announceDirectory())
     /** The caller reports the first original rejection; this owner reports only additional failures. */
     await this.#joinOperations(writes, false)
@@ -904,7 +913,7 @@ export class SessionTable {
   }
 
   /** A ready reply's actual write is the sole publication point for its reserved identity. */
-  #publish(input: ISessionAttachment, view: IRpcSessionView): void {
+  #publish(input: ISessionAttachment, view: IRpcSessionView, announce = true): void {
     /** Retirement removes the reservation, so late codecs cannot revive a closed connection. */
     const selection = this.#reserved.get(input.carrierId)
     if (!selection || selection.view !== view || this.#closing)
@@ -928,6 +937,9 @@ export class SessionTable {
       this.#options.accepted?.(input.carrierId, view)
       publishSessionReadiness(index, view.name)
     }
+    /** The incoming peer already owns this view; only other current peers need the new catalog. */
+    if (announce)
+      void this.announceDirectory(undefined, input.carrierId).catch(this.#options.report)
   }
 
   /** Only canonical publication contributes to cross-namespace forwarding selection. */

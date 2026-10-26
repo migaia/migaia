@@ -44,7 +44,7 @@ export type IRpcSessionTableOptions = Readonly<{
   /** Execution authority is borrowed only after the one native Host has been constructed. */
   pipelines(): IRpcPipelineOwner
   self(): IRpcDirectory['self']
-  directory(namespace: string): IRpcDirectory
+  directory(namespace: string, excludedPeerId?: string): IRpcDirectory
   admitSourceFacts?(facts: IRpcLocalSourceFacts): void
   receive(
     carrierId: string,
@@ -111,7 +111,7 @@ export type IRpcSessionOptions = Readonly<{
   /** The receiving Host lends its genuine named pipeline owner; Session has no runner. */
   pipelines(): IRpcPipelineOwner
   self(): IRpcDirectory['self']
-  directory(): IRpcDirectory
+  directory(excludedPeerId?: string): IRpcDirectory
   admit(
     directory: IRpcDirectory,
     codec: string,

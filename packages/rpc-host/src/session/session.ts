@@ -130,6 +130,8 @@ export class Session {
   #offer: IRpcHello | undefined
   /** The first admitted bootstrap identity cannot change between hello and accept. */
   #remoteId: string | undefined
+  /** Equal catalogs need no repeat write; peer identity applies split horizon across carriers. */
+  #directoryFingerprint: string | undefined
   /** Acceptance becomes public only after both sides have admitted the connection. */
   #view: IRpcSessionView | undefined
   /** The responder retains its one reserved view until the initiator confirms local admission. */
@@ -535,13 +537,24 @@ export class Session {
   /** Announce the actual current provider catalog through this accepted source and codec. */
   async announceDirectory(): Promise<void> {
     await this.#ready.promise
-    await this.send({
-      profile: RpcWireProfile,
-      kind: K.directory,
-      id: String(++this.#controlSerial),
-      route: this.#route(),
-      directory: this.#options.directory()
-    })
+    /** Directory order is canonical; a linear snapshot includes names, hints and schema changes. */
+    const directory = this.#options.directory(this.#view!.peerId)
+    /** Record before writing so reentrant announcements cannot repeat this same catalog. */
+    const fingerprint = JSON.stringify(directory)
+    if (fingerprint === this.#directoryFingerprint) return
+    this.#directoryFingerprint = fingerprint
+    try {
+      await this.send({
+        profile: RpcWireProfile,
+        kind: K.directory,
+        id: String(++this.#controlSerial),
+        route: this.#route(),
+        directory
+      })
+    } catch (error) {
+      if (this.#directoryFingerprint === fingerprint) this.#directoryFingerprint = undefined
+      throw error
+    }
   }
 
   /** Explicit lifecycle close retains its original reason and public Promise identity. */
@@ -689,7 +702,8 @@ export class Session {
   /** Register the local immutable offer before a peer's hello can choose its deterministic role. */
   async #hello(): Promise<void> {
     /** Identity is owned globally; a carrier never invents one local self per namespace. */
-    const directory = this.#options.directory()
+    const directory = this.#options.directory(this.#remoteId ?? this.#options.expectedPeerId)
+    this.#directoryFingerprint = JSON.stringify(directory)
     /** Installed flow handlers, rather than user metadata, supply extension authority. */
     const hello: IRpcHello = {
       profile: RpcWireProfile,

@@ -154,14 +154,16 @@ export class Forwarder {
   /** Project accepted method metadata only at directory output; dispatch keeps its single index. */
   describe(
     local: readonly IRpcMethodDescription[],
-    targets: Iterable<IForwardSelection>
+    targets: Iterable<IForwardSelection>,
+    excludedPeerId?: string
   ): readonly IRpcMethodDescription[] {
     /** Original local registration order and exact-name precedence survive automatic forwarding. */
     const methods = [...local]
     /** This output-sized set prevents collisions without another persistent business-method table. */
     const names = new Set(local.map((method) => method.name))
     for (const selection of targets) {
-      if (!this.#contributions.has(selection.carrierId)) continue
+      if (selection.view.peerId === excludedPeerId || !this.#contributions.has(selection.carrierId))
+        continue
       for (const method of selection.view.methods.values()) {
         /** Prefixing materializes only the actual public directory entry being emitted. */
         const name = `${selection.view.name}.${method.name}`
