@@ -12,8 +12,13 @@ export { RpcBinaryProfile, RpcBinaryStorage }
 /** Each carrier selects one of the two canonical manifest storage representations. */
 export type RpcBinaryStorage = (typeof RpcBinaryStorage)[keyof typeof RpcBinaryStorage]
 
-/** Signed native-capable captures inline complete backings through this internal 16 KiB boundary. */
-export const RPC_BINARY_INTEGRITY_INLINE_BYTES = 16 * 1024
+/**
+ * Signed native-capable captures inline complete backings through this internal 1125-byte boundary.
+ * Claude's 2026-10-26 measurements found inline faster by 2.4 µs at 1126 B and 2.1 µs at 1178 B,
+ * but slower by 1.1 µs at 1229 B: the crossover is near 1.2 KiB. The final selected boundary is
+ * 1125 bytes; callers do not configure this representation policy.
+ */
+export const RPC_BINARY_INTEGRITY_INLINE_BYTES = 1125
 
 /** Local codec failures distinguish backing integrity from structural grammar for the core reporter. */
 export const RpcBinaryViolation = {
