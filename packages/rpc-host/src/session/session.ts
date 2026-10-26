@@ -1093,7 +1093,7 @@ export class Session {
      * Inline signed backings cannot retain native transfer grants; batching receives the filtered
      * list.
      */
-    const transfer = rpcPreparedTransfer(options.transfer, encoded.sidecars)
+    const transfer = rpcPreparedTransfer(options.transfer, encoded.sidecars, captured.manifest)
     if (transfer !== options.transfer) options = { ...options, transfer }
     this.#observation.media(S.encoded, D.outbound, encoded.data, message, options.transfer)
     this.#assertOpen(continuing, final)

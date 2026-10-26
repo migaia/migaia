@@ -29,12 +29,13 @@ export function splitRpcPreparedMetadata(
   return { message: value, sidecars }
 }
 
-/** Keep only caller-authorized native backings, preserving the original list when no grant changes. */
+/** Prune inlined manifest backings without changing transfer authority for unrelated codec output. */
 export function rpcPreparedTransfer(
   transfer: readonly ArrayBuffer[] | undefined,
-  sidecars: readonly ArrayBuffer[] | undefined
+  sidecars: readonly ArrayBuffer[] | undefined,
+  manifest?: IRpcPreparedMessage['manifest']
 ): readonly ArrayBuffer[] | undefined {
-  if (!transfer?.length) return transfer
+  if (!manifest || !transfer?.length) return transfer
   /** Only this final physical backing set may retain an already granted native transfer. */
   const native = new Set(sidecars)
   /** A changed list copies its accepted prefix once, in the caller's exact original order. */
