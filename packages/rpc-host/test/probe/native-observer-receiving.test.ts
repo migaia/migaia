@@ -491,3 +491,52 @@ it('keeps the original large public payload fragmented on both actual native dir
     await Promise.all([connected.host.close(), server.close()])
   }
 })
+
+// C004-A001/A002 receive only provider values/order; opaque framing and equal keys remain pending.
+it('keeps original control and payload order from two actual public chunk sources', async () => {
+  /** Every real native installation owns its own canonical chunk state. */
+  const fragments = chunk({ chunkBytes: 64, required: true })
+  /** Original provider effects distinguish the two physical sources without observing decoding. */
+  const received: unknown[] = []
+  /** Only the real admitted provider context supplies each sender's identity. */
+  const sources: string[] = []
+  /** The existing listener supplies distinct MemoryCarrier pairs and Sessions for both callers. */
+  const listener = coreMemoryServer('opaque-server', 'opaque-server', 'memory', [], [], {
+    create: () => new RpcJsonCarrierCodec(),
+    nativeBinary: false
+  })
+  /** The same actual server receives both original source payloads through public chunk. */
+  const server = await createRpcHost({
+    ...listener.options,
+    plugins: [fragments, listener.transport],
+    provide: {
+      echo: (value, context) => {
+        received.push(value)
+        sources.push(context.senderId)
+        return context.success(value)
+      }
+    }
+  })
+  /** Partial acquisition cleanup borrows only the original first caller Host. */
+  let first: Awaited<ReturnType<typeof listener.connect>> | undefined
+  /** The second caller owns an independent actual transport and accepted Session. */
+  let second: Awaited<ReturnType<typeof listener.connect>> | undefined
+  try {
+    first = await listener.connect('opaque-a', { plugins: [fragments] })
+    second = await listener.connect('opaque-b', { plugins: [fragments] })
+    expect(first.pair[0].id).not.toBe(second.pair[0].id)
+    expect(listener.lookup('opaque-a')!.handle).not.toBe(listener.lookup('opaque-b')!.handle)
+    await first.host.memory!.notify('echo', 'control-a', { targetId: 'opaque-server' })
+    await expect.poll(() => received).toEqual(['control-a'])
+    received.length = 0
+    sources.length = 0
+    await first.host.memory!.notify('echo', 'opaque-a', { targetId: 'opaque-server' })
+    /** Actual first-provider acceptance, rather than a delay, preserves the original effect order. */
+    await expect.poll(() => received).toEqual(['opaque-a'])
+    await second.host.memory!.notify('echo', 'opaque-b', { targetId: 'opaque-server' })
+    await expect.poll(() => received).toEqual(['opaque-a', 'opaque-b'])
+    expect(sources).toEqual(['opaque-a', 'opaque-b'])
+  } finally {
+    await Promise.all([first?.host.close(), second?.host.close(), server.close()])
+  }
+})
