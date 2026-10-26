@@ -118,6 +118,8 @@ Every call kind supports `signal`, including cancellation propagated after a one
 
 Branch on `source/code`; preserve native classes, `stack`, `cause`, and `AggregateError.errors`. Timeout or disconnection does not prove that business work never executed. Reconcile uncertain non-idempotent work before retrying.
 
+Promise-returning calls such as `send` and `request` reject invalid `idempotencyKey` values or a closed namespace, preserving each entry's existing `source/code` and `cause`; invalid keys still use `CONTRACT_INVALID`. Handle failures with `await` or `Promise.catch`. `dispatch` still returns `void` and reports failures, while `stream` and `streamTo` still return lazy async iterators.
+
 Public provider registration rejects with `INVALID_CONFIG` and retains the exact registration failure directly on `cause`; diagnostic text does not invoke the thrown value's string conversion. Closing settles pending calls with `ENDPOINT_DISPOSED`, and actual carrier closure rejects held writes. Closing does not force an arbitrary business Promise to finish.
 
 Plugin authors start at `@migaia/rpc-host/sdk`; observation lives under `/plugins/probe`. Old `/plugin`, `/probe`, endpoint, per-session Peer, and v1/JSON-RPC profile entries are removed. RPC packages can depend directly on `@migaia/rpc-contract`. Import only `/error-code` when only codes are needed, without retaining protocol or codec execution code.

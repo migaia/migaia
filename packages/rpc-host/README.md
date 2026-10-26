@@ -118,6 +118,8 @@ export const perCallDeadline = timeoutFromSubpath({ ms: 100 })
 
 按 `source/code` 识别错误，保留原生类型、`stack`、`cause` 和 `AggregateError.errors`。超时或断开不证明业务未执行；非幂等操作须先对账再考虑重试。
 
+`send`、`request` 等返回 Promise 的调用通过拒绝传播非法 `idempotencyKey` 或命名空间已关闭的错误，保留各入口原有的 `source/code` 和 `cause`；非法 key 仍为 `CONTRACT_INVALID`。使用 `await` 或 `Promise.catch` 处理失败。`dispatch` 仍同步返回 `void` 并向 reporter 交付失败，`stream` 与 `streamTo` 仍返回延迟启动的异步迭代器。
+
 公开 provider 注册失败以 `INVALID_CONFIG` 拒绝，原注册错误直接保留在 `cause`；错误说明不通过调用异常的字符串转换来生成。关闭后，待决调用以 `ENDPOINT_DISPOSED` 结算，实际载体关闭会拒绝仍被挂住的写入；不要求任意业务 Promise 因关闭而强行完成。
 
 自定义 plugin 作者从 `@migaia/rpc-host/sdk` 开始。观察入口是 `/plugins/probe`；旧 `/plugin`、`/probe`、endpoint、per-session Peer 和 v1/JSON-RPC profile 已删除。rpc 家族可以直接依赖 `@migaia/rpc-contract`；只需错误码时导入 `/error-code`，不会带入协议与编解码执行代码。
