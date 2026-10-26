@@ -11,7 +11,10 @@ it.each([false, true])(
   async (withBinary) => {
     /** Real MessagePorts prove detachment under the existing HMAC-authenticated public path. */
     const pair = await nativeHosts({ note: () => 'accepted' })
-    /** Explicit transfer may hand off a backing independently from whether the receiver references it. */
+    /**
+     * Explicit transfer may hand off a backing independently from whether the receiver references
+     * it.
+     */
     const transferred = new ArrayBuffer(3)
     /** This ungranted small backing belongs to signed-inline policy, not the explicit grant. */
     const payload = withBinary ? Uint8Array.of(1) : undefined
