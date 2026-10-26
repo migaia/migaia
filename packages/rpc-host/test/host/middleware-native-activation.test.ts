@@ -177,3 +177,80 @@ it('C124 installs one actual native carrier receiver and keeps its subscription 
     }
   }
 })
+
+// RPC-TEST-CD50052EF4A5-C003/C004: retain real subscription counts without an activation facade.
+it.each(['commit', 'rollback'] as const)(
+  'transaction %s keeps the preceding observer unsubscribed and preserves actual acquisition counts',
+  async (outcome) => {
+    /** One actual native owner carries both the observer and the genuine transport definition. */
+    const rpc = rpcHostPipelines(
+      () => native,
+      (name) => native.pipeline(name),
+      ['memory']
+    )
+    /** Native installation remains the only transaction and cleanup authority. */
+    const native = defineHost({
+      ...rpc,
+      host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+    })
+    /** The existing real final participant connects the original physical endpoints on success. */
+    const input: IActivationInput = {
+      server: coreMemoryServer('transaction-subscription'),
+      enter: deferred<void>(),
+      entered: false,
+      dispatches: 0
+    }
+    /** This passthrough records only actual MemoryCarrier receiver acquisition. */
+    const subscribed = vi.spyOn(MemoryCarrier.prototype, 'subscribe')
+    /** Earlier setup records the actual count before native installation reaches its transport. */
+    const observation = {
+      before: -1,
+      primary: new Error('transaction before native subscription')
+    }
+    /** The real preceding install hook reads the physical count without opening a carrier. */
+    const observer = definePlugin({
+      name: 'transaction-subscription-observer',
+      install() {
+        observation.before = subscribed.mock.calls.length
+        return {}
+      }
+    })
+    /** A failed earlier native hook must leave the original cold transport untouched. */
+    const later =
+      outcome === 'rollback'
+        ? [
+            definePlugin({
+              name: 'transaction-subscription-failure',
+              install() {
+                throw observation.primary
+              }
+            })
+          ]
+        : []
+    try {
+      /** Observe the genuine transaction result; no legacy installing/activation Promise exists. */
+      const failure = await native
+        .use(observer, ...later, input.server.transport, finalParticipant(input))
+        .then(
+          () => undefined,
+          (error: unknown) => error
+        )
+      expect(observation.before).toBe(0)
+      if (outcome === 'commit') {
+        expect(failure).toBeUndefined()
+        /** Select only this original endpoint, excluding its opposite real receiving Host. */
+        const carrier = input.client!.pair[0]
+        expect(subscribed.mock.contexts.filter((receiver) => receiver === carrier).length).toBe(1)
+      } else {
+        expect((failure as Error).cause).toBe(observation.primary)
+        expect(subscribed.mock.calls.length).toBe(0)
+      }
+    } finally {
+      try {
+        await Promise.all([native.dispose(), input.client?.host.close()])
+      } finally {
+        subscribed.mockRestore()
+      }
+    }
+  }
+)
