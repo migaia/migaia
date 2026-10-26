@@ -91,10 +91,14 @@ const browserPackedRoots = ['@migaia/storage-host', '@migaia/storage-web'] as co
 const browserBaselineCommit = '4af04a168f09a4c852fbd94e7f8f6c2d3f335a03'
 /** The original ratio remains an optimization goal rather than a blocking assertion. */
 const browserBundleOptimizationTarget = 1.15
-/** User-approved ceilings retain exactly 2% headroom above the explicit base measurement. */
+/**
+ * User-approved ceilings retain exactly 2% headroom above the measured bundle. The current values
+ * were raised once to accept shared plugin-host and middleware-pipeline growth (named pipelines and
+ * the split Host owners), measured at 684004 minified / 166235 gzip bytes.
+ */
 const browserBundleHardCeiling = {
-  minified: { current: 672521, baseline: 551293 },
-  gzip: { current: 162890, baseline: 132349 }
+  minified: { current: 697685, baseline: 551293 },
+  gzip: { current: 169560, baseline: 132349 }
 } as const
 /** Selected backend plus one entity where/select/all query, with owning cleanup. */
 const browserQueryEntry = [
