@@ -210,9 +210,9 @@ export class RpcMemberGeneration<TUnit, TSpec> {
       throw primary
     }
   }
-  /** Commands and native observations join the same original pending replacement Promise. */
+  /** Native observations share preparation; a caller may abandon only its own readiness wait. */
   rebind(signal: IAbortSignal = this.#options.signal): Promise<number> {
-    return this.#resources.prepareRebind(signal)
+    return this.#resources.prepareRebind(this.#options.signal, signal)
   }
   /** Cold lifecycle oracles count only actual acquired resource groups. */
   retainedResourceCount(): number {

@@ -7,6 +7,7 @@ import {
   type ISupervisor
 } from '@migaia/supervision'
 import { createManualScheduler } from '@migaia/utils/testing'
+import { UtilsAbortError } from '@migaia/utils/error'
 import { deferred, type IAbortSignal } from '@migaia/utils/promise'
 import {
   createRpcHost,
@@ -561,6 +562,8 @@ it('preserves native aggregate release errors and exact primary rollback error o
 
 /** One real handshake stage holds admission; it does not replace Session readiness or its handle. */
 class NativeHandshakeGate {
+  /** Cases can first accept one real Session before holding its replacement handshake. */
+  hold = true
   /** The actual installed inbound handshake stage signals entry before its original continuation. */
   readonly entered = deferred<void>()
   /** A case releases this one input gate without completing a counterfeit Session. */
@@ -571,10 +574,12 @@ class NativeHandshakeGate {
     setup: () => ({ stages: { [RpcFlowPoint.handshakeInbound]: this.#wait } })
   })
 
-  /** Caller preparation cancellation is checked after the real late handshake completes. */
+  /** Hold only the chosen real handshake, without replacing its original continuation. */
   readonly #wait: IRpcFlowStage<typeof RpcFlowPoint.handshakeInbound> = async (payload, next) => {
-    this.entered.resolve()
-    await this.resume.promise
+    if (this.hold) {
+      this.entered.resolve()
+      await this.resume.promise
+    }
     await next(payload)
   }
 }
@@ -778,34 +783,51 @@ it('rejects native departure during a real handshake and closes its actual candi
   }
 })
 
-// RPC-TEST-19CE78390954-C008: the removed endpointFactory is not used to simulate late setup.
-it('cancels original native preparation after a genuinely late handshake and closes its resources', async () => {
-  /** The caller's original cancellation object remains the direct setup rejection oracle. */
+// RPC-TEST-19CE78390954-C008 / A37: each caller can abandon only its own shared rebind wait.
+it('keeps shared native rebind alive when its first caller cancels only its own wait', async () => {
+  /** Only the first caller receives cancellation; its original reason remains reachable. */
   const controller = new AbortController()
+  const reason = new Error('setup cancelled')
   /** A real installed handshake stage delays only its original continuation. */
   const gate = new NativeHandshakeGate()
-  /** Native acquisition and Session attach occur before the original late handshake gate. */
+  gate.hold = false
+  /** The original accepted Session enables the real native observation/reconciliation loop. */
   const fixture = new NativeMemberFixture('proxy-late-native-setup', [], {
     features: [gate.feature]
   })
   try {
     await fixture.start()
-    /** Public rebind(signal) uses the original resource holder even for its first actual candidate. */
-    const pending = fixture.member.rebind(controller.signal)
-    /** The late preparation result must reject with the original top-level cancellation message. */
-    const rejected = expect(pending).rejects.toThrow('setup cancelled')
-    await gate.entered.promise
-    controller.abort(new Error('setup cancelled'))
-    gate.resume.resolve()
-    await rejected
-    /** Failed candidates are observed by their exact actual attach result, not accepted onReady. */
-    const attachedAt = fixture.attach.mock.calls.findIndex(
-      ([, carrier]) => carrier === fixture.carriers[0]!.source.carrier
+    await fixture.member.open()
+    const previous = fixture.member.current().generation
+    gate.hold = true
+    fixture.native.units[0]!.exit({})
+    await fixture.member.whenClosed(previous)
+    const restarted = await fixture.supervisor.restart()
+    assert(restarted.state === 'ready')
+    /** Two public callers and the queued native reconcile share one actual acquired candidate. */
+    const first = fixture.member.rebind(controller.signal).catch((error: unknown) => error)
+    const second = fixture.member.rebind().then(
+      (generation) => ({ generation }),
+      (error: unknown) => ({ error })
     )
-    /** This is the original Session handle returned by the real table before readiness. */
-    const candidate = fixture.attach.mock.results[attachedAt]!.value as IRpcSessionHandle
-    expect(fixture.detach.mock.calls.filter(([handle]) => handle === candidate)).toHaveLength(1)
+    await gate.entered.promise
+    fixture.scheduler.advance(0)
+    controller.abort(reason)
+    gate.resume.resolve()
+    expect(await second).toEqual({ generation: restarted.generation })
+    /** Canonical cancellation retains this caller's exact original reason, not an equal copy. */
+    const cancellation = await first
+    assert(cancellation instanceof UtilsAbortError)
+    expect(cancellation.cause).toBe(reason)
+    expect(fixture.member.current()).toMatchObject({
+      active: true,
+      generation: restarted.generation
+    })
+    await expect(fixture.namespace.send('remote', 'value', null)).resolves.toBe('result')
+    expect(fixture.carriers).toHaveLength(2)
+    expect(fixture.member.retainedResourceCount()).toBe(1)
     expect(fixture.physicalCleanupCount()).toBe(1)
+    expect(fixture.reports).toEqual([])
   } finally {
     gate.resume.resolve()
     await fixture.cleanup()

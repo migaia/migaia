@@ -4,7 +4,7 @@
  * failures and transfers only acquired resources into the accepted generation lifetime.
  */
 import { createGenerationController } from '@migaia/lifecycle'
-import { deferred, type IAbortSignal } from '@migaia/utils/promise'
+import { deferred, raceWithAbort, type IAbortSignal } from '@migaia/utils/promise'
 import { RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
 import { createRemoteLayerError } from '../host/remote-error-owner.js'
 import { resolveAbortReason } from '../host/abort-reason.js'
@@ -121,8 +121,20 @@ export class RpcMemberResources {
     failureDecided?: (error: unknown) => void
   ) => this.#prepare(signal, rollbackOnFailure, false, failureDecided)
 
+  /** Caller cancellation releases only its wait; member lifetime alone owns shared preparation. */
+  prepareRebind = (signal: IAbortSignal, callerSignal: IAbortSignal): Promise<number> => {
+    if (callerSignal === signal) return this.#prepareRebind(signal)
+    return raceWithAbort(() => this.#prepareRebind(signal), {
+      signal: callerSignal,
+      report: (error, context) => {
+        /** The shared preparation already reports its failure; wait cleanup still owns its errors. */
+        if (context.phase !== 'late-rejection') (0, this.#report)(error)
+      }
+    })
+  }
+
   /** Join one preparation of the same original native generation without retargeting. */
-  prepareRebind = (signal: IAbortSignal) => {
+  #prepareRebind = (signal: IAbortSignal): Promise<number> => {
     if (signal.aborted) return Promise.reject(resolveAbortReason(signal))
     if (this.#releasePromise)
       return Promise.reject(createRemoteLayerError(RpcRemoteLayerErrorCode.closed))
