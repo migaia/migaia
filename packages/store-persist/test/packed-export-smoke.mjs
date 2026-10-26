@@ -26,7 +26,9 @@ const packageDirectories = [
   'capability',
   'middleware-pipeline',
   'plugin-host',
+  'event-subscriber',
   'storage-contract',
+  'storage-host',
   'store-persist'
 ].map((name) => resolve(packageDirectory, '..', name))
 /** Consumer resolves only extracted package tarballs, never workspace source or dist paths. */
