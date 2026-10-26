@@ -46,6 +46,18 @@ type IFaultOptions = {
   retry?: IRpcRetryFeature
 }
 
+/** Inspect only the genuine current peer catalog, without issuing another business call. */
+function hasPeerWait(
+  namespace: Awaited<ReturnType<typeof installBusinessClient>>['namespace']
+): boolean {
+  for (const entry of Object.values(namespace.peers)) {
+    const group = Reflect.get(entry, 'peer')
+    if (group && typeof group === 'object' && typeof Reflect.get(group, 'wait') === 'function')
+      return true
+  }
+  return false
+}
+
 /** Own the original native source and real public namespace across native replacement generations. */
 class FaultClient {
   /** The existing production unit budget remains authoritative for native lease cleanup. */
@@ -68,12 +80,15 @@ class FaultClient {
   readonly #fixture: ReturnType<typeof deployment>
   /** One immutable test scenario selects original clocks, restart and complete policy instances. */
   readonly #options: IFaultOptions
+  /** The TS provider registers independent methods after its p-only declaration is installed. */
+  readonly #independentMethods: boolean
   /** The canonical public Host remains the only request, stream, pending and provider owner. */
   #installed: Awaited<ReturnType<typeof installBusinessClient>> | undefined
 
   /** Prepare only the native recipe; the normal install transaction owns all actual execution. */
   constructor(peer: IPeer, options: IFaultOptions) {
     this.#options = options
+    this.#independentMethods = peer.language === 'node' || peer.language === 'bun'
     this.budget = createUnitBudget({ kind: 'process', maxUnits: 1, scheduler: options.scheduler })
     this.#fixture = deployment(
       peer,
@@ -123,6 +138,9 @@ class FaultClient {
               })
             ])
       ])
+      /** Contract-scoped p methods and independent TS peer methods have separate public catalogs. */
+      if (this.#independentMethods)
+        await vi.waitFor(() => expect(hasPeerWait(this.namespace)).toBe(true))
       return this
     } catch (error) {
       await this.#installed?.close()
@@ -171,11 +189,7 @@ describe('source domains error source domains', () => {
     expect(expected.error, 'SOURCE_DOMAIN_PUBLIC_VECTOR_DOMAIN_SOURCE').toMatchObject({
       source: 'rpc.endpoint',
       code: 'INTERNAL',
-      cause: {
-        source: 'rpc.endpoint',
-        code: 'INTERNAL',
-        cause: { source: 'rpc.endpoint', code: 'INTERNAL', message: 'peer cause' }
-      }
+      cause: { source: 'rpc.endpoint', code: 'INTERNAL', message: 'peer cause' }
     })
   })
 
@@ -193,11 +207,8 @@ describe('source domains error source domains', () => {
           })
         ).rejects.toMatchObject({
           code: 'INTERNAL',
-          cause: {
-            code: 'INTERNAL',
-            message: 'peer error',
-            cause: { code: 'INTERNAL', message: 'peer cause' }
-          }
+          message: 'peer error',
+          cause: { code: 'INTERNAL', message: 'peer cause' }
         })
         /** Observe the actual provider bytes through the canonical stream decoder. */
         const failedWire = wireFrames(active.stdout).find(
@@ -205,7 +216,7 @@ describe('source domains error source domains', () => {
         )?.error
         expect(failedWire).toBeDefined()
         /** Existing graph assertions prove exact code/name/message/stack and cause preservation. */
-        assertWireGraph((receivedError as { cause: unknown }).cause, failedWire)
+        assertWireGraph(receivedError, failedWire)
         expect
           .soft(failedWire.nodes[failedWire.root], 'SOURCE_DOMAIN_WIRE_DOMAIN_SOURCE')
           .toMatchObject({
@@ -222,12 +233,8 @@ describe('source domains error source domains', () => {
         expect.soft(receivedError, 'SOURCE_DOMAIN_RECEIVED_DOMAIN_SOURCE').toMatchObject({
           source: 'rpc.endpoint',
           code: 'INTERNAL',
-          cause: {
-            source: 'rpc.endpoint',
-            code: 'INTERNAL',
-            message: 'peer error',
-            cause: { source: 'rpc.endpoint', code: 'INTERNAL', message: 'peer cause' }
-          }
+          message: 'peer error',
+          cause: { source: 'rpc.endpoint', code: 'INTERNAL', message: 'peer cause' }
         })
       } finally {
         await active.close()
@@ -239,78 +246,52 @@ describe('source domains error source domains', () => {
     })
 
   it('uses the process domain for a real Go authentication rejection', async () => {
-    /** The admitted Go executable receives bootstrap and hello through its existing native entry. */
+    /** The external owner retains its Go listener even when native credential admission fails. */
     const peer = peers.find((candidate) => candidate.language === 'go')!
-    /** This test owns the raw child because a rejected hello cannot produce a ready facade. */
-    const child = spawn(peer.command, [...peer.args, '--stdio', '--bootstrap', 'stdin'], {
-      stdio: ['pipe', 'pipe', 'pipe']
+    /** Each attempt owns one real socket path and inherited credential descriptor. */
+    const directory = await mkdtemp(join(tmpdir(), 'rpc-hf-go-auth-'))
+    /** Listener address is local fixture data, never a handwritten semantic hello producer. */
+    const address = join(directory, 'peer.sock')
+    /** The real foreign listener reads its own correct credential through the inherited FD. */
+    const token = randomUUID()
+    /** Credentials never enter process argv or the retained diagnostics. */
+    const auth = join(directory, 'auth')
+    writeFileSync(auth, token, { mode: 0o600 })
+    /** Only the fixture owns this inherited credential descriptor. */
+    const fd = openSync(auth, 'r')
+    /** The same native Go executable used by the business matrix owns authentication. */
+    const child = spawn(peer.command, [...peer.args, '--listen-unix', address, '--auth-fd', '3'], {
+      stdio: ['ignore', 'pipe', 'pipe', fd]
     })
-    /** Register close observation before sending input so early launch failures remain visible. */
+    closeSync(fd)
+    /** Native exit is observed before any authentication attempt may complete. */
     const exited = once(child, 'close')
-    /** Only peer-produced bytes are decoded as evidence of the rejected handshake. */
-    const stdout: Uint8Array[] = []
-    /** Retain native diagnostics without logging the local authentication fixture. */
-    const stderr: Uint8Array[] = []
-    child.stdout!.on('data', (chunk: Buffer) => stdout.push(chunk.slice()))
-    child.stderr!.on('data', (chunk: Buffer) => stderr.push(chunk.slice()))
+    /** Only fixture-ready and coded failure diagnostics are retained. */
+    const stderr: Buffer[] = []
+    child.stderr!.on('data', (chunk: Buffer) => stderr.push(chunk))
     try {
-      child.stdin!.end(
-        Buffer.concat([
-          encodeRpcStreamFrame(Buffer.from('source-domain-bootstrap-token')),
-          encodeRpcStreamFrame(
-            Buffer.from(
-              JSON.stringify({
-                kind: 'handshake',
-                step: 'hello',
-                profile: 'migaia.rpc/2',
-                peer: { id: 'caller', runtime: 'node' },
-                versions: [{ major: 2, minor: 0 }],
-                codecs: ['json'],
-                extensions: [],
-                directory: {
-                  schemaVersion: 3,
-                  self: {
-                    name: 'caller',
-                    instanceId: 'caller',
-                    generation: { kind: 'connection', value: 0 },
-                    applicationVersion: '0.0.0'
-                  },
-                  methods: []
-                },
-                auth: 'source-domain-different-token'
-              })
-            )
-          )
-        ])
+      await vi.waitFor(() => expect(Buffer.concat(stderr).toString()).toContain('READY'))
+      /** Public connect owns the real native proof; its wrong credential cannot admit a Session. */
+      const error = await faultClient(peer, { address, token: randomUUID() }).then(
+        () => expect.fail('wrong native credential admitted'),
+        (error: unknown) => error
       )
-      expect((await exited)[0]).toBe(0)
-      /** The real Go rejectRecord calls its generic wireError before returning this frame. */
-      const rejected = wireFrames(stdout).find(
-        (frame) => frame.kind === 'handshake' && frame.step === 'reject'
-      )
-      expect(rejected?.error.nodes[rejected.error.root]).toMatchObject({
-        code: 'AUTH_REJECTED',
-        name: 'Error',
-        message: 'authentication rejected',
-        stack: 'Error: authentication rejected'
+      expect(error).toMatchObject({
+        source: 'rpc.remote',
+        code: 'REMOTE_START_FAILED',
+        cause: { source: 'rpc.transport.process', code: 'PROCESS_CHANNEL_AUTH_REJECTED' }
       })
-      expect(
-        rejected.error.nodes[rejected.error.root],
-        'SOURCE_DOMAIN_GENERIC_HANDSHAKE_SOURCE'
-      ).toMatchObject({
-        source: 'rpc.transport.process'
-      })
+      /** Rejecting a borrowed connection must preserve the external process owner's authority. */
+      expect(child.exitCode).toBeNull()
+      process.kill(child.pid!, 0)
     } finally {
-      if (child.exitCode === null && child.signalCode === null) child.kill()
+      child.kill()
       await exited
       writeFileSync(
-        join(evidence, 'hf-go-source-domain-generic-handshake.stdout.bin'),
-        Buffer.concat(stdout)
-      )
-      writeFileSync(
-        join(evidence, 'hf-go-source-domain-generic-handshake.stderr.log'),
+        join(evidence, 'hf-go-source-domain-native-auth.stderr.log'),
         Buffer.concat(stderr)
       )
+      await rm(directory, { recursive: true, force: true })
     }
   })
 })
@@ -563,7 +544,7 @@ describe('independent peer rejects raw malformed input', () => {
                */
               await vi.waitFor(() =>
                 expect(Buffer.concat(active.output).toString()).toContain(
-                  'PEER_ERROR DECODE_FAILED'
+                  'PEER_ERROR HANDSHAKE_INVALID'
                 )
               )
               expect(await active.namespace.request('p.f.request', ['after-invalid-json'])).toBe(
@@ -602,6 +583,15 @@ describe('real owned terminal guards', () => {
           restart: { mode: 'on-failure', maxRestarts: 0 }
         })
         try {
+          /** Capture this actual admitted peer name before native retirement removes its directory. */
+          const target = Object.keys(active.namespace.peers)[0]!
+          /**
+           * A real benign call proves business readiness independently from removed management
+           * frames.
+           */
+          expect(await active.namespace.send(target, 'p.f.request', ['before-terminal'])).toBe(
+            'before-terminal'
+          )
           const current = active.handles[0]!
           process.kill(current.identity.pid!, 'SIGKILL')
           await current.exited
@@ -610,13 +600,13 @@ describe('real owned terminal guards', () => {
           )
           const writes = active.sent.length
           for (const operation of [
-            () => active.namespace.request('p.f.request', []),
-            () => active.namespace.notify('p.f.oneWay', []),
-            () => singleStream(active.namespace.stream('p.f.generator', [])).next()
+            () => active.namespace.send(target, 'p.f.request', []),
+            () => active.namespace.notify('p.f.oneWay', [], { targetId: target }),
+            () => active.namespace.streamTo(target, 'p.f.generator', []).next()
           ])
             await expect(async () => operation()).rejects.toMatchObject({
-              source: 'rpc.remote',
-              code: 'REMOTE_CLOSED'
+              source: 'rpc.transport.process',
+              code: 'PROCESS_TERMINAL_CALL'
             })
           expect(active.sent).toHaveLength(writes)
           expect(active.handles).toHaveLength(1)
@@ -673,7 +663,7 @@ describe('explicit persistent authenticated scope', () => {
         'hf-original-key',
         'hf-original-key'
       ])
-      expect(requests[1].options.remainingMs).toBeLessThanOrEqual(requests[0].options.remainingMs)
+      expect(requests[1].route.remainingMs).toBeLessThanOrEqual(requests[0].route.remainingMs)
     } finally {
       await active?.close()
       if (active) {
@@ -947,7 +937,7 @@ describe('real owned crash retry eligibility', () => {
               'hf-crash-original-key',
               'hf-crash-original-key'
             ])
-            expect(requests[1].options.remainingMs).toBeLessThan(requests[0].options.remainingMs)
+            expect(requests[1].route.remainingMs).toBeLessThan(requests[0].route.remainingMs)
           } else if (disposition === 'cancel') {
             expect(result).toMatchObject({ error: { name: 'AbortError', cause: 'hf-cancelled' } })
           } else if (disposition === 'deadline') {

@@ -208,7 +208,7 @@ class ForeignPeerSession {
   constructor(
     raw: IProcessByteChannel,
     token: string | undefined,
-    self: NonNullable<Parameters<typeof createRpcHost>[0]['self']> = {
+    self: Readonly<{ name?: string; instanceId: string }> = {
       name: 'ts-peer',
       instanceId: 'ts-peer'
     }
@@ -226,7 +226,7 @@ class ForeignPeerSession {
       void this.close().catch(report)
     })
     this.opening = createRpcHost({
-      self,
+      self: { ...self, name: self.name ?? 'ts-peer' },
       provide: { p: business.provide.p! },
       contract,
       plugins: [
