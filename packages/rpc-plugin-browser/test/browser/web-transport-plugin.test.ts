@@ -321,3 +321,28 @@ it('waits for native readiness and closes only its created reader and writer onc
     )
   }
 })
+
+it('A38 WebTransport rejects an oversized first length header before a handshake timeout', async () => {
+  /** Only a length header is supplied, so parsing or buffering its payload cannot complete. */
+  const header = new Uint8Array(4)
+  new DataView(header.buffer).setUint32(0, 65_537)
+  /** Actual WHATWG stream delivery reaches the plugin's original acquired reader. */
+  const stream = {
+    readable: new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(header)
+      }
+    }),
+    writable: new WritableStream<Uint8Array>()
+  }
+  /** Native session ownership remains with the caller while the plugin owns its created stream. */
+  const session = { createBidirectionalStream: vi.fn(async () => stream), close: vi.fn() }
+  await expect(
+    createRpcHost({
+      plugins: [webTransportPlugin({ session, connect: { timeoutMs: 30 } })],
+      report: () => undefined
+    })
+  ).rejects.toMatchObject({ code: 'FRAME_LIMIT_EXCEEDED' })
+  expect(session.createBidirectionalStream).toHaveBeenCalledOnce()
+  expect(session.close).not.toHaveBeenCalled()
+})

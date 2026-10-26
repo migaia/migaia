@@ -1,4 +1,7 @@
 /** Stable protocol coordination diagnostics for the actual session owner. */
+import { RPC_CARRIER_HANDSHAKE_FRAME_BYTES } from '../sdk/carrier/constants.js'
+
+/** Session negotiation and physical byte framing share the same initial admission quota. */
 export const SessionText = {
   /** Opaque arrivals share three verification slots until authenticated control identity is known. */
   maximumConcurrentVerifications: 3,
@@ -21,5 +24,5 @@ export const SessionText = {
   /** Same-name admission retains the existing connect probe deadline. */
   defaultNameProbeTimeoutMs: 10_000,
   /** Common JSON bootstrap has the retained first-message ceiling. */
-  handshakeMaxFrameBytes: 65_536
+  handshakeMaxFrameBytes: RPC_CARRIER_HANDSHAKE_FRAME_BYTES
 } as const

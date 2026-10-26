@@ -10,15 +10,20 @@ import { createContractError } from '@migaia/rpc-contract/errors'
 import { RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
 import type {
   IRpcCarrier,
+  IRpcCarrierFrame,
+  IRpcCodecContext,
   IRpcDispose,
   IRpcCarrierWriteOptions
 } from '@migaia/rpc-contract/interfaces'
-import { createRpcStreamFrameDecoder, encodeRpcStreamTextFrame } from '../wire/physical-stream.js'
+import {
+  createRpcStreamFrameDecoderWithLimit,
+  encodeRpcStreamTextFrame
+} from '../wire/physical-stream.js'
 import type { IRpcByteIO } from '../wire/byte-pump.js'
 import { RpcUtf8 } from './utf8.js'
 import { createRpcMessageCarrier } from './message.js'
-import { decodeRpcCarrierText } from './json.js'
-import { RPC_CARRIER_RETAINED_FRAME_BYTES } from './constants.js'
+import { decodeRpcJsonPhysicalFrame } from './json-codec.js'
+import { RPC_CARRIER_RETAINED_FRAME_BYTES, RPC_CARRIER_HANDSHAKE_FRAME_BYTES } from './constants.js'
 import type {
   IRpcMessageIO,
   IRpcMessageCarrierOptions,
@@ -33,6 +38,23 @@ export type IRpcByteCarrierOptions = Omit<IRpcMessageCarrierOptions, 'io' | 'nat
     utf8?: IRpcUtf8Options
   }>
 
+/** Weak identity metadata lends framing policy to Session without retaining retired physical IO. */
+const byteCarriers = new WeakMap<IRpcCarrier, RpcByteMessageIO>()
+
+/** Accepted Session admission updates only this exact native byte decoder's existing limit port. */
+export function setRpcByteCarrierFrameLimit(carrier: IRpcCarrier, maxFrameBytes: number): void {
+  byteCarriers.get(carrier)?.setFrameLimit(maxFrameBytes)
+}
+
+/** Session delegates physical text parsing to the codec before native frame hooks inspect wrappers. */
+export function decodeRpcByteCarrierFrame(
+  carrier: IRpcCarrier,
+  frame: IRpcCarrierFrame,
+  context: IRpcCodecContext
+): IRpcCarrierFrame {
+  return byteCarriers.has(carrier) ? decodeRpcJsonPhysicalFrame(frame, context) : frame
+}
+
 /**
  * The actual length-framing owner converts physical bytes once and lends only drained small
  * storage.
@@ -43,12 +65,14 @@ class RpcByteMessageIO implements IRpcMessageIO {
   /** A genuine fatal UTF-8 decoder is captured once for this physical stream. */
   readonly #utf8: RpcUtf8
   /**
-   * Native JSON parse/stringify preserves own-key order without a portable reprojection or key
-   * sort.
+   * Outbound extension wrappers preserve native JSON insertion order; inbound parsing is
+   * codec-owned.
    */
   readonly #json = jsonParser() as unknown as IRpcJsonTextParser
   /** Partial frame bytes remain with the existing bounded decoder until end or explicit close. */
   readonly #decoder
+  /** Every complete length header checks the current accepted or bootstrap budget before allocating. */
+  #maxFrameBytes = RPC_CARRIER_HANDSHAKE_FRAME_BYTES
   /** Only the physical message carrier's exact receiver is held here. */
   #receive: ((value: unknown) => void) | undefined
   /** Framing/UTF-8 failures reach the physical owner's existing failure channel. */
@@ -66,31 +90,29 @@ class RpcByteMessageIO implements IRpcMessageIO {
   constructor(options: IRpcByteCarrierOptions) {
     this.#options = options
     this.#utf8 = new RpcUtf8(options.utf8)
-    this.#decoder = createRpcStreamFrameDecoder({
-      onFrame: this.#frame,
-      onError: this.#fail,
-      errorMetadata: options.errorMetadata
-    })
+    this.#decoder = createRpcStreamFrameDecoderWithLimit(
+      {
+        onFrame: this.#frame,
+        onError: this.#fail,
+        errorMetadata: options.errorMetadata
+      },
+      () => this.#maxFrameBytes
+    )
   }
-  /** Decode native UTF-8 and JSON exactly once; ordinary bytes carry semantic JSON directly. */
+  /** Native byte framing hands opaque UTF-8 text to the canonical codec's admission boundary. */
   readonly #frame = (bytes: Uint8Array): void => {
     try {
-      /** The canonical JSON parser supplies actual native JSON semantics without a sorting codec. */
-      const value = decodeRpcCarrierText(
-        this.#utf8.decode(bytes, this.#options.errorMetadata),
-        this.#json,
-        this.#options.errorMetadata
-      )
-      this.#receive?.(
-        value &&
-          typeof value === 'object' &&
-          Object.getOwnPropertyDescriptor(value, 'kind')?.value === RpcCarrierFrameKind.extension
-          ? value
-          : { kind: RpcCarrierFrameKind.message, data: value }
-      )
+      this.#receive?.({
+        kind: RpcCarrierFrameKind.message,
+        data: this.#utf8.decode(bytes, this.#options.errorMetadata)
+      })
     } catch (error) {
       this.#fail(error)
     }
+  }
+  /** Only Session's accepted admission can replace the initial handshake frame budget. */
+  setFrameLimit(maxFrameBytes: number): void {
+    this.#maxFrameBytes = maxFrameBytes
   }
   /** The physical carrier alone reports and retires a framing/decode failure. */
   readonly #fail = (error: unknown): void => {
@@ -194,9 +216,14 @@ class RpcByteMessageIO implements IRpcMessageIO {
 
 /** Hold the real byte stream under the same message lifecycle, without bootstrap/ACK/old profiles. */
 export function createRpcByteCarrier(options: IRpcByteCarrierOptions): IRpcCarrier {
-  return createRpcMessageCarrier({
+  /** The original IO resource remains the sole physical decoder and writer. */
+  const io = new RpcByteMessageIO(options)
+  /** Register exact identity after native acquisition; the WeakMap owns no additional lifetime. */
+  const carrier = createRpcMessageCarrier({
     ...options,
-    io: new RpcByteMessageIO(options),
+    io,
     nativeBinary: false
   })
+  byteCarriers.set(carrier, io)
+  return carrier
 }

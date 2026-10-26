@@ -12,9 +12,12 @@ import { createManualScheduler } from '@migaia/utils/testing'
 import { defineHost, definePlugin } from '@migaia/plugin-host'
 import {
   defineFlowFeature,
+  createRpcByteCarrier,
+  RpcEventByteIO,
   rpcHostPipelines,
   type IRpcFlowInstallation
 } from '@migaia/rpc-host/sdk'
+import { PassThrough } from 'node:stream'
 import { TOKEN, leaks } from '../../../rpc-contract/test/fixtures/handshake-privacy.js'
 
 import {
@@ -67,7 +70,7 @@ class Host {
     id: string,
     name = id,
     installed: IRpcFlowInstallation<object> = {},
-    options?: Pick<IRpcSessionTableOptions, 'scheduler' | 'handshakeTimeoutMs'>
+    options?: Pick<IRpcSessionTableOptions, 'scheduler' | 'handshakeTimeoutMs' | 'maxFrameBytes'>
   ): Promise<Host> {
     /** This bounded fixture retains the same global identity and original hook callbacks. */
     const host = new Host(id, name)
@@ -78,7 +81,7 @@ class Host {
   /** Native groups own real short-name declarations and canonical setup, without a copied runner. */
   async #install(
     installed: IRpcFlowInstallation<object>,
-    options?: Pick<IRpcSessionTableOptions, 'scheduler' | 'handshakeTimeoutMs'>
+    options?: Pick<IRpcSessionTableOptions, 'scheduler' | 'handshakeTimeoutMs' | 'maxFrameBytes'>
   ): Promise<void> {
     /** Genuine native construction fixes one execution port per namespace registration. */
     const owners = new Map<string, IRpcPipelineOwner>()
@@ -140,6 +143,7 @@ class Host {
       report: this.report,
       scheduler: options?.scheduler ?? this.scheduler,
       handshakeTimeoutMs: options?.handshakeTimeoutMs,
+      maxFrameBytes: options?.maxFrameBytes,
       timestamp: () => 0,
       nameProbeTimeoutMs: 20
     })
@@ -726,5 +730,58 @@ it('A39 late track after physical retirement preserves its promise without alloc
     expect(await original).toBe('late result')
   } finally {
     await Promise.all([left.table.close(), right.table.close()])
+  }
+})
+
+it('A38 accepted byte Session replaces the bootstrap cap with its configured frame limit', async () => {
+  /** A real accepted handshake fits within this smaller configured business-frame budget. */
+  const left = await Host.create('byte-a', 'byte-a', {}, { maxFrameBytes: 1024 })
+  /** The opposite actual Session negotiates using the same canonical byte carrier. */
+  const right = await Host.create('byte-b')
+  /** Each direction is one original native ordered stream. */
+  const toLeft = new PassThrough()
+  /** Peer writes feed the opposite real IO subscriber. */
+  const toRight = new PassThrough()
+  /** Actual native input/output ownership is shared only across its two physical endpoints. */
+  const io = (input: PassThrough, output: PassThrough) =>
+    new RpcEventByteIO(
+      input,
+      output,
+      () => {
+        input.pause()
+        output.end()
+      },
+      { closedError: () => new Error('byte session fixture closed'), report: left.report }
+    ).value
+  /** Both real Session owners subscribe before any asynchronous handshake is written. */
+  const first = left.attach(
+    'process',
+    createRpcByteCarrier({ id: 'byte-left', io: io(toLeft, toRight), report: left.report })
+  )
+  /** The peer has its own physical carrier and original frame decoder. */
+  const second = right.attach(
+    'process',
+    createRpcByteCarrier({ id: 'byte-right', io: io(toRight, toLeft), report: right.report })
+  )
+  try {
+    await Promise.all([first.ready, second.ready])
+    /** A header above the accepted limit must fail without waiting for its nonexistent payload. */
+    const header = new Uint8Array(4)
+    new DataView(header.buffer).setUint32(0, 1025)
+    /** The configured cap is enforced before any semantic JSON parse starts. */
+    const parse = vi.spyOn(JSON, 'parse')
+    try {
+      toLeft.emit('data', header)
+      expect(left.report).toHaveBeenCalledWith(
+        expect.objectContaining({ code: 'FRAME_LIMIT_EXCEEDED' })
+      )
+      expect(parse).not.toHaveBeenCalled()
+    } finally {
+      parse.mockRestore()
+    }
+  } finally {
+    await Promise.all([left.table.close(), right.table.close()])
+    toLeft.destroy()
+    toRight.destroy()
   }
 })

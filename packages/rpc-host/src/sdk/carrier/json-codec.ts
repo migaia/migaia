@@ -28,6 +28,30 @@ import { splitRpcPreparedMetadata, joinRpcPreparedMetadata } from './prepared.js
 import { decodeRpcCarrierText } from './json.js'
 import { captureRpcWirePortableRecord } from '@migaia/rpc-contract/portable'
 
+/** Physical byte wrappers use the canonical codec parser before installed frame hooks inspect them. */
+const physicalJson = jsonParser() as unknown as IRpcJsonTextParser
+
+/** Decode the byte transport wrapper once; ordinary semantic objects stay with the existing codec. */
+export function decodeRpcJsonPhysicalFrame(
+  frame: IRpcCarrierFrame,
+  context: IRpcCodecContext
+): IRpcCarrierFrame {
+  if (frame.kind !== RpcCarrierFrameKind.message || typeof frame.data !== 'string') return frame
+  /** The same bounded text admission also protects serialized extension wrappers before frame hooks. */
+  const value = decodeRpcCarrierText(
+    frame.data,
+    physicalJson,
+    context.errorMetadata,
+    undefined,
+    context.maxFrameBytes
+  )
+  return value &&
+    typeof value === 'object' &&
+    Object.getOwnPropertyDescriptor(value, 'kind')?.value === RpcCarrierFrameKind.extension
+    ? (value as IRpcCarrierFrame)
+    : { ...frame, data: value }
+}
+
 /** Native media may retain its registered syntax diagnostic after the one parser's privacy policy. */
 type IRpcJsonCarrierCodecOptions = Readonly<{
   digest?: IRpcBinaryDigest
@@ -102,7 +126,7 @@ export class RpcJsonCarrierCodec implements IRpcCarrierCodec {
       ...(value.sidecars.length ? { sidecars: value.sidecars } : {})
     }
   }
-  /** Parse text once; byte carriers already supply their once-parsed ordinary JSON value. */
+  /** Parse text once; the codec's physical wrapper stage already decoded byte-carrier text. */
   decode(frame: IRpcCarrierFrame, context: IRpcCodecContext): IRpcPreparedMessage {
     if (frame.kind !== RpcCarrierFrameKind.message)
       throw createContractError(RpcContractErrorCode.invalidFrame, undefined, context.errorMetadata)

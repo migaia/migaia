@@ -85,6 +85,7 @@ import { isRpcCarrierAdmissionFailure } from '../sdk/carrier/admission.js'
 import { RpcFlowPoint } from '../sdk/flow-pipelines.js'
 import type { IRpcSessionOptions, IRpcSessionWriteOptions } from './types.js'
 import { bindSessionCredentials, type ISessionCredentials } from './credentials.js'
+import { decodeRpcByteCarrierFrame, setRpcByteCarrierFrameLimit } from '../sdk/carrier/byte.js'
 
 /** A live control record holds settlement only, never a business payload or request facade. */
 type IControlPending = { completion: IDeferred<void>; signal: IAbortSignal }
@@ -768,6 +769,7 @@ export class Session {
   /** Process one admitted ingress slot through its actual accepted or bootstrap codec boundary. */
   async #receiveFrame(frame: IRpcCarrierFrame, ingress: IIngressPrefix): Promise<void> {
     this.#assertOpen(true, true)
+    frame = decodeRpcByteCarrierFrame(this.#options.carrier, frame, this.#codecContext(!this.#view))
     if (this.#view)
       await this.#options
         .pipelines()
@@ -998,6 +1000,8 @@ export class Session {
       this.#authentication()
     )
     this.#assertOpen()
+    /** Raise the native cap before sending accept, so a coalesced confirmation/business frame fits. */
+    setRpcByteCarrierFrameLimit(this.#options.carrier, this.#options.maxFrameBytes)
     if (responder) this.#candidate = view
     this.#reply = this.#writeHandshake(
       responder

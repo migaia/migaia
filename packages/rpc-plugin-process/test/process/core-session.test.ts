@@ -120,6 +120,9 @@ it('preserves actual short spawn inline binary and refuses explicit native trans
     expect(Array.from(result as Uint8Array)).toEqual([7, 8, 9])
     expect((result as Uint8Array).byteOffset).toBe(4)
     expect((result as Uint8Array).buffer.byteLength).toBe(7)
+    /** Accepted Process byte media uses the Session budget above the 64 KiB bootstrap cap. */
+    const large = 'x'.repeat(70_000)
+    expect(await host.process.request('echo', large)).toBe(large)
     await expect(
       host.process.request('echo', value, { transfer: [backing] })
     ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
