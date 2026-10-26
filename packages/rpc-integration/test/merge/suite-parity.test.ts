@@ -474,6 +474,20 @@ const retiredLayeringTitles = new Set([
 
 /** Exact receiver fullNames preserve migrated business; missing reception still fails. */
 const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
+  // Late construction diagnostics retain once-only reporting and the original Error, without hooks DTOs.
+  'packages/web-rpc/test/construction-hooks.test.ts::real construction diagnostic reporter delivers the exact late install error after factory rejection and Host rollback':
+    [
+      'packages/rpc-host/test/host/installation-late-failure.test.ts::keeps caller cancellation terminal before reporting the original late setup failure'
+    ],
+  // R7/BC3 removes the old listener fanout; its exact two callback errors are NoPASS.
+  'packages/web-rpc/test/construction-hooks.test.ts::real construction diagnostic reporter isolates sync and async listener failures while preserving late delivery':
+    [
+      'packages/rpc-host/test/host/installation-late-failure.test.ts::keeps caller cancellation terminal before reporting the original late setup failure'
+    ],
+  'packages/web-rpc/test/construction-hooks.test.ts::real construction diagnostic reporter does not report a pre-settlement primary install failure as a late diagnostic':
+    [
+      'packages/rpc-host/test/host/native-installation-errors.test.ts::classifies the original native flow setup failure without replacing its Error'
+    ],
   'packages/web-rpc/test/internal/async-control.test.ts::async control settles on timeout and ignores late operation completion':
     [
       'packages/utils/test/promise.test.ts::retains the deadline terminal after the original operation fulfills late'
@@ -1241,7 +1255,8 @@ function migratedTitles(title: string): readonly string[] {
   if (retiredSuites.has(file.split('/').at(-1) ?? '') || retiredLayeringTitles.has(title)) return []
   if (
     file === 'packages/web-rpc/test/middleware-ports.test.ts' ||
-    file === 'packages/web-rpc/test/internal/async-control.test.ts'
+    file === 'packages/web-rpc/test/internal/async-control.test.ts' ||
+    file === 'packages/web-rpc/test/construction-hooks.test.ts'
   ) {
     /** Missing/unfinished reception fails before a ghost legacy file can enter the real child. */
     const receivers = currentCaseReceivers[title]
