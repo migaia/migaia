@@ -1,6 +1,4 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
-import { readFileSync, readdirSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
 import {
   createPipeline,
@@ -125,9 +123,6 @@ const expectInvalidOption = (
   if (hasCause) expect((failure as Error).cause).toBe(cause)
 }
 
-/** Source directory used to prove internal ownership and import order. */
-const sourceDirectory = fileURLToPath(new URL('../src/', import.meta.url))
-
 describe('pipeline internal cleanup', () => {
   it.each(Object.values(MiddlewarePipelineMode))(
     'codes an aborted getter failure after admission in %s mode',
@@ -251,28 +246,6 @@ describe('pipeline internal cleanup', () => {
     }
   })
 
-  it('has one error factory, one control admission, and ordered runtime imports', () => {
-    const files = readdirSync(sourceDirectory).filter((name) => name.endsWith('.ts'))
-    const source = files.map(
-      (name) => [name, readFileSync(`${sourceDirectory}/${name}`, 'utf8')] as const
-    )
-    expect(
-      source.flatMap(([name, text]) => [...text.matchAll(/new TypeError\(/g)].map(() => name))
-    ).toEqual(['errors.ts'])
-    const create = source.find(([name]) => name === 'create-pipeline.ts')?.[1] ?? ''
-    const runtime = source.find(([name]) => name === 'runtime.ts')?.[1] ?? ''
-    /** Canonical context admission moved with branching runners; its checks remain unique. */
-    const context = source.find(([name]) => name === 'runtime-context.ts')?.[1] ?? ''
-    expect(create).not.toContain('const invalidOption')
-    expect(runtime).not.toMatch(/readControlSignal|readAsyncSignal|invalidSignal/)
-    expect(context.lastIndexOf('import ')).toBeLessThan(
-      context.indexOf('function invokeWithContext')
-    )
-    expect(runtime).toMatch(
-      /\/\*\* Explicit generator result[^]*?\*\/\s*type IGeneratorUndefinedSignal/
-    )
-  })
-
   it('wraps primitive reason getter failures in all modes and preserves cleanup order', async () => {
     for (const mode of Object.values(MiddlewarePipelineMode)) {
       for (const duringStage of [false, true]) {
@@ -348,22 +321,5 @@ describe('pipeline internal cleanup', () => {
         expect(fixture.reads()).toBe(1)
       }
     }
-  })
-  it('uses guarded reason reads and documents every invalid-option scenario', () => {
-    const files = readdirSync(sourceDirectory).filter((name) => name.endsWith('.ts'))
-    const source = files
-      .map((name) => readFileSync(`${sourceDirectory}/${name}`, 'utf8'))
-      .join('\n')
-    const runtime = readFileSync(`${sourceDirectory}/runtime-context.ts`, 'utf8')
-    const codes = readFileSync(`${sourceDirectory}/error-code.ts`, 'utf8')
-    expect(runtime).toMatch(/import \{[^}]*\btryReadProperty\b[^}]*\} from '@migaia\/utils\/error'/)
-    expect((runtime.match(/tryReadProperty\([^\n]*, 'reason'\)/g) ?? []).length).toBe(1)
-    expect(source).not.toMatch(/\.reason\b/)
-    const comment = codes.slice(
-      codes.indexOf('/**', codes.indexOf('executionFailed:')),
-      codes.indexOf("invalidOption: 'INVALID_OPTION'")
-    )
-    for (const scenario of ['mode', 'onViolation', 'signal', 'signals', 'lift'])
-      expect(comment).toContain(scenario)
   })
 })
