@@ -21,7 +21,6 @@ import {
   type ILifecycleScope
 } from '@migaia/lifecycle'
 import { observeAbortSubscription } from '@migaia/lifecycle/abort'
-import { attachSecondaryErrors } from '@migaia/utils/error'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import {
   RpcCoreErrorText,
@@ -55,6 +54,7 @@ import type { IProviderCommitGate } from '../dispatch/types.js'
 import { createProviderCommitGate } from '../dispatch/exposure.js'
 import { HostErrorText } from '../host/error-text.js'
 import type { IRpcTransportSetupContext } from '../sdk/types.js'
+import { RpcInstallationSetup } from '../sdk/flow-setup.js'
 
 /** Per-source native extensions remain distinct from the fixed RPC namespace publication. */
 const sourceFamily = Object.freeze({})
@@ -374,20 +374,17 @@ export class Namespace {
       operation.report
     )
     core.onDispose(preparing.unsubscribe)
-    /** Acquired cleanup is admitted before its original installation result becomes observable. */
-    const installed = await definition.open(context)
-    preparing.unsubscribe()
     try {
-      resources.own(installed, { force: () => installed.dispose() })
-    } catch (primary) {
-      try {
-        await installed.dispose()
-      } catch (cleanup) {
-        throw attachSecondaryErrors(primary, [cleanup])
-      }
-      throw primary
+      /** Native transport and flow setup reuse the same cancellation and late-cleanup handoff. */
+      return await new RpcInstallationSetup({
+        setup: () => definition.open(context),
+        own: (installed) => resources.own(installed, { force: () => installed.dispose() }),
+        report: operation.report,
+        signals: [context.signal, core.operation.signal]
+      }).run()
+    } finally {
+      preparing.unsubscribe()
     }
-    return installed
   }
 
   /** Handlers borrow the original SessionTable scope; Namespace owns no parallel listener set. */

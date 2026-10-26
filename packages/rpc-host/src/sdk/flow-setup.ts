@@ -7,11 +7,11 @@ import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { createRpcAbortError } from '../host/error-owner.js'
 import type { IRpcFlowDefinition, IRpcFlowInstallation, IRpcFlowSetupContext } from './types.js'
 
-/** One native install borrows its original definition, report context and captured operation signal. */
-type IFlowSetupInput = Readonly<{
-  definition: IRpcFlowDefinition<object>
-  core: IPluginHostCore
-  context: IRpcFlowSetupContext
+/** One native install borrows its original acquisition, cleanup admission and operation signals. */
+type IInstallationSetupInput<T> = Readonly<{
+  setup(): T | PromiseLike<T>
+  own(installed: T): void
+  report(error: unknown): void
   signals: readonly IAbortSignal[]
 }>
 
@@ -31,32 +31,32 @@ export class RpcFlowSetup {
     rootSignal: IAbortSignal,
     context: IRpcFlowSetupContext
   ): Promise<IRpcFlowInstallation<object>> =>
-    new RpcFlowSetupAttempt({
-      definition: this.#definition,
-      core,
-      context,
+    new RpcInstallationSetup({
+      setup: () => this.#definition.setup(context),
+      own: (installed) => core.onDispose(() => installed.dispose?.()),
+      report: context.report,
       signals: [rootSignal, core.operation.signal]
     }).run()
 }
 
 /** One setup attempt hands off acquired cleanup or releases a value that arrived after cancellation. */
-class RpcFlowSetupAttempt {
+export class RpcInstallationSetup<T extends { dispose?(): void | Promise<void> }> {
   /** Inputs remain alive only until the original setup and its ownership handoff finish. */
-  readonly #input: IFlowSetupInput
+  readonly #input: IInstallationSetupInput<T>
   /** Distinguish business-thrown UtilsAbortError from cancellation produced by the utility race. */
   #failure: unknown
 
   /** Capture the original native operation signal before asynchronous setup can outlive rollback. */
-  constructor(input: IFlowSetupInput) {
+  constructor(input: IInstallationSetupInput<T>) {
     this.#input = input
   }
 
   /** Preserve original setup failures; only utility cancellation crosses the canonical RPC boundary. */
-  async run(): Promise<IRpcFlowInstallation<object>> {
+  async run(): Promise<T> {
     try {
       return await raceWithAbort(this.#invoke, {
         signals: this.#input.signals,
-        report: this.#input.context.report,
+        report: this.#input.report,
         cleanupPolicy: 'report'
       })
     } catch (error) {
@@ -71,20 +71,16 @@ class RpcFlowSetupAttempt {
    * Fulfill only after native cleanup owns the exact acquired installation; late values are
    * released.
    */
-  readonly #invoke = async ({
-    signal
-  }: {
-    signal: INativeAbortSignal
-  }): Promise<IRpcFlowInstallation<object>> => {
+  readonly #invoke = async ({ signal }: { signal: INativeAbortSignal }): Promise<T> => {
     try {
-      /** The original setup call retains its definition receiver and unchanged lifecycle context. */
-      const installed = await this.#input.definition.setup(this.#input.context)
+      /** The owner supplies the original callback receiver and unchanged lifecycle context. */
+      const installed = await this.#input.setup()
       if (signal.aborted) {
         await installed.dispose?.()
         return installed
       }
       try {
-        this.#input.core.onDispose(() => installed.dispose?.())
+        this.#input.own(installed)
       } catch (error) {
         return await releaseUnownedInstallation(installed, error)
       }
@@ -102,7 +98,7 @@ class RpcFlowSetupAttempt {
 
 /** Release a value rejected by native cleanup admission while retaining the original primary first. */
 async function releaseUnownedInstallation(
-  installed: IRpcFlowInstallation<object>,
+  installed: { dispose?(): void | Promise<void> },
   primary: unknown
 ): Promise<never> {
   try {
