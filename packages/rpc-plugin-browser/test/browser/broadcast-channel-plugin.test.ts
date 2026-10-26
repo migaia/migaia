@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { describe, expect, it, vi } from 'vitest'
+import type { IRpcObservation } from '@migaia/rpc-host/sdk'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
 import {
   defineFlowPlugin,
@@ -103,12 +104,10 @@ class BroadcastRoomFixture {
         defineFlowPlugin<Record<never, never>>({
           name: 'broadcast-native-observer',
           setup: () => ({
-            hooks: {
-              observe: (event) => {
-                if (event.kind === HostObservationKind.peerReady) state.joined.push(event.peerId)
-                else if (event.kind === HostObservationKind.peerLeave)
-                  state.departed.push(event.peerId)
-              }
+            observe: (event: IRpcObservation) => {
+              if (event.kind === HostObservationKind.peerReady) state.joined.push(event.peerId)
+              else if (event.kind === HostObservationKind.peerLeave)
+                state.departed.push(event.peerId)
             }
           })
         }),

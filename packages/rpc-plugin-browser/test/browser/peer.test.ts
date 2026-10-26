@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { setTimeout as delay } from 'node:timers/promises'
 import { normalizeRpcHandshake, RpcWireHandshakeStep } from '@migaia/rpc-contract/protocol'
+import type { IRpcObservation } from '@migaia/rpc-host/sdk'
 import { createRpcHost, type IRpcHost, type IRpcFanoutResult } from '@migaia/rpc-host'
 import {
   defineFlowPlugin,
@@ -405,10 +406,8 @@ describe('browser public namespace runtime', () => {
         defineFlowPlugin({
           name: 'browser-shared-native-ready',
           setup: () => ({
-            hooks: {
-              observe: (event) => {
-                if (event.kind === HostObservationKind.peerReady) ready.push(String(event.peerId))
-              }
+            observe: (event: IRpcObservation) => {
+              if (event.kind === HostObservationKind.peerReady) ready.push(String(event.peerId))
             }
           })
         }),
