@@ -79,7 +79,7 @@ describe('coroutine authentication cleanup', () => {
     const unprotected: unknown[] = []
     /** Every report must remain observable, including errors that surface while Hosts dispose. */
     const reports: unknown[] = []
-    /** The parent-assigned name overrides explicit child self without entering the error channel. */
+    /** Parent-assigned identity overrides explicit child self without entering the error channel. */
     const warnings: IRpcWarning[] = []
     /** Parent and child use the exact same supported public authentication configuration. */
     const authentication = await protection(unprotected)
@@ -131,7 +131,12 @@ describe('coroutine authentication cleanup', () => {
     expect(warnings).toEqual([
       expect.objectContaining({
         code: RpcWarningCode.selfIgnored,
-        data: { parentName: 'math', ignoredName: 'math-child' }
+        data: {
+          parentName: 'math',
+          ignoredName: 'math-child',
+          parentInstanceId: expect.any(String),
+          ignoredInstanceId: 'authenticated-child'
+        }
       })
     ])
   })
