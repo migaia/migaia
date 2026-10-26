@@ -405,7 +405,8 @@ export class Session {
       .finally(() => {
         this.#keepaliveBytes -= job.bytes
       })
-    this.#writing = previous.then(() => writing).catch(this.#options.report)
+    // The returned write owns its rejection; the FIFO tail only releases the next queued write.
+    this.#writing = previous.then(() => writing).catch(() => undefined)
     return writing
   }
 

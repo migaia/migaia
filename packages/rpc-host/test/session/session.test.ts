@@ -876,6 +876,40 @@ it('A38 accepted byte Session replaces the bootstrap cap with its configured fra
   }
 })
 
+it('A40 closing keepalive queue leaves cancellation with its original caller', async () => {
+  /** Real accepted native sources enter the existing closing-write grace window. */
+  const left = await Host.create('keepalive-queue-a')
+  /** The actual peer remains able to receive the final close notification. */
+  const right = await Host.create('keepalive-queue-b')
+  /** Both original carriers explicitly grant closing writes. */
+  const pair = connect(left, right, 'process', false, '', true)
+  /** The original close reason remains the public keepalive lifecycle cause. */
+  const reason = new Error('closing keepalive queue')
+  /** Only the original send rejection fills this caller-owned observation. */
+  let failure: unknown
+  /** The real namespace hook starts and observes one cancelled closing write. */
+  const off = left.onClosing(async () => {
+    /** This genuine caller cancellation happens within the existing permitted grace period. */
+    const cancellation = new AbortController()
+    cancellation.abort(new Error('keepalive caller stopped'))
+    failure = await left.table
+      .send(pair.a.id, call(left, right), {
+        keepalive: true,
+        signal: cancellation.signal
+      })
+      .catch((error: unknown) => error)
+  })
+  try {
+    await Promise.all([pair.first.ready, pair.second.ready])
+    await pair.first.close(reason)
+    expect(failure).toMatchObject({ code: RpcCoreErrorCode.endpointDisposed, cause: reason })
+    expect(left.report).not.toHaveBeenCalled()
+  } finally {
+    off()
+    await Promise.all([left.table.close(), right.table.close()])
+  }
+})
+
 it('A40 closing a physically written pending ping reports no cancellation acknowledgment', async () => {
   /** Both original native Session owners first complete the genuine accepted handshake. */
   const left = await Host.create('closing-ping-a')
