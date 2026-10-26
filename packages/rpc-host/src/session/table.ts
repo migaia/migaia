@@ -260,8 +260,8 @@ export class SessionTable {
   constructor(options: IRpcSessionTableOptions) {
     /** Validate close budgets before any source, Session or lifecycle timer can be acquired. */
     const keepalive = {
-      maxBytes: options.keepalive?.maxBytes ?? 65536,
-      timeoutMs: options.keepalive?.timeoutMs ?? 1000
+      maxBytes: options.keepalive?.maxBytes ?? SessionText.defaultKeepaliveBytes,
+      timeoutMs: options.keepalive?.timeoutMs ?? SessionText.defaultKeepaliveTimeoutMs
     }
     for (const value of [keepalive.maxBytes, keepalive.timeoutMs])
       if (!Number.isFinite(value) || !Number.isInteger(value) || value < 1)
