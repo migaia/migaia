@@ -27,7 +27,7 @@ export type IRpcHostOptions<
   /** Every supported physical Session owns its closing byte quota and complete grace deadline. */
   keepalive?: Readonly<{ maxBytes?: number; timeoutMs?: number }>
   report?(error: unknown): void
-  /** Successful native identity overrides warn once; omitted handlers use console.warn. */
+  /** Receives each warning before SDK subscribers; console.warn runs only when both are absent. */
   onWarning?(warning: IRpcWarning): void
   signal?: IAbortSignal
 }>

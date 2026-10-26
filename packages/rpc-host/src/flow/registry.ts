@@ -1,8 +1,10 @@
 /** Registers native stages and retains scoped facts; execution and lifetime remain native-owned. */
 import type { IPluginHostCore } from '@migaia/plugin-host'
+import { containAsyncRejection } from '@migaia/lifecycle'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IRpcObservation } from '@migaia/rpc-contract/interfaces'
 import { HostErrorText } from '../host/error-text.js'
+import { defaultRpcWarning, type IRpcWarning } from '../host/warning.js'
 import type { IRpcFlowFeature, IRpcFlowInstallation, IRpcFlowSetupContext } from '../sdk/types.js'
 import type { IRpcFlowEntry, IRpcSharedFlows } from '../sdk/metadata.js'
 import type { RpcTransportFlowProgram } from '../sdk/flow-program.js'
@@ -103,6 +105,12 @@ function namespaceExtensions(
   return values
 }
 
+/** Warning subscriptions belong only to native host observers, never information-flow Features. */
+function assertInterventionEntries(entries: Iterable<IRpcFlowEntry>): void {
+  for (const { installed } of entries)
+    if (installed.onWarning !== undefined) invalidFlow(HostErrorText.pluginInvalid)
+}
+
 /** A group borrows installations and host observers without owning another cleanup or executor. */
 class RpcFlowGroup implements IRpcFlowGroup {
   /** The original registry alone owns host observer registration and reporting. */
@@ -158,14 +166,18 @@ export class FlowRegistry {
   readonly #report: (error: unknown) => void
   /** Only the native owner's committed namespace table supplies global namespace routing. */
   readonly #resolveGroup: ((namespace: string) => IRpcFlowGroup | undefined) | undefined
+  /** The original options callback receives the same record before native host subscribers. */
+  readonly #onWarning: ((warning: IRpcWarning) => void) | undefined
 
   /** Borrow reporting and committed group lookup without creating a public or pending group map. */
   constructor(
     report: (error: unknown) => void,
-    resolveGroup?: (namespace: string) => IRpcFlowGroup | undefined
+    resolveGroup?: (namespace: string) => IRpcFlowGroup | undefined,
+    onWarning?: (warning: IRpcWarning) => void
   ) {
     this.#report = report
     this.#resolveGroup = resolveGroup
+    this.#onWarning = onWarning
   }
 
   /** Register a readonly host installation; information-flow stages must use native Features. */
@@ -183,6 +195,7 @@ export class FlowRegistry {
   /** Remember shared setup once; later transports borrow entries without retaining an expired core. */
   registerShared(core: IPluginHostCore, shared: IRpcSharedFlows): void {
     this.#assertMutable()
+    assertInterventionEntries(shared.entries.values())
     this.#shared = shared
     this.#allFacts = undefined
     core.onDispose(() => {
@@ -200,6 +213,7 @@ export class FlowRegistry {
   ): Promise<IRpcFlowGroup> {
     /** Every local setup belongs to this current core; shared setup is never repeated here. */
     const entries = await program.prepare(core, rootSignal, context, this.#shared)
+    assertInterventionEntries(entries)
     // Seven points form the complete compile-time intervention domain.
     for (const point of Object.values(RpcFlowPoint))
       this.#registerStages(core as IRpcFlowCore, point, entries)
@@ -231,6 +245,33 @@ export class FlowRegistry {
         event.namespace === undefined ? this.facts().selected : this.hostFacts().selected,
         event
       )
+  }
+
+  /** Deliver one successful-decision record in order; only handler failures enter reporting. */
+  readonly dispatchWarning = (warning: IRpcWarning): void => {
+    /** Presence, rather than handler success, suppresses the console fallback. */
+    let received = false
+    /** A plain call preserves the configured callback's receiverless public signature. */
+    const configured = this.#onWarning
+    if (configured) {
+      received = true
+      this.#deliverWarning(() => configured(warning))
+    }
+    for (const installed of this.#registrations) {
+      if (installed.onWarning === undefined) continue
+      received = true
+      this.#deliverWarning(() => installed.onWarning!(warning))
+    }
+    if (!received) this.#deliverWarning(() => defaultRpcWarning(warning))
+  }
+
+  /** Synchronous and late asynchronous handler failures keep their exact original identity. */
+  #deliverWarning(deliver: () => unknown): void {
+    try {
+      containAsyncRejection(deliver(), this.#report)
+    } catch (error) {
+      this.#report(error)
+    }
   }
 
   /** Isolate observer failures without replacing business continuation or error identity. */

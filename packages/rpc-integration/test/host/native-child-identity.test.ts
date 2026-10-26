@@ -57,8 +57,7 @@ it.each(['process', 'thread', 'coroutine'] as const)(
         {
           code: RpcWarningCode.selfIgnored,
           message: expect.stringContaining('self.name will be ignored'),
-          parentName: 'math',
-          ignoredName: 'math-child'
+          data: { parentName: 'math', ignoredName: 'math-child' }
         }
       ])
       expect(snapshot.reports).toBe(0)
@@ -110,8 +109,7 @@ it('A26: omitted onWarning uses console.warn for the successful native name over
       expect(warning).toHaveBeenCalledExactlyOnceWith(
         expect.objectContaining({
           code: RpcWarningCode.selfIgnored,
-          parentName: 'math',
-          ignoredName: 'math-child'
+          data: { parentName: 'math', ignoredName: 'math-child' }
         })
       )
     } finally {

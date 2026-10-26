@@ -10,8 +10,10 @@ export type RpcWarningCode = (typeof RpcWarningCode)[keyof typeof RpcWarningCode
 export type IRpcWarning = Readonly<{
   code: RpcWarningCode
   message: string
-  parentName: string
-  ignoredName: string
+  data: Readonly<{
+    parentName: string
+    ignoredName: string
+  }>
 }>
 
 /** The default warning channel remains separate from the configured background error reporter. */

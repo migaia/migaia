@@ -131,8 +131,7 @@ describe('coroutine authentication cleanup', () => {
     expect(warnings).toEqual([
       expect.objectContaining({
         code: RpcWarningCode.selfIgnored,
-        parentName: 'math',
-        ignoredName: 'math-child'
+        data: { parentName: 'math', ignoredName: 'math-child' }
       })
     ])
   })

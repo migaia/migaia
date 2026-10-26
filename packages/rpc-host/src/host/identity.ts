@@ -8,7 +8,7 @@ import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcCoreErrorText, RuntimeApiErrorText } from '@migaia/rpc-contract/errors'
 import { createRpcConfigurationError, createRpcError } from './error-owner.js'
 import { sameGeneration } from '../call/envelope.js'
-import { defaultRpcWarning, RpcWarningCode, type IRpcWarning } from './warning.js'
+import { RpcWarningCode, type IRpcWarning } from './warning.js'
 import { HostWarningText } from './warning-text.js'
 
 /** Public identity is global to the host; a transport never creates a second public self. */
@@ -52,8 +52,8 @@ function captureSelf(value: IRpcSelf): IRpcSelf {
 export class HostIdentity {
   /** Explicit child display names warn when an actual parent supplies a different name. */
   readonly #configured: boolean
-  /** Successful identity overrides use their own public warning channel, never error reporting. */
-  readonly #onWarning: (warning: IRpcWarning) => void
+  /** The original flow registry owns warning subscriptions, fallback and handler failures. */
+  readonly #dispatchWarning: (warning: IRpcWarning) => void
   /** The one immutable accepted identity is borrowed by every namespace directory. */
   #self: IRpcSelf
   /** Native restart/session facts belong to the same global identity owner. */
@@ -63,12 +63,12 @@ export class HostIdentity {
 
   /** Capture caller configuration once; ordinary native hosts provide their original identity. */
   constructor(
-    self?: IRpcSelf,
-    configured = self !== undefined,
-    onWarning: (warning: IRpcWarning) => void = defaultRpcWarning
+    self: IRpcSelf | undefined,
+    configured: boolean,
+    dispatchWarning: (warning: IRpcWarning) => void
   ) {
     this.#configured = configured
-    this.#onWarning = onWarning
+    this.#dispatchWarning = dispatchWarning
     /** Default name matches its generated instance address, preserving direct host behavior. */
     const instanceId = self?.instanceId ?? defaultRpcId()
     this.#self = captureSelf(self ?? { name: instanceId, instanceId })
@@ -105,12 +105,13 @@ export class HostIdentity {
         this.#self = incoming
         this.#generation = Object.freeze({ ...this.#generation, providerId: incoming.instanceId })
         if (this.#configured && facts.self.name !== undefined && incoming.name !== ignoredName)
-          this.#onWarning({
-            code: RpcWarningCode.selfIgnored,
-            message: HostWarningText.selfIgnored(incoming.name, ignoredName),
-            parentName: incoming.name,
-            ignoredName
-          })
+          this.#dispatchWarning(
+            Object.freeze({
+              code: RpcWarningCode.selfIgnored,
+              message: HostWarningText.selfIgnored(incoming.name, ignoredName),
+              data: Object.freeze({ parentName: incoming.name, ignoredName })
+            })
+          )
       }
     }
     if (facts.generation !== undefined) {

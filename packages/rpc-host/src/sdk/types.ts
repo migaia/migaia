@@ -23,6 +23,7 @@ import type { IRpcTransportContext } from '@migaia/rpc-contract/interfaces'
 import type { IRpcFlowStages, RpcFlowPipelines } from './flow-pipelines.js'
 import type { IRpcNativeTransportFeature } from './native-feature-types.js'
 import type { IRpcIntersection } from '../namespace/types.js'
+import type { IRpcWarning } from '../host/warning.js'
 
 /** Native source policy borrows its genuine installation core, including dependency liquidation. */
 export type IRpcTransportSetupContext = IRpcTransportContext &
@@ -107,6 +108,8 @@ export type IRpcFlowSetupContext = Readonly<{
 export type IRpcFlowInstallation<E extends object = Record<never, never>> = Readonly<{
   stages?: IRpcFlowStages
   observe?(event: IRpcObservation): void
+  /** Only host-level flow plugins subscribe; native unuse or rollback removes this callback. */
+  onWarning?(warning: IRpcWarning): void
   extensions?: readonly string[]
   requiredExtensions?: readonly string[]
   /** Installed media protection may narrow physical native storage; it cannot grant capability. */

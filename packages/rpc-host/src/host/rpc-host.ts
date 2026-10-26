@@ -139,7 +139,6 @@ export class RpcHost {
     nodeId = defaultRpcId().replace(/-/gu, ''),
     configuredSelf = options.self !== undefined
   ) {
-    this.#identity = new HostIdentity(options.self, configuredSelf, options.onWarning)
     this.#nodeId = nodeId
     this.#configuredReport = options.report
     this.#reporter = this.#configuredReport ?? defaultRpcReporter
@@ -150,8 +149,10 @@ export class RpcHost {
     }
     this.#flow = new FlowRegistry(
       this.#report,
-      (namespace) => this.#namespaces.get(namespace)?.flow
+      (namespace) => this.#namespaces.get(namespace)?.flow,
+      options.onWarning
     )
+    this.#identity = new HostIdentity(options.self, configuredSelf, this.#flow.dispatchWarning)
     this.#sessions = new SessionTable({
       flow: this.#flow,
       pipelines: () => this.#pipelineOwner!,
