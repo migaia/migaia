@@ -9,7 +9,7 @@ import { attachSecondaryErrors } from '@migaia/utils/error'
 import { normalizeRpcPortable, type IRpcPortableValue } from '@migaia/rpc-contract/portable'
 import { createRpcHost, type IRpcHost, type IRpcContext } from '@migaia/rpc-host'
 import { timeout } from '@migaia/rpc-host/features/timeout'
-import { RpcConstructionError, RpcLifecycleError } from '@migaia/rpc-contract/errors'
+import { RpcAbortError, RpcConstructionError, RpcLifecycleError } from '@migaia/rpc-contract/errors'
 import { dedicatedWorkerPlugin } from '@migaia/rpc-plugin-browser'
 import type { IWorkerMessagePort } from './worker-message-event.js'
 import { StoreWorkerErrorText } from './error-text.js'
@@ -241,16 +241,26 @@ class WorkerContractEndpoint implements IWorkerContractEndpoint {
       const host = await this.#opening
       await host.close()
     } catch (error) {
-      if (error instanceof RpcConstructionError && error.cause === this.#closeReason) {
-        /** Construction already owns the original native receipts, including late rollback cleanup. */
-        const failures = error.cleanupPromise ? await error.cleanupPromise : error.cleanupErrors
-        if (failures.length === 1) throw failures[0]!.error
-        if (failures.length > 1)
-          throw attachSecondaryErrors(
-            failures[0]!.error,
-            failures.slice(1).map((entry) => entry.error)
-          )
-      } else if (error !== this.#closeReason) throw error
+      /** Host construction may retain this endpoint's intentional cancellation in its typed cause. */
+      const primary = error instanceof RpcConstructionError ? error.cause : error
+      if (
+        primary !== this.#closeReason &&
+        !(primary instanceof RpcAbortError && primary.cause === this.#closeReason)
+      )
+        throw error
+      /** Both canonical construction and cancellation receipts can own late rollback cleanup. */
+      const cleanup =
+        error instanceof RpcConstructionError || error instanceof RpcAbortError ? error : undefined
+      /** Preserve the original native cleanup values instead of reporting normal cancellation. */
+      const failures = cleanup?.cleanupPromise
+        ? await cleanup.cleanupPromise
+        : (cleanup?.cleanupErrors ?? [])
+      if (failures.length === 1) throw failures[0]!.error
+      if (failures.length > 1)
+        throw attachSecondaryErrors(
+          failures[0]!.error,
+          failures.slice(1).map((entry) => entry.error)
+        )
     }
   }
 }
