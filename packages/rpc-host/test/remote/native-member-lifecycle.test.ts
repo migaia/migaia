@@ -633,9 +633,11 @@ it('replays a written idempotent public request through the complete retry featu
     await fixture.member.rebind()
     await expect(result).resolves.toBe('result')
     expect(replacementRequest).toHaveBeenCalledTimes(1)
+    /** The departed attempt's canonical unknown-result rejection is normal retry settlement. */
+    expect(reports).toEqual([])
     first.reject(new Error('late failure'))
     for (let turn = 0; turn < 5; turn++) await Promise.resolve()
-    expect(reports).toHaveLength(1)
+    expect(reports).toEqual([])
   } finally {
     first.resolve('result')
     await fixture.cleanup()

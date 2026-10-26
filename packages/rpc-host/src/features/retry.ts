@@ -10,12 +10,14 @@ import {
   type IRpcRetryFeature
 } from '@migaia/rpc-contract/interfaces'
 import { RpcCoreErrorCode, RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
+import { safeRead } from '@migaia/rpc-contract/errors'
 import { createRpcAbortError, createRpcError, createRpcTimeoutError } from '../host/error-owner.js'
 import { createRemoteLayerError } from '../host/remote-error-owner.js'
 import { defaultRpcId } from '../host/identity.js'
 import { defaultRpcReporter, reportDiagnostic } from '../host/report.js'
 import { resolveAbortReason } from '../host/abort-reason.js'
 import { HostErrorText } from '../host/error-text.js'
+import { localErrorWireSummary } from '../host/error-wire-metadata.js'
 
 /** Limits and stable key generation belong to this complete feature, never host call flags. */
 export type IRetryFeatureOptions = Readonly<{
@@ -34,7 +36,12 @@ type IRetryPolicy = Readonly<{
   report(error: unknown): void
 }>
 /** Physical handoff is explicit and cannot be inferred from mutable public error diagnostics. */
-type IRetrySend = { available: IRpcAvailableAttempt | undefined; sent: boolean; departed: boolean }
+type IRetrySend = {
+  available: IRpcAvailableAttempt | undefined
+  sent: boolean
+  departed: boolean
+  reason?: unknown
+}
 
 /** The empty receipt owns no subscription and permits unconditional terminal cleanup. */
 function noSubscription(): void {}
@@ -162,6 +169,7 @@ class RetryInvocation<T> {
   #leave(send: IRetrySend, reason: unknown): void {
     if (this.#settled) return
     send.departed = true
+    send.reason = reason
     this.#leaveReason = reason
     this.#removeLeave()
     if (!send.sent) {
@@ -257,12 +265,12 @@ class RetryInvocation<T> {
             if (!send.departed) this.#finish(value, true)
           },
           (error: unknown) => {
-            if (send.departed) this.#report(error)
+            if (send.departed) this.#reportDeparted(send, error)
             else this.#finish(error, false)
           }
         )
     } catch (error) {
-      if (send.departed) this.#report(error)
+      if (send.departed) this.#reportDeparted(send, error)
       else this.#finish(error, false)
     }
   }
@@ -288,7 +296,21 @@ class RetryInvocation<T> {
     this.#send(this.#availability?.current())
   }
 
-  /** Late retired attempts and secondary cleanup retain the caller's diagnostic destination. */
+  /** Only the original departure or its locally minted closed/unknown wrapper is expected retry. */
+  #reportDeparted(send: IRetrySend, error: unknown): void {
+    /** The owner receipt survives public code mutation and cannot be forged by a business error. */
+    const code = localErrorWireSummary(error)?.code
+    if (
+      error === send.reason ||
+      ((code === RpcRemoteLayerErrorCode.closed ||
+        code === RpcRemoteLayerErrorCode.resultUnknown) &&
+        safeRead(error, 'cause') === send.reason)
+    )
+      return
+    this.#report(error)
+  }
+
+  /** Genuine late retired failures and secondary cleanup retain the original diagnostic owner. */
   #report(error: unknown): void {
     reportDiagnostic(this.#policy.report, error)
   }
