@@ -23,7 +23,7 @@ export const PROCESS_RUNTIME_API_ENV_VERSION = '1'
 export const PROCESS_RUNTIME_API_BOOTSTRAP_KIND = 'rpc-runtime-api-bootstrap'
 /** Both launch and child admission require this private metadata version. */
 export const PROCESS_RUNTIME_API_BOOTSTRAP_VERSION = 1
-/** Launcher-owned monotonic identities distinguish opt-in launches without exposing native PIDs. */
+/** Launcher-owned identities distinguish opt-in launches without exposing native PIDs. */
 export const PROCESS_RUNTIME_API_FINGERPRINT_PREFIX = 'rpc-process-'
 /** Discovery has a bounded wait before the original ordinary handshake deadline starts. */
 export const PROCESS_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS = 10_000

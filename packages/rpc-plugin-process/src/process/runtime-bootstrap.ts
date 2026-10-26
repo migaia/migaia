@@ -9,7 +9,7 @@ import {
   normalizeRpcGeneration,
   type IRpcGeneration
 } from '@migaia/rpc-contract/protocol'
-import type { IRpcMemberIdentity } from '@migaia/rpc-host/sdk'
+import { defaultRpcId, type IRpcMemberIdentity } from '@migaia/rpc-host/sdk'
 import {
   PROCESS_HANDSHAKE_MAX_FRAME_BYTES,
   PROCESS_RUNTIME_API_FINGERPRINT_PREFIX,
@@ -36,9 +36,6 @@ export type IProcessRuntimeBootstrap = Readonly<{
   /** Execution identity is separate from the new physical instance fingerprint. */
   generation?: IRpcGeneration
 }>
-
-/** All opt-in platform launchers allocate from this original bootstrap owner exactly once. */
-let sequence = 0
 
 /** Reject malformed secret-bearing input without retaining parser diagnostics or payload bytes. */
 export function invalidProcessRuntimeBootstrap(): never {
@@ -121,10 +118,10 @@ export function prepareProcessRuntimeBootstrap(
   } catch {
     return invalidProcessRuntimeBootstrap()
   }
-  /** This ID belongs to the launch attempt and is never replaced by a facade allocation. */
+  /** Native entropy prevents independent parent processes from reusing the same launch identity. */
   const self = Object.freeze({
     name: options.name,
-    instanceId: `${PROCESS_RUNTIME_API_FINGERPRINT_PREFIX}${++sequence}`
+    instanceId: `${PROCESS_RUNTIME_API_FINGERPRINT_PREFIX}${defaultRpcId()}`
   })
   /** A single metadata encoder is shared by Node/Bun and Deno launchers. */
   const record = {
