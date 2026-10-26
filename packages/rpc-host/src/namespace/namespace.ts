@@ -342,7 +342,7 @@ export class Namespace {
     for (const key of Reflect.ownKeys(extension)) {
       if (reservedMethods.has(key) || Object.hasOwn(surface, key))
         throw tagRpcError(
-          new TypeError(HostErrorText.namespaceDuplicate),
+          new TypeError(HostErrorText.namespaceExtensionConflict),
           RpcCoreErrorCode.invalidConfig
         )
       /** Snapshot descriptors without running extension accessors. */

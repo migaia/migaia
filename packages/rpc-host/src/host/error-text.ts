@@ -9,6 +9,8 @@ export const HostErrorText = {
   dispatchNextRepeated: 'RPC dispatch continuation was invoked more than once',
   /** Namespace isolation requires unique own keys before any transport starts. */
   namespaceDuplicate: 'RPC host transport namespace is already installed',
+  /** Native extensions cannot replace mandatory namespace calls or an earlier extension member. */
+  namespaceExtensionConflict: 'RPC namespace extension conflicts with an existing member',
   /** Namespace names must be safe public keys and cannot replace host lifecycle methods. */
   namespaceInvalid: 'RPC host transport namespace is invalid or reserved',
   /** Full feature instances are the only executing call policy syntax admitted by revision 11. */

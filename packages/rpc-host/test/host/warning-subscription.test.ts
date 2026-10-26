@@ -460,6 +460,26 @@ it('A28 rejects local subscriber plugins and host-only warning callbacks returne
   expect(open).not.toHaveBeenCalled()
 })
 
+it('identifies a namespace extension collision without claiming the namespace is installed twice', async () => {
+  /** A genuine SDK installation attempts to replace a mandatory namespace call. */
+  const extension = defineFlowPlugin({
+    name: 'namespace-extension-conflict',
+    setup: () => ({ namespaceExtensions: () => ({ request: () => undefined }) })
+  })
+  /** The real native transport owns cleanup if final surface composition rejects the extension. */
+  const server = coreMemoryServer('extension-conflict-host')
+  await expect(
+    createRpcHost({
+      ...server.options,
+      plugins: [extension, server.transport]
+    })
+  ).rejects.toMatchObject({
+    source: 'rpc.endpoint',
+    code: 'INVALID_CONFIG',
+    message: 'RPC namespace extension conflicts with an existing member'
+  })
+})
+
 it.each([false, true])(
   'A32 keeps warnings and recipient reports original without calling errorMap, subscriber first %s',
   async (subscriberFirst) => {
