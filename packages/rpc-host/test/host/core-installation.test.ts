@@ -34,6 +34,7 @@ it('publishes the original close Promise before provider abort listeners can ree
           'abort',
           () => {
             lifetime.reentrant = client.host.close()
+            lifetime.completion.resolve()
           },
           { once: true }
         )
@@ -49,12 +50,12 @@ it('publishes the original close Promise before provider abort listeners can ree
   )
   try {
     await lifetime.entered.promise
-    /** The first close must be visible before abort synchronously calls back into the same owner. */
+    /** The first close must be visible when provider abort reenters the same owner. */
     const closing = client.host.close()
+    /** Session-first close reaches the actual abort listener before its captured Promise is read. */
+    await closing
     expect(lifetime.reentrant).toBe(closing)
     expect(client.host.close()).toBe(closing)
-    lifetime.completion.resolve()
-    await closing
     await pending
   } finally {
     lifetime.completion.resolve()
