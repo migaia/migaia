@@ -1,7 +1,7 @@
 /** Public lifetime and native rollback oracles for the new single-owner RPC installation. */
 import { defineHost, defineFeature, definePlugin } from '@migaia/plugin-host'
 import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
-import { defineFlowPlugin, defineTransportPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowPlugin, defineTransportPlugin, rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { linkPolicy } from '@migaia/rpc-host/plugins/link-policy'
 import type {
   IRpcAttempt,
@@ -65,7 +65,15 @@ it('publishes the original close Promise before provider abort listeners can ree
 
 it('withdraws rolled-back flow hooks, extensions and policy before an ordinary native host retries', async () => {
   /** This is the genuine ordinary native host; SDK definitions must reuse it directly. */
+  /** Cold namespace groups lend this same ordinary native owner its actual RPC execution authority. */
+  const rpc = rpcHostPipelines(
+    () => native,
+    (name) => native.pipeline(name),
+    ['memory']
+  )
+  /** Native construction consumes the original declaration and lazy domain-core receipt. */
   const native = defineHost({
+    ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
   /** One original acquisition error must remain reachable through native transaction rejection. */
@@ -86,7 +94,7 @@ it('withdraws rolled-back flow hooks, extensions and policy before an ordinary n
   const failedFlow = defineFlowPlugin({
     name: 'failed-flow',
     setup: () => ({
-      hooks: {},
+      stages: {},
       dispose: disposed,
       namespaceExtensions: () => ({ stale: () => true })
     })
@@ -106,7 +114,7 @@ it('withdraws rolled-back flow hooks, extensions and policy before an ordinary n
   /** A new cold flow must be installable after the entire first batch rolled back. */
   const recovered = defineFlowPlugin({
     name: 'recovered-flow',
-    setup: () => ({ hooks: {}, namespaceExtensions: () => ({ recovered: () => true }) })
+    setup: () => ({ stages: {}, namespaceExtensions: () => ({ recovered: () => true }) })
   })
   /** The ordinary host's real SDK transport accepts the later public caller. */
   const server = coreMemoryServer('ordinary')
@@ -128,7 +136,15 @@ it('withdraws rolled-back flow hooks, extensions and policy before an ordinary n
 
 it('preserves real native Feature exposure and releases an ordinary transport exactly once on unUse', async () => {
   /** The receiving ordinary host remains the sole native plugin-host for both registrations. */
+  /** Cold namespace groups lend this same ordinary native owner its actual RPC execution authority. */
+  const rpc = rpcHostPipelines(
+    () => native,
+    (name) => native.pipeline(name),
+    ['memory']
+  )
+  /** Native construction consumes the original declaration and lazy domain-core receipt. */
   const native = defineHost({
+    ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
   /** The explicit whitelist is captured by the actual SDK transport definition. */
