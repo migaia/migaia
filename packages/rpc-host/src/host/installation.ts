@@ -183,20 +183,32 @@ export class RpcHostInstallation {
   }
 }
 
+/** One original close flight belongs either to native pre-release or its resource fallback. */
+type IRpcTransportCloseReceipt = {
+  readonly close: () => Promise<void>
+  beforeRelease?: Promise<void>
+}
+
 /** Exact native registration signals route the existing beforeRelease hook to Session grace. */
-const transportClosers = new WeakMap<object, () => Promise<void>>()
+const transportClosers = new WeakMap<object, IRpcTransportCloseReceipt>()
 
 /** Attach no second lifetime; native onDispose removes this private collaboration receipt. */
 export function ownRpcTransportClose(core: IPluginHostCore, close: () => Promise<void>): void {
   /** Capture the exact native signal before cleanup revokes reads through the install core. */
   const signal = core.lifecycle.signal
-  transportClosers.set(signal, close)
+  /** The native hook's ledger owns its flight, including timeout continuation and late failure. */
+  const receipt: IRpcTransportCloseReceipt = { close }
+  transportClosers.set(signal, receipt)
   core.onDispose(() => {
     transportClosers.delete(signal)
+    /** Failed installation skips beforeRelease and still needs the original resource cleanup. */
+    if (!receipt.beforeRelease) return receipt.close()
   })
 }
 
 /** Native removal calls this before retiring pipeline stages or disposing transport resources. */
 export function closeRpcTransport(signal: object): Promise<void> | undefined {
-  return transportClosers.get(signal)?.()
+  /** Returning the original flight keeps one rejection in the native pre-release collection. */
+  const receipt = transportClosers.get(signal)
+  return receipt && (receipt.beforeRelease ??= receipt.close())
 }
