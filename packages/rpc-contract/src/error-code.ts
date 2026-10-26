@@ -98,7 +98,6 @@ export const RpcCoreErrorCode = {
    */
   forwardHopLimit: 'FORWARD_HOP_LIMIT',
 
-
   /**
    * A Runtime API operation requires a mode or capability absent from the actual peer agreement.
    * Choose a supported method/mode rather than retrying the same operation.
@@ -169,7 +168,6 @@ export const RpcCoreErrorCode = {
    */
   providerNotFound: 'PROVIDER_NOT_FOUND',
 
-
   /**
    * A provider throws an unhandled exception. This is the standard code for an `INTERNAL` response.
    *
@@ -185,7 +183,6 @@ export const RpcCoreErrorCode = {
    * returns an unknown receiver.
    */
   targetUnknown: 'TARGET_UNKNOWN',
-
 
   /**
    * An endpoint operation runs after disposal (`RpcLifecycleError`).
