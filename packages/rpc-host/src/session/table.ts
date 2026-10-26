@@ -59,7 +59,7 @@ import type {
 } from './types.js'
 
 /** Namespace admission protects the Host's lifecycle methods before transport setup begins. */
-const reservedNamespaces = new Set(['self', 'provide', 'close', 'use', 'unuse', 'dispose', 'unUse'])
+const reservedNamespaces = new Set(['self', 'provide', 'close', 'use', 'dispose', 'unUse'])
 
 /** One namespace has independent direct instance and display-name domains. */
 type INamespaceIndex = ISessionAvailabilityIndex & {

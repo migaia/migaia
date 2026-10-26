@@ -108,7 +108,7 @@ export type IRpcFlowSetupContext = Readonly<{
 export type IRpcFlowInstallation<E extends object = Record<never, never>> = Readonly<{
   stages?: IRpcFlowStages
   observe?(event: IRpcObservation): void
-  /** Only host-level flow plugins subscribe; native unuse or rollback removes this callback. */
+  /** Only host-level flow plugins subscribe; native unUse or rollback removes this callback. */
   onWarning?(warning: IRpcWarning): void
   extensions?: readonly string[]
   requiredExtensions?: readonly string[]

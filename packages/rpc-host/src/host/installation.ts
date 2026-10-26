@@ -1,5 +1,10 @@
 /** Join SDK definitions to their genuine native receiving host without creating another plugin-host. */
-import { defineHost, getPluginRuntimeIntegration, type IPluginHostCore } from '@migaia/plugin-host'
+import {
+  defineHost,
+  getPluginRuntimeIntegration,
+  type IHostHandle,
+  type IPluginHostCore
+} from '@migaia/plugin-host'
 import type { IRpcDefinitionMetadata } from '../sdk/metadata.js'
 import {
   rpcHostPipelines,
@@ -12,7 +17,7 @@ import { HostErrorText } from './error-text.js'
 import { RpcHost } from './rpc-host.js'
 import { RpcFlowProgram } from '../sdk/flow-program.js'
 import { readRpcDefinition, RpcDefinitionKind } from '../sdk/metadata.js'
-import type { IRpcFlowPlugin, IRpcHostPlugin, IRpcTransportPlugin } from '../sdk/types.js'
+import type { IRpcHostPlugin } from '../sdk/types.js'
 import type { IRpcHost } from './public.js'
 import type { IRpcSelf } from './identity.js'
 import { originalRpcInstallationFailure, rpcConstructionFailure } from './error-owner.js'
@@ -72,10 +77,10 @@ type IRpcInstallationPorts = Readonly<{
 }>
 
 /** Only the genuine native Host supplies these transactional operations. */
-type IRpcNativeInstallation = Readonly<{
-  use(...plugins: readonly (IRpcFlowPlugin | IRpcTransportPlugin)[]): Promise<unknown>
-  unuse: IRpcHost['unuse']
-}>
+type IRpcNativeInstallation = Pick<
+  IHostHandle<Record<never, never>, never, readonly []>,
+  'use' | 'unUse'
+>
 
 /** Compose cold startup and later batches through one native Host's existing transaction owner. */
 export class RpcHostInstallation {
@@ -83,7 +88,7 @@ export class RpcHostInstallation {
   readonly #ports: IRpcInstallationPorts
   /** Each public operation borrows the same real native Host after initial construction. */
   #native: IRpcNativeInstallation | undefined
-  /** One stable projection widens types after use while preserving public object identity. */
+  /** The exact native frozen handle carries RPC's public type projection without another object. */
   #public: IRpcHost | undefined
 
   /** Capture explicit lifetime and directory ports without acquiring any native resource. */
@@ -106,13 +111,18 @@ export class RpcHostInstallation {
         identity: { name: ports.self().name },
         execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
       },
-      surface: {
-        get self() {
-          return ports.self()
-        },
-        provide: ports.provide,
-        close: ports.close,
-        [Symbol.asyncDispose]: ports.close
+      surface: (nativeOperations) => {
+        this.#native = nativeOperations
+        return {
+          get self() {
+            return ports.self()
+          },
+          use: this.use,
+          unUse: nativeOperations.unUse,
+          provide: ports.provide,
+          close: ports.close,
+          [Symbol.asyncDispose]: ports.close
+        }
       },
       domainCore: (request) => ({
         ...configuration.domainCore(request),
@@ -120,14 +130,10 @@ export class RpcHostInstallation {
       })
     })
     ports.setNative(native)
-    this.#native = {
-      use: (...plugins) => native.use(...plugins),
-      unuse: native.unUse
-    }
-    this.#public = this.#project(native)
+    this.#public = native as unknown as IRpcHost
     try {
-      await native.use(...program.flows, program.plugin())
-      await native.use(...program.transports)
+      await this.#native!.use(...program.flows, program.plugin())
+      await this.#native!.use(...program.transports)
       await ports.announceDirectory()
       return this.#public
     } catch (primary) {
@@ -155,31 +161,6 @@ export class RpcHostInstallation {
     } catch (failure) {
       throw (await originalRpcInstallationFailure(failure)).error
     }
-  }
-
-  /** The native frozen facade stays the identity authority; an empty target permits method wiring. */
-  #project(native: object): IRpcHost {
-    /**
-     * The existing native removal hook closes Sessions before its stages drain and group
-     * disappears.
-     */
-    const unuse = this.#native!.unuse
-    return new Proxy(Object.create(null), {
-      get: (_target, key) =>
-        key === 'use' ? this.use : key === 'unuse' ? unuse : Reflect.get(native, key),
-      has: (_target, key) => key === 'unuse' || Reflect.has(native, key),
-      ownKeys: () => [...Reflect.ownKeys(native), 'unuse'],
-      getOwnPropertyDescriptor: (_target, key) => {
-        if (key === 'use' || key === 'unuse')
-          return { value: key === 'use' ? this.use : unuse, enumerable: true, configurable: true }
-        /** Proxy descriptors describe this projection, not the frozen native target. */
-        const descriptor = Object.getOwnPropertyDescriptor(native, key)
-        return descriptor && { ...descriptor, configurable: true }
-      },
-      set: () => false,
-      defineProperty: () => false,
-      deleteProperty: () => false
-    }) as IRpcHost
   }
 }
 

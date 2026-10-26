@@ -47,7 +47,9 @@ async function lateTransportTypes(): Promise<void> {
   // @ts-expect-error Local namespace extensions cannot leak into an earlier transport.
   extended.parent.answer()
   /** Public removal returns the existing plugin-host logical receipt without an RPC wrapper. */
-  const removal: IPluginRemoval = await extended.unuse('thread')
+  const removal: IPluginRemoval = await extended.unUse('thread')
+  // @ts-expect-error Removal has only the canonical native spelling.
+  extended.unuse('thread')
   void removal
   await extended.close()
 }

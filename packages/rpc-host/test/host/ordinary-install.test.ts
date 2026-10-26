@@ -319,14 +319,14 @@ describe('ordinary native Host RPC installation', () => {
     /** The actual accepted native receipt fences cold deletion after the last Session closes. */
     const accepted = server.lookup('local-auth-client')!.handle
     try {
-      await expect(host.unuse(server.transport.name)).rejects.toMatchObject({
+      await expect(host.unUse(server.transport.name)).rejects.toMatchObject({
         source: 'plugin.host',
         code: 'LIFECYCLE_MUTATION'
       })
       expect(await client.host.memory.send('local-auth-server', 'echo', 42)).toBe(42)
       await client.host.close()
       await accepted.closed
-      expect(await host.unuse(server.transport.name)).toMatchObject({ ok: true })
+      expect(await host.unUse(server.transport.name)).toMatchObject({ ok: true })
     } finally {
       await Promise.all([client.host.close(), host.close()])
     }

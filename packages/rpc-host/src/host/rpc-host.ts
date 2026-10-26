@@ -94,7 +94,7 @@ export class RpcHost {
    * host.
    */
   #native: INativeHost | undefined
-  /** Native installation and public use/unuse composition remain with the installation owner. */
+  /** Native installation and public use/unUse composition remain with the installation owner. */
   readonly #installation: RpcHostInstallation
   /** The genuine native owner lends execution authority separately from plugin registration. */
   readonly #pipelineOwner: IRpcPipelineOwner

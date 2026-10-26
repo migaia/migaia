@@ -77,15 +77,35 @@ export type IHostDomainCoreRequest = Readonly<{
   readonly batch: object
 }>
 
-/**
- * `TValue` is deliberately absent: no member of this shape mentions the pipeline value. The design
- * declares it as `IDefineHostOptions<TDomainCore, TValue>`, which would be an unused type parameter
- * — `defineHost` still takes both, because the handle it returns does use `TValue`.
- */
+/** Native surface composition borrows only the original install and removal transaction entries. */
+type IHostSurfaceOperations<
+  TDomainCore extends object,
+  TValue,
+  TPipelines extends IPipelineDefinitions
+> = Pick<
+  IHostHandle<TDomainCore, TValue, readonly [], Record<never, never>, TPipelines>,
+  'use' | 'unUse'
+>
+
+/** Only function-form composition may replace these two public methods before the handle freezes. */
+type IHostSurfaceFactory<
+  TDomainCore extends object,
+  TValue,
+  TPublicSurface extends object,
+  TPipelines extends IPipelineDefinitions
+> = (native: IHostSurfaceOperations<TDomainCore, TValue, TPipelines>) => TPublicSurface & {
+  readonly [K in Exclude<
+    keyof IHostHandle<Record<string, never>, never, readonly []>,
+    'use' | 'unUse'
+  >]?: never
+}
+
+/** Construction options retain their original type axes; the final axis types borrowed mutations. */
 export type IDefineHostOptions<
   TDomainCore extends object,
   TPublicSurface extends object = Record<never, never>,
-  TPipelines extends IPipelineDefinitions = Record<never, never>
+  TPipelines extends IPipelineDefinitions = Record<never, never>,
+  TValue = never
 > = Readonly<{
   /** Forwarded to the host unchanged; identical in shape to the class constructor's options. */
   readonly host: IPluginHostOptions
@@ -93,11 +113,14 @@ export type IDefineHostOptions<
   readonly pipelines?: TPipelines
   /**
    * Domain-owned public descriptors installed before the single canonical handle is frozen.
-   * Canonical host keys are reserved; domain methods and fluent host entries share one identity.
+   * Object-form canonical keys stay reserved. A factory borrows native use/unUse and may replace
+   * only those two methods; domain methods and fluent host entries still share one identity.
    */
-  readonly surface?: TPublicSurface & {
-    readonly [K in keyof IHostHandle<Record<string, never>, never, readonly []>]?: never
-  }
+  readonly surface?:
+    | (TPublicSurface & {
+        readonly [K in keyof IHostHandle<Record<string, never>, never, readonly []>]?: never
+      })
+    | IHostSurfaceFactory<TDomainCore, TValue, TPublicSurface, TPipelines>
   /** Replaces the `protected createPluginDomainCore` override; absent means an empty object. */
   readonly domainCore?: (request: IHostDomainCoreRequest) => TDomainCore
   /**
@@ -128,117 +151,123 @@ export type IHostHandle<
   TInstalled extends readonly IPluginConstraint<any>[],
   TPublicSurface extends object = Record<never, never>,
   TPipelines extends IPipelineDefinitions = Record<never, never>
-> = Readonly<{
-  /** Immutable issuing Host label/id, shared with its canonical runtime. */
-  readonly identity: IPluginHostIdentity
-  /** Reversible availability controls; disabling retains resources rather than unloading. */
-  readonly plugin: IPluginEnablement<
-    IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface, TPipelines>,
-    TInstalled,
-    TDomainCore,
-    TValue
-  >
-  /** Runner selected at construction; access fails while closing or disposed. */
-  readonly pipelineMode: IMiddlewarePipelineMode
-  /** Owner authority for one declared name, including mode-appropriate execution. */
-  pipeline<TName extends keyof (TPipelines & IInstalledPipelines<TInstalled>) & string>(
-    name: TName
-  ): IPipelineOwner<(TPipelines & IInstalledPipelines<TInstalled>)[TName]>
-  /** Construction owners can execute their genuine candidate through the same lookup entry. */
-  pipeline(
-    name: string,
-    request: IHostCoreConstructionRequest
-  ): IPipelineOwner<import('./pipeline-spec.js').IPipelineSpec<unknown>>
-  /** Current committed publication revision, not a count of attempted operations. */
-  readonly revision: number
-  /** Stable name/path config reader and queued transactional updater. */
-  readonly config: IPluginHostConfigFor<TInstalled>
-  /** Synchronous owner path; eager setup/async install is rejected and partial work rolls back. */
-  useSync<const TPlugins extends readonly IPluginConstraint<any>[]>(
-    ...plugins: TPlugins &
-      IPluginConstraintTuple<
-        TDomainCore &
-          IPluginHostCore<
-            TValue,
-            Record<PropertyKey, unknown>,
-            import('./typing.js').IPluginConfig,
-            TPipelines
-          >,
-        TPlugins,
-        TInstalled
-      >
-  ): IPluginHandleTuple<TPlugins>
-  /** Queues one install batch and returns input-ordered name handles only after atomic publication. */
-  use<const TPlugins extends readonly IPluginConstraint<any>[]>(
-    ...plugins: TPlugins &
-      IPluginConstraintTuple<
-        TDomainCore &
-          IPluginHostCore<
-            TValue,
-            Record<PropertyKey, unknown>,
-            import('./typing.js').IPluginConfig,
-            TPipelines
-          >,
-        TPlugins,
-        TInstalled
-      >
-  ): Promise<IPluginHandleTuple<TPlugins>>
-  /** Observes a dependency-aware removal plan without cleanup or revision change. */
-  unUse(
-    name: string,
-    options: IPluginDependencyMutationOptions & Readonly<{ readonly dryRun: true }>
-  ): Promise<IPluginDependencyPlan>
-  /**
-   * Removes or suspends according to policy; cleanup failures return ok:false with affected
-   * changes.
-   */
-  unUse(
-    name: string,
-    options?: IPluginDependencyMutationOptions & Readonly<{ readonly dryRun?: false }>
-  ): Promise<IPluginRemoval>
-  /** Starts a lazy registration and needed providers; same-name pending callers share one Promise. */
-  activate(name: string): Promise<IPluginHandle<IPluginConstraint<any>>>
-  /**
-   * Installs a same-name candidate before withdrawing the old generation; failure preserves the
-   * old.
-   */
-  replace<TPlugin extends IPluginConstraint<any>>(
-    name: string,
-    next: TPlugin
-  ): Promise<IPluginHandle<TPlugin>>
-  /** Adds an unowned sync stage and returns this same handle; incompatible runner modes fail. */
-  usePipeline(
-    stage: ISyncMiddlewareStage<TValue>
-  ): IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface, TPipelines>
-  /** Adds an unowned async stage, subject to canonical mode lifting and execution guards. */
-  useAsyncPipeline(
-    stage: IAsyncMiddlewareStage<TValue>
-  ): IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface, TPipelines>
-  /** Adds an unowned generator stage using the middleware generator-return protocol. */
-  useGeneratorPipeline(
-    stage: IGeneratorMiddlewareStage<TValue>
-  ): IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface, TPipelines>
-  /** Adds an unowned async-generator stage; the Host still owns execution cancellation/leases. */
-  useAsyncGeneratorPipeline(
-    stage: IAsyncGeneratorMiddlewareStage<TValue>
-  ): IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface, TPipelines>
-  /**
-   * Runs the current stage snapshot; done receives the final delivered value if traversal reaches
-   * it.
-   */
-  runPipeline(value: TValue, done: (value: TValue) => void): void | Promise<void>
-  /** Runs synchronous stages, rejecting before effects if any visible async stage exists. */
-  runPipelineSync<TResult>(value: TValue, done: (value: TValue) => TResult): TResult | undefined
-  /** Waits for async execution; an empty lane returns the exact terminal Promise. */
-  runPipelineAsync<TResult>(
-    value: TValue,
-    done: (value: TValue) => Promise<TResult>
-  ): Promise<TResult | undefined>
-  /** Shared singleflight completion; defaults to structured cleanup, custom middleware may reject. */
-  dispose(): Promise<IPluginHostDisposalResult>
-}> &
-  IPluginHostRuntimeExtensions<TInstalled> &
-  IPluginHostCoreTypeInfo<TDomainCore, TValue, TPipelines> &
+> = Omit<
+  Readonly<{
+    /** Immutable issuing Host label/id, shared with its canonical runtime. */
+    readonly identity: IPluginHostIdentity
+    /** Reversible availability controls; disabling retains resources rather than unloading. */
+    readonly plugin: IPluginEnablement<
+      IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface, TPipelines>,
+      TInstalled,
+      TDomainCore,
+      TValue
+    >
+    /** Runner selected at construction; access fails while closing or disposed. */
+    readonly pipelineMode: IMiddlewarePipelineMode
+    /** Owner authority for one declared name, including mode-appropriate execution. */
+    pipeline<TName extends keyof (TPipelines & IInstalledPipelines<TInstalled>) & string>(
+      name: TName
+    ): IPipelineOwner<(TPipelines & IInstalledPipelines<TInstalled>)[TName]>
+    /** Construction owners can execute their genuine candidate through the same lookup entry. */
+    pipeline(
+      name: string,
+      request: IHostCoreConstructionRequest
+    ): IPipelineOwner<import('./pipeline-spec.js').IPipelineSpec<unknown>>
+    /** Current committed publication revision, not a count of attempted operations. */
+    readonly revision: number
+    /** Stable name/path config reader and queued transactional updater. */
+    readonly config: IPluginHostConfigFor<TInstalled>
+    /** Synchronous owner path; eager setup/async install is rejected and partial work rolls back. */
+    useSync<const TPlugins extends readonly IPluginConstraint<any>[]>(
+      ...plugins: TPlugins &
+        IPluginConstraintTuple<
+          TDomainCore &
+            IPluginHostCore<
+              TValue,
+              Record<PropertyKey, unknown>,
+              import('./typing.js').IPluginConfig,
+              TPipelines
+            >,
+          TPlugins,
+          TInstalled
+        >
+    ): IPluginHandleTuple<TPlugins>
+    /**
+     * Queues one install batch and returns input-ordered name handles only after atomic
+     * publication.
+     */
+    use<const TPlugins extends readonly IPluginConstraint<any>[]>(
+      ...plugins: TPlugins &
+        IPluginConstraintTuple<
+          TDomainCore &
+            IPluginHostCore<
+              TValue,
+              Record<PropertyKey, unknown>,
+              import('./typing.js').IPluginConfig,
+              TPipelines
+            >,
+          TPlugins,
+          TInstalled
+        >
+    ): Promise<IPluginHandleTuple<TPlugins>>
+    /** Observes a dependency-aware removal plan without cleanup or revision change. */
+    unUse(
+      name: string,
+      options: IPluginDependencyMutationOptions & Readonly<{ readonly dryRun: true }>
+    ): Promise<IPluginDependencyPlan>
+    /**
+     * Removes or suspends according to policy; cleanup failures return ok:false with affected
+     * changes.
+     */
+    unUse(
+      name: string,
+      options?: IPluginDependencyMutationOptions & Readonly<{ readonly dryRun?: false }>
+    ): Promise<IPluginRemoval>
+    /** Starts a lazy registration and needed providers; same-name pending callers share one Promise. */
+    activate(name: string): Promise<IPluginHandle<IPluginConstraint<any>>>
+    /**
+     * Installs a same-name candidate before withdrawing the old generation; failure preserves the
+     * old.
+     */
+    replace<TPlugin extends IPluginConstraint<any>>(
+      name: string,
+      next: TPlugin
+    ): Promise<IPluginHandle<TPlugin>>
+    /** Adds an unowned sync stage and returns this same handle; incompatible runner modes fail. */
+    usePipeline(
+      stage: ISyncMiddlewareStage<TValue>
+    ): IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface, TPipelines>
+    /** Adds an unowned async stage, subject to canonical mode lifting and execution guards. */
+    useAsyncPipeline(
+      stage: IAsyncMiddlewareStage<TValue>
+    ): IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface, TPipelines>
+    /** Adds an unowned generator stage using the middleware generator-return protocol. */
+    useGeneratorPipeline(
+      stage: IGeneratorMiddlewareStage<TValue>
+    ): IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface, TPipelines>
+    /** Adds an unowned async-generator stage; the Host still owns execution cancellation/leases. */
+    useAsyncGeneratorPipeline(
+      stage: IAsyncGeneratorMiddlewareStage<TValue>
+    ): IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface, TPipelines>
+    /**
+     * Runs the current stage snapshot; done receives the final delivered value if traversal reaches
+     * it.
+     */
+    runPipeline(value: TValue, done: (value: TValue) => void): void | Promise<void>
+    /** Runs synchronous stages, rejecting before effects if any visible async stage exists. */
+    runPipelineSync<TResult>(value: TValue, done: (value: TValue) => TResult): TResult | undefined
+    /** Waits for async execution; an empty lane returns the exact terminal Promise. */
+    runPipelineAsync<TResult>(
+      value: TValue,
+      done: (value: TValue) => Promise<TResult>
+    ): Promise<TResult | undefined>
+    /** Shared singleflight completion; defaults to structured cleanup, custom middleware may reject. */
+    dispose(): Promise<IPluginHostDisposalResult>
+  }> &
+    IPluginHostRuntimeExtensions<TInstalled> &
+    IPluginHostCoreTypeInfo<TDomainCore, TValue, TPipelines>,
+  Extract<keyof TPublicSurface, 'use' | 'unUse'>
+> &
   Readonly<TPublicSurface>
 
 /**
@@ -265,15 +294,21 @@ export function defineHost<
   TPublicSurface extends object = Record<never, never>,
   const TPipelines extends IPipelineDefinitions = Record<never, never>
 >(
-  options: IDefineHostOptions<TDomainCore, TPublicSurface, TPipelines>
+  options: IDefineHostOptions<TDomainCore, TPublicSurface, TPipelines, TValue>
 ): IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface, TPipelines> {
   /** Snapshot descriptors before acquiring a runtime; do not evaluate domain accessors. */
   let surfaceDescriptors: PropertyDescriptorMap | undefined
+  /** Composition runs once after native entries exist, without exposing the mutable handle target. */
+  let surfaceFactory:
+    | IHostSurfaceFactory<TDomainCore, TValue, TPublicSurface, TPipelines>
+    | undefined
   try {
     /** Capture the option once even when the caller supplies a getter. */
     const publicSurface = options.surface
-    surfaceDescriptors =
-      publicSurface === undefined ? undefined : Object.getOwnPropertyDescriptors(publicSurface)
+    if (typeof publicSurface === 'function') surfaceFactory = publicSurface
+    else
+      surfaceDescriptors =
+        publicSurface === undefined ? undefined : Object.getOwnPropertyDescriptors(publicSurface)
   } catch (error) {
     throw identifyPluginHostCallbackFailure(error)
   }
@@ -281,10 +316,26 @@ export function defineHost<
   /** The fluent pipeline entries return the public proxy, which exists only after the surface. */
   const reference: IHandleReference = { handle: undefined }
   const handleSurface = createHandleSurface(runtime, options, reference)
+  if (surfaceFactory) {
+    try {
+      /** These original callables keep all transaction, rollback and removal ownership native. */
+      const native = Object.freeze({
+        use: handleSurface.use,
+        unUse: handleSurface.unUse
+      }) as IHostSurfaceOperations<TDomainCore, TValue, TPipelines>
+      surfaceDescriptors = Object.getOwnPropertyDescriptors(surfaceFactory(native))
+    } catch (error) {
+      throw identifyPluginHostCallbackFailure(error)
+    }
+  }
   if (surfaceDescriptors) {
     for (const key of Reflect.ownKeys(surfaceDescriptors)) {
       // Host methods and the issued identity remain canonical even at a plain-JS boundary.
-      if (key !== 'identity' && !Object.hasOwn(handleSurface, key))
+      if (
+        key !== 'identity' &&
+        (!Object.hasOwn(handleSurface, key) ||
+          (surfaceFactory && (key === 'use' || key === 'unUse')))
+      )
         Object.defineProperty(handleSurface, key, surfaceDescriptors[key])
     }
   }

@@ -48,6 +48,12 @@ it('A27: late use returns the same public Host, inherits one shared setup and pr
   /** The cold path already has a real physical client before the next transport is installed. */
   const a = await first.connect('late-first-client')
   try {
+    expect(Object.isFrozen(host)).toBe(true)
+    expect('unuse' in host).toBe(false)
+    expect(Object.hasOwn(host, 'unuse')).toBe(false)
+    expect(Reflect.set(host, 'use', () => undefined)).toBe(false)
+    expect(Reflect.defineProperty(host, 'unUse', { value: () => undefined })).toBe(false)
+    expect(Reflect.deleteProperty(host, 'use')).toBe(false)
     expect(sharedSetup).toHaveBeenCalledTimes(1)
     await expect(a.host.first.send('late-host', 'echo', 'cold')).resolves.toBe('cold')
     expect(localDispatch).toHaveBeenCalledTimes(1)
@@ -75,7 +81,7 @@ it('A27: late use returns the same public Host, inherits one shared setup and pr
   }
 })
 
-it('A27: a failed late batch preserves its original cause and old calls; duplicate and unuse retain native results', async () => {
+it('A27: a failed late batch preserves its original cause and old calls; duplicate and unUse retain native results', async () => {
   /**
    * A previously committed real listener and physical Session remain usable after another batch
    * fails.
@@ -140,7 +146,7 @@ it('A27: a failed late batch preserves its original cause and old calls; duplica
       ])
     ).toHaveProperty('run')
     /** The public result is the native logical-removal receipt, rather than an RPC boolean wrapper. */
-    const removal = await host.unuse('memory')
+    const removal = await host.unUse('memory')
     expect(removal).toMatchObject({ ok: true })
     // The seven values are fixed by RpcFlowPoint, not a collection growing with runtime traffic.
     for (const point of Object.values(RpcFlowPoint))

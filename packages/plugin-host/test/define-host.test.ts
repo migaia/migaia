@@ -11,6 +11,45 @@ const hostOptions = {
 const plugin = (name: string) => definePlugin({ name, install: () => ({}) })
 
 describe('defineHost', () => {
+  it('composes use and unUse through original native entries on the same frozen handle', async () => {
+    /** The factory receives only native transaction callables, never a mutable handle target. */
+    let borrowed: object | undefined
+    /** Replacing use changes only its public return contract; installation stays native. */
+    const host = defineHost({
+      host: hostOptions,
+      surface: (native) => {
+        borrowed = native
+        return {
+          use: async (name: string) => {
+            const [installed] = await native.use(plugin(name))
+            return installed.name
+          },
+          unUse: native.unUse
+        }
+      }
+    })
+    try {
+      expect(Object.isFrozen(borrowed)).toBe(true)
+      expect(Object.keys(borrowed!)).toEqual(['use', 'unUse'])
+      expect(Object.isFrozen(host)).toBe(true)
+      expect(isManagedHost(host)).toBe(true)
+      /** Omit prevents the original tuple-returning signature from intersecting this string result. */
+      const installed: string = await host.use('surface-composed')
+      expect(installed).toBe('surface-composed')
+      expect(host.revision).toBe(1)
+      expect(host.unUse).toBe(Reflect.get(borrowed!, 'unUse'))
+      expect(await host.unUse('surface-composed', { dryRun: true })).toMatchObject({
+        order: ['surface-composed']
+      })
+      expect(await host.unUse('surface-composed')).toMatchObject({ ok: true })
+      expect(Reflect.set(host, 'use', () => undefined)).toBe(false)
+      expect(Reflect.defineProperty(host, 'unUse', { value: () => undefined })).toBe(false)
+      expect(Reflect.deleteProperty(host, 'use')).toBe(false)
+    } finally {
+      await host.dispose()
+    }
+  })
+
   it('preserves live domain accessors on the canonical frozen fluent handle', async () => {
     /** Application state changes independently of the immutable public member descriptors. */
     let current = 1
