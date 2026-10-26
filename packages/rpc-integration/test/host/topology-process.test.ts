@@ -367,8 +367,9 @@ describe('forwarding through process b to its child process d', () => {
       const first = (await inspectB(host)).d!
       expect([first.echoCalls, first.failCalls]).toEqual([1, 1])
       await viaB(host, Topology.d, Topology.crash)
+      /** Missing D during restart cannot count as observing a replacement process. */
       await expect
-        .poll(async () => (await inspectB(host).catch(() => undefined))?.d?.pid, {
+        .poll(async () => (await inspectB(host).catch(() => undefined))?.d?.pid ?? first.pid, {
           timeout: 10000
         })
         .not.toBe(first.pid)
@@ -386,7 +387,10 @@ describe('forwarding through Node process b to a Python child process', () => {
     const host = await openOrigin({ python: true })
     try {
       expect(await viaB(host, Topology.python, Topology.echo, 'ping')).toBe('ping')
-      await host.process.notify(`${Topology.b}.${Topology.python}.p.f.oneWay`, ['once'], traced)
+      await host.process.notify(`${Topology.python}.p.f.oneWay`, ['once'], {
+        ...traced,
+        targetId: Topology.b
+      })
       await expect
         .poll(() => viaB(host, Topology.python, 'peer.received', []), { timeout: 5000 })
         .toEqual({ count: 1, values: ['once'] })
