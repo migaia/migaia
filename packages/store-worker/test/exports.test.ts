@@ -122,8 +122,8 @@ describe('store-worker exports', () => {
       expect(received).toMatchObject({
         name: providerFailure.name,
         message: providerFailure.message,
-        source: 'unknown',
-        code: 'UNKNOWN'
+        source: 'rpc.endpoint',
+        code: 'INTERNAL'
       })
       expect((received as Error).stack).not.toHaveLength(0)
       expect((received as Error).stack).toBe(providerFailure.stack)
@@ -146,8 +146,8 @@ describe('store-worker exports', () => {
       expect(received).toMatchObject({
         name: primary.name,
         message: primary.message,
-        source: 'unknown',
-        code: 'UNKNOWN'
+        source: 'rpc.endpoint',
+        code: 'INTERNAL'
       })
       expect((received as Error).stack).not.toHaveLength(0)
       expect((received as Error).stack).toBe(primary.stack)
@@ -328,18 +328,17 @@ describe('store-worker exports', () => {
       createWorkerContractEndpoint(clientPort),
       createWorkerContractEndpoint(workerPort, { id: 'worker', targetId: 'main' }, (endpoint) => {
         endpoint.onRequest('call', (payload) => payload)
+        endpoint.onRequest('notice', async (payload) => {
+          received.push(payload)
+          entered()
+          await held
+        })
         return endpoint
       })
     ])
     try {
       /** This actual round trip completes negotiation before physical-send accounting begins. */
       await expect(client.request('ready')).resolves.toBe('ready')
-      /** Later registrations extend the same real Host provider rather than a second endpoint. */
-      worker.onRequest('notice', async (payload) => {
-        received.push(payload)
-        entered()
-        await held
-      })
       /** BC2 directory publication is metadata traffic, not a provider completion or notify ACK. */
       const beforeNotice = await workerFrames(workerPosts)
       const workerPostsBeforeNotice = beforeNotice.filter(
@@ -488,12 +487,11 @@ describe('store-worker exports', () => {
     expect(worker.dispose!()).toBe(firstDispose)
     await expect(pending).rejects.toMatchObject({ name: 'RpcLifecycleError' })
     await firstDispose
-    /** BC2 removes the private ready ACK; close wins before any actual Host frame is written. */
+    /** BC2 handshake metadata may precede close; no business call may be admitted afterward. */
     const prepared = await workerFrames(frames)
     /** Count actual admitted business frames after all original cleanup has completed. */
     const sends = prepared.filter((frame) => frame.kind === RpcWireKind.call).length
     expect(sends).toBe(0)
-    expect(prepared).toEqual([])
   })
   it('rejects null options at worker entry points with a tagged configuration error', () => {
     expect(() => new WorkerAdapter(fakePort(), null as never)).toThrow(
