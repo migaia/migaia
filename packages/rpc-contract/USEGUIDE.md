@@ -104,6 +104,8 @@ group按顺序执行，首个失败后的步骤为`not-executed`；步骤结果�
 
 线上错误为`{root,nodes}`。每个节点必须有source/code/name/message/stack，cause为节点索引，errors为有序索引数组，可带data/route/truncated。共享与循环边通过索引表达；接收端须检查索引、节点和累计预算。
 
+节点上限为 1024；包含 1025 个节点的输入以原 `TypeError` / `INVALID_WIRE_ERROR` 拒绝。旧错误树的 64 层深度规则不适用于 flat 图的边。还原先为每个节点创建一个错误对象，再迭代接上引用，因此一个节点被多次引用时保持 `===`，环也指回同一批已还原对象；这不表示跨进程对象与发送端保持 `===`。
+
 ```ts doc-test=run
 import assert from 'node:assert/strict'
 import { serializeRpcWireError, deserializeRpcWireError } from '@migaia/rpc-contract/protocol'

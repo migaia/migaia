@@ -104,6 +104,8 @@ Default wire traversal reads own enumerable string fields and may execute each g
 
 Wire errors are `{root,nodes}`. Every node requires source/code/name/message/stack. Cause is a node index and errors is an ordered index list; data/route/truncated are optional. Indices represent shared/cyclic edges. Receivers validate references, nodes, and aggregate budgets.
 
+The limit is 1024 nodes; a 1025-node input is rejected with the existing `TypeError` / `INVALID_WIRE_ERROR`. Flat graph edges do not use the old 64-level error-tree rule. Restoration first creates one error object per node, then connects references iteratively. Repeated references keep `===` within the restored graph, and cycles refer back to those same restored objects; this does not promise `===` with objects in the sending process.
+
 ```ts doc-test=run
 import assert from 'node:assert/strict'
 import { serializeRpcWireError, deserializeRpcWireError } from '@migaia/rpc-contract/protocol'

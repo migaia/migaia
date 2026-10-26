@@ -164,6 +164,38 @@ describe('single RPC wire profile', () => {
     ).toThrowError(expect.objectContaining({ code: 'INVALID_WIRE_ERROR' }))
   })
 
+  it('[CORE-R6-FLAT-NODE-LIMIT] restores a 1024-node chain and rejects the 1025th node', () => {
+    /** Flat edges carry depth without recursively nesting the received JSON records. */
+    const nodes = Array.from({ length: 1024 }, (_, index) => ({
+      source: 'business',
+      code: 'FAILED',
+      name: 'Error',
+      message: 'node',
+      stack: 'remote node stack',
+      ...(index < 1023 ? { cause: index + 1 } : {})
+    }))
+    /** Full admission retains the original bounded graph before iterative native restoration. */
+    const input = { root: 0, nodes }
+    expect(normalizeRpcWireError(input)).toBe(input)
+    /** Follow the restored references iteratively, without imposing the old tree-depth policy. */
+    let node: Error | undefined = deserializeRpcWireError(input)
+    /** A bounded receiver loop also detects an accidentally introduced restored cycle. */
+    let depth = 0
+    while (node !== undefined && depth <= 1024) {
+      depth += 1
+      node = node.cause as Error | undefined
+    }
+    expect(depth).toBe(1024)
+    expect(node).toBeUndefined()
+    expect(() => normalizeRpcWireError({ root: 0, nodes: [...nodes, nodes[1023]!] })).toThrowError(
+      expect.objectContaining({
+        source: 'rpc.contract',
+        code: 'INVALID_WIRE_ERROR',
+        name: 'TypeError'
+      })
+    )
+  })
+
   it('[CORE-R6-05] reuses bounded source-error projection for cycles without recursion failure', () => {
     const source = new TypeError('business failure')
     Object.defineProperty(source, 'cause', { value: source })
