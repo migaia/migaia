@@ -2,6 +2,7 @@
 import {
   RpcCallMode,
   RpcWireLimit,
+  type IRpcDirectory,
   type IRpcMethodDescription,
   type IRpcPortableValue,
   type IRpcStep,
@@ -150,6 +151,22 @@ export class Forwarder {
       (node.namespaces.get(selection.view.namespace) ?? 0) + 1
     )
     this.#contributions.set(selection.carrierId, { namespace: selection.view.namespace, name })
+  }
+
+  /** Publish the host's explicit identity and the same accepted forwarding method projection. */
+  directory(
+    self: IRpcDirectory['self'],
+    nodeId: string,
+    local: readonly IRpcMethodDescription[],
+    targets: Iterable<IForwardSelection>,
+    excludedPeerId?: string
+  ): IRpcDirectory {
+    return {
+      schemaVersion: 3,
+      self,
+      nodeId,
+      methods: this.describe(local, targets, excludedPeerId)
+    }
   }
 
   /** Project accepted method metadata only at directory output; dispatch keeps its single index. */

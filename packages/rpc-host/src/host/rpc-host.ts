@@ -17,7 +17,6 @@ import type {
 import {
   RpcWireKind,
   RpcWireProfile,
-  type IRpcDirectory,
   type IRpcEnvelope,
   type IRpcSemanticFrame
 } from '@migaia/rpc-contract/protocol'
@@ -154,7 +153,14 @@ export class RpcHost {
       flow: this.#flow,
       pipelines: () => this.#pipelineOwner!,
       self: () => this.#identity.directorySelf,
-      directory: (namespace, peerId) => this.#directory(namespace, peerId),
+      directory: (namespace, peerId) =>
+        this.#forwarder.directory(
+          this.#identity.directorySelf,
+          this.#nodeId,
+          this.#providers.describe(namespace),
+          this.#sessions.forwardTargets(namespace),
+          peerId
+        ),
       admitSourceFacts: (facts) => this.#identity.admit(facts),
       receive: this.#receive,
       rejected: this.#rejected,
@@ -457,23 +463,6 @@ export class RpcHost {
       peerId: view?.peerId,
       data: reason
     })
-  }
-
-  /**
-   * The provider catalog is global; each carrier announces its namespace-local accepted sessions
-   * separately.
-   */
-  #directory(namespace: string, excludedPeerId?: string): IRpcDirectory {
-    return {
-      schemaVersion: 3,
-      self: this.#identity.directorySelf,
-      nodeId: this.#nodeId,
-      methods: this.#forwarder.describe(
-        this.#providers.describe(namespace),
-        this.#sessions.forwardTargets(namespace),
-        excludedPeerId
-      )
-    }
   }
 
   /** Installation admits namespace names before a transport can acquire any physical resources. */
