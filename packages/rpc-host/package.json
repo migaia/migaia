@@ -56,6 +56,10 @@
       "types": "./dist/features/auth/index.d.ts",
       "default": "./dist/features/auth/index.js"
     },
+    "./plugins/error-map": {
+      "types": "./dist/features/error-map/index.d.ts",
+      "default": "./dist/features/error-map/index.js"
+    },
     "./plugins/chunk": {
       "types": "./dist/features/chunk/index.d.ts",
       "default": "./dist/features/chunk/index.js"

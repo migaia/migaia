@@ -3,11 +3,16 @@ import {
   serializeRpcError as serializeProtocolError,
   deserializeRpcError as deserializeProtocolError,
   type IRpcErrorWireSummary,
+  type IRpcErrorWireMetadata,
   type IRpcSerializedError,
   type IRpcSerializeErrorOptions,
   type IRpcWireErrorOptions
 } from '@migaia/rpc-contract/errors'
-import { RuntimeApiErrorText, identifyRpcBoundaryFailure } from '@migaia/rpc-contract/errors'
+import {
+  RpcCoreErrorText,
+  RuntimeApiErrorText,
+  identifyRpcBoundaryFailure
+} from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { createRpcSerializationError, localRpcErrorCode } from './error-owner.js'
 
@@ -17,6 +22,10 @@ const summaries = new WeakMap<Error, IRpcErrorWireSummary>()
 const routes = new WeakMap<Error, readonly string[]>()
 /** The protocol operation receives actual owned data maps, never a registration callback or claim. */
 export const hostErrorWireMetadata = Object.freeze({ summaries, routes })
+/** Ordinary wire failures preserve every original cause while retaining admitted forwarding routes. */
+const hostErrorWireRoutes = Object.freeze({ routes })
+/** A live outbound graph retains its exact local failure without modifying the immutable wire data. */
+const originals = new WeakMap<IRpcWireError, unknown>()
 
 /** Retain admitted route data without reading the held Error's properties. */
 export function registerLocalErrorWireRoute(error: Error, route: readonly string[]): void {
@@ -85,12 +94,14 @@ import {
   type IRpcWireError
 } from '@migaia/rpc-contract/protocol'
 
-/** Flat projection borrows the existing private presentation owner and original reporting policy. */
-export function serializeHostWireError(
+/** One flat projection owns the original reporting policy regardless of its presentation metadata. */
+function serializeHostError(
   value: unknown,
-  options: IRpcSerializeErrorOptions
+  options: IRpcSerializeErrorOptions,
+  metadata: IRpcErrorWireMetadata
 ): IRpcWireError {
-  return serializeRpcWireError(
+  /** The same graph is passed through actual codec preparation, preserving this local association. */
+  const graph = serializeRpcWireError(
     value,
     {
       ...options,
@@ -110,8 +121,42 @@ export function serializeHostWireError(
               : createRpcSerializationError(RuntimeApiErrorText.errorDataInvalid, failure.error)
         })
     },
-    hostErrorWireMetadata
+    metadata
   )
+  originals.set(graph, value)
+  return graph
+}
+
+/** Ordinary and explicitly mapped failures retain complete causes, never private wire summaries. */
+export function serializeHostWireError(
+  value: unknown,
+  options: IRpcSerializeErrorOptions
+): IRpcWireError {
+  return serializeHostError(value, options, hostErrorWireRoutes)
+}
+
+/** Only a trusted local authentication root receives the default preauthentication summary. */
+export function serializeHostHandshakeError(
+  value: unknown,
+  options: IRpcSerializeErrorOptions
+): IRpcWireError {
+  if (localRpcErrorCode(value) !== RpcCoreErrorCode.authenticationFailed)
+    return serializeHostError(value, options, hostErrorWireMetadata)
+  /** This operation hides descendants without changing the original Error or global summaries. */
+  const authenticationSummary = new WeakMap<Error, IRpcErrorWireSummary>()
+  authenticationSummary.set(
+    value as Error,
+    Object.freeze({
+      code: RpcCoreErrorCode.authenticationFailed,
+      message: RpcCoreErrorText.authenticationFailed
+    })
+  )
+  return serializeHostError(value, options, { summaries: authenticationSummary, routes })
+}
+
+/** Persisted/restored graphs have no local identity association and use the canonical deserializer. */
+export function originalHostWireError(value: IRpcWireError): unknown {
+  return originals.has(value) ? originals.get(value) : deserializeHostWireError(value)
 }
 
 /** Restore once; downstream error routes take precedence over the admitted reply's hop header. */

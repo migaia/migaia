@@ -511,10 +511,7 @@ it('rejects verification after physical retirement and preserves custom verifica
   })
   await f.installation.dispose?.()
   await f.flow.dispose()
-  /**
-   * A native user callback error is preserved unless the separate credential-redaction rule
-   * applies.
-   */
+  /** User callback failures preserve the original local cause independently from wire mapping. */
   const cause = new RangeError('fixture bad signature')
   /** Actual verify failure keeps the original cause/type/stack reachable. */
   const bad = await fixture({
@@ -531,7 +528,7 @@ it('rejects verification after physical retirement and preserves custom verifica
   await bad.flow.dispose()
 })
 
-it('retains the last uint64 allocation and sanitizes actual handshake verifier credentials', async () => {
+it('retains the last uint64 allocation and original local handshake credential causes', async () => {
   /** The configured signer reads only the actual input with Auth's existing representation owner. */
   const representation = new AuthenticationRepresentation('any')
   /** Original decimal spelling is observable without adding an allocator inspection port. */
@@ -558,11 +555,16 @@ it('retains the last uint64 allocation and sanitizes actual handshake verifier c
   await f.flow.dispose()
   /** A real native credential callback is independent from the optional frame protection policy. */
   const secret = 'fixture-private-token'
-  /** User verifier errors may contain credentials and must not enter cause/report paths. */
+  /**
+   * Local authentication diagnostics retain this exact verifier error, even when it contains
+   * credentials.
+   */
+  const verifierCause = new Error(secret)
+  /** Wire redaction is independent from the original local callback error. */
   const credentials = await fixture({
     credentials: secret,
     verifyCredentials: () => {
-      throw new Error(secret)
+      throw verifierCause
     }
   })
   /** Fixed handshake hook adds only the admitted portable auth field to the actual hello shape. */
@@ -592,7 +594,7 @@ it('retains the last uint64 allocation and sanitizes actual handshake verifier c
       async (payload) => payload.handshake
     )
   expect(offered).toMatchObject({ auth: secret })
-  /** The sanitized rejection deliberately withholds the original secret-bearing native exception. */
+  /** The local rejection retains the original verifier failure without duplicating its report. */
   const rejected = await credentials.pipelines
     .pipeline(RpcFlowPoint.handshakeInbound, 'test')
     .run(
@@ -601,17 +603,19 @@ it('retains the last uint64 allocation and sanitizes actual handshake verifier c
     )
     .catch((error: unknown) => error)
   expect(rejected).toMatchObject({ code: 'AUTHENTICATION_FAILED' })
-  expect((rejected as Error).cause).toBeUndefined()
+  expect((rejected as Error).cause).toBe(verifierCause)
   expect(String(rejected)).not.toContain(secret)
   expect(credentials.reports).toEqual([])
   await credentials.installation.dispose?.()
   await credentials.flow.dispose()
   /** Native credential resolution keeps independent carrier tokens without inspecting wire identity. */
   const verify = vi.fn()
+  /** The resolver's exact native failure remains reachable through its local authentication wrapper. */
+  const resolverCause = new Error(secret)
   /** The same actual optional flow resolves both native sources through its fixed handshake hook. */
   const perSource = await fixture({
     credentials: (context) => {
-      if (context.carrierId === 'failed-source') throw new Error(secret)
+      if (context.carrierId === 'failed-source') throw resolverCause
       return context.carrierId
     },
     verifyCredentials: verify
@@ -638,7 +642,7 @@ it('retains the last uint64 allocation and sanitizes actual handshake verifier c
     .pipeline(RpcFlowPoint.handshakeInbound, 'test')
     .run({ handshake: hello, context: sourceOne }, async (payload) => payload.handshake)
   expect(verify.mock.calls[0]?.[2]).toBe(sourceOne)
-  /** Resolver failures follow the same privacy boundary as native credential verification. */
+  /** Resolver failures preserve the same original local cause contract as credential verification. */
   const resolverFailure = await perSource.pipelines
     .pipeline(RpcFlowPoint.handshakeOutbound, 'test')
     .run(
@@ -647,7 +651,7 @@ it('retains the last uint64 allocation and sanitizes actual handshake verifier c
     )
     .catch((error: unknown) => error)
   expect(resolverFailure).toMatchObject({ code: 'AUTHENTICATION_FAILED' })
-  expect((resolverFailure as Error).cause).toBeUndefined()
+  expect((resolverFailure as Error).cause).toBe(resolverCause)
   expect(String(resolverFailure)).not.toContain(secret)
   expect(perSource.reports).toEqual([])
   await perSource.installation.dispose?.()

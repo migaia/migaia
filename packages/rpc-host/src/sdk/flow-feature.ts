@@ -10,6 +10,7 @@ export const RpcBuiltinFeature = {
   batch: Symbol('rpc.batch'),
   idempotency: Symbol('rpc.idempotency'),
   limits: Symbol('rpc.limits'),
+  errorMap: Symbol('rpc.error-map'),
   schema: Symbol('rpc.schema')
 } as const
 

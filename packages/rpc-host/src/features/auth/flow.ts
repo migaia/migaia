@@ -29,8 +29,7 @@ import {
   RpcAuthenticationError,
   RpcConfigurationError,
   RpcCoreErrorText,
-  RpcProviderRejectionReason,
-  redactRpcHandshakeFailure
+  RpcProviderRejectionReason
 } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import {
@@ -299,12 +298,9 @@ export class RpcAuthenticationFlow {
           context.handshakeResult.authentication = { principalId }
       }
       return frame
-    } catch {
-      /**
-       * Original native credential failures are deliberately withheld from report/cause
-       * diagnostics.
-       */
-      throw createRpcAuthenticationError(Text.inboundFrameAuthenticationFailed)
+    } catch (error) {
+      /** Local diagnostics retain the verifier failure; outbound presentation owns redaction. */
+      throw createRpcAuthenticationError(Text.inboundFrameAuthenticationFailed, error)
     }
   }
 
@@ -387,8 +383,8 @@ export class RpcAuthenticationFlow {
     if (!this.#config.verify) return this.#restoreEnvelopeJob(input)
     return raceWithAbort(() => this.#restoreEnvelopeJob(input), {
       signal: context.signal,
-      /** Bootstrap retains the existing pure redaction policy; accepted failures stay identical. */
-      report: (error) => context.report(context.session ? error : redactRpcHandshakeFailure(error))
+      /** Late local verifier failures retain their original identity in every handshake state. */
+      report: context.report
     })
   }
 

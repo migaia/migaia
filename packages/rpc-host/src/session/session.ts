@@ -38,7 +38,6 @@ import {
   acceptRpcHandshake,
   completeRpcHandshake,
   normalizeRpcHandshake,
-  serializeRpcWireError,
   deserializeRpcWireError,
   RpcWireKind as K,
   RpcWireHandshakeStep as H,
@@ -74,7 +73,11 @@ import {
   createRpcTransportError,
   isLocalRpcError
 } from '../host/error-owner.js'
-import { hostErrorWireMetadata } from '../host/error-wire-metadata.js'
+import {
+  hostErrorWireMetadata,
+  serializeHostHandshakeError,
+  serializeHostWireError
+} from '../host/error-wire-metadata.js'
 import { SessionText } from './text.js'
 import { carrierSizeBytes } from '../sdk/wire/probe-content.js'
 import { portableBytes } from '../sdk/wire/portable-size.js'
@@ -620,11 +623,7 @@ export class Session {
                 await this.#encode(
                   {
                     ...this.#control(C.close, String(++this.#controlSerial)),
-                    reason: serializeRpcWireError(
-                      this.#reason,
-                      { report: this.#options.report },
-                      hostErrorWireMetadata
-                    )
+                    reason: serializeHostWireError(this.#reason, { report: this.#options.report })
                   },
                   { signal, keepalive: true },
                   false,
@@ -1454,7 +1453,7 @@ export class Session {
         profile: RpcWireProfile,
         kind: K.handshake,
         step: H.reject,
-        error: serializeRpcWireError(error, { report: this.#options.report }, hostErrorWireMetadata)
+        error: serializeHostHandshakeError(error, { report: this.#options.report })
       })
       try {
         await this.#reply

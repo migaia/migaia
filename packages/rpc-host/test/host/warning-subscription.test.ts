@@ -8,6 +8,7 @@ import {
   type IRpcWarning
 } from '@migaia/rpc-host'
 import { defineFlowFeature, defineFlowPlugin, defineTransportPlugin } from '@migaia/rpc-host/sdk'
+import { errorMap } from '@migaia/rpc-host/plugins/error-map'
 import type { IRpcTransportContext } from '@migaia/rpc-contract/interfaces'
 import { MemoryCarrier } from '../fixtures/core-carrier.js'
 import { coreMemoryServer } from './core-fixture.js'
@@ -279,3 +280,44 @@ it('A28 rejects local subscriber plugins and host-only warning callbacks returne
   ).rejects.toMatchObject({ source: 'rpc.endpoint', code: 'INVALID_CONFIG' })
   expect(open).not.toHaveBeenCalled()
 })
+
+it.each([false, true])(
+  'A32 keeps warnings and recipient reports original without calling errorMap, subscriber first %s',
+  async (subscriberFirst) => {
+    /** The warning recipient's exact error belongs only to the local report channel. */
+    const recipientFailure = new Error('A32 warning recipient failed')
+    /** Both recipients receive this same actual warning record from trusted native parent admission. */
+    const warnings: IRpcWarning[] = []
+    const reports: unknown[] = []
+    /** Mapping outbound errors must never transform warnings or a local recipient failure. */
+    const map = vi.fn(() => null)
+    const mapping = errorMap(map)
+    const subscriber = defineFlowPlugin({
+      name: 'a32-warning-subscriber',
+      setup: () => ({ onWarning: (warning) => warnings.push(warning) })
+    })
+    /** The existing real native fixture remains the sole warning producer. */
+    const pair = new WarningPair()
+    try {
+      await pair.open({
+        onWarning(warning) {
+          warnings.push(warning)
+          throw recipientFailure
+        },
+        plugins: subscriberFirst ? [subscriber, mapping] : [mapping, subscriber],
+        report: (error) => reports.push(error)
+      })
+      expect(await pair.send(42)).toBe(42)
+      expect(warnings).toHaveLength(2)
+      expect(warnings[1]).toBe(warnings[0])
+      expect(warnings[0]).toMatchObject({
+        code: RpcWarningCode.selfIgnored,
+        data: { parentName: 'math', ignoredName: 'math-child' }
+      })
+      expect(reports).toEqual([recipientFailure])
+      expect(map).not.toHaveBeenCalled()
+    } finally {
+      await pair.close()
+    }
+  }
+)

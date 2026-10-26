@@ -8,6 +8,8 @@ export type {
   IRpcMethodValidators
 } from '../features/schema/types.js'
 export { auth } from '../features/auth/index.js'
+export { errorMap } from '../features/error-map/index.js'
+export type { IRpcErrorMap } from '../features/error-map/types.js'
 export type {
   IRpcAuthenticationOptions,
   IRpcAuthenticationTransform,

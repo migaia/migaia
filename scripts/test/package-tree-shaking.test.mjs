@@ -346,6 +346,7 @@ for (const style of ['named', 'default']) {
 const rpcOptionalSelections = [
   { factory: 'auth', folder: 'auth', kind: 'plugins', implementation: 'features' },
   { factory: 'batch', folder: 'batch', kind: 'plugins', implementation: 'features' },
+  { factory: 'errorMap', folder: 'error-map', kind: 'plugins', implementation: 'features' },
   { factory: 'idempotency', folder: 'idempotency', kind: 'plugins', implementation: 'features' },
   { factory: 'limits', folder: 'limits', kind: 'plugins', implementation: 'features' },
   { factory: 'schema', folder: 'schema', kind: 'plugins', implementation: 'features' },

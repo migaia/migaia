@@ -16,6 +16,7 @@ const expectedEntries = [
   './plugins/auth',
   './plugins/batch',
   './plugins/chunk',
+  './plugins/error-map',
   './plugins/idempotency',
   './plugins/limits',
   './plugins/link-policy',
@@ -114,6 +115,7 @@ const expectedPlugins = [
   'chunk',
   'createRpcIdempotencyStore',
   'defineProbe',
+  'errorMap',
   'idempotency',
   'limits',
   'linkPolicy',
@@ -164,4 +166,7 @@ it('publishes the same feature factory through its named and default entry', asy
   /** Camel-case factory and stable hyphenated subpath belong to the same link policy owner. */
   const entry = await import('@migaia/rpc-host/plugins/link-policy')
   expect(entry.default).toBe(plugins.linkPolicy)
+  /** Outbound presentation uses the same camel-case factory at its stable hyphenated subpath. */
+  const mapping = await import('@migaia/rpc-host/plugins/error-map')
+  expect(mapping.default).toBe(plugins.errorMap)
 })

@@ -23,10 +23,11 @@ const flowPositions = {
   schema: 1,
   idempotency: 2,
   limits: 3,
-  auth: 4,
-  chunk: 5,
-  batch: 6,
-  [RpcFlowLayer.wire]: 7
+  errorMap: 4,
+  auth: 5,
+  chunk: 6,
+  batch: 7,
+  [RpcFlowLayer.wire]: 8
 } as const
 
 /** No shared wrapper is required for an ordinary native host with only local transport Features. */
@@ -335,13 +336,13 @@ export class FlowRegistry {
     this.#invalidateObservers()
   }
 
-  /** The fixed eight positions preserve native dependency/install order inside every bucket. */
+  /** The fixed nine positions preserve native dependency/install order inside every bucket. */
   #registerStages<K extends RpcFlowPoint>(
     core: IRpcFlowCore,
     point: K,
     entries: readonly IRpcFlowEntry[]
   ): void {
-    /** Eight is fixed: plaintext, six builtin capabilities and wire. No collection is sorted. */
+    /** Nine is fixed: plaintext, seven builtin capabilities and wire. No collection is sorted. */
     const buckets = Object.values(flowPositions).map((): IRpcFlowStage<K>[] => [])
     for (const entry of entries) {
       /** Registration lends the original stage without a namespace filtering continuation. */
