@@ -37,6 +37,7 @@ describe('advanced native parent-port startup', () => {
                 nativeChildSource(
                   ports.port2,
                   createThreadBootstrap('native-child', 'native-child', undefined, {
+                    childName: 'native-child',
                     parent: { name: self.name, instanceId: self.instanceId },
                     generation: { kind: 'restart', value: 0, providerId: 'native-startup' }
                   })

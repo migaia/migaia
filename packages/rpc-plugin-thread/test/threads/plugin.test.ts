@@ -84,7 +84,7 @@ describe('native thread transport plugin', () => {
       /** BC7 keeps exact native isolation through the actual member controls. */
       const first = (await host.thread.members.list()).connections[0]!.identity
       if (!('instanceId' in first)) return expect.unreachable()
-      await host.thread.members.stop(first.instanceId)
+      await host.thread.members.stop(first.name)
       expect(await host.thread.request('echo', 42)).toBe(42)
     } finally {
       await host.close()

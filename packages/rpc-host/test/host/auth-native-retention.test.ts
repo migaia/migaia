@@ -11,6 +11,7 @@ it('releases completed request IDs on a genuine exclusive Node Worker source bey
     plugins: [
       auth(createFixtureAuthentication()),
       threadPlugin({
+        name: 'thread',
         spawn: {
           entry: new URL(
             '../../../rpc-plugin-thread/test/threads/fixtures/dx-signed-worker.mjs',

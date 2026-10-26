@@ -1,7 +1,7 @@
 /** Original bootstrap business uses the current native first-frame owner and actual Host Sessions. */
 import { PassThrough } from 'node:stream'
 import { expect, it } from 'vitest'
-import { createRpcHost } from '@migaia/rpc-host'
+import { createRpcHost, RpcWarningCode, type IRpcHost, type IRpcWarning } from '@migaia/rpc-host'
 import { defineTransportPlugin, RpcEventByteIO, encodeRpcStreamFrame } from '@migaia/rpc-host/sdk'
 import { deferred, type IAbortSignal } from '@migaia/utils/promise'
 import type { IRpcSessionView } from '@migaia/rpc-contract/interfaces'
@@ -208,34 +208,56 @@ it('adopts the real first-frame self and generation and keeps bidirectional call
   }
 })
 
-it('rejects an explicit self mismatch and preserves cleanup failure reports', async () => {
+it('warns for an ignored explicit self and preserves cleanup failure reports', async () => {
   /** One native cleanup exception remains the exact original object in the report sink. */
   const cleanup = new Error('bootstrap native close failure')
-  /** No parent Session is required to reject contradictory trusted native self metadata. */
+  /** The original stream pair carries both native bootstrap and a genuine accepted Session. */
   const fixture = new NativeBootstrapFixture()
   fixture.cleanupFailure = cleanup
-  /** Observe the original opening rejection immediately, before physical input can arrive. */
+  /** BC14 replaces the old identity rejection with one warning on this same child Host. */
+  const warnings: IRpcWarning[] = []
+  /** Only actual completed public Hosts enter this original cleanup set. */
+  const hosts: Pick<IRpcHost, 'close'>[] = []
+  /** The original explicit mismatch remains unchanged while trusted parent facts take precedence. */
   const opening = createRpcHost({
     self: { name: 'wrong', instanceId: 'wrong' },
     plugins: [fixture.child],
+    onWarning: (warning) => warnings.push(warning),
     report: (error) => fixture.reports.push(error)
-  })
-  /** This is the same original public configuration error, with no substituted native code. */
-  const rejected = expect(opening).rejects.toMatchObject({
-    source: 'rpc.endpoint',
-    code: 'INVALID_CONFIG'
   })
   try {
     await fixture.reading.promise
-    await fixture.parentIO.write(
-      encodeRpcStreamFrame(new TextEncoder().encode(JSON.stringify(bootstrap)))
+    /**
+     * Reuse the original parent's real token admission and semantic handshake instead of fake
+     * ready.
+     */
+    const parentOpening = createRpcHost({
+      self: { name: 'parent', instanceId: 'actual-parent' },
+      plugins: [fixture.parent],
+      report: (error) => fixture.reports.push(error)
+    })
+    /** Successful construction proves the override completed through the original native path. */
+    const [parent, child] = await Promise.all([parentOpening, opening])
+    hosts.push(parent, child)
+    expect(child.self).toEqual(childSelf)
+    expect(fixture.accepted).toMatchObject({ name: childSelf.name, peerId: childSelf.instanceId })
+    expect(warnings).toEqual([
+      expect.objectContaining({
+        code: RpcWarningCode.selfIgnored,
+        parentName: childSelf.name,
+        ignoredName: 'wrong'
+      })
+    ])
+    /** Native close failure is expected; the original report must retain that exact Error instance. */
+    await Promise.allSettled(hosts.map((host) => host.close()))
+    /** The accepted carrier reports its existing cleanup aggregate with the identical native error. */
+    const cleanupReports = fixture.reports.filter(
+      (error): error is AggregateError => error instanceof AggregateError
     )
-    /** The child must pass the original private token gate before Host checks contradictory self. */
-    await fixture.admit(new AbortController().signal)
-    await rejected
-    expect(fixture.reports).toContain(cleanup)
+    expect(cleanupReports.flatMap((error) => error.errors)).toContain(cleanup)
     expect(fixture.childCloses).toBe(1)
   } finally {
+    await Promise.allSettled(hosts.map((host) => host.close()))
     await fixture.close()
   }
 })

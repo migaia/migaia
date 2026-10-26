@@ -49,7 +49,7 @@ describe('ordinary signed native-binary thread profile', () => {
       report: (error) => reported.push(error),
       plugins: [
         auth(options.authentication),
-        threadPlugin({ spawn: source(true, (error) => reported.push(error)) })
+        threadPlugin({ name: 'thread', spawn: source(true, (error) => reported.push(error)) })
       ]
     })
     try {
@@ -75,7 +75,7 @@ describe('ordinary signed native-binary thread profile', () => {
       readonly [ReturnType<typeof threadPlugin<'thread'>>]
     >({
       report: () => undefined,
-      plugins: [threadPlugin({ spawn: source(false, () => undefined) })]
+      plugins: [threadPlugin({ name: 'thread', spawn: source(false, () => undefined) })]
     })
     try {
       /** Rejection before submission must leave the caller buffer usable. */
@@ -122,7 +122,7 @@ describe('ordinary signed native-binary thread profile', () => {
       report: () => undefined,
       plugins: [
         auth(options.authentication),
-        threadPlugin({ spawn: source(true, () => undefined) })
+        threadPlugin({ name: 'thread', spawn: source(true, () => undefined) })
       ]
     })
     try {
