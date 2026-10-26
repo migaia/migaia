@@ -109,6 +109,11 @@ export type IRpcNativePipelineCore = Readonly<{
 /** Native lookup is borrowed unchanged; this adapter never owns execution or registration state. */
 type IRpcNativePipeline = (name: string) => unknown
 
+/** One flow configuration failure preserves native type, optional original cause and semantic code. */
+export function invalidFlow(message: string, options?: ErrorOptions): never {
+  throw tagRpcError(new TypeError(message, options), RpcCoreErrorCode.invalidConfig)
+}
+
 /** One cold namespace map lends the actual native handles without allocating keys on each message. */
 class RpcPipelineGroups {
   /** Qualified names are immutable declaration facts, not execution snapshots. */
@@ -159,10 +164,7 @@ class RpcPipelineGroups {
         this.#validated = true
       }
     } catch (cause) {
-      throw tagRpcError(
-        new TypeError(HostErrorText.nativePipelinesRequired, { cause }),
-        RpcCoreErrorCode.invalidConfig
-      )
+      invalidFlow(HostErrorText.nativePipelinesRequired, { cause })
     }
     return { [rpcPipelineOwner]: { host: this.#getHost(), pipeline: this.pipeline } }
   }

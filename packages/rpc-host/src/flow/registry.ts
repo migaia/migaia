@@ -1,13 +1,12 @@
 /** Registers native stages and retains negotiation/observation facts, never an RPC executor. */
 import type { IPluginHostCore } from '@migaia/plugin-host'
 import type { IRpcObservation } from '@migaia/rpc-contract/interfaces'
-import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
-import { tagRpcError } from '@migaia/rpc-contract/errors'
 import { HostErrorText } from '../host/error-text.js'
 import type { IRpcFlowInstallation } from '../sdk/types.js'
 import type { IRpcFlowEntry } from '../sdk/metadata.js'
 import {
   RpcFlowPoint,
+  invalidFlow,
   RpcFlowLayer,
   RpcFlowPipelines,
   rpcHostPipelines,
@@ -17,21 +16,18 @@ import {
 } from '../sdk/flow-pipelines.js'
 
 /** Inner-to-outer fixed positions are private; display names cannot grant builtin placement. */
-const builtinPositions = {
+const flowPositions = {
+  [RpcFlowLayer.plaintext]: 0,
   schema: 1,
   idempotency: 2,
   limits: 3,
   auth: 4,
   chunk: 5,
-  batch: 6
+  batch: 6,
+  [RpcFlowLayer.wire]: 7
 } as const
 /** Plaintext and wire surround the six fixed builtin positions. */
-const bucketCount = 8
-
-/** Every rejected declaration keeps the same native TypeError and package configuration code. */
-function invalidFlow(message: string): never {
-  throw tagRpcError(new TypeError(message), RpcCoreErrorCode.invalidConfig)
-}
+const bucketCount = Object.keys(flowPositions).length
 
 /** Cached namespace facts contain no stage order, snapshots, or execution continuations. */
 type IFlowFacts = Readonly<{
@@ -106,11 +102,9 @@ export class FlowRegistry {
   namespaceExtensions(namespace: string): readonly Readonly<Record<string, unknown>>[] {
     /** Each selected installation produces its own public extension surface once at publication. */
     const values: Readonly<Record<string, unknown>>[] = []
-    for (const installed of this.#selected(namespace)) {
-      /** Factories remain with their genuine installation and never obtain mutable host tables. */
-      const create = installed.namespaceExtensions
+    /** Borrow each factory once; destructuring preserves its original receiverless invocation. */
+    for (const { namespaceExtensions: create } of this.#selected(namespace))
       if (create) values.push(create(namespace) as Readonly<Record<string, unknown>>)
-    }
     return values
   }
 
@@ -159,12 +153,7 @@ export class FlowRegistry {
       if (layer !== RpcFlowLayer.plaintext && layer !== RpcFlowLayer.wire)
         invalidFlow(HostErrorText.flowLayerInvalid)
       /** Private builtin identity fixes placement even when another definition copies its name. */
-      const position =
-        entry.builtin === undefined
-          ? layer === RpcFlowLayer.wire
-            ? bucketCount - 1
-            : 0
-          : builtinPositions[entry.builtin]
+      const position = flowPositions[entry.builtin ?? layer]
       buckets[position]!.push((annotation ? annotation.stage : selected) as IRpcFlowStage<K>)
     }
     /** The original inbound declaration fixes reversal; registration owns no second direction table. */
