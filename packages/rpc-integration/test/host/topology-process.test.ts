@@ -263,16 +263,31 @@ describe('forwarding through process b to its thread, pool and coroutine', () =>
   })
 
   it('rejects a forwarding loop between b and c without reaching the leaf', async () => {
-    /** B's own name as c sees its parent peer. */
-    const { selfName } = await inspectB(host)
-    /** Calls counted before the loop attempt. */
-    const before = (await inspectB(host)).c.echoCalls
-    /** A → b → c → b → c: b appears twice on the route. */
-    const error = await rejection(
-      viaB(host, Topology.c, `${selfName}.${Topology.c}.${Topology.echo}`, 0)
-    )
-    expect(causeChain(error)).toContainEqual(expect.objectContaining({ code: 'FORWARD_LOOP' }))
-    expect((await inspectB(host)).c.echoCalls).toBe(before)
+    /**
+     * Only this origin requests the explicit public providers; ordinary topology cases stay
+     * unchanged.
+     */
+    const looping = await openOrigin({ loop: true })
+    try {
+      /** The loop must refuse before any actual echo business can execute. */
+      const before = (await inspectB(looping)).c.echoCalls
+      /** A calls through b to c.loop, whose explicitly held target revisits b.loop. */
+      const error = await rejection(viaB(looping, Topology.c, Topology.loop, 0))
+      expect(causeChain(error)).toContainEqual(expect.objectContaining({ code: 'FORWARD_LOOP' }))
+      expect((await inspectB(looping)).c.echoCalls).toBe(before)
+      /** Split horizon keeps the old reflected route out of b's advertised public directory. */
+      const reflected = `${Topology.c}.${Topology.b}.${Topology.c}.${Topology.echo}`
+      expect(looping.process.peers[Topology.b]).not.toHaveProperty(reflected)
+      /** Unknown reflected paths are refused by the origin, without reaching b's forward stage. */
+      const observed = (await inspectB(looping)).forward.length
+      const unknown = await rejection(looping.process.send(Topology.b, reflected, 0, traced))
+      expect(causeChain(unknown)).toContainEqual(
+        expect.objectContaining({ code: 'PROVIDER_NOT_FOUND' })
+      )
+      expect((await inspectB(looping)).forward).toHaveLength(observed)
+    } finally {
+      await looping.close()
+    }
   })
 })
 

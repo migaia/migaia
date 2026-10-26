@@ -17,6 +17,7 @@ import {
   HopSecret,
   Topology,
   TopologyRecorder,
+  topologyLoopMethod,
   type ITopologyOptions
 } from './topology-vocabulary.ts'
 
@@ -117,6 +118,15 @@ const opening: Promise<IRpcHost> = createRpcHost({
         host.coroutine.send(Topology.coroutine, Topology.ready),
         ...(options.python ? [host.foreign.send(Topology.python, Topology.echo, true)] : [])
       ])
+      if (options.loop) {
+        /** A real existing leaf method lets c capture b's public loop name before it becomes cyclic. */
+        host.provide({
+          [Topology.loop]: Reflect.get(host.thread.peers[Topology.c]!, Topology.echo)
+        })
+        await host.thread.send(Topology.c, Topology.prepareLoop)
+        /** C's setup reply does not itself acknowledge processing its independently sent directory. */
+        await topologyLoopMethod(host.thread, Topology.c)
+      }
       return true
     },
     /** Report b's forward rows and each leaf's counters. */
