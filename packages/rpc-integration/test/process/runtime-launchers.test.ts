@@ -22,7 +22,7 @@ function probe(command: string, args: string[]) {
 
 describe('native runtime launchers', () => {
   it.skipIf(!hasBun)('Bun runs a framed stdio child and authenticated TCP listener', () => {
-    const result = probe('bun', [resolve(folder, './fixtures/bun-parent.mjs')])
+    const result = probe('bun', [resolve(folder, './fixtures/runtime-launcher-public.ts')])
     expect(result.ok).toBe(true)
     expect(new Set(Object.keys(result.capabilities))).toEqual(
       new Set([
@@ -41,7 +41,11 @@ describe('native runtime launchers', () => {
   })
 
   it.skipIf(!hasDeno)('Deno runs a framed stdio child and authenticated TCP listener', () => {
-    const result = probe('deno', ['run', '-A', resolve(folder, './fixtures/deno-parent.mjs')])
+    const result = probe('deno', [
+      'run',
+      '-A',
+      resolve(folder, './fixtures/runtime-launcher-public.ts')
+    ])
     expect(result.ok).toBe(true)
     expect(new Set(Object.keys(result.capabilities))).toEqual(
       new Set([
