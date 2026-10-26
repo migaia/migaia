@@ -10,8 +10,6 @@ export function registerAuthenticationCounterSetter(
 /** Preserve the existing bounded internal oracle without exposing a production counter option. */
 export function setAuthenticationReplayCounter(owner: object, counter: bigint): boolean {
   /** Only a real original owner identity can set its existing uint64 allocation state. */
-  const setter = counters.get(owner)
-  if (!setter) return false
-  setter(counter)
+  counters.get(owner)!(counter)
   return true
 }

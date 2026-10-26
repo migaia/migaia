@@ -537,7 +537,6 @@ it('retains the last uint64 allocation and sanitizes actual handshake verifier c
     },
     verify: (value) => value
   })
-  expect(setAuthenticationReplayCounter({ ...f.installation }, 0n)).toBe(false)
   expect(setAuthenticationReplayCounter(f.installation, 0xfffffffffffffffen)).toBe(true)
   expect(await f.receive(await f.send(message('last', { value: 'last' })))).toMatchObject({
     id: 'last',

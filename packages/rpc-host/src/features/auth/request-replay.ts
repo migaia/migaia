@@ -67,15 +67,9 @@ export class RequestReplayLedger {
     }
     /** The retained lease is released by this exact entry on expiry or source retirement. */
     const entry = { source, at: now, activeOnly, releaseCount: this.#peerCounts.retain(peerKey) }
-    try {
-      this.#active.set(key, entry)
-      source.replayKeys.add(key)
-      return entry
-    } catch (error) {
-      this.#active.delete(key)
-      entry.releaseCount()
-      throw error
-    }
+    this.#active.set(key, entry)
+    source.replayKeys.add(key)
+    return entry
   }
 
   /** A late completion cannot settle a reused key or revive a physically retired source. */
