@@ -156,7 +156,7 @@ export class StreamProducer {
         this.#input.envelope.options.cancel !== RpcWireCancel
       ) {
         await this.#fail(
-          createRpcError(RpcCoreErrorCode.contractInvalid, RpcStreamErrorText.iterableInvalid)
+          createRpcError(RpcCoreErrorCode.contractInvalid, RpcStreamErrorText.finishInvalid)
         )
         return
       }
