@@ -288,7 +288,7 @@ export class ProviderInvocation {
       if (this.#input.envelope.kind === RpcWireKind.group && completion.ok) reply = completion
       else this.#finish(completion, { outcome: RpcProbeOutcome.settled })
     } catch (error) {
-      if (this.#oneWay()) this.#input.ports.report(error)
+      if (this.#oneWay()) this.#reportFailure(error)
       else failed = { error }
       this.#finish(this.#cancelled() ?? this.#failure(error), {
         outcome: RpcProbeOutcome.failed,
@@ -300,7 +300,7 @@ export class ProviderInvocation {
       if (!this.#settled && !reply) this.#finish(this.#cancelled() ?? { ok: true })
     }
     await this.#respond(reply)
-    if (failed) this.#input.ports.report(failed.error)
+    if (failed) this.#reportFailure(failed.error)
     this.#waitingGate = undefined
   }
 
@@ -436,7 +436,7 @@ export class ProviderInvocation {
           ...(outcome.value === undefined ? {} : { result: outcome.value })
         })
       } catch (error) {
-        this.#input.ports.report(error)
+        this.#reportFailure(error)
         failed = true
         results.push({ state: RpcWireStepState.failure, error: this.#failure(error).error })
       }
@@ -577,9 +577,27 @@ export class ProviderInvocation {
     }
   }
 
+  /** Local work and not-yet-started forwarding can select their original cancellation terminal. */
+  #hasCancellation(): boolean {
+    return this.signal.aborted && !(this.#forwarded && this.#started)
+  }
+
+  /** Normal abort acknowledgment is silent; a different late business failure remains diagnostic. */
+  #reportFailure(error: unknown): void {
+    if (
+      this.signal.aborted &&
+      (error === this.signal.reason ||
+        (this.#hasCancellation() &&
+          localRpcErrorCode(error) === RpcCoreErrorCode.cancelled &&
+          safeRead(error, 'cause') === this.signal.reason))
+    )
+      return
+    this.#input.ports.report(error)
+  }
+
   /** Cancellation retains the admitted timeout or the original caller reason through cause. */
   #cancelled(): Extract<IRpcCompletion, { ok: false }> | undefined {
-    if (!this.signal.aborted || (this.#forwarded && this.#started)) return undefined
+    if (!this.#hasCancellation()) return undefined
     /** Actual cancellation already won; admitted deadline diagnostics retain their original family. */
     const reason = this.signal.reason
     /** Only this actual aborted stream decision records a cancellation terminal for later replay. */

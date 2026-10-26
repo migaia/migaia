@@ -267,3 +267,46 @@ it('caller cancellation late reject reports the original error with only its CAN
     await fixture.close()
   }
 })
+
+// A40 / owner review M8: acknowledging this operation's abort is normal provider completion.
+it('caller cancellation acknowledgment does not report the original provider signal reason', async () => {
+  /** The same provider holds business completion until its actual remote signal aborts. */
+  const provider = new SignalTerminalProvider()
+  /** This report window belongs only to the real receiving Host. */
+  const reports: unknown[] = []
+  const fixture = await connectedCoreHosts(
+    {},
+    { wait: provider.run },
+    () => undefined,
+    undefined,
+    (error) => reports.push(error)
+  )
+  const controller = new AbortController()
+  const pending = Promise.allSettled([
+    fixture.a.memory.send('b', 'wait', null, { signal: controller.signal, timeout: false })
+  ])
+  try {
+    await provider.started.promise
+    controller.abort(new Error('caller cancelled'))
+    await provider.aborted.promise
+    assert(provider.signal?.aborted)
+    provider.reject(provider.signal.reason)
+    await provider.finished.promise
+    await pending
+    await settleProviderDelivery()
+    expect(reports).toEqual([])
+    /** The actual cancellation still produces its sole correlated error terminal. */
+    const terminals = fixture.pair[1].written.filter(
+      (frame) => frame.kind === RpcWireKind.error || frame.kind === RpcWireKind.result
+    )
+    expect(terminals).toHaveLength(1)
+    const terminal = terminals[0]
+    assert(terminal?.kind === RpcWireKind.error)
+    expect(terminal.error.nodes[terminal.error.root]?.code).toBe(RpcCoreErrorCode.cancelled)
+  } finally {
+    controller.abort()
+    provider.resolve('unreachable')
+    await pending
+    await fixture.close()
+  }
+})
