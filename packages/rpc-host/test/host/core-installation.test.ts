@@ -3,7 +3,9 @@ import {
   defineHost,
   defineFeature,
   definePlugin,
-  getPluginRuntimeIntegration
+  getPluginRuntimeIntegration,
+  type IFeatureReference,
+  type IPluginHostCore
 } from '@migaia/plugin-host'
 import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
 import { defineFlowPlugin, defineTransportPlugin, rpcHostPipelines } from '@migaia/rpc-host/sdk'
@@ -463,5 +465,113 @@ it('rolls back both native dependency owners once without replacing their origin
     expect(disposals.feature).toBe(1)
   } finally {
     await native.dispose()
+  }
+})
+
+// RPC-TEST-CD50052EF4A5-C002-A001: the public factory preserves the same transaction primary.
+it('public construction preserves the original primary after both native dependency resources roll back', async () => {
+  /** The original native provider and its actual dependent consumer must share this exact object. */
+  const firstValue = Object.freeze({ owner: 'first' })
+  /** Only the same two acquired native installations contribute cleanup counts and release order. */
+  const disposals = { resource: 0, feature: 0, order: [] as string[] }
+  /** The actual first flow setup owns this original disposer. */
+  const releaseResource = (): void => {
+    disposals.resource += 1
+    disposals.order.push('resource')
+  }
+  /** The actual dependent flow setup owns this separate original disposer. */
+  const releaseFeature = (): void => {
+    disposals.feature += 1
+    disposals.order.push('feature')
+  }
+  /** Native metadata participates in the same public factory's genuine prefix transaction. */
+  const first = defineFlowPlugin(
+    {
+      name: 'public-transaction-first',
+      setup: () => ({ stages: {}, dispose: releaseResource })
+    },
+    { features: { value: defineFeature(() => firstValue) } }
+  )
+  /** SDK typing erases native Feature keys; invoke the genuine method to obtain its opaque token. */
+  const firstReference: IFeatureReference<typeof firstValue> = Reflect.apply(
+    first.getFeature,
+    first,
+    ['value']
+  )
+  /** The native exposure hook lends its real core before setup reads the original earlier output. */
+  const observed = {
+    providerName: first.name,
+    core: undefined as IPluginHostCore | undefined,
+    value: undefined as unknown
+  }
+  /** Real native dependencies force this setup to follow the actual first resource acquisition. */
+  const second = defineFlowPlugin(
+    {
+      name: 'public-transaction-second',
+      setup() {
+        observed.value = getPluginRuntimeIntegration(observed.core!).readFeatureOutputs(
+          observed.providerName
+        ).outputs.value
+        return { stages: {}, dispose: releaseFeature }
+      }
+    },
+    {
+      features: {
+        dependency: defineFeature((_core, dependencies) => dependencies.value, {
+          value: firstReference
+        })
+      },
+      featureExpose(core: IPluginHostCore) {
+        observed.core = core
+        return {}
+      }
+    }
+  )
+  /** The real dependent definition mints this token; no structural reference is manufactured. */
+  const secondReference: IFeatureReference<typeof firstValue> = Reflect.apply(
+    second.getFeature,
+    second,
+    ['dependency']
+  )
+  /** This exact later callback failure must leave the public factory unchanged after rollback. */
+  const primaryFailure = new Error('later public transaction member failed')
+  /** The final real setup depends on both actual earlier resource acquisitions through the graph. */
+  const failing = defineFlowPlugin(
+    {
+      name: 'public-transaction-failure',
+      setup() {
+        throw primaryFailure
+      }
+    },
+    {
+      features: {
+        dependency: defineFeature((_core, dependencies) => dependencies.value, {
+          value: secondReference
+        })
+      }
+    }
+  )
+  /** A genuine cold transport keeps the public constructor's native admission premise valid. */
+  const server = coreMemoryServer('public-transaction-rollback')
+  /** Unexpected success must still release the actual public lifetime rather than leak a Host. */
+  let host: { close(reason?: unknown): Promise<void> } | undefined
+  /** Inspect the real public construction rejection directly, without native-wrapper projection. */
+  let failure: unknown
+  try {
+    try {
+      host = await createRpcHost({
+        ...server.options,
+        plugins: [first, second, failing, server.transport]
+      })
+    } catch (error) {
+      failure = error
+    }
+    expect(failure).toBe(primaryFailure)
+    expect(observed.value).toBe(firstValue)
+    expect(disposals.resource).toBe(1)
+    expect(disposals.feature).toBe(1)
+    expect(disposals.order).toEqual(['feature', 'resource'])
+  } finally {
+    await host?.close()
   }
 })
