@@ -385,7 +385,11 @@ class NodeSocketListener {
   #close = (): Promise<void> => {
     if (this.#closePromise) return this.#closePromise
     this.#scope.closed = true
-    this.#scope.closeReason = createProcessError(RpcProcessErrorCode.channelClosed)
+    /** Abort-driven candidates keep the listening owner's reason on their closed-channel cause. */
+    const signal = this.#scope.options.signal
+    this.#scope.closeReason = signal?.aborted
+      ? resolveAbortReason(signal)
+      : createProcessError(RpcProcessErrorCode.channelClosed)
     this.#closePromise = this.#release()
     return this.#closePromise
   }

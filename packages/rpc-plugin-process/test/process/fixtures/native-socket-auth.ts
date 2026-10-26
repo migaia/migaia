@@ -132,7 +132,7 @@ export class NativeSocketAuth {
     return completion
   }
   /** Open the original listener recipe with a legal selected auth plugin and original verifier. */
-  async listen(verify: (credential: unknown) => string) {
+  async listen(verify: (credential: unknown) => string | Promise<string>) {
     /** This native root publishes its real source before any separate client starts. */
     const server = await createRpcHost({
       self: { name: 'listener-route', instanceId: 'listener-route' },

@@ -280,7 +280,13 @@ class ProcessSessionOwner {
       } catch (cleanup) {
         this.#report(cleanup)
       }
-      this.#report(error)
+      /** The same owner's abort may be returned directly or through its native closed wrapper. */
+      const signal = this.#controller.signal
+      if (
+        !signal.aborted ||
+        (error !== signal.reason && !(error instanceof Error && error.cause === signal.reason))
+      )
+        this.#report(error)
     }
   }
 
