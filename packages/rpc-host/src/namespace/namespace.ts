@@ -373,7 +373,6 @@ export class Namespace {
       (reason) => void operation.close(reason).catch(operation.report),
       operation.report
     )
-    core.onDispose(preparing.unsubscribe)
     try {
       /** Native transport and flow setup reuse the same cancellation and late-cleanup handoff. */
       return await new RpcInstallationSetup({
