@@ -388,9 +388,11 @@ describe('handshake redaction', () => {
   })
   it('verifies current baseline handshake bytes without credentials', () => {
     const directory = resolve(PACKAGE_ROOT, '../rpc-integration/schema/vectors')
-    const vector = readFileSync(resolve(directory, 'handshake.json'))
+    const vector = readFileSync(resolve(directory, 'protocol-baseline.json'))
     const sums = readFileSync(resolve(directory, 'SHA256SUMS'), 'utf8')
-    expect(sums).toContain(createHash('sha256').update(vector).digest('hex') + '  handshake.json')
+    expect(sums).toContain(
+      createHash('sha256').update(vector).digest('hex') + '  protocol-baseline.json'
+    )
     expect(vector.toString('utf8')).not.toContain('"auth"')
   })
 })
