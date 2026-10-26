@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { coreMemoryServer } from './core-fixture.js'
 
 // RPC-TEST-B2526C80E8FC-C004: retain original borrowed-session lifetime through actual SDK handles.
@@ -22,9 +23,9 @@ it('lends the actual listener session with disposal confined to that peer', asyn
     expect(accepted).toHaveLength(2)
     // A002's retired endpoint-constructor count is archived under BC3, without a substitute counter.
     await accepted[0]!.handle.close()
-    // A departed name rejects with its own departure reason; only that Session is affected.
+    // BC21 removes history for the default name (name === instanceId); its sibling stays live.
     await expect(host.memory.send('first', 'value')).rejects.toMatchObject({
-      code: 'ENDPOINT_DISPOSED'
+      code: RpcCoreErrorCode.targetUnknown
     })
     // RPC-TEST-B2526C80E8FC-C004-A004: its independently owned sibling remains callable.
     expect(await host.memory.send('second', 'value')).toBe(2)

@@ -155,11 +155,11 @@ it('isolates two original provider endpoints and prevents execution or replies a
     await secondClient.host.memory.send('r70-isolation-second', 'barrier', 'after-cross-endpoint')
     expect(secondExecutions).toBe(1)
 
-    /** This actual Root owns the public provider catalog and closes its original physical source. */
+    /** BC21 retires the default name's departure reason together with its physical source. */
     await firstHost.close()
     await expect(
       firstClient.host.memory.send('r70-isolation-first', 'echo', 'r70-post-removal')
-    ).rejects.toMatchObject({ code: RpcCoreErrorCode.endpointDisposed })
+    ).rejects.toMatchObject({ code: RpcCoreErrorCode.targetUnknown })
     expect(firstExecutions).toBe(1)
     /** No new terminal can be produced by the removed provider after the original one reply. */
     expect(
