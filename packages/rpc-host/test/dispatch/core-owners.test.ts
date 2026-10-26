@@ -439,12 +439,13 @@ describe('C2 ProviderDispatcher / Forwarder / StreamChannel owners', () => {
     await pair.close()
   })
 
-  it('C2-P03 retains notify id cancellation until actual business completion and adds no ordinary ACK', async () => {
+  // H2 retires only C2-P03's post-write remote cancellation oracle; completion and no-ACK remain.
+  it('C2-P03 releases notify cancellation after write while business completion adds no ordinary ACK', async () => {
     /** Business completion is deliberately later than physical notification handoff. */
     const release = deferred<void>()
     /** This Promise observes the actual captured provider context rather than fixture-private state. */
     const started = deferred<IRpcContext>()
-    /** A normal client cancellation signal remains usable after notify public fulfillment. */
+    /** H2 releases caller cancellation ownership after the notification's physical handoff. */
     const abort = new AbortController()
     /** One actual pair retains incoming state under ProviderDispatcher. */
     const pair = new OwnerPair()
@@ -462,7 +463,7 @@ describe('C2 ProviderDispatcher / Forwarder / StreamChannel owners', () => {
     /** Captured context is public business input and keeps its original native signal. */
     const context = await started.promise
     abort.abort(createRpcError(RpcCoreErrorCode.cancelled, 'fixture cancellation'))
-    expect(context.signal.aborted).toBe(true)
+    expect(context.signal.aborted).toBe(false)
     /** Actual completion cannot settle while the original handler is still running. */
     let completed = false
     void pair.completions[0]!.then(() => {
