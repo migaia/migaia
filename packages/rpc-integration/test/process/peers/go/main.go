@@ -12,9 +12,11 @@ import (
 	"math"
 	"net"
 	"os"
+	"os/signal"
 	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 	"unicode/utf8"
 )
@@ -597,6 +599,8 @@ func serveUnix(path, role string) error {
 
 // main keeps the existing CLI/transport owner while removing semantic-v1/JSON-RPC/remote-Host selectors.
 func main() {
+	// A lost parent closes stdout: preserve EPIPE so existing descendant cleanup defers still run.
+	signal.Ignore(syscall.SIGPIPE)
 	business := flag.Bool("business", false, "serve published providers")
 	jsonrpc := flag.Bool("jsonrpc", false, "historical pure JSON baseline label only")
 	bareJSON := flag.Bool("bare-jsonrpc", false, "parse and write JSON only; no RPC profile")
