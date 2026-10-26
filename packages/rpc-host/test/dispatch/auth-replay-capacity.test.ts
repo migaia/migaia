@@ -53,6 +53,7 @@ it.each([undefined, 1101])(
         auth({
           credentials: replayCredential,
           verifyCredentials: verifyReplayCredential,
+          retain: 310_000,
           ...(maximum === undefined ? {} : { maxReplayEntriesPerPeer: maximum }),
           onRejected: (notice) => {
             notices.push(notice)
@@ -133,6 +134,7 @@ it.each(['none', 'ok', 'throw', 'reject'] as const)(
         auth({
           credentials: replayCredential,
           verifyCredentials: verifyReplayCredential,
+          retain: 310_000,
           maxReplayEntriesPerPeer: 1,
           ...(mode === 'none' ? {} : { onRejected: observer })
         }),
@@ -149,7 +151,7 @@ it.each(['none', 'ok', 'throw', 'reject'] as const)(
       expect(await client.host.memory.send('ledger-server', 'echo', null)).toBe(null)
       await expect
         .soft(client.host.memory.send('ledger-server', 'echo', 'secret-request-payload'))
-        .rejects.toMatchObject({ code: 'OVERLOADED', message: 'Provider failed' })
+        .rejects.toMatchObject({ code: 'OVERLOADED', message: 'Request replay ledger is full' })
       await client.host.memory.notify('echo', 'secret-oneway-payload', {
         targetId: 'ledger-server'
       })
@@ -178,7 +180,7 @@ it.each(['none', 'ok', 'throw', 'reject'] as const)(
       assert(response?.kind === 'error')
       expect
         .soft(deserializeRpcWireError(response.error))
-        .toMatchObject({ code: 'OVERLOADED', message: 'Provider failed' })
+        .toMatchObject({ code: 'OVERLOADED', message: 'Request replay ledger is full' })
       expect(reports.filter(isReplayRefusal)[0]).toMatchObject({
         source: 'rpc.endpoint',
         code: 'OVERLOADED',

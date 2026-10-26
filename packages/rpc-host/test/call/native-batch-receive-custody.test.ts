@@ -11,7 +11,7 @@ import { RpcBatchExtension } from '../../dist/features/batch/constants.js'
 import { coreMemoryServer } from '../host/core-fixture.js'
 
 it('reports each native batch replay refusal and its exact physical write failure independently', async () => {
-  /** One completed actual request fills the original configured per-peer replay capacity. */
+  /** Explicit numeric retention keeps the completed seed in the configured replay capacity. */
   let calls = 0
   /** Only the receiving public Host's original diagnostic outlet contributes to this oracle. */
   const failures: unknown[] = []
@@ -21,6 +21,7 @@ it('reports each native batch replay refusal and its exact physical write failur
     verifyCredentials: (value) => {
       expect(value).toBe('batch-custody-credential')
     },
+    retain: 310_000,
     maxReplayEntriesPerPeer: 1
   })
   /** Both original physical endpoints use the actual once-only JSON codec and batch extension. */

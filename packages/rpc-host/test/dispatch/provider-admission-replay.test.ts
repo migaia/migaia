@@ -12,13 +12,15 @@ import { coreMemoryServer } from '../host/core-fixture.js'
 
 /** The real handshake verifier recognizes only this fixture's portable credential. */
 const replayCredential = 'provider-replay-fixture-credential'
-/** Each Host installs its own Auth owner; no sign/verify counter wrapper alters raw replay input. */
-const replayAuthentication = auth({
+/** Shared credentials keep default and explicit completed-retention rows on the same real verifier. */
+const replayAuthenticationOptions = {
   credentials: replayCredential,
-  verifyCredentials: (credentials) => {
+  verifyCredentials: (credentials: unknown) => {
     if (credentials !== replayCredential) throw new Error('unrecognized replay fixture credentials')
   }
-})
+}
+/** Each Host installs its own Auth owner; no sign/verify counter wrapper alters raw replay input. */
+const replayAuthentication = auth(replayAuthenticationOptions)
 
 /** Borrow the original allocated call/task rather than manufacturing a caller or generation. */
 function admittedCall(carrier: MemoryCarrier, method: string) {
@@ -39,7 +41,7 @@ it('installed replay suppresses a completed task repeated at actual ingress', as
   /** BC3 moves the original optional replay policy to its real complete plugin owner. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [replayAuthentication, ...server.options.plugins],
+    plugins: [auth({ ...replayAuthenticationOptions, retain: 310_000 }), ...server.options.plugins],
     provide: {
       echo: (_value, context) => {
         executions += 1
@@ -265,6 +267,7 @@ it.each([
               if (credentials !== replayCredential)
                 throw new Error('unrecognized replay fixture credentials')
             },
+            retain: 310_000,
             maxReplayEntriesPerPeer: 1,
             onRejected
           })

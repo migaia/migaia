@@ -96,6 +96,7 @@ describe('stream replay custody through public endpoint behavior', () => {
         auth({
           sign: (value) => value,
           verify: (value) => value,
+          retain: 310_000,
           maxReplayEntriesPerPeer: 1,
           onRejected: (notice) => {
             notices.push(notice)
