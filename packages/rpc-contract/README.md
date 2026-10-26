@@ -24,18 +24,20 @@ pnpm add @migaia/rpc-contract
 
 所有 RPC 包都可以直接声明本包依赖。包设置 `sideEffects: false`；只导入 `/error-code` 不会把协议、载体编解码或 portable 执行路径带入包。
 
+`/interfaces` 提供纯 flow payload 类型；原生命名管道的 stage 类型由 `@migaia/rpc-host/sdk` 提供。
+
 ```ts doc-test=check
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import type {
   IRpcCarrier,
-  IRpcFlowHooks,
+  IRpcEnvelopePayload,
   IRpcTimeoutFeature
 } from '@migaia/rpc-contract/interfaces'
 
 export const cancelled = RpcCoreErrorCode.cancelled
 export type ITransportParts = Readonly<{
   carrier: IRpcCarrier
-  hooks: IRpcFlowHooks
+  envelope: IRpcEnvelopePayload
   timeout: IRpcTimeoutFeature
 }>
 ```

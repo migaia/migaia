@@ -10,7 +10,7 @@
 pnpm add @migaia/rpc-host @migaia/rpc-contract @migaia/rpc-plugin-browser
 ```
 
-页面入口借用一个模块 Worker，调用位于默认的 `worker` namespace。`worker.js` 是下方独立 Worker 入口的编译结果。
+页面入口借用一个模块 Worker，调用位于默认的 `worker` namespace。下方 Worker 模块由实际 `worker.ts` 入口调用 `startWorker(self)`，再编译为 `worker.js`。
 
 ```ts doc-test=check
 import { createRpcHost } from '@migaia/rpc-host'
@@ -31,16 +31,19 @@ try {
 }
 ```
 
-独立 `worker.ts` 使用 Worker 全局类型编译，不把页面 Window 强制转换成 Worker：
+独立 Worker 模块接收真实原生来源。实际 `worker.ts` 入口使用 Worker 全局类型编译，再调用 `startWorker(self)`：
 
-```ts doc-test=check environment=worker
+```ts doc-test=check
 import { createRpcHost } from '@migaia/rpc-host'
-import { dedicatedWorkerPlugin } from '@migaia/rpc-plugin-browser'
+import { dedicatedWorkerPlugin, type IWorkerPluginOptions } from '@migaia/rpc-plugin-browser'
 
-await createRpcHost({
-  plugins: [dedicatedWorkerPlugin({ worker: self })],
-  provide: { double: (value: number) => value * 2 }
-})
+/** 借用真实 Worker 全局；原生生命周期仍由应用管理。 */
+export function startWorker(worker: IWorkerPluginOptions['worker']) {
+  return createRpcHost({
+    plugins: [dedicatedWorkerPlugin({ worker })],
+    provide: { double: (value: number) => value * 2 }
+  })
+}
 ```
 
 Worker 提供 `double` 后，兼容的页面调用可取得 `42`。应用仍负责 Worker 地址、创建、部署和最终 terminate；这些示例做公开 dist 类型检查，不代替跨 realm 运行验证。

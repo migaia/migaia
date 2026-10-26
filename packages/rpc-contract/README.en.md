@@ -24,18 +24,20 @@ pnpm add @migaia/rpc-contract
 
 Every RPC package may declare a direct dependency on this package. `sideEffects: false` permits tree-shaking; importing only `/error-code` does not retain protocol, carrier codec, or portable execution paths.
 
+`/interfaces` provides pure flow payload types; native named-pipeline stage types come from `@migaia/rpc-host/sdk`.
+
 ```ts doc-test=check
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import type {
   IRpcCarrier,
-  IRpcFlowHooks,
+  IRpcEnvelopePayload,
   IRpcTimeoutFeature
 } from '@migaia/rpc-contract/interfaces'
 
 export const cancelled = RpcCoreErrorCode.cancelled
 export type ITransportParts = Readonly<{
   carrier: IRpcCarrier
-  hooks: IRpcFlowHooks
+  envelope: IRpcEnvelopePayload
   timeout: IRpcTimeoutFeature
 }>
 ```

@@ -10,7 +10,7 @@ Connect actual Windows, Workers, BroadcastChannels, reliable RTCDataChannels or 
 pnpm add @migaia/rpc-host @migaia/rpc-contract @migaia/rpc-plugin-browser
 ```
 
-This page borrows a module Worker and calls the default `worker` namespace. `worker.js` is the compiled separate Worker entry below.
+This page borrows a module Worker and calls the default `worker` namespace. The actual `worker.ts` entry calls `startWorker(self)` from the Worker module below, then compiles to `worker.js`.
 
 ```ts doc-test=check
 import { createRpcHost } from '@migaia/rpc-host'
@@ -31,16 +31,19 @@ try {
 }
 ```
 
-Compile the separate `worker.ts` with Worker globals, without casting a page Window to Worker:
+The separate Worker module accepts the actual native source. Compile the real `worker.ts` entry with Worker globals and call `startWorker(self)`:
 
-```ts doc-test=check environment=worker
+```ts doc-test=check
 import { createRpcHost } from '@migaia/rpc-host'
-import { dedicatedWorkerPlugin } from '@migaia/rpc-plugin-browser'
+import { dedicatedWorkerPlugin, type IWorkerPluginOptions } from '@migaia/rpc-plugin-browser'
 
-await createRpcHost({
-  plugins: [dedicatedWorkerPlugin({ worker: self })],
-  provide: { double: (value: number) => value * 2 }
-})
+/** Borrow the actual Worker global; the application keeps its native lifetime. */
+export function startWorker(worker: IWorkerPluginOptions['worker']) {
+  return createRpcHost({
+    plugins: [dedicatedWorkerPlugin({ worker })],
+    provide: { double: (value: number) => value * 2 }
+  })
+}
 ```
 
 After the Worker provides `double`, the compatible page call can receive `42`. Applications own the address, creation, deployment and eventual termination. These examples receive public-dist typechecking, not cross-realm runtime acceptance.
