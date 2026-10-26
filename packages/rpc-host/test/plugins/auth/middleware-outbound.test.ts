@@ -1,19 +1,30 @@
-import { expect, it, vi } from 'vitest'
+import { assert, expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { auth } from '@migaia/rpc-host/plugins/auth'
 import { batch } from '@migaia/rpc-host/features/batch'
-import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
+import {
+  defineFlowFeature,
+  RpcFlowPoint,
+  RpcJsonCarrierCodec,
+  type IRpcFlowStage
+} from '@migaia/rpc-host/sdk'
 import {
   RPC_CORE_ERROR_SOURCE,
   RpcAuthenticationError,
   RpcError
 } from '@migaia/rpc-contract/errors'
-import { IpcSendClass, type IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
+import {
+  IpcSendClass,
+  type IRpcCarrierFrame,
+  type IRpcFlowContext
+} from '@migaia/rpc-contract/interfaces'
+import { RpcCarrierFrameKind } from '@migaia/rpc-contract/protocol'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { deferred } from '@migaia/utils/promise'
 import { coreMemoryServer } from '../../host/core-fixture.js'
 import { createRpcAuthenticationError } from '../../../dist/host/error-owner.js'
+import { RpcBatchExtension } from '../../../dist/features/batch/constants.js'
 
 it('hostile outbound authentication preserves native source/code/cause identity', async () => {
   /** The exact original callback failure must remain the public authentication error's cause. */
@@ -353,6 +364,133 @@ it('isolates a public signing failure while the native batch writer is busy and 
       expect(output.frames).toHaveLength(3)
     } finally {
       state.failNext = false
+      client.pair[1].releaseWrites()
+      writing.mockRestore()
+      await client.host.close()
+      await Promise.all(pending)
+    }
+  } finally {
+    await server.close()
+  }
+})
+
+it('coalesces two separately authenticated public calls on the same actual source after a held write', async () => {
+  /** Actual public providers retain all three original logical values in native delivery order. */
+  const calls: string[] = []
+  /** This bounded witness observes actual sign entries and frames without parsing protected text. */
+  const observation = {
+    enabled: false,
+    contexts: [] as IRpcFlowContext[],
+    frames: [] as IRpcCarrierFrame[],
+    entered: deferred<void>()
+  }
+  /** The genuine frame stage forwards first, so the native Batch owner owns each queued input. */
+  const observeFrame: IRpcFlowStage<'frameOutbound'> = (payload, next) => {
+    /** This is the original native continuation, never a second stage runner or IO queue. */
+    const traversal = next(payload)
+    if (observation.enabled && payload.frame.kind === RpcCarrierFrameKind.message) {
+      observation.frames.push(payload.frame)
+      if (observation.frames.length === 3) observation.entered.resolve()
+    }
+    return traversal
+  }
+  /** Actual native setup publishes the original named callback without another closure backbone. */
+  const witness = defineFlowFeature({
+    name: 'authenticated-batch-member-witness',
+    setup: () => ({ stages: { [RpcFlowPoint.frameOutbound]: observeFrame } })
+  })
+  /** Both endpoints reuse the actual JSON codec and existing physical MemoryCarrier pair. */
+  const listener = coreMemoryServer('authenticated-batch-provider', undefined, 'memory', [], [], {
+    create: () => new RpcJsonCarrierCodec(),
+    nativeBinary: false
+  })
+  /** Per-envelope Auth precedes the provider's physical Batch feature in the original pipelines. */
+  const server = await createRpcHost({
+    ...listener.options,
+    plugins: [
+      auth({ encodedType: 'string', sign: (value) => value, verify: (value) => value }),
+      batch(),
+      listener.transport
+    ],
+    provide: {
+      echo: (value: string) => {
+        calls.push(value)
+        return value
+      }
+    }
+  })
+  try {
+    /** The configured canonical signer returns the same actual input without a new group format. */
+    const client = await listener.connect('authenticated-batch-client', {
+      plugins: [
+        auth({
+          encodedType: 'string',
+          sign: (value, context) => {
+            if (observation.enabled) observation.contexts.push(context)
+            return value
+          },
+          verify: (value) => value
+        }),
+        witness,
+        batch()
+      ]
+    })
+    /** Existing write facts distinguish actual data frames without decoding the signed payload. */
+    const output = { send: client.pair[1].write, frames: [] as IRpcCarrierFrame[] }
+    /** Preserve original write and gate ownership while retaining each real physical frame. */
+    const writing = vi.spyOn(client.pair[1], 'write').mockImplementation((frame, options) => {
+      if (options?.sendClass === IpcSendClass.data) output.frames.push(frame)
+      return output.send(frame, options)
+    })
+    /** Every original caller settlement is observed immediately and joined during cleanup. */
+    const pending: Promise<unknown>[] = []
+    try {
+      observation.enabled = true
+      client.pair[1].holdWrites()
+      /** The actual first native write supplies backpressure before the two separate later calls. */
+      const first = client.host.memory
+        .send('authenticated-batch-provider', 'echo', 'first')
+        .catch((error: unknown) => error)
+      pending.push(first)
+      await vi.waitFor(() => expect(output.frames).toHaveLength(1))
+      /** Each later public operation keeps its original task, signature and returned value. */
+      const one = client.host.memory
+        .send('authenticated-batch-provider', 'echo', 'one')
+        .catch((error: unknown) => error)
+      /** This distinct logical call enters the same existing physical source's Batch lane. */
+      const two = client.host.memory
+        .send('authenticated-batch-provider', 'echo', 'two')
+        .catch((error: unknown) => error)
+      pending.push(one, two)
+      await observation.entered.promise
+      expect(output.frames).toHaveLength(1)
+      expect(calls).toEqual([])
+      /** Current Auth signs all three envelopes independently; no old two-group count is required. */
+      expect(observation.contexts).toHaveLength(3)
+      for (const context of observation.contexts) {
+        expect(context.namespace).toBe('memory')
+        expect(context.carrierId).toBe(client.pair[1].id)
+        expect(context.session?.peerId).toBe('authenticated-batch-provider')
+      }
+      client.pair[1].releaseWrites()
+      expect(await Promise.all([first, one, two])).toEqual(['first', 'one', 'two'])
+      expect(calls).toEqual(['first', 'one', 'two'])
+      expect(output.frames).toHaveLength(2)
+      /** The second physical frame is the original Batch extension over exactly two encoded members. */
+      const aggregate = output.frames[1]
+      expect(aggregate).toMatchObject({
+        kind: RpcCarrierFrameKind.extension,
+        extension: RpcBatchExtension,
+        data: { frames: observation.frames.slice(1) }
+      })
+      assert(aggregate?.kind === RpcCarrierFrameKind.extension)
+      /** Reading this owned outer frame does not parse or restore either opaque member string. */
+      const members = Reflect.get(aggregate.data as object, 'frames') as IRpcCarrierFrame[]
+      expect(members).toHaveLength(2)
+      expect(members[0]).toBe(observation.frames[1])
+      expect(members[1]).toBe(observation.frames[2])
+    } finally {
+      observation.enabled = false
       client.pair[1].releaseWrites()
       writing.mockRestore()
       await client.host.close()
