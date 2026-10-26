@@ -16,7 +16,11 @@ import type {
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import { type IProcessLaunchCommand, type IProcessShortSpawn } from '@migaia/rpc-plugin-process'
 import { defineHost } from '@migaia/plugin-host'
-import type { IRpcMemberEvent, IRpcNativeMemberControls } from '@migaia/rpc-host/sdk'
+import {
+  rpcHostPipelines,
+  type IRpcMemberEvent,
+  type IRpcNativeMemberControls
+} from '@migaia/rpc-host/sdk'
 import {
   createNodeProcessLauncher,
   type INodeProcessHandle
@@ -96,9 +100,17 @@ function externalEnv(command: IProcessLaunchCommand): IProcessLaunchCommand {
 
 /** Create the existing public Host without imposing mutation deadlines on real child startup. */
 function createHost() {
-  return defineHost({
+  /** Lazy pipeline authority reads this case's own native host only at installation. */
+  const rpc = rpcHostPipelines(
+    () => host,
+    (name) => host.pipeline(name),
+    ['process']
+  )
+  const host = defineHost({
+    ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
-  }) as ILaunchWrapHost
+  })
+  return host as ILaunchWrapHost
 }
 
 /** Every scenario uses the same short source and leaves supervision's restart policy explicit. */

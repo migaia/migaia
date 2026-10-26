@@ -1,5 +1,6 @@
 /** Original native Process public oracles use the same real child and current namespace API. */
-import { PluginHost, definePlugin, defineFeature } from '@migaia/plugin-host'
+import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'
+import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { deferred } from '@migaia/utils/promise'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { randomUUID } from 'node:crypto'
@@ -102,7 +103,8 @@ it('recovers an owned killed process through the original supervisor on the same
     const pid = (await host.process.request('pid')) as number
     process.kill(pid, 'SIGKILL')
     await exit.promise
-    await expect(host.process.request('pid')).rejects.toMatchObject({ code: 'REMOTE_CLOSED' })
+    /** Before the replacement is ready the departed member rejects with its departure reason. */
+    await expect(host.process.request('pid')).rejects.toMatchObject({ code: 'ENDPOINT_DISPOSED' })
     await ready.promise
     const replacement = (await host.process.request('pid')) as number
     expect(replacement).not.toBe(pid)
@@ -175,8 +177,15 @@ it('retains the real terminal Process error for an explicitly addressed retired 
 }, 15_000)
 
 it('installs the same native plugin on an ordinary Host with name and exposed feature calls', async () => {
-  const host = new PluginHost<Record<string, never>>({
-    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+  /** Lazy pipeline authority reads this case's own native host only at installation. */
+  const rpc = rpcHostPipelines(
+    () => host,
+    (name) => host.pipeline(name),
+    ['process']
+  )
+  const host = defineHost({
+    ...rpc,
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
   const app = definePlugin({
     name: 'app',
