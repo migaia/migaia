@@ -1395,7 +1395,15 @@ export class Session {
       if (error !== this.#reason) this.#options.report(error)
       return
     }
-    this.#options.report(error)
+    /** Provider cancellation keeps the original typed reason beside its public protocol report. */
+    const reported =
+      this.#view &&
+      error instanceof TypeError &&
+      safeRead(error, 'source') === RPC_CONTRACT_SOURCE &&
+      safeRead(error, 'code') === RpcContractErrorCode.invalidWireError
+        ? createRpcProtocolError(error.message, error)
+        : error
+    this.#options.report(reported)
     if (reject && !this.#view && this.#offer) {
       this.#reply = this.#writeHandshake({
         profile: RpcWireProfile,

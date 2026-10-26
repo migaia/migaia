@@ -274,3 +274,75 @@ it('preserves hostile caller listener failure cause and cleanup before any busin
     await fixture.close()
   }
 })
+
+// RPC-TEST-2558A5FABE51-C001: retain only the original invalidData provider-reason branch here.
+it('aborts the actual provider with invalid cancellation data and reports one protocol failure', async () => {
+  /** Only the actual running provider's signal can settle this original cancellation barrier. */
+  const provider = new CancellationProvider()
+  /** Provider-side diagnostics are distinct from caller retirement and its ordinary report sink. */
+  const reports: unknown[] = []
+  /** Original native carriers, Session admission and public provider dispatch remain unchanged. */
+  const fixture = await connectedCoreHosts(
+    {},
+    { slow: provider.run },
+    () => undefined,
+    undefined,
+    (error) => reports.push(error)
+  )
+  try {
+    /** The original call stays active until a genuine incoming cancellation or retirement aborts it. */
+    const pending = fixture.a.memory.send('b', 'slow', null, { timeout: false })
+    void pending.catch(() => undefined)
+    await provider.started.promise
+    /** Borrow the real admitted call once; no fixture parser or replacement request is created. */
+    const call = fixture.pair[0].written.find((frame) => frame.kind === RpcWireKind.call)
+    expect(call?.kind).toBe(RpcWireKind.call)
+    /** The malformed portable bytes and every original error scalar remain literal peer input. */
+    const reasonGraph = {
+      root: 0,
+      nodes: [
+        {
+          source: 'peer',
+          code: 'STOP',
+          name: 'Error',
+          message: 'stop',
+          stack: 'peer-stack',
+          data: { $rpc: 'bytes', base64url: '!' }
+        }
+      ]
+    }
+    /** Raw native delivery reaches the sole real codec without a serializer repairing bad data. */
+    await fixture.pair[0].write({
+      kind: 'message',
+      data: {
+        profile: RpcWireProfile,
+        kind: RpcWireKind.cancel,
+        id: call!.id,
+        task: call!.task,
+        route: call!.route,
+        reason: reasonGraph
+      }
+    })
+    /** Keep each original error oracle even when another one exposes the first real regression. */
+    const reason = await provider.aborted.promise
+    expect.soft(reason).toBeInstanceOf(TypeError)
+    expect.soft(reason).toMatchObject({ code: 'INVALID_WIRE_ERROR', violation: 'dataPortable' })
+    expect.soft((reason as { readonly cause?: unknown } | undefined)?.cause).toMatchObject({
+      code: 'INVALID_ENVELOPE'
+    })
+    /** Only real configured provider diagnostics count; a visible cancel frame cannot pass this. */
+    await vi.waitFor(() =>
+      expect(
+        reports.filter(
+          (error) =>
+            error !== null &&
+            typeof error === 'object' &&
+            'code' in error &&
+            error.code === 'PROTOCOL_INVALID'
+        )
+      ).toHaveLength(1)
+    )
+  } finally {
+    await fixture.close()
+  }
+})
