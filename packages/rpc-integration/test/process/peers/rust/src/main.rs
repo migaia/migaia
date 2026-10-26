@@ -1118,7 +1118,23 @@ fn handshake(
                     .any(|version| safe_integer(value(version, "major")) == Some(2))
                     || !items(value(&remote, "requiredExtensions")).is_empty()
                 {
-                    return Err(invalid("HANDSHAKE_INCOMPATIBLE"));
+                    write_frame(
+                        output,
+                        &object(&[
+                            ("profile", string(PROFILE)),
+                            ("kind", string("handshake")),
+                            ("step", string("reject")),
+                            (
+                                "error",
+                                wire_error(
+                                    "rpc.contract",
+                                    "HANDSHAKE_INCOMPATIBLE",
+                                    "rpc handshake incompatible",
+                                ),
+                            ),
+                        ]),
+                    )?;
+                    return Err(invalid("HANDSHAKE_INVALID"));
                 }
                 if local_id > remote_id {
                     let mut accepted = accept(local);
