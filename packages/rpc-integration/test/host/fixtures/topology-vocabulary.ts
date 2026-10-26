@@ -127,6 +127,9 @@ export function binaryPattern(length: number): Uint8Array {
 /** Portable copy of one forward or message probe event. */
 export type ITopologyProbeEvent = Readonly<{
   stage: RpcProbeStage
+  /** Public interaction kind and message identity pair stream creation with its actual settlement. */
+  kind: number
+  messageId: string
   direction: RpcProbeDirection
   outcome: RpcProbeOutcome
   hop: number
@@ -164,6 +167,8 @@ export class TopologyRecorder {
   static #copy(view: IRpcProbeEventView): ITopologyProbeEvent {
     return {
       stage: view.stage as RpcProbeStage,
+      kind: view.kind,
+      messageId: view.messageId ?? '',
       direction: view.direction as RpcProbeDirection,
       outcome: view.outcome as RpcProbeOutcome,
       hop: view.hop,

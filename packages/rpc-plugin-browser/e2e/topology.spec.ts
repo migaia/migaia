@@ -3,9 +3,11 @@
  * dedicated worker through the top window, and one tab calls another through a SharedWorker hub.
  */
 import { expect, test, type Frame, type Page } from '@playwright/test'
+import { RpcProbeKind, RpcProbeOutcome } from '@migaia/rpc-contract/interfaces'
 import {
   Topology,
-  type ITopologyLeafSnapshot
+  type ITopologyLeafSnapshot,
+  type ITopologyProbeEvent
 } from '../../rpc-integration/test/host/fixtures/topology-vocabulary.ts'
 import { BrowserTopology } from './browser-peer/topology-names.ts'
 
@@ -24,9 +26,11 @@ type IForwardRow = Readonly<{ outcome: number; hop: number; route: readonly stri
 /** T2 separates both forwarding hosts' observations from the SharedWorker leaf's business counters. */
 type INestedInspection = Readonly<{
   forward: readonly IForwardRow[]
+  messages: readonly ITopologyProbeEvent[]
   auth: Readonly<{ signed: number; verified: number }>
   intermediate: Readonly<{
     forward: readonly IForwardRow[]
+    messages: readonly ITopologyProbeEvent[]
     auth: Readonly<{ signed: number; verified: number }>
   }>
   worker: ITopologyLeafSnapshot
@@ -60,6 +64,27 @@ function run<T>(frame: Frame, operation: string, argument?: unknown): Promise<T>
       (globalThis.topologyFrame[name as string] as (input?: unknown) => Promise<unknown>)(value),
     [operation, argument] as const
   ) as Promise<T>
+}
+
+/** Match each forwarding consumer's public creation with its terminal event in one linear pass. */
+function streamCompletion(events: readonly ITopologyProbeEvent[]) {
+  /** Only owner-local creation and settlement count; physical copies do not inflate the totals. */
+  const opened = new Set<string>()
+  /** Terminal message identities come from the same public probe owner as creation. */
+  const ended = new Set<string>()
+  for (const event of events) {
+    if (event.kind === RpcProbeKind.streamOpen && event.outcome === RpcProbeOutcome.created)
+      opened.add(event.messageId)
+    if (
+      event.kind === RpcProbeKind.streamClose &&
+      (event.outcome === RpcProbeOutcome.settled || event.outcome === RpcProbeOutcome.failed)
+    )
+      ended.add(event.messageId)
+  }
+  /** Unmatched public lifecycle events disclose outstanding streams without a private table hook. */
+  let unmatched = 0
+  for (const id of opened) if (!ended.has(id)) unmatched += 1
+  return { opened: opened.size, ended: ended.size, unmatched }
 }
 
 test.describe('iframe calls the top window dedicated worker through the top window', () => {
@@ -260,6 +285,30 @@ test.describe('iframe reaches a SharedWorker through window and dedicated worker
     await expect
       .poll(async () => (await run<INestedInspection>(frame, 'inspect')).worker.streamsFinalized)
       .toBe(1)
+    /** Both forwarding hosts expose the consumer's real stream start and terminal settlement. */
+    await expect
+      .poll(async () => {
+        /** Snapshots copy the existing public probe fields; no private stream state is read. */
+        const observed = await run<INestedInspection>(frame, 'inspect')
+        return {
+          window: streamCompletion(observed.messages),
+          dedicatedWorker: streamCompletion(observed.intermediate.messages)
+        }
+      })
+      .toEqual({
+        window: { opened: 1, ended: 1, unmatched: 0 },
+        dedicatedWorker: { opened: 1, ended: 1, unmatched: 0 }
+      })
+    /** Preserve the actual public evidence with the existing Playwright artifact mechanism. */
+    const streams = await run<INestedInspection>(frame, 'inspect')
+    await test.info().attach('t2-stream-hop-events', {
+      body: JSON.stringify({
+        window: streamCompletion(streams.messages),
+        dedicatedWorker: streamCompletion(streams.intermediate.messages),
+        leaf: { opened: streams.worker.streamsOpened, finalized: streams.worker.streamsFinalized }
+      }),
+      contentType: 'application/json'
+    })
     /** Cancellation of the scalar call reaches the SharedWorker's own context signal. */
     const aborted = await run<ISettled>(frame, 'abort')
     expect(aborted.error).toBeDefined()

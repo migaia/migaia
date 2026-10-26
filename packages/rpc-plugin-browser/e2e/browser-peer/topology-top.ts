@@ -97,6 +97,7 @@ async function openTop(): Promise<IRpcHost> {
     provide: {
       [Topology.inspect]: async () => ({
         forward: recorder.snapshot().filter((event) => event.stage === RpcProbeStage.forward),
+        messages: recorder.snapshot().filter((event) => event.stage === RpcProbeStage.message),
         auth: authCounter.snapshot(),
         worker: await (
           await opening
