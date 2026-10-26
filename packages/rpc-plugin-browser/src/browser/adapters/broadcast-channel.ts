@@ -16,7 +16,7 @@ export class BroadcastRouteIO implements IRpcMessageIO {
   /** Real selected-route metadata shares the same detail across native sends and receives. */
   readonly #metadata: IBrowserObservationMetadata = { rejectedSource: 0 }
   /** All outgoing frames pass the actual native channel owner's existing route selector. */
-  readonly #send: (value: unknown, options?: IRpcCarrierWriteOptions) => void
+  readonly #send: (value: unknown, options?: IRpcCarrierWriteOptions) => void | Promise<void>
   /** Native route retirement releases this exact record without following successor membership. */
   readonly #release: () => void
   /** SDK's single frame callback receives original selected native payloads. */
@@ -27,7 +27,7 @@ export class BroadcastRouteIO implements IRpcMessageIO {
   #error: ((error: unknown) => void) | undefined
   /** Retain original native dispatch without borrowing another codec or listener registry. */
   constructor(
-    send: (value: unknown, options?: IRpcCarrierWriteOptions) => void,
+    send: (value: unknown, options?: IRpcCarrierWriteOptions) => void | Promise<void>,
     release: () => void,
     report: (error: unknown) => void
   ) {
@@ -47,8 +47,8 @@ export class BroadcastRouteIO implements IRpcMessageIO {
     value: unknown,
     _transfer?: readonly ArrayBuffer[],
     options?: IRpcCarrierWriteOptions
-  ): void {
-    this.#send(value, options)
+  ): void | Promise<void> {
+    return this.#send(value, options)
   }
   /** These one-owner slots are installed and removed by the shared SDK carrier. */
   onMessage(listener: (value: unknown) => void): () => void {

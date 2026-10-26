@@ -1,5 +1,6 @@
 /** Adapts one borrowed ordered RTC channel to native text message IO for the shared SDK carrier. */
 import { BrowserPeerEvent, BrowserNativeState } from '../peer-text.js'
+import { inspectThenable, assimilateCapturedThen } from '@migaia/utils/function'
 import {
   createRpcMessageCarrier,
   RpcJsonCarrierCodec,
@@ -111,11 +112,27 @@ class RtcMessageIO implements IRpcMessageIO {
     value: unknown,
     _transfer?: readonly ArrayBuffer[],
     options?: IRpcCarrierWriteOptions
-  ): void {
+  ): void | Promise<void> {
     if (this.#ended) throw this.#reason
     /** This shell is the actual admitted media frame produced by SDK, not untrusted business data. */
     const frame = value as IRpcCarrierFrame & { data: string }
-    options?.onWriteStart?.()
+    /** Only an actual async seal waits; ordinary callbacks keep the immediate native send. */
+    const started: unknown = options?.onWriteStart?.()
+    /** Admit the original then method once without replacing callback failures. */
+    const inspection = inspectThenable(started)
+    if ('error' in inspection) throw inspection.error
+    if (inspection.then) {
+      /** This operation borrows the same already-admitted text frame until handoff. */
+      const operation = { owner: this, frame }
+      return assimilateCapturedThen<void>(inspection.then, started).then(() => {
+        if (operation.owner.#ended) throw operation.owner.#reason
+        operation.owner.#sendNative(operation.frame)
+      })
+    }
+    this.#sendNative(frame)
+  }
+  /** Actual RTC state and original text remain the sole physical send authority. */
+  #sendNative(frame: IRpcCarrierFrame & { data: string }): void {
     emitBrowserObservation(this.observation, this.#metadata, RpcProbeDirection.outbound, frame.data)
     this.#channel.send(frame.data)
   }

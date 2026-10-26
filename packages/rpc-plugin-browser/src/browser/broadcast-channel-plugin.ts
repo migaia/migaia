@@ -1,5 +1,6 @@
 /** Owns native BroadcastChannel discovery and participant routes while Host owns RPC sessions. */
 import { BrowserPeerEvent } from './peer-text.js'
+import { inspectThenable, assimilateCapturedThen } from '@migaia/utils/function'
 import {
   defineTransportPlugin,
   createRpcMessageCarrier,
@@ -107,8 +108,33 @@ class BroadcastChannelListener {
     payload?: unknown,
     options?: IRpcCarrierWriteOptions,
     route?: BroadcastRouteIO
+  ): void | Promise<void> {
+    /** Native discovery remains synchronous; only an actual data-write seal is asynchronous. */
+    const started: unknown = options?.onWriteStart?.()
+    /** Preserve a returned thenable's original getter and receiver exactly once. */
+    const inspection = inspectThenable(started)
+    if ('error' in inspection) throw inspection.error
+    if (inspection.then) {
+      /** The asynchronous branch retains one explicit selected-route operation. */
+      const operation = { owner: this, kind, target, payload, route }
+      return assimilateCapturedThen<void>(inspection.then, started).then(() =>
+        operation.owner.#sendNative(
+          operation.kind,
+          operation.target,
+          operation.payload,
+          operation.route
+        )
+      )
+    }
+    this.#sendNative(kind, target, payload, route)
+  }
+  /** Build the same physical discovery shell only when its original handoff is admitted. */
+  #sendNative(
+    kind: IBroadcastFrame['kind'],
+    target?: string,
+    payload?: unknown,
+    route?: BroadcastRouteIO
   ): void {
-    options?.onWriteStart?.()
     /** Observation borrows the one actual native wrapper, never a reconstructed semantic frame. */
     const frame = {
       protocol: BroadcastChannelControl.protocol,

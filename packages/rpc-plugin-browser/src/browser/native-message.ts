@@ -3,6 +3,7 @@
  * state.
  */
 import { BrowserPeerEvent } from './peer-text.js'
+import { inspectThenable, assimilateCapturedThen } from '@migaia/utils/function'
 import {
   createRpcMessageCarrier,
   createRpcBackingDigest,
@@ -80,8 +81,27 @@ class BrowserMessageIO implements IRpcMessageIO {
     value: unknown,
     transfer?: readonly ArrayBuffer[],
     options?: IRpcCarrierWriteOptions
-  ): void => {
-    options?.onWriteStart?.()
+  ): void | Promise<void> => {
+    /** Void callbacks preserve this stack; only an actual asynchronous seal delays native send. */
+    const started: unknown = options?.onWriteStart?.()
+    /** One then read retains the callback's original receiver and failure identity. */
+    const inspection = inspectThenable(started)
+    if ('error' in inspection) throw inspection.error
+    if (inspection.then) {
+      /** Explicit write facts are retained only by the asynchronous continuation. */
+      const operation = { owner: this, value, transfer, options }
+      return assimilateCapturedThen<void>(inspection.then, started).then(() =>
+        operation.owner.#sendNative(operation.value, operation.transfer, operation.options)
+      )
+    }
+    this.#sendNative(value, transfer, options)
+  }
+  /** Readonly observation still borrows the original source's exact native write. */
+  #sendNative(
+    value: unknown,
+    transfer?: readonly ArrayBuffer[],
+    options?: IRpcCarrierWriteOptions
+  ): void {
     emitBrowserObservation(
       this.observation,
       this.#metadata,

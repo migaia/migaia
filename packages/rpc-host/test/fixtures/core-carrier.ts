@@ -1,5 +1,6 @@
 /** A test-only real carrier exercises public host and Session lifecycles through the same medium. */
 import { deferred, raceWithAbort, type IDeferred } from '@migaia/utils/promise'
+import { inspectThenable, assimilateCapturedThen } from '@migaia/utils/function'
 import type {
   IRpcCarrier,
   IRpcCarrierCodec,
@@ -145,7 +146,15 @@ export class MemoryCarrier implements IRpcCarrier {
           : [this.#controller.signal]
       })
     if (this.#controller.signal.aborted) throw this.#controller.signal.reason
-    options?.onWriteStart?.()
+    /** The real medium waits only when the original handoff callback actually returns a thenable. */
+    const started: unknown = options?.onWriteStart?.()
+    /** Void handoff keeps the original synchronous observation and delivery path. */
+    const inspection = inspectThenable(started)
+    if ('error' in inspection) throw inspection.error
+    if (inspection.then) {
+      await assimilateCapturedThen<void>(inspection.then, started)
+      if (this.#controller.signal.aborted) throw this.#controller.signal.reason
+    }
     this.observation.emit(RpcProbeDirection.outbound, frame, options?.transfer)
     this.trace.push(`write:${message?.kind ?? frame.kind}`)
     if (message) this.written.push(message)

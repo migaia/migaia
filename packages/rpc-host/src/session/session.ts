@@ -8,6 +8,7 @@ import {
   type ITimeoutOperation
 } from '@migaia/utils/promise'
 import { UtilsAbortError, UtilsTimeoutError, attachSecondaryErrors } from '@migaia/utils/error'
+import { inspectThenable, assimilateCapturedThen } from '@migaia/utils/function'
 import type { IScheduledTask } from '@migaia/utils/scheduler'
 import {
   RpcProbeStage as S,
@@ -1148,7 +1149,16 @@ export class Session {
       options.onWriteStart &&
       (() => {
         try {
-          options.onWriteStart!()
+          /** Void callbacks retain their synchronous handoff; only actual async sealing waits. */
+          const result: unknown = options.onWriteStart!()
+          /** Inspect once so a user then getter cannot replace its original failure. */
+          const inspection = inspectThenable(result)
+          if ('error' in inspection) throw inspection.error
+          if (inspection.then)
+            return assimilateCapturedThen<void>(inspection.then, result).catch((error) => {
+              admission = { error }
+              throw error
+            })
         } catch (error) {
           admission = { error }
           throw error
@@ -1157,10 +1167,11 @@ export class Session {
     try {
       await this.#options.carrier.write(frame, { ...options, onWriteStart })
     } catch (cause) {
+      if (admission) throw admission.error
       if (
         bootstrap ||
-        isRpcCarrierAdmissionFailure(cause) ||
-        (admission && cause === admission.error) ||
+        (isRpcCarrierAdmissionFailure(cause) &&
+          safeRead(cause, 'code') !== RpcContractErrorCode.frameLimitExceeded) ||
         isLocalRpcError(cause, RpcLifecycleError)
       )
         throw cause

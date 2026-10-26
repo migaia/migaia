@@ -34,9 +34,14 @@ import {
   type IRpcPortableValue
 } from '@migaia/rpc-contract/protocol'
 import { RpcStreamEvent } from '@migaia/rpc-contract'
-import { RPC_ENDPOINT_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
+import {
+  RPC_ENDPOINT_ERROR_SOURCE,
+  RpcCoreErrorCode,
+  RpcContractErrorCode
+} from '@migaia/rpc-contract/error-code'
 import {
   RpcCoreErrorText,
+  RpcTransportError,
   RuntimeApiErrorText,
   identifyRpcBoundaryFailure,
   safeRead
@@ -52,6 +57,7 @@ import {
   createRpcRemoteError,
   createRpcSerializationError,
   createRpcTimeoutError,
+  isLocalRpcError,
   localRpcErrorCode
 } from '../host/error-owner.js'
 import {
@@ -65,6 +71,7 @@ import { readProviderCommitGate, readProviderPreflight } from './catalog.js'
 import { completeProviderReturn } from './return.js'
 import { RpcFlowPoint } from '../sdk/flow-pipelines.js'
 import type { IProviderOrderReceipt, ProviderOrdering } from './ordering.js'
+import { isRpcCarrierAdmissionFailure } from '../sdk/carrier/admission.js'
 import type {
   IProviderCommitGate,
   IProviderDispatcherOptions,
@@ -225,6 +232,8 @@ export class ProviderInvocation {
     this.#observe(RpcProbeOutcome.received)
     /** Reply-bearing failures report their original error only after the physical response settles. */
     let failed: { error: unknown } | undefined
+    /** A group result seals only after its sole encoded/protected physical admission. */
+    let reply: IRpcCompletion | undefined
     try {
       /** A late native source cannot enter any business stage before its own atomic commit. */
       const sourceWaiting = this.#waitForGate(this.#input.sourceGate)
@@ -271,13 +280,13 @@ export class ProviderInvocation {
         return
       }
       this.#transfer = outcome.transfer
-      this.#finish(
-        this.#cancelled() ?? {
-          ok: true,
-          ...(outcome.value === undefined ? {} : { result: outcome.value })
-        },
-        { outcome: RpcProbeOutcome.settled }
-      )
+      /** Retain this existing computed outcome locally, without creating a second terminal cache. */
+      const completion = this.#cancelled() ?? {
+        ok: true as const,
+        ...(outcome.value === undefined ? {} : { result: outcome.value })
+      }
+      if (this.#input.envelope.kind === RpcWireKind.group && completion.ok) reply = completion
+      else this.#finish(completion, { outcome: RpcProbeOutcome.settled })
     } catch (error) {
       if (this.#oneWay()) this.#input.ports.report(error)
       else failed = { error }
@@ -288,9 +297,9 @@ export class ProviderInvocation {
     } finally {
       this.#streamContext?.finish()
       /** The producer Promise includes iterator.return and all outstanding writes. */
-      if (!this.#settled) this.#finish(this.#cancelled() ?? { ok: true })
+      if (!this.#settled && !reply) this.#finish(this.#cancelled() ?? { ok: true })
     }
-    await this.#respond()
+    await this.#respond(reply)
     if (failed) this.#input.ports.report(failed.error)
     this.#waitingGate = undefined
   }
@@ -626,11 +635,15 @@ export class ProviderInvocation {
   }
 
   /** A reply is sent only after its actual physical Promise fulfills. */
-  async #send(envelope: IRpcEnvelope, transfer?: readonly ArrayBuffer[]): Promise<void> {
+  async #send(
+    envelope: IRpcEnvelope,
+    transfer?: readonly ArrayBuffer[],
+    onWriteStart?: () => void
+  ): Promise<void> {
     await this.#input.ports.send(
       this.#input.source.carrierId,
       envelope,
-      { transfer },
+      { transfer, onWriteStart },
       this.#input.targetSource
     )
     this.#observe(RpcProbeOutcome.sent, undefined, envelope, RpcProbeDirection.outbound)
@@ -675,10 +688,13 @@ export class ProviderInvocation {
   }
 
   /** Ordinary notify adds no ACK; request/group and existing refusals carry their original terminal. */
-  async #respond(): Promise<void> {
-    if (this.#detached || this.#oneWay()) return
+  async #respond(candidate?: IRpcCompletion): Promise<void> {
+    if (this.#detached || this.#oneWay()) {
+      if (candidate) this.#finish(candidate)
+      return
+    }
     /** This is the actual completed operation, not a snapshot taken when cancellation arrived. */
-    const completion = await this.completion
+    const completion = candidate ?? (await this.completion)
     /** Reply routing echoes the selected task and original immediate caller. */
     const self = this.#input.ports.self()
     /** No inherited budget is refreshed by the response path. */
@@ -734,10 +750,43 @@ export class ProviderInvocation {
               ...(completion.result === undefined ? {} : { result: completion.result })
             }
           : { ...common, kind: RpcWireKind.error, error: completion.error },
-        completion.ok ? this.#transfer : undefined
+        completion.ok ? this.#transfer : undefined,
+        candidate ? () => this.#sealReply(candidate) : undefined
       )
     } catch (error) {
-      this.#input.ports.report(error)
+      /** Ordinary writes keep their original transport wrapper; only this exact owner lends cause. */
+      const admission = isLocalRpcError(error, RpcTransportError) ? error.cause : error
+      if (
+        candidate &&
+        !this.#settled &&
+        isRpcCarrierAdmissionFailure(admission) &&
+        safeRead(admission, 'code') === RpcContractErrorCode.frameLimitExceeded
+      ) {
+        /** Only the genuine packing owner can mint this failure; public labels alone are inert. */
+        const failure = createRpcSerializationError(
+          RpcCoreErrorText.runtimeGroupResultTooLarge,
+          error
+        )
+        registerLocalErrorWireSummary(
+          failure,
+          RpcCoreErrorCode.payloadInvalid,
+          RpcCoreErrorText.runtimeGroupResultTooLarge,
+          { preserveSerializedError: true }
+        )
+        this.#finish(this.#failure(failure))
+        /** The bounded compact reply has no candidate and cannot reenter the success admission. */
+        await this.#respond()
+        this.#input.ports.report(failure)
+      } else this.#input.ports.report(error)
+    } finally {
+      /** Authentication or genuine IO refusal cannot rewrite an already completed business result. */
+      if (candidate && !this.#settled) this.#finish(candidate)
     }
+  }
+
+  /** Existing completion subscribers seal the original store before the physical writer resumes. */
+  #sealReply(completion: IRpcCompletion): Promise<void> {
+    this.#finish(completion)
+    return this.completion.then(() => undefined)
   }
 }

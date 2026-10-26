@@ -5,6 +5,8 @@
  */
 import { RpcCarrierFrameKind as K } from '@migaia/rpc-contract/protocol'
 import { deferred, type IAbortSignal } from '@migaia/utils/promise'
+import { inspectThenable, assimilateCapturedThen } from '@migaia/utils/function'
+import { attachSecondaryErrors } from '@migaia/utils/error'
 import { createRpcAbortError } from '../../host/error-owner.js'
 import {
   RpcBatchExtension,
@@ -163,18 +165,46 @@ export class RpcBatchLane {
   }
 
   /** Recheck every member before invoking any original started callback at physical handoff. */
-  #start(entries: readonly IRpcBatchEntry[]): void {
+  #start(entries: readonly IRpcBatchEntry[]): void | Promise<void> {
     if (this.#closed) throw this.#reason
     if (entries.some((entry) => entry.cancelled || entry.signal.aborted)) {
       if (entries.length > 1) throw RpcBatchAdmissionChanged
       throw createRpcAbortError(undefined, undefined, entries[0]!.signal.reason)
     }
-    for (const entry of entries) {
-      if (entry.started) continue
-      entry.started = true
-      entry.remove()
-      entry.write?.onWriteStart?.()
+    /** Only asynchronous member admission allocates a join; ordinary handoff stays synchronous. */
+    let pending: Promise<void>[] | undefined
+    try {
+      for (const entry of entries) {
+        if (entry.started) continue
+        entry.started = true
+        entry.remove()
+        /** Each original member seals once at the same coalesced physical handoff. */
+        const result: unknown = entry.write?.onWriteStart?.()
+        /** Preserve the callback's actual then method instead of reading a user getter twice. */
+        const inspection = inspectThenable(result)
+        if ('error' in inspection) throw inspection.error
+        if (inspection.then)
+          (pending ??= []).push(assimilateCapturedThen<void>(inspection.then, result))
+      }
+    } catch (primary) {
+      if (!pending) throw primary
+      /** A later synchronous failure still joins already-started callbacks without replacing it. */
+      return this.#joinStart(pending, { error: primary })
     }
+    if (pending) return this.#joinStart(pending)
+  }
+
+  /** Every started seal settles before native handoff; exact primary and secondary leaves survive. */
+  #joinStart(
+    pending: readonly Promise<void>[],
+    primary?: Readonly<{ error: unknown }>
+  ): Promise<void> {
+    return Promise.allSettled(pending).then((results) => {
+      /** Original member order determines the retained secondary failure order. */
+      const failures: unknown[] = primary ? [primary.error] : []
+      for (const result of results) if (result.status === 'rejected') failures.push(result.reason)
+      if (failures.length) throw attachSecondaryErrors(failures[0], failures.slice(1))
+    })
   }
 
   /** One aggregate failure retains the original native identity for every logical member. */

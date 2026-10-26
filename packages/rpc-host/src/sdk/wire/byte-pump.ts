@@ -4,6 +4,7 @@
  * cleanup ports are borrowed, with raw observations emitted only at the actual read/write points.
  */
 import { deferred } from '@migaia/utils/promise'
+import { inspectThenable, assimilateCapturedThen } from '@migaia/utils/function'
 import {
   RpcProbeDirection,
   type IRpcCarrierObservation,
@@ -81,7 +82,24 @@ export class RpcBytePump {
   /** Preserve the original physical write, options identity and observation-before-handoff order. */
   readonly #write = (chunk: Uint8Array, options?: IRpcCarrierWriteOptions): Promise<void> => {
     if (this.#closed) return Promise.reject(this.#terminal)
-    options?.onWriteStart?.()
+    /** A void handoff keeps native write in this stack; only an actual seal is awaited. */
+    const started: unknown = options?.onWriteStart?.()
+    /** One captured then method preserves the original callback failure. */
+    const inspection = inspectThenable(started)
+    if ('error' in inspection) throw inspection.error
+    if (inspection.then) {
+      /** The asynchronous branch alone retains a per-write continuation context. */
+      const operation = { owner: this, chunk, options }
+      return assimilateCapturedThen<void>(inspection.then, started).then(() => {
+        if (operation.owner.#closed) throw operation.owner.#terminal
+        return operation.owner.#writeNative(operation.chunk, operation.options)
+      })
+    }
+    return this.#writeNative(chunk, options)
+  }
+
+  /** The same native writer and original options retain physical completion ownership. */
+  #writeNative(chunk: Uint8Array, options?: IRpcCarrierWriteOptions): Promise<void> {
     this.#ports.options.observation?.emit(RpcProbeDirection.outbound, chunk, options?.transfer)
     return this.#ports.writer.write(chunk, options)
   }

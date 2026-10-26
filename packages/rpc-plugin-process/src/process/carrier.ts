@@ -3,6 +3,7 @@
  * SDK carrier boundary. Host retains semantic handshake, pending calls and provider execution.
  */
 import { deferred } from '@migaia/utils/promise'
+import { inspectThenable, assimilateCapturedThen } from '@migaia/utils/function'
 import {
   createRpcByteCarrier,
   createRpcMessageCarrier,
@@ -263,7 +264,23 @@ function runProcessMessageWrite(operation: IProcessMessageOperation): Promise<vo
 function writeProcessMessage(operation: IProcessMessageOperation): Promise<void> {
   /** These are the same original callback and remaining options used before this owner move. */
   const { onWriteStart, ...physical } = operation.write ?? {}
-  onWriteStart?.()
+  /** Native queue admission has already occurred; only a real asynchronous seal delays send. */
+  const started: unknown = onWriteStart?.()
+  /** Capturing then once preserves hostile getter and callback primary identities. */
+  const inspection = inspectThenable(started)
+  if ('error' in inspection) throw inspection.error
+  if (inspection.then)
+    return assimilateCapturedThen<void>(inspection.then, started).then(() =>
+      handoffProcessMessage(operation, physical)
+    )
+  return handoffProcessMessage(operation, physical)
+}
+
+/** The original observation and native send occur together after the existing handoff callback. */
+function handoffProcessMessage(
+  operation: IProcessMessageOperation,
+  physical: IRpcCarrierWriteOptions
+): Promise<void> {
   operation.observation.emit(RpcProbeDirection.outbound, operation.value, operation.transfer)
   return writeProcessFrame(() =>
     operation.raw.send(

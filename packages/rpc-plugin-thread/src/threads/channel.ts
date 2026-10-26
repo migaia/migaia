@@ -28,6 +28,7 @@ import { ThreadErrorText } from './error-text.js'
 import type { IThreadNodePort } from './runtime-types.js'
 import type { IThreadWebPort } from './types.js'
 import { ThreadEvent } from './constants.js'
+import { inspectThenable, assimilateCapturedThen } from '@migaia/utils/function'
 
 /** Both original native postMessage surfaces expose one direct, whole-message port. */
 const threadCarrierFacts = Object.freeze({
@@ -72,8 +73,24 @@ class ThreadNativeIO implements IRpcMessageIO {
     value: unknown,
     transfer?: readonly ArrayBuffer[],
     options?: IRpcCarrierWriteOptions
-  ): void => {
-    options?.onWriteStart?.()
+  ): void | Promise<void> => {
+    /** Only an actual asynchronous seal moves handoff out of this original stack. */
+    const started: unknown = options?.onWriteStart?.()
+    /** Capturing then once preserves user callback and getter failure identity. */
+    const inspection = inspectThenable(started)
+    if ('error' in inspection) throw inspection.error
+    if (inspection.then) {
+      /** This explicit context is retained only while an asynchronous seal is pending. */
+      const operation = { owner: this, value, transfer }
+      return assimilateCapturedThen<void>(inspection.then, started).then(() =>
+        operation.owner.#sendNative(operation.value, operation.transfer)
+      )
+    }
+    this.#sendNative(value, transfer)
+  }
+
+  /** Observation remains adjacent to the same native postMessage and exact transfer list. */
+  #sendNative(value: unknown, transfer?: readonly ArrayBuffer[]): void {
     this.#observe(RpcProbeDirection.outbound, value, transfer)
     this.#binding.port.postMessage(value, transfer)
   }

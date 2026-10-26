@@ -4,6 +4,7 @@
  * grace until its actual error, close or finish event retires them.
  */
 import { deferred } from '@migaia/utils/promise'
+import { inspectThenable, assimilateCapturedThen } from '@migaia/utils/function'
 import type { IRpcByteIO } from './byte-pump.js'
 import { RpcProbeDirection, type IRpcCarrierWriteOptions } from '@migaia/rpc-contract/interfaces'
 import type { RpcCarrierObservation } from '../carrier/observation.js'
@@ -166,16 +167,49 @@ export class RpcEventByteIO {
   /** Native callbacks settle writes; drain remains an independent optional observation. */
   readonly #write = (chunk: Uint8Array, options?: IRpcCarrierWriteOptions): Promise<void> => {
     if (this.#closed) return Promise.reject(this.#terminal)
+    try {
+      /** Capture the exact observer installation before the original callback can replace it. */
+      const observer = this.#writeObserver
+      /** A later observer cannot inherit this physical write's drain receipt. */
+      const generation = this.#writeGeneration
+      /** Preserve the original observation start point without reading clocks on unobserved writes. */
+      const started = observer === undefined ? 0 : performance.now()
+      /** The original handoff callback may lend a seal; void observers stay synchronous. */
+      const admitted: unknown = options?.onWriteStart?.()
+      /** Read an actual thenable once before borrowing its original continuation. */
+      const inspection = inspectThenable(admitted)
+      if ('error' in inspection) throw inspection.error
+      if (inspection.then) {
+        /** Only an asynchronous seal retains this explicit physical write context. */
+        const operation = { owner: this, chunk, options, observer, generation, started }
+        return assimilateCapturedThen<void>(inspection.then, admitted).then(() => {
+          if (operation.owner.#closed) throw operation.owner.#terminal
+          return operation.owner.#writeNative(
+            operation.chunk,
+            operation.options,
+            operation.observer,
+            operation.generation,
+            operation.started
+          )
+        })
+      }
+      return this.#writeNative(chunk, options, observer, generation, started)
+    } catch (error) {
+      return Promise.reject(error)
+    }
+  }
+
+  /** Native write callbacks and drain ownership begin only after the existing handoff admits. */
+  #writeNative(
+    chunk: Uint8Array,
+    options: IRpcCarrierWriteOptions | undefined,
+    observer: ((chunk: Uint8Array, drainMs: number) => void) | undefined,
+    generation: number,
+    started: number
+  ): Promise<void> {
     /** One native callback settles this operation; construction failures keep Promise rejection. */
     const completion = deferred<void>()
     try {
-      /** Capture the exact installation before native write can synchronously emit events. */
-      const observer = this.#writeObserver
-      /** Stale drain callbacks cannot be retargeted to a later installation. */
-      const generation = this.#writeGeneration
-      /** Unobserved writes do not read the clock. */
-      const started = observer === undefined ? 0 : performance.now()
-      options?.onWriteStart?.()
       this.#ports.options.observation?.emit(RpcProbeDirection.outbound, chunk, options?.transfer)
       /** Inspect only the native return value; retain the original completion callback. */
       const accepted = this.#ports.writer.write(chunk, (error) => {

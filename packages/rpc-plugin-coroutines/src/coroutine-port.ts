@@ -18,6 +18,7 @@ import {
 } from '@migaia/rpc-contract/interfaces'
 import type { ICoroutineMessagePort } from './coroutine-task.js'
 import { CoroutineText } from './error-text.js'
+import { inspectThenable, assimilateCapturedThen } from '@migaia/utils/function'
 
 /** Native EventTarget receiver adaptation owns activation only; the SDK owns capture and codec IO. */
 export class CoroutinePort implements IRpcMessageIO {
@@ -40,8 +41,27 @@ export class CoroutinePort implements IRpcMessageIO {
     )
   }
   /** Native message identity and the caller's original transfer list stay unchanged. */
-  send(value: unknown, transfer?: readonly ArrayBuffer[], options?: IRpcCarrierWriteOptions): void {
-    options?.onWriteStart?.()
+  send(
+    value: unknown,
+    transfer?: readonly ArrayBuffer[],
+    options?: IRpcCarrierWriteOptions
+  ): void | Promise<void> {
+    /** Original void callbacks keep the native synchronous handoff path. */
+    const started: unknown = options?.onWriteStart?.()
+    /** Capture actual asynchronous admission without rereading its then getter. */
+    const inspection = inspectThenable(started)
+    if ('error' in inspection) throw inspection.error
+    if (inspection.then) {
+      /** Only a pending seal retains these original native write facts. */
+      const operation = { owner: this, value, transfer }
+      return assimilateCapturedThen<void>(inspection.then, started).then(() =>
+        operation.owner.#sendNative(operation.value, operation.transfer)
+      )
+    }
+    this.#sendNative(value, transfer)
+  }
+  /** Task-owned ports and exact transfer lists remain the only native physical authority. */
+  #sendNative(value: unknown, transfer?: readonly ArrayBuffer[]): void {
     this.observation.emit(RpcProbeDirection.outbound, value, transfer)
     this.#port.postMessage(value, transfer)
   }

@@ -6,6 +6,7 @@
 import { isUint8Array } from '@migaia/utils/bytes'
 import { createContractError, type IRpcErrorWireMetadata } from '@migaia/rpc-contract/errors'
 import { RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
+import { markRpcCarrierAdmissionFailure } from '../carrier/admission.js'
 
 /** Maximum payload carried by one native process frame. */
 export const RPC_STREAM_MAX_FRAME_BYTES = 16 * 1024 * 1024
@@ -45,7 +46,9 @@ export function encodeRpcStreamFrame(
   if (!isUint8Array(payload) || payload.byteLength === 0)
     throw createContractError(RpcContractErrorCode.invalidFrame, undefined, errorMetadata)
   if (payload.byteLength > RPC_STREAM_MAX_FRAME_BYTES)
-    throw createContractError(RpcContractErrorCode.frameLimitExceeded, undefined, errorMetadata)
+    throw markRpcCarrierAdmissionFailure(
+      createContractError(RpcContractErrorCode.frameLimitExceeded, undefined, errorMetadata)
+    )
   /** One allocation keeps prefix and payload adjacent for a single physical write. */
   const framed = new Uint8Array(4 + payload.byteLength)
   new DataView(framed.buffer).setUint32(0, payload.byteLength, false)
