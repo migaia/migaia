@@ -42,20 +42,13 @@ describe('canonical child stdio replay registration', () => {
       const { channel, bootstrap } = await openProcessStdioChannel({ bootstrap: 'none' })
       expect(bootstrap).toBeUndefined()
       expect(construct).toHaveBeenCalledOnce()
-      expect(construct.mock.calls[0]).toEqual([process.stdin, process.stdout, expect.any(Function)])
-      const { bindNativeReplayTransport, claimNativeReplayTransport } =
-        await import('../../../rpc-host/dist/core/internal/native-replay.js')
-      /** The registration transfers provenance to one canonical transport identity. */
-      const transport = {
-        platform: 'Memory' as const,
-        send: () => undefined,
-        subscribe: () => () => undefined
-      }
-      bindNativeReplayTransport(channel, transport)
-      /** Represents the one privately registered byte-channel lifetime. */
-      const receipt = claimNativeReplayTransport(transport)!
-      expect(receipt.qualified).toBe(true)
-      /** Actual stream traffic remains intact after canonical registration. */
+      expect(construct.mock.calls[0]).toEqual([
+        process.stdin,
+        process.stdout,
+        expect.any(Function),
+        expect.any(Function)
+      ])
+      /** Actual traffic uses the canonical byte IO after private replay receipts were removed. */
       const received: Uint8Array[] = []
       /** Releases the test reader before closing the physical streams. */
       const remove = channel.onData((chunk) => received.push(chunk))
@@ -66,8 +59,8 @@ describe('canonical child stdio replay registration', () => {
       expect([...(writable.read() as Buffer)]).toEqual([4, 5])
       remove()
       await channel.close()
-      receipt.observeOwner()
-      expect(receipt.active).toBe(false)
+      expect(readable.destroyed).toBe(true)
+      expect(writable.destroyed).toBe(true)
       construct.mockImplementationOnce(() =>
         byteStreams.nodeByteStream(failingReadable, failingWritable, () => {
           failingReadable.destroy()
