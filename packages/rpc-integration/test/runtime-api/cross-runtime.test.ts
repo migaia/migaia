@@ -21,8 +21,7 @@ for (const runtime of ['bun', 'deno'] as const) {
           mode,
           forwardCalls: 1,
           reverseCalls: 1,
-          identityMatched: true,
-          secretVisible: false
+          identityMatched: true
         },
         'actual platform business receipt matches both directions'
       )

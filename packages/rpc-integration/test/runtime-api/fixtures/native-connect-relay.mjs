@@ -1,197 +1,89 @@
-import { processPlugin } from '@migaia/rpc-plugin-process'
-import { createRpcHost } from '@migaia/rpc-host'
 import assert from 'node:assert/strict'
+import { randomUUID } from 'node:crypto'
 import process from 'node:process'
-import { fileURLToPath } from 'node:url'
-import { defineHost } from '@migaia/plugin-host'
-import { systemScheduler } from '@migaia/utils/scheduler'
-import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
-import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
-import { threadProtocolDefinition as createThreadPlugin } from './thread-protocol.ts'
-import {
-  createAdapterWebThreadLauncher as createWebThreadLauncher,
-  createAdapterWebThreadChannelFactory as createWebThreadChannelFactory
-} from '../../../../rpc-plugin-thread/dist/threads/web-launcher.js'
-import { createBunProcessLauncher } from '../../../../rpc-plugin-process/dist/process/adapters/bun-spawn.js'
-import { createDenoProcessLauncher } from '../../../../rpc-plugin-process/dist/process/adapters/deno-command.js'
-
-import {
-  listenProcessByteChannel,
-  dialProcessByteChannel
-} from '../../../../rpc-plugin-process/dist/process/adapters/node-socket.js'
-import { RUNTIME_API_CAPABILITIES } from '../../../../rpc-host/dist/remote/runtime-api/constants.js'
+import { createRpcHost } from '@migaia/rpc-host'
+import { processPlugin } from '@migaia/rpc-plugin-process'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
 
 /** This entire graph runs in the requested runtime, including its actual native child. */
-const runtime = process.argv[2]
-/** The native final provider varies only its original process versus Worker source. */
-const mode = process.argv[3]
-/** Public fixture token is unrelated to any actual account or external endpoint. */
-const token = 'listener-public-token'
-/** Original Host and shared slot own both forwarding and the accepted listener connection. */
-const host = defineHost({
-  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
-})
-/** Only actual native resources acquired by this fixture are closed in finally. */
-let handle, client, address
-/** Listener readiness comes from its actual OS bind. */
-let sequence = 0
+const runtime = typeof Deno !== 'undefined' ? Deno.args[0] : process.argv[2]
+/** The native final provider varies only its process versus Worker source. */
+const mode = typeof Deno !== 'undefined' ? Deno.args[1] : process.argv[3]
+/** Same-user local endpoint name; the operating system isolates it to this user. */
+const address = 'relay-' + randomUUID()
 /** All operational failures remain visible with their full package classification. */
 const failures = []
-/** Existing report callback preserves error objects locally and exposes redacted fields on failure. */
-const report = (error) =>
+/** Expected unsupported-termination notices from the runtime launcher, kept apart from failures. */
+const notices = []
+/** Report callback keeps redacted classification of every reported failure. */
+const report = (error) => {
+  /** Bun and Deno launchers cannot guarantee tree termination; this notice is expected. */
+  if (error?.source === 'supervision' && error?.code === 'CAPABILITY_UNSUPPORTED') {
+    notices.push(error.code)
+    return
+  }
   failures.push({
     source: error?.source,
     code: error?.code,
     name: error?.name,
-    reason: error?.reason ?? error?.detail?.reason ?? null,
     message: String(error?.message ?? '').slice(0, 160)
   })
+}
+/** Only hosts constructed by this fixture are closed in finally. */
+let server, client
 try {
-  await host.use(
-    (mode === 'process' ? processPlugin : createThreadPlugin)({
-      name: 'c',
-      report,
-      spawn: async (context) => {
-        if (mode === 'thread') {
-          const launcher = createWebThreadLauncher({ runtimeApi: context, report })
-          handle = await launcher.launch(
-            {
-              entry: new URL('./runtime-api-worker.mjs', import.meta.url).href,
-              name: 'relay-child'
-            },
-            { signal: new AbortController().signal }
-          )
-          return createWebThreadChannelFactory({ scheduler: systemScheduler }).open(
-            handle,
-            new AbortController().signal
-          )
-        }
-        const launcher = (runtime === 'bun' ? createBunProcessLauncher : createDenoProcessLauncher)(
-          {
-            runtimeApiBootstrap: { name: 'relay-child', parentInstanceId: context.self.instanceId }
-          }
-        )
-        handle = await launcher.launch(
-          {
-            command: process.execPath,
-            args:
-              runtime === 'deno'
-                ? [
-                    'run',
-                    '-A',
-                    fileURLToPath(new URL('./runtime-api-process.mjs', import.meta.url))
-                  ]
-                : [fileURLToPath(new URL('./runtime-api-process.mjs', import.meta.url))],
-            env: { inherit: ['PATH'], set: {} },
-            stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },
-            bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }
-          },
-          { signal: new AbortController().signal, output: () => undefined }
-        )
-        return createProcessTransport(handle.channel, {
-          role: 'initiator',
-          peerId: handle.runtimeApiIdentity.instanceId,
-          offer: createNativeProcessOffer({
-            peer: { id: context.self.instanceId, runtime },
-            auth: token,
-            capabilities: context.capabilities
-          }),
-          ipc: { connectionId: 'relay-c', sessionId: 'relay-c', log: () => undefined },
-          report
+  /** The final native provider c; the server reaches it through its own namespace. */
+  const leaf =
+    mode === 'thread'
+      ? threadPlugin({
+          name: 'c',
+          spawn: { entry: new URL('./runtime-api-worker.mjs', import.meta.url) }
         })
-      }
-    })
-  )
-  await host.use(
-    processPlugin({
-      name: 'listener',
-      self: { name: 'relay-server', instanceId: 'relay-server' },
-      expose: ['c'],
-      report,
-      listen: {
-        kind: 'listener',
-        address: 'tcp://127.0.0.1:0',
-        listen: async (options) => {
-          const listener = await listenProcessByteChannel(options)
-          address = listener.address
-          return listener
-        },
-        verify: (auth) => {
-          assert.equal(auth, token)
-          return 'principal'
-        },
-        offer: createNativeProcessOffer({
-          peer: { id: 'relay-server', runtime },
-          capabilities: RUNTIME_API_CAPABILITIES
-        }),
-        createConnectionContext: () => ({
-          peerId: `client-${++sequence}`,
-          ipc: { connectionId: 'relay-in', sessionId: 'relay-in', log: () => undefined }
+      : processPlugin({
+          namespace: 'child',
+          name: 'c',
+          spawn: { entry: new URL('./runtime-api-process.mjs', import.meta.url) }
         })
-      }
-    })
-  )
-  /** A real public connect object reaches the original authenticated TCP listener. */
+  server = await createRpcHost({
+    self: { name: 'relay-server', instanceId: 'relay-server' },
+    plugins: [leaf, processPlugin({ listen: address })],
+    report
+  })
   client = await createRpcHost({
     self: { name: 'client', instanceId: 'client-1' },
     provide: { reverse: () => 9 },
-    report,
-    plugins: [
-      processPlugin({
-        connect: {
-          target: {
-            kind: 'connect',
-            address,
-            token,
-            dial: (path, signal) => dialProcessByteChannel({ address: path, signal }),
-            establish: (raw, options) =>
-              createProcessTransport(raw, {
-                role: 'initiator',
-                offer: options.offer,
-                peerId: 'relay-server',
-                scheduler: options.scheduler,
-                ipc: {
-                  connectionId: 'relay-client',
-                  sessionId: 'relay-client',
-                  log: () => undefined
-                },
-                report
-              })
-          }
-        }
-      })
-    ]
+    plugins: [processPlugin({ connect: { target: address, timeoutMs: 5000 } })],
+    report
   })
-  /** Both payload levels cross A-to-B and the actual compiled B-to-C forwarding owner. */
+  /** Both payload levels cross client-to-server and the server-to-c forwarding hop. */
   const payload = { marker: 'one-hop', nested: { value: mode } }
-  assert.equal(await client.request('c.binaryCount'), 0)
-  const value = await client.request('c.echo', payload)
+  assert.equal(await client.process.request('c.binaryCount'), 0)
+  /** Forwarded echo through the server to c. */
+  const value = await client.process.request('c.echo', payload)
   assert.equal(value.marker, payload.marker)
   assert.equal(value.nested.value, mode)
   assert.equal(
-    await client.request('c.binaryCount'),
+    await client.process.request('c.binaryCount'),
     1,
-    'final native business executes once through the original forward slot'
+    'final native business executes once through the forwarding hop'
   )
   assert.equal(
-    await host.process.request('client-1', 'reverse'),
+    await server.process.send('client', 'reverse'),
     9,
-    'accepted native listener preserves actual reverse business'
+    'accepted listener connection preserves reverse business'
   )
   assert.deepEqual(failures, [])
   console.log(
     JSON.stringify({
       runtime,
       mode,
-      cases: ['tcp-connect', 'authenticated-listen', 'actual-native-one-hop', 'reverse'],
+      cases: ['named-connect', 'named-listen', 'actual-native-one-hop', 'reverse'],
       effects: 1
     })
   )
 } finally {
   await client?.close()
-  await host.dispose()
-  handle?.terminate(mode === 'process' ? 'force' : undefined)
-  if (mode === 'process') await handle?.exited
+  await server?.close()
 }
 if (runtime === 'deno') Deno.exit(0)
 else process.exit(0)

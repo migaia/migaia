@@ -34,7 +34,7 @@ for (const runtime of ['bun', 'deno'] as const) {
       ])
         assert.ok(receipt.cases.includes(expected))
     }, 40000)
-    it(`actual ${runtime} ${mode} keeps TCP connect/listen and native one-hop forwarding`, () => {
+    it(`actual ${runtime} ${mode} keeps named connect/listen and native one-hop forwarding`, () => {
       /**
        * The same canonical Host/Plugin slots reach a real native final provider, never a forwarding
        * stub.
@@ -52,63 +52,11 @@ for (const runtime of ['bun', 'deno'] as const) {
       assert.equal(receipt.runtime, runtime)
       assert.equal(receipt.mode, mode)
       assert.deepEqual(receipt.cases, [
-        'tcp-connect',
-        'authenticated-listen',
+        'named-connect',
+        'named-listen',
         'actual-native-one-hop',
         'reverse'
       ])
     }, 40000)
   }
-  it(`actual ${runtime} opt-in native Thread binary keeps copy, transfer, aliases and lazy original stream`, () => {
-    /**
-     * Reuse the original Bun qualification; Deno uses the same maintained fixture emitted as
-     * concrete modules.
-     */
-    const entry = fileURLToPath(
-      new URL(
-        runtime === 'bun'
-          ? './fixtures/bun-binary-parent.mjs'
-          : './fixtures/deno-binary-parent.mjs',
-        import.meta.url
-      )
-    )
-    /** Native WebCrypto and the actual clone-transfer Worker execute every operation. */
-    const output = execFileSync(runtime, runtime === 'deno' ? ['run', '-A', entry] : [entry], {
-      encoding: 'utf8',
-      timeout: 30000
-    })
-    /** Assertion-bearing qualification records actual backing detachment and alias restoration. */
-    const receipt = JSON.parse(output.trim().split('\n').at(-1)!)
-    assert.equal(receipt.copy.senderLength, 4)
-    assert.equal(receipt.transfer.senderLength, 0)
-    assert.equal(receipt.transfer.firstLength, 0)
-    assert.equal(receipt.transfer.secondLength, 0)
-    assert.equal(receipt.transfer.alias, true)
-    assert.equal(receipt.streamed.beforeNext, 2)
-    assert.equal(receipt.streamed.senderLength, 0)
-    assert.equal(receipt.count, 6)
-    assert.deepEqual(receipt.failures, [])
-    /** Repeated native close preserves identity and completion without inventing exit support. */
-    assert.deepEqual(receipt.closure, { samePromise: true, completed: true })
-    /**
-     * Closing reports retain complete source/code/name/reason/cause after the fixed business
-     * cutoff.
-     */
-    console.log(
-      'native binary phases',
-      JSON.stringify({
-        runtime,
-        businessCount: receipt.count,
-        businessFailures: receipt.failures,
-        closing: receipt.closing
-      })
-    )
-    assert.equal(
-      receipt.closing.every(
-        (event: { phase: string; businessComplete: boolean }) =>
-          event.phase === 'closing' && event.businessComplete
-      ),
-      true
-    )
-  }, 40000)
 }

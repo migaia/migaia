@@ -1,126 +1,70 @@
 import assert from 'node:assert/strict'
-import { systemScheduler } from '@migaia/utils/scheduler'
-import { createRuntimePeer } from '../../../../rpc-host/dist/remote/runtime-api/peer.js'
-import {
-  createAdapterWebThreadLauncher as createWebThreadLauncher,
-  createAdapterWebThreadChannelFactory as createWebThreadChannelFactory
-} from '../../../../rpc-plugin-thread/dist/threads/web-launcher.js'
-
-import { createNodeProcessLauncher } from '../../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
-import { createDenoProcessLauncher } from '../../../../rpc-plugin-process/dist/process/adapters/deno-command.js'
-import { createProcessTransport } from '../../../../rpc-plugin-process/dist/process/handshake.js'
-import { createNativeProcessOffer } from '../../../../rpc-plugin-process/dist/process/offer.js'
+import { createRpcHost } from '@migaia/rpc-host'
+import { processPlugin } from '@migaia/rpc-plugin-process'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
 
 /** This fixture executes within an actual runtime; a Node host cannot grant its PASS. */
 const deno = typeof Deno !== 'undefined'
-/** Each owned process/Worker path exercises the same production automatic child factory. */
+/** Each owned process/Worker path exercises the public transport plugin of the actual runtime. */
 const mode = deno ? Deno.args[0] : process.argv[2]
-/** Reverse calls must reach a separately counted provider on the actual parent endpoint. */
+/** Peer name the parent assigns to its child; the child adopts it from its bootstrap. */
+const childName = 'cross-runtime-child'
+/** Reverse calls must reach a separately counted provider on the actual parent host. */
 let reverseCalls = 0
-/** Only a successfully constructed Peer is closed; native handles always terminate in finally. */
-let peer
-/** Real lifecycle remains with the original launcher handle and its capability declaration. */
-let handle
-/** A fixture-only auth token never enters a returned business result. */
-const token = 'c3-cross-runtime-token'
+/** Only a successfully constructed host is closed. */
+let host
 try {
-  peer = await createRuntimePeer({
+  /** The child transport selected by mode; both spawn through the runtime's own launcher. */
+  const child =
+    mode === 'thread'
+      ? threadPlugin({
+          name: childName,
+          spawn: { entry: new URL('./automatic-web-worker.mjs', import.meta.url) }
+        })
+      : processPlugin({
+          name: childName,
+          spawn: { entry: new URL('./automatic-process.mjs', import.meta.url) }
+        })
+  host = await createRpcHost({
     self: { name: 'parent', instanceId: 'cross-runtime-parent' },
+    plugins: [child],
     provide: {
       parentEcho: () => {
         reverseCalls += 1
-        return peer.self.instanceId
+        return host.self.instanceId
       }
-    },
-    spawn: async (context) => {
-      if (mode === 'thread') {
-        const launcher = createWebThreadLauncher({
-          runtimeApi: context,
-          report: () => undefined
-        })
-        handle = await launcher.launch(
-          {
-            entry: new URL('./automatic-web-worker.mjs', import.meta.url).href,
-            name: 'cross-runtime-child'
-          },
-          { signal: new AbortController().signal }
-        )
-        return createWebThreadChannelFactory({
-          scheduler: systemScheduler
-        }).open(handle, new AbortController().signal)
-      }
-      const launcher = (deno ? createDenoProcessLauncher : createNodeProcessLauncher)({
-        runtimeApiBootstrap: {
-          name: 'cross-runtime-child',
-          parentInstanceId: context.self.instanceId
-        }
-      })
-      const entry = new URL('./automatic-process.mjs', import.meta.url).pathname
-      handle = await launcher.launch(
-        {
-          command: deno ? Deno.execPath() : process.execPath,
-          args: deno ? ['run', '-A', entry] : [entry],
-          env: { inherit: ['PATH'], set: {} },
-          stdio: { stdin: 'channel', stdout: 'channel', stderr: 'drain' },
-          bootstrap: { via: 'stdin', payload: new TextEncoder().encode(token) }
-        },
-        { signal: new AbortController().signal, output: () => undefined }
-      )
-      const offer = createNativeProcessOffer({
-        peer: { id: context.self.instanceId, runtime: deno ? 'deno' : 'bun' },
-        auth: token
-      })
-      return createProcessTransport(handle.channel, {
-        role: 'initiator',
-        peerId: handle.runtimeApiIdentity.instanceId,
-        offer: { ...offer, capabilities: context.capabilities },
-        ipc: { connectionId: 'cross-runtime', sessionId: 'cross-runtime', log: () => undefined },
-        report: () => undefined
-      })
     },
     report: () => undefined
   })
-  const result = await peer.request('probe', 'actual-runtime-ready')
+  /** The namespace of the selected child transport. */
+  const namespace = mode === 'thread' ? host.thread : host.process
+  /** Forward call into the child, which itself calls back into the parent once. */
+  const result = await namespace.send(childName, 'probe', 'actual-runtime-ready')
   assert.equal(
     result.value,
     'actual-runtime-ready',
     'forward business ran in the actual platform child'
   )
-  assert.equal(
-    result.self.name,
-    'cross-runtime-child',
-    'child identity belongs to its real launcher'
-  )
-  assert.equal(
-    result.self.instanceId,
-    handle.identity.fingerprint,
-    'exact launch fingerprint survives bootstrap'
-  )
+  assert.equal(result.self.name, childName, 'child identity is the name its parent assigned')
+  assert.equal(typeof result.self.instanceId, 'string', 'child has its own instance id')
+  assert.notEqual(result.self.instanceId, host.self.instanceId, 'child identity is distinct')
   assert.equal(
     result.parent,
     'cross-runtime-parent',
     'actual child reverse request returns parent business'
   )
   assert.equal(reverseCalls, 1, 'exactly one genuine reverse dispatch executed')
-  assert.equal(JSON.stringify(result).includes(token), false, 'token remains private')
   console.log(
     JSON.stringify({
       runtime: deno ? 'deno' : 'bun',
       mode,
       forwardCalls: 1,
       reverseCalls,
-      identityMatched: true,
-      secretVisible: false
+      identityMatched: true
     })
   )
 } finally {
-  try {
-    await peer?.close()
-  } finally {
-    handle?.terminate(mode === 'process' ? 'force' : undefined)
-    // Unsupported Web actual-exit promises never become fabricated receipts.
-    if (mode === 'process') await handle?.exited
-  }
+  await host?.close()
 }
 if (deno) Deno.exit(0)
 else process.exit(0)

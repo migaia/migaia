@@ -31,7 +31,7 @@ catch (error) { console.log(JSON.stringify({code: error.code, before, after: pro
     /** The actual Host result owns identity; fixture metadata never fabricates one. */
     probe: async (value) => {
       const peer = await initialized
-      return { value, self: peer.self, parent: await peer.request('parentEcho') }
+      return { value, self: peer.self, parent: await peer.process.request('parentEcho') }
     }
   },
   report: () => undefined

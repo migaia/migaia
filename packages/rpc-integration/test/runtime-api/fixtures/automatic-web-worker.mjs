@@ -9,7 +9,7 @@ initialized = createRpcHost({
     /** Genuine reverse dispatch is independent from bootstrap-returned identity labels. */
     probe: async (value) => {
       const peer = await initialized
-      return { value, self: peer.self, parent: await peer.request('parentEcho') }
+      return { value, self: peer.self, parent: await peer.thread.request('parentEcho') }
     }
   },
   report: () => undefined
