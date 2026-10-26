@@ -300,6 +300,14 @@ export class Namespace {
   readonly #options: INamespaceOptions
   /** These callable snapshots retain compact generation metadata, never mutable Session instances. */
   readonly #peers: Record<string, object> = Object.create(null)
+  /** Public reads borrow live membership without permission to mutate the owning dictionary. */
+  readonly #publicPeers = new Proxy(this.#peers, {
+    set: () => false,
+    defineProperty: () => false,
+    deleteProperty: () => false,
+    setPrototypeOf: () => false,
+    preventExtensions: () => false
+  })
   /** Exact carrier identity prevents an old retirement from removing its same-name successor. */
   readonly #peerCarriers = new Map<string, string>()
   /** One close operation supplies one original lifecycle error to every new namespace call. */
@@ -398,7 +406,7 @@ export class Namespace {
 
   /** Readonly public capability groups are replaced only at accepted generation changes. */
   get peers(): Readonly<Record<string, object>> {
-    return this.#peers
+    return this.#publicPeers
   }
 
   /** Installed namespace extensions originate ordinary semantic calls through the same work owner. */
@@ -512,6 +520,8 @@ export class Namespace {
   accepted(selection: IRpcSessionSelection): void {
     /** Own-data null groups cannot trigger inherited setters or getters during projection. */
     const capabilities: Record<string, unknown> = Object.create(null)
+    /** Only nodes created for this projection are frozen; held callable identity stays unchanged. */
+    const nodes: object[] = [capabilities]
     for (const description of selection.view.methods.values()) {
       /** Method paths have the existing bounded catalog depth, so construction remains cold O(n). */
       const parts = description.name.split('.')
@@ -520,10 +530,34 @@ export class Namespace {
       for (let index = 0; index < parts.length - 1; index++) {
         /** A group is allocated only for an actual admitted path prefix. */
         const key = parts[index]!
-        group = (group[key] ??= Object.create(null)) as Record<string, unknown>
+        if (!Object.getOwnPropertyDescriptor(group, key)?.enumerable) {
+          /** Own descriptors also support a callable prefix's native name/length properties. */
+          const child = Object.create(null) as Record<string, unknown>
+          Object.defineProperty(group, key, {
+            value: child,
+            enumerable: true,
+            configurable: true,
+            writable: true
+          })
+          nodes.push(child)
+        }
+        group = group[key] as Record<string, unknown>
       }
-      group[parts[parts.length - 1]!] = this.#options.hold(selection, description)
+      /** A method may arrive after its descendants without discarding their already built paths. */
+      const key = parts[parts.length - 1]!
+      /** This original held function retains forwarding provenance and native call semantics. */
+      const method = this.#options.hold(selection, description)
+      if (Object.getOwnPropertyDescriptor(group, key)?.enumerable)
+        Object.defineProperties(method, Object.getOwnPropertyDescriptors(group[key]!))
+      Object.defineProperty(group, key, {
+        value: method,
+        enumerable: true,
+        configurable: true,
+        writable: true
+      })
+      nodes.push(method)
     }
+    for (const node of nodes) Object.freeze(node)
     this.#peers[selection.view.name] = capabilities
     this.#peerCarriers.set(selection.view.name, selection.carrierId)
   }
