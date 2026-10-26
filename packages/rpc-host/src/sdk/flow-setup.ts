@@ -1,11 +1,17 @@
 /** Admit async flow installations into the native cleanup owner before publishing their hooks. */
 import type { IPluginHostCore } from '@migaia/plugin-host'
+import type { ILifecycleScope } from '@migaia/lifecycle'
 import { attachSecondaryErrors, UtilsAbortError } from '@migaia/utils/error'
 import { raceWithAbort, type IAbortSignal, type INativeAbortSignal } from '@migaia/utils/promise'
 import { identifyRpcBoundaryFailure, RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { createRpcAbortError } from '../host/error-owner.js'
-import type { IRpcFlowDefinition, IRpcFlowInstallation, IRpcFlowSetupContext } from './types.js'
+import type {
+  IRpcFlowDefinition,
+  IRpcFlowInstallation,
+  IRpcFlowSetupContext,
+  IRpcTransportSetupContext
+} from './types.js'
 
 /** One native install borrows its original acquisition, cleanup admission and operation signals. */
 type IInstallationSetupInput<T> = Readonly<{
@@ -13,7 +19,24 @@ type IInstallationSetupInput<T> = Readonly<{
   own(installed: T): void
   report(error: unknown): void
   signals: readonly IAbortSignal[]
+  /** Pending members borrow the same scope that owns the final native installation. */
+  nativeStartup?: Readonly<{ owner: IPluginHostCore; resources: ILifecycleScope }>
 }>
+
+/** Native preparation shares failure choice and cleanup admission with this one active install. */
+type INativeMemberStartupOwner = Readonly<{
+  own(dispose: () => Promise<void>): void
+  failed(error: unknown): void
+}>
+/** Installation identity reaches private members across transport context projections. */
+const nativeMemberStartups = new WeakMap<IPluginHostCore, INativeMemberStartupOwner>()
+
+/** Borrow only an active native startup; this private collaboration is not part of the SDK export. */
+export function nativeMemberStartup(context: object): INativeMemberStartupOwner | undefined {
+  /** Real transport setup already carries this core; direct generation users need no install owner. */
+  const owner = (context as Partial<IRpcTransportSetupContext>).owner
+  return owner === undefined ? undefined : nativeMemberStartups.get(owner)
+}
 
 /** Cold definitions create independent preparation attempts without retaining installation state. */
 export class RpcFlowSetup {
@@ -45,6 +68,8 @@ export class RpcInstallationSetup<T extends { dispose?(): void | Promise<void> }
   readonly #input: IInstallationSetupInput<T>
   /** Distinguish business-thrown UtilsAbortError from cancellation produced by the utility race. */
   #failure: unknown
+  /** Successful handoff removes pending-member receipts from the original native scope. */
+  readonly #pendingMembers: (() => void)[] = []
 
   /** Capture the original native operation signal before asynchronous setup can outlive rollback. */
   constructor(input: IInstallationSetupInput<T>) {
@@ -53,6 +78,20 @@ export class RpcInstallationSetup<T extends { dispose?(): void | Promise<void> }
 
   /** Preserve original setup failures; only utility cancellation crosses the canonical RPC boundary. */
   async run(): Promise<T> {
+    /** One native install owns pending member cleanup before its final installation value exists. */
+    const startup = this.#input.nativeStartup
+    if (startup)
+      nativeMemberStartups.set(startup.owner, {
+        own: (dispose) => {
+          startup.resources.own(dispose, { force: dispose })
+          this.#pendingMembers.push(() => {
+            startup.resources.release(dispose)
+          })
+        },
+        failed: (error) => {
+          if (this.#failure === undefined) this.#failure = error
+        }
+      })
     try {
       return await raceWithAbort(this.#invoke, {
         signals: this.#input.signals,
@@ -60,10 +99,13 @@ export class RpcInstallationSetup<T extends { dispose?(): void | Promise<void> }
         cleanupPolicy: 'report'
       })
     } catch (error) {
-      if (error === this.#failure) throw error
+      if (this.#failure !== undefined) throw this.#failure
       if (error instanceof UtilsAbortError)
         throw createRpcAbortError(undefined, undefined, error.cause)
       throw error
+    } finally {
+      if (startup) nativeMemberStartups.delete(startup.owner)
+      this.#pendingMembers.length = 0
     }
   }
 
@@ -77,22 +119,30 @@ export class RpcInstallationSetup<T extends { dispose?(): void | Promise<void> }
       const installed = await this.#input.setup()
       if (signal.aborted) {
         await installed.dispose?.()
+        this.#releasePendingMembers()
         return installed
       }
       try {
         this.#input.own(installed)
+        this.#releasePendingMembers()
       } catch (error) {
         return await releaseUnownedInstallation(installed, error)
       }
       return installed
     } catch (error) {
-      this.#failure = identifyRpcBoundaryFailure(
+      this.#failure ??= identifyRpcBoundaryFailure(
         error,
         RpcCoreErrorCode.callbackFailed,
         RpcCoreErrorText.callbackFailed
       )
       throw this.#failure
     }
+  }
+
+  /** Final installation cleanup supersedes temporary member ownership without changing its order. */
+  #releasePendingMembers(): void {
+    for (const remove of this.#pendingMembers) remove()
+    this.#pendingMembers.length = 0
   }
 }
 

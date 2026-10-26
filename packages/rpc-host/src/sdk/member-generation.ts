@@ -22,6 +22,7 @@ import { resolveAbortReason } from '../host/abort-reason.js'
 import { memberAggregate } from './member-errors.js'
 import { RpcMemberFirstStart } from './member-start.js'
 import { RpcMemberResources } from './member-resources.js'
+import { nativeMemberStartup } from './flow-setup.js'
 import type {
   IRpcMemberGenerationOptions,
   IRpcMemberSource,
@@ -160,6 +161,7 @@ export class RpcMemberGeneration<TUnit, TSpec> {
     this.#options = options
     this.#resources = new RpcMemberResources(this, options.report, true)
     this.#unsubscribe = options.binding.supervisor.subscribe(this.#native)
+    nativeMemberStartup(options.context)?.own(this.#resources.release)
   }
 
   /** Return safe accepted metadata, without exposing a per-session request/notify factory. */
@@ -186,7 +188,11 @@ export class RpcMemberGeneration<TUnit, TSpec> {
   /** Preserve actual setup rollback and only begin background observation after acceptance. */
   async #open(): Promise<IRpcSessionView> {
     try {
-      await this.#resources.prepareInitial(this.#options.signal, true)
+      await this.#resources.prepareInitial(
+        this.#options.signal,
+        true,
+        nativeMemberStartup(this.#options.context)?.failed
+      )
       this.#observing = true
       return this.#current!.view
     } catch (primary) {

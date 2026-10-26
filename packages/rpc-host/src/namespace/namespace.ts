@@ -380,7 +380,8 @@ export class Namespace {
         setup: () => definition.open(context),
         own: (installed) => resources.own(installed, { force: () => installed.dispose() }),
         report: operation.report,
-        signals: [context.signal, core.operation.signal]
+        signals: [context.signal, core.operation.signal],
+        nativeStartup: { owner: core, resources }
       }).run()
     } finally {
       preparing.unsubscribe()

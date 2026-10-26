@@ -65,7 +65,8 @@ export class RpcMemberResources {
   #prepare = async (
     signal: IAbortSignal,
     cleanupOnFailure: boolean,
-    reportFailure: boolean
+    reportFailure: boolean,
+    failureDecided?: (error: unknown) => void
   ): Promise<number> => {
     const group = new Set<() => Promise<void>>()
     this.#retained.add(group)
@@ -93,6 +94,8 @@ export class RpcMemberResources {
       })
       return generation
     } catch (error) {
+      /** Preserve a native-first decision before rollback yields to a later caller cancellation. */
+      if (!signal.aborted) failureDecided?.(error)
       if (cleanupOnFailure || this.#releasePromise) {
         const hadCleanupFailure = await this.#rollback(group, error)
         if (reportFailure && !hadCleanupFailure) (0, this.#report)(error)
@@ -112,8 +115,11 @@ export class RpcMemberResources {
   }
 
   /** Use original initial setup and explicit rollback policy before publication. */
-  prepareInitial = (signal: IAbortSignal, rollbackOnFailure = false) =>
-    this.#prepare(signal, rollbackOnFailure, false)
+  prepareInitial = (
+    signal: IAbortSignal,
+    rollbackOnFailure = false,
+    failureDecided?: (error: unknown) => void
+  ) => this.#prepare(signal, rollbackOnFailure, false, failureDecided)
 
   /** Join one preparation of the same original native generation without retargeting. */
   prepareRebind = (signal: IAbortSignal) => {
