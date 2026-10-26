@@ -601,7 +601,8 @@ export class SessionTable {
         : callbacks.connection
     /** Capture only accepted routing ports; never retain the callback object's native credentials. */
     const ingress = { owner: this, id: carrier.id, source: callbacks.source, scope: staged }
-    return new Session({
+    /** Late native completions retain this physical owner's lifetime, including private media. */
+    const session = new Session({
       ...callbacks,
       connection,
       receive: (view, frame) =>
@@ -628,7 +629,8 @@ export class SessionTable {
       pipelines: staged?.pipelines ?? this.#options.pipelines,
       self: this.#options.self,
       directory: (peerId) => this.#options.directory(namespace, peerId),
-      track: (promise) => this.#draining.track(carrier.id, promise),
+      track: (promise) =>
+        session.signal.aborted ? promise : this.#draining.track(carrier.id, promise),
       draining: (remainingMs, announce) => this.#draining.drain(carrier.id, remainingMs, announce),
       report: this.#options.report,
       scheduler: this.#options.scheduler ?? systemScheduler,
@@ -639,6 +641,7 @@ export class SessionTable {
         (scope === undefined ? undefined : this.#scopes.get(scope)!.handshakeTimeoutMs) ??
         this.#options.handshakeTimeoutMs
     })
+    return session
   }
 
   /** Explicit names retain priority over an instance fallback, including unusual caller names. */
@@ -756,15 +759,16 @@ export class SessionTable {
   drain(target: string | IRpcSessionHandle, remainingMs: number): Promise<void> {
     /** Handle identity resolves the original carrier even after a same-name replacement. */
     const session = this.#session(target)
-    if (session instanceof Session && session.closing) return Promise.resolve()
     /** No Session facade or alternate business tracker is created for a native drain. */
     const carrierId = typeof target === 'string' ? target : this.#handles.get(target)!.carrierId
+    if (session instanceof Session ? session.closing : this.#sessions.get(carrierId) !== session)
+      return Promise.resolve()
     return this.#draining.drain(carrierId, remainingMs, (budget) => session.drain(budget))
   }
 
   /** Track the exact real business completion without replacing its native Promise. */
   track<T>(carrierId: string, promise: Promise<T>): Promise<T> {
-    return this.#draining.track(carrierId, promise)
+    return this.#sessions.has(carrierId) ? this.#draining.track(carrierId, promise) : promise
   }
 
   /** Every current accepted source announces once; one failed write cannot suppress other peers. */

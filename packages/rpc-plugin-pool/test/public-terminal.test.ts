@@ -4,6 +4,9 @@ import { createManualScheduler } from '@migaia/utils/testing'
 import { expect, it, vi } from 'vitest'
 import { pool } from '../dist/index.js'
 import { repeatableConnect } from './connect-fixture.js'
+import { SessionTable } from '../../rpc-host/dist/session/table.js'
+import { SessionDrain } from '../../rpc-host/dist/session/drain.js'
+import type { IRpcOriginHandle } from '@migaia/rpc-contract/interfaces'
 
 /** This is an application iterator returned by an actual public provider, never a carrier facade. */
 class PendingValues implements AsyncIterableIterator<number> {
@@ -147,6 +150,46 @@ it('public Pool preserves exact cold-refill failure for its reserved head and as
     await host.process.pool.close()
     expect(source.opens()).toBe(beforeRefill + 1)
   } finally {
+    await host.close()
+    await source.close()
+  }
+})
+
+it('A39 retired public Pool origin cannot allocate another Session drain record', async () => {
+  /** A pass-through spy observes the original pool's genuine native publication. */
+  const attach = SessionTable.prototype.attachOrigin
+  /** Only the actual public construction below can fill this original-resource observation. */
+  let origin: Readonly<{ table: SessionTable; handle: IRpcOriginHandle }> | undefined
+  /** The original owner and handle remain unchanged; no binding or Session view is synthesized. */
+  const publication = vi.spyOn(SessionTable.prototype, 'attachOrigin').mockImplementation(function (
+    this: SessionTable,
+    ...args: Parameters<SessionTable['attachOrigin']>
+  ) {
+    /** Reflect.apply preserves the native owner receiver while its spy is installed. */
+    const handle = Reflect.apply(attach, this, args) as IRpcOriginHandle
+    origin = { table: this, handle }
+    return handle
+  })
+  /** The existing fixture acquires real private native media for this public pool. */
+  const source = repeatableConnect()
+  /** Public installation is the only producer of the observed logical origin. */
+  const host = await createRpcHost({ plugins: [source.transport(pool({ size: 1 }))] })
+  publication.mockRestore()
+  try {
+    expect(origin).toBeDefined()
+    /** Retire through the original public pool completion before attempting a stale native drain. */
+    await host.process.pool.close()
+    await origin!.handle.closed
+    /** Observe allocation at the existing drain owner, without a new diagnostic API. */
+    const draining = vi.spyOn(SessionDrain.prototype, 'drain')
+    try {
+      await origin!.table.drain(origin!.handle, 100)
+      expect(draining).not.toHaveBeenCalled()
+    } finally {
+      draining.mockRestore()
+    }
+  } finally {
+    publication.mockRestore()
     await host.close()
     await source.close()
   }

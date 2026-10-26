@@ -24,6 +24,7 @@ import {
 } from '@migaia/rpc-contract/protocol'
 import { RpcCoreErrorCode, RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
 import { SessionTable } from '../../dist/session/table.js'
+import { SessionDrain } from '../../dist/session/drain.js'
 import { FlowRegistry, type IRpcFlowGroup } from '../../dist/flow/registry.js'
 import {
   rpcPipelineOwner,
@@ -697,5 +698,33 @@ it('A36 handshake timeout closes locally without consulting a native terminal re
     expect(local.scheduler.pendingCount).toBe(0)
   } finally {
     await local.table.close()
+  }
+})
+
+it('A39 late track after physical retirement preserves its promise without allocating drain state', async () => {
+  /** Both original Sessions first complete a genuine native handshake. */
+  const left = await Host.create('late-track-a')
+  /** The peer owns the opposite original physical endpoint. */
+  const right = await Host.create('late-track-b')
+  /** Actual carrier retirement removes its existing business barrier. */
+  const pair = connect(left, right)
+  try {
+    await Promise.all([pair.first.ready, pair.second.ready])
+    await pair.first.close()
+    await pair.second.closed
+    /** The original owner method reveals any attempt to recreate a retired barrier. */
+    const tracking = vi.spyOn(SessionDrain.prototype, 'track')
+    /** Completion still belongs to the late caller, even though no live source can track it. */
+    const original = Promise.resolve('late result')
+    try {
+      expect(left.table.track(pair.a.id, original)).toBe(original)
+      expect(tracking).not.toHaveBeenCalled()
+      expect(left.scheduler.pendingCount).toBe(0)
+    } finally {
+      tracking.mockRestore()
+    }
+    expect(await original).toBe('late result')
+  } finally {
+    await Promise.all([left.table.close(), right.table.close()])
   }
 })
