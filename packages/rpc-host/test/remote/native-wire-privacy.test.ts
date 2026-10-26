@@ -6,6 +6,8 @@ import { normalizePortable } from '@migaia/rpc-contract/portable'
 import type { IRpcProviderDeclaration } from '@migaia/rpc-contract/protocol'
 import { RpcContractErrorCode, RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
 import { timeout } from '@migaia/rpc-host/features/timeout'
+import { errorMap } from '@migaia/rpc-host/plugins/error-map'
+import { deserializeRpcError } from '@migaia/rpc-contract/errors'
 import { hostErrorWireMetadata, serializeRpcError } from '../../dist/host/error-wire-metadata.js'
 import { connectedCoreHosts } from '../host/core-fixture.js'
 
@@ -58,9 +60,20 @@ function declarationReadFailure(server: Pick<IRpcHost, 'provide'>, original: Err
   return failure
 }
 
-describe('local contract error privacy through public native Hosts', () => {
+/** Select the existing controlled presentation explicitly without changing its local Error graph. */
+function redactControlledError(error: unknown): Error {
+  return deserializeRpcError(
+    serializeRpcError(error, {
+      report: (failure) => {
+        throw failure.error
+      }
+    })
+  )
+}
+
+describe('application-selected contract error privacy through public native Hosts', () => {
   it.each(['remote', 'contract'] as const)(
-    'preserves %s original cause locally and sends only code/message',
+    'preserves %s original cause locally and explicitly sends only code/message',
     async (kind) => {
       /** The fresh original marker detects disclosure in any error field, frame or descendant. */
       const marker = randomUUID()
@@ -80,7 +93,8 @@ describe('local contract error privacy through public native Hosts', () => {
         },
         () => undefined,
         undefined,
-        (error) => reports.push(error)
+        (error) => reports.push(error),
+        [errorMap(redactControlledError)]
       )
       try {
         local =
@@ -141,7 +155,7 @@ describe('local contract error privacy through public native Hosts', () => {
     }
   )
 
-  it('keeps the original cause local when a real stream emits a controlled failure', async () => {
+  it('keeps the original cause local with explicit redaction of a real controlled stream failure', async () => {
     /**
      * The original arbitrary getter marker must not enter any actual stream terminal or other
      * frame.
@@ -160,7 +174,10 @@ describe('local contract error privacy through public native Hosts', () => {
           throw local
         }
       },
-      () => undefined
+      () => undefined,
+      undefined,
+      undefined,
+      [errorMap(redactControlledError)]
     )
     try {
       /**

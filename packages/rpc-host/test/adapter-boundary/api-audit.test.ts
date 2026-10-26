@@ -214,12 +214,12 @@ it('contains a transport error listener failure and still closes the message por
   expect(report).toHaveBeenCalledWith(original)
 })
 
-it('keeps the verifier failure out of every report, cause and peer rejection', async () => {
+it('retains the verifier failure locally and keeps it out of the unauthenticated peer rejection', async () => {
   /** Real byte IO and bilateral Session handshakes carry the actual rejection. */
   const physical = duplex()
   /** The offered verifier failure deliberately contains a private diagnostic marker. */
   const original = new Error('AUDIT_ONLY_PRIVATE_VERIFIER_FAILURE')
-  /** Both actual reporters must receive only the established redacted diagnostics. */
+  /** Local diagnostics retain the original verifier failure while handshake wire remains redacted. */
   const reports: unknown[] = []
   /** Observe real rejection bytes while leaving the original framing/write implementation intact. */
   const writes = vi.spyOn(physical.ports[1]!, 'write')
@@ -263,8 +263,8 @@ it('keeps the verifier failure out of every report, cause and peer rejection', a
     )
     expect(result.map((value) => value.status)).toEqual(['rejected', 'rejected'])
     expect(reports.length).toBeGreaterThan(0)
-    expect(reports.some((error) => reaches(error, original))).toBe(false)
-    expect(result[1]!.status === 'rejected' && reaches(result[1]!.reason, original)).toBe(false)
+    expect(reports.some((error) => reaches(error, original))).toBe(true)
+    expect(result[1]!.status === 'rejected' && reaches(result[1]!.reason, original)).toBe(true)
     expect(result[0]!.status === 'rejected' && reaches(result[0]!.reason, original)).toBe(false)
     expect(
       writes.mock.calls.map(([bytes]) => new TextDecoder().decode(bytes)).join('')

@@ -87,7 +87,7 @@ describe('limits provider concurrency observer', () => {
           if (response.kind !== 'error') continue
           expect(deserializeRpcWireError(response.error)).toMatchObject({
             code: 'OVERLOADED',
-            message: 'Provider failed'
+            message: 'Provider admission limit reached'
           })
         }
         /**

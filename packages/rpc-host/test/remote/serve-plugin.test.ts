@@ -1,6 +1,9 @@
 import { expect, it } from 'vitest'
 import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
+import { errorMap } from '@migaia/rpc-host/plugins/error-map'
 import { RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
+import { deserializeRpcError } from '@migaia/rpc-contract/errors'
+import { serializeRpcError } from '../../dist/host/error-wire-metadata.js'
 import { createRemoteLayerError } from '../../dist/host/remote-error-owner.js'
 import { coreMemoryServer } from '../host/core-fixture.js'
 
@@ -101,9 +104,20 @@ it('passes the stream-open context unchanged and invokes its hook once', async (
   const fixture = new ProviderContextFixture()
   /** Actual server identity and declarations belong to this installed native listener. */
   const listener = coreMemoryServer('server', 'server')
+  /** The application's explicit outbound policy preserves the controlled code and hides its cause. */
+  const redaction = errorMap((error) =>
+    deserializeRpcError(
+      serializeRpcError(error, {
+        report: (failure) => {
+          throw failure.error
+        }
+      })
+    )
+  )
   /** Provider construction is complete before the independent client starts its one handshake. */
   const server = await createRpcHost({
     ...listener.options,
+    plugins: [redaction, listener.transport],
     provide: fixture.provide,
     contract: fixture.contract
   })

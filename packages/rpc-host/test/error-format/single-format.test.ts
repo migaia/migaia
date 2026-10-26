@@ -62,8 +62,16 @@ describe('one production wire error format', () => {
             arguments: ['value', 'options', 'hostErrorWireMetadata']
           },
           serializeHostWireError: {
+            callee: 'serializeHostError',
+            arguments: ['value', 'options', 'hostErrorWireRoutes']
+          },
+          serializeHostError: {
             callee: 'serializeRpcWireError',
-            arguments: ['value', 'options', 'hostErrorWireMetadata']
+            arguments: ['value', 'options', 'metadata']
+          },
+          serializeHostHandshakeError: {
+            callee: 'serializeHostError',
+            arguments: ['value', 'options', '{summaries:authenticationSummary,routes}']
           },
           deserializeHostWireError: {
             callee: 'deserializeRpcWireError',
@@ -77,15 +85,21 @@ describe('one production wire error format', () => {
           if (!node.id || !/^(de)?serialize\w*Error$/.test(node.id.name)) return
           const name = node.id.name
           if (inspection.path === 'host/error-wire-metadata.ts') {
-            /** Restoration may add route bookkeeping after storing the canonical result first. */
-            const routed = name === 'deserializeHostWireError'
-            if (!routed) expect(node.body?.body).toHaveLength(1)
-            const statement = node.body!.body[0]!
-            expect(statement.type).toBe(routed ? 'VariableDeclaration' : 'ReturnStatement')
+            /** R29 wrappers may bookkeep without owning another wire format. */
+            const associated = name === 'serializeHostError'
+            /** This delegate selects metadata for the existing preauthentication projection. */
+            const handshake = name === 'serializeHostHandshakeError'
+            /** Find the canonical delegate whether its result is returned or held for bookkeeping. */
+            const statement = node.body!.body.find((candidate) =>
+              candidate.type === 'ReturnStatement'
+                ? candidate.argument?.type === 'CallExpression'
+                : candidate.type === 'VariableDeclaration' &&
+                  candidate.declarations[0]?.init?.type === 'CallExpression'
+            )
             const returned =
-              statement.type === 'ReturnStatement'
+              statement?.type === 'ReturnStatement'
                 ? statement.argument
-                : statement.type === 'VariableDeclaration'
+                : statement?.type === 'VariableDeclaration'
                   ? statement.declarations[0]?.init
                   : null
             expect(returned?.type).toBe('CallExpression')
@@ -99,9 +113,11 @@ describe('one production wire error format', () => {
             )
             /** Host's diagnostic projection borrows the walker while retaining its boundary code. */
             const argumentsToCheck = returned.arguments.map((argument, index) =>
-              name === 'serializeHostWireError' && index === 1
+              associated && index === 1
                 ? 'options'
-                : inspection.text.slice(argument.start, argument.end)
+                : handshake && index === 2
+                  ? inspection.text.slice(argument.start, argument.end).replace(/\s+/g, '')
+                  : inspection.text.slice(argument.start, argument.end)
             )
             expect(argumentsToCheck).toEqual(call.arguments)
             inspection.delegates.push(`${inspection.path}:${name}`)
@@ -118,12 +134,14 @@ describe('one production wire error format', () => {
         'wire/errors.ts:deserializeRpcWireError'
       ])
     )
-    expect(delegates).toHaveLength(4)
+    expect(delegates).toHaveLength(6)
     expect(new Set(delegates)).toEqual(
       new Set([
         'host/error-wire-metadata.ts:serializeRpcError',
         'host/error-wire-metadata.ts:deserializeRpcError',
+        'host/error-wire-metadata.ts:serializeHostError',
         'host/error-wire-metadata.ts:serializeHostWireError',
+        'host/error-wire-metadata.ts:serializeHostHandshakeError',
         'host/error-wire-metadata.ts:deserializeHostWireError'
       ])
     )

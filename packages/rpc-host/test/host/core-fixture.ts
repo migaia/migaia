@@ -189,13 +189,14 @@ export function coreMemoryServer(
   return new CoreMemoryServer(name, instanceId, namespace, features, expose, codec)
 }
 
-/** Connect original public hosts over the existing listener and physical carrier pair. */
+/** Connect public hosts over the original pair; remote plugins precede its actual native transport. */
 export async function connectedCoreHosts(
   local: IRpcHostOptions['provide'] = {},
   remote: IRpcHostOptions['provide'] = {},
   report?: (error: unknown) => void,
   codec?: ICoreCodec,
-  remoteReport = report
+  remoteReport = report,
+  remotePlugins?: IRpcHostOptions['plugins']
 ) {
   /** The first actual native installation accepts the second without another carrier abstraction. */
   const server = coreMemoryServer('a', 'test-pair-a', 'memory', [], [], codec)
@@ -205,7 +206,7 @@ export async function connectedCoreHosts(
     /** Client acquisition reuses CoreMemoryConnection and its genuine ready handshakes. */
     const connected = await server.connect(
       'b',
-      { provide: remote, report: remoteReport },
+      { provide: remote, report: remoteReport, plugins: remotePlugins },
       'test-pair-b'
     )
     /** Cleanup borrows only these real host owners, never generated request/stream methods. */
