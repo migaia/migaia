@@ -286,7 +286,6 @@ class NamespaceSource {
               RpcCoreErrorText.endpointDisposed,
               new AggregateError(failures, HostErrorText.cleanupFailed)
             )
-      this.#options.report(error)
       throw error
     }
   }

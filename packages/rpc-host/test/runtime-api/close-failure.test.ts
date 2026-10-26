@@ -6,8 +6,12 @@ import { walkErrorCauses } from '@migaia/utils/error'
 import { connectedCoreHosts } from '../host/core-fixture.js'
 
 it('[L2] a failed physical close keeps the original error and repeated close Promise', async () => {
+  /** The same cleanup failure must have one background diagnostic owner. */
+  const reports: unknown[] = []
   /** Real hosts complete the same original successful business call before cleanup fails. */
-  const fixture = await connectedCoreHosts({}, { echo: (value) => value }, () => undefined)
+  const fixture = await connectedCoreHosts({}, { echo: (value) => value }, (error) =>
+    reports.push(error)
+  )
   /** The original single-source RuntimePeer close belongs to this public namespace owner. */
   const namespace = fixture.a.memory
   /** A caller may retain the same public peer projection after physical shutdown fails. */
@@ -40,6 +44,7 @@ it('[L2] a failed physical close keeps the original error and repeated close Pro
       )
     }
     assert.equal(closes, 1, 'failed close cannot repeat physical ownership release')
+    assert.equal(reports.filter((error) => walkErrorCauses(error).includes(original)).length, 1)
     await assert.rejects(async () => fixture.a.memory.request('echo', 43), {
       code: 'ENDPOINT_DISPOSED'
     })

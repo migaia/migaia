@@ -1,6 +1,7 @@
 /** Own accepted identity/name indexes; Session owns the actual carrier and codec lifecycle. */
 import { deferred, type IDeferred, type IAbortSignal } from '@migaia/utils/promise'
 import { systemScheduler, systemWallClock } from '@migaia/utils/scheduler'
+import { attachSecondaryErrors } from '@migaia/utils/error'
 import type { ILifecycleScope } from '@migaia/lifecycle'
 import type {
   IRpcCarrier,
@@ -173,7 +174,9 @@ class SessionTransportContext implements IRpcTransportContext {
       connection
     )
     this.#ports.resources.own(handle, { force: () => handle.close(this.#ports.closeReason()) })
-    void handle.closed.finally(() => this.#ports.resources.release(handle)).catch(this.report)
+    /** Session owns its cleanup rejection; this observer reports only a new release failure. */
+    const release = () => this.#ports.resources.release(handle)
+    void handle.closed.then(release, release).catch(this.report)
     return handle
   }
   /** The original SDK candidate remains the sole owner of each private pool Session. */
@@ -796,8 +799,8 @@ export class SessionTable {
       ) {
         writes.push(this.#session(selection.carrierId).announceDirectory())
       }
-    /** The caller reports the first original rejection; this owner reports only additional failures. */
-    await this.#joinOperations(writes, false)
+    /** The caller observes all original write failures through the returned error graph. */
+    await this.#joinOperations(writes)
   }
 
   /** Both public and private physical Sessions borrow one current namespace preparation. */
@@ -882,21 +885,20 @@ export class SessionTable {
     return this.#closing.promise
   }
 
-  /**
-   * Original IO operations share one join policy; directory callers report their primary
-   * themselves.
-   */
-  async #joinOperations(operations: readonly Promise<void>[], reportPrimary = true): Promise<void> {
+  /** Join errors without reporting again after each physical owner has observed its own failure. */
+  async #joinOperations(operations: readonly Promise<void>[]): Promise<void> {
     /** Every operation settles before the exact first failure returns to its original caller. */
     const results = await Promise.allSettled(operations)
-    /** All failures remain reported while the first exact rejection owns the close result. */
-    let failure: { reason: unknown } | undefined
-    for (const result of results)
-      if (result.status === 'rejected') {
-        if (failure || reportPrimary) this.#options.report(result.reason)
-        failure ??= result
-      }
-    if (failure) throw failure.reason
+    /** Multiple failures stay reachable while the first exact error remains primary. */
+    const failures: unknown[] = []
+    for (const result of results) if (result.status === 'rejected') failures.push(result.reason)
+    if (failures.length === 1) throw failures[0]
+    if (failures.length > 1)
+      throw identifyRpcBoundaryFailure(
+        attachSecondaryErrors(failures[0], failures.slice(1)),
+        RpcCoreErrorCode.transport,
+        RpcCoreErrorText.endpointDisposalCleanupFailed
+      )
   }
 
   /** Resolve only genuine held handles and current physical ids in constant time. */

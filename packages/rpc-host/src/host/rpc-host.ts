@@ -655,12 +655,12 @@ export class RpcHost {
     if (errors.length || sessionFailures.length) {
       /** Every original close or scope failure remains reachable in its observed order. */
       const failures = [...sessionFailures, ...errors.map((entry) => entry.error)]
-      /** The original cleanup aggregate stays observable separately from construction's primary. */
-      const cleanup = new AggregateError(failures, HostErrorText.cleanupFailed)
-      this.#report(cleanup)
       throw failures.length === 1
         ? failures[0]
-        : createRpcLifecycleError(RpcCoreErrorText.endpointDisposed, cleanup)
+        : createRpcLifecycleError(
+            RpcCoreErrorText.endpointDisposed,
+            new AggregateError(failures, HostErrorText.cleanupFailed)
+          )
     }
   }
 
