@@ -795,10 +795,13 @@ export class SessionTable {
     const input = typeof handle === 'string' ? undefined : this.#handles.get(handle)?.attachment
     if (input?.native && input.name && isRpcCarrierAdmissionFailure(reason) && !this.#closing) {
       /** Never let a late old generation replace a successor's current or retired admission fact. */
-      const current =
-        input.index.names.get(input.name)?.carrierId ??
-        input.index.departed.get(input.name)?.carrierId
-      if (current === input.carrierId)
+      const current = input.index.names.get(input.name)
+      /** Only an explicit name keeps a late departure reason after its physical source leaves. */
+      const departed = input.index.departed.get(input.name)
+      if (
+        (current?.carrierId === input.carrierId && current.view.name !== current.view.peerId) ||
+        departed?.carrierId === input.carrierId
+      )
         input.index.departed.set(input.name, { carrierId: input.carrierId, reason })
     }
     /** Only trusted local policy producers select the actual physical carrier's retirement mapper. */
@@ -1066,7 +1069,12 @@ export class SessionTable {
     const selection = this.#accepted.get(input.carrierId)?.selection
     /** Received peer reasons remain distinct from this Session's already-started local primary. */
     const peerReason = closeFrame ? closeFrame.reason : error
-    if (selection && !this.#closing && !input.index.departed.has(selection.view.name))
+    if (
+      selection &&
+      selection.view.name !== selection.view.peerId &&
+      !this.#closing &&
+      !input.index.departed.has(selection.view.name)
+    )
       input.index.departed.set(selection.view.name, {
         carrierId: input.carrierId,
         reason: peerReason

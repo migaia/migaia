@@ -92,12 +92,18 @@ function forwardRoute(
   return Object.freeze([...route, nodeId])
 }
 
+/** Explicit spellings keep offline routing history; default names exist only while live. */
+type IForwardNamespace = {
+  references: number
+  remembered: boolean
+}
+
 /** Only peer-name spelling is indexed here; SessionTable remains the accepted target owner. */
 type IForwardPrefix = {
   children: Map<string, IForwardPrefix>
   /** Live exact-name contributions exclude longer names sharing this character prefix. */
   references: number
-  namespaces: Map<string, number>
+  namespaces: Map<string, IForwardNamespace>
   name?: string
 }
 
@@ -146,10 +152,16 @@ export class Forwarder {
     }
     node.references++
     node.name = name
-    node.namespaces.set(
-      selection.view.namespace,
-      (node.namespaces.get(selection.view.namespace) ?? 0) + 1
-    )
+    /** Namespace history remains only when an explicit name contributed to this spelling. */
+    const membership = node.namespaces.get(selection.view.namespace)
+    if (membership) {
+      membership.references++
+      membership.remembered ||= name !== selection.view.peerId
+    } else
+      node.namespaces.set(selection.view.namespace, {
+        references: 1,
+        remembered: name !== selection.view.peerId
+      })
     this.#contributions.set(selection.carrierId, { namespace: selection.view.namespace, name })
   }
 
@@ -201,17 +213,30 @@ export class Forwarder {
     const contribution = this.#contributions.get(carrierId)
     if (!contribution) return
     this.#contributions.delete(carrierId)
-    /** Known peer spellings survive departure so an offline route differs from a local method. */
+    /** The path permits empty default-name branches to be removed in one reverse traversal. */
+    const parents: [IForwardPrefix, string][] = []
+    /** Explicit spellings retain historical membership after the live source count reaches zero. */
     let node = this.#prefix
     for (const character of contribution.name) {
+      parents.push([node, character])
       /** The same original trie retains no Session or provider objects after its live count drops. */
       const child = node.children.get(character)!
       node = child
     }
     node.references--
-    /** A zero count retains only historical name membership, not a selectable direct source. */
-    const remaining = node.namespaces.get(contribution.namespace)! - 1
-    node.namespaces.set(contribution.namespace, remaining)
+    /** Default names release their namespace membership instead of retaining the departure. */
+    const membership = node.namespaces.get(contribution.namespace)!
+    membership.references--
+    if (membership.references === 0 && !membership.remembered)
+      node.namespaces.delete(contribution.namespace)
+    if (node.references === 0 && node.namespaces.size === 0) delete node.name
+    for (let index = parents.length - 1; index >= 0; index--) {
+      const [parent, character] = parents[index]!
+      /** A longer live or remembered spelling still owns its shared character path. */
+      const child = parent.children.get(character)!
+      if (child.references !== 0 || child.namespaces.size !== 0 || child.children.size !== 0) break
+      parent.children.delete(character)
+    }
   }
 
   /** Resolve the longest admitted peer prefix before checking its method, including missing methods. */
@@ -278,7 +303,7 @@ export class Forwarder {
           knownGlobal = node.name
           if (node.namespaces.has(namespace)) knownLocal = node.name
           if (node.references > 0) global = node.name
-          if ((node.namespaces.get(namespace) ?? 0) > 0) local = node.name
+          if ((node.namespaces.get(namespace)?.references ?? 0) > 0) local = node.name
         }
       }
       node = node?.children.get(character)
