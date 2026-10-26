@@ -96,7 +96,7 @@ export class PoolScheduler<T extends IPoolResource> implements IRpcPoolControls 
   #cursor = 0
   /** Transactional acquisition batches survive partial failure and concurrent close. */
   readonly #creationJobs = new Set<Promise<void>>()
-  /** Original member failures remain in the final CLOSE_FAILED AggregateError. */
+  /** Final cleanup retains its own failures; open-phase errors are delivered without history. */
   readonly #closeErrors: unknown[] = []
   /** Resize results stay visible while the sequencing tail recovers after rejection. */
   #resizeTail: Promise<void> = Promise.resolve()
@@ -286,7 +286,8 @@ export class PoolScheduler<T extends IPoolResource> implements IRpcPoolControls 
           this.#notifyDrain()
         },
         (error: unknown) => {
-          this.#closeErrors.push(error)
+          /** Open-phase failures go to resize/report; final close retains only its own failures. */
+          if (this.#state !== RpcPoolState.open) this.#closeErrors.push(error)
           this.#members.delete(member)
           member.closed.reject(error)
           this.#notifyDrain()

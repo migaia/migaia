@@ -291,3 +291,30 @@ it('drains a reserved stream when Root closes before native member selection res
     await source.close()
   }
 })
+
+it('releases already delivered open-phase cleanup errors before the final pool close', async () => {
+  /** Repeated native retirements must not retain an unbounded history of delivered error graphs. */
+  const failures = Array.from({ length: 3 }, (_, index) => new Error(`resize cleanup ${index}`))
+  /** The existing native fixture throws only after each real member and opposite Host have closed. */
+  const source = repeatableConnect({ closeErrors: failures })
+  /** Background cleanup owns its original report while resize owns the same rejection identity. */
+  const reports: unknown[] = []
+  const host = await createRpcHost({
+    plugins: [source.transport(poolFeature({ size: 2 }))],
+    report: (error) => reports.push(error)
+  })
+  try {
+    for (const original of failures) {
+      await expect(host.process.pool.resize(1)).rejects.toBe(original)
+      expect([...reports, ...source.reports].filter((error) => error === original)).toHaveLength(1)
+      await host.process.pool.resize(2)
+      expect(await host.process.send('pool', 'echo', 42)).toBe(42)
+    }
+    /** All failing open-phase closes were already delivered; only healthy current members remain. */
+    await expect(host.process.pool.close()).resolves.toBeUndefined()
+    expect(source.closeOrder).toEqual([0, 1, 2, 3, 4])
+  } finally {
+    await host.close().catch(() => undefined)
+    await source.close()
+  }
+})

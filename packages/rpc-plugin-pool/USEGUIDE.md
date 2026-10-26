@@ -109,4 +109,4 @@ stats 是新的冻结快照：targetSize、memberCount、inFlight、queued、sta
 
 池 source 为 `rpc.pool`：INVALID_OPTIONS、POOL_TRANSPORT_UNSUPPORTED、POOL_CLOSED、QUEUE_FULL、CALL_ABORTED、CLOSE_FAILED。业务与原生错误保留其原 owner 的 source/code/cause；池不自动重放。
 
-部分构造失败会清理已获取成员并保留原 primary，次级清理错误继续从错误图或报告到达。成员关闭失败以 CLOSE_FAILED AggregateError 保留原 errors 和首个 cause，关闭后不重新开放。只读观察使用 `@migaia/rpc-host/plugins/probe`，不在 pool 中另装一套诊断或消息解析器。
+部分构造失败会清理已获取成员并保留原 primary，次级清理错误继续从错误图或报告到达。最终关闭期间的成员清理失败以 CLOSE_FAILED AggregateError 保留原 errors 和首个 cause，关闭后不重新开放。开放期间已经通过 resize 拒绝或空闲回收报告交付的错误不会保留到最终 close 再次抛出。只读观察使用 `@migaia/rpc-host/plugins/probe`，不在 pool 中另装一套诊断或消息解析器。

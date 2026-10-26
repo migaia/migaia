@@ -40,8 +40,9 @@ export type IRpcPoolControls = Readonly<{
    * Synchronously enters closing, rejects new admission and drains already accepted operations and
    * acquisitions before closing owned Peers. Streams must finish/return/throw or settle their
    * cancellation; no pool drain timeout is added. Repeated calls share one Promise. All member
-   * closes are attempted; retained close failures reject as CLOSE_FAILED AggregateError with
-   * original errors and the first retained failure on cause, even though state has become closed.
+   * closes are attempted; failures from this closing phase reject as CLOSE_FAILED AggregateError
+   * with original errors and the first failure on cause, even though state has become closed.
+   * Completed open-phase resize/idle failures have already been delivered and are not replayed.
    */
   close(): Promise<void>
 }>
