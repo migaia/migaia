@@ -346,3 +346,100 @@ it('aborts the actual provider with invalid cancellation data and reports one pr
     await fixture.close()
   }
 })
+
+/** Reuse both original malformed tree records without introducing a graph-depth acceptance rule. */
+function originalLegacyCancellationReasons() {
+  /** The exact original base plus seventy wrappers is retained as peer input, never flattened. */
+  let deep: Record<string, unknown> = {
+    source: 'peer',
+    code: 'STOP',
+    name: 'Error',
+    message: 'stop',
+    stack: 'peer-stack'
+  }
+  for (let index = 0; index < 70; index += 1)
+    deep = {
+      source: 'peer',
+      code: 'STOP',
+      name: 'Error',
+      message: 'stop',
+      stack: 'peer-stack',
+      cause: deep
+    }
+  /** This is the unchanged original legacy bytes marker, not a repaired portable value. */
+  const invalidData = {
+    source: 'peer',
+    code: 'STOP',
+    name: 'Error',
+    message: 'stop',
+    stack: 'peer-stack',
+    data: { $rpc: 'bytes', base64url: '!' }
+  }
+  return [
+    ['70-wrapper', deep],
+    ['invalidData', invalidData]
+  ] as const
+}
+
+/** Count only the actual provider's configured public protocol diagnostic. */
+function protocolFailureCount(reports: readonly unknown[]): number {
+  /** A single traversal leaves report order and original failure objects untouched. */
+  let count = 0
+  for (const error of reports)
+    if (
+      error !== null &&
+      typeof error === 'object' &&
+      'code' in error &&
+      error.code === 'PROTOCOL_INVALID'
+    )
+      count += 1
+  return count
+}
+
+// RPC-TEST-2558A5FABE51-C001: original raw reason identity survives the current graph-shape refusal.
+it.each(originalLegacyCancellationReasons())(
+  'preserves the original raw %s cancellation reason as the malformed provider cause',
+  async (_variant, payload) => {
+    /** The actual entered provider, not a synthetic controller, observes the rejected reason. */
+    const provider = new CancellationProvider()
+    /** The provider's configured report callback is separate from caller terminal diagnostics. */
+    const reports: unknown[] = []
+    /** Identity media retains original raw references until the canonical receiving grammar. */
+    const fixture = await connectedCoreHosts(
+      {},
+      { slow: provider.run },
+      () => undefined,
+      undefined,
+      (error) => reports.push(error)
+    )
+    try {
+      /** This real public request remains pending until original native cancellation or retirement. */
+      const pending = fixture.a.memory.send('b', 'slow', null, { timeout: false })
+      void pending.catch(() => undefined)
+      await provider.started.promise
+      /** Borrow the already-written real task and route without parsing or replacing its call. */
+      const call = fixture.pair[0].written.find((frame) => frame.kind === RpcWireKind.call)
+      expect(call?.kind).toBe(RpcWireKind.call)
+      /** One raw native write exposes the original malformed reason to the sole current decoder. */
+      await fixture.pair[0].write({
+        kind: 'message',
+        data: {
+          profile: RpcWireProfile,
+          kind: RpcWireKind.cancel,
+          id: call!.id,
+          task: call!.task,
+          route: call!.route,
+          reason: payload
+        }
+      })
+      /** Both original malformed variants must still abort through the same native TypeError. */
+      const reason = await provider.aborted.promise
+      expect.soft(reason).toBeInstanceOf(TypeError)
+      expect.soft(reason).toMatchObject({ code: 'INVALID_WIRE_ERROR' })
+      expect.soft((reason as Error | undefined)?.cause).toBe(payload)
+      await vi.waitFor(() => expect(protocolFailureCount(reports)).toBe(1))
+    } finally {
+      await fixture.close()
+    }
+  }
+)

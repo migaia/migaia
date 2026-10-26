@@ -163,7 +163,13 @@ export function normalizeRpcWireError(
     invalidGraph(P.error, undefined, metadata)
   /** Graph metadata is read directly, with no enumeration or descriptor/prototype restrictions. */
   const graph = value as Record<string, unknown>
-  if (graph.root === undefined) invalidGraph(rpcWirePointer(P.error, F.root), undefined, metadata)
+  /** Retain the rejected record while handshake callers keep their existing privacy projection. */
+  if (graph.root === undefined)
+    invalidGraph(
+      rpcWirePointer(P.error, F.root),
+      causeProjector ? causeProjector(value) : value,
+      metadata
+    )
   if (
     !Array.isArray(graph.nodes) ||
     graph.nodes.length === 0 ||
