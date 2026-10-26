@@ -573,39 +573,45 @@ it('drops installation cancellation during verification and preserves the origin
   }
 })
 
-it('reports a genuine late verification failure after the connection has closed', async () => {
-  /** A verifier failure remains a failure even after the waiting Session cancels its traversal. */
-  const cause = new RangeError('late invalid signature')
-  /** Only the actual verifier is delayed; no replacement authentication stage is installed. */
-  const entered = deferred<void>()
-  /** The existing callback resumes only after the genuine physical source has closed. */
-  const released = deferred<void>()
-  /** Keep native Auth setup, codec restoration and late-result reporting under their real owners. */
-  const f = await fixture({
-    sign: (value) => value,
-    verify: async () => {
-      entered.resolve()
-      await released.promise
-      throw cause
+it.each(['signature', 'other-abort'] as const)(
+  'reports a genuine late verification failure after the connection has closed (%s)',
+  async (kind) => {
+    /** A verifier failure remains a failure even after the waiting Session cancels its traversal. */
+    const cause =
+      kind === 'signature'
+        ? new RangeError('late invalid signature')
+        : new UtilsAbortError(new Error('another operation cancelled'))
+    /** Only the actual verifier is delayed; no replacement authentication stage is installed. */
+    const entered = deferred<void>()
+    /** The existing callback resumes only after the genuine physical source has closed. */
+    const released = deferred<void>()
+    /** Keep native Auth setup, codec restoration and late-result reporting under their real owners. */
+    const f = await fixture({
+      sign: (value) => value,
+      verify: async () => {
+        entered.resolve()
+        await released.promise
+        throw cause
+      }
+    })
+    try {
+      /** The pending traversal is cancelled independently from its late verifier rejection. */
+      const pending = f.receive(await f.send(message('late-verifier-failure')))
+      await entered.promise
+      f.source.abort()
+      released.resolve()
+      expect(await pending).toBeUndefined()
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      expect(f.reports).toHaveLength(1)
+      expect(f.reports[0]).toMatchObject({ code: 'AUTHENTICATION_FAILED' })
+      expect((f.reports[0] as Error).cause).toBe(cause)
+    } finally {
+      released.resolve()
+      await f.installation.dispose?.()
+      await f.flow.dispose()
     }
-  })
-  try {
-    /** The pending traversal is cancelled independently from its late verifier rejection. */
-    const pending = f.receive(await f.send(message('late-verifier-failure')))
-    await entered.promise
-    f.source.abort()
-    released.resolve()
-    expect(await pending).toBeUndefined()
-    await new Promise<void>((resolve) => setImmediate(resolve))
-    expect(f.reports).toHaveLength(1)
-    expect(f.reports[0]).toMatchObject({ code: 'AUTHENTICATION_FAILED' })
-    expect((f.reports[0] as Error).cause).toBe(cause)
-  } finally {
-    released.resolve()
-    await f.installation.dispose?.()
-    await f.flow.dispose()
   }
-})
+)
 
 it('retains the last uint64 allocation and original local handshake credential causes', async () => {
   /** The configured signer reads only the actual input with Auth's existing representation owner. */

@@ -138,7 +138,7 @@ export class RpcAuthenticationFlow {
             prepared = await this.#restoreEnvelope(payload.prepared, payload.context)
           } catch (error) {
             /** Close releases this native traversal while the original job reports late results. */
-            if (error instanceof UtilsAbortError && this.#cancelled(payload.context)) return
+            if (this.#acknowledgesCancellation(error, payload.context)) return
             if (payload.context.session && isLocalRpcError(error, RpcAuthenticationError)) {
               payload.context.report(error)
               return
@@ -298,7 +298,7 @@ export class RpcAuthenticationFlow {
       }
       return frame
     } catch (error) {
-      if (error instanceof UtilsAbortError && this.#cancelled(context)) throw error
+      if (this.#acknowledgesCancellation(error, context)) throw error
       /** Local diagnostics retain the verifier failure; outbound presentation owns redaction. */
       throw createRpcAuthenticationError(Text.inboundFrameAuthenticationFailed, error)
     }
@@ -365,7 +365,7 @@ export class RpcAuthenticationFlow {
       return prepared
     } catch (error) {
       if (
-        (error instanceof UtilsAbortError && this.#cancelled(context)) ||
+        this.#acknowledgesCancellation(error, context) ||
         isLocalRpcError(error, RpcAuthenticationError) ||
         isLocalRpcError(error, RpcConfigurationError)
       )
@@ -386,7 +386,7 @@ export class RpcAuthenticationFlow {
       signal: context.signal,
       /** Late local verifier failures retain their original identity in every handshake state. */
       report: (error) => {
-        if (!(error instanceof UtilsAbortError && this.#cancelled(context))) context.report(error)
+        if (!this.#acknowledgesCancellation(error, context)) context.report(error)
       }
     })
   }
@@ -460,7 +460,7 @@ export class RpcAuthenticationFlow {
     } catch (error) {
       if (validationFailed && error === validationFailure) throw error
       if (
-        (error instanceof UtilsAbortError && this.#cancelled(context)) ||
+        this.#acknowledgesCancellation(error, context) ||
         isLocalRpcError(error, RpcAuthenticationError)
       )
         throw error
@@ -507,9 +507,15 @@ export class RpcAuthenticationFlow {
         : this.#signal
     if (this.#closed || signal.aborted) throw new UtilsAbortError(resolveAbortReason(signal))
   }
-  /** Cancellation retires an unfinished transform; it does not identify invalid credentials. */
-  #cancelled(context: IRpcFlowContext): boolean {
-    return this.#closed || context.signal.aborted || context.connectionSignal?.aborted === true
+  /** Only this job's cancellation reasons distinguish retirement from an unrelated verifier error. */
+  #acknowledgesCancellation(error: unknown, context: IRpcFlowContext): boolean {
+    if (!(error instanceof UtilsAbortError)) return false
+    return (
+      (context.signal.aborted && Object.is(error.cause, resolveAbortReason(context.signal))) ||
+      (context.connectionSignal?.aborted === true &&
+        Object.is(error.cause, resolveAbortReason(context.connectionSignal))) ||
+      (this.#closed && Object.is(error.cause, resolveAbortReason(this.#signal)))
+    )
   }
   /** Observe actual sign/verify inputs without inferring protection from an opaque object's shape. */
   #protected(context: IRpcFlowContext, content: unknown): void {
