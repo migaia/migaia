@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest'
-import { PluginHost, definePlugin, defineFeature } from '@migaia/plugin-host'
+import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'
+import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { createRpcHost } from '@migaia/rpc-host'
 /** The existing ordinary thread outlet accepts a registration and its remote method. */
 type IOrdinaryOutlet = Readonly<{ request(method: string, data?: unknown): Promise<unknown> }>
@@ -59,8 +60,11 @@ it('carries bidirectional Worker calls and streams while retaining borrowed nati
     expect(values).toEqual([3, 4])
     await Promise.all(hosts.map((host) => host.close()))
     /** Native delivery still works after both borrowed logical connections have been retired. */
+    /** A retired host's queued close control frame may still arrive first; wait for this probe. */
     const received = new Promise<unknown>((resolve) =>
-      pair.port2.addEventListener('message', (event) => resolve(event.data), { once: true })
+      pair.port2.addEventListener('message', (event) => {
+        if (event.data === 'still-borrowed') resolve(event.data)
+      })
     )
     pair.port1.postMessage('still-borrowed')
     expect(await received).toBe('still-borrowed')
@@ -207,8 +211,15 @@ it.each(['window', 'worker', 'shared', 'rtc'] as const)(
     expect(await first[0].browser.request('value')).toBe(17)
     await Promise.all(first.map((host) => host.close()))
     /** Ordinary Host lifecycle remains the sole installation and disposal owner. */
-    const host = new PluginHost({
-      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    /** Lazy pipeline authority reads this case's own native host only at installation. */
+    const rpc = rpcHostPipelines(
+      () => host,
+      (name) => host.pipeline(name),
+      ['browser']
+    )
+    const host = defineHost({
+      ...rpc,
+      host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })
     /** Explicit exposure resolves the existing native Feature output rather than another provider. */
     const app = definePlugin({

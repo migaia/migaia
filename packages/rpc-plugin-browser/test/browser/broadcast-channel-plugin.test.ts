@@ -242,13 +242,13 @@ describe('BroadcastChannel transport plugin', () => {
     }
   })
 
-  it('rejects transfer synchronously and uses the original timeout for a silent discovered participant', async () => {
+  it('rejects transfer through the call Promise and uses the original timeout for a silent discovered participant', async () => {
     const room = await openRoom()
     try {
       const buffer = new ArrayBuffer(8)
-      expect(() =>
+      await expect(
         room.hosts[0]!.broadcastChannel.request('echo', buffer, { transfer: [buffer] })
-      ).toThrowError(expect.objectContaining({ code: 'CAPABILITY_UNSUPPORTED' }))
+      ).rejects.toMatchObject({ code: 'CAPABILITY_UNSUPPORTED' })
       expect(buffer.byteLength).toBe(8)
     } finally {
       await room.close()
