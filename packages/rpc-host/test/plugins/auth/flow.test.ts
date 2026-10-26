@@ -6,6 +6,8 @@ import type { IRpcEnvelope, IRpcHello } from '@migaia/rpc-contract/protocol'
 import { RpcWireProfile } from '@migaia/rpc-contract/protocol'
 import { auth, type IRpcAuthenticationOptions } from '../../../dist/features/auth/index.js'
 import { setAuthenticationReplayCounter } from '../../../dist/features/auth/counter.js'
+import { readAuthenticationEnvelope } from '../../../dist/features/auth/envelope.js'
+import { AuthenticationRepresentation } from '../../../dist/features/auth/representation.js'
 import { readRpcDefinition, RpcDefinitionKind } from '../../../dist/sdk/metadata.js'
 import { RpcJsonCarrierCodec } from '../../../dist/sdk/carrier/json-codec.js'
 import { FlowRegistry } from '../../../dist/flow/registry.js'
@@ -388,6 +390,64 @@ it.each(['missing', 'throwing'] as const)(
   }
 )
 
+// RPC-TEST-D12BE7E44139-C007: mutate only the original seven signed binding fields.
+it('rejects the original malformed versions counters and nonces after actual native verification', async () => {
+  /** Native sign-only any exposes the authentic complete binding as an object to this callback. */
+  const state = { change: {} as Record<string, unknown> }
+  /** The genuine selected codec owns the native backing and all semantic metadata preparation. */
+  const f = await fixture(
+    {
+      sign: (value) => {
+        expect(typeof value).toBe('object')
+        return { ...(value as object), ...state.change }
+      },
+      verify: (value) => value
+    },
+    true
+  )
+  try {
+    /** Preserve the exact original malformed domains; each still fails before replay admission. */
+    const invalid = [
+      { version: 2 },
+      { nonce: '' },
+      { nonce: 'A'.repeat(32) },
+      { counter: '0' },
+      { counter: '-1' },
+      { counter: '01' },
+      { counter: '18446744073709551616' }
+    ]
+    for (const change of invalid) {
+      state.change = change
+      /** Four native bytes select the supported opaque binding without parsing signed text. */
+      const frame = await f.send(message('malformed-binding', new Uint8Array([1, 2, 3, 4])))
+      await expect(f.receive(frame)).rejects.toMatchObject({ code: 'AUTHENTICATION_FAILED' })
+    }
+  } finally {
+    await f.flow.dispose()
+  }
+})
+
+// RPC-TEST-D12BE7E44139-C008: payload categories remain business data beneath prepared metadata.
+it.each(['text', new Uint8Array([0, 255, 42]), { nested: 'value' }])(
+  'retains the original authenticated payload category %# through the actual codec',
+  async (value) => {
+    /** The codec owns the prepared envelope; Auth never adds an arbitrary raw protect API. */
+    const f = await fixture({ sign: (input) => input, verify: (input) => input }, true)
+    try {
+      /** Preserve each original text, byte or record value after genuine verified restoration. */
+      const received = await f.receive(await f.send(message('payload-category', value)))
+      expect(received).toMatchObject({ payload: value })
+      if (received.kind === 'call') {
+        expect(typeof received.payload).toBe(typeof value)
+        expect(received.payload instanceof Uint8Array).toBe(value instanceof Uint8Array)
+        expect(received.payload).toEqual(value)
+      } else expect.fail('expected original authenticated call')
+    } finally {
+      await f.flow.dispose()
+    }
+  }
+)
+
 it('finishes original native integrity before replay commit and reuses the exact cached restore Promise', async () => {
   /** Signing covers the original complete manifest including full backing digest/length. */
   const f = await fixture({ sign: (value) => value, verify: (value) => value }, true)
@@ -457,11 +517,25 @@ it('rejects verification after physical retirement and preserves custom verifica
 })
 
 it('retains the last uint64 allocation and sanitizes actual handshake verifier credentials', async () => {
+  /** The configured signer reads only the actual input with Auth's existing representation owner. */
+  const representation = new AuthenticationRepresentation('any')
+  /** Original decimal spelling is observable without adding an allocator inspection port. */
+  const signedCounters: string[] = []
   /** Reuse the original private exact-owner injection seam, without adding a public counter option. */
-  const f = await fixture({ sign: (value) => value, verify: (value) => value })
+  const f = await fixture({
+    sign: (value) => {
+      signedCounters.push(readAuthenticationEnvelope(representation.plaintext(value)).counter)
+      return value
+    },
+    verify: (value) => value
+  })
   expect(setAuthenticationReplayCounter({ ...f.installation }, 0n)).toBe(false)
   expect(setAuthenticationReplayCounter(f.installation, 0xfffffffffffffffen)).toBe(true)
-  expect(await f.receive(await f.send(message('last')))).toMatchObject({ id: 'last' })
+  expect(await f.receive(await f.send(message('last', { value: 'last' })))).toMatchObject({
+    id: 'last',
+    payload: { value: 'last' }
+  })
+  expect(signedCounters).toEqual(['18446744073709551615'])
   await expect(f.send(message('overflow'))).rejects.toMatchObject({
     code: 'INVALID_CONFIG',
     message: 'Authentication replay counter is exhausted'
