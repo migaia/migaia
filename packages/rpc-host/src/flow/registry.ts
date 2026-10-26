@@ -26,11 +26,10 @@ const flowPositions = {
   batch: 6,
   [RpcFlowLayer.wire]: 7
 } as const
-/** Plaintext and wire surround the six fixed builtin positions. */
-const bucketCount = Object.keys(flowPositions).length
 
-/** Cached namespace facts contain no stage order, snapshots, or execution continuations. */
+/** Namespace membership and facts are cached together; native stages retain execution ownership. */
 type IFlowFacts = Readonly<{
+  selected: readonly IRpcFlowInstallation<object>[]
   extensions: readonly string[]
   required: readonly string[]
   observing: boolean
@@ -44,7 +43,7 @@ export class FlowRegistry {
   /** Exact installations retain their namespace/observer facts until native rollback or removal. */
   readonly #registrations = new Map<IRpcFlowInstallation<object>, Set<string> | undefined>()
   /** Negotiation reads one cached membership projection per actual namespace. */
-  readonly #scopes = new Map<string, IFlowFacts>()
+  readonly #scopes = new Map<string | undefined, IFlowFacts>()
   /** First transport startup freezes the declared intervention prefix. */
   #started = false
   /** Failed readonly observers report to the host's original diagnostic outlet. */
@@ -103,14 +102,14 @@ export class FlowRegistry {
     /** Each selected installation produces its own public extension surface once at publication. */
     const values: Readonly<Record<string, unknown>>[] = []
     /** Borrow each factory once; destructuring preserves its original receiverless invocation. */
-    for (const { namespaceExtensions: create } of this.#selected(namespace))
+    for (const { namespaceExtensions: create } of this.facts(namespace).selected)
       if (create) values.push(create(namespace) as Readonly<Record<string, unknown>>)
     return values
   }
 
   /** Isolate observer failures without changing any business continuation or result. */
   readonly observe = (event: IRpcObservation): void => {
-    for (const installed of this.#selected(event.namespace)) {
+    for (const installed of this.facts(event.namespace).selected) {
       try {
         installed.observe?.(event)
       } catch (error) {
@@ -133,7 +132,7 @@ export class FlowRegistry {
     entries: readonly IRpcFlowEntry[]
   ): void {
     /** Eight is a compile-time bound: plaintext, six builtins, wire. No collection is sorted. */
-    const buckets: IRpcFlowStage<K>[][] = Array.from({ length: bucketCount }, () => [])
+    const buckets = Object.values(flowPositions).map((): IRpcFlowStage<K>[] => [])
     for (const entry of entries) {
       /** This point selects the original stage without introducing a filtering continuation. */
       const selected = entry.installed.stages?.[point]
@@ -187,14 +186,8 @@ export class FlowRegistry {
     if (this.#started) invalidFlow(HostErrorText.flowStarted)
   }
 
-  /** Observation and negotiation share one selected installation view, deduplicated by identity. */
-  *#selected(namespace?: string): IterableIterator<IRpcFlowInstallation<object>> {
-    for (const [installed, namespaces] of this.#registrations)
-      if (namespace === undefined || !namespaces || namespaces.has(namespace)) yield installed
-  }
-
   /** Collect only negotiation/observation membership; native snapshots never enter this cache. */
-  facts(namespace: string): IFlowFacts {
+  facts(namespace?: string): IFlowFacts {
     /** Existing namespace facts are invalidated only when real installation membership changes. */
     const existing = this.#scopes.get(namespace)
     if (existing) return existing
@@ -210,7 +203,11 @@ export class FlowRegistry {
     let transferRequiresIntegrity = false
     /** A later selected installation retains the original protection-fact precedence. */
     let observationFacts: IRpcFlowInstallation['observationFacts']
-    for (const installed of this.#selected(namespace)) {
+    /** Select once when real installation membership changes; execution never scans registrations. */
+    const selected: IRpcFlowInstallation<object>[] = []
+    for (const [installed, namespaces] of this.#registrations) {
+      if (namespace !== undefined && namespaces && !namespaces.has(namespace)) continue
+      selected.push(installed)
       for (const name of installed.extensions ?? []) extensions.add(name)
       for (const name of installed.requiredExtensions ?? []) required.add(name)
       observing ||= installed.observe !== undefined
@@ -220,6 +217,7 @@ export class FlowRegistry {
     }
     /** The cache publishes only immutable lists and readonly installation facts. */
     const facts = {
+      selected,
       extensions: [...extensions],
       required: [...required],
       observing,
