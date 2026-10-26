@@ -263,6 +263,15 @@ class NativeCoroutineCase {
       await this.#service.installed
       /** This exact coroutine child owns its actual accepted parent Session. */
       const child = this.#service.children[0]!
+      /** Sibling startup can finish before this realm consumes the parent's updated directory. */
+      await vi.waitFor(
+        () =>
+          expect(child.coroutine.peers.parent).toHaveProperty(
+            'native.service.read',
+            expect.any(Function)
+          ),
+        { timeout: 2000 }
+      )
       /** Both outer errors retain their distinct original channel paths for final evidence. */
       const forwardError = await this.#forward(child)
       /** Native selection borrows the one real namespace installed for this family. */
