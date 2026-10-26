@@ -288,8 +288,10 @@ export class RpcAuthenticationFlow {
       const credentials = this.#config.verify
         ? this.#handshakeCredentials(frame.auth, frame.step, context)
         : frame.auth
+      /** Keep the verifier receiver-free like the other authentication callbacks. */
+      const verifyCredentials = this.#config.verifyCredentials
       /** Only an explicit verifier result can grant a principal; wire identity never supplies it. */
-      const verified = await this.#config.verifyCredentials?.(credentials, frame.peer, context)
+      const verified = await verifyCredentials?.(credentials, frame.peer, context)
       this.#assert(context)
       if (verified !== null && typeof verified === 'object' && !Array.isArray(verified)) {
         /** Formerly ignored primitive returns retain their original non-authoritative meaning. */
