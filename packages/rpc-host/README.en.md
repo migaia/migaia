@@ -102,6 +102,8 @@ Aggregate and default subpath imports support tree-shaking. Other flow plugins a
 
 A custom flow returns `stages` from `defineFlowPlugin` setup. Each stage receives its pipeline payload and native `next(payload)`; readonly events belong in the separate `observe` field. Frame pipelines allow independent submissions: after catching and reporting one member's failure, a stage can submit another. Ignoring a failed `next()` Promise rejects the pipeline. The original call settles a cancelled batch member with `CANCELLED` and its original reason on `cause`; other members complete normally.
 
+`auth` protects each complete message before `chunk` splits it into physical frames. The receiver reassembles the message before restoring protection. Probe `protected` events describe the complete message; `frame` events retain actual `chunkIndex`, `chunkCount` and `members`. Physical batch membership is observed on its batch frame, while each logical message has one `envelope` observation.
+
 A custom carrier may implement optional `reserveWrite` by borrowing its existing flow-control capacity. Reserve once per logical write: chunk fragments share its receipt, while a batch retains each member's receipt until completion. `write` still completes at actual physical acceptance, and `close` must settle carrier-owned queued writes.
 
 [Pool](../rpc-plugin-pool/README.en.md) is the transport's `pool({ size })` feature. Members use one carrier kind and expose one logical peer. Pool owns member acquisition, scheduling, and closure; the transport contributes native `host.<ns>.members` controls.
