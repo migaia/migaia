@@ -114,11 +114,11 @@ describe('Tray receipt-bound relay', () => {
           (count) => count === 2
         )
         expect(await caller.request('node.svc.aborted')).toBe(0)
-        expect(
-          reports.some(
-            (error) => chainHas(error, 'CANCELLED') || chainHas(error, 'DEADLINE_EXCEEDED')
-          )
-        ).toBe(true)
+        /**
+         * Cooperative cancellation is acknowledged without a diagnostic; a genuine late timeout may
+         * report.
+         */
+        expect(reports.some((error) => chainHas(error, 'CANCELLED'))).toBe(false)
       } finally {
         await tray.dispose()
       }
