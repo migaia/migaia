@@ -437,7 +437,7 @@ function packDependency(packageDirectory, dependency) {
 function assertPackedOwnerManifests(packedPackages) {
   const expectedPeers = {
     'rpc-contract': [],
-    'rpc-host': ['@migaia/rpc-contract'],
+    'rpc-host': [],
     'rpc-plugin-process': ['@migaia/rpc-contract', '@migaia/rpc-host'],
     'rpc-plugin-thread': ['@migaia/rpc-contract', '@migaia/rpc-host'],
     'rpc-plugin-browser': ['@migaia/rpc-contract', '@migaia/rpc-host'],
@@ -458,11 +458,22 @@ function assertPackedOwnerManifests(packedPackages) {
     const rpcPeers = orderStringKeys(
       Object.keys(manifest.peerDependencies ?? {}).filter((peer) => peer.startsWith('@migaia/rpc-'))
     )
-    if (JSON.stringify(rpcPeers) !== JSON.stringify(expectedPeers[owner]))
+    /** The Host owns its Contract runtime; optional transports borrow both exact peer owners. */
+    const rpcDependencies = orderStringKeys(
+      Object.keys(manifest.dependencies ?? {}).filter((name) => name.startsWith('@migaia/rpc-'))
+    )
+    if (
+      JSON.stringify(rpcPeers) !== JSON.stringify(expectedPeers[owner]) ||
+      JSON.stringify(rpcDependencies) !==
+        JSON.stringify(owner === 'rpc-host' ? ['@migaia/rpc-contract'] : [])
+    )
       throw new Error(`Packed dependency direction or required peers drifted: ${owner}`)
-    for (const [peer, version] of Object.entries(manifest.peerDependencies ?? {}))
+    for (const [peer, version] of [
+      ...Object.entries(manifest.dependencies ?? {}),
+      ...Object.entries(manifest.peerDependencies ?? {})
+    ])
       if (peer.startsWith('@migaia/rpc-') && version !== manifest.version)
-        throw new Error(`Packed peer is not exact lockstep: ${owner} ${peer}=${version}`)
+        throw new Error(`Packed RPC dependency is not exact lockstep: ${owner} ${peer}=${version}`)
     for (const [subpath, entry] of Object.entries(manifest.exports)) {
       if (subpath.includes('/internal/') || subpath.includes('spi'))
         throw new Error(`Packed owner exposes a private entry: ${owner}${subpath}`)
