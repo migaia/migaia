@@ -17,9 +17,7 @@ import {
   RpcProbeOutcome,
   rpcProbeEnvelopeFacts,
   RpcProbeLifecycle,
-  RpcProbeObservationKind,
   rpcCarrierWriteFacts,
-  type IRpcProbeObservation,
   type IRpcCarrierFrame,
   type IRpcCodecContext,
   type IRpcDispose,
@@ -79,7 +77,7 @@ import {
   serializeHostWireError
 } from '../host/error-wire-metadata.js'
 import { SessionText } from './text.js'
-import { carrierSizeBytes } from '../sdk/wire/probe-content.js'
+import { RpcSessionObservation } from '../sdk/carrier/observation.js'
 import { portableBytes } from '../sdk/wire/portable-size.js'
 import { rpcPortableBackingLength } from '@migaia/rpc-contract/portable'
 import { isRpcCarrierAdmissionFailure } from '../sdk/carrier/admission.js'
@@ -119,6 +117,8 @@ function isSessionReply(frame: IRpcSemanticFrame): boolean {
 export class Session {
   /** Explicit collaborators own identity, indexing and actual business execution elsewhere. */
   readonly #options: IRpcSessionOptions
+  /** Readonly stage projection borrows this Session's facts without owning media or cleanup. */
+  readonly #observation: RpcSessionObservation
   /** Native secrets belong to this physical connection and are cleared on retirement. */
   readonly #credentials: ISessionCredentials
   /** All plugin and control work observes this connection's terminal signal. */
@@ -187,6 +187,17 @@ export class Session {
     /** Retained lifecycle collaborators never retain the original secret-bearing context. */
     const { connection, ...collaborators } = options
     this.#options = collaborators
+    this.#observation = new RpcSessionObservation({
+      namespace: collaborators.namespace,
+      carrierId: collaborators.carrier.id,
+      view: () => this.#view,
+      mediaFacts: () => this.#options.carrier.observation?.facts,
+      descriptorFacts: () => ({
+        ...this.#options.flow.facts(this.#options.namespace).observationFacts,
+        endpointId: this.#options.self().instanceId
+      }),
+      emit: collaborators.flow.observe && ((event) => this.#options.flow.observe?.(event))
+    })
     this.#credentials = { value: connection?.credentials, retain: connection?.retain }
     bindSessionCredentials(this.#handshakeResult, this.#credentials)
     this.#handshakeResult.authentication = connection?.authentication
@@ -252,15 +263,9 @@ export class Session {
     try {
       /** Subscribe before handshake traffic; the native owner supplies raw facts before any decode. */
       if (this.#options.flow.facts(this.#options.namespace).observing)
-        this.#unobserve = this.#options.carrier.observation?.subscribe((event) => {
-          this.#observe({
-            ...event,
-            // Bootstrap may contain private credentials; its physical facts remain observable.
-            content: this.#view ? event.content : undefined,
-            stage: S.carrier,
-            carrier: this.#options.carrier.observation!.facts.platform
-          })
-        })
+        this.#unobserve = this.#options.carrier.observation?.subscribe((event) =>
+          this.#observation.carrier(event)
+        )
       /** Native callbacks capture only this resource owner, never a host/runtime facade. */
       const remove = this.#options.carrier.subscribe({
         frame: this.#onFrame,
@@ -280,7 +285,7 @@ export class Session {
       return
     }
     if (!this.#closing) {
-      this.#lifecycle(RpcProbeLifecycle.handshake)
+      this.#observation.lifecycle(RpcProbeLifecycle.handshake)
       if (this.#closing) return
       try {
         this.#scheduleHandshake(
@@ -409,7 +414,7 @@ export class Session {
         onWriteStart: job.options?.onWriteStart
       }
       const context = this.#codecContext(false, job.options)
-      this.#media(S.envelope, D.outbound, job.frame, job.frame)
+      this.#observation.media(S.envelope, D.outbound, job.frame, job.frame)
       const prepared = await this.#options.carrier.codec.prepare(job.frame, context)
       this.#assertOpen(true)
       job.capture = { prepared, context }
@@ -581,7 +586,7 @@ export class Session {
     this.#closing = true
     this.#physicalFailure = physicalFailure
     this.#reason = reason ?? createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
-    this.#lifecycle(RpcProbeLifecycle.closing, this.#reason)
+    this.#observation.lifecycle(RpcProbeLifecycle.closing, this.#reason)
     this.#cancelHandshakeTimer()
     this.#ready.reject(this.#reason)
     this.#offered.reject(this.#reason)
@@ -731,7 +736,7 @@ export class Session {
    */
   readonly #onFrame = (frame: IRpcCarrierFrame): void => {
     if (this.#controller.signal.aborted) return
-    this.#media(S.frame, D.inbound, frame)
+    this.#observation.media(S.frame, D.inbound, frame)
     /** Accepted frames may verify together; bootstrap still uses its original serial agreement. */
     const previous = this.#receiving
     /** Parallel logical next calls from this same physical input reserve their own arrival order. */
@@ -802,7 +807,7 @@ export class Session {
     try {
       /** The physical codec owns the canonical semantic parser; no second walker runs here. */
       const context = this.#codecContext(!this.#view)
-      this.#media(S.encoded, D.inbound, frame.data)
+      this.#observation.media(S.encoded, D.inbound, frame.data)
       /** Four-stage media boundary leaves protected metadata visible before restoration. */
       const decoded = await this.#options.carrier.codec.decode(frame, context)
       /** Only a restored, route-admitted frame can authorize correlated failure settlement. */
@@ -866,7 +871,7 @@ export class Session {
       await previous
     if (this.#controller.signal.aborted) return
     this.#assertOpen(true, true)
-    this.#media(S.envelope, D.inbound, message, message)
+    this.#observation.media(S.envelope, D.inbound, message, message)
     if (message.kind === K.handshake) {
       await this.#handshake(message)
       return
@@ -882,7 +887,7 @@ export class Session {
       return
     }
     if (message.kind === K.control)
-      this.#observe({
+      this.#observation.event({
         ...rpcProbeEnvelopeFacts(message),
         stage: S.message,
         direction: D.inbound,
@@ -1013,12 +1018,12 @@ export class Session {
     this.#offer = undefined
     this.#remoteId = undefined
     if (first) {
-      this.#describe()
+      this.#observation.describe()
       this.#assertOpen()
     }
     this.#ready.resolve(view)
     this.#options.changed?.()
-    if (first) this.#lifecycle(RpcProbeLifecycle.ready)
+    if (first) this.#observation.lifecycle(RpcProbeLifecycle.ready)
   }
 
   /**
@@ -1052,7 +1057,7 @@ export class Session {
     options = { ...options, ...rpcCarrierWriteFacts(message) }
     /** Bootstrap always uses common JSON and has no native transfer permission. */
     const context = capture?.context ?? this.#codecContext(bootstrap, options)
-    if (!capture) this.#media(S.envelope, D.outbound, message, message)
+    if (!capture) this.#observation.media(S.envelope, D.outbound, message, message)
     /** Closing quota already owns this exact preparation; ordinary traffic captures here once. */
     const captured =
       capture?.prepared ?? (await this.#options.carrier.codec.prepare(message, context))
@@ -1083,7 +1088,7 @@ export class Session {
       if (bootstrap) throw cause
       throw createRpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
     }
-    this.#media(S.encoded, D.outbound, encoded.data, message, options?.transfer)
+    this.#observation.media(S.encoded, D.outbound, encoded.data, message, options?.transfer)
     this.#assertOpen(continuing, final)
     /** A single logical reservation belongs to this whole run, including all native next branches. */
     const admission = this.#options.carrier.reserveWrite?.(options)
@@ -1102,7 +1107,7 @@ export class Session {
       this.#assertOpen(writeContext.continuing, writeContext.final)
       /** A batch may clear only its first logical signal, never the held Session's terminal fence. */
       const signal = physical?.signal === false ? this.#controller.signal : physical?.signal
-      this.#media(S.frame, D.outbound, frame, writeContext.message, physical?.transfer)
+      this.#observation.media(S.frame, D.outbound, frame, writeContext.message, physical?.transfer)
       this.#assertOpen(writeContext.continuing, writeContext.final)
       if (signal?.aborted) throw createRpcAbortError(undefined, undefined, signal.reason)
       await this.#write(
@@ -1139,7 +1144,7 @@ export class Session {
       admission?.release()
     }
     if (message.kind === K.control)
-      this.#observe({
+      this.#observation.event({
         ...rpcProbeEnvelopeFacts(message),
         stage: S.message,
         direction: D.outbound,
@@ -1190,91 +1195,6 @@ export class Session {
         throw cause
       throw createRpcTransportError(RpcCoreErrorText.transportSendFailed, cause)
     }
-  }
-
-  /** One successful physical publication describes only acquired native and installed flow facts. */
-  #describe(): void {
-    /** A carrier without acquired observation metadata cannot claim a guessed platform. */
-    const observation = this.#options.carrier.observation
-    if (!observation) return
-    this.#options.flow.observe?.({
-      kind: RpcProbeObservationKind.descriptor,
-      namespace: this.#options.namespace,
-      carrierId: this.#options.carrier.id,
-      peerId: this.#view?.peerId,
-      data: Object.freeze({
-        ...observation.facts,
-        ...this.#options.flow.facts(this.#options.namespace).observationFacts,
-        endpointId: this.#options.self().instanceId,
-        namespace: this.#options.namespace,
-        carrierId: this.#options.carrier.id,
-        carrier: observation.facts.platform,
-        stageMask:
-          (1 << S.peer) |
-          (1 << S.message) |
-          (1 << S.envelope) |
-          (1 << S.encoded) |
-          (1 << S.frame) |
-          (1 << S.carrier) |
-          (1 << S.forward)
-      })
-    })
-  }
-
-  /** Publish only borrowed stage facts; the observer cannot replace a continuation or frame. */
-  #observe(data: IRpcProbeObservation): void {
-    this.#options.flow.observe?.({
-      kind: RpcProbeObservationKind.event,
-      namespace: this.#options.namespace,
-      carrierId: this.#options.carrier.id,
-      peerId: this.#view?.peerId,
-      id: data.messageId,
-      data
-    })
-  }
-
-  /** Only real connection transitions produce the existing public lifecycle names. */
-  #lifecycle(lifecycle: string, error?: unknown): void {
-    this.#observe({
-      stage: S.peer,
-      kind: RpcProbeKind.lifecycle,
-      peerId: this.#view?.peerId,
-      lifecycle,
-      error
-    })
-  }
-
-  /** Opaque physical input has no fabricated task identity before the one codec admits it. */
-  #media(
-    stage: number,
-    direction: number,
-    content: unknown,
-    message?: IRpcSemanticFrame,
-    transfer?: readonly ArrayBuffer[]
-  ): void {
-    /** Admitted semantic routes may annotate outbound media and restored inbound envelopes only. */
-    const routed = message && message.kind !== K.handshake ? message : undefined
-    /** Only the existing frame stage lends its original opaque outer frame to readonly observers. */
-    const frame = stage === S.frame ? (content as IRpcCarrierFrame) : undefined
-    /** Captured bytes and extension data retain their original identity and representation. */
-    const media = frame ? frame.data : content
-    this.#observe({
-      stage,
-      direction,
-      variation:
-        stage === S.envelope && message?.kind === K.control ? message.operation : undefined,
-      messageId: routed?.id,
-      method: message && 'task' in message ? message.task.method : undefined,
-      senderId: routed?.route.senderId,
-      targetId: routed?.route.targetId,
-      receiverId: routed?.route.receiverId,
-      peerId: this.#view?.peerId,
-      sizeBytes: stage === S.envelope ? -1 : carrierSizeBytes(media),
-      // A not-yet-accepted handshake can carry private connection credentials.
-      content: this.#view ? media : undefined,
-      carrierFrame: this.#view ? frame : undefined,
-      transfer
-    })
   }
 
   /** Negotiated facts are borrowed; arbitrary caller options cannot grant native binary support. */
