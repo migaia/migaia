@@ -9,11 +9,9 @@ import { inspectFeatures } from '@migaia/plugin-host/composition'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { tagRpcError } from '@migaia/rpc-contract/errors'
-import { RpcCallFeatureKind } from '@migaia/rpc-contract/interfaces'
 import { HostErrorText } from '../host/error-text.js'
 import { installRpcDefinition } from '../host/installation.js'
 import { RpcFlowSetup } from './flow-setup.js'
-import { RpcNativeFeatureKind } from './native-feature-types.js'
 import { RpcBuiltinFeature } from './flow-feature.js'
 import {
   readRpcDefinition,
@@ -80,14 +78,12 @@ function transportFlows(features: readonly unknown[] = []): IRpcFlowFeature<obje
       flows.push(feature as IRpcFlowFeature<object>)
       continue
     }
-    /** Existing transport policies keep their canonical installers and are not reimplemented here. */
+    /**
+     * Call policies, pool and transport-native features (for example process `ipcLog`) keep their
+     * own installers; the transport validates its own kinds, so only shapeless values fail here.
+     */
     const kind = feature && typeof feature === 'object' && Reflect.get(feature, 'kind')
-    if (
-      kind !== RpcCallFeatureKind.timeout &&
-      kind !== RpcCallFeatureKind.retry &&
-      kind !== RpcNativeFeatureKind.pool
-    )
-      invalidFeature()
+    if (typeof kind !== 'string') invalidFeature()
   }
   return flows
 }
