@@ -84,6 +84,8 @@ type IAsyncBranch = {
   promise?: ObservedTraversalPromise
   active: boolean
   failed: boolean
+  /** Set once the branch traversal has settled; a settled branch needs no further await. */
+  settled: boolean
   error?: unknown
 }
 
@@ -112,8 +114,8 @@ class ObservedTraversalPromise extends Promise<void> {
     return super.then(onfulfilled, onrejected)
   }
   /** The runner joins and consumes original rejection without pretending the caller observed it. */
-  consume(onRejected: (error: unknown) => void): Promise<void> {
-    return super.then(undefined, onRejected)
+  consume(onFulfilled: () => void, onRejected: (error: unknown) => void): Promise<void> {
+    return super.then(onFulfilled, onRejected)
   }
   /** Observation is sampled only after the stage and all its started traversals settle. */
   get observed(): boolean {
@@ -246,7 +248,7 @@ class AsyncPipelineFrame<TValue> {
       return Promise.resolve()
     }
     /** Placeholder keeps the control record stable while synchronous downstream entry begins. */
-    const branch: IAsyncBranch = { active: false, failed: false }
+    const branch: IAsyncBranch = { active: false, failed: false, settled: false }
     // Publish admission before dispatch: downstream may reenter this captured next synchronously.
     this.#branches.push(branch)
     /** Caller receives the exact started branch promise; the observer never rejects. */
@@ -257,12 +259,17 @@ class AsyncPipelineFrame<TValue> {
         ? new ObservedTraversalPromise(pending)
         : undefined
     branch.promise = observed
+    /** Marks a fulfilled traversal so the frame can skip awaiting it again. */
+    const settled = (): void => {
+      branch.settled = true
+    }
     /** This exact record consumes rejection without calling the public observation hook. */
     const failed = (error: unknown): void => {
       branch.failed = true
       branch.error = error
+      branch.settled = true
     }
-    branch.completion = observed ? observed.consume(failed) : pending.then(undefined, failed)
+    branch.completion = observed ? observed.consume(settled, failed) : pending.then(settled, failed)
     return observed ?? pending
   }
   /** Awaits stage and started branches, preserving active control and original failure order. */
@@ -278,7 +285,8 @@ class AsyncPipelineFrame<TValue> {
       stageError = error
     }
     this.#returned = true
-    for (const branch of this.#branches) await branch.completion
+    // A settled branch's completion has already resolved; awaiting it would only add a turn.
+    for (const branch of this.#branches) if (!branch.settled) await branch.completion
     /** Original rejections are collected once in submission order. */
     const failures: unknown[] = []
     /** Object identity proves a stage only propagated one of its started branch failures. */
