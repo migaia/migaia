@@ -377,7 +377,7 @@ export class Namespace {
     try {
       /** Native transport and flow setup reuse the same cancellation and late-cleanup handoff. */
       return await new RpcInstallationSetup({
-        setup: () => definition.open(context),
+        setup: () => (0, definition.open)(context),
         own: (installed) => resources.own(installed, { force: () => installed.dispose() }),
         report: operation.report,
         signals: [context.signal, core.operation.signal],

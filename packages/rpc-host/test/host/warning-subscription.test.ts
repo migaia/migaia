@@ -186,6 +186,63 @@ it('A28 delivers one original warning to the option then host SDK plugins in reg
   }
 })
 
+it('calls SDK setup and observation callbacks without a configuration receiver', async () => {
+  /** Normal functions expose receiver binding that arrow callbacks cannot observe. */
+  const receivers: { callback: string; receiver: unknown }[] = []
+  /** The SDK observer must see real lifecycle and business events. */
+  const observations: unknown[] = []
+  /** Native parent facts exercise the same warning producer as the subscription cases. */
+  const pair = new WarningPair()
+  try {
+    await pair.open({
+      plugins: [
+        defineTransportPlugin({
+          name: 'receiver-transport',
+          namespace: 'other',
+          open: function (this: unknown) {
+            receivers.push({ callback: 'transport open', receiver: this })
+            return { dispose: () => undefined }
+          }
+        }),
+        defineFlowFeature({
+          name: 'receiver-feature',
+          setup: function (this: unknown) {
+            receivers.push({ callback: 'feature setup', receiver: this })
+            return {}
+          }
+        }),
+        defineFlowPlugin({
+          name: 'receiver-observer',
+          setup: function (this: unknown) {
+            receivers.push({ callback: 'plugin setup', receiver: this })
+            return {
+              onWarning: function (this: unknown) {
+                receivers.push({ callback: 'warning', receiver: this })
+              },
+              observe: function (this: unknown, event) {
+                receivers.push({ callback: 'observe', receiver: this })
+                observations.push(event)
+              }
+            }
+          }
+        })
+      ]
+    })
+    expect(await pair.send(42)).toBe(42)
+    expect(observations.length).toBeGreaterThan(0)
+    expect(new Set(receivers.map(({ callback }) => callback))).toEqual(
+      new Set(['transport open', 'feature setup', 'plugin setup', 'warning', 'observe'])
+    )
+    expect(
+      new Set(
+        receivers.filter(({ receiver }) => receiver !== undefined).map(({ callback }) => callback)
+      )
+    ).toEqual(new Set())
+  } finally {
+    await pair.close()
+  }
+})
+
 it('A26 warns only about an ignored instanceId when the configured name matches the parent', async () => {
   /** The actual parent and child names agree; only their configured instance addresses differ. */
   const warnings: IRpcWarning[] = []

@@ -284,9 +284,11 @@ export class FlowRegistry {
       this.#deliverWarning(() => configured(warning))
     }
     for (const installed of this.#registrations) {
-      if (installed.onWarning === undefined) continue
+      /** SDK subscriptions are callbacks, independent of their installation record. */
+      const receive = installed.onWarning
+      if (receive === undefined) continue
       received = true
-      this.#deliverWarning(() => installed.onWarning!(warning))
+      this.#deliverWarning(() => receive(warning))
     }
     if (!received) this.#deliverWarning(() => defaultRpcWarning(warning))
   }
@@ -305,9 +307,9 @@ export class FlowRegistry {
     installations: readonly IRpcFlowInstallation<object>[],
     event: IRpcObservation
   ): void {
-    for (const installed of installations) {
+    for (const { observe } of installations) {
       try {
-        installed.observe?.(event)
+        observe?.(event)
       } catch (error) {
         this.#report(error)
       }

@@ -40,7 +40,7 @@ export function nativeMemberStartup(context: object): INativeMemberStartupOwner 
 
 /** Cold definitions create independent preparation attempts without retaining installation state. */
 export class RpcFlowSetup {
-  /** The frozen original definition preserves the setup method receiver and configuration identity. */
+  /** Frozen configuration supplies a receiverless setup callback for each installation. */
   readonly #definition: IRpcFlowDefinition<object>
 
   /** Capture only the cold definition; each native install supplies its own lifecycle owner. */
@@ -55,7 +55,7 @@ export class RpcFlowSetup {
     context: IRpcFlowSetupContext
   ): Promise<IRpcFlowInstallation<object>> =>
     new RpcInstallationSetup({
-      setup: () => this.#definition.setup(context),
+      setup: () => (0, this.#definition.setup)(context),
       own: (installed) => core.onDispose(() => installed.dispose?.()),
       report: context.report,
       signals: [rootSignal, core.operation.signal]
@@ -113,15 +113,15 @@ export class RpcInstallationSetup<T extends { dispose?(): void | Promise<void> }
    */
   readonly #invoke = async ({ signal }: { signal: INativeAbortSignal }): Promise<T> => {
     try {
-      /** The owner supplies the original callback receiver and unchanged lifecycle context. */
-      const installed = await this.#input.setup()
+      /** Acquisition callbacks receive no configuration object as their receiver. */
+      const installed = await (0, this.#input.setup)()
       if (signal.aborted) {
         await installed.dispose?.()
         this.#releasePendingMembers()
         return installed
       }
       try {
-        this.#input.own(installed)
+        ;(0, this.#input.own)(installed)
         this.#releasePendingMembers()
       } catch (error) {
         return await releaseUnownedInstallation(installed, error)
