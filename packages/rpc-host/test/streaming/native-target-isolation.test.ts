@@ -1,10 +1,12 @@
 /** Same-id producer isolation uses real public Hosts, native Sessions and original stream owners. */
 import { createRpcHost } from '@migaia/rpc-host'
 import type { IRpcCarrierCodec, IRpcCodecContext } from '@migaia/rpc-contract/interfaces'
-import type {
-  IRpcEnvelope,
-  IRpcPortableValue,
-  IRpcSemanticFrame
+import {
+  RpcWireKind,
+  RpcStreamEvent,
+  type IRpcEnvelope,
+  type IRpcPortableValue,
+  type IRpcSemanticFrame
 } from '@migaia/rpc-contract/protocol'
 import { assert, expect, it, vi } from 'vitest'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
@@ -36,7 +38,7 @@ function observeItems(codec: IRpcCarrierCodec, items: IStreamItem[]) {
   return vi.spyOn(codec, 'encode').mockImplementation((prepared, context) => {
     /** This genuine codec's prepared message is borrowed without decode or restore. */
     const message = prepared.message as IRpcSemanticFrame
-    if (message.kind === 'stream' && message.stream.event === 'item')
+    if (message.kind === RpcWireKind.stream && message.stream.event === RpcStreamEvent.item)
       items.push({ targetId: message.route.targetId, value: message.stream.value })
     return Reflect.apply(encode, codec, [prepared, context]) as ReturnType<
       IRpcCarrierCodec['encode']
@@ -66,12 +68,16 @@ async function waitForIntruder(input: IIntruderDelivery): Promise<void> {
       if (
         carrierId === input.carrierId &&
         frame.id === input.id &&
-        frame.kind === 'stream' &&
-        frame.stream.event === 'pull'
+        frame.kind === RpcWireKind.stream &&
+        frame.stream.event === RpcStreamEvent.pull
       )
         received.pull = true
     for (const [source, frame] of input.providerCalls)
-      if (source.carrierId === input.carrierId && frame.id === input.id && frame.kind === 'cancel')
+      if (
+        source.carrierId === input.carrierId &&
+        frame.id === input.id &&
+        frame.kind === RpcWireKind.cancel
+      )
         received.cancel = true
     expect(received).toEqual({ pull: true, cancel: true })
   })
@@ -155,18 +161,18 @@ it('isolates same-id producers by actual admitted sender before intruder pull an
     await owners[1]!.prepare(second)
     /** Read actual prepare calls; no observer codec restoration creates these inputs. */
     const alphaRequest = alphaPreparing.mock.calls.find(
-      ([frame]) => frame.kind === 'call' && frame.task.mode === 'stream'
+      ([frame]) => frame.kind === RpcWireKind.call && frame.task.mode === 'stream'
     )
     /** This second real source has a separate original caller/generation tuple. */
     const betaRequest = betaPreparing.mock.calls.find(
-      ([frame]) => frame.kind === 'call' && frame.task.mode === 'stream'
+      ([frame]) => frame.kind === RpcWireKind.call && frame.task.mode === 'stream'
     )
     assert(alphaRequest && betaRequest)
     /** The exact original codec context is sufficient for the identical native JSON medium. */
     const [alphaOpen, codecContext] = alphaRequest
     /** Native collision is calibrated from both actual executed CallIdAllocators. */
     const [betaOpen] = betaRequest
-    assert(alphaOpen.kind === 'call' && betaOpen.kind === 'call')
+    assert(alphaOpen.kind === RpcWireKind.call && betaOpen.kind === RpcWireKind.call)
     expect(alphaOpen.id).toBe(betaOpen.id)
     expect(alphaOpen.task.callerId).toBe('alpha')
     expect(betaOpen.task.callerId).toBe('beta')
@@ -176,16 +182,16 @@ it('isolates same-id producers by actual admitted sender before intruder pull an
     /** A wrong-source pull must not grant credit to either same-id producer. */
     const pull: IRpcEnvelope = {
       profile: alphaOpen.profile,
-      kind: 'stream',
+      kind: RpcWireKind.stream,
       id: alphaOpen.id,
       route,
       task: alphaOpen.task,
-      stream: { event: 'pull', seq: 0 }
+      stream: { event: RpcStreamEvent.pull, seq: 0 }
     }
     /** Current cancellation uses its core frame while retaining the same original task metadata. */
     const cancel: IRpcEnvelope = {
       profile: alphaOpen.profile,
-      kind: 'cancel',
+      kind: RpcWireKind.cancel,
       id: alphaOpen.id,
       route,
       task: alphaOpen.task
