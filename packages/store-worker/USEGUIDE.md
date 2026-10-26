@@ -221,15 +221,15 @@ if (!isMainThread) {
 输出：
 
 ```text
-远端错误： TypeError UNKNOWN
+远端错误： TypeError INTERNAL
 原始错误： true 无法计算总数
 原因： true 行数据无效
 堆栈： true true
 ```
 
-依次输出 `远端错误： TypeError UNKNOWN`、`原始错误： true 无法计算总数`、`原因： true 行数据无效`、`堆栈： true true`。
+依次输出 `远端错误： TypeError INTERNAL`、`原始错误： true 无法计算总数`、`原因： true 行数据无效`、`堆栈： true true`。
 
-原生 terminal 在顶层恢复 provider 的 TypeError，保留原 stack，RangeError 仍在 cause 上；未分类 provider 错误的 code 为 UNKNOWN，不再添加人为 RpcRemoteError 外壳。消息处理器的 Promise 只等待投递，不代表计算完成；操作结果由主端请求等待。
+原生 terminal 在顶层恢复 provider TypeError，并附加 rpc.endpoint / INTERNAL，保留其 stack 与原 RangeError cause，不再添加 RpcRemoteError 外壳。消息处理器的 Promise 只等待投递，不代表计算完成；操作结果由主端请求等待。
 
 ## 用 Resource 管理 Worker 结果与缓存
 
@@ -464,7 +464,7 @@ IWorkerPort 是 browser plugin 的 IWebWorkerLikePort 类型别名，要求 post
 
 构造 options 的 clientId / timeoutMs、请求 options 的 signal 在入口捕获，不在等待初始化后重读调用方 getter。非法 options 对象或读取失败带 INVALID_OPTION，捕获原错保留在 cause；request 返回 rejected Promise，构造期失败同步抛出。端口与 RPC 配置的后续准入继续由 Core 负责，不把所有 Core 错误改成本包错误。
 
-同一 Adapter 可并发 request；Host 关联每项结果，隔离 deadline 与取消。独立请求可用 Promise.all，但该原生 runtime 路径发送 call/terminal 操作，不承诺旧 envelope 自动批处理。request 等业务完成；内部 notify 使用 `host.notify(method, payload, { targetId })`，其 Promise 在真实物理发送后结算，不等 provider 回复。原生 postMessage 失败以原错误作为 cause 拒绝，通知不发送业务响应。
+同一 Adapter 可并发 request；Host 关联每项结果，隔离 deadline 与取消。独立请求可用 Promise.all，但该原生 runtime 路径发送 call/terminal 操作，不承诺旧 envelope 自动批处理。request 等业务完成；内部 notify 使用 `host.worker.notify(method, payload, { targetId })`，其 Promise 在真实物理发送后结算，不等 provider 回复。原生 postMessage 失败以原错误作为 cause 拒绝，通知不发送业务响应。
 
 | 成员      | 生命周期                                                                                                           |
 | --------- | ------------------------------------------------------------------------------------------------------------------ |
@@ -550,7 +550,7 @@ handler 传 parser.encode 输入段的 payload；输出可为一个合法 ISeria
 
 ### 取消、错误与清理归属
 
-通用 Adapter request 保留 canonical Host 取消、超时与 transport 错误。原生 runtime terminal 直接恢复 provider 的 Error/TypeError，保留原 message、stack 与原生 cause 链，不再加旧 RpcRemoteError / INTERNAL 外壳；未分类原生错误使用 unknown / UNKNOWN。跨 realm 会重建对象，不保留发送方引用 identity。未配置期限且 provider 一直不结算时，请求仍可能等待。
+通用 Adapter request 保留 canonical Host 取消、超时与 transport 错误。未分类 provider 失败在顶层保留原生 Error/TypeError，并附加 rpc.endpoint / INTERNAL；message、stack 与嵌套 cause 链保持，其中未分类原生原因节点仍为 unknown / UNKNOWN。不再增加 RpcRemoteError 外壳。跨 realm 会重建对象，不保留发送方引用 identity。未配置期限且 provider 一直不结算时，请求仍可能等待。
 
 序列化 decode / request 与预取消 encode 使用 SerializeCodecError / REQUEST_ABORTED，包含 type（默认 worker）、phase（encode / decode）、context、chunkIndex 0 和 bytesConsumed（输入 bytes 长度，否则 0），原 signal.reason 保留在 cause。活动 encode 流可以由原始 RPC / 取消失败终结，不保证每个失败都有全部 codec 字段。credit 等待和显式流停止创建原生 DOMException / AbortError，message 为 serialize stream cancelled，附 REQUEST_ABORTED；其原生类型、message 和 stack 由错误链保留。
 

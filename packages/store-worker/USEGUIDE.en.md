@@ -221,15 +221,15 @@ if (!isMainThread) {
 Output:
 
 ```text
-remote: TypeError UNKNOWN
+remote: TypeError INTERNAL
 primary: true cannot compute total
 cause: true invalid row
 stacks: true true
 ```
 
-The output is `remote: TypeError UNKNOWN`, `primary: true cannot compute total`, `cause: true invalid row`, then `stacks: true true`.
+The output is `remote: TypeError INTERNAL`, `primary: true cannot compute total`, `cause: true invalid row`, then `stacks: true true`.
 
-The native terminal restores the provider TypeError at the top level, with its original stack and the RangeError on cause. An unclassified provider error has code UNKNOWN; no artificial RpcRemoteError outer is added. The message handler's Promise covers delivery, not compute completion; await the main-side request for the operation result.
+The native terminal restores the provider TypeError at the top level, tagged rpc.endpoint / INTERNAL, retaining its stack and original RangeError cause; no RpcRemoteError outer is added. The message handler's Promise covers delivery, not compute completion; await the main-side request for the operation result.
 
 ## Use Resource state and cache for Worker results
 
@@ -464,7 +464,7 @@ IWorkerPort aliases the browser plugin's IWebWorkerLikePort: postMessage, addEve
 
 Construction captures clientId / timeoutMs, and requests capture signal without rereading caller getters after initialization. Invalid option objects or property reads produce INVALID_OPTION with caught failures on cause. request rejects its Promise while construction errors throw synchronously. Core retains later port and RPC admission rather than every Core failure becoming a local error.
 
-One Adapter supports concurrent requests. The Host correlates each result and isolates its deadline / cancellation. Independent requests can use Promise.all, but this native runtime path emits call/terminal operations and does not promise legacy envelope auto-batching. request waits for business completion. Internal notify uses `host.notify(method, payload, { targetId })`: its Promise settles after actual physical send, not a provider reply. A native postMessage failure rejects with its original error on cause; no business response is sent for notification.
+One Adapter supports concurrent requests. The Host correlates each result and isolates its deadline / cancellation. Independent requests can use Promise.all, but this native runtime path emits call/terminal operations and does not promise legacy envelope auto-batching. request waits for business completion. Internal notify uses `host.worker.notify(method, payload, { targetId })`: its Promise settles after actual physical send, not a provider reply. A native postMessage failure rejects with its original error on cause; no business response is sent for notification.
 
 | Member    | Lifetime                                                                                                                                                      |
 | --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -550,7 +550,7 @@ All Worker calls copy their parameters without detaching caller input. WorkerDia
 
 ### Cancellation, errors, and ownership
 
-General Adapter requests retain canonical Host cancellation, timeout, and transport errors. Native runtime terminal errors restore the original provider Error/TypeError directly, including its original message, stack, and native cause chain; there is no former RpcRemoteError / INTERNAL outer. Unidentified native errors use unknown / UNKNOWN. A cross-realm object is reconstructed rather than retaining sender-side reference identity. Without a deadline, a provider that never settles can still leave a request pending.
+General Adapter requests retain canonical Host cancellation, timeout, and transport errors. Unclassified provider failures retain their native Error/TypeError at the top level, tagged rpc.endpoint / INTERNAL. Their message, stack, and nested cause chain remain intact; unidentified native cause nodes retain unknown / UNKNOWN. There is no RpcRemoteError outer. A cross-realm object is reconstructed rather than retaining sender-side reference identity. Without a deadline, a provider that never settles can still leave a request pending.
 
 Serialization decode / request and pre-cancelled encode use SerializeCodecError / REQUEST_ABORTED with type (default worker), phase encode / decode, context, chunkIndex 0, and bytesConsumed (input byte length or zero). The caller's signal.reason remains on cause. Active encode streams can end with the original RPC / cancellation error rather than every codec diagnostic field. Credit waits and explicit stream stop create native DOMException / AbortError with message serialize stream cancelled and REQUEST_ABORTED, preserving native type, message, and stack through the error chain.
 
