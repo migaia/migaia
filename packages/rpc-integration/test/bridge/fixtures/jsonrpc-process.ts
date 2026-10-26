@@ -1,7 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { once } from 'node:events'
 import { randomUUID } from 'node:crypto'
-import { resolve } from 'node:path'
 import type { Writable } from 'node:stream'
 import { CapabilityLevel } from '@migaia/supervision'
 import {
@@ -9,20 +8,11 @@ import {
   type IProcessHandle,
   type IProcessLauncher
 } from '@migaia/supervision/process'
-import { createProcessJsonRpcChannel } from '../../../../rpc-plugin-process/dist/process/jsonrpc-channel.js'
-import type { IProcessJsonRpcChannelOptions } from '../../../../rpc-plugin-process/dist/process/jsonrpc-channel.js'
-import type { IProcessPluginEstablish } from '../../../../rpc-plugin-process/dist/process/plugin/types.js'
 import { nodeByteStream } from '../../../../rpc-plugin-process/dist/process/node-byte-stream.js'
 import { createNodeProcessLauncher } from '../../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
 import type { IProcessByteChannel } from '../../../../rpc-plugin-process/dist/process/types.js'
-import type { IIpcLogRecord } from '@migaia/rpc-host/plugin'
-import { BRIDGE_CONTRACT, BridgeFixture } from '../fixture.js'
 
-/** A short dedicated-fd peer tests actual Node pipes without changing the native launcher. */
-export const childPath = resolve(import.meta.dirname, 'jsonrpc-child.mjs')
-/** This fixture token is deliberately unrelated to source paths and ordinary error text. */
-export const token = 'Q7X9Z3V5K8W2R6T4Y1N0'
-/** The fixture adds only the explicitly supported fd carrier to Node's advertised capabilities. */
+/** The retained FD benchmark lends this actual native child and byte channel. */
 export type IFixtureHandle = IProcessHandle & { channel: IProcessByteChannel; child: ChildProcess }
 
 /** Launch a real child with a private fd, while stdout/stdin contain only JSON-RPC frames. */
@@ -57,45 +47,5 @@ export function fdLauncher(): IProcessLauncher<IFixtureHandle> {
         }
       }
     }
-  }
-}
-
-/** Bind the caller's generation identity, token and stderr into the bridge's canonical channel. */
-export function establish(
-  logs: IIpcLogRecord[],
-  reports: unknown[],
-  removals: number[],
-  retained: Array<(chunk: Uint8Array) => void> = [],
-  target: IProcessJsonRpcChannelOptions['target'] = { kind: 'plugin', contract: BRIDGE_CONTRACT }
-): IProcessPluginEstablish {
-  return (raw, options) => {
-    if (raw.kind !== 'byte') throw new TypeError('fixture requires byte channel')
-    return createProcessJsonRpcChannel({
-      byte: raw,
-      peerId: 'peer',
-      target,
-      offer: new BridgeFixture().options.offer,
-      token: options.token!,
-      scheduler: options.scheduler,
-      wallClock: { timestamp: () => Date.now() },
-      signal: options.signal as AbortSignal,
-      ipc: {
-        ...options.session,
-        log: (entry) => {
-          logs.push(entry)
-        },
-        stderr:
-          options.stderr &&
-          ((listener) => {
-            retained.push(listener)
-            const remove = options.stderr!(listener)
-            return () => {
-              removals.push(1)
-              remove()
-            }
-          })
-      },
-      report: (error) => reports.push(error)
-    })
   }
 }

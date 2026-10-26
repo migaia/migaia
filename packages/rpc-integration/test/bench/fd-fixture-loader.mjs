@@ -59,27 +59,14 @@ export async function loadFdLauncher() {
   return (await import(pathToFileURL(path).href)).fdLauncher()
 }
 
-/**
- * Load the canonical public endpoint fixture after offline type erasure in a separate PID.
- *
- * @returns {Promise<typeof import('../core/qualification-runtime.ts')>} Unchanged fixture exports.
- * @throws {Error} Original preparation, file or module loading failure.
- */
-export async function loadEndpointFixture() {
-  /** Compiler memory is preparation cost, independent of either measured production endpoint. */
-  const path = execFileSync('node', [fileURLToPath(import.meta.url), '--prepare-endpoint'], {
-    encoding: 'utf8'
-  }).trim()
-  return import(pathToFileURL(path).href)
-}
-
 /** Erase the sole canonical function body into a worktree-specific temporary module. */
 async function prepare() {
   const { stripTypeScriptTypes } = await import('node:module')
   const fixture = new URL('../bridge/fixtures/jsonrpc-process.ts', import.meta.url)
   const source = readFileSync(fixture, 'utf8')
   const start = source.indexOf('export function fdLauncher(')
-  const end = source.indexOf('\n/**', start)
+  const next = source.indexOf('\n/**', start)
+  const end = next === -1 ? source.length : next
   assert.ok(start >= 0 && end >= 0, IpcBenchPreparationText.fdDeclarationMissing)
   /**
    * Only module locations change; the maintained factory implementation is never copied or
@@ -121,18 +108,8 @@ function writePrepared(fixture, contents, filename) {
   return path
 }
 
-/** Erase the entire canonical endpoint module without altering its runtime imports or graph. */
-async function prepareEndpoint() {
-  const { stripTypeScriptTypes } = await import('node:module')
-  const fixture = new URL('../../../rpc-host/test/core/qualification-runtime.ts', import.meta.url)
-  return writePrepared(fixture, stripTypeScriptTypes(readFileSync(fixture, 'utf8')), 'endpoint.mjs')
-}
-
-if (
-  process.argv[1] === fileURLToPath(import.meta.url) &&
-  (process.argv.includes('--prepare') || process.argv.includes('--prepare-endpoint'))
-)
-  (process.argv.includes('--prepare-endpoint') ? prepareEndpoint() : prepare()).then(
+if (process.argv[1] === fileURLToPath(import.meta.url) && process.argv.includes('--prepare'))
+  prepare().then(
     (path) => console.log(path),
     (error) => {
       console.error(error)

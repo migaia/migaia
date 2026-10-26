@@ -107,7 +107,6 @@ async function rpcApi() {
     await import('../../../rpc-host/dist/remote/runtime-api/peer.js')
   const { PluginHost } = await import('@migaia/plugin-host')
   const { threadPlugin } = await import('@migaia/rpc-plugin-thread')
-  const { threadProtocolDefinition } = await import('../runtime-api/fixtures/thread-protocol.ts')
   const { readRuntimeOutletConnection } =
     await import('../../../rpc-host/dist/remote/runtime-api/outlet.js')
   const {
@@ -129,12 +128,19 @@ async function rpcApi() {
     prepareRuntimePeerSourceContext,
     PluginHost,
     threadPlugin,
-    threadProtocolDefinition,
     readRuntimeOutletConnection,
     createWebThreadLauncher,
     createWebThreadChannelFactory,
     ...threadAdapters
   }
+}
+/** Load only public native Worker factories; deleted Peer/profile modules stay out of this arm. */
+async function workerApi() {
+  const { createRpcHost } = await import('@migaia/rpc-host')
+  const { threadPlugin } = await import('@migaia/rpc-plugin-thread')
+  const { limits } = await import('@migaia/rpc-host/plugins/limits')
+  const adapters = await import('../../../rpc-plugin-thread/dist/threads/node-launcher.js')
+  return { createRpcHost, threadPlugin, limits, ...adapters }
 }
 /** Fixed benchmark method has no side effect besides returning its portable input. */
 const echoMethod = RuntimeBench.echo
@@ -260,17 +266,19 @@ async function serveRpc(source) {
  * Retain a genuine native Host install receipt while returning its actual selected Peer.
  *
  * @param {IIpcState} state Existing physical fixture owns native cleanup.
- * @param {import('@migaia/rpc-host/plugin').IRpcTransportPlugin} definition Genuine cold transport.
- * @returns {Promise<import('@migaia/rpc-host/plugin').IRuntimePeer>} Original committed Peer.
+ * @param {import('@migaia/rpc-host/sdk').IRpcTransportPlugin} definition Genuine cold transport.
+ * @returns {Promise<import('@migaia/rpc-host').IRpcNamespace>} Original installed namespace.
  * @throws {unknown} Original Host admission, native source or startup failure.
  */
 async function retainBenchThread(state, definition) {
-  const host = new state.api.PluginHost({
-    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+  const host = await state.api.createRpcHost({
+    self: { name: 'parent', instanceId: 'parent' },
+    plugins: [state.api.limits({ onRejected: nativeProviderLimits.onRejected }), definition],
+    report
   })
-  state.cleanup.push(() => host.dispose())
-  await host.use(definition)
-  return state.api.readRuntimeOutletConnection(Reflect.get(host, 'thread'), definition.name).peer
+  state.host = host
+  state.cleanup.push(() => host.close())
+  return host.thread
 }
 
 /** Bare replies own only correlation accounting, with no RPC graph loaded by the bare arm. */
@@ -390,6 +398,8 @@ function ipcState(input) {
     peerPid: undefined,
     /** Original public Peer owns RPC business dispatch and shutdown. */
     runtime: undefined,
+    /** Public Worker construction retains the original Host cleanup owner. */
+    host: undefined,
     /** Bare preparation never loads this RPC API. */
     api: undefined,
     /** Both paired sides measure exactly the same JSON business encoding. */
@@ -404,60 +414,60 @@ function ipcState(input) {
 
 /** @param {IIpcState} state Native Web Worker RPC context. @returns {Promise<void>} */
 async function prepareWebRpcWorker(state) {
-  state.runtime = await retainBenchThread(
-    state,
-    state.api.threadProtocolDefinition({
+  /** Bun enters through the same ordinary public source shorthand as application Workers. */
+  let spawn = { entry: new URL(import.meta.url), name: 'peer' }
+  if (deno) {
+    /** This existing Deno entry publishes only a cold-module readiness event before adoption. */
+    const entry = new URL('../../bench/deno-worker.mjs', import.meta.url)
+    const worker = new globalThis.Worker(entry.href, { type: 'module', name: 'peer' })
+    /** Native launcher adoption transfers termination to the original managed source owner. */
+    let adopted = false
+    /** Cold preparation owns termination until the canonical launcher adopts this Worker. */
+    state.cleanup.push(() => {
+      if (!adopted) worker.terminate()
+    })
+    /** Reuse the existing one-shot utility without nesting a second preparation callback owner. */
+    const { deferred } = await import('@migaia/utils/promise')
+    /** This receipt belongs only to the already-existing cold module readiness event. */
+    const ready = deferred()
+    /** Ordinary business events cannot settle the separate cold construction boundary. */
+    const onReady = (event) => {
+      if (event.data === IpcBenchControl.ready) ready.resolve()
+    }
+    /** Preserve the native Worker error before the canonical launcher has adopted this resource. */
+    const onError = (event) => ready.reject(event.error ?? event)
+    worker.addEventListener('message', onReady)
+    worker.addEventListener('error', onError)
+    try {
+      await ready.promise
+    } finally {
+      worker.removeEventListener('message', onReady)
+      worker.removeEventListener('error', onError)
+    }
+    /** The canonical Web launcher still supplies original launch facts and carrier custody. */
+    const { createWebThreadLauncher } =
+      await import('../../../rpc-plugin-thread/dist/threads/web-launcher.js')
+    spawn = {
+      entry,
       name: 'peer',
-      self: { name: 'parent', instanceId: 'parent' },
-      providerLimits: nativeProviderLimits,
-      report,
-      spawn: async (context) => {
-        /** Deno cold imports finish before its native runtime can deliver the bootstrap event. */
-        let WorkerConstructor
-        let workerEntry = import.meta.url
-        if (deno) {
-          workerEntry = new URL('../../bench/deno-worker.mjs', import.meta.url).href
-          const worker = new globalThis.Worker(workerEntry, { type: 'module', name: 'peer' })
-          /** Before launcher adoption, failed cold preparation still owns this exact Worker. */
-          state.cleanup.push(() => worker.terminate())
-          await new Promise((resolve, reject) => {
-            const ready = (event) => {
-              if (event.data !== IpcBenchControl.ready) return
-              worker.removeEventListener('message', ready)
-              resolve()
-            }
-            worker.addEventListener('message', ready)
-            worker.addEventListener('error', (event) => reject(event.error ?? event), {
-              once: true
-            })
-          })
-          /** Canonical launcher adopts the genuine prestarted native object without a queue. */
-          WorkerConstructor = class {
-            constructor() {
-              return worker
-            }
+      launcher: createWebThreadLauncher({
+        report,
+        Worker: class {
+          /** Lend the prepared native object to the canonical launcher's generation ownership. */
+          constructor() {
+            adopted = true
+            return worker
           }
         }
-        /** The Bun adapter supplies real Web bootstrap and retains unsupported exit semantics. */
-        const launcher = state.api.createWebThreadLauncher({
-          runtimeApi: context,
-          report,
-          ...(WorkerConstructor ? { Worker: WorkerConstructor } : {})
-        })
-        const handle = await launcher.launch(
-          { entry: workerEntry, name: 'peer' },
-          { signal: new AbortController().signal }
-        )
-        state.cleanup.push(() => handle.terminate())
-        return state.api
-          .createWebThreadChannelFactory({
-            scheduler: systemScheduler
-          })
-          .open(handle, new AbortController().signal)
-      }
-    })
+      }),
+      report
+    }
+  }
+  state.runtime = await retainBenchThread(
+    state,
+    state.api.threadPlugin({ name: 'peer', spawn, report })
   )
-  /** This extra control operation is outside timing and is reported separately from bare OOB. */
+  /** Snapshot business remains separate from the measured echo request. */
   snapshotPeer = () => state.runtime.request(IpcBenchControl.snapshot)
   state.peerPid = process.pid
 }
@@ -514,12 +524,8 @@ async function prepareNodeRpcWorker(state, controls) {
   const { createUnitBudget } = await import('@migaia/supervision')
   state.runtime = await retainBenchThread(
     state,
-    state.api.threadProtocolDefinition({
+    state.api.threadPlugin({
       name: 'peer',
-      /** The genuine handle follows public managed forwarding instead of a Core loader edit. */
-      probe: globalThis.__PROBE_BENCH_PROBE,
-      self: { name: 'parent', instanceId: 'parent' },
-      providerLimits: nativeProviderLimits,
       report,
       spawn: {
         spec: {
@@ -736,7 +742,7 @@ async function closeBare(state) {
 }
 /** @param {IIpcState} state Original Peer context. @returns {Promise<object>} Ready RPC result. */
 async function rpcResult(state) {
-  state.cleanup.push(() => state.runtime.close())
+  if (!state.host) state.cleanup.push(() => state.runtime.close())
   await state.runtime.request(echoMethod, state.payload)
   return {
     facade: state.runtime,
@@ -813,7 +819,7 @@ export async function createIpcSession(input) {
   }
   if (wire === 'jsonrpc') return createBridgeIpcSession({ carrier, side, payload, peerRuntime })
   const state = ipcState({ carrier, side, payload })
-  state.api = side === 'rpc' ? await rpcApi() : undefined
+  state.api = side === 'rpc' ? await (carrier === 'worker' ? workerApi() : rpcApi()) : undefined
   try {
     if (carrier === 'worker') {
       const prepared = await prepareWorker(state)
@@ -1091,7 +1097,7 @@ async function createBridgeIpcSession(input) {
 
 /** Child entry installs the public protocol or a physical echo before signalling readiness. */
 async function childMain(side, carrier, address) {
-  const api = side === 'rpc' ? await rpcApi() : undefined
+  const api = side === 'rpc' ? await (carrier === 'worker' ? workerApi() : rpcApi()) : undefined
   if (carrier === 'worker') {
     if (side === 'bare' && deno) {
       /** Only the cold control message carries a port; business echo retains one parse/stringify. */
@@ -1108,22 +1114,17 @@ async function childMain(side, carrier, address) {
         parentPort.postMessage(JSON.parse(JSON.stringify(value)), undefined)
       )
     else {
-      const host = new api.PluginHost({
-        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+      await api.createRpcHost({
+        plugins: [
+          api.limits({ onRejected: nativeProviderLimits.onRejected }),
+          api.threadPlugin({ name: 'parent', connectToParent: true })
+        ],
+        provide:
+          process.versions.bun || deno
+            ? { bench: { ...echoProvide.bench, snapshot } }
+            : echoProvide,
+        report
       })
-      await host.use(
-        api.threadPlugin({
-          name: 'parent',
-          connectToParent: true,
-          probe: globalThis.__PROBE_BENCH_PROBE,
-          provide:
-            process.versions.bun || deno
-              ? { bench: { ...echoProvide.bench, snapshot } }
-              : echoProvide,
-          providerLimits: nativeProviderLimits,
-          report
-        })
-      )
     }
     if (side === 'bare') parentPort.postMessage(readyText, undefined)
     return

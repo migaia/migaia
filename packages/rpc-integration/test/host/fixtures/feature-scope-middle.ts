@@ -5,7 +5,8 @@ import {
   defineFlowFeature,
   RpcFlowPoint,
   type IRpcFlowFeature,
-  type IRpcFlowStage
+  type IRpcFlowStage,
+  type IRpcTransportPlugin
 } from '@migaia/rpc-host/sdk'
 import { RpcWireKind } from '@migaia/rpc-contract/protocol'
 import type { IRpcEnvelopePayload } from '@migaia/rpc-contract/interfaces'
@@ -39,6 +40,16 @@ export type IFeatureScopeForwardRow = Readonly<{
 }>
 /** This counter belongs to the real final Worker provider, rather than a forwarding observation. */
 type IFeatureScopeLeafStats = Readonly<{ echoCalls: number }>
+/** Only the installed native namespace belongs to the final Worker's public Host. */
+type IFeatureScopeLeafHost = IRpcHost<
+  Record<never, never>,
+  readonly [IRpcTransportPlugin<'native', object, true>]
+>
+/** The middle borrows exactly its two declared public namespaces and native closing capability. */
+type IFeatureScopeMiddleHost = IRpcHost<
+  Record<never, never>,
+  readonly [IRpcTransportPlugin<'up', object, true>, IRpcTransportPlugin<'down', object, true>]
+>
 /** Public middle inspection reads the original two recorders and the same actual downstream leaf. */
 export type IFeatureScopeForwardStats = Readonly<{
   up: readonly IFeatureScopeForwardRow[]
@@ -110,7 +121,7 @@ class FeatureScopeLeaf {
   /** Only execution of the publicly exposed echo callback increments this value. */
   #echoCalls = 0
   /** Providers wait on this original Host installation rather than inventing a readiness signal. */
-  readonly #opening: Promise<IRpcHost>
+  readonly #opening: Promise<IFeatureScopeLeafHost>
 
   /** The original Thread plugin borrows its real parent and authenticates with the same Host key. */
   constructor() {
@@ -139,7 +150,7 @@ class FeatureScopeLeaf {
   }
 
   /** The native fixture remains alive through the same actual Host and its parent channel. */
-  opened(): Promise<IRpcHost> {
+  opened(): Promise<IFeatureScopeLeafHost> {
     return this.#opening
   }
 }
@@ -151,7 +162,7 @@ class FeatureScopeMiddle {
   /** Downstream state is never shared with the upstream Feature placement. */
   readonly #down = new ScopedEnvelopeObservation(FeatureScopeForwardFixture.down)
   /** This actual installation contains both native sources and their two declared pipeline groups. */
-  readonly #opening: Promise<IRpcHost>
+  readonly #opening: Promise<IFeatureScopeMiddleHost>
 
   /** Acquire only through original Process-parent and Thread-spawn source recipes. */
   constructor() {
@@ -191,7 +202,7 @@ class FeatureScopeMiddle {
   }
 
   /** The original opening Promise gates readiness of the real forwarded directory. */
-  opened(): Promise<IRpcHost> {
+  opened(): Promise<IFeatureScopeMiddleHost> {
     return this.#opening
   }
 }

@@ -13,8 +13,10 @@ const source = readFileSync(
 )
 /** Strip only the function body, matching the production preparation path. */
 const start = source.indexOf('export function fdLauncher(')
-/** The next declaration documentation terminates this canonical function. */
-const end = source.indexOf('\n/**', start)
+/** Keep the canonical function through EOF when its retired sibling no longer follows it. */
+const next = source.indexOf('\n/**', start)
+/** A declaration after this function, when present, is excluded from offline preparation. */
+const end = next === -1 ? source.length : next
 /** Type erasure removes imports that exist only in the compile-time contract. */
 const body = stripTypeScriptTypes(source.slice(start, end))
 

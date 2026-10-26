@@ -155,9 +155,12 @@ function thrownCodes(sourceText: string, filename: string): ICodeReference[] {
       continue
     /** The factory's first argument names the forwarded code parameter. */
     const code = statement.argument.arguments[0]
-    const position = node.value.params.findIndex(
-      (parameter) => parameter.type === 'Identifier' && parameter.name === code?.name
-    )
+    const position =
+      code?.type === 'Identifier'
+        ? node.value.params.findIndex(
+            (parameter) => parameter.type === 'Identifier' && parameter.name === code.name
+          )
+        : -1
     if (code?.type === 'Identifier' && position !== -1)
       contractFactoryForwarders.set(`this.#${node.key.name}`, position)
   }

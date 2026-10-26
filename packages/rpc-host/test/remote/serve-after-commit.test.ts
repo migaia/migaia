@@ -42,20 +42,24 @@ function observe<T>(operation: Promise<T>) {
   )
 }
 
-/** Own one genuine uncommitted native batch and its existing physical caller fixture. */
-class ServeCommitBarrier {
-  /** Feature and SDK transport registrations share the original native commit decision. */
-  readonly #host = defineHost({
-    ...rpcHostPipelines(
-      () => this.#host,
-      (name) => this.#host.pipeline(name),
-      ['memory', 'back']
-    ),
+/** Infer the actual native Host without making its lazy owner callback infer itself. */
+function barrierHost(getHost: () => object, pipeline: Parameters<typeof rpcHostPipelines>[1]) {
+  return defineHost({
+    ...rpcHostPipelines(getHost, pipeline, ['memory', 'back']),
     host: {
       identity: { name: 'provider' },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     }
   })
+}
+
+/** Own one genuine uncommitted native batch and its existing physical caller fixture. */
+class ServeCommitBarrier {
+  /** Feature and SDK transport registrations share the original native commit decision. */
+  readonly #host: ReturnType<typeof barrierHost> = barrierHost(
+    () => this.#host,
+    (name) => this.#host.pipeline(name)
+  )
   /** The canonical memory listener lends actual SDK attach and bilateral Session negotiation. */
   readonly #server = coreMemoryServer('provider', 'provider-1', 'memory', [], ['business'])
   /** Only the native installation's existing continuation is held by this acceptance fixture. */
@@ -222,12 +226,14 @@ class ServeCommitBarrier {
         return {}
       }
     })
-    this.#installing = this.#host.use(
+    /** Keep the definite original Promise in the public scenario receipt. */
+    const installing = this.#host.use(
       ...(this.#forwarded ? [] : [this.#business()]),
       this.#runtime(),
       tail
     )
-    void this.#installing.catch(() => undefined)
+    this.#installing = installing
+    void installing.catch(() => undefined)
     await this.#prepared.promise
     /** The existing fixture owns both original MemoryCarrier endpoints and their ready receipts. */
     const connected = await this.#server.connect(
@@ -244,7 +250,7 @@ class ServeCommitBarrier {
       installFailure: this.#installFailure,
       rollbackGate: this.#rollbackGate,
       notified: this.#notified.promise,
-      installing: this.#installing,
+      installing,
       waitForArrivals: (count: number) => this.#waitForArrivals(count),
       release: () => this.#release.resolve(),
       close: () => this.#close()
