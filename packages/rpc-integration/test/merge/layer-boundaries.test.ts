@@ -35,17 +35,6 @@ const inwardOwners: Record<string, readonly string[]> = {
   'rpc-plugin-browser': ['rpc-host', 'rpc-contract']
 }
 /**
- * Logical foundation labels retain the existing synthetic directional cases without merging package
- * roots.
- */
-function logicalPath(file: string): string {
-  const entry = ownerRoots.find(({ root }) => file.startsWith(root + sep))
-  return entry
-    ? relative(entry.root, file).split(sep).join('/')
-    : relative(sourceRoot, file).split(sep).join('/')
-}
-
-/**
  * Contract portable traversal depends inward on serialize alongside byte/error utilities, and on
  * utils/function so the framer observes thenable rejections instead of swallowing them.
  */
@@ -56,16 +45,16 @@ const contractBareAllowlist = new Set([
   '@migaia/utils/function',
   '@migaia/utils/string'
 ])
-/** Published adapter boundary: shared primitives, errors, and local text only. */
-const browserCoreAllowlist = new Set(['core/transport-kit.ts'])
-
-/** Return each import or re-export that violates the contract/core/browser direction. */
+/** Return each import or re-export that violates the current physical package direction. */
 function layerViolations(file: string, source: string): string[] {
+  /** Actual package roots remain independent after the old core/remote directories were removed. */
+  const owner = ownerRoots.find(({ root }) => file.startsWith(root + sep))!
+  /** The parser distinguishes source edges from documentation strings and comments. */
   const parsed = parseSync(file, source).program
-  const owner = logicalPath(file).split('/')[0]
-  const physicalOwner = ownerRoots.find(({ root }) => file.startsWith(root + sep))
+  /** Exact source edges retain actionable package-relative diagnostics. */
   const failures: string[] = []
   for (const statement of parsed.body) {
+    /** Import and re-export have the same ownership obligation. */
     const specifier =
       statement.type === 'ImportDeclaration' || statement.type === 'ExportAllDeclaration'
         ? statement.source.value
@@ -73,61 +62,35 @@ function layerViolations(file: string, source: string): string[] {
           ? statement.source?.value
           : undefined
     if (specifier === undefined) continue
+    /** Source imports retain this branch's emitted-JavaScript specifier convention. */
     const isRelative = specifier.startsWith('.')
-    const resolved = isRelative ? resolve(dirname(file), specifier.replace(/\.js$/, '.ts')) : ''
-    const target = isRelative ? logicalPath(resolved) : ''
-    const outside =
-      isRelative &&
-      (physicalOwner
-        ? !resolved.startsWith(physicalOwner.root + sep)
-        : target === '..' || target.startsWith('../'))
-    let invalid = !isRelative && specifier.startsWith('@migaia/rpc/')
+    /** No package may reach a sibling's private files, including through re-exports. */
+    const resolved = isRelative ? resolve(dirname(file), specifier.replace(/\.js$/u, '.ts')) : ''
+    let invalid =
+      isRelative && (!resolved.startsWith(owner.root + sep) || extname(specifier) !== '.js')
+    if (!isRelative && specifier.startsWith('@migaia/rpc/')) invalid = true
     if (!isRelative && specifier.startsWith('@migaia/rpc-')) {
-      const targetOwner = specifier.slice('@migaia/'.length).split('/')[0]!
-      invalid ||=
-        !ordinaryRpcEntries.has(specifier) ||
-        Boolean(physicalOwner && !inwardOwners[physicalOwner.owner]!.includes(targetOwner))
+      /** Ordinary entries must exist and point inward to the owning package's public surface. */
+      const target = specifier.slice('@migaia/'.length).split('/')[0]!
+      invalid ||= !ordinaryRpcEntries.has(specifier) || !inwardOwners[owner.owner]!.includes(target)
     }
-    if (owner === 'contract')
-      invalid ||= isRelative
-        ? outside || !target.startsWith('contract/')
-        : !contractBareAllowlist.has(specifier)
-    if (owner === 'threads')
-      invalid ||= outside || target.startsWith('process/') || target.startsWith('browser/')
-    if (owner === 'process')
-      invalid ||= target.startsWith('threads/') || target.startsWith('browser/')
-    if (owner === 'core')
-      invalid ||=
-        outside ||
-        target.startsWith('browser/') ||
-        target.startsWith('remote/') ||
-        target.startsWith('bridge/') ||
-        target.startsWith('threads/')
-    if (owner === 'remote')
-      invalid ||= outside || target.startsWith('browser/') || target.startsWith('threads/')
-    if (owner === 'browser') {
-      invalid ||= target.startsWith('process/') || target.startsWith('threads/')
-      invalid ||=
-        outside ||
-        (!isRelative &&
-          specifier !== '@migaia/utils' &&
-          specifier !== '@migaia/utils/bytes' &&
-          specifier !== '@migaia/utils/error' &&
-          specifier !== '@migaia/utils/scheduler' &&
-          specifier !== '@migaia/utils/promise' &&
-          !ordinaryRpcEntries.has(specifier)) ||
-        (target.startsWith('core/') && !browserCoreAllowlist.has(target))
+    if (owner.owner === 'rpc-contract' && !isRelative) {
+      /** Signal shapes are type-only contracts; no promise runtime or lifecycle enters contract. */
+      const signalType =
+        specifier === '@migaia/utils/promise' &&
+        statement.type === 'ImportDeclaration' &&
+        statement.importKind === 'type'
+      invalid ||= !signalType && !contractBareAllowlist.has(specifier)
     }
-    if (owner === 'bridge')
-      invalid ||=
-        outside ||
-        /^(?:browser|threads)\//.test(target) ||
-        /^process\/(?:plugin|host|resilience)\//.test(target) ||
-        /^remote\/(?:plugin|host|serve-plugin|serve-host)\.ts$/.test(target)
-    if (isRelative && extname(specifier) !== '.js') invalid = true
-    if (invalid) failures.push(`${relative(sourceRoot, file)}: ${specifier}`)
+    if (owner.owner === 'rpc-host' && !isRelative) invalid ||= /^(?:node:|bun:)/u.test(specifier)
+    if (invalid) failures.push(`${owner.owner}/${relative(owner.root, file)}: ${specifier}`)
   }
   return failures
+}
+
+/** Synthetic edges use the same real package roots as maintained production sources. */
+function ownerFile(owner: string, path: string): string {
+  return join(ownerRoots.find((entry) => entry.owner === owner)!.root, path)
 }
 
 /** List TypeScript files under a layer without relying on a glob loader. */
@@ -154,9 +117,9 @@ describe('layer dependency direction', () => {
     ])
   })
 
-  it('keeps remote retry independent of process and coroutine launchers', () => {
+  it('keeps the retry feature independent of process and coroutine launchers', () => {
     const source = readFileSync(
-      join(import.meta.dirname, '../../../rpc-host/src/remote/retry.ts'),
+      join(import.meta.dirname, '../../../rpc-host/src/features/retry.ts'),
       'utf8'
     )
     const imports = parseSync('retry.ts', source).program.body.flatMap((statement) =>
@@ -173,39 +136,114 @@ describe('layer dependency direction', () => {
   })
 
   it.each([
-    ['threads to process', 'threads/plugin.ts', "import '../process/index.js'"],
-    ['threads to browser', 'threads/plugin.ts', "import '../browser/adapters/shared-worker.js'"],
-    ['process to threads', 'process/x.ts', "import '../threads/index.js'"],
-    ['browser to threads', 'browser/x.ts', "import '../threads/index.js'"],
-    ['core to threads', 'core/x.ts', "import '../threads/index.js'"],
-    ['remote to threads', 'remote/x.ts', "import '../threads/index.js'"],
-    ['contract bare import', 'contract/x.ts', "import '@migaia/utils'"],
-    ['contract to core', 'contract/framing/x.ts', "import '../../core/errors.js'"],
-    ['core to browser', 'core/x.ts', "import '../browser/adapters/window.js'"],
-    ['core to remote', 'core/x.ts', "import '../remote/host.js'"],
-    ['core to bridge', 'core/x.ts', "import '../bridge/jsonrpc/index.js'"],
-    ['bridge to process plugin', 'bridge/jsonrpc/x.ts', "import '../../process/plugin/client.js'"],
-    ['remote to browser', 'remote/x.ts', "import '../browser/adapters/window.js'"],
-    ['browser to private core', 'browser/x.ts', "import '../../core/internal/outbound-sender.js'"],
-    ['browser bare import', 'browser/x.ts', "import '@migaia/lifecycle'"],
-    ['browser escape', 'browser/x.ts', "import '../../../outside.js'"],
-    ['core self-reference', 'core/x.ts', "import '@migaia/rpc/contract'"],
-    ['browser re-export', 'browser/x.ts', "export * from '../../core/internal/outbound-sender.js'"],
-    ['contract re-export', 'contract/x.ts', "export { x } from '../core/errors.js'"]
-  ])('rejects %s once', (_case, file, source) => {
-    expect(layerViolations(join(sourceRoot, file), source)).toHaveLength(1)
+    [
+      'thread to process',
+      'rpc-plugin-thread',
+      'threads/plugin.ts',
+      "import '@migaia/rpc-plugin-process'"
+    ],
+    [
+      'thread to browser',
+      'rpc-plugin-thread',
+      'threads/plugin.ts',
+      "import '@migaia/rpc-plugin-browser'"
+    ],
+    [
+      'process to thread',
+      'rpc-plugin-process',
+      'process/plugin.ts',
+      "import '@migaia/rpc-plugin-thread'"
+    ],
+    [
+      'browser to thread',
+      'rpc-plugin-browser',
+      'browser/plugin.ts',
+      "import '@migaia/rpc-plugin-thread'"
+    ],
+    ['host to thread', 'rpc-host', 'host/rpc-host.ts', "import '@migaia/rpc-plugin-thread'"],
+    ['host to process', 'rpc-host', 'features/retry.ts', "import '@migaia/rpc-plugin-process'"],
+    ['contract bare import', 'rpc-contract', 'wire/frame.ts', "import '@migaia/utils'"],
+    ['contract to host', 'rpc-contract', 'wire/frame.ts', "import '@migaia/rpc-host'"],
+    ['host to browser', 'rpc-host', 'host/rpc-host.ts', "import '@migaia/rpc-plugin-browser'"],
+    ['host to pool', 'rpc-host', 'host/rpc-host.ts', "import '@migaia/rpc-plugin-pool'"],
+    ['contract to process', 'rpc-contract', 'wire/frame.ts', "import '@migaia/rpc-plugin-process'"],
+    [
+      'process to private host',
+      'rpc-plugin-process',
+      'process/plugin.ts',
+      "import '../../../rpc-host/src/call/table.js'"
+    ],
+    [
+      'host to private browser',
+      'rpc-host',
+      'host/rpc-host.ts',
+      "import '../../../rpc-plugin-browser/src/browser/plugin.js'"
+    ],
+    [
+      'browser to private host',
+      'rpc-plugin-browser',
+      'browser/plugin.ts',
+      "import '../../../rpc-host/src/call/table.js'"
+    ],
+    [
+      'browser legacy import',
+      'rpc-plugin-browser',
+      'browser/plugin.ts',
+      "import '@migaia/rpc/contract'"
+    ],
+    ['browser escape', 'rpc-plugin-browser', 'browser/plugin.ts', "import '../../../outside.js'"],
+    ['host self-reference', 'rpc-host', 'host/rpc-host.ts', "import '@migaia/rpc/contract'"],
+    [
+      'browser private re-export',
+      'rpc-plugin-browser',
+      'browser/plugin.ts',
+      "export * from '../../../rpc-host/src/call/table.js'"
+    ],
+    [
+      'contract host re-export',
+      'rpc-contract',
+      'wire/frame.ts',
+      "export { x } from '@migaia/rpc-host'"
+    ]
+  ])('rejects %s once', (_case, owner, file, source) => {
+    expect(layerViolations(ownerFile(owner, file), source)).toHaveLength(1)
   })
 
   it.each([
-    ['contract byte utility', 'contract/normalize.ts', "import '@migaia/utils/bytes'"],
-    ['contract error utility', 'contract/contract-error.ts', "import '@migaia/utils/error'"],
-    ['browser sibling', 'browser/adapters/window.ts', "import './broadcast-channel.js'"],
-    ['browser approved core', 'browser/adapters/window.ts', "import '../../core/transport-kit.js'"],
-    ['browser bytes', 'browser/adapters/web-transport.ts', "import '@migaia/utils/bytes'"],
-    ['remote to core', 'remote/host.ts', "import '../core/typing.js'"],
-    ['bridge IPC owner', 'bridge/jsonrpc/x.ts', "import '../../process/ipc-connection.js'"],
-    ['bridge remote schema', 'bridge/jsonrpc/x.ts', "import '../../remote/contract.js'"]
-  ])('accepts %s', (_case, file, source) => {
-    expect(layerViolations(join(sourceRoot, file), source)).toEqual([])
+    ['contract byte utility', 'rpc-contract', 'wire/frame.ts', "import '@migaia/utils/bytes'"],
+    ['contract error utility', 'rpc-contract', 'contract/error.ts', "import '@migaia/utils/error'"],
+    [
+      'browser sibling',
+      'rpc-plugin-browser',
+      'browser/adapters/window.ts',
+      "import './broadcast-channel.js'"
+    ],
+    [
+      'browser public SDK',
+      'rpc-plugin-browser',
+      'browser/plugin.ts',
+      "import '@migaia/rpc-host/sdk'"
+    ],
+    [
+      'browser bytes',
+      'rpc-plugin-browser',
+      'browser/adapters/web-transport.ts',
+      "import '@migaia/utils/bytes'"
+    ],
+    [
+      'host contract errors',
+      'rpc-host',
+      'host/error-owner.ts',
+      "import '@migaia/rpc-contract/errors'"
+    ],
+    [
+      'process public SDK',
+      'rpc-plugin-process',
+      'process/plugin.ts',
+      "import '@migaia/rpc-host/sdk'"
+    ],
+    ['contract sibling owner', 'rpc-contract', 'contract/error.ts', "import '../wire/limits.js'"]
+  ])('accepts %s', (_case, owner, file, source) => {
+    expect(layerViolations(ownerFile(owner, file), source)).toEqual([])
   })
 })

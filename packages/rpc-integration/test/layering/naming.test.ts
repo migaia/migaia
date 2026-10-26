@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import * as core from '../../../rpc-host/dist/index.js'
+import * as core from '@migaia/rpc-host'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { deserializeRpcError, serializeRpcError } from '@migaia/rpc-contract'
 
 /** Runtime-facing symbol table, including exports whose names changed in the layering rename. */
@@ -13,7 +14,6 @@ describe('Rpc naming boundary', () => {
       'isRpcErrorInstance',
       'isRpcRemoteError',
       'isRpcTimeoutError',
-      'RpcCoreErrorCode',
       'RPC_CORE_ERROR_SOURCE'
     ]) {
       expect(surface[name], name).toBeDefined()
@@ -22,6 +22,7 @@ describe('Rpc naming boundary', () => {
       expect(name).not.toMatch(/^(?:WebRpc|WEBRPC|isWebRpc|tagWebRpc)/u)
     }
     for (const name of [
+      'RpcCoreErrorCode',
       'WEBRPC_SOURCE',
       'WebRpcErrorCode',
       'WebRpcTransportError',
@@ -51,7 +52,7 @@ describe('Rpc naming boundary', () => {
     expect(serializeRpcError(lifecycle, { report: () => {} })).toMatchObject({
       name: 'RpcLifecycleError',
       source: core.RPC_CORE_ERROR_SOURCE,
-      code: core.RpcCoreErrorCode.endpointDisposed
+      code: RpcCoreErrorCode.endpointDisposed
     })
     const abort = new DOMException('aborted', 'AbortError')
     const restored = deserializeRpcError(serializeRpcError(abort, { report: () => {} }))

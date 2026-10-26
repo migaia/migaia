@@ -58,8 +58,8 @@ function violations(path: string, text: string): string[] {
           statement.type === 'ReturnStatement' && statement.argument ? [statement.argument] : []
         )
       : []
-  /** Text factories may live only in an error-text owner, not at an adapter call site. */
-  const isTextOwner = /(?:^|\/)error-text\.ts$/u.test(path)
+  /** Text factories live in canonical package text owners, not at adapter call sites. */
+  const isTextOwner = /(?:^|\/)(?:error-text|text|runtime-text)\.ts$/u.test(path)
   for (const node of nodes) {
     if (node.type === 'CallExpression' || node.type === 'NewExpression') {
       const callee = node.callee
@@ -71,6 +71,8 @@ function violations(path: string, text: string): string[] {
             : ''
       if (/(?:Error|Exception)$/u.test(name) || name === 'tagRpcError') {
         node.arguments.forEach((argument, index) => {
+          /** This canonical factory accepts a detail field; its error owner supplies all text. */
+          if (name === 'createProcessRangeError' && index === 0) return
           if (
             /^(?:DOMException|DomException|domException)$/u.test(name) &&
             index === 1 &&
@@ -105,17 +107,13 @@ function violations(path: string, text: string): string[] {
           : undefined
       /** These named fields describe wire keys or schema types, not failure text. */
       const nonErrorMessage =
-        (path === 'contract/wire-constants.ts' && value === "'message'") ||
-        ((path === 'threads/constants.ts' || path === 'runtime-adapter/message/constants.ts') &&
+        (path === 'wire/constants.ts' &&
           value === "'message'" &&
-          declared ===
-            (path === 'threads/constants.ts' ? 'ThreadEvent' : 'MessageResourceEvent')) ||
+          (declared === 'RpcCarrierFrameKind' || declared === 'RpcWireField')) ||
+        (path === 'threads/constants.ts' && value === "'message'" && declared === 'ThreadEvent') ||
         (path === 'browser/peer-text.ts' &&
           value === "'message'" &&
-          declared === 'BrowserPeerEvent') ||
-        (path === 'core/internal/contract.ts' && value === "'string'") ||
-        (path === 'core/internal/discovery-attachment.ts' && value === "'discovery'") ||
-        (path === 'core/internal/provider-executor.ts' && ["'message'", "'string'"].includes(value))
+          declared === 'BrowserPeerEvent')
       if (!nonErrorMessage) addLiteral(node.value)
     }
     if (
@@ -205,33 +203,35 @@ describe('error text ownership', () => {
     )
   })
 
-  it('resolves abort reasons through one guarded owner', () => {
+  it('resolves caller abort reasons through one guarded owner', () => {
+    /** Native controllers and Session flow signals retain direct, trusted reason access. */
     const files = packageRoots.flatMap((root) =>
       sourceFiles(root).map(
         (path) => [sourceLabel(root, path), readFileSync(path, 'utf8')] as const
       )
     )
     expect(
-      files.flatMap(([path, text]) =>
-        [...text.matchAll(/(?:[sS]ignal|\))\??\.reason\b/gu)].map(
-          (match) => `${path}:${match.index}`
-        )
-      )
-    ).toEqual([])
-    expect(
       files.filter(([, text]) => text.includes('function resolveAbortReason')).map(([path]) => path)
-    ).toEqual(['core/internal/async-control.ts'])
-    const asyncControl = files.find(([path]) => path === 'core/internal/async-control.ts')?.[1]
-    expect(asyncControl).toContain("from '@migaia/utils/error'")
+    ).toEqual(['host/abort-reason.ts'])
+    /** Structural caller signals enter through these actual public operation owners. */
+    const boundaries = [
+      'host/rpc-host.ts',
+      'call/invocation.ts',
+      'call/record.ts',
+      'stream/consumer.ts',
+      'stream/producer.ts',
+      'sdk/carrier/message.ts'
+    ]
+    for (const path of boundaries) {
+      /** A missing owner cannot turn the architecture assertion into an empty scan. */
+      const text = files.find(([entry]) => entry === path)?.[1]
+      expect(text, path).toMatch(/import .*resolveAbortReason.*abort-reason\.js/u)
+      expect(text, path).not.toMatch(/(?:[sS]ignal|\))\??\.reason\b/u)
+    }
+    /** The canonical boundary keeps getter failure itself reachable as the abort reason. */
+    const abortReason = files.find(([path]) => path === 'host/abort-reason.ts')?.[1]
+    expect(abortReason).toContain("from '@migaia/utils/error'")
+    expect(abortReason).toContain("tryReadProperty(signal, 'reason')")
     expect(files.some(([, text]) => text.includes('tryReadAbortReason'))).toBe(false)
-    for (const path of [
-      'core/internal/outbound-attachment.ts',
-      'core/internal/construction-install.ts',
-      'core/internal/stream/owner.ts',
-      'core/internal/canonical-chunk-attachment.ts'
-    ])
-      expect(files.find(([entry]) => entry === path)?.[1]).toMatch(
-        /import .*resolveAbortReason.*async-control\.js/u
-      )
   })
 })

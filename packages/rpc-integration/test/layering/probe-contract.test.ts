@@ -4,8 +4,8 @@ import { parseSync } from 'oxc-parser'
 import { describe, expect, it } from 'vitest'
 
 /** Probe definitions remain independent of host and carrier implementations. */
-const probeRoot = join(import.meta.dirname, '../../../rpc-host/src/core/probe')
-/** Devtools contracts may consume only the two public inward-facing RPC owners. */
+const probeRoot = join(import.meta.dirname, '../../../rpc-host/src/plugins/probe')
+/** Devtools consumes public inward RPC entries and shared runtime-neutral utilities. */
 const devtoolsRoot = join(import.meta.dirname, '../../../rpc-plugin-devtools/src')
 
 /** Enumerate maintained TypeScript files for the contract dependency assertions. */
@@ -52,10 +52,10 @@ describe('rpc-devtools layer-1 dependency direction', () => {
     for (const path of sourceFiles(devtoolsRoot))
       for (const specifier of imports(path)) {
         if (specifier.startsWith('.')) expect(specifier, path).toMatch(/\.js$/u)
-        // Shared runtime-neutral owners provide one clock and linear UTF-16 key ordering.
+        // Shared runtime-neutral owners provide the clock, key order and original failure reporter.
         else
           expect(specifier, path).toMatch(
-            /^(?:@migaia\/rpc-(?:host|contract)(?:\/|$)|@migaia\/utils\/(?:scheduler|string)$)/u
+            /^(?:@migaia\/rpc-(?:host|contract)(?:\/|$)|@migaia\/utils\/(?:scheduler|string|promise)$)/u
           )
       }
   })

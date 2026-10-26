@@ -8,22 +8,19 @@ const packageRoots = {
   contract: resolve(dirname(fileURLToPath(import.meta.url)), '../../../rpc-contract'),
   core: resolve(dirname(fileURLToPath(import.meta.url)), '../../../rpc-host')
 } as const
-/**
- * Files the core type proof must include after the source move, spelled as `tsc --showConfig` lists
- * them.
- */
+/** Current owner files make the whole-package neutral type proof non-vacuous. */
 const coreFiles = [
   '../utils/types/host-globals.d.ts',
-  './src/core/composed.ts',
-  './src/core/endpoint-kernel.ts',
-  './src/core/errors.ts',
-  './src/core/error-text.ts',
-  './src/core/transport.ts',
-  './src/core/typing.ts',
-  './src/core/adapters/message-port.ts'
+  './src/host/rpc-host.ts',
+  './src/host/error-owner.ts',
+  './src/namespace/namespace.ts',
+  './src/session/session.ts',
+  './src/call/table.ts',
+  './src/dispatch/dispatcher.ts',
+  './src/forward/forwarder.ts'
 ]
 
-/** Execute TypeScript exactly as the package-level proof script does. */
+/** Check the maintained package source through its actual neutral compiler configuration. */
 function tsc(layer: keyof typeof packageRoots, args: string[]) {
   return spawnSync('pnpm', ['exec', 'tsc', ...args], {
     cwd: packageRoots[layer],
@@ -36,7 +33,7 @@ describe('platform-neutral type boundaries', () => {
   it.each(['contract', 'core'] as const)(
     'typechecks %s without DOM or ambient host types',
     (layer) => {
-      const config = `tsconfig.${layer}.json`
+      const config = 'tsconfig.json'
       const check = tsc(layer, ['--noEmit', '-p', config])
       expect(check.status, `${config}\n${check.stdout}\n${check.stderr}`).toBe(0)
       const show = tsc(layer, ['--showConfig', '-p', config])
@@ -45,20 +42,21 @@ describe('platform-neutral type boundaries', () => {
         compilerOptions: { lib: string[]; types: string[] }
         files: string[]
       }
-      expect(parsed.compilerOptions.lib).toEqual([layer === 'contract' ? 'es2024' : 'es2023'])
+      expect(parsed.compilerOptions.lib).toEqual(['es2023', 'esnext.disposable'])
       expect(parsed.compilerOptions.types).toEqual([])
       expect(parsed.compilerOptions.lib).not.toContain('dom')
       if (layer === 'core') {
         for (const file of coreFiles) expect(parsed.files).toContain(file)
-        expect(parsed.files).not.toContain('./src/core/adapters/memory.ts')
+        expect(parsed.files).not.toContain('./src/core/composed.ts')
       } else {
         expect(
           parsed.files.every(
-            (file) =>
-              file.startsWith('./src/contract/') ||
-              file === './test/types/runtime-encoding-globals.proof.d.ts'
+            (file) => file.startsWith('./src/') || file === '../utils/types/host-globals.d.ts'
           )
         ).toBe(true)
+        expect(parsed.files).toContain('./src/wire/index.ts')
+        expect(parsed.files).toContain('./src/interfaces/index.ts')
+        expect(parsed.files).toContain('./src/error-code.ts')
       }
       // Two full tsc processes per case exceed Vitest's 5 s default under `--coverage` load.
     },
