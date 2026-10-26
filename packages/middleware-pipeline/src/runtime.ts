@@ -13,7 +13,8 @@ import {
   check,
   invokeWithContext,
   cleanupSyncIterator,
-  cleanupAsyncIterator
+  cleanupAsyncIterator,
+  snapshotStages
 } from './runtime-context.js'
 
 import {
@@ -250,7 +251,7 @@ export const runSyncMiddleware = <TValue>(
   const context = admit(signal)
   assertActive?.()
   /** Caller-stage identity snapshot; dispatch never observes later list mutation. */
-  const stageSnapshot = stages.slice()
+  const stageSnapshot = snapshotStages(stages)
   let current = value
   for (let index = 0; index < stageSnapshot.length; index += 1) {
     const stage = stageSnapshot[index]
@@ -308,7 +309,7 @@ export const runGeneratorMiddleware = <TValue>(
   const context = admit(signal)
   assertActive?.()
   /** Caller-stage identity snapshot; generator dispatch uses one fixed stage sequence. */
-  const stageSnapshot = stages.slice()
+  const stageSnapshot = snapshotStages(stages)
   let current = value
   for (const stage of stageSnapshot) {
     check(context)
@@ -356,7 +357,7 @@ export const runAsyncGeneratorMiddleware = async <TValue>(
   const context = admit(signal)
   assertActive?.()
   /** Caller-stage identity snapshot; async iteration never re-reads the mutable input list. */
-  const stageSnapshot = stages.slice()
+  const stageSnapshot = snapshotStages(stages)
   let current = value
   for (const stage of stageSnapshot) {
     /** Iterator is driven with its native receiver through direct method syntax. */

@@ -14,7 +14,8 @@ import {
   check,
   invokeWithContext,
   cleanupSyncIterator,
-  cleanupAsyncIterator
+  cleanupAsyncIterator,
+  snapshotStages
 } from './runtime-context.js'
 import {
   MiddlewarePipelineNext,
@@ -152,7 +153,7 @@ class AsyncPipelineRun<TValue> {
     options: IMiddlewarePipelineOptions
   ) {
     this.context = admit(options.signal)
-    this.stages = stages.slice()
+    this.stages = snapshotStages(stages)
     this.done = done
     this.options = options
   }
@@ -176,8 +177,13 @@ class AsyncPipelineRun<TValue> {
       this.#depth -= 1
     }
   }
-  /** Executes a suffix and marks only runner-owned control failures on its parent branch. */
-  async #step(index: number, value: TValue, parent?: IAsyncBranch): Promise<void> {
+  /**
+   * Executes a suffix and marks only runner-owned control failures on its parent branch. It is not
+   * an async function: the frame and the terminal already return their own Promise, so wrapping
+   * them again would only add an allocation and extra microtask turns on every stage. Synchronous
+   * failures are returned as rejections, exactly as an async function would.
+   */
+  #step(index: number, value: TValue, parent?: IAsyncBranch): Promise<void> {
     try {
       this.check()
     } catch (error) {
@@ -185,13 +191,15 @@ class AsyncPipelineRun<TValue> {
         parent.active = true
         parent.error = error
       }
-      throw error
+      return Promise.reject(error)
     }
-    if (index >= this.stages.length) {
+    if (index < this.stages.length) return new AsyncPipelineFrame(this, index, parent).run(value)
+    try {
       check(this.context)
-      return invokeWithContext(this.done, [value], this.context)
+      return Promise.resolve(invokeWithContext(this.done, [value], this.context))
+    } catch (error) {
+      return Promise.reject(error)
     }
-    return new AsyncPipelineFrame(this, index, parent).run(value)
   }
   /** Drains all currently queued deep entries in their submission order. */
   #drain(): void {
@@ -331,13 +339,26 @@ class AsyncPipelineFrame<TValue> {
   }
 }
 
-/** Runs both async next policies through one canonical, depth-safe onion owner. */
-export const runAsyncPipeline = async <TValue>(
+/**
+ * Runs both async next policies through one canonical, depth-safe onion owner. Signal admission
+ * failures during construction become a rejected Promise, without an extra async wrapper around the
+ * dispatch Promise.
+ */
+export const runAsyncPipeline = <TValue>(
   stages: readonly IAsyncMiddlewareStage<TValue>[],
   value: TValue,
   done: AsyncPipelineRun<TValue>['done'],
   options: IMiddlewarePipelineOptions
-): Promise<void> => new AsyncPipelineRun(stages, done, options).dispatch(0, value)
+): Promise<void> => {
+  /** Construction admits the signal; its failure must reject rather than throw. */
+  let run: AsyncPipelineRun<TValue>
+  try {
+    run = new AsyncPipelineRun(stages, done, options)
+  } catch (error) {
+    return Promise.reject(error)
+  }
+  return run.dispatch(0, value)
+}
 
 /** A sync branch stores only its suffix position and submitted payload. */
 type ISyncBranch<TValue> = { readonly index: number; readonly value: TValue }
@@ -352,7 +373,7 @@ export const runMultipleSyncPipeline = <TValue>(
   /** Canonical admission runs before any stage or terminal. */
   const context = admit(options.signal)
   /** Caller mutations cannot change the suffix traversals already accepted by this run. */
-  const snapshot = stages.slice()
+  const snapshot = snapshotStages(stages)
   /** LIFO suffix requests preserve each stage's submission order. */
   const pending: ISyncBranch<TValue>[] = [{ index: 0, value }]
   /** Independent failures retain registration order while every accepted suffix is traversed. */
@@ -424,7 +445,7 @@ export const runMultipleGeneratorPipeline = <TValue>(
   /** Admission is shared with every other runner. */
   const context = admit(options.signal)
   /** One immutable snapshot serves every suffix traversal. */
-  const snapshot = stages.slice()
+  const snapshot = snapshotStages(stages)
   /** Resume tasks sit below their yielded suffix work. */
   const pending: IGeneratorTask<
     TValue,
@@ -487,7 +508,7 @@ export const runMultipleAsyncGeneratorPipeline = async <TValue>(
   /** Admission is shared with every other runner. */
   const context = admit(options.signal)
   /** One immutable snapshot serves every suffix traversal. */
-  const snapshot = stages.slice()
+  const snapshot = snapshotStages(stages)
   /** Resume tasks sit below their yielded suffix work. */
   const pending: IGeneratorTask<
     TValue,
