@@ -1,7 +1,4 @@
-/**
- * Encodes only signed-handshake freshness metadata. The installed Auth source record owns each
- * challenge; this module validates known fields without discovery state or another handshake.
- */
+/** Encode signed freshness metadata while the installed source record owns each challenge. */
 import type { IRpcPortableValue } from '@migaia/rpc-contract/protocol'
 import { createRpcAuthenticationError } from '../../host/error-owner.js'
 import { RpcAuthenticationHandshake as Format } from './constants.js'
@@ -9,7 +6,7 @@ import { isAuthenticationNonce } from './envelope.js'
 import { RpcAuthenticationText as Text } from './text.js'
 import type { IAuthenticationHandshake } from './types.js'
 
-/** Bind the original configured credentials to this source's receiver challenge and current echo. */
+/** Bind configured credentials to this source's challenge and peer echo. */
 export function wrapAuthenticationHandshake(
   credentials: IRpcPortableValue | undefined,
   challenge: string,

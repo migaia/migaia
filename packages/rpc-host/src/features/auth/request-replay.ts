@@ -1,30 +1,29 @@
 /**
- * Owns active request-ID deduplication and selected completed retention for one authentication
- * flow. Original source cleanup keys and the numeric lease counter retain exact ownership; no
- * provider body, timer, outcome store or second source registry belongs to this ledger.
+ * Own active deduplication and completed retention for one flow, using source cleanup keys and
+ * numeric leases without retaining provider bodies.
  */
 import { createStringLeaseRegistry } from '@migaia/lifecycle'
 import type { IRpcAuthenticationRetain } from '@migaia/rpc-contract/interfaces'
 import { RpcAuthenticationReplayPolicy as Policy } from './constants.js'
 
-/** Existing source membership also lends its actual signed counter window for completion checks. */
+/** Use the source's signed counter window to decide completed retention. */
 export type IRequestReplaySource = Readonly<{
   replayKeys: Set<string>
   window?: Readonly<{ high: bigint }>
 }>
 
-/** One exact entry keeps its original retention choice and verified request counter. */
+/** Keep retention choice and verified request counter with the admitted entry. */
 export type IRequestReplayEntry = Readonly<{
   source: IRequestReplaySource
   at: number
   retain: IRpcAuthenticationRetain
-  /** Window entries borrow this request's verified counter, never a later dispatch high value. */
+  /** Use the request's verified counter, never the high counter at dispatch time. */
   counter?: bigint
-  /** Only numeric retention reserves original global/per-peer bounded capacity. */
+  /** Reserve bounded global and per-peer capacity only for numeric retention. */
   releaseCount?: () => void
 }>
 
-/** Refused numeric correlations retain their original source and fixed short expiry. */
+/** Keep numeric refusals tied to their source and fixed short expiry. */
 type IRequestReplayRejection = Readonly<{ source: IRequestReplaySource; expiresAt: number }>
 
 /** Expiry metadata can be checked without reading an unexpired request body. */
@@ -41,7 +40,7 @@ type IRequestReplayWindow = {
 
 /** Active entries never expire; completed entries follow false, signed-window or individual TTL. */
 export class RequestReplayLedger {
-  /** Actual business completion alone may remove an in-flight correlation. */
+  /** Deduplicate active business independently from its completed-retention policy. */
   readonly #active = new Map<string, IRequestReplayEntry>()
   /** Numeric lookup retains expiry metadata separately from the request body. */
   readonly #completed = new Map<string, IRequestReplayCompletion>()
@@ -49,15 +48,15 @@ export class RequestReplayLedger {
   readonly #durations = new Map<number, Map<string, IRequestReplayCompletion>>()
   /** Window lookup is independent from numeric TTL cleanup; only the counter ring expires it. */
   readonly #windowCompleted = new Map<string, IRequestReplayEntry>()
-  /** The original short numeric refusal history does not reserve accepted-entry capacity. */
+  /** Keep short numeric refusal history outside accepted-entry capacity. */
   readonly #rejected = new Map<string, IRequestReplayRejection>()
-  /** Each original source retains only completed IDs in its fixed-size signed-counter ring. */
+  /** Index completed window IDs in their source's fixed-size counter ring. */
   readonly #windowRings = new WeakMap<IRequestReplaySource, IRequestReplayWindow>()
-  /** Original lifecycle leases count numeric entries only for each admitted direct peer. */
+  /** Use per-peer lifecycle leases only for numeric entries. */
   readonly #peerCounts = createStringLeaseRegistry()
   /** This derived scalar counts numeric active and completed entries without another index. */
   #numericCount = 0
-  /** Cold auth configuration fixes the original numeric per-peer bound before dispatch. */
+  /** Fix the numeric per-peer bound before dispatch begins. */
   readonly #maxPerPeer: number
 
   /** False and window modes do not consume the numeric retention budget. */
@@ -65,13 +64,13 @@ export class RequestReplayLedger {
     this.#maxPerPeer = maxPerPeer
   }
 
-  /** Duplicate checks never refresh an accepted correlation's original completion timestamp. */
+  /** Do not extend completion expiry when checking duplicates. */
   has(key: string, now: number): boolean {
     this.#purge(now)
     return this.#active.has(key) || this.#completed.has(key) || this.#windowCompleted.has(key)
   }
 
-  /** Reserve one original identity; only numeric policy can refuse bounded capacity admission. */
+  /** Reserve a correlation; only numeric retention can exhaust capacity. */
   admit(
     source: IRequestReplaySource,
     peerKey: string,
@@ -94,7 +93,7 @@ export class RequestReplayLedger {
         return undefined
       }
     }
-    /** Only this exact numeric entry can release the original peer lease and derived count. */
+    /** Release the peer lease and derived count once for this numeric entry. */
     const releaseCount = typeof retain === 'number' ? this.#peerCounts.retain(peerKey) : undefined
     if (releaseCount) this.#numericCount += 1
     /** Admission has already verified the counter for window-mode entries. */
@@ -134,7 +133,7 @@ export class RequestReplayLedger {
     bucket.set(key, completed)
   }
 
-  /** The original signed window may release completed entries, never active business or streams. */
+  /** Expire only completed window entries; active business and streams remain deduplicated. */
   advanceWindow(source: IRequestReplaySource): void {
     /** No completed window identity means there is no expiry work or counter snapshot to advance. */
     const ring = this.#windowRings.get(source)
@@ -149,7 +148,7 @@ export class RequestReplayLedger {
     let index = Number((ring.high + 1n) % requestReplayWindowSlots)
     // The ring is allocated with exactly 64 slots below; this loop has a compile-time fixed bound.
     for (let step = 0; step < steps; step++) {
-      /** Remove the original completed slot before releasing its owned membership. */
+      /** Remove the completed slot before releasing its source membership. */
       const entries = ring.slots[index]
       ring.slots[index] = undefined
       if (entries)
@@ -176,16 +175,16 @@ export class RequestReplayLedger {
     }
     /** Two live counters cannot collide modulo 64 within the admitted 64-slot window. */
     const index = Number(entry.counter! % requestReplayWindowSlots)
-    /** Equal-counter logical group members share one original completion bucket. */
+    /** Share a completion bucket among logical group members with the same counter. */
     const entries = (ring.slots[index] ??= new Map())
     entries.set(key, entry)
   }
 
-  /** Source retirement uses only its original owned keys and fences every late completion. */
+  /** Retire only the source's owned keys and prevent late completion from reviving them. */
   retire(source: IRequestReplaySource): void {
     this.#windowRings.delete(source)
     for (const key of source.replayKeys) {
-      /** Exact original source identity prevents cleanup from touching a reused correlation. */
+      /** Check source identity before cleanup can touch a reused correlation. */
       const entry =
         this.#active.get(key) ?? this.#windowCompleted.get(key) ?? this.#completed.get(key)?.entry
       if (entry?.source === source) {
@@ -204,7 +203,7 @@ export class RequestReplayLedger {
     return source.window!.high - counter >= requestReplayWindowSlots
   }
 
-  /** Every caller removes its exact map entry first, so capacity and membership release once. */
+  /** Remove the owning map entry before releasing capacity and source membership once. */
   #release(key: string, entry: IRequestReplayEntry): void {
     entry.source.replayKeys.delete(key)
     if (entry.releaseCount) {

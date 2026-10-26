@@ -1,7 +1,6 @@
 /**
- * Defines the signed nonce/counter envelope and its bounded replay-window operations. Nonce
- * acquisition borrows native crypto; replay checks mutate only the explicit source-window argument
- * supplied by the authentication flow, which owns its lifetime and admission.
+ * Use native entropy for signed envelopes; replay checks mutate only the source window owned by the
+ * installed flow.
  */
 import {
   createRpcAuthenticationError,
@@ -19,7 +18,7 @@ export function isAuthenticationNonce(value: unknown): value is string {
   return typeof value === 'string' && authenticationNoncePattern.test(value)
 }
 
-/** Allocate the original cryptographic 128-bit nonce; never substitute weak entropy on failure. */
+/** Require cryptographic 128-bit entropy; never substitute weak randomness on failure. */
 export function createAuthenticationNonce(): string {
   /** Native entropy is obtained structurally without importing a specific runtime or DOM types. */
   const crypto = (
@@ -28,7 +27,7 @@ export function createAuthenticationNonce(): string {
   if (!crypto?.getRandomValues)
     throw createRpcConfigurationError(Text.authenticationNonceUnavailable)
   try {
-    /** Original nonce spelling is canonical lowercase hex. */
+    /** Keep nonce spelling canonical across signed bindings and challenges. */
     const bytes = crypto.getRandomValues(new Uint8Array(16))
     return Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')
   } catch (error) {
@@ -36,7 +35,7 @@ export function createAuthenticationNonce(): string {
   }
 }
 
-/** Bind one original counter before any asynchronous encryption/signing callback runs. */
+/** Allocate the counter before asynchronous transforms can reorder completion. */
 export function wrapAuthenticationEnvelope(
   value: unknown,
   nonce: string,
@@ -55,7 +54,7 @@ export function wrapAuthenticationEnvelope(
 export function readAuthenticationEnvelope(value: unknown): IAuthenticationEnvelope {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     throw createRpcAuthenticationError(Text.authenticationReplayBindingInvalid)
-  /** Each original replay binding field is captured exactly once before arithmetic. */
+  /** Snapshot signed fields before validation and counter arithmetic. */
   const { authentication, version, nonce, counter, payload } = value as IAuthenticationEnvelope
   if (
     authentication !== Format.kind ||
@@ -69,18 +68,18 @@ export function readAuthenticationEnvelope(value: unknown): IAuthenticationEnvel
   return { authentication, version, nonce, counter, payload }
 }
 
-/** Commit the original fixed window synchronously after verification and native integrity finish. */
+/** Commit the window synchronously after signature and native integrity checks pass. */
 export function admitAuthenticationCounter(
   state: IAuthenticationCounterWindow,
   sequence: bigint
 ): void {
   if (sequence > state.high) {
-    /** Advancing beyond the complete bitmap discards only the original out-of-window history. */
+    /** Discard bitmap history only when its counters leave the window. */
     const advance = sequence - state.high
     state.bits[0] = (advance >= 64n ? 0n : state.bits[0]! << advance) | 1n
     state.high = sequence
   } else {
-    /** Bit 63 remains admissible once; bit 64 and already committed bits are original replays. */
+    /** Admit bit 63 once; reject bit 64 and previously committed bits as replays. */
     const distance = state.high - sequence
     if (distance >= 64n || (state.bits[0]! & (1n << distance)) !== 0n)
       throw createRpcAuthenticationError(Text.authenticationFrameReplayed)

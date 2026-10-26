@@ -1,15 +1,15 @@
-/** The original internal uint64 boundary seam recognizes only this exact installed owner identity. */
+/** Associate the internal uint64 boundary setter with its installed owner. */
 const counters = new WeakMap<object, (counter: bigint) => void>()
-/** Register the actual installation's allocator; copied public values cannot acquire that authority. */
+/** Register the allocator by owner identity so copied values cannot acquire setter authority. */
 export function registerAuthenticationCounterSetter(
   owner: object,
   setter: (counter: bigint) => void
 ): void {
   counters.set(owner, setter)
 }
-/** Preserve the existing bounded internal oracle without exposing a production counter option. */
+/** Allow boundary checks without exposing a production counter option. */
 export function setAuthenticationReplayCounter(owner: object, counter: bigint): boolean {
-  /** Only a real original owner identity can set its existing uint64 allocation state. */
+  /** Resolve the allocator through its registered owner identity. */
   counters.get(owner)!(counter)
   return true
 }

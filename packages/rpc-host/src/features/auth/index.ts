@@ -1,7 +1,6 @@
 /**
- * Exposes the authentication flow factory, snapshots its cold configuration and creates a separate
- * RpcAuthenticationFlow for each native installation. Host flow setup supplies namespaces and
- * lifetime; this entry does not execute transport IO or retain replay state itself.
+ * Snapshot cold configuration once; create a separate flow for each native installation and its
+ * lifetime.
  */
 import { defineBuiltinFlowFeature } from '../../sdk/flow-feature.js'
 import type { IRpcFlowFeature } from '../../sdk/types.js'
@@ -17,9 +16,9 @@ export type {
   IRpcAuthenticationCredentials
 } from './types.js'
 
-/** Install actual credentials, paired transforms and physical replay windows through fixed hooks. */
+/** Install credentials and paired transforms through fixed flow hooks. */
 export function auth(options: IRpcAuthenticationOptions): IRpcFlowFeature {
-  /** One original getter snapshot is reused by every independent actual installation. */
+  /** Reuse the configuration snapshot without sharing installed replay state. */
   const captured = snapshotAuthenticationConfig(options)
   return defineBuiltinFlowFeature('auth', {
     name: RpcAuthenticationPluginName,

@@ -1,7 +1,6 @@
 /**
- * Owns authentication callback encoding across prepared metadata, text and byte representations.
- * Reuses the canonical JSON privacy and UTF-8 boundaries while preserving original binary sidecars;
- * the codec remains the sole semantic admission and native-backing restoration owner.
+ * Adapt callback representations without replacing the codec's semantic admission, JSON privacy or
+ * backing restoration.
  */
 import { jsonParser } from '@migaia/serialize/plugins'
 import { isUint8Array } from '@migaia/utils/bytes'
@@ -17,23 +16,23 @@ import {
 import { RpcAuthenticationText as Text } from './text.js'
 import type { IAuthenticationEnvelope, IRpcAuthenticationOptions } from './types.js'
 
-/** Only auth's existing replay representation is adapted to the fixed prepared-metadata stage. */
+/** Adapt the replay binding at the prepared-metadata stage. */
 export class AuthenticationRepresentation {
-  /** The original JSON implementation preserves metadata own-key order without a second validator. */
+  /** Reuse the JSON codec to preserve metadata key order without another validator. */
   readonly #json = jsonParser() as unknown as IRpcJsonTextParser
-  /** Explicit byte transforms borrow one original fatal UTF-8 capability for their installation. */
+  /** Acquire fatal UTF-8 handling only when byte transforms need it. */
   #utf8: RpcUtf8 | undefined
-  /** Explicit representation policy is captured once with its original paired transforms. */
+  /** Keep encoding fixed for the lifetime of its paired transforms. */
   readonly #encoding: NonNullable<IRpcAuthenticationOptions['encodedType']>
 
-  /** Capture one existing representation choice; ordinary object transforms acquire no byte codec. */
+  /** Capture encoding without acquiring an unused byte codec. */
   constructor(encoding: IRpcAuthenticationOptions['encodedType']) {
     this.#encoding = encoding ?? Encoding.any
   }
 
   /** Select the default signing object or the configured text/byte callback representation. */
   bound(value: IAuthenticationEnvelope, signOnly = true): unknown {
-    /** Object signing preserves the original native path and leaves canonicalization to callbacks. */
+    /** Let object-signing callbacks choose their canonicalization. */
     if (signOnly && this.#encoding === Encoding.any) return value
     /** Encryption and explicit categories retain the signed prefix with object payload metadata. */
     const text = Format.prefix + this.#json.encode(value)[1]
@@ -51,7 +50,7 @@ export class AuthenticationRepresentation {
    * objects.
    */
   pack(value: unknown): unknown {
-    /** Actual output categories, rather than caller fields, choose the one private wire projection. */
+    /** Choose the wire projection from the transform's output category. */
     const encoding = isUint8Array(value)
       ? Encoding.bytes
       : typeof value === 'string'
@@ -100,7 +99,7 @@ export class AuthenticationRepresentation {
    * policy.
    */
   plaintext(value: unknown): unknown {
-    /** Byte plaintext returns to the same original prefixed signed JSON category. */
+    /** Decode byte plaintext into the prefixed signed JSON representation. */
     const decoded = isUint8Array(value) ? this.#bytes().decode(value, hostErrorWireMetadata) : value
     if (typeof decoded !== 'string') return decoded
     if (!decoded.startsWith(Format.prefix))
@@ -112,7 +111,7 @@ export class AuthenticationRepresentation {
     )
   }
 
-  /** Native byte capabilities are obtained only for an actually used byte transform category. */
+  /** Acquire byte capabilities lazily for byte transforms. */
   #bytes(): RpcUtf8 {
     return (this.#utf8 ??= new RpcUtf8())
   }

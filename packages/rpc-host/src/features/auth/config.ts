@@ -1,7 +1,6 @@
 /**
- * Snapshots and validates authentication transform pairs, credentials and encoding options before
- * installation. Configuration failures use Host error ownership; nonce, replay and connection state
- * are allocated only by the installed authentication flow.
+ * Validate configuration before installation; each installed flow owns its nonce, replay and
+ * connection state.
  */
 import type { IRpcAuthenticationRetain } from '@migaia/rpc-contract/interfaces'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
@@ -30,13 +29,13 @@ export function readAuthenticationRetain(
   return value
 }
 
-/** Capture actual transform functions once, preserving the original unreadable getter cause. */
+/** Snapshot transforms once so unreadable getters retain their failure cause. */
 export function snapshotAuthenticationConfig(
   config: IRpcAuthenticationOptions
 ): IRpcAuthenticationOptions {
   if (!config || typeof config !== 'object' || Array.isArray(config))
     throw createRpcError(RpcCoreErrorCode.invalidConfig, Text.authenticationDescriptorIsInvalid)
-  /** Actual callbacks are captured before validation; later caller mutation cannot replace them. */
+  /** Capture callbacks before validation so caller mutation cannot replace them later. */
   let snapshot: IRpcAuthenticationOptions
   try {
     snapshot = {

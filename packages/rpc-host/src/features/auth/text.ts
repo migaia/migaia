@@ -1,4 +1,4 @@
-/** Stable authentication diagnostics move with their unique plugin execution owner. */
+/** Keep authentication diagnostics with the plugin that emits them. */
 export const RpcAuthenticationText = {
   /** Requires a signed replay binding inside encryption; encrypt-only callers must add signing. */
   authenticationEncryptionRequiresSigning:
@@ -11,33 +11,33 @@ export const RpcAuthenticationText = {
   authenticationCounterExhausted: 'Authentication replay counter is exhausted',
   /** Signed replay nonces require 128 bits of secure entropy; weak randomness is never substituted. */
   authenticationNonceUnavailable: 'Authentication replay nonce is unavailable',
-  /** Entropy failure keeps the original cause on a coded configuration error. */
+  /** Preserve entropy failure as the configuration error's cause. */
   authenticationNonceFailed: 'Authentication replay nonce generation failed',
-  /** Stable core error text consumed by features/auth; preserves its existing caller-facing wording. */
+  /** Reject non-object configuration before reading transform properties. */
   authenticationDescriptorIsInvalid: 'authentication descriptor is invalid',
-  /** Stable core error text consumed by features/auth; preserves its existing caller-facing wording. */
+  /** Identify configuration getters that failed during the installation snapshot. */
   authenticationDescriptorIsUnreadable: 'authentication descriptor is unreadable',
-  /** Stable core error text consumed by features/auth; preserves its existing caller-facing wording. */
+  /** Name the configured transform that is not callable. */
   authenticationTransformInvalid: (name: string): string =>
     `authentication.${name} must be a function`,
-  /** Stable core error text consumed by features/auth; preserves its existing caller-facing wording. */
+  /** Require decryption wherever encryption changes the callback representation. */
   authenticationEncryptDecryptMustBeConfiguredTogether:
     'authentication encrypt/decrypt must be configured together',
-  /** Stable core error text consumed by features/auth; preserves its existing caller-facing wording. */
+  /** Require verification wherever signing protects the callback representation. */
   authenticationSignVerifyMustBeConfiguredTogether:
     'authentication sign/verify must be configured together',
-  /** Stable core error text consumed by features/auth; preserves its existing caller-facing wording. */
+  /** Refuse transform configuration that supplies neither protection pair. */
   authenticationRequiresEncryptionOrSigningTransforms:
     'authentication requires encryption or signing transforms',
-  /** Stable core error text consumed by features/auth; preserves its existing caller-facing wording. */
+  /** Reject encoding choices outside the supported callback categories. */
   authenticationEncodedTypeIsInvalid: 'authentication.encodedType is invalid',
   /** Auth and connection retention share this admission rule before native credential handling. */
   authenticationRetainIsInvalid:
     'authentication.retain must be false, window, or a positive safe integer',
   /** Counter-window retention requires the configured sign/verify pair to establish real counters. */
   authenticationWindowRetentionRequiresSigning: 'authentication.retain window requires signing',
-  /** Stable core error text consumed by features/auth; preserves its existing caller-facing wording. */
+  /** Classify outbound transform failure while retaining its cause locally. */
   outboundFrameAuthenticationFailed: 'Outbound frame authentication failed',
-  /** Stable core error text consumed by features/auth; preserves its existing caller-facing wording. */
+  /** Classify inbound transform failure while retaining its cause locally. */
   inboundFrameAuthenticationFailed: 'Inbound frame authentication failed'
 } as const

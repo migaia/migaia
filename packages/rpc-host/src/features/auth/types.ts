@@ -1,7 +1,6 @@
 /**
- * Declares authentication transforms, credentials and bounded request-replay configuration. These
- * runtime-neutral contracts lend admitted flow facts and shared refusal data; installed auth owns
- * mutable replay state while native transports supply real credential/source facts.
+ * Keep authentication options runtime-neutral; transports supply connection facts and installed
+ * flows own replay state.
  */
 import type { IRpcFlowContext, IRpcAuthenticationRetain } from '@migaia/rpc-contract/interfaces'
 import type { IRpcPeerInfo, IRpcPortableValue } from '@migaia/rpc-contract/protocol'
@@ -12,14 +11,14 @@ export type IRpcAuthenticationTransform = (
   value: unknown,
   context: IRpcFlowContext
 ) => unknown | Promise<unknown>
-/** Only the configured resolver receives private material from its exact native connection. */
+/** Expose connection-private credentials only to the configured resolver. */
 export type IRpcAuthenticationCredentialsContext = IRpcFlowContext &
   Readonly<{ credentials?: IRpcPortableValue }>
-/** A native owner resolves credentials from its exact carrier, never decoded self or payload fields. */
+/** Resolve credentials from the carrier, never decoded identity or payload fields. */
 export type IRpcAuthenticationCredentials = (
   context: IRpcAuthenticationCredentialsContext
 ) => IRpcPortableValue | undefined | Promise<IRpcPortableValue | undefined>
-/** The original paired-transform contract remains independent from native handshake credentials. */
+/** Keep paired transforms independent from native handshake credentials. */
 export type IRpcAuthenticationOptions = Readonly<{
   encrypt?: IRpcAuthenticationTransform
   decrypt?: IRpcAuthenticationTransform
@@ -29,15 +28,14 @@ export type IRpcAuthenticationOptions = Readonly<{
   encodedType?: 'any' | 'string' | 'uint8array'
   /** Completed IDs release immediately by default; connection retain overrides this installation. */
   retain?: IRpcAuthenticationRetain
-  /** Numeric retention alone reserves up to1024 active/retained IDs per admitted direct peer. */
+  /** Bound numeric retention to at most 1024 active or retained IDs per admitted direct peer. */
   maxReplayEntriesPerPeer?: number
-  /** Replay capacity refusal borrows the original admitted-identity diagnostic contract. */
+  /** Report replay-capacity refusal through the admitted-identity diagnostic contract. */
   onRejected?(rejection: IRpcProviderRejection): void | Promise<void>
   credentials?: IRpcPortableValue | IRpcAuthenticationCredentials
   /**
-   * Return an explicit {principalId: nonemptyString} to lend authenticated identity to this
-   * Session. Other formerly ignored returns remain ignored; throwing or rejection refuses
-   * credentials.
+   * Only {principalId: nonemptyString} grants authenticated Session identity; other returns are
+   * ignored, while failure refuses credentials.
    */
   verifyCredentials?(
     auth: IRpcPortableValue | undefined,
@@ -45,9 +43,9 @@ export type IRpcAuthenticationOptions = Readonly<{
     context: IRpcFlowContext
   ): unknown | Promise<unknown>
 }>
-/** One fixed 64-bit window belongs only to one actual inbound physical source. */
+/** Isolate the 64-bit replay window to one inbound physical source. */
 export type IAuthenticationCounterWindow = { nonce: string; high: bigint; bits: BigUint64Array }
-/** This original signed wrapper is private auth data, independent from the RPC semantic profile. */
+/** Keep the signed replay wrapper independent from the RPC semantic profile. */
 export type IAuthenticationEnvelope = Readonly<{
   authentication: string
   version: number
