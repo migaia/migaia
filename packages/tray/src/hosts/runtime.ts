@@ -71,7 +71,13 @@ export function runtimePlugin(
   definition: IAnyTrayHost,
   mode: TrayRuntimeMode,
   options: ITrayRuntimeOptions &
-    Readonly<{ id?: string; connect?: ICoroutineConnect; task?: ICoroutineUserTask }>
+    Readonly<{
+      id?: string
+      connect?: ICoroutineConnect
+      task?: ICoroutineUserTask
+      /** Child parent-loss handling borrows its original first-exit decision. */
+      parentLossExit?(code: number): void
+    }>
 ): IPluginConstraint<any> {
   /** Parent sources retain their unique id; a real child transport registers under its namespace. */
   const common = {
@@ -113,7 +119,11 @@ export function runtimePlugin(
               ...(definition.sandbox ? { wrap: definition.sandbox.wrap } : {})
             }
           }
-        : { ...common, connectToParent: true }
+        : {
+            ...common,
+            connectToParent: true,
+            ...(options.parentLossExit ? { parentLoss: { exit: options.parentLossExit } } : {})
+          }
     )
   return (
     mode === TrayRuntimeMode.parent

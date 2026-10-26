@@ -15,6 +15,13 @@ import {
 import { TrayRuntime, TrayRuntimeMode } from '../constants.js'
 import type { IAnyTrayHost } from '../typing.js'
 
+/** The original Node child realm exit stays shared by parent loss and the chosen Tray outcome. */
+function exitNodeRealm(code: number): void {
+  /** Thread and process entries are Node realms; the structural read keeps Tray free of Node types. */
+  const realm = Reflect.get(globalThis, 'process') as { exit(code: number): never } | undefined
+  realm?.exit(code)
+}
+
 /** Finish business cleanup before retiring transport while native pipelines remain admitted. */
 export async function disposeChildHost(
   host: ITrayRuntimeHost,
@@ -100,7 +107,14 @@ export async function serveChild(
       dispatcher.plugin
     )
     /** Native teardown retains this exact registration name rather than guessing a runtime alias. */
-    const transport = runtimePlugin(admitted, TrayRuntimeMode.child, { ...options, connect })
+    const transport = runtimePlugin(admitted, TrayRuntimeMode.child, {
+      ...options,
+      connect,
+      parentLossExit: (code) => {
+        // An explicit first exit keeps its outcome while the same cleanup closes parent stdio.
+        if (!ended) exitNodeRealm(code)
+      }
+    })
     await host.use(transport)
     return {
       host,
@@ -144,7 +158,5 @@ export async function serveTrayHost(
   } finally {
     await disposeChildHost(child.host, child.shutdown, report, child.transportName)
   }
-  /** Thread and process entries are Node realms; the structural read keeps Tray free of Node types. */
-  const realm = Reflect.get(globalThis, 'process') as { exit(code: number): never } | undefined
-  realm?.exit(code)
+  exitNodeRealm(code)
 }
