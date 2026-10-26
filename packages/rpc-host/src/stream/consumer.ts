@@ -229,6 +229,7 @@ export class StreamConsumer {
       target.callTimeoutCap
     )
     void operation.catch((error) => {
+      if (this.#terminal && 'error' in this.#terminal && error === this.#terminal.error) return
       if (this.#beforeStart && this.#opened) this.#owner.report(error)
       else this.close(error)
     })
@@ -428,6 +429,7 @@ export class StreamConsumer {
 
   /** One retained finish sends the original before-start drain or ordinary cancellation intent. */
   #finishIntent(reason?: unknown): Promise<IteratorResult<IRpcPortableValue>> {
+    if (this.#terminal) return this.#finished.promise
     if (!this.#finishing) {
       this.#finishing = this.#finished.promise
       if (this.#target.origin && !this.#prepared) {

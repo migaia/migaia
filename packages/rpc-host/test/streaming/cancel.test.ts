@@ -1,7 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import type { IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
-import { RpcWireKind, RpcStreamEvent, type IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
+import {
+  RpcWireKind,
+  RpcStreamEvent,
+  RpcWireStreamFinish,
+  type IRpcSemanticFrame
+} from '@migaia/rpc-contract/protocol'
 import { RpcStreamLimit } from '@migaia/rpc-contract'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
@@ -21,6 +26,72 @@ function controlledDeadlineScheduler(): IScheduler & { advance(ms: number): void
 
 /** Return keeps its local value and releases the remote generator once. */
 describe('streaming cancellation', () => {
+  it('does not report an opened before-start stream failure again at its caller', async () => {
+    /** The provider failure remains visible through the stream and its actual provider reporter. */
+    const providerFailure = new RangeError('before-start provider failed')
+    /** Caller diagnostics must not repeat a failure already delivered by next(). */
+    const reports: unknown[] = []
+    /** A provider report remains independently owned and must not be suppressed. */
+    const providerReports: unknown[] = []
+    /** Both ends use the same ordinary native handshake and real stream owner. */
+    const fixture = await connectedCoreHosts(
+      {
+        values: function* () {
+          yield 1
+          throw providerFailure
+        },
+        barrier: () => true
+      },
+      {},
+      (error) => providerReports.push(error),
+      undefined,
+      (error) => reports.push(error)
+    )
+    try {
+      /** Opening detaches before-start cancellation without transferring error-report ownership. */
+      const stream = fixture.b.memory.stream('values', null, {
+        cancel: 'before-start'
+      }) as AsyncIterableIterator<unknown>
+      expect(await stream.next()).toEqual({ done: false, value: 1 })
+      await expect(stream.next()).rejects.toMatchObject({
+        name: 'RangeError',
+        message: providerFailure.message
+      })
+      await fixture.b.memory.send('a', 'barrier')
+      expect(providerReports).toEqual([providerFailure])
+      expect(reports).toEqual([])
+    } finally {
+      await fixture.close()
+    }
+  })
+
+  it('does not send finish after a before-start stream has already ended', async () => {
+    /** One finite provider completes before the caller returns its already-terminal iterator. */
+    const fixture = await connectedCoreHosts({
+      values: function* () {
+        yield 1
+      },
+      barrier: () => true
+    })
+    try {
+      /** The real before-start option activates the original finish-without-items protocol. */
+      const stream = fixture.b.memory.stream('values', null, {
+        cancel: 'before-start'
+      }) as AsyncIterableIterator<unknown>
+      expect(await stream.next()).toEqual({ done: false, value: 1 })
+      expect(await stream.next()).toEqual({ done: true, value: undefined })
+      expect(await stream.return?.('local')).toEqual({ done: true, value: undefined })
+      await fixture.b.memory.send('a', 'barrier')
+      expect(
+        fixture.pair[1].written.filter(
+          (frame) => frame.kind === RpcWireKind.stream && frame.stream.event === RpcWireStreamFinish
+        )
+      ).toEqual([])
+    } finally {
+      await fixture.close()
+    }
+  })
+
   it('ignores an in-flight item and cancellation acknowledgement after local cancellation', async () => {
     /** Model a native-accepted item whose delivery completes after caller cancellation. */
     const accepted = deferred<void>()
