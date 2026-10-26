@@ -12,6 +12,7 @@ import {
   admit,
   check,
   invokeWithContext,
+  invokeStageWithContext,
   cleanupSyncIterator,
   cleanupAsyncIterator,
   snapshotStages
@@ -156,7 +157,7 @@ export const adaptSyncStageToAsync =
     /** Local submissions preserve synchronous stage timing under async lifting. */
     const submissions = new PipelineSubmissions<TValue>(nextPolicy, onViolation)
     try {
-      invokeWithContext(stage, [value, submissions.next], context)
+      invokeStageWithContext(stage, value, submissions.next, context)
     } finally {
       submissions.close()
     }
@@ -187,7 +188,7 @@ export const adaptSyncStageToGenerator = <
     /** Sync stage side effects complete before any yielded value reaches downstream. */
     const submissions = new PipelineSubmissions<TValue>(nextPolicy, onViolation)
     try {
-      invokeWithContext(stage, [value, submissions.next], context)
+      invokeStageWithContext(stage, value, submissions.next, context)
     } finally {
       submissions.close()
     }
@@ -214,7 +215,7 @@ export const adaptGeneratorStageToAsyncGenerator = <
   stage: IGeneratorMiddlewareStage<TValue, TSignals>
 ): IAsyncGeneratorMiddlewareStage<TValue, TSignals> =>
   async function* (value, context) {
-    return yield* invokeWithContext(stage, [value], context)
+    return yield* invokeWithContext(stage, value, context)
   }
 
 /** Promotes a sync next-style stage through the canonical sync-to-generator violation guard. */
@@ -275,7 +276,7 @@ export const runSyncMiddleware = <TValue>(
       nextValue = valueAfter
     }
     check(context)
-    invokeWithContext(stage, [current, next], context)
+    invokeStageWithContext(stage, current, next, context)
     returned = true
     check(context)
     assertActive?.()
@@ -283,7 +284,7 @@ export const runSyncMiddleware = <TValue>(
     current = nextValue
   }
   check(context)
-  invokeWithContext(done, [current], context)
+  invokeWithContext(done, current, context)
 }
 
 /** Runs an asynchronous stage sequence with runner-owned downstream failure composition. */
@@ -313,7 +314,7 @@ export const runGeneratorMiddleware = <TValue>(
   let current = value
   for (const stage of stageSnapshot) {
     check(context)
-    const iterator = invokeWithContext(stage, [current], context)
+    const iterator = invokeWithContext(stage, current, context)
     let last = current
     let step = iterator.next()
     while (!step.done) {
@@ -333,7 +334,7 @@ export const runGeneratorMiddleware = <TValue>(
     current = reduction.value
   }
   check(context)
-  invokeWithContext(done, [current], context)
+  invokeWithContext(done, current, context)
 }
 
 /** Serially drains asynchronous generator stages and commits only each terminal transition. */
@@ -362,7 +363,7 @@ export const runAsyncGeneratorMiddleware = async <TValue>(
   for (const stage of stageSnapshot) {
     /** Iterator is driven with its native receiver through direct method syntax. */
     check(context)
-    const iterator = invokeWithContext(stage, [current], context)
+    const iterator = invokeWithContext(stage, current, context)
     let last = current
     let step = await iterator.next()
     while (!step.done) {
@@ -382,5 +383,5 @@ export const runAsyncGeneratorMiddleware = async <TValue>(
     current = reduction.value
   }
   check(context)
-  await invokeWithContext(done, [current], context)
+  await invokeWithContext(done, current, context)
 }

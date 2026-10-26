@@ -9,26 +9,23 @@ import {
 } from './errors.js'
 import type { IMiddlewarePipelineContext } from './runtime.js'
 
-/** Invokes a one-argument optional-context callback. */
+/** Invoke a terminal or generator directly, appending context only when a signal was admitted. */
 export function invokeWithContext<TFirst, TResult>(
   callback: (first: TFirst, context?: IMiddlewarePipelineContext) => TResult,
-  args: readonly [TFirst],
+  first: TFirst,
   context: IMiddlewarePipelineContext | undefined
-): TResult
-/** Invokes a two-argument optional-context callback. */
-export function invokeWithContext<TFirst, TSecond, TResult>(
-  callback: (first: TFirst, second: TSecond, context?: IMiddlewarePipelineContext) => TResult,
-  args: readonly [TFirst, TSecond],
+): TResult {
+  return context ? callback(first, context) : callback(first)
+}
+
+/** Invoke a next-style stage directly, retaining its exact two- or three-argument call shape. */
+export function invokeStageWithContext<TFirst, TNext, TResult>(
+  callback: (first: TFirst, next: TNext, context?: IMiddlewarePipelineContext) => TResult,
+  first: TFirst,
+  next: TNext,
   context: IMiddlewarePipelineContext | undefined
-): TResult
-/** Implements both supported callback arities without reflective invocation. */
-export function invokeWithContext(
-  callback: Function,
-  args: readonly [unknown] | readonly [unknown, unknown],
-  context: IMiddlewarePipelineContext | undefined
-): unknown {
-  if (args.length === 1) return context ? callback(args[0], context) : callback(args[0])
-  return context ? callback(args[0], args[1], context) : callback(args[0], args[1])
+): TResult {
+  return context ? callback(first, next, context) : callback(first, next)
 }
 
 /**

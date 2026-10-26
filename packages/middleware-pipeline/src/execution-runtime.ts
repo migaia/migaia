@@ -13,6 +13,7 @@ import {
   admit,
   check,
   invokeWithContext,
+  invokeStageWithContext,
   cleanupSyncIterator,
   cleanupAsyncIterator,
   snapshotStages
@@ -203,7 +204,7 @@ class AsyncPipelineRun<TValue> {
     if (index < this.stages.length) return new AsyncPipelineFrame(this, index, parent).run(value)
     try {
       check(this.context)
-      return Promise.resolve(invokeWithContext(this.done, [value], this.context))
+      return Promise.resolve(invokeWithContext(this.done, value, this.context))
     } catch (error) {
       return Promise.reject(error)
     }
@@ -285,7 +286,12 @@ class AsyncPipelineFrame<TValue> {
     /** A boolean distinguishes throw undefined from successful completion. */
     let stageFailed = false
     try {
-      await invokeWithContext(this.#run.stages[this.#index]!, [value, this.next], this.#run.context)
+      await invokeStageWithContext(
+        this.#run.stages[this.#index]!,
+        value,
+        this.next,
+        this.#run.context
+      )
     } catch (error) {
       stageFailed = true
       stageError = error
@@ -399,7 +405,7 @@ export const runMultipleSyncPipeline = <TValue>(
       check(context)
       options.assertActive?.()
       if (branch.index === snapshot.length) {
-        invokeWithContext(done, [branch.value], context)
+        invokeWithContext(done, branch.value, context)
         continue
       }
       /** This stage owns its retained callback independently of later branch entries. */
@@ -408,7 +414,7 @@ export const runMultipleSyncPipeline = <TValue>(
         options.onViolation
       )
       try {
-        invokeWithContext(snapshot[branch.index]!, [branch.value, submissions.next], context)
+        invokeStageWithContext(snapshot[branch.index]!, branch.value, submissions.next, context)
       } finally {
         submissions.close()
       }
@@ -473,11 +479,11 @@ export const runMultipleGeneratorPipeline = <TValue>(
       options.assertActive?.()
       if (!('iterator' in task)) {
         if (task.index === snapshot.length) {
-          invokeWithContext(done, [task.value], context)
+          invokeWithContext(done, task.value, context)
           continue
         }
         /** The factory and all yielded suffixes stay under this one task stack. */
-        const iterator = invokeWithContext(snapshot[task.index]!, [task.value], context)
+        const iterator = invokeWithContext(snapshot[task.index]!, task.value, context)
         pending.push({ index: task.index, iterator })
         continue
       }
@@ -536,11 +542,11 @@ export const runMultipleAsyncGeneratorPipeline = async <TValue>(
       options.assertActive?.()
       if (!('iterator' in task)) {
         if (task.index === snapshot.length) {
-          await invokeWithContext(done, [task.value], context)
+          await invokeWithContext(done, task.value, context)
           continue
         }
         /** One native iterator owns this stage and each subsequent yielded suffix. */
-        const iterator = invokeWithContext(snapshot[task.index]!, [task.value], context)
+        const iterator = invokeWithContext(snapshot[task.index]!, task.value, context)
         pending.push({ index: task.index, iterator })
         continue
       }
