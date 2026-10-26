@@ -1,9 +1,50 @@
 /** Owner-review failures use public hosts and their real physical carrier pair. */
 import { deferred } from '@migaia/utils/promise'
-import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
-import { deserializeRpcWireError } from '@migaia/rpc-contract/protocol'
-import { expect, it, vi } from 'vitest'
-import { connectedCoreHosts } from '../host/core-fixture.js'
+import {
+  defineFlowFeature,
+  RpcFlowPoint,
+  RpcJsonCarrierCodec,
+  type IRpcFlowStage
+} from '@migaia/rpc-host/sdk'
+import { createRpcHost } from '@migaia/rpc-host'
+import type { IRpcFlowContext } from '@migaia/rpc-contract/interfaces'
+import { deserializeRpcWireError, RpcWireHandshakeStep } from '@migaia/rpc-contract/protocol'
+import { assert, expect, it, vi } from 'vitest'
+import { connectedCoreHosts, coreMemoryServer } from '../host/core-fixture.js'
+
+/** A real accept hook lends its actual connection signal and can hold only its own continuation. */
+class ClosingAcceptGate {
+  /** Cold recipes may observe the same stage without suspending an ordinary ready handshake. */
+  hold = true
+  /** This is the real handshake context received from the installed native group. */
+  readonly entered = deferred<IRpcFlowContext>()
+  /** Fixture cleanup always releases the original stage continuation. */
+  readonly resume = deferred<void>()
+  /** An optional business failure remains distinct from a normal closing acknowledgment. */
+  readonly #failure: Error | undefined
+  /** The actual public feature installs the same hook under the native transport lifetime. */
+  readonly feature = defineFlowFeature({
+    name: 'closing-accept-gate',
+    setup: () => ({ stages: { [RpcFlowPoint.handshakeOutbound]: this.#wait } })
+  })
+
+  /** Capture the original late failure without replacing the real handshake or Session. */
+  constructor(failure?: Error) {
+    this.#failure = failure
+  }
+
+  /** The accepted handshake remains original work; closing cannot turn a late failure into success. */
+  readonly #wait: IRpcFlowStage<typeof RpcFlowPoint.handshakeOutbound> = async (payload, next) => {
+    if (payload.handshake.step === RpcWireHandshakeStep.accept) {
+      this.entered.resolve(payload.context)
+      if (this.hold) {
+        await this.resume.promise
+        if (this.#failure) throw this.#failure
+      }
+    }
+    await next(payload)
+  }
+}
 
 /** The fixture erases optional native capabilities; inspect its real public namespace method. */
 function observePeerClose(namespace: object, listener: (event: unknown) => void): void {
@@ -72,29 +113,88 @@ it('A36 local bad-frame failure keeps its own reason, sends close and does not a
 })
 
 it('A36 physical EOF still uses its native terminal reason and publishes peer closure', async () => {
+  /** The public native stage observes the actual connection signal without replacing its owner. */
+  const gate = new ClosingAcceptGate()
+  gate.hold = false
   /** The actual optional native close capability remains present on both endpoints. */
-  const hosts = await connectedCoreHosts({}, {}, () => undefined, {
-    create: () => new RpcJsonCarrierCodec(),
-    nativeBinary: false,
-    closingWrites: true
-  })
+  const hosts = await connectedCoreHosts(
+    {},
+    {},
+    () => undefined,
+    { create: () => new RpcJsonCarrierCodec(), nativeBinary: false, closingWrites: true },
+    () => undefined,
+    [gate.feature]
+  )
+  const connectionSignal = (await gate.entered.promise).signal
+  assert(connectionSignal)
   /** Native completion may refine its earlier EOF reason. */
   const reason = new Error('physical terminal reason')
+  /** The provisional native Error remains caller-owned when the final reason replaces it. */
+  const eof = new Error('physical eof')
   /** Only the physical path is allowed to consult this native completion port. */
   const terminalReason = vi.fn(async () => reason)
-  Object.assign(hosts.pair[0], { terminalReason })
+  Object.assign(hosts.pair[1], { terminalReason })
   /** A physical peer event remains distinct from local protocol failure. */
   const peerClosed = vi.fn()
-  observePeerClose(hosts.a.memory, peerClosed)
+  observePeerClose(hosts.b.memory, peerClosed)
   try {
-    await hosts.pair[1].close(new Error('physical eof'))
+    await hosts.pair[0].close(eof)
     await vi.waitFor(() => expect(peerClosed).toHaveBeenCalledOnce())
     expect(terminalReason).toHaveBeenCalledOnce()
     expect(peerClosed.mock.calls[0]?.[0]).toMatchObject({ reason, closeFrame: false })
+    expect(connectionSignal.aborted).toBe(true)
+    /** The one closing wrapper must carry the selected native reason, not the provisional EOF. */
+    const cancellation = connectionSignal.reason
+    assert(cancellation instanceof Error)
+    expect(cancellation.cause).toBe(reason)
+    expect(eof).not.toHaveProperty('cause')
+    expect(reason).not.toHaveProperty('cause')
   } finally {
     await hosts.close()
   }
 })
+
+it.each(['acknowledgment', 'genuine failure'] as const)(
+  'A40 suspended handshake accept preserves closing %s diagnostics',
+  async (mode) => {
+    /** Only the optional genuine business error may be reported after ordinary close. */
+    const lateError = new Error('late handshake business failure')
+    const gate = new ClosingAcceptGate(mode === 'genuine failure' ? lateError : undefined)
+    /** This window belongs only to the real server's Session and native lifetime. */
+    const reports: unknown[] = []
+    /** The existing listener creates both physical endpoints and the original accept handshake. */
+    const server = coreMemoryServer('a', 'closing-accept-a', 'memory', [gate.feature], [], {
+      create: () => new RpcJsonCarrierCodec(),
+      nativeBinary: false,
+      closingWrites: true
+    })
+    const host = await createRpcHost({ ...server.options, report: (error) => reports.push(error) })
+    /** Client construction may fail normally when its original peer closes during admission. */
+    const connected = server
+      .connect('b', { report: () => undefined }, 'closing-accept-b')
+      .catch((error: unknown) => error)
+    try {
+      const context = await gate.entered.promise
+      const aborted = deferred<void>()
+      context.signal.addEventListener('abort', () => aborted.resolve(), { once: true })
+      /** Closing starts before the real accepted handshake continuation resumes. */
+      const closing = host.close(new Error('close during handshake accept'))
+      await aborted.promise
+      gate.resume.resolve()
+      await closing
+      await connected
+      if (mode === 'acknowledgment') expect(reports).toEqual([])
+      else {
+        expect(reports).toContain(lateError)
+        expect(reports.every((error) => error === lateError)).toBe(true)
+      }
+    } finally {
+      gate.resume.resolve()
+      await host.close()
+      await connected
+    }
+  }
+)
 
 it.each(['caller', 'session'] as const)(
   'A40 %s cancellation while encoding does not report a late failure',

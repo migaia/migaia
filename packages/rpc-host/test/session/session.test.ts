@@ -8,7 +8,7 @@ import {
 import { createProbeEmitter } from '../../dist/plugins/probe/emitter.js'
 import { createDirectorySnapshot } from '../../dist/session/view.js'
 import { MemoryCarrier } from '../fixtures/core-carrier.js'
-import { describe, expect, it, vi } from 'vitest'
+import { assert, describe, expect, it, vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { deferred } from '@migaia/utils/promise'
 import { defineHost, definePlugin } from '@migaia/plugin-host'
@@ -873,5 +873,39 @@ it('A38 accepted byte Session replaces the bootstrap cap with its configured fra
     await Promise.all([left.table.close(), right.table.close()])
     toLeft.destroy()
     toRight.destroy()
+  }
+})
+
+it('A40 closing a physically written pending ping reports no cancellation acknowledgment', async () => {
+  /** Both original native Session owners first complete the genuine accepted handshake. */
+  const left = await Host.create('closing-ping-a')
+  const right = await Host.create('closing-ping-b')
+  /** Closing capability uses the same native control conversion as real process transports. */
+  const pair = connect(left, right, 'process', false, '', true)
+  try {
+    await Promise.all([pair.first.ready, pair.second.ready])
+    pair.a.silentPing = true
+    /** Observe rejection before close; the peer never answers this physically written control. */
+    const pending = left.table
+      .ping(pair.first, { timeoutMs: false })
+      .catch((error: unknown) => error)
+    await vi.waitFor(() =>
+      expect(
+        pair.a.written.some((frame) => frame.kind === 'control' && frame.operation === 'ping')
+      ).toBe(true)
+    )
+    /** The same original caller reason must remain reachable through the closing wrapper. */
+    const reason = new Error('close with ping outstanding')
+    await pair.first.close(reason)
+    const failure = await pending
+    expect(failure).toMatchObject({ code: RpcCoreErrorCode.endpointDisposed })
+    assert(failure instanceof Error)
+    expect(failure.cause).toBe(reason)
+    /** The original utility race owns its late rejection handler; no extra timer is needed. */
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    expect(left.report).not.toHaveBeenCalled()
+    expect(left.scheduler.pendingCount).toBe(0)
+  } finally {
+    await Promise.all([left.table.close(), right.table.close()])
   }
 })

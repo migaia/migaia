@@ -183,7 +183,7 @@ export class Session {
   #keepaliveBytes = 0
   /** Work callbacks and pending controls receive the same original terminal reason. */
   #reason: unknown
-  /** Closing writes and their cancellation acknowledgement share one lifecycle error identity. */
+  /** Closing-capable Sessions own one lifecycle error whose cause follows the terminal reason. */
   #closeError: unknown
   /** Control correlation is independent of business CallTable records. */
   readonly #controls = new Map<string, IControlPending>()
@@ -607,14 +607,14 @@ export class Session {
         reason: reason ?? createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
       }
       reason = this.#receivedClose.reason
-      if (this.#closing && this.#physicalFailure) this.#reason = reason
+      if (this.#closing && this.#physicalFailure) this.#refineCloseReason(reason)
     }
     if (this.#closing) return this.#closed.promise
     this.#closing = true
     this.#physicalFailure = physicalFailure
     this.#reason = reason ?? createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
     this.#closeError =
-      this.#options.carrier.closingWrites && !isLocalRpcError(this.#reason, RpcLifecycleError)
+      this.#options.carrier.closingWrites && reason !== undefined && reason !== null
         ? createRpcLifecycleError(RpcCoreErrorText.endpointDisposed, this.#reason)
         : this.#reason
     this.#observation.lifecycle(RpcProbeLifecycle.closing, this.#reason)
@@ -635,6 +635,18 @@ export class Session {
     return this.#closed.promise
   }
 
+  /** Refine only the owned closing wrapper; native/user errors keep their original cause and stack. */
+  #refineCloseReason(reason: unknown): void {
+    this.#reason = reason
+    if (this.#options.carrier.closingWrites)
+      Object.defineProperty(this.#closeError, 'cause', {
+        value: reason,
+        configurable: true,
+        writable: true
+      })
+    else this.#closeError = reason
+  }
+
   /** One budget bounds native reason selection, application hooks, FIFO writes and final close. */
   async #finishClose(physicalFailure: boolean, skipReceiving: boolean): Promise<void> {
     if (
@@ -647,7 +659,7 @@ export class Session {
             if (physicalFailure) await this.#receiving
             if (physicalFailure && !this.#receivedClose && this.#options.carrier.terminalReason) {
               const reason = await this.#options.carrier.terminalReason()
-              if (!signal.aborted && reason !== undefined) this.#reason = reason
+              if (!signal.aborted && reason !== undefined) this.#refineCloseReason(reason)
             }
             if (signal.aborted) return
             if (this.#view && this.#options.carrier.closingWrites) {
@@ -697,7 +709,7 @@ export class Session {
       this.#options.report(error)
     }
     this.#controller.abort(this.#closeError)
-    for (const pending of this.#controls.values()) pending.completion.reject(this.#reason)
+    for (const pending of this.#controls.values()) pending.completion.reject(this.#closeError)
     this.#controls.clear()
     const remove = this.#unsubscribe
     this.#unsubscribe = undefined
@@ -725,7 +737,7 @@ export class Session {
     try {
       await this.#reply
     } catch (error) {
-      if (error !== this.#reason) this.#options.report(error)
+      if (error !== this.#reason && error !== this.#closeError) this.#options.report(error)
     }
     /** External close joins admitted ingress before its native stage owner is revoked. */
     if (!skipReceiving) await this.#receiving
