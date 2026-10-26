@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { deferred } from '@migaia/utils/promise'
+import type { IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
+import { RpcWireKind, RpcStreamEvent, type IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
+import { RpcStreamLimit } from '@migaia/rpc-contract'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { timeout } from '@migaia/rpc-host/features'
@@ -17,6 +21,147 @@ function controlledDeadlineScheduler(): IScheduler & { advance(ms: number): void
 
 /** Return keeps its local value and releases the remote generator once. */
 describe('streaming cancellation', () => {
+  it('ignores an in-flight item and cancellation acknowledgement after local cancellation', async () => {
+    /** Model a native-accepted item whose delivery completes after caller cancellation. */
+    const accepted = deferred<void>()
+    const deliver = deferred<void>()
+    const acknowledged = deferred<void>()
+    /** Only consumer diagnostics are relevant; provider cancellation keeps its existing owner. */
+    const reports: unknown[] = []
+    const fixture = await connectedCoreHosts(
+      {
+        values: function* () {
+          yield 0
+          yield 1
+        },
+        barrier: () => true
+      },
+      {},
+      () => undefined,
+      undefined,
+      (error) => reports.push(error)
+    )
+    /** Capture the real acknowledgement to prove its tombstone is removed after first receipt. */
+    let acknowledgement: IRpcCarrierFrame | undefined
+    const write = fixture.pair[0].write
+    const delivery = vi
+      .spyOn(fixture.pair[0], 'write')
+      .mockImplementation(async (frame, options) => {
+        const message = frame.data as IRpcSemanticFrame
+        if (
+          message.kind === RpcWireKind.stream &&
+          message.stream.event === RpcStreamEvent.item &&
+          message.stream.value === 1
+        ) {
+          /** Native acceptance consumes this handoff once before the held delivery completes. */
+          await options?.onWriteStart?.()
+          accepted.resolve()
+          await deliver.promise
+          return write(frame, { ...options, onWriteStart: undefined })
+        }
+        await write(frame, options)
+        if (
+          message.kind === RpcWireKind.stream &&
+          message.stream.event === RpcStreamEvent.cancelled
+        ) {
+          acknowledgement = frame
+          acknowledged.resolve()
+        }
+      })
+    try {
+      const caller = new AbortController()
+      const reason = new Error('local stream cancellation')
+      const stream = fixture.b.memory.stream('values', null, {
+        signal: caller.signal
+      }) as AsyncIterableIterator<unknown>
+      expect(await stream.next()).toEqual({ done: false, value: 0 })
+      const pending = stream.next()
+      const rejection = expect(pending).rejects.toBe(reason)
+      await accepted.promise
+      caller.abort(reason)
+      await rejection
+      deliver.resolve()
+      await acknowledged.promise
+      await fixture.b.memory.send('a', 'barrier')
+      expect(reports).toEqual([])
+      /** An extra acknowledgement is unknown again after the expected terminal cleared history. */
+      expect(acknowledgement).toBeDefined()
+      await write(acknowledgement!)
+      await fixture.b.memory.send('a', 'barrier')
+      expect(reports).toEqual([expect.objectContaining({ code: 'INVALID_STREAM' })])
+      await expect(stream.next()).rejects.toBe(reason)
+    } finally {
+      deliver.resolve()
+      delivery.mockRestore()
+      await fixture.close()
+    }
+  })
+
+  it('bounds cancelled stream history while keeping the newest acknowledgement admissible', async () => {
+    /** Lost acknowledgements keep history resident until its fixed capacity evicts old headers. */
+    const acknowledgements: IRpcCarrierFrame[] = []
+    const reports: unknown[] = []
+    let acknowledged = deferred<void>()
+    const fixture = await connectedCoreHosts(
+      {
+        values: function* () {
+          yield 0
+          yield 1
+        },
+        barrier: () => true
+      },
+      {},
+      () => undefined,
+      undefined,
+      (error) => reports.push(error)
+    )
+    /** Drop only genuine generated acknowledgements at the native boundary, preserving all calls. */
+    const write = fixture.pair[0].write
+    const delivery = vi
+      .spyOn(fixture.pair[0], 'write')
+      .mockImplementation(async (frame, options) => {
+        const message = frame.data as IRpcSemanticFrame
+        if (
+          message.kind === RpcWireKind.stream &&
+          message.stream.event === RpcStreamEvent.cancelled
+        ) {
+          acknowledgements.push(frame)
+          acknowledged.resolve()
+          return
+        }
+        await write(frame, options)
+      })
+    try {
+      /** The existing compile-time stream ceiling bounds history; this is a count, not a timer. */
+      const count = RpcStreamLimit.maxOpenStreamsPerPeer + 1
+      for (let index = 0; index < count; index++) {
+        acknowledged = deferred<void>()
+        const caller = new AbortController()
+        const reason = new Error('bounded cancellation history')
+        const stream = fixture.b.memory.stream('values', null, {
+          signal: caller.signal
+        }) as AsyncIterableIterator<unknown>
+        expect(await stream.next()).toEqual({ done: false, value: 0 })
+        caller.abort(reason)
+        await expect(stream.next()).rejects.toBe(reason)
+        await acknowledged.promise
+      }
+      expect(acknowledgements).toHaveLength(count)
+      expect(reports).toEqual([])
+      /** An evicted oldest task must remain an unknown stream rather than permanent history. */
+      await write(acknowledgements[0]!)
+      await fixture.b.memory.send('a', 'barrier')
+      expect(reports).toEqual([expect.objectContaining({ code: 'INVALID_STREAM' })])
+      /** The newest task still owns a marker; consuming it must not add a second diagnostic. */
+      await write(acknowledgements.at(-1)!)
+      await fixture.b.memory.send('a', 'barrier')
+      expect(reports).toEqual([expect.objectContaining({ code: 'INVALID_STREAM' })])
+    } finally {
+      delivery.mockRestore()
+      await fixture.close()
+    }
+  })
+
   it('sends one cancel and receives the producer cleanup acknowledgement', async () => {
     /** The complete call-only feature owns this clock; the Host retains its real clock. */
     const clientClock = controlledDeadlineScheduler()

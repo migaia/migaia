@@ -2,6 +2,7 @@
 import type {
   IRpcEnvelope,
   IRpcCompletion,
+  IRpcTask,
   IRpcPortableValue,
   IRpcStreamEvent
 } from '@migaia/rpc-contract/protocol'
@@ -75,7 +76,12 @@ export type IStreamOwner = IStreamChannelOptions &
     ): Promise<void>
     trackConsumer(carrierId: string, consumer: IStreamConsumer): void
     registerConsumer(carrierId: string, id: string, consumer: IStreamConsumer): void
-    removeConsumer(carrierId: string, id: string | undefined, consumer: IStreamConsumer): void
+    removeConsumer(
+      carrierId: string,
+      id: string | undefined,
+      consumer: IStreamConsumer,
+      cancelled?: IRpcTask
+    ): void
     removeProducer(carrierId: string, id: string, producer: IStreamProducer): void
     frame(envelope: IRpcEnvelope, stream: IRpcStreamEvent, reply: boolean): IRpcEnvelope
   }>

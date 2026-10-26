@@ -6,9 +6,10 @@ import {
   type IRpcEnvelope,
   type IRpcPortableValue,
   type IRpcCompletion,
+  type IRpcTask,
   type IRpcStreamEvent
 } from '@migaia/rpc-contract/protocol'
-import { RpcStreamEvent } from '@migaia/rpc-contract'
+import { RpcStreamEvent, RpcStreamLimit } from '@migaia/rpc-contract'
 import { RpcCoreErrorCode, RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcAbortError, RpcCoreErrorText, createContractError } from '@migaia/rpc-contract/errors'
 import type { IRpcFlowContext, IRpcTargetSource } from '@migaia/rpc-contract/interfaces'
@@ -18,6 +19,7 @@ import type { ICallLocalOptions, ICallTargetRef } from '../call/types.js'
 import { StreamConsumer } from './consumer.js'
 import { StreamProducer } from './producer.js'
 import { RpcStreamErrorText } from './error-text.js'
+import { sameTask } from '../call/envelope.js'
 import type {
   IStreamChannelOptions,
   IStreamAdmissionFailure,
@@ -33,6 +35,8 @@ export class StreamChannel {
   readonly #ports: IStreamChannelOptions
   /** Consumers wait on the original selected direct binding and correlation id. */
   readonly #consumers = new Map<string, Map<string, IStreamConsumer>>()
+  /** Bounded cancelled-task headers absorb expected in-flight items and terminal acknowledgements. */
+  readonly #cancelledConsumers = new Map<string, Map<string, IRpcTask>>()
   /** Producers own only original business iterators received on this exact physical source. */
   readonly #producers = new Map<string, Map<string, IStreamProducer>>()
   /** Pending Feature execution before preparation must still be retired with its source. */
@@ -59,7 +63,8 @@ export class StreamChannel {
         this.#track(this.#activeConsumers, carrierId, consumer),
       registerConsumer: (carrierId, id, consumer) =>
         this.#register(this.#consumers, carrierId, id, consumer),
-      removeConsumer: (carrierId, id, consumer) => this.#removeConsumer(carrierId, id, consumer),
+      removeConsumer: (carrierId, id, consumer, cancelled) =>
+        this.#removeConsumer(carrierId, id, consumer, cancelled),
       removeProducer: (carrierId, id, producer) =>
         this.#remove(this.#producers, carrierId, id, producer),
       frame: (envelope, stream, reply) => this.#frame(envelope, stream, reply)
@@ -154,6 +159,19 @@ export class StreamChannel {
       consumer.accept(envelope)
       return true
     }
+    /** Retired local consumers retain no iterator or payload, only their source-qualified task. */
+    const cancelled = this.#cancelledConsumers.get(carrierId)?.get(envelope.id)
+    if (
+      cancelled &&
+      sameTask(cancelled, envelope.task) &&
+      envelope.kind === RpcWireKind.stream &&
+      (envelope.stream.event === RpcStreamEvent.item ||
+        envelope.stream.event === RpcStreamEvent.cancelled)
+    ) {
+      if (envelope.stream.event === RpcStreamEvent.cancelled)
+        this.#remove(this.#cancelledConsumers, carrierId, envelope.id, cancelled)
+      return true
+    }
     /** Original pull/finish demand runs only the selected producer's own credit state machine. */
     const producer = this.#producers.get(carrierId)?.get(envelope.id)
     if (!producer) {
@@ -194,6 +212,7 @@ export class StreamChannel {
     this.#activeConsumers.delete(carrierId)
     this.#activeProducers.delete(carrierId)
     this.#consumers.delete(carrierId)
+    this.#cancelledConsumers.delete(carrierId)
     this.#producers.delete(carrierId)
     if (consumers) for (const consumer of consumers) consumer.close(terminal, true)
     if (producers) await Promise.all(Array.from(producers, (producer) => producer.close(terminal)))
@@ -212,6 +231,7 @@ export class StreamChannel {
     if (this.#closing) return this.#closing.promise
     this.seal()
     this.#closing = deferred<void>()
+    this.#cancelledConsumers.clear()
     /** Cold shutdown takes each source once, independent from unrelated source cardinality. */
     const sources = new Set([...this.#activeConsumers.keys(), ...this.#activeProducers.keys()])
     void Promise.all(Array.from(sources, (source) => this.retire(source, reason))).then(
@@ -261,8 +281,23 @@ export class StreamChannel {
   }
 
   /** A consumer terminal releases both pending lookup and pre-preparation lifecycle ownership. */
-  #removeConsumer(carrierId: string, id: string | undefined, value: IStreamConsumer): void {
-    if (id !== undefined) this.#remove(this.#consumers, carrierId, id, value)
+  #removeConsumer(
+    carrierId: string,
+    id: string | undefined,
+    value: IStreamConsumer,
+    cancelled?: IRpcTask
+  ): void {
+    if (id !== undefined) {
+      if (cancelled && this.#consumers.get(carrierId)?.get(id) === value) {
+        /** The existing per-peer stream ceiling also bounds cancellation history to 256 headers. */
+        let entries = this.#cancelledConsumers.get(carrierId)
+        if (!entries) this.#cancelledConsumers.set(carrierId, (entries = new Map()))
+        entries.set(id, cancelled)
+        if (entries.size > RpcStreamLimit.maxOpenStreamsPerPeer)
+          entries.delete(entries.keys().next().value!)
+      }
+      this.#remove(this.#consumers, carrierId, id, value)
+    }
     this.#untrack(this.#activeConsumers, carrierId, value)
   }
 

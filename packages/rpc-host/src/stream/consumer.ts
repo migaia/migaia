@@ -550,7 +550,12 @@ export class StreamConsumer {
         RpcProbeKind.streamClose
       )
     this.#removeAbort()
-    this.#owner.removeConsumer(this.#target.carrierId, this.#prepared?.envelope.id, this)
+    this.#owner.removeConsumer(
+      this.#target.carrierId,
+      this.#prepared?.envelope.id,
+      this,
+      !received && this.#handedOff ? this.#prepared?.envelope.task : undefined
+    )
     try {
       if (this.#target.origin)
         this.#controller?.supersede('error' in terminal ? terminal.error : createRpcAbortError())
