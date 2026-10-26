@@ -31,9 +31,7 @@ function compileStages(stages: readonly IRpcProbeStageName[], allowEmpty: boolea
   /** A validated temporary mask makes rejected stage updates atomic. */
   let mask = 0
   for (let i = 0; i < stages.length; i++) {
-    /** Exact table lookup rejects inherited property names and unknown stage names. */
-    // The lookup domain is the seven fixed stage names declared in RpcProbeStageName, never peers/events.
-    /** Exact table lookup rejects inherited property names and unknown stage names. */
+    /** The fixed RpcProbeStageName tuple bounds this search and rejects unknown stage names. */
     const stage = RpcProbeStageName.indexOf(stages[i]!)
     if (stage < 0) invalid(RpcCoreErrorText.probeStagesInvalid)
     mask |= 1 << stage

@@ -279,8 +279,7 @@ class RpcIdempotencyStore implements IRpcIdempotencyStore {
   }
   /** Lookup observes retention without allocating waiters or modifying a claim's lifetime. */
   readonly lookup = (scope: string, key: string, now: number): IRpcIdempotencyLookup => {
-    /** Missing/expired/body-evicted keys are unknown; continuity belongs to the actual store owner. */
-    /** Read-only observation borrows the same scoped owner without refreshing retention. */
+    /** Lookup does not refresh retention; an unknown key cannot infer store continuity. */
     const entry = this.#scopes.get(scope)?.get(key)
     if (
       !entry ||
@@ -330,8 +329,7 @@ class RpcIdempotencyStore implements IRpcIdempotencyStore {
   settleClaim(entry: IEntry, outcome: IRpcIdempotencyOutcome, settledAt: number): void {
     if (entry.status !== State.pending || this.#scopes.get(entry.scope)?.get(entry.key) !== entry)
       return
-    /** Byte measurement preserves the original provider-value access and failure point. */
-    /** Measure the original result once before changing pending ownership or retention state. */
+    /** Measure before changing pending ownership so a failed result read leaves it releasable. */
     const size = outcomeBytes(outcome)
     entry.status = State.done
     entry.settledAt = settledAt

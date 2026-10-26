@@ -37,9 +37,9 @@ export class RpcLimitsFlow {
   readonly #connections = new Map<string, LimitsGovernor>()
   /** Native lifecycle and the existing scheduler remain explicit borrowed ports. */
   readonly #ports: ILimitsGovernorPorts
-  /** The owning native installation cancels this exact policy before releasing its hooks. */
-  /** The native installation lends the same readonly flow publication port. */
+  /** The native installation lends the readonly flow publication port. */
   readonly #publish: IRpcFlowSetupContext['observe']
+  /** Installation cancellation releases this policy before its hooks retire. */
   readonly #signal: IRpcFlowSetupContext['signal']
   /** Native installation publishes only complete fixed hooks and its one cleanup operation. */
   readonly value: IRpcFlowInstallation

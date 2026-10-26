@@ -117,7 +117,6 @@ export function createBinaryChunkAssembler<
   ) as IRpcChunkAssembler<Uint8Array>
 }
 
-/** Builds one profile while keeping framing independent from semantic and codec layers. */
 /** Allocate one source-scoped fragment reassembly lifetime before installing behavior callbacks. */
 function fragmentFramerState<TKind extends 'string' | 'binary', TEncoded extends IEncoded>(
   kind: TKind,
@@ -222,7 +221,7 @@ class FragmentFramer<TKind extends 'string' | 'binary', TEncoded extends IEncode
   #schedule = (callback: () => void, delay: number): unknown => {
     try {
       if (this.#state.options.schedule) return (0, this.#state.options.schedule)(callback, delay)
-      /** Revoke assembly ownership and account once before a user cancel callback can reenter. */
+      /** Borrow the platform timer when no application scheduling callback is configured. */
       const timer = (
         globalThis as unknown as { setTimeout?: (task: () => void, timeout: number) => unknown }
       ).setTimeout
@@ -236,7 +235,7 @@ class FragmentFramer<TKind extends 'string' | 'binary', TEncoded extends IEncode
   #cancel = (handle: unknown): void => {
     if (this.#state.options.cancel) (0, this.#state.options.cancel)(handle)
     else {
-      /** Revoke assembly ownership and account once before a user cancel callback can reenter. */
+      /** Borrow platform cancellation when no application cancellation callback is configured. */
       const timer = (globalThis as unknown as { clearTimeout?: (value: unknown) => void })
         .clearTimeout
       timer?.(handle)
