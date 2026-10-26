@@ -2,10 +2,19 @@
 import assert from 'node:assert/strict'
 import { PassThrough } from 'node:stream'
 import { createRpcHost } from '@migaia/rpc-host'
+import { batch } from '@migaia/rpc-host/features/batch'
 import { idempotency, type IRpcOutcomeLookup } from '@migaia/rpc-host/features/idempotency'
 import limits from '@migaia/rpc-host/features/limits'
 import { timeout } from '@migaia/rpc-host/features/timeout'
-import { createRpcByteCarrier, defineTransportPlugin, RpcEventByteIO } from '@migaia/rpc-host/sdk'
+import {
+  createRpcByteCarrier,
+  defineTransportPlugin,
+  RPC_STREAM_MAX_FRAME_BYTES,
+  RpcEventByteIO,
+  RpcJsonCarrierCodec
+} from '@migaia/rpc-host/sdk'
+import { RpcTransportError } from '@migaia/rpc-contract/errors'
+import { RpcCoreErrorCode, RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
 import { deferred, type IAbortSignal } from '@migaia/utils/promise'
 import type { IRpcEnvelope } from '@migaia/rpc-contract/protocol'
 import { it, vi } from 'vitest'
@@ -617,5 +626,126 @@ it('real outcome lookup observes the original pending claim and complete sealed 
     blocked.resolve()
     await Promise.all(pending)
     await Promise.all([client.host.close(), host.close()])
+  }
+})
+
+// RPC-TEST-E1A1C1DA273B-C003: only the removed private512selector changes to the real media ceiling.
+it('rejects an ordinary queued oversized byte frame with its original RangeError and sends its survivor', async () => {
+  /** The provider alone proves which original ordinary requests actually reached business. */
+  const calls: string[] = []
+  /** Reuse the original runtime-wire pair of native streams, not a second frame queue. */
+  const streams = { upstream: new PassThrough(), downstream: new PassThrough() }
+  /** The same real public listener owns provider Session attachment and accepted identity. */
+  const server = coreMemoryServer('ordinary-oversize-provider')
+  /** Only optional physical Batch is needed; no chunk transformation changes the oversize input. */
+  const host = await createRpcHost({
+    ...server.options,
+    plugins: [batch(), server.transport],
+    provide: {
+      echo: (value: string) => {
+        calls.push(value)
+        return value
+      }
+    }
+  })
+  /** Both byte owners share only original native physical cleanup, as in the existing wire case. */
+  const physical = {
+    report: () => undefined,
+    closedError: () => new Error('ordinary oversize byte fixture closed'),
+    close: () => {
+      streams.upstream.destroy()
+      streams.downstream.destroy()
+    }
+  }
+  /** The unmodified SDK codec and byte framer admit and write the actual provider traffic. */
+  const left = createRpcByteCarrier({
+    id: 'ordinary-oversize-provider-carrier',
+    io: new RpcEventByteIO(streams.upstream, streams.downstream, physical.close, physical).value,
+    codec: new RpcJsonCarrierCodec(),
+    report: physical.report
+  })
+  /** This original caller framer, rather than a custom bad codec, rejects the real physical size. */
+  const right = createRpcByteCarrier({
+    id: 'ordinary-oversize-caller-carrier',
+    io: new RpcEventByteIO(streams.downstream, streams.upstream, physical.close, physical).value,
+    codec: new RpcJsonCarrierCodec(),
+    report: physical.report
+  })
+  /** The genuine native install subscribes both original carriers before waiting for readiness. */
+  const transport = defineTransportPlugin({
+    name: 'ordinary-oversize-byte-caller',
+    namespace: 'memory',
+    open: async (context) => {
+      /** The existing provider listener owns the accepted physical Session handle. */
+      const accepted = server.accept(left)
+      /** The caller install owns the opposite original attachment and its readiness receipt. */
+      const connected = context.attach(right)
+      await Promise.all([accepted.ready, connected.ready])
+      return { dispose: physical.close }
+    }
+  })
+  /** All three logical operations use this same real public namespace and native Batch lane. */
+  const client = await createRpcHost({
+    self: { name: 'ordinary-oversize-caller', instanceId: 'ordinary-oversize-caller' },
+    plugins: [batch(), transport],
+    report: physical.report
+  })
+  /** Default spies retain actual once-only codec, carrier and native stream results unchanged. */
+  const encoded = vi.spyOn(right.codec, 'encode')
+  /** Carrier attempts include the framing failure; native stream writes must exclude it. */
+  const sending = vi.spyOn(right, 'write')
+  /** This native PassThrough is the original actual byte writer, not a synthesized physical sink. */
+  const writing = vi.spyOn(streams.upstream, 'write')
+  /** Caller rejections are observed immediately and joined even if a later assertion fails. */
+  const pending: Promise<unknown>[] = []
+  try {
+    /** Native Writable corking holds its own callback and bytes; no fixture queue is introduced. */
+    streams.upstream.cork()
+    /** The first actual small request enters that held native writer before the queued inputs. */
+    const first = client.memory
+      .send('ordinary-oversize-provider', 'echo', 'first')
+      .catch((error: unknown) => error)
+    pending.push(first)
+    await vi.waitFor(() => assert.equal(writing.mock.calls.length, 1))
+    /** Ordinary valid ASCII exceeds the fixed native16MiB ceiling without artificial expansion. */
+    const oversized = client.memory
+      .send('ordinary-oversize-provider', 'echo', 'x'.repeat(RPC_STREAM_MAX_FRAME_BYTES + 1))
+      .catch((error: unknown) => error)
+    pending.push(oversized)
+    /** Actual original encode completion fixes this ordinary input before the valid sibling starts. */
+    await vi.waitFor(() => assert.equal(encoded.mock.calls.length, 2))
+    /** One smaller ordinary call follows the oversized member in the same real source lane. */
+    const survivor = client.memory
+      .send('ordinary-oversize-provider', 'echo', 'survivor')
+      .catch((error: unknown) => error)
+    pending.push(survivor)
+    await vi.waitFor(() => assert.equal(encoded.mock.calls.length, 3))
+    assert.equal(writing.mock.calls.length, 1)
+    assert.deepEqual(calls, [])
+    /** Releasing the original native callback drains first, rejects oversize and continues FIFO. */
+    streams.upstream.uncork()
+    /** The real public failure owns the original framing exception rather than a fixture error. */
+    const failure = await oversized
+    assert.ok(failure instanceof RpcTransportError)
+    assert.equal(failure.code, RpcCoreErrorCode.transport)
+    assert.ok(failure.cause instanceof RangeError)
+    assert.equal(Reflect.get(failure.cause, 'code'), RpcContractErrorCode.frameLimitExceeded)
+    /** Borrow the already-rejected original carrier Promise; no second framing execution occurs. */
+    const nativeFailure = await Promise.resolve(sending.mock.results[1]!.value).catch(
+      (error: unknown) => error
+    )
+    assert.equal(failure.cause, nativeFailure)
+    assert.equal(await first, 'first')
+    assert.equal(await survivor, 'survivor')
+    assert.deepEqual(calls, ['first', 'survivor'])
+    assert.equal(writing.mock.calls.length, 2, 'oversized ordinary frame never reaches native IO')
+    assert.equal(sending.mock.calls.length, 3, 'both valid frames and one framing refusal settle')
+  } finally {
+    streams.upstream.uncork()
+    encoded.mockRestore()
+    sending.mockRestore()
+    writing.mockRestore()
+    await Promise.all([client.close(), host.close()])
+    await Promise.all(pending)
   }
 })
