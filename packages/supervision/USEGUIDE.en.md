@@ -19,21 +19,67 @@ The [README](./README.en.md) explains what the package is for, what sets it apar
 
 ## Supervise a real child process
 
-This package defines only a launcher interface and never calls an operating-system API itself, so one policy works on Node, Bun, Deno and Electron. `@migaia/rpc-plugin-process` ships ready-made launchers; on Node use `createNodeProcessLauncher()`.
+This package defines a public launcher interface and never calls operating-system APIs itself. Production transports provide real launchers. The user-written launcher below only illustrates that interface, using a timer-backed handle rather than creating a child process.
 
-The child below always exits with code 3, 200 ms after starting, like an indexing service that reads a broken config. The supervisor waits between restarts; after 2 restarts it still fails, so the supervisor moves to `terminal` and stops trying.
+The example handle below always exits with code 3, 200 ms after starting, like an indexing service that reads a broken config. The supervisor waits between restarts; after 2 restarts it still fails, so the supervisor moves to `terminal` and stops trying.
 
 ```ts doc-test=run
-import { createUnitBudget } from '@migaia/supervision'
+import { createUnitBudget, CapabilityLevel, StandardCapability } from '@migaia/supervision'
 import { createProcessSupervisor } from '@migaia/supervision/process'
-import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import type {
+  IProcessLauncher,
+  IProcessHandle,
+  IProcessExitStatus
+} from '@migaia/supervision/process'
+
+/** This example owns only a timer and a completion receipt; it creates no OS process. */
+class ExampleProcess implements IProcessHandle {
+  /** Each launch has a distinct execution identity. */
+  readonly identity = { fingerprint: crypto.randomUUID() }
+  /** The completion settles once after the example timer has been cleared. */
+  readonly exited: Promise<IProcessExitStatus>
+  /** Only this handle may complete its original exit receipt. */
+  #finish!: (status: IProcessExitStatus) => void
+  /** The optional timer represents the demonstrated process crash. */
+  #timer: ReturnType<typeof setTimeout> | undefined
+
+  constructor(crashAfterMs?: number) {
+    this.exited = new Promise((resolve) => {
+      this.#finish = resolve
+    })
+    if (crashAfterMs !== undefined) this.#timer = setTimeout(() => this.#exit(3), crashAfterMs)
+  }
+
+  /** Repeated termination is harmless; the original exit Promise settles only once. */
+  terminate(): void {
+    this.#exit(0)
+  }
+
+  /** Stop the example resource before publishing its exit status. */
+  #exit(code: number): void {
+    clearTimeout(this.#timer)
+    this.#finish({ code, signal: null })
+  }
+}
+
+/** Production transports provide real launchers; this one only demonstrates the public port. */
+const launcher: IProcessLauncher = {
+  capabilities: {
+    [StandardCapability.termination]: CapabilityLevel.enforced,
+    [StandardCapability.faultIsolation]: CapabilityLevel.unsupported
+  },
+  async launch(_spec, context) {
+    if (context.signal.aborted) throw context.signal.reason
+    return new ExampleProcess(200)
+  }
+}
 
 const budget = createUnitBudget({ kind: 'process', maxUnits: 1 })
 const indexer = createProcessSupervisor({
   id: 'search-indexer',
-  launcher: createNodeProcessLauncher(),
+  launcher,
   budget,
-  // The Node launcher cannot guarantee ending a whole process tree; accept that explicitly.
+  // The example declares no fault isolation; accept that capability gap explicitly.
   isolation: 'best-effort',
   spec: {
     command: process.execPath,
@@ -69,7 +115,7 @@ report: SUPERVISION_EXHAUSTED
 final state: terminal
 ```
 
-The first line, `CAPABILITY_UNSUPPORTED`, is a degradation notice. The Node launcher declares that it cannot guarantee ending a whole process tree. With `best-effort` the supervisor works normally, reports the gap once and records it in `inspect().degraded`. Without `isolation: 'best-effort'`, creating the supervisor throws this error instead.
+The first line, `CAPABILITY_UNSUPPORTED`, is a degradation notice. The example launcher declares that it provides no fault isolation. With `best-effort` the supervisor works normally, reports the gap once and records it in `inspect().degraded`. Without `isolation: 'best-effort'`, creating the supervisor throws this error instead.
 
 "Restart succeeded" means the new process started; it says nothing about whether it crashes later. This example passes no `ready`, so a process counts as usable as soon as it starts. A real service should pass `ready`, for example waiting for a "ready" line on stdout or for one successful connection.
 
@@ -412,12 +458,57 @@ Pass `registry: { port, namespace }` to `createProcessSupervisor` and the superv
 `createPrewarmPool` starts idle processes ahead of time. When a supervisor calls `start()`, it takes one instead of spawning, and still runs its `ready` check afterwards. The pool must use the same budget, launcher and spec objects as the supervisor, and every idle process occupies a budget slot.
 
 ```ts doc-test=run
-import { createUnitBudget } from '@migaia/supervision'
+import { createUnitBudget, CapabilityLevel, StandardCapability } from '@migaia/supervision'
 import { createPrewarmPool, createProcessSupervisor } from '@migaia/supervision/process'
-import type { IProcessSpec } from '@migaia/supervision/process'
-import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import type {
+  IProcessSpec,
+  IProcessLauncher,
+  IProcessHandle,
+  IProcessExitStatus
+} from '@migaia/supervision/process'
 
-const launcher = createNodeProcessLauncher()
+/** This example owns only a timer and a completion receipt; it creates no OS process. */
+class ExampleProcess implements IProcessHandle {
+  /** Each launch has a distinct execution identity. */
+  readonly identity = { fingerprint: crypto.randomUUID() }
+  /** The completion settles once after the example timer has been cleared. */
+  readonly exited: Promise<IProcessExitStatus>
+  /** Only this handle may complete its original exit receipt. */
+  #finish!: (status: IProcessExitStatus) => void
+  /** The optional timer represents the demonstrated process crash. */
+  #timer: ReturnType<typeof setTimeout> | undefined
+
+  constructor(crashAfterMs?: number) {
+    this.exited = new Promise((resolve) => {
+      this.#finish = resolve
+    })
+    if (crashAfterMs !== undefined) this.#timer = setTimeout(() => this.#exit(3), crashAfterMs)
+  }
+
+  /** Repeated termination is harmless; the original exit Promise settles only once. */
+  terminate(): void {
+    this.#exit(0)
+  }
+
+  /** Stop the example resource before publishing its exit status. */
+  #exit(code: number): void {
+    clearTimeout(this.#timer)
+    this.#finish({ code, signal: null })
+  }
+}
+
+/** Production transports provide real launchers; this one only demonstrates the public port. */
+const launcher: IProcessLauncher = {
+  capabilities: {
+    [StandardCapability.termination]: CapabilityLevel.enforced,
+    [StandardCapability.faultIsolation]: CapabilityLevel.unsupported
+  },
+  async launch(_spec, context) {
+    if (context.signal.aborted) throw context.signal.reason
+    return new ExampleProcess()
+  }
+}
+
 const budget = createUnitBudget({ kind: 'process', maxUnits: 2 })
 const spec: IProcessSpec = {
   command: process.execPath,
@@ -449,8 +540,10 @@ Output:
 
 ```text
 idle processes: 1
-start(): ready | idle left: 0
+start(): ready | idle left: 1
 ```
+
+Taking an idle handle triggers replenishment. This example launcher returns immediately, so one idle handle has already been refilled when `start()` completes.
 
 An idle process that nobody takes within 60 s (the default) is ended. `restart()` and `replace()` skip idle processes that may be stale and start fresh ones.
 

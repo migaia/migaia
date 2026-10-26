@@ -19,21 +19,67 @@
 
 ## 监督一个真实的子进程
 
-本包只定义“启动器”接口，不直接调用操作系统 API，这样同一套策略可以用在 Node、Bun、Deno 和 Electron 上。`@migaia/rpc-plugin-process` 提供了现成的启动器，Node 用 `createNodeProcessLauncher()`。
+本包定义公开的 launcher 接口，不直接调用操作系统 API。生产环境由传输插件提供真实的 launcher。下面用户编写的最小 launcher 只说明接口，用定时器句柄演示退出，不创建真实子进程。
 
-下面的子进程每次启动 200 毫秒后都以退出码 3 崩溃，模拟一个读错配置的索引服务。监督器每次崩溃后间隔一段时间重启，重启 2 次后仍然失败，就进入 `terminal` 并停止尝试。
+下面的示例句柄每次启动 200 毫秒后都以退出码 3 退出，模拟一个读错配置的索引服务。监督器每次崩溃后间隔一段时间重启，重启 2 次后仍然失败，就进入 `terminal` 并停止尝试。
 
 ```ts doc-test=run
-import { createUnitBudget } from '@migaia/supervision'
+import { createUnitBudget, CapabilityLevel, StandardCapability } from '@migaia/supervision'
 import { createProcessSupervisor } from '@migaia/supervision/process'
-import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import type {
+  IProcessLauncher,
+  IProcessHandle,
+  IProcessExitStatus
+} from '@migaia/supervision/process'
+
+/** This example owns only a timer and a completion receipt; it creates no OS process. */
+class ExampleProcess implements IProcessHandle {
+  /** Each launch has a distinct execution identity. */
+  readonly identity = { fingerprint: crypto.randomUUID() }
+  /** The completion settles once after the example timer has been cleared. */
+  readonly exited: Promise<IProcessExitStatus>
+  /** Only this handle may complete its original exit receipt. */
+  #finish!: (status: IProcessExitStatus) => void
+  /** The optional timer represents the demonstrated process crash. */
+  #timer: ReturnType<typeof setTimeout> | undefined
+
+  constructor(crashAfterMs?: number) {
+    this.exited = new Promise((resolve) => {
+      this.#finish = resolve
+    })
+    if (crashAfterMs !== undefined) this.#timer = setTimeout(() => this.#exit(3), crashAfterMs)
+  }
+
+  /** Repeated termination is harmless; the original exit Promise settles only once. */
+  terminate(): void {
+    this.#exit(0)
+  }
+
+  /** Stop the example resource before publishing its exit status. */
+  #exit(code: number): void {
+    clearTimeout(this.#timer)
+    this.#finish({ code, signal: null })
+  }
+}
+
+/** Production transports provide real launchers; this one only demonstrates the public port. */
+const launcher: IProcessLauncher = {
+  capabilities: {
+    [StandardCapability.termination]: CapabilityLevel.enforced,
+    [StandardCapability.faultIsolation]: CapabilityLevel.unsupported
+  },
+  async launch(_spec, context) {
+    if (context.signal.aborted) throw context.signal.reason
+    return new ExampleProcess(200)
+  }
+}
 
 const budget = createUnitBudget({ kind: 'process', maxUnits: 1 })
 const indexer = createProcessSupervisor({
   id: 'search-indexer',
-  launcher: createNodeProcessLauncher(),
+  launcher,
   budget,
-  // Node 启动器不能保证结束整个进程树，这里显式接受这一点。
+  // 示例没有提供故障隔离，这里显式接受这一能力缺口。
   isolation: 'best-effort',
   spec: {
     command: process.execPath,
@@ -69,7 +115,7 @@ report: SUPERVISION_EXHAUSTED
 最终状态: terminal
 ```
 
-第一行 `CAPABILITY_UNSUPPORTED` 是降级提示：Node 启动器声明自己不能保证结束整个进程树，选择 `best-effort` 后监督器照常工作，但会把这一项报告一次，并记在 `inspect().degraded` 里。不写 `isolation: 'best-effort'` 时，创建监督器会直接抛出这个错误。
+第一行 `CAPABILITY_UNSUPPORTED` 是降级提示：示例启动器声明自己没有提供故障隔离，选择 `best-effort` 后监督器照常工作，但会把这一项报告一次，并记在 `inspect().degraded` 里。不写 `isolation: 'best-effort'` 时，创建监督器会直接抛出这个错误。
 
 “重启成功”指新进程启动成功，不代表它之后不会再崩溃。这里没有提供 `ready`，所以进程一启动就算可用；真实服务应该提供 `ready`，例如等它在标准输出里打印“已就绪”，或者等一次连接成功。
 
@@ -412,12 +458,57 @@ console.log('已结束:', result.terminated, '| 已删除记录:', result.remove
 `createPrewarmPool` 提前启动若干空闲进程。监督器 `start()` 时直接取用一个，省掉创建进程的时间；取用后监督器仍然会执行 `ready` 检查。预热池必须和监督器使用同一个预算、启动器和规格对象，预热进程同样占用预算名额。
 
 ```ts doc-test=run
-import { createUnitBudget } from '@migaia/supervision'
+import { createUnitBudget, CapabilityLevel, StandardCapability } from '@migaia/supervision'
 import { createPrewarmPool, createProcessSupervisor } from '@migaia/supervision/process'
-import type { IProcessSpec } from '@migaia/supervision/process'
-import { createNodeProcessLauncher } from '@migaia/rpc-plugin-process/adapters/node-child-process'
+import type {
+  IProcessSpec,
+  IProcessLauncher,
+  IProcessHandle,
+  IProcessExitStatus
+} from '@migaia/supervision/process'
 
-const launcher = createNodeProcessLauncher()
+/** This example owns only a timer and a completion receipt; it creates no OS process. */
+class ExampleProcess implements IProcessHandle {
+  /** Each launch has a distinct execution identity. */
+  readonly identity = { fingerprint: crypto.randomUUID() }
+  /** The completion settles once after the example timer has been cleared. */
+  readonly exited: Promise<IProcessExitStatus>
+  /** Only this handle may complete its original exit receipt. */
+  #finish!: (status: IProcessExitStatus) => void
+  /** The optional timer represents the demonstrated process crash. */
+  #timer: ReturnType<typeof setTimeout> | undefined
+
+  constructor(crashAfterMs?: number) {
+    this.exited = new Promise((resolve) => {
+      this.#finish = resolve
+    })
+    if (crashAfterMs !== undefined) this.#timer = setTimeout(() => this.#exit(3), crashAfterMs)
+  }
+
+  /** Repeated termination is harmless; the original exit Promise settles only once. */
+  terminate(): void {
+    this.#exit(0)
+  }
+
+  /** Stop the example resource before publishing its exit status. */
+  #exit(code: number): void {
+    clearTimeout(this.#timer)
+    this.#finish({ code, signal: null })
+  }
+}
+
+/** Production transports provide real launchers; this one only demonstrates the public port. */
+const launcher: IProcessLauncher = {
+  capabilities: {
+    [StandardCapability.termination]: CapabilityLevel.enforced,
+    [StandardCapability.faultIsolation]: CapabilityLevel.unsupported
+  },
+  async launch(_spec, context) {
+    if (context.signal.aborted) throw context.signal.reason
+    return new ExampleProcess()
+  }
+}
+
 const budget = createUnitBudget({ kind: 'process', maxUnits: 2 })
 const spec: IProcessSpec = {
   command: process.execPath,
@@ -449,8 +540,10 @@ budget.close()
 
 ```text
 空闲进程: 1
-start(): ready | 剩余空闲进程: 0
+start(): ready | 剩余空闲进程: 1
 ```
+
+取用空闲句柄会触发补充。示例 launcher 立即返回，所以 `start()` 完成时已经补回一个空闲句柄。
 
 空闲进程默认 60 秒没有被取用就会被结束。`restart()` 和 `replace()` 会绕过可能已经过时的空闲进程，重新启动。
 
