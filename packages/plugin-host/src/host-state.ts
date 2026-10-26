@@ -17,6 +17,7 @@ import type { IPluginRuntimeSharedSlot } from './core.js'
 import { assertPluginExtensionKey, isSharedExtensionSlot } from './extension.js'
 import { createPluginHostTypeError } from './error-text.js'
 import { toIndexNode } from './dependency-runtime.js'
+import { SharedSlotView, type ISharedSlotViewPort } from './shared-slot-view.js'
 
 /** Creates the host-owned dependency index and translates structural failures at its boundary. */
 const createDependencyIndex = (): ITopologyIndex =>
@@ -73,6 +74,15 @@ export class PluginHostState<TDomainCore extends object, TValue> {
   #nextStageSlot = 0n
   /** Monotonic view generation; every committed mutation advances it by one. */
   #revision = 0
+
+  /** Host state access shared by every shared-slot view this state issues. */
+  readonly #slotViewPort: ISharedSlotViewPort<TDomainCore, TValue> = {
+    assertActive: () => this.#sharedPublication?.assertActive(),
+    ownerOf: (key) => this.extensionOwners.get(key),
+    registrationNamed: (name) => this.registrations.get(name),
+    isLive: (registration) => this.isLive(registration),
+    updateContribution: (receipt, add) => this.#updateSharedContribution(receipt, add)
+  }
 
   get revision(): number {
     return this.#revision
@@ -152,70 +162,17 @@ export class PluginHostState<TDomainCore extends object, TValue> {
       value: undefined as object | undefined
     }
     /** Writes are exact-registration scoped; facade reads require committed slot identity. */
-    const view: IPluginRuntimeSharedSlot<TFacade> = Object.freeze({
-      get facade() {
-        return slot.facade as TFacade
-      },
-      find: (target: string): object | null | undefined => {
-        this.#sharedPublication?.assertActive()
-        if (slot.retired || this.extensionOwners.get(key) !== slot) return undefined
-        /** Instance identity takes precedence over an equal human name. */
-        const instances = slot.instanceIds.get(target) ?? slot.names.get(target)
-        if (instances && instances.members.size !== 1) return null
-        /** Both indexes select one receipt before the original registration's availability check. */
-        const receipt = instances?.single
-        return receipt &&
-          this.isLive(receipt.registration) &&
-          receipt.registration.activated &&
-          !receipt.registration.suspended
-          ? receipt.value
-          : undefined
-      },
-      values: (): readonly object[] =>
-        this.extensionOwners.get(key) === slot
-          ? [...slot.contributions.values()].map((receipt) => receipt.value)
-          : [],
-      registered: (): readonly object[] => {
-        if (slot.retired || this.extensionOwners.get(key) !== slot) return []
-        /** Cold enumeration includes suspended/non-ready units, but never candidates or old owners. */
-        return Array.from(slot.registrations, ([owner, entry]) =>
-          this.registrations.get(owner.name) === owner ? entry.value : undefined
-        ).filter((value): value is object => value !== undefined)
-      },
-      register: (value: object, onCommit?: () => void): void => {
-        assertContribution()
-        if (typeof value !== 'object' || value === null)
-          throw createPluginHostTypeError(ERROR_TEXT.INVALID_OPTION)
-        reservation.value = value
-        reservation.onCommit = onCommit
-      },
-      contribute: (value: object, instanceId: string): (() => void) => {
-        assertContribution()
-        if (
-          typeof value !== 'object' ||
-          value === null ||
-          typeof instanceId !== 'string' ||
-          !instanceId
-        )
-          throw createPluginHostTypeError(ERROR_TEXT.INVALID_OPTION)
-        if (slot.retired)
-          throw new PluginHostError(
-            PluginHostErrorCode.registrationRevoked,
-            ERROR_TEXT.REGISTRATION_REVOKED
-          )
-        /** Candidate rollback cannot erase any committed or successor receipt. */
-        const receipt = Object.freeze({ slot, registration, instanceId, value })
-        if (!batch.committed) batch.sharedContributions.add(receipt)
-        ;(registration.sharedContributions ??= new Set()).add(receipt)
-        if (batch.committed) this.#updateSharedContribution(receipt, true)
-        return () => {
-          /** Candidate withdrawal never publishes and late cleanup cannot affect a successor. */
-          batch.sharedContributions.delete(receipt)
-          this.#updateSharedContribution(receipt, false)
-          registration.sharedContributions?.delete(receipt)
-        }
-      }
-    })
+    const view: IPluginRuntimeSharedSlot<TFacade> = Object.freeze(
+      new SharedSlotView<TDomainCore, TValue, TFacade>(
+        this.#slotViewPort,
+        slot,
+        key,
+        registration,
+        batch,
+        reservation,
+        assertContribution
+      )
+    )
     if (!owner || (isSharedExtensionSlot(owner) && owner.retired)) {
       slot.facade = create(view)
       if (typeof slot.facade !== 'object' || slot.facade === null)
