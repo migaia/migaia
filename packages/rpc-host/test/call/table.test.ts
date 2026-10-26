@@ -8,9 +8,14 @@ import {
   type IRpcEnvelope,
   type IRpcTask
 } from '@migaia/rpc-contract/protocol'
-import type { IRpcAttempt, IRpcRetryFeature } from '@migaia/rpc-contract/interfaces'
+import type {
+  IRpcAttempt,
+  IRpcRetryFeature,
+  IRpcSessionSelection
+} from '@migaia/rpc-contract/interfaces'
 import { FeatureScope } from '../../dist/feature/scope.js'
 import { CallTable, type ICallTargetRef, type ICallWriteOptions } from '../../dist/call/table.js'
+import { createSessionView } from '../../dist/session/view.js'
 
 /** One accepted source supplies actual handoff and optional synchronous native delivery. */
 class CallFixture {
@@ -45,8 +50,8 @@ class CallFixture {
   /** The actual source under test owns no Session or provider fixture framework. */
   readonly table: CallTable
 
-  /** All callbacks capture only this named fixture owner. */
-  constructor() {
+  /** Only the existing replacement test borrows current-selection queries from this fixture. */
+  constructor(refreshSelection = false) {
     this.features.register('fixture')
     this.table = new CallTable({
       assertTransfer: () => undefined,
@@ -61,9 +66,36 @@ class CallFixture {
       },
       now: () => this.#now,
       timestamp: () => 1000 + this.#now,
-      refreshTarget: () => this.target,
+      ...(refreshSelection
+        ? {
+            sessions: {
+              get: () => this.#currentSelection(),
+              getById: () => undefined,
+              availability: () => undefined
+            }
+          }
+        : {}),
       send: (source, frame, options) => this.#send(source, frame, options)
     })
+  }
+
+  /** Compile the original controlled target's directory without inventing native readiness. */
+  #currentSelection(): IRpcSessionSelection {
+    /** One current read supplies every descriptive identity field for this lookup. */
+    const target = this.target
+    return {
+      carrierId: target.carrierId,
+      view: createSessionView(
+        target.namespace,
+        {
+          schemaVersion: 3,
+          self: { name: target.name, instanceId: target.peerId, generation: target.generation },
+          methods: []
+        },
+        'fixture',
+        []
+      )
+    }
   }
 
   /** Change only elapsed time; no production scheduler or backoff is emulated here. */
@@ -410,7 +442,7 @@ describe('CallTable owner transitions (public Namespace migration is tracked sep
 
   it('retries only through a complete instance and shrinks inherited time while refreshing identity', async () => {
     /** Namespace replacement and monotonic time remain explicit fixture facts. */
-    const fixture = new CallFixture()
+    const fixture = new CallFixture(true)
     fixture.synchronousReply = true
     fixture.failure = new Error('fixture first write')
     /** This complete caller feature, rather than CallTable, chooses exactly two attempts. */

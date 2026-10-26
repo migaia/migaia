@@ -14,7 +14,11 @@ import {
   type IRpcStep
 } from '@migaia/rpc-contract/protocol'
 import { RpcCoreErrorCode, RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
-import { RpcProbeObservationKind, type IRpcAttemptOptions } from '@migaia/rpc-contract/interfaces'
+import {
+  RpcProbeObservationKind,
+  type IRpcAttemptFacts,
+  type IRpcAttemptOptions
+} from '@migaia/rpc-contract/interfaces'
 import {
   RpcCoreErrorText,
   RpcLifecycleError,
@@ -225,10 +229,56 @@ export class CallTable {
       command,
       options,
       selected,
-      this.#options.attemptFacts?.(target, command, options)
+      this.#attemptFacts(target, command, options)
     )
     this.#invocations.add(invocation)
     return invocation.start()
+  }
+
+  /**
+   * A normal origin retry may select a current replacement; held capabilities enforce their own
+   * fence.
+   */
+  #refreshTarget(target: ICallTargetRef): ICallTargetRef | undefined {
+    /** Lower-level call owners without accepted Session queries keep their original target. */
+    const sessions = this.#options.sessions
+    if (!sessions) return target
+    /** Private source absence never falls through to an unrelated ordinary accepted binding. */
+    const selection = target.source
+      ? target.source.current(target.carrierId)
+      : sessions.get(target.namespace, target.name)
+    return selection === undefined ? undefined : callTarget(selection)
+  }
+
+  /** Read actual accepted declarations and native generation authority before a feature can replay. */
+  #attemptFacts(
+    target: ICallTargetRef,
+    command: ICallCommand,
+    options: ICallLocalOptions
+  ): IRpcAttemptFacts | undefined {
+    /** Owners without Session queries preserve their original absence of attempt metadata. */
+    const sessions = this.#options.sessions
+    if (!sessions) return undefined
+    /** The accepted selection lends real native limits without trusting remote diagnostics. */
+    const current = target.source?.current(target.carrierId) ?? sessions.getById(target.carrierId)
+    /** The compiled method Map supplies idempotency facts without a per-attempt directory scan. */
+    const methods = current?.view.methods
+    /** A group may repeat only when every admitted member explicitly declares idempotency. */
+    const idempotent =
+      command.mode === 'group'
+        ? command.steps.length > 0 &&
+          command.steps.every((step) => methods?.get(step.method)?.idempotent === true)
+        : command.mode === 'request' && methods?.get(command.method)?.idempotent === true
+    return {
+      method: 'method' in command ? command.method : command.mode,
+      idempotent,
+      callTimeoutCap: current?.view.callTimeoutCap,
+      ...(options.idempotencyKey === undefined ? {} : { idempotencyKey: options.idempotencyKey }),
+      availability:
+        command.mode === 'request' || command.mode === 'group'
+          ? sessions.availability(target.namespace, target.name, target.carrierId, target.source)
+          : undefined
+    }
   }
 
   /** Transfer checks stay with the actual native resource source or ordinary SessionTable. */
@@ -385,10 +435,7 @@ export class CallTable {
     this.#assertOpen()
     if (signal.aborted) throw createRpcAbortError(undefined, undefined, resolveAbortReason(signal))
     /** Only a new originating attempt may choose the namespace's current binding. */
-    const current =
-      options.origin === false || this.#options.refreshTarget === undefined
-        ? target
-        : this.#options.refreshTarget(target)
+    const current = options.origin === false ? target : this.#refreshTarget(target)
     if (current === undefined)
       throw createRpcError(
         RpcCoreErrorCode.targetUnknown,
@@ -401,9 +448,7 @@ export class CallTable {
       throw createRemoteLayerError(RpcRemoteLayerErrorCode.closed)
     if (attemptOptions?.expectedGeneration !== undefined) {
       /** Namespace refresh cannot substitute a different native generation for this attempt. */
-      const available = this.#options
-        .attemptFacts?.(current, command, options)
-        .availability?.current()
+      const available = this.#attemptFacts(current, command, options)?.availability?.current()
       if (!available || available.generation !== attemptOptions.expectedGeneration)
         throw createRemoteLayerError(RpcRemoteLayerErrorCode.closed, undefined, {
           generation: attemptOptions.expectedGeneration

@@ -9,7 +9,6 @@ import {
   type ILifecycleScope
 } from '@migaia/lifecycle'
 import type {
-  IRpcAttemptFacts,
   IRpcFlowContext,
   IRpcSessionView,
   IRpcTransportDefinition,
@@ -25,8 +24,6 @@ import {
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcCoreErrorText, tagRpcError } from '@migaia/rpc-contract/errors'
 import { CallTable } from '../call/table.js'
-import { callTarget } from '../call/target.js'
-import type { ICallCommand, ICallLocalOptions, ICallTargetRef } from '../call/types.js'
 import { ProviderDispatcher } from '../dispatch/dispatcher.js'
 import type { ProviderRegistration } from '../dispatch/registration.js'
 import type { IRpcProvide, IRpcProvideOptions, IProviderCommitGate } from '../dispatch/types.js'
@@ -188,8 +185,7 @@ export class RpcHost {
     }
     this.#calls = new CallTable({
       ...work,
-      refreshTarget: this.#refreshTarget,
-      attemptFacts: this.#attemptFacts
+      sessions: this.#sessions
     })
     this.#streams = new StreamChannel({
       ...work,
@@ -342,51 +338,6 @@ export class RpcHost {
     generation: this.#identity.directorySelf.generation,
     applicationVersion: RpcWireProfile
   })
-
-  /**
-   * A normal origin retry may select a current replacement; held capabilities enforce their own
-   * fence.
-   */
-  readonly #refreshTarget = (target: ICallTargetRef): ICallTargetRef | undefined => {
-    const selection = target.source
-      ? target.source.current(target.carrierId)
-      : this.#sessions.get(target.namespace, target.name)
-    return selection === undefined ? undefined : callTarget(selection)
-  }
-
-  /** Read actual accepted declarations and native generation authority before a feature can replay. */
-  readonly #attemptFacts = (
-    target: ICallTargetRef,
-    command: ICallCommand,
-    options: ICallLocalOptions
-  ): IRpcAttemptFacts => {
-    /** The accepted selection lends real native limits without trusting remote diagnostics. */
-    const current =
-      target.source?.current(target.carrierId) ?? this.#sessions.getById(target.carrierId)
-    /** The compiled method Map supplies idempotency facts without a per-attempt directory scan. */
-    const methods = current?.view.methods
-    /** A group may repeat only when every admitted member explicitly declares idempotency. */
-    const idempotent =
-      command.mode === 'group'
-        ? command.steps.length > 0 &&
-          command.steps.every((step) => methods?.get(step.method)?.idempotent === true)
-        : command.mode === 'request' && methods?.get(command.method)?.idempotent === true
-    return {
-      method: 'method' in command ? command.method : command.mode,
-      idempotent,
-      callTimeoutCap: current?.view.callTimeoutCap,
-      ...(options.idempotencyKey === undefined ? {} : { idempotencyKey: options.idempotencyKey }),
-      availability:
-        command.mode === 'request' || command.mode === 'group'
-          ? this.#sessions.availability(
-              target.namespace,
-              target.name,
-              target.carrierId,
-              target.source
-            )
-          : undefined
-    }
-  }
 
   /** Only accepted source facts can reach work owners; carrier representation never enters dispatch. */
   readonly #receive = (

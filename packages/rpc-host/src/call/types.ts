@@ -16,6 +16,7 @@ import type {
 } from '@migaia/rpc-contract/interfaces'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import type { FeatureScope } from '../feature/scope.js'
+import type { SessionTable } from '../session/table.js'
 import type { RpcCallIdAllocator } from './id.js'
 
 /** One attempt captures the exact accepted binding; later replacement cannot settle this task. */
@@ -106,12 +107,13 @@ export type ICallTableOptions = Readonly<{
   /** The canonical drain counts this exact attempt Promise without replacing its identity. */
   track?<T>(carrierId: string, promise: Promise<T>): Promise<T>
   features: Pick<FeatureScope, 'resolve' | 'execute'>
-  refreshTarget?(target: ICallTargetRef): ICallTargetRef | undefined
-  attemptFacts?(
-    target: ICallTargetRef,
-    command: ICallCommand,
-    options: ICallLocalOptions
-  ): IRpcAttemptFacts
+  /** Attempt facts borrow accepted Session queries without granting mutation or media ownership. */
+  sessions?: Pick<SessionTable, 'get' | 'getById'> &
+    Readonly<{
+      availability(
+        ...args: Parameters<SessionTable['availability']>
+      ): IRpcAttemptFacts['availability']
+    }>
   now?: () => number
   timestamp?: () => number
   allocator?: RpcCallIdAllocator
