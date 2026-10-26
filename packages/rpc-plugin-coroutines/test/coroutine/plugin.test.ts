@@ -98,7 +98,7 @@ describe('coroutine transport plugin', () => {
       expect((await runtime.members.restart('worker')).state).toBe('ready')
       expect(first.contexts[1]!.signal).not.toBe(context.signal)
       expect(first.contexts[1]!.connect).not.toBe(context.connect)
-      expect(() => runtime.members.replace('worker', { task: 1 } as never)).toThrowError(
+      await expect(runtime.members.replace('worker', { task: 1 } as never)).rejects.toThrowError(
         expect.objectContaining({ source: 'rpc.endpoint', code: 'INVALID_CONFIG' })
       )
       expect(await runtime.request('read', 6)).toEqual(['first', 2, 6])
