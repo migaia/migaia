@@ -69,7 +69,7 @@ export class RpcInstallationSetup<T extends { dispose?(): void | Promise<void> }
   /** Distinguish business-thrown UtilsAbortError from cancellation produced by the utility race. */
   #failure: unknown
   /** Successful handoff removes pending-member receipts from the original native scope. */
-  readonly #pendingMembers: (() => void)[] = []
+  readonly #pendingMembers: (() => Promise<void>)[] = []
 
   /** Capture the original native operation signal before asynchronous setup can outlive rollback. */
   constructor(input: IInstallationSetupInput<T>) {
@@ -84,9 +84,7 @@ export class RpcInstallationSetup<T extends { dispose?(): void | Promise<void> }
       nativeMemberStartups.set(startup.owner, {
         own: (dispose) => {
           startup.resources.own(dispose, { force: dispose })
-          this.#pendingMembers.push(() => {
-            startup.resources.release(dispose)
-          })
+          this.#pendingMembers.push(dispose)
         },
         failed: (error) => {
           if (this.#failure === undefined) this.#failure = error
@@ -141,7 +139,8 @@ export class RpcInstallationSetup<T extends { dispose?(): void | Promise<void> }
 
   /** Final installation cleanup supersedes temporary member ownership without changing its order. */
   #releasePendingMembers(): void {
-    for (const remove of this.#pendingMembers) remove()
+    for (const dispose of this.#pendingMembers)
+      this.#input.nativeStartup!.resources.release(dispose)
     this.#pendingMembers.length = 0
   }
 }
