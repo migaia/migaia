@@ -4,6 +4,42 @@ import type { IRpcMemberEvent } from '@migaia/rpc-host/sdk'
 import { ordinaryHost, outlet, runtimeService } from './fixture.js'
 
 describe('coroutine native lifecycle', () => {
+  it('rejects invalid native member commands through their declared Promise boundary', async () => {
+    /** The public namespace belongs to a real task and its accepted parent Session. */
+    const host = ordinaryHost()
+    /** The existing task fixture keeps native cleanup and generation ownership unchanged. */
+    const task = runtimeService('command-errors', () => undefined)
+    try {
+      await host.use(coroutinePlugin({ name: 'c', spawn: task.task, report: () => undefined }))
+      /** Every command must return a Promise even when target admission fails locally. */
+      const commands = [
+        () => outlet(host).members.stop(''),
+        () => outlet(host).members.kill(''),
+        () => outlet(host).members.restart(''),
+        () => outlet(host).members.replace('')
+      ]
+      /** Capture sync throws separately so the regression checks all four real operations. */
+      const observed = commands.map((command) => {
+        try {
+          return { synchronous: false, outcome: command().catch((error: unknown) => error) }
+        } catch (error) {
+          return { synchronous: true, outcome: Promise.resolve(error) }
+        }
+      })
+      /** Existing error identity and text remain unchanged; only delivery obeys the public type. */
+      const errors = await Promise.all(observed.map((entry) => entry.outcome))
+      expect(observed.map((entry) => entry.synchronous)).toEqual([false, false, false, false])
+      for (const error of errors)
+        expect(error).toMatchObject({ source: 'rpc.endpoint', code: 'INVALID_CONFIG' })
+      expect(await outlet(host).request('service.read', 'still-serving')).toEqual([
+        'command-errors',
+        'still-serving'
+      ])
+    } finally {
+      await host.dispose()
+    }
+  })
+
   it('restarts, stops, replaces and reports listener failure through the original outlet', async () => {
     /** Parent lifecycle remains the existing PluginHost owner. */
     const host = ordinaryHost()
@@ -40,7 +76,7 @@ describe('coroutine native lifecycle', () => {
         'first',
         'after-stop'
       ])
-      expect(() => outlet(host).members.replace('c', { task: 1 } as never)).toThrow(
+      await expect(outlet(host).members.replace('c', { task: 1 } as never)).rejects.toThrow(
         expect.objectContaining({ code: 'INVALID_CONFIG' })
       )
       expect(await outlet(host).request('service.read', 'unchanged')).toEqual([

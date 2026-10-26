@@ -105,58 +105,76 @@ export class RpcNativeMembers<K extends RpcNativeMemberKind = RpcNativeMemberKin
       supervisor: NonNullable<IRpcNativeMemberRecord['supervisor']>
     }
   }
-  /** Validate platform options synchronously, then return the original shared stop completion. */
+  /** Reject invalid commands through their Promise boundary without wrapping native stop completion. */
   readonly #stop = (
     name: string,
     options?: Readonly<{ graceMs?: number; signal?: string }>
   ): Promise<void> => {
-    if (
-      (options?.graceMs !== undefined &&
-        (!Number.isFinite(options.graceMs) || options.graceMs < 0)) ||
-      (options &&
-        Object.hasOwn(options, 'signal') &&
-        (this.#options.kind !== RpcNativeMemberKind.process ||
-          options.signal !== RpcMemberStopSignal))
-    )
-      throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.stopInvalid)
-    return this.#controlled(name).supervisor.stop(
-      options?.graceMs === undefined ? undefined : { graceMs: options.graceMs }
-    )
+    try {
+      if (
+        (options?.graceMs !== undefined &&
+          (!Number.isFinite(options.graceMs) || options.graceMs < 0)) ||
+        (options &&
+          Object.hasOwn(options, 'signal') &&
+          (this.#options.kind !== RpcNativeMemberKind.process ||
+            options.signal !== RpcMemberStopSignal))
+      )
+        throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.stopInvalid)
+      return this.#controlled(name).supervisor.stop(
+        options?.graceMs === undefined ? undefined : { graceMs: options.graceMs }
+      )
+    } catch (error) {
+      return Promise.reject(error)
+    }
   }
   /** Force upgrades the native supervisor's actual pending stop and preserves its Promise identity. */
-  readonly #kill = (name: string): Promise<void> => this.#controlled(name).supervisor.kill()
+  readonly #kill = (name: string): Promise<void> => {
+    try {
+      return this.#controlled(name).supervisor.kill()
+    } catch (error) {
+      return Promise.reject(error)
+    }
+  }
   /**
    * Native ready outcome is retained until the same registration's shared generation is
    * addressable.
    */
   readonly #restart: IRpcNativeMemberControls<K>['restart'] = (name) => {
-    /** Capture before await so a later installation can never become this command's target. */
-    const record = this.#controlled(name)
-    return record.supervisor.restart().then(async (outcome) => {
-      if (outcome.state === SupervisorState.ready) await record.whenReady?.()
-      return outcome
-    })
+    try {
+      /** Capture before await so a later installation can never become this command's target. */
+      const record = this.#controlled(name)
+      return record.supervisor.restart().then(async (outcome) => {
+        if (outcome.state === SupervisorState.ready) await record.whenReady?.()
+        return outcome
+      })
+    } catch (error) {
+      return Promise.reject(error)
+    }
   }
   /**
    * Original platform spec preparation precedes native replacement and exact generation
    * publication.
    */
   readonly #replace: IRpcNativeMemberControls<K>['replace'] = (name, spec) => {
-    /** The native registration alone understands its process/thread/coroutine specification. */
-    const record = this.#controlled(name)
-    /** Undefined retains the supervisor's original spec rather than manufacturing a new one. */
-    const replacement =
-      spec === undefined
-        ? undefined
-        : record.prepareReplacement
-          ? record.prepareReplacement(spec)
-          : spec
-    return record.supervisor
-      .replace(replacement === undefined ? undefined : { spec: replacement })
-      .then(async (outcome) => {
-        if (outcome.kind === 'replaced') await record.whenReady?.()
-        return outcome
-      })
+    try {
+      /** The native registration alone understands its process/thread/coroutine specification. */
+      const record = this.#controlled(name)
+      /** Undefined retains the supervisor's original spec rather than manufacturing a new one. */
+      const replacement =
+        spec === undefined
+          ? undefined
+          : record.prepareReplacement
+            ? record.prepareReplacement(spec)
+            : spec
+      return record.supervisor
+        .replace(replacement === undefined ? undefined : { spec: replacement })
+        .then(async (outcome) => {
+          if (outcome.kind === 'replaced') await record.whenReady?.()
+          return outcome
+        })
+    } catch (error) {
+      return Promise.reject(error)
+    }
   }
   /** Name filtering happens before asynchronous native sampling; other axes combine by AND. */
   readonly #list: IRpcMemberListQuery = (async (options) => {
