@@ -83,11 +83,11 @@ type ISessionAttachment = {
   callTimeoutCap?: IRpcSessionView['callTimeoutCap']
   /** The exact native query remains live when Root reconstructs admitted dispatch context. */
   isExclusive?: IRpcSessionView['isExclusive']
-  /** Only direct attachments join their original registration's lifecycle membership. */
+  /** Physical attachments join their original registration's lifecycle membership. */
   scope?: IStagedSessions
 }
 
-/** One staged native registration retains only its direct physical lifetimes and event handlers. */
+/** One staged native registration retains its original physical lifetimes and event handlers. */
 type IStagedSessions = Readonly<{
   namespace: string
   index: INamespaceIndex
@@ -320,7 +320,9 @@ export class SessionTable {
     let published = false
     for (const session of staged.sessions) {
       /** Existing handle identity supplies the attachment without another candidate index. */
-      const input = this.#handles.get(session.handle)!.attachment!
+      const input = this.#handles.get(session.handle)!.attachment
+      /** Private pool Sessions join lifetime membership without publishing a direct attachment. */
+      if (!input) continue
       /** Directory arbitration may still be in flight; only the accepted current view can publish. */
       const pending = this.#reserved.get(input.carrierId)
       if (pending && pending.view === session.current()?.view) {
@@ -372,6 +374,11 @@ export class SessionTable {
     staged.closing.clear()
     staged.peerClosed.clear()
     this.#scopes.delete(scope)
+  }
+
+  /** Actual direct and private Session lifetimes determine whether selected Features remain in use. */
+  hasOpenSessions(scope: IRpcSessionScope): boolean {
+    return (this.#scopes.get(scope)?.sessions.size ?? 0) !== 0
   }
 
   /** Only the actual closing Session can grant bounded keepalive admission. */
@@ -443,8 +450,7 @@ export class SessionTable {
         this.#retire(input, view, error, physicalFailure, closeFrame)
     })
     this.#sessions.set(input.carrierId, session)
-    input.scope?.sessions.add(session)
-    input.scope?.parent?.sessions.add(session)
+    this.#joinMembership(input.scope, session)
     if (facts?.nativeGeneration)
       this.#nativeGenerations.set(input.carrierId, facts.nativeGeneration)
     input.native = facts?.nativeGeneration !== undefined
@@ -502,6 +508,9 @@ export class SessionTable {
         input.changed?.()
       }
     })
+    /** Weak handle lookup retains the same physical owner without entering public identity indexes. */
+    this.#handles.set(session.handle, { carrierId: carrier.id, session })
+    this.#joinMembership(input.scope, session)
     session.start()
     return session.handle
   }
@@ -775,12 +784,9 @@ export class SessionTable {
     return typeof handle === 'string' ? this.#session(handle).close(reason) : handle.close(reason)
   }
 
-  /** The original native registration closes its direct Sessions before aborting acquired media. */
+  /** The original native registration joins physical Sessions before aborting acquired media. */
   closeScope(scope: IRpcSessionScope, reason?: unknown): Promise<void> {
-    /**
-     * Membership contains real direct resources only; private SDK candidates retain their own
-     * close.
-     */
+    /** Direct and private members keep their same idempotent Session close Promises. */
     const staged = this.#scopes.get(scope)!
     /** Snapshot before native callbacks can remove their exact closing resource from membership. */
     return this.#joinOperations([...staged.sessions].map((session) => session.close(reason)))
@@ -1046,14 +1052,7 @@ export class SessionTable {
     this.#releaseReservation(input)
     this.#accepted.delete(input.carrierId)
     this.#nativeGenerations.delete(input.carrierId)
-    /** Closing membership follows the same original physical cleanup Promise, including failures. */
-    const session = this.#sessions.get(input.carrierId)
     this.#sessions.delete(input.carrierId)
-    if (session instanceof Session && input.scope)
-      void session.handle.closed.then(
-        () => this.#releaseMembership(input.scope!, session),
-        () => this.#releaseMembership(input.scope!, session)
-      )
     this.#draining.retire(input.carrierId)
     this.#options.retired?.(
       input.carrierId,
@@ -1071,7 +1070,18 @@ export class SessionTable {
       this.#notifyPeerClosed(input.scope, (selection?.view ?? view)!, error, closeFrame)
   }
 
-  /** Source cleanup withdraws the same physical membership from its namespace's close snapshot. */
+  /** Both direct and private Sessions borrow one original scope membership until actual cleanup. */
+  #joinMembership(scope: IStagedSessions | undefined, session: Session): void {
+    if (!scope) return
+    scope.sessions.add(session)
+    scope.parent?.sessions.add(session)
+    void session.handle.closed.then(
+      () => this.#releaseMembership(scope, session),
+      () => this.#releaseMembership(scope, session)
+    )
+  }
+
+  /** The original physical cleanup Promise releases both direct and private scope membership. */
   #releaseMembership(scope: IStagedSessions, session: Session): void {
     scope.sessions.delete(session)
     scope.parent?.sessions.delete(session)

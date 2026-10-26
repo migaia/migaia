@@ -8,10 +8,12 @@ import {
   RpcFlowLayer,
   type IRpcFlowStage
 } from '@migaia/rpc-host/sdk'
-import type { IRpcNamespace } from '@migaia/rpc-host'
+import { createRpcHost, type IRpcNamespace } from '@migaia/rpc-host'
 import type { IRpcDispatchContext } from '@migaia/rpc-contract/interfaces'
 import { typegen } from '@migaia/rpc-host/plugins/typegen'
 import { limits } from '@migaia/rpc-host/plugins/limits'
+import { auth } from '@migaia/rpc-host/plugins/auth'
+import { chunk } from '@migaia/rpc-host/plugins/chunk'
 import { deferred, type IDeferred } from '@migaia/utils/promise'
 import { describe, expect, it, vi, type MockInstance as IMockInstance } from 'vitest'
 import { readRpcDefinition } from '../../dist/sdk/metadata.js'
@@ -228,8 +230,11 @@ describe('ordinary native Host RPC installation', () => {
     }
   })
 
-  it('does not reattach limits after unUse resumes an existing dispatch continuation', async () => {
-    /** The same ordinary Host retains its live transport after the optional policy is removed. */
+  it('A31 rejects removal of an in-use shared Auth wrapper and permits deletion after Session close', async () => {
+    /**
+     * The same ordinary Host keeps its shared information-flow owner until all affected Sessions
+     * close.
+     */
     const host = ordinaryHost()
     /** Actual native exposure supplies the original provider directory and physical connection. */
     const server = coreMemoryServer(
@@ -251,6 +256,7 @@ describe('ordinary native Host RPC installation', () => {
     const transport = namedTransport(server)
     /** Removing this generation retires its actual limits instance and original borrowed stages. */
     const flows = rpcFlowPlugin([
+      auth({ sign: (value) => value, verify: (value) => value }),
       limits(),
       heldDispatch({ entered, resume: resume.promise, admitted: () => additions?.mockClear() }),
       transport
@@ -258,7 +264,11 @@ describe('ordinary native Host RPC installation', () => {
     await host.use(limitsService, flows)
     await host.use(transport)
     /** This is a genuine connected public client, not a constructed flow context or fake signal. */
-    const client = await server.connect('limits-client')
+    const client = await server.connect('limits-client', {
+      plugins: [auth({ sign: (value) => value, verify: (value) => value })]
+    })
+    /** Native readiness supplies the exact accepted close receipt needed before cold deletion. */
+    const accepted = server.lookup('limits-client')!.handle
     /** The actual inbound chain captures its original suffix before optional unUse occurs. */
     const pending = namespace(client.host).request('limits-service.value')
     void pending.catch(() => undefined)
@@ -269,22 +279,22 @@ describe('ordinary native Host RPC installation', () => {
       expect(context.connectionSignal).toBeDefined()
       additions = vi.spyOn(LimitsGovernor.prototype, 'bind')
       retirements = vi.spyOn(LimitsGovernor.prototype, 'close')
-      /** Native R5 withdrawal waits for this already borrowed snapshot before completing removal. */
-      let removed = false
-      /** Observe the actual public completion rather than reconstructing private lease state. */
-      const removing = host.unUse(flows.name).then((value) => {
-        removed = true
-        return value
+      /** BC18 replaces the old mid-session withdrawal oracle with native lifecycle refusal. */
+      await expect(host.unUse(flows.name)).rejects.toMatchObject({
+        source: 'plugin.host',
+        code: 'LIFECYCLE_MUTATION'
       })
-      await Promise.resolve()
-      expect(removed).toBe(false)
+      expect(retirements).not.toHaveBeenCalled()
       resume.resolve()
       expect(await pending).toBe(42)
-      await removing
-      expect(retirements).toHaveBeenCalled()
       additions.mockClear()
       expect(await namespace(client.host).request('limits-service.value')).toBe(42)
-      expect(additions).not.toHaveBeenCalled()
+      expect(additions).toHaveBeenCalled()
+      expect(retirements).not.toHaveBeenCalled()
+      await client.host.close()
+      await accepted.closed
+      expect(await host.unUse(flows.name)).toMatchObject({ ok: true })
+      expect(retirements).toHaveBeenCalledTimes(1)
     } finally {
       resume.resolve()
       await Promise.allSettled([pending])
@@ -294,4 +304,113 @@ describe('ordinary native Host RPC installation', () => {
       await host.dispose()
     }
   })
+
+  it('A31 protects a selected transport-local Feature while active and permits cold deletion and reconstruction', async () => {
+    /** The local information-flow instance belongs to this original transport registration. */
+    const server = coreMemoryServer('local-auth-server', 'local-auth-server', 'memory', [
+      auth({ sign: (value) => value, verify: (value) => value })
+    ])
+    /** Only the genuine public provider supplies observable post-refusal communication. */
+    const host = await createRpcHost({ ...server.options, provide: { echo: (value) => value } })
+    /** Both peers explicitly install the original wire-changing Feature. */
+    const client = await server.connect('local-auth-client', {
+      plugins: [auth({ sign: (value) => value, verify: (value) => value })]
+    })
+    /** The actual accepted native receipt fences cold deletion after the last Session closes. */
+    const accepted = server.lookup('local-auth-client')!.handle
+    try {
+      await expect(host.unuse(server.transport.name)).rejects.toMatchObject({
+        source: 'plugin.host',
+        code: 'LIFECYCLE_MUTATION'
+      })
+      expect(await client.host.memory.send('local-auth-server', 'echo', 42)).toBe(42)
+      await client.host.close()
+      await accepted.closed
+      expect(await host.unuse(server.transport.name)).toMatchObject({ ok: true })
+    } finally {
+      await Promise.all([client.host.close(), host.close()])
+    }
+    /** A closed host lends no old capability promise to this fresh featureless construction. */
+    const fresh = coreMemoryServer('reconstructed-server')
+    /** The new public root and its new physical pair contain no deleted Feature. */
+    const reconstructed = await createRpcHost({
+      ...fresh.options,
+      provide: { echo: (value) => value }
+    })
+    const peer = await fresh.connect('reconstructed-client')
+    try {
+      expect(await peer.host.memory.send('reconstructed-server', 'echo', 43)).toBe(43)
+    } finally {
+      await Promise.all([peer.host.close(), reconstructed.close()])
+    }
+  })
+
+  it('A31 records a one-sided chunk outcome without imposing a compatibility guarantee', async () => {
+    /** Only this side installs chunk; the framework does not manufacture an opposite Feature. */
+    const server = coreMemoryServer('one-sided-chunk-server')
+    /** Reports retain native failure details separately from an optional public operation rejection. */
+    const reports: unknown[] = []
+    /** This public root deliberately publishes the wire-changing Feature on just one endpoint. */
+    const host = await createRpcHost({
+      ...server.options,
+      plugins: [chunk({ chunkBytes: 1_024 }), server.transport],
+      provide: { echo: (value) => value },
+      report: (error) => reports.push(error)
+    })
+    /** Unexpected success still retains its real public close owner. */
+    let peer: Awaited<ReturnType<typeof server.connect>> | undefined
+    /** The receipt records actual establishment/call outcome without requiring either result. */
+    let outcome: unknown
+    try {
+      try {
+        peer = await server.connect('one-sided-chunk-client', {
+          report: (error) => reports.push(error)
+        })
+        outcome = {
+          status: 'fulfilled',
+          value: await peer.host.memory.send('one-sided-chunk-server', 'echo', 'one-sided')
+        }
+      } catch (error) {
+        outcome = { status: 'rejected', failure: classifyOneSidedFailure(error) }
+      }
+      console.info('A31-ONE-SIDED-CHUNK', {
+        outcome,
+        reports: reports.map(classifyOneSidedFailure)
+      })
+    } finally {
+      await Promise.all([peer?.host.close(), host.close()])
+    }
+  })
 })
+
+/**
+ * One-sided outcomes retain the complete native diagnostic chain and package-specific refusal
+ * reason.
+ */
+type IOneSidedFailure = Readonly<{
+  source?: string
+  code?: string
+  name: string
+  reason?: unknown
+  message: string
+  stack?: string
+  cause?: IOneSidedFailure
+  errors?: readonly IOneSidedFailure[]
+}>
+
+/** Preserve actual native failure details; this fixture contains no credential-bearing inputs. */
+function classifyOneSidedFailure(error: unknown): IOneSidedFailure {
+  /** Only normal native errors are expected from the genuine public transport and call paths. */
+  const failure = error as Error & { source?: string; code?: string; reason?: unknown }
+  return {
+    source: failure?.source,
+    code: failure?.code,
+    name: failure?.name ?? typeof error,
+    reason: failure?.reason,
+    message: failure?.message ?? String(error),
+    stack: failure?.stack,
+    cause: failure?.cause === undefined ? undefined : classifyOneSidedFailure(failure.cause),
+    errors:
+      failure instanceof AggregateError ? failure.errors.map(classifyOneSidedFailure) : undefined
+  }
+}

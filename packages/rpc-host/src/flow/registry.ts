@@ -48,6 +48,10 @@ type IFlowFacts = Readonly<{
 
 /** A Session borrows its exact native registration's view, including during candidate startup. */
 export type IRpcFlowGroup = Readonly<{
+  /** Only selected transport-owned information-flow Features prevent removal with live Sessions. */
+  local: boolean
+  /** Exact shared setup identity excludes host capabilities overridden by local selection. */
+  usesShared(shared: IRpcSharedFlows): boolean
   facts(namespace?: string): IFlowFacts
   observe(event: IRpcObservation): void
   namespaceExtensions(namespace: string): readonly Readonly<Record<string, unknown>>[]
@@ -117,15 +121,36 @@ class RpcFlowGroup implements IRpcFlowGroup {
   readonly #registry: FlowRegistry
   /** These exact selected entries belong to one native transport generation. */
   readonly #installed: readonly IRpcFlowInstallation<object>[]
+  /** Only a selected shared entry retains this exact wrapper's removal relationship. */
+  readonly #shared: IRpcSharedFlows | undefined
+  /** Native readonly observers never contribute to this selected local intervention fact. */
+  readonly local: boolean
   /** Host fact identity changes only when a readonly native registration is added or removed. */
   #host: IFlowFacts | undefined
   /** Negotiation never rescans entries until actual host observer membership changes. */
   #facts: IFlowFacts | undefined
 
   /** Capture only the original prepared installations; no resource is acquired here. */
-  constructor(registry: FlowRegistry, entries: readonly IRpcFlowEntry[]) {
+  constructor(registry: FlowRegistry, entries: readonly IRpcFlowEntry[], shared: IRpcSharedFlows) {
     this.#registry = registry
     this.#installed = Object.freeze(entries.map(({ installed }) => installed))
+    /** Registration-time identity membership distinguishes borrowed shared and native local entries. */
+    const borrowed = new Set(shared.entries.values())
+    /** Each selected entry participates once; no dependency or Session registry is added here. */
+    let hasShared = false
+    /** A local Feature's owning removable unit is this native transport registration. */
+    let hasLocal = false
+    for (const entry of entries) {
+      if (borrowed.has(entry)) hasShared = true
+      else hasLocal = true
+    }
+    this.#shared = hasShared ? shared : undefined
+    this.local = hasLocal
+  }
+
+  /** Cold wrapper deletion is guarded only by namespaces actually borrowing its selected entries. */
+  usesShared(shared: IRpcSharedFlows): boolean {
+    return this.#shared === shared
   }
 
   /** Scope is already fixed by registration identity; the argument preserves Session's narrow port. */
@@ -217,7 +242,7 @@ export class FlowRegistry {
     // Seven points form the complete compile-time intervention domain.
     for (const point of Object.values(RpcFlowPoint))
       this.#registerStages(core as IRpcFlowCore, point, entries)
-    return new RpcFlowGroup(this, entries)
+    return new RpcFlowGroup(this, entries, this.#shared)
   }
 
   /** A failed first native batch may retry before any transport has committed traffic. */

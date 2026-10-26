@@ -45,7 +45,7 @@ import {
   type IRpcNativePipelineCore
 } from '../sdk/flow-pipelines.js'
 import type { RpcFlowProgram, RpcTransportFlowProgram } from '../sdk/flow-program.js'
-import type { IRpcDefinitionMetadata } from '../sdk/metadata.js'
+import type { IRpcDefinitionMetadata, IRpcSharedFlows } from '../sdk/metadata.js'
 import { RpcDefinitionKind } from '../sdk/metadata.js'
 import { HostIdentity, defaultRpcId } from './identity.js'
 import { createRpcAbortError, createRpcError, createRpcLifecycleError } from './error-owner.js'
@@ -272,11 +272,15 @@ export class RpcHost {
       )
     /** Setup borrows the same Host lifetime and real work owners for every optional registration. */
     const context = this.#flowSetupContext(core)
-    if (metadata.kind === RpcDefinitionKind.features)
-      return this.#flow.registerShared(
-        core,
-        await metadata.prepare(core, this.#controller.signal, context)
+    if (metadata.kind === RpcDefinitionKind.features) {
+      /** The original shared setup lends only its selected group relationship to native removal. */
+      const shared = await metadata.prepare(core, this.#controller.signal, context)
+      this.#flow.registerShared(core, shared)
+      getPluginRuntimeIntegration(core).allowRemovalWhen(
+        () => this.closed || !this.#sharedFlowsInUse(shared)
       )
+      return
+    }
     /**
      * Readonly observers retain their native registration rather than becoming information-flow
      * Features.
@@ -295,6 +299,17 @@ export class RpcHost {
       observe: this.#flow.observe,
       retire: (carrierId, reason, kind) => this.#sessions.detach(carrierId, reason, kind)
     }
+  }
+
+  /** Only committed namespace groups can keep this exact shared wrapper in active communication. */
+  #sharedFlowsInUse(shared: IRpcSharedFlows): boolean {
+    for (const registration of this.#namespaces.values())
+      if (
+        registration.flow.usesShared(shared) &&
+        this.#sessions.hasOpenSessions(registration.sessionScope)
+      )
+        return true
+    return false
   }
 
   /** Global close seals admission, joins native origin drains, then retires physical work. */
@@ -583,6 +598,11 @@ export class RpcHost {
       pipelines: () => pipelines,
       flow
     })
+    /** Removing a local information-flow Feature means removing its owning native transport unit. */
+    if (flow.local)
+      integration.allowRemovalWhen(
+        () => this.closed || !this.#sessions.hasOpenSessions(sessionScope)
+      )
     /**
      * Namespace projection owns selection and calls while this resource scope owns registration
      * cleanup.
