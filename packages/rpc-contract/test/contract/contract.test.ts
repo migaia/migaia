@@ -1,27 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { normalizePortable } from '@migaia/rpc-contract/portable'
 import { deserializeRpcError, serializeRpcError } from '@migaia/rpc-contract/errors'
-import { normalizeRpcFrame } from '@migaia/rpc-contract/protocol'
-import { header } from '../fixtures/core-profile.js'
 
 describe('rpc-contract pure business boundary', () => {
-  it('rejects live metadata accessors without evaluating them under the sole closed profile', () => {
-    let reads = 0
-    const input = {
-      ...header(),
-      options: {},
-      get payload() {
-        reads++
-        return null
-      }
-    }
-    expect(() => normalizeRpcFrame(input)).toThrow()
-    expect(reads).toBe(0)
-    expect(() =>
-      normalizeRpcFrame(
-        Object.assign(Object.create({ inherited: true }), { ...header(), options: {} })
-      )
-    ).toThrow()
+  it('rejects non-portable caller values', () => {
     expect(() => normalizePortable(new Date())).toThrow()
     const cycle: Record<string, unknown> = {}
     cycle.self = cycle

@@ -9,7 +9,7 @@ import {
 /** Unknown semantic kinds still fail at their canonical grammar pointer under the sole profile. */
 it('retains the unknown-kind rejection for unregistered future kinds', () => {
   expect(() => normalizeRpcFrame({ profile: RpcWireProfile, kind: 'future-kind' })).toThrow(
-    expect.objectContaining({ code: 'INVALID_ENVELOPE', pointer: '/profile' })
+    expect.objectContaining({ code: 'INVALID_ENVELOPE', pointer: '/kind' })
   )
 })
 
