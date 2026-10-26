@@ -122,6 +122,19 @@ type IPluginCoreContext<TDomainCore extends object, TValue> = {
   readonly runtimeIntegration: () => IPluginRuntimeIntegration
 }
 
+/** Core members the Host defines; a domain core may not supply any of them. */
+const reservedCoreKeys: ReadonlySet<PropertyKey> = new Set<PropertyKey>([
+  'config',
+  'operation',
+  'lifecycle',
+  'onDispose',
+  'usePipeline',
+  'useAsyncPipeline',
+  'useGeneratorPipeline',
+  'useAsyncGeneratorPipeline',
+  'pipeline'
+])
+
 export const createPluginCore = <TDomainCore extends object, TValue>(
   context: IPluginCoreContext<TDomainCore, TValue>
 ): TDomainCore & IPluginHostCore<TValue> => {
@@ -129,20 +142,9 @@ export const createPluginCore = <TDomainCore extends object, TValue>(
   const prototype = Object.getPrototypeOf(domainCore)
   if (prototype !== Object.prototype && prototype !== null)
     throw createPluginHostTypeError(PluginHostInternalText.DOMAIN_CORE_OBJECT)
-  const reservedKeys = new Set<PropertyKey>([
-    'config',
-    'operation',
-    'lifecycle',
-    'onDispose',
-    'usePipeline',
-    'useAsyncPipeline',
-    'useGeneratorPipeline',
-    'useAsyncGeneratorPipeline',
-    'pipeline'
-  ])
   const facade: Record<PropertyKey, unknown> = {}
   for (const key of Reflect.ownKeys(domainCore)) {
-    if (reservedKeys.has(key))
+    if (reservedCoreKeys.has(key))
       throw createPluginHostTypeError(PluginHostInternalText.DOMAIN_CORE_RESERVED(key))
     const descriptor = Object.getOwnPropertyDescriptor(domainCore, key)
     if (!descriptor || !('value' in descriptor) || !descriptor.enumerable)

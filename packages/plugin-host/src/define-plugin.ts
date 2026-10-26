@@ -106,31 +106,65 @@ const readDefinitionFields = (source: object): IDefinitionFields => ({
   syncDisposer: readSymbolDisposer(source, Symbol.dispose)
 })
 
-/** Rejects a malformed name, hook, activation, retired field or Feature expose value. */
-const assertDefinitionFields = (fields: IDefinitionFields): void => {
-  const { name, install, setup, beforeRelease, activation, featureExpose } = fields
-  if (typeof name !== 'string' || name.length === 0 || name.includes('.'))
-    throw createPluginHostTypeError(PluginHostInternalText.PLUGIN_NAME_STRICT)
-  if (typeof install !== 'function')
+/** Optional lifecycle fields shared by functional and raw-object plugin definitions. */
+export type IDefinitionLifecycleFields = Readonly<{
+  install: unknown
+  setup: unknown
+  beforeRelease: unknown
+  update: unknown
+  onEnable: unknown
+  onDisable: unknown
+  onDependencyReplaced: unknown
+  dispose: unknown
+  activation: unknown
+  retiredShared: unknown
+}>
+
+/**
+ * Rejects a non-function install or hook, an unknown activation, or the retired shared field. The
+ * functional and raw-object admission paths share this one rule; each checks its own name rule and
+ * disposer form separately.
+ */
+export const assertDefinitionLifecycle = (fields: IDefinitionLifecycleFields): void => {
+  if (typeof fields.install !== 'function')
     throw createPluginHostTypeError(PluginHostInternalText.PLUGIN_INSTALL_FUNCTION)
-  if (setup !== undefined && typeof setup !== 'function')
+  if (fields.setup !== undefined && typeof fields.setup !== 'function')
     throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_SETUP_FUNCTION)
-  if (beforeRelease !== undefined && typeof beforeRelease !== 'function')
+  if (fields.beforeRelease !== undefined && typeof fields.beforeRelease !== 'function')
     throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_BEFORE_RELEASE_FUNCTION)
-  // Fixed seven optional hooks; the bound comes from the definition contract, not from input.
+  // Fixed five optional hooks; the bound comes from the definition contract, not from input.
   for (const [key, value] of [
     ['update', fields.update],
     ['onEnable', fields.onEnable],
     ['onDisable', fields.onDisable],
     ['onDependencyReplaced', fields.onDependencyReplaced],
-    ['dispose', fields.dispose],
+    ['dispose', fields.dispose]
+  ] as const)
+    if (value !== undefined && typeof value !== 'function')
+      throw createPluginHostTypeError(PluginHostInternalText.PLUGIN_HOOK_FUNCTION(key))
+}
+
+/** Rejects an unknown activation or the retired shared field, after hook-shape checks. */
+export const assertDefinitionPolicy = (fields: IDefinitionLifecycleFields): void => {
+  if (fields.activation !== 'eager' && fields.activation !== 'lazy')
+    throw createPluginDefinitionTypeError()
+  if (fields.retiredShared !== undefined) throw createPluginDefinitionTypeError()
+}
+
+/** Rejects a malformed name, hook, activation, retired field or Feature expose value. */
+const assertDefinitionFields = (fields: IDefinitionFields): void => {
+  const { name, featureExpose } = fields
+  if (typeof name !== 'string' || name.length === 0 || name.includes('.'))
+    throw createPluginHostTypeError(PluginHostInternalText.PLUGIN_NAME_STRICT)
+  assertDefinitionLifecycle(fields)
+  // Two symbol disposers; checked after the named hooks, as before.
+  for (const [key, value] of [
     [String(Symbol.asyncDispose), fields.asyncDisposer],
     [String(Symbol.dispose), fields.syncDisposer]
   ] as const)
     if (value !== undefined && typeof value !== 'function')
       throw createPluginHostTypeError(PluginHostInternalText.PLUGIN_HOOK_FUNCTION(key))
-  if (activation !== 'eager' && activation !== 'lazy') throw createPluginDefinitionTypeError()
-  if (fields.retiredShared !== undefined) throw createPluginDefinitionTypeError()
+  assertDefinitionPolicy(fields)
   if (
     featureExpose !== undefined &&
     typeof featureExpose !== 'object' &&

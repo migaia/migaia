@@ -1,10 +1,13 @@
 import { copyConfig } from './config.js'
 import { snapshotDisposer } from './disposal.js'
 import { snapshotFeatureRecord } from './define-feature.js'
-import { readPluginDefinitionData } from './define-plugin.js'
+import {
+  assertDefinitionLifecycle,
+  assertDefinitionPolicy,
+  readPluginDefinitionData
+} from './define-plugin.js'
 import ERROR_TEXT, {
   PluginHostError,
-  createPluginDefinitionTypeError,
   createPluginHostTypeError,
   PluginHostInternalText
 } from './error-text.js'
@@ -87,7 +90,6 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
       activation,
       dispose,
       beforeRelease,
-      retiredShared,
       features,
       featureExpose,
       disposer
@@ -95,23 +97,8 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
     if (typeof name !== 'string' || name.length === 0)
       throw createPluginHostTypeError(PluginHostInternalText.PLUGIN_NAME_REQUIRED)
     if (name.includes('.')) throw createPluginHostTypeError(PluginHostInternalText.PLUGIN_NAME_DOT)
-    if (typeof install !== 'function')
-      throw createPluginHostTypeError(PluginHostInternalText.PLUGIN_INSTALL_FUNCTION)
-    if (setup !== undefined && typeof setup !== 'function')
-      throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_SETUP_FUNCTION)
-    if (beforeRelease !== undefined && typeof beforeRelease !== 'function')
-      throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_BEFORE_RELEASE_FUNCTION)
-    for (const [key, hook] of [
-      ['update', update],
-      ['onEnable', onEnable],
-      ['onDisable', onDisable],
-      ['onDependencyReplaced', onDependencyReplaced],
-      ['dispose', dispose]
-    ] as const)
-      if (hook !== undefined && typeof hook !== 'function')
-        throw createPluginHostTypeError(PluginHostInternalText.PLUGIN_HOOK_FUNCTION(key))
-    if (activation !== 'eager' && activation !== 'lazy') throw createPluginDefinitionTypeError()
-    if (retiredShared !== undefined) throw createPluginDefinitionTypeError()
+    assertDefinitionLifecycle(captured)
+    assertDefinitionPolicy(captured)
     for (const candidate of [...disposer.asyncCandidates, ...disposer.disposeCandidates])
       if (candidate.value !== undefined && typeof candidate.value !== 'function')
         throw createPluginHostTypeError(
@@ -133,7 +120,7 @@ export const snapshotPluginDefinitions = <TDomainCore extends object, TValue>(
       onEnable: onEnable as IPluginConstraint<any>['onEnable'],
       onDisable: onDisable as IPluginConstraint<any>['onDisable'],
       onDependencyReplaced: onDependencyReplaced as IPluginConstraint<any>['onDependencyReplaced'],
-      activation,
+      activation: activation as 'eager' | 'lazy',
       dispose: dispose as IPluginConstraint<any>['dispose'],
       beforeRelease: beforeRelease as IPluginConstraint<any>['beforeRelease'],
       disposer: disposer.disposer,
