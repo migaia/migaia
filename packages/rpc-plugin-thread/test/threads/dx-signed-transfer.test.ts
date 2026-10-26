@@ -54,14 +54,13 @@ describe('ordinary signed native-binary thread profile', () => {
     })
     try {
       /** Native transfer must detach caller storage once the signed frame reaches the held port. */
-      const bytes = new Uint8Array(16_385)
-      bytes.set([7, 8, 9])
-      /** BC19 preserves this native-detachment oracle above the signed inline backing boundary. */
+      const bytes = new Uint8Array([7, 8, 9])
+      /** Explicit handoff retains native detachment even below the signed inline boundary. */
       const buffer = bytes.buffer
       expect(
         await peer.thread.send('thread', 'bytes.inspect', buffer, { transfer: [buffer] })
       ).toEqual({
-        length: 16_385,
+        length: 3,
         first: 7
       })
       expect(buffer.byteLength).toBe(0)
@@ -130,8 +129,7 @@ describe('ordinary signed native-binary thread profile', () => {
     })
     try {
       /** The submitted native frame detaches storage even though the peer refuses its signature. */
-      const bytes = new Uint8Array(16_385)
-      bytes.set([7, 8, 9])
+      const bytes = new Uint8Array([7, 8, 9])
       /** The original forged-native assertion must still exercise an actual transferred backing. */
       const buffer = bytes.buffer
       forge = true

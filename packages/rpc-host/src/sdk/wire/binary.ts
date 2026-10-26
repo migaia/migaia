@@ -32,7 +32,8 @@ export function prepareRpcBinary(
       encodeBytes,
       options.errorMetadata,
       undefined,
-      options.transferRequiresIntegrity
+      options.transferRequiresIntegrity,
+      options.transfer
     )
     return finishRpcBinaryCapture(capture, options, shape)
   } catch (cause) {

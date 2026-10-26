@@ -209,6 +209,25 @@ it('A33 unsigned native bytes preserve actual transfer and execute zero SHA-256 
   }
 })
 
+it('A33 explicit signed transfer keeps a small backing native while an ungranted echo is inline', async () => {
+  /** The three-byte caller grant must retain original native handoff instead of copying inline. */
+  const bytes = new Uint8Array([7, 8, 9])
+  /** The echo has no return transfer grant and therefore uses the signed small-backing policy. */
+  const pair = new BinaryIntegrityPair()
+  try {
+    await pair.open(true)
+    expect(await pair.send(bytes, [bytes.buffer])).toEqual(bytes)
+    expect(pair.writes[0]!.frame.sidecars).toEqual([bytes.buffer])
+    expect(pair.writes[0]!.transfer).toEqual([bytes.buffer])
+    expect(pair.hashedSteps().map((step) => step.hashes)).toEqual([1, 1])
+    expect(pair.hashedSteps().filter((step) => step.stage === 'prepare')).toHaveLength(1)
+    expect(pair.hashedSteps().filter((step) => step.stage === 'restore')).toHaveLength(1)
+    expect(pair.delivered).toEqual([bytes])
+  } finally {
+    await pair.close()
+  }
+})
+
 it.each([1125, 1126])(
   'A33 signed whole-backing boundary %i preserves bytes and rejects actual wire tampering',
   async (size) => {
@@ -222,7 +241,7 @@ it.each([1125, 1126])(
     try {
       await pair.open(true)
       /** The actual echo performs two prepares and two restores, not one global digest operation. */
-      const restored = (await pair.send(view, [bytes.buffer])) as Uint8Array
+      const restored = (await pair.send(view, [])) as Uint8Array
       expect(restored).toEqual(view)
       expect(restored.byteOffset).toBe(1)
       expect(restored.buffer.byteLength).toBe(size)
@@ -238,12 +257,13 @@ it.each([1125, 1126])(
         size === 1125 ? 0 : 2
       )
       expect(pair.writes[0]!.frame.sidecars ?? []).toEqual(size === 1125 ? [] : [bytes.buffer])
-      expect(pair.writes[0]!.transfer ?? []).toEqual(size === 1125 ? [] : [bytes.buffer])
+      expect(pair.writes[0]!.transfer ?? []).toEqual([])
+      expect(bytes.buffer.byteLength).toBe(size)
       pair.reset()
       pair.tamperInline = size === 1125
       pair.tamperBacking = size === 1126
       /** Immediate rejection observation retains the actual pending caller until native shutdown. */
-      const pending = pair.send(view, [bytes.buffer]).catch((error: unknown) => error)
+      const pending = pair.send(view, []).catch((error: unknown) => error)
       /** Verification or restore must reject before the genuine provider enters a second time. */
       const reported = await pair.failure.promise
       if (size === 1125) expect(reported).toMatchObject({ code: 'AUTHENTICATION_FAILED' })
@@ -269,7 +289,7 @@ it.each([1125, 1126])(
 )
 
 it('A33 mixed logical backings retain aliases and transfer only the actual large sidecar subset', async () => {
-  /** Small signed storage is inline even when the caller lists it as transferable. */
+  /** Small signed storage remains inline when the caller grants no ownership handoff for it. */
   const small = new Uint8Array([1, 2]).buffer
   /** Two aliases and a tiny final-byte view all borrow this one complete native backing. */
   const large = new Uint8Array(1126)
@@ -287,8 +307,8 @@ it('A33 mixed logical backings retain aliases and transfer only the actual large
   const pair = new BinaryIntegrityPair()
   try {
     await pair.open(true)
-    /** Transfer intent includes both logical backings; actual IO may take only the large one. */
-    const restored = (await pair.send(payload, [small, large.buffer])) as typeof payload
+    /** The explicit large handoff leaves the small copied backing eligible for signed inline. */
+    const restored = (await pair.send(payload, [large.buffer])) as typeof payload
     expect(restored).toEqual(payload)
     expect(restored.first.buffer).toBe(restored.large)
     expect(restored.second.buffer).toBe(restored.large)
@@ -298,6 +318,7 @@ it('A33 mixed logical backings retain aliases and transfer only the actual large
     expect(restored.tiny.byteOffset).toBe(1125)
     expect(pair.writes[0]!.frame.sidecars).toEqual([large.buffer])
     expect(pair.writes[0]!.transfer).toEqual([large.buffer])
+    expect(small.byteLength).toBe(2)
     expect(pair.hashedSteps()).toHaveLength(4)
     expect(pair.hashedSteps().map((step) => step.hashes)).toEqual([1, 1, 1, 1])
   } finally {

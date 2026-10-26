@@ -23,6 +23,8 @@ export type IRpcBinaryOptions = Readonly<{
   digest?: IRpcBinaryDigest
   /** Local integrity demand; wire capture borrows the selected signing flow's trusted fact. */
   transferRequiresIntegrity?: boolean
+  /** Caller-granted ownership handoff keeps these original backings native even below threshold. */
+  transfer?: readonly ArrayBuffer[]
   errorMetadata?: IRpcErrorWireMetadata
   encoding?: IRpcBinaryEncoding
   beforeDigest?(manifest: IRpcBinaryManifest, backingBytes: number): void

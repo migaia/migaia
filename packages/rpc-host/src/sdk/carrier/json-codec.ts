@@ -76,7 +76,8 @@ export class RpcJsonCarrierCodec implements IRpcCarrierCodec {
       encodeBytes,
       context.errorMetadata,
       context.nativeBinary ? undefined : captureRpcWirePortableRecord,
-      options.transferRequiresIntegrity
+      options.transferRequiresIntegrity,
+      context.transfer
     )
     if (!capture.hasBinary) return { message: capture.semanticEnvelope, sidecars: [] }
     /** Actual hash suspension never rereads the original business graph or replaces its backings. */
