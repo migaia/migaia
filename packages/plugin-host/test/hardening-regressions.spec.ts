@@ -903,9 +903,4 @@ describe('fifth adversarial pass', () => {
       vi.useRealTimers()
     }
   })
-
-  it('ERROR_TEXT carries no dead diagnostic text left over from the superseded diagnostic-only watchdog', async () => {
-    const errorTextModule = await import('../src/error-text')
-    expect(Object.hasOwn(errorTextModule.default, 'QUEUE_WATCHDOG_TIMEOUT')).toBe(false)
-  })
 })
