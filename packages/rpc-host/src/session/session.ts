@@ -176,6 +176,8 @@ export class Session {
   #keepaliveBytes = 0
   /** Work callbacks and pending controls receive the same original terminal reason. */
   #reason: unknown
+  /** Closing writes and their cancellation acknowledgement share one lifecycle error identity. */
+  #closeError: unknown
   /** Control correlation is independent of business CallTable records. */
   readonly #controls = new Map<string, IControlPending>()
   /** A connection-local serial cannot collide with another physical session's controls. */
@@ -592,6 +594,10 @@ export class Session {
     this.#closing = true
     this.#physicalFailure = physicalFailure
     this.#reason = reason ?? createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
+    this.#closeError =
+      this.#options.carrier.closingWrites && !isLocalRpcError(this.#reason, RpcLifecycleError)
+        ? createRpcLifecycleError(RpcCoreErrorText.endpointDisposed, this.#reason)
+        : this.#reason
     this.#observation.lifecycle(RpcProbeLifecycle.closing, this.#reason)
     this.#cancelHandshakeTimer()
     this.#ready.reject(this.#reason)
@@ -671,7 +677,7 @@ export class Session {
     } catch (error) {
       this.#options.report(error)
     }
-    this.#controller.abort(this.#reason)
+    this.#controller.abort(this.#closeError)
     for (const pending of this.#controls.values()) pending.completion.reject(this.#reason)
     this.#controls.clear()
     const remove = this.#unsubscribe
@@ -1124,7 +1130,7 @@ export class Session {
       const signal = physical?.signal === false ? this.#controller.signal : physical?.signal
       this.#observation.media(S.frame, D.outbound, frame, writeContext.message, physical?.transfer)
       this.#assertOpen(writeContext.continuing, writeContext.final)
-      if (signal?.aborted) throw createRpcAbortError(undefined, undefined, signal.reason)
+      if (signal?.aborted) throw signal.reason
       await this.#write(
         frame,
         {
@@ -1356,10 +1362,7 @@ export class Session {
 
   /** Translate only utils-owned control wrappers while retaining the original reason/cause. */
   #controlError(error: unknown): unknown {
-    if (this.#closing)
-      return this.#options.carrier.closingWrites
-        ? createRpcLifecycleError(RpcCoreErrorText.endpointDisposed, this.#reason)
-        : this.#reason
+    if (this.#closing) return this.#closeError
     if (error instanceof UtilsAbortError)
       return createRpcAbortError(undefined, undefined, error.cause)
     if (error instanceof UtilsTimeoutError) {
@@ -1374,7 +1377,7 @@ export class Session {
   /** A failing unaccepted candidate emits its coded reject before releasing the physical source. */
   async #fail(error: unknown, reject: boolean): Promise<void> {
     if (this.#closing) {
-      if (error !== this.#reason) this.#options.report(error)
+      if (error !== this.#reason && error !== this.#closeError) this.#options.report(error)
       return
     }
     /** Provider cancellation keeps the original typed reason beside its public protocol report. */
