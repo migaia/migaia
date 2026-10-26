@@ -105,7 +105,16 @@ export function serializeHostWireError(
   )
 }
 
-/** Restore flat native errors and retain admitted routes by exact restored identity. */
-export function deserializeHostWireError(value: unknown): Error {
-  return deserializeRpcWireError(value, hostErrorWireMetadata)
+/** Restore once; downstream error routes take precedence over the admitted reply's hop header. */
+export function deserializeHostWireError(value: unknown, admittedRoute?: readonly string[]): Error {
+  /** Native identity and the entire restored graph remain owned by the canonical deserializer. */
+  const error = deserializeRpcWireError(value, hostErrorWireMetadata)
+  /** A restored route already has its canonical descriptor and may exceed the upstream header. */
+  if (!routes.has(error) && admittedRoute !== undefined) {
+    /** Error diagnostics outlive the original frame, without retaining its mutable route array. */
+    const snapshot = Object.freeze([...admittedRoute])
+    Object.defineProperty(error, RpcWireField.route, { value: snapshot, enumerable: true })
+    registerLocalErrorWireRoute(error, snapshot)
+  }
+  return error
 }

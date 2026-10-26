@@ -315,7 +315,10 @@ export class StreamConsumer {
     if (!this.#prepared || !sameTask(this.#prepared.envelope.task, envelope.task) || this.#terminal)
       return
     if (envelope.kind === RpcWireKind.error) {
-      this.#finish({ error: deserializeHostWireError(envelope.error) }, envelope)
+      this.#finish(
+        { error: deserializeHostWireError(envelope.error, envelope.route.forwardRoute) },
+        envelope
+      )
       return
     }
     if (envelope.kind !== RpcWireKind.stream) return
@@ -343,7 +346,7 @@ export class StreamConsumer {
             error:
               event.error === undefined
                 ? createRpcAbortError()
-                : deserializeHostWireError(event.error)
+                : deserializeHostWireError(event.error, envelope.route.forwardRoute)
           },
           envelope
         )
@@ -390,7 +393,10 @@ export class StreamConsumer {
         envelope
       )
     else if (event.event === RpcStreamEvent.fail)
-      this.#finish({ error: deserializeHostWireError(event.error!) }, envelope)
+      this.#finish(
+        { error: deserializeHostWireError(event.error!, envelope.route.forwardRoute) },
+        envelope
+      )
   }
 
   /** Caller return and throw share one original finishing Promise; unopened return performs no IO. */

@@ -298,7 +298,7 @@ export class CallTable {
       record.resolve(envelope.result)
     } else if (envelope.kind === RpcWireKind.error) {
       /** One restoration supplies both the actual observer reference and original call settlement. */
-      const error = deserializeHostWireError(envelope.error)
+      const error = deserializeHostWireError(envelope.error, envelope.route.forwardRoute)
       record.received(envelope, error)
       record.remoteError(error)
     } else if (envelope.kind === RpcWireKind.outcome && envelope.operation === 'result') {
