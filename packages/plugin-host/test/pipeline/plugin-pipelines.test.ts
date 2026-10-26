@@ -216,6 +216,28 @@ it('A8: native removal drains the real group before releasing its registered res
     await host.dispose()
     throw error
   }
+  /** Owner stages share the group's original allocation index and exact removal handles. */
+  const hostStageCalls = vi.fn()
+  /** Reusing one function proves removal acts on an occurrence, not function identity. */
+  const ownerStage = async (
+    value: unknown,
+    next: (value: unknown) => Promise<unknown>
+  ): Promise<void> => {
+    hostStageCalls()
+    await next(value)
+  }
+  /** Genuine construction scope remains valid for this committed generation. */
+  const group = host.pipeline('envelopeOutbound', requests.at(-1)!)
+  /** Explicit removal deletes the original host allocation and remains idempotent. */
+  const removedStage = group.use(ownerStage)
+  await group.run({ text: 'owner-first' }, (value) => value)
+  expect(hostStageCalls).toHaveBeenCalledTimes(1)
+  removedStage.remove()
+  removedStage.remove()
+  await group.run({ text: 'owner-removed' }, (value) => value)
+  expect(hostStageCalls).toHaveBeenCalledTimes(1)
+  /** Native group cleanup also deletes still-live host allocations after the in-flight run. */
+  const retiredStage = group.use(ownerStage)
   /** Public qualified execution has no transaction request after publication. */
   const run = Reflect.apply(host.pipeline, undefined, ['drained.envelopeOutbound']).run(
     { text: 'held' },
@@ -228,6 +250,9 @@ it('A8: native removal drains the real group before releasing its registered res
   await run
   expect((await removal).ok).toBe(true)
   expect(cleanup).toHaveBeenCalledTimes(1)
+  expect(hostStageCalls).toHaveBeenCalledTimes(2)
+  retiredStage.remove()
+  retiredStage.remove()
   expect(() => Reflect.apply(host.pipeline, undefined, ['drained.envelopeOutbound'])).toThrowError(
     expect.objectContaining({ code: 'PIPELINE_UNKNOWN' })
   )

@@ -72,6 +72,11 @@ class StageAllocationOrder {
     this.#allocations.set(ordinal, { kind: 'host', ordinal, key, entry })
   }
 
+  /** Deletes one exact host occurrence from the original allocation index in O(1). */
+  removeHost(ordinal: bigint): void {
+    this.#allocations.delete(ordinal)
+  }
+
   /** Binding the first current generation adds one actual visible pipeline owner to its slot. */
   bindOwner(ordinal: bigint): void {
     /** The original slot was reserved before any candidate could register its first stage. */
@@ -229,6 +234,7 @@ export class StageLanes<TValue> {
     return () => {
       if (!entry.alive) return
       entry.alive = false
+      this.#order.removeHost(ordinal)
       this.#size -= 1
       if (!forms.syncStage) this.#asyncStageCount -= 1
       this.invalidate()
@@ -453,7 +459,13 @@ export class StageLaneCollection<TValue> {
       this.#lanes.delete(key)
     }
     for (const allocation of this.#order.values()) {
-      if (allocation.kind !== 'owner') continue
+      if (allocation.kind === 'host') {
+        if (keys.has(allocation.key)) {
+          allocation.entry.alive = false
+          this.#order.removeHost(allocation.ordinal)
+        }
+        continue
+      }
       for (const key of allocation.slot.segments?.keys() ?? [])
         if (keys.has(key)) allocation.slot.segments!.delete(key)
     }
