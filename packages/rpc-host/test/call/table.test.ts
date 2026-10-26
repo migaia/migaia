@@ -310,10 +310,10 @@ describe('CallTable owner transitions (public Namespace migration is tracked sep
     expect(fixture.frames).toHaveLength(0)
   })
 
-  it('notify resolves at physical completion and a later actual caller abort emits one cancel', async () => {
+  it('ordinary notify resolves at physical completion without post-write cancel authority', async () => {
     /** No provider terminal or new acknowledgement is supplied to this notification. */
     const fixture = new CallFixture()
-    /** Only this actual caller signal authorizes a post-write cancellation subscription. */
+    /** The caller signal controls sending only until physical completion. */
     const controller = new AbortController()
     await expect(
       fixture.table.invoke(
@@ -322,18 +322,11 @@ describe('CallTable owner transitions (public Namespace migration is tracked sep
         { signal: controller.signal }
       )
     ).resolves.toBeUndefined()
-    /** The original call identity must be echoed by the cancellation. */
+    /** No terminal or later cancellation may replace the physically sent call. */
     const call = fixture.frames[0]!
     controller.abort(new RangeError('fixture later abort'))
     await fixture.flush()
-    expect(fixture.frames).toHaveLength(2)
-    expect(fixture.frames[1]).toMatchObject({
-      kind: RpcWireKind.cancel,
-      id: call.id,
-      task: call.task
-    })
-    expect(fixture.frames[1]).not.toHaveProperty('payload')
-    expect(fixture.frames[1]).not.toHaveProperty('options')
+    expect(fixture.frames).toEqual([call])
   })
 
   it('a legitimate notify terminal removes its post-write cancel authority', async () => {
@@ -344,7 +337,7 @@ describe('CallTable owner transitions (public Namespace migration is tracked sep
     await fixture.table.invoke(
       fixture.target,
       { mode: 'notify', method: 'work' },
-      { signal: controller.signal }
+      { signal: controller.signal, orderKey: 'ordered-notify' }
     )
     expect(fixture.table.accept('carrier-1', fixture.reply(fixture.frames[0]!))).toBe(true)
     controller.abort(new Error('fixture late abort'))

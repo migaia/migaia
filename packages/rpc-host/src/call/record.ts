@@ -17,6 +17,7 @@ import {
 import { deferred, type IAbortSignal } from '@migaia/utils/promise'
 import {
   RpcCallMode,
+  RpcWireKind,
   type IRpcEnvelope,
   type IRpcRoute,
   type IRpcTask
@@ -72,7 +73,7 @@ export class CallRecord {
   readonly #beforeStart: boolean
   /** Forwarded notifications already have a real terminal; their internal caller owns that lifetime. */
   readonly #terminalNotify: boolean
-  /** Only an actual caller signal may survive physical notification settlement. */
+  /** Only before-start, ordered or forwarded notify may retain caller cancellation after sending. */
   readonly #callerSignal: IAbortSignal | undefined
   /** Every successfully acquired listener has exactly one removal receipt. */
   readonly #registrations = new Map<IAbortSignal, IAbortRegistration>()
@@ -114,7 +115,13 @@ export class CallRecord {
     this.task = frame.task
     this.route = frame.route
     this.#beforeStart = beforeStart
-    this.#callerSignal = frame.task.mode === RpcCallMode.notify ? callerSignal : undefined
+    this.#callerSignal =
+      frame.task.mode === RpcCallMode.notify &&
+      (beforeStart ||
+        terminalNotify ||
+        (frame.kind === RpcWireKind.call && frame.options.orderKey !== undefined))
+        ? callerSignal
+        : undefined
     this.#terminalNotify = terminalNotify
   }
 
@@ -243,7 +250,7 @@ export class CallRecord {
     this.#settle(false, error)
   }
 
-  /** Physical notify completion keeps only the caller's compact cancellation subscription. */
+  /** Ordinary notify finishes at physical completion; special modes keep their cancellation route. */
   #writeComplete(): void {
     if (this.#terminal || this.task.mode !== RpcCallMode.notify || this.#terminalNotify) return
     this.#publicDone = true

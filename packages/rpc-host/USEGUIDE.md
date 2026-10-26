@@ -35,7 +35,7 @@ export function exposeWork(host: IRpcHost) {
 }
 ```
 
-调用方通过 `options.signal` 取消，处理方读取自己的 `context.signal`。示例 `wait` 等待取消；实际任务应在自己的 finally 中释放资源。取消不回滚已执行副作用，也不自动终止进程。单向调用发送完成后，其 signal 仍可向下游传递取消。
+调用方通过 `options.signal` 取消，处理方读取自己的 `context.signal`。示例 `wait` 等待取消；实际任务应在自己的 finally 中释放资源。取消不回滚已执行副作用，也不自动终止进程。需要可取消、可知道何时完成的远程动作，请使用 `request`。
 
 ## 选择目标并消费流
 
@@ -292,7 +292,7 @@ export async function sendUpdates(host: IRpcHost<IApi>) {
 }
 ```
 
-`notify` 的 Promise 只表示物理发送，不表示业务确认。`dispatch(target, method, payload, options)` 同步返回 `void`，失败交给原 reporter。每个目标按顺序执行自己的 group，没有跨目标事务。
+`notify` 的 Promise 只表示物理发送，不表示业务确认。普通 `notify`（没有 `cancel: 'before-start'`、没有 `orderKey`，且非转发）发送完成后解除调用方 signal 监听；之后 abort 不再发送远端取消。`dispatch(target, method, payload, options)` 同步返回 `void`，失败交给原 reporter。每个目标按顺序执行自己的 group，没有跨目标事务。
 
 安装 `idempotency()` 信息流 Feature 后，才有 `host.<ns>.outcome(key)` 查询保留的结果。省略时不启用按幂等键保存和查询结果的存储。auth 的请求 ID 去重与它独立，三种保留方式见[认证说明](#认证签名与重复请求)。推荐安装 `limits()`；不安装就不启用相应并发、速率或 payload 配额。
 

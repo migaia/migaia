@@ -35,7 +35,7 @@ export function exposeWork(host: IRpcHost) {
 }
 ```
 
-Callers cancel with `options.signal`; providers receive their own `context.signal`. The example deliberately waits for cancellation. Real tasks release their own resources in finally. Cancellation neither rolls back side effects nor automatically terminates a process. A one-way call can still propagate cancellation after physical sending completes.
+Callers cancel with `options.signal`; providers receive their own `context.signal`. The example deliberately waits for cancellation. Real tasks release their own resources in finally. Cancellation neither rolls back side effects nor automatically terminates a process. Use `request` for remote actions that need cancellation and completion acknowledgement.
 
 ## Select targets and consume streams
 
@@ -292,7 +292,7 @@ export async function sendUpdates(host: IRpcHost<IApi>) {
 }
 ```
 
-A `notify` Promise means physical sending completed, without business acknowledgement. `dispatch(target, method, payload, options)` returns `void` synchronously and reports failures. Each target executes its own ordered group; there is no cross-target transaction.
+A `notify` Promise means physical sending completed, without business acknowledgement. An ordinary `notify` with no `cancel: 'before-start'`, no `orderKey`, and no forwarding removes its caller-signal listener after sending; later aborts send no remote cancellation. `dispatch(target, method, payload, options)` returns `void` synchronously and reports failures. Each target executes its own ordered group; there is no cross-target transaction.
 
 Install the `idempotency()` flow Feature to add `host.<ns>.outcome(key)` for retained results. Omitting it enables no store for retaining and querying results by idempotency key. Auth request-ID deduplication is independent; see the [authentication section](#authentication-signing-and-duplicate-requests) for its three retention modes. Installing `limits()` is recommended; omitting it enables no corresponding concurrency, rate, or payload quotas.
 
