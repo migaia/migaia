@@ -2,6 +2,34 @@ import { MessageChannel } from 'node:worker_threads'
 import { expect, it } from 'vitest'
 import { createWebThreadLauncher } from '../../dist/threads/web-launcher.js'
 
+it('tags native Worker construction failure without replacing its type or identity', async () => {
+  /** Constructor injection is the existing native launcher seam; no Worker is acquired here. */
+  const original = new TypeError('native Worker construction rejected')
+  /** A failed constructor publishes no native resource for rollback to terminate. */
+  class RejectedWorker extends EventTarget {
+    /** Throw the same native-family failure before the launcher can install any IO listener. */
+    constructor() {
+      super()
+      throw original
+    }
+    /** The Worker shape is never reached after failed native construction. */
+    postMessage(): void {}
+    /** No resource is constructed, so this operation must remain unreachable. */
+    terminate(): void {}
+  }
+  /** The production launcher owns error classification at its actual constructor call. */
+  const launcher = createWebThreadLauncher({ Worker: RejectedWorker, report: () => undefined })
+  await expect(
+    launcher.launch(
+      { entry: new URL(import.meta.url).href },
+      { signal: new AbortController().signal }
+    )
+  ).rejects.toBe(original)
+  expect(original).toBeInstanceOf(TypeError)
+  expect(original).toMatchObject({ source: 'rpc.endpoint', code: 'INVALID_CONFIG' })
+  expect(original.stack).toBeTruthy()
+})
+
 it('rolls back the actual acquired Worker when its first physical write fails', async () => {
   /** The native I/O failure must remain the same primary exception after rollback. */
   const original = new Error('audit initial Worker write failed')

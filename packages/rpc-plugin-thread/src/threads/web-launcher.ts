@@ -159,8 +159,17 @@ class WebThreadLauncher {
     const fingerprint = THREAD_FINGERPRINT_PREFIX + 'web-' + ++sequence
     /** Actual source facts are provided by the installed native transport. */
     const facts = readRpcLaunchFacts(context)
-    /** The acquired Worker is reclaimed if installing listeners or native initialization fails. */
-    const worker = new Constructor(entry, { type: 'module', name: spec.name })
+    /** Failed native construction has no acquired Worker for the rollback owner to terminate. */
+    let worker: IWebThreadWorker
+    try {
+      worker = new Constructor(entry, { type: 'module', name: spec.name })
+    } catch (error) {
+      throw identifyRpcBoundaryFailure(
+        error,
+        RpcCoreErrorCode.invalidConfig,
+        ThreadErrorText.workerOptionsInvalid
+      )
+    }
     /** Keep the acquired generation available for rollback after its carrier has been installed. */
     let generation: WebThreadGeneration | undefined
     try {
