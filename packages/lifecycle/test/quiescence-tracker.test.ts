@@ -34,6 +34,10 @@ describe('QuiescenceTracker: strict whenZero() vs non-exclusive whenZeroOnce()',
     const tracker = createStringLeaseRegistry()
     await tracker.whenZeroOnce('never-retained')
     expect(tracker.forget('never-retained')).toBe(false)
+    /** A completed unsealed string epoch also releases its strong Map entry. */
+    const release = tracker.retain('completed')
+    release()
+    expect(tracker.forget('completed')).toBe(false)
   })
 
   it('strict whenZero() resolves once the sealed key reaches zero, and rejects further retain()', async () => {
@@ -133,6 +137,26 @@ describe('QuiescenceTracker: object-keyed variant', () => {
     expect(tracker.count(key)).toBe(1)
     release()
     expect(tracker.count(key)).toBe(0)
+    expect(tracker.forget(key)).toBe(true)
+    expect(tracker.forget(key)).toBe(false)
+  })
+
+  it('keeps detached methods and both zero wait modes on the same original object state', async () => {
+    /** Class-backed ownership must preserve the previously receiver-independent public methods. */
+    const tracker = createQuiescenceTracker<object>()
+    const { retain, count, whenZero, whenZeroOnce, seal, isSealed, forget } = tracker
+    /** Strict and loose waits share one real retained operation and resolve only at its zero. */
+    const key = {}
+    const release = retain(key)
+    const loose = whenZeroOnce(key)
+    seal(key)
+    const strict = whenZero(key)
+    expect(isSealed(key)).toBe(true)
+    expect(forget(key)).toBe(false)
+    release()
+    await Promise.all([loose, strict])
+    expect(count(key)).toBe(0)
+    expect(forget(key)).toBe(true)
   })
 
   it('does not confuse two distinct object keys', () => {
