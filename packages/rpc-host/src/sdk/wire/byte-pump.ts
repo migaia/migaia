@@ -55,6 +55,8 @@ export class RpcBytePump {
   #closed = false
   /** The first reason is replayed unchanged to late close subscribers. */
   #terminal: unknown
+  /** Native cancellation may repeat a read failure already observed from the same stream. */
+  #readFailure: Readonly<{ error: unknown }> | undefined
   /** Reentrant and repeated close calls return the same actual cleanup Promise. */
   #closing: Promise<void> | undefined
   /** Detached methods preserve one stable resource identity for the carrier's native ownership. */
@@ -148,14 +150,30 @@ export class RpcBytePump {
       this.#ports.writer.abort(this.#terminal),
       Promise.resolve().then(this.#ports.closePhysical)
     ]).then((results) => {
-      for (const result of results)
-        if (result.status === 'rejected' && result.reason !== this.#terminal)
-          operation.errors.push(result.reason)
+      for (const [index, result] of results.entries()) {
+        if (result.status !== 'rejected' || result.reason === this.#terminal) continue
+        /** Cancel of an errored reader rethrows its original read failure, not a cleanup failure. */
+        const repeatedReadFailure =
+          index === 0 &&
+          this.#readFailure !== undefined &&
+          result.reason === this.#readFailure.error
+        if (!repeatedReadFailure) operation.errors.push(result.reason)
+      }
       if (operation.errors.length)
         operation.completion.reject(this.#ports.options.cleanupFailed(operation.errors))
       else operation.completion.resolve()
     })
     return this.#closing
+  }
+
+  /** Retain only native read failure identity so cancellation cannot count it a second time. */
+  async #read(): ReturnType<IRpcByteReader['read']> {
+    try {
+      return await this.#ports.reader.read()
+    } catch (error) {
+      this.#readFailure = { error }
+      throw error
+    }
   }
 
   /** Pause with no subscribers and deliver each original native read once in subscription order. */
@@ -170,7 +188,7 @@ export class RpcBytePump {
           continue
         }
         /** Only the native reader determines message boundaries and end-of-input. */
-        const next = await this.#ports.reader.read()
+        const next = await this.#read()
         if (next.done) {
           await this.#end()
           return
