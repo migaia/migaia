@@ -6,6 +6,28 @@ import { coreMemoryServer } from './core-fixture.js'
 import { idempotency } from '@migaia/rpc-host/plugins/idempotency'
 import { key, fanout, items, containsCause, nativeHosts } from './fanout-fixture.js'
 
+it.each([false, true])(
+  'honors an explicit native grant independently of other payload binary (binary=%s)',
+  async (withBinary) => {
+    /** Real MessagePorts prove detachment under the existing HMAC-authenticated public path. */
+    const pair = await nativeHosts({ note: () => 'accepted' })
+    /** Explicit transfer may hand off a backing independently from whether the receiver references it. */
+    const transferred = new ArrayBuffer(3)
+    /** This ungranted small backing belongs to signed-inline policy, not the explicit grant. */
+    const payload = withBinary ? Uint8Array.of(1) : undefined
+    try {
+      expect(
+        await pair.caller.native.send('native-1', 'note', payload, { transfer: [transferred] })
+      ).toBe('accepted')
+      expect(transferred.byteLength).toBe(0)
+    } finally {
+      await Promise.all([pair.caller.close(), pair.provider.close()])
+      pair.writes.mockRestore()
+      pair.replies.mockRestore()
+    }
+  }
+)
+
 it('context broadcasts retain each selected peer when another name equals its instanceId', async () => {
   /** A provider dispatches through the genuine business context and accepted namespace index. */
   const server = coreMemoryServer('notification-hub')

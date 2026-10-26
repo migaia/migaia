@@ -28,23 +28,3 @@ export function splitRpcPreparedMetadata(
     }
   return { message: value, sidecars }
 }
-
-/** Prune inlined manifest backings without changing transfer authority for unrelated codec output. */
-export function rpcPreparedTransfer(
-  transfer: readonly ArrayBuffer[] | undefined,
-  sidecars: readonly ArrayBuffer[] | undefined,
-  manifest?: IRpcPreparedMessage['manifest']
-): readonly ArrayBuffer[] | undefined {
-  if (!manifest || !transfer?.length) return transfer
-  /** Only this final physical backing set may retain an already granted native transfer. */
-  const native = new Set(sidecars)
-  /** A changed list copies its accepted prefix once, in the caller's exact original order. */
-  let selected: ArrayBuffer[] | undefined
-  for (let index = 0; index < transfer.length; index++) {
-    /** Preserve this exact caller-owned backing only when the final frame still carries it natively. */
-    const backing = transfer[index]!
-    if (native.has(backing)) selected?.push(backing)
-    else selected ??= transfer.slice(0, index)
-  }
-  return selected ?? transfer
-}

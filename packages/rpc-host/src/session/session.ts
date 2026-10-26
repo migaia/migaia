@@ -84,7 +84,6 @@ import {
   type IRpcDirectoryFingerprint
 } from './view.js'
 import { RpcSessionObservation } from '../sdk/carrier/observation.js'
-import { rpcPreparedTransfer } from '../sdk/carrier/prepared.js'
 import { portableBytes } from '../sdk/wire/portable-size.js'
 import { rpcPortableBackingLength } from '@migaia/rpc-contract/portable'
 import { isRpcCarrierAdmissionFailure } from '../sdk/carrier/admission.js'
@@ -1143,12 +1142,7 @@ export class Session {
       if (bootstrap) throw cause
       throw createRpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
     }
-    /**
-     * Inline signed backings cannot retain native transfer grants; batching receives the filtered
-     * list.
-     */
-    const transfer = rpcPreparedTransfer(options.transfer, encoded.sidecars, captured.manifest)
-    if (transfer !== options.transfer) options = { ...options, transfer }
+    /** Explicit grants retain native handoff even when the codec metadata does not reference them. */
     this.#observation.media(S.encoded, D.outbound, encoded.data, message, options.transfer)
     this.#assertOpen(continuing, final)
     /** A single logical reservation belongs to this whole run, including all native next branches. */
