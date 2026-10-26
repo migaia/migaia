@@ -382,6 +382,95 @@ await host.dispose()
 
 省略 pipelines 的旧泛型用法不需要新增轴。类入口则是 `PluginHost<TDomainCore, TValue, TInstalled, TPipelines>`，通过类构造选项传同一个映射，并从子类的领域方法调用 protected pipeline。
 
+## 高阶：插件声明自己的管道
+
+插件可以在 `definePlugin({ pipelines })` 里声明载荷、mode、next 和 order，不要求应用预先复制它的约定。Host 声明用原名访问，本插件的管道用短名，依赖插件的管道用 `插件名.管道名`。下面复用真实 Feature 依赖，既决定安装顺序，也推导提供方的限定名；不新增权限列表。
+
+```ts doc-test=check
+import { defineFeature, defineHost, definePlugin, pipelineSpec } from '@migaia/plugin-host'
+
+/** Own declarations infer this plugin's short names and payloads. */
+const transport = definePlugin({
+  name: 'transport',
+  pipelines: { envelope: pipelineSpec<{ text: string }>()({ mode: 'async' }) },
+  features: { ready: defineFeature(() => ({ ready: true })) },
+  install(core) {
+    core.pipeline('envelope').use(async (value, next) => next({ text: value.text.trim() }))
+    return {}
+  }
+})
+/** A real Feature reference supplies the existing provider dependency and qualified name. */
+const dependency = defineFeature(() => ({}), { provider: transport.getFeature('ready') })
+/** The dependent receives transport.envelope through inference, without copying its spec. */
+const consumer = definePlugin({
+  name: 'consumer',
+  features: { dependency },
+  install(core) {
+    core.pipeline('transport.envelope').use(async (value, next) => next({ text: `${value.text}!` }))
+    return {}
+  }
+})
+/** The installed-definition type supplies owner names; use still performs actual installation. */
+const host = defineHost<Record<never, never>, never, readonly [typeof transport]>({
+  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+})
+await host.use(transport, consumer)
+console.log(
+  await host.pipeline('transport.envelope').run({ text: ' hello ' }, (value) => value.text)
+)
+await host.unUse('transport', { policy: 'cascade' })
+await host.dispose()
+```
+
+输出 `hello!`。安装器保留 core 的推导，所以自己的 `envelope` 和依赖方的 `transport.envelope` 都有正确载荷类型。拥有自己管道的插件应保留 core 推导，避免只含 Host 声明的注解遮掉短名；`IPluginHostCoreFor<typeof host>` 仍适用于上方只使用 Host 声明的示例。Host 的已安装定义类型轴只提供类型，实际安装仍由 `await host.use(...)` 完成。
+
+插件及其 Feature 共享该插件的可见范围。插件不能覆盖 Host 的同名管道；无依赖关系的查询以 `PIPELINE_UNKNOWN` 拒绝，诊断包含调用方、请求名和可见范围。插件组在安装事务里创建，失败回滚，卸载按原预算排空后删除。
+
+## 高阶：用 through 组合管道
+
+把 target 嵌入 source 后，target 的终点就是 source 的剩余步骤和原终点。它可以修改值或短路，也可以在 `await next(...)` 之后处理余下链路的结果。
+
+```ts doc-test=check
+import { defineHost, definePlugin, pipelineSpec } from '@migaia/plugin-host'
+
+/** Matching declarations infer both registration handles from this original definition. */
+const bridge = definePlugin({
+  name: 'bridge',
+  pipelines: {
+    source: pipelineSpec<{ count: number }>()({ mode: 'async' }),
+    target: pipelineSpec<{ count: number }>()({ mode: 'async' })
+  },
+  install(core) {
+    /** The target terminal resumes the remaining source stages and original terminal. */
+    const link = core.pipeline('source').through('target')
+    core.pipeline('source').use(async (value, next) => next({ count: value.count + 1 }))
+    core.pipeline('target').use(async (value, next) => {
+      /** This is the actual source suffix result, available after its completion. */
+      const result = await next({ count: value.count * 2 })
+      console.log(result)
+    })
+    return { removeLink: () => link.remove() }
+  }
+})
+/** Execution remains with the owner of this actual Host. */
+const host = defineHost<Record<never, never>, never, readonly [typeof bridge]>({
+  host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+})
+/** Only this original registration owns the removable link. */
+const [installed] = await host.use(bridge)
+console.log(
+  await host.pipeline('bridge.source').run({ count: 1 }, async (value) => value.count * 10)
+)
+installed.extensions.removeLink()
+installed.extensions.removeLink()
+await host.unUse('bridge')
+await host.dispose()
+```
+
+这里 target 先把一乘二，source 的剩余步骤再加一，原终点乘十。target 的 next 和 owner 的 run 都得到 `30`。`remove()` 幂等，只撤回这次登记；插件卸载会自动撤回自己的链接和 stage。已在运行的快照继续按原生命周期排空。
+
+两条管道须有相同载荷类型和 mode。mode 不同以 `PIPELINE_MODE_MISMATCH` 拒绝；target 是 multiple 而 source 不是，或登记产生环时，以 `INVALID_PIPELINE_OPTION` 拒绝，环只在登记时检查。空 target 直接调用 source 的 next，不取 target 快照或 lease。`use` 仍只接收 stage，不接收字符串或管道对象。through 属于插件和 Feature 的登记入口，Host owner 仍用 use/run；完整规则见下方契约细节。
+
 ## 契约细节
 
 ### 定位、入口与类型轴
@@ -436,6 +525,7 @@ surface 的自有描述符在获取 Runtime 之前读取一次，访问器保持
 | `name`、`install(core, setupOutput?)`                             | 必填；install 返回 plain extension record 或 PromiseLike |
 | `config`                                                          | 可选；无配置时使用空记录，捕获为宿主拥有的冻结快照       |
 | `features`、`featureExpose`                                       | 可选；声明 Feature 根及其可见能力                        |
+| `pipelines`                                                       | 可选；插件拥有的管道约定，见下方高阶命名管道契约。       |
 | `setup(context)`                                                  | 可选，仅对象形；安装前准备，输出保留原身份               |
 | `activation`                                                      | 默认 `'eager'`；另一值为 `'lazy'`                        |
 | `update(next, core)`                                              | 可选；成功才提交配置，返回值不作为配置                   |
@@ -453,7 +543,7 @@ extension 必须是普通对象。仅可枚举且 configurable 的 data property
 
 ### 插件 core、setup 与资源归属
 
-安装与更新 core 包含领域能力，以及 `config.get()`、`operation`、`lifecycle`、`features`、`featureExpose`、`onDispose(resource)` 、`pipeline(name)` 和四个 `use*Pipeline(stage)`。config 返回已提交的递归只读快照；operation 提供当前操作 `signal` 与绝对 `deadlineAt`，lifecycle 提供注册代际的 signal。stage 注册方法返回同一 core，只允许安装窗口使用，且受模式兼容约束。
+安装与更新 core 包含领域能力，以及 `config.get()`、`operation`、`lifecycle`、`features`、`featureExpose`、`onDispose(resource)` 、`pipeline(name)` 和四个 `use*Pipeline(stage)`。config 返回已提交的递归只读快照；operation 提供当前操作 `signal` 与绝对 `deadlineAt`，lifecycle 提供注册代际的 signal。四个 use*Pipeline 方法仍返回 core；命名管道的 use/through 返回带幂等 remove() 的登记句柄。登记只允许安装窗口使用，且受模式兼容约束。
 
 `core.onDispose` 只在安装窗口接管资源；窗口外抛 `RESOURCE_OUTSIDE_INSTALL`，不会接管或释放新传入的资源，调用方仍负责它。资源可为清理函数、同步 disposable 或异步 disposable，PromiseLike 结果由生命周期 owner 同化。同步安装也能登记异步 disposer。
 
@@ -505,7 +595,7 @@ use、unUse、config.update 等变更共享 lifecycle 的 FIFO mutation 队列�
 
 ### 命名管道：类型、权限与生命周期
 
-在函数入口的顶层 `pipelines`，或类构造选项的 `pipelines`，声明一个固定的“名字 → `pipelineSpec<TPayload>()(config)`”映射。每条管道独立推断载荷和 mode；名字是非空的自有可枚举字符串键，值必须来自真实 `pipelineSpec`，不能用结构相同的普通对象替代。说明对象被冻结；构造后不再增删管道。
+在函数入口的顶层 `pipelines`，或类构造选项的 `pipelines`，声明一个固定的“名字 → `pipelineSpec<TPayload>()(config)`”映射。每条管道独立推断载荷和 mode；名字是非空的自有可枚举字符串键，值必须来自真实 `pipelineSpec`，不能用结构相同的普通对象替代。说明对象被冻结；Host 的声明在构造时固定；插件也可在 `definePlugin({ pipelines })` 声明自己的组，随安装创建、失败回滚、卸载按原预算排空后删除。插件不能覆盖 Host 的同名管道，冲突以 `INVALID_PIPELINE_OPTION` 拒绝。
 
 | config 字段 | 默认        | 取值与作用                                                                            |
 | ----------- | ----------- | ------------------------------------------------------------------------------------- |
@@ -513,19 +603,27 @@ use、unUse、config.update 等变更共享 lifecycle 的 FIFO mutation 队列�
 | `next`      | `'single'`  | `'single'` 或 `'multiple'`；直接采用 middleware-pipeline 的四模式继续及失败规则。     |
 | `order`     | `'install'` | `'install'` 按分配顺序，`'reverse'` 按其逆序；同一插件在所有管道共享原排序 slot。     |
 
-持有函数 handle 的 owner 调用 `host.pipeline(name).use(stage)` 或 `.run(value, done)`；类 owner 使用 protected `pipeline(name)`。安装中的插件 core 只得到 `core.pipeline(name).use(stage)`，没有 run 执行权；用 `IPluginHostCoreFor<typeof host>` 派生该 core 类型，无需重复编写载荷映射。未声明的名字在类型检查时拒绝；绕过类型检查时同步抛 `PIPELINE_UNKNOWN`。
+持有函数 handle 的 owner 调用 `host.pipeline(name).use(stage)` 或 `.run(value, done)`；类 owner 使用 protected `pipeline(name)`。安装中的插件和 Feature core 只有 `use(stage)`、`through(name)` 登记权，没有 run。两种命名登记都返回带幂等 `remove()` 的句柄；移除影响后续运行，已取得的快照仍由原生命周期排空。
 
-sync、generator 的命名 run 返回 `TResult | undefined`；async、async-generator 返回 `Promise<Awaited<TResult> | undefined>`。短路返回 undefined，每次到达末端的遍历各调用一次 done。multiple 不返回结果数组；需要每次结果时，在 done 中明确收集。async 分支错误在被 next 的 then/await 观察后由 stage 处理；未观察的失败仍由 runner 拒绝，多个原错按启动顺序保留在 `MULTIPLE_DOWNSTREAM_FAILED` 中。generator 用 throw 把失败交回 yield；sync 遍历全部登记值后汇总错误。
+插件和它的 Feature 用原名访问 Host 管道、用短名访问自己的管道，并通过既有 Feature 依赖用 `插件名.管道名` 访问提供方的组。无依赖关系的插件不能访问别人的组。`IPluginHostCoreFor<typeof host>` 适合仅使用 Host 声明的 core；声明插件自己的管道时，保留 install 参数的推导，避免 Host-only 注解遮掉自己的短名。未知或不可见名字同步抛 `PIPELINE_UNKNOWN`；诊断包含查询的插件或 Feature、请求名和可见的 Host、本插件、依赖插件范围。
+
+sync、generator 的命名 run 返回 `TResult | undefined`；async、async-generator 返回 `Promise<Awaited<TResult> | undefined>`。短路返回 undefined，每次到达末端的遍历各调用一次 done。multiple 不返回结果数组；需要每次结果时，在 done 中明确收集。multiple 模式下，stage 可以处理经 next 的 then/await 观察到的分支失败；未观察的失败仍由 runner 拒绝，多个原错按启动顺序保留在 `MULTIPLE_DOWNSTREAM_FAILED` 中。generator 用 throw 把失败交回 yield；sync 遍历全部登记值后汇总错误。
 
 所有管道在同一 Host 事务中提交；每条管道在同一可见 stage 修订内复用编译快照，reverse 也只在编译时处理。没有可见 stage 时直接调用终点，不取快照或 lease。有 stage 时，所有管道复用同一套登记、排序和 quiescence/lease owner。安装失败回滚、unUse、replace、禁用和挂起在一次提交中作用于该插件的全部管道；已有运行持有原快照和分管道的代际 lease，drain 等待这些实际运行，清理和排空预算仍由既有生命周期配置控制。任何管道执行期间，owner 向任一管道注册 stage 都会抛 `PIPELINE_EXECUTING`。
 
-不传 pipelines 时，命名类型轴默认为 `Record<never, never>`，没有额外命名 runner、lane 或 lease key。原 `TValue`、`pipeline.mode`、四个 use*Pipeline、runPipeline/runPipelineSync/runPipelineAsync、pipelineMode 都只操作默认管道，原有显式泛型调用不变。默认管道使用内部 symbol，不占用任何字符串名字。显式填写 defineHost 泛型并同时声明命名管道时，要在第五个泛型参数传 `typeof pipelines`；省略它会保留空轴，pipeline(name) 只接受 never。
+Host 未声明 pipelines 时，其命名轴默认为 `Record<never, never>`；已知插件定义仍能推出其限定名。Host 和插件都没有命名组时，不分配额外的命名 runner、lane 或 lease key。原 `TValue`、`pipeline.mode`、四个 use*Pipeline、runPipeline/runPipelineSync/runPipelineAsync、pipelineMode 都只操作默认管道，原有显式泛型调用不变。默认管道使用内部 symbol，不占用任何字符串名字。显式填写 defineHost 泛型并同时声明命名管道时，要在第五个泛型参数传 `typeof pipelines`；省略它会保留空轴，pipeline(name) 只接受 never。
 
 非法 map、名字、spec、order 以原生 TypeError / `INVALID_PIPELINE_OPTION` 在构造时拒绝，不返回 handle；mode 非法仍是 `INVALID_PIPELINE_MODE`。next 非法的外层码为 `INVALID_PIPELINE_OPTION`，cause 保留 middleware-pipeline 的 TypeError / `INVALID_OPTION`。spec 配置 getter 抛错时也以 `INVALID_PIPELINE_OPTION` 保留原 cause。
 
+### 高阶：through 组合
+
+`core.pipeline('y').through('z')` 在 y 的这个位置进入 z，z 的终点就是 y 剩余的步骤和原终点。z 可以改写同一载荷、短路，也可以在 async stage 的 `await next(value)` 后处理余下链路的结果。目标自己的 order 仍然有效。
+
+两条管道的载荷类型和 mode 必须相同。mode 不同以 `PIPELINE_MODE_MISMATCH` 拒绝；目标允许 multiple 而来源不允许，或登记产生环时，以 `INVALID_PIPELINE_OPTION` 拒绝。环只在登记时检查。空目标直接调用来源的 next，不取目标快照或 lease。through 返回的登记句柄支持幂等 `remove()`，属于发起登记的插件，卸载时一起撤回。`use` 仍只接收 stage，不接收字符串或管道对象；Host owner 的入口仍是 use/run。
+
 ### Pipeline：模式、快照与取消
 
-Host 侧四个注册方法返回 this，插件 core 的同名方法返回 core。兼容关系如下，不能提升时同步抛 PIPELINE_MODE_MISMATCH，cause 保留上游 middleware-pipeline TypeError / INVALID_OPTION：
+以下四个 use*Pipeline 方法在 Host 侧返回 this，在插件 core 上返回 core；命名 use/through 则返回登记句柄。兼容关系如下，不能提升时同步抛 PIPELINE_MODE_MISMATCH，cause 保留上游 middleware-pipeline TypeError / INVALID_OPTION：
 
 | 注册方法                           | 允许的 Host mode                           |
 | ---------------------------------- | ------------------------------------------ |
@@ -580,55 +678,55 @@ diagnostic 的第三参数保留原失败身份；诊断回调自身失败不会
 
 `PluginHostDisposalNodeKind` 区分清理错误、聚合及 disposer 包装；`readPluginHostDisposalProvenance(error)` 只读取本物理包登记的追溯信息，未知错误或重复包副本返回 undefined，不按形状猜测。它用于诊断，不替代 source/code/cause 分类。
 
-| code                               | 含义与处置                                                                                        |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `HOST_DISPOSED`                    | 宿主已终态，创建新 Host，不能复用。                                                               |
-| `HOST_DISPOSING`                   | 宿主正在关闭，不能开始新变更。                                                                    |
-| `PLUGIN_DUPLICATE`                 | 同一名称已占用或在批次中重复。                                                                    |
-| `PLUGIN_NOT_INSTALLED`             | 目标名称不存在，或句柄已无对应安装。                                                              |
-| `PLUGIN_DISABLED`                  | 插件禁用中，先恢复再调用。                                                                        |
-| `PLUGIN_SUSPENDED`                 | 必需 provider 不可用使插件挂起，先恢复依赖。                                                      |
-| `PLUGIN_NOT_ACTIVATED`             | lazy 插件未激活，先 await activate。                                                              |
-| `FEATURE_NOT_DECLARED`             | 请求了未声明的 Feature 名称。                                                                     |
-| `PREREQUISITE_MISSING`             | 必需 provider 从未安装，安装前直接拒绝。                                                          |
-| `PREREQUISITE_DISABLED`            | 必需 provider 已禁用，启用后重试。                                                                |
-| `PREREQUISITE_REMOVED`             | 必需 provider 已卸载，需要重新安装。                                                              |
-| `DEPENDENCY_CYCLE`                 | Feature 跨插件引用成环，任何 install 前拒绝。                                                     |
-| `DEPENDENCY_BLOCKED`               | 变更会遗留必需依赖者，detail.blockedBy 列出传递闭包。                                             |
-| `REPLACE_NAME_MISMATCH`            | 替换候选名称不同，未安装候选。                                                                    |
-| `DEPENDENT_RESTART_FAILED`         | 新 provider 已提交但依赖者重装失败，cause.errors 首项为重装失败。                                 |
-| `PLUGIN_DEFINITION_INVALID`        | 退役或不支持的定义字段、非法依赖或非 canonical core，保留 TypeError。                             |
-| `PLUGIN_INSTALL_FAILED`            | 安装/发布失败，原错在 cause，回滚详情保留次错。                                                   |
-| `SETUP_REQUIRES_ASYNC_INSTALL`     | 即时 useSync 安装遇到 setup，改用异步 use。                                                       |
-| `PLUGIN_INSTALL_ROLLBACK_FAILED`   | 仅诊断：回滚也失败，不替换原安装主错。                                                            |
-| `INSTALL_RESULT_THENABLE`          | install 结果自带 then，或同步路径得到异步结果，不发布此扩展。                                     |
-| `PLUGIN_DISPOSE_FAILED`            | beforeRelease 或插件释放步骤失败，cause 保留原错，其余清理继续。                                  |
-| `EXTENSION_DUPLICATE`              | 扩展键已占用，Host 保留键优先分类为 EXTENSION_RESERVED。                                          |
-| `EXTENSION_OBJECT_PROTOTYPE`       | 扩展键命中 Object.prototype。                                                                     |
-| `EXTENSION_RESERVED`               | 扩展使用 Host 协议键、then 或清理 symbol。                                                        |
-| `EXTENSION_NON_ENUMERABLE_IGNORED` | 仅诊断：有意忽略非枚举扩展键。                                                                    |
-| `RESOURCE_OUTSIDE_INSTALL`         | core 在安装窗口外拒绝且不接管；setup 关闭后的有效资源先释放再拒绝。                               |
-| `LIFECYCLE_MUTATION`               | 生命周期同步重入，或 setup / beforeRelease 等待期发起变更，不能执行。                             |
-| `INVALID_PIPELINE_MODE`            | 构造时 mode 非四种合法值。                                                                        |
-| `INVALID_PIPELINE_OPTION`          | 命名 map、名字、spec、next 或 order 非法；构造时同步抛原生 TypeError，已有上游失败由 cause 保留。 |
-| `PIPELINE_UNKNOWN`                 | 查询的名字没有声明；修正查询或构造时的映射。                                                      |
-| `ASYNC_STAGE_IN_SYNC_ENTRY`        | 默认同步入口遇到可见 async stage；任何 stage 或终点执行前拒绝。                                   |
-| `PIPELINE_MODE_MISMATCH`           | stage 无法提升到 Host 模式，cause 保留上游 TypeError。                                            |
-| `PIPELINE_NEXT_DUPLICATE`          | 同次 stage 重复调用 next，不重复派发。                                                            |
-| `PIPELINE_NEXT_LATE`               | 仅诊断：stage 已结束后调用 next，忽略此调用。                                                     |
-| `PIPELINE_EXECUTING`               | 管线执行期间注册新 stage。                                                                        |
-| `PIPELINE_FAILED`                  | async 双失败，AggregateError.errors 固定为 stage、downstream。                                    |
-| `MUTATION_QUEUE_TIMEOUT`           | 已配置准入期限且排队到限，任务移出并不再执行。                                                    |
-| `DISPOSE_STEP_TIMEOUT`             | beforeRelease 或普通释放步骤超预算，结束等待并继续清理，不强行取消。                              |
-| `INVALID_OPTION`                   | 入参形状不合法，保留原生 TypeError，修正输入。                                                    |
-| `INVALID_CONFIG_VALUE`             | 配置不满足普通数据语法，detail 含 path/reason。                                                   |
-| `CONFIG_CYCLE_REJECTED`            | 配置含引用环，提供无环值图。                                                                      |
-| `CALLBACK_FAILED`                  | 未分类配置、surface 读取或 defineHost disposal 回调失败；保留原错或 cause。                       |
-| `MUTATION_EXECUTION_TIMEOUT`       | hook 执行到限，丧失提交权限，迟到结果不能提交。                                                   |
-| `REGISTRATION_REVOKED`             | 已取出的扩展属于已卸载或替换的旧注册。                                                            |
-| `PIPELINE_DRAIN_TIMEOUT`           | 普通卸载排空超预算，ok false，继续有界清理并诊断。                                                |
-| `CLEANUP_INCOMPLETE`               | 逻辑关闭已提交，清理有错或仍未完成；读取结果与 continuation。                                     |
-| `COMPOSITION_TARGET_UNMANAGED`     | 组合目标非本物理包登记的 Host，不做结构兼容。                                                     |
+| code                               | 含义与处置                                                                    |
+| ---------------------------------- | ----------------------------------------------------------------------------- |
+| `HOST_DISPOSED`                    | 宿主已终态，创建新 Host，不能复用。                                           |
+| `HOST_DISPOSING`                   | 宿主正在关闭，不能开始新变更。                                                |
+| `PLUGIN_DUPLICATE`                 | 同一名称已占用或在批次中重复。                                                |
+| `PLUGIN_NOT_INSTALLED`             | 目标名称不存在，或句柄已无对应安装。                                          |
+| `PLUGIN_DISABLED`                  | 插件禁用中，先恢复再调用。                                                    |
+| `PLUGIN_SUSPENDED`                 | 必需 provider 不可用使插件挂起，先恢复依赖。                                  |
+| `PLUGIN_NOT_ACTIVATED`             | lazy 插件未激活，先 await activate。                                          |
+| `FEATURE_NOT_DECLARED`             | 请求了未声明的 Feature 名称。                                                 |
+| `PREREQUISITE_MISSING`             | 必需 provider 从未安装，安装前直接拒绝。                                      |
+| `PREREQUISITE_DISABLED`            | 必需 provider 已禁用，启用后重试。                                            |
+| `PREREQUISITE_REMOVED`             | 必需 provider 已卸载，需要重新安装。                                          |
+| `DEPENDENCY_CYCLE`                 | Feature 跨插件引用成环，任何 install 前拒绝。                                 |
+| `DEPENDENCY_BLOCKED`               | 变更会遗留必需依赖者，detail.blockedBy 列出传递闭包。                         |
+| `REPLACE_NAME_MISMATCH`            | 替换候选名称不同，未安装候选。                                                |
+| `DEPENDENT_RESTART_FAILED`         | 新 provider 已提交但依赖者重装失败，cause.errors 首项为重装失败。             |
+| `PLUGIN_DEFINITION_INVALID`        | 退役或不支持的定义字段、非法依赖或非 canonical core，保留 TypeError。         |
+| `PLUGIN_INSTALL_FAILED`            | 安装/发布失败，原错在 cause，回滚详情保留次错。                               |
+| `SETUP_REQUIRES_ASYNC_INSTALL`     | 即时 useSync 安装遇到 setup，改用异步 use。                                   |
+| `PLUGIN_INSTALL_ROLLBACK_FAILED`   | 仅诊断：回滚也失败，不替换原安装主错。                                        |
+| `INSTALL_RESULT_THENABLE`          | install 结果自带 then，或同步路径得到异步结果，不发布此扩展。                 |
+| `PLUGIN_DISPOSE_FAILED`            | beforeRelease 或插件释放步骤失败，cause 保留原错，其余清理继续。              |
+| `EXTENSION_DUPLICATE`              | 扩展键已占用，Host 保留键优先分类为 EXTENSION_RESERVED。                      |
+| `EXTENSION_OBJECT_PROTOTYPE`       | 扩展键命中 Object.prototype。                                                 |
+| `EXTENSION_RESERVED`               | 扩展使用 Host 协议键、then 或清理 symbol。                                    |
+| `EXTENSION_NON_ENUMERABLE_IGNORED` | 仅诊断：有意忽略非枚举扩展键。                                                |
+| `RESOURCE_OUTSIDE_INSTALL`         | core 在安装窗口外拒绝且不接管；setup 关闭后的有效资源先释放再拒绝。           |
+| `LIFECYCLE_MUTATION`               | 生命周期同步重入，或 setup / beforeRelease 等待期发起变更，不能执行。         |
+| `INVALID_PIPELINE_MODE`            | 构造时 mode 非四种合法值。                                                    |
+| `INVALID_PIPELINE_OPTION`          | 声明非法、插件覆盖 Host 名字、through 的 next 不兼容或成环；保留已有 cause。  |
+| `PIPELINE_UNKNOWN`                 | 名字未声明或对当前注册不可见；诊断包含调用方与可见范围。                      |
+| `ASYNC_STAGE_IN_SYNC_ENTRY`        | 默认同步入口遇到可见 async stage；任何 stage 或终点执行前拒绝。               |
+| `PIPELINE_MODE_MISMATCH`           | stage 无法提升，或 through 的两条管道 mode 不同；提升失败保留上游 TypeError。 |
+| `PIPELINE_NEXT_DUPLICATE`          | 同次 stage 重复调用 next，不重复派发。                                        |
+| `PIPELINE_NEXT_LATE`               | 仅诊断：stage 已结束后调用 next，忽略此调用。                                 |
+| `PIPELINE_EXECUTING`               | 管线执行期间注册新 stage。                                                    |
+| `PIPELINE_FAILED`                  | async 双失败，AggregateError.errors 固定为 stage、downstream。                |
+| `MUTATION_QUEUE_TIMEOUT`           | 已配置准入期限且排队到限，任务移出并不再执行。                                |
+| `DISPOSE_STEP_TIMEOUT`             | beforeRelease 或普通释放步骤超预算，结束等待并继续清理，不强行取消。          |
+| `INVALID_OPTION`                   | 入参形状不合法，保留原生 TypeError，修正输入。                                |
+| `INVALID_CONFIG_VALUE`             | 配置不满足普通数据语法，detail 含 path/reason。                               |
+| `CONFIG_CYCLE_REJECTED`            | 配置含引用环，提供无环值图。                                                  |
+| `CALLBACK_FAILED`                  | 未分类配置、surface 读取或 defineHost disposal 回调失败；保留原错或 cause。   |
+| `MUTATION_EXECUTION_TIMEOUT`       | hook 执行到限，丧失提交权限，迟到结果不能提交。                               |
+| `REGISTRATION_REVOKED`             | 已取出的扩展属于已卸载或替换的旧注册。                                        |
+| `PIPELINE_DRAIN_TIMEOUT`           | 普通卸载排空超预算，ok false，继续有界清理并诊断。                            |
+| `CLEANUP_INCOMPLETE`               | 逻辑关闭已提交，清理有错或仍未完成；读取结果与 continuation。                 |
+| `COMPOSITION_TARGET_UNMANAGED`     | 组合目标非本物理包登记的 Host，不做结构兼容。                                 |
 
 ### 支持环境与维护
 
