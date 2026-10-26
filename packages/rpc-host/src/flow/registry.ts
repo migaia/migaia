@@ -9,6 +9,7 @@ import type { IRpcFlowEntry } from '../sdk/metadata.js'
 import {
   RpcFlowPoint,
   RpcFlowLayer,
+  RpcFlowPipelines,
   rpcHostPipelines,
   rpcFlowPipelineKey,
   type IRpcFlowCore,
@@ -94,7 +95,6 @@ export class FlowRegistry {
   /** A failed first native batch may retry before any transport has committed traffic. */
   reopenBeforeStartup(): void {
     this.#started = false
-    this.#scopes.clear()
   }
 
   /** Freeze registration at the original startup boundary without compiling an execution chain. */
@@ -167,11 +167,8 @@ export class FlowRegistry {
           : builtinPositions[entry.builtin]
       buckets[position]!.push((annotation ? annotation.stage : selected) as IRpcFlowStage<K>)
     }
-    /** Inbound native snapshots reverse all entries, so each bucket is registered in reverse too. */
-    const reverse =
-      point !== RpcFlowPoint.handshakeOutbound &&
-      point !== RpcFlowPoint.envelopeOutbound &&
-      point !== RpcFlowPoint.frameOutbound
+    /** The original inbound declaration fixes reversal; registration owns no second direction table. */
+    const reverse = RpcFlowPipelines[point].order === RpcFlowPipelines.handshakeInbound.order
     /** All entries use the same genuine native install core and pipeline registration path. */
     const pipeline = core.pipeline(rpcFlowPipelineKey(point, namespace))
     for (const bucket of buckets) {
