@@ -28,6 +28,7 @@ import { sameGeneration } from '../call/envelope.js'
 import { callTarget } from '../call/target.js'
 import { createRpcError } from '../host/error-owner.js'
 import {
+  admitLocalErrorWireRoute,
   registerLocalErrorWireRoute,
   registerLocalErrorWireSummary
 } from '../host/error-wire-metadata.js'
@@ -335,14 +336,17 @@ export class Forwarder {
       : (incomingMode ?? RpcCallMode.request)
     /** Admission and route observations precede the actual existing CallTable operation. */
     const local = this.#options(entry, context, source, options, envelope)
-    return this.#ports.call(
-      this.#select(entry),
-      {
-        mode,
-        method: entry.method,
-        ...(context.data === undefined ? {} : { payload: context.data as IRpcPortableValue })
-      },
-      local
+    return this.#result(
+      this.#ports.call(
+        this.#select(entry),
+        {
+          mode,
+          method: entry.method,
+          ...(context.data === undefined ? {} : { payload: context.data as IRpcPortableValue })
+        },
+        local
+      ),
+      local.forwardRoute!
     )
   }
 
@@ -359,14 +363,25 @@ export class Forwarder {
     const first = entries[0]!
     /** One group is one physical forward, regardless of its number of member methods. */
     const local = this.#options(first, context, source, options, envelope)
-    return (await this.#ports.call(
-      this.#select(first),
-      {
-        mode: RpcCallMode.group,
-        steps: steps.map((step, index) => ({ ...step, method: entries[index]!.method }))
-      },
-      local
+    return (await this.#result(
+      this.#ports.call(
+        this.#select(first),
+        {
+          mode: RpcCallMode.group,
+          steps: steps.map((step, index) => ({ ...step, method: entries[index]!.method }))
+        },
+        local
+      ),
+      local.forwardRoute!
     )) as IRpcPortableValue
+  }
+
+  /** A foreign leaf may omit reply routes; preserve its original error while filling that gap. */
+  #result(pending: Promise<unknown>, route: readonly string[]): Promise<unknown> {
+    return pending.catch((error: unknown) => {
+      if (error instanceof Error) admitLocalErrorWireRoute(error, route)
+      throw error
+    })
   }
 
   /** Streaming relays retain the sole downstream lazy iterator and single-credit owner. */

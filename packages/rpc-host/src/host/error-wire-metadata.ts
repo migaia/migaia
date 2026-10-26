@@ -30,6 +30,15 @@ export function localErrorWireRoute(error: unknown): readonly string[] | undefin
     : undefined
 }
 
+/** Downstream diagnostics take precedence; a missing route borrows this admitted hop once. */
+export function admitLocalErrorWireRoute(error: Error, route: readonly string[]): void {
+  if (localErrorWireRoute(error) !== undefined) return
+  /** Error diagnostics outlive the original frame without retaining its mutable route array. */
+  const snapshot = Object.freeze([...route])
+  Object.defineProperty(error, RpcWireField.route, { value: snapshot, enumerable: true })
+  registerLocalErrorWireRoute(error, snapshot)
+}
+
 /** Keep the original cause while selecting the same bounded wire presentation for this node. */
 export function registerLocalErrorWireSummary(
   error: Error,
@@ -110,11 +119,6 @@ export function deserializeHostWireError(value: unknown, admittedRoute?: readonl
   /** Native identity and the entire restored graph remain owned by the canonical deserializer. */
   const error = deserializeRpcWireError(value, hostErrorWireMetadata)
   /** A restored route already has its canonical descriptor and may exceed the upstream header. */
-  if (!routes.has(error) && admittedRoute !== undefined) {
-    /** Error diagnostics outlive the original frame, without retaining its mutable route array. */
-    const snapshot = Object.freeze([...admittedRoute])
-    Object.defineProperty(error, RpcWireField.route, { value: snapshot, enumerable: true })
-    registerLocalErrorWireRoute(error, snapshot)
-  }
+  if (admittedRoute !== undefined) admitLocalErrorWireRoute(error, admittedRoute)
   return error
 }
