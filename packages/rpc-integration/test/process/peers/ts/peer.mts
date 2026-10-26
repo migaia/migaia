@@ -208,7 +208,10 @@ class ForeignPeerSession {
   constructor(
     raw: IProcessByteChannel,
     token: string | undefined,
-    self = { name: 'ts-peer', instanceId: 'ts-peer' }
+    self: NonNullable<Parameters<typeof createRpcHost>[0]['self']> = {
+      name: 'ts-peer',
+      instanceId: 'ts-peer'
+    }
   ) {
     const write = raw.write
     const channel = {
@@ -246,7 +249,7 @@ class ForeignPeerSession {
   /** Count only successfully admitted public services. */
   async ready(): Promise<void> {
     const host = await this.opening
-    /** Independent peer methods are published through the same public dynamic directory owner. */
+    /** Independent peer methods are published outside the p-only contract whitelist. */
     host.provide({ echo: business.provide.echo!, peer: business.provide.peer! })
     this.#cleanup = { calls: 0, settled: 0, providerAborts: 0 }
     business.cleanups.push(this.#cleanup)
@@ -304,7 +307,7 @@ async function main(): Promise<void> {
       ],
       report
     })
-    /** The same independent business providers enter the real directory before readiness is printed. */
+    /** Independent methods retain the same explicit public registration after p is installed. */
     host.provide({ echo: business.provide.echo!, peer: business.provide.peer! })
     process.stderr.write(`${PeerText.ready}${process.pid}\n`)
     return

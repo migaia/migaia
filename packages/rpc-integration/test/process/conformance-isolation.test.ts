@@ -45,7 +45,12 @@ async function observedClient(token: string, address: string, scheduler?: ISched
     ...fixture.selected,
     supervision: { ...fixture.selected.supervision, ...(scheduler ? { scheduler } : {}) }
   }
-  const installed = await installBusinessClient(fixture, selected)
+  /** Each simultaneously admitted public Host has its own genuine name and instance identity. */
+  const identity = `caller-${randomUUID()}`
+  const installed = await installBusinessClient(fixture, selected, undefined, {
+    name: identity,
+    instanceId: identity
+  })
   return { ...fixture, ...installed, raw: fixture.rawChannels[0]! }
 }
 /** The same native acquisition path serves all original isolation socket callers. */
@@ -245,7 +250,7 @@ describe('real process session and principal isolation', () => {
           return value
         })
       ).rejects.toMatchObject({
-        code: 'HANDSHAKE_REJECTED',
+        code: 'REMOTE_START_FAILED',
         cause: { code: 'PROCESS_CHANNEL_AUTH_REJECTED' }
       })
       expect(ready).not.toHaveBeenCalled()
@@ -374,7 +379,7 @@ describe('real process session and principal isolation', () => {
             throw error
           })
       ).rejects.toMatchObject({
-        code: 'HANDSHAKE_REJECTED',
+        code: 'REMOTE_START_FAILED',
         cause: { code: 'PROCESS_CHANNEL_AUTH_REJECTED' }
       })
       noSecret(failure, sentinel)
@@ -406,9 +411,9 @@ describe('real process session and principal isolation', () => {
   })
 
   it('equal inbound msgid replay is connection-local while repeated same-session frames do not execute twice', async () => {
-    /** Same route sender on two authenticated sockets exposes an accidental global replay ledger. */
+    /** Equal message IDs on two admitted native sources expose an accidental global replay ledger. */
     const peer = await listener('replay')
-    /** Both proxies have caller route identity but different physical session identities. */
+    /** Each physical source has its own admitted public Host identity and authentication scope. */
     const sessions: Awaited<ReturnType<typeof observedClient>>[] = []
     try {
       sessions.push(await observedClient(peer.tokens.alice, peer.address))
@@ -422,14 +427,36 @@ describe('real process session and principal isolation', () => {
         )
       )!
       expect(request).toBeDefined()
-      /** Literal byte replay preserves the exact original envelope id on both sockets. */
+      /** Literal replay on the original socket preserves every byte, including the envelope id. */
       const id = wireFrames([request])[0].id
       expect(id).toEqual(expect.any(String))
       await first.raw.write(request)
       expect(((await first.namespace.request('p.f.request', ['stats'])) as IStats).executions).toBe(
         1
       )
-      await second.raw.write(request)
+      /** Borrow source-bound routing and generation facts from this second actual Host's own call. */
+      await second.namespace.request('p.f.request', ['stats'])
+      /** Native byte receipts supply both original envelopes without inventing admission metadata. */
+      const original = wireFrames([request])[0]
+      /** The uncounted stats call is already valid on Bob's independently admitted connection. */
+      const secondSource = wireFrames(second.sent).find(
+        (frame) => frame.kind === 'call' && frame.task.method === 'p.f.request'
+      )!
+      /** Keep the original id and payload while respecting this source's authenticated identity. */
+      const repeated = {
+        ...original,
+        route: secondSource.route,
+        task: {
+          ...original.task,
+          callerGeneration: secondSource.task.callerGeneration,
+          targetGeneration: secondSource.task.targetGeneration
+        }
+      }
+      expect(repeated.id).toBe(id)
+      expect(repeated.payload).toEqual(original.payload)
+      await second.raw.write(
+        encodeRpcStreamFrame(new TextEncoder().encode(JSON.stringify(repeated)))
+      )
       const receipt = (await second.namespace.request('p.f.request', ['stats'])) as IStats
       expect(receipt.executions).toBe(2)
       expect(receipt.contexts.map((context) => context.principalId)).toEqual(['alice', 'bob'])

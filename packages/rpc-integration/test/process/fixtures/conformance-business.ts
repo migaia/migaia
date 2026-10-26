@@ -85,7 +85,7 @@ const peers = [
   {
     language: 'bun',
     command: 'bun',
-    args: [new URL('../peers/ts/node-runner.mjs', import.meta.url).pathname],
+    args: [new URL('../peers/ts/peer.mts', import.meta.url).pathname],
     id: 'ts-peer'
   }
 ]
@@ -207,11 +207,12 @@ function deployment(
 async function installBusinessClient(
   fixture: Pick<ReturnType<typeof deployment>, 'reports'>,
   source: ISpawnProcessPluginDeployment | IConnectProcessPluginDeployment,
-  features?: readonly IProcessFeature[]
+  features?: readonly IProcessFeature[],
+  self: Readonly<{ name: string; instanceId: string }> = { name: 'caller', instanceId: 'caller' }
 ) {
   /** Credentials remain mandatory when the original foreign peer requires its inherited token. */
   const host = await createRpcHost({
-    self: { name: 'caller', instanceId: 'caller' },
+    self,
     plugins: [
       auth({ credentials: source.token }),
       processPlugin({

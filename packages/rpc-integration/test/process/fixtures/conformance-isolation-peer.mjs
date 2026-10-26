@@ -4,7 +4,9 @@ import { serializeRpcError, isRpcTimeoutError } from '@migaia/rpc-contract/error
 import { PluginHost, definePlugin, defineFeature } from '@migaia/plugin-host'
 import { createRpcHost } from '@migaia/rpc-host'
 import { auth } from '@migaia/rpc-host/plugins/auth'
-import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
+import { idempotency } from '@migaia/rpc-host/plugins/idempotency'
+import { limits } from '@migaia/rpc-host/plugins/limits'
+import { defineFlowFeature, RpcFlowPoint, RpcFlowLayer } from '@migaia/rpc-host/sdk'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import { openProcessStdioChannel } from '../../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
 import { decodeProcessRuntimeBootstrap } from '../../../../rpc-plugin-process/dist/process/runtime-bootstrap.js'
@@ -46,24 +48,39 @@ function report(error) {
   })
   process.stderr.write(`ISOLATION_REPORT:${String(error?.code ?? 'UNKNOWN')}\n`)
 }
-/** The original verifier remains strict; its principal result has no current receiving port. */
+/** The original verifier remains strict; only successful authentication yields its stable principal. */
 function verifyCredentials(value) {
   if (value === credentials.alice) return 'alice'
   if (value === credentials.bob && credentials.bob !== undefined) return 'bob'
   throw new Error(String(value))
 }
-/** Explicit auth enforces the original verifier without claiming a principal-result receiver. */
+/** Only the actual successful verifier lends the public authentication principal to this Session. */
 function authenticateCredentials(value) {
-  verifyCredentials(value)
+  return { principalId: verifyCredentials(value) }
+}
+
+/** Application receipts project the current public context fields without minting session facts. */
+function sessionContext(context) {
+  return {
+    connectionId: context.connectionId,
+    sessionId: context.sessionId,
+    principalId: context.principalId
+  }
 }
 /** Observe only admitted canonical envelope facts, without inventing a session identity. */
 function observeFrames() {
   return {
-    hooks: {
-      envelope: {
-        inbound(value) {
-          state.frames.push({ kind: value.message.kind, id: value.message.id ?? null })
-          return value
+    stages: {
+      [RpcFlowPoint.envelopeInbound]: {
+        layer: RpcFlowLayer.wire,
+        stage(payload, next) {
+          state.frames.push({
+            sessionId:
+              payload.context.session?.authentication?.sessionId ?? payload.context.carrierId,
+            kind: payload.prepared.message.kind,
+            id: payload.prepared.message.id ?? null
+          })
+          return next(payload)
         }
       }
     }
@@ -110,7 +127,7 @@ class IsolationTarget {
                 return true
               }
               state.executions += 1
-              state.contexts.push({ method: 'request', ...context.session })
+              state.contexts.push({ method: 'request', ...sessionContext(context) })
               if (input?.[0] === 'wait') {
                 await new Promise((resolve) =>
                   context.signal.addEventListener(
@@ -118,7 +135,7 @@ class IsolationTarget {
                     () => {
                       state.aborts.push({
                         label: input[1],
-                        ...context.session,
+                        ...sessionContext(context),
                         code: context.signal.reason?.code ?? null,
                         message: context.signal.reason?.message ?? null,
                         localTimeout: isRpcTimeoutError(context.signal.reason)
@@ -129,18 +146,23 @@ class IsolationTarget {
                   )
                 )
               }
-              return { input, execution: state.executions, revision, session: context.session }
+              return {
+                input,
+                execution: state.executions,
+                revision,
+                session: sessionContext(context)
+              }
             },
             oneWay(input, context) {
-              state.contexts.push({ method: 'oneWay', input, ...context.session })
+              state.contexts.push({ method: 'oneWay', input, ...sessionContext(context) })
             },
             *generator(input, context) {
-              state.contexts.push({ method: 'generator', ...context.session })
-              yield { input, session: context.session }
+              state.contexts.push({ method: 'generator', ...sessionContext(context) })
+              yield { input, session: sessionContext(context) }
             },
             async *asyncGenerator(input, context) {
-              state.contexts.push({ method: 'asyncGenerator', ...context.session })
-              yield { input, session: context.session }
+              state.contexts.push({ method: 'asyncGenerator', ...sessionContext(context) })
+              yield { input, session: sessionContext(context) }
             }
           }
           this.#output = output
@@ -182,7 +204,9 @@ class IsolationService {
       },
       plugins: [
         auth({ verifyCredentials: authenticateCredentials }),
-        defineFlowPlugin({ name: 'isolation-envelope-observer', setup: observeFrames }),
+        idempotency(),
+        limits({ maxConsecutiveTimeouts: 3 }),
+        defineFlowFeature({ name: 'isolation-envelope-observer', setup: observeFrames }),
         processPlugin({
           name: 'p',
           report,
