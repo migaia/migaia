@@ -135,8 +135,12 @@ export class RpcMemberGeneration<TUnit, TSpec> {
   #current: IMemberGeneration | undefined
   /** Failed candidates never consume this accepted-session ordinal. */
   #ordinal = -1
-  /** Departed generations retain exact original reasons until final registration release. */
-  readonly #departed = new Map<number, unknown>()
+  /** Only the most recent departure retains its original failure, independent of restart count. */
+  #departed: Readonly<{ generation: number; reason: unknown }> | undefined
+  /** A scalar closes forgotten old generations without retaining their errors or subscriptions. */
+  #departedThrough = -1
+  /** Actual native readiness can remain on an older unit after a newer replacement fails. */
+  #readyGeneration: number | undefined
   /** Outstanding physical cleanup survives retirement until the original Promise settles. */
   readonly #closing = new Map<number, Promise<void>>()
   /** Leave observation is source-generation qualified and removed on departure or unsubscribe. */
@@ -243,6 +247,9 @@ export class RpcMemberGeneration<TUnit, TSpec> {
         { state: outcome.state }
       )
     }
+    /** The actual serving outcome, rather than the latest attempt number, establishes readiness. */
+    if (this.#departed?.generation !== outcome.generation)
+      this.#readyGeneration = outcome.generation
     this.#assertPreparing(signal, outcome.generation)
     /** Ordinals remain reserved until the accepted pointer commits. */
     const ordinal = this.#ordinal + 1
@@ -320,17 +327,34 @@ export class RpcMemberGeneration<TUnit, TSpec> {
   #assertPreparing(signal: IAbortSignal, generation: number): void {
     if (signal.aborted) throw resolveAbortReason(signal)
     if (this.#released) throw createRemoteLayerError(RpcRemoteLayerErrorCode.closed)
-    if (this.#departed.has(generation))
-      throw createRemoteLayerError(RpcRemoteLayerErrorCode.closed, this.#departed.get(generation), {
-        generation
-      })
+    if (this.#hasDeparted(generation)) throw this.#closedGeneration(generation)
+  }
+
+  /** Current serving facts remain valid when a newer native replacement candidate has departed. */
+  #hasDeparted(generation: number): boolean {
+    return (
+      generation <= this.#departedThrough &&
+      generation !== this.#current?.number &&
+      generation !== this.#readyGeneration
+    )
+  }
+
+  /** Forgotten generations retain their identity on the existing closed error without a cause. */
+  #closedGeneration(generation: number): Error {
+    return createRemoteLayerError(
+      RpcRemoteLayerErrorCode.closed,
+      this.#departed?.generation === generation ? this.#departed.reason : undefined,
+      { generation }
+    )
   }
 
   /** Revoke publication before leave observers and the original Session/physical disposal. */
   #leave(generation: number, reason: unknown, nativeDeparture: boolean): void {
-    if (this.#departed.has(generation) || (this.#released && this.#current?.number !== generation))
+    if (this.#hasDeparted(generation) || (this.#released && this.#current?.number !== generation))
       return
-    this.#departed.set(generation, reason)
+    this.#departedThrough = Math.max(this.#departedThrough, generation)
+    this.#departed = { generation, reason }
+    if (this.#readyGeneration === generation) this.#readyGeneration = undefined
     /** Only this exact generation can retire its accepted Session. */
     const current = this.#current?.number === generation ? this.#current : undefined
     if (current) this.#current = undefined
@@ -360,13 +384,20 @@ export class RpcMemberGeneration<TUnit, TSpec> {
   }
 
   /**
-   * Late observers receive the exact original reason on the native clock without synchronous
-   * reentry.
+   * Late observers receive the latest original reason or a cause-free closed error on the native
+   * clock without synchronous reentry.
    */
   onLeave(generation: number, listener: (reason: unknown) => void): () => void {
-    if (this.#released || this.#departed.has(generation)) {
-      /** Capture before final cleanup clears historical reason retention. */
-      const receipt = { listener, reason: this.#releaseReason ?? this.#departed.get(generation) }
+    if (this.#released || this.#hasDeparted(generation)) {
+      /** Capture only this observation's result before final cleanup releases the latest reason. */
+      const receipt = {
+        listener,
+        reason:
+          this.#releaseReason ??
+          (this.#departed?.generation === generation
+            ? this.#departed.reason
+            : this.#closedGeneration(generation))
+      }
       deferTask(this.#options.binding.scheduler, () => {
         try {
           receipt.listener(receipt.reason)
@@ -543,7 +574,8 @@ export class RpcMemberGeneration<TUnit, TSpec> {
       }
     } finally {
       await Promise.allSettled(this.#closing.values())
-      this.#departed.clear()
+      this.#departed = undefined
+      this.#readyGeneration = undefined
       this.#listeners.clear()
     }
     if (failures.length === 1) throw failures[0]

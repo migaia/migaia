@@ -53,6 +53,8 @@ type INativeMemberFixtureOptions = Readonly<{
   contract?: IRpcHostOptions['contract']
   features?: readonly unknown[]
   restart?: Parameters<typeof createSupervisor>[0]['restart']
+  maxUnits?: number
+  ready?: (unit: IManagedMemoryUnit, signal: IAbortSignal) => Promise<void>
 }>
 
 /** Only genuine owners and passive acquisition/cleanup receipts belong to this bounded fixture. */
@@ -98,7 +100,7 @@ class NativeMemberFixture {
     this.reports = reports
     this.budget = createUnitBudget({
       kind: name,
-      maxUnits: 1,
+      maxUnits: options.maxUnits ?? 1,
       launchRate: false,
       scheduler: this.scheduler
     })
@@ -115,7 +117,8 @@ class NativeMemberFixture {
       budget: this.budget,
       scheduler: this.scheduler,
       report: this.report,
-      restart: options.restart ?? { mode: 'never' }
+      restart: options.restart ?? { mode: 'never' },
+      ready: options.ready
     })
   }
 
@@ -353,8 +356,8 @@ it('retains the actual departing candidate until physical cleanup finishes acros
   }
 })
 
-// RPC-TEST-19CE78390954-C012: exact late reason identities replace only the removed debug counter.
-it('retains five actual native leave reasons by identity until final member release', async () => {
+// RPC-TEST-19CE78390954-C012 / A35: only the most recent departed generation retains its reason.
+it('retains only the latest native leave reason and closes older generation observers without causes', async () => {
   /** Each lower-level unit failure must remain the actual Supervisor exit error's original cause. */
   const reasons = Array.from({ length: 5 }, (_, index) => new Error(`exit ${index + 1}`))
   /** The same manually driven native clock owns every late observer. */
@@ -386,12 +389,19 @@ it('retains five actual native leave reasons by identity until final member rele
       await fixture.member.whenClosed(generation)
     }
     expect(nativeReasons).toHaveLength(reasons.length)
-    for (const { generation, reason } of nativeReasons) {
-      /** The genuine SDK stores the historical reason and defers notification on its native clock. */
+    for (const [index, { generation, reason }] of nativeReasons.entries()) {
+      /** Late observations use the same native clock without keeping every historical error alive. */
       const waiting = deferred<unknown>()
       fixture.member.onLeave(generation, waiting.resolve)
       fixture.scheduler.advance(0)
-      expect(await waiting.promise).toBe(reason)
+      if (index === nativeReasons.length - 1) expect(await waiting.promise).toBe(reason)
+      else {
+        expect(await waiting.promise).toMatchObject({
+          code: RpcRemoteLayerErrorCode.closed,
+          detail: { generation }
+        })
+        expect(await waiting.promise).not.toHaveProperty('cause')
+      }
     }
     await fixture.member.close()
     /** A released member returns its actual closed result rather than a historical native error. */
@@ -402,6 +412,52 @@ it('retains five actual native leave reasons by identity until final member rele
     expect(await afterRelease.promise).not.toBe(nativeReasons[0]!.reason)
   } finally {
     stopExitObservation()
+    await fixture.cleanup()
+  }
+})
+
+// A35: a failed newer native candidate cannot retire the still-serving accepted generation.
+it('preserves the older active generation after a newer native replacement fails', async () => {
+  /** This failure belongs to the real second native unit, while its predecessor remains ready. */
+  const replacementFailure = new Error('replacement failed')
+  /** A real start-then-switch replacement temporarily needs both original budget slots. */
+  const fixture = new NativeMemberFixture('proxy-active-member-reason', [], {
+    maxUnits: 2,
+    ready: async (unit) => {
+      if (unit === fixture.native.units[0]) return
+      unit.exit({ error: replacementFailure })
+      await unit.exited
+      throw replacementFailure
+    }
+  })
+  try {
+    await fixture.start()
+    /** A borrowed supervisor may already serve an older unit before the SDK opens its Session. */
+    const started = await fixture.supervisor.start()
+    assert(started.state === 'ready')
+    const generation = started.generation
+    await expect(
+      fixture.supervisor.replace({ strategy: 'start-then-switch' })
+    ).resolves.toMatchObject({
+      kind: 'failed'
+    })
+    await fixture.member.open()
+    /** An already accepted Session survives a second genuinely failed replacement as well. */
+    await expect(
+      fixture.supervisor.replace({ strategy: 'start-then-switch' })
+    ).resolves.toMatchObject({ kind: 'failed' })
+    expect(fixture.supervisor.generation).toBeGreaterThan(generation)
+    expect(fixture.member.current()).toMatchObject({ generation, active: true })
+    /** Registering after that failure must still observe the original unit's actual later exit. */
+    const left = vi.fn()
+    fixture.member.onLeave(generation, left)
+    fixture.scheduler.advance(0)
+    expect(left).not.toHaveBeenCalled()
+    await expect(fixture.namespace.send('remote', 'value', null)).resolves.toBe('result')
+    fixture.native.units[0]!.exit({})
+    await fixture.member.whenClosed(generation)
+    expect(left).toHaveBeenCalledTimes(1)
+  } finally {
     await fixture.cleanup()
   }
 })
