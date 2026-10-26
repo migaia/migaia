@@ -135,7 +135,7 @@ export class LimitsGovernor {
   /** Native concurrency and quota refusals share the original consecutive-violation policy. */
   violate(error: unknown): void {
     this.#violations += 1
-    if (this.#violations >= (this.#options.violationLimit ?? Infinity))
+    if (this.#violations === this.#options.violationLimit)
       deferTask(this.#ports.scheduler, () =>
         this.#requestClose(error, RpcSessionRetirement.liquidated)
       )
@@ -194,15 +194,15 @@ export class LimitsGovernor {
 
   /** A ready quiet connection with no real business may retire at its original idle deadline. */
   #scheduleIdle(): void {
-    this.#idle?.cancel()
-    this.#idle = undefined
     if (
       this.#closed ||
       !this.#ready ||
       this.#active > 0 ||
-      this.#options.idleTimeoutMs === undefined
+      this.#options.idleTimeoutMs === undefined ||
+      this.#idle !== undefined
     )
       return
+    /** Activity moves the due time; the one armed task wakes and schedules only its remainder. */
     this.#idle = this.#ports.scheduler.schedule(
       () => {
         this.#idle = undefined

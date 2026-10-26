@@ -320,3 +320,61 @@ describe('limits governor retirement reasons', () => {
     governor.close()
   })
 })
+
+it('keeps one idle deadline task while inbound activity advances its due time', () => {
+  /** Count scheduling operations through the same deterministic scheduler used by the governor. */
+  const scheduler = createManualScheduler()
+  const schedule = vi.spyOn(scheduler, 'schedule')
+  /** An idle retirement remains the ordinary existing source port. */
+  const retire = vi.fn(async () => undefined)
+  const governor = new LimitsGovernor(
+    'activity-source',
+    { idleTimeoutMs: 10 },
+    { scheduler, retire, report: () => undefined, release: () => undefined }
+  )
+  try {
+    governor.ready()
+    for (let frame = 0; frame < 4; frame++) {
+      scheduler.advance(1)
+      governor.touch()
+    }
+    expect(schedule).toHaveBeenCalledTimes(1)
+    expect(scheduler.pendingCount).toBe(1)
+    scheduler.advance(6)
+    expect(retire).not.toHaveBeenCalled()
+    expect(schedule).toHaveBeenCalledTimes(2)
+    scheduler.advance(4)
+    expect(retire).toHaveBeenCalledExactlyOnceWith(
+      'activity-source',
+      expect.objectContaining({ message: 'Connection idle timeout' }),
+      'idle'
+    )
+    expect(scheduler.pendingCount).toBe(0)
+  } finally {
+    governor.close()
+    schedule.mockRestore()
+  }
+})
+
+it('queues one liquidation when several refusals reach the same violation threshold', () => {
+  /** A burst can add several violations before the original deferred retirement begins. */
+  const scheduler = createManualScheduler()
+  /** The first threshold refusal remains the exact reason selected for physical retirement. */
+  const retire = vi.fn(async () => undefined)
+  const governor = new LimitsGovernor(
+    'burst-source',
+    { violationLimit: 1 },
+    { scheduler, retire, report: () => undefined, release: () => undefined }
+  )
+  const first = new Error('first threshold refusal')
+  try {
+    governor.violate(first)
+    governor.violate(new Error('later refusal'))
+    governor.violate(new Error('last refusal'))
+    expect(scheduler.pendingCount).toBe(1)
+    scheduler.advance(0)
+    expect(retire).toHaveBeenCalledExactlyOnceWith('burst-source', first, 'liquidated')
+  } finally {
+    governor.close()
+  }
+})
