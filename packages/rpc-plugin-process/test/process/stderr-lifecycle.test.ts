@@ -209,7 +209,11 @@ describe('public process stderr lifetime', () => {
     /** Actual source rollback must release its original acquired child byte resource. */
     const owner = new NativeStderrFixture(failure)
     try {
-      await expect(owner.open()).rejects.toBe(failure)
+      /** Supervised startup reports the failed unit with the original subscription error on cause. */
+      await expect(owner.open()).rejects.toMatchObject({
+        code: 'REMOTE_START_FAILED',
+        cause: failure
+      })
     } finally {
       expect(owner.physicalClose).toHaveBeenCalledOnce()
       await owner.close()

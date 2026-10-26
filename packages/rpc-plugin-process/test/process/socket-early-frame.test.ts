@@ -2,7 +2,7 @@
 import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { processPlugin } from '@migaia/rpc-plugin-process'
-import { defineFlowPlugin, RpcFlowPoint, type IRpcFlowStage } from '@migaia/rpc-host/sdk'
+import { defineFlowFeature, RpcFlowPoint, type IRpcFlowStage } from '@migaia/rpc-host/sdk'
 import { deferred } from '@migaia/utils/promise'
 import {
   dialProcessByteChannel,
@@ -89,7 +89,7 @@ class EarlyProcessFrames {
   /** The receiver registers its real provider before native source opening and waits on acceptance. */
   client() {
     /** This actual flow stage only holds user work at its admitted handshake boundary. */
-    const gate = defineFlowPlugin({
+    const gate = defineFlowFeature({
       name: 'early-process-accept',
       setup: () => ({ stages: { [RpcFlowPoint.handshakeOutbound]: this.#accept } })
     })

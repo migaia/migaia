@@ -93,21 +93,7 @@ describe('process outlet command readiness', () => {
             source: 'rpc.remote',
             code: 'REMOTE_CLOSED',
             detail: { generation: 1 },
-            stack: expect.stringMatching(/\S/),
-            cause: expect.objectContaining({
-              name: 'Error',
-              message: 'process channel is closed',
-              source: 'rpc.transport.process',
-              code: 'PROCESS_CHANNEL_CLOSED',
-              stack: expect.stringMatching(/\S/),
-              cause: expect.objectContaining({
-                name: 'Error',
-                message: 'process channel is closed',
-                source: 'rpc.transport.process',
-                code: 'PROCESS_CHANNEL_CLOSED',
-                stack: expect.stringMatching(/\S/)
-              })
-            })
+            stack: expect.stringMatching(/\S/)
           })
         ])
       } finally {

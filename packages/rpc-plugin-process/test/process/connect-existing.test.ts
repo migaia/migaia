@@ -150,8 +150,9 @@ describe('Node rendezvous sockets', () => {
           report: () => undefined
         })
       ).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
+      /** Missing plugin options are classified by the process plugin's own option code. */
       await expect(fixture.listen(undefined as never).then(() => undefined)).rejects.toMatchObject({
-        code: 'INVALID_CONFIG'
+        code: 'PROCESS_PLUGIN_INVALID_OPTION'
       })
     } finally {
       await fixture.close()

@@ -115,7 +115,10 @@ it.each(['kind', 'step', 'unknown-field'] as const)(
       expect(
         JSON.stringify(serializeRpcError(observed, { report: () => undefined }))
       ).not.toContain(token)
-      expect(observed).toMatchObject({ code: 'HANDSHAKE_INVALID' })
+      /** Malformed records fail the Contract envelope grammar; a hostile step fails the handshake. */
+      expect(observed).toMatchObject({
+        code: position === 'step' ? 'HANDSHAKE_INVALID' : 'INVALID_ENVELOPE'
+      })
     } finally {
       await fixture.close()
     }
@@ -142,7 +145,8 @@ it('uses the original manual deadline and closes the actual silent Process byte 
     await fixture.physicallyClosed.promise
     expect(scheduler.pendingCount).toBe(0)
     expect(fixture.physicalCloses).toBe(1)
-    expect(observed).toMatchObject({ code: 'PROCESS_HANDSHAKE_TIMEOUT' })
+    /** The attached Session's own handshake timer settles readiness. */
+    expect(observed).toMatchObject({ code: 'DEADLINE_EXCEEDED' })
   } finally {
     await fixture.close()
     clock.mockRestore()
