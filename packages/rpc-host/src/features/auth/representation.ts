@@ -35,38 +35,15 @@ export class AuthenticationRepresentation {
   bound(value: IAuthenticationEnvelope, signOnly = true): unknown {
     /** Object signing preserves the original native path and leaves canonicalization to callbacks. */
     if (signOnly && this.#encoding === Encoding.any) return value
-    /** The real selected JSON codec supplies the same original text category for default any. */
-    const json = this.#json.encode(value.payload)[1]
-    /** Explicit byte transforms keep the original byte payload spelling within the signed binding. */
-    const payload =
-      this.#encoding === Encoding.bytes ? Array.from(this.#bytes().encoder.encode(json)) : json
-    /** The original prefix stays within both configured encryption and signing transforms. */
-    const text = Format.prefix + this.#json.encode({ ...value, payload })[1]
+    /** Encryption and explicit categories retain the signed prefix with object payload metadata. */
+    const text = Format.prefix + this.#json.encode(value)[1]
     return this.#encoding === Encoding.bytes ? this.#bytes().encoder.encode(text) : text
   }
 
-  /** Restore only the once-encoded metadata after the signed binding and its category are verified. */
+  /** Reuse verified object metadata without a second JSON parse or semantic admission. */
   metadata(value: unknown): unknown {
-    /** An opaque native binding restores its object through the same sole codec admission. */
-    if (this.#encoding === Encoding.any && value !== null && typeof value === 'object') return value
-    /** Original explicit byte payloads are restored only after their dense scalar domain is checked. */
-    const text =
-      this.#encoding === Encoding.bytes
-        ? this.#bytes().decode(this.#payloadBytes(value), hostErrorWireMetadata)
-        : value
-    if (typeof text !== 'string')
-      throw createRpcAuthenticationError(Text.authenticationReplayBindingInvalid)
-    return decodeRpcCarrierText(text, this.#json, hostErrorWireMetadata)
-  }
-
-  /** Reuse the original byte-domain admission before constructing the one restored byte array. */
-  #payloadBytes(value: unknown): Uint8Array {
-    if (
-      !Array.isArray(value) ||
-      !value.every((byte) => Number.isInteger(byte) && byte >= 0 && byte <= 255)
-    )
-      throw createRpcAuthenticationError(Text.authenticationReplayBindingInvalid)
-    return new Uint8Array(value)
+    if (value !== null && typeof value === 'object') return value
+    throw createRpcAuthenticationError(Text.authenticationReplayBindingInvalid)
   }
 
   /**

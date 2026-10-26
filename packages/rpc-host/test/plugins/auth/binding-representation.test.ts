@@ -5,6 +5,7 @@ import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
 import { auth, type IRpcAuthenticationOptions } from '@migaia/rpc-host/plugins/auth'
 import { createRpcBackingDigest, RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import type { IRpcPortableValue } from '@migaia/rpc-contract/protocol'
+import { RpcAuthenticationEnvelope } from '../../../dist/features/auth/constants.js'
 import { coreMemoryServer } from '../../host/core-fixture.js'
 
 /** The original A12 fixture uses this public key with SHA-256 over JSON.stringify(value). */
@@ -163,6 +164,92 @@ it('A29 rejects a changed default binding in verify before public provider deliv
     expect(failures).not.toHaveLength(0)
     expect(failures[0]).toMatchObject({ message: 'A29 fixture signature mismatch' })
     expect(pair.delivered).toEqual([])
+  } finally {
+    await pair.close()
+  }
+})
+
+// BC16 B: explicit text/byte categories and encryption encode the complete binding only once.
+it.each(['string', 'uint8array'] as const)(
+  'A29 delivers %s with a prefixed binding whose object payload needs only one JSON parse',
+  async (encodedType) => {
+    /** Client observations retain the exact explicit callback category after original preparation. */
+    const signed: unknown[] = []
+    /** The counterpart verifier receives the same text or bytes reconstructed by the real codec. */
+    const verified: unknown[] = []
+    /** Inline storage isolates the explicit callback representation from native binary sidecars. */
+    const pair = new PublicAuthenticationPair()
+    try {
+      await pair.open(
+        {
+          encodedType,
+          sign: (value) => {
+            signed.push(value)
+            return value
+          },
+          verify: (value) => value
+        },
+        {
+          encodedType,
+          sign: (value) => value,
+          verify: (value) => {
+            verified.push(value)
+            return value
+          }
+        }
+      )
+      expect(await pair.echo({ category: encodedType })).toEqual({ category: encodedType })
+      /** The final signed value belongs to the actual completed business request. */
+      const input = signed.at(-1)
+      if (encodedType === 'string') expect(input).toBeTypeOf('string')
+      else expect(input).toBeInstanceOf(Uint8Array)
+      /** UTF-8 reconstruction is needed only for the explicitly selected byte category. */
+      const text =
+        encodedType === 'string' ? (input as string) : new TextDecoder().decode(input as Uint8Array)
+      expect(text.startsWith(RpcAuthenticationEnvelope.prefix)).toBe(true)
+      /** Exactly one parse exposes prepared metadata, rather than another encoded payload string. */
+      const binding = JSON.parse(text.slice(RpcAuthenticationEnvelope.prefix.length)) as IBinding
+      expect(binding.payload).toBeTypeOf('object')
+      expect(Array.isArray(binding.payload)).toBe(false)
+      expect(verified).toContainEqual(input)
+    } finally {
+      await pair.close()
+    }
+  }
+)
+
+it('A29 supplies encryption with prefixed text containing an object payload after one parse', async () => {
+  /** The original encrypt callback observes plaintext before the user signer sees its result. */
+  const encrypted: unknown[] = []
+  /** Both ends retain the original encrypt-sign/verify-decrypt transform ordering. */
+  const pair = new PublicAuthenticationPair()
+  try {
+    await pair.open(
+      {
+        encrypt: (value) => {
+          encrypted.push(value)
+          return value
+        },
+        decrypt: (value) => value,
+        sign: signBinding,
+        verify: verifyBinding
+      },
+      {
+        encrypt: (value) => value,
+        decrypt: (value) => value,
+        sign: signBinding,
+        verify: verifyBinding
+      }
+    )
+    expect(await pair.echo('encrypted roundtrip')).toBe('encrypted roundtrip')
+    /** The final observed plaintext belongs to the completed public business request. */
+    const text = encrypted.at(-1) as string
+    expect(text).toBeTypeOf('string')
+    expect(text.startsWith(RpcAuthenticationEnvelope.prefix)).toBe(true)
+    /** One envelope parse must already produce the prepared metadata object. */
+    const binding = JSON.parse(text.slice(RpcAuthenticationEnvelope.prefix.length)) as IBinding
+    expect(binding.payload).toBeTypeOf('object')
+    expect(Array.isArray(binding.payload)).toBe(false)
   } finally {
     await pair.close()
   }

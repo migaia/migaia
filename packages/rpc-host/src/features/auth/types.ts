@@ -25,6 +25,7 @@ export type IRpcAuthenticationOptions = Readonly<{
   decrypt?: IRpcAuthenticationTransform
   sign?: IRpcAuthenticationTransform
   verify?: IRpcAuthenticationTransform
+  /** Default any signs the binding object without encrypt; explicit text/bytes encode it once. */
   encodedType?: 'any' | 'string' | 'uint8array'
   /** Active plus retained completed request IDs default to1024 per admitted direct peer. */
   maxReplayEntriesPerPeer?: number
