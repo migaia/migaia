@@ -156,13 +156,11 @@ async function omitDisabledDeadline(): Promise<void> {
   }
 }
 
-/** Retain the original zero-wire-budget business-entry oracle, even while its semantics remain RED. */
-async function observeInjectedZeroDeadline(): Promise<void> {
+/** An already exhausted wire deadline rejects before entering the original provider. */
+async function rejectInjectedZeroDeadline(): Promise<void> {
   /** Only the original native physical writer injects the already-expired valid new-profile frame. */
   const server = coreMemoryServer('provider')
-  /** Preserve the original second-business-entry signal oracle, including its execution condition. */
-  const called = deferred<boolean>()
-  /** A second actual provider execution remains required; a dispatch observer cannot replace it. */
+  /** The first successful call calibrates admission; the exhausted second call must not enter. */
   let calls = 0
   /** Both calls enter through the genuine namespace/provider owner with no private execution port. */
   const provider = await createRpcHost({
@@ -170,7 +168,6 @@ async function observeInjectedZeroDeadline(): Promise<void> {
     provide: {
       check: (_value, context) => {
         calls += 1
-        if (calls === 2) called.resolve(context.signal.aborted)
         return context.success(null)
       }
     }
@@ -189,8 +186,12 @@ async function observeInjectedZeroDeadline(): Promise<void> {
     })
     /** Wait for real dispatch settlement so a changed provider-admission rule fails without hanging. */
     await vi.waitFor(() => expect(providerSignalTerminal(client.pair[0].written)).toBeDefined())
-    expect(calls).toBe(2)
-    expect(await called.promise).toBe(true)
+    expect(calls).toBe(1)
+    /** The original physical response proves deadline refusal, not a missing or delayed call. */
+    const terminal = providerSignalTerminal(client.pair[0].written)
+    expect(terminal?.kind).toBe('error')
+    if (terminal?.kind !== 'error') expect.unreachable('missing actual deadline refusal')
+    expect(terminal.error.nodes[terminal.error.root]).toMatchObject({ code: 'DEADLINE_EXCEEDED' })
   } finally {
     await client.host.close()
     await provider.close()
@@ -260,10 +261,7 @@ describe('provider relative deadline', () => {
     subtractReceiverResolutionDelay
   )
   it('omits disabled deadlines and clears a settled provider timer', omitDisabledDeadline)
-  it(
-    'presents an injected zero deadline as an already aborted provider signal',
-    observeInjectedZeroDeadline
-  )
+  it('rejects an injected zero deadline before entering the provider', rejectInjectedZeroDeadline)
   it(
     'aborts at the monotonic deadline even without the abort control capability',
     abortAtMonotonicDeadline

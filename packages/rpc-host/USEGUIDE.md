@@ -87,6 +87,8 @@ export const callOptions = { timeout: timeout({ ms: 100 }), retry: false } as co
 
 `timeout: false` 不启用 feature 超时，持续等待响应；已经继承的上游剩余期限仍递减。`retry: false` 禁用重试。下游只得到剩余预算，转发不能延期。只有发起方的标量调用和 group 重试，stream 从不重放、只使用 timeout；超时或失联不证明业务未执行，非幂等操作须先对账。传输提供的握手准备期限是另一项配置，不是业务 timeout feature。
 
+进入 provider 前剩余截止时间已经耗尽的调用，以 `DEADLINE_EXCEEDED` 拒绝，不执行 provider；`before-start` 的取消语义保持不变。
+
 ## 在已有宿主中安装 RPC
 
 已有 `defineHost` 宿主使用 `rpcHostPipelines(getHost, pipeline)`，同时获得管道声明和 `domainCore`。helper 构造时不调用回调、不创建宿主或资源；安装时，`domainCore` 才读取真实宿主并借用其管道执行权。不要复制七条声明，也不要把另一个宿主的执行权交进来。

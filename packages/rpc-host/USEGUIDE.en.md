@@ -87,6 +87,8 @@ Selection has one order: complete per-call instance or `false`, then the transpo
 
 `timeout: false` waits for the response without a feature timeout; an upstream remaining deadline still decreases. `retry: false` disables retry. Downstream hops receive only the remaining budget and cannot extend it. Only the origin retries scalar calls and groups; streams never replay and use timeout only. Timeout or disconnection does not prove that business work never executed; reconcile uncertain non-idempotent work first. Transport handshake preparation deadlines are separate from the business timeout feature.
 
+A call whose remaining deadline has expired before provider entry rejects with `DEADLINE_EXCEEDED` without executing the provider. `before-start` cancellation keeps its existing semantics.
+
 ## Install RPC in an existing host
 
 An existing `defineHost` owner uses `rpcHostPipelines(getHost, pipeline)` to obtain both pipeline declarations and `domainCore`. Creating the helper calls neither callback and creates no host or resource. At installation, `domainCore` reads the real owner and borrows its pipeline execution authority. Do not copy seven declarations or supply another host's execution authority.

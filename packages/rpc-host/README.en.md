@@ -108,6 +108,8 @@ A custom carrier may implement optional `reserveWrite` by borrowing its existing
 
 `FeatureScope` alone selects call `options.timeout/retry`, then the transport's installed feature, then the link-policy default. Call values accept only complete feature instances or `false`, never numbers or configuration objects. `timeout: false` waits for the response without a feature timeout; an upstream remaining deadline still decreases. `retry: false` disables retry. Only the origin retries scalar calls and groups; streams never replay and use timeout only; forwarding does not restart the budget.
 
+A call whose remaining deadline has expired before provider entry rejects with `DEADLINE_EXCEEDED` without executing the provider. `before-start` cancellation keeps its existing semantics.
+
 Every call kind supports `signal`, including cancellation propagated after a one-way physical send. Providers receive their own `context.signal`. Cancellation neither kills a process nor rolls back side effects.
 
 Branch on `source/code`; preserve native classes, `stack`, `cause`, and `AggregateError.errors`. Timeout or disconnection does not prove that business work never executed. Reconcile uncertain non-idempotent work before retrying.
