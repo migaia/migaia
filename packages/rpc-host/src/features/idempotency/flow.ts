@@ -9,6 +9,7 @@ import type {
   IRpcPortableValue
 } from '@migaia/rpc-contract/protocol'
 import { RpcWireKind, RpcWireProfile } from '@migaia/rpc-contract/protocol'
+import type { IRpcObservation } from '@migaia/rpc-contract/interfaces'
 import type { IRpcFlowInstallation, IRpcFlowSetupContext } from '../../sdk/types.js'
 import { RpcFlowPoint, type IRpcFlowStage } from '../../sdk/flow-pipelines.js'
 import { createRpcLifecycleError, createRpcConfigurationError } from '../../host/error-owner.js'
@@ -17,6 +18,8 @@ import { createRpcIdempotencyStore, type IRpcIdempotencyStore } from './store.js
 import { RpcIdempotencyState as State, RpcIdempotencyStoreFact as Fact } from './constants.js'
 import type { IRpcIdempotencyOptions, IRpcOutcomeLookup } from './types.js'
 import { RpcIdempotencyExecution } from './execution.js'
+import { HostObservationKind } from '../../host/state-constants.js'
+import { reportDiagnostic } from '../../host/report.js'
 
 /** The actual plugin owns outcome lookup and the same original injectable claim/seal store. */
 export class RpcIdempotencyFlow {
@@ -28,6 +31,8 @@ export class RpcIdempotencyFlow {
   readonly #options: IRpcIdempotencyOptions
   /** Only a newly created default memory store can report loss on a real native restart. */
   readonly #defaultMemory: boolean
+  /** Index only carrier-owned scopes so retirement never removes principal or custom continuity. */
+  readonly #carrierScopes = new Map<string, Set<string>>()
   /** Cleanup revokes late callbacks; external stores retain their independently owned lifetime. */
   #closed = false
   /** Existing dispatch hook and plugin-host namespace extension are the sole integration surface. */
@@ -43,6 +48,7 @@ export class RpcIdempotencyFlow {
     this.#store = options.store ?? createRpcIdempotencyStore(options)
     this.value = {
       stages: { [RpcFlowPoint.dispatchInbound]: this.#dispatch },
+      observe: this.#observe,
       namespaceExtensions: this.#namespace,
       dispose: this.close
     }
@@ -72,16 +78,25 @@ export class RpcIdempotencyFlow {
     const authentication = context.session?.authentication
     /** Stable principal identity shares retained outcomes across its independently held sessions. */
     const token = authentication?.principalId ?? context.carrierId
-    const scope = JSON.stringify([
-      RpcWireProfile,
-      context.envelope.task.targetGeneration.providerId,
+    /** A custom scope can outlive a connection and must not inherit carrier retirement. */
+    const selected =
       this.#options.scope?.({
         token,
         senderId: context.envelope.route.senderId,
         ...(authentication === undefined ? {} : authentication)
       }) ?? token
+    const scope = JSON.stringify([
+      RpcWireProfile,
+      context.envelope.task.targetGeneration.providerId,
+      selected
     ])
     if (context.envelope.kind === RpcWireKind.call || context.envelope.kind === RpcWireKind.group) {
+      if (!authentication && selected === context.carrierId && this.#store.releaseScope) {
+        /** One carrier may contribute multiple admitted provider scopes, all retired together. */
+        let scopes = this.#carrierScopes.get(context.carrierId)
+        if (!scopes) this.#carrierScopes.set(context.carrierId, (scopes = new Set()))
+        scopes.add(scope)
+      }
       return new RpcIdempotencyExecution({
         payload,
         envelope: context.envelope,
@@ -135,6 +150,27 @@ export class RpcIdempotencyFlow {
       ) as ReturnType<IRpcOutcomeLookup>
   })
 
+  /** Native retirement already owns cancellation; this hook removes only carrier-local retention. */
+  readonly #observe = (event: IRpcObservation): void => {
+    if (event.kind === HostObservationKind.peerLeave && event.carrierId !== undefined)
+      this.#releaseCarrier(event.carrierId)
+  }
+
+  /** Drop the carrier index before invoking store cleanup so reentrant retirement remains once. */
+  #releaseCarrier(carrierId: string): void {
+    /** Full scope keys preserve the provider domain without parsing or guessing a prefix. */
+    const scopes = this.#carrierScopes.get(carrierId)
+    if (!scopes) return
+    this.#carrierScopes.delete(carrierId)
+    for (const scope of scopes) {
+      try {
+        this.#store.releaseScope?.(scope)
+      } catch (error) {
+        reportDiagnostic(this.#setup.report, error)
+      }
+    }
+  }
+
   /**
    * Rollback/final close removes the one setup listener without taking ownership of external
    * stores.
@@ -143,5 +179,6 @@ export class RpcIdempotencyFlow {
     if (this.#closed) return
     this.#closed = true
     this.#setup.signal.removeEventListener('abort', this.close)
+    for (const carrierId of this.#carrierScopes.keys()) this.#releaseCarrier(carrierId)
   }
 }

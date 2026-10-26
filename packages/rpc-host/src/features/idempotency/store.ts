@@ -81,6 +81,8 @@ export type IRpcIdempotencyStore = Readonly<{
   lookup?: (scope: string, key: string, now: number) => IRpcIdempotencyLookup
   /** Opt-in store facts describe this actual owner; ordinary claims never create or read an epoch. */
   readRuntimeFacts?: () => IRpcOutcomeStore
+  /** Optional synchronous retirement releases entries owned by one disconnected carrier scope. */
+  releaseScope?: (scope: string) => void
 }>
 
 /** A lookup reports only retained store facts and never allocates execution or waiter ownership. */
@@ -264,6 +266,16 @@ class RpcIdempotencyStore implements IRpcIdempotencyStore {
       epoch: (this.#epoch ??= defaultRpcId()),
       continuity: Fact.retained
     })
+  }
+  /** Retire only this scope's entries; late settlement cannot revive their removed identities. */
+  readonly releaseScope = (scope: string): void => {
+    /** Scope membership partitions retirement work without scanning other connections' entries. */
+    const entries = this.#scopes.get(scope)
+    if (!entries) return
+    for (const entry of entries.values()) {
+      if (entry.status === State.pending) this.releaseClaim(entry)
+      else this.#remove(entry)
+    }
   }
   /** Lookup observes retention without allocating waiters or modifying a claim's lifetime. */
   readonly lookup = (scope: string, key: string, now: number): IRpcIdempotencyLookup => {
