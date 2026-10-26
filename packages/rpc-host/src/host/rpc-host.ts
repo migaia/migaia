@@ -578,6 +578,7 @@ export class RpcHost {
       handshakeTimeoutMs: definition.handshakeTimeoutMs,
       nameAdmissionTimeoutMs: definition.nameAdmissionTimeoutMs,
       signal: controller.signal,
+      gate,
       pipelines: () => pipelines,
       flow
     })
@@ -654,9 +655,9 @@ export class RpcHost {
       this.#publications.get(commit.slot.facade)!.surface = commit.registration.surface!
       commit.provider.commit()
       commit.commitFeatures()
+      commit.gate.open()
       this.#sessions.commit(commit.registration.sessionScope)
       this.#everCommittedTransport = true
-      commit.gate.open()
     })
   }
 

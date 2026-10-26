@@ -302,18 +302,25 @@ export class SessionTable {
   /** Native source commit publishes only that registration's original reserved physical peers. */
   commitAppend(scope: IRpcSessionScope): void {
     /** One append transaction announces only after all of its actual public views are installed. */
+    if (this.#publishPrepared(this.#scopes.get(scope)!))
+      void this.announceDirectory().catch(this.#options.report)
+  }
+
+  /** Original scope members retain accepted reservations until their native commit gate opens. */
+  #publishPrepared(staged: IStagedSessions): boolean {
+    /** Public aliases are announced by the caller after every original reservation is processed. */
     let published = false
-    for (const session of this.#scopes.get(scope)!.sessions) {
-      /** Existing handle identity supplies the exact attachment without another source index. */
+    for (const session of staged.sessions) {
+      /** Existing handle identity supplies the attachment without another candidate index. */
       const input = this.#handles.get(session.handle)!.attachment!
-      /** A directory arbitration still in flight cannot publish its provisional replacement view. */
+      /** Directory arbitration may still be in flight; only the accepted current view can publish. */
       const pending = this.#reserved.get(input.carrierId)
       if (pending && pending.view === session.current()?.view) {
         this.#publish(input, pending.view, false)
         published ||= input.published
       }
     }
-    if (published) void this.announceDirectory().catch(this.#options.report)
+    return published
   }
 
   /** Move only transport context wiring into the existing scope and Session owners. */
@@ -371,6 +378,7 @@ export class SessionTable {
     if (this.#closing) throw createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
     /** Only stage-created native tokens reach this internal commit operation. */
     const staged = this.#scopes.get(scope)!
+    this.#publishPrepared(staged)
     /** Repeated same native commit cannot fabricate another accepted notification. */
     const previous = this.#namespaces.get(staged.namespace)
     if (previous === staged.index) return
