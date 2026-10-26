@@ -1,14 +1,102 @@
 /** Actual public dispatch consumes the sole keyed store and verified principal/Session facts. */
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost } from '@migaia/rpc-host'
 import { auth } from '@migaia/rpc-host/plugins/auth'
-import { idempotency } from '@migaia/rpc-host/plugins/idempotency'
+import { createRpcIdempotencyStore, idempotency } from '@migaia/rpc-host/plugins/idempotency'
 import { limits } from '@migaia/rpc-host/plugins/limits'
 import { coreMemoryServer } from '../../host/core-fixture.js'
 
 /** These public fixture credentials are shared only by the real verifier and actual clients. */
 const principals = { alice: 'principal-alice', bob: 'principal-bob' }
+
+it('withdraws cancelled pending claims without retaining their waiters or cancelling the owner', async () => {
+  /** Hold the first provider while repeated public requests join its logical key. */
+  const release = deferred<void>()
+  const entered = deferred<void>()
+  /** Observe the canonical stored entry without adding a production diagnostic surface. */
+  let stored: { waiters: Set<unknown> } | undefined
+  /** Native methods remain the sole storage operations behind these observations. */
+  const mapSet = Map.prototype.set
+  const setAdd = Set.prototype.add
+  /** Count registration independently from cleanup, including the expected failing implementation. */
+  let registrations = 0
+  const mapSpy = vi
+    .spyOn(Map.prototype, 'set')
+    .mockImplementation(function (this: Map<unknown, unknown>, key, value) {
+      if (key === 'cancelled-key' && value?.waiters instanceof Set) stored = value
+      return Reflect.apply(mapSet, this, [key, value])
+    })
+  const setSpy = vi
+    .spyOn(Set.prototype, 'add')
+    .mockImplementation(function (this: Set<unknown>, value) {
+      if (this === stored?.waiters) registrations += 1
+      return Reflect.apply(setAdd, this, [value])
+    })
+  /** Every replay and waiter belongs to the real public store installed on the server. */
+  const store = createRpcIdempotencyStore()
+  const server = coreMemoryServer('waiter-server')
+  /** Provider entry distinguishes waiter cancellation from cancellation of the original owner. */
+  let calls = 0
+  const host = await createRpcHost({
+    ...server.options,
+    plugins: [idempotency({ store }), server.transport],
+    provide: {
+      hold: async () => {
+        calls += 1
+        entered.resolve()
+        await release.promise
+        return 42
+      },
+      barrier: () => true
+    }
+  })
+  const client = await server.connect('waiter-client')
+  /** Observe each request immediately so cleanup cannot leave a fixture rejection unhandled. */
+  const pending: Promise<unknown>[] = []
+  try {
+    const owner = client.host.memory.send('waiter-server', 'hold', undefined, {
+      idempotencyKey: 'cancelled-key'
+    })
+    pending.push(owner)
+    void owner.catch(() => undefined)
+    await entered.promise
+    expect(stored?.waiters).toBeInstanceOf(Set)
+    for (let index = 0; index < 32; index++) {
+      /** Each caller owns cancellation of its waiter, never the provider's original execution. */
+      const cancel = new AbortController()
+      const duplicate = client.host.memory.send('waiter-server', 'hold', undefined, {
+        idempotencyKey: 'cancelled-key',
+        signal: cancel.signal
+      })
+      pending.push(duplicate)
+      void duplicate.catch(() => undefined)
+      await vi.waitFor(() => expect(registrations).toBe(index + 1))
+      cancel.abort()
+      await expect(duplicate).rejects.toMatchObject({ code: 'CANCELLED' })
+      await client.host.memory.send('waiter-server', 'barrier')
+    }
+    expect(registrations).toBe(32)
+    await vi.waitFor(() => expect(stored!.waiters.size).toBe(0))
+    expect(calls).toBe(1)
+    /** A surviving waiter must still receive the owner's terminal outcome. */
+    const survivor = client.host.memory.send('waiter-server', 'hold', undefined, {
+      idempotencyKey: 'cancelled-key'
+    })
+    pending.push(survivor)
+    await vi.waitFor(() => expect(registrations).toBe(33))
+    release.resolve()
+    expect(await Promise.all([owner, survivor])).toEqual([42, 42])
+    expect(stored!.waiters.size).toBe(0)
+    expect(calls).toBe(1)
+  } finally {
+    mapSpy.mockRestore()
+    setSpy.mockRestore()
+    release.resolve()
+    await Promise.allSettled(pending)
+    await Promise.all([client.host.close(), host.close()])
+  }
+})
 
 it('claims once across one principal and treats a different own-key order as a conflicting body', async () => {
   /** This real provider gate makes overlapping claims observable without a store/controller stub. */

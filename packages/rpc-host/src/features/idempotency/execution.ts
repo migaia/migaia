@@ -65,12 +65,12 @@ export class RpcIdempotencyExecution {
         return
       }
       if (claim.status === State.pending) {
-        /** Existing utility cancellation withdraws this observer without cancelling the owner. */
+        /** Withdraw the store callback when this observer finishes or cancels its own waiting. */
         const outcome = await raceWithAbort(() => claim.outcome, {
           signals: [this.#input.payload.context.signal],
           report: this.#report,
           cleanupPolicy: 'report'
-        })
+        }).finally(claim.release)
         if (outcome !== undefined) {
           this.#input.payload.outcome.value = this.#replay(outcome)
           return

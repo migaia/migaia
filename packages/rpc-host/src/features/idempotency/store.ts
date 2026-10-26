@@ -18,6 +18,7 @@ import {
   RpcIdempotencyDefaults as Defaults
 } from './constants.js'
 import { defaultRpcId } from '../../host/identity.js'
+import { deferred } from '@migaia/utils/promise'
 
 /** A portable provider outcome that can be replayed with a new request identifier. */
 export type IRpcIdempotencyOutcome = Readonly<
@@ -60,6 +61,8 @@ export type IRpcIdempotencyClaim =
        * retained.
        */
       outcome: Promise<IRpcIdempotencyOutcome | 'unavailable' | undefined>
+      /** The built-in store withdraws its waiter; custom stores retain their own resource policy. */
+      release?: () => void
     }>
   | Readonly<{ status: 'done'; outcome: IRpcIdempotencyOutcome | 'unavailable' }>
   | Readonly<{ status: 'full' }>
@@ -161,6 +164,30 @@ class RpcIdempotencyClaim {
   /** Receiver-independent release affects only this still-pending entry and its own waiters. */
   readonly release = (): void => {
     this.#store.releaseClaim(this.#entry)
+  }
+}
+
+/** A pending observer owns only its removable callback, never the original execution claim. */
+class RpcIdempotencyWaiter {
+  /** Keep the callback in the entry that registered it, independently from later key reuse. */
+  readonly #entry: IEntry
+  /** Reuse the completion owner so withdrawing an observer also settles its waiting Promise. */
+  readonly #completion = deferred<IRpcIdempotencyOutcome | 'unavailable' | undefined>()
+  /** Pending receipts expose observation without granting provider execution. */
+  readonly status = State.pending
+  /** Owner completion and observer withdrawal settle the same Promise at most once. */
+  readonly outcome = this.#completion.promise
+
+  /** Register one callback while the original execution is still pending. */
+  constructor(entry: IEntry) {
+    this.#entry = entry
+    entry.waiters.add(this.#completion.resolve)
+  }
+
+  /** Removing this callback is idempotent and cannot cancel another observer or the owner. */
+  readonly release = (): void => {
+    this.#entry.waiters.delete(this.#completion.resolve)
+    this.#completion.resolve(undefined)
   }
 }
 
@@ -267,13 +294,7 @@ class RpcIdempotencyStore implements IRpcIdempotencyStore {
       throw createRpcContractError(RpcCoreErrorText.runtimeIdempotencyConflict)
     if (existing?.status === State.done)
       return Object.freeze({ status: State.done, outcome: existing.outcome! })
-    if (existing?.status === State.pending)
-      return Object.freeze({
-        status: State.pending,
-        outcome: new Promise<IRpcIdempotencyOutcome | 'unavailable' | undefined>((resolve) => {
-          existing.waiters.add(resolve)
-        })
-      })
+    if (existing?.status === State.pending) return Object.freeze(new RpcIdempotencyWaiter(existing))
     /** An empty scope is published only after the original capacity checks admit this claim. */
     const scoped = this.#scopes.get(scope) ?? new Map<string, IEntry>()
     if (this.#entries >= this.#maxEntries || scoped.size >= this.#maxEntriesPerScope)
