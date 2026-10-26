@@ -17,7 +17,7 @@ import type {
   IRpcTransportFeatureExtensions,
   IRpcNativePoolEvents
 } from '@migaia/rpc-host/sdk'
-import type { IRpcCallFeature } from '@migaia/rpc-contract/interfaces'
+import type { IRpcAuthenticationRetain, IRpcCallFeature } from '@migaia/rpc-contract/interfaces'
 import { RpcError, RuntimeApiErrorText } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { isNativeThreadChild } from './child.js'
@@ -33,6 +33,8 @@ export type IThreadCommonOptions = Readonly<{
   namespace?: string
   expose?: readonly string[]
   features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[]
+  /** Local connection policy remains independent from native launch/bootstrap objects. */
+  connect?: Readonly<{ retain?: IRpcAuthenticationRetain }>
   report?(error: unknown): void
 }>
 /** Sources are real native recipes or entry shorthand, never callbacks returning completed Peers. */
@@ -165,6 +167,7 @@ export function threadPlugin<
     closingWrites: true,
     expose: configured.expose,
     features: configured.features,
+    connect: { retain: configured.connect?.retain },
     open: installation.open
   }) as IRpcTransportPlugin<
     N,

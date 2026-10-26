@@ -156,6 +156,7 @@ export function webTransportPlugin<
     expose: options.expose,
     features: options.features,
     handshakeTimeoutMs: options.connect?.timeoutMs,
+    connect: { retain: options.connect?.retain },
     open: (context) => openStream(options.session, context)
   }) as IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>
 }

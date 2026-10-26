@@ -15,7 +15,7 @@ import {
   type IRpcNativeMemberControls,
   type IRpcTransportPlugin
 } from '@migaia/rpc-host/sdk'
-import type { IRpcCallFeature } from '@migaia/rpc-contract/interfaces'
+import type { IRpcAuthenticationRetain, IRpcCallFeature } from '@migaia/rpc-contract/interfaces'
 import { CoroutineSource, type ICoroutineSupervisorPolicy } from './coroutine-source.js'
 import {
   connectionOf,
@@ -31,6 +31,8 @@ export type ICoroutineCommonOptions = Readonly<{
   namespace?: string
   expose?: readonly string[]
   features?: readonly (IRpcCallFeature | IRpcNativeTransportFeature | IRpcFlowFeature<object>)[]
+  /** The native task or parent token borrows this exact connection's auth retention policy. */
+  connect?: Readonly<{ retain?: IRpcAuthenticationRetain }>
   report?(error: unknown): void
 }>
 /** Exactly one original native source is admitted before any task or port can be acquired. */
@@ -139,6 +141,7 @@ export function coroutinePlugin<
     closingWrites: true,
     expose: options.expose,
     features: options.features,
+    connect: { retain: options.connect?.retain },
     open: installation.open
   }) as IRpcTransportPlugin<
     N,

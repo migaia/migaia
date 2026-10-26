@@ -221,6 +221,7 @@ export function serviceWorkerPlugin<
     expose: options.expose,
     features: options.features,
     handshakeTimeoutMs: options.connect?.timeoutMs,
+    connect: { retain: options.connect?.retain },
     open: (context) => {
       if (!coldContext.clients)
         return attachBrowserCarrier(

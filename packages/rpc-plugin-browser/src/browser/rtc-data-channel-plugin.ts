@@ -36,6 +36,7 @@ export function rtcDataChannelPlugin<
     expose: options.expose,
     features: options.features,
     handshakeTimeoutMs: options.connect?.timeoutMs,
+    connect: { retain: options.connect?.retain },
     open: (context) => attachBrowserCarrier(createRtcDataChannelCarrier(channel, context), context)
   }) as IRpcTransportPlugin<NoInfer<N>, IRpcTransportFeatureExtensions<TFeatures[number]>, true>
 }

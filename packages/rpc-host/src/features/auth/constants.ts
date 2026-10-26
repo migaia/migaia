@@ -25,14 +25,12 @@ export const RpcAuthenticationEncoding = {
   bytes: 'uint8array'
 } as const
 
-/** Original bounded request-ID retention is independent from signed-envelope counter windows. */
+/** Numeric request-ID retention bounds are independent from signed-envelope counter windows. */
 export const RpcAuthenticationReplayPolicy = {
-  /** Accepted active and completed correlations share this non-evicting installation bound. */
+  /** Numeric active and completed correlations share this non-evicting installation bound. */
   maxEntries: 4096,
-  /** One admitted direct peer cannot occupy the entire original replay budget. */
+  /** One numeric-retention peer cannot occupy the entire original replay budget. */
   maxEntriesPerPeer: 1024,
-  /** Completed identities expire lazily; active streams retain capacity until actual completion. */
-  ttlMs: 310_000,
   /** Refused identities keep their original short retry refusal without refreshing timestamps. */
   rejectedTtlMs: 1_000
 } as const

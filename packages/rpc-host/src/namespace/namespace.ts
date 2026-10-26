@@ -209,7 +209,8 @@ class NamespaceSource {
       {
         signal: this.#controller.signal,
         handshakeTimeoutMs: definition.handshakeTimeoutMs,
-        nameAdmissionTimeoutMs: definition.nameAdmissionTimeoutMs
+        nameAdmissionTimeoutMs: definition.nameAdmissionTimeoutMs,
+        connect: definition.connect
       },
       this.#gate
     )

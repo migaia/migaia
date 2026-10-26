@@ -66,6 +66,7 @@ it('retains legacy stream admission through next, return and terminal physical c
       auth({
         sign: (value) => value,
         verify: (value) => value,
+        retain: 310_000,
         maxReplayEntriesPerPeer: 1,
         onRejected: (rejection) => {
           rejected.push(rejection.reason)

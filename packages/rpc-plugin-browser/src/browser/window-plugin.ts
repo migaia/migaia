@@ -40,6 +40,7 @@ export function windowPlugin<
     expose: options.expose,
     features: options.features,
     handshakeTimeoutMs: options.connect?.timeoutMs,
+    connect: { retain: options.connect?.retain },
     open: (context) =>
       attachBrowserCarrier(
         createWindowCarrier(

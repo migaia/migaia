@@ -184,7 +184,7 @@ export class Session {
     /** Retained lifecycle collaborators never retain the original secret-bearing context. */
     const { connection, ...collaborators } = options
     this.#options = collaborators
-    this.#credentials = { value: connection?.credentials }
+    this.#credentials = { value: connection?.credentials, retain: connection?.retain }
     bindSessionCredentials(this.#handshakeResult, this.#credentials)
     this.#handshakeResult.authentication = connection?.authentication
     /** The readonly handle getter borrows only this Session's actual readiness-failure fact. */
@@ -588,6 +588,7 @@ export class Session {
     this.#admissionDeadline = undefined
     this.#handshakeResult.authentication = undefined
     this.#credentials.value = undefined
+    this.#credentials.retain = undefined
     void this.#finishClose(physicalFailure).then(this.#closed.resolve, this.#closed.reject)
     return this.#closed.promise
   }

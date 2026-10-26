@@ -56,9 +56,12 @@ export function defineTransportPlugin<
   definition: IRpcTransportDefinition<F, E, IRpcTransportSetupContext> &
     Readonly<{ namespace: N; closingWrites?: A }>
 ): IRpcTransportPlugin<N, E & IRpcTransportFeatureExtensions<F>, A> {
-  /** Capture the caller's array once; installed feature instances retain their original identity. */
+  /** Capture only the generic local policy; native token and acquisition objects never enter it. */
+  const { connect, ...configuration } = definition
+  /** Capture caller configuration once; installed feature instances retain their original identity. */
   const captured = Object.freeze({
-    ...definition,
+    ...configuration,
+    connect: connect === undefined ? undefined : Object.freeze({ retain: connect.retain }),
     expose: definition.expose === undefined ? undefined : Object.freeze([...definition.expose]),
     features:
       definition.features === undefined ? undefined : Object.freeze([...definition.features])

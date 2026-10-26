@@ -3,8 +3,8 @@ import { it } from 'vitest'
 
 import { RequestReplayLedger } from '../../dist/features/auth/request-replay.js'
 
-it('default replay owner keeps global 4096 capacity and isolated endpoint ownership', () => {
-  /** Zero-argument construction decides the real default owner, not explicit fixture capacities. */
+it('numeric replay retention keeps global 4096 capacity and isolated endpoint ownership', () => {
+  /** Default constructor capacities still constrain explicitly retained numeric-mode entries. */
   const ledger = new RequestReplayLedger()
   /** A second canonical owner must not share capacity or disposal with the first. */
   const other = new RequestReplayLedger()
@@ -18,15 +18,15 @@ it('default replay owner keeps global 4096 capacity and isolated endpoint owners
     for (let peer = 0; peer < 4; peer++)
       for (let index = 0; index < 1024; index++)
         assert.notEqual(
-          ledger.admit(sources[peer]!, String(peer), `${peer}-${index}`, 0),
+          ledger.admit(sources[peer]!, String(peer), `${peer}-${index}`, 0, 310_000),
           undefined
         )
     assert.equal(
       sources.reduce((total, source) => total + source.replayKeys.size, 0),
       4096
     )
-    assert.equal(ledger.admit(rejected, 'other-peer', 'overflow', 0), undefined)
-    assert.notEqual(other.admit(independent, '0', 'independent', 0), undefined)
+    assert.equal(ledger.admit(rejected, 'other-peer', 'overflow', 0, 310_000), undefined)
+    assert.notEqual(other.admit(independent, '0', 'independent', 0, 310_000), undefined)
     for (const source of sources) ledger.retire(source)
     ledger.retire(rejected)
     assert.equal(independent.replayKeys.size, 1)

@@ -13,6 +13,7 @@ import {
 } from '@migaia/rpc-host/sdk'
 import { RpcError, RuntimeApiErrorText } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
+import type { IRpcAuthenticationRetain } from '@migaia/rpc-contract/interfaces'
 import { PROCESS_NAMESPACE } from './constants.js'
 import { isProcessChild } from './child.js'
 import { NativeProcessRuntimeLoader, type IAdapterProcessRuntimeModule } from './runtime-loader.js'
@@ -49,8 +50,12 @@ export type IProcessPluginCommonOptions = Omit<IProcessShortSpawn, 'entry'> &
     report?(error: unknown): void
     parentLoss?: IProcessServeChildIngress['parentLoss']
   }>
-/** The original connect decorator sets a handshake budget; only target selects a native source. */
-export type IProcessConnectDeadline = Readonly<{ timeoutMs?: number }>
+/** Generic connection policy borrows the original connect decorator; only target selects a source. */
+export type IProcessConnectDeadline = Readonly<{
+  timeoutMs?: number
+  /** Completed request retention overrides auth only on this native connection. */
+  retain?: IRpcAuthenticationRetain
+}>
 /** Exactly one physical source is selected synchronously before native resources are acquired. */
 export type IProcessPluginOptions = IProcessPluginCommonOptions &
   (
@@ -304,6 +309,7 @@ export function processPlugin<
     expose: configured.expose,
     features: configured.features,
     nameAdmissionTimeoutMs: configured.connect?.timeoutMs,
+    connect: { retain: configured.connect?.retain },
     open: installation.open
   }) as IRpcTransportPlugin<
     N,

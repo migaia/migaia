@@ -50,6 +50,7 @@ export function sharedWorkerPlugin<
     expose: options.expose,
     features: options.features,
     handshakeTimeoutMs: options.connect?.timeoutMs,
+    connect: { retain: options.connect?.retain },
     open: (context) =>
       scope
         ? listenBrowserPorts(scope, context)

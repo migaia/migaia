@@ -1,11 +1,11 @@
-/** Auth completion retention follows actual acquired native custody, not a caller-selected flag. */
+/** Default completed-ID release and invalid retention use actual native Worker sources. */
 import { expect, it } from 'vitest'
-import { createRpcHost } from '@migaia/rpc-host'
+import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
 import { auth } from '@migaia/rpc-host/plugins/auth'
 import { threadPlugin } from '../../../rpc-plugin-thread/dist/threads/index.js'
 import { createFixtureAuthentication } from '../../../rpc-plugin-thread/test/threads/fixtures/dx-authentication.mjs'
 
-it('releases completed request IDs on a genuine exclusive Node Worker source beyond1024', async () => {
+it('releases default completed request IDs beyond1024 on a genuine native Node Worker source', async () => {
   /** This existing Worker independently installs real Auth; it is not automatic native Auth proof. */
   const host = await createRpcHost({
     plugins: [
@@ -37,3 +37,32 @@ it('releases completed request IDs on a genuine exclusive Node Worker source bey
     await host.close()
   }
 }, 15_000)
+
+it('A30 preserves invalid connection retention as the public native Worker configuration failure', async () => {
+  /** Unexpected successful construction must still release its actual public Host and Worker. */
+  let host: Pick<IRpcHost, 'close'> | undefined
+  try {
+    await expect(
+      createRpcHost({
+        plugins: [
+          auth(createFixtureAuthentication()),
+          threadPlugin({
+            name: 'thread',
+            connect: { retain: 0 },
+            spawn: {
+              entry: new URL(
+                '../../../rpc-plugin-thread/test/threads/fixtures/dx-signed-worker.mjs',
+                import.meta.url
+              ),
+              data: { signed: true }
+            }
+          })
+        ]
+      }).then((created) => {
+        host = created
+      })
+    ).rejects.toMatchObject({ source: 'rpc.endpoint', code: 'INVALID_CONFIG' })
+  } finally {
+    await host?.close()
+  }
+})

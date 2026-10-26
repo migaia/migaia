@@ -3,12 +3,32 @@
  * installation. Configuration failures use Host error ownership; nonce, replay and connection state
  * are allocated only by the installed authentication flow.
  */
+import type { IRpcAuthenticationRetain } from '@migaia/rpc-contract/interfaces'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 import { createRpcError } from '../../host/error-owner.js'
 import { RpcAuthenticationText as Text } from './text.js'
 import type { IRpcAuthenticationOptions } from './types.js'
 import { RpcAuthenticationEncoding as Encoding } from './constants.js'
+
+/** Validate one captured auth or physical-connection retention without interpreting credentials. */
+export function readAuthenticationRetain(
+  value: unknown,
+  signed: boolean
+): IRpcAuthenticationRetain {
+  if (
+    value !== false &&
+    value !== 'window' &&
+    !(typeof value === 'number' && Number.isSafeInteger(value) && value > 0)
+  )
+    throw createRpcError(RpcCoreErrorCode.invalidConfig, Text.authenticationRetainIsInvalid)
+  if (value === 'window' && !signed)
+    throw createRpcError(
+      RpcCoreErrorCode.invalidConfig,
+      Text.authenticationWindowRetentionRequiresSigning
+    )
+  return value
+}
 
 /** Capture actual transform functions once, preserving the original unreadable getter cause. */
 export function snapshotAuthenticationConfig(
@@ -25,6 +45,7 @@ export function snapshotAuthenticationConfig(
       sign: config.sign,
       verify: config.verify,
       encodedType: config.encodedType,
+      retain: config.retain,
       maxReplayEntriesPerPeer: config.maxReplayEntriesPerPeer,
       onRejected: config.onRejected,
       credentials: config.credentials,
@@ -64,6 +85,7 @@ export function snapshotAuthenticationConfig(
       RpcCoreErrorCode.invalidConfig,
       Text.authenticationEncryptionRequiresSigning
     )
+  readAuthenticationRetain(snapshot.retain === undefined ? false : snapshot.retain, !!snapshot.sign)
   if (!snapshot.sign && !snapshot.verifyCredentials && snapshot.credentials === undefined)
     throw createRpcError(
       RpcCoreErrorCode.invalidConfig,

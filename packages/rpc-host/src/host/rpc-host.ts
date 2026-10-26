@@ -575,6 +575,7 @@ export class RpcHost {
     const controller = createAbortController()
     /** The original registration lends its one staged identity index to every actual attachment. */
     const sessionScope = this.#sessions.stage(definition.namespace, {
+      connect: definition.connect,
       handshakeTimeoutMs: definition.handshakeTimeoutMs,
       nameAdmissionTimeoutMs: definition.nameAdmissionTimeoutMs,
       signal: controller.signal,

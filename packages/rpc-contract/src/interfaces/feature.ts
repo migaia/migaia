@@ -3,7 +3,7 @@
  * selects instances; timeout, retry, pool, and media features own their own behavior.
  */
 import type { IAbortSignal } from '@migaia/utils/promise'
-import type { IRpcDispose, IRpcTransportContext } from './carrier.js'
+import type { IRpcAuthenticationRetain, IRpcDispose, IRpcTransportContext } from './carrier.js'
 
 /** Canonical executing-policy discriminants are shared by factories and the sole feature selector. */
 export const RpcCallFeatureKind = {
@@ -147,6 +147,8 @@ export type IRpcTransportDefinition<
   expose?: readonly string[]
   /** The transport owns installation and disposal of each supplied feature. */
   features?: readonly TFeature[]
+  /** Only generic local connection policy reaches Host; native acquisition options stay native. */
+  connect?: Readonly<{ retain?: IRpcAuthenticationRetain }>
   /** Bound each physical handshake with the existing Session clock; omission keeps its default. */
   handshakeTimeoutMs?: number
   /** Name arbitration has its own original connect deadline after protocol negotiation. */

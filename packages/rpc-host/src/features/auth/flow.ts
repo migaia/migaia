@@ -9,7 +9,8 @@ import type {
   IRpcFlowContext,
   IRpcEnvelopeContext,
   IRpcPreparedMessage,
-  IRpcDispatchContext
+  IRpcDispatchContext,
+  IRpcAuthenticationRetain
 } from '@migaia/rpc-contract/interfaces'
 import {
   RpcProbeStage,
@@ -18,7 +19,11 @@ import {
   RpcProbeObservationKind,
   RpcDispatchDrop
 } from '@migaia/rpc-contract/interfaces'
-import type { IRpcHandshake, IRpcPortableValue } from '@migaia/rpc-contract/protocol'
+import type {
+  IRpcHandshake,
+  IRpcPortableValue,
+  IRpcSemanticFrame
+} from '@migaia/rpc-contract/protocol'
 import { RpcWireHandshakeStep, RpcWireKind } from '@migaia/rpc-contract/protocol'
 import {
   RpcAuthenticationError,
@@ -51,12 +56,15 @@ import { registerAuthenticationCounterSetter } from './counter.js'
 import type { IAuthenticationCounterWindow, IRpcAuthenticationOptions } from './types.js'
 import { RequestReplayLedger, type IRequestReplaySource } from './request-replay.js'
 import { readAuthenticationHandshake, wrapAuthenticationHandshake } from './handshake.js'
-import { readSessionCredentials } from '../../session/credentials.js'
+import { readSessionCredentials, readSessionRetention } from '../../session/credentials.js'
+import { readAuthenticationRetain } from './config.js'
 
 /** One original physical source owns its pinned nonce/window and exact retirement receipt. */
 type IAuthenticationSource = IRequestReplaySource & {
   id: string
   signal: IAbortSignal
+  /** This exact physical source keeps its validated connection-over-auth completed-ID policy. */
+  retain: IRpcAuthenticationRetain
   window?: IAuthenticationCounterWindow
   /** A rebuilt logical source must prove this receiver's new challenge before becoming ready. */
   challenge?: string
@@ -64,6 +72,9 @@ type IAuthenticationSource = IRequestReplaySource & {
   remoteChallenge?: string
   abort(): void
 }
+
+/** Route-admitted native envelope identity carries only its original verified window counter. */
+type IAuthenticationVerification = Readonly<{ source: IAuthenticationSource; counter: bigint }>
 
 /** All transforms, outgoing sequence and inbound replay windows belong to this installed plugin. */
 export class RpcAuthenticationFlow {
@@ -77,6 +88,8 @@ export class RpcAuthenticationFlow {
   #counter = 0n
   /** Actual physical ids index one existing nonce/64-bit window, without discovery/challenge tables. */
   readonly #sources = new Map<string, IAuthenticationSource>()
+  /** Only original restored envelope identities can lend verified counters to dispatch. */
+  readonly #verified = new WeakMap<object, IAuthenticationVerification>()
   /** Correlation replay retention is separate from signed-envelope nonce/counter admission. */
   readonly #requests: RequestReplayLedger
   /** Native setup cancellation owns all listener and replay-window cleanup for this installation. */
@@ -151,6 +164,9 @@ export class RpcAuthenticationFlow {
     this.#assert(context)
     /** Only the existing accepted physical source owns this correlation and its retirement. */
     const source = this.#source(context)
+    /** Consume this exact verified envelope proof without retaining completed business frames. */
+    const verified = this.#verified.get(context.envelope)
+    this.#verified.delete(context.envelope)
     /** Quota identity comes from actual business admission, after handshake publishes the peer. */
     const peerKey = context.session?.peerId ?? context.carrierId
     /** The admitted caller stays distinct from the immediate physical source and public task ID. */
@@ -166,7 +182,9 @@ export class RpcAuthenticationFlow {
       return
     }
     /** Original entry identity prevents late completion from touching a reused correlation. */
-    const entry = this.#requests.admit(source, peerKey, key, now, context.exclusive === true)
+    if (source.retain === 'window' && verified?.source !== source)
+      throw createRpcAuthenticationError(Text.authenticationReplayBindingInvalid)
+    const entry = this.#requests.admit(source, peerKey, key, now, source.retain, verified?.counter)
     if (!entry) {
       void this.#notify(context, peerKey, key)
       /**
@@ -236,6 +254,18 @@ export class RpcAuthenticationFlow {
   ): Promise<IRpcHandshake> {
     this.#assert(context)
     if (frame.step === RpcWireHandshakeStep.reject) return frame
+    /** Local configuration admission must remain outside the credential-failure privacy boundary. */
+    const source = this.#source(context)
+    /** Undefined alone falls back; false and invalid runtime values retain their original meaning. */
+    const connectedRetain = readSessionRetention(context)
+    source.retain = readAuthenticationRetain(
+      connectedRetain !== undefined
+        ? connectedRetain
+        : this.#config.retain === undefined
+          ? false
+          : this.#config.retain,
+      !!this.#config.sign
+    )
     try {
       if (context.direction === 'outbound') {
         /** One captured resolver borrows the native owner's exact connection-local token. */
@@ -249,7 +279,6 @@ export class RpcAuthenticationFlow {
         if (!this.#config.sign)
           return credentials === undefined ? frame : { ...frame, auth: credentials }
         /** The same source record owns both replay admission and handshake freshness. */
-        const source = this.#source(context)
         source.challenge ??= createAuthenticationNonce()
         return {
           ...frame,
@@ -402,8 +431,11 @@ export class RpcAuthenticationFlow {
         this.#representation.metadata(envelope.payload),
         value.sidecars
       )
+      /** Session returns its original grammar-, integrity- and route-admitted envelope identity. */
+      let restored: IRpcSemanticFrame | undefined
       try {
-        if ((await context.restore(inner)) === undefined) return inner
+        restored = await context.restore(inner)
+        if (restored === undefined) return inner
       } catch (error) {
         validationFailed = true
         validationFailure = error
@@ -415,7 +447,18 @@ export class RpcAuthenticationFlow {
       source.window ??= { nonce: envelope.nonce, high: 0n, bits: new BigUint64Array(1) }
       if (source.window.nonce !== envelope.nonce)
         throw createRpcAuthenticationError(Text.authenticationReplayBindingInvalid)
-      admitAuthenticationCounter(source.window, BigInt(envelope.counter))
+      /** This request counter is captured before later verified envelopes can advance the window. */
+      const counter = BigInt(envelope.counter)
+      admitAuthenticationCounter(source.window, counter)
+      if (source.retain === 'window') {
+        this.#requests.advanceWindow(source)
+        if (
+          restored.kind === RpcWireKind.call ||
+          restored.kind === RpcWireKind.group ||
+          restored.kind === RpcWireKind.outcome
+        )
+          this.#verified.set(restored, { source, counter })
+      }
       return inner
     } catch (error) {
       if (validationFailed && error === validationFailure) throw error
@@ -433,6 +476,7 @@ export class RpcAuthenticationFlow {
       id: context.carrierId,
       replayKeys: new Set(),
       signal: context.connectionSignal ?? context.signal,
+      retain: this.#config.retain === undefined ? false : this.#config.retain,
       abort: () => undefined
     }
     /** The record carries its compact id so this callback captures only its explicit owner/record. */

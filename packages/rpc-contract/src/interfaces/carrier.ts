@@ -302,10 +302,18 @@ export type IRpcLocalSourceFacts = Readonly<{
   nativeGeneration?: IRpcNativeGeneration
 }>
 
+/**
+ * Completed request IDs release immediately, follow signed counters, or retain positive safe
+ * milliseconds.
+ */
+export type IRpcAuthenticationRetain = false | 'window' | number
+
 /** Trusted connection secrets stay with Session and never enter descriptive source facts. */
 export type IRpcConnectionContext = Readonly<{
   /** Only the configured auth credential resolver receives this native connection's value. */
   credentials?: IRpcPortableValue
+  /** This exact connection overrides the auth Feature's completed-request retention policy. */
+  retain?: IRpcAuthenticationRetain
   /** The native bootstrap verifier may attest identity before application authentication runs. */
   authentication?: Readonly<{ principalId: string }>
 }>

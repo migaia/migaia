@@ -4,7 +4,9 @@ import { systemScheduler, systemWallClock } from '@migaia/utils/scheduler'
 import type { ILifecycleScope } from '@migaia/lifecycle'
 import type {
   IRpcCarrier,
+  IRpcAuthenticationRetain,
   IRpcConnectionContext,
+  IRpcTransportDefinition,
   IRpcLocalSourceFacts,
   IRpcNativeGeneration,
   IRpcPingOptions,
@@ -97,6 +99,8 @@ type IStagedSessions = Readonly<{
   parent?: IStagedSessions
   handshakeTimeoutMs?: number
   nameAdmissionTimeoutMs?: number
+  /** Appended sources inherit this local default without retaining any connection credentials. */
+  retain?: IRpcAuthenticationRetain
   sessions: Set<Session>
   closing: Set<IRpcClosingHandler>
   peerClosed: Set<IRpcPeerClosedHandler>
@@ -106,6 +110,7 @@ type IStagedSessions = Readonly<{
 type ISessionScopeOptions = Pick<IRpcSessionTableOptions, 'handshakeTimeoutMs'> & {
   signal?: IAbortSignal
   nameAdmissionTimeoutMs?: number
+  connect?: IRpcTransportDefinition['connect']
   parent?: IRpcSessionScope
   /** Appended sources inherit these same native transport-owned collaborators. */
   pipelines?: () => IRpcPipelineOwner
@@ -273,6 +278,8 @@ export class SessionTable {
     const scope = Object.freeze({})
     /** Appended sources borrow canonical identity indexes and retain their own resource scope. */
     const parent = options?.parent === undefined ? undefined : this.#scopes.get(options.parent)!
+    /** Only omission inherits; false and invalid runtime values remain Auth's explicit inputs. */
+    const retain = options?.connect?.retain
     this.#scopes.set(scope, {
       namespace,
       index: parent?.index ?? this.#newIndex(options?.signal),
@@ -283,6 +290,7 @@ export class SessionTable {
       gate: options?.gate,
       handshakeTimeoutMs,
       nameAdmissionTimeoutMs: options?.nameAdmissionTimeoutMs,
+      retain: retain === undefined ? parent?.retain : retain,
       sessions: new Set(),
       closing: new Set(),
       peerClosed: new Set()
@@ -552,10 +560,21 @@ export class SessionTable {
     if (facts) this.#options.admitSourceFacts?.(facts)
     /** Direct and private physical sessions share one ingress/gate and lifecycle notification path. */
     const staged = scope === undefined ? undefined : this.#scopes.get(scope)
+    /** Exact physical overrides win; invalid runtime values must reach Auth validation unchanged. */
+    const retain = callbacks.connection?.retain
+    /**
+     * Adding a scope default preserves the original credentials and authentication value
+     * identities.
+     */
+    const connection =
+      retain === undefined && staged?.retain !== undefined
+        ? { ...callbacks.connection, retain: staged.retain }
+        : callbacks.connection
     /** Capture only accepted routing ports; never retain the callback object's native credentials. */
     const ingress = { owner: this, id: carrier.id, source: callbacks.source, scope: staged }
     return new Session({
       ...callbacks,
+      connection,
       receive: (view, frame) =>
         ingress.owner.#options.receive(
           ingress.id,

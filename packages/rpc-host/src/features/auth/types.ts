@@ -3,7 +3,7 @@
  * runtime-neutral contracts lend admitted flow facts and shared refusal data; installed auth owns
  * mutable replay state while native transports supply real credential/source facts.
  */
-import type { IRpcFlowContext } from '@migaia/rpc-contract/interfaces'
+import type { IRpcFlowContext, IRpcAuthenticationRetain } from '@migaia/rpc-contract/interfaces'
 import type { IRpcPeerInfo, IRpcPortableValue } from '@migaia/rpc-contract/protocol'
 import type { IRpcProviderRejection } from '@migaia/rpc-contract/errors'
 
@@ -27,7 +27,9 @@ export type IRpcAuthenticationOptions = Readonly<{
   verify?: IRpcAuthenticationTransform
   /** Default any signs the binding object without encrypt; explicit text/bytes encode it once. */
   encodedType?: 'any' | 'string' | 'uint8array'
-  /** Active plus retained completed request IDs default to1024 per admitted direct peer. */
+  /** Completed IDs release immediately by default; connection retain overrides this installation. */
+  retain?: IRpcAuthenticationRetain
+  /** Numeric retention alone reserves up to1024 active/retained IDs per admitted direct peer. */
   maxReplayEntriesPerPeer?: number
   /** Replay capacity refusal borrows the original admitted-identity diagnostic contract. */
   onRejected?(rejection: IRpcProviderRejection): void | Promise<void>

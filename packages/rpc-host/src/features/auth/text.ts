@@ -31,6 +31,11 @@ export const RpcAuthenticationText = {
     'authentication requires encryption or signing transforms',
   /** Stable core error text consumed by features/auth; preserves its existing caller-facing wording. */
   authenticationEncodedTypeIsInvalid: 'authentication.encodedType is invalid',
+  /** Auth and connection retention share this admission rule before native credential handling. */
+  authenticationRetainIsInvalid:
+    'authentication.retain must be false, window, or a positive safe integer',
+  /** Counter-window retention requires the configured sign/verify pair to establish real counters. */
+  authenticationWindowRetentionRequiresSigning: 'authentication.retain window requires signing',
   /** Stable core error text consumed by features/auth; preserves its existing caller-facing wording. */
   outboundFrameAuthenticationFailed: 'Outbound frame authentication failed',
   /** Stable core error text consumed by features/auth; preserves its existing caller-facing wording. */

@@ -16,10 +16,10 @@ import type {
   IRpcSessionHandle,
   IRpcSessionView
 } from '@migaia/rpc-contract/interfaces'
-import { RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
+import { RpcCoreErrorCode, RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcAuthenticationError } from '@migaia/rpc-contract/errors'
 import { createRemoteLayerError } from '../host/remote-error-owner.js'
-import { isLocalRpcError } from '../host/error-owner.js'
+import { isLocalRpcError, localRpcErrorCode } from '../host/error-owner.js'
 import { resolveAbortReason } from '../host/abort-reason.js'
 import { memberAggregate } from './member-errors.js'
 import { RpcMemberFirstStart } from './member-start.js'
@@ -278,8 +278,13 @@ export class RpcMemberGeneration<TUnit, TSpec> {
       /** Only Session's actual reject receipt preserves its original handshake phase and error. */
       const failure = candidate.session?.handshakeFailure
       if (failure && cause === failure.error) throw cause
-      /** Local refusal reaches the first-failure owner; an already-aborted caller keeps priority. */
-      if (!signal.aborted && isLocalRpcError(cause, RpcAuthenticationError)) throw cause
+      /** Local Auth/config refusal stays primary; an already-aborted caller keeps priority. */
+      if (
+        !signal.aborted &&
+        (isLocalRpcError(cause, RpcAuthenticationError) ||
+          localRpcErrorCode(cause) === RpcCoreErrorCode.invalidConfig)
+      )
+        throw cause
       /** Native departure or caller cancellation keeps its original preparation checkpoint error. */
       this.#assertPreparing(signal, outcome.generation)
       throw createRemoteLayerError(RpcRemoteLayerErrorCode.startFailed, cause)
