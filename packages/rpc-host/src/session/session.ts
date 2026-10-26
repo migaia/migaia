@@ -282,7 +282,7 @@ export class Session {
       else this.#unsubscribe = remove
     } catch (error) {
       this.#options.report(error)
-      void this.#close(error, true)
+      void this.#close(error, false, false, true)
       return
     }
     if (!this.#closing) {
@@ -575,7 +575,12 @@ export class Session {
     )
 
   /** The physical ingress fact survives retirement without changing shared native error identity. */
-  #close(reason?: unknown, physicalFailure = false, closeFrame = false): Promise<void> {
+  #close(
+    reason?: unknown,
+    physicalFailure = false,
+    closeFrame = false,
+    skipReceiving = physicalFailure || closeFrame
+  ): Promise<void> {
     if (closeFrame) {
       this.#receivedClose = {
         reason: reason ?? createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
@@ -598,12 +603,15 @@ export class Session {
     this.#handshakeResult.authentication = undefined
     this.#credentials.value = undefined
     this.#credentials.retain = undefined
-    void this.#finishClose(physicalFailure).then(this.#closed.resolve, this.#closed.reject)
+    void this.#finishClose(physicalFailure, skipReceiving).then(
+      this.#closed.resolve,
+      this.#closed.reject
+    )
     return this.#closed.promise
   }
 
   /** One budget bounds native reason selection, application hooks, FIFO writes and final close. */
-  async #finishClose(physicalFailure: boolean): Promise<void> {
+  async #finishClose(physicalFailure: boolean, skipReceiving: boolean): Promise<void> {
     if (
       (this.#view && this.#options.carrier.closingWrites) ||
       (physicalFailure && this.#options.carrier.terminalReason)
@@ -669,11 +677,11 @@ export class Session {
     const remove = this.#unsubscribe
     this.#unsubscribe = undefined
     await this.#writing
-    await this.#cleanup(remove, physicalFailure || Boolean(this.#receivedClose))
+    await this.#cleanup(remove, skipReceiving)
   }
 
   /** Physical close settles queued writes before joining the reply; ingress never waits on itself. */
-  async #cleanup(remove: IRpcDispose | undefined, physicalFailure: boolean): Promise<void> {
+  async #cleanup(remove: IRpcDispose | undefined, skipReceiving: boolean): Promise<void> {
     /** Keep all original cleanup values reachable if multiple native releases fail. */
     const failures: unknown[] = []
     // These two carrier releases remain supported cleanup boundaries in their original order.
@@ -695,7 +703,7 @@ export class Session {
       if (error !== this.#reason) this.#options.report(error)
     }
     /** External close joins admitted ingress before its native stage owner is revoked. */
-    if (!physicalFailure) await this.#receiving
+    if (!skipReceiving) await this.#receiving
     this.#view = undefined
     if (failures.length === 1) throw failures[0]
     if (failures.length > 1)
@@ -1392,7 +1400,7 @@ export class Session {
       }
     }
     // Ingress never joins its own close: the same bounded close may wait for this receive tail.
-    void this.#close(error, true).catch(this.#options.report)
+    void this.#close(error, false, false, true).catch(this.#options.report)
   }
 
   /** Every asynchronous codec/hook continuation checks this before publication or physical write. */

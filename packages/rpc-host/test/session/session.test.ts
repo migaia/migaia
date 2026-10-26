@@ -673,3 +673,29 @@ it('records the original control.sent assertion through the real native Session 
     emitter.dispose()
   }
 })
+
+it('A36 handshake timeout closes locally without consulting a native terminal reason', async () => {
+  /** Manual startup time exercises the genuine unpublished Session timeout. */
+  const local = await Host.create('timeout-owner', 'timeout-owner', {}, { handshakeTimeoutMs: 5 })
+  /** No linked peer means the actual hello remains unanswered. */
+  const carrier = new MemoryCarrier('unanswered')
+  /** An unrelated native exit must not be awaited by a local handshake timeout. */
+  const terminalReason = vi.fn(async () => new Error('unrelated native exit'))
+  Object.assign(carrier, { terminalReason })
+  /** The real table publishes the original readiness and close completions. */
+  const session = local.attach('process', carrier)
+  /** Observe readiness rejection before advancing the original manual deadline. */
+  const failed = expect(session.ready).rejects.toMatchObject({
+    code: RpcCoreErrorCode.deadlineExceeded
+  })
+  try {
+    local.scheduler.advance(5)
+    await failed
+    await session.closed
+    expect(terminalReason).not.toHaveBeenCalled()
+    expect(local.report).toHaveBeenCalledOnce()
+    expect(local.scheduler.pendingCount).toBe(0)
+  } finally {
+    await local.table.close()
+  }
+})
