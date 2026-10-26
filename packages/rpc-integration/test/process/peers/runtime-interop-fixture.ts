@@ -1,4 +1,4 @@
-import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowFeature, RpcFlowPoint } from '@migaia/rpc-host/sdk'
 import type { IRpcDirectory, IRpcWireError } from '@migaia/rpc-contract/protocol'
 import { fileURLToPath } from 'node:url'
 
@@ -37,30 +37,27 @@ export class NativeInteropObservations {
   /** Original flat error emitted by the foreign provider, before local restoration. */
   #error: IRpcWireError | undefined
 
-  /** The real cold flow receiver returns every original value unchanged. */
-  readonly plugin = defineFlowPlugin({
+  /** The real flow stages forward every original value unchanged. */
+  readonly plugin = defineFlowFeature({
     name: 'native-interop-observation',
     setup: () => ({
-      hooks: {
-        handshake: (value, context) => {
-          if (context.direction === 'inbound' && value.step !== 'reject')
-            this.#directory = value.directory
-          return value
+      stages: {
+        [RpcFlowPoint.handshakeInbound]: (payload, next) => {
+          if ('directory' in payload.handshake) this.#directory = payload.handshake.directory
+          return next(payload)
         },
-        envelope: {
-          inbound: (value) => {
-            /** Metadata has already passed the native JSON decoder; this hook never grants authority. */
-            const message = value.message
-            if (
-              message &&
-              typeof message === 'object' &&
-              'kind' in message &&
-              message.kind === 'error' &&
-              'error' in message
-            )
-              this.#error = message.error as IRpcWireError
-            return value
-          }
+        [RpcFlowPoint.envelopeInbound]: (payload, next) => {
+          /** Metadata has already passed the native JSON decoder; this stage never grants authority. */
+          const message = payload.prepared.message
+          if (
+            message &&
+            typeof message === 'object' &&
+            'kind' in message &&
+            message.kind === 'error' &&
+            'error' in message
+          )
+            this.#error = message.error as IRpcWireError
+          return next(payload)
         }
       }
     })

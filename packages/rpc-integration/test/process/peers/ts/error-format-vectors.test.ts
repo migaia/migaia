@@ -4,7 +4,6 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import {
   deserializeRpcError,
-  fromJsonRpcError,
   normalizeRpcSerializedError,
   RpcWireErrorField,
   RpcWireErrorLimit,
@@ -73,12 +72,9 @@ const vectors = JSON.parse(readFileSync(join(vectorRoot, 'error-chain.json'), 'u
   invalid: ICase[]
   unknownFields: Array<{
     wire: unknown
-    reject: { violation: string; pointer: string }
-    ignoreReports: unknown[]
     ignoreExpected: unknown
   }>
   truncation: IMappingCase[]
-  jsonrpc: IMappingCase[]
 }
 
 /** Build one canonical node without relying on a native Error constructor. */
@@ -186,24 +182,6 @@ function generatedTruncation(item: IGeneratedCase): { input: unknown; expected: 
   return expect.fail(`unknown truncation generator: ${item.shape}`)
 }
 
-/** Expand a large foreign message without storing its 65 KiB text literally. */
-function generatedJsonRpc(item: IGeneratedCase): { input: unknown; expected: unknown } {
-  if (item.shape !== 'foreignLongMessage')
-    return expect.fail(`unknown JSON-RPC generator: ${item.shape}`)
-  const message = 'x'.repeat(item.size)
-  return {
-    input: { code: -1, message },
-    expected: {
-      source: 'jsonrpc-2.0',
-      code: '-1',
-      name: 'Error',
-      message,
-      stack: `Error: ${'x'.repeat(item.expectedStackBytes! - 7)}`,
-      truncated: true
-    }
-  }
-}
-
 describe('wire-error language-neutral vectors', () => {
   it('keeps schema fields and five wire limits aligned with the implementation', () => {
     const schema = JSON.parse(readFileSync(join(schemaRoot, 'wire-error.schema.json'), 'utf8')) as {
@@ -237,8 +215,13 @@ describe('wire-error language-neutral vectors', () => {
 
   it.each(vectors.invalid)('rejects invalid vector $id at its first pointer', (item) => {
     const wire = expand(item)
-    expect(() => normalizeRpcSerializedError(wire)).toThrow(TypeError)
-    expect(() => normalizeRpcSerializedError(wire)).toThrow(
+    /**
+     * Additive fields are ignored at the protocol boundary, so a missing field is the first
+     * failure.
+     */
+    const policy = { unknownFields: 'ignore' } as const
+    expect(() => normalizeRpcSerializedError(wire, policy)).toThrow(TypeError)
+    expect(() => normalizeRpcSerializedError(wire, policy)).toThrow(
       expect.objectContaining({
         code: 'INVALID_WIRE_ERROR',
         violation: item.violation,
@@ -247,20 +230,11 @@ describe('wire-error language-neutral vectors', () => {
     )
   })
 
-  it('sorts ignored unknown keys and reports their containing node pointer', () => {
+  it('ignores additive unknown keys and keeps the known tree', () => {
     for (const item of vectors.unknownFields) {
-      expect(() => normalizeRpcSerializedError(item.wire)).toThrow(
-        expect.objectContaining(item.reject)
+      expect(normalizeRpcSerializedError(item.wire, { unknownFields: 'ignore' })).toEqual(
+        item.ignoreExpected
       )
-      const reports: unknown[] = []
-      const result = normalizeRpcSerializedError(item.wire, {
-        unknownFields: 'ignore',
-        onUnknownField: (pointer, field) => {
-          reports.push({ pointer, field })
-        }
-      })
-      expect(result).toEqual(item.ignoreExpected)
-      expect(reports).toEqual(item.ignoreReports)
     }
   })
 
@@ -278,15 +252,6 @@ describe('wire-error language-neutral vectors', () => {
         })
       ).toEqual(expected)
       expect(reports).toEqual([])
-    }
-  })
-
-  it('maps foreign JSON-RPC values into the same wire schema', () => {
-    for (const item of vectors.jsonrpc) {
-      const { input, expected } = item.generate
-        ? generatedJsonRpc(item.generate)
-        : { input: item.input, expected: item.expected }
-      expect(fromJsonRpcError(input)).toEqual(expected)
     }
   })
 })
