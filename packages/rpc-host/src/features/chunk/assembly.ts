@@ -56,7 +56,6 @@ function snapshotOptions(options: IRpcChunkOptions = {}) {
     maxConcurrentMessages: options.maxConcurrentMessages ?? RpcChunkLimit.maxConcurrentMessages,
     assemblyTimeoutMs: options.assemblyTimeoutMs ?? RpcChunkLimit.assemblyTimeoutMs,
     errorMetadata: options.errorMetadata,
-    now: options.now,
     schedule: options.schedule,
     cancel: options.cancel
   }
@@ -148,7 +147,6 @@ function fragmentFramerState<TKind extends 'string' | 'binary', TEncoded extends
     activeBuffers,
     closed,
     kind,
-    input,
     lengthOf,
     slice
   }

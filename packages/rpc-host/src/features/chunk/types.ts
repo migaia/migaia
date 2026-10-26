@@ -75,8 +75,6 @@ export type IRpcChunkOptions = Readonly<{
   maxConcurrentMessages?: number
   /** Defaults to 30000 ms; positive safe-integer retention lifetime for an incomplete assembly. */
   assemblyTimeoutMs?: number
-  /** Retained configuration option; current assembly expiry is driven by schedule, not this clock. */
-  now?: () => number
   /** Optional timer admission callback; omission uses the host timeout path. */
   schedule?: (callback: () => void, delayMs: number) => unknown
   /** Optional cancellation for scheduled handles; omission uses the host timeout cancellation. */
