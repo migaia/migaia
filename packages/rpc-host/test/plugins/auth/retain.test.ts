@@ -16,6 +16,7 @@ import {
   type IRequestReplaySource
 } from '../../../dist/features/auth/request-replay.js'
 import { ProviderDispatcher } from '../../../dist/dispatch/dispatcher.js'
+import { readAuthenticationRetain } from '../../../dist/features/auth/config.js'
 import { coreMemoryServer } from '../../host/core-fixture.js'
 import { MemoryCarrier } from '../../fixtures/core-carrier.js'
 
@@ -651,4 +652,9 @@ it('A30 rejects invalid public connection numbers, null and unsigned window as c
   } finally {
     await server.close()
   }
+})
+
+it('defaults omitted retention at the shared authentication configuration boundary', () => {
+  expect(readAuthenticationRetain(undefined, false)).toBe(false)
+  expect(readAuthenticationRetain(undefined, true)).toBe(false)
 })

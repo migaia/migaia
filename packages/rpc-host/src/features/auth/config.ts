@@ -11,9 +11,9 @@ import { RpcAuthenticationText as Text } from './text.js'
 import type { IRpcAuthenticationOptions } from './types.js'
 import { RpcAuthenticationEncoding as Encoding } from './constants.js'
 
-/** Validate one captured auth or physical-connection retention without interpreting credentials. */
+/** Default omitted retention to false, then validate the auth or physical-connection policy. */
 export function readAuthenticationRetain(
-  value: unknown,
+  value: unknown = false,
   signed: boolean
 ): IRpcAuthenticationRetain {
   if (
@@ -85,7 +85,7 @@ export function snapshotAuthenticationConfig(
       RpcCoreErrorCode.invalidConfig,
       Text.authenticationEncryptionRequiresSigning
     )
-  readAuthenticationRetain(snapshot.retain === undefined ? false : snapshot.retain, !!snapshot.sign)
+  readAuthenticationRetain(snapshot.retain, !!snapshot.sign)
   if (!snapshot.sign && !snapshot.verifyCredentials && snapshot.credentials === undefined)
     throw createRpcError(
       RpcCoreErrorCode.invalidConfig,

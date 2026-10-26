@@ -259,11 +259,7 @@ export class RpcAuthenticationFlow {
     /** Undefined alone falls back; false and invalid runtime values retain their original meaning. */
     const connectedRetain = readSessionRetention(context)
     source.retain = readAuthenticationRetain(
-      connectedRetain !== undefined
-        ? connectedRetain
-        : this.#config.retain === undefined
-          ? false
-          : this.#config.retain,
+      connectedRetain !== undefined ? connectedRetain : this.#config.retain,
       !!this.#config.sign
     )
     try {
@@ -422,8 +418,7 @@ export class RpcAuthenticationFlow {
         ? await (0, this.#config.decrypt)(verified, context)
         : verified
       this.#assert(context)
-      if (this.#sources.get(source.id) !== source || source.signal.aborted)
-        throw createRpcAuthenticationError(Text.authenticationReplayBindingInvalid)
+      this.#assertSource(source)
       /** One original nonce and one counter bind the complete prepared native metadata. */
       const envelope = readAuthenticationEnvelope(this.#representation.plaintext(decrypted))
       /**
@@ -445,8 +440,7 @@ export class RpcAuthenticationFlow {
         throw error
       }
       this.#assert(context)
-      if (this.#sources.get(source.id) !== source || source.signal.aborted)
-        throw createRpcAuthenticationError(Text.authenticationReplayBindingInvalid)
+      this.#assertSource(source)
       source.window ??= { nonce: envelope.nonce, high: 0n, bits: new BigUint64Array(1) }
       if (source.window.nonce !== envelope.nonce)
         throw createRpcAuthenticationError(Text.authenticationReplayBindingInvalid)
@@ -483,7 +477,7 @@ export class RpcAuthenticationFlow {
       id: context.carrierId,
       replayKeys: new Set(),
       signal: context.connectionSignal ?? context.signal,
-      retain: this.#config.retain === undefined ? false : this.#config.retain,
+      retain: readAuthenticationRetain(this.#config.retain, !!this.#config.sign),
       abort: () => undefined
     }
     /** The record carries its compact id so this callback captures only its explicit owner/record. */
@@ -495,6 +489,12 @@ export class RpcAuthenticationFlow {
     record.signal.addEventListener('abort', record.abort, { once: true })
     if (record.signal.aborted) record.abort()
     return record
+  }
+
+  /** Reject a retired or replaced source before applying its replay state. */
+  #assertSource(source: IAuthenticationSource): void {
+    if (this.#sources.get(source.id) !== source || source.signal.aborted)
+      throw createRpcAuthenticationError(Text.authenticationReplayBindingInvalid)
   }
 
   /** Check the real operation/connection lifetime after every asynchronous authentication phase. */
