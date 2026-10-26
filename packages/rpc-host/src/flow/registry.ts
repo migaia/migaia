@@ -309,7 +309,7 @@ export class FlowRegistry {
   ): void {
     for (const { observe } of installations) {
       try {
-        observe?.(event)
+        containAsyncRejection(observe?.(event), this.#report)
       } catch (error) {
         this.#report(error)
       }

@@ -480,6 +480,39 @@ it('identifies a namespace extension collision without claiming the namespace is
   })
 })
 
+it('reports a readonly SDK observer rejection without interrupting business', async () => {
+  /** A rejected diagnostic Promise must retain its exact local failure identity. */
+  const failure = new Error('readonly SDK observer rejected')
+  /** One real event supplies the failure; later events remain ordinary observations. */
+  let rejected = false
+  const reports: unknown[] = []
+  const pair = new WarningPair()
+  try {
+    await pair.open({
+      report: (error) => reports.push(error),
+      plugins: [
+        defineFlowPlugin({
+          name: 'async-readonly-observer',
+          setup: () => ({
+            onWarning: () => undefined,
+            observe: () => {
+              if (!rejected) {
+                rejected = true
+                return Promise.reject(failure)
+              }
+            }
+          })
+        })
+      ]
+    })
+    expect(await pair.send(42)).toBe(42)
+    expect(rejected).toBe(true)
+    expect(reports).toEqual([failure])
+  } finally {
+    await pair.close()
+  }
+})
+
 it.each([false, true])(
   'A32 keeps warnings and recipient reports original without calling errorMap, subscriber first %s',
   async (subscriberFirst) => {
