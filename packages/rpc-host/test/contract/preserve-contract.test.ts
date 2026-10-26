@@ -206,7 +206,7 @@ it('process JSON and signer metadata preserve integer keys, own text-key order a
         version: 1,
         nonce,
         counter: '1',
-        payload: expected
+        payload: prepared.message
       }),
     'exact signer string input'
   )
@@ -239,16 +239,20 @@ it('string and Uint8Array signed metadata keep binding fields, category and stri
       'counter',
       'payload'
     ])
-    assert.deepEqual(bound, {
+    /** Single encoding retains object payload order in both text and UTF-8 callback categories. */
+    const expectedBinding = {
       authentication: RpcAuthenticationEnvelope.kind,
       version: 1,
       nonce,
       counter: '23',
-      payload:
-        encoding === 'uint8array'
-          ? Array.from(new TextEncoder().encode(JSON.stringify(payload)))
-          : JSON.stringify(payload)
-    })
+      payload
+    }
+    assert.deepEqual(bound, expectedBinding)
+    assert.equal(
+      text,
+      RpcAuthenticationEnvelope.prefix + JSON.stringify(expectedBinding),
+      'exact single-encoded signed metadata'
+    )
     assert.deepEqual(
       representation.metadata(readAuthenticationEnvelope(representation.plaintext(signed)).payload),
       payload

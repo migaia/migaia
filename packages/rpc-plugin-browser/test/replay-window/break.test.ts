@@ -133,10 +133,10 @@ describe('replay-window r12 authentication break', () => {
       /** Inspect the actual signed representation, without constructing another auth path. */
       const binding = JSON.parse(
         (encryptedInput as string).slice(RpcAuthenticationEnvelope.prefix.length)
-      ) as { version?: unknown; payload: string }
+      ) as { version?: unknown; payload: { payload: unknown } }
       assert.equal(binding.version, 1, 'wrapper version')
-      /** BC2 replaces the naked payload root with the complete new-profile call envelope. */
-      assert.deepEqual(JSON.parse(binding.payload).payload, payload, 'bound payload')
+      /** BC16 keeps the complete call envelope as an object inside the single encoded binding. */
+      assert.deepEqual(binding.payload.payload, payload, 'bound payload')
     } finally {
       await client.host.close()
       await server.close()
