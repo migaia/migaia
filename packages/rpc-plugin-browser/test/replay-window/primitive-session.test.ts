@@ -14,10 +14,7 @@ describe('replay-window r12 physical session authority', () => {
     let verifies = 0
     /** No native source filter failure may cause business entry. */
     let providers = 0
-    /**
-     * Keep the original observable authentication failure expectations pending their recorded
-     * ruling.
-     */
+    /** Native source filtering owns this rejection before authentication reads its payload. */
     const failures: unknown[] = []
     const peers = await Promise.all([
       createRpcHost({
@@ -59,9 +56,13 @@ describe('replay-window r12 physical session authority', () => {
     ])
     /** Hold genuine native delivery, retaining the original signed call for the source event. */
     const before = pair.right.sent.length
+    /** Public cancellation later settles the held call without granting forged-source authority. */
+    const cancellation = new AbortController()
+    /** The original local reason must remain reachable through the real cancellation result. */
+    const reason = new Error('cancel rejected native source fixture call')
     pair.right.setDeliver(false)
     const pending = peers[0].window
-      .send('server', 'echo', 'primitive')
+      .send('server', 'echo', 'primitive', { signal: cancellation.signal })
       .catch((error: unknown) => error)
     try {
       await vi.waitFor(() => assert.equal(pair.right.sent.length, before + 1))
@@ -75,16 +76,26 @@ describe('replay-window r12 physical session authority', () => {
       )
       await nextTurn()
       await nextTurn()
-      // CORE-C2-AUTH-SOURCELESS-FRESHNESS: native filtering now precedes verification. Preserve RED.
-      assert.ok(verifies > 0, 'actual physical delivery reached the verifier')
+      assert.equal(verifies, 0, 'native source filtering precedes authentication verification')
       assert.equal(
         providers,
         0,
         'primitive source cannot establish authenticated session authority'
       )
-      assert.equal(failures.length, 1)
-      assert.equal((failures[0] as { code: string }).code, 'AUTHENTICATION_FAILED')
+      assert.equal(failures.length, 0, 'a filtered native source never enters authentication')
+      pair.right.setDeliver(true)
+      cancellation.abort(reason)
+      /** Real public cancellation settles the original held call with its unchanged reason. */
+      const cancelled = await pending
+      assert.equal((cancelled as { code?: unknown }).code, 'CANCELLED')
+      assert.strictEqual((cancelled as Error).cause, reason)
+      assert.equal(await peers[0].window.send('server', 'echo', 'valid'), 'valid')
+      assert.equal(providers, 1, 'the genuine native source remains accepted')
+      assert.ok(verifies > 0, 'the genuine native delivery reaches authentication')
+      assert.equal(failures.length, 0)
     } finally {
+      pair.right.setDeliver(true)
+      cancellation.abort(reason)
       await peers[0].close()
       await peers[1].close()
       await pending

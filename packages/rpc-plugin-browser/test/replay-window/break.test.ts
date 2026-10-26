@@ -19,6 +19,8 @@ describe('replay-window r12 authentication break', () => {
     let verified: unknown
     /** Genuine installation/directory frames remain valid before the selected unbound delivery. */
     let legacy = false
+    /** Rejected protection must never authorize the original business provider. */
+    let providers = 0
     const server = await createRpcHost({
       ...source.options,
       plugins: [
@@ -31,7 +33,12 @@ describe('replay-window r12 authentication break', () => {
         }),
         source.transport
       ],
-      provide: { echo: (value: unknown) => value },
+      provide: {
+        echo: (value: unknown) => {
+          providers++
+          return value
+        }
+      },
       report: (error) => failures.push(error)
     })
     /** The signer deliberately emits the same successfully verified old unbound value. */
@@ -40,21 +47,36 @@ describe('replay-window r12 authentication break', () => {
         auth({ sign: (value) => (legacy ? { legacy: true } : value), verify: (value) => value })
       ]
     })
+    /** The sender cancels work whose malformed protection removed trustworthy reply correlation. */
+    const cancellation = new AbortController()
+    /** Public cancellation preserves this exact local reason without inventing a remote reply. */
+    const reason = new Error('cancel unbound authentication fixture call')
     try {
       legacy = true
-      await assert.rejects(
-        () => client.host.memory.request('echo', 'legacy'),
-        { code: 'AUTHENTICATION_FAILED' },
-        'a valid legacy signature must not bypass replay binding'
-      )
+      /** Observe the genuine pending call immediately while the receiver drops its unbound frame. */
+      const pending = client.host.memory
+        .request('echo', 'legacy', { signal: cancellation.signal })
+        .catch((error: unknown) => error)
       await vi.waitFor(() => assert.equal(failures.length, 1))
       assert.deepEqual(verified, { legacy: true })
+      assert.equal(providers, 0, 'a valid legacy signature must not bypass replay binding')
       assert.equal(
         (failures[0] as { code?: unknown }).code,
         'AUTHENTICATION_FAILED',
         'a valid legacy signature must not bypass replay binding'
       )
+      legacy = false
+      cancellation.abort(reason)
+      /** This is the sender's real public cancellation, not a fabricated authenticated response. */
+      const cancelled = await pending
+      assert.equal((cancelled as { code?: unknown }).code, 'CANCELLED')
+      assert.strictEqual((cancelled as Error).cause, reason)
+      assert.equal(await client.host.memory.request('echo', 'valid'), 'valid')
+      assert.equal(providers, 1, 'the admitted source remains usable after a forged frame')
+      assert.equal(failures.length, 1)
     } finally {
+      legacy = false
+      cancellation.abort(reason)
       await client.host.close()
       await server.close()
     }

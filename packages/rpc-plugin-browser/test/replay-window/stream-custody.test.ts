@@ -25,9 +25,6 @@ describe('stream replay custody through public endpoint behavior', () => {
         ],
         report: (error) => failures.push(error)
       })
-      const client = await source.connect('client', {
-        plugins: authenticated ? [auth({ sign: (value) => value, verify: (value) => value })] : []
-      })
       /** The original native error must survive producer cleanup reporting unchanged. */
       const cause = new Error('fixture iterator return failure')
       /** Held pulls and cleanup retain their independent original lifetimes. */
@@ -59,6 +56,10 @@ describe('stream replay custody through public endpoint behavior', () => {
           }
           return iterator
         }
+      })
+      /** Initial accepted directories include the provider before its first public stream call. */
+      const client = await source.connect('client', {
+        plugins: authenticated ? [auth({ sign: (value) => value, verify: (value) => value })] : []
       })
       try {
         const iterator = client.host.memory.stream('held', null) as AsyncIterableIterator<never>
@@ -104,9 +105,6 @@ describe('stream replay custody through public endpoint behavior', () => {
         source.transport
       ]
     })
-    const client = await source.connect('client', {
-      plugins: [auth({ sign: (value) => value, verify: (value) => value })]
-    })
     /** Each original active pull retains its iterator until explicit cleanup. */
     let release!: () => void
     /** Count true provider entry independently of physical reception. */
@@ -132,6 +130,10 @@ describe('stream replay custody through public endpoint behavior', () => {
         }
         return iterator
       }
+    })
+    /** Establish the original held method in the initial directory before testing replay capacity. */
+    const client = await source.connect('client', {
+      plugins: [auth({ sign: (value) => value, verify: (value) => value })]
     })
     /** Cleanup always joins both original consumer promises, including the known failed admission. */
     const pending: Promise<unknown>[] = []
