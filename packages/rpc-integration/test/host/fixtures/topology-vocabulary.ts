@@ -19,6 +19,7 @@ export const Topology = {
   remaining: 'remaining',
   bytes: 'bytes',
   ticks: 'ticks',
+  ticksFail: 'ticksFail',
   crash: 'crash',
   shutdown: 'shutdown',
   /** One trace separates business calls from readiness and inspection calls. */

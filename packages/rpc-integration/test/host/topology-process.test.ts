@@ -194,6 +194,42 @@ describe('forwarding through process b to its thread, pool and coroutine', () =>
     expect((await inspectB(host)).c.streamsOpened).toBe(1)
   })
 
+  it('restores a mid-stream leaf failure through the forwarding hop', async () => {
+    /** Lazy stream through b to a generator that fails after two values. */
+    const stream = host.process
+      .streamTo(Topology.b, `${Topology.c}.${Topology.ticksFail}`, undefined, traced)
+      [Symbol.asyncIterator]()
+    expect((await stream.next()).value).toBe(0)
+    expect((await stream.next()).value).toBe(1)
+    expectLeafFailure(await rejection(stream.next()))
+  })
+
+  it('runs a forwarded group once per step and refuses a group with an unknown step', async () => {
+    /** Echo executions before the groups. */
+    const before = (await inspectB(host)).c.echoCalls
+    /** Two steps forwarded through b to c as one group. */
+    const outcomes = (await host.process.group(
+      [
+        { method: `${Topology.c}.${Topology.echo}`, payload: 'g1' },
+        { method: `${Topology.c}.${Topology.echo}`, payload: 'g2' }
+      ],
+      traced
+    )) as readonly { state: string; result?: { value: unknown } }[]
+    expect(outcomes.map((outcome) => outcome.result?.value)).toEqual(['g1', 'g2'])
+    expect((await inspectB(host)).c.echoCalls).toBe(before + 2)
+    /** A group whose second step names a method c does not provide. */
+    await rejection(
+      host.process.group(
+        [
+          { method: `${Topology.c}.${Topology.echo}`, payload: 'g3' },
+          { method: `${Topology.c}.missing`, payload: 'g4' }
+        ],
+        traced
+      )
+    )
+    expect((await inspectB(host)).c.echoCalls).toBe(before + 2)
+  })
+
   it('propagates abort with its reason to the leaf signal', async () => {
     /** Caller-owned cancellation for the in-flight wait. */
     const controller = new AbortController()

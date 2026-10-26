@@ -60,6 +60,7 @@ export class TopologyLeaf {
       }),
       [Topology.bytes]: (bytes: Uint8Array) => TopologyLeaf.#compare(bytes),
       [Topology.ticks]: () => this.#ticks(),
+      [Topology.ticksFail]: () => TopologyLeaf.#ticksFail(),
       [Topology.inspect]: (): ITopologyLeafSnapshot => this.snapshot()
     }
   }
@@ -113,6 +114,13 @@ export class TopologyLeaf {
       if (bytes[index] !== expected[index]) mismatches += 1
     }
     return { length: bytes.length, mismatches }
+  }
+
+  /** Yield two values, then fail with the coded leaf failure mid-stream. */
+  static async *#ticksFail(): AsyncGenerator<number> {
+    yield 0
+    yield 1
+    throw TopologyLeaf.#failure()
   }
 
   /** Yield an unbounded sequence until the consumer cancels; `finally` records cleanup. */
