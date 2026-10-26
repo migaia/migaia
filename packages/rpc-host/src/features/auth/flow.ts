@@ -311,8 +311,12 @@ export class RpcAuthenticationFlow {
     this.#assert(context)
     if (!this.#config.sign) return value
     try {
-      if (this.#counter === Format.maximumCounter)
-        throw createRpcConfigurationError(Text.authenticationCounterExhausted)
+      if (this.#counter === Format.maximumCounter) {
+        /** Exhaustion reports the same original failure rejected by this actual outbound stage. */
+        const error = createRpcConfigurationError(Text.authenticationCounterExhausted)
+        context.report(error)
+        throw error
+      }
       this.#nonce ??= createAuthenticationNonce()
       /** The complete native backing digest/length manifest stays inside both transforms. */
       const bound = this.#representation.bound(

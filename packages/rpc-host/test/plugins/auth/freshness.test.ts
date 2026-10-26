@@ -1,16 +1,28 @@
 /** Signed captured traffic cannot reconstruct a fresh source in the same installed Auth owner. */
 import { createHmac } from 'node:crypto'
-import { expect, it } from 'vitest'
-import { createRpcHost } from '@migaia/rpc-host'
+import { MessageChannel } from 'node:worker_threads'
+import { setImmediate as nextTurn } from 'node:timers/promises'
+import { expect, it, vi } from 'vitest'
+import { createRpcHost, type IRpcNamespace } from '@migaia/rpc-host'
 import { auth } from '@migaia/rpc-host/plugins/auth'
-import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
+import { defineTransportPlugin, RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import type {
   IRpcCarrierFrame,
   IRpcCodecContext,
-  IRpcPreparedMessage
+  IRpcPreparedMessage,
+  IRpcTransportContext
 } from '@migaia/rpc-contract/interfaces'
+import type { IRpcEnvelopeCommon } from '@migaia/rpc-contract/protocol'
 import { MemoryCarrier } from '../../fixtures/core-carrier.js'
 import { coreMemoryServer } from '../../host/core-fixture.js'
+import { createNodeThreadCarrier } from '../../../../rpc-plugin-thread/dist/threads/channel.js'
+import { FlowRegistry } from '../../../dist/flow/registry.js'
+import { readRpcDefinition, RpcDefinitionKind } from '../../../dist/sdk/metadata.js'
+import { setAuthenticationReplayCounter } from '../../../dist/features/auth/counter.js'
+import { readAuthenticationEnvelope } from '../../../dist/features/auth/envelope.js'
+import { AuthenticationRepresentation } from '../../../dist/features/auth/representation.js'
+import { RpcAuthenticationEnvelope } from '../../../dist/features/auth/constants.js'
+import { RpcAuthenticationText } from '../../../dist/features/auth/text.js'
 
 /** Public test data signs complete Auth transform inputs; this is not a deployed credential. */
 const signingKey = 'auth-source-freshness-public-fixture'
@@ -164,3 +176,254 @@ it('publishes only an explicit authenticated principal on the actual accepted Se
     await Promise.all([...clients.map((client) => client.host.close()), host.close()])
   }
 })
+
+/** One physical pair observes only the genuine native registration, codec and HMAC callbacks. */
+class PhysicalAuthenticationPair {
+  /** Native structured-clone resources retain their original caller-owned final cleanup. */
+  readonly ports = new MessageChannel()
+  /** Receiving diagnostics remain distinct from the caller's original outbound failures. */
+  readonly inboundFailures: unknown[] = []
+  /** Public call failures are retained without translating their original identity. */
+  readonly outboundFailures: unknown[] = []
+  /** Only genuine provider entry records business effects. */
+  readonly providers: unknown[] = []
+  /** Successful HMAC verification counts actual inputs, including captured physical replays. */
+  verifies = 0
+  /** Each host installs its own original opaque authentication factory result exactly once. */
+  readonly clientFeature: ReturnType<typeof auth>
+  /** Separate configuration identity constructs the receiver's independent replay owner. */
+  readonly serverFeature: ReturnType<typeof auth>
+  /** The ordinary SDK listener accepts the actual borrowed MessagePort carrier. */
+  readonly server = coreMemoryServer('physical-server')
+  /** Real Node carrier observations and native cloning remain below the unchanged JSON codec. */
+  readonly serverCarrier = createNodeThreadCarrier(
+    this.ports.port2,
+    'physical-server-port',
+    (error) => this.inboundFailures.push(error)
+  )
+  /** The caller uses the same genuine carrier constructor and original physical write owner. */
+  readonly clientCarrier = createNodeThreadCarrier(
+    this.ports.port1,
+    'physical-client-port',
+    (error) => this.outboundFailures.push(error)
+  )
+  /** Default spies retain actual original inputs/results without replacing codec execution. */
+  readonly encoded = vi.spyOn(this.clientCarrier.codec, 'encode')
+  /** The actual native wrapper supplies the exact installed entry; no second setup is executed. */
+  readonly registered = vi.spyOn(FlowRegistry.prototype, 'registerFeatures')
+  /** Public host handles retain their original shared close owner. */
+  #serverHost: { close(): Promise<void> } | undefined
+  /** Caller construction and final close remain owned by its public root. */
+  #clientHost: { close(): Promise<void>; memory: IRpcNamespace } | undefined
+
+  /** Sign the complete original authentication input without decoding semantic or media frames. */
+  readonly #sign = (value: unknown) => ({ value, signature: this.#signature(value) })
+
+  /** Validate HMAC before counting an accepted cryptographic input or returning its original value. */
+  readonly #verify = (value: unknown): unknown => {
+    /** Only this finite fixture's signer produces this exact protected callback representation. */
+    const signed = value as { value: unknown; signature: string }
+    expect(signed.signature).toBe(this.#signature(signed.value))
+    this.verifies += 1
+    return signed.value
+  }
+
+  /** Public fixture material is unrelated to any deployed credential. */
+  #signature(value: unknown): string {
+    return createHmac('sha256', signingKey).update(JSON.stringify(value)).digest('hex')
+  }
+
+  /** Capture original callback methods only after this pair's owning state has initialized. */
+  constructor() {
+    this.clientFeature = auth({ sign: this.#sign, verify: this.#verify })
+    this.serverFeature = auth({ sign: this.#sign, verify: this.#verify })
+  }
+
+  /** Admit both original endpoints before either native handshake can suspend waiting for its peer. */
+  readonly #open = async (context: IRpcTransportContext) => {
+    /** The installed listener owns the receiving endpoint's original attachment. */
+    const accepted = this.server.accept(this.serverCarrier)
+    /** The actual caller transport owns its independently attached local endpoint. */
+    const connected = context.attach(this.clientCarrier)
+    await Promise.all([accepted.ready, connected.ready])
+    return { dispose: () => undefined }
+  }
+
+  /** Construct only ordinary public roots and the one real transport definition. */
+  async open(): Promise<void> {
+    this.#serverHost = await createRpcHost({
+      ...this.server.options,
+      plugins: [this.serverFeature, ...this.server.options.plugins],
+      report: (error) => this.inboundFailures.push(error),
+      provide: {
+        echo: (value) => {
+          this.providers.push(value)
+          return value
+        }
+      }
+    })
+    this.#clientHost = await createRpcHost({
+      self: { name: 'physical-client', instanceId: 'physical-client' },
+      plugins: [
+        defineTransportPlugin({
+          name: 'physical-authentication-client',
+          namespace: 'memory',
+          features: [this.clientFeature],
+          open: this.#open
+        })
+      ],
+      report: (error) => this.outboundFailures.push(error)
+    })
+  }
+
+  /** Calls cross the actual named namespace and original physical carrier pair. */
+  send(value: string): Promise<unknown> {
+    return this.#clientHost!.memory.send('physical-server', 'echo', value)
+  }
+
+  /** Borrow only the original Auth installation passed to genuine native group registration. */
+  installation() {
+    /** The actual opaque factory identity supplies its immutable cold definition. */
+    const metadata = readRpcDefinition(this.clientFeature)
+    expect(metadata?.kind).toBe(RpcDefinitionKind.feature)
+    /** A missing identity remains an assertion failure, never an alternate installation path. */
+    const definition =
+      metadata?.kind === RpcDefinitionKind.feature ? metadata.definition : undefined
+    /** Shared group membership may repeat one installed value, so identity is deduplicated once. */
+    const installed = new Set<Parameters<typeof setAuthenticationReplayCounter>[0]>()
+    for (const [, groups] of this.registered.mock.calls)
+      for (const entries of groups.values())
+        for (const entry of entries)
+          if (entry.definition === definition) installed.add(entry.installed)
+    expect(installed.size).toBe(1)
+    return [...installed][0]!
+  }
+
+  /** Final cleanup releases both public roots before their original borrowed native ports. */
+  async close(): Promise<void> {
+    try {
+      await Promise.all([this.#clientHost?.close(), this.#serverHost?.close()])
+    } finally {
+      this.encoded.mockRestore()
+      this.registered.mockRestore()
+      this.ports.port1.close()
+      this.ports.port2.close()
+    }
+  }
+}
+
+it('protects all original binding fields on real MessagePorts and reports the same exhausted counter once', async () => {
+  /** All observed state belongs to this one pair of genuine public roots and native carriers. */
+  const pair = new PhysicalAuthenticationPair()
+  try {
+    await pair.open()
+    expect(await pair.send('discovered')).toBe('discovered')
+    expect(setAuthenticationReplayCounter(pair.installation(), 0xfffffffffffffffen)).toBe(true)
+    expect(await pair.send('last')).toBe('last')
+    expect(pair.providers).toEqual(['discovered', 'last'])
+    /** The original encode inputs are retained before any later physical injection changes them. */
+    const [prepared, context] = pair.encoded.mock.calls.at(-1)!
+    /** Actual JSON preparation selected the original authentication wrapper and signed text. */
+    const outer = prepared.message as { payload: { value: unknown; signature: string } }
+    /** Canonical Auth inspection is confined to constructing the six original hostile inputs. */
+    const representation = new AuthenticationRepresentation('any')
+    /** Signed metadata is inspected once without a second media decode or semantic restore. */
+    const bound = readAuthenticationEnvelope(representation.plaintext(outer.payload.value))
+    expect(bound.counter).toBe('18446744073709551615')
+    /** The same existing Auth representation supplies the original signed semantic metadata. */
+    const semantic = representation.metadata(bound.payload) as IRpcEnvelopeCommon
+    for (const change of [
+      { version: 2 },
+      { nonce: '0'.repeat(32) },
+      { counter: '1' },
+      { payload: 'tampered' },
+      {
+        payload: JSON.stringify({
+          ...semantic,
+          route: { ...semantic.route, senderId: 'forged-sender' }
+        })
+      },
+      {
+        payload: JSON.stringify({
+          ...semantic,
+          route: { ...semantic.route, receiverId: 'forged-receiver' }
+        })
+      }
+    ]) {
+      /** Each distinct hostile input is encoded once by the actual already-owned media codec. */
+      const frame = pair.clientCarrier.codec.encode(
+        {
+          ...prepared,
+          message: {
+            ...outer,
+            payload: {
+              ...outer.payload,
+              value: RpcAuthenticationEnvelope.prefix + JSON.stringify({ ...bound, ...change })
+            }
+          }
+        },
+        context
+      )
+      /** The native report count is sampled before the real physical injection. */
+      const before = pair.inboundFailures.length
+      pair.ports.port1.postMessage(frame)
+      for (let turn = 0; turn < 20 && pair.inboundFailures.length === before; turn++)
+        await nextTurn()
+      expect(pair.inboundFailures).toHaveLength(before + 1)
+      expect(pair.inboundFailures.at(-1)).toMatchObject({ code: 'AUTHENTICATION_FAILED' })
+      expect(pair.providers).toEqual(['discovered', 'last'])
+    }
+    /**
+     * The public rejection and its original report must refer to the same exhausted allocator
+     * error.
+     */
+    const failure = await pair.send('overflow').catch((error: unknown) => error)
+    expect(failure).toBeInstanceOf(Error)
+    expect(failure).toMatchObject({
+      code: 'INVALID_CONFIG',
+      message: RpcAuthenticationText.authenticationCounterExhausted
+    })
+    expect(pair.outboundFailures.filter((error) => error === failure)).toHaveLength(1)
+    expect(pair.providers).toEqual(['discovered', 'last'])
+  } finally {
+    await pair.close()
+  }
+})
+
+it.each([100, 310_001])(
+  'rejects the captured signed native frame after a controlled clock offset of %s ms',
+  async (elapsed) => {
+    /** The replay remains the exact original native frame, without re-signing or re-encoding it. */
+    const pair = new PhysicalAuthenticationPair()
+    /** Restore the actual global clock before ordinary public-root final cleanup. */
+    let clock: { mockRestore(): void } | undefined
+    try {
+      await pair.open()
+      expect(await pair.send('original')).toBe('original')
+      expect(pair.providers).toEqual(['original'])
+      /** This exact result was handed to the original carrier after the original HMAC callback. */
+      const replay = pair.encoded.mock.results.at(-1)!.value as IRpcCarrierFrame
+      expect(replay).toBeTruthy()
+      /** No public operation remains pending when the existing monotonic input is controlled. */
+      const before = pair.verifies
+      /** The original native clock method retains its actual platform receiver on every read. */
+      const originalNow = performance.now
+      /** One exact clock sample proves the selected offset without claiming any wall-clock wait. */
+      let nativeSample = 0
+      clock = vi.spyOn(performance, 'now').mockImplementation(() => {
+        nativeSample = Reflect.apply(originalNow, performance, []) as number
+        return nativeSample + elapsed
+      })
+      expect(performance.now() - nativeSample).toBe(elapsed)
+      pair.ports.port1.postMessage(replay)
+      for (let turn = 0; turn < 20 && pair.inboundFailures.length === 0; turn++) await nextTurn()
+      expect(pair.verifies).toBe(before + 1)
+      expect(pair.providers).toEqual(['original'])
+      expect(pair.inboundFailures).toHaveLength(1)
+      expect(pair.inboundFailures[0]).toMatchObject({ code: 'AUTHENTICATION_FAILED' })
+    } finally {
+      clock?.mockRestore()
+      await pair.close()
+    }
+  }
+)
