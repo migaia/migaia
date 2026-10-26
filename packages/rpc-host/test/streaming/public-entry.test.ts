@@ -2,6 +2,12 @@
 import { expect, it, vi } from 'vitest'
 import { connectedCoreHosts } from '../host/core-fixture.js'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
+import {
+  RpcCallMode,
+  RpcStreamEvent,
+  RpcWireKind,
+  type IRpcEnvelope
+} from '@migaia/rpc-contract/protocol'
 
 it('delivers the original stream items through the complete public Host entry', async () => {
   /** Both real Hosts install their original raw memory carriers and complete actual handshakes. */
@@ -79,3 +85,49 @@ it.each(['item', 'end'] as const)(
     }
   }
 )
+
+// RPC-TEST-28443200104E-C001-A001: preserve the original unknown-cancelled diagnostic code.
+it('reports INVALID_STREAM for an unknown cancelled frame on the actual accepted source', async () => {
+  /** No genuine stream provider may execute for a terminal whose original id was never opened. */
+  const count = vi.fn(function* () {
+    yield 'unused'
+  })
+  /** Only the real provider Host's configured reporter contributes diagnostic observations. */
+  const reports: unknown[] = []
+  /** Third argument reports provider a; fifth argument keeps independent caller b diagnostics apart. */
+  const fixture = await connectedCoreHosts(
+    { count, calibrate: () => 42 },
+    {},
+    (error) => reports.push(error),
+    undefined,
+    () => undefined
+  )
+  try {
+    expect(await fixture.b.memory.send('a', 'calibrate')).toBe(42)
+    /** Actual caller writes lend the admitted profile, task generations and exact physical route. */
+    const calibration = fixture.pair[1].written.find(
+      (frame) => frame.kind === RpcWireKind.call && frame.task.method === 'calibrate'
+    )
+    if (calibration?.kind !== RpcWireKind.call)
+      expect.unreachable('actual calibration call was not written')
+    expect(calibration.id).not.toBe('stream-1')
+    /** Only the unknown id and stream mode/method differ from this genuine admitted task tuple. */
+    const message: IRpcEnvelope = {
+      profile: calibration.profile,
+      kind: RpcWireKind.stream,
+      id: 'stream-1',
+      task: { ...calibration.task, mode: RpcCallMode.stream, method: 'count' },
+      route: calibration.route,
+      stream: { event: RpcStreamEvent.cancelled, seq: 0 }
+    }
+    /** The existing identity medium delivers this raw current-profile frame to its actual Session. */
+    await fixture.pair[1].write({ kind: 'message', data: message })
+    await vi.waitFor(() => expect(reports).toHaveLength(1))
+    expect(count).not.toHaveBeenCalled()
+    expect(reports.map((error) => (error as { readonly code?: unknown }).code)).toContain(
+      'INVALID_STREAM'
+    )
+  } finally {
+    await fixture.close()
+  }
+})

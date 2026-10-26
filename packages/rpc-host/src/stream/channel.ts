@@ -9,8 +9,8 @@ import {
   type IRpcStreamEvent
 } from '@migaia/rpc-contract/protocol'
 import { RpcStreamEvent } from '@migaia/rpc-contract'
-import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
-import { RpcAbortError, RpcCoreErrorText } from '@migaia/rpc-contract/errors'
+import { RpcCoreErrorCode, RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
+import { RpcAbortError, RpcCoreErrorText, createContractError } from '@migaia/rpc-contract/errors'
 import type { IRpcFlowContext, IRpcTargetSource } from '@migaia/rpc-contract/interfaces'
 import { deferred, type IDeferred, type IAbortSignal } from '@migaia/utils/promise'
 import { createRpcError, createRpcLifecycleError, isLocalRpcError } from '../host/error-owner.js'
@@ -156,7 +156,12 @@ export class StreamChannel {
     }
     /** Original pull/finish demand runs only the selected producer's own credit state machine. */
     const producer = this.#producers.get(carrierId)?.get(envelope.id)
-    if (!producer) return false
+    if (!producer) {
+      if (envelope.kind === RpcWireKind.error) return false
+      /** An unclaimed stream event violates this owner's state, not the root envelope contract. */
+      this.#ports.report(createContractError(RpcContractErrorCode.invalidStream))
+      return true
+    }
     void producer.accept(envelope).catch(this.#ports.report)
     return true
   }
