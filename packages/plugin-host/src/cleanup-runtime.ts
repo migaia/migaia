@@ -86,9 +86,8 @@ export class PluginHostCleanupRuntime {
           : undefined
       },
       graceful: async () => {
-        const pending = Promise.resolve().then(async () => {
-          await run()
-        })
+        // One derived Promise: then() already adopts a thenable returned by run.
+        const pending: Promise<void> = Promise.resolve().then(() => run())
         policy?.cleanupLedger?.start(phase, () => pending)
         try {
           await this.#options.pending.track(pending)
