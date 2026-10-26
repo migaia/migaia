@@ -111,11 +111,6 @@ export function createRpcStreamFrameDecoder(
   return createRpcStreamFrameDecoderWithLimit(options, () => RPC_STREAM_MAX_FRAME_BYTES)
 }
 
-/**
- * Uses the same decoder with a required maxFrameBytes callback, read once for each completed length
- * header before payload allocation. Carriers can select a smaller bootstrap/handshake cap. Callback
- * exceptions retain their caller-owned behavior; the decoder installs no timer or I/O.
- */
 /** Allocate one length-prefixed byte decoder before installing behavior callbacks. */
 function rpcStreamFrameDecoderState(
   options: IRpcStreamFrameDecoderOptions,
@@ -223,7 +218,11 @@ class RpcStreamFrameDecoder {
   }
 }
 
-/** Construct the single owner for one length-prefixed byte decoder. */
+/**
+ * Use the same decoder with a maxFrameBytes callback read once per completed header, before payload
+ * allocation. Carriers may select a smaller bootstrap cap. Callback exceptions remain caller-owned;
+ * this decoder installs no timer or I/O.
+ */
 export function createRpcStreamFrameDecoderWithLimit(
   options: IRpcStreamFrameDecoderOptions,
   maxFrameBytes: () => number

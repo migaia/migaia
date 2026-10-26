@@ -28,7 +28,7 @@ it('rejects a duplicate public provider without replacing the admitted method', 
 it('clears the sole provider index and its pending reservations on repeated close', () => {
   /** The canonical compiler supplies exact entries rather than a parallel test registry. */
   const methods = compileProviderMethods({ method: () => ({ ok: true as const }) })
-  /** Directory projection is irrelevant to cleanup but uses its actual finite method contract. */
+  /** Count the catalog's own projection without replacing its cleanup or compiler. */
   const describe = vi.fn(
     (entry: Parameters<ConstructorParameters<typeof ProviderCatalog>[0]>[0]) => ({
       name: entry.name,

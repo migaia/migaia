@@ -28,7 +28,6 @@ import type { IRpcBinaryDigest, IRpcBinaryEncoding, IRpcBinaryCapture } from './
 type IBinaryValue = { encoded: IRpcPortableValue; semantic: IRpcPortableValue; native: boolean }
 /** Only the real ordinary JSON codec borrows this existing shallow wire-capture policy. */
 type IRecordCapture = typeof captureRpcWirePortableRecord
-/** Capture the original graph, byte budget and inline snapshots before any asynchronous handoff. */
 /** Allocate one synchronous binary capture traversal before installing behavior callbacks. */
 function binaryCaptureState(
   message: IRpcEnvelope,

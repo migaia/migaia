@@ -5,8 +5,6 @@ export const HostErrorText = {
    * payload.
    */
   replyUnclaimed: 'RPC response has no active call',
-  /** A flow dispatch continuation is single-use so one call cannot execute business twice. */
-  dispatchNextRepeated: 'RPC dispatch continuation was invoked more than once',
   /** Namespace isolation requires unique own keys before any transport starts. */
   namespaceDuplicate: 'RPC host transport namespace is already installed',
   /** Native extensions cannot replace mandatory namespace calls or an earlier extension member. */
