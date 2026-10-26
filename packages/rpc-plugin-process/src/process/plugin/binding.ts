@@ -152,6 +152,8 @@ type IProcessBindingOptions<TUnit extends object, TSpec> = Readonly<{
   expectedPeerId?(unit: TUnit): string
   /** A native execution unit supplies its actual exit fact without waiting in the transport. */
   terminalReason?(unit: TUnit): Promise<unknown>
+  /** Only a launched native process can supply its physical PID to redacted IPC diagnostics. */
+  processId?(unit: TUnit): string
   prepareReplacement?(spec: unknown): TSpec
   stderr?: (listener: (chunk: Uint8Array) => void) => () => void
   /** Original native source configuration supplies its connection token only to private admission. */
@@ -361,6 +363,7 @@ export class ProcessBinding<TUnit extends object, TSpec> {
           ipc: {
             connectionId: id,
             sessionId: id,
+            processId: this.#options.processId?.(unit),
             stderr: this.#options.stderr,
             log: () => undefined
           }
@@ -590,6 +593,7 @@ export function createSpawnProcessBinding<THandle extends IProcessHandle>(
     },
     expectedPeerId: source.channelKind === 'byte' ? (unit) => unit.identity.fingerprint : undefined,
     prepareReplacement: (spec) => spec as IProcessSpec,
+    processId: (unit) => String(unit.identity.pid),
     create: (ports) => createSpawnProcessSupervisor({ ...native, ports })
   })
 }
