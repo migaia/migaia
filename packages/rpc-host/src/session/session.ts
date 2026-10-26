@@ -120,6 +120,10 @@ export class Session {
   readonly #credentials: ISessionCredentials
   /** All plugin and control work observes this connection's terminal signal. */
   readonly #controller = new AbortController()
+  /** Two immutable codec bases exclude per-write transfer authority. */
+  readonly #codecContexts: [IRpcCodecContext?, IRpcCodecContext?] = []
+  /** Weak signal keys preserve live source snapshots without retaining completed write signals. */
+  readonly #contexts = new WeakMap<IAbortSignal, IRpcFlowContext>()
   /** The original readiness Promise is published through the lifecycle handle. */
   readonly #ready = deferred<IRpcSessionView>()
   /** Every close path returns this same Promise, including a rejected cleanup. */
@@ -1277,33 +1281,58 @@ export class Session {
     })
   }
 
-  /** Negotiated facts are borrowed; arbitrary caller options cannot grant native binary support. */
+  /** Reuse two negotiated bases; transfer variants retain only their original backing list. */
   #codecContext(bootstrap: boolean, options?: IRpcSessionWriteOptions): IRpcCodecContext {
-    return {
-      codec: bootstrap ? RpcWireJsonCodec : this.#view!.codec,
-      nativeBinary:
-        !bootstrap &&
-        this.#options.carrier.nativeBinary &&
-        this.#options.flow.facts(this.#options.namespace).nativeBinary !== false,
-      errorMetadata: hostErrorWireMetadata,
-      maxFrameBytes: bootstrap
-        ? Math.min(SessionText.handshakeMaxFrameBytes, this.#options.maxFrameBytes)
-        : this.#options.maxFrameBytes,
-      ...(options?.transfer ? { transfer: options.transfer } : {})
+    /** Exactly two slots follow the bootstrap boolean, never a growable runtime collection. */
+    const slot = bootstrap ? 0 : 1
+    /** Native flow withdrawal can change this restriction while its transport remains installed. */
+    const nativeBinary =
+      !bootstrap &&
+      this.#options.carrier.nativeBinary &&
+      this.#options.flow.facts(this.#options.namespace).nativeBinary !== false
+    /** A replacement base never mutates a context already held by an in-flight codec. */
+    let context = this.#codecContexts[slot]
+    if (!context || context.nativeBinary !== nativeBinary) {
+      context = {
+        codec: bootstrap ? RpcWireJsonCodec : this.#view!.codec,
+        nativeBinary,
+        errorMetadata: hostErrorWireMetadata,
+        maxFrameBytes: bootstrap
+          ? Math.min(SessionText.handshakeMaxFrameBytes, this.#options.maxFrameBytes)
+          : this.#options.maxFrameBytes
+      }
+      this.#codecContexts[slot] = context
     }
+    return options?.transfer ? { ...context, transfer: options.transfer } : context
   }
 
-  /** Context identity always comes from the held physical source, not inbound business metadata. */
+  /** Retain readonly source snapshots only while signal, direction and live source facts agree. */
   #context(direction: IRpcFlowContext['direction'], signal?: IAbortSignal): IRpcFlowContext {
-    return {
+    signal ??= this.#controller.signal
+    /** Preserve the original view read before the native exclusivity callback can reenter. */
+    const session = this.#view
+    /** Sole-reader ownership is a current native fact and must still be sampled on every call. */
+    const exclusive = this.#options.isExclusive?.()
+    /** A single signal entry is replaced, never mutated, when any snapshot field changes. */
+    const previous = this.#contexts.get(signal)
+    if (
+      previous?.direction === direction &&
+      previous.session === session &&
+      previous.exclusive === exclusive
+    )
+      return previous
+    /** These own enumerable fields retain the original keys, order and exact signal/report values. */
+    const context = {
       namespace: this.#options.namespace,
       carrierId: this.#options.carrier.id,
-      session: this.#view,
-      exclusive: this.#options.isExclusive?.(),
+      session,
+      exclusive,
       direction,
-      signal: signal ?? this.#controller.signal,
+      signal,
       report: this.#options.report
     }
+    this.#contexts.set(signal, context)
+    return context
   }
 
   /** The verifier output slot exists only at the already-declared handshake intervention point. */
