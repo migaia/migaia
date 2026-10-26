@@ -353,6 +353,9 @@ impl Business {
             return self.stream_control(message);
         }
         if text(message, "kind") == "group" {
+            if self.closing {
+                return Ok(vec![]);
+            }
             return Ok(vec![self.group(message)]);
         }
         if text(message, "kind") != "call" {

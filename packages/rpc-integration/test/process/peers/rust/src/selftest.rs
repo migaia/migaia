@@ -453,6 +453,61 @@ fn notification_and_cancel(counts: &mut Counts) {
             && text(&nodes[1], "stack") == "Error: peer cause",
     );
 }
+/// A pending original call holds drain open; a later group must not execute its notification step.
+fn closing_group_admission(counts: &mut Counts) {
+    let local = crate::identity();
+    let remote = caller();
+    let waiting = call("held", "peer.wait", "request", Value::Null, &local, &remote);
+    let mut drain = crate::business::header(&waiting);
+    crate::set(&mut drain, "kind", string("control"));
+    crate::set(&mut drain, "operation", string("drain"));
+    let mut group = call(
+        "late-group",
+        "p.f.oneWay",
+        "group",
+        Value::Null,
+        &local,
+        &remote,
+    );
+    crate::set(&mut group, "kind", string("group"));
+    crate::set(
+        &mut group,
+        "steps",
+        Value::Array(vec![
+            object(&[
+                ("method", string("p.f.oneWay")),
+                ("payload", Value::Array(vec![string("late")])),
+            ]),
+            object(&[("method", string("peer.received"))]),
+        ]),
+    );
+    let mut cancel = crate::business::header(&waiting);
+    crate::set(&mut cancel, "kind", string("cancel"));
+    let mut input = Vec::new();
+    for message in [
+        crate::hello(&remote, true, None),
+        crate::accept(&crate::hello(&remote, true, None)),
+        waiting,
+        drain,
+        group,
+        cancel,
+    ] {
+        write_frame(&mut input, &message).unwrap();
+    }
+    let mut output = Vec::new();
+    let result = crate::business::serve(&mut &input[..], &mut output, &local, None, None, true);
+    let replies = frames(&output);
+    counts.check(
+        "closing-rejects-group-before-notification",
+        result.is_ok()
+            && replies.len() == 3
+            && text(&replies[2], "operation") == crate::CONTROL_CLOSE
+            && !replies
+                .iter()
+                .any(|reply| text(reply, "id") == "late-group"),
+    );
+}
+
 fn flat_error_boundaries(counts: &mut Counts) {
     for key in ["source", "code", "name", "message", "stack"] {
         let mut node = crate::error_node("s", "C", "Error", "m");
@@ -534,6 +589,7 @@ pub fn run(root: &Path) -> io::Result<()> {
     stream_vectors(root, &mut counts);
     native_baseline(&mut counts);
     notification_and_cancel(&mut counts);
+    closing_group_admission(&mut counts);
     flat_error_boundaries(&mut counts);
     original_error_vectors(root, &mut counts);
     if let Some(vector) = load(root, "stream-framing.json", &mut counts) {
