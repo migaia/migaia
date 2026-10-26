@@ -502,6 +502,7 @@ class RpcDevtoolsCollector {
       this.#state.watchers.length = 0
       this.#state.names.clear()
       this.#state.descriptors.clear()
+      this.#state.serviceEndpoints.clear()
     }
   }
 

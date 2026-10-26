@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createRpcHost, type IRpcContext, type IRpcNamespace } from '@migaia/rpc-host'
 import { coreMemoryServer } from '../../../rpc-host/test/host/core-fixture.js'
 import { RpcProbeStage } from '@migaia/rpc-host/plugins/probe'
@@ -154,8 +154,18 @@ describe('collector query, watch and service', () => {
     const namespace = pair.a.memory
     /** Address the exact service Host rather than the broadcast scalar/fanout union. */
     const remote = namespace.peers[pair.b.self.name]!.devtools
+    /** Observe native Set operations without replacing the collector or service path. */
+    const observeExclusion = vi.spyOn(Set.prototype, 'add')
     try {
       await remote.describe()
+      /** The public service request identifies the original serving-endpoint exclusion set. */
+      const addition = observeExclusion.mock.calls.findIndex(
+        ([value]) => value === pair.b.self.instanceId
+      )
+      /** The spy preserves native Set.add receiver semantics and storage. */
+      const excluded = observeExclusion.mock.contexts[addition] as Set<unknown> | undefined
+      observeExclusion.mockRestore()
+      expect(excluded?.has(pair.b.self.instanceId)).toBe(true)
       /** Hand-filled views avoid a dependency on the separate probe-core observation leaf. */
       const ownTraffic = collectorView()
       ownTraffic.endpointId = pair.b.self.instanceId
@@ -164,7 +174,10 @@ describe('collector query, watch and service', () => {
       ownTraffic.method = CollectorFixture.method
       devtools.emit(ownTraffic)
       expect(devtools.query().events).toEqual([])
+      devtools.close()
+      expect(excluded!.size).toBe(0)
     } finally {
+      observeExclusion.mockRestore()
       devtools.close()
       await Promise.all([pair.a.close(), pair.b.close()])
     }
