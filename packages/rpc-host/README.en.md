@@ -53,22 +53,26 @@ Coroutines do not provide Worker isolation. Choose the [process](../rpc-plugin-p
 
 `createRpcHost` first commits flow plugins, link-policy plugins and their features, then installs transport plugins and their features on the same native plugin-host. Stages such as auth are available before transport handshake begins. The same lifecycle owner rolls back and releases acquired resources if a later installation fails.
 
-An existing `defineHost` or class owner uses `rpcHostPipelines(getHost, pipeline, namespaces)` from `@migaia/rpc-host/sdk` to obtain both pipeline declarations and `domainCore`. Its callbacks read the real host only at installation and borrow that host's own execution authority. Commit flow and link-policy plugins before installing transports; do not copy seven declarations. See the [usage guide](./USEGUIDE.en.md#install-rpc-in-an-existing-host).
+After construction, `const extended = await host.use(transport)` installs another transport and returns the same host with an added namespace in the return type. Each `use` commits or rolls back independently; the construction batch succeeds or fails together. Configure host Features in the construction `plugins`; they cannot be added later. Later transports borrow them, while local `features` still override only their own namespace.
+
+An existing `defineHost` or class owner obtains `domainCore` from SDK `rpcHostPipelines(getHost, pipeline)` and forwards the native construction request to `pipeline(name, request)`. Each transport declares its own pipelines, without an advance namespace list. Ordinary native hosts install shared flow Features through `rpcFlowPlugin([...features])` before transports. See the [usage guide](./USEGUIDE.en.md#install-rpc-in-an-existing-host).
 
 ## Calls and ownership
 
-| Entry                                                      | Completion                                                                            |
-| ---------------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| `host.<ns>.request(method, payload?, options?)`            | Business result                                                                       |
-| `host.<ns>.notify(method, payload?, options?)`             | Physical send, without business acknowledgement; `targetId` selects one direct target |
-| `host.<ns>.stream(method, payload?, options?)`             | Lazy iterator; independent consumption for multiple targets                           |
-| `host.<ns>.streamTo(targetId, method, payload?, options?)` | One lazy iterator for one direct target                                               |
-| `host.<ns>.group(steps, options?)`                         | Ordered `{ method, payload }` steps per target, without a cross-target transaction    |
-| `host.<ns>.send(targetId, method, payload?, options?)`     | Scalar result from one direct target                                                  |
-| `host.<ns>.dispatch(targetId, method, payload?, options?)` | Synchronous `void`; asynchronous failures reach the reporter                          |
-| `host.provide(definition)`                                 | Adds local methods; duplicate names reject                                            |
-| `host.<ns>.peers`                                          | Accepted direct capabilities; held functions bind to the original generation          |
-| `host.close()`                                             | Closes the host; repeated calls share the original Promise                            |
+| Entry                                                      | Completion                                                                             |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `host.<ns>.request(method, payload?, options?)`            | Business result                                                                        |
+| `host.<ns>.notify(method, payload?, options?)`             | Physical send, without business acknowledgement; `targetId` selects one direct target  |
+| `host.<ns>.stream(method, payload?, options?)`             | Lazy iterator; independent consumption for multiple targets                            |
+| `host.<ns>.streamTo(targetId, method, payload?, options?)` | One lazy iterator for one direct target                                                |
+| `host.<ns>.group(steps, options?)`                         | Ordered `{ method, payload }` steps per target, without a cross-target transaction     |
+| `host.<ns>.send(targetId, method, payload?, options?)`     | Scalar result from one direct target                                                   |
+| `host.<ns>.dispatch(targetId, method, payload?, options?)` | Synchronous `void`; asynchronous failures reach the reporter                           |
+| `host.provide(definition)`                                 | Adds local methods; duplicate names reject                                             |
+| `host.<ns>.peers`                                          | Accepted direct capabilities; held functions bind to the original generation           |
+| `host.close()`                                             | Closes the host; repeated calls share the original Promise                             |
+| `host.use(...plugins)`                                     | Independent installation transaction; returns the same host with added namespace types |
+| `host.unuse(name)`                                         | Native removal result; active flow restrictions reject with a lifecycle error          |
 
 Untargeted calls select only within their namespace: zero targets return empty `fulfilled/rejected` maps, one returns a scalar, and multiple return maps indexed by instance identity. Stream iterators cancel independently. Root call methods such as `host.request` are removed.
 
@@ -82,7 +86,7 @@ Configure each forwarding host with `forward: { maxHops: 3 }` in `createRpcHost`
 
 ## Optional capabilities
 
-The same `auth`, `chunk`, `batch`, `idempotency`, `limits`, and `schema` factories work in host `plugins` and transport `features`. Host placement supplies every namespace; transport placement overrides that capability only in its namespace. Each namespace has one implementation of each capability. Host `limits` shares quotas across namespaces; transport `limits` owns separate quotas. `probe`, `typegen`, and Devtools are host-only plugins. The former `namespaces` scope option is removed; select a transport with `features`.
+The same `auth`, `chunk`, `batch`, `idempotency`, `limits`, `errorMap`, and `schema` factories work in host `plugins` and transport `features`. Host placement supplies every namespace; transport placement overrides that capability only in its namespace. Each namespace has one implementation of each capability. Host `limits` shares quotas across namespaces; transport `limits` owns separate quotas. `probe`, `typegen`, and Devtools are host-only plugins. The former `namespaces` scope option is removed; select a transport with `features`.
 
 ```ts doc-test=check
 import { timeout, retry } from '@migaia/rpc-host/features'
@@ -98,15 +102,21 @@ export const observation = probe({
 export const perCallDeadline = timeoutFromSubpath({ ms: 100 })
 ```
 
-Aggregate and default subpath imports support tree-shaking. Other flow plugins are `auth`, `chunk`, `batch`, `idempotency`, `schema`, and `typegen`. Installing `limits` is recommended; omitting it enables no such quotas. `host.<ns>.outcome(key)` exists only with `idempotency` installed. `auth` independently owns request-ID replay retention; `maxReplayEntriesPerPeer` bounds retained identities per admitted peer, and `onRejected` receives replay-capacity refusal reasons.
+Aggregate and default subpath imports support tree-shaking. Installing `limits` is recommended; omitting it enables no such quotas. `host.<ns>.outcome(key)` exists only with `idempotency` installed. Auth passes the signing binding object to `sign/verify` by default; text and byte modes encode one binding layer. Its request-ID deduplication releases completed IDs immediately by default, with signed-window or millisecond `retain` alternatives. `maxReplayEntriesPerPeer` bounds only numeric retention mode, and `onRejected` receives capacity refusal reasons. See [authentication](./USEGUIDE.en.md#authentication-signing-and-duplicate-requests) for configuration and HMAC examples.
+
+`errorMap` synchronously maps outbound errors without changing local originals, reports, warnings, or log observation. A throw, returned Promise, or unserializable result is reported before sending the original default error graph. Without a mapper, unauthenticated peers still receive a redacted handshake refusal. See [error mapping](./USEGUIDE.en.md#map-errors-sent-to-the-peer).
 
 A custom flow returns `stages` from `defineFlowFeature` setup; place the feature in host `plugins` or in one transport's `features`. Each stage receives its pipeline payload and native `next(payload)`; readonly events belong in the separate `observe` field. Frame pipelines allow independent submissions: after catching and reporting one member's failure, a stage can submit another. Ignoring a failed `next()` Promise rejects the pipeline. The original call settles a cancelled batch member with `CANCELLED` and its original reason on `cause`; other members complete normally.
 
-Builtin positions are fixed: outbound plaintext → schema → idempotency → limits → auth → chunk → batch → wire; inbound reverses the direction. Array order does not change these positions. Third-party stages default to plaintext; SDK authors may select the supported `layer` explicitly.
+Builtin positions are fixed: outbound plaintext → schema → idempotency → limits → errorMap → auth → chunk → batch → wire; inbound reverses the direction. Array order does not change these positions. Third-party stages default to plaintext; SDK authors may select the supported `layer` explicitly.
 
 `auth` protects each complete message before `chunk` splits it into physical frames. The receiver reassembles the message before restoring protection. Probe `protected` events describe the complete message; `frame` events retain actual `chunkIndex`, `chunkCount` and `members`. Physical batch membership is observed on its batch frame, while each logical message has one `envelope` observation.
 
 A custom carrier may implement optional `reserveWrite` by borrowing its existing flow-control capacity. Reserve once per logical write: chunk fragments share its receipt, while a batch retains each member's receipt until completion. `write` still completes at actual physical acceptance, and `close` must settle carrier-owned queued writes.
+
+With native binary negotiated, no signature covering the manifest means no digest. Signed complete backings at or below the internal 16 KiB threshold are inline; larger backings use native sidecars and SHA-256. Aliases retain complete backing identity, and transfer remains limited to the caller's original grants. This differs from the former manifest requiring a digest on every native row; see [binary integrity](./USEGUIDE.en.md#binary-integrity-and-transfer).
+
+Shared or local flow Features used by open Sessions cannot be hot-unloaded: removal of their native registration rejects with `LIFECYCLE_MUTATION`. Close affected namespace Sessions before cold removal. Capabilities such as auth, chunk, and batch change the wire format; only two-sided installation guarantees establishment. One-sided configuration has no compatibility guarantee and is not proactively prohibited. See [later installation and removal](./USEGUIDE.en.md#install-and-remove-transports-after-construction).
 
 [Pool](../rpc-plugin-pool/README.en.md) is the transport's `pool({ size })` feature. Members use one carrier kind and expose one logical peer. Pool owns member acquisition, scheduling, and closure; the transport contributes native `host.<ns>.members` controls.
 
@@ -138,12 +148,12 @@ Idempotency fingerprints follow the object's own key order. Changing key order c
 
 Native Feature descriptors are captured once per cold compilation while preserving the first selector validation and error order; later selectors do not repeat Proxy reflection.
 
-auth() releases a completed request ID immediately only when the actual native owner proves exclusive source custody; other sources retain the bounded completed TTL. Active requests and streams remain held through actual business and iterator cleanup.
+Auth changes its default signing input from text to an object. Normalize it in callbacks or set `encodedType: 'string'` when text is required. Completed request IDs release immediately by default; set `retain: 310_000` for the former behavior. Local verifier and credential resolver errors retain their original causes; synchronous `errorMap` controls remote redaction.
 
 With sign/verify configured, auth exchanges and validates a fresh source challenge inside the existing signed handshake. Application callbacks must still sign and verify the complete input they receive. No public discovery or handshake option is added.
 
 verifyCredentials may return { principalId: nonemptyString } to lend the authenticated principal to the current Session. Throwing or rejection still refuses authentication. Void, string, and other formerly ignored results do not grant a principal.
 
-The six former `/features/{auth,batch,chunk,idempotency,limits,schema}` entries are removed; import their factories from `/plugins/*` or `/plugins`. `rpcHostPipelines(getHost, pipeline, namespaces)` requires the third argument to declare every future transport namespace before native host construction. The following unused error codes are removed without replacement: `HOST_ASSEMBLER_DUPLICATE`, `HOST_FEATURE_DUPLICATE`, `PROVIDER_GENERATION_RETIRED`, `MIDDLEWARE_DUPLICATED`, `MIDDLEWARE_MISSING`, `PROVIDER_NOT_SETTLED`, `TARGET_NOT_IDENTIFIABLE`.
+The six former `/features/{auth,batch,chunk,idempotency,limits,schema}` entries are removed; import their factories from `/plugins/*` or `/plugins`. `rpcHostPipelines` removes its third argument and `pipelines` output: forward the actual construction request instead, and let transports declare pipelines. The following unused error codes are removed without replacement: `HOST_ASSEMBLER_DUPLICATE`, `HOST_FEATURE_DUPLICATE`, `PROVIDER_GENERATION_RETIRED`, `MIDDLEWARE_DUPLICATED`, `MIDDLEWARE_MISSING`, `PROVIDER_NOT_SETTLED`, `TARGET_NOT_IDENTIFIABLE`.
 
-For a child launched with native parent facts (process, thread, coroutine, dedicated worker, or pool member), the Host uses the parent-supplied name, otherwise the child `self.name`, otherwise the existing default. The parent also controls `instanceId`. Omit a parent name to address the name returned by the child during handshake. If an explicit child name differs from the parent name, construction succeeds and the child emits one `SELF_IGNORED` warning. Handle it with `createRpcHost({ onWarning })`; the warning contains `code`, `message`, `parentName`, and `ignoredName`, and `RpcWarningCode.selfIgnored` names the public code. Without a callback it goes to `console.warn`. Warnings do not enter `report` and carry no error code. Two conflicting sets of parent launch facts still reject with `INVALID_CONFIG`.
+Launched children prefer the actual parent-supplied name and instanceId, otherwise child `self.name` and the existing default. Without a parent name, address the name reported in the child's handshake. An explicit child name conflict emits one `RpcWarningCode.selfIgnored` (`SELF_IGNORED`) warning; conflicting parent startup facts still reject with `INVALID_CONFIG`. Warnings have `{ code, message, data: { parentName, ignoredName } }`, delivered first to the `onWarning` option, then host-level SDK subscribers, with `console.warn` only when no recipient exists. The warning itself is not reported; recipient failures report their originals and delivery continues. See [warning subscriptions](./USEGUIDE.en.md#warnings-and-child-names).

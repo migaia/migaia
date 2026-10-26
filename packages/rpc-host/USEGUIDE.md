@@ -89,14 +89,42 @@ export const callOptions = { timeout: timeout({ ms: 100 }), retry: false } as co
 
 进入 provider 前剩余截止时间已经耗尽的调用，以 `DEADLINE_EXCEEDED` 拒绝，不执行 provider；`before-start` 的取消语义保持不变。
 
+## 后装与卸载传输
+
+`createRpcHost({ plugins })` 构造时安装的整批定义一起成功或一起回滚。构造完成后，`host.use(...)` 每次开启一个独立的原生安装事务；失败只回滚本批新资源，已提交的命名空间继续工作。返回值还是同一个公开 host；用新变量接住它，才能在类型上取得新命名空间。
+
+```ts doc-test=check
+import { createRpcHost } from '@migaia/rpc-host'
+import { limits } from '@migaia/rpc-host/plugins'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
+
+const host = await createRpcHost({ plugins: [limits({ maxGlobal: 256 })] })
+try {
+  const extended = await host.use(threadPlugin({ spawn: new URL('./worker.ts', import.meta.url) }))
+  await extended.thread.notify('refresh')
+  await extended.thread.close()
+  await extended.unuse('thread')
+} finally {
+  await host.close()
+}
+```
+
+传输插件的名字就是命名空间；重复名字或保留名在安装前被拒绝。宿主级 auth、limits 等信息流 Feature 放在 `createRpcHost({ plugins })` 中，只准备一次；后装传输沿用同一份安装与共享额度，传输 `features` 中的同种能力只覆盖本命名空间。后续 `use` 不接受新的宿主级 Feature，不能用 `use(auth(...))` 改写这份前缀。只读观察插件仍可后装。
+
+`unuse(name)` 沿用原生卸载结果 `{ ok, affected, errors? }`。没有活动信息流约束时，卸载先按正常关闭流程关闭该传输的会话，再删除其管道组。会话仍在使用所选宿主级 Feature，或传输自己持有的局部 Feature 时，移除相应注册会以 `plugin.host / LIFECYCLE_MUTATION` 拒绝；共享 Feature 的卸载单位是原生共享封装，局部 Feature 的卸载单位是所属传输。先关闭受影响命名空间的会话，再冷删除；示例因此先调用 `thread.close()`。没有选中信息流 Feature 的传输、只读观察插件不受这项限制。宿主关闭或重新构造后也可去掉能力，框架不再保证原来的能力。
+
+auth、chunk、batch 等通过握手协商并改变线上格式的能力，只有两端都装时才保证能建立通信。只装一端时不提供兼容，也不会主动禁止这种配置；应用需要自行提供匹配的 plugin 或 feature。
+
 ## 在已有宿主中安装 RPC
 
-已有 `defineHost` 宿主使用 `rpcHostPipelines(getHost, pipeline, namespaces)`，同时获得管道声明和 `domainCore`。`namespaces` 列出这个宿主将安装的全部传输命名空间（示例为 `thread`）；安装未列出的命名空间时，传输启动会失败。helper 构造时不调用回调、不创建宿主或资源；安装时，`domainCore` 才读取真实宿主并借用其管道执行权。不要复制七条声明，也不要把另一个宿主的执行权交进来。
+已有 `defineHost` 宿主使用 `rpcHostPipelines(getHost, pipeline)` 取得 `domainCore`。helper 构造时不调用回调、不创建宿主或资源；安装时才读取真实宿主，并把本次原生构造请求交还给这个宿主的 `pipeline(name, request)`。传输插件自己声明七条短名管道，安装时创建、卸载时删除，不需要预先列出命名空间，也不再有 `rpc.pipelines`。不要复制声明，或借用另一个宿主的执行权。
 
 ```ts doc-test=check
 import { defineHost } from '@migaia/plugin-host'
 import {
   rpcHostPipelines,
+  rpcFlowPlugin,
+  type IRpcFlowFeature,
   type IRpcFlowPlugin,
   type IRpcTransportPlugin
 } from '@migaia/rpc-host/sdk'
@@ -104,63 +132,58 @@ import {
 /** Capture lazy authority callbacks before the real host is assigned. */
 const rpc = rpcHostPipelines(
   () => host,
-  (name) => host.pipeline(name),
-  ['thread']
+  (name, request) => host.pipeline(name, request)
 )
 /** One native owner supplies both stage registration and execution. */
 export const host = defineHost({
-  ...rpc,
+  domainCore: rpc.domainCore,
   host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
 })
 
 /** Commit reusable flow definitions before opening any transport resource. */
 export async function installRpc(
-  flows: readonly IRpcFlowPlugin[],
+  features: readonly IRpcFlowFeature<object>[],
+  observers: readonly IRpcFlowPlugin[],
   transports: readonly IRpcTransportPlugin[]
 ) {
-  await host.use(...flows)
+  await host.use(...observers, rpcFlowPlugin(features))
   await host.use(...transports)
 }
 ```
 
-class 宿主同样通过 helper 延迟读取 `this`。构造时把声明交给 `super`，之后由 `createPluginDomainCore` 提供同一份接法；无需公开原本受保护的 `pipeline`。构造完成后再按上面的顺序安装 plugin。
+`rpcFlowPlugin(features)` 是普通原生宿主安装共享信息流 Feature 的封装，实际 setup 与清理由原生注册持有；不能把 `auth()` 等 Feature 直接当原生 plugin 交给 `host.use`。先提交这个封装和只读观察插件，再装传输，确保首次握手已经有完整策略。
+
+class 宿主同样通过 helper 延迟读取 `this`。`createPluginDomainCore` 必须转交本次构造请求；无需公开原本受保护的 `pipeline`。构造完成后按上面的顺序安装 plugin。
 
 ```ts doc-test=check
-import { PluginHost } from '@migaia/plugin-host'
+import { PluginHost, type IHostCoreConstructionRequest } from '@migaia/plugin-host'
 import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 
-/** Keep the helper's declaration and domain-core axes together. */
+/** Retain the helper's domain-core construction port. */
 type IRpcSetup = ReturnType<typeof rpcHostPipelines>
 /** Native installation receives only this owner's declared RPC core. */
 type IRpcCore = ReturnType<IRpcSetup['domainCore']>
 
-export class NativeRpcHost extends PluginHost<
-  IRpcCore,
-  unknown,
-  readonly [],
-  IRpcSetup['pipelines']
-> {
+export class NativeRpcHost extends PluginHost<IRpcCore, unknown, readonly []> {
   /** The setup lends this exact owner's protected pipeline without another executor. */
   readonly #rpc: IRpcSetup
 
   /** Register lazy callbacks before super without reading an unconstructed this. */
   constructor() {
-    /** The same setup supplies declarations now and authority only after construction. */
+    /** The callbacks are invoked only after construction by the actual native installation. */
     const rpc = rpcHostPipelines(
       () => this,
-      (name) => this.pipeline(name),
-      ['thread']
+      (name, request) => this.pipeline(name, request)
     )
     super({
-      pipelines: rpc.pipelines,
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
     this.#rpc = rpc
   }
 
   /** Each install borrows this exact constructed owner's pipeline execution authority. */
-  protected override createPluginDomainCore(): IRpcCore {
-    return this.#rpc.domainCore()
+  protected override createPluginDomainCore(request: IHostCoreConstructionRequest): IRpcCore {
+    return this.#rpc.domainCore(request)
   }
 }
 ```
@@ -173,13 +196,84 @@ frame 管道允许多次提交。每次 `await next(payload)` 的失败交给当
 
 `batch` 中取消的成员不再向下游提交，原调用以 `CANCELLED` 结算，原 reason 保留在 `cause`；同批其他成员继续完成。入站某个成员失败只 report 该成员，不阻止后续成员。
 
-内置位置固定：出站 plaintext → schema → idempotency → limits → auth → chunk → batch → wire；入站反向。数组书写顺序不改变这些位置。第三方 stage 默认在 plaintext，高阶 SDK 作者可显式指定受支持的 `layer`。
+内置位置固定：出站 plaintext → schema → idempotency → limits → errorMap → auth → chunk → batch → wire；入站反向。数组书写顺序不改变这些位置。第三方 stage 默认在 plaintext，高阶 SDK 作者可显式指定受支持的 `layer`。
 
 `auth` 对完整消息执行保护，再由 `chunk` 拆成物理帧；接收端先重组，再还原保护。probe 的 `protected` 事件对应整条消息，`frame` 事件保留实际 `chunkIndex`、`chunkCount` 和 `members`。物理 batch 的成员数在 batch frame 上观察；`envelope` 事件仍对每条逻辑消息观察一次。
 
 载体可选实现 `reserveWrite(options)`，借用原有流控 owner，返回带 `release()` 的容量凭据。Session 在编码之后为一次逻辑写出预留一次，等这次 frame 管道实际结算后释放；chunk 的所有分片借用同一凭据，batch 各成员保留各自凭据，合并的物理写出借用仍存活成员的凭据。载体的 `write` 仍在实际物理接纳后完成，不应再把分片或 batch 重复计为新的逻辑调用。凭据不进入线上数据。
 
-同一组 `auth`、`chunk`、`batch`、`idempotency`、`limits`、`schema` 工厂支持 host 的 `plugins` 与传输的 `features`；传输配置只覆盖本命名空间。host 级 `limits` 共用额度，传输级各自独立。`probe`、`typegen`、Devtools 只装在 host 级。删除原 `namespaces` 作用范围选项，改为把 feature 放在对应传输上。
+同一组 `auth`、`chunk`、`batch`、`idempotency`、`limits`、`errorMap`、`schema` 工厂支持 host 的 `plugins` 与传输的 `features`；传输配置只覆盖本命名空间。host 级 `limits` 共用额度，传输级各自独立。`probe`、`typegen`、Devtools 只装在 host 级。删除原 `namespaces` 作用范围选项，改为把 feature 放在对应传输上。
+
+## 认证、签名与重复请求
+
+默认 `encodedType: 'any'` 且未配置 `encrypt` 时，`sign` 收到带 nonce、counter 和对象 payload 的签名绑定对象，`verify` 收到对端还原出的同一结构。回调必须签名、验证完整输入；框架不先将它转换成文本。HMAC 等按字节处理的算法由应用决定规范化方式，两端必须一致。
+
+```ts doc-test=check
+import { createHmac } from 'node:crypto'
+import { auth } from '@migaia/rpc-host/plugins'
+
+/** Both peers use the same application-owned key and binding representation. */
+function mac(value: unknown, key: string): string {
+  return createHmac('sha256', key).update(JSON.stringify(value)).digest('hex')
+}
+
+/** The application supplies its key; callbacks cover the entire replay binding. */
+export function signedAuthentication(key: string) {
+  return auth({
+    sign: (value) => ({ value, mac: mac(value, key) }),
+    verify: (envelope) => {
+      const signed = envelope as { value: unknown; mac: string }
+      if (signed.mac !== mac(signed.value, key)) throw new Error('signature mismatch')
+      return signed.value
+    }
+  })
+}
+```
+
+显式选择 `'string'`、`'uint8array'`，或配置 `encrypt` 时，绑定改用带前缀的文本或相应 UTF-8 字节。整个绑定只编码一次，里面的 payload 仍是对象，入站只解析这层文本。加密仍先于签名，入站先验证再解密；支持的原生对象路径保持不变。原先假定默认输入总是文本的回调，应自行 `JSON.stringify` 或改用 `encodedType: 'string'`。nonce、签名计数器窗口及其重放检查没有改变。
+
+auth 始终挡住还在执行的同一请求 ID，直到实际业务及 stream 清理完成。完成后如何释放由 `retain` 决定：
+
+| `retain`         | 完成后的释放时机               | 使用边界                                                            |
+| ---------------- | ------------------------------ | ------------------------------------------------------------------- |
+| `false`（默认）  | 立即释放                       | 只保留在途身份，不按已完成请求数累积                                |
+| `'window'`       | 原签名计数器被 64 位窗口越过时 | 必须配置签名，否则为 `INVALID_CONFIG`；窗口前进不释放仍在执行的请求 |
+| 正安全整数毫秒数 | 完成后保留指定时长             | 非法数字以 `INVALID_CONFIG` 拒绝；数值模式受容量限制                |
+
+可以在 `auth({ retain })` 设置默认值，也可以在传输连接选项 `connect: { retain }` 中覆盖；只有未指定连接值时才回退，所以连接级 `false` 也会覆盖宿主设置。需要旧的 310 秒行为时显式配置 `retain: 310_000`。
+
+`maxReplayEntriesPerPeer` 默认 `1024`，只限制数字模式中的活动与保留身份，必须是正安全整数；满额以 `OVERLOADED` 拒绝。`false` 和 `'window'` 不受这个数值容量限制。`onRejected` 接收冻结的 `replayLedgerFull` 或 `groupReplayFull` 通知，回调失败仍按原错误及原因报告。重复请求静默丢弃，不再次执行，也不补发终态；需要把已完成结果回放给重发方时，安装 `idempotency()`。
+
+## 映射发往对端的错误
+
+verifier 或凭据解析器抛出、拒绝时，auth 在本地错误的 `cause` 上保留原始错误。`errorMap(map)` 只在错误发往对端、序列化之前映射协议中的错误槽；本地抛出的错误、`report`、警告和只读观察插件看到的仍是原始错误，与插件安装先后无关。它可放在宿主 `plugins` 或传输 `features`，传输级覆盖宿主级。
+
+```ts doc-test=check
+import { createRpcHost } from '@migaia/rpc-host'
+import { errorMap, type IRpcErrorMap } from '@migaia/rpc-host/plugins'
+
+/** Decide what remote callers may learn while preserving local diagnostic causes. */
+const redact: IRpcErrorMap = (error) =>
+  new Error(
+    error instanceof Error && /credential/i.test(error.message)
+      ? 'request rejected'
+      : 'request failed'
+  )
+
+export const host = await createRpcHost({ plugins: [errorMap(redact)] })
+```
+
+`map(error, context)` 必须同步返回 `Error`、可移植值或 `undefined`。抛错或映射结果序列化失败时，报告该失败并发送原来的默认错误图；返回 Promise/thenable 时报告 `INVALID_CONFIG`，立即回退且不等待它，因此不会卡住同一会话的后续消息。迟到的 Promise 拒绝仍会单独报告。
+
+没有 `errorMap` 时，仅未通过认证的对端收到的握手拒绝默认隐藏细节；其他错误发送完整 cause 图。跨 realm 会还原新对象，不保证接收对象与发送方原错 `===`。不要靠改写日志或丢弃本地 cause 来控制对端可见信息。
+
+## 二进制完整性与 transfer
+
+在已协商原生二进制的载体路径上，没有覆盖清单的签名就不计算 SHA-256，清单也不要求摘要。配置签名后，完整 backing 不超过 16 KiB 时快照并内联进签名内容，不原生转移，也不计算摘要；较大的 backing 保留原生 sidecar，每个唯一 backing 在一次 prepare 中计算一次摘要，在对应 restore 中校验一次。阈值是 SDK 内部选择，不是公开配置项。
+
+判断大小和摘要都针对完整 backing，而不是某个 Uint8Array 的可见切片；共享同一 backing 的别名、offset 和 length 保持。签名清单的逻辑 backing 行可为 `{ byteLength, data }`（完整 backing 的 canonical base64url）或 `{ byteLength, sha256 }`（原生 sidecar）；无完整性要求的原生行只有 `{ byteLength }`。带 `data` 的行不消耗物理 sidecar，其他行依序消费。
+
+载体作者通过已有 codec context 的 `transferRequiresIntegrity` 借用本地选中的信息流要求，不能信任对端字段来授予权限。最终 transfer 仅保留调用方原本授权、且编码结果确实仍作为原生 sidecar 承载的 backing；内联不会新增 transfer 授权。此清单格式替代原来所有原生行都必带摘要的格式，具体形状见 [contract 协议说明](../rpc-contract/USEGUIDE.md#载体二进制与收发顺序)。
 
 ## 通知、分组与结果查询
 
@@ -198,7 +292,7 @@ export async function sendUpdates(host: IRpcHost<IApi>) {
 
 `notify` 的 Promise 只表示物理发送，不表示业务确认。`dispatch(target, method, payload, options)` 同步返回 `void`，失败交给原 reporter。每个目标按顺序执行自己的 group，没有跨目标事务。
 
-安装 `idempotency()` 信息流 plugin 后，才有 `host.<ns>.outcome(key)` 查询保留的结果。省略 plugin 时不会启用按幂等键保存和查询结果的存储。`auth()` 独立拥有请求 ID 去重：实际业务及流清理完成前保留活动身份，完成后的身份仅在真实原生来源独占时立即释放，其他来源按有界 TTL 保留；重复身份不再次执行或发送终态。`auth.maxReplayEntriesPerPeer` 默认 `1024`，必须为正安全整数；容量不足以 `OVERLOADED` 拒绝，`auth.onRejected` 接收冻结的 `replayLedgerFull` 或 `groupReplayFull` 通知。该回调失败按原 `INTERNAL` 错误及原因上报。推荐安装 `limits()`；不安装就不启用相应并发、速率或 payload 配额。
+安装 `idempotency()` 信息流 Feature 后，才有 `host.<ns>.outcome(key)` 查询保留的结果。省略时不启用按幂等键保存和查询结果的存储。auth 的请求 ID 去重与它独立，三种保留方式见[认证说明](#认证签名与重复请求)。推荐安装 `limits()`；不安装就不启用相应并发、速率或 payload 配额。
 
 ## 转发与持有能力
 
@@ -236,6 +330,32 @@ export const declarations = typegen({
 ```
 
 把这两个定义与传输一起放入 `plugins`。`typegen.out.write` 是应用拥有的输出能力，文件 I/O 由应用决定；失败通过 reporter 传播。关闭 host 或卸载相应 plugin 后释放订阅。
+
+## 警告与子节点名称
+
+警告是冻结的 `{ code, message, data }` 记录，不是错误，不会进 `report`，也不阻止构造或调用。每条记录先交给 `createRpcHost({ onWarning })`，再按注册顺序交给宿主级 SDK 插件 setup 返回的 `onWarning`；所有接收者拿到同一个记录。没有接收者时只调用一次 `console.warn`。接收者抛错或异步拒绝时，报告原错误，其他接收者继续收到警告。
+
+```ts doc-test=check
+import { createRpcHost, type IRpcWarning } from '@migaia/rpc-host'
+import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
+
+/** Subscribe through the native host registration lifetime. */
+const warnings = defineFlowPlugin({
+  name: 'application-warnings',
+  setup: () => ({
+    onWarning: (warning: IRpcWarning) => console.log(warning.code, warning.data)
+  })
+})
+
+export const host = await createRpcHost({
+  onWarning: (warning) => console.log(warning.message),
+  plugins: [warnings]
+})
+```
+
+只读警告订阅可后装，卸载或安装回滚时由原生注册移除。订阅只能由宿主级 `defineFlowPlugin` 提供；放进传输 `features`，或让 `defineFlowFeature` 返回 `onWarning`，均以 `INVALID_CONFIG` 拒绝。
+
+被父端拉起并收到真实原生启动事实的子节点（process、thread、coroutine、dedicated worker 或 pool 成员），名字依次取父端指定名、子节点 `self.name`、现有默认名，`instanceId` 也以父端事实为准。父端省略名字时，用子节点握手报回的名字寻址。显式子节点名字与父端不同时，构造成功，只发出一次 `RpcWarningCode.selfIgnored`（`SELF_IGNORED`）警告；两个名字在 `warning.data.parentName` 与 `warning.data.ignoredName`。两份冲突的父端启动事实仍以 `INVALID_CONFIG` 拒绝。
 
 ## 迁移入口
 
@@ -276,12 +396,12 @@ export const declarations = typegen({
 
 原生 Feature 的 descriptors 每次冷编译只捕获一次，首次 selector 的校验及错误顺序保持；后续 selector 不再重复触发 Proxy reflection。
 
-auth() 的已完成请求 ID 仅在实际原生 owner 证明来源独占时立即释放；其他来源继续按有界 TTL 保留。活动请求与 stream 仍保留到实际业务及迭代器清理完成。
+auth 默认以对象交给 sign/verify；依赖旧文本输入时自行规范化或选择 `encodedType: 'string'`。完成的请求 ID 默认立即释放，需要旧保留时长时设置 `retain: 310_000`。本地 verifier/凭据解析错误保留原 cause，对端脱敏改用同步 `errorMap`。
 
 配置 sign/verify 时，auth 在既有签名握手中交换并验证每个来源的新挑战；应用回调仍须签名和验证收到的完整输入。此过程不增加公开 discovery 或握手配置。
 
 verifyCredentials 可返回 { principalId: 非空字符串 }，把真实认证主体交给当前 Session；抛出或拒绝仍拒绝认证。void、字符串及其他原先被忽略的结果不会授予主体身份。
 
-原六个 `/features/{auth,batch,chunk,idempotency,limits,schema}` 入口已删除，改从 `/plugins/*` 或 `/plugins` 导入。`rpcHostPipelines(getHost, pipeline, namespaces)` 的第三参数须在原生宿主构造前声明全部未来传输命名空间。以下无抛出点错误码已删除，不提供替代码：`HOST_ASSEMBLER_DUPLICATE`, `HOST_FEATURE_DUPLICATE`, `PROVIDER_GENERATION_RETIRED`, `MIDDLEWARE_DUPLICATED`, `MIDDLEWARE_MISSING`, `PROVIDER_NOT_SETTLED`, `TARGET_NOT_IDENTIFIABLE`。
+原六个 `/features/{auth,batch,chunk,idempotency,limits,schema}` 入口已删除，改从 `/plugins/*` 或 `/plugins` 导入。`rpcHostPipelines` 删除第三参数和 `pipelines` 输出，构造请求必须传给 `domainCore(request)`；传输自己声明管道。以下无抛出点错误码已删除，不提供替代码：`HOST_ASSEMBLER_DUPLICATE`, `HOST_FEATURE_DUPLICATE`, `PROVIDER_GENERATION_RETIRED`, `MIDDLEWARE_DUPLICATED`, `MIDDLEWARE_MISSING`, `PROVIDER_NOT_SETTLED`, `TARGET_NOT_IDENTIFIABLE`。
 
-被父端拉起并收到原生启动事实的子节点（process、thread、coroutine、dedicated worker 或 pool 成员），Host 名字按父端指定名、子节点 `self.name`、现有默认名依次选择；`instanceId` 也以父端为准。父端省略名字时，按子节点握手报回的名字寻址。显式子节点名字与父端不同时，构造成功，子节点只发出一次 `SELF_IGNORED` 警告。通过 `createRpcHost({ onWarning })` 接收，事件含 `code`、`message`、`parentName`、`ignoredName`，公开常量为 `RpcWarningCode.selfIgnored`；未配置回调时交给 `console.warn`。警告不进 `report`，不带错误码。两份互相冲突的父端启动事实仍以 `INVALID_CONFIG` 拒绝。
+`onWarning` 的两个名字从顶层移到 `data`。原生二进制清单的摘要改为按本地完整性要求提供，签名小 backing 可在原生清单内内联；对端实现须同步采用[当前清单格式](../rpc-contract/USEGUIDE.md#载体二进制与收发顺序)。
