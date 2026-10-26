@@ -1,5 +1,6 @@
 import { PluginHost } from '@migaia/plugin-host'
-import { localStorageHost } from '@migaia/storage-web/local-storage'
+import { createStorageHost } from '@migaia/storage-host'
+import { localStorageBackendPlugin } from '@migaia/storage-web/local-storage'
 
 class RendererHost extends PluginHost<Record<string, never>> {}
 
@@ -8,5 +9,10 @@ const host = new RendererHost({
 })
 void host.dispose()
 
-// Electron renderer 进程有完整的 DOM/BOM，storage-web 的浏览器后端可直接使用。
-void localStorageHost().set('k', 'v')
+/** Electron renderer declarations install the browser backend through its owning Host. */
+const storage = await createStorageHost({ plugins: [localStorageBackendPlugin()] })
+try {
+  await storage.backend('local').set('k', 'v')
+} finally {
+  await storage.dispose()
+}

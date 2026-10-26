@@ -1,9 +1,5 @@
 /** Check real package declarations for a DOM-free Node consumer, including native RPC message IO. */
-// @migaia/storage-web 主入口是 web-only（localStorageHost/sessionStorageHost/document.cookie/
-// IndexedDB 全是浏览器 API），Node 主线程没有这些全局对象——见
-// 但 `memoryStorageHost` 是纯内存后端
-// （Map 实现、SSR/Node/testing 降级目标），经 DOM-free 子路径 `@migaia/storage-web/memory`
-// 单独引入，不把 IDB/WebStorage 的 DOM 类型带进来。
+// The neutral StorageHost owns its builtin memory backend; browser backends remain separate.
 import { MessageChannel } from 'node:worker_threads'
 import type { IRpcMessageIO } from '@migaia/rpc-host/sdk'
 import { Logger, type ILogEntry, type ISink } from '@migaia/logger'
@@ -11,7 +7,7 @@ import { createCapabilityHost } from '@migaia/capability'
 import { jsonPlugin } from '@migaia/serialize'
 import { createRuntime } from '@migaia/reactive'
 import { Resource } from '@migaia/resource'
-import { memoryStorageHost } from '@migaia/storage-web/memory'
+import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
 import { createStore } from '@migaia/store-light'
 import { ObservableArray } from '@migaia/store-indexed'
 import { atomDef, createAtomStore } from '@migaia/store-keyed'
@@ -29,7 +25,9 @@ jsonPlugin()
 const runtime = createRuntime()
 runtime.signal(0).dispose()
 new Resource(() => 1, runtime).dispose()
-memoryStorageHost().dispose()
+/** This genuine neutral-memory installation is disposed through its original public Host. */
+const memory = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+await memory.dispose()
 createStore({ count: 0 }).$dispose()
 new ObservableArray([0]).dispose()
 createAtomStore(runtime).dispose()

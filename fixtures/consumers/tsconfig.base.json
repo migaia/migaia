@@ -24,7 +24,7 @@
       "@migaia/serialize": ["../../packages/serialize/dist/index.d.ts"],
       "@migaia/storage-web": ["../../packages/storage-web/dist/index.d.ts"],
       "@migaia/storage-web/*": ["../../packages/storage-web/dist/*"],
-      "@migaia/storage-web/memory": ["../../packages/storage-web/dist/memory.d.ts"],
+      "@migaia/storage-host": ["../../packages/storage-host/dist/index.d.ts"],
       "@migaia/lifecycle": ["../../packages/lifecycle/dist/index.d.ts"],
       "@migaia/utils/promise": ["../../packages/utils/dist/promise.d.ts"]
     },
