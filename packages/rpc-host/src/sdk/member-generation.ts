@@ -205,7 +205,7 @@ export class RpcMemberGeneration<TUnit, TSpec> {
       try {
         await this.#resources.release()
       } catch (cleanup) {
-        this.#options.report(cleanup)
+        ;(0, this.#options.report)(cleanup)
       }
       throw primary
     }
@@ -314,9 +314,9 @@ export class RpcMemberGeneration<TUnit, TSpec> {
       close: candidate.close
     }
     try {
-      this.#options.onReady?.(view, outcome.generation, outcome.unit, candidate.session)
+      ;(0, this.#options.onReady)?.(view, outcome.generation, outcome.unit, candidate.session)
     } catch (error) {
-      this.#options.report(error)
+      ;(0, this.#options.report)(error)
     }
     for (const waiter of this.#waiters)
       if (outcome.generation > waiter.after) this.#settle(waiter, outcome.generation, true)
@@ -362,7 +362,7 @@ export class RpcMemberGeneration<TUnit, TSpec> {
       try {
         listener(reason)
       } catch (error) {
-        this.#options.report(error)
+        ;(0, this.#options.report)(error)
       }
     }
     this.#listeners.delete(generation)
@@ -400,9 +400,9 @@ export class RpcMemberGeneration<TUnit, TSpec> {
       }
       deferTask(this.#options.binding.scheduler, () => {
         try {
-          receipt.listener(receipt.reason)
+          ;(0, receipt.listener)(receipt.reason)
         } catch (error) {
-          this.#options.report(error)
+          ;(0, this.#options.report)(error)
         }
       })
       return () => undefined
@@ -484,9 +484,9 @@ export class RpcMemberGeneration<TUnit, TSpec> {
       for (const waiter of this.#waiters) this.#settle(waiter, failure, false)
     }
     try {
-      this.#options.onNative?.(event, current)
+      ;(0, this.#options.onNative)?.(event, current)
     } catch (error) {
-      this.#options.report(error)
+      ;(0, this.#options.report)(error)
     }
     if (!this.#observing || this.#released) return
     if (
@@ -535,7 +535,7 @@ export class RpcMemberGeneration<TUnit, TSpec> {
     this.#released = completion.promise
     this.#releaseReason = createRemoteLayerError(RpcRemoteLayerErrorCode.closed)
     this.#observing = false
-    this.#unsubscribe()
+    ;(0, this.#unsubscribe)()
     for (const waiter of this.#waiters) this.#settle(waiter, this.#releaseReason, false)
     void this.#release().then(completion.resolve, completion.reject)
     return this.#released

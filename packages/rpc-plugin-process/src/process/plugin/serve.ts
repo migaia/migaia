@@ -294,7 +294,7 @@ class ProcessSessionOwner {
     /** This single existing bootstrap reader hands its unconsumed semantic tail to Session. */
     const admitted = await acceptProcessConnectionBootstrap(
       raw,
-      { verify: (credential, peer) => ingress.verify(credential, peer) },
+      { verify: (credential, peer) => (0, ingress.verify)(credential, peer) },
       {
         signal: this.#controller.signal,
         scheduler: this.#scheduler,
@@ -303,7 +303,7 @@ class ProcessSessionOwner {
     )
     this.#assertOpen()
     /** Only an admitted connection may execute the original user metadata callback. */
-    const selected = ingress.createConnectionContext(pending)
+    const selected = (0, ingress.createConnectionContext)(pending)
     await this.#attach(
       admitted.channel,
       lease,

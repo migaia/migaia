@@ -183,7 +183,7 @@ export class CoroutineSource {
         },
         (error) => {
           this.#closed = true
-          this.#report(error)
+          ;(0, this.#report)(error)
         }
       )
     }
@@ -237,7 +237,7 @@ export class CoroutineSource {
       try {
         await this.close()
       } catch (cleanup) {
-        this.#report(cleanup)
+        ;(0, this.#report)(cleanup)
       }
       throw primary
     }
@@ -297,7 +297,7 @@ export class CoroutineSource {
     try {
       if (session) await this.#context.drain(session, remainingMs())
       if (!signal.aborted)
-        await this.#options.supervisor?.stop?.beforeTerminate?.(unit, signal, remainingMs)
+        await (0, this.#options.supervisor?.stop?.beforeTerminate)?.(unit, signal, remainingMs)
     } catch (primary) {
       if (session) await this.#context.detach(session, primary).catch(this.#context.report)
       throw primary

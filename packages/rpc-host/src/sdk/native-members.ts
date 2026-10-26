@@ -181,7 +181,7 @@ export class RpcNativeMembers<K extends RpcNativeMemberKind = RpcNativeMemberKin
     validateMemberFilter(options?.filter)
     /** Native bootstrap may adopt self after installation; one query keeps one identity snapshot. */
     const self =
-      typeof this.#options.self === 'function' ? this.#options.self() : this.#options.self
+      typeof this.#options.self === 'function' ? (0, this.#options.self)() : this.#options.self
     /** Capture exact committed registration receipts before the first native sampler can yield. */
     const records = Array.from(this.#options.source.values()).filter((record) => {
       const name = options?.filter?.name

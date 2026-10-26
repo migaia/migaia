@@ -74,6 +74,8 @@ class NativeMemberFixture {
   readonly carriers: ICarrierReceipt[] = []
   /** Accepted handles are borrowed only from the SDK's genuine onReady callback. */
   readonly handles: IRpcSessionHandle[] = []
+  /** Public SDK readiness hooks must not receive their private configuration record as this. */
+  readonly readyReceivers: boolean[] = []
   /** Passthrough spies observe actual table operations, qualified by exact carrier/handle identity. */
   readonly attach = vi.spyOn(SessionTable.prototype, 'attach')
   /** The actual native context still owns every detach and its original shared close Promise. */
@@ -161,6 +163,8 @@ class NativeMemberFixture {
 
   /** A listener-style native installation can attach its real member after cold namespace commit. */
   readonly #install = (context: IRpcTransportSetupContext) => {
+    /** This fixture observes a genuine user hook without changing the original Session handle. */
+    const observation = { owner: this }
     /** No test-side lifecycle generation, wait queue, or resource group is created. */
     const member = new RpcMemberGeneration({
       context,
@@ -172,7 +176,10 @@ class NativeMemberFixture {
       },
       signal: context.signal,
       report: this.report,
-      onReady: (_view, _generation, _unit, handle) => this.handles.push(handle)
+      onReady: function (this: unknown, _view, _generation, _unit, handle) {
+        observation.owner.readyReceivers.push(this !== undefined)
+        observation.owner.handles.push(handle)
+      }
     })
     this.#member = member
     return { dispose: () => member.close() }
@@ -294,6 +301,7 @@ it('shares actual member preparation and closes both accepted Session and carrie
     expect(fixture.member.close()).toBe(closing)
     await closing
     expect(fixture.reports).toEqual([])
+    expect(fixture.readyReceivers).toEqual([false, false])
     expect(fixture.sessionCleanupCount()).toBe(2)
     expect(fixture.physicalCleanupCount()).toBe(2)
   } finally {

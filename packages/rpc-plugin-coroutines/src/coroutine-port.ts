@@ -47,7 +47,7 @@ export class CoroutinePort implements IRpcMessageIO {
     options?: IRpcCarrierWriteOptions
   ): void | Promise<void> {
     /** Original void callbacks keep the native synchronous handoff path. */
-    const started: unknown = options?.onWriteStart?.()
+    const started: unknown = (0, options?.onWriteStart)?.()
     /** Capture actual asynchronous admission without rereading its then getter. */
     const inspection = inspectThenable(started)
     if ('error' in inspection) throw inspection.error

@@ -236,7 +236,7 @@ export class IpcFlowControl {
     admission?: IIpcSendAdmission
   ): Promise<void> {
     if (this.#closed) throw this.#closeReason
-    admission?.assertCanSend?.()
+    ;(0, admission?.assertCanSend)?.()
     if (!admission?.coalesced) this.#active = facts.sendClass
     try {
       await write()
@@ -278,7 +278,7 @@ export class IpcFlowControl {
     for (const receipt of Array.from(this.#listeners)) {
       try {
         /** Runtime-returned thenables remain observed even though listener result type is void. */
-        const result = receipt.invoke(event)
+        const result = (0, receipt.invoke)(event)
         observeThenableRejection(result, inspectThenable(result), (error) =>
           hostRethrowReporter(error, IpcReporterContext)
         )

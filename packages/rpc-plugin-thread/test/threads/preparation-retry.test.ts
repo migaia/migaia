@@ -12,6 +12,29 @@ import { threadFrames } from './frame.js'
 import { nativeFixture, workerEntry } from './fixture.js'
 /** Ordinary lifecycle regressions from archived audit receipts do not restart the interrupted audit. */
 describe('thread preparation and retry settlement', () => {
+  it('invokes the configured stop hook without a receiver on the real native unit', async () => {
+    /** Native construction, Session readiness and actual termination retain their existing owners. */
+    const receivers: unknown[] = []
+    /** Only the user hook's receiver is observed; the real launcher and channel methods are intact. */
+    const fixture = nativeFixture({
+      supervisor: {
+        stop: {
+          async beforeTerminate(this: unknown) {
+            receivers.push(this)
+          }
+        }
+      }
+    })
+    try {
+      const feature = await fixture.install()
+      expect(await feature.read(['hook'])).toBe('hook')
+      await fixture.host.thread.members.stop('p')
+      expect(receivers).toEqual([undefined])
+    } finally {
+      await fixture.close()
+    }
+  })
+
   it('preserves pre-aborted open priority before reading the local capability proposal', async () => {
     /** A cancelled opening must retain its original caller reason before configuration effects. */
     const controller = new AbortController()

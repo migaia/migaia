@@ -55,8 +55,11 @@ it('rejects verifier failure with fixed wire error and no token in diagnostics',
 it('admits the native token once without an application auth plugin', async () => {
   /** Only the native configured verifier decides connection admission in this case. */
   const token = 'native-only-valid-credential'
+  /** Verification is a user configuration callback, not a method on the native ingress recipe. */
+  const receivers: unknown[] = []
   /** Real native verification is counted independently from every later semantic handshake. */
-  const verify = vi.fn((credential: unknown) => {
+  const verify = vi.fn(function (this: unknown, credential: unknown) {
+    receivers.push(this)
     expect(credential).toBe(token)
     return 'native-only-principal'
   })
@@ -75,6 +78,7 @@ it('admits the native token once without an application auth plugin', async () =
       'native-only-principal'
     )
     expect(fixture.reports).toEqual([])
+    expect(receivers).toEqual([undefined])
   } finally {
     await fixture.close()
   }

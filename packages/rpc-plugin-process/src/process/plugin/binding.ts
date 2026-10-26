@@ -113,7 +113,7 @@ class ProcessStderrSource {
   /** Caller output and native draining remain independent from the optional log observer. */
   readonly emit = (chunk: Uint8Array): void => {
     try {
-      this.#listener?.(chunk)
+      ;(0, this.#listener)?.(chunk)
     } catch (error) {
       reportSafely(this.#report, error)
     }
@@ -473,7 +473,7 @@ async function beforeProcessTerminate<TUnit>(
   const errors: unknown[] = []
   try {
     await ports.drain(unit, remainingMs())
-    if (!signal.aborted) await stop?.beforeTerminate?.(unit, signal, remainingMs)
+    if (!signal.aborted) await (0, stop?.beforeTerminate)?.(unit, signal, remainingMs)
   } catch (error) {
     errors.push(error)
   }
@@ -493,7 +493,7 @@ function processSpawnOutput<THandle extends IProcessHandle>(
   chunk: Uint8Array
 ): void {
   try {
-    recipe.source.supervision.output?.onChunk?.(stream, chunk)
+    ;(0, recipe.source.supervision.output?.onChunk)?.(stream, chunk)
   } catch (error) {
     reportSafely(recipe.context.report, error)
   }

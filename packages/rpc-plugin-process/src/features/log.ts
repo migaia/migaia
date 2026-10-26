@@ -36,7 +36,7 @@ class IpcLog {
   /** Preserve the original terminal path when the selected error reporter itself throws or rejects. */
   #reportError(error: unknown, record: IIpcLogRecord): void {
     try {
-      void Promise.resolve(this.#context.onReportError(error, record)).catch((failure) =>
+      void Promise.resolve((0, this.#context.onReportError)(error, record)).catch((failure) =>
         hostRethrowReporter(failure, IpcReporterContext)
       )
     } catch (failure) {
@@ -46,7 +46,7 @@ class IpcLog {
   /** Sink failure cannot change queue capacity, physical write settlement or the original error. */
   readonly #publish = (record: IIpcLogRecord): void => {
     try {
-      void Promise.resolve(this.#options.report(record)).catch((error) =>
+      void Promise.resolve((0, this.#options.report)(record)).catch((error) =>
         this.#reportError(error, record)
       )
     } catch (error) {

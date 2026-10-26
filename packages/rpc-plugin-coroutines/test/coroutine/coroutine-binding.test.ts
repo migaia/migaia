@@ -214,11 +214,14 @@ describe('coroutine runtime binding', () => {
       /** Expected terminal diagnostics remain visible even for the never-restart policy. */
       const reports: unknown[] = []
       /** Native exit carries the original classified error without a second lifecycle bridge. */
+      /** Configuration tasks must not receive the wrapper's private input record as this. */
+      const taskReceivers: unknown[] = []
       const supervisor = createCoroutineSupervisor<MessagePort>({
         id: 'raw-task',
         spec: {
           task: wrapCoroutineTask(
-            async () => {
+            async function (this: unknown) {
+              taskReceivers.push(this)
               await finish.promise
               if (outcome === 'reject') throw failure
             },
@@ -232,6 +235,7 @@ describe('coroutine runtime binding', () => {
       })
       try {
         expect((await supervisor.start()).state).toBe('ready')
+        expect(taskReceivers).toEqual([undefined])
         finish.resolve()
         await vi.waitFor(() => expect(supervisor.inspect().lastExit).toBeDefined())
         expect(supervisor.inspect().lastExit?.reason).toBe(

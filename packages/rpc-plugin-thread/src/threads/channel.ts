@@ -75,7 +75,7 @@ class ThreadNativeIO implements IRpcMessageIO {
     options?: IRpcCarrierWriteOptions
   ): void | Promise<void> => {
     /** Only an actual asynchronous seal moves handoff out of this original stack. */
-    const started: unknown = options?.onWriteStart?.()
+    const started: unknown = (0, options?.onWriteStart)?.()
     /** Capturing then once preserves user callback and getter failure identity. */
     const inspection = inspectThenable(started)
     if ('error' in inspection) throw inspection.error
@@ -117,7 +117,7 @@ class ThreadNativeIO implements IRpcMessageIO {
    */
   readonly #messageError = (value: unknown): void => {
     if (!this.#binding.node) {
-      this.#report(threadTransportError(ThreadErrorText.browserMessagePortDeserializeFailed))
+      ;(0, this.#report)(threadTransportError(ThreadErrorText.browserMessagePortDeserializeFailed))
       return
     }
     /**
@@ -128,12 +128,12 @@ class ThreadNativeIO implements IRpcMessageIO {
       value === undefined
         ? ''
         : `: ${safeString(value, undefined, ({ error }) => {
-            this.#report(
+            ;(0, this.#report)(
               new RpcTransportError(ThreadErrorText.messagePortDeserializeFailed(''), error)
             )
             return undefined
           })}`
-    this.#report(threadTransportError(ThreadErrorText.messagePortDeserializeFailed(detail)))
+    ;(0, this.#report)(threadTransportError(ThreadErrorText.messagePortDeserializeFailed(detail)))
   }
 
   /** Remove only the same callback from the same actual native subscription API. */

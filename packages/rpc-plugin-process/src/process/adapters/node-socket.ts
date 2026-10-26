@@ -239,7 +239,7 @@ class NodeSocketCandidate {
   /** Deliver the candidate after native accept, then close any candidate the caller did not accept. */
   publish(): void {
     void Promise.resolve()
-      .then(() => this.#scope.options.onConnection(this.value))
+      .then(() => (0, this.#scope.options.onConnection)(this.value))
       .then(
         () => {
           if (this.#state === 'pending') void this.value.close().catch(this.#reportCleanup)

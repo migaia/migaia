@@ -50,7 +50,9 @@ class ProcessStderrLog {
     this.#ipc = ipc
     this.#report = report
     this.#scheduler = scheduler
-    this.#unsubscribe = ipc.stderr!(this.#chunk)
+    /** The configured subscription callback borrows no private IPC options as its receiver. */
+    const subscribe = ipc.stderr!
+    this.#unsubscribe = subscribe(this.#chunk)
   }
   /** Emit original redacted text and preserve the original receiverless error reporter. */
   #record = (droppedChunks?: number): void => {
@@ -120,7 +122,7 @@ class ProcessStderrLog {
     if (this.#closed) return
     this.#closed = true
     this.#flush(this.#scheduler.now())
-    this.#unsubscribe()
+    ;(0, this.#unsubscribe)()
   }
 }
 

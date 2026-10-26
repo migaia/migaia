@@ -75,7 +75,7 @@ function processInstanceFallbackState(options: IProcessFallbackOptions) {
     : createProcessError(RpcProcessErrorCode.instanceUnhealthy, undefined, {
         field: 'host.replace'
       })
-  if (unavailable) options.report(unavailable)
+  if (unavailable) (0, options.report)(unavailable)
 
   return {
     sessions,
@@ -102,7 +102,7 @@ class ProcessInstanceFallback {
   constructor(options: IProcessFallbackOptions) {
     this.#state = processInstanceFallbackState(options)
     this.#unsubscribe =
-      this.#state.options.onInstanceUnhealthy?.(this.#unhealthy) ?? (() => undefined)
+      (0, this.#state.options.onInstanceUnhealthy)?.(this.#unhealthy) ?? (() => undefined)
     this.value = Object.freeze(
       Object.defineProperties(
         {
@@ -125,7 +125,7 @@ class ProcessInstanceFallback {
       .catch(() => undefined)
       .then(() => this.#recover(event))
     void this.#state.pending.catch((error: unknown) => {
-      if (error !== this.#state.unavailable) this.#state.options.report(error)
+      if (error !== this.#state.unavailable) (0, this.#state.options.report)(error)
     })
   }
 
@@ -172,7 +172,7 @@ class ProcessInstanceFallback {
     if (this.#state.unavailable) throw this.#state.unavailable
     if (!canReplace(this.#state.options.host) || !this.#state.options.createSharedTarget)
       throw createProcessError(RpcProcessErrorCode.instanceUnhealthy, event.reason)
-    const candidate = await this.#state.options.createSharedTarget({
+    const candidate = await (0, this.#state.options.createSharedTarget)({
       reason: event.reason,
       signal: this.#state.controller.signal
     })

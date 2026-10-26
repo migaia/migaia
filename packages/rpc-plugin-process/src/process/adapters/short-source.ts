@@ -156,14 +156,14 @@ function reportTerminationNotice(
     notice.detail.kind === 'process'
   ) {
     if (policy.onNotice) {
-      policy.onNotice(error)
+      ;(0, policy.onNotice)(error)
       return
     }
     if (policy.reportEach || !terminationNoticeReported) {
       terminationNoticeReported = true
-      policy.report(error)
+      ;(0, policy.report)(error)
     }
-  } else policy.report(error)
+  } else (0, policy.report)(error)
 }
 
 /** Reject unsupported short configuration with the existing native configuration identity. */

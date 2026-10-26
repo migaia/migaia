@@ -203,7 +203,7 @@ export class ThreadSource<THandle extends IThreadHandle = IThreadHandle> {
     try {
       if (session) await this.#context.drain(session, remainingMs())
       if (!signal.aborted)
-        await this.#source.supervisor?.stop?.beforeTerminate?.(unit, signal, remainingMs)
+        await (0, this.#source.supervisor?.stop?.beforeTerminate)?.(unit, signal, remainingMs)
     } catch (primary) {
       if (session) await this.#context.detach(session, primary).catch(this.#context.report)
       throw primary

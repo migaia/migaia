@@ -168,12 +168,12 @@ async function runCoroutineTask(
   /** The task receives a frozen token whose physical port stays in this lower module. */
   const connect = Object.freeze({}) as ICoroutineConnect
   /** Both private keys refer to one receipt; no second source or generation index is created. */
-  const connection = new CoroutineConnection(connect, port2, input.facts?.())
+  const connection = new CoroutineConnection(connect, port2, (0, input.facts)?.())
   coroutinePorts.set(connect, connection)
   coroutinePorts.set(port1, connection)
   context.expose(port1)
   try {
-    await input.task(
+    await (0, input.task)(
       Object.freeze({ signal: context.signal, heartbeat: () => context.heartbeat(), connect })
     )
   } finally {

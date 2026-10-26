@@ -150,6 +150,8 @@ it('applies explicit data capacity while preserving control capacity on one actu
 
 it('keeps native stderr on the selected log and unsubscribes it before physical connection close', async () => {
   const records: IIpcLogRecord[] = []
+  /** The sink must not gain access to the captured native logging options as its receiver. */
+  const receivers: unknown[] = []
   const observed = deferred<void>()
   const observation = new NativeConnectionObservation()
   const byte = vi.spyOn(nativeIO, 'createAdapterChildStdio').mockImplementation(observation.child)
@@ -164,7 +166,8 @@ it('keeps native stderr on the selected log and unsubscribes it before physical 
         spawn: { entry: child },
         features: [
           logFeature({
-            report(record) {
+            report(this: unknown, record) {
+              receivers.push(this)
               records.push(record)
               if (record.name === IpcLogEventName['ipc.stderr']) observed.resolve()
             }
@@ -177,6 +180,7 @@ it('keeps native stderr on the selected log and unsubscribes it before physical 
   try {
     expect(await host.process.request('stderr')).toEqual(expect.any(Number))
     await observed.promise
+    expect(receivers).toEqual([undefined])
     expect(stderr).toHaveBeenCalledTimes(1)
     expect(records.filter((record) => record.name === IpcLogEventName['ipc.stderr'])).toEqual([
       expect.objectContaining({ text: '[child stderr redacted]' })

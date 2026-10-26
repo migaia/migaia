@@ -63,7 +63,7 @@ export class RpcMemberFirstStart<TUnit, TSpec> {
   }
   /** No subscription outlives its actual native start wait. */
   #settle(): void {
-    this.#unsubscribe()
+    ;(0, this.#unsubscribe)()
     this.#signal.removeEventListener('abort', this.#abort)
   }
   /** Native abort reasons keep exact identity through initial rollback. */

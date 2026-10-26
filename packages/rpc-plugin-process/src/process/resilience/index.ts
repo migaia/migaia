@@ -300,7 +300,7 @@ class ProcessResilience {
   /** Application reporter failures retain the original asynchronous host-rethrow boundary. */
   #report = (error: unknown): void => {
     try {
-      this.#state.options.report(error)
+      ;(0, this.#state.options.report)(error)
     } catch (reporterError) {
       hostRethrowReporter(reporterError, IpcReporterContext)
     }

@@ -197,7 +197,7 @@ class RpcMemberEventPublisher {
     if (!Object.values(RpcMemberEventName).includes(event) || typeof listener !== 'function')
       throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.eventInvalid)
     if (this.#closed) return () => undefined
-    /** The original callback remains on its exact receipt, including its invocation receiver. */
+    /** Each registration retains its callback on an independent removal receipt. */
     const receipt = { event, invoke: listener }
     this.#listeners.add(receipt)
     return () => {
@@ -211,8 +211,8 @@ class RpcMemberEventPublisher {
     for (const receipt of Array.from(this.#listeners)) {
       if (receipt.event !== undefined && receipt.event !== event.type) continue
       try {
-        /** Invocation preserves the original exact callback receipt receiver. */
-        const result = receipt.invoke(event)
+        /** User subscribers receive no private receipt as their receiver. */
+        const result = (0, receipt.invoke)(event)
         observeThenableRejection(result, inspectThenable(result), (error) =>
           reportEventFailure(report, error)
         )

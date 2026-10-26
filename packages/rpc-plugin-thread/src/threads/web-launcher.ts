@@ -106,7 +106,7 @@ class WebThreadGeneration {
     this.#failure = threadTransportError(ThreadErrorText.workerFailed(event.message), event.error)
     void this.#carrier.close(this.#failure).catch(this.#report)
     try {
-      this.#report(this.#failure)
+      ;(0, this.#report)(this.#failure)
     } catch (error) {
       hostRethrowReporter(error, IpcReporterContext)
     }
