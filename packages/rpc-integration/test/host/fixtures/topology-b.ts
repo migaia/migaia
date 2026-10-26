@@ -54,6 +54,13 @@ const hopAuth = new HopAuthCounter()
 /** Hop-scoped auth installed only on the b–c thread transport. */
 const threadFeatures = options.hopAuth ? [auth(hopAuth.options(HopSecret.shared))] : []
 
+/** Cold metadata is reusable; a mismatch is acquired only by the later public use transaction. */
+const childThread = threadPlugin({
+  name: Topology.c,
+  spawn: { entry: threadEntry, data: options },
+  features: threadFeatures
+})
+
 /** Bootstrap secret for the Python leaf; it travels only through the native launch bootstrap. */
 const pythonToken = randomUUID()
 /** Python foreign leaf launched like an ML sidecar; it is a leaf and never forwards. */
@@ -84,11 +91,7 @@ const opening: Promise<IRpcHost> = createRpcHost({
   plugins: [
     recorder.plugin,
     processPlugin({ namespace: 'parent', connectToParent: true }),
-    threadPlugin({
-      name: Topology.c,
-      spawn: { entry: threadEntry, data: options },
-      features: threadFeatures
-    }),
+    ...(options.hopAuth === 'mismatch' ? [] : [childThread]),
     ...(options.childProcess
       ? [
           processPlugin({
@@ -127,6 +130,15 @@ const opening: Promise<IRpcHost> = createRpcHost({
         /** C's setup reply does not itself acknowledge processing its independently sent directory. */
         await topologyLoopMethod(host.thread, Topology.c)
       }
+      return true
+    },
+    /** A27 exposes the real public install transaction; its original rejection returns to a. */
+    [Topology.installThread]: async () => {
+      /** The already opened host keeps its parent, pool and coroutine when this batch fails. */
+      const host = await opening
+      /** Await the returned namespace projection rather than pretending the original type narrows. */
+      const extended = await host.use(childThread)
+      await extended.thread.send(Topology.c, Topology.ready)
       return true
     },
     /** Report b's forward rows and each leaf's counters. */

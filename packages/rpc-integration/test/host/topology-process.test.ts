@@ -6,11 +6,18 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { RpcProbeDirection, RpcProbeOutcome } from '@migaia/rpc-contract/interfaces'
 import type { IRpcPortableValue } from '@migaia/rpc-contract/protocol'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
+import { auth } from '@migaia/rpc-host/plugins/auth'
+import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'
+import { threadPlugin } from '@migaia/rpc-plugin-thread'
+import { TopologyLeaf } from './fixtures/topology-leaf.ts'
 import { timeout } from '@migaia/rpc-host/features/timeout'
 import { RPC_POOL_PEER_ID } from '@migaia/rpc-plugin-pool'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import {
   LeafFailure,
+  HopAuthCounter,
+  HopAuthText,
+  HopSecret,
   Topology,
   binaryPattern,
   type ITopologyLeafSnapshot,
@@ -312,15 +319,101 @@ describe('auth installed on one hop only', () => {
   })
 
   it('a wrong secret on c refuses only the b–c hop', async () => {
-    /** C presents a secret b refuses; b does not wait for c. */
+    /** B first commits parent, pool and coroutine; c remains a cold definition until public use. */
     const host = await openOrigin({ hopAuth: 'mismatch' })
     try {
+      /** Actual remote identity proves this same native process survives the rejected install. */
+      const before = await inspectB(host)
+      expect(before.pid).not.toBe(process.pid)
+      /** Only c's later native installation presents the deliberately mismatched credentials. */
+      const error = await rejection(host.process.send(Topology.b, Topology.installThread))
+      expect(causeChain(error)).toContainEqual(
+        expect.objectContaining({ code: 'AUTHENTICATION_FAILED' })
+      )
       await rejection(viaB(host, Topology.c, Topology.echo, 5))
       expect(await viaB(host, Topology.coroutine, Topology.echo, 6)).toMatchObject({ value: 6 })
+      expect(await viaB(host, RPC_POOL_PEER_ID, Topology.echo, 7)).toMatchObject({ value: 7 })
+      /** A reachable public provider in the original process remains available after both calls. */
+      const after = await inspectB(host)
+      expect(after.pid).toBe(before.pid)
+      expect(after.selfId).toBe(before.selfId)
+      expect(causeChain(error)).toContainEqual(
+        expect.objectContaining({ message: HopAuthText.credentialRefused })
+      )
     } finally {
       await host.close()
     }
   })
+})
+
+it('A27: host-level auth applies to a late thread while the authenticated coroutine remains callable', async () => {
+  /** Both real transports must borrow this single host-level auth installation. */
+  const counter = new HopAuthCounter()
+  /** The task reuses the original topology business providers and its own real auth counter. */
+  const leaf = new TopologyLeaf()
+  /** The original coroutine task port owns this independent public leaf Host until cancellation. */
+  const task: ICoroutineUserTask = async ({ connect, signal, heartbeat }) => {
+    const child = await createRpcHost({
+      plugins: [
+        auth(leaf.auth.options(HopSecret.shared)),
+        coroutinePlugin({ connectToParent: connect })
+      ],
+      provide: leaf.providers()
+    })
+    leaf.bind(child.self.instanceId)
+    heartbeat()
+    try {
+      await new Promise<void>((resolve) => {
+        if (signal.aborted) resolve()
+        else signal.addEventListener('abort', () => resolve(), { once: true })
+      })
+    } finally {
+      await child.close()
+    }
+  }
+  /** Initial construction includes a real authenticated baseline and no thread namespace. */
+  const host = await createRpcHost({
+    self: { name: Topology.b, instanceId: 'topology-late-auth-b' },
+    plugins: [
+      auth(counter.options(HopSecret.shared)),
+      coroutinePlugin({ namespace: 'baseline', name: Topology.coroutine, spawn: task })
+    ],
+    report: () => undefined
+  })
+  try {
+    await host.baseline.send(Topology.coroutine, Topology.ready)
+    await expect(
+      host.baseline.send(Topology.coroutine, Topology.echo, 'before-late')
+    ).resolves.toMatchObject({ value: 'before-late' })
+    /**
+     * Existing c authenticates its parent with the same real hop secret; no local b-side override
+     * exists.
+     */
+    const extended = await host.use(
+      threadPlugin({
+        name: Topology.c,
+        spawn: {
+          entry: new URL('./fixtures/topology-leaf-thread.ts', import.meta.url),
+          data: { hopAuth: 'match' }
+        }
+      })
+    )
+    expect(extended).toBe(host)
+    await extended.thread.send(Topology.c, Topology.ready)
+    /** Awaited readiness leaves only this real thread business call between the two counter reads. */
+    const before = counter.snapshot()
+    await expect(
+      extended.thread.send(Topology.c, Topology.echo, 'late-thread')
+    ).resolves.toMatchObject({ value: 'late-thread' })
+    const after = counter.snapshot()
+    expect(after.signed).toBeGreaterThan(before.signed)
+    expect(after.verified).toBeGreaterThan(before.verified)
+    await expect(
+      extended.baseline.send(Topology.coroutine, Topology.echo, 'after-late')
+    ).resolves.toMatchObject({ value: 'after-late' })
+  } finally {
+    await host.close()
+  }
 })
 
 describe('middle hop failure while a call is in flight', () => {

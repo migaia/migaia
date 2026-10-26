@@ -13,6 +13,8 @@ export const Topology = {
   python: 'py',
   /** Provider names on forwarding hosts and leaves. */
   ready: 'ready',
+  /** A27 starts c only after b's original parent, pool and coroutine have committed. */
+  installThread: 'installThread',
   /** Explicit held-forward methods form the ruled loop without reflected directory routes. */
   loop: 'loop',
   /** Fixture setup installs c's held forward only after b's real public method is announced. */
@@ -76,6 +78,9 @@ export type ITopologyOptions = Readonly<{
 /** Secrets used by the hop-scoped auth assertion. */
 export const HopSecret = { shared: 'topology-hop-secret', other: 'topology-other-secret' } as const
 
+/** The credential verifier's original native cause survives the installation and RPC boundaries. */
+export const HopAuthText = { credentialRefused: 'hop credential refused' } as const
+
 /** Counts of identity sign and verify transforms run by one side of the auth hop. */
 export class HopAuthCounter {
   /** Outbound messages this side signed. */
@@ -92,7 +97,7 @@ export class HopAuthCounter {
     return {
       credentials: secret,
       verifyCredentials: (presented: unknown) => {
-        if (presented !== HopSecret.shared) throw new Error('hop credential refused')
+        if (presented !== HopSecret.shared) throw new Error(HopAuthText.credentialRefused)
       },
       sign: (value: unknown) => {
         this.signed += 1
