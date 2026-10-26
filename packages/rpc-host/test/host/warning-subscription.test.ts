@@ -27,12 +27,23 @@ class WarningPair {
   #child: IRpcHost | undefined
   /** An unnamed parent supplies only the instance assignment, leaving default naming to Host. */
   readonly #parentNamed: boolean
+  /** A second real namespace may repeat the same parent assignment without its optional name. */
+  readonly #repeatAssignment: boolean
+  /** This separate namespace owns its independent parent-side native attachment. */
+  readonly #otherServer = coreMemoryServer('warning-parent', 'warning-parent', 'other')
+  /** Repeated identity facts arrive through a distinct genuine physical source. */
+  readonly #otherParent = new MemoryCarrier('warning-other-parent')
+  /** The second child endpoint never shares a carrier identity or native listener with the first. */
+  readonly #otherChild = new MemoryCarrier('warning-other-child')
 
   /** Link the maintained real carrier fixture before either endpoint subscribes. */
-  constructor(parentNamed = true) {
+  constructor(parentNamed = true, repeatAssignment = false) {
     this.#parentNamed = parentNamed
+    this.#repeatAssignment = repeatAssignment
     this.#parentCarrier.link(this.#childCarrier)
     this.#childCarrier.link(this.#parentCarrier)
+    this.#otherParent.link(this.#otherChild)
+    this.#otherChild.link(this.#otherParent)
   }
 
   /** Complete original native setup before exercising the public child namespace. */
@@ -43,6 +54,10 @@ class WarningPair {
   ): Promise<void> {
     this.#parent = await createRpcHost({
       ...this.#server.options,
+      plugins: [
+        this.#server.transport,
+        ...(this.#repeatAssignment ? [this.#otherServer.transport] : [])
+      ],
       provide: { echo: (value) => value }
     })
     this.#child = await createRpcHost({
@@ -56,7 +71,16 @@ class WarningPair {
           name: 'warning-child-native',
           namespace: 'memory',
           open: this.#connect
-        })
+        }),
+        ...(this.#repeatAssignment
+          ? [
+              defineTransportPlugin({
+                name: 'warning-other-native',
+                namespace: 'other',
+                open: this.#connectOther
+              })
+            ]
+          : [])
       ]
     })
   }
@@ -84,6 +108,16 @@ class WarningPair {
     const child = context.attach(this.#childCarrier, {
       self: { ...(this.#parentNamed ? { name: 'math' } : {}), instanceId: 'assigned-child' }
     })
+    await Promise.all([parent.ready, child.ready])
+    return { dispose: () => undefined }
+  }
+
+  /** Later native facts omit the name instead of changing the identity accepted by the first source. */
+  readonly #connectOther = async (context: IRpcTransportContext) => {
+    /** Both original namespace owners complete their real handshake independently. */
+    const parent = this.#otherServer.accept(this.#otherParent)
+    /** Omitting a field cannot introduce a conflicting parent-assigned name. */
+    const child = context.attach(this.#otherChild, { self: { instanceId: 'assigned-child' } })
     await Promise.all([parent.ready, child.ready])
     return { dispose: () => undefined }
   }
@@ -187,6 +221,21 @@ it('A26 keeps an unconfigured child name equal to its parent-assigned instanceId
   try {
     await pair.open({ onWarning: (warning) => warnings.push(warning) }, false)
     expect(pair.self).toEqual({ name: 'assigned-child', instanceId: 'assigned-child' })
+    expect(await pair.send(42)).toBe(42)
+    expect(warnings).toEqual([])
+  } finally {
+    await pair.close()
+  }
+})
+
+it('A26 retains the accepted parent name when a later namespace repeats only its instanceId', async () => {
+  /** No explicit child identity competes with either trusted native assignment. */
+  const warnings: IRpcWarning[] = []
+  /** The first source names the child; the second supplies only the same instance assignment. */
+  const pair = new WarningPair(true, true)
+  try {
+    await pair.open({ onWarning: (warning) => warnings.push(warning) }, false)
+    expect(pair.self).toEqual({ name: 'math', instanceId: 'assigned-child' })
     expect(await pair.send(42)).toBe(42)
     expect(warnings).toEqual([])
   } finally {

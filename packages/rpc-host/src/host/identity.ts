@@ -95,7 +95,9 @@ export class HostIdentity {
       /** Capture before mutation so a mismatching source cannot partially replace global identity. */
       const incoming = captureSelf({
         ...facts.self,
-        name: facts.self.name ?? (this.#configured ? this.#self.name : facts.self.instanceId)
+        name:
+          facts.self.name ??
+          (this.#configured || this.#started ? this.#self.name : facts.self.instanceId)
       })
       if (
         this.#started &&
