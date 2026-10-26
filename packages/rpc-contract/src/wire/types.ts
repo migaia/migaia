@@ -220,7 +220,13 @@ export type IRpcBinaryManifest = Readonly<{
   profile: 'migaia.rpc.portable-binary/1'
   storage: 'inline' | 'native'
   envelope: IRpcEnvelope
-  backings: readonly Readonly<{ byteLength: number; sha256: string }>[]
+  backings: readonly Readonly<{
+    byteLength: number
+    /** A complete inline backing keeps its logical index without consuming a native sidecar. */
+    data?: string
+    /** Native sidecar integrity is required only by the receiving host's local signing policy. */
+    sha256?: string
+  }>[]
 }>
 
 /** A peer identity used only for diagnostics and connection-owned policy. */

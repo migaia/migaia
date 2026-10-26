@@ -303,12 +303,124 @@
         },
         "backings": [
           {
-            "byteLength": 4,
-            "sha256": "72da1306102d539d496263b20bb94f5f75090cc6d75842bc3e64062408f6f7eb"
+            "byteLength": 4
           }
         ]
       },
       "sidecars": [[9, 1, 2, 8]]
+    },
+    {
+      "id": "native-inline-alias",
+      "value": {
+        "profile": "migaia.rpc.portable-binary/1",
+        "storage": "native",
+        "envelope": {
+          "profile": "migaia.rpc/2",
+          "id": "REQUEST:caller:1",
+          "route": {
+            "applicationVersion": "1",
+            "senderId": "caller",
+            "targetId": "provider",
+            "receiverId": "provider",
+            "sentAt": 0
+          },
+          "task": {
+            "mode": "request",
+            "callerId": "caller",
+            "callerGeneration": {
+              "kind": "session",
+              "value": 0,
+              "providerId": "caller"
+            },
+            "targetGeneration": {
+              "kind": "restart",
+              "value": 0,
+              "providerId": "provider"
+            },
+            "method": "echo"
+          },
+          "kind": "call",
+          "options": {
+            "cancel": "before-start",
+            "idempotencyKey": "key-1"
+          },
+          "payload": [
+            "object",
+            [
+              ["buffer", ["buffer", 0]],
+              ["first", ["uint8array", 0, 1, 2]],
+              ["second", ["uint8array", 0, 2, 1]]
+            ]
+          ]
+        },
+        "backings": [
+          {
+            "byteLength": 4,
+            "data": "CQECCA"
+          }
+        ]
+      },
+      "sidecars": [],
+      "transferRequiresIntegrity": true
+    },
+    {
+      "id": "native-mixed-logical-indices",
+      "value": {
+        "profile": "migaia.rpc.portable-binary/1",
+        "storage": "native",
+        "envelope": {
+          "profile": "migaia.rpc/2",
+          "id": "REQUEST:caller:1",
+          "route": {
+            "applicationVersion": "1",
+            "senderId": "caller",
+            "targetId": "provider",
+            "receiverId": "provider",
+            "sentAt": 0
+          },
+          "task": {
+            "mode": "request",
+            "callerId": "caller",
+            "callerGeneration": {
+              "kind": "session",
+              "value": 0,
+              "providerId": "caller"
+            },
+            "targetGeneration": {
+              "kind": "restart",
+              "value": 0,
+              "providerId": "provider"
+            },
+            "method": "echo"
+          },
+          "kind": "call",
+          "options": {
+            "cancel": "before-start",
+            "idempotencyKey": "key-1"
+          },
+          "payload": [
+            "object",
+            [
+              ["buffer", ["buffer", 0]],
+              ["first", ["uint8array", 0, 1, 2]],
+              ["second", ["uint8array", 0, 2, 1]],
+              ["other", ["uint8array", 1, 0, 2]]
+            ]
+          ]
+        },
+        "backings": [
+          {
+            "byteLength": 4,
+            "data": "CQECCA"
+          },
+          {
+            "byteLength": 2,
+            "sha256": "0ce3940bebf2b22a5d2108ecf0c368a0541c7e3c45703f8540921b4eafc82947"
+          }
+        ]
+      },
+      "sidecars": [[3, 4]],
+      "transferRequiresIntegrity": true
     }
   ],
   "invalid": [
@@ -564,8 +676,7 @@
         },
         "backings": [
           {
-            "byteLength": 4,
-            "sha256": "72da1306102d539d496263b20bb94f5f75090cc6d75842bc3e64062408f6f7eb"
+            "byteLength": 4
           }
         ]
       },
@@ -622,7 +733,8 @@
           }
         ]
       },
-      "sidecars": [[7, 1, 2, 8]]
+      "sidecars": [[7, 1, 2, 8]],
+      "transferRequiresIntegrity": true
     }
   ]
 }

@@ -12,6 +12,9 @@ export { RpcBinaryProfile, RpcBinaryStorage }
 /** Each carrier selects one of the two canonical manifest storage representations. */
 export type RpcBinaryStorage = (typeof RpcBinaryStorage)[keyof typeof RpcBinaryStorage]
 
+/** Signed native-capable captures inline complete backings through this internal 16 KiB boundary. */
+export const RPC_BINARY_INTEGRITY_INLINE_BYTES = 16 * 1024
+
 /** Local codec failures distinguish backing integrity from structural grammar for the core reporter. */
 export const RpcBinaryViolation = {
   /** Actual native backing length or SHA-256 differs from the protected manifest. */

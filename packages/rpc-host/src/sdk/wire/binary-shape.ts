@@ -6,6 +6,7 @@ import {
 } from '@migaia/rpc-contract/protocol'
 import type { IRpcPortableValue } from '@migaia/rpc-contract/protocol'
 import { isArrayBuffer } from '@migaia/utils/bytes'
+import { isCanonicalBase64url } from '@migaia/serialize/core'
 import {
   createContractError,
   safeRead,
@@ -192,6 +193,12 @@ export class BinaryShape {
   digest(value: unknown, pointer?: string): string {
     if (typeof value !== 'string' || !/^[0-9a-f]{64}$/u.test(value))
       this.invalid(undefined, pointer)
+    return value
+  }
+
+  /** Complete signed inline backings reuse the canonical unpadded byte spelling. */
+  inlineData(value: unknown, pointer?: string): string {
+    if (typeof value !== 'string' || !isCanonicalBase64url(value)) this.invalid(undefined, pointer)
     return value
   }
 }

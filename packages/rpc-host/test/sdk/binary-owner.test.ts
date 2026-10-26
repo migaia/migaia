@@ -57,7 +57,10 @@ it('C2-B01 captures inline bytes before returning and preserves view offset and 
 
 it('C2-B02 retains original native backing aliases and checks invisible bytes with full digest', async () => {
   /** Only one original complete backing is physically eligible for transfer. */
-  const backing = new Uint8Array([9, 1, 2, 8]).buffer
+  const bytes = new Uint8Array(16_385)
+  bytes.set([9, 1, 2, 8])
+  /** Signed native storage is selected from the whole backing above the inline boundary. */
+  const backing = bytes.buffer
   /** Multiple supported views deliberately share that exact original backing. */
   const prepared = await prepareRpcBinary(
     envelope({
@@ -65,17 +68,18 @@ it('C2-B02 retains original native backing aliases and checks invisible bytes wi
       first: new Uint8Array(backing, 1, 2),
       second: new Uint8Array(backing, 2, 1)
     }),
-    { storage: RpcBinaryStorage.native, limit: 1024, digest }
+    { storage: RpcBinaryStorage.native, limit: 32_768, digest, transferRequiresIntegrity: true }
   )
   assert.equal(prepared.sidecars.length, 1)
   assert.equal(prepared.sidecars[0], backing)
-  assert.equal(prepared.backingBytes, 4)
+  assert.equal(prepared.backingBytes, 16_385)
   /** Restore borrows the supplied original buffers rather than making transfer copies. */
   const restored = await restoreRpcBinary(prepared.manifest, {
     storage: RpcBinaryStorage.native,
     sidecars: prepared.sidecars,
-    limit: 1024,
-    digest
+    limit: 32_768,
+    digest,
+    transferRequiresIntegrity: true
   })
   assert.ok('payload' in restored)
   /** Exact backing identity matters independently of byte equality. */
@@ -88,8 +92,9 @@ it('C2-B02 retains original native backing aliases and checks invisible bytes wi
     restoreRpcBinary(prepared.manifest, {
       storage: RpcBinaryStorage.native,
       sidecars: prepared.sidecars,
-      limit: 1024,
-      digest
+      limit: 32_768,
+      digest,
+      transferRequiresIntegrity: true
     }),
     { code: 'INVALID_ENVELOPE' }
   )
@@ -97,9 +102,9 @@ it('C2-B02 retains original native backing aliases and checks invisible bytes wi
 
 it('C2-B03 starts prehash and the first original digest synchronously, then hashes in backing order', async () => {
   /** Distinct original storage proves the digest order without a second transport fixture. */
-  const first = new Uint8Array([3, 4]).buffer
+  const first = new ArrayBuffer(16_385)
   /** The later hash must wait for the original first Promise. */
-  const second = new Uint8Array([5, 6]).buffer
+  const second = new ArrayBuffer(16_386)
   /** One explicit observation context holds only this operation's digest order and release. */
   const observed: { order: ArrayBuffer[]; release?: (value: string) => void } = { order: [] }
   /** Prehash must run once before the digest can detach or suspend the original buffers. */
@@ -107,6 +112,7 @@ it('C2-B03 starts prehash and the first original digest synchronously, then hash
   /** The real codec owns synchronous capture and asynchronous completion together. */
   const pending = prepareRpcBinary(envelope({ first, second }), {
     storage: RpcBinaryStorage.native,
+    transferRequiresIntegrity: true,
     digest: (backing) => {
       observed.order.push(backing)
       return backing === first
@@ -129,13 +135,14 @@ it('C2-B03 starts prehash and the first original digest synchronously, then hash
 
 it('C2-B04 rejects whole-backing overflow before any digest and never executes business accessors', async () => {
   /** A tiny visible view cannot hide a complete over-budget backing. */
-  const backing = new ArrayBuffer(1025)
+  const backing = new ArrayBuffer(16_385)
   /** Original expensive hash work is forbidden before the full graph is admitted. */
   let hashes = 0
   await assert.rejects(
     prepareRpcBinary(envelope(new Uint8Array(backing, 100, 1)), {
       storage: RpcBinaryStorage.native,
-      limit: 1024,
+      limit: 16_384,
+      transferRequiresIntegrity: true,
       digest: (value) => {
         hashes++
         return digest(value)

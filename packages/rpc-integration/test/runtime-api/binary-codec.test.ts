@@ -98,12 +98,21 @@ for (const size of [64 * 1024, 1024 * 1024]) {
 
 it('private owned capture preserves public preparation shape and native digest order', async () => {
   /** Two actual backings distinguish sequential digest order from view alias handling. */
-  const first = new Uint8Array([9, 1, 2, 8]).buffer
-  const second = new Uint8Array([3, 4]).buffer
+  const firstBytes = new Uint8Array(16_385)
+  firstBytes.set([9, 1, 2, 8])
+  /** Only integrity assertions use above-threshold complete native storage. */
+  const first = firstBytes.buffer
+  const secondBytes = new Uint8Array(16_386)
+  secondBytes.set([3, 4])
+  const second = secondBytes.buffer
   /** All preparation paths share the original admitted semantic source. */
   const input = envelope({ first, view: new Uint8Array(first, 1, 2), second })
   /** The same source without an internal capture retains the public result geometry. */
-  const ordinary = await prepareRpcBinary(input, { storage: RpcBinaryStorage.native, digest })
+  const ordinary = await prepareRpcBinary(input, {
+    storage: RpcBinaryStorage.native,
+    digest,
+    transferRequiresIntegrity: true
+  })
   /** Only actual digest invocations enter this ordered record. */
   const order: ArrayBuffer[] = []
   /** Prehash must occur once before the first real digest starts. */
@@ -112,6 +121,7 @@ it('private owned capture preserves public preparation shape and native digest o
   const captured: object[] = []
   const prepared = await prepareRpcBinary(input, {
     storage: RpcBinaryStorage.native,
+    transferRequiresIntegrity: true,
     digest: async (backing) => {
       order.push(backing)
       return digest(backing)
@@ -125,7 +135,7 @@ it('private owned capture preserves public preparation shape and native digest o
     beforeDigest(manifest, bytes) {
       beforeDigest++
       assert.equal(order.length, 0)
-      assert.equal(bytes, 6)
+      assert.equal(bytes, 32_771)
       assert.equal(captured.at(-1), manifest)
     }
   })

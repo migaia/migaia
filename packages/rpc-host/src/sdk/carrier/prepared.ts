@@ -28,3 +28,22 @@ export function splitRpcPreparedMetadata(
     }
   return { message: value, sidecars }
 }
+
+/** Keep only caller-authorized native backings, preserving the original list when no grant changes. */
+export function rpcPreparedTransfer(
+  transfer: readonly ArrayBuffer[] | undefined,
+  sidecars: readonly ArrayBuffer[] | undefined
+): readonly ArrayBuffer[] | undefined {
+  if (!transfer?.length) return transfer
+  /** Only this final physical backing set may retain an already granted native transfer. */
+  const native = new Set(sidecars)
+  /** A changed list copies its accepted prefix once, in the caller's exact original order. */
+  let selected: ArrayBuffer[] | undefined
+  for (let index = 0; index < transfer.length; index++) {
+    /** Preserve this exact caller-owned backing only when the final frame still carries it natively. */
+    const backing = transfer[index]!
+    if (native.has(backing)) selected?.push(backing)
+    else selected ??= transfer.slice(0, index)
+  }
+  return selected ?? transfer
+}

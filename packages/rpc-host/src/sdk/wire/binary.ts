@@ -30,7 +30,9 @@ export function prepareRpcBinary(
       options.digest,
       options.encoding,
       encodeBytes,
-      options.errorMetadata
+      options.errorMetadata,
+      undefined,
+      options.transferRequiresIntegrity
     )
     return finishRpcBinaryCapture(capture, options, shape)
   } catch (cause) {
@@ -58,10 +60,11 @@ export async function finishRpcBinaryCapture(
         profile: RpcBinaryProfile,
         storage: options.storage,
         envelope: capture.envelope,
-        backings: capture.sidecars.map((backing) => ({
-          byteLength: shape.backingLength(backing),
-          sha256: '0'.repeat(64)
-        }))
+        backings: capture.backings.map((backing) =>
+          backing.data !== undefined || !options.transferRequiresIntegrity
+            ? backing
+            : { ...backing, sha256: '0'.repeat(64) }
+        )
       }
       options.encoding?.capture(pending, capture.capturedRoots!)
       options.beforeDigest(pending, capture.backingBytes)
@@ -70,12 +73,21 @@ export async function finishRpcBinaryCapture(
      * Each native hash covers its complete original backing, including bytes outside referenced
      * views.
      */
-    const backings: { byteLength: number; sha256: string }[] = []
-    for (const backing of capture.sidecars) {
-      /** Capture byte length before awaiting the actual original supplied digest. */
-      const byteLength = shape.backingLength(backing)
+    const backings: IRpcBinaryManifest['backings'][number][] = []
+    /** Only logical native rows consume the next original physical sidecar. */
+    let physical = 0
+    for (const row of capture.backings) {
+      if (row.data !== undefined) {
+        backings.push(row)
+        continue
+      }
+      /** Validate the retained complete backing before invoking the one operation's digest. */
+      const backing = capture.sidecars[physical++]!
+      if (shape.backingLength(backing) !== row.byteLength) shape.integrity()
       backings.push(
-        Object.freeze({ byteLength, sha256: shape.digest(await options.digest!(backing)) })
+        options.transferRequiresIntegrity
+          ? Object.freeze({ ...row, sha256: shape.digest(await options.digest!(backing)) })
+          : row
       )
     }
     /** Only newly constructed metadata is frozen; original buffers/views remain borrowed untouched. */

@@ -611,6 +611,44 @@ const records: IRecordCase[] = [
 ]
 
 describe('R17 direct record fields', () => {
+  it('[CORE-A33-MANIFEST] admits unsigned sidecars and canonical inline backings without trusting wire integrity claims', () => {
+    /** The native profile keeps logical backing rows even when no physical sidecar is consumed. */
+    const rows = [
+      Object.freeze({ byteLength: 4 }),
+      Object.freeze({ byteLength: 4, sha256: 'a'.repeat(64) }),
+      Object.freeze({ byteLength: 4, data: 'CQECCA', sha256: { inactive: true } })
+    ]
+    for (const row of rows) {
+      /** Pure shape admission retains each original row without granting local signing policy. */
+      const manifest = Object.freeze({
+        profile: RpcWireBinaryProfile,
+        storage: 'native',
+        envelope: Object.freeze({ ...header(), options: Object.freeze({}) }),
+        backings: Object.freeze([row])
+      })
+      expect(normalizeRpcBinaryManifest(manifest)).toBe(manifest)
+      expect(manifest.backings[0]).toBe(row)
+    }
+    for (const row of [
+      { byteLength: 4, data: 1 },
+      { byteLength: 4, data: 'A' },
+      { byteLength: 4, sha256: 1 }
+    ]) {
+      /** Only the active representation's present fields participate in known-field validation. */
+      const field = Object.hasOwn(row, 'data') ? 'data' : 'sha256'
+      expect(() =>
+        normalizeRpcBinaryManifest({
+          profile: RpcWireBinaryProfile,
+          storage: 'native',
+          envelope: { ...header(), options: {} },
+          backings: [row]
+        })
+      ).toThrowError(
+        expect.objectContaining({ code: 'INVALID_ENVELOPE', pointer: `/manifest/0/${field}` })
+      )
+    }
+  })
+
   it('[CORE-C004-TERMINAL] retains only actual failed-stream terminal facts after original field admission', () => {
     /** The complete original graph and unknown metadata retain their input identities. */
     const completion = Object.freeze({

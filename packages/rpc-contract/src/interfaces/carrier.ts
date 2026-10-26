@@ -101,6 +101,8 @@ export type IRpcCodecContext = Readonly<{
   codec: string
   /** True only for a physical carrier that can carry original native backings. */
   nativeBinary: boolean
+  /** Local signing policy requires native backing integrity; peer metadata cannot enable it. */
+  transferRequiresIntegrity?: boolean
   /** Actual carrier frame ceiling, enforced before allocation or physical write. */
   maxFrameBytes: number
   /** Only these explicit original backings may be transferred by the physical writer. */

@@ -18,7 +18,11 @@ import type { IRpcErrorWireMetadata } from '@migaia/rpc-contract/errors'
 import { BinaryShape } from './binary-shape.js'
 import { projectRpcFrameSlots } from './frame-slots.js'
 import { markRpcPortableBinary } from './portable.js'
-import { RpcBinaryStorage, RpcBinaryTag as T } from './binary-constants.js'
+import {
+  RpcBinaryStorage,
+  RpcBinaryTag as T,
+  RPC_BINARY_INTEGRITY_INLINE_BYTES
+} from './binary-constants.js'
 import type { IRpcBinaryDigest, IRpcBinaryEncoding, IRpcBinaryCapture } from './binary-types.js'
 /** One original visit builds both semantic snapshots and tags without rescanning business data. */
 type IBinaryValue = { encoded: IRpcPortableValue; semantic: IRpcPortableValue; native: boolean }
@@ -34,13 +38,16 @@ function binaryCaptureState(
   encoding: IRpcBinaryEncoding | undefined,
   fallbackEncodeInline: ((bytes: Uint8Array) => string) | undefined,
   errorMetadata?: IRpcErrorWireMetadata,
-  captureRecord?: IRecordCapture
+  captureRecord?: IRecordCapture,
+  transferRequiresIntegrity = false
 ) {
   /** One explicit shape/budget owner serves this operation without a second graph walker. */
   const shape = new BinaryShape(limit, errorMetadata)
   if (!Object.values(RpcBinaryStorage).includes(storage)) shape.invalid()
-  /** Original buffer identities determine dense index allocation and explicit transfer eligibility. */
+  /** Only physical native backings remain eligible for the caller's original transfer grants. */
   const sidecars: ArrayBuffer[] = []
+  /** The existing alias index addresses logical rows independently from physical native storage. */
+  const backings: IRpcBinaryCapture['backings'] = []
   /** A single scoped index preserves aliases without introducing any persistent buffer registry. */
   const indices = new Map<ArrayBuffer, number>()
   /** Cycles are rejected while separate occurrences of ordinary records are independently copied. */
@@ -60,6 +67,7 @@ function binaryCaptureState(
 
   return {
     sidecars,
+    backings,
     indices,
     active,
     consume,
@@ -72,6 +80,7 @@ function binaryCaptureState(
     storage,
     limit,
     digest,
+    transferRequiresIntegrity,
     encoding,
     fallbackEncodeInline,
     shape,
@@ -105,7 +114,8 @@ class BinaryCapture {
     encoding: IRpcBinaryEncoding | undefined,
     fallbackEncodeInline: ((bytes: Uint8Array) => string) | undefined,
     errorMetadata?: IRpcErrorWireMetadata,
-    captureRecord?: IRecordCapture
+    captureRecord?: IRecordCapture,
+    transferRequiresIntegrity = false
   ) {
     this.#state = binaryCaptureState(
       message,
@@ -115,7 +125,8 @@ class BinaryCapture {
       encoding,
       fallbackEncodeInline,
       errorMetadata,
-      captureRecord
+      captureRecord,
+      transferRequiresIntegrity
     )
     /** Header/task/errors remain in the original grammar; only its portable slots call this codec. */
     const envelope = normalizeRpcFrame(
@@ -127,8 +138,8 @@ class BinaryCapture {
     const shape: BinaryShape = this.#state.shape
     if (!isRpcOperationalFrame(envelope)) shape.invalid()
     if (
-      this.#state.hasBinary &&
-      this.#state.storage === RpcBinaryStorage.native &&
+      this.#state.sidecars.length > 0 &&
+      this.#state.transferRequiresIntegrity &&
       !this.#state.digest
     )
       this.#state.shape.invalid()
@@ -137,6 +148,7 @@ class BinaryCapture {
       semanticEnvelope: projectRpcFrameSlots(envelope, this.#semanticRoot),
       hasBinary: this.#state.hasBinary,
       sidecars: this.#state.sidecars,
+      backings: this.#state.backings,
       backingBytes: this.#state.backingBytes,
       capturedRoots: this.#state.capturedRoots
     }
@@ -213,10 +225,20 @@ class BinaryCapture {
     /** Each distinct backing contributes its whole native byte length to the physical budget. */
     const length = this.#state.shape.backingLength(backing)
     ;(0, this.#state.consume)(length)
-    this.#state.backingBytes += length
-    const next = this.#state.sidecars.length
+    /** Logical row order remains the original first-seen whole-backing order for every alias. */
+    const next = this.#state.backings.length
     this.#state.indices.set(backing, next)
-    this.#state.sidecars.push(backing)
+    if (this.#state.transferRequiresIntegrity && length <= RPC_BINARY_INTEGRITY_INLINE_BYTES) {
+      /** Snapshot the entire small backing now, before any later native digest can suspend. */
+      const bytes = new Uint8Array(backing).slice()
+      /** Original byte encoding supplies the signed inline representation without a second codec. */
+      const encodeInline = this.#state.encodeInline!
+      this.#state.backings.push(Object.freeze({ byteLength: length, data: encodeInline(bytes) }))
+    } else {
+      this.#state.backingBytes += length
+      this.#state.backings.push(Object.freeze({ byteLength: length }))
+      this.#state.sidecars.push(backing)
+    }
     return next
   }
 
@@ -351,7 +373,8 @@ export function captureRpcBinary(
   encoding: IRpcBinaryEncoding | undefined,
   encodeInline: (bytes: Uint8Array) => string,
   errorMetadata?: IRpcErrorWireMetadata,
-  captureRecord?: IRecordCapture
+  captureRecord?: IRecordCapture,
+  transferRequiresIntegrity = false
 ): IRpcBinaryCapture {
   return new BinaryCapture(
     message,
@@ -361,6 +384,7 @@ export function captureRpcBinary(
     encoding,
     encodeInline,
     errorMetadata,
-    captureRecord
+    captureRecord,
+    transferRequiresIntegrity
   ).value
 }

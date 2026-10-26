@@ -63,6 +63,7 @@ export class RpcJsonCarrierCodec implements IRpcCarrierCodec {
       storage: context.nativeBinary ? RpcWireBinaryStorage.native : RpcWireBinaryStorage.inline,
       limit: context.maxFrameBytes,
       digest: this.#options.digest,
+      transferRequiresIntegrity: context.transferRequiresIntegrity,
       errorMetadata: context.errorMetadata
     }
     /** Metadata admission and both output builders share the sole BinaryCapture traversal. */
@@ -74,7 +75,8 @@ export class RpcJsonCarrierCodec implements IRpcCarrierCodec {
       undefined,
       encodeBytes,
       context.errorMetadata,
-      context.nativeBinary ? undefined : captureRpcWirePortableRecord
+      context.nativeBinary ? undefined : captureRpcWirePortableRecord,
+      options.transferRequiresIntegrity
     )
     if (!capture.hasBinary) return { message: capture.semanticEnvelope, sidecars: [] }
     /** Actual hash suspension never rereads the original business graph or replaces its backings. */
@@ -160,6 +162,7 @@ export class RpcJsonCarrierCodec implements IRpcCarrierCodec {
         sidecars: value.sidecars,
         limit: context.maxFrameBytes,
         digest: this.#options.digest,
+        transferRequiresIntegrity: context.transferRequiresIntegrity,
         errorMetadata: context.errorMetadata
       }
     )

@@ -11,6 +11,7 @@ import type { IRpcErrorWireMetadata } from '../contract/types.js'
  * fragment reassembly, sidecar integrity work, transfer, and physical IO belong to their owners.
  */
 import { isArrayBuffer } from '@migaia/utils/bytes'
+import { isCanonicalBase64url } from '@migaia/serialize/core'
 import { array, identifier, invalid } from './record.js'
 
 import { createContractError } from '../contract/contract-error.js'
@@ -66,7 +67,7 @@ export function normalizeRpcCarrierFrame(
   return value as IRpcCarrierFrame
 }
 
-/** Validate only the digest and length metadata of one original backing record. */
+/** Validate the active inline-data or native-sidecar metadata without executing backing policy. */
 function validateBacking(value: unknown, pointer: string, metadata?: IRpcErrorWireMetadata): void {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     invalid(pointer, undefined, metadata)
@@ -74,7 +75,17 @@ function validateBacking(value: unknown, pointer: string, metadata?: IRpcErrorWi
   const backing = value as Record<string, unknown>
   if (!Number.isSafeInteger(backing.byteLength) || (backing.byteLength as number) < 0)
     invalid(`${pointer}/byteLength`, undefined, metadata)
-  if (typeof backing.sha256 !== 'string' || !digestPattern.test(backing.sha256))
+  if (Object.hasOwn(backing, F.data)) {
+    /** Inline data selects this row's representation; any digest field is inactive metadata. */
+    const data = backing.data
+    if (typeof data !== 'string' || !isCanonicalBase64url(data))
+      invalid(`${pointer}/data`, undefined, metadata)
+    return
+  }
+  if (
+    Object.hasOwn(backing, F.sha256) &&
+    (typeof backing.sha256 !== 'string' || !digestPattern.test(backing.sha256))
+  )
     invalid(`${pointer}/sha256`, undefined, metadata)
 }
 

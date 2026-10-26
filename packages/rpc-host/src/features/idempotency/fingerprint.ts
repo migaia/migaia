@@ -31,6 +31,7 @@ export function invocationFingerprint(envelope: IIdempotentEnvelope): string | P
   const options = {
     storage: digest ? RpcBinaryStorage.native : RpcBinaryStorage.inline,
     digest,
+    transferRequiresIntegrity: true,
     errorMetadata: hostErrorWireMetadata
   }
   /** No ordinary request is visited here unless it actually selected an idempotency key. */
@@ -41,7 +42,9 @@ export function invocationFingerprint(envelope: IIdempotentEnvelope): string | P
     digest,
     undefined,
     encodeBytes,
-    hostErrorWireMetadata
+    hostErrorWireMetadata,
+    undefined,
+    options.transferRequiresIntegrity
   )
   if (!capture.hasBinary)
     return JSON.stringify([

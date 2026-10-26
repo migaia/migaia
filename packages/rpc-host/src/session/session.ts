@@ -78,6 +78,7 @@ import {
 } from '../host/error-wire-metadata.js'
 import { SessionText } from './text.js'
 import { RpcSessionObservation } from '../sdk/carrier/observation.js'
+import { rpcPreparedTransfer } from '../sdk/carrier/prepared.js'
 import { portableBytes } from '../sdk/wire/portable-size.js'
 import { rpcPortableBackingLength } from '@migaia/rpc-contract/portable'
 import { isRpcCarrierAdmissionFailure } from '../sdk/carrier/admission.js'
@@ -1088,7 +1089,13 @@ export class Session {
       if (bootstrap) throw cause
       throw createRpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
     }
-    this.#observation.media(S.encoded, D.outbound, encoded.data, message, options?.transfer)
+    /**
+     * Inline signed backings cannot retain native transfer grants; batching receives the filtered
+     * list.
+     */
+    const transfer = rpcPreparedTransfer(options.transfer, encoded.sidecars)
+    if (transfer !== options.transfer) options = { ...options, transfer }
+    this.#observation.media(S.encoded, D.outbound, encoded.data, message, options.transfer)
     this.#assertOpen(continuing, final)
     /** A single logical reservation belongs to this whole run, including all native next branches. */
     const admission = this.#options.carrier.reserveWrite?.(options)
@@ -1205,6 +1212,9 @@ export class Session {
         !bootstrap &&
         this.#options.carrier.nativeBinary &&
         this.#options.flow.facts(this.#options.namespace).nativeBinary !== false,
+      transferRequiresIntegrity:
+        !bootstrap &&
+        this.#options.flow.facts(this.#options.namespace).transferRequiresIntegrity === true,
       errorMetadata: hostErrorWireMetadata,
       maxFrameBytes: bootstrap
         ? Math.min(SessionText.handshakeMaxFrameBytes, this.#options.maxFrameBytes)

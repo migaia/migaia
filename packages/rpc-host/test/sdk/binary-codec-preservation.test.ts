@@ -119,13 +119,14 @@ it('R18 receiver codec retains INVALID_ENVELOPE for an oversized item', async ()
 })
 
 it('BC9 SDK manifest and backing metadata ignore unknowns but validate known fields', async () => {
-  /** Native bytes and their actual digest reach both fixed metadata record validators. */
+  /** Unsigned native bytes reach both fixed metadata validators without requiring a digest. */
   const bytes = new Uint8Array([1, 2]).buffer
   /** The sole real capture creates both original metadata records before unknown fields are added. */
   const prepared = await prepareRpcBinary(envelope(bytes), {
     storage: RpcBinaryStorage.native,
     digest
   })
+  assert.equal(prepared.manifest.backings[0]!.sha256, undefined)
   /** Only metadata gains unknown fields; portable business data keeps its original strict policy. */
   const manifest = {
     ...prepared.manifest,
@@ -145,6 +146,16 @@ it('BC9 SDK manifest and backing metadata ignore unknowns but validate known fie
   })
   assert.ok('payload' in restored)
   assert.equal(restored.payload, bytes)
+  /** An actual unsigned native row is accepted above, but cannot satisfy trusted signed integrity. */
+  await assert.rejects(
+    restoreRpcBinary(manifest, {
+      storage: RpcBinaryStorage.native,
+      sidecars: prepared.sidecars,
+      digest,
+      transferRequiresIntegrity: true
+    }),
+    { code: 'INVALID_ENVELOPE' }
+  )
   /** Missing profile stays a genuine known-field error despite extra metadata. */
   const missingManifest: Record<string, unknown> = { ...manifest }
   delete missingManifest.profile
@@ -228,8 +239,8 @@ it('cold binary preparation captures inline bytes and starts the first native di
   })
   inline.fill(7)
   /** Separate native backings expose the original sequential digest order. */
-  const first = new Uint8Array([3, 4]).buffer
-  const second = new Uint8Array([5, 6]).buffer
+  const first = new ArrayBuffer(16_385)
+  const second = new ArrayBuffer(16_386)
   /** The first digest is deliberately held while the codec module finishes loading. */
   let releaseFirst!: (value: string) => void
   /** Actual digest calls establish ordering independently of prepared manifest equality. */
@@ -239,6 +250,7 @@ it('cold binary preparation captures inline bytes and starts the first native di
   /** This operation shares only module loading; captured backings remain operation-local. */
   const pendingNative = prepareRpcBinary(envelope({ first, second }), {
     storage: RpcBinaryStorage.native,
+    transferRequiresIntegrity: true,
     digest: (backing) => {
       order.push(backing)
       return backing === first
@@ -330,14 +342,17 @@ it('inline tag-shaped business records and view boundaries restore without leaki
 })
 
 it('native refs preserve original complete backings and aliases without making a transfer copy', async () => {
-  const backing = new Uint8Array([9, 1, 2, 8]).buffer
+  /** Whole signed storage above the inline boundary keeps the original native identity oracle. */
+  const bytes = new Uint8Array(16_385)
+  bytes.set([9, 1, 2, 8])
+  const backing = bytes.buffer
   const prepared = await prepareRpcBinary(
     envelope({
       buffer: backing,
       first: new Uint8Array(backing, 1, 2),
       second: new Uint8Array(backing, 2, 1)
     }),
-    { storage: RpcBinaryStorage.native, limit: 1024, digest: digest }
+    { storage: RpcBinaryStorage.native, limit: 32_768, digest, transferRequiresIntegrity: true }
   )
   assert.equal(prepared.sidecars.length, 1)
   assert.equal(
@@ -345,27 +360,30 @@ it('native refs preserve original complete backings and aliases without making a
     backing,
     'native preparation must retain the original transfer identity'
   )
-  assert.equal(prepared.backingBytes, 4)
+  assert.equal(prepared.backingBytes, 16_385)
   assert.equal(prepared.manifest.backings[0]!.sha256, await digest(backing))
   const restored = await restoreRpcBinary(prepared.manifest, {
     storage: RpcBinaryStorage.native,
     sidecars: prepared.sidecars,
-    limit: 1024,
-    digest: digest
+    limit: 32_768,
+    digest,
+    transferRequiresIntegrity: true
   })
   assert.ok('payload' in restored)
   const value = restored.payload as { buffer: ArrayBuffer; first: Uint8Array; second: Uint8Array }
   assert.equal(value.buffer, backing)
   assert.equal(value.first.buffer, value.second.buffer)
   assert.equal(value.first.byteOffset, 1)
-  assert.deepEqual([...new Uint8Array(value.first.buffer)], [9, 1, 2, 8])
+  assert.equal(value.first.buffer.byteLength, 16_385)
+  assert.deepEqual([...new Uint8Array(value.first.buffer, 0, 4)], [9, 1, 2, 8])
   new Uint8Array(backing)[0] = 7
   await assert.rejects(
     restoreRpcBinary(prepared.manifest, {
       storage: RpcBinaryStorage.native,
       sidecars: prepared.sidecars,
-      limit: 1024,
-      digest: digest
+      limit: 32_768,
+      digest,
+      transferRequiresIntegrity: true
     }),
     { code: 'INVALID_ENVELOPE' }
   )
@@ -378,11 +396,12 @@ it('full backing overflow and invalid business graphs fail before digest work', 
     hashes++
     return digest(backing)
   }
-  const backing = new ArrayBuffer(1025)
+  const backing = new ArrayBuffer(16_385)
   await assert.rejects(
     prepareRpcBinary(envelope(new Uint8Array(backing, 100, 1)), {
       storage: RpcBinaryStorage.native,
-      limit: 1024,
+      limit: 16_384,
+      transferRequiresIntegrity: true,
       digest: observedDigest
     }),
     { code: 'INVALID_ENVELOPE' }
@@ -464,7 +483,9 @@ it('binary tuple/backing vectors preserve canonical restoration through the sole
     const restored = await restoreRpcBinary(vector.value, {
       storage: storage,
       sidecars: sidecars,
-      digest: digest
+      digest: digest,
+      transferRequiresIntegrity:
+        'transferRequiresIntegrity' in vector ? vector.transferRequiresIntegrity : undefined
     })
     assert.equal(restored.profile, vectors.profile)
   }
@@ -474,7 +495,9 @@ it('binary tuple/backing vectors preserve canonical restoration through the sole
       restoreRpcBinary(vector.value, {
         storage: vector.value.storage as RpcBinaryStorage,
         sidecars: sidecars,
-        digest: digest
+        digest: digest,
+        transferRequiresIntegrity:
+          'transferRequiresIntegrity' in vector ? vector.transferRequiresIntegrity : undefined
       }),
       { code: 'INVALID_ENVELOPE' }
     )

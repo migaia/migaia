@@ -21,6 +21,8 @@ export type IRpcBinaryOptions = Readonly<{
   storage: RpcBinaryStorage
   limit?: number
   digest?: IRpcBinaryDigest
+  /** Local integrity demand; wire capture borrows the selected signing flow's trusted fact. */
+  transferRequiresIntegrity?: boolean
   errorMetadata?: IRpcErrorWireMetadata
   encoding?: IRpcBinaryEncoding
   beforeDigest?(manifest: IRpcBinaryManifest, backingBytes: number): void
@@ -34,6 +36,8 @@ export type IRpcBinaryCapture = {
   semanticEnvelope: IRpcEnvelope
   hasBinary: boolean
   sidecars: ArrayBuffer[]
+  /** Logical aliases index these rows; only rows without inline data consume physical sidecars. */
+  backings: Readonly<{ byteLength: number; data?: string }>[]
   backingBytes: number
   capturedRoots: Map<object, number> | undefined
 }

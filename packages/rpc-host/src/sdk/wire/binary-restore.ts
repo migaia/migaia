@@ -38,7 +38,9 @@ class BinaryRestore {
   readonly #shape: BinaryShape
   /** Original sidecars are retained once, in the caller's exact physical order. */
   #sidecars: readonly unknown[] = []
-  /** Every native sidecar must have at least one legitimate tagged business reference. */
+  /** Logical indexes retain each decoded inline or original native whole backing exactly once. */
+  readonly #backings: ArrayBuffer[] = []
+  /** Every logical backing must have at least one legitimate tagged business reference. */
   readonly #used = new Set<number>()
   /** Admission order retains each decoded root once, independent from repeated input identity. */
   readonly #roots: IRpcPortableValue[] = []
@@ -66,18 +68,17 @@ class BinaryRestore {
       /** Declared full backing records are captured before every expensive digest. */
       const backings = this.#shape.array(manifest.backings, `${P.manifest}/${F.backings}`)
       if (
-        this.#sidecars.length !== backings.length ||
-        (this.#options.storage === RpcBinaryStorage.inline && backings.length)
+        this.#options.storage === RpcBinaryStorage.inline &&
+        (backings.length || this.#sidecars.length)
       )
         this.#shape.invalid()
       /** A complete backing identity may be referenced repeatedly, but appear only once physically. */
       const unique = new Set<ArrayBuffer>()
       /** Captured original digest/length metadata remains unchanged through asynchronous hash calls. */
-      const metadata: { byteLength: number; sha256: string }[] = []
+      const metadata: { backing: ArrayBuffer; sha256: string }[] = []
+      /** Inline rows consume no physical sidecar, preserving the original native subsequence order. */
+      let physical = 0
       for (let index = 0; index < backings.length; index++) {
-        const backing = this.#sidecars[index]
-        if (!isArrayBuffer(backing) || unique.has(backing)) this.#shape.invalid()
-        unique.add(backing)
         /** One protected record describes the complete backing, including bytes outside a view. */
         const data = this.#backing(backings[index], `${P.manifest}/${index}`)
         /** Actual length equality is established before digest work can suspend or detach storage. */
@@ -85,13 +86,41 @@ class BinaryRestore {
           data.byteLength,
           `${P.manifest}/${index}/${F.byteLength}`
         )
-        if (length !== this.#shape.backingLength(backing)) this.#shape.integrity()
         this.#shape.consume(length)
-        metadata.push({
-          byteLength: length,
-          sha256: this.#shape.digest(data.sha256, `${P.manifest}/${index}/${F.sha256}`)
-        })
+        /** Capture only the active inline field before deciding whether a physical sidecar exists. */
+        const inline = data.data
+        if (inline !== undefined) {
+          /**
+           * Inline signed bytes are charged before allocation and materialized once for all
+           * aliases.
+           */
+          const encoded = this.#shape.inlineData(inline, `${P.manifest}/${index}/${F.data}`)
+          if (Math.floor((encoded.length * 3) / 4) !== length) this.#shape.integrity()
+          this.#backings.push(decodeBytes(encoded, 0, this.#shape).buffer as ArrayBuffer)
+          continue
+        }
+        /** Only native logical rows borrow the next original whole physical backing. */
+        const backing = this.#sidecars[physical++]
+        if (!isArrayBuffer(backing) || unique.has(backing)) this.#shape.invalid()
+        unique.add(backing)
+        if (length !== this.#shape.backingLength(backing)) this.#shape.integrity()
+        this.#backings.push(backing)
+        /**
+         * Optional wire metadata never grants integrity authority; only local signing requires
+         * hashing.
+         */
+        const checksum = data.sha256
+        /** Optional SHA metadata is validated once without granting any hashing authority. */
+        const sha256 =
+          checksum === undefined
+            ? undefined
+            : this.#shape.digest(checksum, `${P.manifest}/${index}/${F.sha256}`)
+        if (this.#options.transferRequiresIntegrity) {
+          if (sha256 === undefined || !this.#options.digest) this.#shape.invalid()
+          metadata.push({ backing, sha256 })
+        }
       }
+      if (physical !== this.#sidecars.length) this.#shape.invalid()
       /**
        * Exactly one existing metadata admission delegates only portable slots to the original
        * decoder.
@@ -102,14 +131,9 @@ class BinaryRestore {
       /** The same single known field read enters the canonical semantic frame admission. */
       const envelope = normalizeRpcFrame(sourceEnvelope, this.#options.errorMetadata, this.#project)
       if (!isRpcOperationalFrame(envelope)) this.#shape.invalid()
-      if (this.#used.size !== this.#sidecars.length) this.#shape.invalid()
-      if (this.#options.storage === RpcBinaryStorage.native && !this.#options.digest)
-        this.#shape.invalid()
-      for (let index = 0; index < this.#sidecars.length; index++)
-        if (
-          this.#shape.digest(await this.#options.digest!(this.#sidecars[index] as ArrayBuffer)) !==
-          metadata[index]!.sha256
-        )
+      if (this.#used.size !== this.#backings.length) this.#shape.invalid()
+      for (const entry of metadata)
+        if (this.#shape.digest(await this.#options.digest!(entry.backing)) !== entry.sha256)
           this.#shape.integrity()
       return projectRpcFrameSlots(envelope, this.#restoredRoot)
     } catch (cause) {
@@ -156,7 +180,7 @@ class BinaryRestore {
   /** Resolve one admitted backing index without copying or granting native transfer authority. */
   #native(selected: unknown): ArrayBuffer {
     const index = this.#shape.integer(selected)
-    const backing = this.#sidecars[index]
+    const backing = this.#backings[index]
     if (!isArrayBuffer(backing)) this.#shape.invalid()
     this.#used.add(index)
     markRpcPortableBinary(backing)
