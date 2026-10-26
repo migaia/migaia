@@ -65,19 +65,10 @@ export class PluginHostDisposalRuntime<TRegistration> {
     try {
       this.#port.terminal.close()
       for (const key of this.#port.pipelineKeys) this.#port.pipelineLeases.seal(key)
-      try {
-        this.#port.executionController.abort(
-          new PluginHostError(PluginHostErrorCode.hostDisposing, ERROR_TEXT.HOST_DISPOSING)
-        )
-      } catch (abortFailure) {
-        // A hostile abort listener cannot alter terminal authority; its failure is reported.
-        reportDiagnostic(
-          this.#port.diagnostic,
-          ERROR_TEXT.HOST_DISPOSING,
-          PluginHostErrorCode.hostDisposing,
-          abortFailure
-        )
-      }
+      // A native abort never throws: listener failures go to the host's own error reporting.
+      this.#port.executionController.abort(
+        new PluginHostError(PluginHostErrorCode.hostDisposing, ERROR_TEXT.HOST_DISPOSING)
+      )
       /** The existing terminal queue still owns every physical cleanup step. */
       const pending = this.#port.enqueueTerminal(async () => {
         const errors: unknown[] = []

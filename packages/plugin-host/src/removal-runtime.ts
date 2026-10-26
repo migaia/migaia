@@ -97,13 +97,10 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
     registration.extensions = []
     registration.featureExpose = undefined
     registration.featureOutputs = undefined
-    try {
-      registration.lifecycleController?.abort(
-        new PluginHostError(PluginHostErrorCode.hostDisposing, ERROR_TEXT.HOST_DISPOSING)
-      )
-    } catch (error) {
-      errors.push(error)
-    }
+    // A native abort never throws: listener failures go to the host's own error reporting.
+    registration.lifecycleController?.abort(
+      new PluginHostError(PluginHostErrorCode.hostDisposing, ERROR_TEXT.HOST_DISPOSING)
+    )
     return errors
   }
 
