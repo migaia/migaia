@@ -31,10 +31,10 @@ export class AuthenticationRepresentation {
     this.#encoding = encoding ?? Encoding.any
   }
 
-  /** Preserve the original signed replay marker for explicit string and byte callback categories. */
-  bound(value: IAuthenticationEnvelope, native = false): unknown {
-    /** Native sign-only any originally signs the complete manifest object without text wrapping. */
-    if (native && this.#encoding === Encoding.any) return value
+  /** Select the default signing object or the configured text/byte callback representation. */
+  bound(value: IAuthenticationEnvelope, signOnly = true): unknown {
+    /** Object signing preserves the original native path and leaves canonicalization to callbacks. */
+    if (signOnly && this.#encoding === Encoding.any) return value
     /** The real selected JSON codec supplies the same original text category for default any. */
     const json = this.#json.encode(value.payload)[1]
     /** Explicit byte transforms keep the original byte payload spelling within the signed binding. */

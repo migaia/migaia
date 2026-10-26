@@ -19,11 +19,7 @@ import {
   RpcDispatchDrop
 } from '@migaia/rpc-contract/interfaces'
 import type { IRpcHandshake, IRpcPortableValue } from '@migaia/rpc-contract/protocol'
-import {
-  RpcWireHandshakeStep,
-  RpcWireKind,
-  RpcWireBinaryStorage
-} from '@migaia/rpc-contract/protocol'
+import { RpcWireHandshakeStep, RpcWireKind } from '@migaia/rpc-contract/protocol'
 import {
   RpcAuthenticationError,
   RpcConfigurationError,
@@ -325,7 +321,7 @@ export class RpcAuthenticationFlow {
       /** The complete native backing digest/length manifest stays inside both transforms. */
       const bound = this.#representation.bound(
         wrapAuthenticationEnvelope(joinRpcPreparedMetadata(value), this.#nonce, ++this.#counter),
-        !this.#config.encrypt && value.manifest?.storage === RpcWireBinaryStorage.native
+        !this.#config.encrypt
       )
       /** Preserve original encrypt-before-sign order without lending the mutable owner as receiver. */
       const encrypted = this.#config.encrypt

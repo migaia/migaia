@@ -20,7 +20,6 @@ import { FlowRegistry } from '../../../dist/flow/registry.js'
 import { setAuthenticationReplayCounter } from '../../../dist/features/auth/counter.js'
 import { readAuthenticationEnvelope } from '../../../dist/features/auth/envelope.js'
 import { AuthenticationRepresentation } from '../../../dist/features/auth/representation.js'
-import { RpcAuthenticationEnvelope } from '../../../dist/features/auth/constants.js'
 import { RpcAuthenticationText } from '../../../dist/features/auth/text.js'
 
 /** Public test data signs complete Auth transform inputs; this is not a deployed credential. */
@@ -325,7 +324,7 @@ it('protects all original binding fields on real MessagePorts and reports the sa
     expect(pair.providers).toEqual(['discovered', 'last'])
     /** The original encode inputs are retained before any later physical injection changes them. */
     const [prepared, context] = pair.encoded.mock.calls.at(-1)!
-    /** Actual JSON preparation selected the original authentication wrapper and signed text. */
+    /** Actual JSON preparation selected the default signed binding object. */
     const outer = prepared.message as { payload: { value: unknown; signature: string } }
     /** Canonical Auth inspection is confined to constructing the six original hostile inputs. */
     const representation = new AuthenticationRepresentation('any')
@@ -340,16 +339,16 @@ it('protects all original binding fields on real MessagePorts and reports the sa
       { counter: '1' },
       { payload: 'tampered' },
       {
-        payload: JSON.stringify({
+        payload: {
           ...semantic,
           route: { ...semantic.route, senderId: 'forged-sender' }
-        })
+        }
       },
       {
-        payload: JSON.stringify({
+        payload: {
           ...semantic,
           route: { ...semantic.route, receiverId: 'forged-receiver' }
-        })
+        }
       }
     ]) {
       /** Each distinct hostile input is encoded once by the actual already-owned media codec. */
@@ -360,7 +359,7 @@ it('protects all original binding fields on real MessagePorts and reports the sa
             ...outer,
             payload: {
               ...outer.payload,
-              value: RpcAuthenticationEnvelope.prefix + JSON.stringify({ ...bound, ...change })
+              value: { ...bound, ...change }
             }
           }
         },
