@@ -176,7 +176,10 @@ class ProcessSessionOwner {
     /** Publish cleanup before synchronous cancellation can reenter the same native owner. */
     const closing = this.#close()
     this.#controller.abort(resolveAbortReason(this.#context.signal))
-    void closing.catch(this.#report)
+    void closing.catch((error: unknown) => {
+      /** The published handle's native cleanup owns this flight; pending acquisition still reports. */
+      if (!this.#value) this.#report(error)
+    })
   }
 
   /** Publish close before native callbacks can reenter and observe a second teardown. */
