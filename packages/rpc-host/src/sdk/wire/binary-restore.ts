@@ -87,14 +87,13 @@ class BinaryRestore {
           `${P.manifest}/${index}/${F.byteLength}`
         )
         this.#shape.consume(length)
-        /** Capture only the active inline field before deciding whether a physical sidecar exists. */
-        const inline = data.data
-        if (inline !== undefined) {
+        /** An own inline field selects this representation even when its value is malformed. */
+        if (Object.hasOwn(data, F.data)) {
           /**
            * Inline signed bytes are charged before allocation and materialized once for all
            * aliases.
            */
-          const encoded = this.#shape.inlineData(inline, `${P.manifest}/${index}/${F.data}`)
+          const encoded = this.#shape.inlineData(data.data, `${P.manifest}/${index}/${F.data}`)
           if (Math.floor((encoded.length * 3) / 4) !== length) this.#shape.integrity()
           this.#backings.push(decodeBytes(encoded, 0, this.#shape).buffer as ArrayBuffer)
           continue
@@ -106,15 +105,12 @@ class BinaryRestore {
         if (length !== this.#shape.backingLength(backing)) this.#shape.integrity()
         this.#backings.push(backing)
         /**
-         * Optional wire metadata never grants integrity authority; only local signing requires
+         * Validate any own SHA field once without granting authority; only local signing requires
          * hashing.
          */
-        const checksum = data.sha256
-        /** Optional SHA metadata is validated once without granting any hashing authority. */
-        const sha256 =
-          checksum === undefined
-            ? undefined
-            : this.#shape.digest(checksum, `${P.manifest}/${index}/${F.sha256}`)
+        const sha256 = Object.hasOwn(data, F.sha256)
+          ? this.#shape.digest(data.sha256, `${P.manifest}/${index}/${F.sha256}`)
+          : undefined
         if (this.#options.transferRequiresIntegrity) {
           if (sha256 === undefined || !this.#options.digest) this.#shape.invalid()
           metadata.push({ backing, sha256 })

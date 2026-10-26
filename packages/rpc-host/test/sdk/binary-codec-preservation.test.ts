@@ -191,6 +191,21 @@ it('BC9 SDK manifest and backing metadata ignore unknowns but validate known fie
     ),
     { code: 'INVALID_ENVELOPE', pointer: '/manifest/0/byteLength' }
   )
+  /** Present undefined is malformed active metadata, rather than an omitted inline or SHA field. */
+  await assert.rejects(
+    restoreRpcBinary(
+      { ...manifest, backings: [{ ...manifest.backings[0], data: undefined }] },
+      { storage: RpcBinaryStorage.native, sidecars: prepared.sidecars, digest }
+    ),
+    { code: 'INVALID_ENVELOPE', pointer: '/manifest/0/data' }
+  )
+  await assert.rejects(
+    restoreRpcBinary(
+      { ...manifest, backings: [{ ...manifest.backings[0], sha256: undefined }] },
+      { storage: RpcBinaryStorage.native, sidecars: prepared.sidecars, digest }
+    ),
+    { code: 'INVALID_ENVELOPE', pointer: '/manifest/0/sha256' }
+  )
 })
 
 it('BC9 actual codec ignores operation-only fields outside their known variants', async () => {
