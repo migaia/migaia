@@ -1,5 +1,5 @@
 /** Native child/listener admission borrows the host's sole Session and supervision owners. */
-import { raceWithAbort, UtilsAbortError } from '@migaia/utils/promise'
+import { raceWithAbort } from '@migaia/utils/promise'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { createParentLossGuard } from '@migaia/supervision/process'
 import type {
@@ -233,8 +233,8 @@ class ProcessSessionOwner {
 
   /** Late candidates cannot publish after explicit close or parent-loss shutdown began. */
   #assertOpen(): void {
-    if (this.#context.signal.aborted)
-      throw new UtilsAbortError(resolveAbortReason(this.#context.signal))
+    /** Installation cancellation rethrows its own reason so upstream treats it as an echo. */
+    if (this.#context.signal.aborted) throw resolveAbortReason(this.#context.signal)
     if (this.#closing || this.#controller.signal.aborted)
       throw createProcessChannelClosedError(resolveAbortReason(this.#controller.signal))
   }
