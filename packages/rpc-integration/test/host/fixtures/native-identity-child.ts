@@ -14,8 +14,8 @@ export class NativeIdentityChild {
   readonly #warnings: IRpcWarning[] = []
   /** Unexpected native/Host failures remain observable throughout the child's lifetime. */
   readonly #reports: unknown[] = []
-  /** Only successfully opened public hosts enter this child's cleanup owner. */
-  #host: IRpcHost | undefined
+  /** Provider entry may precede factory return, so identity and cleanup join its original promise. */
+  #host: Promise<IRpcHost> | undefined
   /** The default-sink case intentionally omits the public onWarning option. */
   readonly #collectWarnings: boolean
 
@@ -26,7 +26,7 @@ export class NativeIdentityChild {
 
   /** Open the actual supplied native child source without rewriting its explicit self. */
   async open(plugin: IRpcHostPlugin): Promise<void> {
-    this.#host = await createRpcHost({
+    this.#host = createRpcHost({
       self: { name: 'math-child', instanceId: 'configured-child-instance' },
       ...(this.#collectWarnings
         ? { onWarning: (warning: IRpcWarning) => this.#warnings.push(warning) }
@@ -35,17 +35,18 @@ export class NativeIdentityChild {
       plugins: [plugin],
       provide: { inspect: this.inspect }
     })
+    await this.#host
   }
 
-  /** Business requests inspect the actual accepted public self after construction has completed. */
-  readonly inspect = (): IIdentitySnapshot => ({
-    self: this.#host!.self,
+  /** An admitted call waits for the original factory instead of reading a not-yet-assigned Host. */
+  readonly inspect = async (): Promise<IIdentitySnapshot> => ({
+    self: (await this.#host!).self,
     warnings: this.#warnings,
     reports: this.#reports.length
   })
 
   /** Coroutine task cleanup joins the actual child Host's existing close Promise. */
   async close(): Promise<void> {
-    await this.#host?.close()
+    await (await this.#host)?.close()
   }
 }

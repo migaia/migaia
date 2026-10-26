@@ -5,6 +5,33 @@ import { processPlugin } from '@migaia/rpc-plugin-process'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'
 import { NativeIdentityChild, type IIdentitySnapshot } from './fixtures/native-identity-child.js'
+import { deferred } from '@migaia/utils/promise'
+
+/** Observe real native delivery while the SDK retains the original carrier and listener lifetime. */
+function identityCarrier(port: MessagePort, id: string, received?: () => void) {
+  return createRpcMessageCarrier({
+    id,
+    report: () => undefined,
+    io: {
+      send: (value) => port.postMessage(value),
+      onMessage: (listener) => {
+        /** Notify only after delivering the original native frame to its genuine Session. */
+        const receive = (event: MessageEvent) => {
+          listener(event.data)
+          received?.()
+        }
+        port.addEventListener('message', receive)
+        port.start()
+        return () => port.removeEventListener('message', receive)
+      },
+      onClose: (listener) => {
+        port.addEventListener('close', listener)
+        return () => port.removeEventListener('close', listener)
+      },
+      close: () => port.close()
+    }
+  })
+}
 
 /** Native Node launchers consume the same maintained source in a real process or Worker. */
 const childEntry = new URL('./fixtures/native-identity-realm.ts', import.meta.url)
@@ -145,27 +172,6 @@ it('A26: conflicting trusted parent startup facts still reject the public Host',
   const first = new MessageChannel()
   /** The second original source claims a different parent-assigned child identity. */
   const second = new MessageChannel()
-  /** Public SDK IO callbacks attach only the actual original native receiver and sender. */
-  const carrier = (port: MessagePort, id: string) =>
-    createRpcMessageCarrier({
-      id,
-      report: () => undefined,
-      io: {
-        send: (value) => port.postMessage(value),
-        onMessage: (listener) => {
-          /** The exact native wrapper is removed by its SDK-owned subscription receipt. */
-          const receive = (event: MessageEvent) => listener(event.data)
-          port.addEventListener('message', receive)
-          port.start()
-          return () => port.removeEventListener('message', receive)
-        },
-        onClose: (listener) => {
-          port.addEventListener('close', listener)
-          return () => port.removeEventListener('close', listener)
-        },
-        close: () => port.close()
-      }
-    })
   try {
     await expect(
       createRpcHost({
@@ -175,10 +181,10 @@ it('A26: conflicting trusted parent startup facts still reject the public Host',
             name: 'native-facts',
             namespace: 'native',
             open: (context) => {
-              context.attach(carrier(first.port1, 'native-first'), {
+              context.attach(identityCarrier(first.port1, 'native-first'), {
                 self: { name: 'math', instanceId: 'native-first-child' }
               })
-              context.attach(carrier(second.port1, 'native-second'), {
+              context.attach(identityCarrier(second.port1, 'native-second'), {
                 self: { name: 'other', instanceId: 'native-second-child' }
               })
               return { dispose: () => undefined }
@@ -192,5 +198,76 @@ it('A26: conflicting trusted parent startup facts still reject the public Host',
     first.port2.close()
     second.port1.close()
     second.port2.close()
+  }
+})
+
+it('A26 fixture inspects its original child factory when a native call waits at installation commit', async () => {
+  /** A genuine native message pair completes the real bilateral Session handshake. */
+  const channel = new MessageChannel()
+  /** The original child factory is held only after its native Session becomes ready. */
+  const release = deferred<void>()
+  /** Native input proves the parent request arrived before releasing child installation. */
+  const received = deferred<void>()
+  /** Startup messages do not satisfy the business-delivery observation. */
+  let armed = false
+  /** The same fixture used by Process, Thread and Coroutine remains the public provider. */
+  const child = new NativeIdentityChild()
+  /** No Host/readiness object is manufactured; the real plugin owns the admission hold. */
+  const opening = child.open(
+    defineTransportPlugin({
+      name: 'identity-opening-child',
+      namespace: 'memory',
+      open: async (context) => {
+        /** This is the original native attachment and its real accepted readiness. */
+        const handle = context.attach(
+          identityCarrier(channel.port2, 'identity-child-port', () => {
+            if (armed) received.resolve()
+          })
+        )
+        await handle.ready
+        await release.promise
+        return { dispose: () => context.detach(handle) }
+      }
+    })
+  )
+  /** The independent real parent may finish before the child's public factory returns. */
+  const parent = await createRpcHost({
+    self: { name: 'identity-parent', instanceId: 'identity-parent' },
+    report: () => undefined,
+    plugins: [
+      defineTransportPlugin({
+        name: 'identity-opening-parent',
+        namespace: 'memory',
+        open: async (context) => {
+          /** Both original physical endpoints subscribe before asynchronous acceptance. */
+          const handle = context.attach(identityCarrier(channel.port1, 'identity-parent-port'))
+          await handle.ready
+          return { dispose: () => context.detach(handle) }
+        }
+      })
+    ]
+  })
+  /** Observe the original public rejection before the fixture exposes the old assignment race. */
+  let request: Promise<unknown> | undefined
+  try {
+    armed = true
+    request = parent.memory.send('math-child', 'inspect', null).catch((error: unknown) => error)
+    await received.promise
+    /** Allow the genuine inbound invocation to reach its still-pending native commit gate. */
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    release.resolve()
+    expect(await request).toMatchObject({
+      self: { name: 'math-child', instanceId: 'configured-child-instance' },
+      warnings: [],
+      reports: 0
+    })
+    await opening
+  } finally {
+    release.resolve()
+    await opening
+    await Promise.all([parent.close(), child.close()])
+    await request
+    channel.port1.close()
+    channel.port2.close()
   }
 })
