@@ -1,8 +1,9 @@
+/** Actual native Auth stages retain transform, replay and cancellation semantics through one codec. */
 import { expect, it, vi } from 'vitest'
 import { defineHost, definePlugin } from '@migaia/plugin-host'
 import { deferred, type IAbortSignal } from '@migaia/utils/promise'
 import type { IRpcEnvelopeContext, IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
-import type { IRpcEnvelope, IRpcHello } from '@migaia/rpc-contract/protocol'
+import type { IRpcEnvelope, IRpcHello, IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
 import { RpcWireProfile } from '@migaia/rpc-contract/protocol'
 import { auth, type IRpcAuthenticationOptions } from '../../../dist/features/auth/index.js'
 import { setAuthenticationReplayCounter } from '../../../dist/features/auth/counter.js'
@@ -155,7 +156,7 @@ async function fixture(options: IRpcAuthenticationOptions, nativeBinary = false)
     value: IRpcCarrierFrame,
     signal = path.context('inbound').signal,
     id = 'source'
-  ) => {
+  ): Promise<IRpcSemanticFrame | undefined> => {
     /** Restoration receives the same forwarded prepared object used by authentication. */
     const prepared = await path.pipelines.pipeline(RpcFlowPoint.envelopeInbound, 'test').run(
       {
@@ -164,7 +165,7 @@ async function fixture(options: IRpcAuthenticationOptions, nativeBinary = false)
       },
       async (payload) => payload.prepared
     )
-    return path.codec.restore(prepared!, path.codecContext)
+    return prepared === undefined ? undefined : path.codec.restore(prepared, path.codecContext)
   }
 
   return {
@@ -437,7 +438,7 @@ it.each(['text', new Uint8Array([0, 255, 42]), { nested: 'value' }])(
       /** Preserve each original text, byte or record value after genuine verified restoration. */
       const received = await f.receive(await f.send(message('payload-category', value)))
       expect(received).toMatchObject({ payload: value })
-      if (received.kind === 'call') {
+      if (received?.kind === 'call') {
         expect(typeof received.payload).toBe(typeof value)
         expect(received.payload instanceof Uint8Array).toBe(value instanceof Uint8Array)
         expect(received.payload).toEqual(value)
@@ -491,9 +492,16 @@ it('rejects verification after physical retirement and preserves custom verifica
   /** Rejection remains observed during asynchronous physical shutdown. */
   const pending = f.receive(packet).catch((error: unknown) => error)
   await arrived.promise
+  /** The ruled close drops this native continuation; its late original Auth failure still reports. */
+  const before = f.reports.length
   f.source.abort()
   wait.resolve()
-  expect(await pending).toMatchObject({ code: 'AUTHENTICATION_FAILED' })
+  expect(await pending).toBeUndefined()
+  await vi.waitFor(() => expect(f.reports).toHaveLength(before + 1))
+  expect(f.reports.at(-1)).toMatchObject({
+    source: 'rpc.endpoint',
+    code: 'AUTHENTICATION_FAILED'
+  })
   await f.installation.dispose?.()
   await f.flow.dispose()
   /**

@@ -408,10 +408,10 @@ it.each([100, 310_001])(
       const before = pair.verifies
       /** The original native clock method retains its actual platform receiver on every read. */
       const originalNow = performance.now
-      /** One exact clock sample proves the selected offset without claiming any wall-clock wait. */
+      /** An integer native sample keeps this controlled offset exact without claiming wall time. */
       let nativeSample = 0
       clock = vi.spyOn(performance, 'now').mockImplementation(() => {
-        nativeSample = Reflect.apply(originalNow, performance, []) as number
+        nativeSample = Math.trunc(Reflect.apply(originalNow, performance, []) as number)
         return nativeSample + elapsed
       })
       expect(performance.now() - nativeSample).toBe(elapsed)

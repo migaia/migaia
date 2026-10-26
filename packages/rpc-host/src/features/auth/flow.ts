@@ -3,7 +3,8 @@
  * Fixed handshake/envelope hooks verify admitted data; dispatch borrows real business completion.
  * Native cancellation releases these records without owning Sessions, providers or outcome keys.
  */
-import type { IAbortSignal } from '@migaia/utils/promise'
+import { raceWithAbort, type IAbortSignal } from '@migaia/utils/promise'
+import { UtilsAbortError } from '@migaia/utils/error'
 import type {
   IRpcFlowContext,
   IRpcEnvelopeContext,
@@ -27,7 +28,8 @@ import {
   RpcAuthenticationError,
   RpcConfigurationError,
   RpcCoreErrorText,
-  RpcProviderRejectionReason
+  RpcProviderRejectionReason,
+  redactRpcHandshakeFailure
 } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import {
@@ -126,6 +128,8 @@ export class RpcAuthenticationFlow {
           try {
             prepared = await this.#restoreEnvelope(payload.prepared, payload.context)
           } catch (error) {
+            /** Close releases this native traversal while the original job reports late results. */
+            if (error instanceof UtilsAbortError && payload.context.signal.aborted) return
             if (payload.context.session && isLocalRpcError(error, RpcAuthenticationError)) {
               payload.context.report(error)
               return
@@ -348,11 +352,27 @@ export class RpcAuthenticationFlow {
     }
   }
 
-  /** Verify/decrypt and complete the sole SDK restore before committing the original replay bitmap. */
-  readonly #restoreEnvelope = async (
+  /** Borrow Session cancellation without retaining the native stage lease for a user verifier. */
+  #restoreEnvelope(
     value: IRpcPreparedMessage,
     context: IRpcEnvelopeContext
-  ): Promise<IRpcPreparedMessage> => {
+  ): Promise<IRpcPreparedMessage> {
+    /** The same restore job owns late classification; its original context retains the signal. */
+    const input = { value, context }
+    if (!this.#config.verify) return this.#restoreEnvelopeJob(input)
+    return raceWithAbort(() => this.#restoreEnvelopeJob(input), {
+      signal: context.signal,
+      /** Bootstrap retains the existing pure redaction policy; accepted failures stay identical. */
+      report: (error) => context.report(context.session ? error : redactRpcHandshakeFailure(error))
+    })
+  }
+
+  /** Verify/decrypt and restore once; late completion still crosses the original abort checks. */
+  async #restoreEnvelopeJob(input: {
+    value: IRpcPreparedMessage
+    context: IRpcEnvelopeContext
+  }): Promise<IRpcPreparedMessage> {
+    const { value, context } = input
     this.#assert(context)
     if (!this.#config.verify) return value
     this.#protected(context, value.message)
@@ -368,6 +388,7 @@ export class RpcAuthenticationFlow {
         this.#representation.unpack(value.message),
         context
       )
+      this.#assert(context)
       /** Decrypted replay fields remain untrusted until their existing binding grammar passes. */
       const decrypted = this.#config.decrypt
         ? await (0, this.#config.decrypt)(verified, context)
