@@ -33,14 +33,15 @@ function nonce(): string {
 export class RpcCallIdAllocator {
   /** Native construction entropy isolates this host's counter from other hosts. */
   readonly #nonce: string
-  /** One uint64 sequence is shared with StreamChannel, including failed attempts. */
-  #counter = 0n
+  /** One uint64 sequence is shared with StreamChannel; internal starting state stays within uint64. */
+  #counter: bigint
   /** Exhaustion reporting belongs to the host, without a second error-class implementation. */
   readonly #report: (error: unknown) => void
 
-  /** Acquire entropy before installation publishes an owner, preserving rollback failure cause. */
-  constructor(report: (error: unknown) => void = () => undefined) {
+  /** Acquire native entropy and the original internal starting state before publishing an owner. */
+  constructor(report: (error: unknown) => void = () => undefined, startingCounter = 0n) {
     this.#report = report
+    this.#counter = startingCounter
     this.#nonce = nonce()
   }
 

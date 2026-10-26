@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { RpcCallIdAllocator } from '../../dist/call/id.js'
+import { NativeDefaultIdText } from '../../dist/call/id-text.js'
 
 // RPC-TEST-96C1E6C992FE-C003: keep the original million allocations and all four exact predicates.
 it('allocates one million unique 36-character IDs without a completed-ID cache', () => {
@@ -39,4 +40,56 @@ it('preserves the original throwing secure entropy cause as INVALID_CONFIG', () 
   } finally {
     vi.unstubAllGlobals()
   }
+})
+
+// RPC-TEST-96C1E6C992FE-C001: migrate only the original internal starting-counter input.
+it('rejects exhaustion with the default reporter without allocating another ID', () => {
+  /** The same canonical owner receives the original internal exhausted-state constructor input. */
+  const allocator = new RpcCallIdAllocator(undefined, 0xffffffffffffffffn)
+  assert.throws(
+    () => allocator.allocate(),
+    (error: unknown) => {
+      assert.equal((error as { code: string }).code, 'INVALID_CONFIG')
+      assert.equal((error as Error).message, NativeDefaultIdText.counterExhausted)
+      return true
+    }
+  )
+})
+
+// RPC-TEST-96C1E6C992FE-C002: the sole current allocator preserves its own reported failure.
+it('preserves genuine exhaustion through the canonical RPC ID allocation owner', () => {
+  /** Keep original diagnostic identities without replacing the allocator or its report callback. */
+  const reported: unknown[] = []
+  /** Existing internal starting state reaches the last allocation without a completed-ID cache. */
+  const allocator = new RpcCallIdAllocator((error) => reported.push(error), 0xfffffffffffffffen)
+  assert.ok(allocator.allocate().endsWith(0xffffffffffffffffn.toString(36).padStart(13, '0')))
+  assert.throws(
+    () => allocator.allocate(),
+    (error: unknown) => {
+      assert.equal(error, reported[0], 'genuine exhaustion must not be rebuilt by ID allocation')
+      assert.equal((error as Error).message, NativeDefaultIdText.counterExhausted)
+      return true
+    }
+  )
+  assert.equal(reported.length, 1)
+})
+
+// RPC-TEST-96C1E6C992FE-C004: keep all five original final-value/report/type-code predicates.
+it('returns uint64 max then reports and throws the same exhaustion object', () => {
+  /** The original report sink retains the same object later thrown by this canonical owner. */
+  const reported: unknown[] = []
+  /** Only constructor state changes; native entropy, allocation and failure minting remain real. */
+  const allocator = new RpcCallIdAllocator((error) => reported.push(error), 0xfffffffffffffffen)
+  assert.equal(allocator.allocate().slice(23), 0xffffffffffffffffn.toString(36).padStart(13, '0'))
+  /** Catch the original synchronous allocation failure without classifying or replacing it. */
+  let failure: unknown
+  try {
+    allocator.allocate()
+  } catch (error) {
+    failure = error
+  }
+  assert.equal(reported.length, 1)
+  assert.equal(failure, reported[0])
+  assert.equal((failure as Error).message, NativeDefaultIdText.counterExhausted)
+  assert.equal((failure as { code: string }).code, 'INVALID_CONFIG')
 })
