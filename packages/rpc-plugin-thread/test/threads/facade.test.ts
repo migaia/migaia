@@ -4,6 +4,7 @@ import { createNodeThreadChannelFactory } from '../../src/threads/node-launcher.
 import { nativeFixture, workerEntry } from './fixture.js'
 import { RpcCallMode, RpcWireKind } from '@migaia/rpc-contract/protocol'
 import { timeout } from '@migaia/rpc-host/features/timeout'
+import type { IRpcNotifyOptions } from '@migaia/rpc-host'
 import { threadFrames } from './frame.js'
 describe('thread Host facade', () => {
   it.each([false, true])(
@@ -105,12 +106,12 @@ describe('thread Host facade', () => {
         code: 'PROVIDER_NOT_FOUND'
       })
       expect(first.frames).toHaveLength(frames)
+      /** The actual public notify options include directed selection beyond this fixture's view. */
+      const target: IRpcNotifyOptions = { targetId: 'p' }
       /** One-way methods obey the same current-directory refusal before their physical write. */
-      await expect(left.notify('unknown.read', undefined, { targetId: 'p' })).rejects.toMatchObject(
-        {
-          code: 'PROVIDER_NOT_FOUND'
-        }
-      )
+      await expect(left.notify('unknown.read', undefined, target)).rejects.toMatchObject({
+        code: 'PROVIDER_NOT_FOUND'
+      })
       /** A missing stream remains a plain lazy iterator and never sends its opening frame. */
       const unavailable = left.stream('unknown.read')
       expect(first.frames).toHaveLength(frames)

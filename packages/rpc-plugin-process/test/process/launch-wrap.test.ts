@@ -13,27 +13,15 @@ import type {
   IProcessSpec,
   IProcessSupervisorOptions
 } from '@migaia/supervision/process'
-import { processPlugin } from '@migaia/rpc-plugin-process'
+import { processPlugin, type IProcessNamespaceExtensions } from '@migaia/rpc-plugin-process'
+import type { IRpcNamespace } from '@migaia/rpc-host'
 import { type IProcessLaunchCommand, type IProcessShortSpawn } from '@migaia/rpc-plugin-process'
 import { defineHost } from '@migaia/plugin-host'
-import {
-  rpcHostPipelines,
-  type IRpcMemberEvent,
-  type IRpcNativeMemberControls
-} from '@migaia/rpc-host/sdk'
+import { rpcHostPipelines, type IRpcMemberEvent } from '@migaia/rpc-host/sdk'
 import {
   createNodeProcessLauncher,
   type INodeProcessHandle
 } from '../../dist/process/adapters/node-child-process.js'
-
-/** Static view of the genuine Host extension; no replacement facade or callback is created. */
-type ILaunchWrapHost = ReturnType<typeof defineHost> &
-  Readonly<{
-    process: Readonly<{
-      send(address: string, method: string, payload?: unknown): Promise<unknown>
-      members: IRpcNativeMemberControls<'process'>
-    }>
-  }>
 
 /** An absolute TypeScript entry works with Node's native type stripping and no fixture loader. */
 const entry = fileURLToPath(new URL('./fixtures/launch-wrap-child.ts', import.meta.url))
@@ -110,7 +98,12 @@ function createHost() {
     ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
-  return host as ILaunchWrapHost
+  /** The same native object drops unused contravariant pipeline methods from this static view. */
+  const native: Pick<typeof host, 'use' | 'dispose'> = host
+  /** Keep this exact native Host's generics and its installed public process namespace. */
+  type ILaunchWrapHost = typeof native &
+    Readonly<{ process: IRpcNamespace & IProcessNamespaceExtensions }>
+  return native as ILaunchWrapHost
 }
 
 /** Every scenario uses the same short source and leaves supervision's restart policy explicit. */
