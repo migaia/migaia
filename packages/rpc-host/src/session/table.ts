@@ -40,7 +40,7 @@ import type { IRpcPipelineOwner } from '../sdk/flow-pipelines.js'
 import type { IProviderCommitGate } from '../dispatch/types.js'
 import { SessionDrain } from './drain.js'
 import { OriginSession } from './origin.js'
-import { createSessionView } from './view.js'
+import { createSessionView, projectDirectory, type IRpcDirectorySnapshot } from './view.js'
 import { isRpcCarrierAdmissionFailure } from '../sdk/carrier/admission.js'
 import {
   SessionAvailability,
@@ -70,6 +70,8 @@ type INamespaceIndex = ISessionAvailabilityIndex & {
   pendingPeers: Map<string, string>
   /** One native departure per accepted name retains its exact original admission failure. */
   departed: Map<string, Readonly<{ carrierId: string; reason: unknown }>>
+  /** Only this namespace index retains its latest prepared metadata; scope release clears it. */
+  directory?: Readonly<{ revision: number; snapshot: IRpcDirectorySnapshot }>
 }
 
 /** Native callbacks retain their original scope index after a successor becomes canonical. */
@@ -231,6 +233,8 @@ export class SessionTable {
   >()
   /** Accepted namespace indexes support both instance and name lookup in constant time. */
   readonly #namespaces = new Map<string, INamespaceIndex>()
+  /** Invalidation triggers compilation; exact token equality alone decides whether IO changes. */
+  #directoryRevision = 0
   /** Opaque registration tokens identify private indexes without duplicating physical Sessions. */
   readonly #scopes = new WeakMap<IRpcSessionScope, IStagedSessions>()
   /** Global name membership is maintained incrementally for unique cross-namespace forwarding. */
@@ -286,6 +290,7 @@ export class SessionTable {
   /** Prepare a namespace candidate without publishing peers, global names or readiness events. */
   stage(namespace: string, options?: ISessionScopeOptions): IRpcSessionScope {
     if (this.#closing) throw createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
+    this.#directoryRevision++
     /** Validate cold native connect policy before a transport acquires any physical source. */
     const handshakeTimeoutMs = options?.handshakeTimeoutMs
     for (const timeout of [handshakeTimeoutMs, options?.nameAdmissionTimeoutMs])
@@ -391,6 +396,8 @@ export class SessionTable {
     /** Root invokes this only after the original native resource scope has fully disposed. */
     const staged = this.#scopes.get(scope)
     if (!staged) return
+    if (!staged.parent) delete staged.index.directory
+    this.#directoryRevision++
     staged.closing.clear()
     staged.peerClosed.clear()
     this.#scopes.delete(scope)
@@ -411,6 +418,7 @@ export class SessionTable {
   /** Native commit atomically swaps the canonical alias before announcing candidate readiness. */
   commit(scope: IRpcSessionScope): void {
     if (this.#closing) throw createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
+    this.#directoryRevision++
     /** Only stage-created native tokens reach this internal commit operation. */
     const staged = this.#scopes.get(scope)!
     this.#publishPrepared(staged)
@@ -587,6 +595,7 @@ export class SessionTable {
   ): Session {
     if (this.#closing) throw createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
     if (facts) this.#options.admitSourceFacts?.(facts)
+    this.#directoryRevision++
     /** Direct and private physical sessions share one ingress/gate and lifecycle notification path. */
     const staged = scope === undefined ? undefined : this.#scopes.get(scope)
     /** Exact physical overrides win; invalid runtime values must reach Auth validation unchanged. */
@@ -628,7 +637,8 @@ export class SessionTable {
       flow: staged?.flow ?? this.#options.flow,
       pipelines: staged?.pipelines ?? this.#options.pipelines,
       self: this.#options.self,
-      directory: (peerId) => this.#options.directory(namespace, peerId),
+      directory: (peerId) => projectDirectory(this.#directory(namespace, scope), peerId),
+      directorySnapshot: () => this.#directory(namespace, scope),
       /** Final write sealing precedes synchronous retirement callbacks and controller abort. */
       track: (promise) =>
         session.closing && !session.canKeepalive()
@@ -776,16 +786,34 @@ export class SessionTable {
 
   /** Every current accepted source announces once; one failed write cannot suppress other peers. */
   async announceDirectory(namespace?: string, excludedCarrierId?: string): Promise<void> {
+    this.#directoryRevision++
     /** Snapshot the actual current sessions before any asynchronous write can retire a source. */
     const writes: Promise<void>[] = []
     for (const { selection } of this.#accepted.values())
       if (
         selection.carrierId !== excludedCarrierId &&
         (namespace === undefined || selection.view.namespace === namespace)
-      )
+      ) {
         writes.push(this.#session(selection.carrierId).announceDirectory())
+      }
     /** The caller reports the first original rejection; this owner reports only additional failures. */
     await this.#joinOperations(writes, false)
+  }
+
+  /** Both public and private physical Sessions borrow one current namespace preparation. */
+  #directory(namespace: string, scope?: IRpcSessionScope): IRpcDirectorySnapshot {
+    /** Released native scopes may finish an announcement without restoring retained metadata. */
+    const staged = scope === undefined ? undefined : this.#scopes.get(scope)
+    if (scope !== undefined && !staged) return this.#options.directory(namespace)
+    /** Candidate metadata uses the same global discovery inputs without publishing a new index. */
+    const index = this.#namespaces.get(namespace) ?? staged?.index ?? this.#index(namespace)
+    /** A fresh revision compiles once; identical tokens reuse the previous shared snapshot. */
+    const previous = index.directory
+    if (previous?.revision === this.#directoryRevision) return previous.snapshot
+    /** Root supplies metadata only; it cannot acquire or select physical Sessions here. */
+    const snapshot = this.#options.directory(namespace, previous?.snapshot)
+    if (!this.#closing) index.directory = { revision: this.#directoryRevision, snapshot }
+    return snapshot
   }
 
   /** A native source retires its exact handle, never an unrelated same-name replacement. */
@@ -843,7 +871,10 @@ export class SessionTable {
         index,
         reason ?? createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
       )
-    for (const index of this.#namespaces.values()) index.departed.clear()
+    for (const index of this.#namespaces.values()) {
+      index.departed.clear()
+      delete index.directory
+    }
     /** Snapshot close operations before their synchronous retire callbacks mutate membership. */
     const closes: Promise<void>[] = []
     for (const session of this.#sessions.values()) closes.push(session.close(reason))
@@ -1017,6 +1048,7 @@ export class SessionTable {
 
   /** Only canonical publication contributes to cross-namespace forwarding selection. */
   #publishName(selection: IRpcSessionSelection): void {
+    this.#directoryRevision++
     /** Global uniqueness is maintained at admission rather than scanned during forwarding. */
     let global = this.#globalNames.get(selection.view.name)
     if (!global) {
@@ -1049,11 +1081,13 @@ export class SessionTable {
     if (index.peers.get(selection.view.peerId) === selection)
       index.peers.delete(selection.view.peerId)
     if (index.names.get(selection.view.name) === selection) index.names.delete(selection.view.name)
+    if (index.peers.size === 0) delete index.directory
     this.#unpublish(selection)
   }
 
   /** Unpublishing an old scope cannot delete a successor's independent carrier contribution. */
   #unpublish(selection: IRpcSessionSelection): void {
+    this.#directoryRevision++
     /** Name membership has no stale strong references after this physical source retires. */
     const global = this.#globalNames.get(selection.view.name)
     if (global?.get(selection.carrierId) === selection) global.delete(selection.carrierId)

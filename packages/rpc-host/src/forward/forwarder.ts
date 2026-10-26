@@ -36,6 +36,13 @@ import {
 import { forwardHint, retainProviderForwardMethod } from '../dispatch/catalog.js'
 import type { IProviderForwardEntry, IRpcContext } from '../dispatch/types.js'
 import { ForwardErrorText } from './text.js'
+import {
+  createDirectoryRow,
+  createDirectorySnapshot,
+  directoryMethods,
+  type IRpcDirectoryRow,
+  type IRpcDirectorySnapshot
+} from '../session/view.js'
 
 /** Accepted facts are borrowed only during selection and never retained in a callable capability. */
 export type IForwardSelection = IRpcSessionSelection
@@ -171,14 +178,13 @@ export class Forwarder {
     nodeId: string,
     local: readonly IRpcMethodDescription[],
     targets: Iterable<IForwardSelection>,
-    excludedPeerId?: string
-  ): IRpcDirectory {
-    return {
-      schemaVersion: 3,
-      self,
-      nodeId,
-      methods: this.describe(local, targets, excludedPeerId)
-    }
+    previous?: IRpcDirectorySnapshot
+  ): IRpcDirectorySnapshot {
+    return createDirectorySnapshot(
+      { schemaVersion: 3, self, nodeId, methods: [] },
+      previous,
+      this.#directoryRows(local, targets)
+    )
   }
 
   /** Project accepted method metadata only at directory output; dispatch keeps its single index. */
@@ -187,24 +193,49 @@ export class Forwarder {
     targets: Iterable<IForwardSelection>,
     excludedPeerId?: string
   ): readonly IRpcMethodDescription[] {
-    /** Original local registration order and exact-name precedence survive automatic forwarding. */
-    const methods = [...local]
-    /** This output-sized set prevents collisions without another persistent business-method table. */
-    const names = new Set(local.map((method) => method.name))
+    return directoryMethods(this.#directoryRows(local, targets), excludedPeerId)
+  }
+
+  /** One excluded peer needs only the first candidate and its first different-peer fallback. */
+  #directoryRows(
+    local: readonly IRpcMethodDescription[],
+    targets: Iterable<IForwardSelection>
+  ): readonly IRpcDirectoryRow[] {
+    /** Candidate order is retained so split-horizon fallback matches the original projection. */
+    const rows = local.map((method) => createDirectoryRow(method))
+    /** Local methods always win; forwarded duplicates retain at most two distinct peer choices. */
+    const names = new Map<string, { peerId?: string; fallback?: boolean }>(
+      local.map((method) => [method.name, {}])
+    )
     for (const selection of targets) {
-      if (selection.view.peerId === excludedPeerId || !this.#contributions.has(selection.carrierId))
-        continue
+      if (!this.#contributions.has(selection.carrierId)) continue
       for (const method of selection.view.methods.values()) {
         /** Prefixing materializes only the actual public directory entry being emitted. */
         const name = `${selection.view.name}.${method.name}`
-        if (name.length > RpcWireLimit.maxIdentifierChars || names.has(name)) continue
-        names.add(name)
+        if (name.length > RpcWireLimit.maxIdentifierChars) continue
+        /** A receiver can exclude only one peer id, so later same-peer choices cannot win. */
+        const primary = names.get(name)
+        if (
+          primary &&
+          (primary.peerId === undefined ||
+            primary.peerId === selection.view.peerId ||
+            primary.fallback)
+        )
+          continue
+        if (primary) primary.fallback = true
+        else names.set(name, { peerId: selection.view.peerId })
         /** A dotted peer name is routable but cannot occupy the protocol's single-segment hint. */
         const { forwardedVia: _previous, ...description } = method
-        methods.push(Object.freeze({ ...description, name, ...forwardHint(selection.view.name) }))
+        rows.push(
+          createDirectoryRow(
+            Object.freeze({ ...description, name, ...forwardHint(selection.view.name) }),
+            primary ? undefined : selection.view.peerId,
+            primary?.peerId
+          )
+        )
       }
     }
-    return Object.freeze(methods)
+    return rows
   }
 
   /** Withdraw the exact source's spelling without scanning unrelated peers or method entries. */

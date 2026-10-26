@@ -77,6 +77,12 @@ import {
   serializeHostWireError
 } from '../host/error-wire-metadata.js'
 import { SessionText } from './text.js'
+import {
+  createDirectorySnapshot,
+  projectDirectory,
+  sameDirectoryFingerprint,
+  type IRpcDirectoryFingerprint
+} from './view.js'
 import { RpcSessionObservation } from '../sdk/carrier/observation.js'
 import { rpcPreparedTransfer } from '../sdk/carrier/prepared.js'
 import { portableBytes } from '../sdk/wire/portable-size.js'
@@ -136,7 +142,7 @@ export class Session {
   /** The first admitted bootstrap identity cannot change between hello and accept. */
   #remoteId: string | undefined
   /** Equal catalogs need no repeat write; peer identity applies split horizon across carriers. */
-  #directoryFingerprint: string | undefined
+  #directoryFingerprint: IRpcDirectoryFingerprint | undefined
   /** Acceptance becomes public only after both sides have admitted the connection. */
   #view: IRpcSessionView | undefined
   /** The responder retains its one reserved view until the initiator confirms local admission. */
@@ -549,12 +555,20 @@ export class Session {
   /** Announce the actual current provider catalog through this accepted source and codec. */
   async announceDirectory(): Promise<void> {
     await this.#ready.promise
-    /** Directory order is canonical; a linear snapshot includes names, hints and schema changes. */
-    const directory = this.#options.directory(this.#view!.peerId)
-    /** Record before writing so reentrant announcements cannot repeat this same catalog. */
-    const fingerprint = JSON.stringify(directory)
-    if (fingerprint === this.#directoryFingerprint) return
+    /** Public and private native paths borrow the table's same namespace preparation. */
+    const peerId = this.#view!.peerId
+    /** Direct Session fixtures can still supply their existing standalone directory port. */
+    const snapshot =
+      this.#options.directorySnapshot?.() ??
+      createDirectorySnapshot(this.#options.directory(peerId))
+    /** Keep receiver selection with the shared metadata, including the initial unidentified hello. */
+    const fingerprint = { snapshot, peerId }
+    /** An unchanged visible directory may still release an older namespace snapshot. */
+    const previous = this.#directoryFingerprint
     this.#directoryFingerprint = fingerprint
+    if (previous && sameDirectoryFingerprint(previous, fingerprint)) return
+    /** Only changed wire output allocates the recipient's method vector. */
+    const directory = projectDirectory(snapshot, peerId)
     try {
       await this.send({
         profile: RpcWireProfile,
@@ -564,7 +578,11 @@ export class Session {
         directory
       })
     } catch (error) {
-      if (this.#directoryFingerprint === fingerprint) this.#directoryFingerprint = undefined
+      if (
+        this.#directoryFingerprint &&
+        sameDirectoryFingerprint(this.#directoryFingerprint, fingerprint)
+      )
+        this.#directoryFingerprint = undefined
       throw error
     }
   }
@@ -723,8 +741,14 @@ export class Session {
   /** Register the local immutable offer before a peer's hello can choose its deterministic role. */
   async #hello(): Promise<void> {
     /** Identity is owned globally; a carrier never invents one local self per namespace. */
-    const directory = this.#options.directory(this.#remoteId ?? this.#options.expectedPeerId)
-    this.#directoryFingerprint = JSON.stringify(directory)
+    const peerId = this.#remoteId ?? this.#options.expectedPeerId
+    /** The selected peer can be unknown on the first hello and known on later announcements. */
+    const snapshot =
+      this.#options.directorySnapshot?.() ??
+      createDirectorySnapshot(this.#options.directory(peerId))
+    /** Handshake output uses the same split-horizon projection as directory frames. */
+    const directory = projectDirectory(snapshot, peerId)
+    this.#directoryFingerprint = { snapshot, peerId }
     /** Installed flow handlers, rather than user metadata, supply extension authority. */
     const hello: IRpcHello = {
       profile: RpcWireProfile,

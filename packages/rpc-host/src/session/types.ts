@@ -12,6 +12,7 @@ import type { IRpcDirectory, IRpcEnvelope, IRpcSemanticFrame } from '@migaia/rpc
 import type { FlowRegistry } from '../flow/registry.js'
 import type { IRpcPipelineOwner } from '../sdk/flow-pipelines.js'
 import type { IProviderCommitGate } from '../dispatch/types.js'
+import type { IRpcDirectorySnapshot } from './view.js'
 
 /** Only these flow operations participate in carrier preparation and session negotiation. */
 export type IRpcSessionFlow = Pick<FlowRegistry, 'facts'> & Partial<Pick<FlowRegistry, 'observe'>>
@@ -44,7 +45,7 @@ export type IRpcSessionTableOptions = Readonly<{
   /** Execution authority is borrowed only after the one native Host has been constructed. */
   pipelines(): IRpcPipelineOwner
   self(): IRpcDirectory['self']
-  directory(namespace: string, excludedPeerId?: string): IRpcDirectory
+  directory(namespace: string, previous?: IRpcDirectorySnapshot): IRpcDirectorySnapshot
   admitSourceFacts?(facts: IRpcLocalSourceFacts): void
   receive(
     carrierId: string,
@@ -112,6 +113,8 @@ export type IRpcSessionOptions = Readonly<{
   pipelines(): IRpcPipelineOwner
   self(): IRpcDirectory['self']
   directory(excludedPeerId?: string): IRpcDirectory
+  /** Table-owned namespace preparation is shared with zero-argument private native announcements. */
+  directorySnapshot?(): IRpcDirectorySnapshot
   admit(
     directory: IRpcDirectory,
     codec: string,

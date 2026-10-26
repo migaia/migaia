@@ -6,6 +6,7 @@ import {
   type IRpcProbeEventView
 } from '@migaia/rpc-host/plugins/probe'
 import { createProbeEmitter } from '../../dist/plugins/probe/emitter.js'
+import { createDirectorySnapshot } from '../../dist/session/view.js'
 import { MemoryCarrier } from '../fixtures/core-carrier.js'
 import { describe, expect, it, vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
@@ -145,7 +146,7 @@ class Host {
       flow,
       pipelines: () => owners.get('process')!,
       self: () => this.directory.self,
-      directory: () => this.directory,
+      directory: () => createDirectorySnapshot(this.directory),
       receive: this.receive,
       report: this.report,
       scheduler: options?.scheduler ?? this.scheduler,

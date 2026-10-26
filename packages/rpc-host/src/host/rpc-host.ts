@@ -151,13 +151,13 @@ export class RpcHost {
       flow: this.#flow,
       pipelines: () => this.#pipelineOwner!,
       self: () => this.#identity.directorySelf,
-      directory: (namespace, peerId) =>
+      directory: (namespace, previous) =>
         this.#forwarder.directory(
           this.#identity.directorySelf,
           this.#nodeId,
           this.#providers.describe(namespace),
           this.#sessions.forwardTargets(namespace),
-          peerId
+          previous
         ),
       admitSourceFacts: (facts) => this.#identity.admit(facts),
       receive: this.#receive,
