@@ -900,16 +900,15 @@ export class Session {
   /** Return false for foreign-source metadata without retiring the genuine native connection. */
   #admitRoute(message: IRpcSemanticFrame): boolean {
     if (message.kind === K.handshake) return true
+    /** A reused native port can still deliver the previous host's terminal frame. */
+    if (message.route.receiverId !== this.#options.self().instanceId) return false
     if (!this.#view)
       throw createContractError(
         RpcContractErrorCode.handshakeInvalid,
         undefined,
         hostErrorWireMetadata
       )
-    return (
-      message.route.senderId === this.#view.peerId &&
-      message.route.receiverId === this.#options.self().instanceId
-    )
+    return message.route.senderId === this.#view.peerId
   }
 
   /** Bilateral accepts confirm both admission decisions before either side reports readiness. */
