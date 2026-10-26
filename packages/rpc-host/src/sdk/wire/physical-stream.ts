@@ -3,7 +3,7 @@
  * callbacks receive owned payloads and the consumed offset preserves native bootstrap tail handoff;
  * callers retain IO, byte limits and physical-close ownership.
  */
-import { isUint8Array } from '@migaia/utils/bytes'
+import { isUint8Array, utf8ByteLength } from '@migaia/utils/bytes'
 import { createContractError, type IRpcErrorWireMetadata } from '@migaia/rpc-contract/errors'
 import { RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
 import { markRpcCarrierAdmissionFailure } from '../carrier/admission.js'
@@ -81,6 +81,13 @@ export function encodeRpcStreamTextFrame(
 ): Uint8Array {
   /** Three bytes per UTF-16 code unit is a conclusive bound, including lone surrogates. */
   const upper = text.length * 3
+  if (
+    text.length > RPC_STREAM_MAX_FRAME_BYTES ||
+    (upper > RPC_STREAM_MAX_FRAME_BYTES && utf8ByteLength(text) > RPC_STREAM_MAX_FRAME_BYTES)
+  )
+    throw markRpcCarrierAdmissionFailure(
+      createContractError(RpcContractErrorCode.frameLimitExceeded, undefined, errorMetadata)
+    )
   if (text.length === 0 || upper > RPC_STREAM_MAX_FRAME_BYTES)
     return encodeRpcStreamFrame(encoder.encode(text), errorMetadata)
   /** A connection lends this backing only after the previous physical write completed. */

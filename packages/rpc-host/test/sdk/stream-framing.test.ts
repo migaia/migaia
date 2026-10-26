@@ -47,6 +47,25 @@ const vectors = JSON.parse(
 ) as readonly IStreamVector[]
 
 describe('rpc native stream framing', () => {
+  it.each(['a', '汉'])(
+    'rejects oversized %s text before asking the encoder to allocate bytes',
+    (unit) => {
+      /** ASCII and three-byte scalars exercise conclusive and ambiguous UTF-16 bounds. */
+      const text = unit.repeat(Math.floor(RPC_STREAM_MAX_FRAME_BYTES / (unit === 'a' ? 1 : 3)) + 1)
+      /** The genuine native encoder preserves its object receiver and exact byte behavior. */
+      const encoder = new TextEncoder()
+      const encode = vi.spyOn(encoder, 'encode')
+      try {
+        expect(() => encodeRpcStreamTextFrame(text, encoder)).toThrowError(
+          expect.objectContaining({ source: 'rpc.contract', code: 'FRAME_LIMIT_EXCEEDED' })
+        )
+        expect(encode.mock.calls.length).toBe(0)
+      } finally {
+        encode.mockRestore()
+      }
+    }
+  )
+
   it('direct text encoding preserves wire bytes with a drained backing and an inconclusive bound', () => {
     /** The production text encoder supplies the same UTF-8 behavior as the original byte path. */
     const encoder = new TextEncoder()
