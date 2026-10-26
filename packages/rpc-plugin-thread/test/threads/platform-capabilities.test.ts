@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import { createRpcHost } from '@migaia/rpc-host'
 import { defineHost } from '@migaia/plugin-host'
+import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import {
   createWebThreadLauncher,
   createWebThreadChannelFactory
@@ -40,7 +41,14 @@ describe('platform capability admission', () => {
 
         report: vi.fn()
       }
+      /** Lazy pipeline authority reads this case's own native host only at installation. */
+      const rpc = rpcHostPipelines(
+        () => host,
+        (name) => host.pipeline(name),
+        ['thread']
+      )
       const host = defineHost({
+        ...rpc,
         host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
       })
       expect(launcher.capabilities).toMatchObject({

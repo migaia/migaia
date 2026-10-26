@@ -1,6 +1,7 @@
 import { MessageChannel } from 'node:worker_threads'
 import { EventEmitter } from 'node:events'
-import { PluginHost } from '@migaia/plugin-host'
+import { defineHost } from '@migaia/plugin-host'
+import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { describe, expect, it, vi } from 'vitest'
@@ -85,8 +86,15 @@ describe('thread channel ownership and portable boundary', () => {
 
         report: vi.fn()
       }
-      const host = new PluginHost({
-        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+      /** Lazy pipeline authority reads this case's own native host only at installation. */
+      const rpc = rpcHostPipelines(
+        () => host,
+        (name) => host.pipeline(name),
+        ['thread']
+      )
+      const host = defineHost({
+        ...rpc,
+        host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
       })
       try {
         for (const build of [

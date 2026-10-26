@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
+import type { IRpcAvailableAttempt } from '@migaia/rpc-contract/interfaces'
 import { describe, expect, it } from 'vitest'
 import { createWebThreadChannelFactory } from '../../src/threads/web-launcher.js'
 import type { IThreadWebPort } from '../../src/threads/types.js'
@@ -62,20 +63,23 @@ describe('thread preparation and retry settlement', () => {
     /** Drive departure independently from later readiness. */
     let leave!: (reason: unknown) => void
     /** Readiness may arrive after cancellation and must not replay the request. */
-    let ready!: (generation: number) => void
+    let ready!: (attempt: IRpcAvailableAttempt) => void
     /** Deferred replacement keeps the logical request inside the vulnerable await boundary. */
-    const generationReady = new Promise<number>((resolve) => {
+    const generationReady = new Promise<IRpcAvailableAttempt>((resolve) => {
       ready = resolve
     })
-    /** The same event owner is supplied to construction and each logical dispatch. */
-    const events = {
-      current: () => ({ generation: 1, active: true }),
-      onLeave: (_generation: number, listener: (reason: unknown) => void) => {
+    /** The first physical generation; departure and replacement readiness are driven by the test. */
+    const first: IRpcAvailableAttempt = {
+      carrierId: 'thread-carrier',
+      generation: 1,
+      onLeave: (listener) => {
         leave = listener
         return () => undefined
       },
       whenReady: () => generationReady
     }
+    /** The same availability owner is supplied to each logical dispatch. */
+    const availability = { current: () => first }
     /** Settlement is inspected before replacement readiness can conceal a missed abort listener. */
     let outcome: unknown
     /** Only the initial generation may receive the physical send. */
@@ -87,7 +91,7 @@ describe('thread preparation and retry settlement', () => {
           method: 'p.read',
           idempotent: true,
           idempotencyKey: 'readiness-key',
-          native: events
+          availability
         },
         signal: controller.signal,
         invoke: (_signal, _budget, options) => {
@@ -103,7 +107,7 @@ describe('thread preparation and retry settlement', () => {
     controller.abort(new Error('caller cancelled'))
     for (let turn = 0; turn < 10; turn++) await Promise.resolve()
     expect(outcome).toMatchObject({ code: 'CANCELLED' })
-    ready(2)
+    ready({ ...first, generation: 2 })
     await result
     expect(sends).toBe(1)
     expect(scheduler.pendingCount).toBe(0)

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { Worker, threadId } from 'node:worker_threads'
-import { PluginHost, defineFeature, definePlugin } from '@migaia/plugin-host'
+import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'
+import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createRpcHost } from '@migaia/rpc-host'
 import { pool } from '../../../rpc-plugin-pool/dist/index.js'
@@ -96,8 +97,15 @@ describe('native thread transport plugin', () => {
       features: { value: defineFeature(() => ({ double: (value: number) => value * 2 })) },
       install: () => ({})
     })
-    const host = new PluginHost<Record<string, never>>({
-      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    /** Lazy pipeline authority reads this case's own native host only at installation. */
+    const rpc = rpcHostPipelines(
+      () => host,
+      (name) => host.pipeline(name),
+      ['thread']
+    )
+    const host = defineHost({
+      ...rpc,
+      host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })
     const [mathHandle] = await host.use(local)
     await host.use(threadPlugin({ name: 'native', spawn: child, expose: ['math.double'] }))

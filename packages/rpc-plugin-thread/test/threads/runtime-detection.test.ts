@@ -111,8 +111,11 @@ describe('native thread runtime selection', () => {
     }
   }, 40000)
 
-  it('passes the actual SDK connection budget to the original silent Worker ACK deadline', async () => {
+  it('fails a silent Worker at the default handshake deadline', async () => {
+    /** Default Session handshake budget for transports that do not set their own. */
+    const handshakeMs = 10_000
     const delays: number[] = []
+    /** Records every delay the launcher requests; the deadline itself runs on real time. */
     const scheduler = {
       ...systemScheduler,
       schedule: (callback: () => void, delay: number) => {
@@ -120,21 +123,20 @@ describe('native thread runtime selection', () => {
         return systemScheduler.schedule(callback, delay)
       }
     }
-    /** The original unsupported cold budget remains a real runtime pending assertion. */
-    const options = {
-      spawn: { entry: new URL('./fixtures/adapter-idle.mts', import.meta.url), scheduler },
-      connect: { timeoutMs: 20 }
-    }
     const failure = await createRpcHost({
-      plugins: [threadPlugin(options)],
+      plugins: [
+        threadPlugin({
+          spawn: { entry: new URL('./fixtures/adapter-idle.mts', import.meta.url), scheduler }
+        })
+      ],
       report: () => undefined
     }).catch((error: unknown) => error)
-    expect(delays.filter((delay) => delay === 20)).toEqual([20])
+    expect(delays).toContain(handshakeMs)
     expect(walkErrorCauses(failure)).toContainEqual(
       expect.objectContaining({
         source: 'rpc.endpoint',
         code: 'DEADLINE_EXCEEDED'
       })
     )
-  }, 10000)
+  }, 25000)
 })

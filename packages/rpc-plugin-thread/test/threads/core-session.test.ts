@@ -1,9 +1,11 @@
 import { createRpcHost } from '@migaia/rpc-host'
+import { auth } from '@migaia/rpc-host/plugins/auth'
 import { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'
 import { readRpcLaunchFacts, type IRpcLaunchFacts } from '@migaia/rpc-host/sdk'
 import { createUnitBudget, type ILaunchContext } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { expect, it } from 'vitest'
+import { createFixtureAuthentication } from './fixtures/dx-authentication.mjs'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory,
@@ -12,6 +14,8 @@ import {
 
 /** The existing real Worker fixture now uses the sole public Host/transport protocol path. */
 const entry = new URL('./fixtures/short-spawn-worker.mjs', import.meta.url)
+/** Worker that installs the same fixture credentials when its launch data asks for signing. */
+const signedEntry = new URL('./fixtures/dx-signed-worker.mjs', import.meta.url)
 
 it('connects real native spawn/parent Sessions and retains exact launcher context and parent facts', async () => {
   /** This native source deliberately forwards through a caller-owned launcher before acquisition. */
@@ -81,9 +85,15 @@ it('connects real native spawn/parent Sessions and retains exact launcher contex
 })
 
 it('preserves real native transfer backing, offset and borrowed parent cleanup on the new protocol', async () => {
-  /** Shorthand still acquires a genuine native Worker through the same launcher and budget defaults. */
+  /** Native transfer is enabled only on a signed profile, so both endpoints install auth. */
   const host = await createRpcHost({
-    plugins: [threadPlugin({ name: 'binary-worker', spawn: { entry, name: 'binary-worker' } })]
+    plugins: [
+      auth(createFixtureAuthentication()),
+      threadPlugin({
+        name: 'binary-worker',
+        spawn: { entry: signedEntry, name: 'binary-worker', data: { signed: true } }
+      })
+    ]
   })
   /** A nonzero view offset proves transfer uses the original complete backing. */
   const backing = new ArrayBuffer(16)
@@ -92,7 +102,9 @@ it('preserves real native transfer backing, offset and borrowed parent cleanup o
   value.set([7, 8, 9])
   try {
     /** Public options carry the exact backing to the actual Worker.postMessage transfer list. */
-    const result = await host.thread.send('binary-worker', 'echo', value, { transfer: [backing] })
+    const result = await host.thread.send('binary-worker', 'bytes.echo', value, {
+      transfer: [backing]
+    })
     expect(backing.byteLength).toBe(0)
     expect(result).toBeInstanceOf(Uint8Array)
     expect(Array.from(result as Uint8Array)).toEqual([7, 8, 9])

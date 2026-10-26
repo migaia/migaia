@@ -16,7 +16,9 @@ await createRpcHost({
         calls += 1
         return { length: buffer.byteLength, first: new Uint8Array(buffer)[0] }
       },
-      calls: () => calls
+      calls: () => calls,
+      /** Returns the received view so the parent can inspect its restored backing and offset. */
+      echo: (value) => value
     }
   },
   report: (error) => process.stderr.write(`${error?.stack ?? String(error)}\n`),

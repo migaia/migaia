@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import { deferred } from '@migaia/utils/promise'
 import { defineHost } from '@migaia/plugin-host'
+import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import {
   createWebThreadLauncher,
   createWebThreadChannelFactory
@@ -33,7 +34,14 @@ describe('thread lifecycle ownership', () => {
     }
     const launcher = createWebThreadLauncher({ Worker, report })
     const budget = createUnitBudget({ kind: 'thread', maxUnits: 1, scheduler })
+    /** Lazy pipeline authority reads this case's own native host only at installation. */
+    const rpc = rpcHostPipelines(
+      () => host,
+      (name) => host.pipeline(name),
+      ['thread']
+    )
     const host = defineHost({
+      ...rpc,
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })
     const plugin = threadPlugin({

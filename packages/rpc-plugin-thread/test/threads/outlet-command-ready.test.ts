@@ -8,6 +8,7 @@ import {
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { defineHost } from '@migaia/plugin-host'
+import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import type { INativeFixtureHost } from './fixture.js'
 
 /** A real Worker uses only public factories and exposes its own admitted instance identity. */
@@ -18,7 +19,14 @@ describe('thread outlet command readiness', () => {
     '[DX3-thread] %s resolves only after the new generation can receive an immediate request',
     async (command) => {
       /** Host owns every generation; no event wait or retry hides publication ordering. */
+      /** Lazy pipeline authority reads this case's own native host only at installation. */
+      const rpc = rpcHostPipelines(
+        () => host,
+        (name) => host.pipeline(name),
+        ['thread']
+      )
       const host = defineHost({
+        ...rpc,
         host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
       }) as INativeFixtureHost
       /** Keep native diagnostics observable without changing their objects. */

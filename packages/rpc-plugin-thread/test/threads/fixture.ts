@@ -6,7 +6,7 @@ import type { IThreadHandle } from '@migaia/supervision/threads'
 import { fileURLToPath } from 'node:url'
 import { defineHost } from '@migaia/plugin-host'
 import type { IRpcCallOptions } from '@migaia/rpc-host'
-import type { IRpcNativeMemberControls } from '@migaia/rpc-host/sdk'
+import { rpcHostPipelines, type IRpcNativeMemberControls } from '@migaia/rpc-host/sdk'
 import type { IRpcCarrier } from '@migaia/rpc-contract/interfaces'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
@@ -31,11 +31,12 @@ export type INativeFixtureHost = ReturnType<typeof defineHost> &
         payload?: unknown,
         options?: IRpcCallOptions
       ): Promise<unknown>
+      notify(method: string, payload?: unknown, options?: IRpcCallOptions): Promise<void>
       stream(
         method: string,
         payload?: unknown,
         options?: IRpcCallOptions
-      ): AsyncIterableIterator<unknown>
+      ): AsyncGenerator<unknown, unknown, unknown>
     }>
   }>
 
@@ -138,7 +139,14 @@ function nativeThreadFixtureState(
   overrides: Partial<IFixtureOptions> = {},
   data: Record<string, unknown> = {}
 ) {
+  /** Lazy pipeline authority reads this case's own native host only at installation. */
+  const rpc = rpcHostPipelines(
+    () => host,
+    (name) => host.pipeline(name),
+    ['thread']
+  )
   const host = defineHost({
+    ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   }) as INativeFixtureHost
   const budget = createUnitBudget({

@@ -1,6 +1,7 @@
 import { createRpcHost } from '@migaia/rpc-host'
 import { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'
 import { defineHost } from '@migaia/plugin-host'
+import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 
 /** Awaiting the guard prevents this same module from spawning another Worker in the child. */
 const child = await isThreadChild()
@@ -23,7 +24,14 @@ if (child) {
       spawn: new URL('./short-spawn-worker.mjs', import.meta.url)
     })
     /** The Host releases the actual Worker when the fixture completes. */
+    /** Lazy pipeline authority reads this case's own native host only at installation. */
+    const rpc = rpcHostPipelines(
+      () => host,
+      (name) => host.pipeline(name),
+      ['thread']
+    )
     const host = defineHost({
+      ...rpc,
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })
     try {
