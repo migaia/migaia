@@ -5,6 +5,9 @@
  */
 import { deferred } from '@migaia/utils/promise'
 import { inspectThenable, assimilateCapturedThen } from '@migaia/utils/function'
+import { attachSecondaryErrors } from '@migaia/utils/error'
+import { identifyRpcBoundaryFailure, RpcCoreErrorText } from '@migaia/rpc-contract/errors'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import type { IRpcByteIO } from './byte-pump.js'
 import { RpcProbeDirection, type IRpcCarrierWriteOptions } from '@migaia/rpc-contract/interfaces'
 import type { RpcCarrierObservation } from '../carrier/observation.js'
@@ -147,20 +150,49 @@ export class RpcEventByteIO {
     this.#terminal = reason ?? this.#ports.options.closedError()
     this.#writeObserver = undefined
     this.#writeGeneration++
+    /** Callback failures cannot withhold the same terminal from the remaining subscribers. */
+    const listeners = [...this.#listeners]
+    /** The original order is retained while every independent failure remains reachable. */
+    const failures: unknown[] = []
+    this.#data.clear()
+    this.#listeners.clear()
     try {
       this.#releaseDrains()
       this.#releaseReader()
       /** Original end/destroy owns flush completion; close does not wait for or fake that terminal. */
       if (!this.#writerTerminal) this.#ports.writer.once('finish', this.#releaseWriter)
-      this.#ports.closePhysical()
-      for (const listener of this.#listeners) listener(this.#terminal)
-      completion.resolve()
+      ;(0, this.#ports.closePhysical)()
     } catch (error) {
-      completion.reject(error)
-    } finally {
-      this.#data.clear()
-      this.#listeners.clear()
+      failures.push(
+        identifyRpcBoundaryFailure(
+          error,
+          RpcCoreErrorCode.transport,
+          RpcCoreErrorText.endpointDisposalCleanupFailed
+        )
+      )
     }
+    for (const listener of listeners)
+      try {
+        listener(this.#terminal)
+      } catch (error) {
+        failures.push(
+          identifyRpcBoundaryFailure(
+            error,
+            RpcCoreErrorCode.callbackFailed,
+            RpcCoreErrorText.callbackFailed
+          )
+        )
+      }
+    if (failures.length === 1) completion.reject(failures[0])
+    else if (failures.length > 1)
+      completion.reject(
+        identifyRpcBoundaryFailure(
+          attachSecondaryErrors(failures[0], failures.slice(1)),
+          RpcCoreErrorCode.transport,
+          RpcCoreErrorText.endpointDisposalCleanupFailed
+        )
+      )
+    else completion.resolve()
     return this.#closing
   }
 
@@ -219,7 +251,7 @@ export class RpcEventByteIO {
       })
       if (observer === undefined) return completion.promise
       if (accepted !== false) {
-        observer(chunk, 0)
+        this.#observeWrite(observer, chunk, 0)
         return completion.promise
       }
       /** One observed drain retains its own small native-write facts, never the caller's options. */
@@ -228,7 +260,11 @@ export class RpcEventByteIO {
       function drained(): void {
         operation.owner.#pendingDrains.delete(drained)
         if (!operation.owner.#closed && operation.generation === operation.owner.#writeGeneration)
-          operation.observer(operation.chunk, performance.now() - operation.started)
+          operation.owner.#observeWrite(
+            operation.observer,
+            operation.chunk,
+            performance.now() - operation.started
+          )
       }
       this.#pendingDrains.add(drained)
       this.#ports.writer.once('drain', drained)
@@ -240,6 +276,7 @@ export class RpcEventByteIO {
 
   /** Resume only subscribed delivery and pause after the last original remover. */
   readonly #onData = (listener: (chunk: Uint8Array) => void): (() => void) => {
+    if (this.#closed) return () => undefined
     this.#data.add(listener)
     this.#ports.reader.resume()
     return () => {
@@ -268,6 +305,19 @@ export class RpcEventByteIO {
       this.#writeObserver = undefined
       this.#writeGeneration++
       this.#releaseDrains()
+    }
+  }
+
+  /** Diagnostic callbacks cannot change the native writer's own completion result. */
+  #observeWrite(
+    observer: (chunk: Uint8Array, drainMs: number) => void,
+    chunk: Uint8Array,
+    drainMs: number
+  ): void {
+    try {
+      observer(chunk, drainMs)
+    } catch (error) {
+      ;(0, this.#ports.options.report)(error)
     }
   }
 }

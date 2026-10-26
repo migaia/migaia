@@ -26,6 +26,106 @@ it('does not report an explicit byte-pump cleanup rejection again from its cance
   expect(reports).toEqual([])
 })
 
+it('notifies later close listeners after an earlier listener throws', async () => {
+  /** Real paused native streams remain owned by the original IO. */
+  const input = new PassThrough({ autoDestroy: false })
+  const output = new PassThrough({ autoDestroy: false })
+  /** A listener failure must not replace the native terminal delivered to its siblings. */
+  const terminal = new Error('terminal before listener failure')
+  const failure = new Error('first close listener failed')
+  /** Later listeners retain their actual notification order and terminal object. */
+  const notified: unknown[] = []
+  const io = new RpcEventByteIO(
+    input,
+    output,
+    () => {
+      input.pause()
+      output.end()
+    },
+    { closedError: () => terminal, report: () => undefined }
+  ).value
+  io.onClose(() => {
+    throw failure
+  })
+  io.onClose((reason) => notified.push(reason))
+  try {
+    await expect(io.close()).rejects.toBe(failure)
+    expect(notified).toEqual([terminal])
+  } finally {
+    input.destroy()
+    output.destroy()
+  }
+})
+
+it('does not resume or retain a data subscription after close', async () => {
+  /** Process-style close pauses rather than destroys its acquired input. */
+  const input = new PassThrough({ autoDestroy: false })
+  const output = new PassThrough({ autoDestroy: false })
+  const io = new RpcEventByteIO(
+    input,
+    output,
+    () => {
+      input.pause()
+      output.end()
+    },
+    { closedError: () => new Error('closed before subscribe'), report: () => undefined }
+  ).value
+  await io.close()
+  /** The original reader is observed without replacing pause/resume or event delivery. */
+  const resume = vi.spyOn(input, 'resume')
+  try {
+    const remove = io.onData(() => expect.unreachable())
+    expect(resume).not.toHaveBeenCalled()
+    expect(input.isPaused()).toBe(true)
+    remove()
+  } finally {
+    resume.mockRestore()
+    input.destroy()
+    output.destroy()
+  }
+})
+
+it('keeps a diagnostic write observer failure separate from native write completion', async () => {
+  const input = new PassThrough()
+  /** A real Writable retains its original callback until the native operation completes. */
+  let complete!: () => void
+  const output = new Writable({
+    write(_chunk, _encoding, callback) {
+      complete = callback
+    }
+  })
+  /** The exact diagnostic failure belongs to reporting rather than the write Promise. */
+  const failure = new Error('write observer failed')
+  const reports: unknown[] = []
+  const io = new RpcEventByteIO(
+    input,
+    output,
+    () => {
+      input.destroy()
+      output.destroy()
+    },
+    {
+      closedError: () => new Error('observer fixture closed'),
+      report: (error) => reports.push(error)
+    }
+  ).value
+  io.onWrite(() => {
+    throw failure
+  })
+  /** Observe rejection immediately, while letting the genuine native callback settle its write. */
+  const sending = io.write(Uint8Array.of(1)).then(
+    () => ({ ok: true }),
+    (error: unknown) => ({ error })
+  )
+  try {
+    complete()
+    expect(await sending).toEqual({ ok: true })
+    expect(reports).toEqual([failure])
+  } finally {
+    await io.close()
+  }
+})
+
 it('preserves paused delivery, original terminal replay and physical-close-before-listeners ordering', async () => {
   /** Native readable state, rather than a second byte queue, owns paused chunks. */
   const input = new PassThrough()
