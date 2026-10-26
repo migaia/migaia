@@ -58,6 +58,9 @@ import type {
   IRpcPeerClosedHandler
 } from './types.js'
 
+/** Namespace admission protects the Host's lifecycle methods before transport setup begins. */
+const reservedNamespaces = new Set(['self', 'provide', 'close', 'use', 'unuse', 'dispose', 'unUse'])
+
 /** One namespace has independent direct instance and display-name domains. */
 type INamespaceIndex = ISessionAvailabilityIndex & {
   peers: Map<string, IRpcSessionSelection>
@@ -261,6 +264,23 @@ export class SessionTable {
       scheduler: options.scheduler ?? systemScheduler,
       report: options.report
     })
+  }
+
+  /**
+   * Reject invalid names before flow setup, borrowing the original pending map without retaining
+   * it.
+   */
+  admitNamespace(namespace: string, pending: ReadonlyMap<string, unknown>): void {
+    if (typeof namespace !== 'string' || !namespace || reservedNamespaces.has(namespace))
+      throw tagRpcError(
+        new TypeError(HostErrorText.namespaceInvalid),
+        RpcCoreErrorCode.invalidConfig
+      )
+    if (pending.has(namespace))
+      throw tagRpcError(
+        new TypeError(HostErrorText.namespaceDuplicate),
+        RpcCoreErrorCode.hostNamespaceDuplicate
+      )
   }
 
   /** Prepare a namespace candidate without publishing peers, global names or readiness events. */

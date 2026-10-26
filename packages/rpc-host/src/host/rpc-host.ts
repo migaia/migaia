@@ -55,8 +55,6 @@ import { resolveAbortReason } from './abort-reason.js'
 
 /** This family identifies actual RPC namespace publication inside native shared-slot admission. */
 const namespaceFamily = Object.freeze({})
-/** Native host method names cannot be shadowed by a transport's public namespace. */
-const reservedNamespaces = new Set(['self', 'provide', 'close', 'use', 'unuse', 'dispose', 'unUse'])
 /**
  * Native resources belong to one transport registration, independent from SessionTable's live
  * index.
@@ -471,22 +469,9 @@ export class RpcHost {
     definition: IRpcTransportDefinition<unknown, object, IRpcTransportSetupContext>,
     flows: RpcTransportFlowProgram
   ): Promise<void> {
-    if (
-      typeof definition.namespace !== 'string' ||
-      !definition.namespace ||
-      reservedNamespaces.has(definition.namespace)
-    )
-      throw tagRpcError(
-        new TypeError(HostErrorText.namespaceInvalid),
-        RpcCoreErrorCode.invalidConfig
-      )
+    this.#sessions.admitNamespace(definition.namespace, this.#pendingNamespaces)
     /** Native use rejects duplicate definition names; only its same-name replace can reach here. */
     const previous = this.#namespaces.get(definition.namespace)
-    if (this.#pendingNamespaces.has(definition.namespace))
-      throw tagRpcError(
-        new TypeError(HostErrorText.namespaceDuplicate),
-        RpcCoreErrorCode.hostNamespaceDuplicate
-      )
     /** Native Feature guards and the original commit gate stay with the actual receiving host. */
     const integration = getPluginRuntimeIntegration(core)
     /** This transport borrows only its own authentic native construction request. */
