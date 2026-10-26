@@ -380,9 +380,7 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     } catch (error) {
       const rollbackErrors: unknown[] = []
       for (const registration of [...installed].reverse())
-        rollbackErrors.push(
-          ...(await this.#port.removal.disposeRegistration(registration, true)).cleanupErrors
-        )
+        rollbackErrors.push(...(await this.#port.removal.rollbackRegistration(registration)))
       this.#reportRollbackFailure(failedName, rollbackErrors)
       throw this.#installFailure(failedName, error, {
         failedName,

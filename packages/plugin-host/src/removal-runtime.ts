@@ -97,10 +97,34 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
     registration.extensions = []
     registration.featureExpose = undefined
     registration.featureOutputs = undefined
+    this.#abortRegistration(registration)
+    return errors
+  }
+
+  /** Abort once with the original native rollback identity, before or during logical revocation. */
+  #abortRegistration(registration: IRegistration<TDomainCore, TValue>): void {
+    /** An earlier native failure keeps its exact signal reason rather than allocating a substitute. */
+    const controller = registration.lifecycleController
+    if (!controller || controller.signal.aborted) return
     // A native abort never throws: listener failures go to the host's own error reporting.
-    registration.lifecycleController?.abort(
+    controller.abort(
       new PluginHostError(PluginHostErrorCode.hostDisposing, ERROR_TEXT.HOST_DISPOSING)
     )
+  }
+
+  /** Completed candidates release held replies before rollback revokes their original pipelines. */
+  async rollbackRegistration(
+    registration: IRegistration<TDomainCore, TValue>
+  ): Promise<readonly unknown[]> {
+    /** Cleanup leaves are appended without replacing the installation transaction's primary. */
+    const errors: unknown[] = []
+    if (registration.installed) {
+      this.#abortRegistration(registration)
+      /** The same once guard, timeout and aggregation own ordinary and rollback pre-release. */
+      const beforeRelease = this.runBeforeRelease(registration)
+      if (beforeRelease) errors.push(...(await beforeRelease).cleanupErrors)
+    }
+    errors.push(...(await this.disposeRegistration(registration, true)).cleanupErrors)
     return errors
   }
 

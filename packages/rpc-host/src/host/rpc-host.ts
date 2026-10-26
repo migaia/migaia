@@ -613,11 +613,13 @@ export class RpcHost {
       pipelines
     }
     this.#pendingNamespaces.set(definition.namespace, registration)
-    ownRpcTransportClose(core, () => namespace.close(this.#reason))
-    core.onDispose(async () => {
+    /** Both native pre-release and resource cleanup join held terminals before retiring their IO. */
+    const close = async (): Promise<void> => {
       await this.#providers.settleFailedGate(gate)
       await namespace.close(this.#reason)
-    })
+    }
+    ownRpcTransportClose(core, close)
+    core.onDispose(close)
     /**
      * Only call-feature instances are interpreted here; media/pool features remain with their
      * transport.
