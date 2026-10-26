@@ -200,6 +200,38 @@ describe('ConfigOwner', () => {
     )
   })
 
+  it('reports a shared difference once at its first deterministic path', () => {
+    /** Each graph has two aliases of its own shared branch. */
+    const before = { value: 1 }
+    /** The changed pair is first reached through the first root key. */
+    const after = { value: 2 }
+    /** Ownership preserves both aliases within the immutable snapshot. */
+    const owner = new ConfigOwner({ first: before, second: before })
+    expect(owner.diff({ first: after, second: after })).toEqual([
+      { path: ['first', 'value'], kind: 'changed' }
+    ])
+  })
+
+  it.each([
+    [1, 1],
+    [17, 19]
+  ])('compares equal cyclic graphs without a depth cutoff (%i/%i)', (leftSize, rightSize) => {
+    /** Each independently owned ring repeats the same observable data. */
+    type INode = { value: number; next?: INode }
+    /** The two cycles need not have the same reference topology to contain equal data. */
+    const left: INode[] = Array.from({ length: leftSize }, () => ({ value: 1 }))
+    /** Different cycle lengths exercise pair traversal beyond the former depth cutoff. */
+    const right: INode[] = Array.from({ length: rightSize }, () => ({ value: 1 }))
+    for (let index = 0; index < left.length; index += 1)
+      left[index]!.next = left[(index + 1) % left.length]
+    for (let index = 0; index < right.length; index += 1)
+      right[index]!.next = right[(index + 1) % right.length]
+    /** The public comparison borrows the same canonical owned snapshots as ordinary configs. */
+    const owner = new ConfigOwner(left[0]!)
+    expect(owner.diff(new ConfigOwner(right[0]!))).toEqual([])
+    expect(owner.equals(right[0]!)).toBe(true)
+  })
+
   it('serializes to JSON and rejects non-JSON runtime values', () => {
     /** Owner under test. */
     const owner = createOwner()

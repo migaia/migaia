@@ -439,6 +439,8 @@ console.log(diff) // { retries: { before: 1, after: 3 } }
 
 Neither `defaults` nor `override` changes. This `diff` only makes the changes explicit; it is not an extra return value from `combineConfig`.
 
+Use `ConfigOwner.diff(other)` / `equals(other)` to compare owned snapshots. Traversal is depth first with left-side keys first, and each object pair is compared once. A difference in shared nodes is reported only at its first path, rather than once for every alias. Cycles with no data differences compare equal.
+
 ### `/function`: which instance owns an initialization
 
 `once(fn)` remembers the first result of a synchronous initialization, including its first thrown error. Each call to `once(fn)` creates a separate cache. Create and export one wrapper at module scope to share it among consumers of that module instance.

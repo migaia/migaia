@@ -1744,6 +1744,8 @@ const env = ConfigOwner.fromEnv(process.env, { prefix: 'APP__', key: (s) => s.to
 - 序列化：`toJSON()` / `toString(space)`；Map、Set、函数等非 JSON 值抛 `CONFIG_UNSUPPORTED`。
 - 静态：`from`、`fromAsync`（Promise、值或接收 `signal` 的工厂；支持 `signal` / `timeoutMs`）、`fromEnv`、`merge`、`is`。与 `@migaia/resource` 的 `createResource` 组合即可得到一份响应式的配置资源。
 
+`diff` 按左侧自身字符串键优先、再追加右侧独有键的顺序，深度优先比较数据。每对对象只访问一次；共享分支的同一差异只出现在首次到达的路径上，不再为其他别名重复报告。循环上没有数据差异时，`equals` 返回 `true`。路径监听使用同样的数据比较规则；监听顺序、取消订阅和异常上报规则不变。
+
 ## `/function` 模块
 
 ```ts doc-test=skip reason="签名摘要，不是可运行模块"

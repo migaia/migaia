@@ -341,34 +341,94 @@ function sameLeaf(left: unknown, right: unknown): boolean {
   return left instanceof Date && right instanceof Date && left.getTime() === right.getTime()
 }
 
-/** Collects differences between two plain graphs; containers are compared key by key. */
+/** A first-visit path stays linked until a difference needs its public segment list. */
+type IConfigDiffPath = Readonly<{ parent: IConfigDiffPath | undefined; key: string }>
+
+/** One pair waiting for the original depth-first comparison. */
+type IConfigDiffPair = Readonly<{
+  left: unknown
+  right: unknown
+  path: IConfigDiffPath | undefined
+}>
+
+/** One admitted pair retains its own-key order while a child pair is compared. */
+type IConfigDiffFrame = IConfigDiffPair & {
+  readonly keys: readonly string[]
+  index: number
+}
+
+/** Materialize only reported paths; equal cycles never copy a growing path prefix. */
+function diffPath(root: readonly string[], path: IConfigDiffPath | undefined): readonly string[] {
+  if (!path) return root
+  /** Reverse linked segments once before appending the caller's original root path. */
+  const segments: string[] = []
+  for (let node: IConfigDiffPath | undefined = path; node; node = node.parent)
+    segments.push(node.key)
+  segments.reverse()
+  return Object.freeze([...root, ...segments])
+}
+
+/** Compare each container pair once, reporting differences at its first depth-first path. */
 function collectDiff(
   left: unknown,
   right: unknown,
   path: readonly string[],
-  out: IConfigDiffEntry[],
-  depth: number
+  out: IConfigDiffEntry[]
 ): void {
-  if (sameLeaf(left, right)) return
-  /** Both sides are comparable containers of the same kind. */
-  const containers =
-    depth < 256 &&
-    ((Array.isArray(left) && Array.isArray(right)) || (isPlainObject(left) && isPlainObject(right)))
-  if (!containers) {
-    out.push(Object.freeze({ path, kind: 'changed' }))
-    return
-  }
-  /** Union of own string keys, left keys first for stable order. */
-  const keys = new Set([...Object.keys(left as object), ...Object.keys(right as object)])
-  for (const key of keys) {
-    /** Child path, frozen because entries are returned to callers. */
-    const childPath = Object.freeze([...path, key])
-    /** Own data values on each side. */
-    const before = ownValue(left, key)
-    const after = ownValue(right, key)
-    if (!before.found) out.push(Object.freeze({ path: childPath, kind: 'added' }))
-    else if (!after.found) out.push(Object.freeze({ path: childPath, kind: 'removed' }))
-    else collectDiff(before.value, after.value, childPath, out, depth + 1)
+  /** Pair identity belongs only to this comparison, never to a later diff or notification. */
+  const compared = new WeakMap<object, WeakSet<object>>()
+  /** Explicit frames preserve recursive key/read order without growing the JavaScript call stack. */
+  const frames: IConfigDiffFrame[] = []
+  /** The next child is visited before its parent's following key. */
+  let pair: IConfigDiffPair | undefined = { left, right, path: undefined }
+  while (pair || frames.length > 0) {
+    if (pair) {
+      /** The pending pair is consumed before its frame can descend again. */
+      const current = pair
+      pair = undefined
+      if (sameLeaf(current.left, current.right)) continue
+      if (
+        !(
+          (Array.isArray(current.left) && Array.isArray(current.right)) ||
+          (isPlainObject(current.left) && isPlainObject(current.right))
+        )
+      ) {
+        out.push(Object.freeze({ path: diffPath(path, current.path), kind: 'changed' }))
+        continue
+      }
+      /** Both sides passed the same-kind container check. */
+      const before = current.left as object
+      /** Right identities are distinct per left node, preserving comparisons against other aliases. */
+      const after = current.right as object
+      /** Mark before descending so an equal back edge ends without reporting a false difference. */
+      const matches = compared.get(before) ?? new WeakSet<object>()
+      if (matches.has(after)) continue
+      matches.add(after)
+      compared.set(before, matches)
+      frames.push({
+        ...current,
+        keys: [...new Set([...Object.keys(before), ...Object.keys(after)])],
+        index: 0
+      })
+    }
+    /** The top frame alone selects the next descriptor read, retaining left-key-first order. */
+    const frame = frames[frames.length - 1]!
+    /** An exhausted frame releases its own keys before its parent advances. */
+    const key = frame.keys[frame.index]
+    if (key === undefined) {
+      frames.pop()
+      continue
+    }
+    frame.index += 1
+    /** Linking costs one edge; public arrays are allocated only for actual output entries. */
+    const childPath: IConfigDiffPath = { parent: frame.path, key }
+    /** Own data values retain their original before-then-after observation order. */
+    const before = ownValue(frame.left, key)
+    const after = ownValue(frame.right, key)
+    if (!before.found) out.push(Object.freeze({ path: diffPath(path, childPath), kind: 'added' }))
+    else if (!after.found)
+      out.push(Object.freeze({ path: diffPath(path, childPath), kind: 'removed' }))
+    else pair = { left: before.value, right: after.value, path: childPath }
   }
 }
 
@@ -748,13 +808,7 @@ export class ConfigOwner<T extends IConfigRecord = IConfigRecord> {
   diff(other: IConfigSource): readonly IConfigDiffEntry[] {
     /** Collected entries in key order. */
     const out: IConfigDiffEntry[] = []
-    collectDiff(
-      this.#config,
-      ConfigOwner.is(other) ? other.#config : other,
-      Object.freeze([]),
-      out,
-      0
-    )
+    collectDiff(this.#config, ConfigOwner.is(other) ? other.#config : other, Object.freeze([]), out)
     return Object.freeze(out)
   }
 
@@ -1035,7 +1089,7 @@ export class ConfigOwner<T extends IConfigRecord = IConfigRecord> {
             /** Only a completed comparison is cached; thrown failures retain per-listener reporting. */
             const changes: IConfigDiffEntry[] = []
             if (before.found !== after.found) changes.push({ path: watcher.path, kind: 'changed' })
-            else collectDiff(before.value, after.value, watcher.path, changes, 0)
+            else collectDiff(before.value, after.value, watcher.path, changes)
             changed = changes.length > 0
             if (objects) {
               /**

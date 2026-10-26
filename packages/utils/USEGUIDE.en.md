@@ -1637,6 +1637,25 @@ const diff = {
 
 ---
 
+### `ConfigOwner`
+
+`ConfigOwner` holds an immutable configuration snapshot and exposes typed reads, copy-on-write updates, validation, watchers, `diff(other)` and `equals(other)` through `@migaia/utils/config`.
+
+Comparison visits own string keys depth first: left-side keys first, followed by keys found only on the right. Each object pair is compared once. Shared branches report a difference only at the first path that reaches it, rather than once for every alias. Cycles with no data differences compare equal. Path watchers use the same data comparison; listener order, unsubscribe behavior and error reporting stay unchanged.
+
+```ts doc-test=check
+import { ConfigOwner } from '@migaia/utils/config'
+
+/** Each snapshot retains two aliases of its shared branch. */
+const before = { value: 1 }
+/** The new snapshot changes the same shared branch. */
+const after = { value: 2 }
+/** The first alias supplies the one reported difference path. */
+const config = new ConfigOwner({ first: before, second: before })
+config.diff({ first: after, second: after })
+// [{ path: ['first', 'value'], kind: 'changed' }]
+```
+
 <a id="function-module"></a>
 
 ## `/function` module
