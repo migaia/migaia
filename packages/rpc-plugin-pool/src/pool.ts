@@ -76,6 +76,8 @@ export class PoolScheduler<T extends IPoolResource> implements IRpcPoolControls 
   readonly #createResource: () => Promise<T>
   /** Native and idle failures use the owning installation's genuine report port. */
   readonly #report: (error: unknown) => void
+  /** Native registrations lend current availability without copying their lifecycle state. */
+  readonly #isAvailable: (resource: T) => boolean
   /** Idle timers borrow the scheduler admitted once before any member can open. */
   readonly #scheduler: IScheduler
   /** The requested capacity survives native idle retirement until an explicit resize. */
@@ -107,7 +109,8 @@ export class PoolScheduler<T extends IPoolResource> implements IRpcPoolControls 
   constructor(
     options: IPoolPluginOptions,
     createResource: () => Promise<T>,
-    report: (error: unknown) => void = defaultRpcReporter
+    report: (error: unknown) => void = defaultRpcReporter,
+    isAvailable: (resource: T) => boolean = () => true
   ) {
     this.#options = options
     this.#scheduler = resolveSchedulerOption(options, systemScheduler)
@@ -115,6 +118,7 @@ export class PoolScheduler<T extends IPoolResource> implements IRpcPoolControls 
     this.#maxQueue = options.maxQueue ?? RPC_POOL_DEFAULT_MAX_QUEUE
     this.#createResource = createResource
     this.#report = report
+    this.#isAvailable = isAvailable
     void this.#closing.promise.catch(() => undefined)
   }
 
@@ -334,11 +338,19 @@ export class PoolScheduler<T extends IPoolResource> implements IRpcPoolControls 
       /** This exact resource alone owns the selected native slot. */
       const index = (start + offset) % ordered.length
       const member = ordered[index]!
-      if (!member.retiring && !member.busy) {
+      if (
+        !member.retiring &&
+        !member.busy &&
+        (member.resource === undefined || this.#isAvailable(member.resource))
+      ) {
         this.#cursor = (index + 1) % ordered.length
         yield member
       }
     }
+  }
+  /** Native readiness changes wake the original FIFO without acquiring or restarting members. */
+  refresh(): void {
+    this.#pump()
   }
   /** Publish occupancy before returning a slot or resolving a queued caller. */
   #reserve(member: IPoolSlot<T>): void {

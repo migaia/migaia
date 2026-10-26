@@ -69,7 +69,12 @@ class PoolInstallation implements IRpcOriginSelection {
         byInstance: (id) => uniqueRecord(this.#instances.get(id))
       }
     })
-    this.#pool = new PoolScheduler(options, this.#openMember, context.report)
+    this.#pool = new PoolScheduler(
+      options,
+      this.#openMember,
+      context.report,
+      (media) => media.record.current().active
+    )
     void this.#pool.closed.then(
       () => this.#members.close(),
       () => this.#members.close()
@@ -166,6 +171,7 @@ class PoolInstallation implements IRpcOriginSelection {
     }
     if (!this.#representative && current) this.#representative = media
     if (this.#representative === media) this.#project()
+    this.#pool.refresh()
   }
   /** A representative change borrows the first ready record from the existing native instance index. */
   #project(): void {
