@@ -1,173 +1,154 @@
-import assert from 'node:assert/strict'
-import { describe, it } from 'vitest'
-import { createManualScheduler } from '@migaia/utils/testing'
-import { normalizeRpcEnvelope, RpcRouteProfile, type IRpcEnvelope } from '@migaia/rpc-contract'
-import { createMemoryTransportPair } from '../fixtures/memory-transport.js'
-import { createComposedEndpoint } from '../../dist/core/composed.js'
-import { authentication } from '../../dist/core/middleware/authentication.js'
-import { readAuthenticationEnvelope } from '../../dist/core/middleware/authentication-envelope.js'
-import { connect } from '../../dist/core/middleware/connect.js'
-import { readEndpointDebugSnapshot } from '../../dist/core/internal/test-observer.js'
-import { RequestReplayLedger } from '../../dist/core/internal/request-replay-ledger.js'
-import type { IRpcAuthenticationCapability } from '../../dist/core/typing.js'
-import { installPlugin } from '../core/middleware/helpers.js'
-import { streamRoots } from '../streaming/fixture.js'
+/** Genuine Auth capacity retains a stream through its actual iterator and physical terminal work. */
+import { createRpcHost } from '@migaia/rpc-host'
+import auth from '@migaia/rpc-host/features/auth'
+import { defineFlowFeature, RpcFlowPoint, type IRpcFlowStage } from '@migaia/rpc-host/sdk'
+import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
+import { RpcProviderRejectionReason } from '@migaia/rpc-contract/errors'
+import { RpcStreamEvent, RpcWireKind, type IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
+import { deferred } from '@migaia/utils/promise'
+import { expect, it, vi } from 'vitest'
+import { RequestReplayLedger } from '../../dist/features/auth/request-replay.js'
+import { coreMemoryServer } from '../host/core-fixture.js'
+import type { MemoryCarrier } from '../fixtures/core-carrier.js'
 
-/** A physical delivery and its asynchronous owner continuations finish before each observation. */
-const tick = () => new Promise<void>((resolve) => setImmediate(resolve))
-
-describe('r12 protected stream settlement', () => {
-  it('retains legacy stream admission through next, return and terminal physical completion', async () => {
-    /**
-     * The targeted mutant removes only settled-stream retention, without changing any production
-     * file.
-     */
-    const originalAdmit = RequestReplayLedger.prototype.admit
-    if (process.env.RPC_REPLAY_STREAM_MUTANT === 'admission-time-tombstone') {
-      RequestReplayLedger.prototype.admit = function (key, peer, now, mode) {
-        /** Reflect preserves the original private-field receiver while mutating only retention. */
-        return Reflect.apply(originalAdmit, this, [key, peer, now, mode, false])
-      }
+it('retains legacy stream admission through next, return and terminal physical completion', async () => {
+  /** Original business entry alone changes this count; rejection callbacks cannot increment it. */
+  const state = { starts: 0, carrier: undefined as MemoryCarrier | undefined }
+  /** The actual iterator independently holds its original next and return operations. */
+  const next = deferred<IteratorResult<never>>()
+  /** Iterator cleanup remains held even after the public consumer sends its real cancellation. */
+  const returned = deferred<IteratorResult<never>>()
+  /** Entry receipts observe genuine producer callbacks without executing another iterator. */
+  const nextEntered = deferred<void>()
+  /** Cancellation must reach the same original iterator before its cleanup is released. */
+  const returnEntered = deferred<void>()
+  /** A genuine outbound stage identifies the semantic terminal before Auth protects it. */
+  const terminal = deferred<void>()
+  /** Native refusal classification proves Auth capacity independently from the provider table. */
+  const rejected: string[] = []
+  /** Every public refusal remains observed while a prior real physical write is held. */
+  const refusals: Promise<unknown>[] = []
+  /** The original iterator owns both finite application waits. */
+  const iterator: AsyncIterableIterator<never> = {
+    [Symbol.asyncIterator]() {
+      return this
+    },
+    next() {
+      nextEntered.resolve()
+      return next.promise
+    },
+    return() {
+      returnEntered.resolve()
+      return returned.promise
     }
-    /** One physical connection remains source-less and therefore trusted by its receiver owner. */
-    const [peerTransport, serverTransport] = createMemoryTransportPair()
-    /** Clock moves beyond the legacy TTL without waiting or introducing a stream deadline. */
-    const clock = createManualScheduler()
-    /** The hand-written peer signs a fresh physical counter for every repeated business ID. */
-    const peerAuthentication = installPlugin(
-      authentication({ sign: (value) => value, verify: (value) => value })
-    ).get('authenticationCapability') as IRpcAuthenticationCapability
-    /** Real transport completion stays pending only for the producer's terminal acknowledgement. */
-    let releaseTerminal: (() => void) | undefined
-    /** Restore native delivery only when the controlled physical write is released. */
-    const send = serverTransport.send
-    serverTransport.send = (value, options) => {
-      const payload = readAuthenticationEnvelope(value).payload
-      const envelope = typeof payload === 'string' ? JSON.parse(payload) : payload
-      if (envelope.kind === 'stream' && envelope.data.payload.event === 'cancelled') {
-        return new Promise<void>((resolve) => {
-          releaseTerminal = () => {
-            send(value, options)
-            resolve()
-          }
-        })
-      }
-      return send(value, options)
+  }
+  /** This plaintext callback uses the existing native carrier gate, never decodes protected data. */
+  const holdTerminal: IRpcFlowStage<'envelopeOutbound'> = (payload, continuation) => {
+    /** The fixture's original identity codec lends this actual prepared semantic message. */
+    const message = payload.prepared.message as IRpcSemanticFrame
+    if (message.kind === RpcWireKind.stream && message.stream.event === RpcStreamEvent.cancelled) {
+      state.carrier!.holdWrites()
+      terminal.resolve()
     }
-    /** The provider budget of one makes premature release observable without enlarging any limit. */
-    const server = await createComposedEndpoint(
-      {
-        id: 'server',
-        transport: serverTransport,
-        scheduler: clock,
-        providerLimits: { maxReplayEntriesPerPeer: 1 },
-        middlewares: [
-          authentication({ sign: (value) => value, verify: (value) => value }),
-          connect({ transport: serverTransport })
-        ]
+    return continuation(payload)
+  }
+  /** Native registration places this original callback before the authentic Auth transform. */
+  const terminalGate = defineFlowFeature({
+    name: 'stream-retention-physical-terminal',
+    setup: () => ({ stages: { [RpcFlowPoint.envelopeOutbound]: holdTerminal } })
+  })
+  /** One genuine listener owns the original Session and its readonly physical identity. */
+  const server = coreMemoryServer('server')
+  /** Only the authentic bounded Auth ledger decides whether a fresh request is admitted. */
+  const host = await createRpcHost({
+    ...server.options,
+    plugins: [
+      auth({
+        sign: (value) => value,
+        verify: (value) => value,
+        maxReplayEntriesPerPeer: 1,
+        onRejected: (rejection) => {
+          rejected.push(rejection.reason)
+        }
+      }),
+      terminalGate,
+      server.transport
+    ],
+    provide: {
+      held: () => {
+        state.starts += 1
+        return iterator
       },
-      streamRoots()
-    )
-    /** Callback entry is independent of stream Map deletion or client cancellation. */
-    let starts = 0
-    /** Underlying work retains its original Promise until the fixture resolves it. */
-    let releaseNext: (() => void) | undefined
-    /** Iterator cleanup is independently unresolved, exercising the other lifetime owner. */
-    let releaseReturn: (() => void) | undefined
-    server.stream.provide('held', () => {
-      starts += 1
-      const first = starts === 1
-      /** Explicit iterator ownership prevents contextual inference as the broader iterable surface. */
-      const iterator: AsyncIterableIterator<never> = {
-        [Symbol.asyncIterator]() {
-          return this
-        },
-        next: () =>
-          first
-            ? new Promise<IteratorResult<never>>((resolve) => {
-                releaseNext = () => resolve({ done: true, value: undefined })
-              })
-            : Promise.resolve({ done: true as const, value: undefined }),
-        return: () =>
-          first
-            ? new Promise<IteratorResult<never>>((resolve) => {
-                releaseReturn = () => resolve({ done: true, value: undefined })
-              })
-            : Promise.resolve({ done: true as const, value: undefined })
-      }
-      return iterator
-    })
-    /** Hand-written canonical route is the original peer business identity on each physical frame. */
-    const route = {
-      profile: RpcRouteProfile,
-      applicationVersion: '1',
-      senderId: 'peer',
-      targetId: 'server',
-      receiverId: 'server',
-      sentAt: 0
-    }
-    /** Exact request identity is intentionally reused only to test the business replay owner. */
-    const opening = normalizeRpcEnvelope({
-      kind: 'request',
-      id: 'held-id',
-      method: 'held',
-      data: { route: { ...route, type: 'request' }, payload: null }
-    })
-    /** Counter allocation and signing are canonical; the fixture never fabricates a private proof. */
-    const deliver = async (envelope: IRpcEnvelope): Promise<void> => {
-      await peerTransport.send(
-        await peerAuthentication.protect(envelope, {
-          direction: 'outbound',
-          endpointId: 'peer',
-          platform: 'Memory'
-        })
-      )
-      await tick()
-      await tick()
-    }
-    /** Credits and cancellation use the registered stream grammar, not direct owner calls. */
-    const control = (event: 'pull' | 'cancel') =>
-      normalizeRpcEnvelope({
-        kind: 'stream',
-        id: opening.id,
-        data: { route: { ...route, type: 'stream' }, payload: { event, seq: 0 } }
-      })
-    try {
-      await deliver(opening)
-      assert.equal(starts, 1)
-      assert.equal(readEndpointDebugSnapshot(server)?.providerState?.replay, 1)
-      await deliver(control('pull'))
-      assert.equal(typeof releaseNext, 'function')
-      await deliver(control('cancel'))
-      assert.equal(typeof releaseReturn, 'function')
-      await deliver(opening)
-      assert.equal(starts, 1, 'pending next/return block the duplicate')
-      releaseReturn!()
-      await tick()
-      await tick()
-      assert.equal(typeof releaseTerminal, 'function')
-      releaseNext!()
-      await tick()
-      await tick()
-      clock.advance(310_001)
-      await deliver(opening)
-      assert.equal(starts, 1, 'a pending terminal physical send cannot expire stream admission')
-      assert.equal(readEndpointDebugSnapshot(server)?.providerState?.replay, 1)
-      releaseTerminal!()
-      await tick()
-      await tick()
-      await deliver(opening)
-      assert.equal(starts, 1, 'legacy retention starts at final settlement')
-      clock.advance(310_001)
-      await deliver(opening)
-      assert.equal(starts, 2, 'the settled legacy entry expires after its unchanged TTL')
-    } finally {
-      releaseNext?.()
-      releaseReturn?.()
-      releaseTerminal?.()
-      serverTransport.send = send
-      await server.dispose()
-      RequestReplayLedger.prototype.admit = originalAdmit
+      probe: () => ++state.starts
     }
   })
+  /** The opposite public Host supplies every real opening, credit, cancellation and fresh id. */
+  const client = await server.connect('peer', {
+    plugins: [auth({ sign: (value) => value, verify: (value) => value })]
+  })
+  state.carrier = client.pair[0]
+  /** The original native clock input is controlled only after both real handshakes have finished. */
+  let now = Math.trunc(performance.now())
+  /** This is deterministic expiry input, not wall-clock or performance evidence. */
+  const clock = vi.spyOn(performance, 'now').mockImplementation(() => now)
+  /** Default passthrough observes actual terminal physical entry without another transport. */
+  const writing = vi.spyOn(state.carrier, 'write')
+  /** The same original ledger reports settlement only after all real producer work finishes. */
+  const settled = vi.spyOn(RequestReplayLedger.prototype, 'settle')
+  /** The public iterator remains responsible for its original opening and pull credit. */
+  const stream = client.host.memory.streamTo('server', 'held')
+  /** This pending original consumer operation remains observed during real cancellation. */
+  const pulling = stream.next().catch((error: unknown) => error)
+  /** Consumer cancellation remains observed independently from held provider cleanup. */
+  let closing: Promise<unknown> | undefined
+  try {
+    await nextEntered.promise
+    expect(state.starts).toBe(1)
+    /** Fresh public ids cannot be rejected by duplicate-provider admission. */
+    refusals.push(client.host.memory.send('server', 'probe').catch((error: unknown) => error))
+    await vi.waitFor(() => expect(rejected).toHaveLength(1))
+    expect(rejected[0]).toBe(RpcProviderRejectionReason.replayLedgerFull)
+    expect(state.starts).toBe(1)
+    closing = stream.return!().catch((error: unknown) => error)
+    await returnEntered.promise
+    refusals.push(client.host.memory.send('server', 'probe').catch((error: unknown) => error))
+    await vi.waitFor(() => expect(rejected).toHaveLength(2))
+    expect(rejected[1]).toBe(RpcProviderRejectionReason.replayLedgerFull)
+    expect(state.starts).toBe(1)
+    /** Return completion may start the original cancelled terminal while next is still held. */
+    const beforeTerminal = writing.mock.calls.length
+    returned.resolve({ done: true, value: undefined })
+    await terminal.promise
+    await vi.waitFor(() => expect(writing.mock.calls.length).toBeGreaterThan(beforeTerminal))
+    expect(settled).not.toHaveBeenCalled()
+    next.resolve({ done: true, value: undefined })
+    now += 310_001
+    refusals.push(client.host.memory.send('server', 'probe').catch((error: unknown) => error))
+    await vi.waitFor(() => expect(rejected).toHaveLength(3))
+    expect(rejected[2]).toBe(RpcProviderRejectionReason.replayLedgerFull)
+    expect(state.starts).toBe(1)
+    expect(settled).not.toHaveBeenCalled()
+    /** Only original physical completion permits the existing ledger's settlement timestamp. */
+    state.carrier.releaseWrites()
+    await Promise.all([pulling, closing])
+    await vi.waitFor(() => expect(settled).toHaveBeenCalledTimes(1))
+    refusals.push(client.host.memory.send('server', 'probe').catch((error: unknown) => error))
+    await vi.waitFor(() => expect(rejected).toHaveLength(4))
+    expect(rejected[3]).toBe(RpcProviderRejectionReason.replayLedgerFull)
+    expect(state.starts).toBe(1)
+    now += 310_001
+    expect(await client.host.memory.send('server', 'probe')).toBe(2)
+    expect(state.starts).toBe(2)
+    for (const refusal of refusals)
+      expect(await refusal).toMatchObject({ code: RpcCoreErrorCode.overloaded })
+  } finally {
+    next.resolve({ done: true, value: undefined })
+    returned.resolve({ done: true, value: undefined })
+    state.carrier.releaseWrites()
+    clock.mockRestore()
+    await Promise.all([client.host.close(), host.close()])
+    await Promise.all([pulling, closing, ...refusals])
+    writing.mockRestore()
+    settled.mockRestore()
+  }
 })
