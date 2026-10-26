@@ -116,7 +116,9 @@ class ProbeEmitter {
 
   /** Endpoint identity is the emitter's existing constructor value. */
   get endpointId(): string {
-    return typeof this.#identity === 'string' ? this.#identity : this.#identity()
+    /** Dynamic identity is a callback, not a method on this mutable emitter. */
+    const identity = this.#identity
+    return typeof identity === 'string' ? identity : identity()
   }
 
   /** Dropped nested observations remain visible without recursively entering any subscriber. */
@@ -206,7 +208,7 @@ class ProbeEmitter {
     /** Common identity is written once; emit overwrites every optional field before delivery. */
     const view = this.#view
     view.seq = ++this.#seq
-    view.at = at ?? this.#now()
+    view.at = at ?? (0, this.#now)()
     view.endpointId = this.endpointId
     view.stage = stage
     view.messageId = messageId === '' ? undefined : messageId
@@ -284,7 +286,7 @@ class ProbeEmitter {
         /** Only the first selected capture preserves the backing before the actual transfer. */
         const captured = capture === undefined ? content : readTransferredCapture(capture)
         this.#view.content = state.redact
-          ? state.redact(stage as RpcProbeStage, captured)
+          ? (0, state.redact)(stage as RpcProbeStage, captured)
           : captured
         if (this.#observeResult(this.#view.content, subscriber)) {
           this.#view.content = undefined
@@ -294,7 +296,7 @@ class ProbeEmitter {
       }
     }
     try {
-      this.#observeResult(state.emit(this.#view), subscriber)
+      this.#observeResult((0, state.emit)(this.#view), subscriber)
     } catch (error) {
       subscriber.report(error)
     }
@@ -315,7 +317,7 @@ class ProbeEmitter {
     /** Failure allocation occurs only on the report path, never for successful events. */
     const failure = createRpcError(RpcCoreErrorCode.probeFailed, ProbeText.failure, error)
     try {
-      if (state.onError) state.onError(failure)
+      if (state.onError) (0, state.onError)(failure)
       else reportDiagnostic(this.#reporter, failure)
     } catch (reporterError) {
       reportDiagnostic(this.#reporter, reporterError)
@@ -350,7 +352,7 @@ class ProbeEmitter {
         this.#subscribers[i]!
       if (!subscriber.state.describe) continue
       try {
-        this.#observeResult(subscriber.state.describe(available), subscriber)
+        this.#observeResult((0, subscriber.state.describe)(available), subscriber)
       } catch (error) {
         subscriber.report(error)
       }

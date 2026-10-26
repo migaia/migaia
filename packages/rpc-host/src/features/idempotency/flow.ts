@@ -80,7 +80,7 @@ export class RpcIdempotencyFlow {
     const token = authentication?.principalId ?? context.carrierId
     /** A custom scope can outlive a connection and must not inherit carrier retirement. */
     const selected =
-      this.#options.scope?.({
+      (0, this.#options.scope)?.({
         token,
         senderId: context.envelope.route.senderId,
         ...(authentication === undefined ? {} : authentication)

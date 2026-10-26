@@ -198,3 +198,30 @@ it('split surrogate strings use original joined lengthOf', () => {
   if (joined.status === 'complete') assert.equal(joined.value, '🙂')
   framer.close()
 })
+
+it('calls chunk timer configuration without lending its private option snapshot', () => {
+  /** Both timer callbacks are configuration functions, rather than methods on an IO owner. */
+  const receivers: unknown[] = []
+  /** One complete assembly observes scheduling and exact timer release through the real owner. */
+  const framer = createStringChunkAssembler({
+    chunkBytes: 1,
+    schedule(this: unknown) {
+      receivers.push(this)
+      return 'timer'
+    },
+    cancel(this: unknown, timer) {
+      receivers.push(this)
+      assert.equal(timer, 'timer')
+    }
+  })
+  try {
+    /** Fragment membership and completion remain the ordinary assembler's business result. */
+    const context = { source: 'timer-receiver', messageId: 'two-fragments' }
+    const parts = framer.frame('ok', context)
+    assert.equal(framer.accept(parts[0]!, context).status, 'pending')
+    assert.equal(framer.accept(parts[1]!, context).status, 'complete')
+    assert.deepEqual(receivers, [undefined, undefined])
+  } finally {
+    framer.close()
+  }
+})

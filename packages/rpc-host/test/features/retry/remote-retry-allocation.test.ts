@@ -28,8 +28,14 @@ it('successful unreplayed retry dispatch creates no readiness AbortController', 
     }
   }
   const scheduler = createManualScheduler()
+  /** User key factories receive no immutable retry-policy receiver. */
+  const keyReceivers: unknown[] = []
   const strategy = retry({
     scheduler,
+    keyFactory(this: unknown) {
+      keyReceivers.push(this)
+      return 'receiver-free-key'
+    },
     report: (error) => {
       throw error
     }
@@ -49,6 +55,7 @@ it('successful unreplayed retry dispatch creates no readiness AbortController', 
     })
     assert.equal(result, 42)
   }
+  assert.deepEqual(keyReceivers, [undefined])
   assert.equal(allocations.controllers, 0, 'only real replay allocates a readiness controller')
   assert.equal(scheduler.pendingCount, 0)
 })

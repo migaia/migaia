@@ -90,7 +90,8 @@ class RetryInvocation<T> {
     this.#availability = input.facts?.availability
     this.#method = input.facts?.method
     this.#idempotent = input.facts?.idempotent ?? false
-    this.#key = input.facts?.idempotencyKey ?? (this.#idempotent ? policy.keyFactory() : undefined)
+    this.#key =
+      input.facts?.idempotencyKey ?? (this.#idempotent ? (0, policy.keyFactory)() : undefined)
     this.#signal = input.signal
     this.#deadline =
       input.remainingMs === undefined ? undefined : policy.scheduler.now() + input.remainingMs

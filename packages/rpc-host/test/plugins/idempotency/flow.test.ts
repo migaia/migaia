@@ -25,7 +25,15 @@ it('actual optional idempotency dispatch observes sealed outcome and publishes o
    */
   const token = 'actual-admitted-scope'
   /** The native graph owns this real Feature and the original custom scope callback. */
-  const feature = idempotency({ store, scope: () => token })
+  /** Scope is a plain configuration callback and receives no captured option receiver. */
+  const scopeReceivers: unknown[] = []
+  const feature = idempotency({
+    store,
+    scope(this: unknown) {
+      scopeReceivers.push(this)
+      return token
+    }
+  })
   /** The actual native installation owns its original setup signal. */
   const setup = new AbortController()
   /** Namespace lookup must originate a normal call through this existing host port. */
@@ -178,6 +186,7 @@ it('actual optional idempotency dispatch observes sealed outcome and publishes o
     }
   })
   expect(fallbacks).toBe(0)
+  expect(scopeReceivers).toEqual([undefined])
   expect(store.claim(scope, 'another', performance.now()).status).toBe('full')
   /** The only public method is the actual plugin-host namespace extension. */
   const extension = installation.namespaceExtensions?.('test') as {

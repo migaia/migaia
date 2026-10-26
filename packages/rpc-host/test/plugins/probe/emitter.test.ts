@@ -409,3 +409,64 @@ it('shares one preserved transfer backing across selected captures in callback o
     emitter.dispose()
   }
 })
+
+it('keeps probe configuration callbacks outside its private mutable state', () => {
+  /** Callback receivers must expose neither definition snapshots nor the compiled stage record. */
+  const receivers: { callback: string; receiver: unknown }[] = []
+  /** The original sink failure drives the public onError callback without changing its identity. */
+  const primary = new Error('probe receiver fixture')
+  const probe = defineProbe({
+    stages: ['frame'],
+    capture: ['frame'],
+    describe(this: unknown) {
+      receivers.push({ callback: 'describe', receiver: this })
+    },
+    redact(this: unknown, _stage, value) {
+      receivers.push({ callback: 'redact', receiver: this })
+      return value
+    },
+    emit(this: unknown) {
+      receivers.push({ callback: 'emit', receiver: this })
+      throw primary
+    },
+    onError(this: unknown, error) {
+      receivers.push({ callback: 'onError', receiver: this })
+      expect((error as Error).cause).toBe(primary)
+    }
+  })
+  /** Public emitter callbacks are also ordinary callables, never methods on the emitter. */
+  const emitter = createProbeEmitter(
+    [probe],
+    function (this: unknown) {
+      receivers.push({ callback: 'now', receiver: this })
+      return 0
+    },
+    function (this: unknown) {
+      receivers.push({ callback: 'identity', receiver: this })
+      return 'receiver'
+    }
+  )
+  try {
+    emitter.describe({
+      endpointId: 'receiver',
+      platform: 'memory',
+      authentication: 'none',
+      fastPath: false,
+      carrier: 'unavailable',
+      stageMask: 127
+    })
+    emitter.emit({ stage: RpcProbeStage.frame, content: { safe: true } })
+    expect(receivers.map(({ callback }) => callback)).toEqual([
+      'describe',
+      'now',
+      'identity',
+      'redact',
+      'emit',
+      'onError'
+    ])
+    expect(receivers.map(({ receiver }) => receiver)).toEqual(Array(6).fill(undefined))
+    expect(emitter.mask).toBe(1 << RpcProbeStage.frame)
+  } finally {
+    emitter.dispose()
+  }
+})
