@@ -83,3 +83,5 @@ profile 为 `migaia.rpc/2`，协议版本为2.0，方法目录 schemaVersion 为
 线上错误最多包含 1024 个节点，1025 个节点以 `INVALID_WIRE_ERROR` 拒绝，不再按旧错误树的 64 层深度拒绝。接收端迭代还原引用；同一图内的别名指向同一个错误对象，环也保留原有引用关系。
 
 业务应用从 [rpc-host](../rpc-host/README.md) 的 `createRpcHost` 开始；载体作者使用 `@migaia/rpc-host/sdk`。旧 `/v1`、`/runtime`、`/framing`、`/binary`、`/remote` 入口及其 profile 已删除，没有兼容别名。
+
+已删除的无抛出点错误码（无替代码）：`HOST_ASSEMBLER_DUPLICATE`, `HOST_FEATURE_DUPLICATE`, `PROVIDER_GENERATION_RETIRED`, `MIDDLEWARE_DUPLICATED`, `MIDDLEWARE_MISSING`, `PROVIDER_NOT_SETTLED`, `TARGET_NOT_IDENTIFIABLE`。

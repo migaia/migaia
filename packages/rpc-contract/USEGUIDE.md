@@ -84,7 +84,7 @@ stream事件为open/pull/item/end/fail/cancelled/finish-without-items。`seq`和
 
 group按顺序执行，首个失败后的步骤为`not-executed`；步骤结果为`success/result?`或`failure/error`。物理合帧由batch plugin负责，与group无关。outcome查询由idempotency plugin执行；contract只定义pending/unknown/done与store continuity数据。
 
-`control`帧有`id/route/operation/reason?`，operation为ping/pong/drain，不含业务task。`directory`帧有id/route及完整directory，也不创建provider调用。
+`control`帧有`id/route/operation/reason?`，operation为ping/pong/drain/close，不含业务task。`directory`帧有id/route及完整directory，也不创建provider调用。
 
 ## 载体、二进制与收发顺序
 
@@ -136,3 +136,5 @@ console.log('native error graph preserved')
 旧`/v1`、`/runtime`、`/framing`、`/binary`、`/remote`入口、JSON-RPC桥转换和Content-Length profile已删除。只需要RPC调用时使用host；编写载体时使用host SDK；contract内没有独立的连接或策略执行器。
 
 `RpcWireLimit.maxForwardHops` 为 16；`forwardRoute` 与序列化错误路由最多接受 `RpcWireLimit.maxForwardRouteNodes`（17）个节点 id，包含发起节点。Host 默认跳数仍为 3，协议容量不覆盖 host 自身配置。
+
+Host 按命名空间通过 `rpcHostPipelines(getHost, pipeline, namespaces)` 声明管道。内置出站顺序为 plaintext → schema → idempotency → limits → auth → chunk → batch → wire，入站反向。传输 feature 仅覆盖本命名空间的同种能力，不另建执行器。

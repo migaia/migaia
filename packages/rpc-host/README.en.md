@@ -62,7 +62,7 @@ An existing `defineHost` or class owner uses `rpcHostPipelines(getHost, pipeline
 | `host.<ns>.request(method, payload?, options?)`            | Business result                                                                       |
 | `host.<ns>.notify(method, payload?, options?)`             | Physical send, without business acknowledgement; `targetId` selects one direct target |
 | `host.<ns>.stream(method, payload?, options?)`             | Lazy iterator; independent consumption for multiple targets                           |
-| `host.<ns>.streamTo(targetId, method, payload?, options?)` | One lazy iterator for one direct target |
+| `host.<ns>.streamTo(targetId, method, payload?, options?)` | One lazy iterator for one direct target                                               |
 | `host.<ns>.group(steps, options?)`                         | Ordered `{ method, payload }` steps per target, without a cross-target transaction    |
 | `host.<ns>.send(targetId, method, payload?, options?)`     | Scalar result from one direct target                                                  |
 | `host.<ns>.dispatch(targetId, method, payload?, options?)` | Synchronous `void`; asynchronous failures reach the reporter                          |
@@ -82,7 +82,7 @@ Configure each forwarding host with `forward: { maxHops: 3 }` in `createRpcHost`
 
 ## Optional capabilities
 
-Install flow plugins in the host's `plugins`; install features in their owning plugin's `features`.
+The same `auth`, `chunk`, `batch`, `idempotency`, `limits`, and `schema` factories work in host `plugins` and transport `features`. Host placement supplies every namespace; transport placement overrides that capability only in its namespace. Each namespace has one implementation of each capability. Host `limits` shares quotas across namespaces; transport `limits` owns separate quotas. `probe`, `typegen`, and Devtools are host-only plugins. The former `namespaces` scope option is removed; select a transport with `features`.
 
 ```ts doc-test=check
 import { timeout, retry } from '@migaia/rpc-host/features'
@@ -102,6 +102,8 @@ Aggregate and default subpath imports support tree-shaking. Other flow plugins a
 
 A custom flow returns `stages` from `defineFlowFeature` setup; place the feature in host `plugins` or in one transport's `features`. Each stage receives its pipeline payload and native `next(payload)`; readonly events belong in the separate `observe` field. Frame pipelines allow independent submissions: after catching and reporting one member's failure, a stage can submit another. Ignoring a failed `next()` Promise rejects the pipeline. The original call settles a cancelled batch member with `CANCELLED` and its original reason on `cause`; other members complete normally.
 
+Builtin positions are fixed: outbound plaintext → schema → idempotency → limits → auth → chunk → batch → wire; inbound reverses the direction. Array order does not change these positions. Third-party stages default to plaintext; SDK authors may select the supported `layer` explicitly.
+
 `auth` protects each complete message before `chunk` splits it into physical frames. The receiver reassembles the message before restoring protection. Probe `protected` events describe the complete message; `frame` events retain actual `chunkIndex`, `chunkCount` and `members`. Physical batch membership is observed on its batch frame, while each logical message has one `envelope` observation.
 
 A custom carrier may implement optional `reserveWrite` by borrowing its existing flow-control capacity. Reserve once per logical write: chunk fragments share its receipt, while a batch retains each member's receipt until completion. `write` still completes at actual physical acceptance, and `close` must settle carrier-owned queued writes.
@@ -118,7 +120,7 @@ Every call kind supports `signal`, including cancellation propagated after a one
 
 Branch on `source/code`; preserve native classes, `stack`, `cause`, and `AggregateError.errors`. Timeout or disconnection does not prove that business work never executed. Reconcile uncertain non-idempotent work before retrying.
 
-Promise-returning calls such as `send` and `request` reject invalid `idempotencyKey` values or a closed namespace, preserving each entry's existing `source/code` and `cause`; invalid keys still use `CONTRACT_INVALID`. Handle failures with `await` or `Promise.catch`. `dispatch` still returns `void` and reports failures, while `stream` and `streamTo` still return lazy async iterators.
+Promise-returning calls such as `send` and `request` reject invalid `idempotencyKey` values, rejected transfer admission, or a closed namespace, preserving each entry's existing `source/code` and `cause`; invalid keys still use `CONTRACT_INVALID`. Handle failures with `await` or `Promise.catch`. `dispatch` still returns `void` and reports failures, while `stream` and `streamTo` still return lazy async iterators.
 
 Public provider registration rejects with `INVALID_CONFIG` and retains the exact registration failure directly on `cause`; diagnostic text does not invoke the thrown value's string conversion. Closing settles pending calls with `ENDPOINT_DISPOSED`, and actual carrier closure rejects held writes. Closing does not force an arbitrary business Promise to finish.
 
@@ -141,3 +143,7 @@ auth() releases a completed request ID immediately only when the actual native o
 With sign/verify configured, auth exchanges and validates a fresh source challenge inside the existing signed handshake. Application callbacks must still sign and verify the complete input they receive. No public discovery or handshake option is added.
 
 verifyCredentials may return { principalId: nonemptyString } to lend the authenticated principal to the current Session. Throwing or rejection still refuses authentication. Void, string, and other formerly ignored results do not grant a principal.
+
+The six former `/features/{auth,batch,chunk,idempotency,limits,schema}` entries are removed; import their factories from `/plugins/*` or `/plugins`. `rpcHostPipelines(getHost, pipeline, namespaces)` requires the third argument to declare every future transport namespace before native host construction. The following unused error codes are removed without replacement: `HOST_ASSEMBLER_DUPLICATE`, `HOST_FEATURE_DUPLICATE`, `PROVIDER_GENERATION_RETIRED`, `MIDDLEWARE_DUPLICATED`, `MIDDLEWARE_MISSING`, `PROVIDER_NOT_SETTLED`, `TARGET_NOT_IDENTIFIABLE`.
+
+For a child launched with native parent facts (process, thread, coroutine, dedicated worker, or pool member), the Host uses the parent-supplied name, otherwise the child `self.name`, otherwise the existing default. The parent also controls `instanceId`. Omit a parent name to address the name returned by the child during handshake. If an explicit child name differs from the parent name, construction succeeds and the child emits one `SELF_IGNORED` warning. Handle it with `createRpcHost({ onWarning })`; the warning contains `code`, `message`, `parentName`, and `ignoredName`, and `RpcWarningCode.selfIgnored` names the public code. Without a callback it goes to `console.warn`. Warnings do not enter `report` and carry no error code. Two conflicting sets of parent launch facts still reject with `INVALID_CONFIG`.

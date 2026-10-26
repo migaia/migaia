@@ -83,3 +83,5 @@ The protocol carries a `{ root, nodes }` flat error graph. Nodes retain source, 
 Wire errors allow at most 1024 nodes; a 1025-node graph is rejected with `INVALID_WIRE_ERROR`. The old 64-level error-tree rule does not apply to flat graph edges. Iterative restoration preserves aliases as the same error object within the restored graph, including cycles.
 
 Applications start with [rpc-host](../rpc-host/README.en.md) and `createRpcHost`; carrier authors use `@migaia/rpc-host/sdk`. Old `/v1`, `/runtime`, `/framing`, `/binary`, and `/remote` entries and profiles are removed without compatibility aliases.
+
+Removed unused codes, with no replacement: `HOST_ASSEMBLER_DUPLICATE`, `HOST_FEATURE_DUPLICATE`, `PROVIDER_GENERATION_RETIRED`, `MIDDLEWARE_DUPLICATED`, `MIDDLEWARE_MISSING`, `PROVIDER_NOT_SETTLED`, `TARGET_NOT_IDENTIFIABLE`。

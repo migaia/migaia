@@ -84,7 +84,7 @@ Semantic byte measurement applies only to stream value slots bounded by `maxItem
 
 Groups execute in order, with a `not-executed` suffix after the first failure. Step outcomes are `success/result?` or `failure/error`. The batch plugin owns physical batching independently. Idempotency executes outcome lookup; contract defines pending/unknown/done and store-continuity data only.
 
-Control frames contain `id/route/operation/reason?`; operation is ping/pong/drain, without a business task. Directory frames contain id/route and a complete directory, without creating a provider call.
+Control frames contain `id/route/operation/reason?`; operation is ping/pong/drain/close, without a business task. Directory frames contain id/route and a complete directory, without creating a provider call.
 
 ## Carriers, binary, and stage order
 
@@ -136,3 +136,5 @@ RpcWireLimit fixes identifiers at128 characters, traces256, idempotency keys128,
 Old `/v1`, `/runtime`, `/framing`, `/binary`, `/remote`, JSON-RPC bridge conversion, and Content-Length profiles are removed. Applications use Host, carrier authors use its SDK, and contract contains no independent connection or policy executor.
 
 `RpcWireLimit.maxForwardHops` is 16. `forwardRoute` and serialized error routes accept at most `RpcWireLimit.maxForwardRouteNodes` (17) node IDs, including the origin. A host’s default forwarding ceiling remains 3; protocol capacity does not override its local policy.
+
+Host flow pipelines are declared per namespace using `rpcHostPipelines(getHost, pipeline, namespaces)`. Builtin outbound order is plaintext → schema → idempotency → limits → auth → chunk → batch → wire; inbound reverses the direction. Transport feature placement overrides that capability only within its namespace; it does not create a second executor.

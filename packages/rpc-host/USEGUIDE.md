@@ -173,9 +173,13 @@ frame 管道允许多次提交。每次 `await next(payload)` 的失败交给当
 
 `batch` 中取消的成员不再向下游提交，原调用以 `CANCELLED` 结算，原 reason 保留在 `cause`；同批其他成员继续完成。入站某个成员失败只 report 该成员，不阻止后续成员。
 
+内置位置固定：出站 plaintext → schema → idempotency → limits → auth → chunk → batch → wire；入站反向。数组书写顺序不改变这些位置。第三方 stage 默认在 plaintext，高阶 SDK 作者可显式指定受支持的 `layer`。
+
 `auth` 对完整消息执行保护，再由 `chunk` 拆成物理帧；接收端先重组，再还原保护。probe 的 `protected` 事件对应整条消息，`frame` 事件保留实际 `chunkIndex`、`chunkCount` 和 `members`。物理 batch 的成员数在 batch frame 上观察；`envelope` 事件仍对每条逻辑消息观察一次。
 
 载体可选实现 `reserveWrite(options)`，借用原有流控 owner，返回带 `release()` 的容量凭据。Session 在编码之后为一次逻辑写出预留一次，等这次 frame 管道实际结算后释放；chunk 的所有分片借用同一凭据，batch 各成员保留各自凭据，合并的物理写出借用仍存活成员的凭据。载体的 `write` 仍在实际物理接纳后完成，不应再把分片或 batch 重复计为新的逻辑调用。凭据不进入线上数据。
+
+同一组 `auth`、`chunk`、`batch`、`idempotency`、`limits`、`schema` 工厂支持 host 的 `plugins` 与传输的 `features`；传输配置只覆盖本命名空间。host 级 `limits` 共用额度，传输级各自独立。`probe`、`typegen`、Devtools 只装在 host 级。删除原 `namespaces` 作用范围选项，改为把 feature 放在对应传输上。
 
 ## 通知、分组与结果查询
 
@@ -258,7 +262,7 @@ export const declarations = typegen({
 
 按 `source/code` 识别错误，保留原生类型、stack、cause 与 errors。不要把超时、取消或未知结果当成业务未执行证明。原生成员控制位于传输贡献的 `host.<ns>.members`，池控制位于其 feature 贡献的 `host.<ns>.pool`；这些控制不替代调用入口。
 
-`send`、`request` 等返回 Promise 的调用通过拒绝传播非法 `idempotencyKey` 或命名空间已关闭的错误，保留各入口原有的 `source/code` 和 `cause`；非法 key 仍为 `CONTRACT_INVALID`。使用 `await` 或 `Promise.catch` 处理失败。`dispatch` 仍同步返回 `void` 并向 reporter 交付失败，`stream` 与 `streamTo` 仍返回延迟启动的异步迭代器。
+`send`、`request` 等返回 Promise 的调用通过拒绝传播非法 `idempotencyKey`、transfer 准入被拒绝或命名空间已关闭的错误，保留各入口原有的 `source/code` 和 `cause`；非法 key 仍为 `CONTRACT_INVALID`。使用 `await` 或 `Promise.catch` 处理失败。`dispatch` 仍同步返回 `void` 并向 reporter 交付失败，`stream` 与 `streamTo` 仍返回延迟启动的异步迭代器。
 
 ## 公开行为与迁移
 
@@ -277,3 +281,7 @@ auth() 的已完成请求 ID 仅在实际原生 owner 证明来源独占时立�
 配置 sign/verify 时，auth 在既有签名握手中交换并验证每个来源的新挑战；应用回调仍须签名和验证收到的完整输入。此过程不增加公开 discovery 或握手配置。
 
 verifyCredentials 可返回 { principalId: 非空字符串 }，把真实认证主体交给当前 Session；抛出或拒绝仍拒绝认证。void、字符串及其他原先被忽略的结果不会授予主体身份。
+
+原六个 `/features/{auth,batch,chunk,idempotency,limits,schema}` 入口已删除，改从 `/plugins/*` 或 `/plugins` 导入。`rpcHostPipelines(getHost, pipeline, namespaces)` 的第三参数须在原生宿主构造前声明全部未来传输命名空间。以下无抛出点错误码已删除，不提供替代码：`HOST_ASSEMBLER_DUPLICATE`, `HOST_FEATURE_DUPLICATE`, `PROVIDER_GENERATION_RETIRED`, `MIDDLEWARE_DUPLICATED`, `MIDDLEWARE_MISSING`, `PROVIDER_NOT_SETTLED`, `TARGET_NOT_IDENTIFIABLE`。
+
+被父端拉起并收到原生启动事实的子节点（process、thread、coroutine、dedicated worker 或 pool 成员），Host 名字按父端指定名、子节点 `self.name`、现有默认名依次选择；`instanceId` 也以父端为准。父端省略名字时，按子节点握手报回的名字寻址。显式子节点名字与父端不同时，构造成功，子节点只发出一次 `SELF_IGNORED` 警告。通过 `createRpcHost({ onWarning })` 接收，事件含 `code`、`message`、`parentName`、`ignoredName`，公开常量为 `RpcWarningCode.selfIgnored`；未配置回调时交给 `console.warn`。警告不进 `report`，不带错误码。两份互相冲突的父端启动事实仍以 `INVALID_CONFIG` 拒绝。

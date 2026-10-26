@@ -173,9 +173,13 @@ Frame pipelines accept multiple submissions. The stage receives each `await next
 
 A cancelled `batch` member submits no further downstream work. Its call settles with `CANCELLED` and the original reason on `cause`; other members complete normally. An inbound member failure reports only that member and does not prevent later members from being processed.
 
+Builtin positions are fixed: outbound plaintext → schema → idempotency → limits → auth → chunk → batch → wire; inbound reverses the direction. Array order does not change these positions. Third-party stages default to plaintext; SDK authors may select the supported `layer` explicitly.
+
 `auth` protects each complete message before `chunk` splits it into physical frames. The receiver reassembles the message before restoring protection. Probe `protected` events describe the complete message; `frame` events retain actual `chunkIndex`, `chunkCount` and `members`. Physical batch membership is observed on its batch frame, while each logical message has one `envelope` observation.
 
 A carrier may implement `reserveWrite(options)` by borrowing its existing flow-control owner and returning a receipt with `release()`. Session reserves once per logical write after encoding and releases when that frame pipeline actually settles. Chunk fragments share the same receipt; a batch retains each member's receipt and borrows a surviving member's receipt for its coalesced physical write. `write` still completes at actual physical acceptance, without counting fragments or batches as new logical calls. Receipts never enter wire data.
+
+The same `auth`, `chunk`, `batch`, `idempotency`, `limits`, and `schema` factories support host `plugins` and transport `features`; transport placement overrides only its namespace. Host `limits` shares quotas; transport `limits` owns separate quotas. `probe`, `typegen`, and Devtools are host-only. Remove the former `namespaces` scope option and place the feature on its transport.
 
 ## Notifications, groups, and retained outcomes
 
@@ -258,7 +262,7 @@ Public close settles pending calls with `ENDPOINT_DISPOSED` and closes the actua
 
 Branch on `source/code`; preserve native classes, stack, cause, and errors. Timeout, cancellation, or an unknown result is not proof that work never executed. Native controls live under transport-owned `host.<ns>.members`; Pool controls live under feature-owned `host.<ns>.pool`. These controls do not replace RPC calls.
 
-Promise-returning calls such as `send` and `request` reject invalid `idempotencyKey` values or a closed namespace, preserving each entry's existing `source/code` and `cause`; invalid keys still use `CONTRACT_INVALID`. Handle failures with `await` or `Promise.catch`. `dispatch` still returns `void` and reports failures, while `stream` and `streamTo` still return lazy async iterators.
+Promise-returning calls such as `send` and `request` reject invalid `idempotencyKey` values, rejected transfer admission, or a closed namespace, preserving each entry's existing `source/code` and `cause`; invalid keys still use `CONTRACT_INVALID`. Handle failures with `await` or `Promise.catch`. `dispatch` still returns `void` and reports failures, while `stream` and `streamTo` still return lazy async iterators.
 
 ## Public behavior and migration
 
@@ -277,3 +281,7 @@ auth() releases a completed request ID immediately only when the actual native o
 With sign/verify configured, auth exchanges and validates a fresh source challenge inside the existing signed handshake. Application callbacks must still sign and verify the complete input they receive. No public discovery or handshake option is added.
 
 verifyCredentials may return { principalId: nonemptyString } to lend the authenticated principal to the current Session. Throwing or rejection still refuses authentication. Void, string, and other formerly ignored results do not grant a principal.
+
+The six former `/features/{auth,batch,chunk,idempotency,limits,schema}` entries are removed; import their factories from `/plugins/*` or `/plugins`. `rpcHostPipelines(getHost, pipeline, namespaces)` requires the third argument to declare every future transport namespace before native host construction. The following unused error codes are removed without replacement: `HOST_ASSEMBLER_DUPLICATE`, `HOST_FEATURE_DUPLICATE`, `PROVIDER_GENERATION_RETIRED`, `MIDDLEWARE_DUPLICATED`, `MIDDLEWARE_MISSING`, `PROVIDER_NOT_SETTLED`, `TARGET_NOT_IDENTIFIABLE`.
+
+For a child launched with native parent facts (process, thread, coroutine, dedicated worker, or pool member), the Host uses the parent-supplied name, otherwise the child `self.name`, otherwise the existing default. The parent also controls `instanceId`. Omit a parent name to address the name returned by the child during handshake. If an explicit child name differs from the parent name, construction succeeds and the child emits one `SELF_IGNORED` warning. Handle it with `createRpcHost({ onWarning })`; the warning contains `code`, `message`, `parentName`, and `ignoredName`, and `RpcWarningCode.selfIgnored` names the public code. Without a callback it goes to `console.warn`. Warnings do not enter `report` and carry no error code. Two conflicting sets of parent launch facts still reject with `INVALID_CONFIG`.
