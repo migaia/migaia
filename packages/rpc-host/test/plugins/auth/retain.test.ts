@@ -12,11 +12,42 @@ import type {
 import type { IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
 import {
   RequestReplayLedger,
-  type IRequestReplayEntry
+  type IRequestReplayEntry,
+  type IRequestReplaySource
 } from '../../../dist/features/auth/request-replay.js'
 import { ProviderDispatcher } from '../../../dist/dispatch/dispatcher.js'
 import { coreMemoryServer } from '../../host/core-fixture.js'
 import { MemoryCarrier } from '../../fixtures/core-carrier.js'
+
+/** Observe stored bodies through Map's existing write boundary, including completion headers. */
+function observeStoredReplayBody(
+  value: unknown,
+  sources: ReadonlySet<IRequestReplaySource>,
+  read: (retain: IRpcAuthenticationRetain) => void
+): IRequestReplayEntry | undefined {
+  if (!value || typeof value !== 'object') return
+  /** Both completion layouts retain the same actual entry body under this optional header. */
+  const candidate = (value as { entry?: unknown }).entry ?? value
+  if (!candidate || typeof candidate !== 'object') return
+  /** Source identity limits observation to entries created by this particular ledger fixture. */
+  const entry = candidate as Partial<IRequestReplayEntry>
+  if (!entry.source || !sources.has(entry.source)) return
+  /** A repeated insertion of the same body keeps its first counting getter. */
+  const descriptor = Object.getOwnPropertyDescriptor(entry, 'retain')
+  if (descriptor && 'value' in descriptor) {
+    /** Only observation changes: the declared immutable retention value remains identical. */
+    const retain = descriptor.value as IRpcAuthenticationRetain
+    Object.defineProperty(entry, 'retain', {
+      configurable: descriptor.configurable,
+      enumerable: descriptor.enumerable,
+      get: () => {
+        read(retain)
+        return retain
+      }
+    })
+  }
+  return entry as IRequestReplayEntry
+}
 
 /** Preserve an actual plaintext request so a later public notification can reissue its exact ID. */
 class ReissuedRequest {
@@ -406,6 +437,114 @@ it('A30 advances only expired completed counters with many active identities', (
     iterations.mockRestore()
     removed.mockRestore()
     ledger.retire(source)
+  }
+})
+
+it('A30 does not inspect unexpired numeric or window replay bodies on lookup and admission', () => {
+  /** These two supported numeric choices stand for configuration and connection override values. */
+  const numeric = [
+    { source: { replayKeys: new Set<string>() }, retain: 10_000 },
+    { source: { replayKeys: new Set<string>() }, retain: 20_000 }
+  ] as const
+  /** Eight logical IDs per signed counter keep 512 completed IDs inside the actual 64-slot window. */
+  const window = { replayKeys: new Set<string>(), window: { high: 0n } }
+  /** Only entries belonging to these actual fixture sources receive observation getters. */
+  const sources = new Set<IRequestReplaySource>([numeric[0].source, numeric[1].source, window])
+  /** Completion writes prove the probes are installed on stored bodies, not only admission values. */
+  const completedBodies = new Set<IRequestReplayEntry>()
+  /** Setup reads are expected; only the two selected ledger operations are inspected. */
+  let inspecting = false
+  /** This flag observes the existing settle handoff without reading any private table. */
+  let settling = false
+  /** Numeric and window probes must both detect actual body reads before the zero-read assertion. */
+  const reads = { numeric: 0, window: 0 }
+  /** The getter preserves each original body value while recording the selected observation phase. */
+  const read = (retain: IRpcAuthenticationRetain): void => {
+    if (!inspecting) return
+    if (typeof retain === 'number') reads.numeric += 1
+    else if (retain === 'window') reads.window += 1
+  }
+  /** Native Map insertion and entry identity are unchanged by the observation passthrough. */
+  const originalSet = Map.prototype.set
+  /** Every layout passes its real stored body or header through this same native operation. */
+  const stores = vi
+    .spyOn(Map.prototype, 'set')
+    .mockImplementation(function (this: Map<unknown, unknown>, key, value) {
+      /** Headers are followed to their existing entry, so a new layout cannot make the probe blind. */
+      const body = observeStoredReplayBody(value, sources, read)
+      if (settling && body) completedBodies.add(body)
+      return Reflect.apply(originalSet, this, [key, value])
+    })
+  /** Existing numeric leases retain their default capacity; no new duration limit is configured. */
+  const ledger = new RequestReplayLedger()
+  try {
+    // The outer collection is the fixed two-duration fixture above, not a growable nested scan.
+    for (const [sourceIndex, configured] of numeric.entries())
+      for (let index = 0; index < 256; index++) {
+        /** Each provider really completes before retention starts, as in the public A30 cases. */
+        const key = `numeric-${sourceIndex}-${index}`
+        /** Admission supplies the same entry later transferred into completed storage. */
+        const entry = ledger.admit(
+          configured.source,
+          `peer-${sourceIndex}`,
+          key,
+          0,
+          configured.retain
+        )!
+        settling = true
+        ledger.settle(key, entry, 0)
+        settling = false
+      }
+    for (let counter = 1; counter <= 64; counter++) {
+      window.window.high = BigInt(counter)
+      // This fixture has exactly eight logical members per counter, matching one bounded group.
+      for (let member = 0; member < 8; member++) {
+        /** Window membership never reserves numeric replay capacity. */
+        const key = `window-${counter}-${member}`
+        /** The counter belongs to the authenticated envelope shared by these logical members. */
+        const entry = ledger.admit(window, 'window-peer', key, 0, 'window', BigInt(counter))!
+        settling = true
+        ledger.settle(key, entry, 0)
+        settling = false
+      }
+    }
+    stores.mockRestore()
+    expect(completedBodies.size).toBe(1_024)
+    expect(
+      [...completedBodies].every(
+        (entry) => typeof Object.getOwnPropertyDescriptor(entry, 'retain')?.get === 'function'
+      )
+    ).toBe(true)
+    /** Both kinds of actual stored body must demonstrably trigger the probe before measuring reads. */
+    inspecting = true
+    for (const body of completedBodies) {
+      if (reads.numeric > 0 && reads.window > 0) break
+      void body.retain
+    }
+    expect(reads.numeric).toBeGreaterThan(0)
+    expect(reads.window).toBeGreaterThan(0)
+    reads.numeric = 0
+    reads.window = 0
+    expect(ledger.has('missing', 100)).toBe(false)
+    /** Capture lookup separately from admission; both must leave unexpired bodies untouched. */
+    const lookupReads = { ...reads }
+    reads.numeric = 0
+    reads.window = 0
+    expect(ledger.admit(numeric[0].source, 'peer-0', 'new-active', 100, 10_000)).toBeDefined()
+    inspecting = false
+    expect({ lookup: lookupReads, admission: reads }).toEqual({
+      lookup: { numeric: 0, window: 0 },
+      admission: { numeric: 0, window: 0 }
+    })
+    /** Original duration expiry remains independent, and numeric cleanup never touches window IDs. */
+    expect(ledger.has('numeric-0-0', 10_000)).toBe(false)
+    expect(ledger.has('numeric-1-0', 10_000)).toBe(true)
+    expect(ledger.has('numeric-1-0', 20_000)).toBe(false)
+    expect(ledger.has('window-1-0', 20_000)).toBe(true)
+  } finally {
+    inspecting = false
+    stores.mockRestore()
+    for (const source of sources) ledger.retire(source)
   }
 })
 

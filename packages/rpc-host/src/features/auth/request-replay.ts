@@ -27,6 +27,9 @@ export type IRequestReplayEntry = Readonly<{
 /** Refused numeric correlations retain their original source and fixed short expiry. */
 type IRequestReplayRejection = Readonly<{ source: IRequestReplaySource; expiresAt: number }>
 
+/** Expiry metadata can be checked without reading an unexpired request body. */
+type IRequestReplayCompletion = Readonly<{ entry: IRequestReplayEntry; at: number }>
+
 /** The signed admission window has exactly 64 positions, independent of request concurrency. */
 const requestReplayWindowSlots = 64n
 
@@ -40,8 +43,12 @@ type IRequestReplayWindow = {
 export class RequestReplayLedger {
   /** Actual business completion alone may remove an in-flight correlation. */
   readonly #active = new Map<string, IRequestReplayEntry>()
-  /** Numeric expiry and signed-window advancement release only this existing completed history. */
-  readonly #completed = new Map<string, IRequestReplayEntry>()
+  /** Numeric lookup retains expiry metadata separately from the request body. */
+  readonly #completed = new Map<string, IRequestReplayCompletion>()
+  /** Equal durations preserve completion/expiry order, so cleanup stops at each first live header. */
+  readonly #durations = new Map<number, Map<string, IRequestReplayCompletion>>()
+  /** Window lookup is independent from numeric TTL cleanup; only the counter ring expires it. */
+  readonly #windowCompleted = new Map<string, IRequestReplayEntry>()
   /** The original short numeric refusal history does not reserve accepted-entry capacity. */
   readonly #rejected = new Map<string, IRequestReplayRejection>()
   /** Each original source retains only completed IDs in its fixed-size signed-counter ring. */
@@ -61,7 +68,7 @@ export class RequestReplayLedger {
   /** Duplicate checks never refresh an accepted correlation's original completion timestamp. */
   has(key: string, now: number): boolean {
     this.#purge(now)
-    return this.#active.has(key) || this.#completed.has(key)
+    return this.#active.has(key) || this.#completed.has(key) || this.#windowCompleted.has(key)
   }
 
   /** Reserve one original identity; only numeric policy can refuse bounded capacity admission. */
@@ -108,10 +115,23 @@ export class RequestReplayLedger {
       this.#release(key, entry)
       return
     }
-    /** Completion time still belongs to numeric TTL; window ordering uses the verified counter. */
-    const completed = { ...entry, at: now }
+    if (entry.retain === 'window') {
+      this.#windowCompleted.set(key, entry)
+      this.#queueWindow(key, entry)
+      return
+    }
+    /** A connection's selected duration is stable; expiry begins at business completion. */
+    const duration = entry.retain
+    /** The header and its ordered bucket point to the same immutable entry. */
+    const completed = { entry, at: now }
     this.#completed.set(key, completed)
-    if (entry.retain === 'window') this.#queueWindow(key, completed)
+    /** Empty buckets are removed during release, so each bucket consumes a numeric lease. */
+    let bucket = this.#durations.get(duration)
+    if (!bucket) {
+      bucket = new Map()
+      this.#durations.set(duration, bucket)
+    }
+    bucket.set(key, completed)
   }
 
   /** The original signed window may release completed entries, never active business or streams. */
@@ -134,7 +154,7 @@ export class RequestReplayLedger {
       ring.slots[index] = undefined
       if (entries)
         for (const [key, entry] of entries) {
-          this.#completed.delete(key)
+          this.#windowCompleted.delete(key)
           this.#release(key, entry)
         }
       index = (index + 1) % ring.slots.length
@@ -166,9 +186,11 @@ export class RequestReplayLedger {
     this.#windowRings.delete(source)
     for (const key of source.replayKeys) {
       /** Exact original source identity prevents cleanup from touching a reused correlation. */
-      const entry = this.#active.get(key) ?? this.#completed.get(key)
+      const entry =
+        this.#active.get(key) ?? this.#windowCompleted.get(key) ?? this.#completed.get(key)?.entry
       if (entry?.source === source) {
         this.#active.delete(key)
+        this.#windowCompleted.delete(key)
         this.#completed.delete(key)
         this.#release(key, entry)
       }
@@ -186,18 +208,25 @@ export class RequestReplayLedger {
   #release(key: string, entry: IRequestReplayEntry): void {
     entry.source.replayKeys.delete(key)
     if (entry.releaseCount) {
+      /** Active numeric IDs may have no completed bucket; completed IDs release its last slot once. */
+      const bucket = this.#durations.get(entry.retain as number)
+      bucket?.delete(key)
+      if (bucket?.size === 0) this.#durations.delete(entry.retain as number)
       entry.releaseCount()
       this.#numericCount -= 1
     }
   }
 
-  /** Different numeric durations require a complete linear pass rather than an expiry-prefix break. */
+  /** Read only expiry headers; request bodies are touched only when their numeric retention ends. */
   #purge(now: number): void {
-    for (const [key, entry] of this.#completed) {
-      if (typeof entry.retain !== 'number' || now - entry.at < entry.retain) continue
-      this.#completed.delete(key)
-      this.#release(key, entry)
-    }
+    // Each nonempty duration bucket consumes at least one of Policy.maxEntries (4096) numeric
+    // leases. Durations come from config/connection retain; no new user capacity limit is added.
+    for (const [duration, bucket] of this.#durations)
+      for (const [key, completed] of bucket) {
+        if (now - completed.at < duration) break
+        this.#completed.delete(key)
+        this.#release(key, completed.entry)
+      }
     for (const [key, entry] of this.#rejected) {
       if (entry.expiresAt > now) break
       this.#rejected.delete(key)
