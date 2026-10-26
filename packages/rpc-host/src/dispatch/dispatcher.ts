@@ -110,7 +110,12 @@ export class ProviderDispatcher {
   describe(namespace?: string): readonly IRpcMethodDescription[] {
     /** Native exposure is private to this transport; explicit public providers remain global. */
     const scoped = namespace === undefined ? undefined : this.#native.get(namespace)
-    return scoped ? [...this.#global.description, ...scoped.description] : this.#global.description
+    if (!scoped) return this.#global.description
+    /** Advertise the same native-first selection used by dispatch, preserving other method order. */
+    return [
+      ...this.#global.description.filter((method) => scoped.lookup(method.name) === undefined),
+      ...scoped.description
+    ]
   }
 
   /** Cold installation creates one catalog per native namespace and retires it when empty. */

@@ -365,6 +365,32 @@ describe('C2 ProviderDispatcher / Forwarder / StreamChannel owners', () => {
     await pair.close()
   })
 
+  it('A40 describes native precedence once when scoped and global providers share a name', async () => {
+    /** Both catalogs belong to the production dispatcher reached by the existing native owner pair. */
+    const pair = new OwnerPair()
+    try {
+      pair.dispatcher.provide({ shared: () => 'global', globalOnly: () => true })
+      /** The native catalog is committed through its existing installation receipt. */
+      const native = pair.dispatcher.prepare(
+        { shared: () => 'native', nativeOnly: () => true },
+        { namespace: 'test' }
+      )
+      native.commit()
+      expect(await pair.request('shared')).toBe('native')
+      expect(pair.dispatcher.describe().map((method) => method.name)).toEqual([
+        'shared',
+        'globalOnly'
+      ])
+      expect(pair.dispatcher.describe('test').map((method) => method.name)).toEqual([
+        'globalOnly',
+        'shared',
+        'nativeOnly'
+      ])
+    } finally {
+      await pair.close()
+    }
+  })
+
   it('C2-P01 captures descriptor order, method identity and original local receiver without getters', async () => {
     /** Original local group receiver is the actual object captured by descriptor compilation. */
     const receiver = {
