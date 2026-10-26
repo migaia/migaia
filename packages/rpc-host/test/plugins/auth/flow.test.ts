@@ -298,6 +298,96 @@ it('retains the original 64-slot window, concurrent single commit and physical-s
   await f.flow.dispose()
 })
 
+// RPC-TEST-D12BE7E44139-C003/C004: retain the original counter inputs on the genuine native owner.
+it('receives the original 64-slot boundaries and isolated concurrent verification', async () => {
+  /** The same installed Auth owner allocates every original sequence before receive order changes. */
+  const f = await fixture({ sign: (value) => value, verify: (value) => value })
+  /** Actual physical source retirement is independent from this native installation's cleanup. */
+  const sibling = new AbortController()
+  /** A second actual installation owns a different secure nonce, never a forged context binding. */
+  const other = await fixture({ sign: (value) => value, verify: (value) => value })
+  try {
+    /** Preserve all original sixty-six allocations and exact boundary indexes. */
+    const frames: IRpcCarrierFrame[] = []
+    for (let index = 1; index <= 66; index++)
+      frames.push(await f.send(message(String(index), index)))
+    expect(await f.receive(frames[64]!)).toMatchObject({ payload: 65 })
+    expect(await f.receive(frames[1]!)).toMatchObject({ payload: 2 })
+    await expect(f.receive(frames[0]!)).rejects.toMatchObject({ code: 'AUTHENTICATION_FAILED' })
+    await expect(f.receive(frames[1]!)).rejects.toMatchObject({ code: 'AUTHENTICATION_FAILED' })
+    await expect(f.receive(frames[64]!)).rejects.toMatchObject({ code: 'AUTHENTICATION_FAILED' })
+    expect(await f.receive(frames[65]!)).toMatchObject({ payload: 66 })
+    expect(setAuthenticationReplayCounter(f.installation, 130n)).toBe(true)
+    expect(await f.receive(await f.send(message('131', 131)))).toMatchObject({ payload: 131 })
+    await expect(f.receive(frames[65]!)).rejects.toMatchObject({ code: 'AUTHENTICATION_FAILED' })
+    /** The same fresh signed frame enters two real native verification traversals concurrently. */
+    const concurrentFrame = await f.send(message('concurrent', 'value'))
+    /** Both entries share one actual physical source and must commit its counter only once. */
+    const concurrent = await Promise.allSettled([
+      f.receive(concurrentFrame),
+      f.receive(concurrentFrame)
+    ])
+    expect(concurrent.filter((entry) => entry.status === 'fulfilled')).toHaveLength(1)
+    expect(
+      concurrent.filter(
+        (entry) =>
+          entry.status === 'rejected' &&
+          (entry.reason as { code?: string }).code === 'AUTHENTICATION_FAILED'
+      )
+    ).toHaveLength(1)
+    expect(await f.receive(concurrentFrame, sibling.signal, 'independent-source')).toMatchObject({
+      payload: 'value'
+    })
+    await expect(f.receive(await other.send(message('different-nonce')))).rejects.toMatchObject({
+      code: 'AUTHENTICATION_FAILED'
+    })
+  } finally {
+    sibling.abort()
+    await f.flow.dispose()
+    await other.flow.dispose()
+  }
+})
+
+// RPC-TEST-D12BE7E44139-C002: exercise original nonce failure inside the authentic Auth stage.
+it.each(['missing', 'throwing'] as const)(
+  'receives original %s nonce entropy failure without replacing its cause',
+  async (mode) => {
+    /** Construct native declarations before changing only the entropy used by the first Auth send. */
+    const f = await fixture({ sign: (value) => value, verify: (value) => value })
+    /** The original throwing native operation remains reachable by exact identity. */
+    const original = new RangeError('Authentication replay nonce generation failed')
+    /** Restore the real method before native owner cleanup even when an assertion fails. */
+    let restore: (() => void) | undefined
+    try {
+      if (mode === 'missing') vi.stubGlobal('crypto', undefined)
+      else {
+        /** Only the original native entropy operation fails; no Auth callback replaces its owner. */
+        const entropy = vi.spyOn(globalThis.crypto, 'getRandomValues').mockImplementation(() => {
+          throw original
+        })
+        restore = () => entropy.mockRestore()
+      }
+      /** This actual outbound stage has not yet allocated its first installation nonce. */
+      const failure = await f.send(message('entropy')).catch((error: unknown) => error)
+      expect(failure).toMatchObject({
+        code: 'INVALID_CONFIG',
+        message:
+          mode === 'missing'
+            ? 'Authentication replay nonce is unavailable'
+            : 'Authentication replay nonce generation failed'
+      })
+      if (mode === 'throwing') {
+        expect((failure as Error).cause).toBe(original)
+        expect(original.stack).toBeTruthy()
+      }
+    } finally {
+      restore?.()
+      vi.unstubAllGlobals()
+      await f.flow.dispose()
+    }
+  }
+)
+
 it('finishes original native integrity before replay commit and reuses the exact cached restore Promise', async () => {
   /** Signing covers the original complete manifest including full backing digest/length. */
   const f = await fixture({ sign: (value) => value, verify: (value) => value }, true)
