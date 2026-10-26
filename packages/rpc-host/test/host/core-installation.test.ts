@@ -257,9 +257,9 @@ it('rolls back actual native members in reverse opening order without replacing 
       })
     ).rejects.toBe(primary)
     expect(closed).toEqual([1, 0])
-    expect(
-      reports.some((error) => error instanceof AggregateError && error.errors.includes(cleanup))
-    ).toBe(true)
+    /** Session reports its exact cleanup failure once; rollback propagates without a second report. */
+    expect(reports).toEqual([cleanup])
+    expect(reports[0]).toBe(cleanup)
   } finally {
     await remote.close()
   }

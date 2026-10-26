@@ -30,7 +30,7 @@ class ClosingVerification {
 }
 
 it.each(['fulfilled', 'rejected'] as const)(
-  'closes before an ignored verifier settles, aborts its signal and reports its late %s result exactly once',
+  'closes before an ignored verifier settles and applies cancellation reporting to its late %s result',
   async (outcome) => {
     /** Only actual provider entry can change this business observation. */
     const delivered: unknown[] = []
@@ -90,16 +90,23 @@ it.each(['fulfilled', 'rejected'] as const)(
       const before = failures.length
       if (outcome === 'fulfilled') verifier.release.resolve()
       else verifier.release.reject(original)
-      await vi.waitFor(() => expect(failures).toHaveLength(before + 1))
-      expect(failures.at(-1)).toMatchObject({
-        source: 'rpc.endpoint',
-        code: 'AUTHENTICATION_FAILED'
-      })
-      if (outcome === 'rejected') expect((failures.at(-1) as Error).cause).toBe(original)
+      /**
+       * BC20 discards late success; an independent verifier rejection still reports its exact
+       * cause.
+       */
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      expect(failures).toHaveLength(before + (outcome === 'rejected' ? 1 : 0))
+      if (outcome === 'rejected') {
+        expect(failures.at(-1)).toMatchObject({
+          source: 'rpc.endpoint',
+          code: 'AUTHENTICATION_FAILED'
+        })
+        expect((failures.at(-1) as Error).cause).toBe(original)
+      }
       expect(delivered).toEqual([])
       await Promise.resolve()
       await Promise.resolve()
-      expect(failures).toHaveLength(before + 1)
+      expect(failures).toHaveLength(before + (outcome === 'rejected' ? 1 : 0))
     } finally {
       verifier.release.resolve()
       await Promise.all([client.host.close(), host.close()])
