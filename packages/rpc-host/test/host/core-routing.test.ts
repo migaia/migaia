@@ -113,8 +113,10 @@ describe('RPC namespace routing', () => {
           code: 'PROVIDER_NOT_FOUND'
         })
         await c.host.close()
+        /** R20 rejects the withdrawn dotted method locally once the current directory arrives. */
+        await vi.waitFor(() => expect(a.host.memory.peers.b).not.toHaveProperty('c.render'))
         await expect(a.host.memory.send('b', 'c.render', 1)).rejects.toMatchObject({
-          code: 'TARGET_UNKNOWN'
+          code: 'PROVIDER_NOT_FOUND'
         })
         /** The same display name now refers to a new real accepted physical generation. */
         const replacement = await b.connect('c', { provide: { render: () => 'new' } }, 'c-new')
@@ -256,11 +258,15 @@ describe('RPC namespace routing', () => {
       })
       expect(lower).toHaveBeenCalledTimes(0)
       await longer.host.close()
+      /** The shorter real method becomes selectable only after the revised directory is visible. */
+      await vi.waitFor(() => expect(caller.host.memory.peers.gateway).toHaveProperty('a.b.c'))
       expect(await caller.host.memory.send('gateway', 'a.b.c')).toBe(42)
       expect(lower).toHaveBeenCalledTimes(1)
       await shorter.host.close()
+      /** The final withdrawal removes this path from the caller's current direct directory. */
+      await vi.waitFor(() => expect(caller.host.memory.peers.gateway).not.toHaveProperty('a.b.c'))
       await expect(caller.host.memory.send('gateway', 'a.b.c')).rejects.toMatchObject({
-        code: 'TARGET_UNKNOWN'
+        code: 'PROVIDER_NOT_FOUND'
       })
       expect(lower).toHaveBeenCalledTimes(1)
     } finally {
