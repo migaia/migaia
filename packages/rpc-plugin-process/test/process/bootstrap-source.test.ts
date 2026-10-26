@@ -244,8 +244,7 @@ it('warns for an ignored explicit self and preserves cleanup failure reports', a
     expect(warnings).toEqual([
       expect.objectContaining({
         code: RpcWarningCode.selfIgnored,
-        parentName: childSelf.name,
-        ignoredName: 'wrong'
+        data: { parentName: childSelf.name, ignoredName: 'wrong' }
       })
     ])
     /** Native close failure is expected; the original report must retain that exact Error instance. */
