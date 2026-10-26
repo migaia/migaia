@@ -13,7 +13,7 @@ const replay = idempotency()
 /** Each actual generic flow contributes its own disjoint namespace method. */
 const extension = defineFlowFeature({
   name: 'typed-extension',
-  setup: () => ({ hooks: {}, namespaceExtensions: () => ({ answer: () => 42 }) })
+  setup: () => ({ stages: {}, namespaceExtensions: () => ({ answer: () => 42 }) })
 })
 /** The SDK derives both local extension contributions from the actual transport feature list. */
 const memory = defineTransportPlugin({
