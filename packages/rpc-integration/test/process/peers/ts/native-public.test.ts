@@ -33,12 +33,12 @@ const evidence = process.env.RPC_PEERS_EVIDENCE ?? '/tmp/m2-e-evidence'
 mkdirSync(evidence, { recursive: true })
 /** Existing conformance acquisition supplies the exact selected executable and original arguments. */
 const selectedPeer = { language: runtime, command: executable, args: [peer], id: 'ts-peer' }
-/** These original application management predicates remain unreceived, not a restored wire service. */
-const managementMethod = {
-  use: 'migaia.remote.host.use',
-  unUse: 'migaia.remote.host.unUse',
-  inspect: 'migaia.remote.host.inspect'
-} as const
+/** Removed remote-management methods must stay absent from the real ordinary directory. */
+const removedManagementMethods = [
+  'migaia.remote.host.use',
+  'migaia.remote.host.unUse',
+  'migaia.remote.host.inspect'
+] as const
 
 /** Original values remain independent from the production protocol and native source owners. */
 const vectors = JSON.parse(
@@ -49,7 +49,6 @@ const vectors = JSON.parse(
   generator: { input: string[]; expected: string[] }
   error: Record<string, unknown>
   cancel: { reason: string; expectedCode: string; providerReason: Record<string, unknown> }
-  host: { name: string; installed: Record<string, unknown>; removed: Record<string, unknown> }
 }
 
 /** One receipt borrows only the actual SessionTable and the exact native attachment it returned. */
@@ -102,7 +101,7 @@ class NativeControlReceipts {
 }
 
 /** Existing deployment/client owns spawn, socket admission, public Host and all native cleanup. */
-async function nativeClient(hostProfile: boolean, token: string, address?: string) {
+async function nativeClient(token: string, address?: string) {
   /** This observer adds no transport, supervisor, queue, codec or management facade. */
   const controls = new NativeControlReceipts()
   try {
@@ -110,7 +109,7 @@ async function nativeClient(hostProfile: boolean, token: string, address?: strin
      * Token proof and semantic handshake run through the same actual Process recipe as foreign
      * peers.
      */
-    const active = await client(selectedPeer, hostProfile, token, address)
+    const active = await client(selectedPeer, false, token, address)
     return { ...active, controls }
   } finally {
     controls.stopObserving()
@@ -121,10 +120,7 @@ async function nativeClient(hostProfile: boolean, token: string, address?: strin
  * Assert original request, notification, error, cancellation and stream business on real
  * namespaces.
  */
-async function business(
-  active: Awaited<ReturnType<typeof nativeClient>>,
-  hostProfile: boolean
-): Promise<void> {
+async function business(active: Awaited<ReturnType<typeof nativeClient>>): Promise<void> {
   /**
    * Owned launch identity is native fact; the external listener retains its explicit fixed
    * identity.
@@ -154,17 +150,8 @@ async function business(
       expect.objectContaining({ name: 'p.f.asyncGenerator', supportedModes: ['stream'] })
     ])
   )
-  for (const name of Object.values(managementMethod))
-    expect(description.methods.some((method) => method.name === name)).toBe(hostProfile)
-  /** Management remains an explicit RED until a genuine NativeHost receiver exists; no fake results. */
-  if (hostProfile) {
-    expect(
-      await active.namespace.request(managementMethod.use, [vectors.host.name, { value: 1 }])
-    ).toMatchObject(vectors.host.installed)
-    expect(await active.namespace.request(managementMethod.inspect, [])).toMatchObject({
-      plugins: [{ name: 'p' }]
-    })
-  }
+  for (const name of removedManagementMethods)
+    expect(description.methods.some((method) => method.name === name)).toBe(false)
   expect(await active.namespace.request('p.f.request', [vectors.request.input])).toBe(
     vectors.request.expected
   )
@@ -200,26 +187,19 @@ async function business(
   await expect(
     attachment.table.ping(attachment.handle, { timeoutMs: 1000 })
   ).resolves.toBeUndefined()
-  if (hostProfile) {
-    expect(await active.namespace.request(managementMethod.unUse, [vectors.host.name])).toEqual(
-      vectors.host.removed
-    )
-    expect(await active.namespace.request(managementMethod.inspect, [])).toMatchObject({
-      plugins: []
-    })
-    expect(await active.namespace.request(PeerMethod.echo, 'still-alive')).toBe('still-alive')
-  }
+  /** Preserve the original ordinary liveness value without recreating remote plugin management. */
+  expect(await active.namespace.request(PeerMethod.echo, 'still-alive')).toBe('still-alive')
 }
 
 describe('public TS native peer', () => {
-  it.each([false, true])(
+  it.each([false])(
     'stdio host=%s',
     async (hostProfile) => {
       /** Original token custody stays in native stdin bootstrap, outside argv and environment. */
-      const active = await nativeClient(hostProfile, randomUUID())
+      const active = await nativeClient(randomUUID())
       try {
         expect((active.handles[0] as INodeProcessHandle).channel).toBeDefined()
-        await business(active, hostProfile)
+        await business(active)
         await active.close()
         await active.handles[0]!.exited
         expect(Buffer.concat(active.output).toString()).toContain(PeerText.ready)
@@ -239,7 +219,7 @@ describe('public TS native peer', () => {
     10000
   )
 
-  it.each([false, true])(
+  it.each([false])(
     'socket host=%s',
     async (hostProfile) => {
       /** Unique actual Unix address and inherited FD retain original listener/token isolation. */
@@ -254,14 +234,7 @@ describe('public TS native peer', () => {
       /** Each closing client must leave this same external listener process alive. */
       const child = spawn(
         executable,
-        [
-          peer,
-          '--listen-unix',
-          join(directory, 'peer.sock'),
-          '--auth-fd',
-          '3',
-          ...(hostProfile ? ['--host'] : [])
-        ],
+        [peer, '--listen-unix', join(directory, 'peer.sock'), '--auth-fd', '3'],
         { stdio: ['ignore', 'pipe', 'pipe', descriptor], env: { PATH: process.env.PATH } }
       )
       closeSync(descriptor)
@@ -281,9 +254,9 @@ describe('public TS native peer', () => {
         })
         for (let index = 0; index < 2; index += 1) {
           /** Two genuine canonical sources connect independently to the same existing listener. */
-          const active = await nativeClient(hostProfile, token, join(directory, 'peer.sock'))
+          const active = await nativeClient(token, join(directory, 'peer.sock'))
           try {
-            if (index === 0) await business(active, hostProfile)
+            if (index === 0) await business(active)
             else
               expect(await active.namespace.request(PeerMethod.echo, 'second-session')).toBe(
                 'second-session'

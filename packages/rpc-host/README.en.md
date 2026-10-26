@@ -74,6 +74,8 @@ Untargeted calls select only within their namespace: zero targets return empty `
 
 Use `streamTo` for a directed stream, with the target as its first argument. `stream` options no longer accept `targetId`. Both methods share the same backpressure, cancellation, and generation isolation.
 
+`remote.host.use`, `remote.host.unUse` and `remote.host.inspect` are removed. RPC no longer provides a protocol for managing a remote host's plugins; local native host installation and disposal keep their own contracts.
+
 `host.<ns>.send('b', 'c.render', value)` first reaches direct peer b, which reads its current directory and forwards to c. A held `host.<ns>.peers.c.render` does not retarget a later generation. Forwarding can cross namespaces and cannot extend an upstream deadline.
 
 Configure each forwarding host with `forward: { maxHops: 3 }` in `createRpcHost`. The default is 3; integers 1–16 are supported and other values reject with `INVALID_CONFIG`. Each host checks its own forwarding ordinal; loops reject before the hop limit.

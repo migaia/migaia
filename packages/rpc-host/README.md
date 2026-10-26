@@ -74,6 +74,8 @@ try {
 
 定向流使用 `streamTo`，目标放在第一个参数；`stream` 的 options 不再接受 `targetId`。两者复用相同的流背压、取消和代次隔离。
 
+`remote.host.use`、`remote.host.unUse` 和 `remote.host.inspect` 已移除，不再提供通过 RPC 管理远端宿主插件的协议；本地原生宿主的安装与释放 API 保持各自契约。
+
 `host.<ns>.send('b', 'c.render', value)` 先到直连 b，再由 b 查询当前目录并转发到 c。持有的 `host.<ns>.peers.c.render` 不会自动改指重连后的新代。转发可跨命名空间，且不能延长上游截止时间。
 
 在 `createRpcHost` 上用 `forward: { maxHops: 3 }` 配置各转发 host。默认 3，只接受 1–16 的整数，其他值以 `INVALID_CONFIG` 拒绝。各 host 检查自己的转发跳序；先检查环路，再检查跳数。

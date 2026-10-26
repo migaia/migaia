@@ -242,6 +242,8 @@ Include both definitions alongside the transport in `plugins`. The application o
 | Endpoint, RuntimePeer, v1, JSON-RPC profile           | One Host call owner and one new protocol, without compatibility entries |
 | Root `outcome` or idempotency store                   | Install `/plugins/idempotency`; query its namespace extension           |
 
+`remote.host.use`, `remote.host.unUse` and `remote.host.inspect` are removed. RPC no longer provides a protocol for managing a remote host's plugins; local native host installation and disposal keep their own contracts.
+
 Aggregate and individual default subpaths support tree-shaking. Import codes from `@migaia/rpc-contract/error-code` and error classes/contracts from `/errors`. Transport authors supply native carriers and codecs; Host owns handshake, Sessions, pending calls, and provider execution.
 
 ## Close and retain errors
