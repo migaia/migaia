@@ -26,17 +26,13 @@ describe('streaming portable value budget', () => {
       { create: () => new RpcJsonCarrierCodec(), nativeBinary: false }
     )
     try {
-      const exact = client.memory!.stream('exact', null, { targetId: 'b' })
+      const exact = client.memory!.streamTo('b', 'exact', null)
       expect(await exact.next()).toEqual({ done: false, value: 'x'.repeat(16382) })
       expect(await exact.next()).toEqual({ done: true, value: undefined })
-      await expect(
-        client.memory!.stream('exceed', null, { targetId: 'b' }).next()
-      ).rejects.toMatchObject({
+      await expect(client.memory!.streamTo('b', 'exceed', null).next()).rejects.toMatchObject({
         code: 'PAYLOAD_INVALID'
       })
-      await expect(
-        client.memory!.stream('undefined', null, { targetId: 'b' }).next()
-      ).rejects.toMatchObject({
+      await expect(client.memory!.streamTo('b', 'undefined', null).next()).rejects.toMatchObject({
         code: 'PAYLOAD_INVALID'
       })
     } finally {
@@ -61,7 +57,7 @@ describe('streaming portable value budget', () => {
       }
     )
     try {
-      const iterator = client.memory!.stream('chunks', null, { targetId: 'b' })
+      const iterator = client.memory!.streamTo('b', 'chunks', null)
       expect(await iterator.next()).toEqual({ done: false, value })
       expect(await client.memory!.send('b', 'ping', null)).toBe('pong')
       expect(produced).toBeLessThan(1025)

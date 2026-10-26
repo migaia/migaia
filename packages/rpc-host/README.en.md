@@ -62,6 +62,7 @@ An existing `defineHost` or class owner uses `rpcHostPipelines(getHost, pipeline
 | `host.<ns>.request(method, payload?, options?)`            | Business result                                                                       |
 | `host.<ns>.notify(method, payload?, options?)`             | Physical send, without business acknowledgement; `targetId` selects one direct target |
 | `host.<ns>.stream(method, payload?, options?)`             | Lazy iterator; independent consumption for multiple targets                           |
+| `host.<ns>.streamTo(targetId, method, payload?, options?)` | One lazy iterator for one direct target |
 | `host.<ns>.group(steps, options?)`                         | Ordered `{ method, payload }` steps per target, without a cross-target transaction    |
 | `host.<ns>.send(targetId, method, payload?, options?)`     | Scalar result from one direct target                                                  |
 | `host.<ns>.dispatch(targetId, method, payload?, options?)` | Synchronous `void`; asynchronous failures reach the reporter                          |
@@ -70,6 +71,8 @@ An existing `defineHost` or class owner uses `rpcHostPipelines(getHost, pipeline
 | `host.close()`                                             | Closes the host; repeated calls share the original Promise                            |
 
 Untargeted calls select only within their namespace: zero targets return empty `fulfilled/rejected` maps, one returns a scalar, and multiple return maps indexed by instance identity. Stream iterators cancel independently. Root call methods such as `host.request` are removed.
+
+Use `streamTo` for a directed stream, with the target as its first argument. `stream` options no longer accept `targetId`. Both methods share the same backpressure, cancellation, and generation isolation.
 
 `host.<ns>.send('b', 'c.render', value)` first reaches direct peer b, which reads its current directory and forwards to c. A held `host.<ns>.peers.c.render` does not retarget a later generation. Forwarding can cross namespaces and cannot extend an upstream deadline.
 

@@ -28,6 +28,50 @@ it('reports a missing directed dispatch synchronously once on the genuine public
 })
 
 describe('host direct-target broadcast operations', () => {
+  it('streamTo selects one actual target and preserves lazy iterator admission', async () => {
+    /** Two accepted sources share the same real namespace and independent provider state. */
+    const server = coreMemoryServer('direct-stream-server')
+    /** The original public Host owns target selection and stream credit. */
+    const host = await createRpcHost(server.options)
+    /** Only the explicitly selected original provider may begin iteration. */
+    const firstCalls = vi.fn()
+    /** A sibling source must remain untouched by the directed stream. */
+    const secondCalls = vi.fn()
+    /** Both methods are real compiled provider generators, not precomputed iterators. */
+    const first = await server.connect('first', {
+      provide: {
+        sequence: function* () {
+          firstCalls()
+          yield 1
+          yield 2
+        }
+      }
+    })
+    /** The other accepted peer advertises the same method to expose accidental fanout. */
+    const second = await server.connect('second', {
+      provide: {
+        sequence: function* () {
+          secondCalls()
+          yield 3
+        }
+      }
+    })
+    try {
+      /** Construction fixes the selected generation without opening its lazy business call. */
+      const stream = host.memory.streamTo('first', 'sequence')
+      expect(firstCalls).not.toHaveBeenCalled()
+      expect(secondCalls).not.toHaveBeenCalled()
+      expect(stream[Symbol.asyncIterator]()).toBe(stream)
+      expect(await items(stream)).toEqual([1, 2])
+      expect(firstCalls).toHaveBeenCalledTimes(1)
+      expect(secondCalls).not.toHaveBeenCalled()
+    } finally {
+      await second.host.close()
+      await first.host.close()
+      await host.close()
+    }
+  })
+
   it('executes all five operations for zero, one and two sessions on one actual server endpoint', async () => {
     /** The server's one listener accepts additional channels without replacing its endpoint. */
     const server = coreMemoryServer('matrix-server')

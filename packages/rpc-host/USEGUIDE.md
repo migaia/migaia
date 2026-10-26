@@ -54,12 +54,14 @@ type IWorkers = {
 export async function useWorker(host: IRpcHost<IWorkers>) {
   const answer: number = await host.thread.send('worker', 'double', 21)
   const values: number[] = []
-  for await (const value of host.thread.peers.worker.values(3)) values.push(value)
+  for await (const value of host.thread.streamTo('worker', 'values', 3)) values.push(value)
   return { answer, values }
 }
 ```
 
 无目标 `request/notify/group` 在该命名空间内广播：零目标得到空 `fulfilled/rejected`，单目标返回标量，多目标各自保留成功或失败。多目标 `stream` 返回按实例身份索引的迭代器集合，每个迭代器独立背压和取消。
+
+`streamTo(targetId, method, payload?, options?)` 定向选择一个直连目标，始终返回一个惰性迭代器；目标与 `send` 一样放在第一个参数。将原 `stream(method, payload, { targetId })` 改为此写法，options 只保留调用策略、signal、transfer 等原有选项。
 
 stream 在第一次 `next()` 才启动。调用 `return()` 结束消费并等待对应清理；`throw(reason)` 保留调用方抛出的原因。连接失效后，已持有能力仍绑定原连接，不能转向同名新实例。
 

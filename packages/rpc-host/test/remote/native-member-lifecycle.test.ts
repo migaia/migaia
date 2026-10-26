@@ -833,8 +833,7 @@ it('caps public scalar and stream deadlines while one notify creates no scalar r
     expect(scheduled.mock.calls.map(([, ms]) => ms)).toEqual([50, 20])
     scheduled.mockClear()
     /** The actual public lazy iterator runs through the original stream owner and timeout policies. */
-    const stream = fixture.namespace.stream('p.f.generator', [], {
-      targetId: 'remote',
+    const stream = fixture.namespace.streamTo('remote', 'p.f.generator', [], {
       timeout: timeout({ ms: 90, scheduler: fixture.scheduler })
     })
     try {

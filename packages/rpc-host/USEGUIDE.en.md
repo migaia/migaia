@@ -54,12 +54,14 @@ type IWorkers = {
 export async function useWorker(host: IRpcHost<IWorkers>) {
   const answer: number = await host.thread.send('worker', 'double', 21)
   const values: number[] = []
-  for await (const value of host.thread.peers.worker.values(3)) values.push(value)
+  for await (const value of host.thread.streamTo('worker', 'values', 3)) values.push(value)
   return { answer, values }
 }
 ```
 
 Untargeted `request/notify/group` broadcasts within that namespace: zero targets return empty `fulfilled/rejected` maps, one returns a scalar, and multiple retain independent successes and failures. Multi-target `stream` returns iterators indexed by instance identity, each with independent backpressure and cancellation.
+
+`streamTo(targetId, method, payload?, options?)` selects one direct target and always returns one lazy iterator. The target is the first argument, as with `send`. Replace `stream(method, payload, { targetId })` with this form; options retain only the existing call policies, signal, transfer, and other call settings.
 
 A stream starts at the first `next()`. `return()` ends consumption and waits for corresponding cleanup. `throw(reason)` preserves the caller's thrown reason. Held capabilities remain bound to their original connection after it retires; they cannot target a same-name successor.
 

@@ -493,7 +493,7 @@ Loader、Adapter、Runtime 不从根入口聚合，直接导入的依赖应显�
 
 ### 原普通 Host 上的 RPC plugins
 
-Tray 在既有 plugin-host Host 上安装 `processPlugin`、`threadPlugin` 或 `coroutinePlugin`。plugin 保留真实 definition 的 name 与 expose 列表；Host 的 process/thread/coroutine outlet 继续按实例名定向调用，并沿原 stop/restart/replace 控制释放或替换。
+Tray 在既有 plugin-host Host 上安装 `processPlugin`、`threadPlugin` 或 `coroutinePlugin`。父端先声明一个固定 RPC 命名空间，再接纳各实例的真实原生连接；plugin 保留真实 definition 的 name 与 expose 列表。实例的流调用经 `streamTo(targetId, method, ...)` 定向，公开 `remote.stream(path, payload?, options?)` 写法不变；stop/restart/replace 仍由原 owner 控制。
 
 | 载体      | 父端来源                                                               | 子端来源                                                                                              |
 | --------- | ---------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |

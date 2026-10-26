@@ -62,6 +62,7 @@ try {
 | `host.<ns>.request(method, payload?, options?)`            | 等待业务结果                                              |
 | `host.<ns>.notify(method, payload?, options?)`             | 等待物理发送；不等待业务确认，`targetId` 可选单个直连目标 |
 | `host.<ns>.stream(method, payload?, options?)`             | 惰性迭代器；多目标时各自独立消费                          |
+| `host.<ns>.streamTo(targetId, method, payload?, options?)` | 选择一个直连目标，返回一个惰性迭代器 |
 | `host.<ns>.group(steps, options?)`                         | 每个目标按顺序执行 `{ method, payload }`，没有跨目标事务  |
 | `host.<ns>.send(targetId, method, payload?, options?)`     | 选择一个直连目标，返回标量                                |
 | `host.<ns>.dispatch(targetId, method, payload?, options?)` | 同步返回 `void`，异步失败交给 reporter                    |
@@ -70,6 +71,8 @@ try {
 | `host.close()`                                             | 关闭整个 host；重复调用共享原 Promise                     |
 
 上述无目标调用只在所属命名空间内选择目标：零个返回空 `fulfilled/rejected`，一个返回标量，多个返回按实例身份索引的 `fulfilled/rejected`。流集合中的迭代器独立取消。根级 `host.request` 等调用入口已删除。
+
+定向流使用 `streamTo`，目标放在第一个参数；`stream` 的 options 不再接受 `targetId`。两者复用相同的流背压、取消和代次隔离。
 
 `host.<ns>.send('b', 'c.render', value)` 先到直连 b，再由 b 查询当前目录并转发到 c。持有的 `host.<ns>.peers.c.render` 不会自动改指重连后的新代。转发可跨命名空间，且不能延长上游截止时间。
 

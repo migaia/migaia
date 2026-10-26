@@ -101,9 +101,7 @@ it('ready public stream keeps lazy input until first pull and preserves complete
   /** No before-ready resource exists; this input belongs to the genuine already-ready branch. */
   const readyPayload = { value: 42 }
   /** Existing directed-stream selection returns the actual single original consumer. */
-  const readyConsumer = client.host.memory.stream('numbers', readyPayload, {
-    targetId: 'resource-1'
-  })
+  const readyConsumer = client.host.memory.streamTo('resource-1', 'numbers', readyPayload)
   readyPayload.value = 99
   try {
     expect(lifetime.constructed).toBe(0)
@@ -141,7 +139,7 @@ it('the original lazy pull vector executes through a genuine public stream', asy
   /** This actual Host owns the stream operation, independently of the provider iterator identity. */
   const client = await server.connect('caller', {}, 'resource-0')
   /** The same original payload2 travels through the supported namespace path. */
-  const consumer = client.host.memory.stream('numbers', 2, { targetId: 'resource-1' })
+  const consumer = client.host.memory.streamTo('resource-1', 'numbers', 2)
   try {
     expect(pulls).toBe(0)
     expect(await consumer.next()).toEqual({ done: false, value: 46 })

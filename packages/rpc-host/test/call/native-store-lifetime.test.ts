@@ -79,10 +79,7 @@ it.each(['request', 'group', 'notify', 'stream'] as const)(
             : mode === 'notify'
               ? client.host.memory.notify('value', undefined, options)
               : client.host.memory
-                  .stream('values', undefined, {
-                    ...options,
-                    targetId: 'store-lifetime-provider'
-                  })
+                  .streamTo('store-lifetime-provider', 'values', undefined, options)
                   .next()
       ).catch((error: unknown) => error)
       /** Original dispatch alone can supply this exact real quota owner's live membership. */

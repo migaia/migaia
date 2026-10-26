@@ -34,7 +34,7 @@ export function childService(opening: () => Promise<IRpcHost<IParentApi>>, names
        * Explicit streaming selects the generator mode without relying on optional directory
        * schemas.
        */
-      const stream = host[namespace]!.stream('parentValues', value, { targetId: context.senderId })
+      const stream = host[namespace]!.streamTo(context.senderId, 'parentValues', value)
       for await (const item of stream) yield item
     }
   }

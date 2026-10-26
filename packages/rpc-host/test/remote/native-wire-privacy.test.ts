@@ -169,8 +169,7 @@ describe('local contract error privacy through public native Hosts', () => {
        */
       const start = fixture.pair[1].written.length
       /** The original one-second deadline is a complete timeout feature on the real directed stream. */
-      const iterator = fixture.a.memory.stream('controlled-failure', [], {
-        targetId: 'b',
+      const iterator = fixture.a.memory.streamTo('b', 'controlled-failure', [], {
         timeout: timeout({ ms: 1000 })
       })
       /** Keep the genuine consumer's failure rather than decoding its terminal in a fixture path. */

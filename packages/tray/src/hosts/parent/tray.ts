@@ -357,10 +357,12 @@ class TrayRuntime<
     /** Only stopped calls await; a ready stream still selects its generation at this first pull. */
     const outlet = ready(input)
     if (outlet instanceof Promise) return await outlet
-    return yield* outlet.stream(TrayInternal.stream, toWire(input), {
-      ...rpcCallOptions(options),
-      targetId: record.instanceId!
-    })
+    return yield* outlet.streamTo(
+      record.instanceId!,
+      TrayInternal.stream,
+      toWire(input),
+      rpcCallOptions(options)
+    )
   }
 
   /** Outlet detail contains the authoritative native generation and accepted remote identity. */

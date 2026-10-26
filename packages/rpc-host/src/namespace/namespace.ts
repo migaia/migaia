@@ -44,7 +44,6 @@ import type {
   IRpcCallOptions as IPublicCallOptions,
   IRpcFanoutResult,
   IRpcNotifyOptions as IPublicNotifyOptions,
-  IRpcStreamOptions as IPublicStreamOptions,
   IRpcClosingHandler,
   IRpcPeerClosedHandler
 } from './types.js'
@@ -67,6 +66,7 @@ const reservedMethods = new Set<PropertyKey>([
   'dispatch',
   'group',
   'stream',
+  'streamTo',
   'close',
   'onClosing',
   'onPeerClosed',
@@ -474,16 +474,13 @@ export class Namespace {
   readonly stream = (
     method: string,
     payload?: IRpcPortableValue,
-    options: IPublicStreamOptions<true> = {}
+    options: IRpcCallOptions = {}
   ):
     | AsyncIterableIterator<IRpcPortableValue>
     | IRpcFanoutResult<AsyncIterableIterator<IRpcPortableValue>> => {
     assertTrace(options)
     /** One snapshot fixes target identity before any iterator starts. */
-    const selected =
-      options.targetId === undefined
-        ? this.#targets(options)
-        : [this.#direct(options.targetId, options)]
+    const selected = this.#targets(options)
     this.#assertTransfer(selected, options)
     if (selected.length === 1) return this.#stream(selected[0]!, method, payload, options)
     /** Stream fanout contains iterators, never promises masquerading as an iterator. */
@@ -498,6 +495,18 @@ export class Namespace {
       }
     }
     return result
+  }
+
+  /** Directed streams use the same accepted binding, admission and lazy consumer as broadcast. */
+  readonly streamTo = (
+    address: string,
+    method: string,
+    payload?: IRpcPortableValue,
+    options: IRpcCallOptions = {}
+  ): AsyncIterableIterator<IRpcPortableValue> => {
+    assertTrace(options)
+    /** StreamChannel owns the sole target's transfer preflight before constructing its consumer. */
+    return this.#stream(this.#direct(address, options), method, payload, options)
   }
 
   /** Cache method capabilities only after the actual accepted session is published. */

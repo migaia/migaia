@@ -196,7 +196,7 @@ it('C004 sends fail after an uncertain native open and reports the original clea
   })
   try {
     /** This public iterator belongs to caller b and the exact admitted provider a. */
-    const iterator = fixture.b.memory.stream('count', null, { targetId: 'a' })
+    const iterator = fixture.b.memory.streamTo('a', 'count', null)
     expect(owners).toHaveLength(1)
     /** The original relay seam starts open without granting a pull credit. */
     const preparing = owners[0]!.prepare(iterator).catch((error: unknown) => error)
@@ -246,7 +246,7 @@ it('C005 rejects an out-of-sequence native pull without advancing the original p
   const opened = observePublicStreamOwner(owners)
   try {
     /** The public directed overload selects the exact accepted provider without pulling it. */
-    const iterator = fixture.b.memory.stream('count', null, { targetId: 'a' })
+    const iterator = fixture.b.memory.streamTo('a', 'count', null)
     expect(owners).toHaveLength(1)
     await owners[0]!.prepare(iterator)
     /** Actual wire open retains the only id, task generations and native route for this stream. */

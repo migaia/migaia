@@ -28,6 +28,15 @@ expectTypeOf(dynamicCreation).toEqualTypeOf<Promise<IRpcHost>>()
 declare const mapped: IRpcHost<IRemoteByName>
 expectTypeOf(mapped.memory.send('client-a', 'resize', 800)).toEqualTypeOf<Promise<string>>()
 mapped.memory.dispatch('client-b', 'save', 'text')
+expectTypeOf(mapped.memory.streamTo('client-a', 'frames', 2)).toEqualTypeOf<
+  AsyncIterableIterator<number>
+>()
+// @ts-expect-error Stream methods follow the selected direct target's declared inventory.
+mapped.memory.streamTo('client-b', 'frames', 2)
+// @ts-expect-error Directed streams retain the selected method's payload type.
+mapped.memory.streamTo('client-a', 'frames', 'wrong')
+// @ts-expect-error A scalar method cannot be selected as a stream.
+mapped.memory.streamTo('client-a', 'resize', 800)
 // @ts-expect-error Client B's method cannot be invoked on client A.
 mapped.memory.send('client-a', 'save', 'text')
 // @ts-expect-error Unknown direct targets are not inferred from another argument.
@@ -68,6 +77,11 @@ expectTypeOf(single.memory.notify('resize', 800)).toEqualTypeOf<
 expectTypeOf(single.memory.stream('frames', 2)).toEqualTypeOf<
   AsyncIterableIterator<number> | IRpcFanoutResult<AsyncIterableIterator<number>>
 >()
+expectTypeOf(single.memory.streamTo('peer', 'frames', 2)).toEqualTypeOf<
+  AsyncIterableIterator<number>
+>()
+// @ts-expect-error Directed streams take their target in streamTo, never in options.
+single.memory.stream('frames', 2, { targetId: 'peer' })
 expectTypeOf(single.memory.group([{ method: 'resize', payload: 800 }])).toEqualTypeOf<
   Promise<readonly IRpcStepOutcome[] | IRpcFanoutResult<readonly IRpcStepOutcome[]>>
 >()
@@ -140,6 +154,7 @@ const supportedTransport = defineTransportPlugin({
 declare const supported: IRpcHost<IAApi, readonly [typeof supportedTransport]>
 supported.native.request('resize', 800, { keepalive: true })
 supported.native.notify('resize', 800, { keepalive: true })
+supported.native.streamTo('peer', 'frames', 2, { keepalive: true })
 expectTypeOf(
   supported.native.onClosing((event) => {
     expectTypeOf(event.reason).toEqualTypeOf<unknown>()

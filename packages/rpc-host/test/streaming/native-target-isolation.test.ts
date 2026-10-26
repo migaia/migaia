@@ -148,12 +148,10 @@ it('isolates same-id producers by actual admitted sender before intruder pull an
     const betaPreparing = vi.spyOn(beta.pair[1].codec, 'prepare')
     spies.push(alphaPreparing, betaPreparing)
     spies.push(observeItems(alpha.pair[0].codec, items), observeItems(beta.pair[0].codec, items))
-    first = alpha.host.memory!.stream('count', null, {
-      targetId: 'server',
+    first = alpha.host.memory!.streamTo('server', 'count', null, {
       timeout: false
     }) as AsyncIterableIterator<IRpcPortableValue>
-    second = beta.host.memory!.stream('count', null, {
-      targetId: 'server',
+    second = beta.host.memory!.streamTo('server', 'count', null, {
       timeout: false
     }) as AsyncIterableIterator<IRpcPortableValue>
     expect(owners).toHaveLength(2)
@@ -321,12 +319,10 @@ it('isolates a pending consumer from another actual target replaying its origina
     /** Each actual binding supplies its own negotiated codec context and call frame. */
     const betaPreparing = vi.spyOn(beta.pair[0].codec, 'prepare')
     spies.push(alphaPreparing, betaPreparing)
-    first = client.memory!.stream('count', null, {
-      targetId: 'alpha',
+    first = client.memory!.streamTo('alpha', 'count', null, {
       timeout: false
     }) as AsyncIterableIterator<IRpcPortableValue>
-    second = client.memory!.stream('count', null, {
-      targetId: 'beta',
+    second = client.memory!.streamTo('beta', 'count', null, {
       timeout: false
     }) as AsyncIterableIterator<IRpcPortableValue>
     expect(owners).toHaveLength(2)

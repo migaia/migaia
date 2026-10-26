@@ -135,7 +135,7 @@ Loader, Adapter and Runtime are not aggregated by the root. Install directly imp
 
 ### RPC plugins on the original ordinary Host
 
-Tray installs `processPlugin`, `threadPlugin`, or `coroutinePlugin` on its existing plugin-host Host. The plugin keeps the actual definition name and expose list; the Host's process/thread/coroutine outlet continues to address one named instance and use its original stop/restart/replace controls.
+Tray installs `processPlugin`, `threadPlugin`, or `coroutinePlugin` on its existing plugin-host Host. The parent declares one fixed RPC namespace before admitting each instance's actual native connection. The plugin retains its real definition name and expose list. Instance streams use `streamTo(targetId, method, ...)`; the public `remote.stream(path, payload?, options?)` form is unchanged. Original owners still control stop/restart/replace.
 
 | Carrier   | Parent source                                                          | Child source                                                                                            |
 | --------- | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
