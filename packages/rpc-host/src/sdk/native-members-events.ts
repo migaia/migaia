@@ -10,6 +10,7 @@ import { RpcCoreErrorCode, RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/
 import { createRemoteLayerError } from '../host/remote-error-owner.js'
 import { RuntimeApiErrorText } from '@migaia/rpc-contract/errors'
 import { RpcMemberEventName, RpcMemberQueryLimit } from './native-members-constants.js'
+import { IpcReporterContext } from './reporter-context.js'
 import type { IRpcMemberUnavailable } from './native-members-overview.js'
 /** Lifecycle facts contain only the original identity, time and explicitly safe native fields. */
 export type IRpcMemberEvent = Readonly<{
@@ -62,7 +63,7 @@ function reportEventFailure(report: (error: unknown) => void, error: unknown): v
   try {
     report(error)
   } catch (failure) {
-    hostRethrowReporter(failure, { operation: 'limiter', phase: 'reporter' })
+    hostRethrowReporter(failure, IpcReporterContext)
   }
 }
 

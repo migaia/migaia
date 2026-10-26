@@ -18,8 +18,6 @@ export class RpcMemberResources {
   readonly registration: IRpcMemberRegistration
   /** Cleanup diagnostics retain the caller's original bare reporter. */
   #report: (error: unknown) => void
-  /** Native drain ownership may detach preparation cancellation only at genuine commit. */
-  #detachPreparationOnCommit: boolean
   /** Departed generations release their resource groups rather than growing a lifetime stack. */
   #retained = new Set<Set<() => Promise<void>>>()
   /** Final removal shares its first settlement with every repeated PluginHost cleanup. */
@@ -28,14 +26,9 @@ export class RpcMemberResources {
   #pendingRebind: Promise<number> | undefined
 
   /** Capture the existing owner ports without opening or preparing a native generation. */
-  constructor(
-    registration: IRpcMemberRegistration,
-    report: (error: unknown) => void,
-    detachPreparationOnCommit: boolean
-  ) {
+  constructor(registration: IRpcMemberRegistration, report: (error: unknown) => void) {
     this.registration = registration
     this.#report = report
-    this.#detachPreparationOnCommit = detachPreparationOnCommit
   }
   /** Close original group resources in reverse acquisition order, retaining exact errors. */
   #closeGroup = async (group: Set<() => Promise<void>>): Promise<unknown[]> => {
@@ -72,22 +65,15 @@ export class RpcMemberResources {
     const group = new Set<() => Promise<void>>()
     this.#retained.add(group)
     /** The existing lifecycle controller separates one preparation from its committed channel. */
-    const attempt = this.#detachPreparationOnCommit
-      ? createGenerationController({ parentSignal: signal })
-      : undefined
+    const attempt = createGenerationController({ parentSignal: signal })
     /** Initial setup and later rebinds use the same canonical cancellation transfer. */
-    const request = attempt?.begin()
+    const request = attempt.begin()
     try {
-      const generation = await this.registration.prepareGeneration(
-        request?.signal ?? signal,
-        (dispose) => {
-          group.add(dispose)
-        }
-      )
-      if (request) {
-        if (request.signal.aborted) throw resolveAbortReason(request.signal)
-        attempt!.complete(request.token)
-      }
+      const generation = await this.registration.prepareGeneration(request.signal, (dispose) => {
+        group.add(dispose)
+      })
+      if (request.signal.aborted) throw resolveAbortReason(request.signal)
+      attempt.complete(request.token)
       /** One explicit entry owns both the accepted generation and its retained rollback group. */
       const entry = { generation, group }
       this.registration.onLeave(generation, () => {
@@ -108,7 +94,7 @@ export class RpcMemberResources {
       }
       throw error
     } finally {
-      attempt?.dispose()
+      attempt.dispose()
     }
   }
 

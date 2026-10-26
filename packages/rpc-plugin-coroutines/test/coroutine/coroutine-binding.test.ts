@@ -213,9 +213,9 @@ describe('coroutine runtime binding', () => {
       const budget = createUnitBudget({ kind: 'coroutine', maxUnits: 1, launchRate: false })
       /** Expected terminal diagnostics remain visible even for the never-restart policy. */
       const reports: unknown[] = []
-      /** Native exit carries the original classified error without a second lifecycle bridge. */
       /** Configuration tasks must not receive the wrapper's private input record as this. */
       const taskReceivers: unknown[] = []
+      /** Native exit carries the original classified error without a second lifecycle bridge. */
       const supervisor = createCoroutineSupervisor<MessagePort>({
         id: 'raw-task',
         spec: {

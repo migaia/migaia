@@ -165,7 +165,7 @@ export class RpcMemberGeneration<TUnit, TSpec> {
   /** Subscribe to the supplied native owner without starting, attaching or publishing a member. */
   constructor(options: IRpcMemberGenerationOptions<TUnit, TSpec>) {
     this.#options = options
-    this.#resources = new RpcMemberResources(this, options.report, true)
+    this.#resources = new RpcMemberResources(this, options.report)
     this.#unsubscribe = options.binding.supervisor.subscribe(this.#native)
     nativeMemberStartup(options.context)?.own(this.#resources.release)
   }
@@ -369,10 +369,9 @@ export class RpcMemberGeneration<TUnit, TSpec> {
     }
     this.#listeners.delete(generation)
     if (current) {
-      /** Leave observers run first, while actual cleanup remains observable by its original Promise. */
-      /** Final registration release keeps logical shutdown even if a native receipt reenters it. */
-      /** Final release awaits this close; earlier departures keep their independent report owner. */
+      /** Final release awaits cleanup; earlier departures retain their independent failure report. */
       const reportFailure = this.#released ? undefined : this.#options.report
+      /** Final registration release keeps Session-first cleanup even if physical loss reenters it. */
       const closing = current.close(reason, nativeDeparture && !this.#released)
       this.#closing.set(generation, closing)
       void closing.then(
