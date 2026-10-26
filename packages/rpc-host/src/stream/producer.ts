@@ -36,10 +36,16 @@ import {
   safeRead,
   RPC_CONTRACT_SOURCE,
   RpcCoreErrorText,
+  RpcAbortError,
   identifyRpcBoundaryFailure
 } from '@migaia/rpc-contract/errors'
 import { RpcStreamErrorText } from './error-text.js'
-import { createRpcError, createRpcAbortError, localRpcErrorCode } from '../host/error-owner.js'
+import {
+  createRpcError,
+  createRpcAbortError,
+  localRpcErrorCode,
+  isLocalRpcError
+} from '../host/error-owner.js'
 import { serializeHostWireError, deserializeHostWireError } from '../host/error-wire-metadata.js'
 import { sameTask } from '../call/envelope.js'
 import { resolveAbortReason } from '../host/abort-reason.js'
@@ -230,6 +236,15 @@ export class StreamProducer {
             this.#input.targetSource
           )
         } catch (error) {
+          if (admission.signal.aborted) {
+            /** The Session's own abort wrapper acknowledges this exact cancelled item write. */
+            const reason = resolveAbortReason(admission.signal)
+            if (
+              error === reason ||
+              (isLocalRpcError(error, RpcAbortError) && error.cause === reason)
+            )
+              return
+          }
           throw this.#valueFailure(error)
         }
         this.#observe(frame, event.value)

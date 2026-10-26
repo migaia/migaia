@@ -28,6 +28,8 @@ describe('streaming cancellation', () => {
     const acknowledged = deferred<void>()
     /** Only consumer diagnostics are relevant; provider cancellation keeps its existing owner. */
     const reports: unknown[] = []
+    /** Cancellation of a provider's outstanding write is an acknowledgement, not a provider error. */
+    const providerReports: unknown[] = []
     const fixture = await connectedCoreHosts(
       {
         values: function* () {
@@ -37,7 +39,7 @@ describe('streaming cancellation', () => {
         barrier: () => true
       },
       {},
-      () => undefined,
+      (error) => providerReports.push(error),
       undefined,
       (error) => reports.push(error)
     )
@@ -84,6 +86,7 @@ describe('streaming cancellation', () => {
       await acknowledged.promise
       await fixture.b.memory.send('a', 'barrier')
       expect(reports).toEqual([])
+      expect(providerReports).toEqual([])
       /** An extra acknowledgement is unknown again after the expected terminal cleared history. */
       expect(acknowledgement).toBeDefined()
       await write(acknowledgement!)
