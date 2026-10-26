@@ -482,6 +482,48 @@ describe('C2 Session and SessionTable owners', () => {
     ])
   })
 
+  it('keeps a replacement admissible when the retired same-name source cleanup fails', async () => {
+    /** Name arbitration starts with the original accepted physical peer. */
+    const local = await Host.create('replace-a')
+    /** Distinct instance identities share only their application display name. */
+    const old = await Host.create('replace-b', 'worker')
+    /** The new real peer must not inherit an older resource's cleanup failure. */
+    const replacement = await Host.create('replace-c', 'worker')
+    /** The old source's actual close still runs before its independently observed cleanup fails. */
+    const first = connect(local, old)
+    await Promise.all([first.first.ready, first.second.ready])
+    /** One original native cleanup error belongs to the departing Session. */
+    const cleanup = new RangeError('old source cleanup failed')
+    /** Preserve native teardown and its peer notification rather than inventing a dead Session. */
+    const close = first.a.close
+    /** The existing native disposer seam exposes a real cleanup failure after physical release. */
+    const fault = vi.spyOn(first.a, 'close').mockImplementation(async (reason) => {
+      await close(reason)
+      throw cleanup
+    })
+    first.a.silentPing = true
+    /** Observe both handshake completions before the name-health deadline is advanced. */
+    const next = connect(local, replacement)
+    /** Neither original rejecting close nor handshake completion is left unobserved. */
+    const readiness = Promise.allSettled([next.first.ready, next.second.ready])
+    /** The old physical cleanup retains its own exact failure. */
+    const closed = first.first.closed.catch((error: unknown) => error)
+    try {
+      await vi.waitFor(() => expect(local.scheduler.pendingCount).toBe(2))
+      local.scheduler.advance(20)
+      expect(await readiness).toEqual([
+        expect.objectContaining({ status: 'fulfilled' }),
+        expect.objectContaining({ status: 'fulfilled' })
+      ])
+      expect(await closed).toBe(cleanup)
+      expect(local.table.get('process', 'worker')?.carrierId).toBe(next.a.id)
+      expect(local.report.mock.calls.filter(([error]) => error === cleanup)).toHaveLength(1)
+    } finally {
+      fault.mockRestore()
+      await Promise.allSettled([local.table.close(), old.table.close(), replacement.table.close()])
+    }
+  })
+
   it('cancels a retiring candidate probe without retiring its existing same-name source', async () => {
     /** Candidate cancellation is independent of whether the established source is healthy. */
     const local = await Host.create('a'),
@@ -503,6 +545,7 @@ describe('C2 Session and SessionTable owners', () => {
     expect(first.a.unsubscribed).toBe(0)
     first.a.silentPing = false
     await local.table.ping(first.first)
+    expect(local.report).not.toHaveBeenCalled()
     await Promise.all([local.table.close(), old.table.close(), candidate.table.close()])
   })
 

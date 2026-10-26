@@ -35,6 +35,7 @@ import {
   createRpcLifecycleError
 } from '../host/error-owner.js'
 import { HostErrorText } from '../host/error-text.js'
+import { resolveAbortReason } from '../host/abort-reason.js'
 import { Session } from './session.js'
 import { SessionText } from './text.js'
 import type { IRpcPipelineOwner } from '../sdk/flow-pipelines.js'
@@ -983,14 +984,16 @@ export class SessionTable {
     this.#reserved.set(input.carrierId, selection)
     try {
       if (previous && previous.carrierId !== input.carrierId) {
-        /** Failure retains the original ping error in diagnostics before replacing a dead source. */
+        /** Only an independently failing live source owns a diagnostic during name arbitration. */
         const timeoutMs = session.beginAdmission(
           input.scope?.nameAdmissionTimeoutMs ??
             this.#options.nameProbeTimeoutMs ??
             SessionText.defaultNameProbeTimeoutMs
         )
+        /** A stale probe completion belongs only to this original incumbent resource. */
+        const incumbent = this.#session(previous.carrierId)
         /** The old peer's deadline must settle before the candidate's equal-duration timer. */
-        const probe = this.#session(previous.carrierId)
+        const probe = incumbent
           .ping({
             timeoutMs,
             signal: session.signal
@@ -998,19 +1001,28 @@ export class SessionTable {
           .then(
             () => true,
             (error) => {
-              this.#options.report(error)
+              if (!session.closing && this.#sessions.get(previous.carrierId) === incumbent)
+                this.#options.report(error)
               return false
             }
           )
         await session.announceAdmission()
         const alive = await probe
         if (session.closing || this.#closing || this.#sessions.get(input.carrierId) !== session)
-          throw createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
+          throw session.closing
+            ? resolveAbortReason(session.signal)
+            : createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
         if (alive) throw this.#duplicate()
-        await this.#sessions.get(previous.carrierId)?.close()
+        // The departing resource owns and reports cleanup; its failure cannot reject a new peer.
+        await this.#sessions
+          .get(previous.carrierId)
+          ?.close()
+          .catch(() => undefined)
       }
       if (session.closing || this.#closing || this.#sessions.get(input.carrierId) !== session)
-        throw createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
+        throw session.closing
+          ? resolveAbortReason(session.signal)
+          : createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
       return view
     } catch (error) {
       this.#releaseReservation(input, selection)
