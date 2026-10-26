@@ -108,79 +108,29 @@ test('uses explicit layer domains independently of package names', () => {
   }
 })
 
-test('maps merged RPC codes and preserves capability graph ownership', () => {
-  const frozen = JSON.parse(
-    readFileSync(
-      join(repositoryRoot, 'packages/rpc-integration/test/fixtures/legacy-error-codes.json'),
-      'utf8'
+test('maps RPC codes to their declarations and preserves capability graph ownership', () => {
+  /** RPC contract and core code tables share one declaration file. */
+  const rpcDeclarations = readFileSync(
+    join(repositoryRoot, 'packages/rpc-contract/src/error-code.ts'),
+    'utf8'
+  )
+  /** Codes declared by one named table in the RPC declaration file. */
+  const tableCodes = (name) => {
+    /** Start of this table's literal object. */
+    const start = rpcDeclarations.indexOf(`export const ${name} = {`)
+    assert.notEqual(start, -1, name)
+    /** Table body, ending at its own `as const` terminator. */
+    const body = rpcDeclarations.slice(start, rpcDeclarations.indexOf('} as const', start))
+    return [...body.matchAll(/^\s*[A-Za-z][A-Za-z0-9]*\s*:\s*'([A-Z][A-Z0-9_]*)'/gm)].map(
+      (match) => match[1]
     )
-  )
-  /** Additive codes stay separate from the frozen pre-migration registry fixture. */
-  const added = JSON.parse(
-    readFileSync(
-      join(repositoryRoot, 'packages/rpc-integration/test/fixtures/error-format-added-codes.json'),
-      'utf8'
-    )
-  )
-  /** Later additive codes remain separate from both earlier fixture sets. */
-  const controlAdded = JSON.parse(
-    readFileSync(
-      join(
-        repositoryRoot,
-        'packages/rpc-integration/test/fixtures/control-semantics-added-codes.json'
-      ),
-      'utf8'
-    )
-  )
-  /** Core codes the successor rpc-layering change deleted after this merge froze its code set. */
-  const retired = new Set(
-    JSON.parse(
-      readFileSync(
-        join(repositoryRoot, 'packages/rpc-integration/test/fixtures/layering-retired-codes.json'),
-        'utf8'
-      )
-    ).codes
-  )
-  /**
-   * Codes later programs registered after the merge froze its fixture sets: probe reporting,
-   * forwarding, authentication sessions, provider generations, capability negotiation, host
-   * admission and the API audit's callback failures. Each already has its own registry row and
-   * owner tests.
-   */
-  const laterAdded = {
-    contract: ['CALLBACK_FAILED', 'EXTENSION_NEGOTIATION_FAILED'],
-    core: [
-      'CALLBACK_FAILED',
-      'CAPABILITY_UNSUPPORTED',
-      'CHALLENGE_INVALID',
-      'FORWARD_HOP_LIMIT',
-      'FORWARD_LOOP',
-      'HOST_ASSEMBLER_DUPLICATE',
-      'HOST_FEATURE_DUPLICATE',
-      'HOST_PEER_NAME_DUPLICATE',
-      'HOST_PLUGIN_INVALID',
-      'HOST_TRANSPORT_DUPLICATE',
-      'HOST_TRANSPORT_MISSING',
-      'PROBE_FAILED',
-      'PROVIDER_GENERATION_MISMATCH',
-      'PROVIDER_GENERATION_RETIRED',
-      'SESSION_UNKNOWN'
-    ]
   }
   const rows = collectErrorRegistry()
   const codes = (source) => rows.filter((row) => row.source === source).map((row) => row.code)
-  assert.deepEqual(
-    codes('rpc.contract'),
-    [...frozen.contract, ...added.contract, ...controlAdded.contract, ...laterAdded.contract].sort()
-  )
+  assert.deepEqual(codes('rpc.contract'), tableCodes('RpcContractErrorCode').sort())
   assert.deepEqual(
     codes('rpc.endpoint'),
-    [
-      ...frozen.core.filter((code) => !retired.has(code)),
-      ...added.core,
-      ...controlAdded.core,
-      ...laterAdded.core
-    ].sort()
+    [...tableCodes('RpcCoreErrorCode'), ...tableCodes('RpcAuthenticationRejectionReason')].sort()
   )
   /** The graph subpath owns exactly the codes its own declaration file lists. */
   const graphCodes = [
@@ -499,10 +449,7 @@ test('source domains known source readers contain no legacy error identities', (
   const readers = [
     ['packages/tray/src/runtime/create-runtime.ts', ".source === '@migaia/tray'"],
     ['packages/lifecycle/src/abort-factory.ts', ".source === '@migaia/lifecycle'"],
-    [
-      'packages/rpc-host/src/core/internal/endpoint-projection.ts',
-      ".source === '@migaia/plugin-host'"
-    ]
+    ['packages/rpc-host/src/host/error-owner.ts', ".source === '@migaia/plugin-host'"]
   ]
   /** All known runtime comparisons must disappear, while package module specifiers stay valid. */
   const remaining = readers.filter(([file, literal]) =>
@@ -513,7 +460,7 @@ test('source domains known source readers contain no legacy error identities', (
 
 test('source domains cross-package readers reference owner constants instead of inlining migrated domains', () => {
   /** The included cross-package reader must import the owning package constant after migration. */
-  const readers = [['packages/rpc-host/src/core/internal/endpoint-projection.ts', 'plugin.host']]
+  const readers = [['packages/rpc-host/src/host/error-owner.ts', 'plugin.host']]
   /** A quoted new domain in this reader duplicates the owner's source contract. */
   const duplicated = readers.filter(([file, domain]) => {
     /** Public module specifiers retain package names and are not semantic domain literals. */

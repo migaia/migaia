@@ -11,12 +11,6 @@ const sourceRoots = {
   browser: join(import.meta.dirname, '../../../rpc-plugin-browser/src')
 } as const
 /** The core codes removed because no supported throw site emits them. */
-const retired = (
-  JSON.parse(
-    readFileSync(join(import.meta.dirname, '../fixtures/layering-retired-codes.json'), 'utf8')
-  ) as { readonly codes: readonly string[] }
-).codes
-
 type ICodeReference = {
   readonly table: string
   readonly key: string
@@ -128,6 +122,45 @@ function thrownCodes(sourceText: string, filename: string): ICodeReference[] {
         : []
     )
   )
+  /**
+   * The Contract error factory always emits the Contract source with its first argument, whether
+   * imported publicly or from its own module inside the Contract package.
+   */
+  const contractFactoryBindings = new Set(
+    program.body.flatMap((statement) =>
+      statement.type === 'ImportDeclaration' &&
+      /^(?:@migaia\/rpc-contract(?:\/errors)?|\.\.?\/(?:[\w-]+\/)*contract-error\.[jt]s)$/u.test(
+        statement.source.value
+      )
+        ? statement.specifiers.flatMap((specifier) =>
+            specifier.type === 'ImportSpecifier' &&
+            textOf(specifier.imported) === 'createContractError'
+              ? [specifier.local.name]
+              : []
+          )
+        : []
+    )
+  )
+  /** Private methods that only return the public Contract factory forward their code parameter. */
+  const contractFactoryForwarders = new Map<string, number>()
+  for (const node of nodes) {
+    if (node.type !== 'MethodDefinition' || node.key.type !== 'PrivateIdentifier') continue
+    /** The forwarder body is exactly `return createContractError(code, ...)`. */
+    const [statement] = node.value.body?.body ?? []
+    if (
+      statement?.type !== 'ReturnStatement' ||
+      statement.argument?.type !== 'CallExpression' ||
+      !contractFactoryBindings.has(textOf(statement.argument.callee))
+    )
+      continue
+    /** The factory's first argument names the forwarded code parameter. */
+    const code = statement.argument.arguments[0]
+    const position = node.value.params.findIndex(
+      (parameter) => parameter.type === 'Identifier' && parameter.name === code?.name
+    )
+    if (code?.type === 'Identifier' && position !== -1)
+      contractFactoryForwarders.set(`this.#${node.key.name}`, position)
+  }
   /** Name of a plain object property, or `undefined` when it is not `key: value`. */
   const propertyName = (property: ObjectPropertyKind): string | undefined =>
     assignedValue(property) === undefined ? undefined : textOf((property as { key: Node }).key)
@@ -166,6 +199,12 @@ function thrownCodes(sourceText: string, filename: string): ICodeReference[] {
         const argument = node.arguments[rejectionCodeArgument]
         if (argument) references(argument)
       }
+      /** A verified private forwarder emits the Contract source with its forwarded code. */
+      const forwardedCode = contractFactoryForwarders.get(callee)
+      if (forwardedCode !== undefined) {
+        const argument = node.arguments[forwardedCode]
+        if (argument) references(argument, true)
+      }
       const failureResponse =
         node.callee.type === 'MemberExpression' &&
         !node.callee.computed &&
@@ -200,13 +239,16 @@ function thrownCodes(sourceText: string, filename: string): ICodeReference[] {
                 references(assignedValue(property)!, true)
               else references(property)
             }
-          } else references(argument)
+          } else if (index === 0 && contractFactoryBindings.has(callee)) references(argument, true)
+          else references(argument)
         }
       }
     }
     if (node.type === 'ObjectExpression') {
       const ok = node.properties.find((property) => {
-        const value = assignedValue(property)
+        /** `ok: false as const` still names a failure result. */
+        const assigned = assignedValue(property)
+        const value = assigned?.type === 'TSAsExpression' ? assigned.expression : assigned
         return propertyName(property) === 'ok' && value?.type === 'Literal' && value.value === false
       })
       const code = node.properties.find((property) => propertyName(property) === 'code')
@@ -220,13 +262,23 @@ function thrownCodes(sourceText: string, filename: string): ICodeReference[] {
 function layerThrows(
   layer: 'contract' | 'core' | 'browser'
 ): Array<ICodeReference & { file: string }> {
-  /** Host admission emits the same canonical endpoint codes as the existing core owner. */
-  const directories = layer === 'core' ? ['core', 'host'] : [layer]
+  /**
+   * Host owns its whole source tree plus the Core error factories that live under the Contract
+   * package's `errors/`; the Contract layer is every other Contract directory.
+   */
+  const directories =
+    layer === 'browser'
+      ? [join(sourceRoots.browser, layer)]
+      : layer === 'core'
+        ? [sourceRoots.core, join(sourceRoots.contract, 'errors')]
+        : readdirSync(sourceRoots.contract, { withFileTypes: true })
+            .filter((entry) => entry.isDirectory() && entry.name !== 'errors')
+            .map((entry) => join(sourceRoots.contract, entry.name))
   return directories.flatMap((directory) =>
-    sourceFiles(join(sourceRoots[layer], directory)).flatMap((path) =>
+    sourceFiles(directory).flatMap((path) =>
       thrownCodes(readFileSync(path, 'utf8'), path).map((code) => ({
         ...code,
-        file: relative(sourceRoots[layer], path)
+        file: relative(join(directory, '..'), path)
       }))
     )
   )
@@ -301,14 +353,19 @@ describe('layered error ownership', () => {
     ).toEqual([{ table: 'RpcContractErrorCode', key: 'frameLimitExceeded' }])
   })
 
-  it('removes every dead core code while retaining a throw site for each declared code', () => {
+  it('retains a throw site for each declared code', () => {
     const contract = declaredCodes('contract')
     const core = declaredCodes('core')
-    expect(core.size).toBe(39)
+    expect(core.size).toBe(41)
     /** The contract declares this report code before probe-core installs its observation runtime. */
     expect(core.get('probeFailed')).toBe('PROBE_FAILED')
-    for (const value of retired) expect([...core.values()]).not.toContain(value)
-    const contractThrown = new Set(layerThrows('contract').map(({ key }) => key))
+    /** Host carriers and features emit Contract frame codes through the public Contract factory. */
+    const contractThrown = new Set(
+      [
+        ...layerThrows('contract'),
+        ...layerThrows('core').filter(({ contractWireSource }) => contractWireSource)
+      ].map(({ key }) => key)
+    )
     const coreThrown = new Set(
       layerThrows('core')
         .filter(({ table }) => /^(?:WebRpcErrorCode|RpcCoreErrorCode)$/u.test(table))
