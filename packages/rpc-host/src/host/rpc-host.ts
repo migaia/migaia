@@ -2,7 +2,7 @@
  * Own the one native plugin-host, global RPC identity, and composition of mandatory execution
  * owners.
  */
-import { defineHost, getPluginRuntimeIntegration, type IPluginHostCore } from '@migaia/plugin-host'
+import { getPluginRuntimeIntegration, type IPluginHostCore } from '@migaia/plugin-host'
 import {
   createAbortController,
   createLifecycleScope,
@@ -32,29 +32,27 @@ import type { ProviderRegistration } from '../dispatch/registration.js'
 import type { IRpcProvide, IRpcProvideOptions, IProviderCommitGate } from '../dispatch/types.js'
 import { createProviderCommitGate, exposedProvide } from '../dispatch/exposure.js'
 import { FeatureScope } from '../feature/scope.js'
-import { FlowRegistry } from '../flow/registry.js'
+import { FlowRegistry, type IRpcFlowGroup } from '../flow/registry.js'
 import { Forwarder } from '../forward/forwarder.js'
 import { Namespace } from '../namespace/namespace.js'
 import { SessionTable } from '../session/table.js'
 import type { IRpcSessionScope, IRpcSessionWriteOptions } from '../session/types.js'
 import { StreamChannel } from '../stream/channel.js'
 import type { IRpcTransportSetupContext } from '../sdk/types.js'
-import { rpcPipelineOwner, type IRpcPipelineOwner } from '../sdk/flow-pipelines.js'
-import type { RpcFlowProgram } from '../sdk/flow-program.js'
+import {
+  rpcPipelineOwner,
+  type IRpcPipelineOwner,
+  type IRpcNativePipelineCore
+} from '../sdk/flow-pipelines.js'
+import type { RpcFlowProgram, RpcTransportFlowProgram } from '../sdk/flow-program.js'
 import type { IRpcDefinitionMetadata } from '../sdk/metadata.js'
 import { RpcDefinitionKind } from '../sdk/metadata.js'
 import { HostIdentity, defaultRpcId } from './identity.js'
-import {
-  createRpcAbortError,
-  createRpcError,
-  createRpcLifecycleError,
-  rpcConstructionFailure,
-  originalRpcInstallationFailure
-} from './error-owner.js'
+import { createRpcAbortError, createRpcError, createRpcLifecycleError } from './error-owner.js'
 import { HostErrorText } from './error-text.js'
 import { HostObservationKind, RpcProtocolEvent } from './state-constants.js'
 import { deserializeHostWireError } from './error-wire-metadata.js'
-import { rpcInstallationOwner } from './installation.js'
+import { ownRpcTransportClose, RpcHostInstallation } from './installation.js'
 import type { IRpcHost, IRpcRuntimeOptions } from './public.js'
 import { defaultRpcReporter, reportDiagnostic } from './report.js'
 import { resolveAbortReason } from './abort-reason.js'
@@ -62,19 +60,22 @@ import { resolveAbortReason } from './abort-reason.js'
 /** This family identifies actual RPC namespace publication inside native shared-slot admission. */
 const namespaceFamily = Object.freeze({})
 /** Native host method names cannot be shadowed by a transport's public namespace. */
-const reservedNamespaces = new Set(['self', 'provide', 'close', 'use', 'dispose', 'unUse'])
+const reservedNamespaces = new Set(['self', 'provide', 'close', 'use', 'unuse', 'dispose', 'unUse'])
 /**
  * Native resources belong to one transport registration, independent from SessionTable's live
  * index.
  */
 type ITransportRegistration = {
   name: string
-  definitionName: string
   owner: Namespace
   resources: ILifecycleScope
   controller: ReturnType<typeof createAbortController>
   sessionScope: IRpcSessionScope
   provider: ProviderRegistration
+  /** Exact native registration keeps candidate and committed flow facts separate. */
+  flow: IRpcFlowGroup
+  /** Sessions borrow this registration's short-name execution port through native grace. */
+  pipelines: IRpcPipelineOwner
   surface?: Record<PropertyKey, unknown>
 }
 /** Only these native lifetime operations are borrowed by the RPC close owner. */
@@ -99,8 +100,10 @@ export class RpcHost {
    * host.
    */
   #native: INativeHost | undefined
+  /** Native installation and public use/unuse composition remain with the installation owner. */
+  readonly #installation: RpcHostInstallation
   /** The genuine native owner lends execution authority separately from plugin registration. */
-  #pipelineOwner: IRpcPipelineOwner | undefined
+  readonly #pipelineOwner: IRpcPipelineOwner
   /** Each unique namespace owns its registration resources and public method projection. */
   readonly #namespaces = new Map<string, ITransportRegistration>()
   /** Candidate registrations reserve names without replacing the currently committed namespace. */
@@ -134,16 +137,21 @@ export class RpcHost {
   constructor(
     options: IRpcRuntimeOptions,
     nodeId = defaultRpcId().replace(/-/gu, ''),
-    configuredSelf = options.self !== undefined,
-    pipelineOwner?: IRpcPipelineOwner
+    configuredSelf = options.self !== undefined
   ) {
     this.#identity = new HostIdentity(options.self, configuredSelf, options.onWarning)
     this.#nodeId = nodeId
     this.#configuredReport = options.report
     this.#reporter = this.#configuredReport ?? defaultRpcReporter
     this.#externalSignal = options.signal
-    this.#pipelineOwner = pipelineOwner
-    this.#flow = new FlowRegistry(this.#report)
+    this.#pipelineOwner = {
+      pipeline: (point, namespace) =>
+        this.#namespaces.get(namespace)!.pipelines.pipeline(point, namespace)
+    }
+    this.#flow = new FlowRegistry(
+      this.#report,
+      (namespace) => this.#namespaces.get(namespace)?.flow
+    )
     this.#sessions = new SessionTable({
       flow: this.#flow,
       pipelines: () => this.#pipelineOwner!,
@@ -210,6 +218,17 @@ export class RpcHost {
     if (options.signal?.aborted)
       throw createRpcAbortError(undefined, undefined, resolveAbortReason(options.signal))
     options.signal?.addEventListener('abort', this.#abort, { once: true })
+    this.#installation = new RpcHostInstallation({
+      owner: this,
+      self: () => this.self,
+      provide: this.provide,
+      close: this.close,
+      assertOpen: () => this.#assertOpen(),
+      announceDirectory: () => this.#sessions.announceDirectory(),
+      setNative: (native) => {
+        this.#native = native
+      }
+    })
   }
 
   /** Public identity belongs to this host, never to a projected session facade. */
@@ -229,60 +248,16 @@ export class RpcHost {
     void this.#sessions.announceDirectory().catch(this.#report)
   }
 
-  /** One native host commits the cold flow prefix before carriers can perform protected startup. */
-  async open(program: RpcFlowProgram): Promise<IRpcHost> {
-    /** This same public helper lends genuine handles to ordinary native hosts. */
-    const pipelineConfiguration = this.#flow.declarations(
-      () => native,
-      (name) => native.pipeline(name),
-      program.namespaces
-    )
-    /** Native publication supplies namespaces through its canonical extension slots. */
-    const publicContext = { owner: this }
-    /** The surface borrows this explicit owner; no root RPC invocation methods are exposed. */
-    const native = defineHost({
-      pipelines: pipelineConfiguration.pipelines,
-      host: {
-        identity: { name: this.self.name },
-        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
-      },
-      surface: {
-        get self() {
-          return publicContext.owner.self
-        },
-        provide: this.provide,
-        close: this.close,
-        [Symbol.asyncDispose]: this.close
-      },
-      domainCore: () => ({ ...pipelineConfiguration.domainCore(), [rpcInstallationOwner]: this })
-    })
-    this.#native = native
-    this.#pipelineOwner = pipelineConfiguration.domainCore()[rpcPipelineOwner]
-    try {
-      /** Candidate stages are invisible until native commit; no transport can negotiate before it. */
-      await native.use(...program.flows, program.plugin())
-      await native.use(...program.transports)
-      /**
-       * Publish the complete cold batch after child sources have contributed their accepted
-       * methods.
-       */
-      await this.#sessions.announceDirectory()
-      return native as unknown as IRpcHost
-    } catch (primary) {
-      try {
-        await this.close()
-      } catch (cleanup) {
-        throw await rpcConstructionFailure(primary, cleanup)
-      }
-      throw (await originalRpcInstallationFailure(primary)).error
-    }
+  /** Native startup and later install transactions share the same explicit installation owner. */
+  open(program: RpcFlowProgram): Promise<IRpcHost> {
+    return this.#installation.open(program)
   }
 
   /** Actual SDK native hooks join this receiving owner; no second plugin-host is created here. */
   async install(core: IPluginHostCore, metadata: IRpcDefinitionMetadata): Promise<void> {
     this.#assertOpen()
     if (metadata.kind === RpcDefinitionKind.transport)
-      return this.#installTransport(core, metadata.definition)
+      return this.#installTransport(core, metadata.definition, metadata.flows)
     if (metadata.kind === RpcDefinitionKind.source)
       return this.#namespace(metadata.namespace).installSource(core, metadata.definition)
     if (metadata.kind === RpcDefinitionKind.policy) {
@@ -295,16 +270,9 @@ export class RpcHost {
         RpcCoreErrorCode.invalidConfig
       )
     /** Setup borrows the same Host lifetime and real work owners for every optional registration. */
-    const context = {
-      signal: core.lifecycle.signal,
-      report: this.#report,
-      self: () => this.#identity.directorySelf,
-      call: (namespace, command, local) => this.#namespace(namespace).invoke(command, local),
-      observe: this.#flow.observe,
-      retire: (carrierId, reason, kind) => this.#sessions.detach(carrierId, reason, kind)
-    } satisfies import('../sdk/types.js').IRpcFlowSetupContext
+    const context = this.#flowSetupContext(core)
     if (metadata.kind === RpcDefinitionKind.features)
-      return this.#flow.registerFeatures(
+      return this.#flow.registerShared(
         core,
         await metadata.prepare(core, this.#controller.signal, context)
       )
@@ -314,6 +282,18 @@ export class RpcHost {
      */
     const installed = await metadata.prepare(core, this.#controller.signal, context)
     this.#flow.register(core, installed)
+  }
+
+  /** Flow setup borrows stable Root work ports while native cores retain resource ownership. */
+  #flowSetupContext(core: IPluginHostCore): import('../sdk/types.js').IRpcFlowSetupContext {
+    return {
+      signal: core.lifecycle.signal,
+      report: this.#report,
+      self: () => this.#identity.directorySelf,
+      call: (namespace, command, local) => this.#namespace(namespace).invoke(command, local),
+      observe: this.#flow.observe,
+      retire: (carrierId, reason, kind) => this.#sessions.detach(carrierId, reason, kind)
+    }
   }
 
   /** Global close seals admission, joins native origin drains, then retires physical work. */
@@ -532,7 +512,8 @@ export class RpcHost {
   /** Installation admits namespace names before a transport can acquire any physical resources. */
   async #installTransport(
     core: IPluginHostCore,
-    definition: IRpcTransportDefinition<unknown, object, IRpcTransportSetupContext>
+    definition: IRpcTransportDefinition<unknown, object, IRpcTransportSetupContext>,
+    flows: RpcTransportFlowProgram
   ): Promise<void> {
     if (
       typeof definition.namespace !== 'string' ||
@@ -545,16 +526,29 @@ export class RpcHost {
       )
     /** Native use rejects duplicate definition names; only its same-name replace can reach here. */
     const previous = this.#namespaces.get(definition.namespace)
-    if (
-      this.#pendingNamespaces.has(definition.namespace) ||
-      (previous && previous.definitionName !== definition.name)
-    )
+    if (this.#pendingNamespaces.has(definition.namespace))
       throw tagRpcError(
         new TypeError(HostErrorText.namespaceDuplicate),
         RpcCoreErrorCode.hostNamespaceDuplicate
       )
     /** Native Feature guards and the original commit gate stay with the actual receiving host. */
     const integration = getPluginRuntimeIntegration(core)
+    /** This transport borrows only its own authentic native construction request. */
+    const pipelines = Reflect.get(core, rpcPipelineOwner) as
+      | IRpcNativePipelineCore[typeof rpcPipelineOwner]
+      | undefined
+    if (!pipelines || !integration.matchesHost(pipelines.host))
+      throw tagRpcError(
+        new TypeError(HostErrorText.nativePipelinesRequired),
+        RpcCoreErrorCode.invalidConfig
+      )
+    /** Local setup and short-name stages belong to this exact native install registration. */
+    const flow = await this.#flow.prepareTransport(
+      core,
+      flows,
+      this.#controller.signal,
+      this.#flowSetupContext(core)
+    )
     /** A native batch may expose accepted methods before its shared namespace publication commits. */
     const gate = createProviderCommitGate(core.lifecycle.signal)
     const provider = this.#providers.prepare(
@@ -582,7 +576,9 @@ export class RpcHost {
     const sessionScope = this.#sessions.stage(definition.namespace, {
       handshakeTimeoutMs: definition.handshakeTimeoutMs,
       nameAdmissionTimeoutMs: definition.nameAdmissionTimeoutMs,
-      signal: controller.signal
+      signal: controller.signal,
+      pipelines: () => pipelines,
+      flow
     })
     /**
      * Namespace projection owns selection and calls while this resource scope owns registration
@@ -606,14 +602,16 @@ export class RpcHost {
     })
     const registration: ITransportRegistration = {
       name: definition.namespace,
-      definitionName: definition.name,
       owner: namespace,
       resources,
       controller,
       sessionScope,
-      provider
+      provider,
+      flow,
+      pipelines
     }
     this.#pendingNamespaces.set(definition.namespace, registration)
+    ownRpcTransportClose(core, () => namespace.close(this.#reason))
     core.onDispose(async () => {
       await this.#providers.settleFailedGate(gate)
       await namespace.close(this.#reason)
@@ -640,7 +638,7 @@ export class RpcHost {
       (reason) => namespace.close(this.#closing ? this.#reason : reason)
     )
     registration.surface = namespace.surface(
-      this.#flow.namespaceExtensions(definition.namespace),
+      flow.namespaceExtensions(definition.namespace),
       installed.namespaceExtensions
     )
     /** Compose all methods before native publication; a published namespace is immutable. */

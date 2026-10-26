@@ -4,18 +4,26 @@ import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IRpcTransportDefinition } from '@migaia/rpc-contract/interfaces'
 import type {
   IRpcFlowDefinition,
+  IRpcFlowFeature,
   IRpcFlowInstallation,
   IRpcFlowSetupContext,
   IRpcLinkPolicyDefinition,
   IRpcTransportSetupContext
 } from './types.js'
 import type { IRpcBuiltinFeature } from './flow-feature.js'
+import type { RpcTransportFlowProgram } from './flow-program.js'
 
 /** Prepared placements retain native Feature identity and one actual setup result. */
 export type IRpcFlowEntry = Readonly<{
   definition: IRpcFlowDefinition<object>
   installed: IRpcFlowInstallation<object>
   builtin?: IRpcBuiltinFeature
+}>
+
+/** One native wrapper owns every host root and its exact once-prepared dependency closure. */
+export type IRpcSharedFlows = Readonly<{
+  selection: ReadonlyMap<PropertyKey, IRpcFlowFeature<object>>
+  entries: ReadonlyMap<object, IRpcFlowEntry>
 }>
 
 /** SDK definition kinds are private admission facts, never caller-supplied discriminators. */
@@ -33,6 +41,7 @@ export type IRpcDefinitionMetadata = Readonly<
   | {
       kind: 'transport'
       definition: IRpcTransportDefinition<unknown, object, IRpcTransportSetupContext>
+      flows: RpcTransportFlowProgram
     }
   | {
       kind: 'source'
@@ -61,7 +70,7 @@ export type IRpcDefinitionMetadata = Readonly<
         core: IPluginHostCore,
         rootSignal: IAbortSignal,
         context: IRpcFlowSetupContext
-      ): Promise<ReadonlyMap<string, readonly IRpcFlowEntry[]>>
+      ): Promise<IRpcSharedFlows>
     }
 >
 

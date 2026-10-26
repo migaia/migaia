@@ -1,5 +1,9 @@
 /** Build genuine native definitions; their install hooks join the receiving host's single RPC owner. */
-import { definePlugin, type IPluginHostCore } from '@migaia/plugin-host'
+import {
+  definePlugin,
+  type IPluginHostCore,
+  type IPluginBeforeReleaseContext
+} from '@migaia/plugin-host'
 import type { IRpcTransportDefinition } from '@migaia/rpc-contract/interfaces'
 import {
   registerRpcDefinition,
@@ -7,6 +11,8 @@ import {
   type IRpcDefinitionMetadata
 } from './metadata.js'
 import { RpcFlowSetup } from './flow-setup.js'
+import { RpcTransportFlowProgram } from './flow-program.js'
+import { RpcFlowPipelines } from './flow-pipelines.js'
 import type {
   IRpcFlowDefinition,
   IRpcFlowPlugin,
@@ -15,7 +21,7 @@ import type {
   IRpcTransportFeatureExtensions,
   IRpcTransportSetupContext
 } from './types.js'
-import { installRpcDefinition } from '../host/installation.js'
+import { closeRpcTransport, installRpcDefinition } from '../host/installation.js'
 import { tagRpcError } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { HostErrorText } from '../host/error-text.js'
@@ -34,6 +40,10 @@ export class RpcDefinition {
   /** Native installation owns failure and reverse rollback through the genuine receiving core. */
   readonly install = (core: IPluginHostCore): Promise<Record<never, never>> =>
     installRpcDefinition(core, this.#metadata)
+
+  /** Transport Sessions finish their existing grace before native stages are retired. */
+  readonly beforeRelease = (context: IPluginBeforeReleaseContext): Promise<void> | undefined =>
+    closeRpcTransport(context.signal)
 }
 
 /** Define one cold transport with its actual codec/carrier acquisition and plugin-owned features. */
@@ -56,10 +66,19 @@ export function defineTransportPlugin<
   /** The native object alone receives metadata; a declaration-only marker adds no runtime property. */
   const metadata: IRpcDefinitionMetadata = {
     kind: RpcDefinitionKind.transport,
-    definition: captured
+    definition: captured,
+    flows: new RpcTransportFlowProgram(captured.features ?? [])
   }
   /** Native admission determines definition identity and public metadata semantics. */
-  const plugin = definePlugin({ name: captured.name, install: new RpcDefinition(metadata).install })
+  const owner = new RpcDefinition(metadata)
+  /** The native name is the namespace and owns its canonical seven pipeline declarations. */
+  const plugin = definePlugin({
+    name: captured.namespace,
+    pipelines: RpcFlowPipelines,
+    features: metadata.flows.features,
+    install: owner.install,
+    beforeRelease: owner.beforeRelease
+  })
   registerRpcDefinition(plugin, metadata)
   return plugin as unknown as IRpcTransportPlugin<N, E & IRpcTransportFeatureExtensions<F>, A>
 }

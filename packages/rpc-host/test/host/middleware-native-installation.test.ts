@@ -28,8 +28,7 @@ function receivingHost() {
   /** Every original transport in this receiver declares the same actual memory namespace. */
   const rpc = rpcHostPipelines(
     () => host,
-    (key) => host.pipeline(key),
-    ['memory']
+    (key, request) => host.pipeline(key, request)
   )
   /** The original native Host owns both these authentic pipelines and the existing transaction. */
   const host = defineHost({

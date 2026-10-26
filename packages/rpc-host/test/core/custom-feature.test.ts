@@ -26,8 +26,7 @@ function receivingHost(name: string) {
   /** Both lazy execution and cold declarations refer to this same canonical Host identity. */
   const rpc = rpcHostPipelines(
     () => host,
-    (key) => host.pipeline(key),
-    ['memory']
+    (key, request) => host.pipeline(key, request)
   )
   /** The original endpoint label now uses native identity.name; the runtime keeps its actual id. */
   const host = defineHost({

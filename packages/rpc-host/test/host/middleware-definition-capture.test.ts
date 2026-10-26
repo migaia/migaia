@@ -15,8 +15,7 @@ function receivingHost(name: string) {
   /** Original memory listeners borrow only this actual native Host's cold pipeline declarations. */
   const rpc = rpcHostPipelines(
     () => host,
-    (key) => host.pipeline(key),
-    ['memory']
+    (key, request) => host.pipeline(key, request)
   )
   /** The original configured identity still selects its own native Feature output. */
   const host = defineHost({

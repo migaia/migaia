@@ -4,7 +4,8 @@ import {
   type IPipelineOwner,
   type IPipelineStage,
   type IPipelineSpec,
-  type IPluginHostCore
+  type IPluginHostCore,
+  type IHostCoreConstructionRequest
 } from '@migaia/plugin-host'
 import type {
   IRpcHandshakePayload,
@@ -14,7 +15,6 @@ import type {
 } from '@migaia/rpc-contract/interfaces'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { tagRpcError } from '@migaia/rpc-contract/errors'
-import { HostErrorText } from '../host/error-text.js'
 
 /** These fixed keys connect native registration and the corresponding RPC execution owners. */
 export const RpcFlowPoint = {
@@ -74,20 +74,12 @@ export type IRpcFlowStages = Readonly<{
     | Readonly<{ layer: RpcFlowLayer; stage: IRpcFlowStage<K> }>
 }>
 
-/** All namespace-qualified keys retain the same seven authentic native declaration types. */
-type IRpcGroupedPipelines = Readonly<Record<string, (typeof RpcFlowPipelines)[RpcFlowPoint]>>
-
-/** A length-safe tuple key cannot alias another namespace or point containing punctuation. */
-export function rpcFlowPipelineKey(point: RpcFlowPoint, namespace: string): string {
-  return JSON.stringify([namespace, point])
-}
-
 /** Registration authority is narrowed from the genuine install core to these fixed declarations. */
 export type IRpcFlowCore = IPluginHostCore<
   never,
   Record<PropertyKey, unknown>,
   Record<string, unknown>,
-  IRpcGroupedPipelines
+  typeof RpcFlowPipelines
 >
 
 /** Execution authority is explicitly lent by a native host owner, never obtained from plugin core. */
@@ -106,83 +98,66 @@ export type IRpcNativePipelineCore = Readonly<{
   [rpcPipelineOwner]: IRpcPipelineOwner & Readonly<{ host: object }>
 }>
 
-/** Native lookup is borrowed unchanged; this adapter never owns execution or registration state. */
-type IRpcNativePipeline = (name: string) => unknown
+/** Native lookup borrows the original construction request and its exact registration. */
+type IRpcNativePipeline = (name: string, request: IHostCoreConstructionRequest) => unknown
 
 /** One flow configuration failure preserves native type, optional original cause and semantic code. */
 export function invalidFlow(message: string, options?: ErrorOptions): never {
   throw tagRpcError(new TypeError(message, options), RpcCoreErrorCode.invalidConfig)
 }
 
-/** One cold namespace map lends the actual native handles without allocating keys on each message. */
-class RpcPipelineGroups {
-  /** Qualified names are immutable declaration facts, not execution snapshots. */
-  readonly #keys = new Map<string, Readonly<Record<RpcFlowPoint, string>>>()
-  /** Actual native access retains all of plugin-host's registration and lease enforcement. */
+/** One real core borrows its transport's original native group throughout that registration. */
+class RpcPipelineGroup {
+  /** The Host owner lends execution without adding it to the plugin registration core. */
   readonly #native: IRpcNativePipeline
-  /** Host identity is borrowed after its functional handle or class has been constructed. */
-  readonly #getHost: () => object
-  /** Declaration validation occurs once before the first actual native installation can open IO. */
-  #validated = false
-  /** The same cold group declaration serves ordinary and advanced native host construction. */
-  readonly pipelines: IRpcGroupedPipelines
+  /** Exact construction provenance isolates candidates from published predecessors. */
+  readonly #request: IHostCoreConstructionRequest
 
-  /** Capture finite namespace declarations before any feature or transport begins installation. */
-  constructor(getHost: () => object, native: IRpcNativePipeline, namespaces: readonly string[]) {
-    this.#getHost = getHost
+  /** Capture genuine owner authority; declarations belong to the actual transport plugin. */
+  constructor(native: IRpcNativePipeline, request: IHostCoreConstructionRequest) {
     this.#native = native
-    /** One cold traversal builds both declarations and the hot lookup's original qualified keys. */
-    const declarations: Record<string, (typeof RpcFlowPipelines)[RpcFlowPoint]> =
-      Object.create(null)
-    for (const namespace of new Set(namespaces)) {
-      /** The seven fixed points below completely initialize this immutable namespace record. */
-      const keys = {} as Record<RpcFlowPoint, string>
-      for (const point of Object.values(RpcFlowPoint)) {
-        /** Encoding is shared with native registration and cannot alias another group. */
-        const key = rpcFlowPipelineKey(point, namespace)
-        keys[point] = key
-        declarations[key] = RpcFlowPipelines[point]
-      }
-      this.#keys.set(namespace, Object.freeze(keys))
-    }
-    this.pipelines = Object.freeze(declarations)
+    this.#request = request
   }
-  /** The point fixes payload typing while the cold namespace fixes its real native lane. */
+
+  /** Namespace selection already chose this registration; native short lookup owns its lane. */
   readonly pipeline = <K extends RpcFlowPoint>(
     point: K,
-    namespace: string
-  ): IPipelineOwner<(typeof RpcFlowPipelines)[K]> => {
-    /** Unknown groups retain the native coded lookup failure; valid traffic uses its cached key. */
-    const key = this.#keys.get(namespace)?.[point] ?? rpcFlowPipelineKey(point, namespace)
-    return this.#native(key) as IPipelineOwner<(typeof RpcFlowPipelines)[K]>
+    _namespace: string
+  ): IPipelineOwner<(typeof RpcFlowPipelines)[K]> =>
+    this.#native(point, this.#request) as IPipelineOwner<(typeof RpcFlowPipelines)[K]>
+}
+
+/** Lend this native Host's execution authority through its existing domain-core construction. */
+class RpcNativePipelines {
+  /** Host identity is read after the functional handle or class has actually been constructed. */
+  readonly #getHost: () => object
+  /** The same native lookup receives each core's authentic construction request. */
+  readonly #native: IRpcNativePipeline
+
+  /** Capture owner access without predeclaring namespaces or allocating another runner. */
+  constructor(getHost: () => object, native: IRpcNativePipeline) {
+    this.#getHost = getHost
+    this.#native = native
   }
-  /** Installation validates genuine declarations before lending this Host's execution authority. */
-  readonly domainCore = (): IRpcNativePipelineCore => {
-    try {
-      if (!this.#validated) {
-        for (const name of Object.keys(this.pipelines)) this.#native(name)
-        this.#validated = true
-      }
-    } catch (cause) {
-      invalidFlow(HostErrorText.nativePipelinesRequired, { cause })
+
+  /** Every registration receives its own port; shared flow setup never registers late stages. */
+  readonly domainCore = (request: IHostCoreConstructionRequest): IRpcNativePipelineCore => ({
+    [rpcPipelineOwner]: {
+      host: this.#getHost(),
+      pipeline: new RpcPipelineGroup(this.#native, request).pipeline
     }
-    return { [rpcPipelineOwner]: { host: this.#getHost(), pipeline: this.pipeline } }
-  }
+  })
 }
 
 /**
- * Supplies native pipeline declarations and the matching domain core without constructing a Host.
- * Owner lookup stays lazy until installation, so functional handles and protected class accessors
- * can lend their real execution authority after construction. Registration still verifies Host
- * identity before resource acquisition.
+ * Lend the genuine native owner's existing pipeline lookup to each domain core. Transport helpers
+ * declare their own seven pipelines; no cold namespace inventory or host declaration map remains.
  */
 export function rpcHostPipelines(
   getHost: () => object,
-  pipeline: IRpcNativePipeline,
-  namespaces: readonly string[]
+  pipeline: IRpcNativePipeline
 ): Readonly<{
-  pipelines: IRpcGroupedPipelines
-  domainCore(): IRpcNativePipelineCore
+  domainCore(request: IHostCoreConstructionRequest): IRpcNativePipelineCore
 }> {
-  return new RpcPipelineGroups(getHost, pipeline, namespaces)
+  return new RpcNativePipelines(getHost, pipeline)
 }

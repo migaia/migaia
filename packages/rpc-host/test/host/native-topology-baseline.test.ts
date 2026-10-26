@@ -26,8 +26,7 @@ describe('native capability topology', () => {
     /** Lazy pipeline authority reads this case's own native host only at installation. */
     const rpc = rpcHostPipelines(
       () => native,
-      (name) => native.pipeline(name),
-      ['memory']
+      (name, request) => native.pipeline(name, request)
     )
     const native = defineHost({
       ...rpc,

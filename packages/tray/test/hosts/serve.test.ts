@@ -15,8 +15,7 @@ describe('Tray child topology', () => {
       /** This local genuine Host supplies the same native execution declarations as child serve. */
       const rpc = rpcHostPipelines(
         () => local,
-        (name) => local.pipeline(name),
-        [api.hosts[index].runtime]
+        (name, request) => local.pipeline(name, request)
       )
       /** PluginHost owns Feature activation and the dispatcher registration. */
       const local = defineHost({

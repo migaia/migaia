@@ -146,8 +146,7 @@ class TrayRuntime<
     /** This exact parent's handle lends execution only when native installation requests its core. */
     const rpc = rpcHostPipelines(
       () => this.#host,
-      (name) => this.#host.pipeline(name),
-      [TrayInternal.connection]
+      (name, request) => this.#host.pipeline(name, request)
     )
 
     /** Parent PluginHost remains separate from every instance's plain PluginHost. */
@@ -564,7 +563,7 @@ class TrayRuntime<
       await Promise.race([aborted.promise, child.exited])
     } finally {
       release?.()
-      await disposeChildHost(child.host, child.shutdown, this.#report)
+      await disposeChildHost(child.host, child.shutdown, this.#report, child.transportName)
     }
   }
 

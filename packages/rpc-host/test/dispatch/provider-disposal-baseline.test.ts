@@ -27,8 +27,7 @@ function receivingHost() {
   /** Each independent original Host receives its own cold declarations and lazy native handles. */
   const rpc = rpcHostPipelines(
     () => host,
-    (key) => host.pipeline(key),
-    ['memory']
+    (key, request) => host.pipeline(key, request)
   )
   /** Original native lifecycle options remain unchanged on the sole transaction owner. */
   const host = defineHost({ ...rpc, ...nativeFixture.options })

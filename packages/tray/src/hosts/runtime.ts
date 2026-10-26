@@ -32,8 +32,7 @@ export type ITrayRuntimeHost = IHostHandle<
   ReturnType<ReturnType<typeof rpcHostPipelines>['domainCore']>,
   never,
   readonly IPluginConstraint<any>[],
-  Record<never, never>,
-  ReturnType<typeof rpcHostPipelines>['pipelines']
+  Record<never, never>
 > &
   Partial<Record<string, ITrayRuntimeOutlet>>
 /** Parent and child install the same actual observer before native transport acquisition. */
@@ -52,7 +51,7 @@ export function parentRuntimeTransport(): IRpcTransportPlugin<
   true
 > {
   return defineTransportPlugin({
-    name: TrayInternal.transportPlugin,
+    name: TrayInternal.connection,
     namespace: TrayInternal.connection,
     closingWrites: true,
     expose: [TrayInternal.relayPlugin],
@@ -74,9 +73,9 @@ export function runtimePlugin(
   options: ITrayRuntimeOptions &
     Readonly<{ id?: string; connect?: ICoroutineConnect; task?: ICoroutineUserTask }>
 ): IPluginConstraint<any> {
-  /** Native plugin name remains the supervision registration name, separate from namespace. */
+  /** Parent sources retain their unique id; a real child transport registers under its namespace. */
   const common = {
-    name: mode === TrayRuntimeMode.parent ? options.id! : TrayInternal.connection,
+    name: mode === TrayRuntimeMode.parent ? options.id! : definition.runtime,
     namespace:
       mode === TrayRuntimeMode.parent ? instanceNamespace(options.id!) : definition.runtime,
     expose: [mode === TrayRuntimeMode.parent ? TrayInternal.relayPlugin : TrayInternal.childPlugin],

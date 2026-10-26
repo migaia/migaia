@@ -182,8 +182,7 @@ it('default native source retains ordinary Host calls and truthfully negotiated 
   /** This is the sole receiving ordinary native PluginHost. */
   const rpc = rpcHostPipelines(
     () => host,
-    (name) => host.pipeline(name),
-    ['process']
+    (name, request) => host.pipeline(name, request)
   )
   /** The same native owner declares its transport group before installation. */
   const host = defineHost({
@@ -244,8 +243,7 @@ it('genuine process and thread Plugin installs share one final Host provider key
   /** Both native plugins install into this exact original PluginHost instance. */
   const rpc = rpcHostPipelines(
     () => host,
-    (name) => host.pipeline(name),
-    ['process', 'thread', 'failed-process']
+    (name, request) => host.pipeline(name, request)
   )
   /** All transport groups borrow this exact original provider and installation owner. */
   const host = defineHost({
@@ -264,10 +262,7 @@ it('genuine process and thread Plugin installs share one final Host provider key
   const candidateBudget = createUnitBudget({ kind: 'process', maxUnits: 1, launchRate: false })
   try {
     /** The original committed policy keeps its genuine global256/per-peer64 default capacity. */
-    await host.use(
-      servicePlugin(business.service),
-      rpcFlowPlugin([limits()], ['process', 'thread', 'failed-process'])
-    )
+    await host.use(servicePlugin(business.service), rpcFlowPlugin([limits()]))
     for (const index of [0, 1]) {
       /** Both factories acquire their genuine original native runtime and SDK member owner. */
       const options = {

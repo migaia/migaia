@@ -12,14 +12,15 @@ import {
   type ITrayRuntimeHost,
   type ITrayRuntimeOptions
 } from '../runtime.js'
-import { TrayInternal, TrayRuntime, TrayRuntimeMode } from '../constants.js'
+import { TrayRuntime, TrayRuntimeMode } from '../constants.js'
 import type { IAnyTrayHost } from '../typing.js'
 
 /** Finish business cleanup before retiring transport while native pipelines remain admitted. */
 export async function disposeChildHost(
   host: ITrayRuntimeHost,
   shutdown: () => Promise<void>,
-  report: (error: unknown) => void
+  report: (error: unknown) => void,
+  transportName: string
 ): Promise<void> {
   /** Original errors are reported after both pre-disposal cleanup steps have been attempted. */
   const failures: unknown[] = []
@@ -29,8 +30,8 @@ export async function disposeChildHost(
     failures.push(error)
   }
   try {
-    /** This is the original runtime registration, distinct from its public namespace name. */
-    const removed = await host.unUse(TrayInternal.connection)
+    /** The exact installed native plugin supplies its removal key. */
+    const removed = await host.unUse(transportName)
     if (!removed.ok) failures.push(...removed.errors)
   } catch (error) {
     failures.push(error)
@@ -47,14 +48,18 @@ export async function serveChild(
   definition: Parameters<typeof readHost>[0],
   options: ITrayRuntimeOptions,
   connect?: ICoroutineConnect
-): Promise<{ host: ITrayRuntimeHost; exited: Promise<void>; shutdown: () => Promise<void> }> {
+): Promise<{
+  host: ITrayRuntimeHost
+  exited: Promise<void>
+  shutdown: () => Promise<void>
+  transportName: string
+}> {
   /** Branding must come from the same shared host-definition module in this realm. */
   const admitted = readHost(definition)
   /** Native construction receives declarations and lazy execution authority through one SDK call. */
   const rpc = rpcHostPipelines(
     () => host,
-    (name) => host.pipeline(name),
-    [admitted.runtime]
+    (name, request) => host.pipeline(name, request)
   )
   /** PluginHost cleanup diagnostics retain their native errors on the configured reporter. */
   const host = defineHost({
@@ -94,8 +99,15 @@ export async function serveChild(
         : [probe(...(Array.isArray(options.probe) ? options.probe : [options.probe]))]),
       dispatcher.plugin
     )
-    await host.use(runtimePlugin(admitted, TrayRuntimeMode.child, { ...options, connect }))
-    return { host, exited: outcome.promise, shutdown: dispatcher.shutdown }
+    /** Native teardown retains this exact registration name rather than guessing a runtime alias. */
+    const transport = runtimePlugin(admitted, TrayRuntimeMode.child, { ...options, connect })
+    await host.use(transport)
+    return {
+      host,
+      exited: outcome.promise,
+      shutdown: dispatcher.shutdown,
+      transportName: transport.name
+    }
   } catch (primary) {
     await host.dispose()
     throw primary
@@ -130,7 +142,7 @@ export async function serveTrayHost(
     report(error)
     code = 1
   } finally {
-    await disposeChildHost(child.host, child.shutdown, report)
+    await disposeChildHost(child.host, child.shutdown, report, child.transportName)
   }
   /** Thread and process entries are Node realms; the structural read keeps Tray free of Node types. */
   const realm = Reflect.get(globalThis, 'process') as { exit(code: number): never } | undefined

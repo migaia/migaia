@@ -185,8 +185,7 @@ it('C117 preserves both owned flow cleanup failures on the native disposal bound
   /** The same native owner lends genuine execution authority for the listener's memory namespace. */
   const rpc = rpcHostPipelines(
     () => host,
-    (key) => host.pipeline(key),
-    ['memory']
+    (key, request) => host.pipeline(key, request)
   )
   /** C0 endpoint.dispose delegated to this native boundary before its retired RPC translator. */
   const host = defineHost({
@@ -248,8 +247,7 @@ it('C003 retains a lifecycle diagnostic beside an independent native cleanup fai
   /** All original cleanup callbacks share one native Host and its real named pipeline groups. */
   const rpc = rpcHostPipelines(
     () => host,
-    (key) => host.pipeline(key),
-    ['memory']
+    (key, request) => host.pipeline(key, request)
   )
   /** No public RPC Root.close translates or substitutes this original native disposal boundary. */
   const host = defineHost({
@@ -281,8 +279,7 @@ it('C001 publishes native disposal settlement before synchronous cleanup reentry
   /** Declaration and execution authority come from this one actual native owner. */
   const rpc = rpcHostPipelines(
     () => host,
-    (key) => host.pipeline(key),
-    ['memory']
+    (key, request) => host.pipeline(key, request)
   )
   /** Native disposal remains the tested boundary; no binding facade or RPC Root.close is used. */
   const host = defineHost({

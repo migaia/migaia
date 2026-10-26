@@ -1,8 +1,12 @@
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
-import { defineHost } from '@migaia/plugin-host'
+import { defineHost, definePlugin } from '@migaia/plugin-host'
 import { rpcHostPipelines, RpcFlowPoint } from '@migaia/rpc-host/sdk'
-import { rpcPipelineOwner } from '../../dist/sdk/flow-pipelines.js'
+import {
+  rpcPipelineOwner,
+  RpcFlowPipelines,
+  type IRpcPipelineOwner
+} from '../../dist/sdk/flow-pipelines.js'
 import {
   normalizeRpcFrame,
   deserializeRpcWireError,
@@ -26,12 +30,18 @@ class OwnerPair {
   /** Lazy execution access is evaluated only after this actual native handle exists. */
   readonly #rpc = rpcHostPipelines(
     () => this.#native,
-    (name) => this.#native.pipeline(name),
-    ['test']
+    (name, request) => this.#native.pipeline(name, request)
   )
+  /** Actual native construction lends this one registration's original execution authority. */
+  #pipelines!: IRpcPipelineOwner
   /** Genuine native stages execute the same provider pipeline as the public Host. */
   readonly #native = defineHost({
-    ...this.#rpc,
+    domainCore: (request) => {
+      /** The native core's original request identifies this genuine candidate group. */
+      const domain = this.#rpc.domainCore(request)
+      this.#pipelines = domain[rpcPipelineOwner]
+      return domain
+    },
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
   /** Distinct accepted task generations fence client and server completion paths. */
@@ -76,13 +86,21 @@ class OwnerPair {
 
   /** Connect actual new owners at their explicit IO boundary; semantic admission stays canonical. */
   constructor(forward?: IProviderForwardPort, failOpen?: unknown) {
-    this.#rpc
-      .domainCore()
-      [rpcPipelineOwner].pipeline(RpcFlowPoint.dispatchInbound, 'test')
-      .use(async (payload, next) => {
-        this.completions.push(payload.context.completion)
-        await next(payload)
+    /** A real native group owns the original completion-observer stage and its lifetime. */
+    const completions = this.completions
+    this.#native.useSync(
+      definePlugin({
+        name: 'test',
+        pipelines: RpcFlowPipelines,
+        install(core) {
+          core.pipeline(RpcFlowPoint.dispatchInbound).use(async (payload, next) => {
+            completions.push(payload.context.completion)
+            await next(payload)
+          })
+          return {}
+        }
       })
+    )
     this.#failOpen = failOpen
     this.source = {
       namespace: 'test',
@@ -133,7 +151,7 @@ class OwnerPair {
       calls: this.calls,
       self: this.serverSelf,
       send: this.serverSend,
-      pipelines: () => this.#rpc.domainCore()[rpcPipelineOwner],
+      pipelines: () => this.#pipelines,
       notify: async () => undefined,
       forward: forward ?? {
         resolveEntry: () => undefined,

@@ -1,4 +1,5 @@
 /** Public host ownership is global; every RPC invocation is projected under a transport namespace. */
+import type { IHostHandle } from '@migaia/plugin-host'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import type {
   IRpcHostPlugin,
@@ -35,8 +36,14 @@ export type IRpcHostOptions<
 export type IRpcRuntimeOptions = Omit<IRpcHostOptions, 'plugins'>
 
 /** Root lifetime methods cannot be replaced by an inferred dynamic namespace. */
-type IRpcHostRoot = Readonly<{
+type IRpcHostRoot<TRemote, TPlugins extends readonly IRpcHostPlugin[]> = Readonly<{
   self: IRpcSelf
+  /** Each batch is atomic and returns this same Host with its added namespace types. */
+  use<const TAdded extends readonly IRpcHostPlugin[]>(
+    ...plugins: TAdded
+  ): Promise<IRpcHost<TRemote, readonly [...TPlugins, ...TAdded]>>
+  /** Native dependency-aware removal closes the transport's Sessions before deleting its group. */
+  unuse: IHostHandle<Record<never, never>, never, readonly []>['unUse']
   provide(input: IRpcProvide, options?: IRpcProvideOptions): void
   close(reason?: unknown): Promise<void>
   [Symbol.asyncDispose](): Promise<void>
@@ -65,7 +72,7 @@ type IRpcNamespaceClosing<TPlugin, N extends string> =
 export type IRpcHost<
   TRemote = Record<never, never>,
   TPlugins extends readonly IRpcHostPlugin[] = readonly IRpcHostPlugin[]
-> = IRpcHostRoot &
+> = IRpcHostRoot<TRemote, TPlugins> &
   Readonly<{
     [N in IRpcNamespaceNames<TPlugins[number]>]: IRpcNamespace<
       TRemote,

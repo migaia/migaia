@@ -24,9 +24,14 @@ import {
 } from '@migaia/rpc-contract/protocol'
 import { RpcCoreErrorCode, RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
 import { SessionTable } from '../../dist/session/table.js'
-import { FlowRegistry } from '../../dist/flow/registry.js'
-import { rpcPipelineOwner } from '../../dist/sdk/flow-pipelines.js'
-import type { IRpcSessionTableOptions } from '../../dist/session/types.js'
+import { FlowRegistry, type IRpcFlowGroup } from '../../dist/flow/registry.js'
+import {
+  rpcPipelineOwner,
+  RpcFlowPipelines,
+  type IRpcPipelineOwner
+} from '../../dist/sdk/flow-pipelines.js'
+import { RpcTransportFlowProgram } from '../../dist/sdk/flow-program.js'
+import type { IRpcSessionScope, IRpcSessionTableOptions } from '../../dist/session/types.js'
 
 /** These two cold groups cover every physical namespace used by the actual Session fixtures. */
 const sessionNamespaces = ['process', 'thread'] as const
@@ -39,60 +44,95 @@ class Host {
   readonly receive = vi.fn<IRpcSessionTableOptions['receive']>()
   /** Rejections keep every original diagnostic available to assertions. */
   readonly report = vi.fn<IRpcSessionTableOptions['report']>()
-  /** One table covers every installed namespace; self remains global. */
-  readonly table: SessionTable
+  /** One table covers every installed namespace after its genuine native groups are ready. */
+  #table!: SessionTable
+  /** Exact native group scopes lend their original pipeline ports to each physical Session. */
+  readonly #scopes = new Map<string, IRpcSessionScope>()
+
+  /** Expose the existing table only after create() has completed native installation. */
+  get table(): SessionTable {
+    return this.#table
+  }
   /** A real directory supplies method and generation authority. */
   directory: IRpcDirectory
 
-  /** Construct the real fixed flow pipeline, with optional explicit test hooks. */
-  constructor(
+  /** Capture global identity before native installation begins. */
+  constructor(id: string, name: string) {
+    this.directory = directory(id, name)
+  }
+
+  /** Complete genuine asynchronous native Feature setup before a physical Session can attach. */
+  static async create(
     id: string,
     name = id,
     installed: IRpcFlowInstallation<object> = {},
     options?: Pick<IRpcSessionTableOptions, 'scheduler' | 'handshakeTimeoutMs'>
-  ) {
-    this.directory = directory(id, name)
-    /** The SDK keeps declaration and execution authority paired without public raw metadata. */
+  ): Promise<Host> {
+    /** This bounded fixture retains the same global identity and original hook callbacks. */
+    const host = new Host(id, name)
+    await host.#install(installed, options)
+    return host
+  }
+
+  /** Native groups own real short-name declarations and canonical setup, without a copied runner. */
+  async #install(
+    installed: IRpcFlowInstallation<object>,
+    options?: Pick<IRpcSessionTableOptions, 'scheduler' | 'handshakeTimeoutMs'>
+  ): Promise<void> {
+    /** Genuine native construction fixes one execution port per namespace registration. */
+    const owners = new Map<string, IRpcPipelineOwner>()
+    /** Negotiation resolves only actual prepared groups for this fixture's two namespaces. */
+    const groups = new Map<string, IRpcFlowGroup>()
+    /** The original SDK owner borrows native construction provenance without synthetic scope data. */
     const rpc = rpcHostPipelines(
       () => native,
-      (name) => native.pipeline(name),
-      sessionNamespaces
+      (name, request) => native.pipeline(name, request)
     )
-    /** Native construction declares the same seven payload/mode specifications as the real Host. */
+    /** Each domain core receives its original native construction request. */
     const native = defineHost({
-      ...rpc,
+      domainCore(request) {
+        /** The captured port belongs to this exact namespace's native registration. */
+        const domain = rpc.domainCore(request)
+        owners.set(request.pluginName, domain[rpcPipelineOwner])
+        return domain
+      },
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })
-    /** Facts and stages are registered from the actual installing native core, never a fake core. */
-    const flow = new FlowRegistry(this.report)
-    native.useSync(
-      definePlugin({
-        name: 'session-flow',
-        features: {
-          flow: defineFlowFeature({ name: 'session-flow', setup: () => installed })
-        },
-        install(core) {
-          if (installed.stages) {
-            /** The native Feature supplies its true cold definition; the fixture owns setup output. */
-            const entry = { definition: core.features.flow, installed }
-            flow.registerFeatures(
-              core,
-              new Map([
-                [sessionNamespaces[0], [entry]],
-                [sessionNamespaces[1], [entry]]
-              ])
+    /** The genuine Feature exposes only these original hook and observation callbacks. */
+    const feature = defineFlowFeature({ name: 'session-flow', setup: () => installed })
+    /** Source lifetime is explicitly borrowed by canonical native preparation. */
+    const setup = new AbortController()
+    /** Host observations and scoped negotiation share the original report callback. */
+    const flow = new FlowRegistry(this.report, (namespace) => groups.get(namespace))
+    /** Canonical setup reports to the same original fixture spy. */
+    const flowReport = this.report
+    for (const namespace of sessionNamespaces) {
+      /** Each actual namespace selects the same original fixture Feature under its own native core. */
+      const program = new RpcTransportFlowProgram([feature])
+      await native.use(
+        definePlugin({
+          name: namespace,
+          pipelines: RpcFlowPipelines,
+          features: program.features,
+          async install(core) {
+            groups.set(
+              namespace,
+              await flow.prepareTransport(core, program, setup.signal, {
+                signal: setup.signal,
+                report: flowReport,
+                retire: async () => undefined,
+                call: async () => undefined
+              })
             )
-          } else flow.register(core, installed)
-          return {}
-        }
-      })
-    )
+            return {}
+          }
+        })
+      )
+    }
     flow.start()
-    /** The same genuine native owner serves every Session without rebuilding its authority port. */
-    const pipelines = rpc.domainCore()[rpcPipelineOwner]
-    this.table = new SessionTable({
+    this.#table = new SessionTable({
       flow,
-      pipelines: () => pipelines,
+      pipelines: () => owners.get('process')!,
       self: () => this.directory.self,
       directory: () => this.directory,
       receive: this.receive,
@@ -102,6 +142,24 @@ class Host {
       timestamp: () => 0,
       nameProbeTimeoutMs: 20
     })
+    for (const namespace of sessionNamespaces) {
+      /** Existing SessionTable staging borrows this group's exact ports without another owner. */
+      const scope = this.#table.stage(namespace, {
+        flow: groups.get(namespace)!,
+        pipelines: () => owners.get(namespace)!
+      })
+      this.#table.commit(scope)
+      this.#scopes.set(namespace, scope)
+    }
+  }
+
+  /** Attach through the real table while retaining the installed namespace's original group. */
+  attach(
+    namespace: string,
+    carrier: Parameters<SessionTable['attach']>[1],
+    connection?: Parameters<SessionTable['attach']>[2]
+  ) {
+    return this.#table.attach(namespace, carrier, connection, this.#scopes.get(namespace))
   }
 }
 
@@ -131,9 +189,9 @@ function connect(left: Host, right: Host, namespace = 'process', holdAccept = fa
   b.link(a)
   if (holdAccept) b.holdAccept()
   /** Both Session owners subscribe before asynchronous hello processing completes. */
-  const first = left.table.attach(namespace, a)
+  const first = left.attach(namespace, a)
   /** Every supported path exchanges real hello/accept through the public carrier contract. */
-  const second = right.table.attach(namespace, b)
+  const second = right.attach(namespace, b)
   return { a, b, first, second }
 }
 
@@ -169,7 +227,7 @@ describe('C2 Session and SessionTable owners', () => {
     /** Inbound trace belongs to the physical restoring carrier. */
     let b!: MemoryCarrier
     /** Auth hooks see prepared metadata before native restoration. */
-    const left = new Host('a', 'alpha', {
+    const left = await Host.create('a', 'alpha', {
       stages: {
         envelopeOutbound: async (payload, next) => {
           a?.trace.push('envelope')
@@ -182,7 +240,7 @@ describe('C2 Session and SessionTable owners', () => {
       }
     })
     /** Receiver instrumentation observes the inverse protected-metadata seam. */
-    const right = new Host('b', 'beta', {
+    const right = await Host.create('b', 'beta', {
       stages: {
         envelopeInbound: async (payload, next) => {
           b?.trace.push('envelope')
@@ -228,8 +286,8 @@ describe('C2 Session and SessionTable owners', () => {
 
   it('uses host control ports, preserves remaining drain budget and clears timeout/cancel state', async () => {
     /** Real ping/pong and drain share the same accepted Session. */
-    const left = new Host('a'),
-      right = new Host('b')
+    const left = await Host.create('a'),
+      right = await Host.create('b')
     /** One physical connection is sufficient for lifecycle controls. */
     const pair = connect(left, right)
     await Promise.all([pair.first.ready, pair.second.ready])
@@ -268,8 +326,8 @@ describe('C2 Session and SessionTable owners', () => {
 
   it('closes a held accepting write without deadlock or late publication and retains Promise identity', async () => {
     /** The native responder remains inside an unfinished write at retirement. */
-    const left = new Host('a'),
-      right = new Host('b')
+    const left = await Host.create('a'),
+      right = await Host.create('b')
     /** The close contract itself settles this real pending native operation. */
     const pair = connect(left, right, 'process', true)
     await vi.waitFor(() =>
@@ -293,9 +351,9 @@ describe('C2 Session and SessionTable owners', () => {
 
   it('reserves an unpublished instance while its real accept write is pending', async () => {
     /** The responder owns the held accept, so its peer id is reserved before publication. */
-    const local = new Host('z'),
-      first = new Host('a', 'first'),
-      next = new Host('a', 'next')
+    const local = await Host.create('z'),
+      first = await Host.create('a', 'first'),
+      next = await Host.create('a', 'next')
     /** Both connections use genuine native codec/handshake processing and distinct physical ids. */
     const original = connect(local, first)
     original.a.holdAccept()
@@ -320,9 +378,9 @@ describe('C2 Session and SessionTable owners', () => {
 
   it('retains a healthy same-name peer after one ping and rejects the new candidate', async () => {
     /** Two different native instances compete for the same namespace display name. */
-    const local = new Host('a'),
-      old = new Host('b', 'worker'),
-      newcomer = new Host('c', 'worker')
+    const local = await Host.create('a'),
+      old = await Host.create('b', 'worker'),
+      newcomer = await Host.create('c', 'worker')
     /** The admitted first source is selected by both name and instance id. */
     const first = connect(local, old)
     await Promise.all([first.first.ready, first.second.ready])
@@ -340,9 +398,9 @@ describe('C2 Session and SessionTable owners', () => {
 
   it('replaces only a failed same-name source and clears its health deadline', async () => {
     /** The old physical source is live but its actual health write no longer reaches the peer. */
-    const local = new Host('a'),
-      old = new Host('b', 'worker'),
-      replacement = new Host('c', 'worker')
+    const local = await Host.create('a'),
+      old = await Host.create('b', 'worker'),
+      replacement = await Host.create('c', 'worker')
     /** First admission supplies the old session generation and directory. */
     const first = connect(local, old)
     await Promise.all([first.first.ready, first.second.ready])
@@ -361,23 +419,23 @@ describe('C2 Session and SessionTable owners', () => {
 
   it('enforces trusted parent identity and rejects equal global identities with the canonical native error', async () => {
     /** Only actual native facts may constrain a bootstrap parent. */
-    const local = new Host('a'),
-      remote = new Host('b')
+    const local = await Host.create('a'),
+      remote = await Host.create('b')
     /** This connection intentionally presents a different real peer than its parent fact. */
     const a = new MemoryCarrier('fact-a'),
       b = new MemoryCarrier('fact-b')
     a.link(b)
     b.link(a)
     /** Readiness is observed immediately so a rejected handshake owns its original failure. */
-    const handle = local.table.attach('process', a, { expectedPeerId: 'parent' })
+    const handle = local.attach('process', a, { expectedPeerId: 'parent' })
     /** The counterpart still exchanges a genuine pure-valid hello. */
-    const other = remote.table.attach('process', b)
+    const other = remote.attach('process', b)
     await expect(handle.ready).rejects.toMatchObject({ code: RpcCoreErrorCode.protocolInvalid })
     await Promise.all([handle.closed, other.closed])
     expect(local.table.values('process')).toEqual([])
     /** Equal ids cannot select either simultaneous-hello role. */
-    const one = new Host('same'),
-      two = new Host('same')
+    const one = await Host.create('same'),
+      two = await Host.create('same')
     /** Carrier ids are distinct even when the proposed global ids are equal. */
     const pair = connect(one, two)
     await expect(pair.first.ready).rejects.toMatchObject({
@@ -394,9 +452,9 @@ describe('C2 Session and SessionTable owners', () => {
 
   it('cancels a retiring candidate probe without retiring its existing same-name source', async () => {
     /** Candidate cancellation is independent of whether the established source is healthy. */
-    const local = new Host('a'),
-      old = new Host('b', 'worker'),
-      candidate = new Host('c', 'worker')
+    const local = await Host.create('a'),
+      old = await Host.create('b', 'worker'),
+      candidate = await Host.create('c', 'worker')
     /** The old real session remains selectable while candidate liveness is unresolved. */
     const first = connect(local, old)
     await Promise.all([first.first.ready, first.second.ready])
@@ -418,9 +476,9 @@ describe('C2 Session and SessionTable owners', () => {
 
   it('updates O(1) directory/name indexes and rejects ambiguous cross-namespace forwarding', async () => {
     /** The host has two actual namespaces sharing one global self identity. */
-    const local = new Host('a'),
-      remote = new Host('b', 'worker'),
-      other = new Host('c', 'worker')
+    const local = await Host.create('a'),
+      remote = await Host.create('b', 'worker'),
+      other = await Host.create('c', 'worker')
     /** Each accepted directory supplies its actual direct node id. */
     const first = connect(local, remote, 'process'),
       second = connect(local, other, 'thread')
@@ -454,13 +512,13 @@ describe('C2 Session and SessionTable owners', () => {
 
 it('times out an actual silent handshake at10000ms, preserves abort identity and releases timers', async () => {
   /** No peer response reaches this original subscribed physical carrier. */
-  const silent = new Host('silent')
+  const silent = await Host.create('silent')
   /** The actual native resource keeps its original receiver and idempotent physical cleanup. */
   const carrier = new MemoryCarrier('silent-startup')
   /** Count the original native close, without replacing the cleanup implementation. */
   const close = vi.spyOn(carrier, 'close')
   /** Observe failure before moving the real borrowed monotonic clock. */
-  const handle = silent.table.attach('process', carrier)
+  const handle = silent.attach('process', carrier)
   /** The new profile maps retired JSONRPC startup classification onto canonical TIMEOUT. */
   const timed = expect(handle.ready).rejects.toMatchObject({
     code: RpcCoreErrorCode.deadlineExceeded
@@ -474,7 +532,7 @@ it('times out an actual silent handshake at10000ms, preserves abort identity and
   expect(silent.scheduler.pendingCount).toBe(0)
   expect(carrier.unsubscribed).toBe(1)
   /** A cold native namespace lends its configured deadline to this same Session timer owner. */
-  const configured = new Host('configured')
+  const configured = await Host.create('configured')
   /** No native or transport-owned timer is introduced for an explicit connect timeout. */
   const scope = configured.table.stage('process', { handshakeTimeoutMs: 7 })
   /** Silent native IO still uses the original physical close and one readiness Promise. */
@@ -495,7 +553,7 @@ it('times out an actual silent handshake at10000ms, preserves abort identity and
   expect(configured.scheduler.pendingCount).toBe(0)
   await configured.table.close()
   /** A second actual startup is abandoned by its original native source reason. */
-  const aborted = new Host('aborted')
+  const aborted = await Host.create('aborted')
   /** The original receiver survives until actual lifecycle cancellation. */
   const source = new MemoryCarrier('aborted-startup')
   /** A real close count remains independent of ready's failure projection. */
@@ -503,7 +561,7 @@ it('times out an actual silent handshake at10000ms, preserves abort identity and
   /** Exact reason identity is the existing native source cancellation contract. */
   const reason = new Error('caller cancellation')
   /** Actual source close cancels the one pending handshake rather than a fabricated caller task. */
-  const opening = aborted.table.attach('process', source)
+  const opening = aborted.attach('process', source)
   aborted.scheduler.advance(5000)
   await opening.close(reason)
   await expect(opening.ready).rejects.toBe(reason)
@@ -516,12 +574,12 @@ it.each(['batch@1', 'abort@1', 'wire-error@1'])(
   'rejects absent required handler %s through one real handshake and closes once',
   async (extension) => {
     /** Actual cold hook registration is the sole source of required handler negotiation. */
-    const left = new Host('a', 'a', {
+    const left = await Host.create('a', 'a', {
       extensions: [extension],
       requiredExtensions: [extension]
     })
     /** The counterpart genuinely installs no handler for this required extension. */
-    const right = new Host('b')
+    const right = await Host.create('b')
     /** Both sides exchange real profile2 frames over the original physical pair. */
     const pair = connect(left, right)
     /** The original actual carrier owns its sole physical close receipt. */
@@ -543,8 +601,8 @@ it.each(['kind', 'step', 'profile', 'codec', 'unknown-field', 'peer'])(
   'preserves the actual admitted failure and redacts hostile reply %s',
   async (field) => {
     /** The actual sole Session owner must preserve its original codec validation exception. */
-    const left = new Host('a'),
-      right = new Host('b')
+    const left = await Host.create('a'),
+      right = await Host.create('b')
     /** Asynchronous hello hooks let the test observe the original physical write before delivery. */
     const pair = connect(left, right)
     /** Capture the exact source exception, without rebuilding an expected second parse. */
@@ -597,9 +655,9 @@ it('records the original control.sent assertion through the real native Session 
     'a'
   )
   /** Existing Session fixtures retain the original native ping owner and physical carrier. */
-  const left = new Host('a', 'alpha', { observe: emitter.observe })
+  const left = await Host.create('a', 'alpha', { observe: emitter.observe })
   /** A genuine counterpart answers the same physical ping with its real pong. */
-  const right = new Host('b', 'beta')
+  const right = await Host.create('b', 'beta')
   /** Both real subscriptions precede the original hello/accept exchange. */
   const pair = connect(left, right)
   try {

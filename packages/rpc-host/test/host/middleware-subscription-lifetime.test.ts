@@ -13,8 +13,7 @@ function receivingHost() {
   /** Original memory listener and pre-attachment source use these genuine native declarations. */
   const rpc = rpcHostPipelines(
     () => host,
-    (key) => host.pipeline(key),
-    ['memory']
+    (key, request) => host.pipeline(key, request)
   )
   /** The sole native owner retains acquisition, rollback and its stable disposal completion. */
   const host = defineHost({

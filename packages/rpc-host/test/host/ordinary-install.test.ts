@@ -23,8 +23,7 @@ function ordinaryHost() {
   /** The single SDK function lends execution lazily while supplying the fixed declarations. */
   const rpc = rpcHostPipelines(
     () => host,
-    (name) => host.pipeline(name),
-    ['worker']
+    (name, request) => host.pipeline(name, request)
   )
   /** Native execution authority refers to this actual owner after construction completes. */
   const host = defineHost({
@@ -104,39 +103,29 @@ describe('ordinary native Host RPC installation', () => {
     }
   })
 
-  it('rejects omitted pipeline declarations before native acquisition when domainCore is configured', async () => {
-    /** JavaScript may accidentally keep only domainCore while omitting the returned declarations. */
+  it('installs transport-owned pipelines when the ordinary Host supplies only SDK domainCore', async () => {
+    /** The transport declares its own group; the ordinary Host lends genuine candidate execution. */
     const rpc = rpcHostPipelines(
       () => host,
-      (name) => host.pipeline(name as never) as never,
-      ['worker']
+      (name, request) => host.pipeline(name, request)
     )
-    /** This is a real native owner and callback; only its required construction declarations lack. */
+    /** No cold namespace inventory or pipeline declaration belongs to this actual Host. */
     const host = defineHost({
       domainCore: rpc.domainCore,
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })
-    /** A cold genuine transport exposes any resource acquisition before declaration admission. */
+    /** The native acquisition callback runs only after its own plugin pipeline declaration exists. */
     const open = vi.fn(() => ({ dispose: () => undefined }))
     try {
-      /** Box admission facts rather than formatting a native handle after finally disposes it. */
+      /** Public publication and the exact acquisition count receive the new R25 contract. */
       const outcome = await host
-        .use(defineTransportPlugin({ name: 'undeclared', namespace: 'worker', open }))
+        .use(defineTransportPlugin({ name: 'worker', namespace: 'worker', open }))
         .then(
           () => ({ accepted: true, acquisitions: open.mock.calls.length }),
           (error: unknown) => ({ error })
         )
-      expect(outcome).toMatchObject({
-        error: {
-          code: 'PLUGIN_INSTALL_FAILED',
-          cause: {
-            source: 'rpc.endpoint',
-            code: 'INVALID_CONFIG',
-            cause: { source: 'plugin.host', code: 'PIPELINE_UNKNOWN' }
-          }
-        }
-      })
-      expect(open).not.toHaveBeenCalled()
+      expect(outcome).toEqual({ accepted: true, acquisitions: 1 })
+      expect(Reflect.get(host, 'worker')).toBeDefined()
     } finally {
       await host.dispose()
     }

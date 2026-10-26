@@ -75,8 +75,7 @@ it('withdraws rolled-back flow hooks, extensions and policy before an ordinary n
   /** Cold namespace groups lend this same ordinary native owner its actual RPC execution authority. */
   const rpc = rpcHostPipelines(
     () => native,
-    (name) => native.pipeline(name),
-    ['memory']
+    (name, request) => native.pipeline(name, request)
   )
   /** Native construction consumes the original declaration and lazy domain-core receipt. */
   const native = defineHost({
@@ -146,8 +145,7 @@ it('preserves real native Feature exposure and releases an ordinary transport ex
   /** Cold namespace groups lend this same ordinary native owner its actual RPC execution authority. */
   const rpc = rpcHostPipelines(
     () => native,
-    (name) => native.pipeline(name),
-    ['memory']
+    (name, request) => native.pipeline(name, request)
   )
   /** Native construction consumes the original declaration and lazy domain-core receipt. */
   const native = defineHost({
@@ -362,8 +360,7 @@ it('rolls back both native dependency owners once without replacing their origin
   /** Both selected Feature outputs and RPC declarations belong to this same real native Host. */
   const rpc = rpcHostPipelines(
     () => native,
-    (name) => native.pipeline(name),
-    ['memory']
+    (name, request) => native.pipeline(name, request)
   )
   /** Ordinary installation, rollback and final disposal retain their actual native owner. */
   const native = defineHost({

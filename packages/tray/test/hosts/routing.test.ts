@@ -263,8 +263,7 @@ describe('mesh routing and admission accounting', () => {
     /** Genuine native configuration keeps relay fixture typing on the actual RPC host boundary. */
     const rpc = rpcHostPipelines(
       () => host,
-      (name) => host.pipeline(name),
-      []
+      (name, request) => host.pipeline(name, request)
     )
     const host = defineHost({
       ...rpc,

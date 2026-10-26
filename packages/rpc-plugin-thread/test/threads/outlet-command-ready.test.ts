@@ -22,8 +22,7 @@ describe('thread outlet command readiness', () => {
       /** Lazy pipeline authority reads this case's own native host only at installation. */
       const rpc = rpcHostPipelines(
         () => host,
-        (name) => host.pipeline(name),
-        ['thread']
+        (name, request) => host.pipeline(name, request)
       )
       const host = defineHost({
         ...rpc,

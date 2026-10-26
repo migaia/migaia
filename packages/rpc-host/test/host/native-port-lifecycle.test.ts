@@ -26,8 +26,7 @@ function receivingHost(name: string) {
   /** The SDK helper borrows execution lazily from the exact same native receiving Host. */
   const rpc = rpcHostPipelines(
     () => host,
-    (key) => host.pipeline(key),
-    ['memory']
+    (key, request) => host.pipeline(key, request)
   )
   /** The runtime owns rollback and its one stable native disposal Promise. */
   const host = defineHost({

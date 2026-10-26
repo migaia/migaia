@@ -20,7 +20,7 @@ import type {
   RpcSessionRetirement
 } from '@migaia/rpc-contract/interfaces'
 import type { IRpcTransportContext } from '@migaia/rpc-contract/interfaces'
-import type { IRpcFlowStages } from './flow-pipelines.js'
+import type { IRpcFlowStages, RpcFlowPipelines } from './flow-pipelines.js'
 import type { IRpcNativeTransportFeature } from './native-feature-types.js'
 import type { IRpcIntersection } from '../namespace/types.js'
 
@@ -54,7 +54,8 @@ export type IRpcTransportPlugin<
   N extends string = string,
   E extends object = Record<never, never>,
   A extends boolean = boolean
-> = IRpcNamespacePlugin<N, E, 'transport', A>
+> = IRpcNamespacePlugin<N, E, 'transport', A> &
+  Readonly<{ name: N; pipelines: typeof RpcFlowPipelines }>
 
 /** Native flow/link-policy definitions participate in the same installation and rollback. */
 export type IRpcFlowPlugin<E extends object = Record<never, never>> = IRpcNamespacePlugin<

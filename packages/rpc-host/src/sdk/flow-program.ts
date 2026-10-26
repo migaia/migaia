@@ -1,4 +1,4 @@
-/** Compile cold placements and lend their actual native Feature outputs to one common adapter. */
+/** Compile host and transport placements using the original native Feature graph and outputs. */
 import {
   definePlugin,
   type IPluginHostCore,
@@ -17,7 +17,8 @@ import {
   readRpcDefinition,
   registerRpcDefinition,
   RpcDefinitionKind,
-  type IRpcFlowEntry
+  type IRpcFlowEntry,
+  type IRpcSharedFlows
 } from './metadata.js'
 import type {
   IRpcFlowDefinition,
@@ -28,33 +29,30 @@ import type {
   IRpcTransportPlugin
 } from './types.js'
 
-/** The single SDK registration name is stable across hosts; each install has independent state. */
+/** The common native registration owns shared setup independently from transport lifetimes. */
 const flowPluginName = 'rpc-flow-features'
-
-/** Each placement shares a host instance or owns one namespace-local override instance. */
-type IFlowPlacement = Readonly<{ feature: IRpcFlowFeature<object>; scope?: string }>
 
 /** Reject invalid configuration before a transport can acquire native resources. */
 function invalidFeature(): never {
   throw tagRpcError(new TypeError(HostErrorText.pluginInvalid), RpcCoreErrorCode.invalidConfig)
 }
 
-/** Read only authenticated Feature configuration; names cannot impersonate a built-in capability. */
+/** Private capability identity prevents a display name from impersonating a builtin. */
 function featureKey(feature: IRpcFlowFeature<object>): PropertyKey {
-  /** SDK metadata is private and was attached only to the original native identity. */
+  /** Only SDK-authenticated opaque handles participate in flow selection. */
   const metadata = readRpcDefinition(feature)
   if (metadata?.kind !== RpcDefinitionKind.feature) return invalidFeature()
   return metadata.builtin ? RpcBuiltinFeature[metadata.builtin] : metadata.definition.name
 }
 
-/** One scope chooses at most one implementation of each capability before native graph inspection. */
+/** Preserve installation order while choosing exactly one instance of each capability. */
 function featureSelection(
   features: readonly IRpcFlowFeature<object>[]
-): Map<PropertyKey, IRpcFlowFeature<object>> {
-  /** Insertion order remains the caller's installation order within each native dependency bucket. */
+): ReadonlyMap<PropertyKey, IRpcFlowFeature<object>> {
+  /** Selection is cold and never scanned by a message execution. */
   const selected = new Map<PropertyKey, IRpcFlowFeature<object>>()
   for (const feature of features) {
-    /** The same capability cannot consume two quota owners in a single placement. */
+    /** A duplicate capability must not acquire a second quota owner. */
     const key = featureKey(feature)
     if (selected.has(key))
       throw tagRpcError(
@@ -66,95 +64,178 @@ function featureSelection(
   return selected
 }
 
-/** Select information-flow Features while preserving transport-owned pool and call policies. */
-function transportFlows(features: readonly unknown[] = []): IRpcFlowFeature<object>[] {
-  /** Only the same genuine opaque handles may join the common native wrapper. */
+/** Keep native pool, media and call-policy features with their existing transport installers. */
+function transportFlows(features: readonly unknown[]): IRpcFlowFeature<object>[] {
+  /** Observers and other native RPC definitions cannot impersonate transport-local Features. */
   const flows: IRpcFlowFeature<object>[] = []
   for (const feature of features) {
-    /** A native observer/policy/transport in this list is an explicit invalid placement. */
+    /** Metadata authenticates the original native definition rather than structural fields. */
     const metadata = readRpcDefinition(feature)
     if (metadata) {
       if (metadata.kind !== RpcDefinitionKind.feature) invalidFeature()
       flows.push(feature as IRpcFlowFeature<object>)
       continue
     }
-    /**
-     * Call policies, pool and transport-native features (for example process `ipcLog`) keep their
-     * own installers; the transport validates its own kinds, so only shapeless values fail here.
-     */
+    /** Transport-native feature admission remains owned by that transport. */
     const kind = feature && typeof feature === 'object' && Reflect.get(feature, 'kind')
     if (typeof kind !== 'string') invalidFeature()
   }
   return flows
 }
 
-/**
- * Cold programs contain definitions and placements only; running resources belong to native
- * install.
- */
-export class RpcFlowProgram {
-  /** Namespace declarations are fixed before defineHost constructs any pipeline. */
-  readonly namespaces: readonly string[]
-  /** Policy and readonly observer plugins retain their real native registration identities. */
-  readonly flows: readonly IRpcFlowPlugin[]
-  /** Native transport installation remains a second transaction after flow commit. */
-  readonly transports: readonly IRpcTransportPlugin[]
-  /** All native local dependencies are roots so their original outputs remain readable on core. */
-  readonly #roots: Record<string, IRpcFlowFeature<object>> = Object.create(null)
-  /** Each original opaque handle has exactly one native root alias, including implicit dependencies. */
-  readonly #aliases = new Map<object, string>()
-  /**
-   * Native dependency order is projected separately for each namespace's actual selected
-   * placements.
-   */
-  readonly #groups = new Map<string, readonly IFlowPlacement[]>()
+/** Project selected roots through native inspection without evaluating a Feature factory. */
+function inspectSelection(selection: ReadonlyMap<PropertyKey, IRpcFlowFeature<object>>) {
+  return inspectFeatures(
+    Object.fromEntries(
+      [...selection.values()].map((feature, index) => [String(index), feature])
+    ) as IFeatureRecord
+  )
+}
 
-  /** Inspect trusted handles without executing any Feature factory or flow setup. */
-  constructor(plugins: readonly IRpcHostPlugin[], additionalNamespaces: readonly string[] = []) {
-    /** Whole-host placements share one setup result across every group that selects them. */
-    const hostFeatures: IRpcFlowFeature<object>[] = []
-    /** Namespace-local placements are captured from the original real transport definitions. */
-    const locals = new Map<string, readonly IRpcFlowFeature<object>[]>()
-    /** Native observers/policies are deliberately outside the information-flow wrapper. */
+/** Read the real registration's already-built output; setup and disposal stay native-owned. */
+async function prepareEntry(
+  core: IPluginHostCore,
+  alias: string,
+  feature: object,
+  rootSignal: IAbortSignal,
+  context: IRpcFlowSetupContext
+): Promise<IRpcFlowEntry> {
+  /** Native Feature output is the authoritative cold configuration for this exact registration. */
+  const definition = (
+    core as IPluginHostCore &
+      Readonly<{ features: Readonly<Record<string, IRpcFlowDefinition<object>>> }>
+  ).features[alias]!
+  /** Only authenticated flow Features reach this preparation path. */
+  const metadata = readRpcDefinition(feature)!
+  return {
+    definition,
+    installed: await new RpcFlowSetup(definition).prepare(core, rootSignal, context),
+    builtin: metadata.kind === RpcDefinitionKind.feature ? metadata.builtin : undefined
+  }
+}
+
+/** One cold local program can be reused; every native transport installation prepares its own state. */
+export class RpcTransportFlowProgram {
+  /** Native registration builds these aliases, including dependency-only helper outputs. */
+  readonly features: IFeatureRecord
+  /** Explicit local capabilities override host placements without replacing native identities. */
+  readonly #selection: ReadonlyMap<PropertyKey, IRpcFlowFeature<object>>
+  /** Native dependency membership identifies local implicit placements without another graph. */
+  readonly #local: ReadonlySet<object>
+  /** Every local output is readable through the installing transport's original core. */
+  readonly #aliases = new Map<object, string>()
+
+  /** Capture authentic local roots without executing configuration or native acquisition. */
+  constructor(features: readonly unknown[] = []) {
+    this.#selection = featureSelection(transportFlows(features))
+    /** Canonical inspection fixes dependency order and validates the original closure once. */
+    const inspection = inspectSelection(this.#selection)
+    /** Aliases expose original handles rather than rebuilding or wrapping their factories. */
+    const roots: Record<string, IFeatureRecord[string]> = Object.create(null)
+    for (const feature of inspection.ordered) {
+      /** The complete closure must remain visible on core.features, not just explicit roots. */
+      const alias = String(this.#aliases.size)
+      this.#aliases.set(feature, alias)
+      roots[alias] = feature
+    }
+    this.features = Object.freeze(roots)
+    this.#local = new Set(inspection.ordered)
+  }
+
+  /** Combine native dependency order with host reuse and registration-local overrides. */
+  async prepare(
+    core: IPluginHostCore,
+    rootSignal: IAbortSignal,
+    context: IRpcFlowSetupContext,
+    shared: IRpcSharedFlows
+  ): Promise<readonly IRpcFlowEntry[]> {
+    /** Whole-host roots retain their original relative order unless locally overridden. */
+    const selected = new Map<PropertyKey, IRpcFlowFeature<object>>()
+    for (const [key, feature] of shared.selection)
+      if (!this.#selection.has(key)) selected.set(key, feature)
+    for (const [key, feature] of this.#selection) selected.set(key, feature)
+    /** Each physical namespace consumes a single dependency-first projection. */
+    const entries: IRpcFlowEntry[] = []
+    for (const feature of inspectSelection(selected).ordered) {
+      /** Helper Features supply native outputs but contribute no RPC intervention. */
+      const metadata = readRpcDefinition(feature)
+      if (metadata?.kind !== RpcDefinitionKind.feature) continue
+      /** An explicitly selected capability suppresses an older dependency's flow placement. */
+      const key = metadata.builtin ? RpcBuiltinFeature[metadata.builtin] : metadata.definition.name
+      const root = selected.get(key)
+      if (root && root !== feature) continue
+      /** An explicit host root wins over the same handle reached through a local dependency. */
+      const local = root ? this.#selection.get(key) === feature : this.#local.has(feature)
+      entries.push(
+        local
+          ? await prepareEntry(core, this.#aliases.get(feature)!, feature, rootSignal, context)
+          : shared.entries.get(feature)!
+      )
+    }
+    return Object.freeze(entries)
+  }
+}
+
+/** Cold host composition owns all shared roots, even when current transports override them all. */
+export class RpcFlowProgram {
+  /** Observers and policies keep their genuine native registration identities. */
+  readonly flows: readonly IRpcFlowPlugin[]
+  /** Native transport installation remains a separate atomic batch after shared setup. */
+  readonly transports: readonly IRpcTransportPlugin[]
+  /** Host roots select one shared instance for each capability. */
+  readonly #selection: ReadonlyMap<PropertyKey, IRpcFlowFeature<object>>
+  /** The native wrapper builds the complete host closure independently from namespace inventory. */
+  readonly #roots: IFeatureRecord
+  /** Dependency-first handles preserve the canonical native order during shared setup. */
+  readonly #ordered: readonly object[]
+  /** Alias lookup reads only the original native wrapper's feature outputs. */
+  readonly #aliases = new Map<object, string>()
+
+  /** Classify cold definitions without executing Feature factories or transport acquisition. */
+  constructor(plugins: readonly IRpcHostPlugin[]) {
+    /** Host Features are prepared once, independently from transport-local selection. */
+    const features: IRpcFlowFeature<object>[] = []
+    /** Native readonly observer and policy definitions are installed unchanged. */
     const flows: IRpcFlowPlugin[] = []
-    /**
-     * Transport definitions retain their original object identity for native rollback and
-     * replacement.
-     */
+    /** Transport metadata already owns its complete local native Feature program. */
     const transports: IRpcTransportPlugin[] = []
     for (const plugin of plugins) {
-      /** Only SDK-authenticated handles participate in RPC composition. */
+      /** Only original SDK registrations may join composition. */
       const metadata = readRpcDefinition(plugin)
       if (!metadata) invalidFeature()
       if (metadata.kind === RpcDefinitionKind.feature)
-        hostFeatures.push(plugin as IRpcFlowFeature<object>)
-      else if (metadata.kind === RpcDefinitionKind.transport) {
+        features.push(plugin as IRpcFlowFeature<object>)
+      else if (metadata.kind === RpcDefinitionKind.transport)
         transports.push(plugin as IRpcTransportPlugin)
-        locals.set(metadata.definition.namespace, transportFlows(metadata.definition.features))
-      } else if (
+      else if (
         metadata.kind === RpcDefinitionKind.flow ||
         metadata.kind === RpcDefinitionKind.policy
       )
         flows.push(plugin as IRpcFlowPlugin)
       else invalidFeature()
     }
-    this.namespaces = Object.freeze([...new Set([...additionalNamespaces, ...locals.keys()])])
-    this.transports = Object.freeze(transports)
     this.flows = Object.freeze(flows)
-    /** Selection precedes graph projection; no namespace performs a hot-path feature scan. */
-    const shared = featureSelection(hostFeatures)
-    for (const namespace of this.namespaces)
-      this.#group(namespace, shared, featureSelection(locals.get(namespace) ?? []))
+    this.transports = Object.freeze(transports)
+    this.#selection = featureSelection(features)
+    /** All host dependencies remain available to a transport installed in a later transaction. */
+    const inspection = inspectSelection(this.#selection)
+    /** The real native wrapper receives every original dependency as an output alias. */
+    const roots: Record<string, IFeatureRecord[string]> = Object.create(null)
+    for (const feature of inspection.ordered) {
+      /** Alias order is native dependency order, not namespace or capability-name order. */
+      const alias = String(this.#aliases.size)
+      this.#aliases.set(feature, alias)
+      roots[alias] = feature
+    }
+    this.#ordered = inspection.ordered
+    this.#roots = Object.freeze(roots)
   }
 
-  /** Wrap every placement in the same genuine native plugin; no per-capability plugin exists. */
+  /** The one native wrapper owns shared setup and its original reverse cleanup. */
   plugin(): IDefinedPluginConstraint<Record<never, never>, never, Record<never, never>> {
-    /** Native Feature factories produce cold definitions before this actual install callback runs. */
+    /** Metadata borrows this cold program without retaining an installed core. */
     const metadata = { kind: RpcDefinitionKind.features, prepare: this.#prepare }
-    /**
-     * The native graph owns identity deduplication, output construction, stages and rollback
-     * leases.
-     */
+    /** Native installation evaluates original factories and owns every setup disposer. */
     const plugin = definePlugin({
       name: flowPluginName,
       features: this.#roots,
@@ -168,120 +249,30 @@ export class RpcFlowProgram {
     >
   }
 
-  /**
-   * Native inspection supplies dependency order; local overrides replace the host capability only
-   * here.
-   */
-  #group(
-    namespace: string,
-    shared: ReadonlyMap<PropertyKey, IRpcFlowFeature<object>>,
-    local: ReadonlyMap<PropertyKey, IRpcFlowFeature<object>>
-  ): void {
-    /** Every selected root retains its placement identity independently of its reusable cold handle. */
-    const selected = new Map<PropertyKey, IFlowPlacement>()
-    for (const [key, feature] of shared) if (!local.has(key)) selected.set(key, { feature })
-    for (const [key, feature] of local) selected.set(key, { feature, scope: namespace })
-    /** Canonical native topology is reused rather than constructing a second dependency graph. */
-    const inspection = inspectFeatures(
-      Object.fromEntries(
-        [...selected.values()].map((value, index) => [String(index), value.feature])
-      ) as IFeatureRecord
-    )
-    /**
-     * Implicit local dependencies share their local placement unless explicitly selected at Host
-     * scope.
-     */
-    const localDependencies = new Set(
-      inspectFeatures(
-        Object.fromEntries([...local.values()].map((feature, index) => [String(index), feature]))
-      ).ordered
-    )
-    /** Dependency-only helper Features remain native factories but do not acquire flow state. */
-    const placements: IFlowPlacement[] = []
-    for (const feature of inspection.ordered) {
-      if (!this.#aliases.has(feature)) {
-        /** This alias only exposes the same native handle's already deduplicated cold output. */
-        const alias = String(this.#aliases.size)
-        this.#aliases.set(feature, alias)
-        this.#roots[alias] = feature as IRpcFlowFeature<object>
-      }
-      /** Only authenticated flow definitions can contribute stages or negotiation facts. */
-      const metadata = readRpcDefinition(feature)
-      if (metadata?.kind !== RpcDefinitionKind.feature) continue
-      /**
-       * Selected overrides suppress the older dependency's flow placement without replacing its
-       * native identity.
-       */
-      const key = metadata.builtin ? RpcBuiltinFeature[metadata.builtin] : metadata.definition.name
-      const placement = selected.get(key)
-      if (placement && placement.feature !== feature) continue
-      placements.push(
-        placement ?? {
-          feature: feature as IRpcFlowFeature<object>,
-          scope: localDependencies.has(feature) ? namespace : undefined
-        }
-      )
-    }
-    this.#groups.set(namespace, Object.freeze(placements))
-  }
-
-  /** Prepare shared resources once and each local placement independently under the wrapper's lease. */
+  /** Prepare every shared flow once under this actual wrapper's native lifetime. */
   readonly #prepare = async (
     core: IPluginHostCore,
     rootSignal: IAbortSignal,
     context: IRpcFlowSetupContext
-  ): Promise<ReadonlyMap<string, readonly IRpcFlowEntry[]>> => {
-    /** The actual Host wrapper, not a namespace, owns in-progress dispatch stage lifetime. */
-    const shared = new Map<object, IRpcFlowEntry>()
-    /**
-     * Local placements remain independent even when the same cold handle is reused in two
-     * transports.
-     */
-    const local = new Map<string, Map<object, IRpcFlowEntry>>()
-    /** All groups register only after setup succeeds, so failure retains native atomic rollback. */
-    const groups = new Map<string, readonly IRpcFlowEntry[]>()
-    for (const [namespace, placements] of this.#groups) {
-      /** One group's entries preserve native dependency/install order without a stage executor. */
-      const entries: IRpcFlowEntry[] = []
-      for (const placement of placements) {
-        /**
-         * Local scope selects a distinct instance cache; shared placements reuse the exact host
-         * owner.
-         */
-        let cache = shared
-        if (placement.scope !== undefined) {
-          if (!local.has(placement.scope)) local.set(placement.scope, new Map())
-          cache = local.get(placement.scope)!
-        }
-        /** The same selected placement can be reached through several native dependencies. */
-        let entry = cache.get(placement.feature)
-        if (!entry) {
-          /** Native core supplies the genuine output; configuration is never evaluated manually. */
-          const definition = (
-            core as IPluginHostCore &
-              Readonly<{ features: Readonly<Record<string, IRpcFlowDefinition<object>>> }>
-          ).features[this.#aliases.get(placement.feature)!]!
-          /** Private capability identity is unrelated to the public display name. */
-          const metadata = readRpcDefinition(placement.feature)!
-          entry = {
-            definition,
-            installed: await new RpcFlowSetup(definition).prepare(core, rootSignal, context),
-            builtin: metadata.kind === RpcDefinitionKind.feature ? metadata.builtin : undefined
-          }
-          cache.set(placement.feature, entry)
-        }
-        entries.push(entry)
-      }
-      groups.set(namespace, Object.freeze(entries))
+  ): Promise<IRpcSharedFlows> => {
+    /** Exact opaque identity deduplicates roots and implicit dependencies through native order. */
+    const entries = new Map<object, IRpcFlowEntry>()
+    for (const feature of this.#ordered) {
+      /** Dependency-only native helpers never acquire flow installation state. */
+      const metadata = readRpcDefinition(feature)
+      if (metadata?.kind !== RpcDefinitionKind.feature) continue
+      entries.set(
+        feature,
+        await prepareEntry(core, this.#aliases.get(feature)!, feature, rootSignal, context)
+      )
     }
-    return groups
+    return Object.freeze({ selection: this.#selection, entries })
   }
 }
 
-/** Ordinary native hosts use the same common adapter with their cold namespace declarations. */
+/** Ordinary native hosts install the same shared wrapper before their transport batch. */
 export function rpcFlowPlugin(
-  plugins: readonly IRpcHostPlugin[],
-  namespaces: readonly string[] = []
+  plugins: readonly IRpcHostPlugin[]
 ): IDefinedPluginConstraint<Record<never, never>, never, Record<never, never>> {
-  return new RpcFlowProgram(plugins, namespaces).plugin()
+  return new RpcFlowProgram(plugins).plugin()
 }

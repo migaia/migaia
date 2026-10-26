@@ -1,6 +1,6 @@
 import { MessageChannel } from 'node:worker_threads'
 import { describe, expect, it, vi } from 'vitest'
-import { PluginHost } from '@migaia/plugin-host'
+import { PluginHost, type IHostCoreConstructionRequest } from '@migaia/plugin-host'
 import { createHost } from '@migaia/tray/host'
 import { createRpcHost, type IRpcNamespace } from '@migaia/rpc-host'
 import {
@@ -15,7 +15,7 @@ type IRpcSetup = ReturnType<typeof rpcHostPipelines>
 type IRpcCore = ReturnType<IRpcSetup['domainCore']>
 
 /** The real class consumer lends protected execution through its own lexical access. */
-class NativeTrayHost extends PluginHost<IRpcCore, unknown, readonly [], IRpcSetup['pipelines']> {
+class NativeTrayHost extends PluginHost<IRpcCore, unknown, readonly []> {
   /** The same cold SDK configuration supplies declarations and every registration's domain core. */
   readonly #rpc: IRpcSetup
 
@@ -24,20 +24,18 @@ class NativeTrayHost extends PluginHost<IRpcCore, unknown, readonly [], IRpcSetu
     /** These lazy arrows preserve protected access without exposing a public pipeline facade. */
     const rpc = rpcHostPipelines(
       () => this,
-      (name) => this.pipeline(name),
-      ['memory']
+      (name, request) => this.pipeline(name, request)
     )
     super({
       identity: { name: 'tray-rpc-class' },
-      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-      pipelines: rpc.pipelines
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
     this.#rpc = rpc
   }
 
   /** SDK installation still checks this exact Host against the genuine native core identity. */
-  protected override createPluginDomainCore(): IRpcCore {
-    return this.#rpc.domainCore()
+  protected override createPluginDomainCore(request: IHostCoreConstructionRequest): IRpcCore {
+    return this.#rpc.domainCore(request)
   }
 }
 

@@ -181,8 +181,7 @@ async function nativeCleanupFailure(): Promise<void> {
   /** The helper lends pipeline authority lazily from this exact native receiving Host. */
   const rpc = rpcHostPipelines(
     () => host,
-    (key) => host.pipeline(key),
-    ['memory']
+    (key, request) => host.pipeline(key, request)
   )
   /** Native lifecycle and transaction owners remain unmodified, including disposal completion. */
   const host = defineHost({
@@ -387,8 +386,7 @@ function nativeResourceHost(name: string) {
   /** The lazy authority and all pipeline reads belong to this exact native owner. */
   const rpc = rpcHostPipelines(
     () => host,
-    (key) => host.pipeline(key),
-    ['memory']
+    (key, request) => host.pipeline(key, request)
   )
   /** Native scopes, rollback and terminal completion remain the actual implementation. */
   const host = defineHost({

@@ -9,8 +9,7 @@ function receivingHost() {
   /** Each real SDK listener declares memory before the native transaction opens it. */
   const rpc = rpcHostPipelines(
     () => host,
-    (key) => host.pipeline(key),
-    ['memory']
+    (key, request) => host.pipeline(key, request)
   )
   /** Actual native Feature and pipeline ownership stay on the same original runtime. */
   const host = defineHost({

@@ -16,8 +16,7 @@ function nativeSourceHost() {
   /** This fixed map is independent of every later source registration name. */
   const rpc = rpcHostPipelines(
     () => host,
-    (name) => host.pipeline(name),
-    ['shared']
+    (name, request) => host.pipeline(name, request)
   )
   /** Actual native transactions own Features, source commit and rollback. */
   const host = defineHost({

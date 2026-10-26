@@ -10,8 +10,7 @@ function receivingHost() {
   /** Every real listener and partial source in this receiver declares the memory namespace. */
   const rpc = rpcHostPipelines(
     () => host,
-    (key) => host.pipeline(key),
-    ['memory']
+    (key, request) => host.pipeline(key, request)
   )
   /** Original transactions and their genuine pipelines belong to this one receiving runtime. */
   const host = defineHost({

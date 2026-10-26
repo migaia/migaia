@@ -34,6 +34,7 @@ import {
 import { HostErrorText } from '../host/error-text.js'
 import { Session } from './session.js'
 import { SessionText } from './text.js'
+import type { IRpcPipelineOwner } from '../sdk/flow-pipelines.js'
 import type { IProviderCommitGate } from '../dispatch/types.js'
 import { SessionDrain } from './drain.js'
 import { OriginSession } from './origin.js'
@@ -47,6 +48,7 @@ import {
 } from './availability.js'
 import type {
   IRpcSessionOptions,
+  IRpcSessionFlow,
   IRpcSessionScope,
   IRpcSessionTableOptions,
   IRpcSessionWriteOptions,
@@ -88,6 +90,9 @@ type IStagedSessions = Readonly<{
   namespace: string
   index: INamespaceIndex
   signal?: IAbortSignal
+  /** Exact transport registration owns both execution authority and negotiation facts. */
+  pipelines?: () => IRpcPipelineOwner
+  flow?: IRpcSessionFlow
   gate?: IProviderCommitGate
   parent?: IStagedSessions
   handshakeTimeoutMs?: number
@@ -102,6 +107,9 @@ type ISessionScopeOptions = Pick<IRpcSessionTableOptions, 'handshakeTimeoutMs'> 
   signal?: IAbortSignal
   nameAdmissionTimeoutMs?: number
   parent?: IRpcSessionScope
+  /** Appended sources inherit these same native transport-owned collaborators. */
+  pipelines?: () => IRpcPipelineOwner
+  flow?: IRpcSessionFlow
   gate?: IProviderCommitGate
 }
 
@@ -269,6 +277,8 @@ export class SessionTable {
       namespace,
       index: parent?.index ?? this.#newIndex(options?.signal),
       signal: options?.signal,
+      pipelines: options?.pipelines ?? parent?.pipelines,
+      flow: options?.flow ?? parent?.flow,
       parent,
       gate: options?.gate,
       handshakeTimeoutMs,
@@ -558,8 +568,8 @@ export class SessionTable {
       expectedPeerId: facts?.expectedPeerId,
       sessionId: facts?.sessionId,
       isExclusive: facts?.isExclusive,
-      flow: this.#options.flow,
-      pipelines: this.#options.pipelines,
+      flow: staged?.flow ?? this.#options.flow,
+      pipelines: staged?.pipelines ?? this.#options.pipelines,
       self: this.#options.self,
       directory: (peerId) => this.#options.directory(namespace, peerId),
       track: (promise) => this.#draining.track(carrier.id, promise),

@@ -18,8 +18,7 @@ function receivingHost() {
   /** Independent native Hosts share only immutable declarations, never execution handles. */
   const rpc = rpcHostPipelines(
     () => host,
-    (key) => host.pipeline(key),
-    ['memory']
+    (key, request) => host.pipeline(key, request)
   )
   /** One original native runtime owns its actual registration and terminal cleanup. */
   const host = defineHost({

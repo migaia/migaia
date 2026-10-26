@@ -9,15 +9,16 @@ import { auth, type IRpcAuthenticationOptions } from '../../../dist/features/aut
 import { setAuthenticationReplayCounter } from '../../../dist/features/auth/counter.js'
 import { readAuthenticationEnvelope } from '../../../dist/features/auth/envelope.js'
 import { AuthenticationRepresentation } from '../../../dist/features/auth/representation.js'
-import { readRpcDefinition, RpcDefinitionKind } from '../../../dist/sdk/metadata.js'
 import { RpcJsonCarrierCodec } from '../../../dist/sdk/carrier/json-codec.js'
-import { FlowRegistry } from '../../../dist/flow/registry.js'
+import { FlowRegistry, type IRpcFlowGroup } from '../../../dist/flow/registry.js'
 import {
   rpcHostPipelines,
   rpcPipelineOwner,
-  RpcFlowPoint
+  RpcFlowPoint,
+  RpcFlowPipelines,
+  type IRpcPipelineOwner
 } from '../../../dist/sdk/flow-pipelines.js'
-import { RpcFlowSetup } from '../../../dist/sdk/flow-setup.js'
+import { RpcTransportFlowProgram } from '../../../dist/sdk/flow-program.js'
 import type { IRpcFlowInstallation } from '../../../dist/sdk/types.js'
 
 /** Original correlations and own-key order are ordinary semantic fixtures, not another codec. */
@@ -49,11 +50,7 @@ function message(id: string, payload: unknown = id): IRpcEnvelope {
 async function fixture(options: IRpcAuthenticationOptions, nativeBinary = false) {
   /** The genuine native Feature retains original callbacks and paired-transform validation. */
   const feature = auth(options)
-  /** Private builtin identity belongs to this actual factory, never a copied display name. */
-  const metadata = readRpcDefinition(feature)
-  if (metadata?.kind !== RpcDefinitionKind.feature)
-    throw new TypeError('expected actual auth feature')
-  /** Physical source retirement remains distinct from installation rollback. */
+  /** Physical source lifetime remains separate from native installation cleanup. */
   const source = new AbortController()
   /** Setup cleanup owns only this actual native installation. */
   const setup = new AbortController()
@@ -77,30 +74,42 @@ async function fixture(options: IRpcAuthenticationOptions, nativeBinary = false)
   const codecContext = { codec: 'json', nativeBinary, maxFrameBytes: 16 * 1024 * 1024 }
   /** Native use() publishes the exact algorithm installation retained by the original counter seam. */
   let installation!: IRpcFlowInstallation<object>
+  /** Actual native construction requests supply one execution port per installed group. */
+  const owners = new Map<string, IRpcPipelineOwner>()
+  /** Only prepared original groups contribute namespace facts to this fixture. */
+  const groups = new Map<string, IRpcFlowGroup>()
+  /** Canonical native Feature inspection owns the local setup and its dependency closure. */
+  const program = new RpcTransportFlowProgram([feature])
   /** This namespace uses the same genuine group declaration and lazy owner as public SDK hosts. */
   const rpc = rpcHostPipelines(
     () => flow,
-    (name) => flow.pipeline(name),
-    ['test']
+    (name, request) => flow.pipeline(name, request)
   )
   /** Native plugin-host alone owns actual stage execution and immutable snapshots. */
   const flow = defineHost({
-    ...rpc,
+    domainCore(request) {
+      /** The genuine native request fixes this registration's execution authority. */
+      const domain = rpc.domainCore(request)
+      owners.set(request.pluginName, domain[rpcPipelineOwner])
+      return domain
+    },
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
   /** Production registration attaches the authentic setup's stages to this native install core. */
-  const registry = new FlowRegistry((error) => {
-    reports.push(error)
-  })
+  const registry = new FlowRegistry(
+    (error) => {
+      reports.push(error)
+    },
+    (namespace) => groups.get(namespace)
+  )
   await flow.use(
     definePlugin({
-      name: metadata.definition.name,
-      features: { flow: feature },
+      name: 'test',
+      pipelines: RpcFlowPipelines,
+      features: program.features,
       async install(core) {
-        /** Native Feature resolution supplies this original cold definition on the genuine core. */
-        const definition = core.features.flow
-        /** Canonical setup admits the exact algorithm instance into native cleanup ownership. */
-        installation = await new RpcFlowSetup(definition).prepare(core, setup.signal, {
+        /** Canonical setup retains the original instance and its genuine native cleanup owner. */
+        const group = await registry.prepareTransport(core, program, setup.signal, {
           signal: setup.signal,
           report: (error) => {
             reports.push(error)
@@ -108,17 +117,15 @@ async function fixture(options: IRpcAuthenticationOptions, nativeBinary = false)
           retire: async () => undefined,
           call: async () => undefined
         })
-        registry.registerFeatures(
-          core,
-          new Map([['test', [{ definition, installed: installation, builtin: metadata.builtin }]]])
-        )
+        groups.set('test', group)
+        installation = group.facts().selected[0]!
         return {}
       }
     })
   )
   registry.start()
   /** The namespace-qualified execution port is borrowed unchanged from the genuine native host. */
-  const pipelines = rpc.domainCore()[rpcPipelineOwner]
+  const pipelines = owners.get('test')!
   /** Physical facts and the exact codec operation are explicit inputs to tiny fixture callbacks. */
   const ports = { source, reports, codec, codecContext }
   /** The required restore port is the actual codec, never a successful admission stub. */

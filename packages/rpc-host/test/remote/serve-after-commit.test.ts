@@ -45,7 +45,7 @@ function observe<T>(operation: Promise<T>) {
 /** Infer the actual native Host without making its lazy owner callback infer itself. */
 function barrierHost(getHost: () => object, pipeline: Parameters<typeof rpcHostPipelines>[1]) {
   return defineHost({
-    ...rpcHostPipelines(getHost, pipeline, ['memory', 'back']),
+    ...rpcHostPipelines(getHost, pipeline),
     host: {
       identity: { name: 'provider' },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
@@ -58,7 +58,7 @@ class ServeCommitBarrier {
   /** Feature and SDK transport registrations share the original native commit decision. */
   readonly #host: ReturnType<typeof barrierHost> = barrierHost(
     () => this.#host,
-    (name) => this.#host.pipeline(name)
+    (name, request) => this.#host.pipeline(name, request)
   )
   /** The canonical memory listener lends actual SDK attach and bilateral Session negotiation. */
   readonly #server = coreMemoryServer('provider', 'provider-1', 'memory', [], ['business'])

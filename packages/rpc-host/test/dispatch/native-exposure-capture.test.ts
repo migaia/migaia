@@ -21,8 +21,7 @@ it('captures one native output descriptor inventory for repeated exposure select
   /** Lazy pipeline authority reads this case's own native host only at installation. */
   const rpc = rpcHostPipelines(
     () => host,
-    (name) => host.pipeline(name),
-    ['memory']
+    (name, request) => host.pipeline(name, request)
   )
   const host = defineHost({
     ...rpc,
@@ -89,8 +88,7 @@ it('keeps the first selector invalid descriptor ahead of later native output ref
   /** Lazy pipeline authority reads this case's own native host only at installation. */
   const rpc = rpcHostPipelines(
     () => host,
-    (name) => host.pipeline(name),
-    ['memory']
+    (name, request) => host.pipeline(name, request)
   )
   const host = defineHost({
     ...rpc,

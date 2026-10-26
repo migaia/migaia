@@ -7,25 +7,22 @@ import type {
   IRpcFrameWriteOptions
 } from '@migaia/rpc-contract/interfaces'
 import { batch } from '../../../dist/features/batch/index.js'
-import { readRpcDefinition, RpcDefinitionKind } from '../../../dist/sdk/metadata.js'
-import { FlowRegistry } from '../../../dist/flow/registry.js'
+import { FlowRegistry, type IRpcFlowGroup } from '../../../dist/flow/registry.js'
 import {
   rpcHostPipelines,
   rpcPipelineOwner,
-  RpcFlowPoint
+  RpcFlowPoint,
+  RpcFlowPipelines,
+  type IRpcPipelineOwner
 } from '../../../dist/sdk/flow-pipelines.js'
-import { RpcFlowSetup } from '../../../dist/sdk/flow-setup.js'
+import { RpcTransportFlowProgram } from '../../../dist/sdk/flow-program.js'
 import type { IRpcFlowInstallation } from '../../../dist/sdk/types.js'
 
 /** The real native factory/setup is used by every owning physical-flow oracle. */
 async function fixture() {
   /** The native graph instantiates this genuine factory handle before its install callback. */
   const feature = batch({ required: true })
-  /** Private builtin identity comes from the original factory, never its display name. */
-  const metadata = readRpcDefinition(feature)
-  if (metadata?.kind !== RpcDefinitionKind.feature)
-    throw new TypeError('expected actual batch feature')
-  /** Physical source lifetime stays separate from caller cancellation. */
+  /** Physical source lifetime remains separate from native installation cleanup. */
   const source = new AbortController()
   /** Installation cleanup owns its original setup signal. */
   const setup = new AbortController()
@@ -33,30 +30,42 @@ async function fixture() {
   const errors: unknown[] = []
   /** Actual native preparation publishes this exact installation before use() completes. */
   let installation!: IRpcFlowInstallation<object>
+  /** Actual native construction requests supply one execution port per installed group. */
+  const owners = new Map<string, IRpcPipelineOwner>()
+  /** Only prepared original groups contribute namespace facts to this fixture. */
+  const groups = new Map<string, IRpcFlowGroup>()
+  /** Canonical native Feature inspection owns the local setup and its dependency closure. */
+  const program = new RpcTransportFlowProgram([feature])
   /** Qualified declarations and execution authority come from the same canonical SDK owner. */
   const rpc = rpcHostPipelines(
     () => flow,
-    (name) => flow.pipeline(name),
-    ['test', 'other']
+    (name, request) => flow.pipeline(name, request)
   )
   /** Native plugin-host owns the only snapshot, lease and multiple-submission execution path. */
   const flow = defineHost({
-    ...rpc,
+    domainCore(request) {
+      /** The genuine native request fixes this registration's execution authority. */
+      const domain = rpc.domainCore(request)
+      owners.set(request.pluginName, domain[rpcPipelineOwner])
+      return domain
+    },
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
   /** Production registration attaches actual setup stages through a genuine install core. */
-  const registry = new FlowRegistry((error) => {
-    errors.push(error)
-  })
+  const registry = new FlowRegistry(
+    (error) => {
+      errors.push(error)
+    },
+    (namespace) => groups.get(namespace)
+  )
   await flow.use(
     definePlugin({
-      name: metadata.definition.name,
-      features: { flow: feature },
+      name: 'test',
+      pipelines: RpcFlowPipelines,
+      features: program.features,
       async install(core) {
-        /** This is the original cold definition returned by the actual native Feature factory. */
-        const definition = core.features.flow
-        /** Canonical setup owns the acquired instance and its native cleanup receipt. */
-        installation = await new RpcFlowSetup(definition).prepare(core, setup.signal, {
+        /** Canonical setup retains the original instance and its genuine native cleanup owner. */
+        const group = await registry.prepareTransport(core, program, setup.signal, {
           signal: setup.signal,
           report: (error) => {
             errors.push(error)
@@ -64,19 +73,38 @@ async function fixture() {
           retire: async () => undefined,
           call: async () => undefined
         })
-        /** Only genuine factory outputs enter this group; the other real lane remains empty. */
-        const groups = new Map([
-          ['test', [{ definition, installed: installation, builtin: metadata.builtin }]],
-          ['other', []]
-        ])
-        registry.registerFeatures(core, groups)
+        groups.set('test', group)
+        installation = group.facts().selected[0]!
+        return {}
+      }
+    })
+  )
+  /** The other namespace is a separate genuine native group with no selected Features. */
+  const other = new RpcTransportFlowProgram()
+  await flow.use(
+    definePlugin({
+      name: 'other',
+      pipelines: RpcFlowPipelines,
+      features: other.features,
+      async install(core) {
+        groups.set(
+          'other',
+          await registry.prepareTransport(core, other, setup.signal, {
+            signal: setup.signal,
+            report: (error) => {
+              errors.push(error)
+            },
+            retire: async () => undefined,
+            call: async () => undefined
+          })
+        )
         return {}
       }
     })
   )
   registry.start()
   /** Borrow typed execution from the same actual native Host owner, never a copied runner. */
-  const pipelines = rpc.domainCore()[rpcPipelineOwner]
+  const pipelines = owners.get('test')!
   /** Each call borrows accepted facts while retaining its own original write options. */
   const context = (
     write?: IRpcFrameWriteOptions,

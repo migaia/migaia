@@ -17,7 +17,6 @@ import { MemoryCarrier } from '../../fixtures/core-carrier.js'
 import { coreMemoryServer } from '../../host/core-fixture.js'
 import { createNodeThreadCarrier } from '../../../../rpc-plugin-thread/dist/threads/channel.js'
 import { FlowRegistry } from '../../../dist/flow/registry.js'
-import { readRpcDefinition, RpcDefinitionKind } from '../../../dist/sdk/metadata.js'
 import { setAuthenticationReplayCounter } from '../../../dist/features/auth/counter.js'
 import { readAuthenticationEnvelope } from '../../../dist/features/auth/envelope.js'
 import { AuthenticationRepresentation } from '../../../dist/features/auth/representation.js'
@@ -210,7 +209,7 @@ class PhysicalAuthenticationPair {
   /** Default spies retain actual original inputs/results without replacing codec execution. */
   readonly encoded = vi.spyOn(this.clientCarrier.codec, 'encode')
   /** The actual native wrapper supplies the exact installed entry; no second setup is executed. */
-  readonly registered = vi.spyOn(FlowRegistry.prototype, 'registerFeatures')
+  readonly registered = vi.spyOn(FlowRegistry.prototype, 'prepareTransport')
   /** Public host handles retain their original shared close owner. */
   #serverHost: { close(): Promise<void> } | undefined
   /** Caller construction and final close remain owned by its public root. */
@@ -281,20 +280,21 @@ class PhysicalAuthenticationPair {
     return this.#clientHost!.memory.send('physical-server', 'echo', value)
   }
 
-  /** Borrow only the original Auth installation passed to genuine native group registration. */
-  installation() {
-    /** The actual opaque factory identity supplies its immutable cold definition. */
-    const metadata = readRpcDefinition(this.clientFeature)
-    expect(metadata?.kind).toBe(RpcDefinitionKind.feature)
-    /** A missing identity remains an assertion failure, never an alternate installation path. */
-    const definition =
-      metadata?.kind === RpcDefinitionKind.feature ? metadata.definition : undefined
-    /** Shared group membership may repeat one installed value, so identity is deduplicated once. */
+  /** Borrow only the original Auth installation returned by genuine native group preparation. */
+  async installation() {
+    /** The local program retains the exact original opaque Auth handle. */
     const installed = new Set<Parameters<typeof setAuthenticationReplayCounter>[0]>()
-    for (const [, groups] of this.registered.mock.calls)
-      for (const entries of groups.values())
-        for (const entry of entries)
-          if (entry.definition === definition) installed.add(entry.installed)
+    for (let index = 0; index < this.registered.mock.calls.length; index += 1) {
+      /** Native preparation supplies the actual local Feature program, never a copied definition. */
+      const [, program] = this.registered.mock.calls[index]!
+      if (!Object.values(program.features).includes(this.clientFeature)) continue
+      /** The original fulfilled preparation returns the same instances used by physical traffic. */
+      const result = this.registered.mock.results[index]!
+      expect(result.type).toBe('return')
+      /** Await the actual setup result without invoking setup a second time. */
+      const group = await result.value
+      for (const entry of group.facts().selected) installed.add(entry)
+    }
     expect(installed.size).toBe(1)
     return [...installed][0]!
   }
@@ -318,7 +318,9 @@ it('protects all original binding fields on real MessagePorts and reports the sa
   try {
     await pair.open()
     expect(await pair.send('discovered')).toBe('discovered')
-    expect(setAuthenticationReplayCounter(pair.installation(), 0xfffffffffffffffen)).toBe(true)
+    expect(setAuthenticationReplayCounter(await pair.installation(), 0xfffffffffffffffen)).toBe(
+      true
+    )
     expect(await pair.send('last')).toBe('last')
     expect(pair.providers).toEqual(['discovered', 'last'])
     /** The original encode inputs are retained before any later physical injection changes them. */

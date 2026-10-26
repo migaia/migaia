@@ -214,8 +214,7 @@ it.each(['window', 'worker', 'shared', 'rtc'] as const)(
     /** Lazy pipeline authority reads this case's own native host only at installation. */
     const rpc = rpcHostPipelines(
       () => host,
-      (name) => host.pipeline(name),
-      ['browser']
+      (name, request) => host.pipeline(name, request)
     )
     const host = defineHost({
       ...rpc,

@@ -12,8 +12,7 @@ function receivingHost() {
   /** Both the listener fixture and partial native source declare this actual cold namespace. */
   const rpc = rpcHostPipelines(
     () => host,
-    (key) => host.pipeline(key),
-    ['memory']
+    (key, request) => host.pipeline(key, request)
   )
   /** The same native runtime owns authentic pipeline handles, rollback and final disposal. */
   const host = defineHost({
