@@ -1027,6 +1027,9 @@ export class SessionTable {
       undefined,
       input.native
     )
+    /** Live peers must withdraw the departed source from their next callable directory. */
+    if (selection && input.published && !this.#closing)
+      void this.announceDirectory().catch(this.#options.report)
     if ((physicalFailure || closeFrame) && (selection?.view ?? view))
       this.#notifyPeerClosed(input.scope, (selection?.view ?? view)!, error, closeFrame)
   }
