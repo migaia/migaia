@@ -349,6 +349,9 @@ impl Business {
                 .get(id)
                 .is_some_and(|original| Self::matches(original, message))
             {
+                if self.closing {
+                    eprintln!("PEER_EVENT ABORT_DURING_DRAIN");
+                }
                 self.waiting.remove(id);
                 let reason = value(message, "reason");
                 let root = crate::safe_integer(value(reason, "root")).unwrap_or(0) as usize;
