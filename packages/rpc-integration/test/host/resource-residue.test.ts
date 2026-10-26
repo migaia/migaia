@@ -14,13 +14,14 @@ import type { IRpcSessionHandle } from '@migaia/rpc-contract/interfaces'
 import type { IRpcProviderRejection } from '@migaia/rpc-contract/errors'
 import { timeout } from '@migaia/rpc-host/features/timeout'
 import {
-  defineFlowPlugin,
+  defineFlowFeature,
   defineTransportPlugin,
   RpcJsonCarrierCodec,
-  type IRpcFlowPlugin,
+  type IRpcFlowFeature,
   type IRpcTransportSetupContext
 } from '@migaia/rpc-host/sdk'
 import { RpcHost } from '../../../rpc-host/dist/host/rpc-host.js'
+import { RpcFlowProgram } from '../../../rpc-host/dist/sdk/flow-program.js'
 import { RpcBatchFlow } from '../../../rpc-host/dist/features/batch/flow.js'
 import { RpcLimitsFlow } from '../../../rpc-host/dist/features/limits/flow.js'
 import { coreMemoryServer } from '../../../rpc-host/test/host/core-fixture.js'
@@ -353,18 +354,18 @@ function nativeSource(
 }
 
 /** Retain each complete production flow only at the normal SDK installation boundary. */
-function optionalFlows(owners: IRetainedOwners, rejections: unknown[]): IRpcFlowPlugin[] {
+function optionalFlows(owners: IRetainedOwners, rejections: unknown[]): IRpcFlowFeature[] {
   /** The fixed observer borrows only its actual output collection. */
   const onRejected = rejectionObserver(rejections)
   return [
-    defineFlowPlugin({
+    defineFlowFeature({
       name: 'a17-batch',
       setup: (context) => {
         owners.batch = new RpcBatchFlow(context.signal, false)
         return owners.batch.value
       }
     }),
-    defineFlowPlugin({
+    defineFlowFeature({
       name: 'a17-limits',
       setup: (context) => {
         owners.limits = new RpcLimitsFlow({ onRejected }, context)
@@ -576,17 +577,21 @@ it('A17 drains actual work, flow, session, listener and timer owners after 10000
     inspector
   } = createResidueFixture()
   try {
-    await server.host.open([
-      ...optionalFlows(server, rejections),
-      ...listeners.map((listener) => listener.transport)
-    ])
+    await server.host.open(
+      new RpcFlowProgram([
+        ...optionalFlows(server, rejections),
+        ...listeners.map((listener) => listener.transport)
+      ])
+    )
     /** Opening both native sources commits to the same real Host and actual SessionTable. */
-    const publicHost = await client.host.open([
-      ...optionalFlows(client, rejections),
-      ...listeners.map((listener, index) =>
-        nativeSource(index === 0 ? 'alpha' : 'beta', listener, carriers)
-      )
-    ])
+    const publicHost = await client.host.open(
+      new RpcFlowProgram([
+        ...optionalFlows(client, rejections),
+        ...listeners.map((listener, index) =>
+          nativeSource(index === 0 ? 'alpha' : 'beta', listener, carriers)
+        )
+      ])
+    )
     receipt.initial = await inspector.counts()
     for (let ordinal = 0; ordinal < 10000; ordinal++) {
       try {
