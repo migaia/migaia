@@ -167,7 +167,7 @@ export class NativeRpcHost extends PluginHost<
 
 ## 编写信息流与载体
 
-`defineFlowPlugin` 的每次 `setup` 返回本次安装的 `stages`、独立的 `observe` 与可选 `dispose`。stage 使用 SDK 的 `RpcFlowPoint` 和推导出的 payload 类型，转发时调用原生 `next(payload)`。握手、信封和 frame 的替换值分别放在 `handshake`、`prepared` 和 `frame`；dispatch 转发后从同一个 `payload.outcome.value` 读取结果，短路时也写入这个 cell。
+`defineFlowFeature` 的每次 `setup` 返回本次安装的 `stages`，该 feature 放进宿主的 `plugins` 或某个传输的 `features`；setup 同时返回独立的 `observe` 与可选 `dispose`。stage 使用 SDK 的 `RpcFlowPoint` 和推导出的 payload 类型，转发时调用原生 `next(payload)`。握手、信封和 frame 的替换值分别放在 `handshake`、`prepared` 和 `frame`；dispatch 转发后从同一个 `payload.outcome.value` 读取结果，短路时也写入这个 cell。
 
 frame 管道允许多次提交。每次 `await next(payload)` 的失败交给当前 stage：捕获并 report 后可以继续下一个成员；stage 不观察失败的 Promise 时，管道在所有已启动遍历结算后拒绝，多个未观察失败按提交顺序汇总。观察回调不负责执行或推进这些 stage。
 

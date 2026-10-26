@@ -1,6 +1,6 @@
 /** Original provider failure cleanup is observed through actual public hosts and native flows. */
 import { createRpcHost } from '@migaia/rpc-host'
-import { defineFlowPlugin, type IRpcFlowStages } from '@migaia/rpc-host/sdk'
+import { defineFlowFeature, type IRpcFlowStages } from '@migaia/rpc-host/sdk'
 import { limits } from '@migaia/rpc-host/plugins/limits'
 import type { IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
@@ -14,7 +14,7 @@ it('releases admission and the original request identity when params validation 
   /** This exact native error is created by the existing canonical application error factory. */
   const validation = createRpcSchemaValidationError('invalid params', { field: 'data' })
   /** The real optional plugin performs validation after the actual limits admission hook. */
-  const validator = defineFlowPlugin({
+  const validator = defineFlowFeature({
     name: 'provider-result-validation',
     setup: () => ({
       stages: {
@@ -74,7 +74,7 @@ it('releases same-session capacity when the validation error reply write fails',
     }
   }
   /** The complete native definition adds validation without another provider or lease. */
-  const validator = defineFlowPlugin({
+  const validator = defineFlowFeature({
     name: 'provider-result-write-failure-validation',
     setup: () => ({ stages })
   })

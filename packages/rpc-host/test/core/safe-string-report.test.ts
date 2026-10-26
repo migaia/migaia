@@ -1,7 +1,7 @@
 import { createRpcSchemaValidationError } from '../../dist/host/error-owner.js'
 import { describe, expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowFeature } from '@migaia/rpc-host/sdk'
 import { RpcWireKind, type IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
 import { validateContractData } from '../../dist/features/schema/validate.js'
 import { coreMemoryServer } from '../host/core-fixture.js'
@@ -83,7 +83,7 @@ describe('safeString failure reporting', () => {
       }
     })
     /** The fixed dispatch hook is the same validation failure boundary before business execution. */
-    const validation = defineFlowPlugin({
+    const validation = defineFlowFeature({
       name: 'original-schema-failure',
       setup: () => ({
         stages: {

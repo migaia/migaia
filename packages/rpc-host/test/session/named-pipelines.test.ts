@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost } from '@migaia/rpc-host'
-import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
+import { defineFlowFeature } from '@migaia/rpc-host/sdk'
 import type { IRpcWriteAdmission } from '@migaia/rpc-contract/interfaces'
 import { coreMemoryServer } from '../host/core-fixture.js'
 
@@ -15,7 +15,7 @@ describe('native Session frame pipelines', () => {
       admissions: [] as (IRpcWriteAdmission | undefined)[]
     }
     /** The real native multiple-next runner owns branch completion even when a stage returns void. */
-    const fork = defineFlowPlugin({
+    const fork = defineFlowFeature({
       name: 'native-frame-fork',
       setup: () => ({
         stages: {

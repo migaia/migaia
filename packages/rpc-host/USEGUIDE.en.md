@@ -167,7 +167,7 @@ export class NativeRpcHost extends PluginHost<
 
 ## Author flows and carriers
 
-Each `defineFlowPlugin` setup returns installation-local `stages`, a separate `observe` callback and optional `dispose`. Stages use SDK `RpcFlowPoint` keys with inferred payload types and forward through native `next(payload)`. Handshake, envelope and frame replacements belong in `handshake`, `prepared` and `frame`. Dispatch reads the same `payload.outcome.value` after forwarding, and writes that cell when short-circuiting.
+Each `defineFlowFeature` setup returns installation-local `stages`; install the feature through host `plugins` or one transport's `features`. The setup also returns a separate `observe` callback and optional `dispose`. Stages use SDK `RpcFlowPoint` keys with inferred payload types and forward through native `next(payload)`. Handshake, envelope and frame replacements belong in `handshake`, `prepared` and `frame`. Dispatch reads the same `payload.outcome.value` after forwarding, and writes that cell when short-circuiting.
 
 Frame pipelines accept multiple submissions. The stage receives each `await next(payload)` failure and may catch, report and continue with another member. If it does not observe a failed Promise, the pipeline rejects after all started traversals settle; multiple unobserved failures are collected in submission order. Observation callbacks do not execute or advance stages.
 

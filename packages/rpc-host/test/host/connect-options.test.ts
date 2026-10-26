@@ -8,7 +8,7 @@ import { createRpcHost } from '@migaia/rpc-host'
 import {
   createRpcByteCarrier,
   createRpcMessageCarrier,
-  defineFlowPlugin,
+  defineFlowFeature,
   defineTransportPlugin,
   type IRpcFlowInstallation
 } from '@migaia/rpc-host/sdk'
@@ -87,7 +87,7 @@ it.each(['deployment', 'managed'] as const)(
     /** Actual provider dispatch observes the received method and unchanged originating key. */
     const received: IRpcEnvelope[] = []
     /** Only the real fixed dispatch hook records actual business admission. */
-    const observer = defineFlowPlugin({
+    const observer = defineFlowFeature({
       name: 'received-call-policy',
       setup: () => receivedCallStages(received)
     })
