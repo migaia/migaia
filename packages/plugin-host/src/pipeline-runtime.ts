@@ -112,6 +112,15 @@ export const registerPluginHostStage = <TDomainCore extends object, TValue>(
   return options.lanes.registerOwner(owner, slotState, stage, options.forms)
 }
 
+/** Keep every execution's original depth-before-lease release order in one settlement path. */
+function settlePluginHostPipeline<TValue>(
+  options: Pick<IPluginHostPipelineExecutionPort<TValue>, 'leave'>,
+  release: () => void
+): void {
+  options.leave()
+  release()
+}
+
 /**
  * Executes the single host-mode lane and owns lease/depth/pending cleanup. In async modes the
  * returned Promise settles after cleanup; `result` (when given) supplies its fulfilled value, so a
@@ -142,19 +151,16 @@ export const executePluginHostPipeline = <TValue, TResult = void>(
     try {
       running = options.runner.run(stages, value, done) as Promise<void>
     } catch (error) {
-      options.leave()
-      release()
+      settlePluginHostPipeline(options, release)
       return Promise.reject(error)
     }
     const task = running.then(
       () => {
-        options.leave()
-        release()
+        settlePluginHostPipeline(options, release)
         return result?.()
       },
       (error: unknown) => {
-        options.leave()
-        release()
+        settlePluginHostPipeline(options, release)
         throw error
       }
     )
@@ -166,8 +172,7 @@ export const executePluginHostPipeline = <TValue, TResult = void>(
   try {
     options.runner.run(stages, value, done)
   } finally {
-    options.leave()
-    release()
+    settlePluginHostPipeline(options, release)
   }
 }
 

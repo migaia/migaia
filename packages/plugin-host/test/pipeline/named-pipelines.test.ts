@@ -417,4 +417,70 @@ describe('named pipelines', () => {
       snapshot.mockRestore()
     }
   })
+
+  it.each(['sync', 'async'] as const)(
+    'releases the actual execution once after %s failure and still drains the owner',
+    async (mode) => {
+      /** Both supported failure paths must retain this exact original value. */
+      const original = new Error('named execution failed')
+      /** The existing A7 observation counts actual acquisition and its original release callback. */
+      const counts = { retained: 0, released: 0 }
+      /** Delegation preserves the real quiescence tracker and its generation leases. */
+      const originalRetain = StageLanes.prototype.retainLeases
+      /** Only the existing lane seam is observed; no production counter or alternate runner exists. */
+      const retained = vi.spyOn(StageLanes.prototype, 'retainLeases').mockImplementation(function (
+        this: StageLanes<unknown>,
+        key: object,
+        snapshot: IStageSnapshot<unknown>
+      ) {
+        counts.retained++
+        /** The real original receipt supplies all cleanup; the wrapper only counts invocation. */
+        const release = Reflect.apply(originalRetain, this, [key, snapshot])
+        return () => {
+          counts.released++
+          release()
+        }
+      })
+      /** Existing declarations exercise both native execution modes without another fixture. */
+      const host = createNamedHost()
+      try {
+        await host.use(
+          definePlugin({
+            name: 'settlement-failure',
+            install(core: INamedCore) {
+              if (mode === 'sync')
+                core.pipeline('numbers').use(() => {
+                  throw original
+                })
+              else
+                core.pipeline('text').use(async () => {
+                  throw original
+                })
+              return {}
+            }
+          })
+        )
+        if (mode === 'sync') {
+          /** Capture the actual thrown value rather than comparing only its message. */
+          let thrown: unknown
+          try {
+            host.pipeline('numbers').run({ count: 1 }, (value) => value.count)
+          } catch (error) {
+            thrown = error
+          }
+          expect(thrown).toBe(original)
+        } else
+          await expect(
+            host.pipeline('text').run({ text: 'x' }, async (value) => value.text)
+          ).rejects.toBe(original)
+        expect(counts).toEqual({ retained: 1, released: 1 })
+        await expect(host.unUse('settlement-failure')).resolves.toMatchObject({ ok: true })
+        await expect(host.dispose()).resolves.toMatchObject({ cleanupComplete: true })
+        expect(counts).toEqual({ retained: 1, released: 1 })
+      } finally {
+        await host.dispose()
+        retained.mockRestore()
+      }
+    }
+  )
 })
