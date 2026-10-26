@@ -83,7 +83,8 @@ class NativeMemberFixture {
   /** Cases may hold or fail this supported native acquisition boundary after real IO is acquired. */
   prepareSource?: (
     source: IRpcMemberSource,
-    ordinal: number
+    ordinal: number,
+    signal: IAbortSignal
   ) => IRpcMemberSource | Promise<IRpcMemberSource>
   /** One installed public Host supplies the genuine native context and SessionTable. */
   #host: Pick<IRpcHost, 'close'> | undefined
@@ -144,6 +145,11 @@ class NativeMemberFixture {
     this.#namespace = host.memory
   }
 
+  /** Public Host removal supplies this actual member's original installation cancellation. */
+  closeHost(): Promise<void> {
+    return this.#host!.close()
+  }
+
   /** Read the same SDK instance that the genuine native installation owns and disposes. */
   get member(): RpcMemberGeneration<IManagedMemoryUnit, string> {
     assert(this.#member)
@@ -188,7 +194,7 @@ class NativeMemberFixture {
   /** Acquire the existing real MessagePort pair and delegate all attach/readiness to the SDK. */
   readonly #acquire = async (
     unit: IManagedMemoryUnit,
-    _signal: IAbortSignal,
+    signal: IAbortSignal,
     ordinal: number
   ): Promise<IRpcMemberSource> => {
     /** Existing native fixture accepts only the opposite endpoint before returning this local one. */
@@ -198,7 +204,7 @@ class NativeMemberFixture {
     /** Fault injection remains on that same acquired resource, never a surrogate channel. */
     const close = vi.spyOn(source.carrier, 'close')
     this.carriers.push({ source, originalClose, close })
-    return this.prepareSource ? this.prepareSource(source, ordinal) : source
+    return this.prepareSource ? this.prepareSource(source, ordinal, signal) : source
   }
 
   /** Count only this member's actual Session detach receipts, excluding unrelated remote tables. */
@@ -521,6 +527,8 @@ it('preserves native aggregate release errors and exact primary rollback error o
     expect(released).toBeInstanceOf(AggregateError)
     expect(released).toMatchObject({ code: RpcRemoteLayerErrorCode.closed })
     expect((released as AggregateError).errors).toContain(releaseFailure)
+    /** Session reports its physical cleanup failure once; member/context observers add no copies. */
+    expect(first.reports.filter((error) => error === releaseFailure)).toHaveLength(1)
   } finally {
     await first.cleanup()
   }
@@ -591,6 +599,73 @@ class NativeHandshakeGate {
     await next(payload)
   }
 }
+
+it('preserves actual Host cancellation while native rebind acquisition is pending', async () => {
+  /** This is an existing real source acquisition, not a substitute generation or Session. */
+  const acquired = deferred<IAbortSignal>()
+  /** The original member and host remain the only lifetime owners of this native source. */
+  const fixture = new NativeMemberFixture('review32-rebind-host-abort')
+  fixture.prepareSource = (source, ordinal, signal) => {
+    if (ordinal === 0) return source
+    acquired.resolve(signal)
+    /** The native opener acknowledges its own signal and cleans up the actual held carrier. */
+    return new Promise<IRpcMemberSource>((_resolve, reject) => {
+      signal.addEventListener(
+        'abort',
+        () => {
+          void source.carrier.close(signal.reason).then(() => reject(signal.reason), reject)
+        },
+        { once: true }
+      )
+    })
+  }
+  try {
+    await fixture.start()
+    await fixture.member.open()
+    fixture.native.units[0]!.exit({})
+    await fixture.member.whenClosed(fixture.member.current().generation)
+    await fixture.supervisor.restart()
+    /** Catch before public close aborts the real preparation; no manufactured error is supplied. */
+    const pending = fixture.member.rebind().catch((error: unknown) => error)
+    const signal = await acquired.promise
+    await fixture.closeHost()
+    expect(await pending).toBe(signal.reason)
+    expect(fixture.reports).toEqual([])
+  } finally {
+    await fixture.cleanup()
+  }
+})
+
+it('does not report a shared native rebind closed by its own member release', async () => {
+  /** Initial readiness is real; only the replacement's actual handshake continuation is held. */
+  const gate = new NativeHandshakeGate()
+  gate.hold = false
+  /** Reports stay unfiltered throughout original native departure and owner release. */
+  const fixture = new NativeMemberFixture('review32-rebind-close', [], { features: [gate.feature] })
+  try {
+    await fixture.start()
+    await fixture.member.open()
+    gate.hold = true
+    fixture.native.units[0]!.exit({})
+    await fixture.member.whenClosed(fixture.member.current().generation)
+    await fixture.supervisor.restart()
+    /** Observe the real shared rejection before closing its owner. */
+    const pending = fixture.member.rebind().catch((error: unknown) => error)
+    await gate.entered.promise
+    /** Release retains its existing nonblocking cleanup contract for pending user stages. */
+    const closing = fixture.member.close()
+    gate.resume.resolve()
+    /** Local release is expected termination of this preparation, not a background failure. */
+    const failure = await pending
+    await closing
+    expect(failure).toMatchObject({ code: RpcRemoteLayerErrorCode.closed })
+    expect(fixture.member.current().active).toBe(false)
+    expect(fixture.reports).toEqual([])
+  } finally {
+    gate.resume.resolve()
+    await fixture.cleanup()
+  }
+})
 
 // RPC-TEST-19CE78390954-C002: R8 removes the automatic default; explicit retry owns the same replay.
 it('replays a written idempotent public request through the complete retry feature', async () => {

@@ -258,6 +258,8 @@ export class RpcMemberGeneration<TUnit, TSpec> {
     try {
       source = await this.#options.binding.openCarrier(outcome.unit, signal, ordinal)
     } catch (cause) {
+      /** A native opener acknowledging this preparation's cancellation keeps the original reason. */
+      if (signal.aborted && cause === resolveAbortReason(signal)) throw cause
       throw createRemoteLayerError(RpcRemoteLayerErrorCode.startFailed, cause)
     }
     /** This exact cleanup callback is registered before attach/handshake can fail. */
@@ -369,6 +371,8 @@ export class RpcMemberGeneration<TUnit, TSpec> {
     if (current) {
       /** Leave observers run first, while actual cleanup remains observable by its original Promise. */
       /** Final registration release keeps logical shutdown even if a native receipt reenters it. */
+      /** Final release awaits this close; earlier departures keep their independent report owner. */
+      const reportFailure = this.#released ? undefined : this.#options.report
       const closing = current.close(reason, nativeDeparture && !this.#released)
       this.#closing.set(generation, closing)
       void closing.then(
@@ -377,7 +381,7 @@ export class RpcMemberGeneration<TUnit, TSpec> {
         },
         (error: unknown) => {
           this.#closing.delete(generation)
-          this.#options.report(error)
+          reportFailure?.(error)
         }
       )
     }

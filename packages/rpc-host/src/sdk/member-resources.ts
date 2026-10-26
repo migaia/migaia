@@ -8,6 +8,7 @@ import { deferred, raceWithAbort, type IAbortSignal } from '@migaia/utils/promis
 import { RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
 import { createRemoteLayerError } from '../host/remote-error-owner.js'
 import { resolveAbortReason } from '../host/abort-reason.js'
+import { localErrorWireSummary } from '../host/error-wire-metadata.js'
 import { memberAggregate } from './member-errors.js'
 import type { IRpcMemberRegistration } from './member-types.js'
 
@@ -94,11 +95,16 @@ export class RpcMemberResources {
       })
       return generation
     } catch (error) {
+      /** Only this member's cancellation or its owner-minted closed result acknowledges release. */
+      const cancelled =
+        (signal.aborted && error === resolveAbortReason(signal)) ||
+        (this.#releasePromise !== undefined &&
+          localErrorWireSummary(error)?.code === RpcRemoteLayerErrorCode.closed)
       /** Preserve a native-first decision before rollback yields to a later caller cancellation. */
       if (!signal.aborted) failureDecided?.(error)
       if (cleanupOnFailure || this.#releasePromise) {
         const hadCleanupFailure = await this.#rollback(group, error)
-        if (reportFailure && !hadCleanupFailure) (0, this.#report)(error)
+        if (reportFailure && !hadCleanupFailure && !cancelled) (0, this.#report)(error)
       }
       throw error
     } finally {
