@@ -137,7 +137,7 @@ export class RpcHost {
     configuredSelf = options.self !== undefined,
     pipelineOwner?: IRpcPipelineOwner
   ) {
-    this.#identity = new HostIdentity(options.self, configuredSelf)
+    this.#identity = new HostIdentity(options.self, configuredSelf, options.onWarning)
     this.#nodeId = nodeId
     this.#configuredReport = options.report
     this.#reporter = this.#configuredReport ?? defaultRpcReporter

@@ -16,27 +16,31 @@ export type IThreadBootstrapData = Readonly<{ peerId: string; data?: IRpcPortabl
 export type IThreadBootstrap = IThreadBootstrapData & Readonly<{ source?: IRpcLocalSourceFacts }>
 
 /** Retain the bounded closed native identity grammar without an RPC capability offer. */
-function identity(value: unknown): Readonly<{ name: string; instanceId: string }> {
+function identity(value: unknown, child = false): NonNullable<IRpcLocalSourceFacts['self']> {
   if (!value || typeof value !== 'object' || Array.isArray(value))
     return invalidThreadConfig('bootstrap', ThreadErrorText.bootstrapFailed)
   /** Native structured clone supplies plain own fields. */
   const record = value as Record<string, unknown>
   if (
-    Object.keys(record).length !== 2 ||
-    typeof record.name !== 'string' ||
-    !record.name ||
-    record.name.length > RpcWireLimit.maxIdentifierChars ||
+    Object.keys(record).length !== (record.name === undefined ? 1 : 2) ||
+    ((!child || record.name !== undefined) &&
+      (typeof record.name !== 'string' ||
+        !record.name ||
+        record.name.length > RpcWireLimit.maxIdentifierChars)) ||
     typeof record.instanceId !== 'string' ||
     !record.instanceId ||
     record.instanceId.length > RpcWireLimit.maxIdentifierChars
   )
     return invalidThreadConfig('bootstrap', ThreadErrorText.bootstrapFailed)
-  return Object.freeze({ name: record.name, instanceId: record.instanceId })
+  return Object.freeze({
+    ...(record.name === undefined ? {} : { name: record.name as string }),
+    instanceId: record.instanceId
+  })
 }
 
 /** Build native initialization; protocol handshake and extension selection occur in Session. */
 export function createThreadBootstrap(
-  name: string,
+  _name: string,
   peerId: string,
   data: unknown,
   facts?: IThreadLaunchFacts
@@ -48,7 +52,10 @@ export function createThreadBootstrap(
     ...(facts
       ? {
           source: {
-            self: { name: facts.childName ?? name, instanceId: peerId },
+            self: {
+              ...(facts.childName === undefined ? {} : { name: facts.childName }),
+              instanceId: peerId
+            },
             parent: facts.parent,
             generation: facts.generation
           }
@@ -82,7 +89,7 @@ export function readThreadInitial(value: unknown): IThreadBootstrap {
     if (Object.keys(record).length !== 3)
       return invalidThreadConfig('bootstrap', ThreadErrorText.bootstrapFailed)
     /** Child identity must agree with the launcher's native route fingerprint. */
-    const self = identity(record.self)
+    const self = identity(record.self, true)
     if (self.instanceId !== value.peerId)
       return invalidThreadConfig('bootstrap', ThreadErrorText.bootstrapFailed)
     source = Object.freeze({

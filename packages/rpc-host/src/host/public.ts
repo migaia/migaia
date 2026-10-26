@@ -10,6 +10,7 @@ import type { IRpcProvide, IRpcProvideOptions } from '../dispatch/types.js'
 import type { IRpcProviderDeclaration } from '@migaia/rpc-contract/protocol'
 import type { IRpcNamespace, IRpcIntersection } from '../namespace/types.js'
 import type { IRpcSelf } from './identity.js'
+import type { IRpcWarning } from './warning.js'
 
 /** Cold host admission contains no concrete timeout, retry, authentication or quota configuration. */
 export type IRpcHostOptions<
@@ -25,6 +26,8 @@ export type IRpcHostOptions<
   /** Every supported physical Session owns its closing byte quota and complete grace deadline. */
   keepalive?: Readonly<{ maxBytes?: number; timeoutMs?: number }>
   report?(error: unknown): void
+  /** Successful native identity overrides warn once; omitted handlers use console.warn. */
+  onWarning?(warning: IRpcWarning): void
   signal?: IAbortSignal
 }>
 

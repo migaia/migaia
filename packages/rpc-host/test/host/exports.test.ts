@@ -29,6 +29,7 @@ const expectedEntries = [
 const expectedRoot = [
   'RPC_CORE_ERROR_SOURCE',
   'RpcLifecycleError',
+  'RpcWarningCode',
   'createRpcHost',
   'defaultRpcReporter',
   'isRpcError',

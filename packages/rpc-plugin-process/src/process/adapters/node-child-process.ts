@@ -18,9 +18,11 @@ import { RpcProcessErrorCode } from '@migaia/rpc-contract/error-code'
 
 import { RpcProcessErrorText } from '../error-text.js'
 import type { IProcessByteChannel } from '../types.js'
-import type { IRpcMemberIdentity } from '@migaia/rpc-host/sdk'
 import { createAdapterNodeProcessLaunch } from '../node-launch.js'
-import type { IProcessRuntimeBootstrapOptions } from '../runtime-bootstrap.js'
+import type {
+  IProcessRuntimeBootstrap,
+  IProcessRuntimeBootstrapOptions
+} from '../runtime-bootstrap.js'
 import { PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_ENV_VERSION } from '../constants.js'
 import { createAdapterProcessStdio, type IAdapterChildStdio } from '../node-io.js'
 import { sampleNativeProcess } from './native-usage.js'
@@ -31,7 +33,7 @@ export type INodeProcessHandle = IProcessHandle &
     /** Present only when stdin and stdout were both configured as channels. */
     channel?: IProcessByteChannel
     /** Safe launch identity emitted only for the opted-in runtime bootstrap. */
-    runtimeApiIdentity?: IRpcMemberIdentity
+    runtimeApiIdentity?: IProcessRuntimeBootstrap['self']
   }>
 
 /** Node does not claim tree termination until the POSIX grandchild fixture proves it. */

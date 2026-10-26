@@ -46,7 +46,7 @@ import {
   acceptProcessConnectionBootstrap,
   openProcessConnectionBootstrap
 } from '../connection-bootstrap.js'
-import { PROCESS_CONNECTION_RUNTIME } from '../constants.js'
+import { PROCESS_CONNECTION_RUNTIME, PROCESS_NAMESPACE } from '../constants.js'
 import type { IRpcConnectionContext } from '@migaia/rpc-contract/interfaces'
 import type { IProcessByteChannel, IProcessMessageChannel } from '../types.js'
 import {
@@ -143,6 +143,8 @@ type IProcessSupervisorPorts<TUnit extends object, TSpec> = Readonly<{
 type IProcessBindingOptions<TUnit extends object, TSpec> = Readonly<{
   context: IRpcTransportSetupContext
   name: string
+  /** Only an explicitly configured logical child name enters native bootstrap facts. */
+  childName?: string
   kind: 'spawn' | 'connect'
   scheduler: IScheduler
   features?: readonly IProcessFeature[]
@@ -150,10 +152,10 @@ type IProcessBindingOptions<TUnit extends object, TSpec> = Readonly<{
   create(ports: IProcessSupervisorPorts<TUnit, TSpec>): ISupervisor<TUnit, TSpec>
   openRaw(unit: TUnit, signal: IAbortSignal): Promise<IProcessByteChannel | IProcessMessageChannel>
   expectedPeerId?(unit: TUnit): string
-  /** A native execution unit supplies its actual exit fact without waiting in the transport. */
-  terminalReason?(unit: TUnit): Promise<unknown>
   /** Only a launched native process can supply its physical PID to redacted IPC diagnostics. */
   processId?(unit: TUnit): string
+  /** A native execution unit supplies its actual exit fact without waiting in the transport. */
+  terminalReason?(unit: TUnit): Promise<unknown>
   prepareReplacement?(spec: unknown): TSpec
   stderr?: (listener: (chunk: Uint8Array) => void) => () => void
   /** Original native source configuration supplies its connection token only to private admission. */
@@ -206,10 +208,10 @@ export class ProcessBinding<TUnit extends object, TSpec> {
       beforeRelease: () => this.supervisor.stop(),
       onReady: (view, generation, unit, session) => {
         this.#accepted = { unit, view }
+        this.#memberName ??= view.name
         this.#lastSession = session
         this.#sessions.set(unit, session)
         if (options.events) {
-          this.#memberName ??= view.name
           options.events.ready(this.record, view, generation)
           options.events.changed()
         } else this.members!.publishReady(this.record, view, generation)
@@ -220,9 +222,7 @@ export class ProcessBinding<TUnit extends object, TSpec> {
     const identity = { options, owner: this }
     this.record = {
       get name() {
-        return identity.options.events
-          ? (identity.owner.#memberName ?? identity.options.name)
-          : identity.options.name
+        return identity.owner.#memberName ?? identity.options.name
       },
       ownership: options.kind === 'spawn' ? 'owned' : 'borrowed',
       supervisor: this.supervisor as ISupervisor<unknown, unknown>,
@@ -280,7 +280,7 @@ export class ProcessBinding<TUnit extends object, TSpec> {
       context,
       {
         parent: { name: self.name, instanceId: self.instanceId },
-        ...(this.#options.events ? {} : { childName: this.#options.name }),
+        ...(this.#options.childName === undefined ? {} : { childName: this.#options.childName }),
         generation: {
           kind: 'restart',
           value: context.executionGeneration ?? 0,
@@ -555,7 +555,7 @@ function createSpawnProcessSupervisor<THandle extends IProcessHandle>(
 export function createSpawnProcessBinding<THandle extends IProcessHandle>(
   source: ISpawnProcessPluginDeployment<THandle>,
   context: IRpcTransportSetupContext,
-  name: string,
+  name: string | undefined,
   features?: readonly IProcessFeature[],
   events?: IRpcNativePoolEvents
 ): ProcessBinding<THandle, IProcessSpec> {
@@ -568,7 +568,8 @@ export function createSpawnProcessBinding<THandle extends IProcessHandle>(
   const native = { source, context, stderr, scheduler }
   return new ProcessBinding({
     context,
-    name,
+    name: name ?? PROCESS_NAMESPACE,
+    childName: name,
     features,
     events,
     scheduler,
@@ -592,8 +593,8 @@ export function createSpawnProcessBinding<THandle extends IProcessHandle>(
       return raw
     },
     expectedPeerId: source.channelKind === 'byte' ? (unit) => unit.identity.fingerprint : undefined,
-    prepareReplacement: (spec) => spec as IProcessSpec,
     processId: (unit) => String(unit.identity.pid),
+    prepareReplacement: (spec) => spec as IProcessSpec,
     create: (ports) => createSpawnProcessSupervisor({ ...native, ports })
   })
 }

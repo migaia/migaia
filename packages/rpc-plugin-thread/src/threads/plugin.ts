@@ -92,12 +92,7 @@ class ThreadInstallation {
       ? await expandThreadSpawn(this.#options, threadRuntimeResource, context.report)
       : (this.#options.spawn as IThreadSpawn)
     /** The source's native supervisor is the only execution owner. */
-    const connection = new ThreadSource(
-      source,
-      context,
-      this.#options.name ?? THREAD_NAMESPACE,
-      events
-    )
+    const connection = new ThreadSource(source, context, this.#options.name, events)
     try {
       await connection.generation.open()
     } catch (primary) {

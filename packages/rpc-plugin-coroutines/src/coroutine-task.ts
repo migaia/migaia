@@ -10,7 +10,7 @@ import {
   RpcCoroutineErrorCode
 } from '@migaia/rpc-contract/error-code'
 import { CoroutineErrorText } from './error-text.js'
-import { IpcReporterContext } from '@migaia/rpc-host/sdk'
+import { defaultRpcId, IpcReporterContext } from '@migaia/rpc-host/sdk'
 
 /** Opaque connection belongs to one task generation and reveals no physical port operation. */
 export type ICoroutineConnect = Readonly<{ readonly __coroutineConnect: unique symbol }>
@@ -63,6 +63,8 @@ class CoroutineConnection {
   readonly port: ICoroutineMessagePort
   /** Immutable launch identity remains available to the original child recipe. */
   readonly facts: IRpcLaunchFacts | undefined
+  /** This parent-created task receipt assigns one child instance address per real generation. */
+  readonly instanceId = defaultRpcId()
   /** The accepted parent Session supplies its own existing completion, not a delivery ACK. */
   #parentClosed: Promise<void> | undefined
   /** The borrowed child recipe lends its original Session/source close path. */

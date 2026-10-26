@@ -9,7 +9,8 @@ import {
   normalizeRpcGeneration,
   type IRpcGeneration
 } from '@migaia/rpc-contract/protocol'
-import { defaultRpcId, type IRpcMemberIdentity } from '@migaia/rpc-host/sdk'
+import { defaultRpcId } from '@migaia/rpc-host/sdk'
+import type { IRpcLocalSourceFacts } from '@migaia/rpc-contract/interfaces'
 import {
   PROCESS_HANDSHAKE_MAX_FRAME_BYTES,
   PROCESS_RUNTIME_API_FINGERPRINT_PREFIX,
@@ -20,8 +21,8 @@ import { RpcProcessErrorText } from './error-text.js'
 
 /** Safe launch selection belongs to the original process launcher, outside the process spec. */
 export type IProcessRuntimeBootstrapOptions = Readonly<{
-  /** Nonempty bounded logical child name, independent of a native PID. */
-  name: string
+  /** An omitted logical name lets the child publish its configured/default name at handshake. */
+  name?: string
   /** Nonempty bounded parent instance identity written into the original private first frame. */
   parentInstanceId: string
   /** Only an original supervised launch supplies real restart facts. */
@@ -30,7 +31,7 @@ export type IProcessRuntimeBootstrapOptions = Readonly<{
 
 /** Secret first-frame material is never projected into business metadata or supervisor identity. */
 export type IProcessRuntimeBootstrap = Readonly<{
-  self: IRpcMemberIdentity
+  self: NonNullable<IRpcLocalSourceFacts['self']>
   parentInstanceId: string
   token: string
   /** Execution identity is separate from the new physical instance fingerprint. */
@@ -76,13 +77,20 @@ function readBootstrap(value: unknown): IProcessRuntimeBootstrap | undefined {
       return undefined
     /** Runtime PIDs and arbitrary environment values never enter the safe identity projection. */
     const self = record.self as Record<string, unknown>
-    if (Object.keys(self).length !== 2 || !identifier(self.name) || !identifier(self.instanceId))
+    if (
+      Object.keys(self).length !== (self.name === undefined ? 1 : 2) ||
+      (self.name !== undefined && !identifier(self.name)) ||
+      !identifier(self.instanceId)
+    )
       return undefined
     /** The one protocol generation grammar admits data without granting source authority. */
     const generation =
       record.generation === undefined ? undefined : normalizeRpcGeneration(record.generation)
     return Object.freeze({
-      self: Object.freeze({ name: self.name, instanceId: self.instanceId }),
+      self: Object.freeze({
+        ...(self.name === undefined ? {} : { name: self.name as string }),
+        instanceId: self.instanceId
+      }),
       parentInstanceId: record.parentInstanceId,
       token: record.token,
       ...(generation ? { generation } : {})
@@ -108,8 +116,13 @@ export function decodeProcessRuntimeBootstrap(bytes: Uint8Array): IProcessRuntim
 export function prepareProcessRuntimeBootstrap(
   options: IProcessRuntimeBootstrapOptions,
   tokenBytes: Uint8Array | undefined
-): Readonly<{ self: IRpcMemberIdentity; payload: Uint8Array }> {
-  if (!options || !identifier(options.name) || !identifier(options.parentInstanceId) || !tokenBytes)
+): Readonly<{ self: NonNullable<IRpcLocalSourceFacts['self']>; payload: Uint8Array }> {
+  if (
+    !options ||
+    (options.name !== undefined && !identifier(options.name)) ||
+    !identifier(options.parentInstanceId) ||
+    !tokenBytes
+  )
     invalidProcessRuntimeBootstrap()
   /** Invalid UTF-8 token diagnostics remain secret even when local launch admission fails. */
   let token: string
@@ -120,7 +133,7 @@ export function prepareProcessRuntimeBootstrap(
   }
   /** Native entropy prevents independent parent processes from reusing the same launch identity. */
   const self = Object.freeze({
-    name: options.name,
+    ...(options.name === undefined ? {} : { name: options.name }),
     instanceId: `${PROCESS_RUNTIME_API_FINGERPRINT_PREFIX}${defaultRpcId()}`
   })
   /** A single metadata encoder is shared by Node/Bun and Deno launchers. */

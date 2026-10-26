@@ -69,8 +69,6 @@ export class CoroutineSource {
   readonly #context: IRpcTransportContext
   /** Initial and replacement task cleanup borrow the same original effective reporter. */
   readonly #report: (error: unknown) => void
-  /** The original optional pool receiver determines whether native child naming stays private. */
-  readonly #events: IRpcNativePoolEvents | undefined
   /** Repeated or reentrant installation cleanup joins the original completion Promise. */
   #closing: Promise<void> | undefined
   /** This actual native source is the unique issuer for all of its restart generations. */
@@ -114,7 +112,6 @@ export class CoroutineSource {
     this.#options = options
     this.#context = context
     this.#report = options.report ?? context.report
-    this.#events = events
     if (source.task) {
       this.#supervisor = createCoroutineSupervisor({
         ...options.supervisor,
@@ -143,8 +140,8 @@ export class CoroutineSource {
           const binding = this.#sessions.get(unit)!
           binding.session = session
           binding.connection.bindParent(session)
+          this.#memberName ??= view.name
           if (events) {
-            this.#memberName ??= view.name
             events.ready(this.record, view, generation)
             events.changed()
           } else this.members!.publishReady(this.record, view, generation)
@@ -166,11 +163,10 @@ export class CoroutineSource {
           carrier,
           facts
             ? {
-                ...(facts.childName === undefined
-                  ? {}
-                  : {
-                      self: { name: facts.childName, instanceId: context.self().instanceId }
-                    }),
+                self: {
+                  ...(facts.childName === undefined ? {} : { name: facts.childName }),
+                  instanceId: connection.instanceId
+                },
                 generation: facts.generation,
                 expectedPeerId: facts.parent.instanceId
               }
@@ -192,10 +188,10 @@ export class CoroutineSource {
       )
     }
     /** Private display names borrow actual native child identity without a pool naming policy. */
-    const identity = { owner: this, name: options.name ?? context.namespace, events }
+    const identity = { owner: this, name: options.name ?? context.namespace }
     this.record = {
       get name() {
-        return identity.events ? (identity.owner.#memberName ?? identity.name) : identity.name
+        return identity.owner.#memberName ?? identity.name
       },
       ownership: this.#supervisor ? 'owned' : 'borrowed',
       ...(this.#supervisor
@@ -261,7 +257,7 @@ export class CoroutineSource {
     /** Parent identity and execution generation come from their actual original owners. */
     const self = this.#context.self()
     return {
-      ...(this.#events ? {} : { childName: this.record.name }),
+      ...(this.#options.name === undefined ? {} : { childName: this.#options.name }),
       parent: { name: self.name, instanceId: self.instanceId },
       generation: { kind: 'restart', value: this.#supervisor!.generation, providerId: this.#id }
     }

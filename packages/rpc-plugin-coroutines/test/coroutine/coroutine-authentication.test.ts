@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createRpcHost } from '@migaia/rpc-host'
+import { createRpcHost, RpcWarningCode, type IRpcWarning } from '@migaia/rpc-host'
 import { auth, type IRpcAuthenticationOptions } from '@migaia/rpc-host/plugins/auth'
 import { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'
 
@@ -79,6 +79,8 @@ describe('coroutine authentication cleanup', () => {
     const unprotected: unknown[] = []
     /** Every report must remain observable, including errors that surface while Hosts dispose. */
     const reports: unknown[] = []
+    /** The parent-assigned name overrides explicit child self without entering the error channel. */
+    const warnings: IRpcWarning[] = []
     /** Parent and child use the exact same supported public authentication configuration. */
     const authentication = await protection(unprotected)
     /** Parent mode retains native supervision while Host owns identity, provider and auth. */
@@ -91,6 +93,7 @@ describe('coroutine authentication cleanup', () => {
         const child = await createRpcHost({
           self: { name: 'math-child', instanceId: 'authenticated-child' },
           report: (error) => reports.push(error),
+          onWarning: (warning) => warnings.push(warning),
           plugins: [
             auth(authentication),
             coroutinePlugin({ name: 'parent', connectToParent: connect })
@@ -125,5 +128,12 @@ describe('coroutine authentication cleanup', () => {
     }
     expect(unprotected).toEqual([])
     expect(reports).toEqual([])
+    expect(warnings).toEqual([
+      expect.objectContaining({
+        code: RpcWarningCode.selfIgnored,
+        parentName: 'math',
+        ignoredName: 'math-child'
+      })
+    ])
   })
 })

@@ -8,6 +8,8 @@ import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcCoreErrorText, RuntimeApiErrorText } from '@migaia/rpc-contract/errors'
 import { createRpcConfigurationError, createRpcError } from './error-owner.js'
 import { sameGeneration } from '../call/envelope.js'
+import { defaultRpcWarning, RpcWarningCode, type IRpcWarning } from './warning.js'
+import { HostWarningText } from './warning-text.js'
 
 /** Public identity is global to the host; a transport never creates a second public self. */
 export type IRpcSelf = Readonly<{ name: string; instanceId: string }>
@@ -46,10 +48,12 @@ function captureSelf(value: IRpcSelf): IRpcSelf {
   return Object.freeze({ name: value.name, instanceId: value.instanceId })
 }
 
-/** The real native source may replace only an unconfigured initial identity, before first use. */
+/** A trusted native parent selects the child's global identity before its first source starts. */
 export class HostIdentity {
-  /** Explicit public configuration is authoritative against native bootstrap mismatch. */
+  /** Explicit child display names warn when an actual parent supplies a different name. */
   readonly #configured: boolean
+  /** Successful identity overrides use their own public warning channel, never error reporting. */
+  readonly #onWarning: (warning: IRpcWarning) => void
   /** The one immutable accepted identity is borrowed by every namespace directory. */
   #self: IRpcSelf
   /** Native restart/session facts belong to the same global identity owner. */
@@ -58,8 +62,13 @@ export class HostIdentity {
   #started = false
 
   /** Capture caller configuration once; ordinary native hosts provide their original identity. */
-  constructor(self?: IRpcSelf, configured = self !== undefined) {
+  constructor(
+    self?: IRpcSelf,
+    configured = self !== undefined,
+    onWarning: (warning: IRpcWarning) => void = defaultRpcWarning
+  ) {
     this.#configured = configured
+    this.#onWarning = onWarning
     /** Default name matches its generated instance address, preserving direct host behavior. */
     const instanceId = self?.instanceId ?? defaultRpcId()
     this.#self = captureSelf(self ?? { name: instanceId, instanceId })
@@ -84,15 +93,24 @@ export class HostIdentity {
   admit(facts: IRpcLocalSourceFacts): void {
     if (facts.self !== undefined) {
       /** Capture before mutation so a mismatching source cannot partially replace global identity. */
-      const incoming = captureSelf(facts.self)
+      const incoming = captureSelf({ ...facts.self, name: facts.self.name ?? this.#self.name })
       if (
-        (this.#configured || this.#started) &&
+        this.#started &&
         (incoming.name !== this.#self.name || incoming.instanceId !== this.#self.instanceId)
       )
         throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.identityInvalid)
-      if (!this.#configured && !this.#started) {
+      if (!this.#started) {
+        /** Capture the ignored configured name before replacing the one globally published self. */
+        const ignoredName = this.#self.name
         this.#self = incoming
         this.#generation = Object.freeze({ ...this.#generation, providerId: incoming.instanceId })
+        if (this.#configured && facts.self.name !== undefined && incoming.name !== ignoredName)
+          this.#onWarning({
+            code: RpcWarningCode.selfIgnored,
+            message: HostWarningText.selfIgnored(incoming.name, ignoredName),
+            parentName: incoming.name,
+            ignoredName
+          })
       }
     }
     if (facts.generation !== undefined) {

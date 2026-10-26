@@ -187,7 +187,13 @@ class ProcessInstallation {
     const name = this.#options.name ?? PROCESS_NAMESPACE
     /** Both spawn and connect reuse the same SDK generation owner and actual native supervisor. */
     const source = sources.spawn
-      ? createSpawnProcessBinding(sources.spawn, context, name, this.#options.features, events)
+      ? createSpawnProcessBinding(
+          sources.spawn,
+          context,
+          this.#options.name,
+          this.#options.features,
+          events
+        )
       : sources.connect
         ? createConnectProcessBinding(
             {

@@ -289,8 +289,8 @@ export type IRpcLocalSourceFacts = Readonly<{
   sessionId?: string
   /** Query the original native source's current sole-reader ownership after subscription. */
   isExclusive?(): boolean
-  /** A child adopts its real bootstrap identity only when host.self was not explicitly set. */
-  self?: Readonly<{ name: string; instanceId: string }>
+  /** Parent-assigned identity wins; an omitted name preserves the child's configured/default name. */
+  self?: Readonly<{ name?: string; instanceId: string }>
   /** The actual SDK source owner supplies its restart/session generation fact. */
   generation?: IRpcGeneration
   /** A child handshake must match its actual bootstrap parent instance address. */

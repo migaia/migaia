@@ -18,10 +18,12 @@ import { RpcProcessErrorCode } from '@migaia/rpc-contract/error-code'
 
 import { RpcProcessErrorText } from '../error-text.js'
 import type { IProcessByteChannel } from '../types.js'
-import type { IRpcMemberIdentity } from '@migaia/rpc-host/sdk'
 import { createAdapterProcessLaunch } from '../launch.js'
 import { createAdapterWebByteIO } from '../web-byte-stream.js'
-import type { IProcessRuntimeBootstrapOptions } from '../runtime-bootstrap.js'
+import type {
+  IProcessRuntimeBootstrap,
+  IProcessRuntimeBootstrapOptions
+} from '../runtime-bootstrap.js'
 import { PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_ENV_VERSION } from '../constants.js'
 
 /** Only the Deno APIs used by this deep adapter are typed here. */
@@ -102,7 +104,7 @@ export type IDenoProcessHandle = IProcessHandle &
     /** Present only when both standard-input and standard-output directions are channels. */
     channel?: IProcessByteChannel
     /** Safe runtime identity present only when the original launch prepared runtime bootstrap. */
-    runtimeApiIdentity?: IRpcMemberIdentity
+    runtimeApiIdentity?: IProcessRuntimeBootstrap['self']
   }>
 
 /**

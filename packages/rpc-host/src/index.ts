@@ -45,3 +45,5 @@ export type {
   IRpcCleanupError
 } from '@migaia/rpc-contract/errors'
 export { defaultRpcReporter } from './host/report.js'
+export { RpcWarningCode } from './host/warning.js'
+export type { IRpcWarning } from './host/warning.js'

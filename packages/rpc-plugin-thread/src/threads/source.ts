@@ -60,6 +60,8 @@ export class ThreadSource<THandle extends IThreadHandle = IThreadHandle> {
   readonly #providerId: string
   /** Private members lend their original events to the pool's single receiver. */
   readonly #events: IRpcNativePoolEvents | undefined
+  /** An omitted parent name remains absent from every actual generation's trusted launch facts. */
+  readonly #childName: string | undefined
   /** The original pool registration keeps its first genuine accepted native name after retirement. */
   #memberName: string | undefined
   /** Health and beforeTerminate use the exact accepted Session for that original native unit. */
@@ -81,13 +83,14 @@ export class ThreadSource<THandle extends IThreadHandle = IThreadHandle> {
   constructor(
     source: IThreadSpawn<THandle>,
     context: IRpcTransportContext,
-    name: string,
+    name: string | undefined,
     events?: IRpcNativePoolEvents
   ) {
     this.#source = source
     this.#context = context
     this.#providerId = defaultRpcId()
     this.#events = events
+    this.#childName = name
     /** Data capture stays before native Worker or supervisor construction. */
     const spec = portableThreadSpec(source.spec)
     this.supervisor = createThreadSupervisor({
@@ -122,9 +125,9 @@ export class ThreadSource<THandle extends IThreadHandle = IThreadHandle> {
       beforeRelease: () => this.supervisor.stop(),
       onReady: (view, generation, unit, session) => {
         this.#accepted = { unit, view }
+        this.#memberName ??= view.name
         this.#sessions.set(unit, session)
         if (this.#events) {
-          this.#memberName ??= view.name
           this.#events.ready(this.record, view, generation)
           this.#events.changed()
         } else this.members!.publishReady(this.record, view, generation)
@@ -136,10 +139,10 @@ export class ThreadSource<THandle extends IThreadHandle = IThreadHandle> {
       }
     })
     /** Private naming borrows the actual accepted directory, never a generated pool alias. */
-    const identity = { events, owner: this, name }
+    const identity = { owner: this, name: name ?? context.namespace }
     this.record = {
       get name() {
-        return identity.events ? (identity.owner.#memberName ?? identity.name) : identity.name
+        return identity.owner.#memberName ?? identity.name
       },
       ownership: 'owned',
       supervisor: this.supervisor as ISupervisor<unknown, unknown>,
@@ -172,7 +175,7 @@ export class ThreadSource<THandle extends IThreadHandle = IThreadHandle> {
     return withRpcLaunchFacts(
       context,
       {
-        ...(this.#events ? {} : { childName: this.record.name }),
+        ...(this.#childName === undefined ? {} : { childName: this.#childName }),
         parent: { name: self.name, instanceId: self.instanceId },
         generation: {
           kind: 'restart',

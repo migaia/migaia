@@ -38,7 +38,7 @@ export class AdapterProcessLaunch {
     /** Keep the original short-circuit reads of the caller's explicit bootstrap option. */
     const runtimeApiBootstrap = runtime
       ? {
-          name: runtime.childName ?? options.runtimeApiBootstrap?.name ?? runtime.parent.name,
+          name: runtime.childName ?? options.runtimeApiBootstrap?.name,
           parentInstanceId: runtime.parent.instanceId,
           ...(runtime.generation ? { generation: runtime.generation } : {})
         }
