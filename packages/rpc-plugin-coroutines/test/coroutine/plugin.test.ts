@@ -209,7 +209,7 @@ describe('coroutine transport plugin', () => {
       expect(await child.children[0]!.coroutine.request('math.double', 20)).toBe(40)
       expect(await child.children[1]!.coroutine.request('math.double', 21)).toBe(42)
       expect(await outlet(host).request('read', 9)).toEqual(['shared-definition', 2, 9])
-      expect(await host.unUse('worker')).toMatchObject({ ok: true })
+      expect(await host.unUse(transport.name)).toMatchObject({ ok: true })
       expect(child.contexts[1]!.signal.aborted).toBe(true)
       expect(
         child.finished.filter((connect) => connect === child.contexts[1]!.connect)

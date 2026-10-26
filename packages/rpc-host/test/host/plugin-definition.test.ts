@@ -18,7 +18,7 @@ describe('RPC plugin definitions', () => {
     })
     expect(isDefinedPlugin(plugin)).toBe(true)
     expect(Object.isFrozen(plugin)).toBe(true)
-    expect(plugin.name).toBe('transport')
+    expect(plugin.name).toBe('memory')
     expect(readRpcDefinition(plugin)).toMatchObject({
       kind: 'transport',
       definition: { namespace: 'memory', expose: ['app.render'], open }

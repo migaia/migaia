@@ -200,7 +200,7 @@ it('installs the same native plugin on an ordinary Host with name and exposed fe
   try {
     expect(await outlet.send('native-worker', 'echo', 21)).toBe(21)
     expect(await outlet.send('native-worker', 'exposed', 21)).toBe(42)
-    expect(await host.unUse('native-worker')).toMatchObject({ ok: true })
+    expect(await host.unUse(transport.name)).toMatchObject({ ok: true })
     expect(() => process.kill(pid, 0)).toThrow()
     await host.dispose()
   } finally {

@@ -424,12 +424,11 @@ it('rejects an invalid layer and a host-only probe before any local transport ac
   const server = coreMemoryServer('invalid-layer', undefined, 'memory', [invalid])
   await expect(createRpcHost(server.options)).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
   /** Probe is the real readonly native plugin and cannot impersonate a local flow Feature. */
-  const misplaced = coreMemoryServer('invalid-probe', undefined, 'memory', [
-    probe({ stages: ['message'], emit: () => undefined })
-  ])
-  expect(() => createRpcHost(misplaced.options)).toThrowError(
-    expect.objectContaining({ code: 'INVALID_CONFIG' })
-  )
+  expect(() =>
+    coreMemoryServer('invalid-probe', undefined, 'memory', [
+      probe({ stages: ['message'], emit: () => undefined })
+    ])
+  ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }))
 })
 
 it('overrides host authentication once in one Memory namespace and keeps the other host selection', async () => {

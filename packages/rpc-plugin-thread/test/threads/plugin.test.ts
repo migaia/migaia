@@ -107,13 +107,15 @@ describe('native thread transport plugin', () => {
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })
     const [mathHandle] = await host.use(local)
-    await host.use(threadPlugin({ name: 'native', spawn: child, expose: ['math.double'] }))
+    /** Native removal addresses the transport namespace, independently from its peer name. */
+    const transport = threadPlugin({ name: 'native', spawn: child, expose: ['math.double'] })
+    await host.use(transport)
     try {
       const outlet = Reflect.get(host, 'thread') as {
         send(name: string, method: string, payload?: unknown): Promise<unknown>
       }
       expect(await outlet.send('native', 'exposed', 21)).toBe(42)
-      expect(await host.unUse('native')).toMatchObject({ ok: true })
+      expect(await host.unUse(transport.name)).toMatchObject({ ok: true })
       expect(mathHandle.getFeature('value').double(3)).toBe(6)
     } finally {
       await host.dispose()
