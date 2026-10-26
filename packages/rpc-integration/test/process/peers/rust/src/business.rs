@@ -143,8 +143,8 @@ pub(super) struct Business {
     aborts: Vec<Value>,
     /// Request ids index compact pending headers in O(1).
     waiting: HashMap<String, Value>,
-    /// Each generator retains its compact header, actual input values and next credit.
-    streams: HashMap<String, (Value, Vec<Value>, usize)>,
+    /// Each generator keeps its header, values, credit and original early-finish permission.
+    streams: HashMap<String, (Value, Vec<Value>, usize, bool)>,
     /// A genuine admitted fault executes only after its original ACK is physically written.
     pending_fault: Option<String>,
 }
@@ -266,7 +266,7 @@ impl Business {
     /// Each received pull consumes exactly one sequence credit; cancellation releases this same operation.
     fn stream_control(&mut self, message: &Value) -> io::Result<Vec<Value>> {
         let id = text(message, "id");
-        let Some((original, values, seq)) = self.streams.get_mut(id) else {
+        let Some((original, values, seq, allow_finish)) = self.streams.get_mut(id) else {
             return Ok(vec![]);
         };
         if !Self::matches(original, message) {
@@ -278,6 +278,18 @@ impl Business {
             return Ok(vec![result]);
         }
         let event = value(message, "stream");
+        if text(event, "event") == "finish-without-items" && *allow_finish {
+            // Discard only valid remaining yields, preserving the producer's existing item budget.
+            if values[*seq..]
+                .iter()
+                .any(|value| crate::portable_bytes(value, 0).is_none_or(|bytes| bytes > 16_384))
+            {
+                return Err(invalid("INVALID_STREAM"));
+            }
+            let result = stream(original, "end", *seq, None);
+            self.streams.remove(id);
+            return Ok(vec![result]);
+        }
         if text(event, "event") != "pull"
             || crate::safe_integer(value(event, "seq")) != Some(*seq as u64)
         {
@@ -403,8 +415,9 @@ impl Business {
                 .and_then(Value::as_array)
                 .unwrap_or(&[])
                 .to_vec();
+            let allow_finish = text(value(message, "options"), "cancel") == "before-start";
             self.streams
-                .insert(id.to_owned(), (header(message), values, 0));
+                .insert(id.to_owned(), (header(message), values, 0, allow_finish));
             return Ok(vec![stream(message, "open", 0, None)]);
         }
         if method == "peer.finish" {

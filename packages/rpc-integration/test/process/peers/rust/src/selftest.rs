@@ -508,6 +508,75 @@ fn closing_group_admission(counts: &mut Counts) {
     );
 }
 
+/// A permitted early stream finish releases credit state before drain requires another read.
+fn stream_finish_releases_before_drain(counts: &mut Counts) {
+    let local = crate::identity();
+    let remote = caller();
+    let mut opening = call(
+        "early-stream",
+        "p.f.generator",
+        "stream",
+        Value::Array(vec![Value::Array(vec![string("unread")])]),
+        &local,
+        &remote,
+    );
+    crate::set(
+        &mut opening,
+        "options",
+        object(&[("cancel", string("before-start"))]),
+    );
+    let mut finish = crate::business::header(&opening);
+    crate::set(&mut finish, "kind", string("stream"));
+    crate::set(
+        &mut finish,
+        "stream",
+        object(&[
+            ("event", string("finish-without-items")),
+            ("seq", number(0)),
+        ]),
+    );
+    let mut drain = crate::business::header(&opening);
+    crate::set(&mut drain, "kind", string("control"));
+    crate::set(&mut drain, "operation", string("drain"));
+    let mut input = Vec::new();
+    for message in [
+        crate::hello(&remote, true, None),
+        crate::accept(&crate::hello(&remote, true, None)),
+        opening,
+        finish,
+        drain,
+    ] {
+        write_frame(&mut input, &message).unwrap();
+    }
+    let drain_boundary = input.len() as u64;
+    write_frame(
+        &mut input,
+        &call(
+            "after-drain",
+            "echo",
+            "request",
+            string("must-not-read"),
+            &local,
+            &remote,
+        ),
+    )
+    .unwrap();
+    let mut reader = io::Cursor::new(input);
+    let mut output = Vec::new();
+    let result = crate::business::serve(&mut reader, &mut output, &local, None, None, true);
+    let replies = frames(&output);
+    counts.check(
+        "early-stream-finish-releases-before-drain",
+        result.is_ok()
+            && reader.position() == drain_boundary
+            && replies.len() == 5
+            && text(field(&replies[2], "stream"), "event") == "open"
+            && text(field(&replies[3], "stream"), "event") == "end"
+            && field(field(&replies[3], "stream"), "seq").as_u64() == Some(0)
+            && text(&replies[4], "operation") == crate::CONTROL_CLOSE,
+    );
+}
+
 fn flat_error_boundaries(counts: &mut Counts) {
     for key in ["source", "code", "name", "message", "stack"] {
         let mut node = crate::error_node("s", "C", "Error", "m");
@@ -590,6 +659,7 @@ pub fn run(root: &Path) -> io::Result<()> {
     native_baseline(&mut counts);
     notification_and_cancel(&mut counts);
     closing_group_admission(&mut counts);
+    stream_finish_releases_before_drain(&mut counts);
     flat_error_boundaries(&mut counts);
     original_error_vectors(root, &mut counts);
     if let Some(vector) = load(root, "stream-framing.json", &mut counts) {
