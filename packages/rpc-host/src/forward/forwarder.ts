@@ -31,7 +31,7 @@ import {
   registerLocalErrorWireRoute,
   registerLocalErrorWireSummary
 } from '../host/error-wire-metadata.js'
-import { retainProviderForwardMethod } from '../dispatch/catalog.js'
+import { forwardHint, retainProviderForwardMethod } from '../dispatch/catalog.js'
 import type { IProviderForwardEntry, IRpcContext } from '../dispatch/types.js'
 import { ForwardErrorText } from './text.js'
 
@@ -169,15 +169,7 @@ export class Forwarder {
         names.add(name)
         /** A dotted peer name is routable but cannot occupy the protocol's single-segment hint. */
         const { forwardedVia: _previous, ...description } = method
-        methods.push(
-          Object.freeze({
-            ...description,
-            name,
-            ...(namespaceSegment.test(selection.view.name)
-              ? { forwardedVia: selection.view.name }
-              : {})
-          })
-        )
+        methods.push(Object.freeze({ ...description, name, ...forwardHint(selection.view.name) }))
       }
     }
     return Object.freeze(methods)

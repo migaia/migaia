@@ -29,6 +29,17 @@ import type {
   IRpcProviderMethod
 } from './types.js'
 
+/** Peer-name grammar shared by the protocol's single-segment forwarding hint. */
+const forwardSegment = new RegExp(REMOTE_NAME_PATTERN, 'u')
+
+/**
+ * Directory hint naming the peer a method forwards through. A dotted or otherwise non-segment peer
+ * name stays routable but cannot occupy the protocol's single-segment field, so it gets no hint.
+ */
+export function forwardHint(targetName: string): Readonly<{ forwardedVia?: string }> {
+  return forwardSegment.test(targetName) ? { forwardedVia: targetName } : {}
+}
+
 /** Exact local callable identity alone grants access to its installing Feature's commit gate. */
 const commitGates = new WeakMap<Function, IProviderCommitGate>()
 /** Exact callback identity retains the original synchronous pre-admission guard. */

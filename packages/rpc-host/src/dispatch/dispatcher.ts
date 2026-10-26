@@ -24,7 +24,7 @@ import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 import type { IRpcFlowContext, IRpcTargetSource } from '@migaia/rpc-contract/interfaces'
 import { createRpcError } from '../host/error-owner.js'
 import { sameGeneration, sameTask } from '../call/envelope.js'
-import { compileProviderMethods } from './catalog.js'
+import { compileProviderMethods, forwardHint } from './catalog.js'
 import { ProviderInvocation } from './invocation.js'
 import type { ProviderRegistration } from './registration.js'
 import { ProviderCatalog } from './catalog-scope.js'
@@ -40,7 +40,11 @@ import type {
 /** One entry projection is cold, bounded and never reconstructs a per-call provider facade. */
 function describe(entry: IProviderMethodEntry): IRpcMethodDescription {
   if (entry.kind === 'forward' && entry.description)
-    return Object.freeze({ ...entry.description, name: entry.name, forwardedVia: entry.targetName })
+    return Object.freeze({
+      ...entry.description,
+      name: entry.name,
+      ...forwardHint(entry.targetName)
+    })
   return Object.freeze({
     name: entry.name,
     supportedModes:
@@ -48,7 +52,7 @@ function describe(entry: IProviderMethodEntry): IRpcMethodDescription {
       Object.freeze([RpcCallMode.request, RpcCallMode.notify, RpcCallMode.stream]),
     modeSource: entry.supportedModes ? 'declared' : 'generated-routes',
     ...(entry.declaration ? { idempotent: entry.declaration.idempotent } : {}),
-    ...(entry.kind === 'forward' ? { forwardedVia: entry.targetName } : {}),
+    ...(entry.kind === 'forward' ? forwardHint(entry.targetName) : {}),
     ...(entry.declaration?.input === undefined ? {} : { input: entry.declaration.input }),
     ...(entry.declaration?.output === undefined ? {} : { output: entry.declaration.output }),
     ...(entry.declaration?.yield === undefined ? {} : { yield: entry.declaration.yield })
