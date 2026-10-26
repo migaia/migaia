@@ -140,6 +140,7 @@ it('retains the real terminal Process error for an explicitly addressed retired 
       plugins: [
         processPlugin({
           spawn: child,
+          name: 'terminal-native',
           supervision: {
             restart: { mode: 'on-failure', maxRestarts: 0 },
             terminalPolicy: { mode: 'stay' }
@@ -149,8 +150,9 @@ it('retains the real terminal Process error for an explicitly addressed retired 
       report: () => undefined
     })
     cleanup = host
-    /** Address the original accepted native name, rather than broadcast to zero retired targets. */
+    /** Explicit logical names retain native admission reasons after their physical source retires. */
     const name = Object.keys(host.process.peers)[0]!
+    expect(name).toBe('terminal-native')
     /** This PID comes from the real child provider before it is killed. */
     const pid = (await host.process.send(name, 'pid')) as number
     /** Observe existing safe native events; no test changes readiness or generates a terminal state. */
