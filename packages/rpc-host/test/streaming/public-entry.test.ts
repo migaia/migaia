@@ -38,6 +38,7 @@ it.each([false, true])(
         'cold',
         'x'.repeat(64 * 1024)
       ) as AsyncIterableIterator<unknown>
+      expect(iterator[Symbol.asyncIterator]()).toBe(iterator)
       /** A thrown primary remains exactly the caller's object on the unopened path. */
       const reason = new Error('unopened stream throw')
       if (thrown) await expect(iterator.throw!(reason)).rejects.toBe(reason)
