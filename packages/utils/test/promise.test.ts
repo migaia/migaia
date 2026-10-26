@@ -1364,3 +1364,121 @@ describe('promise primitives', () => {
     expect(scheduler.pendingCount).toBe(0)
   })
 })
+
+it('retains the deadline terminal after the original operation fulfills late', async () => {
+  /** The existing scheduler owns the sole deadline and its released timer receipt. */
+  const scheduler = createManualScheduler()
+  /** This genuine operation completes only after its public deadline result has settled. */
+  const operation = deferred<string>()
+  /** Attach the original rejection observer before advancing the actual timer owner. */
+  const pending = withTimeout(() => operation.promise, { timeoutMs: 1, scheduler })
+  /** Preserve the first actual deadline instance for the post-completion identity assertion. */
+  const terminal = pending.catch((error: unknown) => error)
+  scheduler.advance(1)
+  /** The first terminal remains owned by withTimeout rather than by its late operation. */
+  const failure = await terminal
+  expect(failure).toMatchObject({ code: 'DEADLINE_EXCEEDED', scope: 'operation' })
+  operation.resolve('late')
+  await operation.promise
+  await expect(pending).rejects.toBe(failure)
+  expect(scheduler.pendingCount).toBe(0)
+})
+
+it('does not start a direct abort race after native pre-cancellation', async () => {
+  /** The supported native signal is already cancelled before listener or business admission. */
+  const controller = new AbortController()
+  controller.abort()
+  /** Only the real lazy operation can change this original observable business effect. */
+  let started = false
+  await expect(
+    raceWithAbort(
+      () => {
+        started = true
+        return Promise.resolve('late')
+      },
+      { signal: controller.signal }
+    )
+  ).rejects.toMatchObject({ code: 'ABORTED', cause: controller.signal.reason })
+  expect(started).toBe(false)
+})
+
+it('removes the earlier race listener once when a later signal registration fails', async () => {
+  /** Actual listener identity proves rollback of the earlier successfully admitted signal. */
+  const listeners = new Set<() => void>()
+  /** The original earlier listener owns exactly one successful removal receipt. */
+  let removed = 0
+  /** The first registration succeeds before the second signal fails. */
+  const first = {
+    aborted: false,
+    addEventListener: (_type: 'abort', listener: () => void) => {
+      listeners.add(listener)
+    },
+    removeEventListener: (_type: 'abort', listener: () => void) => {
+      removed += 1
+      listeners.delete(listener)
+    }
+  }
+  /** The original native failure must remain reachable through the public admission error. */
+  const failure = new Error('registration failed')
+  /** A distinct signal creates the exact earlier-success/later-failure rollback topology. */
+  const second = {
+    aborted: false,
+    addEventListener: () => {
+      throw failure
+    },
+    removeEventListener: () => undefined
+  }
+  await expect(
+    raceWithAbort(() => Promise.resolve('late'), { signals: [first, second] })
+  ).rejects.toSatisfy((error: unknown) => error instanceof TypeError && error.cause === failure)
+  expect(removed).toBe(1)
+  expect(listeners.size).toBe(0)
+})
+
+it('retains the race result and exact host diagnostic when its cleanup reporter throws', async () => {
+  /** The single remover failure stays distinct from the secondary reporter failure. */
+  const cleanupFailure = new Error('remove failed')
+  /** The same actual reporter failure must escape the canonical host queue by identity. */
+  const reporterFailure = new Error('diagnostic failed')
+  /** Only the real cleanup reporter appends the original diagnostic. */
+  const diagnostics: unknown[] = []
+  /** Capture the existing host exception queue without delivering its deliberate test throw. */
+  const queued: (() => void)[] = []
+  /** The existing queue owner remains observable and is restored after the business assertion. */
+  const enqueue = vi.spyOn(globalThis, 'queueMicrotask').mockImplementation((task) => {
+    queued.push(task)
+  })
+  /** A supported structural signal fails only while releasing its actual race subscription. */
+  const signal = {
+    aborted: false,
+    addEventListener: () => undefined,
+    removeEventListener: () => {
+      throw cleanupFailure
+    }
+  }
+  try {
+    await expect(
+      raceWithAbort(() => Promise.resolve('ok'), {
+        signal,
+        cleanupPolicy: 'report',
+        report: (error) => {
+          diagnostics.push(error)
+          throw reporterFailure
+        }
+      })
+    ).resolves.toBe('ok')
+    expect(diagnostics).toHaveLength(1)
+    expect(diagnostics[0]).toBe(cleanupFailure)
+    expect(queued).toHaveLength(1)
+    /** Execute the one real queued callback once, retaining its exact thrown native instance. */
+    let thrown: unknown
+    try {
+      queued[0]!()
+    } catch (error) {
+      thrown = error
+    }
+    expect(thrown).toBe(reporterFailure)
+  } finally {
+    enqueue.mockRestore()
+  }
+})

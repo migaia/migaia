@@ -9,6 +9,7 @@ import { fileURLToPath } from 'node:url'
 const collect = process.env.RPC_SUITE_PARITY_COLLECT === '1'
 /** Each real owner has a unique project name and its own test root. */
 const owners = [
+  'utils',
   'rpc-contract',
   'rpc-host',
   'rpc-plugin-process',

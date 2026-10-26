@@ -199,6 +199,9 @@ const retiredSuites = new Set([
 ])
 /** Exact historical titles retired by rpc-layering after deleting unused control code. */
 const retiredLayeringTitles = new Set([
+  // SC3/BC3: only the deleted private timeout callback/error-factory ordering has no producer.
+  'packages/web-rpc/test/internal/async-control.test.ts::async control contains synchronous timeout callbacks and observes diagnostics',
+  'packages/web-rpc/test/internal/async-control.test.ts::async control starts the timeout side effect before settling the timeout',
   'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix selected control roots keep dependencies private and disposal endpoint-local',
   // Exact old preset selection, alias and cost titles retire with their deleted implementations.
   'packages/web-rpc/test/composed-ping-parity.test.ts::composed root ping() parity root createEndpoint is the same value as createFullEndpoint',
@@ -469,8 +472,36 @@ const retiredLayeringTitles = new Set([
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts preserves hostile connect config getter primary and cause identity'
 ])
 
-/** Exact receiver fullNames preserve this retired file's business; missing reception still fails. */
-const middlewarePortReceivers: Readonly<Record<string, readonly string[]>> = {
+/** Exact receiver fullNames preserve migrated business; missing reception still fails. */
+const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
+  'packages/web-rpc/test/internal/async-control.test.ts::async control settles on timeout and ignores late operation completion':
+    [
+      'packages/utils/test/promise.test.ts::retains the deadline terminal after the original operation fulfills late'
+    ],
+  'packages/web-rpc/test/internal/async-control.test.ts::async control does not start a lazy operation after pre-cancellation':
+    [
+      'packages/utils/test/promise.test.ts::does not start a direct abort race after native pre-cancellation'
+    ],
+  'packages/web-rpc/test/internal/async-control.test.ts::async control does not start an operation after synchronous signal cancellation':
+    [
+      'packages/utils/test/promise.test.ts::promise primitives stops signal admission after synchronous cancellation in raceWithAbort'
+    ],
+  'packages/web-rpc/test/internal/async-control.test.ts::async control does not register later signals after an earlier synchronous abort':
+    [
+      'packages/utils/test/promise.test.ts::promise primitives stops signal admission after synchronous cancellation in raceWithAbort'
+    ],
+  'packages/web-rpc/test/internal/async-control.test.ts::async control starts the operation only after control checks':
+    [
+      'packages/utils/test/promise.test.ts::does not start a direct abort race after native pre-cancellation'
+    ],
+  'packages/web-rpc/test/internal/async-control.test.ts::async control rolls back earlier signal listeners when a later registration fails':
+    [
+      'packages/utils/test/promise.test.ts::removes the earlier race listener once when a later signal registration fails'
+    ],
+  'packages/web-rpc/test/internal/async-control.test.ts::async control observes race listener cleanup failures without replacing the result':
+    [
+      'packages/utils/test/promise.test.ts::retains the race result and exact host diagnostic when its cleanup reporter throws'
+    ],
   // RPC-TEST-FB075BDD690B-C039: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts owns provider feature disposal once on success and rollback':
     [
@@ -1208,9 +1239,12 @@ const middlewarePortReceivers: Readonly<Record<string, readonly string[]>> = {
 function migratedTitles(title: string): readonly string[] {
   const [file, name] = title.split('::')
   if (retiredSuites.has(file.split('/').at(-1) ?? '') || retiredLayeringTitles.has(title)) return []
-  if (file === 'packages/web-rpc/test/middleware-ports.test.ts') {
+  if (
+    file === 'packages/web-rpc/test/middleware-ports.test.ts' ||
+    file === 'packages/web-rpc/test/internal/async-control.test.ts'
+  ) {
     /** Missing/unfinished reception fails before a ghost legacy file can enter the real child. */
-    const receivers = middlewarePortReceivers[title]
+    const receivers = currentCaseReceivers[title]
     expect(Array.isArray(receivers), title).toBe(true)
     return receivers ?? []
   }
