@@ -5,6 +5,22 @@ import {
   encodeRpcStreamFrame
 } from '../../dist/sdk/wire/physical-stream.js'
 
+it('calls frame and error callbacks without their configuration object as receiver', () => {
+  /** A valid payload and a later zero header exercise both public callback boundaries. */
+  const receivers: unknown[] = []
+  const decoder = createRpcStreamFrameDecoder({
+    onFrame: function (this: unknown) {
+      receivers.push(this)
+    },
+    onError: function (this: unknown) {
+      receivers.push(this)
+    }
+  })
+  decoder.push(encodeRpcStreamFrame(Uint8Array.of(1)))
+  decoder.push(Uint8Array.of(0, 0, 0, 0))
+  expect(receivers).toEqual([undefined, undefined])
+})
+
 it('stops the current chunk when its first delivery closes the decoder', () => {
   /** Deliveries are recorded independently from frame parsing. */
   const delivered: number[] = []

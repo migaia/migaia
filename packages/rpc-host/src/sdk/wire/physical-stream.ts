@@ -183,7 +183,7 @@ class RpcStreamFrameDecoder {
             const complete = this.#state.payload
             this.#state.payload = undefined
             this.#state.payloadBytes = 0
-            this.#state.options.onFrame(complete)
+            ;(0, this.#state.options.onFrame)(complete)
           }
         }
         return offset
@@ -210,7 +210,7 @@ class RpcStreamFrameDecoder {
     this.#state.terminal = true
     this.#state.payload = undefined
     this.#state.headerBytes = 0
-    this.#state.options.onError(
+    ;(0, this.#state.options.onError)(
       createContractError(code, undefined, this.#state.options.errorMetadata)
     )
   }

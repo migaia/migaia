@@ -128,9 +128,12 @@ class BinaryRestore {
       const envelope = normalizeRpcFrame(sourceEnvelope, this.#options.errorMetadata, this.#project)
       if (!isRpcOperationalFrame(envelope)) this.#shape.invalid()
       if (this.#used.size !== this.#backings.length) this.#shape.invalid()
-      for (const entry of metadata)
-        if (this.#shape.digest(await this.#options.digest!(entry.backing)) !== entry.sha256)
+      for (const entry of metadata) {
+        /** Only active native integrity rows borrow this configured callback. */
+        const digest = this.#options.digest!
+        if (this.#shape.digest(await digest(entry.backing)) !== entry.sha256)
           this.#shape.integrity()
+      }
       return projectRpcFrameSlots(envelope, this.#restoredRoot)
     } catch (cause) {
       this.#shape.invalid(cause)

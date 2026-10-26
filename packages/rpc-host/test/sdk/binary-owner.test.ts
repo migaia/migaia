@@ -61,6 +61,13 @@ it('C2-B02 retains original native backing aliases and checks invisible bytes wi
   bytes.set([9, 1, 2, 8])
   /** Signed native storage is selected from the whole backing above the inline boundary. */
   const backing = bytes.buffer
+  /** Capture and both restore paths must invoke the same public callback without configuration this. */
+  const digestReceivers: unknown[] = []
+  /** Digest is a configured callback; its underlying native crypto method keeps its own receiver. */
+  const observedDigest = function (this: unknown, value: ArrayBuffer): Promise<string> {
+    digestReceivers.push(this)
+    return digest(value)
+  }
   /** Multiple supported views deliberately share that exact original backing. */
   const prepared = await prepareRpcBinary(
     envelope({
@@ -68,7 +75,12 @@ it('C2-B02 retains original native backing aliases and checks invisible bytes wi
       first: new Uint8Array(backing, 1, 2),
       second: new Uint8Array(backing, 2, 1)
     }),
-    { storage: RpcBinaryStorage.native, limit: 32_768, digest, transferRequiresIntegrity: true }
+    {
+      storage: RpcBinaryStorage.native,
+      limit: 32_768,
+      digest: observedDigest,
+      transferRequiresIntegrity: true
+    }
   )
   assert.equal(prepared.sidecars.length, 1)
   assert.equal(prepared.sidecars[0], backing)
@@ -78,7 +90,7 @@ it('C2-B02 retains original native backing aliases and checks invisible bytes wi
     storage: RpcBinaryStorage.native,
     sidecars: prepared.sidecars,
     limit: 32_768,
-    digest,
+    digest: observedDigest,
     transferRequiresIntegrity: true
   })
   assert.ok('payload' in restored)
@@ -93,10 +105,14 @@ it('C2-B02 retains original native backing aliases and checks invisible bytes wi
       storage: RpcBinaryStorage.native,
       sidecars: prepared.sidecars,
       limit: 32_768,
-      digest,
+      digest: observedDigest,
       transferRequiresIntegrity: true
     }),
     { code: 'INVALID_ENVELOPE' }
+  )
+  assert.deepEqual(
+    digestReceivers.map((receiver) => receiver === undefined),
+    [true, true, true]
   )
 })
 
@@ -109,6 +125,8 @@ it('C2-B03 starts prehash and the first original digest synchronously, then hash
   const observed: { order: ArrayBuffer[]; release?: (value: string) => void } = { order: [] }
   /** Prehash must run once before the digest can detach or suspend the original buffers. */
   let before = 0
+  /** The public prehash callback must not receive its options record as this. */
+  const beforeReceivers: unknown[] = []
   /** The real codec owns synchronous capture and asynchronous completion together. */
   const pending = prepareRpcBinary(envelope({ first, second }), {
     storage: RpcBinaryStorage.native,
@@ -121,7 +139,8 @@ it('C2-B03 starts prehash and the first original digest synchronously, then hash
           })
         : digest(backing)
     },
-    beforeDigest: () => {
+    beforeDigest: function (this: unknown) {
+      beforeReceivers.push(this)
       before++
       assert.equal(observed.order.length, 0)
     }
@@ -131,6 +150,10 @@ it('C2-B03 starts prehash and the first original digest synchronously, then hash
   observed.release!(await digest(first))
   await pending
   assert.deepEqual(observed.order, [first, second])
+  assert.deepEqual(
+    beforeReceivers.map((receiver) => receiver === undefined),
+    [true]
+  )
 })
 
 it('C2-B04 rejects whole-backing overflow before any digest and never executes business accessors', async () => {

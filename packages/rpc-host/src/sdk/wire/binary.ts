@@ -68,7 +68,7 @@ export async function finishRpcBinaryCapture(
         )
       }
       options.encoding?.capture(pending, capture.capturedRoots!)
-      options.beforeDigest(pending, capture.backingBytes)
+      ;(0, options.beforeDigest)(pending, capture.backingBytes)
     }
     /**
      * Each native hash covers its complete original backing, including bytes outside referenced
@@ -85,11 +85,11 @@ export async function finishRpcBinaryCapture(
       /** Validate the retained complete backing before invoking the one operation's digest. */
       const backing = capture.sidecars[physical++]!
       if (shape.backingLength(backing) !== row.byteLength) shape.integrity()
-      backings.push(
-        options.transferRequiresIntegrity
-          ? Object.freeze({ ...row, sha256: shape.digest(await options.digest!(backing)) })
-          : row
-      )
+      if (options.transferRequiresIntegrity) {
+        /** Configuration lends a receiverless callback; native crypto retains its own wrapper. */
+        const digest = options.digest!
+        backings.push(Object.freeze({ ...row, sha256: shape.digest(await digest(backing)) }))
+      } else backings.push(row)
     }
     /** Only newly constructed metadata is frozen; original buffers/views remain borrowed untouched. */
     const manifest: IRpcBinaryManifest = Object.freeze({
