@@ -56,13 +56,16 @@ it('factory Root close preserves two acquired cleanup errors and reverse release
   expect(failure).toMatchObject({
     name: 'RpcLifecycleError',
     source: 'rpc.endpoint',
-    code: RpcCoreErrorCode.endpointDisposed,
-    cause: secondCleanup
+    code: RpcCoreErrorCode.endpointDisposed
   })
-  /** The original public cleanup metadata must preserve both native leaves in release order. */
-  const cleanupErrors = (failure as { readonly cleanupErrors?: readonly { error: unknown }[] })
-    .cleanupErrors
-  expect(cleanupErrors?.map(({ error }) => error)).toEqual([secondCleanup, firstCleanup])
+  /** Each disposer failure keeps its original native leaf on cause, in release order. */
+  const aggregate = (failure as { readonly cause?: unknown }).cause
+  expect(aggregate).toBeInstanceOf(AggregateError)
+  expect(
+    (aggregate as AggregateError).errors.map((error: { readonly cause?: unknown }) => error.cause)
+  ).toEqual([secondCleanup, firstCleanup])
+  expect((aggregate as AggregateError).errors[0].cause).toBe(secondCleanup)
+  expect((aggregate as AggregateError).errors[1].cause).toBe(firstCleanup)
   expect(cleanupOrder).toEqual(['second', 'first'])
   expect(endpoint.close()).toBe(endpointDispose)
 })

@@ -12,18 +12,19 @@ it('delivers dispatch-only frames to the provider-owned listener registry', asyn
   const listener = coreMemoryServer('event-server')
   /** Public Host close owns unregistering the provider, replacing the retired event disposer. */
   const server = await createRpcHost(listener.options)
+  /** Registered before the client connects so its handshake directory already lists the method. */
+  server.provide({
+    serialize: {
+      frame: (payload: unknown) => {
+        frames.push(payload)
+        delivered.resolve()
+      }
+    }
+  })
   try {
     /** The client reaches the original provider through one actual accepted native connection. */
     const client = await listener.connect('event-client')
     try {
-      server.provide({
-        serialize: {
-          frame: (payload: unknown) => {
-            frames.push(payload)
-            delivered.resolve()
-          }
-        }
-      })
       client.host.memory.dispatch('event-server', 'serialize.frame', { sequence: 4, kind: 'chunk' })
       await delivered.promise
       expect(frames).toEqual([{ sequence: 4, kind: 'chunk' }])

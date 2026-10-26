@@ -159,7 +159,7 @@ it('isolates two original provider endpoints and prevents execution or replies a
     await firstHost.close()
     await expect(
       firstClient.host.memory.send('r70-isolation-first', 'echo', 'r70-post-removal')
-    ).rejects.toMatchObject({ code: RpcCoreErrorCode.targetUnknown })
+    ).rejects.toMatchObject({ code: RpcCoreErrorCode.endpointDisposed })
     expect(firstExecutions).toBe(1)
     /** No new terminal can be produced by the removed provider after the original one reply. */
     expect(

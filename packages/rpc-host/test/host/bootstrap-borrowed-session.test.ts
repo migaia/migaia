@@ -22,9 +22,9 @@ it('lends the actual listener session with disposal confined to that peer', asyn
     expect(accepted).toHaveLength(2)
     // A002's retired endpoint-constructor count is archived under BC3, without a substitute counter.
     await accepted[0]!.handle.close()
-    // RPC-TEST-B2526C80E8FC-C004-A003: exactly the closed Session loses direct targeting.
+    // A departed name rejects with its own departure reason; only that Session is affected.
     await expect(host.memory.send('first', 'value')).rejects.toMatchObject({
-      code: 'TARGET_UNKNOWN'
+      code: 'ENDPOINT_DISPOSED'
     })
     // RPC-TEST-B2526C80E8FC-C004-A004: its independently owned sibling remains callable.
     expect(await host.memory.send('second', 'value')).toBe(2)

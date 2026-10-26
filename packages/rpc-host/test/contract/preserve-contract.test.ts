@@ -16,7 +16,7 @@ import { codecContext, request } from '../core/fixtures/outbound-proof-candidate
 /** The standalone public serialize parser receives its actual immutable fixture context. */
 const serializeContext = { signal: new AbortController().signal, context: 'wire-order-fixture' }
 
-it('current JSON preparation retains own field and getter order without a second caller traversal', async () => {
+it('current JSON preparation reads each getter once per occurrence, level by level, without a second caller traversal', async () => {
   /** Reused children retain original descriptor order at each independently captured occurrence. */
   const reads: string[] = []
   /** Both occurrences belong to the original caller graph, never a test-owned snapshot. */
@@ -56,7 +56,7 @@ it('current JSON preparation retains own field and getter order without a second
   const codec = new RpcJsonCarrierCodec()
   /** Successful preparation is reused by each actual encoding without re-reading caller getters. */
   const prepared = await codec.prepare(envelope, codecContext)
-  assert.deepEqual(reads, ['2', '10', 'b', 'shared.z', 'shared.a', 'a', 'shared.z', 'shared.a'])
+  assert.deepEqual(reads, ['2', '10', 'b', 'a', 'shared.z', 'shared.a', 'shared.z', 'shared.a'])
   /** The selected serialize JSON implementation is the canonical byte-for-byte output oracle. */
   const expected = JSON.stringify(prepared.message)
   assert.deepEqual(jsonParser().encode(prepared.message, serializeContext), ['text', expected])
@@ -66,7 +66,7 @@ it('current JSON preparation retains own field and getter order without a second
     JSON.stringify((prepared.message as Extract<IRpcEnvelope, { kind: 'call' }>).payload),
     '{"2":2,"10":10,"b":{"z":3,"a":4},"a":{"z":3,"a":4}}'
   )
-  assert.deepEqual(reads, ['2', '10', 'b', 'shared.z', 'shared.a', 'a', 'shared.z', 'shared.a'])
+  assert.deepEqual(reads, ['2', '10', 'b', 'a', 'shared.z', 'shared.a', 'shared.z', 'shared.a'])
 })
 
 it('retains the exact original payload getter failure through current preparation', async () => {

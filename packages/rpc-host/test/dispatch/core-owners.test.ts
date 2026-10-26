@@ -734,7 +734,8 @@ describe('C2 ProviderDispatcher / Forwarder / StreamChannel owners', () => {
     })
     /** No item credit can complete before its original failed producer open. */
     const stream = pair.clientStreams.open(pair.target, 'values')
-    await expect(stream.next()).rejects.toMatchObject({ code: RpcCoreErrorCode.cancelled })
+    /** The caller settles with the physical open failure instead of waiting on producer cleanup. */
+    await expect(stream.next()).rejects.toMatchObject({ code: RpcCoreErrorCode.transport })
     await pair.close()
     expect(pair.errors).toContain(failure)
   })

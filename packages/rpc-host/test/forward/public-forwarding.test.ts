@@ -138,7 +138,7 @@ describe('actual public forwarding lifecycle', () => {
   })
 })
 
-it('observes actual known-offline-peer and missing-method forwarding refusals without business execution', async () => {
+it('refuses known-offline-peer and missing methods at the caller without forwarding or execution', async () => {
   /** One actual relay receives qualified method lookup through its normal provider dispatcher. */
   const listener = coreMemoryServer('relay')
   /** The readonly observer snapshots only the real Forwarder events it receives. */
@@ -165,28 +165,13 @@ it('observes actual known-offline-peer and missing-method forwarding refusals wi
     const retired = listener.lookup('missing')!.handle.closed
     await offline.host.close()
     await retired
-    for (const [method, rejection, code] of [
-      ['missing.value', RpcProbeForwardRejection.targetUnknown, 'TARGET_UNKNOWN'],
-      ['client.missing', RpcProbeForwardRejection.methodUnavailable, 'PROVIDER_NOT_FOUND']
-    ] as const) {
+    /** Methods absent from the relay directory, including a departed peer's, are refused locally. */
+    for (const method of ['missing.value', 'client.missing']) {
       events.length = 0
-      await expect(caller.host.memory.send('relay', method)).rejects.toMatchObject({ code })
-      expect(events).toMatchObject([
-        { stage: RpcProbeStage.forward, outcome: RpcProbeOutcome.received, hop: 1, maxHops: 3 },
-        {
-          stage: RpcProbeStage.forward,
-          outcome: RpcProbeOutcome.rejected,
-          rejection,
-          hop: 1,
-          maxHops: 3
-        }
-      ])
-      expect(events[0]!.method).toBe(method)
-      expect(events[0]!.rejection).toBeUndefined()
-      expect(events[0]!.messageId).toEqual(expect.any(String))
-      expect(events[1]!.messageId).toBe(events[0]!.messageId)
-      expect(events[0]!.route).toHaveLength(1)
-      expect(events[1]!.route).toEqual(events[0]!.route)
+      await expect(caller.host.memory.send('relay', method)).rejects.toMatchObject({
+        code: 'PROVIDER_NOT_FOUND'
+      })
+      expect(events).toEqual([])
     }
     expect(executions).toBe(0)
   } finally {

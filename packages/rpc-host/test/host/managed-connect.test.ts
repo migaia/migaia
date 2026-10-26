@@ -140,7 +140,8 @@ it('keeps one host and feature installation through the original supervisor rest
     await vi.waitFor(() => expect(supervisor.generation).toBe(2))
     // C004-A004: BC1 removes the retained single-Peer call surface; zero namespace targets use D4.
     expectNoNativeTargets(await host.memory.request('value'))
-    expect(await pending).toMatchObject({ source: 'rpc.endpoint', code: 'TRANSPORT' })
+    /** A request in flight when its unit crashes has an unknown remote result. */
+    expect(await pending).toMatchObject({ source: 'rpc.remote', code: 'REMOTE_RESULT_UNKNOWN' })
     nextLaunch.resolve()
     await ready.promise
     expect(await host.memory.request('value')).toBe(2)
@@ -270,7 +271,8 @@ it('applies the SDK handshake budget again when an original managed generation r
     await written.promise
     await expect(failed.promise).resolves.toMatchObject({
       code: 'REMOTE_START_FAILED',
-      cause: { source: 'rpc.endpoint', code: 'INVALID_CONFIG' }
+      /** The silent replacement fails at its own handshake budget. */
+      cause: { source: 'rpc.endpoint', code: 'DEADLINE_EXCEEDED' }
     })
     expect(events.listenerCount('message')).toBe(0)
     expect(units).toHaveLength(2)

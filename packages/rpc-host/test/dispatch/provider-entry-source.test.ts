@@ -91,15 +91,14 @@ it('real provider response baseline preserves native provider error code and cau
     await expect(
       client.host.memory.send('provider-error-host', 'fail', null)
     ).rejects.toMatchObject({
+      /** The code is attached to the provider's own error rather than a wrapper. */
       code: RpcCoreErrorCode.internal,
+      message: primary.message,
+      stack: primary.stack,
       cause: expect.objectContaining({
-        message: primary.message,
-        stack: primary.stack,
-        cause: expect.objectContaining({
-          name: 'TypeError',
-          message: cause.message,
-          stack: cause.stack
-        })
+        name: 'TypeError',
+        message: cause.message,
+        stack: cause.stack
       })
     })
   } finally {

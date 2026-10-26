@@ -50,11 +50,8 @@ it('borrowed public request preserves getter capture, independent Promises and c
       'synchronous getter capture before handlers'
     )
     assert.deepEqual(await Promise.all([one, two]), [
-      Object.assign(Object.create(null), {
-        first: Object.assign(Object.create(null), { nested: 1 }),
-        second: 2
-      }),
-      Object.assign(Object.create(null), { value: 2 })
+      { first: { nested: 1 }, second: 2 },
+      { value: 2 }
     ])
     assert.deepEqual(events, ['first', 'second', 'nested', 'handler', 'handler'])
     /** Borrowed namespace shutdown retains its original idempotent completion Promise. */
