@@ -44,7 +44,6 @@ describe('error boundary helpers', () => {
     expect(new RpcProtocolError('protocol').code).toBe('PROTOCOL_INVALID')
     expect(new RpcContractError('contract').code).toBe('CONTRACT_INVALID')
     expect(new RpcChunkError('chunk').code).toBe('CHUNK_INVALID')
-    expect(RpcCoreErrorCode.middlewareMissing).toBe('MIDDLEWARE_MISSING')
   })
 
   it('uses standard AbortError/TimeoutError names for cross-realm type checks', () => {
@@ -58,7 +57,7 @@ describe('error boundary helpers', () => {
     /** Count the public code contract independently from the generated registry. */
     const codes = Object.values(RpcCoreErrorCode)
     /** Namespace/feature conflicts and the closing keepalive quota each retain a distinct identity. */
-    expect(codes).toHaveLength(41)
+    expect(codes).toHaveLength(34)
     expect(new Set(codes).size).toBe(codes.length)
     /** Public native families share one stable source without merging their semantic codes. */
     const samples: ReadonlyArray<{ readonly source: string; readonly code: string }> = [

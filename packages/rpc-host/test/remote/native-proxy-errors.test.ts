@@ -23,7 +23,7 @@ function forgedCoreFailure(kind: IForgeKind): Error {
       ? new Constructor('retirement fixture')
       : attachErrorIdentity(new Error('retirement fixture'), {
           source: RPC_CORE_ERROR_SOURCE,
-          code: RpcCoreErrorCode.providerGenerationRetired
+          code: RpcCoreErrorCode.endpointDisposed
         })
 }
 

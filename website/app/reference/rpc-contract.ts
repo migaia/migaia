@@ -5771,14 +5771,6 @@ domain(
       en: 'A copied or fabricated object lacks registered SDK identity.',
       zh: '复制或伪造对象不具备作者工具登记身份。'
     },
-    hostAssemblerDuplicate: {
-      en: 'Only one member assembler can own scheduling.',
-      zh: '只能有一个成员装配器拥有调度。'
-    },
-    hostFeatureDuplicate: {
-      en: 'A definition may be installed only once in one host.',
-      zh: '同一种定义在一个宿主只能安装一次。'
-    },
     hostPeerNameDuplicate: {
       en: 'A same-name peer is responsive, or its one probe is already pending; reject the newcomer.',
       zh: '同名对端仍响应，或其唯一探测尚未完成，拒绝新连接。'
@@ -5791,10 +5783,6 @@ domain(
       en: 'PROVIDER_GENERATION_MISMATCH: accepted caller/provider generation no longer matches the task; select the actual binding again.',
       zh: '提供方世代不匹配：已接受调用方或提供方世代与任务不符，应重新选择实际绑定。'
     },
-    providerGenerationRetired: {
-      en: 'PROVIDER_GENERATION_RETIRED: an admitted forwarded execution retired with its exact generation; never replay it.',
-      zh: '对应的提供方代次已经结束；先前接受的转发执行随该代次失效，不能重放。'
-    },
     forwardLoop: {
       en: 'FORWARD_LOOP: signed route revisits this or the selected next Host; choose another route.',
       zh: '转发环路错误：签名路由再次访问当前或下一宿主，应选择其他路由。'
@@ -5802,14 +5790,6 @@ domain(
     forwardHopLimit: {
       en: 'FORWARD_HOP_LIMIT: three forwarding nodes were already visited; use a direct channel or shorter route.',
       zh: '转发跳数超限：已经访问三个转发节点，应使用直接通道或更短路由。'
-    },
-    middlewareDuplicated: {
-      en: 'MIDDLEWARE_DUPLICATED: names repeat in the construction tuple; assign one unique name per middleware.',
-      zh: '中间件重复错误：构造元组中名称重复，每个中间件必须使用唯一名称。'
-    },
-    middlewareMissing: {
-      en: 'MIDDLEWARE_MISSING: the operation requires an actually installed connect, abort, ping or other middleware capability.',
-      zh: '缺少中间件错误：操作要求实际安装连接、中止、心跳等中间件能力。'
     },
     capabilityUnsupported: {
       en: 'CAPABILITY_UNSUPPORTED: actual peer agreement does not support the requested runtime mode or capability.',
@@ -5843,10 +5823,6 @@ domain(
       en: 'PROVIDER_NOT_FOUND: the receiving endpoint has no registered provider for the requested method.',
       zh: '提供方不存在错误：接收端没有为所请求方法登记提供方。'
     },
-    providerNotSettled: {
-      en: 'PROVIDER_NOT_SETTLED: a request provider returned without an explicit success or failed result.',
-      zh: '提供方未结算错误：请求提供方返回时没有给出显式成功或失败结果。'
-    },
     internal: {
       en: 'INTERNAL: provider threw unexpectedly; original error stays in local diagnostics while the peer receives a redacted failure.',
       zh: '内部错误：提供方发生意外抛错，原错误保留在本地诊断，对端收到脱敏失败。'
@@ -5854,10 +5830,6 @@ domain(
     targetUnknown: {
       en: 'TARGET_UNKNOWN: target or receiver is unresolved, inactive or outside the original selected binding.',
       zh: '目标未知错误：目标或接收端未解析、不活动或不在原选定绑定内。'
-    },
-    targetNotIdentifiable: {
-      en: 'TARGET_NOT_IDENTIFIABLE: anonymous broadcast group cannot satisfy a per-instance operation.',
-      zh: '目标不可识别错误：匿名广播组不能满足针对单实例的操作。'
     },
     endpointDisposed: {
       en: 'ENDPOINT_DISPOSED: an operation used a disposed endpoint; construct a new owner instead.',
@@ -7049,12 +7021,6 @@ types.RpcCoreErrorText = {
       summary: {
         en: 'Exact diagnostic text: `Authentication challenge binding is invalid`.',
         zh: '精确诊断文本为 `Authentication challenge binding is invalid`。'
-      }
-    },
-    providerGenerationRetired: {
-      summary: {
-        en: 'Exact diagnostic text: `Provider generation retired`.',
-        zh: '精确诊断文本为 `Provider generation retired`。'
       }
     },
     forwardLoop: {

@@ -356,7 +356,7 @@ describe('layered error ownership', () => {
   it('retains a throw site for each declared code', () => {
     const contract = declaredCodes('contract')
     const core = declaredCodes('core')
-    expect(core.size).toBe(41)
+    expect(core.size).toBe(34)
     /** The contract declares this report code before probe-core installs its observation runtime. */
     expect(core.get('probeFailed')).toBe('PROBE_FAILED')
     /** Host carriers and features emit Contract frame codes through the public Contract factory. */

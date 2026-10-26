@@ -72,13 +72,6 @@ export const RpcCoreErrorCode = {
   featureCombinationConflict: 'FEATURE_COMBINATION_CONFLICT',
   /** Host creation received an object without SDK registration identity. Use the define tools. */
   hostPluginInvalid: 'HOST_PLUGIN_INVALID',
-  /** Host creation received multiple member assemblers. Keep one scheduling owner. */
-  hostAssemblerDuplicate: 'HOST_ASSEMBLER_DUPLICATE',
-  /**
-   * Host creation received the same feature definition more than once. Remove the duplicate
-   * configuration.
-   */
-  hostFeatureDuplicate: 'HOST_FEATURE_DUPLICATE',
   /**
    * An incoming peer name is held by a responsive session, or another admission is probing it.
    * Choose a different name or close the current session.
@@ -94,8 +87,6 @@ export const RpcCoreErrorCode = {
    * again.
    */
   providerGenerationMismatch: 'PROVIDER_GENERATION_MISMATCH',
-  /** Retires an admitted forward execution with its exact generation; never replay it. */
-  providerGenerationRetired: 'PROVIDER_GENERATION_RETIRED',
   /**
    * A signed route already contains this Host or the selected next Host. Forwarding rejects before
    * admission and sending; callers must choose a route that does not revisit a Host.
@@ -106,22 +97,7 @@ export const RpcCoreErrorCode = {
    * and sending; callers may establish a direct connect/listen channel instead.
    */
   forwardHopLimit: 'FORWARD_HOP_LIMIT',
-  /**
-   * Two middleware declarations in the same factory use the same `name`.
-   *
-   * The installer rejects before installing any middleware. The caller gives each middleware a
-   * unique `name`. Enforces the duplicate singleton middleware creation rule.
-   */
-  middlewareDuplicated: 'MIDDLEWARE_DUPLICATED',
 
-  /**
-   * An operation requires a capability that is not installed.
-   *
-   * Examples include creating an endpoint without `connect` or calling `ping()` without `ping`.
-   * Remote abort notification additionally needs `abort`; local signal cancellation alone does not.
-   * The caller installs the capability required by the intended operation.
-   */
-  middlewareMissing: 'MIDDLEWARE_MISSING',
 
   /**
    * A Runtime API operation requires a mode or capability absent from the actual peer agreement.
@@ -193,13 +169,6 @@ export const RpcCoreErrorCode = {
    */
   providerNotFound: 'PROVIDER_NOT_FOUND',
 
-  /**
-   * A non-dispatch provider does not return `ctx.success()` or `ctx.failed()`.
-   *
-   * The caller ensures every non-dispatch branch explicitly returns a result, or selects dispatch
-   * if that is intended.
-   */
-  providerNotSettled: 'PROVIDER_NOT_SETTLED',
 
   /**
    * A provider throws an unhandled exception. This is the standard code for an `INTERNAL` response.
@@ -217,14 +186,6 @@ export const RpcCoreErrorCode = {
    */
   targetUnknown: 'TARGET_UNKNOWN',
 
-  /**
-   * An operation requires an individual receiver, but the target is an anonymous BroadcastChannel
-   * group.
-   *
-   * The caller configures `uniqueTargetId` and `identifier` before pinning, or avoids per-instance
-   * operations on the group.
-   */
-  targetNotIdentifiable: 'TARGET_NOT_IDENTIFIABLE',
 
   /**
    * An endpoint operation runs after disposal (`RpcLifecycleError`).

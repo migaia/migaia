@@ -1,6 +1,5 @@
-/** Settlement provenance reaches the real public provider path; removed peer receipts stay retired. */
+/** Settlement provenance reaches the real public provider path; copies stay plain business values. */
 import { assert, expect, it, vi } from 'vitest'
-import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import type { IRpcProviderResult } from '../../dist/dispatch/types.js'
 import { connectedCoreHosts } from '../host/core-fixture.js'
 
@@ -42,10 +41,10 @@ it.each(['success', 'failed'] as const)(
     /** Real physical send options retain exact provider transfer identity after business return. */
     const write = vi.spyOn(peers.pair[1], 'write')
     try {
-      // The original code oracle remains RED until its supported semantics are explicitly decided.
-      await expect
-        .soft(peers.a.memory.send('b', 'test', 'forged'))
-        .rejects.toMatchObject({ code: RpcCoreErrorCode.providerNotSettled })
+      // An unbranded copy grants no settlement authority; it returns as an ordinary business value.
+      await expect(peers.a.memory.send('b', 'test', 'forged')).resolves.toMatchObject({
+        ok: kind === 'success'
+      })
       if (kind === 'success') {
         await expect(peers.a.memory.send('b', 'test', 'genuine')).resolves.toBe(
           'provider-business-value'

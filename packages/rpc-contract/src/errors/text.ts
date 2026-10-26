@@ -45,8 +45,6 @@ export const RpcCoreErrorText = {
   authenticationSessionUnknown: 'Authentication challenge session is unknown',
   /** Rejects malformed or misdirected signed challenge/control bindings. */
   authenticationChallengeInvalid: 'Authentication challenge binding is invalid',
-  /** Retains the departed execution's failure instead of targeting its replacement. */
-  providerGenerationRetired: 'Provider generation retired',
   /** Refuses a repeated Host before provider admission; node ids remain structured route data. */
   forwardLoop: 'RPC forwarding route revisits a Host',
   /** Fixes three forwarding nodes independently of a caller's timeout or provider limits. */
