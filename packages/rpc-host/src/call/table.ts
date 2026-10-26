@@ -340,15 +340,18 @@ export class CallTable {
     if (records)
       for (const record of records)
         record.reject(
-          /** Retiring the actual native generation loses any still-pending written result. */
-          record.written && nativeGeneration !== undefined
-            ? createRemoteLayerError(RpcRemoteLayerErrorCode.resultUnknown, reason, {
-                method: record.task.method,
-                generation: nativeGeneration
-              })
-            : physicalFailure && record.written
-              ? (failure ??= createRpcPhysicalTransportError(reason))
-              : closing
+          /** Closing keepalive work retains its promised lifecycle outcome and original reason. */
+          record.keepalive
+            ? closing
+            : /** Retiring the actual native generation loses any still-pending written result. */
+              record.written && nativeGeneration !== undefined
+              ? createRemoteLayerError(RpcRemoteLayerErrorCode.resultUnknown, reason, {
+                  method: record.task.method,
+                  generation: nativeGeneration
+                })
+              : physicalFailure && record.written
+                ? (failure ??= createRpcPhysicalTransportError(reason))
+                : closing
         )
   }
 
