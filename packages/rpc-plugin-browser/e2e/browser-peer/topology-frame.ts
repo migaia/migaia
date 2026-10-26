@@ -13,6 +13,10 @@ import { BrowserTopology } from './topology-names.ts'
 
 /** Origin of the top window, passed as ordinary fixture configuration. */
 const parentOrigin = new URL(location.href).searchParams.get('parentOrigin')!
+/** Both topologies use the same operations; only their advertised leaf path differs. */
+const leafPrefix = new URL(location.href).searchParams.has(BrowserTopology.nestedQuery)
+  ? `${BrowserTopology.worker}.${BrowserTopology.sharedLeaf}`
+  : BrowserTopology.worker
 /** Options shared by every traced business call. */
 const traced = { trace: Topology.trace } as const
 
@@ -60,12 +64,10 @@ const host = (await (async () => {
 
 /** Forward one traced call through the top window to the worker leaf. */
 function viaTop(method: string, payload?: unknown, options: Record<string, unknown> = {}) {
-  return host.window.send(
-    BrowserTopology.top,
-    `${BrowserTopology.worker}.${method}`,
-    payload as never,
-    { ...traced, ...options }
-  )
+  return host.window.send(BrowserTopology.top, `${leafPrefix}.${method}`, payload as never, {
+    ...traced,
+    ...options
+  })
 }
 
 /** Operations Playwright runs inside this iframe. */
@@ -77,7 +79,7 @@ globalThis.topologyFrame = {
   streamCancel: async () => {
     /** Lazy stream through the top window to the worker generator. */
     const stream = host.window
-      .streamTo(BrowserTopology.top, `${BrowserTopology.worker}.${Topology.ticks}`, undefined, traced)
+      .streamTo(BrowserTopology.top, `${leafPrefix}.${Topology.ticks}`, undefined, traced)
       [Symbol.asyncIterator]()
     /** Values pulled before cancelling. */
     const values: unknown[] = []

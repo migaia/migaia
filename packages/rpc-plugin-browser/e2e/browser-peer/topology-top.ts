@@ -16,6 +16,8 @@ import { BrowserTopology } from './topology-names.ts'
 
 /** Whether auth guards the window–worker hop. */
 const hopAuth = new URL(location.href).searchParams.get('auth') === 'match'
+/** T2 adds a SharedWorker leaf beyond the dedicated worker; T1 keeps its original direct leaf. */
+const nested = new URL(location.href).searchParams.has(BrowserTopology.nestedQuery)
 /** Forward-stage observation of this forwarding window. */
 const recorder = new TopologyRecorder()
 /** Transform counts of this window's side of the auth hop. */
@@ -27,7 +29,7 @@ async function openFrame(): Promise<HTMLIFrameElement> {
   const origin = BrowserTopology.frameOrigin
   /** The iframe this window borrows. */
   const frame = document.createElement('iframe')
-  frame.src = `${origin}/browser-peer/topology-frame.html?parentOrigin=${encodeURIComponent(location.origin)}`
+  frame.src = `${origin}/browser-peer/topology-frame.html?parentOrigin=${encodeURIComponent(location.origin)}${nested ? `&${BrowserTopology.nestedQuery}=1` : ''}`
   /** Settles on the iframe's non-protocol load notice from the exact source and origin. */
   const loaded = new Promise<void>((resolve) => {
     /** Accept only the iframe's own load notice. */
@@ -44,18 +46,41 @@ async function openFrame(): Promise<HTMLIFrameElement> {
   return frame
 }
 
+/**
+ * Transfer the actual SharedWorker port after the dedicated worker installs its configuration
+ * listener.
+ */
+function connectSharedLeaf(worker: Worker): void {
+  /** Each page owns an independent leaf so counters cannot leak between topology cases. */
+  const shared = new SharedWorker(new URL('./topology-shared-leaf.ts', import.meta.url), {
+    type: 'module',
+    name: `forward-topology-leaf-${crypto.randomUUID()}`
+  })
+  /** Only this dedicated worker's configuration notice can trigger its one native port transfer. */
+  const transfer = (event: MessageEvent<Record<string, unknown>>) => {
+    if (event.data?.[BrowserTopology.requestSharedPort] !== true) return
+    worker.removeEventListener('message', transfer)
+    worker.postMessage({ [BrowserTopology.sharedPort]: shared.port }, [shared.port])
+  }
+  worker.addEventListener('message', transfer)
+}
+
 /** Open the forwarding window host over the iframe and the worker. */
 async function openTop(): Promise<IRpcHost> {
   /** Dedicated worker leaf owned by this page. */
   const worker = new Worker(new URL('./topology-worker.ts', import.meta.url), {
     type: 'module',
-    name: hopAuth ? 'auth' : 'plain'
+    name: JSON.stringify({ hopAuth, nested })
   })
+  if (nested) connectSharedLeaf(worker)
   /** The iframe whose calls this window forwards. */
   const frame = await openFrame()
   /** The forwarding host; providers read it after it opens. */
   const opening = createRpcHost({
-    self: { name: BrowserTopology.top, instanceId: `${BrowserTopology.top}-${crypto.randomUUID()}` },
+    self: {
+      name: BrowserTopology.top,
+      instanceId: `${BrowserTopology.top}-${crypto.randomUUID()}`
+    },
     plugins: [
       recorder.plugin,
       windowPlugin({
@@ -73,7 +98,19 @@ async function openTop(): Promise<IRpcHost> {
       [Topology.inspect]: async () => ({
         forward: recorder.snapshot().filter((event) => event.stage === RpcProbeStage.forward),
         auth: authCounter.snapshot(),
-        worker: await (await opening).worker.send(BrowserTopology.worker, Topology.inspect)
+        worker: await (
+          await opening
+        ).worker.send(
+          BrowserTopology.worker,
+          nested ? `${BrowserTopology.sharedLeaf}.${Topology.inspect}` : Topology.inspect
+        ),
+        ...(nested
+          ? {
+              intermediate: await (
+                await opening
+              ).worker.send(BrowserTopology.worker, Topology.inspect)
+            }
+          : {})
       }),
       /** Close the worker namespace shortly after replying, while the iframe has a call in flight. */
       [BrowserTopology.closeWorker]: async () => {

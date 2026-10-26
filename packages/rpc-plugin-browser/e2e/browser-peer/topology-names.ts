@@ -8,6 +8,14 @@ export const BrowserTopology = {
   top: 'top',
   /** Peer name of the dedicated worker leaf as the top window sees it. */
   worker: 'w',
+  /** SharedWorker leaf reached through the dedicated worker in the two-forwarder topology. */
+  sharedLeaf: 'sw',
+  /** Query switch shared by the top window and iframe fixtures. */
+  nestedQuery: 'nested',
+  /** Dedicated worker asks its creating window for the native SharedWorker port. */
+  requestSharedPort: 'topologyRequestSharedPort',
+  /** Configuration event carries the transferred port before RPC construction begins. */
+  sharedPort: 'topologySharedPort',
   /** Peer name of the SharedWorker hub as each tab sees it. */
   hub: 'hub',
   /** Top-window provider that closes its worker namespace while a forwarded call is in flight. */
