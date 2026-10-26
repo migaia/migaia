@@ -1,6 +1,6 @@
 /** Genuine Auth capacity retains a stream through its actual iterator and physical terminal work. */
 import { createRpcHost } from '@migaia/rpc-host'
-import auth from '@migaia/rpc-host/features/auth'
+import auth from '@migaia/rpc-host/plugins/auth'
 import { defineFlowFeature, RpcFlowPoint, type IRpcFlowStage } from '@migaia/rpc-host/sdk'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcProviderRejectionReason } from '@migaia/rpc-contract/errors'

@@ -2,9 +2,9 @@
 import assert from 'node:assert/strict'
 import { PassThrough } from 'node:stream'
 import { createRpcHost } from '@migaia/rpc-host'
-import { batch } from '@migaia/rpc-host/features/batch'
-import { idempotency, type IRpcOutcomeLookup } from '@migaia/rpc-host/features/idempotency'
-import limits from '@migaia/rpc-host/features/limits'
+import { batch } from '@migaia/rpc-host/plugins/batch'
+import { idempotency, type IRpcOutcomeLookup } from '@migaia/rpc-host/plugins/idempotency'
+import limits from '@migaia/rpc-host/plugins/limits'
 import { timeout } from '@migaia/rpc-host/features/timeout'
 import {
   createRpcByteCarrier,

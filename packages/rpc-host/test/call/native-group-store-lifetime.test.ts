@@ -7,8 +7,8 @@ import {
   idempotency,
   type IRpcIdempotencyStore,
   type IRpcOutcomeLookup
-} from '@migaia/rpc-host/features/idempotency'
-import { limits } from '@migaia/rpc-host/features/limits'
+} from '@migaia/rpc-host/plugins/idempotency'
+import { limits } from '@migaia/rpc-host/plugins/limits'
 import { deferred } from '@migaia/utils/promise'
 import { ProviderAdmissionRegistry } from '../../dist/features/limits/provider-admission.js'
 import { coreMemoryServer } from '../host/core-fixture.js'

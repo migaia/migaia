@@ -36,30 +36,6 @@
       "types": "./dist/features/timeout.d.ts",
       "default": "./dist/features/timeout.js"
     },
-    "./features/auth": {
-      "types": "./dist/features/auth/index.d.ts",
-      "default": "./dist/features/auth/index.js"
-    },
-    "./features/chunk": {
-      "types": "./dist/features/chunk/index.d.ts",
-      "default": "./dist/features/chunk/index.js"
-    },
-    "./features/batch": {
-      "types": "./dist/features/batch/index.d.ts",
-      "default": "./dist/features/batch/index.js"
-    },
-    "./features/idempotency": {
-      "types": "./dist/features/idempotency/index.d.ts",
-      "default": "./dist/features/idempotency/index.js"
-    },
-    "./features/limits": {
-      "types": "./dist/features/limits/index.d.ts",
-      "default": "./dist/features/limits/index.js"
-    },
-    "./features/schema": {
-      "types": "./dist/features/schema/index.d.ts",
-      "default": "./dist/features/schema/index.js"
-    },
     "./sdk": {
       "types": "./dist/sdk/index.d.ts",
       "default": "./dist/sdk/index.js"

@@ -1,7 +1,7 @@
 /** Original ingress rejection and late-verification business assertions use genuine native Sessions. */
 import { createRpcHost } from '@migaia/rpc-host'
-import auth from '@migaia/rpc-host/features/auth'
-import limits from '@migaia/rpc-host/features/limits'
+import auth from '@migaia/rpc-host/plugins/auth'
+import limits from '@migaia/rpc-host/plugins/limits'
 import {
   defineFlowFeature,
   RpcFlowLayer,

@@ -11,7 +11,7 @@ import {
 import type { IRpcNamespace } from '@migaia/rpc-host'
 import type { IRpcDispatchContext } from '@migaia/rpc-contract/interfaces'
 import { typegen } from '@migaia/rpc-host/plugins/typegen'
-import { limits } from '@migaia/rpc-host/features/limits'
+import { limits } from '@migaia/rpc-host/plugins/limits'
 import { deferred, type IDeferred } from '@migaia/utils/promise'
 import { describe, expect, it, vi, type MockInstance as IMockInstance } from 'vitest'
 import { readRpcDefinition } from '../../dist/sdk/metadata.js'

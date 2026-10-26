@@ -2,9 +2,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
-import { auth } from '@migaia/rpc-host/features/auth'
-import { chunk } from '@migaia/rpc-host/features/chunk'
-import { batch } from '@migaia/rpc-host/features/batch'
+import { auth } from '@migaia/rpc-host/plugins/auth'
+import { chunk } from '@migaia/rpc-host/plugins/chunk'
+import { batch } from '@migaia/rpc-host/plugins/batch'
 import {
   probe,
   defineProbe,

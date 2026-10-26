@@ -7,7 +7,7 @@ import {
   type IFeatureCore
 } from '@migaia/plugin-host'
 import { createRpcHost } from '@migaia/rpc-host'
-import { chunk } from '@migaia/rpc-host/features/chunk'
+import { chunk } from '@migaia/rpc-host/plugins/chunk'
 import { defineTransportPlugin, rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { RpcError, RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'

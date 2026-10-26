@@ -3,7 +3,7 @@ import { Session as InspectorSession } from 'node:inspector/promises'
 import type { Runtime } from 'node:inspector'
 import { expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { batch } from '@migaia/rpc-host/features/batch'
+import { batch } from '@migaia/rpc-host/plugins/batch'
 import {
   defineFlowFeature,
   defineTransportPlugin,

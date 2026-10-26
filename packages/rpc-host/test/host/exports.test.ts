@@ -95,7 +95,15 @@ const expectedSdk = [
   'rpcMemberResources',
   'rpcMemberUnavailable',
   'splitRpcPreparedMetadata',
-  'withRpcLaunchFacts'
+  'withRpcLaunchFacts',
+  'RpcFlowLayer',
+  'RpcFlowPoint',
+  'defineFlowFeature',
+  'defineRpcSourcePlugin',
+  'isRpcCarrierAdmissionFailure',
+  'markRpcCarrierAdmissionFailure',
+  'rpcFlowPlugin',
+  'rpcHostPipelines'
 ]
 
 /** Optional flow behavior is published only through its actual owning plugin entry. */

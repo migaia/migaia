@@ -599,25 +599,9 @@
         "isRpcRemoteError",
         "isRpcTimeoutError"
       ],
-      "./features": [
-        "auth",
-        "batch",
-        "chunk",
-        "createRpcIdempotencyStore",
-        "idempotency",
-        "limits",
-        "retry",
-        "schema",
-        "timeout"
-      ],
+      "./features": ["retry", "timeout"],
       "./features/retry": ["default", "retry"],
       "./features/timeout": ["default", "timeout"],
-      "./features/auth": ["auth", "default"],
-      "./features/chunk": ["chunk", "default"],
-      "./features/batch": ["batch", "default"],
-      "./features/idempotency": ["createRpcIdempotencyStore", "default", "idempotency"],
-      "./features/limits": ["default", "limits"],
-      "./features/schema": ["default", "schema"],
       "./sdk": [
         "HostObservationKind",
         "IpcReporterContext",

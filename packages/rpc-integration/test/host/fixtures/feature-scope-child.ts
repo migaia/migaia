@@ -1,6 +1,6 @@
 /** A25 children use the actual native source and the same canonical authentication Feature. */
 import { createRpcHost } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/features/auth'
+import { auth } from '@migaia/rpc-host/plugins/auth'
 import type { IRpcTransportPlugin } from '@migaia/rpc-host/sdk'
 import { RpcError } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'

@@ -14,7 +14,7 @@ import {
   RpcCarrierObservation,
   RpcJsonCarrierCodec
 } from '@migaia/rpc-host/sdk'
-import chunk from '@migaia/rpc-host/features/chunk'
+import chunk from '@migaia/rpc-host/plugins/chunk'
 import type { IRpcTransportContext, IRpcSessionHandle } from '@migaia/rpc-contract/interfaces'
 import { devtoolsPlugin } from '../../../rpc-plugin-devtools/src/index.js'
 import { assert, expect, it, vi } from 'vitest'

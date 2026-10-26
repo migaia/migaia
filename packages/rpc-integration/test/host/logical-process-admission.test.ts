@@ -5,8 +5,8 @@ import { deferred } from '@migaia/utils/promise'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { RpcTransportError } from '@migaia/rpc-contract/errors'
 import { createRpcHost } from '@migaia/rpc-host'
-import { batch } from '@migaia/rpc-host/features/batch'
-import { chunk } from '@migaia/rpc-host/features/chunk'
+import { batch } from '@migaia/rpc-host/plugins/batch'
+import { chunk } from '@migaia/rpc-host/plugins/chunk'
 import {
   defineFlowFeature,
   defineTransportPlugin,

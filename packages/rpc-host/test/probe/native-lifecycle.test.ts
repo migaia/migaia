@@ -1,6 +1,6 @@
 /** Original observer lifecycle predicates receive actual public Host and native Session owners. */
 import { createRpcHost } from '@migaia/rpc-host'
-import auth from '@migaia/rpc-host/features/auth'
+import auth from '@migaia/rpc-host/plugins/auth'
 import {
   probe,
   defineProbe,

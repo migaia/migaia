@@ -8,8 +8,8 @@ import {
   type IRpcIdempotencyClaim,
   type IRpcIdempotencyOutcome,
   type IRpcIdempotencyStore
-} from '@migaia/rpc-host/features/idempotency'
-import limits from '@migaia/rpc-host/features/limits'
+} from '@migaia/rpc-host/plugins/idempotency'
+import limits from '@migaia/rpc-host/plugins/limits'
 import { timeout } from '@migaia/rpc-host/features/timeout'
 import {
   RPC_ENDPOINT_ERROR_SOURCE,

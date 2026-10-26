@@ -1,6 +1,6 @@
 /** Public close cancels native verification without retaining a user callback or execution lease. */
 import { createRpcHost } from '@migaia/rpc-host'
-import auth, { type IRpcAuthenticationTransform } from '@migaia/rpc-host/features/auth'
+import auth, { type IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins/auth'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { deferred, type IAbortSignal } from '@migaia/utils/promise'
 import { expect, it, vi } from 'vitest'

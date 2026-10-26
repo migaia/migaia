@@ -1,9 +1,9 @@
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost, RpcLifecycleError } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/features/auth'
-import { chunk } from '@migaia/rpc-host/features/chunk'
-import { batch } from '@migaia/rpc-host/features/batch'
+import { auth } from '@migaia/rpc-host/plugins/auth'
+import { chunk } from '@migaia/rpc-host/plugins/chunk'
+import { batch } from '@migaia/rpc-host/plugins/batch'
 import {
   defineFlowFeature,
   RpcFlowLayer,

@@ -1,7 +1,7 @@
 import { assert, expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { auth } from '@migaia/rpc-host/plugins/auth'
-import { batch } from '@migaia/rpc-host/features/batch'
+import { batch } from '@migaia/rpc-host/plugins/batch'
 import {
   defineFlowFeature,
   RpcFlowPoint,

@@ -2,11 +2,11 @@
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/features/auth'
-import { schema } from '@migaia/rpc-host/features/schema'
-import { chunk } from '@migaia/rpc-host/features/chunk'
-import { batch } from '@migaia/rpc-host/features/batch'
-import { limits } from '@migaia/rpc-host/features/limits'
+import { auth } from '@migaia/rpc-host/plugins/auth'
+import { schema } from '@migaia/rpc-host/plugins/schema'
+import { chunk } from '@migaia/rpc-host/plugins/chunk'
+import { batch } from '@migaia/rpc-host/plugins/batch'
+import { limits } from '@migaia/rpc-host/plugins/limits'
 import { probe } from '@migaia/rpc-host/plugins/probe'
 import {
   defineFlowFeature,

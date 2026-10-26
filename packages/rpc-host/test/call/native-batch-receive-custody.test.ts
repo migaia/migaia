@@ -1,7 +1,7 @@
 /** Real batch ingress preserves each replay refusal and its original physical write failure. */
 import { createRpcHost } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/features/auth'
-import { batch } from '@migaia/rpc-host/features/batch'
+import { auth } from '@migaia/rpc-host/plugins/auth'
+import { batch } from '@migaia/rpc-host/plugins/batch'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { IpcSendClass, type IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
