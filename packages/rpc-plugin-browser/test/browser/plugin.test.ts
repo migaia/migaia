@@ -226,10 +226,12 @@ it.each(['window', 'worker', 'shared', 'rtc'] as const)(
       features: { view: defineFeature(() => ({ increment: (value: number) => value + 1 })) },
       install: () => ({})
     })
-    /** Both raw openings participate concurrently, just as separate native realms do. */
+    /** Commit exposed application Features before either realm starts its transport. */
+    await host.use(app)
+    /** Both transport openings participate concurrently after application preparation completes. */
     const opening = createRpcHost({ plugins: [remotePlugin], provide: { value: () => 23 } })
     try {
-      await host.use(app, plugin)
+      await host.use(plugin)
       const remote = await opening
       expect(await (Reflect.get(host, 'browser') as IOrdinaryOutlet).request('value')).toBe(23)
       expect(await remote.browser.request('app.increment', 4)).toBe(5)
