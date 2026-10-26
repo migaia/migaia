@@ -38,20 +38,10 @@ export async function originalRpcInstallationFailure(
   /** Native completion is the sole source of late cleanup failures; no report collector is added. */
   const detail = error.detail as IPluginInstallFailureDetail | undefined
   if (!detail || !Object.hasOwn(error, 'cause')) return { error }
-  /** An ordinary cancellation without cleanup failure retains its exact original reason. */
+  /** Join native rollback before attaching its ordered leaves to the original primary. */
   const settled = detail.completion ? await detail.completion : detail
   /** The receipt boxes arbitrary failure values so async return cannot assimilate a thrown thenable. */
-  const failure = settled.rollbackErrors.length
-    ? createRpcConstructionError(
-        RpcCoreErrorText.endpointDisposed,
-        error.cause,
-        settled.rollbackErrors.map((failure) => ({
-          resource: RpcCoreErrorText.endpointDisposed,
-          error: failure
-        }))
-      )
-    : error.cause
-  return { error: failure }
+  return { error: attachSecondaryErrors(error.cause, settled.rollbackErrors) }
 }
 
 /** Failed startup exposes the existing close receipt without substituting rollback for its cause. */
