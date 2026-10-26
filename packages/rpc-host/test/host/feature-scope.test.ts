@@ -26,6 +26,55 @@ const permutations = [
   [2, 0, 4, 1, 3]
 ] as const
 
+it('owns one host feature setup and one setup for each transport-local placement', async () => {
+  /** These counters observe actual native Feature setup and cleanup, without owning their lifetime. */
+  const hostSetup = vi.fn()
+  /** Host-level cleanup belongs to its one real shared Feature installation. */
+  const hostDispose = vi.fn()
+  /** Reusing one definition at two local placements still creates two native installations. */
+  const localSetup = vi.fn()
+  /** The same callback is invoked once by each actual local placement owner. */
+  const localDispose = vi.fn()
+  /** One shared definition supplies all namespace groups through its original native wrapper. */
+  const shared = defineFlowFeature({
+    name: 'host-feature-lifetime',
+    setup: () => {
+      hostSetup()
+      return { dispose: hostDispose }
+    }
+  })
+  /** Both real transport definitions install this original opaque Feature independently. */
+  const local = defineFlowFeature({
+    name: 'local-feature-lifetime',
+    setup: () => {
+      localSetup()
+      return { dispose: localDispose }
+    }
+  })
+  /** Actual public construction receives two fixed namespaces before acquiring either source. */
+  const first = coreMemoryServer('feature-lifetime', undefined, 'first', [local])
+  /** The second placement has the same definition identity and its own native setup receipt. */
+  const second = coreMemoryServer('feature-lifetime', undefined, 'second', [local])
+  /** Native Host ownership, rather than a fixture disposer table, controls every callback. */
+  const host = await createRpcHost({
+    ...first.options,
+    plugins: [shared, first.transport, second.transport]
+  })
+  try {
+    expect(hostSetup).toHaveBeenCalledTimes(1)
+    expect(localSetup).toHaveBeenCalledTimes(2)
+    await host.first.close()
+    await host.second.close()
+    expect(hostDispose).not.toHaveBeenCalled()
+    expect(localDispose).not.toHaveBeenCalled()
+    await host.close()
+    expect(hostDispose).toHaveBeenCalledTimes(1)
+    expect(localDispose).toHaveBeenCalledTimes(2)
+  } finally {
+    await host.close()
+  }
+})
+
 /** Actual wire normalization preserves physical geometry and every completed encoded body. */
 class FeatureWireRecords {
   /** Only real fragments from the current finite request sequence enter this assembly record. */
