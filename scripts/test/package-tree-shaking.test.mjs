@@ -344,16 +344,21 @@ for (const style of ['named', 'default']) {
 
 /** Each remaining Host optional owner is selected through both declared publication forms. */
 const rpcOptionalSelections = [
-  { factory: 'auth', folder: 'auth', kind: 'plugins' },
-  { factory: 'batch', folder: 'batch', kind: 'plugins' },
-  { factory: 'idempotency', folder: 'idempotency', kind: 'plugins' },
-  { factory: 'limits', folder: 'limits', kind: 'plugins' },
-  { factory: 'schema', folder: 'schema', kind: 'plugins' },
+  { factory: 'auth', folder: 'auth', kind: 'plugins', implementation: 'features' },
+  { factory: 'batch', folder: 'batch', kind: 'plugins', implementation: 'features' },
+  { factory: 'idempotency', folder: 'idempotency', kind: 'plugins', implementation: 'features' },
+  { factory: 'limits', folder: 'limits', kind: 'plugins', implementation: 'features' },
+  { factory: 'schema', folder: 'schema', kind: 'plugins', implementation: 'features' },
   { factory: 'probe', folder: 'probe', kind: 'plugins' },
   { factory: 'typegen', folder: 'typegen', kind: 'plugins' },
   { factory: 'linkPolicy', folder: 'link-policy', kind: 'plugins' },
   { factory: 'retry', folder: 'retry', kind: 'features' }
 ]
+/** Probe observes shared wire identifiers without retaining batch/chunk execution owners. */
+const probeProtocolMetadata = new Set([
+  'dist/features/batch/constants.js',
+  'dist/features/chunk/constants.js'
+])
 for (const selection of rpcOptionalSelections) {
   for (const style of ['named', 'default']) {
     test(`RPC ${selection.factory} retains only its optional owner through ${style} import`, async () => {
@@ -385,7 +390,9 @@ for (const selection of rpcOptionalSelections) {
         /** The precise selected implementation and its local text share one owning path. */
         const allowed =
           selection.kind === 'plugins'
-            ? new RegExp('^dist/plugins/' + selection.folder + '/')
+            ? new RegExp(
+                '^dist/' + (selection.implementation ?? 'plugins') + '/' + selection.folder + '/'
+              )
             : /^dist\/features\/retry(?:-text)?\.js$/
         /** Existing mandatory Host/SDK modules may be shared; optional owners must remain isolated. */
         const retained = packageModules({ ...result, modules: result.retainedModules }, 'rpc-host')
@@ -395,7 +402,10 @@ for (const selection of rpcOptionalSelections) {
         )
         assert.deepEqual(
           retained.filter(
-            (name) => /^(?:dist\/plugins\/|dist\/features\/)/.test(name) && !allowed.test(name)
+            (name) =>
+              /^(?:dist\/plugins\/|dist\/features\/)/.test(name) &&
+              !allowed.test(name) &&
+              !(selection.factory === 'probe' && probeProtocolMetadata.has(name))
           ),
           []
         )
