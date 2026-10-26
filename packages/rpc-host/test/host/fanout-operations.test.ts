@@ -6,6 +6,27 @@ import { coreMemoryServer } from './core-fixture.js'
 import { idempotency } from '@migaia/rpc-host/plugins/idempotency'
 import { key, fanout, items, containsCause, nativeHosts } from './fanout-fixture.js'
 
+it('reports a missing directed dispatch synchronously once on the genuine public namespace', async () => {
+  /** Only the actual configured public reporter contributes the original diagnostic. */
+  const reports: unknown[] = []
+  /** A cold real listener publishes the namespace without manufacturing a target connection. */
+  const server = coreMemoryServer('missing-dispatch-server')
+  /** Native installation still owns the actual namespace and its directed target selection. */
+  const host = await createRpcHost({
+    ...server.options,
+    report: (error) => reports.push(error)
+  })
+  try {
+    expect(host.memory.dispatch('not-direct', 'value')).toBeUndefined()
+    expect(reports).toEqual([expect.objectContaining({ code: 'TARGET_UNKNOWN' })])
+    /** A later turn must not report the same synchronous selection failure a second time. */
+    await nextTurn()
+    expect(reports).toHaveLength(1)
+  } finally {
+    await host.close()
+  }
+})
+
 describe('host direct-target broadcast operations', () => {
   it('executes all five operations for zero, one and two sessions on one actual server endpoint', async () => {
     /** The server's one listener accepts additional channels without replacing its endpoint. */

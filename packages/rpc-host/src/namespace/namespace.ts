@@ -437,9 +437,16 @@ export class Namespace {
     payload?: IRpcPortableValue,
     options: IRpcCallOptions = {}
   ): void => {
-    void this.#directInvoke(address, { mode: 'notify', method, payload }, options).catch(
-      this.#options.report
-    )
+    assertTrace(options)
+    try {
+      void this.#invoke(
+        this.#direct(address, options),
+        { mode: 'notify', method, payload },
+        options
+      ).catch(this.#options.report)
+    } catch (error) {
+      this.#options.report(error)
+    }
   }
 
   /** Context notifications retain explicit selection or skip the original caller in index order. */
