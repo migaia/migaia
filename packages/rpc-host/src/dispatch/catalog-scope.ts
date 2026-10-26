@@ -59,8 +59,11 @@ export class ProviderCatalog {
 
   /** Closing releases original reservations before removing their one live catalog. */
   close(): void {
-    for (const registration of this.reservations.values()) registration.dispose()
+    /** Each pending receipt may own several keys; retire it once after withdrawing the full table. */
+    const pending = new Set(this.reservations.values())
+    this.reservations.clear()
     this.methods.clear()
+    for (const registration of pending) registration.dispose()
     this.#refresh()
   }
 }

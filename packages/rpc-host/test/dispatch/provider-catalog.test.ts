@@ -1,5 +1,5 @@
 /** Provider admission uses the public Host; exact table cleanup remains with its canonical catalog. */
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { ProviderCatalog } from '../../dist/dispatch/catalog-scope.js'
 import { compileProviderMethods } from '../../dist/dispatch/catalog.js'
@@ -29,17 +29,23 @@ it('clears the sole provider index and its pending reservations on repeated clos
   /** The canonical compiler supplies exact entries rather than a parallel test registry. */
   const methods = compileProviderMethods({ method: () => ({ ok: true as const }) })
   /** Directory projection is irrelevant to cleanup but uses its actual finite method contract. */
-  const catalog = new ProviderCatalog(
-    (entry) => ({ name: entry.name, supportedModes: ['request'], modeSource: 'generated-routes' }),
-    () => undefined
+  const describe = vi.fn(
+    (entry: Parameters<ConstructorParameters<typeof ProviderCatalog>[0]>[0]) => ({
+      name: entry.name,
+      supportedModes: ['request'] as const,
+      modeSource: 'generated-routes' as const
+    })
   )
+  const catalog = new ProviderCatalog(describe, () => undefined)
   /** One committed receipt owns the live method; another owns an independent pending reservation. */
   const active = catalog.prepare(methods)
   active.commit()
   catalog.prepare(compileProviderMethods({ pending: () => undefined }))
   expect(catalog.lookup('method')?.method).toBe(methods.get('method')?.method)
+  describe.mockClear()
   catalog.close()
   catalog.close()
+  expect(describe).not.toHaveBeenCalled()
   expect(catalog.lookup('method')).toBeUndefined()
   expect(catalog.lookup('pending')).toBeUndefined()
   expect(catalog.methods.size).toBe(0)
