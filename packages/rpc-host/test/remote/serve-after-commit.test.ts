@@ -1,11 +1,12 @@
 /** Native installation commit, rollback and cancellation retain the original business oracles. */
 import {
   defineFeature,
+  defineHost,
   definePlugin,
-  PluginHost,
   PluginHostError,
   PluginHostErrorCode
 } from '@migaia/plugin-host'
+import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { deferred } from '@migaia/utils/promise'
 import { describe, expect, it, vi } from 'vitest'
 import { createRpcAbortError } from '../../dist/host/error-owner.js'
@@ -44,9 +45,16 @@ function observe<T>(operation: Promise<T>) {
 /** Own one genuine uncommitted native batch and its existing physical caller fixture. */
 class ServeCommitBarrier {
   /** Feature and SDK transport registrations share the original native commit decision. */
-  readonly #host = new PluginHost<Record<string, never>>({
-    identity: { name: 'provider' },
-    execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+  readonly #host = defineHost({
+    ...rpcHostPipelines(
+      () => this.#host,
+      (name) => this.#host.pipeline(name),
+      ['memory', 'back']
+    ),
+    host: {
+      identity: { name: 'provider' },
+      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
+    }
   })
   /** The canonical memory listener lends actual SDK attach and bilateral Session negotiation. */
   readonly #server = coreMemoryServer('provider', 'provider-1', 'memory', [], ['business'])

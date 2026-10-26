@@ -91,7 +91,7 @@ export const callOptions = { timeout: timeout({ ms: 100 }), retry: false } as co
 
 ## 在已有宿主中安装 RPC
 
-已有 `defineHost` 宿主使用 `rpcHostPipelines(getHost, pipeline)`，同时获得管道声明和 `domainCore`。helper 构造时不调用回调、不创建宿主或资源；安装时，`domainCore` 才读取真实宿主并借用其管道执行权。不要复制七条声明，也不要把另一个宿主的执行权交进来。
+已有 `defineHost` 宿主使用 `rpcHostPipelines(getHost, pipeline, namespaces)`，同时获得管道声明和 `domainCore`。`namespaces` 列出这个宿主将安装的全部传输命名空间（示例为 `thread`）；安装未列出的命名空间时，传输启动会失败。helper 构造时不调用回调、不创建宿主或资源；安装时，`domainCore` 才读取真实宿主并借用其管道执行权。不要复制七条声明，也不要把另一个宿主的执行权交进来。
 
 ```ts doc-test=check
 import { defineHost } from '@migaia/plugin-host'
@@ -104,7 +104,8 @@ import {
 /** Capture lazy authority callbacks before the real host is assigned. */
 const rpc = rpcHostPipelines(
   () => host,
-  (name) => host.pipeline(name)
+  (name) => host.pipeline(name),
+  ['thread']
 )
 /** One native owner supplies both stage registration and execution. */
 export const host = defineHost({
@@ -147,7 +148,8 @@ export class NativeRpcHost extends PluginHost<
     /** The same setup supplies declarations now and authority only after construction. */
     const rpc = rpcHostPipelines(
       () => this,
-      (name) => this.pipeline(name)
+      (name) => this.pipeline(name),
+      ['thread']
     )
     super({
       pipelines: rpc.pipelines,

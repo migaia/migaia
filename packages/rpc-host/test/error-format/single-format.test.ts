@@ -77,10 +77,17 @@ describe('one production wire error format', () => {
           if (!node.id || !/^(de)?serialize\w*Error$/.test(node.id.name)) return
           const name = node.id.name
           if (inspection.path === 'host/error-wire-metadata.ts') {
-            expect(node.body?.body).toHaveLength(1)
+            /** Restoration may add route bookkeeping after storing the canonical result first. */
+            const routed = name === 'deserializeHostWireError'
+            if (!routed) expect(node.body?.body).toHaveLength(1)
             const statement = node.body!.body[0]!
-            expect(statement.type).toBe('ReturnStatement')
-            const returned = statement.type === 'ReturnStatement' ? statement.argument : null
+            expect(statement.type).toBe(routed ? 'VariableDeclaration' : 'ReturnStatement')
+            const returned =
+              statement.type === 'ReturnStatement'
+                ? statement.argument
+                : statement.type === 'VariableDeclaration'
+                  ? statement.declarations[0]?.init
+                  : null
             expect(returned?.type).toBe('CallExpression')
             if (returned?.type !== 'CallExpression') return
             /** Only these exact private metadata borrowers may delegate to canonical projections. */

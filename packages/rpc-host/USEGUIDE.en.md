@@ -91,7 +91,7 @@ A call whose remaining deadline has expired before provider entry rejects with `
 
 ## Install RPC in an existing host
 
-An existing `defineHost` owner uses `rpcHostPipelines(getHost, pipeline)` to obtain both pipeline declarations and `domainCore`. Creating the helper calls neither callback and creates no host or resource. At installation, `domainCore` reads the real owner and borrows its pipeline execution authority. Do not copy seven declarations or supply another host's execution authority.
+An existing `defineHost` owner uses `rpcHostPipelines(getHost, pipeline, namespaces)` to obtain both pipeline declarations and `domainCore`. `namespaces` lists every transport namespace the host will install (`thread` in the example); installing an unlisted namespace fails at transport start. Creating the helper calls neither callback and creates no host or resource. At installation, `domainCore` reads the real owner and borrows its pipeline execution authority. Do not copy seven declarations or supply another host's execution authority.
 
 ```ts doc-test=check
 import { defineHost } from '@migaia/plugin-host'
@@ -104,7 +104,8 @@ import {
 /** Capture lazy authority callbacks before the real host is assigned. */
 const rpc = rpcHostPipelines(
   () => host,
-  (name) => host.pipeline(name)
+  (name) => host.pipeline(name),
+  ['thread']
 )
 /** One native owner supplies both stage registration and execution. */
 export const host = defineHost({
@@ -147,7 +148,8 @@ export class NativeRpcHost extends PluginHost<
     /** The same setup supplies declarations now and authority only after construction. */
     const rpc = rpcHostPipelines(
       () => this,
-      (name) => this.pipeline(name)
+      (name) => this.pipeline(name),
+      ['thread']
     )
     super({
       pipelines: rpc.pipelines,

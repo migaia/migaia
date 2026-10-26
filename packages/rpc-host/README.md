@@ -53,7 +53,7 @@ try {
 
 `createRpcHost` 在同一个原生 plugin-host 上先提交信息流 plugin、链路策略 plugin 及其 feature，再安装传输 plugin 及其 feature。传输开始握手时，auth 等 stage 已经可用；后续安装失败由同一生命周期 owner 回滚并释放已取得的资源。
 
-已有 `defineHost` 或 class 宿主通过 `@migaia/rpc-host/sdk` 的 `rpcHostPipelines(getHost, pipeline)` 一次取得管道声明和 `domainCore`。回调延后到安装时才读取真实宿主，并借用它自己的管道执行权。先提交信息流与链路策略，再安装传输；无需手写七条管道。具体接法见[使用指南](./USEGUIDE.md#在已有宿主中安装-rpc)。
+已有 `defineHost` 或 class 宿主通过 `@migaia/rpc-host/sdk` 的 `rpcHostPipelines(getHost, pipeline, namespaces)` 一次取得管道声明和 `domainCore`。回调延后到安装时才读取真实宿主，并借用它自己的管道执行权。先提交信息流与链路策略，再安装传输；无需手写七条管道。具体接法见[使用指南](./USEGUIDE.md#在已有宿主中安装-rpc)。
 
 ## 调用与归属
 

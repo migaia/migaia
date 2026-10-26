@@ -1,5 +1,6 @@
 /** Original native Feature dependency order is owned by the single actual PluginHost transaction. */
 import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'
+import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { describe, expect, it } from 'vitest'
 import { coreMemoryServer } from './core-fixture.js'
 
@@ -22,7 +23,14 @@ describe('native capability topology', () => {
       { provider }
     )
     /** One native owner installs the actual SDK transport together with this Feature root. */
+    /** Lazy pipeline authority reads this case's own native host only at installation. */
+    const rpc = rpcHostPipelines(
+      () => native,
+      (name) => native.pipeline(name),
+      ['memory']
+    )
     const native = defineHost({
+      ...rpc,
       host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
     })
     /** The real listener contributes its namespace in that same native transaction. */

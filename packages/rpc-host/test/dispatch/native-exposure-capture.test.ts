@@ -1,5 +1,6 @@
 /** Native Feature output reflection is captured once without changing the first selector failure. */
 import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'
+import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { expect, it } from 'vitest'
 import { coreMemoryServer } from '../host/core-fixture.js'
 
@@ -17,7 +18,14 @@ it('captures one native output descriptor inventory for repeated exposure select
     }
   )
   /** The actual NativeHost owns both the Feature and its later RPC transport registration. */
+  /** Lazy pipeline authority reads this case's own native host only at installation. */
+  const rpc = rpcHostPipelines(
+    () => host,
+    (name) => host.pipeline(name),
+    ['memory']
+  )
   const host = defineHost({
+    ...rpc,
     host: {
       identity: { name: 'native-capture' },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
@@ -78,7 +86,14 @@ it('keeps the first selector invalid descriptor ahead of later native output ref
     }
   )
   /** Failure and final cleanup belong to this same genuine NativeHost. */
+  /** Lazy pipeline authority reads this case's own native host only at installation. */
+  const rpc = rpcHostPipelines(
+    () => host,
+    (name) => host.pipeline(name),
+    ['memory']
+  )
   const host = defineHost({
+    ...rpc,
     host: {
       identity: { name: 'native-selector-order' },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }

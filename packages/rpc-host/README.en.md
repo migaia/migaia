@@ -53,7 +53,7 @@ Coroutines do not provide Worker isolation. Choose the [process](../rpc-plugin-p
 
 `createRpcHost` first commits flow plugins, link-policy plugins and their features, then installs transport plugins and their features on the same native plugin-host. Stages such as auth are available before transport handshake begins. The same lifecycle owner rolls back and releases acquired resources if a later installation fails.
 
-An existing `defineHost` or class owner uses `rpcHostPipelines(getHost, pipeline)` from `@migaia/rpc-host/sdk` to obtain both pipeline declarations and `domainCore`. Its callbacks read the real host only at installation and borrow that host's own execution authority. Commit flow and link-policy plugins before installing transports; do not copy seven declarations. See the [usage guide](./USEGUIDE.en.md#install-rpc-in-an-existing-host).
+An existing `defineHost` or class owner uses `rpcHostPipelines(getHost, pipeline, namespaces)` from `@migaia/rpc-host/sdk` to obtain both pipeline declarations and `domainCore`. Its callbacks read the real host only at installation and borrow that host's own execution authority. Commit flow and link-policy plugins before installing transports; do not copy seven declarations. See the [usage guide](./USEGUIDE.en.md#install-rpc-in-an-existing-host).
 
 ## Calls and ownership
 

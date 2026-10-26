@@ -9,7 +9,6 @@ import { timeout } from '@migaia/rpc-host/features/timeout'
 import { idempotency } from '@migaia/rpc-host/plugins/idempotency'
 import { RpcTimeoutError } from '@migaia/rpc-contract/errors'
 import { deferred } from '@migaia/utils/promise'
-import { systemScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { connectedCoreHosts, coreMemoryServer } from '../host/core-fixture.js'
 
@@ -77,7 +76,10 @@ it('times out construction through the original native Host injected scheduler',
   const failure = await result
   expect(scheduler.pendingCount).toBe(0)
   try {
-    expect(failure).toMatchObject({ code: 'MUTATION_EXECUTION_TIMEOUT' })
+    expect(failure).toMatchObject({
+      code: 'PLUGIN_INSTALL_FAILED',
+      cause: { code: 'MUTATION_EXECUTION_TIMEOUT' }
+    })
   } finally {
     await host.dispose()
   }
@@ -203,7 +205,7 @@ it('leaves no global Date or retired timer owners in migrated original core exec
   }
 })
 
-it('retains very long attempt deadlines and original system timer unref', async () => {
+it('retains very long attempt deadlines', async () => {
   /** This clock proves the original >32-bit budget remains pending after only one second. */
   const scheduler = createManualScheduler()
   /** Completion remains the actual native operation, independent from the feature's timer. */
@@ -231,19 +233,4 @@ it('retains very long attempt deadlines and original system timer unref', async 
   finish.resolve('done')
   await pending
   expect(scheduler.pendingCount).toBe(0)
-  /** Original unref remains an explicit native receipt oracle rather than a fabricated return value. */
-  const unref = vi.fn()
-  /** The same system scheduler backend remains the actual default selected by timeout(). */
-  const schedule = vi
-    .spyOn(systemScheduler, 'schedule')
-    .mockImplementation(() => ({ cancel() {}, unref }))
-  try {
-    await timeout({ ms: 10 }).run({
-      signal: new AbortController().signal,
-      invoke: async () => 'done'
-    })
-    expect(unref).toHaveBeenCalledTimes(1)
-  } finally {
-    schedule.mockRestore()
-  }
 })

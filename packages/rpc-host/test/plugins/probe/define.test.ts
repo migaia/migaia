@@ -293,7 +293,7 @@ describe('probe contract', () => {
   )
 
   it('keeps small integer domains aligned with their ordered public name tables', () => {
-    expect(Object.values(RpcProbeStage)).toEqual([0, 1, 2, 3, 4, 5, 6])
+    expect(Object.values(RpcProbeStage)).toEqual([0, 1, 2, 3, 4, 5, 6, 7])
     expect(Object.keys(RpcProbeStage)).toEqual(RpcProbeStageName)
     expect(Object.values(RpcProbeDirection)).toEqual([0, 1, 2])
     expect(Object.keys(RpcProbeDirection)).toEqual(RpcProbeDirectionName)
