@@ -50,7 +50,7 @@ function captureSelf(value: IRpcSelf): IRpcSelf {
 
 /** A trusted native parent selects the child's global identity before its first source starts. */
 export class HostIdentity {
-  /** Explicit child display names warn when an actual parent supplies a different name. */
+  /** Explicit child identity values warn when trusted native parent facts replace them. */
   readonly #configured: boolean
   /** The original flow registry owns warning subscriptions, fallback and handler failures. */
   readonly #dispatchWarning: (warning: IRpcWarning) => void
@@ -93,23 +93,39 @@ export class HostIdentity {
   admit(facts: IRpcLocalSourceFacts): void {
     if (facts.self !== undefined) {
       /** Capture before mutation so a mismatching source cannot partially replace global identity. */
-      const incoming = captureSelf({ ...facts.self, name: facts.self.name ?? this.#self.name })
+      const incoming = captureSelf({
+        ...facts.self,
+        name: facts.self.name ?? (this.#configured ? this.#self.name : facts.self.instanceId)
+      })
       if (
         this.#started &&
         (incoming.name !== this.#self.name || incoming.instanceId !== this.#self.instanceId)
       )
         throw createRpcError(RpcCoreErrorCode.invalidConfig, RuntimeApiErrorText.identityInvalid)
       if (!this.#started) {
-        /** Capture the ignored configured name before replacing the one globally published self. */
-        const ignoredName = this.#self.name
+        /** Capture only explicit child values that this parent actually replaces. */
+        const nameIgnored =
+          this.#configured && facts.self.name !== undefined && incoming.name !== this.#self.name
+        /** An instance-only override must remain visible even when both display names agree. */
+        const instanceIgnored = this.#configured && incoming.instanceId !== this.#self.instanceId
+        /** Absent fields mean that identity component was retained, rather than ignored. */
+        const data = Object.freeze({
+          ...(nameIgnored ? { parentName: incoming.name, ignoredName: this.#self.name } : {}),
+          ...(instanceIgnored
+            ? {
+                parentInstanceId: incoming.instanceId,
+                ignoredInstanceId: this.#self.instanceId
+              }
+            : {})
+        })
         this.#self = incoming
         this.#generation = Object.freeze({ ...this.#generation, providerId: incoming.instanceId })
-        if (this.#configured && facts.self.name !== undefined && incoming.name !== ignoredName)
+        if (nameIgnored || instanceIgnored)
           this.#dispatchWarning(
             Object.freeze({
               code: RpcWarningCode.selfIgnored,
-              message: HostWarningText.selfIgnored(incoming.name, ignoredName),
-              data: Object.freeze({ parentName: incoming.name, ignoredName })
+              message: HostWarningText.selfIgnored(data),
+              data
             })
           )
       }

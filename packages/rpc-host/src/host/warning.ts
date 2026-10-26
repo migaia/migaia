@@ -1,18 +1,20 @@
 /** Public warning codes describe successful construction decisions and are never error codes. */
 export const RpcWarningCode = {
-  /** The actual native parent supplied the name, overriding an explicit child self.name. */
+  /** The native parent overrode an explicitly configured child name or instance address. */
   selfIgnored: 'SELF_IGNORED'
 } as const
 
 export type RpcWarningCode = (typeof RpcWarningCode)[keyof typeof RpcWarningCode]
 
-/** One native identity decision carries both names without exposing launch credentials. */
+/** Native identity warnings include only the values actually ignored, never launch credentials. */
 export type IRpcWarning = Readonly<{
   code: RpcWarningCode
   message: string
   data: Readonly<{
-    parentName: string
-    ignoredName: string
+    parentName?: string
+    ignoredName?: string
+    parentInstanceId?: string
+    ignoredInstanceId?: string
   }>
 }>
 

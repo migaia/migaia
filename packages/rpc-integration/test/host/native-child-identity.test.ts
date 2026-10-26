@@ -57,7 +57,12 @@ it.each(['process', 'thread', 'coroutine'] as const)(
         {
           code: RpcWarningCode.selfIgnored,
           message: expect.stringContaining('self.name will be ignored'),
-          data: { parentName: 'math', ignoredName: 'math-child' }
+          data: {
+            parentName: 'math',
+            ignoredName: 'math-child',
+            parentInstanceId: snapshot.self.instanceId,
+            ignoredInstanceId: 'configured-child-instance'
+          }
         }
       ])
       expect(snapshot.reports).toBe(0)
@@ -81,7 +86,16 @@ it.each(['process', 'thread', 'coroutine'] as const)(
       const snapshot = (await namespace.send('math-child', 'inspect', null)) as IIdentitySnapshot
       expect(snapshot.self.name).toBe('math-child')
       expect(snapshot.self.instanceId).not.toBe('configured-child-instance')
-      expect(snapshot.warnings).toEqual([])
+      expect(snapshot.warnings).toEqual([
+        {
+          code: RpcWarningCode.selfIgnored,
+          message: expect.stringContaining('self.instanceId will be ignored'),
+          data: {
+            parentInstanceId: snapshot.self.instanceId,
+            ignoredInstanceId: 'configured-child-instance'
+          }
+        }
+      ])
       expect(snapshot.reports).toBe(0)
     } finally {
       await host.close()
@@ -109,7 +123,12 @@ it('A26: omitted onWarning uses console.warn for the successful native name over
       expect(warning).toHaveBeenCalledExactlyOnceWith(
         expect.objectContaining({
           code: RpcWarningCode.selfIgnored,
-          data: { parentName: 'math', ignoredName: 'math-child' }
+          data: expect.objectContaining({
+            parentName: 'math',
+            ignoredName: 'math-child',
+            parentInstanceId: expect.any(String),
+            ignoredInstanceId: 'configured-child-instance'
+          })
         })
       )
     } finally {

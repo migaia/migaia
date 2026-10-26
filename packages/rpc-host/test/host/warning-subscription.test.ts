@@ -25,9 +25,12 @@ class WarningPair {
   #parent: IRpcHost | undefined
   /** Public child construction owns all warning subscriptions and the accepted identity. */
   #child: IRpcHost | undefined
+  /** An unnamed parent supplies only the instance assignment, leaving default naming to Host. */
+  readonly #parentNamed: boolean
 
   /** Link the maintained real carrier fixture before either endpoint subscribes. */
-  constructor() {
+  constructor(parentNamed = true) {
+    this.#parentNamed = parentNamed
     this.#parentCarrier.link(this.#childCarrier)
     this.#childCarrier.link(this.#parentCarrier)
   }
@@ -35,7 +38,8 @@ class WarningPair {
   /** Complete original native setup before exercising the public child namespace. */
   async open(
     options: Pick<IRpcHostOptions, 'onWarning' | 'report'> &
-      Partial<Pick<IRpcHostOptions, 'plugins'>>
+      Partial<Pick<IRpcHostOptions, 'plugins' | 'self'>>,
+    configuredSelf = true
   ): Promise<void> {
     this.#parent = await createRpcHost({
       ...this.#server.options,
@@ -43,7 +47,9 @@ class WarningPair {
     })
     this.#child = await createRpcHost({
       ...options,
-      self: { name: 'math-child', instanceId: 'configured-child' },
+      ...(configuredSelf
+        ? { self: options.self ?? { name: 'math-child', instanceId: 'configured-child' } }
+        : {}),
       plugins: [
         ...(options.plugins ?? []),
         defineTransportPlugin({
@@ -60,6 +66,11 @@ class WarningPair {
     return this.#child!.memory.send('warning-parent', 'echo', value)
   }
 
+  /** The public child identity is inspected after the actual native handshake completes. */
+  get self() {
+    return this.#child!.self
+  }
+
   /** Preserve both public roots' original close owners on success and assertion failure. */
   async close(): Promise<void> {
     await Promise.all([this.#child?.close(), this.#parent?.close()])
@@ -71,7 +82,7 @@ class WarningPair {
     const parent = this.#server.accept(this.#parentCarrier)
     /** Parent-supplied identity overrides the child's explicit name before its actual handshake. */
     const child = context.attach(this.#childCarrier, {
-      self: { name: 'math', instanceId: 'assigned-child' }
+      self: { ...(this.#parentNamed ? { name: 'math' } : {}), instanceId: 'assigned-child' }
     })
     await Promise.all([parent.ready, child.ready])
     return { dispose: () => undefined }
@@ -92,7 +103,12 @@ it('A28 delivers one original warning to the option then host SDK plugins in reg
       onWarning(warning) {
         expectTypeOf(warning).toEqualTypeOf<IRpcWarning>()
         expectTypeOf(warning.data).toEqualTypeOf<
-          Readonly<{ parentName: string; ignoredName: string }>
+          Readonly<{
+            parentName?: string
+            ignoredName?: string
+            parentInstanceId?: string
+            ignoredInstanceId?: string
+          }>
         >()
         deliveries.push({ recipient: 'option', warning })
       },
@@ -119,7 +135,12 @@ it('A28 delivers one original warning to the option then host SDK plugins in reg
     expect(warning).toEqual({
       code: RpcWarningCode.selfIgnored,
       message: expect.stringContaining('self.name will be ignored'),
-      data: { parentName: 'math', ignoredName: 'math-child' }
+      data: {
+        parentName: 'math',
+        ignoredName: 'math-child',
+        parentInstanceId: 'assigned-child',
+        ignoredInstanceId: 'configured-child'
+      }
     })
     expect(deliveries[1]!.warning).toBe(warning)
     expect(deliveries[2]!.warning).toBe(warning)
@@ -128,6 +149,48 @@ it('A28 delivers one original warning to the option then host SDK plugins in reg
   } finally {
     await pair.close()
     consoleWarning.mockRestore()
+  }
+})
+
+it('A26 warns only about an ignored instanceId when the configured name matches the parent', async () => {
+  /** The actual parent and child names agree; only their configured instance addresses differ. */
+  const warnings: IRpcWarning[] = []
+  /** Successful native reconciliation must not report an error. */
+  const reports: unknown[] = []
+  /** Reuse the genuine SDK attachment and public business path. */
+  const pair = new WarningPair()
+  try {
+    await pair.open({
+      self: { name: 'math', instanceId: 'configured-child' },
+      onWarning: (warning) => warnings.push(warning),
+      report: (error) => reports.push(error)
+    })
+    expect(await pair.send(42)).toBe(42)
+    expect(warnings).toEqual([
+      {
+        code: RpcWarningCode.selfIgnored,
+        message: expect.stringContaining('self.instanceId will be ignored'),
+        data: { parentInstanceId: 'assigned-child', ignoredInstanceId: 'configured-child' }
+      }
+    ])
+    expect(reports).toEqual([])
+  } finally {
+    await pair.close()
+  }
+})
+
+it('A26 keeps an unconfigured child name equal to its parent-assigned instanceId', async () => {
+  /** Defaults are replaced without warning because the child configured no competing identity. */
+  const warnings: IRpcWarning[] = []
+  /** This public parent deliberately omits the name from its genuine attachment facts. */
+  const pair = new WarningPair(false)
+  try {
+    await pair.open({ onWarning: (warning) => warnings.push(warning) }, false)
+    expect(pair.self).toEqual({ name: 'assigned-child', instanceId: 'assigned-child' })
+    expect(await pair.send(42)).toBe(42)
+    expect(warnings).toEqual([])
+  } finally {
+    await pair.close()
   }
 })
 
@@ -144,7 +207,12 @@ it('A28 uses console.warn exactly once when neither warning recipient is install
     expect(consoleWarning).toHaveBeenCalledExactlyOnceWith({
       code: RpcWarningCode.selfIgnored,
       message: expect.stringContaining('self.name will be ignored'),
-      data: { parentName: 'math', ignoredName: 'math-child' }
+      data: {
+        parentName: 'math',
+        ignoredName: 'math-child',
+        parentInstanceId: 'assigned-child',
+        ignoredInstanceId: 'configured-child'
+      }
     })
     expect(report).not.toHaveBeenCalled()
   } finally {
@@ -171,7 +239,12 @@ it('A28 lets a host SDK subscriber receive the warning without an onWarning opti
     expect(receive).toHaveBeenCalledExactlyOnceWith({
       code: RpcWarningCode.selfIgnored,
       message: expect.stringContaining('self.name will be ignored'),
-      data: { parentName: 'math', ignoredName: 'math-child' }
+      data: {
+        parentName: 'math',
+        ignoredName: 'math-child',
+        parentInstanceId: 'assigned-child',
+        ignoredInstanceId: 'configured-child'
+      }
     })
     expect(consoleWarning).not.toHaveBeenCalled()
     expect(report).not.toHaveBeenCalled()
@@ -312,7 +385,12 @@ it.each([false, true])(
       expect(warnings[1]).toBe(warnings[0])
       expect(warnings[0]).toMatchObject({
         code: RpcWarningCode.selfIgnored,
-        data: { parentName: 'math', ignoredName: 'math-child' }
+        data: {
+          parentName: 'math',
+          ignoredName: 'math-child',
+          parentInstanceId: 'assigned-child',
+          ignoredInstanceId: 'configured-child'
+        }
       })
       expect(reports).toEqual([recipientFailure])
       expect(map).not.toHaveBeenCalled()
