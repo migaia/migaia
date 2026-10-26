@@ -75,6 +75,8 @@ export type IRegistration<TDomainCore extends object, TValue> = {
   /** Observes actual callback settlement for this cleanup attempt without owning resources. */
   cleanupLedger?: import('@migaia/lifecycle').ISyncStartedDisposalLedger
   installed: boolean
+  /** Original domain admission remains immutable until normal revocation or attempt rollback. */
+  removalAdmission?: Readonly<{ allowed: () => boolean }>
   /** Prevents a published registration from running its release hook twice. */
   beforeReleaseRan?: boolean
   /** Orthogonal reachability state; disabling never changes lifecycle or releases resources. */

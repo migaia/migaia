@@ -66,6 +66,11 @@ export type IPluginRuntimeIntegration = Readonly<{
   readonly report?: (error: unknown) => void
   /** Query only the original managed-host authority; this confers no mutation permission. */
   matchesHost(host: object): boolean
+  /**
+   * Register one synchronous domain-owned removal predicate during this exact install. False
+   * rejects explicit removal/replacement before mutation; full disposal and rollback bypass it.
+   */
+  allowRemovalWhen(allowed: () => boolean): void
   /** Reuse original Host/registration admission for explicitly exposed reserved controls. */
   assertCurrent(): void
   /**

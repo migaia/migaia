@@ -4,7 +4,7 @@
  * each request is admitted for this exact registration and batch; slot ownership, registrations and
  * Feature activation stay with Host state and the existing plugin handles.
  */
-import ERROR_TEXT, { PluginHostError } from './error-text.js'
+import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
 import type { IPluginHostIdentity } from './host-identity.js'
@@ -165,6 +165,16 @@ export class PluginHostRuntimeIntegration<
   #assertSlotOwner = (): void => {
     this.#port.assertActive()
     this.#assertValid()
+  }
+
+  /** Capture one original domain predicate without creating another hook or ownership registry. */
+  readonly allowRemovalWhen = (allowed: () => boolean): void => {
+    this.#assertInstall()
+    if (typeof allowed !== 'function')
+      throw createPluginHostTypeError(ERROR_TEXT.REMOVAL_ADMISSION_FUNCTION)
+    if (this.#registration.removalAdmission !== undefined)
+      throw createPluginHostTypeError(ERROR_TEXT.REMOVAL_ADMISSION_ALREADY_SET)
+    this.#registration.removalAdmission = Object.freeze({ allowed })
   }
 
   /** Queries only the original managed-host authority. */

@@ -1159,6 +1159,13 @@ class PluginHostConstructor<
           { detail: { blockedBy: plan.blockedBy } }
         )
       if (admitted.dryRun) return toPluginPlan(plan, admitted.policy)
+      /** The complete removal is admitted atomically before cleanup can alter any registration. */
+      for (const step of plan.steps) {
+        if (step.action !== DependencyAction.release) continue
+        /** A plan names only the current original registrations selected by the native owner. */
+        const registration = this.#state.registrations.get(step.id)
+        if (registration) this.#removalRuntime.assertRemovalAllowed(registration)
+      }
       const cleanupErrors: unknown[] = []
       /** Names whose planned removal or suspension actually changed this Host. */
       const applied: string[] = []

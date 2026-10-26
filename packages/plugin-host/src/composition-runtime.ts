@@ -274,6 +274,9 @@ export class PluginHostCompositionRuntime<TDomainCore extends object, TValue> {
     // Registrations may have changed since preparation; the dependency check is re-run at the
     // commit point, which is the only point that actually revokes anything.
     this.#orderRemoval(state.registrations)
+    /** Every original receipt must admit removal before committed state or publication changes. */
+    for (const registration of state.registrations)
+      this.#port.removal.assertRemovalAllowed(registration)
     state.committed = true
     for (const registration of state.registrations) {
       this.#port.removal.revokeRegistration(registration)

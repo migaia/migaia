@@ -347,6 +347,13 @@ const ERROR_TEXT = {
   PLUGIN_RESOURCE_DISPOSER: 'plugin resource must provide a disposer',
   /** 在生命周期钩子的受保护窗口内重入结构变更时拒绝，避免等待自身事务。 */
   LIFECYCLE_MUTATION: prefixed('Host mutations are forbidden during plugin lifecycle callbacks'),
+  /** Explicit removal/replacement cannot revoke a domain capability still used by live work. */
+  REMOVAL_LIFECYCLE_MUTATION: (name: string) =>
+    prefixed(`plugin "${name}" cannot be removed in its current lifecycle state`),
+  /** Runtime integration captures only a synchronous function supplied by its original installer. */
+  REMOVAL_ADMISSION_FUNCTION: prefixed('plugin removal admission must be a function'),
+  /** One registration has one exact domain owner; later callbacks cannot replace its predicate. */
+  REMOVAL_ADMISSION_ALREADY_SET: prefixed('plugin removal admission is already registered'),
   /** 插件名称重复。 */
   PLUGIN_DUPLICATE: (name: string) => prefixed(`plugin "${name}" is already installed`),
   /** 插件扩展属性冲突。 */

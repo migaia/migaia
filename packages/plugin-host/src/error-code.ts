@@ -191,7 +191,9 @@ export const PluginHostErrorCode = {
    * origin; callers must avoid awaiting their own activation.
    *
    * Reentrancy makes installation rollback boundaries ambiguous. Move later mutations outside
-   * lifecycle callbacks.
+   * lifecycle callbacks. Also rejects explicit removal/replacement while the exact registration's
+   * domain admission predicate forbids revocation; close the domain's live work and retry. Full
+   * Host disposal and failed-install rollback remain unconditional cleanup.
    */
   lifecycleMutation: 'LIFECYCLE_MUTATION',
 

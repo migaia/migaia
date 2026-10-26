@@ -61,6 +61,19 @@ export class PluginHostReplaceRuntime<TDomainCore extends object, TValue> {
     definition: IInstallEntry<TDomainCore, TValue>['plugin']
   ): Promise<void> {
     const name = previous.name
+    /** Existing restart planning includes the original fallback when any dependent rebind fails. */
+    const removalPlan = planRestart(
+      this.#port.state.dependencyIndex(),
+      (pluginName) => this.#port.state.readDependencyState(pluginName),
+      [name]
+    )
+    this.#port.removal.assertRemovalAllowed(previous)
+    for (const step of removalPlan.steps) {
+      if (step.id === name || step.action !== DependencyAction.restart) continue
+      /** Reject before candidate setup, publication or a dependent hook can change live state. */
+      const registration = this.#port.state.registrations.get(step.id)
+      if (registration) this.#port.removal.assertRemovalAllowed(registration)
+    }
     const { installed, batch } = await this.#port.installation.installBatch(
       [{ name, plugin: definition }],
       false,

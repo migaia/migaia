@@ -45,6 +45,17 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
     this.#port = port
   }
 
+  /** Explicit mutation plans call this before any cleanup; terminal cleanup never invokes it. */
+  assertRemovalAllowed(registration: IRegistration<TDomainCore, TValue>): void {
+    /** Invoke receiverlessly; the original installer owns all domain state read by this predicate. */
+    const allowed = registration.removalAdmission?.allowed
+    if (allowed?.() === false)
+      throw new PluginHostError(
+        PluginHostErrorCode.lifecycleMutation,
+        ERROR_TEXT.REMOVAL_LIFECYCLE_MUTATION(registration.name)
+      )
+  }
+
   /** Runs one installed registration's captured hook before any lease or publication is retired. */
   runBeforeRelease(
     registration: IRegistration<TDomainCore, TValue>
@@ -86,6 +97,7 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
   /** Removes a registration from every committed registry without invoking user code. */
   revokeRegistration(registration: IRegistration<TDomainCore, TValue>): unknown[] {
     const errors: unknown[] = []
+    registration.removalAdmission = undefined
     markRegistrationRevoked(registration)
     registration.lifecycle = PluginHostRegistrationLifecycle.dispose
     registration.featureExposeValid = false
@@ -224,6 +236,7 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
       ))
     )
     if (reset) {
+      registration.removalAdmission = undefined
       registration.scope = undefined
       registration.core = undefined
       registration.descriptor = undefined
