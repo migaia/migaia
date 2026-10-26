@@ -269,15 +269,14 @@ describe('BroadcastChannel transport plugin', () => {
         kind: BroadcastChannelControl.join,
         sender: 'silent-participant'
       })
-      await vi.waitFor(() =>
-        expect(reports).toContainEqual(
-          expect.objectContaining({
-            name: 'TypeError',
-            code: 'INVALID_CONFIG',
-            message: 'Thread data bootstrap was not acknowledged'
-          })
-        )
-      )
+      /** Session owns the original deadline; discovery does not repeat it as a configuration error. */
+      await vi.waitFor(() => expect(reports).toHaveLength(1))
+      expect(reports[0]).toMatchObject({
+        source: 'rpc.endpoint',
+        name: 'TimeoutError',
+        code: 'DEADLINE_EXCEEDED',
+        message: 'Web RPC request deadline exceeded'
+      })
       /** The original initial-capture timer is the only configured startup timer for this source. */
       const startupTimers = schedule.mock.calls.filter(
         ([, delay]) => typeof delay === 'number' && delay > 0 && delay <= 20

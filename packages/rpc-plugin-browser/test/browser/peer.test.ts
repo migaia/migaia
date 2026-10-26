@@ -1,6 +1,11 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { setTimeout as delay } from 'node:timers/promises'
-import { normalizeRpcHandshake, RpcWireHandshakeStep } from '@migaia/rpc-contract/protocol'
+import {
+  normalizeRpcHandshake,
+  RpcWireHandshakeStep,
+  RpcWireProfile,
+  serializeRpcWireError
+} from '@migaia/rpc-contract/protocol'
 import type { IRpcObservation } from '@migaia/rpc-host/sdk'
 import { createRpcHost, type IRpcHost, type IRpcFanoutResult } from '@migaia/rpc-host'
 import {
@@ -568,3 +573,65 @@ describe('browser public namespace runtime', () => {
     }
   })
 })
+
+it('closes an accepted unfinished SharedWorker port without reporting shutdown as handshake failure', async () => {
+  /** The existing native connect fixture lends a real port without a remote handshake responder. */
+  const scope = messageTarget()
+  const port = messageTarget()
+  /** A listener has no caller waiting on this candidate's ready Promise. */
+  const reports: unknown[] = []
+  const host = await createRpcHost({
+    plugins: [sharedWorkerPlugin({ listen: scope.target })],
+    report: (error) => reports.push(error)
+  })
+  try {
+    scope.connect(port.target)
+    await expect.poll(() => port.sent.length).toBeGreaterThan(0)
+    await host.close()
+    expect(reports).toEqual([])
+    expect(port.listeners.get('message')?.size ?? 0).toBe(0)
+    expect(port.closeCalls).toBe(0)
+  } finally {
+    await host.close()
+  }
+})
+
+it.each(['local-decode', 'remote-reject'] as const)(
+  'reports one owned handshake failure for an accepted SharedWorker port: %s',
+  async (mode) => {
+    /** Native events enter the original listener and Session, without a second protocol receiver. */
+    const scope = messageTarget()
+    const port = messageTarget()
+    const reports: unknown[] = []
+    const host = await createRpcHost({
+      plugins: [sharedWorkerPlugin({ listen: scope.target })],
+      report: (error) => reports.push(error)
+    })
+    try {
+      scope.connect(port.target)
+      await expect.poll(() => port.sent.length).toBeGreaterThan(0)
+      /** Only received reject metadata creates the public handle's handshakeFailure fact. */
+      const data =
+        mode === 'local-decode'
+          ? '{invalid-handshake'
+          : JSON.stringify({
+              profile: RpcWireProfile,
+              kind: 'handshake',
+              step: 'reject',
+              error: serializeRpcWireError(new Error('remote admission refused'), {
+                report: ({ error }) => {
+                  throw error
+                }
+              })
+            })
+      port.emit('message', { kind: 'message', data })
+      await expect.poll(() => port.listeners.get('message')?.size ?? 0).toBe(0)
+      expect(reports).toHaveLength(1)
+      if (mode === 'local-decode')
+        expect(reports[0]).toMatchObject({ source: 'rpc.contract', code: 'HANDSHAKE_INVALID' })
+      else expect(reports[0]).toMatchObject({ message: 'remote admission refused' })
+    } finally {
+      await host.close()
+    }
+  }
+)

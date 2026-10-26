@@ -209,9 +209,10 @@ class BroadcastChannelListener {
       /** Host alone admits the semantic identity; native sender labels are not trusted source facts. */
       const handle = this.#context.attach(carrier)
       this.#sessions.set(id, { io, handle })
-      void handle.ready.catch((error: unknown) =>
-        this.#context.report(normalizeBrowserHandshakeFailure(error))
-      )
+      void handle.ready.catch((error: unknown) => {
+        /** Local failure reporting belongs to Session; native discovery owns remote rejection. */
+        if (handle.handshakeFailure) this.#context.report(normalizeBrowserHandshakeFailure(error))
+      })
     } catch (primary) {
       void carrier.close(primary).catch(this.#context.report)
       throw primary

@@ -68,9 +68,10 @@ class BrowserPortListener {
             this.#context.report(error)
           }
         )
-        void handle.ready.catch((error: unknown) =>
-          this.#context.report(normalizeBrowserHandshakeFailure(error))
-        )
+        void handle.ready.catch((error: unknown) => {
+          /** Session reports local failures; only a received remote reject lacks that reporter. */
+          if (handle.handshakeFailure) this.#context.report(normalizeBrowserHandshakeFailure(error))
+        })
       }
     } catch (error) {
       this.#context.report(error)

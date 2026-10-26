@@ -147,6 +147,11 @@ class ServiceWorkerClientListener {
       } catch (cleanup) {
         this.#context.report(cleanup)
       }
+      if (record.handle && !record.handle.handshakeFailure) {
+        /** Session already reports local failure; ordinary shutdown needs no second diagnostic. */
+        if (this.#sessions.get(id) === record) this.#sessions.delete(id)
+        return
+      }
       throw normalizeBrowserHandshakeFailure(primary)
     }
   }
