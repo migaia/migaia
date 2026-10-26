@@ -3,7 +3,9 @@ import { MessageChannel, type MessagePort } from 'node:worker_threads'
 import { describe, expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { defineTransportPlugin, type IRpcTransportSetupContext } from '@migaia/rpc-host/sdk'
-import type { IRpcCarrier } from '@migaia/rpc-contract/interfaces'
+import type { IRpcCarrier, IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
+import { deferred } from '@migaia/utils/promise'
+import { sendQueue, IpcSendClass } from '@migaia/rpc-plugin-process/features'
 import { createProcessCarrier } from '../../dist/process/carrier.js'
 import { createAdapterChildStdio } from '../../dist/process/node-io.js'
 import type { IProcessByteChannel, IProcessMessageChannel } from '../../dist/process/types.js'
@@ -154,4 +156,98 @@ describe('process carrier observation', () => {
       ports.port2.close()
     }
   })
+})
+
+/** Acquire one standalone public queue and one bare native carrier under the genuine source context. */
+function openCustodyCarrier(context: IRpcTransportSetupContext, raw: IProcessMessageChannel) {
+  /** No feature queue is installed inside this carrier; the standalone queue is the only owner. */
+  const carrier = createProcessCarrier(raw, context, { id: 'custody-fast', features: [] })
+  /** These are the same actual connection facts normally lent by ProcessCarrierFeatures. */
+  const installed = sendQueue().install({
+    owner: context.namespace,
+    namespace: context.namespace,
+    signal: context.signal,
+    report: context.report,
+    connectionId: carrier.id
+  })
+  return {
+    carrier,
+    installed,
+    /** Return both original receipts without installing a second close or completion owner. */
+    async dispose() {
+      installed.dispose()
+      await carrier.close()
+      await installed.value.whenIdle()
+    }
+  }
+}
+
+it('C005 standalone Process composition admits once before native start and physical write', async () => {
+  /** Actual native ports supply the original whole-message send and delivery operations. */
+  const ports = new MessageChannel()
+  /** The same four original predicates observe only production-owner callback entry. */
+  const order: string[] = []
+  /** Existing native IO remains the sole writer; this callback only records its real invocation. */
+  const native = messagePortIO(ports.port1)
+  /** The production message carrier receives this original passthrough IO object. */
+  const raw: IProcessMessageChannel = {
+    ...native,
+    send(value, transfer, write) {
+      order.push('write')
+      return native.send(value, transfer, write)
+    }
+  }
+  /** Only actual source setup publishes the two genuine public component receipts. */
+  const acquired = deferred<ReturnType<typeof openCustodyCarrier>>()
+  /** Native delivery independently proves that the counted writer performs real IO. */
+  const received = deferred<unknown>()
+  /** This exact native listener is removed on both actual delivery and fixture shutdown. */
+  const onMessage = (value: unknown): void => received.resolve(value)
+  ports.port2.once('message', onMessage)
+  /** A real cold source lends its actual current context without creating a Peer or fake brand. */
+  const host = await createRpcHost({
+    self: { name: 'custody', instanceId: 'custody' },
+    plugins: [
+      defineTransportPlugin({
+        name: 'custody-physical-composition',
+        namespace: 'process',
+        /** Only native setup lends this source its existing transport authority and signal. */
+        open(context) {
+          /** Both original component receipts stay with this source's normal disposer. */
+          const resources = openCustodyCarrier(context, raw)
+          acquired.resolve(resources)
+          return { dispose: resources.dispose }
+        }
+      })
+    ]
+  })
+  try {
+    /** Both values came from the supported factories under the one genuine native source. */
+    const { carrier, installed } = await acquired.promise
+    /** The original physical frame is opaque to native queue admission and remains unchanged. */
+    const frame: IRpcCarrierFrame = { kind: 'message', data: 'fast' }
+    /** Only writeProcessMessage invokes this unchanged callback at the actual native handoff. */
+    const onWriteStart = (): void => {
+      order.push('started')
+    }
+    await installed.value.run(
+      { sendClass: IpcSendClass.data },
+      () => carrier.write(frame, { onWriteStart }),
+      {
+        assertCanSend() {
+          order.push('admission')
+        }
+      }
+    )
+    expect(order.at(-1)).toBe('write')
+    expect(order.slice(-3)).toEqual(['admission', 'started', 'write'])
+    expect(order.filter((event) => event === 'started')).toHaveLength(1)
+    expect(order.filter((event) => event === 'write')).toHaveLength(1)
+    expect(await received.promise).toEqual(frame)
+  } finally {
+    await host.close()
+    ports.port2.off('message', onMessage)
+    ports.port1.close()
+    ports.port2.close()
+  }
 })
