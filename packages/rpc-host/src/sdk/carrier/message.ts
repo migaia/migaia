@@ -22,6 +22,7 @@ import {
   createRpcLifecycleError
 } from '../../host/error-owner.js'
 import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
+import { resolveAbortReason } from '../../host/abort-reason.js'
 import { RpcCarrierCodecId, RpcCarrierErrorText } from './constants.js'
 import { RpcJsonCarrierCodec } from './json-codec.js'
 import type { IRpcMessageCarrierOptions } from './types.js'
@@ -122,7 +123,9 @@ class RpcMessageCarrier implements IRpcCarrier {
   write(frame: IRpcCarrierFrame, options?: IRpcCarrierWriteOptions): Promise<void> {
     if (this.#closing) return Promise.reject(this.#reason)
     if (options?.signal?.aborted)
-      return Promise.reject(createRpcAbortError(undefined, undefined, options.signal.reason))
+      return Promise.reject(
+        createRpcAbortError(undefined, undefined, resolveAbortReason(options.signal))
+      )
     /** One original native write owns this completion until drain or local retirement. */
     const pending = deferred<void>()
     this.#writes.add(pending)
