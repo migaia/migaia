@@ -62,11 +62,11 @@ export type ISyncMiddlewareStage<TValue> = (
  * next short-circuits; independent stage/downstream failures use the configured composition
  * policy.
  */
-export type IAsyncMiddlewareStage<TValue> = (
+export type IAsyncMiddlewareStage<TValue, TResult = void> = (
   value: TValue,
-  next: (value: TValue) => Promise<void>,
+  next: (value: TValue) => Promise<TResult>,
   context?: IMiddlewarePipelineContext
-) => void | Promise<void>
+) => void | Promise<unknown>
 /**
  * Synchronous generator stage drained completely before downstream starts. Yields remain local: a
  * normal returned value continues, continue selects the last yield (or input when no yield), halt

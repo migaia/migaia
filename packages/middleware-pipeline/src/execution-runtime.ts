@@ -87,15 +87,17 @@ type IAsyncBranch = {
   /** Set once the branch traversal has settled; a settled branch needs no further await. */
   settled: boolean
   error?: unknown
+  /** A fulfilled suffix result remains visible to its upstream next caller. */
+  value?: unknown
 }
 
 /** A real Promise subclass makes native await enter the same public observation hook as then. */
-class ObservedTraversalPromise extends Promise<void> {
+class ObservedTraversalPromise extends Promise<unknown> {
   /** Only caller consumption, never the runner's internal rejection handler, observes this branch. */
   #observed = false
 
   /** Borrow the original traversal while immediately handling its native rejection. */
-  constructor(pending: Promise<void>) {
+  constructor(pending: Promise<unknown>) {
     super((resolve, reject) => {
       void pending.then(resolve, reject)
     })
@@ -106,15 +108,18 @@ class ObservedTraversalPromise extends Promise<void> {
   }
   /** Native await and explicit then both transfer failure handling to the submitting stage. */
   // oxlint-disable-next-line unicorn/no-thenable -- This genuine Promise subclass must observe native await through then.
-  override then<TResult1 = void, TResult2 = never>(
-    onfulfilled?: ((value: void) => TResult1 | PromiseLike<TResult1>) | null,
+  override then<TResult1 = unknown, TResult2 = never>(
+    onfulfilled?: ((value: unknown) => TResult1 | PromiseLike<TResult1>) | null,
     onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null
   ): Promise<TResult1 | TResult2> {
     this.#observed = true
     return super.then(onfulfilled, onrejected)
   }
   /** The runner joins and consumes original rejection without pretending the caller observed it. */
-  consume(onFulfilled: () => void, onRejected: (error: unknown) => void): Promise<void> {
+  consume(
+    onFulfilled: (value: unknown) => void,
+    onRejected: (error: unknown) => void
+  ): Promise<void> {
     return super.then(onFulfilled, onRejected)
   }
   /** Observation is sampled only after the stage and all its started traversals settle. */
@@ -127,16 +132,16 @@ type IAsyncRequest<TValue> = {
   readonly index: number
   readonly value: TValue
   readonly parent?: IAsyncBranch
-  readonly resolve: () => void
+  readonly resolve: (value: unknown) => void
   readonly reject: (error: unknown) => void
 }
 
 /** Owns the immutable stage snapshot and depth-safe dispatch for one async execution. */
 class AsyncPipelineRun<TValue> {
   /** Snapshot isolates this execution from later caller mutations. */
-  readonly stages: readonly IAsyncMiddlewareStage<TValue>[]
+  readonly stages: readonly IAsyncMiddlewareStage<TValue, any>[]
   /** Terminal callback belongs to the original caller. */
-  readonly done: (value: TValue, context?: IMiddlewarePipelineContext) => void | Promise<void>
+  readonly done: (value: TValue, context?: IMiddlewarePipelineContext) => unknown
   /** Construction policy is immutable across frames. */
   readonly options: IMiddlewarePipelineOptions
   /** One admitted cooperative context is reused by every branch. */
@@ -165,9 +170,9 @@ class AsyncPipelineRun<TValue> {
     this.options.assertActive?.()
   }
   /** Enters one independent suffix traversal at its own stage index. */
-  dispatch(index: number, value: TValue, parent?: IAsyncBranch): Promise<void> {
+  dispatch(index: number, value: TValue, parent?: IAsyncBranch): Promise<unknown> {
     if (this.#draining || this.#depth >= MAX_NATIVE_RECURSION_DEPTH) {
-      return new Promise<void>((resolve, reject) => {
+      return new Promise<unknown>((resolve, reject) => {
         this.#spill.push({ index, value, parent, resolve, reject })
         this.#drain()
       })
@@ -185,7 +190,7 @@ class AsyncPipelineRun<TValue> {
    * them again would only add an allocation and extra microtask turns on every stage. Synchronous
    * failures are returned as rejections, exactly as an async function would.
    */
-  #step(index: number, value: TValue, parent?: IAsyncBranch): Promise<void> {
+  #step(index: number, value: TValue, parent?: IAsyncBranch): Promise<unknown> {
     try {
       this.check()
     } catch (error) {
@@ -238,7 +243,7 @@ class AsyncPipelineFrame<TValue> {
     this.#parent = parent
   }
   /** Starts one suffix immediately, observing its failure before stage settlement. */
-  readonly next = (value: TValue): Promise<void> => {
+  readonly next = (value: TValue): Promise<unknown> => {
     if (this.#returned) {
       this.#run.options.onViolation(MiddlewarePipelineViolation.late)
       return Promise.resolve()
@@ -260,7 +265,8 @@ class AsyncPipelineFrame<TValue> {
         : undefined
     branch.promise = observed
     /** Marks a fulfilled traversal so the frame can skip awaiting it again. */
-    const settled = (): void => {
+    const settled = (value: unknown): void => {
+      branch.value = value
       branch.settled = true
     }
     /** This exact record consumes rejection without calling the public observation hook. */
@@ -273,7 +279,7 @@ class AsyncPipelineFrame<TValue> {
     return observed ?? pending
   }
   /** Awaits stage and started branches, preserving active control and original failure order. */
-  async run(value: TValue): Promise<void> {
+  async run(value: TValue): Promise<unknown> {
     /** Independent stage failures remain distinct from downstream failures. */
     let stageError: unknown
     /** A boolean distinguishes throw undefined from successful completion. */
@@ -329,6 +335,7 @@ class AsyncPipelineFrame<TValue> {
       this.#markParent(error)
       throw error
     }
+    return this.#branches[this.#branches.length - 1]?.value
   }
   /** Combines independent failures without losing either if the custom combiner throws. */
   #combine(stage: unknown, downstream: unknown): unknown {
@@ -365,7 +372,7 @@ export const runAsyncPipeline = <TValue>(
   } catch (error) {
     return Promise.reject(error)
   }
-  return run.dispatch(0, value)
+  return run.dispatch(0, value).then(() => undefined)
 }
 
 /** A sync branch stores only its suffix position and submitted payload. */
