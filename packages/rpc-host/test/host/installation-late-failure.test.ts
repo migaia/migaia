@@ -18,6 +18,20 @@ it('keeps caller cancellation terminal before reporting the original late setup 
   const latePrimary = new Error('timeout late-reject primary')
   /** Only the real public construction reporter contributes late failure observations. */
   const reports: unknown[] = []
+  /** The same native prefix batch owns this one provisional resource before setup waits. */
+  const resourceCleanup = { calls: 0 }
+  /** Only NativeHost rollback invokes this acquired installation's original disposer. */
+  const ownedInstallation: IRpcFlowInstallation = {
+    stages: {},
+    dispose() {
+      resourceCleanup.calls += 1
+    }
+  }
+  /** Earlier real setup lends its resource to the same transaction as the pending setup. */
+  const resourceFlow = defineFlowPlugin({
+    name: 'late-installation-owned-resource',
+    setup: () => ownedInstallation
+  })
   /** One actual caller controller cancels the same Host whose setup is pending. */
   const controller = new AbortController()
   /** Existing native memory transport admission remains part of this one real installation batch. */
@@ -33,7 +47,7 @@ it('keeps caller cancellation terminal before reporting the original late setup 
   /** Observe the genuine opening immediately, preserving its native failure and caller identity. */
   const opening = createRpcHost({
     ...server.options,
-    plugins: [flow, server.transport],
+    plugins: [resourceFlow, flow, server.transport],
     signal: controller.signal,
     report: (error) => reports.push(error)
   }).then(
@@ -58,6 +72,8 @@ it('keeps caller cancellation terminal before reporting the original late setup 
     const failure = 'error' in outcome ? outcome.error : undefined
     expect.soft(walkErrorCauses(failure).includes(reason)).toBe(true)
     expect.soft(failure).toMatchObject({ code: RpcCoreErrorCode.cancelled })
+    expect(resourceCleanup.calls).toBe(1)
+    expect(reports).toHaveLength(0)
     late.reject(latePrimary)
     await vi.waitFor(() => {
       /** Preserve the original strict Error reachability without another nested callback owner. */
@@ -69,6 +85,9 @@ it('keeps caller cancellation terminal before reporting the original late setup 
         }
       expect(reachable).toBe(true)
     })
+    expect(reports).toHaveLength(1)
+    expect(reports[0]).toBe(latePrimary)
+    expect(resourceCleanup.calls).toBe(1)
   } finally {
     late.reject(latePrimary)
     await opening

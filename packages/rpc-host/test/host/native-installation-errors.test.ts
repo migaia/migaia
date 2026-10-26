@@ -51,6 +51,8 @@ it('retains the original native entropy failure before cold transport acquisitio
 it('classifies the original native flow setup failure without replacing its Error', async () => {
   /** This is the unchanged original user callback error and its native stack. */
   const original = new Error('audit installation failed')
+  /** Primary installation rejection must not also become a late background diagnostic. */
+  const reports: unknown[] = []
   /** Current SDK setup is the surviving public producer; no old middleware install role is faked. */
   const flow = defineFlowPlugin({
     name: 'audit-install',
@@ -75,7 +77,7 @@ it('classifies the original native flow setup failure without replacing its Erro
       host = await createRpcHost({
         self: { name: 'audit-install', instanceId: 'audit-install' },
         plugins: [flow, transport],
-        report: () => undefined
+        report: (error) => reports.push(error)
       })
     } catch (error) {
       failure = error
@@ -83,6 +85,7 @@ it('classifies the original native flow setup failure without replacing its Erro
     expect(failure).toBe(original)
     expect(original).toMatchObject({ source: 'rpc.endpoint', code: 'CALLBACK_FAILED' })
     expect(open).not.toHaveBeenCalled()
+    expect(reports).toHaveLength(0)
   } finally {
     await host?.close()
   }
