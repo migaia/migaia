@@ -92,7 +92,19 @@ group按顺序执行，首个失败后的步骤为`not-executed`；步骤结果�
 
 普通载体帧为 `{kind:'message',data,sidecars?}`，扩展为 `{kind:'extension',extension,data,sidecars?}`。通用JSON byte载体使用四字节无符号大端长度+UTF-8 JSON；长度不含四字节头，非空payload上限16MiB。读取必须支持任意切块，EOF半帧是错误。编解码器和有状态decoder属于host SDK/实际传输，不再从contract导出。
 
-二进制manifest保留 `profile: 'migaia.rpc.portable-binary/1'`、storage(inline/native)、原envelope及`backings: [{byteLength,sha256}]`。这是二进制表示版本，不是第二种RPC语法。native载体校验完整backing的长度与真实SHA-256，按实际原生能力处理sidecar和transfer；inline载体按自己的编码规则承载可见字节。能力与权限不得从payload标志推断。
+二进制清单保留 `profile: 'migaia.rpc.portable-binary/1'`、`storage: 'inline' | 'native'`、原 `envelope` 和逻辑 `backings` 数组。这是二进制表示版本，不是另一套 RPC 语法。`storage: 'inline'` 沿用可见字节内联，`backings` 与物理 sidecars 均为空；`storage: 'native'` 的每行描述一个完整 backing：
+
+| 字段         | 规则                                                                                                           |
+| ------------ | -------------------------------------------------------------------------------------------------------------- |
+| `byteLength` | 完整 backing 的字节长度，不是某个视图的可见长度                                                                |
+| `data`       | 可选；本行存在这个自有字段时，值必须是完整 backing 的无填充 canonical base64url，解码长度必须等于 `byteLength` |
+| `sha256`     | 仅在没有 `data` 时使用；可省略，存在时必须是 64 位小写十六进制摘要                                             |
+
+带 `data` 的行在还原时创建一次 backing，不消耗物理 sidecar，也不读取该行的 `sha256`。没有 `data` 的行依次消费下一个物理 sidecar，校验完整长度与唯一 backing 身份；多余或缺少 sidecar 都拒绝。业务值的二进制标记仍按逻辑 backing 索引引用，因此混合内联与原生行时，共享 backing 的别名、offset 和 length 仍保持。字段存在但值为 `undefined` 不等于省略字段。
+
+纯协议检查只验证清单形状，不从对端字段推导完整性或 transfer 权限。接收方本地 codec context 的 `transferRequiresIntegrity` 为 true 时，原生 sidecar 行必须提供有效摘要，并校验完整 backing 的 SHA-256；否则不计算摘要。Host 当前在签名覆盖清单时把不超过 16 KiB 的完整 backing 快照内联，较大的 backing 才保留为原生 sidecar 并带摘要。这个阈值是 SDK 内部选择，不是清单字段或公开配置项。未配置签名的原生行可只有 `{ byteLength }`。
+
+发送方的 transfer 仍须来自调用方原授权，并与最终实际原生 sidecars 取交集；清单内联不会授予或扩大权限。旧接收方若要求每个原生行总有 `sha256`，或假定每行对应一个物理 sidecar，必须更新为上述格式。全局 inline 存储的编码方式不变。
 
 ## 可移植值与快照
 
@@ -137,4 +149,4 @@ console.log('native error graph preserved')
 
 `RpcWireLimit.maxForwardHops` 为 16；`forwardRoute` 与序列化错误路由最多接受 `RpcWireLimit.maxForwardRouteNodes`（17）个节点 id，包含发起节点。Host 默认跳数仍为 3，协议容量不覆盖 host 自身配置。
 
-Host 按命名空间通过 `rpcHostPipelines(getHost, pipeline, namespaces)` 声明管道。内置出站顺序为 plaintext → schema → idempotency → limits → auth → chunk → batch → wire，入站反向。传输 feature 仅覆盖本命名空间的同种能力，不另建执行器。
+已有原生宿主通过 Host SDK 的 `rpcHostPipelines(getHost, pipeline)` 提供 `domainCore(request)`，把同一个原生构造请求交还给宿主的 `pipeline(name, request)`。每个传输插件声明自己的七条短名管道，安装时创建、卸载时删除；helper 不再接收命名空间列表或返回管道声明。普通原生宿主先用 `rpcFlowPlugin([...features])` 安装共享信息流，再装传输，具体接法见 [Host 使用指南](../rpc-host/USEGUIDE.md#在已有宿主中安装-rpc)。内置出站顺序为 plaintext → schema → idempotency → limits → errorMap → auth → chunk → batch → wire，入站反向。传输 feature 仅覆盖本命名空间的同种能力，不另建执行器。

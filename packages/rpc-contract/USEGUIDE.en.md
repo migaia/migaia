@@ -92,7 +92,19 @@ Outbound: `prepare → envelope.outbound → encode → frame.outbound → write
 
 Ordinary carrier frames are `{kind:'message',data,sidecars?}`; extension frames are `{kind:'extension',extension,data,sidecars?}`. The common JSON byte carrier uses a four-byte unsigned big-endian length followed by UTF-8 JSON. Length excludes the header; nonempty payloads are limited to16MiB. Readers support arbitrary chunk boundaries and reject partial-frame EOF. Stateful decoders/codecs belong to the Host SDK or transport, not contract exports.
 
-Binary manifests contain `profile: 'migaia.rpc.portable-binary/1'`, inline/native storage, the original envelope, and `backings: [{byteLength,sha256}]`. This versions a binary representation rather than another RPC grammar. Native carriers verify complete backing lengths and actual SHA-256 before using native sidecars/transfer. Inline carriers encode visible bytes according to their codec. Payload flags grant no physical capability or transfer authority.
+Binary manifests retain `profile: 'migaia.rpc.portable-binary/1'`, `storage: 'inline' | 'native'`, the original `envelope`, and a logical `backings` array. This versions a binary representation rather than another RPC grammar. `storage: 'inline'` keeps visible bytes inline, with empty `backings` and physical sidecars. Each row under `storage: 'native'` describes one complete backing:
+
+| Field        | Rule                                                                                                                                                 |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `byteLength` | Complete backing length in bytes, rather than one view's visible length                                                                              |
+| `data`       | Optional; when this own field exists, its value must be unpadded canonical base64url of the complete backing, decoding to exactly `byteLength` bytes |
+| `sha256`     | Used only without `data`; optional, but when present must be a 64-character lowercase hexadecimal digest                                             |
+
+A row with `data` creates one backing during restoration, consumes no physical sidecar, and does not read that row's `sha256`. A row without `data` consumes the next physical sidecar, checking its complete length and unique backing identity. Extra or missing sidecars reject. Binary value tags still reference logical backing indices, preserving shared backing aliases, offsets, and lengths when inline and native rows are mixed. A field present with `undefined` is not an omitted field.
+
+Pure protocol validation checks manifest shape; peer fields cannot select integrity policy or grant transfer authority. When the receiver's local codec context has `transferRequiresIntegrity: true`, native sidecar rows require a valid digest and verify SHA-256 over the complete backing. Otherwise no digest is calculated. With a signature covering the manifest, Host currently snapshots complete backings of at most 16 KiB inline; only larger backings remain native sidecars with digests. This threshold is an internal SDK choice, not a manifest field or public option. Unsigned native rows may contain only `{ byteLength }`.
+
+Outbound transfer still comes from the caller's original grants, intersected with the final actual native sidecars. Inlining grants no additional authority. Older receivers that require `sha256` on every native row or assume one physical sidecar per row must adopt this format. Global inline storage encoding is unchanged.
 
 ## Portable values and snapshots
 
@@ -137,4 +149,4 @@ Old `/v1`, `/runtime`, `/framing`, `/binary`, `/remote`, JSON-RPC bridge convers
 
 `RpcWireLimit.maxForwardHops` is 16. `forwardRoute` and serialized error routes accept at most `RpcWireLimit.maxForwardRouteNodes` (17) node IDs, including the origin. A host’s default forwarding ceiling remains 3; protocol capacity does not override its local policy.
 
-Host flow pipelines are declared per namespace using `rpcHostPipelines(getHost, pipeline, namespaces)`. Builtin outbound order is plaintext → schema → idempotency → limits → auth → chunk → batch → wire; inbound reverses the direction. Transport feature placement overrides that capability only within its namespace; it does not create a second executor.
+An existing native host supplies `domainCore(request)` through Host SDK `rpcHostPipelines(getHost, pipeline)`, forwarding the same native construction request to its own `pipeline(name, request)`. Each transport plugin declares seven short pipeline names, created on installation and deleted on removal. The helper no longer takes a namespace list or returns declarations. Ordinary native hosts install shared flow Features through `rpcFlowPlugin([...features])` before transports; see the [Host guide](../rpc-host/USEGUIDE.en.md#install-rpc-in-an-existing-host). Builtin outbound order is plaintext → schema → idempotency → limits → errorMap → auth → chunk → batch → wire; inbound reverses the direction. Transport feature placement overrides that capability only within its namespace; it does not create a second executor.
