@@ -9,6 +9,8 @@ import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-cor
 import { pool, RPC_POOL_PEER_ID } from '@migaia/rpc-plugin-pool'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
+import { randomUUID } from 'node:crypto'
+import { fileURLToPath } from 'node:url'
 import { TopologyLeaf } from './topology-leaf.ts'
 import {
   HopAuthCounter,
@@ -51,6 +53,31 @@ const hopAuth = new HopAuthCounter()
 /** Hop-scoped auth installed only on the b–c thread transport. */
 const threadFeatures = options.hopAuth ? [auth(hopAuth.options(HopSecret.shared))] : []
 
+/** Bootstrap secret for the Python leaf; it travels only through the native launch bootstrap. */
+const pythonToken = randomUUID()
+/** Python foreign leaf launched like an ML sidecar; it is a leaf and never forwards. */
+const pythonPlugins = options.python
+  ? [
+      processPlugin({
+        namespace: 'foreign',
+        name: Topology.python,
+        spawn: {
+          command: 'python3',
+          args: [
+            '-B',
+            fileURLToPath(new URL('../../process/peers/python/peer.py', import.meta.url)),
+            '--business',
+            '--stdio',
+            '--bootstrap',
+            'stdin'
+          ],
+          token: pythonToken
+        },
+        features: [auth({ credentials: pythonToken })]
+      })
+    ]
+  : []
+
 /** Opening Promise of b; providers await it before touching children. */
 const opening: Promise<IRpcHost> = createRpcHost({
   plugins: [
@@ -75,7 +102,8 @@ const opening: Promise<IRpcHost> = createRpcHost({
       spawn: { entry: threadEntry, data: {} },
       features: [pool({ size: 4 })]
     }),
-    coroutinePlugin({ name: Topology.coroutine, spawn: coroutineTask })
+    coroutinePlugin({ name: Topology.coroutine, spawn: coroutineTask }),
+    ...pythonPlugins
   ],
   provide: {
     /** Wait until every child answers its own readiness provider. */
@@ -86,7 +114,8 @@ const opening: Promise<IRpcHost> = createRpcHost({
         ...(options.hopAuth === 'mismatch' ? [] : [host.thread.send(Topology.c, Topology.ready)]),
         ...(options.childProcess ? [host.child.send(Topology.d, Topology.ready)] : []),
         host.pool.send(RPC_POOL_PEER_ID, Topology.ready),
-        host.coroutine.send(Topology.coroutine, Topology.ready)
+        host.coroutine.send(Topology.coroutine, Topology.ready),
+        ...(options.python ? [host.foreign.send(Topology.python, Topology.echo, true)] : [])
       ])
       return true
     },

@@ -343,3 +343,27 @@ describe('forwarding through process b to its child process d', () => {
     }
   })
 })
+
+describe('forwarding through Node process b to a Python child process', () => {
+  it('executes once on the Python leaf and restores its native error graph', async () => {
+    /** Origin whose b also spawns the Python leaf. */
+    const host = await openOrigin({ python: true })
+    try {
+      expect(await viaB(host, Topology.python, Topology.echo, 'ping')).toBe('ping')
+      await host.process.notify(`${Topology.b}.${Topology.python}.p.f.oneWay`, ['once'], traced)
+      await expect
+        .poll(() => viaB(host, Topology.python, 'peer.received', []), { timeout: 5000 })
+        .toEqual({ count: 1, values: ['once'] })
+      /** Native error graph from the Python leaf, restored on a. */
+      const error = await rejection(viaB(host, Topology.python, 'peer.error', []))
+      expect(error).toMatchObject({
+        source: 'rpc.endpoint',
+        code: 'INTERNAL',
+        cause: { source: 'rpc.endpoint', code: 'INTERNAL', message: 'peer cause' }
+      })
+      expect(error).toMatchObject({ route: expect.any(Array) })
+    } finally {
+      await host.close()
+    }
+  })
+})
