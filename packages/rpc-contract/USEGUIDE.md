@@ -102,7 +102,7 @@ group按顺序执行，首个失败后的步骤为`not-executed`；步骤结果�
 
 带 `data` 的行在还原时创建一次 backing，不消耗物理 sidecar，也不读取该行的 `sha256`。没有 `data` 的行依次消费下一个物理 sidecar，校验完整长度与唯一 backing 身份；多余或缺少 sidecar 都拒绝。业务值的二进制标记仍按逻辑 backing 索引引用，因此混合内联与原生行时，共享 backing 的别名、offset 和 length 仍保持。字段存在但值为 `undefined` 不等于省略字段。
 
-纯协议检查只验证清单形状，不从对端字段推导完整性或 transfer 权限。接收方本地 codec context 的 `transferRequiresIntegrity` 为 true 时，原生 sidecar 行必须提供有效摘要，并校验完整 backing 的 SHA-256；否则不计算摘要。Host 当前在签名覆盖清单时把不超过 16 KiB 的完整 backing 快照内联，较大的 backing 才保留为原生 sidecar 并带摘要。这个阈值是 SDK 内部选择，不是清单字段或公开配置项。未配置签名的原生行可只有 `{ byteLength }`。
+纯协议检查只验证清单形状，不从对端字段推导完整性或 transfer 权限。接收方本地 codec context 的 `transferRequiresIntegrity` 为 true 时，原生 sidecar 行必须提供有效摘要，并校验完整 backing 的 SHA-256；否则不计算摘要。Host 当前在签名覆盖清单时把不超过 1125 字节的完整 backing 快照内联，较大的 backing 才保留为原生 sidecar 并带摘要。这个阈值是 SDK 内部选择，不是清单字段或公开配置项。未配置签名的原生行可只有 `{ byteLength }`。
 
 发送方的 transfer 仍须来自调用方原授权，并与最终实际原生 sidecars 取交集；清单内联不会授予或扩大权限。旧接收方若要求每个原生行总有 `sha256`，或假定每行对应一个物理 sidecar，必须更新为上述格式。全局 inline 存储的编码方式不变。
 

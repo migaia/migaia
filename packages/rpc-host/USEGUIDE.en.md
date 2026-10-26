@@ -269,7 +269,7 @@ Without `errorMap`, only a handshake rejection sent to an unauthenticated peer h
 
 ## Binary integrity and transfer
 
-On a negotiated native-binary carrier path, no signature covering the manifest means no SHA-256 calculation or required manifest digest. With signing configured, a complete backing of at most 16 KiB is snapshotted inline into signed content, without native transfer or a digest. Larger backings remain native sidecars: each unique backing is hashed once per prepare and verified once in its corresponding restore. The threshold is an internal SDK choice, not a public option.
+On a negotiated native-binary carrier path, no signature covering the manifest means no SHA-256 calculation or required manifest digest. With signing configured, a complete backing of at most 1125 bytes is snapshotted inline into signed content, without native transfer or a digest. Larger backings remain native sidecars: each unique backing is hashed once per prepare and verified once in its corresponding restore. The threshold is an internal SDK choice, not a public option.
 
 Size and digest apply to the complete backing, not just a Uint8Array's visible slice. Aliases sharing that backing retain their offsets and lengths. A signed manifest's logical backing row is `{ byteLength, data }` for canonical base64url of the complete backing or `{ byteLength, sha256 }` for a native sidecar. Native rows without an integrity requirement contain only `{ byteLength }`. Rows with `data` consume no physical sidecar; other rows consume sidecars in order.
 

@@ -114,7 +114,7 @@ export const perCallDeadline = timeoutFromSubpath({ ms: 100 })
 
 自定义载体可以提供可选的 `reserveWrite`，借用已有流控容量。每次逻辑写出只预留一次；chunk 的分片共用凭据，batch 保留各成员的凭据，完成后释放。`write` 的完成仍表示实际物理接纳，`close` 必须结算载体拥有的排队写入。
 
-协商了原生二进制时，没有签名覆盖清单就不计算摘要；签名路径上的完整 backing 不超过内部 16 KiB 阈值时内联，较大 backing 才用原生 sidecar 和 SHA-256。别名保持完整 backing 身份，transfer 始终限于调用方原授权。当前清单格式与原来所有原生行必带摘要的格式不同，见[二进制说明](./USEGUIDE.md#二进制完整性与-transfer)。
+协商了原生二进制时，没有签名覆盖清单就不计算摘要；签名路径上的完整 backing 不超过内部 1125 字节阈值时内联，较大 backing 才用原生 sidecar 和 SHA-256。别名保持完整 backing 身份，transfer 始终限于调用方原授权。当前清单格式与原来所有原生行必带摘要的格式不同，见[二进制说明](./USEGUIDE.md#二进制完整性与-transfer)。
 
 会话使用中的共享或局部信息流 Feature 不能热卸载，移除相应原生注册以 `LIFECYCLE_MUTATION` 拒绝；先关闭受影响命名空间，再冷删除。auth、chunk、batch 等改变线上格式的能力，只有两端都安装才保证能建立通信；单端配置不提供兼容保证，也不主动禁止。见[后装与卸载](./USEGUIDE.md#后装与卸载传输)。
 

@@ -269,7 +269,7 @@ export const host = await createRpcHost({ plugins: [errorMap(redact)] })
 
 ## 二进制完整性与 transfer
 
-在已协商原生二进制的载体路径上，没有覆盖清单的签名就不计算 SHA-256，清单也不要求摘要。配置签名后，完整 backing 不超过 16 KiB 时快照并内联进签名内容，不原生转移，也不计算摘要；较大的 backing 保留原生 sidecar，每个唯一 backing 在一次 prepare 中计算一次摘要，在对应 restore 中校验一次。阈值是 SDK 内部选择，不是公开配置项。
+在已协商原生二进制的载体路径上，没有覆盖清单的签名就不计算 SHA-256，清单也不要求摘要。配置签名后，完整 backing 不超过 1125 字节时快照并内联进签名内容，不原生转移，也不计算摘要；较大的 backing 保留原生 sidecar，每个唯一 backing 在一次 prepare 中计算一次摘要，在对应 restore 中校验一次。阈值是 SDK 内部选择，不是公开配置项。
 
 判断大小和摘要都针对完整 backing，而不是某个 Uint8Array 的可见切片；共享同一 backing 的别名、offset 和 length 保持。签名清单的逻辑 backing 行可为 `{ byteLength, data }`（完整 backing 的 canonical base64url）或 `{ byteLength, sha256 }`（原生 sidecar）；无完整性要求的原生行只有 `{ byteLength }`。带 `data` 的行不消耗物理 sidecar，其他行依序消费。
 
