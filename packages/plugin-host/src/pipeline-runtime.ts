@@ -101,14 +101,20 @@ export const registerPluginHostStage = <TDomainCore extends object, TValue>(
   options.lanes.registerOwner(owner, slotState, stage, options.forms)
 }
 
-/** Executes the single host-mode lane and owns lease/depth/pending cleanup. */
-export const executePluginHostPipeline = <TValue>(
+/**
+ * Executes the single host-mode lane and owns lease/depth/pending cleanup. In async modes the
+ * returned Promise settles after cleanup; `result` (when given) supplies its fulfilled value, so a
+ * caller needs no second derived Promise. A runner that throws synchronously still releases its
+ * lease and execution depth before the rejection is returned.
+ */
+export const executePluginHostPipeline = <TValue, TResult = void>(
   options: IPluginHostPipelineExecutionPort<TValue>,
   snapshot: IStageSnapshot<TValue>,
   value: TValue,
   done: (value: TValue) => void,
-  stages = snapshot.stages
-): void | Promise<void> => {
+  stages = snapshot.stages,
+  result?: () => TResult
+): void | Promise<TResult | undefined> => {
   const asynchronous =
     options.mode === MiddlewarePipelineMode.async ||
     options.mode === MiddlewarePipelineMode.asyncGenerator
@@ -120,17 +126,34 @@ export const executePluginHostPipeline = <TValue>(
     }
     const release = options.retainLease(snapshot)
     options.enter()
-    const task = (options.runner.run(stages, value, done) as Promise<void>).finally(() => {
+    /** Runner Promise for this execution; its settlement releases the lease and depth. */
+    let running: Promise<void>
+    try {
+      running = options.runner.run(stages, value, done) as Promise<void>
+    } catch (error) {
       options.leave()
       release()
-    })
+      return Promise.reject(error)
+    }
+    const task = running.then(
+      () => {
+        options.leave()
+        release()
+        return result?.()
+      },
+      (error: unknown) => {
+        options.leave()
+        release()
+        throw error
+      }
+    )
     return options.pending.track(task)
   }
   options.assertActive()
   const release = options.retainLease(snapshot)
   options.enter()
   try {
-    return options.runner.run(stages, value, done)
+    options.runner.run(stages, value, done)
   } finally {
     options.leave()
     release()
