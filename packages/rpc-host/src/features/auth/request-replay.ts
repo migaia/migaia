@@ -27,11 +27,13 @@ export type IRequestReplayEntry = Readonly<{
 /** Refused numeric correlations retain their original source and fixed short expiry. */
 type IRequestReplayRejection = Readonly<{ source: IRequestReplaySource; expiresAt: number }>
 
-/** Equal verified counters share one completed bucket; the source window bounds live buckets to64. */
-type IRequestReplayWindowBucket = {
-  readonly counter: bigint
-  readonly entries: Map<string, IRequestReplayEntry>
-  next?: IRequestReplayWindowBucket
+/** The signed admission window has exactly 64 positions, independent of request concurrency. */
+const requestReplayWindowSlots = 64n
+
+/** Completed IDs share their verified counter's ring slot; active and refused IDs never enter it. */
+type IRequestReplayWindow = {
+  high: bigint
+  readonly slots: (Map<string, IRequestReplayEntry> | undefined)[]
 }
 
 /** Active entries never expire; completed entries follow false, signed-window or individual TTL. */
@@ -42,8 +44,8 @@ export class RequestReplayLedger {
   readonly #completed = new Map<string, IRequestReplayEntry>()
   /** The original short numeric refusal history does not reserve accepted-entry capacity. */
   readonly #rejected = new Map<string, IRequestReplayRejection>()
-  /** Only completed window entries appear in counter order under their original source identity. */
-  readonly #windowHeads = new WeakMap<IRequestReplaySource, IRequestReplayWindowBucket>()
+  /** Each original source retains only completed IDs in its fixed-size signed-counter ring. */
+  readonly #windowRings = new WeakMap<IRequestReplaySource, IRequestReplayWindow>()
   /** Original lifecycle leases count numeric entries only for each admitted direct peer. */
   readonly #peerCounts = createStringLeaseRegistry()
   /** This derived scalar counts numeric active and completed entries without another index. */
@@ -114,49 +116,54 @@ export class RequestReplayLedger {
 
   /** The original signed window may release completed entries, never active business or streams. */
   advanceWindow(source: IRequestReplaySource): void {
-    /** An ordered head lets advancement inspect only expired counters and the first live boundary. */
-    let head = this.#windowHeads.get(source)
-    while (head && this.#outsideWindow(source, head.counter)) {
-      for (const [key, entry] of head.entries) {
-        this.#completed.delete(key)
-        this.#release(key, entry)
-      }
-      head = head.next
+    /** No completed window identity means there is no expiry work or counter snapshot to advance. */
+    const ring = this.#windowRings.get(source)
+    if (!ring) return
+    /** Admission owns this monotonic high counter; out-of-order messages leave it unchanged. */
+    const high = source.window!.high
+    /** Newly expired counters are precisely (oldHigh - 64, high - 64]. */
+    const distance = high - ring.high
+    /** A jump of at least 64 expires every old slot, so no advance visits more than 64 slots. */
+    const steps = Number(distance < requestReplayWindowSlots ? distance : requestReplayWindowSlots)
+    /** (oldHigh + 1) % 64 equals (oldHigh - 63) % 64 without negative early-counter indices. */
+    let index = Number((ring.high + 1n) % requestReplayWindowSlots)
+    // The ring is allocated with exactly 64 slots below; this loop has a compile-time fixed bound.
+    for (let step = 0; step < steps; step++) {
+      /** Remove the original completed slot before releasing its owned membership. */
+      const entries = ring.slots[index]
+      ring.slots[index] = undefined
+      if (entries)
+        for (const [key, entry] of entries) {
+          this.#completed.delete(key)
+          this.#release(key, entry)
+        }
+      index = (index + 1) % ring.slots.length
     }
-    if (head) this.#windowHeads.set(source, head)
-    else this.#windowHeads.delete(source)
+    ring.high = high
   }
 
-  /** Insert out-of-order completions among at most64 live counters from the fixed64-slot window. */
+  /** Out-of-order completions insert directly into their counter slot, without ordering active IDs. */
   #queueWindow(key: string, entry: IRequestReplayEntry): void {
     this.advanceWindow(entry.source)
-    /** Old active requests settle directly when expired and never reach this completed queue. */
-    const counter = entry.counter!
-    /** Expired buckets were consumed above, so distinct counters here are bounded by64. */
-    const head = this.#windowHeads.get(entry.source)
-    if (!head || counter < head.counter) {
-      this.#windowHeads.set(entry.source, {
-        counter,
-        entries: new Map([[key, entry]]),
-        next: head
-      })
-      return
-    }
-    /** This walk is bounded by the protocol's fixed64 counters, independent of active key count. */
-    let bucket = head
-    while (bucket.next && bucket.next.counter <= counter) bucket = bucket.next
-    if (bucket.counter === counter) bucket.entries.set(key, entry)
-    else
-      bucket.next = {
-        counter,
-        entries: new Map([[key, entry]]),
-        next: bucket.next
+    /** Old active requests settle directly when expired and never reach this completed ring. */
+    let ring = this.#windowRings.get(entry.source)
+    if (!ring) {
+      ring = {
+        high: entry.source.window!.high,
+        slots: Array<Map<string, IRequestReplayEntry> | undefined>(Number(requestReplayWindowSlots))
       }
+      this.#windowRings.set(entry.source, ring)
+    }
+    /** Two live counters cannot collide modulo 64 within the admitted 64-slot window. */
+    const index = Number(entry.counter! % requestReplayWindowSlots)
+    /** Equal-counter logical group members share one original completion bucket. */
+    const entries = (ring.slots[index] ??= new Map())
+    entries.set(key, entry)
   }
 
   /** Source retirement uses only its original owned keys and fences every late completion. */
   retire(source: IRequestReplaySource): void {
-    this.#windowHeads.delete(source)
+    this.#windowRings.delete(source)
     for (const key of source.replayKeys) {
       /** Exact original source identity prevents cleanup from touching a reused correlation. */
       const entry = this.#active.get(key) ?? this.#completed.get(key)
@@ -172,7 +179,7 @@ export class RequestReplayLedger {
 
   /** These existing source/counter fields are present only after verified window-mode admission. */
   #outsideWindow(source: IRequestReplaySource, counter: bigint): boolean {
-    return source.window!.high - counter >= 64n
+    return source.window!.high - counter >= requestReplayWindowSlots
   }
 
   /** Every caller removes its exact map entry first, so capacity and membership release once. */

@@ -395,6 +395,13 @@ it('A30 advances only expired completed counters with many active identities', (
     expect(ledger.has('completed-516', 0)).toBe(true)
     expect(ledger.has('active-1', 0)).toBe(true)
     expect(source.replayKeys.size).toBe(514)
+    /** A jump past the whole ring releases its remaining completions while active IDs survive. */
+    high = 1_000n
+    removed.mockClear()
+    ledger.advanceWindow(source)
+    expect(iterations).not.toHaveBeenCalled()
+    expect(removed.mock.calls).toEqual([['completed-515'], ['completed-516']])
+    expect(source.replayKeys.size).toBe(512)
   } finally {
     iterations.mockRestore()
     removed.mockRestore()
