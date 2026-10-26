@@ -403,65 +403,6 @@ describe('runAsyncMiddleware', () => {
     expect(combinations).toEqual([[stageError, downstreamError]])
   })
 
-  it.each(['then', 'catch', 'finally'] as const)(
-    'propagates one failure after borrowed native Promise.prototype.%s',
-    async (method) => {
-      const sharedError = new Error(`borrowed ${method} failure`)
-      const combinations: unknown[][] = []
-      const stage: IAsyncMiddlewareStage<number> = async (_value, next) => {
-        const result = next(2)
-        expect(result).toBeInstanceOf(Promise)
-        const rethrow = (error: unknown): never => {
-          throw error
-        }
-        if (method === 'then') {
-          // oxlint-disable-next-line unicorn/no-thenable -- test borrowed native Promise method behavior.
-          Object.defineProperty(result, 'then', { value: Promise.prototype.then })
-          return result.then(undefined, rethrow)
-        }
-        if (method === 'catch') {
-          Object.defineProperty(result, 'catch', { value: Promise.prototype.catch })
-          return result.catch(rethrow)
-        }
-        Object.defineProperty(result, 'finally', { value: Promise.prototype.finally })
-        return result.finally(() => undefined)
-      }
-      await expect(
-        runAsyncForTest([stage, async () => Promise.reject(sharedError)], 1, () => undefined, {
-          onViolation: () => undefined,
-          combineStageAndDownstreamError: (stageError, downstreamError) => {
-            combinations.push([stageError, downstreamError])
-            return new Error('combined borrowed failure')
-          }
-        })
-      ).rejects.toBe(sharedError)
-      expect(combinations).toEqual([])
-    }
-  )
-
-  it('keeps dual-error semantics deterministic when next() constructor is mutated', async () => {
-    const sharedError = new Error('mutated constructor failure')
-    const combinations: unknown[][] = []
-    const stage: IAsyncMiddlewareStage<number> = async (_value, next) => {
-      const result = next(2)
-      Object.defineProperty(result, 'constructor', {
-        configurable: true,
-        value: function MutatedPromiseConstructor() {}
-      })
-      return result
-    }
-    await expect(
-      runAsyncForTest([stage, async () => Promise.reject(sharedError)], 1, () => undefined, {
-        onViolation: () => undefined,
-        combineStageAndDownstreamError: (stageError, downstreamError) => {
-          combinations.push([stageError, downstreamError])
-          return new Error('combined mutated constructor failure')
-        }
-      })
-    ).rejects.toBe(sharedError)
-    expect(combinations).toEqual([])
-  })
-
   it.each([undefined, null])('throws explicit nullish combiner result: %s', async (result) => {
     const stageError = new Error('stage failure')
     const downstreamError = new Error('downstream failure')

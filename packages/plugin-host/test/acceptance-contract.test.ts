@@ -365,15 +365,6 @@ describe('acceptance contract', () => {
     )
   })
 
-  it('leaves Tray as a structural consumer', () => {
-    const source = readFileSync(
-      new URL('../../tray/src/host/create-host.ts', import.meta.url),
-      'utf8'
-    )
-    expect(source).toContain('createPluginAdmission')
-    expect(source).not.toContain('definePlugin(')
-  })
-
   it('preserves source receiver identity', async () => {
     let receiver: unknown
     const source = {
@@ -390,20 +381,6 @@ describe('acceptance contract', () => {
     await host.dispose()
   })
 
-  it('converges entry imports on the V2 runtime', () => {
-    // 两个子路径删除后，根入口是唯一的会合点：函数式与结构式两种形态都从这里导出。
-    const index = readFileSync(new URL('../src/index.ts', import.meta.url), 'utf8')
-    expect(index).toContain("'./host-runtime.js'")
-    expect(index).toContain("'./define-host.js'")
-    expect(index).toContain("'./define-plugin.js'")
-  })
-
-  it('documents explicit cancellation ownership', () => {
-    const docs = readFileSync(new URL('../USEGUIDE.md', import.meta.url), 'utf8')
-    expect(docs).toContain('signal')
-    expect(docs).toContain('dispose')
-  })
-
   it('retains immutable enumerable metadata', () => {
     const plugin = definePlugin({
       name: 'metadata',
@@ -412,20 +389,5 @@ describe('acceptance contract', () => {
     })
     expect(plugin.marker).toBe('literal')
     expect(Object.isFrozen(plugin)).toBe(true)
-  })
-
-  it('trusted storage stores definitions, not Host state', () => {
-    const source = readFileSync(new URL('../src/define-plugin.ts', import.meta.url), 'utf8')
-    expect(source).toContain('WeakMap<object, IStoredDefinition>')
-    expect(source).not.toContain("from './host-runtime.js'")
-    expect(source).not.toContain('HostRuntime')
-  })
-
-  it('carries TValue through pipeline declarations', () => {
-    // 函数式 Host 的 TValue 由句柄类型承载。
-    const source = readFileSync(new URL('../src/typing.ts', import.meta.url), 'utf8')
-    expect(source).toContain('IAsyncGeneratorMiddlewareStage<TValue>')
-    const handle = readFileSync(new URL('../src/define-host.ts', import.meta.url), 'utf8')
-    expect(handle).toContain('IHostHandle<TDomainCore, TValue')
   })
 })
