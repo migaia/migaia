@@ -9,7 +9,7 @@ for (const peer of peers.filter((value) => ['python', 'go', 'rust'].includes(val
     /** The fixture installs the actual new process Peer over its original supervised binding. */
     const active = await client(peer, false, randomUUID())
     try {
-      assert.equal(await active.feature.request(['before-close']), 'before-close')
+      assert.equal(await active.namespace.request('p.f.request', ['before-close']), 'before-close')
       /** Repeated closure must share the original generation owner's completion Promise. */
       const closing = active.close()
       assert.equal(active.close(), closing)
@@ -17,17 +17,15 @@ for (const peer of peers.filter((value) => ['python', 'go', 'rust'].includes(val
       await Promise.all(active.handles.map((handle) => handle.exited))
       assert.equal(
         wireFrames(active.sent).filter(
-          (frame) => frame.kind === 'variation' && frame.data.route.variation === 'close'
+          (frame) => frame.kind === 'control' && frame.operation === 'close'
         ).length,
         1,
         'managed process closure sends the original native close before disposing its endpoint'
       )
       /** A released caller cannot emit another physical frame or acquire a replacement. */
       const sent = active.sent.length
-      await expect(
-        Promise.resolve().then(() => active.feature.request(['after-close']))
-      ).rejects.toMatchObject({
-        code: 'REMOTE_CLOSED'
+      await expect(active.namespace.request('p.f.request', ['after-close'])).rejects.toMatchObject({
+        code: 'ENDPOINT_DISPOSED'
       })
       assert.equal(active.sent.length, sent)
     } finally {
@@ -46,16 +44,16 @@ it('managed native cancellation reaches the independent provider', async () => {
   const controller = new AbortController()
   try {
     /** Attach rejection before cancellation so fixture timing cannot create an unhandled Promise. */
-    const waiting = active.runtime.endpoint.send(peer.id, 'peer.wait', [], {
+    const waiting = active.namespace.request('peer.wait', [], {
       signal: controller.signal
     })
     const rejected = expect(waiting).rejects.toMatchObject({ code: expected.cancel.expectedCode })
     // The FIFO provider barrier proves that wait arrived before the signal is aborted.
-    await active.runtime.endpoint.send(peer.id, 'peer.received', [])
+    await active.namespace.request('peer.received', [])
     controller.abort(new RangeError(expected.cancel.reason))
     await rejected
     /** The provider records the cancellation independently of the caller's rejected Promise. */
-    const reasons = await active.runtime.endpoint.send(peer.id, 'peer.aborts', [])
+    const reasons = await active.namespace.request('peer.aborts', [])
     assert.equal(
       Array.isArray(reasons) && reasons.length,
       1,

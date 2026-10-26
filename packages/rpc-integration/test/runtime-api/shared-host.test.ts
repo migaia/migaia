@@ -6,7 +6,11 @@ import { it, vi } from 'vitest'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import type { IRpcNamespace } from '@migaia/rpc-host'
-import type { IRpcNativeMemberControls } from '@migaia/rpc-host/sdk'
+import {
+  rpcHostPipelines,
+  rpcFlowPlugin,
+  type IRpcNativeMemberControls
+} from '@migaia/rpc-host/sdk'
 import { limits } from '@migaia/rpc-host/plugins/limits'
 import {
   createUnitBudget,
@@ -176,7 +180,14 @@ it('default native source retains ordinary Host calls and truthfully negotiated 
   /** The existing native channel owns expected best-effort degradation, separate from failures. */
   const notices: unknown[] = []
   /** This is the sole receiving ordinary native PluginHost. */
+  const rpc = rpcHostPipelines(
+    () => host,
+    (name) => host.pipeline(name),
+    ['process']
+  )
+  /** The same native owner declares its transport group before installation. */
   const host = defineHost({
+    ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
   /** BC3 moves former transport provide to ordinary Feature exposure without another Host. */
@@ -231,7 +242,14 @@ it('genuine process and thread Plugin installs share one final Host provider key
   /** This case owns its original native notices independently from the first case's observations. */
   const notices: unknown[] = []
   /** Both native plugins install into this exact original PluginHost instance. */
+  const rpc = rpcHostPipelines(
+    () => host,
+    (name) => host.pipeline(name),
+    ['process', 'thread', 'failed-process']
+  )
+  /** All transport groups borrow this exact original provider and installation owner. */
   const host = defineHost({
+    ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
   /** The same original application Feature owns FIFO and quota provider state. */
@@ -246,7 +264,10 @@ it('genuine process and thread Plugin installs share one final Host provider key
   const candidateBudget = createUnitBudget({ kind: 'process', maxUnits: 1, launchRate: false })
   try {
     /** The original committed policy keeps its genuine global256/per-peer64 default capacity. */
-    await host.use(servicePlugin(business.service), limits())
+    await host.use(
+      servicePlugin(business.service),
+      rpcFlowPlugin([limits()], ['process', 'thread', 'failed-process'])
+    )
     for (const index of [0, 1]) {
       /** Both factories acquire their genuine original native runtime and SDK member owner. */
       const options = {
