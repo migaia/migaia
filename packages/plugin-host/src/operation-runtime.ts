@@ -1,5 +1,4 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
-import { reportDiagnostic } from './diagnostic-report.js'
 import { boundedWait, createGenerationController, type IGenerationRequest } from '@migaia/lifecycle'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import ERROR_TEXT, { PluginHostError } from './error-text.js'
@@ -65,19 +64,12 @@ export class PluginHostOperationRuntime {
     try {
       this.#controller.supersede(timeout)
     } catch (secondary) {
-      try {
-        Object.defineProperty(timeout, 'errors', {
-          value: Object.freeze([secondary]),
-          enumerable: true,
-          configurable: true
-        })
-      } catch (attachFailure) {
-        // The timeout primary remains authoritative; the attach failure is reported instead.
-        reportDiagnostic(
-          this.#options.diagnostic,
-          ERROR_TEXT.CAUSE_ATTACH_FAILED(String(attachFailure))
-        )
-      }
+      // The timeout primary stays authoritative; the supersession failure travels with it.
+      Object.defineProperty(timeout, 'errors', {
+        value: Object.freeze([secondary]),
+        enumerable: true,
+        configurable: true
+      })
     }
     throw timeout
   }

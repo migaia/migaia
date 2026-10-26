@@ -779,11 +779,7 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     if (thenable?.kind === 'thenable') {
       const rejection = createPluginHostTypeError(text)
       void assimilateCapturedThen(thenable.thenFn, value).catch((error) => {
-        try {
-          Object.defineProperty(rejection, 'cause', { value: error })
-        } catch (attachFailure) {
-          this.#reportThenableRejection(ERROR_TEXT.CAUSE_ATTACH_FAILED(String(attachFailure)))
-        }
+        Object.defineProperty(rejection, 'cause', { value: error })
         this.#reportThenableRejection(error)
       })
       throw rejection

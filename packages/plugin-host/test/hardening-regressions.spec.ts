@@ -7,9 +7,7 @@ import {
   PluginHost,
   PluginHostError
 } from '../src/index.js'
-import { createAbortController } from '@migaia/lifecycle'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { PluginHostOperationRuntime } from '../src/operation-runtime.js'
 
 class Host extends PluginHost<Record<string, never>, string> {
   /** Supplies an explicit unbounded test policy while preserving test overrides. */
@@ -26,112 +24,6 @@ class Host extends PluginHost<Record<string, never>, string> {
 }
 
 describe('native Feature synchronous installation', () => {
-  it('cause chain: reports each rejected Feature and install attachment failure without replacing its primary error', async () => {
-    const attachmentFailure = new Error('feature-install-cause-attach-failed')
-    const originalDefineProperty = Object.defineProperty
-    const defineProperty = vi.spyOn(Object, 'defineProperty').mockImplementation(((
-      target,
-      key,
-      descriptor
-    ) => {
-      if (key === 'cause') throw attachmentFailure
-      return originalDefineProperty(target, key, descriptor)
-    }) as typeof Object.defineProperty)
-    try {
-      for (const [name, createPlugin] of [
-        [
-          'feature-cause-attachment',
-          (name: string) => {
-            let reject!: (error: unknown) => void
-            const feature = defineFeature((() => ({
-              // oxlint-disable-next-line unicorn/no-thenable -- host must retain the original late rejection.
-              then: (_resolve: unknown, onReject: (error: unknown) => void) => (reject = onReject)
-            })) as never)
-            const plugin = definePlugin({
-              name,
-              features: { feature },
-              featureExpose: {},
-              install: () => ({})
-            })
-            return { plugin, reject: () => reject(new Error('feature-late-rejection')) }
-          }
-        ],
-        [
-          'install-cause-attachment',
-          (name: string) => {
-            let reject!: (error: unknown) => void
-            const plugin = definePlugin({
-              name,
-              featureExpose: {
-                // oxlint-disable-next-line unicorn/no-thenable -- hook result is deliberately hostile.
-                then: (_resolve: unknown, onReject: (error: unknown) => void) => (reject = onReject)
-              },
-              install: () => ({})
-            })
-            return { plugin, reject: () => reject(new Error('install-late-rejection')) }
-          }
-        ]
-      ] as const) {
-        const diagnostics: string[] = []
-        const candidate = createPlugin(name)
-        const host = new Host({ diagnostic: (message: string) => diagnostics.push(message) })
-        let caught: unknown
-        try {
-          await host.use(candidate.plugin as never)
-        } catch (error) {
-          caught = error
-        }
-        expect(caught).toBeInstanceOf(PluginHostError)
-        const primary = (caught as PluginHostError).cause
-        candidate.reject()
-        await Promise.resolve()
-        await Promise.resolve()
-        expect((caught as PluginHostError).cause).toBe(primary)
-        expect(diagnostics.join('|')).toContain('failed to attach error cause')
-      }
-    } finally {
-      defineProperty.mockRestore()
-    }
-  })
-
-  it('cause chain: timeout error attachment failure is diagnostic-only when supersession also fails', async () => {
-    const scheduler = createManualScheduler()
-    const diagnostics: string[] = []
-    const runtime = new PluginHostOperationRuntime({
-      parentSignal: createAbortController().signal,
-      scheduler,
-      timeoutMs: 1,
-      isHostOpen: () => true,
-      diagnostic: (message) => diagnostics.push(message)
-    })
-    const registration: Record<string, never> = {}
-    const request = runtime.begin(registration)
-    // Generation controllers are created on first signal read; read it so supersession aborts a
-    // real controller whose abort() the spy below makes fail.
-    expect(request.signal.aborted).toBe(false)
-    const abort = vi.spyOn(AbortController.prototype, 'abort').mockImplementation(() => {
-      throw new Error('supersede-failed')
-    })
-    const originalDefineProperty = Object.defineProperty
-    const defineProperty = vi.spyOn(Object, 'defineProperty').mockImplementation(((
-      target,
-      key,
-      descriptor
-    ) => {
-      if (key === 'errors') throw new Error('timeout-errors-attach-failed')
-      return originalDefineProperty(target, key, descriptor)
-    }) as typeof Object.defineProperty)
-    try {
-      const pending = runtime.await(new Promise<never>(() => {}), registration)
-      scheduler.advance(1)
-      await expect(pending).rejects.toMatchObject({ code: 'MUTATION_EXECUTION_TIMEOUT' })
-      expect(diagnostics.join('|')).toContain('failed to attach error cause')
-    } finally {
-      defineProperty.mockRestore()
-      abort.mockRestore()
-    }
-  })
-
   it('uses the same registration initializer for useSync', () => {
     const feature = defineFeature(() => ({ value: () => 7 }))
     const plugin = definePlugin({

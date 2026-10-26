@@ -178,11 +178,7 @@ export const instantiateFeatures = (
       }
       if (thenable?.kind === 'thenable')
         void assimilateCapturedThen(thenable.thenFn, output).catch((error) => {
-          try {
-            Object.defineProperty(rejection, 'cause', { value: error })
-          } catch (attachFailure) {
-            reportRejection(ERROR_TEXT.CAUSE_ATTACH_FAILED(String(attachFailure)))
-          }
+          Object.defineProperty(rejection, 'cause', { value: error })
           reportRejection(error)
         })
       throw rejection
