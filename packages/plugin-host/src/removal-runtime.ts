@@ -28,6 +28,7 @@ type IPluginHostRemovalRuntimePort<TDomainCore extends object, TValue> = Readonl
     registration: IRegistration<TDomainCore, TValue> | undefined
   ) => void
   readonly setBeforeReleaseRegistration: (registration: IRegistration<TDomainCore, TValue>) => void
+  /** Clears the running-hook and pending-release marks only while this registration owns them. */
   readonly clearBeforeReleaseRegistrationIfOwner: (
     registration: IRegistration<TDomainCore, TValue>
   ) => void
@@ -158,24 +159,32 @@ export class PluginHostRemovalRuntime<TDomainCore extends object, TValue> {
         )
     }
     const pluginDispose = this.#resolvePluginDispose(registration)
-    if (registration.installed && pluginDispose)
-      errors.push(
-        ...(await this.#port.cleanupRuntime.disposeGroup(
-          [
-            async () => {
-              this.#port.setHookRegistration(registration)
-              try {
-                await pluginDispose()
-              } finally {
-                this.#port.setHookRegistration(undefined)
+    if (registration.installed && pluginDispose) {
+      try {
+        errors.push(
+          ...(await this.#port.cleanupRuntime.disposeGroup(
+            [
+              async () => {
+                this.#port.setHookRegistration(registration)
+                try {
+                  await pluginDispose()
+                } finally {
+                  // A disposer that settles after its bounded step must not clear a later hook.
+                  this.#port.clearBeforeReleaseRegistrationIfOwner(registration)
+                }
               }
-            }
-          ],
-          PluginHostInternalText.PLUGIN_DISPOSE_PHASE,
-          preserveErrorIdentity,
-          registration
-        ))
-      )
+            ],
+            PluginHostInternalText.PLUGIN_DISPOSE_PHASE,
+            preserveErrorIdentity,
+            registration
+          ))
+        )
+      } finally {
+        // The bounded group returns on timeout even when the disposer never settles; the Host
+        // must accept mutations again once its cleanup step is over.
+        this.#port.clearBeforeReleaseRegistrationIfOwner(registration)
+      }
+    }
     if (registration.provisional) {
       try {
         await registration.provisional.rollback()
