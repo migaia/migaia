@@ -440,11 +440,7 @@ export class Namespace {
   ): void => {
     assertTrace(options)
     try {
-      void this.#invoke(
-        this.#direct(address, options),
-        { mode: 'notify', method, payload },
-        options
-      ).catch(this.#options.report)
+      this.#dispatch(this.#direct(address, options), { mode: 'notify', method, payload }, options)
     } catch (error) {
       this.#options.report(error)
     }
@@ -462,9 +458,11 @@ export class Namespace {
     }
     for (const selection of this.#targets())
       if (selection.view.peerId !== excludePeerId)
-        this.dispatch(selection.view.peerId, input.method, input.data as IRpcPortableValue, {
-          signal
-        })
+        this.#dispatch(
+          selection,
+          { mode: 'notify', method: input.method, payload: input.data as IRpcPortableValue },
+          { signal }
+        )
   }
 
   /** Each selected target executes its steps in order and retains its own not-executed suffix. */
@@ -628,6 +626,19 @@ export class Namespace {
   ): Promise<unknown> => {
     if ('method' in command) this.#assertMethod(selection, command.method, command.mode)
     return this.#options.calls.invoke(callTarget(selection), command, options)
+  }
+
+  /** Fire-and-report keeps an already selected target instead of resolving its identity again. */
+  #dispatch(
+    selection: IRpcSessionSelection,
+    command: ICallCommand,
+    options: IRpcCallOptions
+  ): void {
+    try {
+      void this.#invoke(selection, command, options).catch(this.#options.report)
+    } catch (error) {
+      this.#options.report(error)
+    }
   }
 
   /** Directed selection failures remain asynchronous public rejections, as in the original host. */

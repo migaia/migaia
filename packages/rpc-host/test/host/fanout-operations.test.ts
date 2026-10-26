@@ -1,10 +1,54 @@
 import { setImmediate as nextTurn } from 'node:timers/promises'
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
-import { createRpcHost } from '@migaia/rpc-host'
+import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
 import { coreMemoryServer } from './core-fixture.js'
 import { idempotency } from '@migaia/rpc-host/plugins/idempotency'
 import { key, fanout, items, containsCause, nativeHosts } from './fanout-fixture.js'
+
+it('context broadcasts retain each selected peer when another name equals its instanceId', async () => {
+  /** A provider dispatches through the genuine business context and accepted namespace index. */
+  const server = coreMemoryServer('notification-hub')
+  /** Each receiver records actual provider execution, independently of physical write completion. */
+  const delivered: string[] = []
+  /** Fire-and-report failures remain independently visible. */
+  const reports: unknown[] = []
+  /** The original caller is excluded while the other two native connections receive one call each. */
+  const host = await createRpcHost({
+    ...server.options,
+    report: (error) => reports.push(error),
+    provide: {
+      broadcast: (_value, context: IRpcContext) => {
+        context.dispatchTo({ method: 'notice', data: 42 })
+        return true
+      }
+    }
+  })
+  /** Logical name priority must not reinterpret an already selected sibling's physical identity. */
+  const first = await server.connect(
+    'first',
+    { provide: { notice: () => delivered.push('first') } },
+    'second-name'
+  )
+  /** This peer's display name deliberately matches the first peer's separate instance address. */
+  const second = await server.connect(
+    'second-name',
+    { provide: { notice: () => delivered.push('second') } },
+    'second-id'
+  )
+  /** The initiating public Host has its own identity and notification provider. */
+  const caller = await server.connect('caller', {
+    provide: { notice: () => delivered.push('caller') }
+  })
+  try {
+    expect(await caller.host.memory.send('notification-hub', 'broadcast')).toBe(true)
+    await nextTurn()
+    expect(delivered).toEqual(['first', 'second'])
+    expect(reports).toEqual([])
+  } finally {
+    await Promise.all([caller.host.close(), second.host.close(), first.host.close(), host.close()])
+  }
+})
 
 it('reports a missing directed dispatch synchronously once on the genuine public namespace', async () => {
   /** Only the actual configured public reporter contributes the original diagnostic. */
