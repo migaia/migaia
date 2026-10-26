@@ -1,4 +1,3 @@
-import * as resilienceOwner from '../../../rpc-plugin-process/dist/process/resilience/index.js'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
 import { createProcessResilience } from '../../../rpc-plugin-process/dist/process/resilience/index.js'
@@ -89,16 +88,15 @@ describe('process resilience terminal registration', () => {
       kind: 'standalone-host',
       release
     })
-    const guard = resilience.callGuard('p')
     const failure = new Error('terminal')
     supervisor.enter(failure)
     await settle()
     expect(reports).toEqual([failure])
     expect(registration.inspect()).toMatchObject({ state: 'terminal', unhandled: 1 })
     expect(scheduler.pendingCount).toBe(1)
-    expect(() =>
-      guard.beforeDispatch({ method: 'request', mode: 'request', generation: 1 })
-    ).toThrowError(expect.objectContaining({ code: 'PROCESS_TERMINAL_CALL' }))
+    expect(() => resilience.assertAvailable('p')).toThrowError(
+      expect.objectContaining({ code: 'PROCESS_TERMINAL_CALL' })
+    )
     scheduler.advance(60_000)
     await settle()
     expect(reports).toHaveLength(2)
@@ -110,9 +108,9 @@ describe('process resilience terminal registration', () => {
     expect(reports).toHaveLength(4)
     expect(release).toHaveBeenCalledOnce()
     expect(registration.inspect()).toMatchObject({ liquidated: true, unhandled: 4 })
-    expect(() =>
-      guard.beforeDispatch({ method: 'request', mode: 'request', generation: 1 })
-    ).toThrowError(expect.objectContaining({ code: 'PROCESS_LIQUIDATED' }))
+    expect(() => resilience.assertAvailable('p')).toThrowError(
+      expect.objectContaining({ code: 'PROCESS_LIQUIDATED' })
+    )
     expect(scheduler.pendingCount).toBe(0)
     await registration.close()
     await resilience.close()
@@ -179,7 +177,6 @@ describe('process resilience terminal registration', () => {
       kind: 'standalone-host',
       release: async () => undefined
     })
-    const guard = resilience.callGuard('p')
     supervisor.enter(new Error('terminal'))
     await settle()
     const closing = registration.close()
@@ -187,9 +184,7 @@ describe('process resilience terminal registration', () => {
     await closing
     expect(registration.inspect()).toBeUndefined()
     expect(resilience.inspect('p')).toBeUndefined()
-    expect(() =>
-      guard.beforeDispatch({ method: 'request', mode: 'request', generation: 1 })
-    ).not.toThrow()
+    expect(() => resilience.assertAvailable('p')).not.toThrow()
     await registration.restart()
     expect(supervisor.restart).toHaveBeenCalledOnce()
     await resilience.close()
@@ -270,14 +265,9 @@ it('passive liquidation notifications follow successful cleanup and cannot handl
     release
   })
   try {
-    /** Reflection preserves a semantic RED before the private passive seam has been added. */
-    const listen = Reflect.get(resilienceOwner, 'listenProcessLiquidated')
-    expect(
-      typeof listen,
-      'the original governor exposes passive successful-liquidation facts'
-    ).toBe('function')
+    /** The existing governor exposes passive facts after the original cleanup commits. */
     const notifications: unknown[] = []
-    const unsubscribe = listen(resilience, (snapshot: unknown) => {
+    const unsubscribe = resilience.onLiquidated((snapshot: unknown) => {
       notifications.push(snapshot)
       expect(resilience.inspect('p')?.liquidated).toBe(true)
     })
