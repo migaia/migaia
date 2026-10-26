@@ -470,3 +470,40 @@ it('keeps probe configuration callbacks outside its private mutable state', () =
     emitter.dispose()
   }
 })
+
+it('observes an onError thenable rejection through the original fallback reporter', async () => {
+  /** A returned diagnostic thenable must be observed without changing business observation. */
+  const original = new Error('asynchronous probe reporter failed')
+  /** Count attachment at the actual callback-returned thenable, not a fake report hook. */
+  let observed = 0
+  const failures: unknown[] = []
+  const probe = defineProbe({
+    stages: ['message'],
+    emit() {
+      throw new Error('probe callback failed')
+    },
+    onError() {
+      return {
+        // oxlint-disable-next-line unicorn/no-thenable -- This fixture is the actual rejected callback result.
+        then(_resolve: unknown, reject: (error: unknown) => void) {
+          observed++
+          reject(original)
+        }
+      }
+    }
+  })
+  const emitter = createProbeEmitter(
+    [probe],
+    () => 0,
+    'async-reporter',
+    (error) => failures.push(error)
+  )
+  try {
+    emitter.emit({ stage: RpcProbeStage.message })
+    expect(observed).toBe(1)
+    await Promise.resolve()
+    expect(failures).toEqual([original])
+  } finally {
+    emitter.dispose()
+  }
+})

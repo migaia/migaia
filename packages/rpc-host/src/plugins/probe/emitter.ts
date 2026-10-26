@@ -10,6 +10,7 @@ import {
 } from '@migaia/rpc-contract/interfaces'
 import { createRpcError } from '../../host/error-owner.js'
 import { tagRpcError, RpcCoreErrorText } from '@migaia/rpc-contract/errors'
+import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcCarrierFrameKind } from '@migaia/rpc-contract/protocol'
 import { defaultRpcReporter, reportDiagnostic } from '../../host/report.js'
@@ -317,8 +318,13 @@ class ProbeEmitter {
     /** Failure allocation occurs only on the report path, never for successful events. */
     const failure = createRpcError(RpcCoreErrorCode.probeFailed, ProbeText.failure, error)
     try {
-      if (state.onError) (0, state.onError)(failure)
-      else reportDiagnostic(this.#reporter, failure)
+      if (state.onError) {
+        /** Observe a returned diagnostic job without waiting or recursively calling its reporter. */
+        const result: unknown = (0, state.onError)(failure)
+        observeThenableRejection(result, inspectThenable(result), (error) =>
+          reportDiagnostic(this.#reporter, error)
+        )
+      } else reportDiagnostic(this.#reporter, failure)
     } catch (reporterError) {
       reportDiagnostic(this.#reporter, reporterError)
     }
