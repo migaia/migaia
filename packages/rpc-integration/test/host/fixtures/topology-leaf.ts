@@ -68,7 +68,7 @@ export class TopologyLeaf {
   snapshot(): ITopologyLeafSnapshot {
     return {
       instanceId: this.#instanceId,
-      pid: process.pid,
+      pid: globalThis.process?.pid ?? 0,
       echoCalls: this.#echoCalls,
       failCalls: this.#failCalls,
       waitCalls: this.#waitCalls,
