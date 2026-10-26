@@ -189,6 +189,7 @@ export class RpcBytePump {
         }
         /** Only the native reader determines message boundaries and end-of-input. */
         const next = await this.#read()
+        if (this.#closed) return
         if (next.done) {
           await this.#end()
           return

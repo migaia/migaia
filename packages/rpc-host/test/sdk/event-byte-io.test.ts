@@ -1,7 +1,30 @@
 import { PassThrough, Writable } from 'node:stream'
 import { deferred } from '@migaia/utils/promise'
 import { expect, it, vi } from 'vitest'
-import { RpcEventByteIO } from '@migaia/rpc-host/sdk'
+import { RpcBytePump, RpcEventByteIO } from '@migaia/rpc-host/sdk'
+
+it('does not report an explicit byte-pump cleanup rejection again from its cancelled native read', async () => {
+  /** Native cancellation resolves the actual pending read while the same close joins writer cleanup. */
+  const reader = new ReadableStream<Uint8Array>().getReader()
+  /** The original native sink supplies one real cleanup failure. */
+  const failure = new Error('native writer abort failed')
+  const writer = new WritableStream<Uint8Array>({
+    abort() {
+      throw failure
+    }
+  }).getWriter()
+  const reports: unknown[] = []
+  const io = new RpcBytePump(reader, writer, () => undefined, {
+    closedError: () => new Error('byte pump closed'),
+    cleanupFailed: (errors) => new AggregateError(errors, 'byte-pump cleanup failed'),
+    report: (error) => reports.push(error)
+  }).value
+  io.onData(() => undefined)
+  await Promise.resolve()
+  await expect(io.close()).rejects.toMatchObject({ errors: [failure] })
+  await new Promise<void>((resolve) => setImmediate(resolve))
+  expect(reports).toEqual([])
+})
 
 it('preserves paused delivery, original terminal replay and physical-close-before-listeners ordering', async () => {
   /** Native readable state, rather than a second byte queue, owns paused chunks. */
