@@ -1,5 +1,10 @@
 /** Public lifetime and native rollback oracles for the new single-owner RPC installation. */
-import { defineHost, defineFeature, definePlugin } from '@migaia/plugin-host'
+import {
+  defineHost,
+  defineFeature,
+  definePlugin,
+  getPluginRuntimeIntegration
+} from '@migaia/plugin-host'
 import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
 import { defineFlowPlugin, defineTransportPlugin, rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { linkPolicy } from '@migaia/rpc-host/plugins/link-policy'
@@ -347,5 +352,116 @@ it('reclaims a silent same-name Session with one ping and rejects a third concur
     vi.useRealTimers()
     await first.host.close()
     await host.close()
+  }
+})
+
+// RPC-TEST-CD50052EF4A5-C002: preserve same-batch value identity and both acquired cleanup receipts.
+it('rolls back both native dependency owners once without replacing their original value or primary', async () => {
+  /** Both selected Feature outputs and RPC declarations belong to this same real native Host. */
+  const rpc = rpcHostPipelines(
+    () => native,
+    (name) => native.pipeline(name),
+    ['memory']
+  )
+  /** Ordinary installation, rollback and final disposal retain their actual native owner. */
+  const native = defineHost({
+    ...rpc,
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+  })
+  /** The consumer must receive this exact earlier output, without a copied shared-port facade. */
+  const firstValue = Object.freeze({ owner: 'first' })
+  /** Only these original native callbacks count the two independent acquired resources. */
+  const disposals = { resource: 0, feature: 0, order: [] as string[] }
+  /** The first native registration owns this original resource callback. */
+  const releaseResource = (): void => {
+    disposals.resource += 1
+    disposals.order.push('resource')
+  }
+  /** The second native registration owns its distinct original cleanup callback. */
+  const releaseFeature = (): void => {
+    disposals.feature += 1
+    disposals.order.push('feature')
+  }
+  /** The existing native integration lends revocation checks for the original selected output. */
+  const observed = {
+    providerName: 'transaction-native-first',
+    value: undefined as unknown,
+    authority: undefined as
+      | ReturnType<ReturnType<typeof getPluginRuntimeIntegration>['readFeatureOutputs']>
+      | undefined
+  }
+  /** The exact extension callback must disappear with its failed original registration. */
+  const extensionValue = vi.fn()
+  /** Public native Feature dependencies retain earlier output identity within the same batch. */
+  const first = definePlugin({
+    name: observed.providerName,
+    features: { value: defineFeature(() => firstValue) },
+    install(core) {
+      core.onDispose(releaseResource)
+      return { transactionExtension: extensionValue }
+    }
+  })
+  /** This real dependent registration consumes the earlier Feature, never an old getPort alias. */
+  const second = definePlugin({
+    name: 'transaction-native-second',
+    features: {
+      dependency: defineFeature((_core, dependencies) => dependencies.value, {
+        value: first.getFeature('value')
+      })
+    },
+    install(core) {
+      observed.value = core.features.dependency
+      observed.authority = getPluginRuntimeIntegration(core).readFeatureOutputs(
+        observed.providerName
+      )
+      core.onDispose(releaseFeature)
+      return {}
+    }
+  })
+  /** A later real participant fails only after both original resource acquisitions completed. */
+  const primaryFailure = new Error('later transaction native member failed')
+  /** This actual SDK transport stays in the same failed native batch without an activation shim. */
+  const server = coreMemoryServer('transaction-native-rollback')
+  try {
+    /** The native wrapper retains its public shape while preserving the exact original cause. */
+    const failure = await native
+      .use(
+        first,
+        second,
+        definePlugin({
+          name: 'transaction-native-failure',
+          /** Native level ordering must reach the original dependent resource before this failure. */
+          features: {
+            dependency: defineFeature((_core, dependencies) => dependencies.value, {
+              value: second.getFeature('dependency')
+            })
+          },
+          install() {
+            throw primaryFailure
+          }
+        }),
+        server.transport
+      )
+      .catch((error: unknown) => error)
+    expect((failure as Error).cause).toBe(primaryFailure)
+    expect(observed.value).toBe(firstValue)
+    expect(disposals.resource).toBe(1)
+    expect(disposals.feature).toBe(1)
+    expect(disposals.order).toEqual(['feature', 'resource'])
+    expect(Object.hasOwn(native, 'transactionExtension')).toBe(false)
+    expect(observed.authority).toBeDefined()
+    expect(observed.authority!.outputs.value).toBe(firstValue)
+    expect(() => observed.authority!.assertCurrent('value')).toThrowError(
+      expect.objectContaining({ code: 'REGISTRATION_REVOKED' })
+    )
+    expect(native.dispose).not.toBe(releaseFeature)
+    /** Only actual NativeHost.dispose supplies the shared native completion receipt. */
+    const disposed = native.dispose()
+    expect(native.dispose()).toBe(disposed)
+    await disposed
+    expect(disposals.resource).toBe(1)
+    expect(disposals.feature).toBe(1)
+  } finally {
+    await native.dispose()
   }
 })
