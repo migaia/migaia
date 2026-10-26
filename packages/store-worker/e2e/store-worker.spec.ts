@@ -34,8 +34,8 @@ test('Worker failure retains the original native error and stack across realms',
     {
       name: 'Error',
       message: 'Unable to calculate the requested value',
-      source: 'unknown',
-      code: 'UNKNOWN',
+      source: 'rpc.endpoint',
+      code: 'INTERNAL',
       hasStack: true
     }
   ])
