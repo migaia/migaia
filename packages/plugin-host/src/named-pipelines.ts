@@ -405,17 +405,19 @@ class PluginHostPipeline<TDomainCore extends object, TValue> {
           ? (done(value) as Promise<Awaited<TResult> | undefined>)
           : Promise.resolve(done(value))
       const snapshot = this.#lanes.snapshot()
-      let result: Awaited<TResult> | undefined
+      /** The terminal's own return value; the runner awaits it, so no extra async wrapper. */
+      let result: TResult | undefined
       const completion = executePluginHostPipeline(
         execution,
         snapshot,
         value,
-        async (next) => {
-          result = await done(next)
+        (next) => {
+          result = done(next)
+          return result as unknown as void
         },
         ordinary ? snapshot.asyncStages : snapshot.stages
       ) as Promise<void>
-      return completion.then(() => result)
+      return completion.then(() => result as Awaited<TResult> | undefined)
     } catch (error) {
       return Promise.reject(error)
     }

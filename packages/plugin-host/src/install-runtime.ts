@@ -50,7 +50,7 @@ export type IInstallBatchContext<TDomainCore extends object, TValue> = {
   readonly registrations: Map<string, IRegistration<TDomainCore, TValue>>
   readonly extensionOwners: Map<PropertyKey, IExtensionOwner<TDomainCore, TValue>>
   /** Pending shared receipts become visible only at the existing synchronous commit. */
-  readonly sharedContributions: ISharedExtensionContribution<TDomainCore, TValue>[]
+  readonly sharedContributions: Set<ISharedExtensionContribution<TDomainCore, TValue>>
   /** Committed generations whose extension slots are released only when this batch publishes. */
   readonly releasedOwners: Set<IRegistration<TDomainCore, TValue>>
   committed: boolean
@@ -256,7 +256,7 @@ export class PluginHostInstallRuntime<TDomainCore extends object, TValue> {
     return {
       registrations: new Map(),
       extensionOwners: new Map(),
-      sharedContributions: [],
+      sharedContributions: new Set(),
       releasedOwners: new Set(),
       committed: false
     }

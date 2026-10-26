@@ -121,7 +121,9 @@ export class PluginHostResumeRuntime<TDomainCore extends object, TValue> {
 
     /** Provider-first canonical order retained for reinstall after dependent-first disposal. */
     const restartOrder = plan.order.filter((name) => restart.has(name)) as string[]
-    for (const name of restart) if (!restartOrder.includes(name)) restartOrder.push(name)
+    /** Names already placed by the canonical order; restart names outside it are appended once. */
+    const ordered = new Set(restartOrder)
+    for (const name of restart) if (!ordered.has(name)) restartOrder.push(name)
     /** Current registrations to reinstall, provider-first. */
     const restarting = restartOrder
       .map((name) => this.#port.state.registrations.get(name))

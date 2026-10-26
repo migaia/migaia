@@ -205,16 +205,14 @@ export class PluginHostState<TDomainCore extends object, TValue> {
           )
         /** Candidate rollback cannot erase any committed or successor receipt. */
         const receipt = Object.freeze({ slot, registration, instanceId, value })
-        if (!batch.committed) batch.sharedContributions.push(receipt)
-        ;(registration.sharedContributions ??= []).push(receipt)
+        if (!batch.committed) batch.sharedContributions.add(receipt)
+        ;(registration.sharedContributions ??= new Set()).add(receipt)
         if (batch.committed) this.#updateSharedContribution(receipt, true)
         return () => {
           /** Candidate withdrawal never publishes and late cleanup cannot affect a successor. */
-          const candidate = batch.sharedContributions.indexOf(receipt)
-          if (candidate !== -1) batch.sharedContributions.splice(candidate, 1)
+          batch.sharedContributions.delete(receipt)
           this.#updateSharedContribution(receipt, false)
-          const owned = registration.sharedContributions?.indexOf(receipt) ?? -1
-          if (owned !== -1) registration.sharedContributions!.splice(owned, 1)
+          registration.sharedContributions?.delete(receipt)
         }
       }
     })
@@ -380,7 +378,7 @@ export class PluginHostState<TDomainCore extends object, TValue> {
         slot.retired = true
       }
     }
-    registration.sharedContributions = []
+    registration.sharedContributions = undefined
     registration.sharedSlots = []
   }
 

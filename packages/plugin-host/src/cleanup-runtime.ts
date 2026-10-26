@@ -142,27 +142,11 @@ export class PluginHostCleanupRuntime {
      * A timed-out callback can reject before the whole plan seals. Match each logical failure once
      * so that such a late rejection is retained without repeating an already returned error.
      */
-    const unmatched = [...errors]
+    const matcher = new ReturnedErrorMatcher(errors)
     const newlyObserved = outcome.cleanupErrors.filter((entry) => {
-      const index = unmatched.findIndex(
-        (error) =>
-          error === entry.error || (error instanceof PluginHostError && error.cause === entry.error)
-      )
-      if (index >= 0) {
-        unmatched.splice(index, 1)
-        return false
-      }
+      if (matcher.take(entry.error)) return false
       /** Provisional rollback already exposes an aggregate's children as individual failures. */
-      if (entry.error instanceof AggregateError) {
-        const remaining = [...unmatched]
-        for (const error of entry.error.errors) {
-          const childIndex = remaining.indexOf(error)
-          if (childIndex < 0) return true
-          remaining.splice(childIndex, 1)
-        }
-        unmatched.splice(0, unmatched.length, ...remaining)
-        return false
-      }
+      if (entry.error instanceof AggregateError) return !matcher.takeAll(entry.error.errors)
       return true
     })
     const additionalErrors = this.#wrapCollected(newlyObserved, undefined, preserveErrorIdentity)
@@ -203,5 +187,66 @@ export class PluginHostCleanupRuntime {
       if (preserveErrorIdentity) return entry.error
       return this.#options.wrapDisposalError(entry.error, phase ?? entry.source!)
     })
+  }
+}
+
+/**
+ * Matches returned errors against late cleanup entries in O(1) per lookup. Each returned error is
+ * consumed at most once, in its original order, matching either the entry itself or, for a package
+ * wrapper, the wrapper's cause.
+ */
+class ReturnedErrorMatcher {
+  /** Indexes of returned errors, keyed by the value an entry can match: the error or its cause. */
+  readonly #byMatch = new Map<unknown, number[]>()
+  /** Indexes of returned errors keyed by their own identity, for aggregate-child matching. */
+  readonly #byIdentity = new Map<unknown, number[]>()
+  /** Whether each returned error has already been matched. */
+  readonly #consumed: boolean[]
+
+  /** Indexes the returned errors once. */
+  constructor(errors: readonly unknown[]) {
+    this.#consumed = Array.from({ length: errors.length }, () => false)
+    for (let index = 0; index < errors.length; index += 1) {
+      const error = errors[index]
+      ReturnedErrorMatcher.#append(this.#byMatch, error, index)
+      ReturnedErrorMatcher.#append(this.#byIdentity, error, index)
+      if (error instanceof PluginHostError && error.cause !== error)
+        ReturnedErrorMatcher.#append(this.#byMatch, error.cause, index)
+    }
+  }
+
+  /** Adds one index under a key, keeping each list in ascending order. */
+  static #append(map: Map<unknown, number[]>, key: unknown, index: number): void {
+    const list = map.get(key)
+    if (list) list.push(index)
+    else map.set(key, [index])
+  }
+
+  /** First unconsumed index in a list, or -1. */
+  #first(list: readonly number[] | undefined, skip?: ReadonlySet<number>): number {
+    if (!list) return -1
+    for (const index of list) if (!this.#consumed[index] && !skip?.has(index)) return index
+    return -1
+  }
+
+  /** Consumes the first returned error that matches this entry directly or as a wrapper cause. */
+  take(entry: unknown): boolean {
+    const index = this.#first(this.#byMatch.get(entry))
+    if (index < 0) return false
+    this.#consumed[index] = true
+    return true
+  }
+
+  /** Consumes one returned error per child only when every child is present by identity. */
+  takeAll(children: readonly unknown[]): boolean {
+    /** Indexes reserved for earlier children of this same aggregate. */
+    const reserved = new Set<number>()
+    for (const child of children) {
+      const index = this.#first(this.#byIdentity.get(child), reserved)
+      if (index < 0) return false
+      reserved.add(index)
+    }
+    for (const index of reserved) this.#consumed[index] = true
+    return true
   }
 }

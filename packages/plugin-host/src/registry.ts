@@ -56,7 +56,7 @@ export type IRegistration<TDomainCore extends object, TValue> = {
   config: IPluginConfig
   extensions: IExtensionOwnership[]
   /** Candidate and committed shared receipts belong to this exact registration generation. */
-  sharedContributions?: ISharedExtensionContribution<TDomainCore, TValue>[]
+  sharedContributions?: Set<ISharedExtensionContribution<TDomainCore, TValue>>
   /** Original registration reservations retain a facade while native generations rebind. */
   sharedSlots?: ISharedExtensionReservation<TDomainCore, TValue>[]
   pipelineDisposers: IPluginDisposer[]
