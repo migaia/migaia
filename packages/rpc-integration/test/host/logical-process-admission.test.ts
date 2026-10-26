@@ -1,7 +1,9 @@
 /** Public Host composition borrows only the genuine Process carrier, FIFO and logical capacity. */
 import { MessageChannel, type MessagePort } from 'node:worker_threads'
-import { expect, it } from 'vitest'
+import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
+import { walkErrorCauses } from '@migaia/utils/error'
+import { RpcTransportError } from '@migaia/rpc-contract/errors'
 import { createRpcHost } from '@migaia/rpc-host'
 import { batch } from '@migaia/rpc-host/features/batch'
 import { chunk } from '@migaia/rpc-host/features/chunk'
@@ -25,6 +27,7 @@ import {
   type IProcessFeatureContext
 } from '@migaia/rpc-plugin-process/features'
 import type { IpcSendQueue } from '@migaia/rpc-plugin-process/features/send-queue'
+import { IpcFlowControl } from '@migaia/rpc-plugin-process/features/flow-control'
 import { createProcessCarrier } from '../../../rpc-plugin-process/dist/process/carrier.js'
 import type { IProcessMessageChannel } from '../../../rpc-plugin-process/dist/process/types.js'
 
@@ -40,6 +43,10 @@ class NativeProcessAdmissionPair {
   readonly events: IIpcBacklogEvent[] = []
   /** Original raw writes witness physical batches/fragments without replacing their admission. */
   readonly writes: IRpcCarrierFrame[] = []
+  /** Original encoded member references prove physical grouping without observer-side decoding. */
+  readonly submitted: IRpcCarrierFrame[] = []
+  /** A separate case may hold real data on the same existing first native write receipt. */
+  readonly firstDataEntered = deferred<IRpcCarrierFrame>()
   /** A real control write makes the existing batch lane busy without occupying data capacity. */
   readonly controlEntered = deferred<void>()
   /** The actual native data writer remains unfinished until this test releases it. */
@@ -56,6 +63,8 @@ class NativeProcessAdmissionPair {
   #holdControl = false
   /** Only the next original physical data write is held. */
   #holdData = false
+  /** Only the paired-data failure case borrows the first gate for an actual data-class write. */
+  #holdFirstData = false
   /** Frame-hook ordinals provide an entry barrier only; they never represent logical capacity. */
   #members = 0
   /** The immutable configured capacity is compared only against genuine flow events. */
@@ -91,11 +100,14 @@ class NativeProcessAdmissionPair {
   }
   /** A genuine named stage observes entry before forwarding to the unchanged batch continuation. */
   readonly #member: IRpcFlowStage<'frameOutbound'> = (payload, next) => {
+    /** The witness resolves only after this exact frame enters the real Chunk/Batch suffix. */
+    const traversal = next(payload)
     if (payload.frame.kind === 'message' && payload.write?.sendClass === IpcSendClass.data) {
+      this.submitted.push(payload.frame)
       this.#members += 1
       if (this.#members === 3) this.membersEntered.resolve()
     }
-    return next(payload)
+    return traversal
   }
   /** Borrow actual native methods; this fixture implements no codec, reservation or scheduler. */
   #raw(port: MessagePort, client: boolean): IProcessMessageChannel {
@@ -128,7 +140,11 @@ class NativeProcessAdmissionPair {
   ): Promise<void> {
     if (client) {
       this.writes.push(value as IRpcCarrierFrame)
-      if (this.#holdControl && write?.sendClass === IpcSendClass.control) {
+      if (this.#holdFirstData && write?.sendClass === IpcSendClass.data) {
+        this.#holdFirstData = false
+        this.firstDataEntered.resolve(value as IRpcCarrierFrame)
+        await this.#controlRelease.promise
+      } else if (this.#holdControl && write?.sendClass === IpcSendClass.control) {
         this.#holdControl = false
         this.controlEntered.resolve()
         await this.#controlRelease.promise
@@ -197,6 +213,7 @@ class NativeProcessAdmissionPair {
     this.#hosts = [client, server]
     this.events.length = 0
     this.writes.length = 0
+    this.submitted.length = 0
     return { client, server }
   }
   /** Hold one control operation through the original Session API after real readiness. */
@@ -208,7 +225,16 @@ class NativeProcessAdmissionPair {
   holdData(): void {
     this.#holdData = true
   }
-  /** Return only the original native control write, allowing the batch lane's existing drain. */
+  /** Hold two real data writes on the two original native receipts, without another queue. */
+  holdDataPair(): void {
+    this.#holdFirstData = true
+    this.#holdData = true
+  }
+  /** Reject only the entered second native write; its raw IO never posts the failed aggregate. */
+  rejectData(reason: unknown): void {
+    this.#dataRelease.reject(reason)
+  }
+  /** Return the first original native receipt, used by control or paired-data backpressure. */
   releaseControl(): void {
     this.#controlRelease.resolve()
   }
@@ -329,6 +355,83 @@ it('retains one logical Process credit across every physical fragment of a publi
     expect(await client.process.send('logical-server', 'echo', 'after-chunks')).toBe('after-chunks')
     expect(fixture.reports).toEqual([])
   } finally {
+    await fixture.close()
+  }
+})
+
+it('C004 actual failed Process batch keeps native whenIdle pending through both logical settlements', async () => {
+  /** Existing source, native ports and sole installed Process queue own the entire public path. */
+  const fixture = new NativeProcessAdmissionPair(3)
+  /** Both public roots finish their genuine startup before native physical failure is armed. */
+  const { client } = await fixture.open()
+  /** The normal prototype method lends its actual receiving owner without replacing execution. */
+  const reservations = vi.spyOn(IpcFlowControl.prototype, 'reserveWrite')
+  try {
+    fixture.holdDataPair()
+    /** This is the first actual data write, not a control or a fabricated busy queue item. */
+    const first = client.process.send('logical-server', 'echo', 'first')
+    /** Keep the original first result observable even if a fixture assertion exits before release. */
+    void first.catch(() => undefined)
+    await fixture.firstDataEntered.promise
+    /** A genuine reservation captured this same native flow before any frame became opaque. */
+    const flow = reservations.mock.contexts[0]!
+    expect(flow).toBe(fixture.queue.flow)
+    /** Narrow only the original native instance captured by the real prototype invocation. */
+    if (!(flow instanceof IpcFlowControl)) expect.fail('expected original native flow owner')
+    /** Both independent public calls retain their own correlated failure promises. */
+    const one = client.process
+      .send('logical-server', 'echo', 'one')
+      .catch((error: unknown) => error)
+    /** The second member shares physical completion without borrowing the first call's result. */
+    const two = client.process
+      .send('logical-server', 'echo', 'two')
+      .catch((error: unknown) => error)
+    /** Only the actual native flow may announce complete logical and physical drain. */
+    let idle = false
+    /** The queue's real delegate returns this very same native pending drain receipt. */
+    const nativeIdle = flow.whenIdle()
+    expect(fixture.queue.whenIdle()).toBe(nativeIdle)
+    /** Record completion of the original native drain promise, not Promise.all of client calls. */
+    const drained = nativeIdle.then(() => {
+      idle = true
+    })
+    await fixture.membersEntered.promise
+    await Promise.resolve()
+    expect(idle).toBe(false)
+    fixture.releaseControl()
+    await expect(first).resolves.toBe('first')
+    /** The second actual native writer is the aggregate of both original encoded members. */
+    const physical = await fixture.dataEntered.promise
+    expect(fixture.writes).toHaveLength(2)
+    expect(physical).toMatchObject({ kind: 'extension', extension: 'batch@1' })
+    /**
+     * These are original frame references retained at the real existing stage, never decoded
+     * copies.
+     */
+    const members = (physical.data as { frames: IRpcCarrierFrame[] }).frames
+    expect(members).toHaveLength(2)
+    expect(members[0]).toBe(fixture.submitted[1])
+    expect(members[1]).toBe(fixture.submitted[2])
+    expect(idle).toBe(false)
+    /** Process owns its real channel wrapper; this native leaf must remain exactly reachable. */
+    const cause = new Error('custody native batch failure')
+    fixture.rejectData(cause)
+    /** Both promises settle only after the actual original writer rejects. */
+    const failures = await Promise.all([one, two])
+    for (const failure of failures) {
+      expect(failure).toBeInstanceOf(RpcTransportError)
+      expect(failure).toMatchObject({ code: 'TRANSPORT' })
+      expect(Array.from(walkErrorCauses(failure))).toContain(cause)
+    }
+    await drained
+    expect(idle).toBe(true)
+    await expect(client.process.send('logical-server', 'echo', 'recovered')).resolves.toBe(
+      'recovered'
+    )
+    expect(fixture.writes).toHaveLength(3)
+    expect(fixture.writes[2]).toBe(fixture.submitted[3])
+  } finally {
+    reservations.mockRestore()
     await fixture.close()
   }
 })
