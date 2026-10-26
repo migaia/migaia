@@ -53,7 +53,7 @@ try {
 
 `createRpcHost` 在同一个原生 plugin-host 上先提交信息流 plugin、链路策略 plugin 及其 feature，再安装传输 plugin 及其 feature。传输开始握手时，auth 等 stage 已经可用；后续安装失败由同一生命周期 owner 回滚并释放已取得的资源。
 
-构造后可用 `const extended = await host.use(transport)` 后装传输，返回同一个 host，并在返回值的类型上增加命名空间。每次 `use` 独立提交或回滚；构造时那一批则一起成功或失败。宿主级 Feature 在构造的 `plugins` 中配置，不能后装；后装传输自动借用它们，局部 `features` 仍只覆盖本命名空间。
+构造后可用 `const extended = await host.use(transport)` 后装传输，返回同一个冻结的原生 host，并在返回值的类型上增加命名空间。每次 `use` 独立提交或回滚；构造时那一批则一起成功或失败。改变消息流的宿主级 Feature 只能在构造的 `plugins` 中配置，后装会以 `INVALID_CONFIG` 拒绝；后装传输自动借用它们，传输自己的 `features` 随传输一起安装，仍只覆盖本命名空间。只读观察插件，包括警告订阅，可以后装。
 
 已有 `defineHost` 或 class 宿主通过 `@migaia/rpc-host/sdk` 的 `rpcHostPipelines(getHost, pipeline)` 取得 `domainCore`，并把原生构造请求转交 `pipeline(name, request)`。每个传输自己声明管道，无需预列命名空间。普通原生宿主用 `rpcFlowPlugin([...features])` 安装共享信息流，再装传输。具体接法见[使用指南](./USEGUIDE.md#在已有宿主中安装-rpc)。
 
@@ -72,7 +72,7 @@ try {
 | `host.<ns>.peers`                                          | 已接受的直连能力；保存的函数绑定原连接代次                |
 | `host.close()`                                             | 关闭整个 host；重复调用共享原 Promise                     |
 | `host.use(...plugins)`                                     | 独立安装事务，返回带新增命名空间类型的同一 host           |
-| `host.unuse(name)`                                         | 原生卸载结果；活动信息流限制下以状态错误拒绝              |
+| `host.unUse(name)`                                         | 原生卸载结果；活动信息流限制下以状态错误拒绝              |
 
 上述无目标调用只在所属命名空间内选择目标：零个返回空 `fulfilled/rejected`，一个返回标量，多个返回按实例身份索引的 `fulfilled/rejected`。流集合中的迭代器独立取消。根级 `host.request` 等调用入口已删除。
 
@@ -104,7 +104,7 @@ export const perCallDeadline = timeoutFromSubpath({ ms: 100 })
 
 汇总入口与默认子路径导入均可 tree-shake。推荐安装 `limits`；省略它就不启用这些配额。安装 `idempotency` 后，才有 `host.<ns>.outcome(key)`。auth 默认把签名绑定对象交给 `sign/verify`；文本和字节模式只编码一层绑定。它的请求 ID 去重默认在完成后立即释放，也可选择签名窗口或毫秒 `retain`；`maxReplayEntriesPerPeer` 只限制数字保留模式，`onRejected` 接收容量拒绝原因。配置和 HMAC 示例见[认证说明](./USEGUIDE.md#认证签名与重复请求)。
 
-`errorMap` 同步映射发往对端的错误，不改变本地原错、report、警告或日志观察；回调抛错、返回 Promise 或结果无法序列化时，报告后发送原默认错误图。未配置映射时，未认证对端的握手失败仍默认脱敏。见[错误映射](./USEGUIDE.md#映射发往对端的错误)。
+`errorMap` 同步决定对端能看到哪些错误信息，不改变本地原错、report、警告或日志观察。回调抛错、返回 Promise 或结果无法序列化时，报告映射失败，并按未映射时的规则发送原错误。未配置映射时，未认证对端的握手失败仍默认隐藏细节。见[错误映射](./USEGUIDE.md#映射发往对端的错误)。
 
 自定义信息流通过 `defineFlowFeature` 的 `setup` 返回 `stages`，放进宿主的 `plugins` 或某个传输的 `features`；stage 接收该管道的 payload 和原生 `next(payload)`。观察事件单独放在 `observe`。frame 管道允许多次提交，各成员独立：捕获并报告一个成员失败后可以继续交出下一个；忽略失败的 `next()` Promise 会使管道拒绝。被取消的 batch 成员由原调用以 `CANCELLED` 结算，原 reason 保留在 `cause`，其他成员照常完成。
 
@@ -114,7 +114,7 @@ export const perCallDeadline = timeoutFromSubpath({ ms: 100 })
 
 自定义载体可以提供可选的 `reserveWrite`，借用已有流控容量。每次逻辑写出只预留一次；chunk 的分片共用凭据，batch 保留各成员的凭据，完成后释放。`write` 的完成仍表示实际物理接纳，`close` 必须结算载体拥有的排队写入。
 
-协商了原生二进制时，没有签名覆盖清单就不计算摘要；签名路径上的完整 backing 不超过内部 1125 字节阈值时内联，较大 backing 才用原生 sidecar 和 SHA-256。别名保持完整 backing 身份，transfer 始终限于调用方原授权。当前清单格式与原来所有原生行必带摘要的格式不同，见[二进制说明](./USEGUIDE.md#二进制完整性与-transfer)。
+载体支持原生二进制时，显式列在 `transfer` 中的 ArrayBuffer 始终原生转移，移交后原 buffer 被 detach；配置签名时也会计算并校验摘要。没有显式转移的小 buffer 在签名路径上可内联，原 buffer 保留可用；未配置签名时不计算二进制摘要。共享 buffer 的视图仍保持别名关系和偏移。见[二进制说明](./USEGUIDE.md#二进制完整性与-transfer)。
 
 会话使用中的共享或局部信息流 Feature 不能热卸载，移除相应原生注册以 `LIFECYCLE_MUTATION` 拒绝；先关闭受影响命名空间，再冷删除。auth、chunk、batch 等改变线上格式的能力，只有两端都安装才保证能建立通信；单端配置不提供兼容保证，也不主动禁止。见[后装与卸载](./USEGUIDE.md#后装与卸载传输)。
 
@@ -156,4 +156,4 @@ verifyCredentials 可返回 { principalId: 非空字符串 }，把真实认证�
 
 原六个 `/features/{auth,batch,chunk,idempotency,limits,schema}` 入口已删除，改从 `/plugins/*` 或 `/plugins` 导入。`rpcHostPipelines` 删除第三参数与 `pipelines` 输出，改为转交真实构造请求；管道由传输声明。以下无抛出点错误码已删除，不提供替代码：`HOST_ASSEMBLER_DUPLICATE`, `HOST_FEATURE_DUPLICATE`, `PROVIDER_GENERATION_RETIRED`, `MIDDLEWARE_DUPLICATED`, `MIDDLEWARE_MISSING`, `PROVIDER_NOT_SETTLED`, `TARGET_NOT_IDENTIFIABLE`。
 
-被父端拉起的子节点优先使用真实父端指定的名字与 instanceId，否则使用子节点 `self.name` 和现有默认名。父端未命名时，可按子节点握手报回的名字寻址。显式子节点名字冲突只发出一次 `RpcWarningCode.selfIgnored`（`SELF_IGNORED`）警告；冲突的父端启动事实仍为 `INVALID_CONFIG`。警告形状为 `{ code, message, data: { parentName, ignoredName } }`，先交给 `onWarning` 选项，再交给宿主级 SDK 订阅插件；无人接收才用 `console.warn`。警告本身不进 report，接收者失败则报告原错并继续。见[警告订阅](./USEGUIDE.md#警告与子节点名称)。
+被父端拉起的子节点优先使用真实父端指定的名字与 instanceId。父端未命名时，保留显式的子节点 `self.name`；子节点也未命名时，默认名随父端的 instanceId 更新。可按子节点握手报回的名字寻址。显式子节点名字或 instanceId 被父端覆盖时，只发出一次 `RpcWarningCode.selfIgnored`（`SELF_IGNORED`）警告。警告为 `{ code, message, data }`，`data` 只含实际被忽略的项：`parentName`/`ignoredName`、`parentInstanceId`/`ignoredInstanceId`。先交给 `onWarning` 选项，再交给宿主级 SDK 订阅插件；无人接收才用 `console.warn`。警告本身不进 report，接收者失败则报告原错并继续。冲突的父端启动事实仍为 `INVALID_CONFIG`。见[警告订阅](./USEGUIDE.md#警告与子节点名称)。

@@ -103,15 +103,15 @@ try {
   const extended = await host.use(threadPlugin({ spawn: new URL('./worker.ts', import.meta.url) }))
   await extended.thread.notify('refresh')
   await extended.thread.close()
-  await extended.unuse('thread')
+  await extended.unUse('thread')
 } finally {
   await host.close()
 }
 ```
 
-传输插件的名字就是命名空间；重复名字或保留名在安装前被拒绝。宿主级 auth、limits 等信息流 Feature 放在 `createRpcHost({ plugins })` 中，只准备一次；后装传输沿用同一份安装与共享额度，传输 `features` 中的同种能力只覆盖本命名空间。后续 `use` 不接受新的宿主级 Feature，不能用 `use(auth(...))` 改写这份前缀。只读观察插件仍可后装。
+传输插件的名字就是命名空间；重复名字或保留名在安装前被拒绝。改变消息流的宿主级 Feature（如 auth、limits）只能放在构造时的 `createRpcHost({ plugins })` 中，只准备一次；后装会以 `INVALID_CONFIG` 拒绝。后装传输沿用同一份安装与共享额度，传输自己的 `features` 随传输一起安装，同种能力只覆盖本命名空间。只读观察插件，包括警告订阅，可以后装。`use` 返回的仍是同一个冻结的原生宿主；新增命名空间只体现在 `const extended = await host.use(...)` 的返回类型中。
 
-`unuse(name)` 沿用原生卸载结果 `{ ok, affected, errors? }`。没有活动信息流约束时，卸载先按正常关闭流程关闭该传输的会话，再删除其管道组。会话仍在使用所选宿主级 Feature，或传输自己持有的局部 Feature 时，移除相应注册会以 `plugin.host / LIFECYCLE_MUTATION` 拒绝；共享 Feature 的卸载单位是原生共享封装，局部 Feature 的卸载单位是所属传输。先关闭受影响命名空间的会话，再冷删除；示例因此先调用 `thread.close()`。没有选中信息流 Feature 的传输、只读观察插件不受这项限制。宿主关闭或重新构造后也可去掉能力，框架不再保证原来的能力。
+`unUse(name)` 沿用原生卸载结果 `{ ok, affected, errors? }`。没有活动信息流约束时，卸载先按正常关闭流程关闭该传输的会话，再删除其管道组。会话仍在使用所选宿主级 Feature，或传输自己持有的局部 Feature 时，移除相应注册会以 `plugin.host / LIFECYCLE_MUTATION` 拒绝；共享 Feature 的卸载单位是原生共享封装，局部 Feature 的卸载单位是所属传输。先关闭受影响命名空间的会话，再冷删除；示例因此先调用 `thread.close()`。没有选中信息流 Feature 的传输、只读观察插件不受这项限制。宿主关闭或重新构造后也可去掉能力，框架不再保证原来的能力。
 
 auth、chunk、batch 等通过握手协商并改变线上格式的能力，只有两端都装时才保证能建立通信。只装一端时不提供兼容，也不会主动禁止这种配置；应用需要自行提供匹配的 plugin 或 feature。
 
@@ -246,7 +246,7 @@ auth 始终挡住还在执行的同一请求 ID，直到实际业务及 stream �
 
 ## 映射发往对端的错误
 
-verifier 或凭据解析器抛出、拒绝时，auth 在本地错误的 `cause` 上保留原始错误。`errorMap(map)` 只在错误发往对端、序列化之前映射协议中的错误槽；本地抛出的错误、`report`、警告和只读观察插件看到的仍是原始错误，与插件安装先后无关。它可放在宿主 `plugins` 或传输 `features`，传输级覆盖宿主级。
+verifier 或凭据解析器抛出、拒绝时，auth 在本地错误的 `cause` 上保留原始错误。用 `errorMap(map)` 决定对端能看到哪些错误信息，例如把含凭据的细节换成公开提示。本地抛出的错误、`report`、警告和只读观察插件看到的仍是原始错误，与插件安装先后无关。它可放在宿主 `plugins` 或传输 `features`，传输级覆盖宿主级。
 
 ```ts doc-test=check
 import { createRpcHost } from '@migaia/rpc-host'
@@ -263,17 +263,17 @@ const redact: IRpcErrorMap = (error) =>
 export const host = await createRpcHost({ plugins: [errorMap(redact)] })
 ```
 
-`map(error, context)` 必须同步返回 `Error`、可移植值或 `undefined`。抛错或映射结果序列化失败时，报告该失败并发送原来的默认错误图；返回 Promise/thenable 时报告 `INVALID_CONFIG`，立即回退且不等待它，因此不会卡住同一会话的后续消息。迟到的 Promise 拒绝仍会单独报告。
+`map(error, context)` 必须同步返回 `Error`、可移植值或 `undefined`。返回值就是发给对端的错误内容，不自动附加原错的原因链。回调抛错或返回值无法序列化时，报告映射失败，并按未映射时的规则发送原错误。返回 Promise/thenable 时报告 `INVALID_CONFIG`，立即按原规则发送，不等待它，因此同一会话的后续消息不会被它卡住；迟到的 Promise 拒绝仍会单独报告。
 
-没有 `errorMap` 时，仅未通过认证的对端收到的握手拒绝默认隐藏细节；其他错误发送完整 cause 图。跨 realm 会还原新对象，不保证接收对象与发送方原错 `===`。不要靠改写日志或丢弃本地 cause 来控制对端可见信息。
+没有 `errorMap` 时，未认证对端收到的握手拒绝默认隐藏细节；其他错误保留完整的原因链。跨进程或线程会还原成新对象，不保证与发送方原错 `===`。需要隐藏对端可见信息时配置映射，本地日志和原因链仍可用于排查。
 
 ## 二进制完整性与 transfer
 
-在已协商原生二进制的载体路径上，没有覆盖清单的签名就不计算 SHA-256，清单也不要求摘要。配置签名后，完整 backing 不超过 1125 字节时快照并内联进签名内容，不原生转移，也不计算摘要；较大的 backing 保留原生 sidecar，每个唯一 backing 在一次 prepare 中计算一次摘要，在对应 restore 中校验一次。阈值是 SDK 内部选择，不是公开配置项。
+载体支持原生二进制时，显式列在 `transfer` 中的 ArrayBuffer 始终原生转移，实际移交后原 buffer 被 detach；配置签名时也会计算并校验 SHA-256。没有显式转移的 buffer 在签名路径上才按大小处理：不超过 1125 字节时复制到签名内容中，原 buffer 保留可用，也不计算摘要；较大的 buffer 用原生二进制传送并校验摘要。未配置签名时不计算二进制摘要。1125 字节是 SDK 内部阈值，不是公开配置项。
 
-判断大小和摘要都针对完整 backing，而不是某个 Uint8Array 的可见切片；共享同一 backing 的别名、offset 和 length 保持。签名清单的逻辑 backing 行可为 `{ byteLength, data }`（完整 backing 的 canonical base64url）或 `{ byteLength, sha256 }`（原生 sidecar）；无完整性要求的原生行只有 `{ byteLength }`。带 `data` 的行不消耗物理 sidecar，其他行依序消费。
+大小和摘要针对整个 ArrayBuffer，Uint8Array 的可见切片再小，也不会缩小其底层 buffer。共享同一 buffer 的视图在接收端仍共享同一 buffer，并保留各自的偏移和长度。
 
-载体作者通过已有 codec context 的 `transferRequiresIntegrity` 借用本地选中的信息流要求，不能信任对端字段来授予权限。最终 transfer 仅保留调用方原本授权、且编码结果确实仍作为原生 sidecar 承载的 backing；内联不会新增 transfer 授权。此清单格式替代原来所有原生行都必带摘要的格式，具体形状见 [contract 协议说明](../rpc-contract/USEGUIDE.md#载体二进制与收发顺序)。
+`transfer` 表示移交所有权，只能使用调用方显式授权的 buffer，并且载体必须支持这种移交；不支持时仍按原能力规则拒绝。普通调用者不必处理二进制清单，载体作者所需的线上格式见 [contract 协议说明](../rpc-contract/USEGUIDE.md#载体二进制与收发顺序)。
 
 ## 通知、分组与结果查询
 
@@ -355,7 +355,7 @@ export const host = await createRpcHost({
 
 只读警告订阅可后装，卸载或安装回滚时由原生注册移除。订阅只能由宿主级 `defineFlowPlugin` 提供；放进传输 `features`，或让 `defineFlowFeature` 返回 `onWarning`，均以 `INVALID_CONFIG` 拒绝。
 
-被父端拉起并收到真实原生启动事实的子节点（process、thread、coroutine、dedicated worker 或 pool 成员），名字依次取父端指定名、子节点 `self.name`、现有默认名，`instanceId` 也以父端事实为准。父端省略名字时，用子节点握手报回的名字寻址。显式子节点名字与父端不同时，构造成功，只发出一次 `RpcWarningCode.selfIgnored`（`SELF_IGNORED`）警告；两个名字在 `warning.data.parentName` 与 `warning.data.ignoredName`。两份冲突的父端启动事实仍以 `INVALID_CONFIG` 拒绝。
+被父端拉起并收到真实原生启动事实的子节点（process、thread、coroutine、dedicated worker 或 pool 成员）优先使用父端指定名，`instanceId` 也以父端事实为准。父端未命名时，保留子节点显式的 `self.name`；子节点也未命名时，默认名随父端的 instanceId 更新。用子节点握手报回的名字寻址。显式子节点名字或 instanceId 被父端覆盖时，构造成功，只发出一次 `RpcWarningCode.selfIgnored`（`SELF_IGNORED`）警告。`warning.data` 只含实际被忽略的项：名字冲突带 `parentName`/`ignoredName`，身份冲突带 `parentInstanceId`/`ignoredInstanceId`；只有 instanceId 不同也会警告。两份冲突的父端启动事实仍以 `INVALID_CONFIG` 拒绝。
 
 ## 迁移入口
 
@@ -404,4 +404,4 @@ verifyCredentials 可返回 { principalId: 非空字符串 }，把真实认证�
 
 原六个 `/features/{auth,batch,chunk,idempotency,limits,schema}` 入口已删除，改从 `/plugins/*` 或 `/plugins` 导入。`rpcHostPipelines` 删除第三参数和 `pipelines` 输出，构造请求必须传给 `domainCore(request)`；传输自己声明管道。以下无抛出点错误码已删除，不提供替代码：`HOST_ASSEMBLER_DUPLICATE`, `HOST_FEATURE_DUPLICATE`, `PROVIDER_GENERATION_RETIRED`, `MIDDLEWARE_DUPLICATED`, `MIDDLEWARE_MISSING`, `PROVIDER_NOT_SETTLED`, `TARGET_NOT_IDENTIFIABLE`。
 
-`onWarning` 的两个名字从顶层移到 `data`。原生二进制清单的摘要改为按本地完整性要求提供，签名小 backing 可在原生清单内内联；对端实现须同步采用[当前清单格式](../rpc-contract/USEGUIDE.md#载体二进制与收发顺序)。
+`onWarning` 的被忽略身份项放在 `data`，只包含实际发生冲突的名字或 instanceId。签名的小 buffer 只有未显式 `transfer` 时才可能内联；显式转移仍移交并 detach 原 buffer。载体实现须同步采用[当前清单格式](../rpc-contract/USEGUIDE.md#载体二进制与收发顺序)。

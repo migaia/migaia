@@ -139,7 +139,7 @@ pnpm add @migaia/plugin-host
 | `surface`                       | 可选；默认无领域公开成员，第四类型参数默认空表面                                                     |
 | `pipelines`                     | 可选；真实 `pipelineSpec<TPayload>()(config)` 组成的固定命名映射；defineHost 在顶层传入。            |
 
-surface 的自有描述符在获取 Runtime 之前读取一次，访问器保持动态；领域方法、Host 身份、共享出口和 fluent 管线方法属于同一个冻结 handle。canonical Host 键（包括 identity）保留且优先。组合方应在这里提供自己的方法，不能复制返回的冻结 handle。surface 选项或描述符读取失败保持原错，经 `CALLBACK_FAILED` 边界分类。旧三类型参数调用仍有效。
+`surface` 支持对象或工厂。对象形式的自有描述符在获取 Runtime 之前读取一次，访问器保持动态，所有 canonical Host 键（包括 identity、use、unUse）仍为保留键。工厂形式 `surface: (native) => ({ ... })` 在创建最终 handle 时执行一次，收到冻结的原生 `use`、`unUse`，可组合并替换这两个方法；其他 canonical Host 键仍不能替换。领域方法、Host 身份、共享出口和 fluent 管线方法属于同一个冻结 handle，组合方应通过 surface 提供方法，不能复制返回的 handle。surface 读取或工厂失败保持原错，经 `CALLBACK_FAILED` 边界分类。旧对象写法和三类型参数调用仍有效。
 
 类构造 `options` 必填，defineHost 的 `host` 同样必填：
 

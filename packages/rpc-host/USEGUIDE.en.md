@@ -103,15 +103,15 @@ try {
   const extended = await host.use(threadPlugin({ spawn: new URL('./worker.ts', import.meta.url) }))
   await extended.thread.notify('refresh')
   await extended.thread.close()
-  await extended.unuse('thread')
+  await extended.unUse('thread')
 } finally {
   await host.close()
 }
 ```
 
-A transport plugin's name is its namespace. Duplicate and reserved names reject before installation. Configure host-level flow Features such as auth and limits in `createRpcHost({ plugins })`; they are prepared once, and later transports borrow the same installations and shared quotas. The same capability in transport `features` overrides it only in that namespace. Subsequent `use` calls do not accept new host-level Features, so `use(auth(...))` cannot change that prefix. Readonly observer plugins can still be installed later.
+A transport plugin's name is its namespace. Duplicate and reserved names reject before installation. Host Features that change message flow, such as auth and limits, must be configured in the construction `createRpcHost({ plugins })`; they are prepared once, and adding them later rejects with `INVALID_CONFIG`. Later transports borrow the same installations and shared quotas. Their own `features` install with the transport and override that capability only in its namespace. Readonly observer plugins, including warning subscriptions, may be installed later. `use` returns the same frozen native host; the added namespace appears only in the return type captured by `const extended = await host.use(...)`.
 
-`unuse(name)` retains the native removal result `{ ok, affected, errors? }`. Without an active flow restriction, removal closes the transport's Sessions through the normal close path before deleting its pipeline group. Removing a selected host Feature or a transport that owns a local Feature while affected Sessions remain open rejects with `plugin.host / LIFECYCLE_MUTATION`. Shared Features are removed with their native wrapper registration; local Features are removed with their transport. Close affected namespace Sessions before cold removal, as the example does with `thread.close()`. Transports with no selected flow Feature and readonly observer plugins are exempt from this restriction. Capabilities can also be omitted after Host closure or reconstruction, without preserving their former guarantees.
+`unUse(name)` retains the native removal result `{ ok, affected, errors? }`. Without an active flow restriction, removal closes the transport's Sessions through the normal close path before deleting its pipeline group. Removing a selected host Feature or a transport that owns a local Feature while affected Sessions remain open rejects with `plugin.host / LIFECYCLE_MUTATION`. Shared Features are removed with their native wrapper registration; local Features are removed with their transport. Close affected namespace Sessions before cold removal, as the example does with `thread.close()`. Transports with no selected flow Feature and readonly observer plugins are exempt from this restriction. Capabilities can also be omitted after Host closure or reconstruction, without preserving their former guarantees.
 
 Capabilities such as auth, chunk, and batch negotiate through the handshake and change the wire representation. Establishment is guaranteed only when both peers install them. One-sided installation provides no compatibility guarantee and is not proactively prohibited; applications must supply matching plugins or features when needed.
 
@@ -246,7 +246,7 @@ Set a default with `auth({ retain })` or override it in a transport connection's
 
 ## Map errors sent to the peer
 
-When a verifier or credential resolver throws or rejects, auth retains the original error on the local error's `cause`. `errorMap(map)` maps only protocol error slots immediately before outbound serialization. Local thrown errors, `report`, warnings, and readonly observation plugins still receive the original errors, regardless of installation order. Install it in host `plugins` or transport `features`; transport placement overrides host placement.
+When a verifier or credential resolver throws or rejects, auth retains the original error on the local error's `cause`. Use `errorMap(map)` to control what a peer learns, such as replacing credential details with a public message. Local thrown errors, `report`, warnings, and readonly observation plugins still receive the original errors, regardless of installation order. Install it in host `plugins` or transport `features`; transport placement overrides host placement.
 
 ```ts doc-test=check
 import { createRpcHost } from '@migaia/rpc-host'
@@ -263,17 +263,17 @@ const redact: IRpcErrorMap = (error) =>
 export const host = await createRpcHost({ plugins: [errorMap(redact)] })
 ```
 
-`map(error, context)` must synchronously return an `Error`, portable value, or `undefined`. If it throws or its result cannot be serialized, the failure is reported and the original default error graph is sent. Returning a Promise/thenable reports `INVALID_CONFIG` and falls back immediately without waiting, so it cannot block later messages in the same Session. A late Promise rejection is still reported separately.
+`map(error, context)` must synchronously return an `Error`, portable value, or `undefined`. That result becomes the error sent to the peer; the original cause chain is not appended automatically. If the callback throws or its result cannot be serialized, the mapping failure is reported and the original error is sent under the rules used without a mapper. Returning a Promise/thenable reports `INVALID_CONFIG` and immediately uses those original rules without waiting, so it cannot block later messages in the same Session. A late Promise rejection is still reported separately.
 
-Without `errorMap`, only a handshake rejection sent to an unauthenticated peer hides details by default. Other errors transmit the complete cause graph. Crossing a realm reconstructs objects and does not preserve `===` with the sender's original error. Control remote disclosure through this outbound mapping rather than rewriting logs or discarding local causes.
+Without `errorMap`, handshake refusals hide details from unauthenticated peers by default; other errors preserve the complete cause chain. Crossing a process or thread reconstructs objects and does not preserve `===` with the sender's original error. Configure mapping to hide information from peers while keeping local logs and causes available for diagnosis.
 
 ## Binary integrity and transfer
 
-On a negotiated native-binary carrier path, no signature covering the manifest means no SHA-256 calculation or required manifest digest. With signing configured, a complete backing of at most 1125 bytes is snapshotted inline into signed content, without native transfer or a digest. Larger backings remain native sidecars: each unique backing is hashed once per prepare and verified once in its corresponding restore. The threshold is an internal SDK choice, not a public option.
+When the carrier supports native binary, an ArrayBuffer explicitly listed in `transfer` always transfers natively and the original buffer detaches on actual handoff; signing also calculates and verifies SHA-256. Only buffers without an explicit transfer follow the size rule when signed: at most 1125 bytes are copied into signed content, leaving the original usable and requiring no digest; larger buffers travel as native binary with digest verification. Without signing, binary digests are not calculated. The 1125-byte threshold is an internal SDK choice, not a public option.
 
-Size and digest apply to the complete backing, not just a Uint8Array's visible slice. Aliases sharing that backing retain their offsets and lengths. A signed manifest's logical backing row is `{ byteLength, data }` for canonical base64url of the complete backing or `{ byteLength, sha256 }` for a native sidecar. Native rows without an integrity requirement contain only `{ byteLength }`. Rows with `data` consume no physical sidecar; other rows consume sidecars in order.
+Size and digest apply to the entire ArrayBuffer. A small visible Uint8Array slice does not shrink its underlying buffer. Views sharing a buffer still share one buffer at the receiver and retain their offsets and lengths.
 
-Carrier authors borrow the locally selected flow requirement through the existing codec context's `transferRequiresIntegrity`; peer fields cannot grant authority. Final transfer entries are limited to backings both originally authorized by the caller and still carried as actual native sidecars after encoding. Inlining grants no transfer authority. This manifest replaces the former format requiring a digest on every native row; see the [contract guide](../rpc-contract/USEGUIDE.en.md#carriers-binary-and-stage-order) for its exact shape.
+`transfer` hands over ownership, uses only buffers explicitly authorized by the caller, and requires a carrier that supports that handoff; unsupported transfers still reject under the existing capability rules. Ordinary callers need not handle a binary manifest. Carrier authors can find the wire format in the [contract guide](../rpc-contract/USEGUIDE.en.md#carriers-binary-and-stage-order).
 
 ## Notifications, groups, and retained outcomes
 
@@ -355,7 +355,7 @@ export const host = await createRpcHost({
 
 Readonly warning subscriptions may be installed later; native removal or rollback removes them. Only a host-level `defineFlowPlugin` can subscribe. Placing it in transport `features`, or returning `onWarning` from `defineFlowFeature`, rejects with `INVALID_CONFIG`.
 
-For a launched child with actual native parent facts (process, thread, coroutine, dedicated worker, or pool member), the name comes from the parent, otherwise child `self.name`, otherwise the existing default. Parent facts also control `instanceId`. When the parent omits a name, address the name returned in the child's handshake. An explicit child name that differs from the parent's does not fail construction; it emits one `RpcWarningCode.selfIgnored` (`SELF_IGNORED`) warning, with names in `warning.data.parentName` and `warning.data.ignoredName`. Conflicting sets of parent startup facts still reject with `INVALID_CONFIG`.
+A launched child with actual native parent facts (process, thread, coroutine, dedicated worker, or pool member) prefers the parent-supplied name and instanceId. Without a parent name, an explicit child `self.name` remains; without either name, the default follows the parent's instanceId. Address the name returned in the child's handshake. Overriding an explicit child name or instanceId does not fail construction; it emits one `RpcWarningCode.selfIgnored` (`SELF_IGNORED`) warning. `warning.data` includes only the overridden items: `parentName`/`ignoredName` for a name conflict and `parentInstanceId`/`ignoredInstanceId` for an identity conflict. An instanceId-only conflict also warns. Conflicting sets of parent startup facts still reject with `INVALID_CONFIG`.
 
 ## Migrate entries
 
@@ -404,4 +404,4 @@ verifyCredentials may return { principalId: nonemptyString } to lend the authent
 
 The six former `/features/{auth,batch,chunk,idempotency,limits,schema}` entries are removed; import their factories from `/plugins/*` or `/plugins`. `rpcHostPipelines` removes its third argument and `pipelines` output; pass the construction request to `domainCore(request)`. Transports declare their own pipelines. The following unused error codes are removed without replacement: `HOST_ASSEMBLER_DUPLICATE`, `HOST_FEATURE_DUPLICATE`, `PROVIDER_GENERATION_RETIRED`, `MIDDLEWARE_DUPLICATED`, `MIDDLEWARE_MISSING`, `PROVIDER_NOT_SETTLED`, `TARGET_NOT_IDENTIFIABLE`.
 
-The two names in `onWarning` move from top-level fields to `data`. Native binary manifest digests now depend on local integrity requirements, and small signed backings may be inline within a native manifest. Peer implementations must adopt the [current manifest format](../rpc-contract/USEGUIDE.en.md#carriers-binary-and-stage-order).
+Overridden identity fields in `onWarning` are under `data`, including only the name or instanceId items that actually conflict. Small signed buffers may be inline only without explicit `transfer`; explicit transfer still hands over and detaches the original buffer. Carrier implementations must adopt the [current manifest format](../rpc-contract/USEGUIDE.en.md#carriers-binary-and-stage-order).
