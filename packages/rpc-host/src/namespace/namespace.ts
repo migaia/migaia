@@ -647,14 +647,14 @@ export class Namespace {
   #broadcast(command: ICallCommand, options: IRpcCallOptions): Promise<unknown> {
     assertTrace(options)
     if (!Object.hasOwn(options, 'transfer')) return this.#deliver(command, options)
-    /** Retain one actual selection; ordinary selection failures keep their Promise rejection timing. */
+    /** Selection and transfer refusals reject the returned Promise, before any getter is read. */
     let selected: readonly IRpcSessionSelection[]
     try {
       selected = this.#targets(options)
+      this.#assertTransfer(selected, options)
     } catch (error) {
       return Promise.reject(error)
     }
-    this.#assertTransfer(selected, options)
     return this.#deliver(command, options, selected)
   }
 
