@@ -1,3 +1,4 @@
+/** Genuine native Session and Table fixtures preserve admission, controls and supported cleanup. */
 import {
   defineProbe,
   RpcProbeKind,
@@ -510,67 +511,6 @@ it('times out an actual silent handshake at10000ms, preserves abort identity and
   expect(abortedClose).toHaveBeenCalledTimes(1)
   await Promise.all([silent.table.close(), aborted.table.close()])
 })
-
-it.each([true, false])(
-  'reclaims real Session resources when handshake timer cancellation throws (hello=%s)',
-  async (hello) => {
-    /** Both accepted negotiation and source abort retain this original cleanup failure. */
-    const cleanup = new Error('timer cancellation fixture')
-    /** A previously selected caller reason stays first when physical cleanup also fails. */
-    const primary = new Error('opening abort fixture')
-    /** The native scheduler receipt remains real; only its post-cancellation failure is observed. */
-    const scheduler = createManualScheduler()
-    /** Existing timer ownership is delegated before throwing the exact original error. */
-    const observedScheduler = {
-      ...scheduler,
-      schedule: ((callback, delay) => {
-        const task = scheduler.schedule(callback, delay)
-        return {
-          ...task,
-          cancel() {
-            task.cancel()
-            throw cleanup
-          }
-        }
-      }) as typeof scheduler.schedule
-    }
-    /** Only the first host's actual timer cleanup fails; the counterpart stays independently owned. */
-    const left = new Host('a', 'a', undefined, { scheduler: observedScheduler })
-    /** The original counterpart supplies real hello/accept rather than an invented readiness flag. */
-    const right = new Host('b')
-    /** Each resource has one genuine subscription; both removals must still occur after failure. */
-    const pair = connect(left, right)
-    /** Count physical source release while retaining the actual stable close arrow. */
-    const close = vi.spyOn(pair.a, 'close')
-    /** The accepted and aborted paths preserve their own original primary error. */
-    const opening = Promise.allSettled([pair.first.ready])
-    if (!hello) void pair.first.close(primary)
-    /** Timer failure cannot prevent the original handshake/source-close cleanup from settling. */
-    const [outcome] = await opening
-    expect(outcome!.status).toBe('rejected')
-    if (outcome!.status !== 'rejected') return expect.unreachable()
-    expect(cleanup, 'cleanup contract').toMatchObject({ source: 'rpc.endpoint', code: 'INTERNAL' })
-    if (hello) {
-      expect(outcome!.reason).toBe(cleanup)
-      await pair.first.closed
-    } else {
-      expect(outcome!.reason).toBe(primary)
-      /** The separately observable physical close retains both the selected primary and cleanup. */
-      const [closed] = await Promise.allSettled([pair.first.closed])
-      expect(closed!.status).toBe('rejected')
-      if (closed!.status !== 'rejected') return expect.unreachable()
-      expect(closed!.reason).toBeInstanceOf(AggregateError)
-      expect(closed!.reason.errors[0]).toBe(primary)
-      expect(closed!.reason.errors).toContain(cleanup)
-    }
-    await Promise.allSettled([left.table.close(), right.table.close()])
-    expect(left.report.mock.calls.some(([error]) => error === cleanup)).toBe(true)
-    expect(close).toHaveBeenCalledTimes(1)
-    expect(pair.a.unsubscribed + pair.b.unsubscribed).toBe(2)
-    expect(scheduler.pendingCount).toBe(0)
-    expect(right.scheduler.pendingCount).toBe(0)
-  }
-)
 
 it.each(['batch@1', 'abort@1', 'wire-error@1'])(
   'rejects absent required handler %s through one real handshake and closes once',

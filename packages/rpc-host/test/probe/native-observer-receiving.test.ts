@@ -30,16 +30,15 @@ type IObservedSource = {
 /** SessionTable owns physical cleanup; this native registration acquires no second resource. */
 function releaseObservedSource(): void {}
 
-/** The genuine observation receipt owns these original release counts and failure stimulus. */
+/** The genuine observation receipt owns these original acquisition and release counts. */
 type IObservationCleanup = {
   observed: number
   released: number
-  error: Error
   subscribe: RpcCarrierObservation['subscribe']
 }
 
-/** Wrap only the original native remover, which must release before its fixture failure. */
-function failingObservationCleanup(
+/** Count the original native remover without replacing its infallible unsubscribe behavior. */
+function observationCleanup(
   observation: RpcCarrierObservation,
   listener: Parameters<RpcCarrierObservation['subscribe']>[0],
   fixture: IObservationCleanup
@@ -50,7 +49,6 @@ function failingObservationCleanup(
   return () => {
     fixture.released++
     remove()
-    throw fixture.error
   }
 }
 
@@ -303,25 +301,22 @@ it('rolls back the actual native observer before describing a failed Session', a
   }
 })
 
-// RPC-TEST-B569E95AA42F-C003: both originals survive native critical-before-observer release.
-it('keeps physical close first and reports the original observer cleanup failure once', async () => {
+// RPC-TEST-B569E95AA42F-C003: supported physical failure and critical-before-observer release remain.
+it('keeps physical close first and preserves its original failure while releasing the observer once', async () => {
   /** Critical physical close failure remains first in the actual cleanup result. */
   const primary = new Error('primary close fixture')
-  /** Observer release fails after removing its actual native subscription. */
-  const secondary = new Error('observer close fixture')
   /** The public probe diagnostic sink remains independent from close settlement. */
   const failures: unknown[] = []
   /** The counters belong to the real subscription rather than a synthetic probe event. */
   const observation: IObservationCleanup = {
     observed: 0,
     released: 0,
-    error: secondary,
     subscribe: RpcCarrierObservation.prototype.subscribe
   }
   const subscribe = vi
     .spyOn(RpcCarrierObservation.prototype, 'subscribe')
     .mockImplementation(function (this: RpcCarrierObservation, listener) {
-      return failingObservationCleanup(this, listener, observation)
+      return observationCleanup(this, listener, observation)
     })
   /** The shared source fixture still acquires both actual native Sessions. */
   const listener = coreMemoryServer('observer-cleanup-provider')
@@ -344,19 +339,16 @@ it('keeps physical close first and reports the original observer cleanup failure
   /** Inject failure only after the original physical close completion. */
   const close = vi.spyOn(client.pair[0], 'close').mockImplementation(async (reason) => {
     await closeOriginal(reason)
+    expect(observation.released).toBe(0)
     throw primary
   })
   try {
-    /** This accepted Session owns the exact two failing releases under assertion. */
+    /** This accepted Session owns the supported original physical release failure. */
     const handle = listener.lookup('observer-cleanup-caller')!.handle
-    /** The original two cleanup failures occupy the actual canonical error array without filtering. */
+    /** The physical release remains the exact close rejection, without an observer failure wrapper. */
     const failure: unknown = await handle.close().catch((error: unknown) => error)
-    expect((failure as Error & { readonly errors?: readonly unknown[] }).errors).toEqual([
-      primary,
-      secondary
-    ])
-    expect.soft(failures).toHaveLength(1)
-    expect.soft(failures[0]).toMatchObject({ code: 'PROBE_FAILED', cause: secondary })
+    expect(failure).toBe(primary)
+    expect(failures).toHaveLength(0)
     await handle.close().catch(() => undefined)
     expect(observation.observed).toBe(1)
     expect(observation.released).toBe(1)

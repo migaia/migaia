@@ -61,8 +61,7 @@ import {
   RpcLifecycleError,
   RpcSerializationError,
   RPC_CONTRACT_SOURCE,
-  safeRead,
-  tagRpcError
+  safeRead
 } from '@migaia/rpc-contract/errors'
 import {
   createRpcError,
@@ -337,20 +336,12 @@ export class Session {
     return Math.max(0, this.#admissionDeadline! - this.#options.scheduler.now())
   }
 
-  /** Take ownership before native cancellation so a thrown cleanup cannot cause a second attempt. */
+  /** Clear the original scheduler receipt before cancellation can reenter this Session. */
   #cancelHandshakeTimer(): void {
     /** Only the original scheduled receipt is ever cancelled, at accepted readiness or retirement. */
     const timer = this.#handshakeTimer
     this.#handshakeTimer = undefined
-    try {
-      timer?.task.cancel()
-    } catch (error) {
-      throw identifyRpcBoundaryFailure(
-        error,
-        RpcCoreErrorCode.internal,
-        RpcCoreErrorText.endpointDisposalCleanupFailed
-      )
-    }
+    timer?.task.cancel()
   }
 
   /** Reject unsupported native transfer presence without reading caller getters or payload data. */
@@ -566,14 +557,7 @@ export class Session {
     this.#physicalFailure = physicalFailure
     this.#reason = reason ?? createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
     this.#lifecycle(RpcProbeLifecycle.closing, this.#reason)
-    /** Timer cleanup remains secondary to an already selected abort/EOF/deadline primary. */
-    const timerFailures: unknown[] = []
-    try {
-      this.#cancelHandshakeTimer()
-    } catch (error) {
-      timerFailures.push(error)
-      this.#options.report(error)
-    }
+    this.#cancelHandshakeTimer()
     this.#ready.reject(this.#reason)
     this.#offered.reject(this.#reason)
     this.#offer = undefined
@@ -582,15 +566,12 @@ export class Session {
     this.#admissionDeadline = undefined
     this.#handshakeResult.authentication = undefined
     this.#credentials.value = undefined
-    void this.#finishClose(timerFailures, physicalFailure).then(
-      this.#closed.resolve,
-      this.#closed.reject
-    )
+    void this.#finishClose(physicalFailure).then(this.#closed.resolve, this.#closed.reject)
     return this.#closed.promise
   }
 
   /** One budget bounds native reason selection, application hooks, FIFO writes and final close. */
-  async #finishClose(timerFailures: unknown[], physicalFailure: boolean): Promise<void> {
+  async #finishClose(physicalFailure: boolean): Promise<void> {
     if (
       (this.#view && this.#options.carrier.closingWrites) ||
       (physicalFailure && this.#options.carrier.terminalReason)
@@ -660,37 +641,15 @@ export class Session {
     const remove = this.#unsubscribe
     this.#unsubscribe = undefined
     await this.#writing
-    await this.#cleanup(remove, timerFailures, physicalFailure || Boolean(this.#receivedClose))
+    await this.#cleanup(remove, physicalFailure || Boolean(this.#receivedClose))
   }
 
   /** Physical close settles queued writes before joining the reply; ingress never waits on itself. */
-  async #cleanup(
-    remove: IRpcDispose | undefined,
-    timerFailures: unknown[],
-    physicalFailure: boolean
-  ): Promise<void> {
+  async #cleanup(remove: IRpcDispose | undefined, physicalFailure: boolean): Promise<void> {
     /** Keep all original cleanup values reachable if multiple native releases fail. */
-    const failures: unknown[] = [...timerFailures]
-    // This fixed three-step native cleanup order is independent of growable call/frame tables.
-    for (const release of [
-      () => remove?.(),
-      () => this.#options.carrier.close(this.#reason),
-      () => {
-        // Observe late successful acquisition only when its original release step is reached.
-        const unobserve = this.#unobserve
-        this.#unobserve = undefined
-        try {
-          return unobserve?.()
-        } catch (error) {
-          this.#options.flow.observe?.({
-            kind: RpcProbeObservationKind.cleanupFailure,
-            namespace: this.#options.namespace,
-            data: error
-          })
-          throw error
-        }
-      }
-    ]) {
+    const failures: unknown[] = []
+    // These two carrier releases remain supported cleanup boundaries in their original order.
+    for (const release of [() => remove?.(), () => this.#options.carrier.close(this.#reason)]) {
       try {
         await release()
       } catch (error) {
@@ -698,6 +657,10 @@ export class Session {
         this.#options.report(error)
       }
     }
+    /** Native observation removal is an infallible unsubscribe, after critical physical cleanup. */
+    const unobserve = this.#unobserve
+    this.#unobserve = undefined
+    await unobserve?.()
     try {
       await this.#reply
     } catch (error) {
@@ -706,14 +669,6 @@ export class Session {
     /** External close joins admitted ingress before its native stage owner is revoked. */
     if (!physicalFailure) await this.#receiving
     this.#view = undefined
-    if (timerFailures.length)
-      throw tagRpcError(
-        new AggregateError(
-          [this.#reason, ...failures],
-          RpcCoreErrorText.endpointDisposalCleanupFailed
-        ),
-        RpcCoreErrorCode.internal
-      )
     if (failures.length === 1) throw failures[0]
     if (failures.length > 1)
       throw attachSecondaryErrors(
