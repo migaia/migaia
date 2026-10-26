@@ -629,8 +629,11 @@ export class SessionTable {
       pipelines: staged?.pipelines ?? this.#options.pipelines,
       self: this.#options.self,
       directory: (peerId) => this.#options.directory(namespace, peerId),
+      /** Final write sealing precedes synchronous retirement callbacks and controller abort. */
       track: (promise) =>
-        session.signal.aborted ? promise : this.#draining.track(carrier.id, promise),
+        session.closing && !session.canKeepalive()
+          ? promise
+          : this.#draining.track(carrier.id, promise),
       draining: (remainingMs, announce) => this.#draining.drain(carrier.id, remainingMs, announce),
       report: this.#options.report,
       scheduler: this.#options.scheduler ?? systemScheduler,

@@ -9,6 +9,7 @@ import { createProbeEmitter } from '../../dist/plugins/probe/emitter.js'
 import { MemoryCarrier } from '../fixtures/core-carrier.js'
 import { describe, expect, it, vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
+import { deferred } from '@migaia/utils/promise'
 import { defineHost, definePlugin } from '@migaia/plugin-host'
 import {
   defineFlowFeature,
@@ -70,7 +71,10 @@ class Host {
     id: string,
     name = id,
     installed: IRpcFlowInstallation<object> = {},
-    options?: Pick<IRpcSessionTableOptions, 'scheduler' | 'handshakeTimeoutMs' | 'maxFrameBytes'>
+    options?: Pick<
+      IRpcSessionTableOptions,
+      'scheduler' | 'handshakeTimeoutMs' | 'maxFrameBytes' | 'retired'
+    >
   ): Promise<Host> {
     /** This bounded fixture retains the same global identity and original hook callbacks. */
     const host = new Host(id, name)
@@ -81,7 +85,10 @@ class Host {
   /** Native groups own real short-name declarations and canonical setup, without a copied runner. */
   async #install(
     installed: IRpcFlowInstallation<object>,
-    options?: Pick<IRpcSessionTableOptions, 'scheduler' | 'handshakeTimeoutMs' | 'maxFrameBytes'>
+    options?: Pick<
+      IRpcSessionTableOptions,
+      'scheduler' | 'handshakeTimeoutMs' | 'maxFrameBytes' | 'retired'
+    >
   ): Promise<void> {
     /** Genuine native construction fixes one execution port per namespace registration. */
     const owners = new Map<string, IRpcPipelineOwner>()
@@ -144,6 +151,7 @@ class Host {
       scheduler: options?.scheduler ?? this.scheduler,
       handshakeTimeoutMs: options?.handshakeTimeoutMs,
       maxFrameBytes: options?.maxFrameBytes,
+      retired: options?.retired,
       timestamp: () => 0,
       nameProbeTimeoutMs: 20
     })
@@ -166,6 +174,11 @@ class Host {
   ) {
     return this.#table.attach(namespace, carrier, connection, this.#scopes.get(namespace))
   }
+
+  /** Closing controls use the installed scope's native grace hook without synthetic readiness. */
+  onClosing(handler: Parameters<SessionTable['onClosing']>[1]): () => void {
+    return this.#table.onClosing(this.#scopes.get('process')!, handler)
+  }
 }
 
 /** Every fixture directory uses the actual schema3 admission path. */
@@ -179,16 +192,29 @@ function directory(id: string, name = id): IRpcDirectory {
 }
 
 /** Build one actual bidirectional physical connection without accepting a fabricated session view. */
-function connect(left: Host, right: Host, namespace = 'process', holdAccept = false, key = '') {
+function connect(
+  left: Host,
+  right: Host,
+  namespace = 'process',
+  holdAccept = false,
+  key = '',
+  closingWrites?: true
+) {
   /** Endpoint ids are local physical identities, independent of peer display names. */
   const a = new MemoryCarrier(
     `${left.directory.self.instanceId}-${right.directory.self.instanceId}${key}`,
-    ['native', 'json']
+    ['native', 'json'],
+    undefined,
+    true,
+    closingWrites
   )
   /** Opposite preference proves the smaller-id initiating offer owns codec priority. */
   const b = new MemoryCarrier(
     `${right.directory.self.instanceId}-${left.directory.self.instanceId}${key}`,
-    ['json', 'native']
+    ['json', 'native'],
+    undefined,
+    true,
+    closingWrites
   )
   a.link(b)
   b.link(a)
@@ -729,6 +755,69 @@ it('A39 late track after physical retirement preserves its promise without alloc
     }
     expect(await original).toBe('late result')
   } finally {
+    await Promise.all([left.table.close(), right.table.close()])
+  }
+})
+
+it('A39 reentrant retirement track is inert while closing grace keeps its original tracking', async () => {
+  /** One real grace callback remains active before the Session seals its final writes. */
+  const entered = deferred<void>()
+  const release = deferred<void>()
+  /** Retirement must preserve this independently owned business Promise without wrapping it. */
+  const original = deferred<string>()
+  /** Capture genuine advanced handle methods only after their actual native handshake succeeds. */
+  let track!: <T>(promise: Promise<T>) => Promise<T>
+  let canKeepalive!: () => boolean
+  /** Snapshot both callback phases outside assertions that Session cleanup intentionally reports. */
+  let graceResult: Promise<string> | undefined
+  let retiredResult: Promise<string> | undefined
+  let graceAllowed: boolean | undefined
+  let retiredAllowed: boolean | undefined
+  /** The synchronous table collaborator reenters before the Session aborts its controller. */
+  const left = await Host.create(
+    'reentrant-track-a',
+    'reentrant-track-a',
+    {},
+    {
+      retired: () => {
+        retiredAllowed = canKeepalive()
+        retiredResult = track(original.promise)
+      }
+    }
+  )
+  const right = await Host.create('reentrant-track-b')
+  const pair = connect(left, right, 'process', false, '', true)
+  /** Observe the existing drain owner rather than replacing its record or settlement behavior. */
+  const tracking = vi.spyOn(SessionDrain.prototype, 'track')
+  const off = left.onClosing(async () => {
+    graceAllowed = canKeepalive()
+    graceResult = track(original.promise)
+    entered.resolve()
+    await release.promise
+  })
+  try {
+    await Promise.all([pair.first.ready, pair.second.ready])
+    expect(typeof Reflect.get(pair.first, 'track')).toBe('function')
+    expect(typeof Reflect.get(pair.first, 'canKeepalive')).toBe('function')
+    track = Reflect.get(pair.first, 'track')
+    canKeepalive = Reflect.get(pair.first, 'canKeepalive')
+    const closing = pair.first.close()
+    await entered.promise
+    expect(graceAllowed).toBe(true)
+    expect(graceResult).toBe(original.promise)
+    expect(tracking).toHaveBeenCalledExactlyOnceWith(pair.a.id, original.promise)
+    release.resolve()
+    await closing
+    expect(retiredAllowed).toBe(false)
+    expect(retiredResult).toBe(original.promise)
+    expect(tracking).toHaveBeenCalledExactlyOnceWith(pair.a.id, original.promise)
+    expect(left.table.get('process', right.directory.self.instanceId)).toBeUndefined()
+    expect(left.scheduler.pendingCount).toBe(0)
+  } finally {
+    release.resolve()
+    original.resolve('finished independently')
+    off()
+    tracking.mockRestore()
     await Promise.all([left.table.close(), right.table.close()])
   }
 })
