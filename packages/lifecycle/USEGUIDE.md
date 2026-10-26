@@ -738,7 +738,7 @@ await tracker.whenZero(key) // 必须先 seal，否则同步抛 QUIESCENCE_UNSEA
 - `whenZero(key)`：**必须先 `seal(key)`**，否则**同步**抛 `QUIESCENCE_UNSEALED_WAIT`（不是返回 rejected Promise）；已归零时立即 resolve。
 - `whenZeroOnce(key)`：不要求 seal，随时可等待"下一次归零"，不阻塞新 `retain()`。
 - `seal(key)`：幂等，标记该 key 之后拒绝新租约。
-- `forget(key)`：仅当计数为 0 且没有任何等待者时才移除该 key 的状态并返回 `true`；否则返回 `false`。
+- `forget(key)`：仅当计数为 0 且没有任何等待者时才移除该 key 的已存储状态。返回值表示本次是否实际删除了状态；状态原本不存在或已被自动清除时也返回 `false`，不表示计数仍大于 0。
 - 一个未 seal 且归零的 key（字符串键）会被自动从底层 `Map` 中删除，避免长期驻留；已 `seal` 的 key 的"已 seal"事实会保留。
 
 ### `createObjectLeaseRegistry` / `createStringLeaseRegistry`

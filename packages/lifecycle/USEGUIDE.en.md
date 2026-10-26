@@ -727,7 +727,7 @@ Neither factory takes arguments. Edge cases:
 - `whenZero(key)`: **you must `seal(key)` first**, or it throws `QUIESCENCE_UNSEALED_WAIT` **synchronously** (not as a rejected Promise). Resolves immediately when the count is already zero.
 - `whenZeroOnce(key)`: needs no seal; waits for the next time the count reaches zero and does not block new `retain()` calls.
 - `seal(key)`: idempotent; the key rejects new leases from then on.
-- `forget(key)`: removes the key's state and returns `true` only when its count is zero and nobody is waiting; otherwise returns `false`.
+- `forget(key)`: removes stored state only when its count is zero and nobody is waiting. The return value says whether this call actually deleted state; an absent or automatically pruned entry also returns `false`, which does not imply a positive count.
 - An unsealed string key that reaches zero is removed from the underlying `Map` automatically, so it does not linger; a sealed key keeps the fact that it is sealed.
 
 ### `createObjectLeaseRegistry` / `createStringLeaseRegistry`

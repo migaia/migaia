@@ -13,7 +13,10 @@ export type IQuiescenceTracker<TKey> = {
   /** Blocks further `retain()` calls for `key`. Idempotent. */
   seal(key: TKey): void
   isSealed(key: TKey): boolean
-  /** Removes a zero-count key and returns whether a state entry was removed. */
+  /**
+   * Returns whether this call removed stored idle state; absent or already-pruned keys return
+   * false.
+   */
   forget(key: TKey): boolean
 }
 
@@ -131,7 +134,7 @@ class QuiescenceTracker<TKey> implements IQuiescenceTracker<TKey> {
   /** Read the admission fence without allocating any counter state. */
   readonly isSealed = (key: TKey): boolean => this.#store.get(key)?.sealed ?? false
 
-  /** Explicitly remove only an idle state with no unresolved strict or loose waiters. */
+  /** Remove stored idle state with no waiters; return whether this call actually deleted that state. */
   readonly forget = (key: TKey): boolean => {
     /** Object states may be retained at zero; pristine string states were already pruned. */
     const state = this.#store.get(key)
