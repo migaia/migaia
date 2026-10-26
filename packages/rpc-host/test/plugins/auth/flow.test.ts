@@ -10,6 +10,7 @@ import { setAuthenticationReplayCounter } from '../../../dist/features/auth/coun
 import { readAuthenticationEnvelope } from '../../../dist/features/auth/envelope.js'
 import { AuthenticationRepresentation } from '../../../dist/features/auth/representation.js'
 import { RpcJsonCarrierCodec } from '../../../dist/sdk/carrier/json-codec.js'
+import { createRpcBackingDigest } from '../../../dist/sdk/carrier/digest.js'
 import { FlowRegistry, type IRpcFlowGroup } from '../../../dist/flow/registry.js'
 import {
   rpcHostPipelines,
@@ -58,20 +59,15 @@ async function fixture(options: IRpcAuthenticationOptions, nativeBinary = false)
   const reports: unknown[] = []
   /** Hash calls expose repeated restore without replacing the original SDK integrity algorithm. */
   const hashes = { count: 0 }
-  /**
-   * This controlled digest fixture covers its complete four-byte backing and canonical digest
-   * shape.
-   */
+  /** The original crypto helper hashes the complete backing, including bytes outside any view. */
+  const digest = createRpcBackingDigest()!
+  /** Count the real digest without substituting another integrity algorithm. */
   const codec = new RpcJsonCarrierCodec({
     digest: async (backing) => {
       hashes.count += 1
-      return Array.from(new Uint8Array(backing), (byte) => byte.toString(16).padStart(2, '0'))
-        .join('')
-        .padEnd(64, '0')
+      return digest(backing)
     }
   })
-  /** Actual executing codec policy is shared by prepare/decode and the one cached restore operation. */
-  const codecContext = { codec: 'json', nativeBinary, maxFrameBytes: 16 * 1024 * 1024 }
   /** Native use() publishes the exact algorithm installation retained by the original counter seam. */
   let installation!: IRpcFlowInstallation<object>
   /** Actual native construction requests supply one execution port per installed group. */
@@ -124,6 +120,13 @@ async function fixture(options: IRpcAuthenticationOptions, nativeBinary = false)
     })
   )
   registry.start()
+  /** Actual selected Auth facts supply the same integrity policy as production Session. */
+  const codecContext = {
+    codec: 'json',
+    nativeBinary,
+    maxFrameBytes: 16 * 1024 * 1024,
+    transferRequiresIntegrity: groups.get('test')!.facts().transferRequiresIntegrity
+  }
   /** The namespace-qualified execution port is borrowed unchanged from the genuine native host. */
   const pipelines = owners.get('test')!
   /** Physical facts and the exact codec operation are explicit inputs to tiny fixture callbacks. */
@@ -269,8 +272,9 @@ it('keeps native sign-only any bindings as objects with the original backing int
     true
   )
   try {
-    /** The genuine codec's manifest must hash this exact native backing in both directions. */
-    const bytes = new Uint8Array([1, 2, 3, 4])
+    /** Exceed signed inlining so the original native-sidecar integrity oracle stays exercised. */
+    const bytes = new Uint8Array(16385)
+    bytes.set([1, 2, 3, 4])
     /** This is the normal prepare/stage/encode/decode/stage/restore path on a native carrier. */
     const frame = await f.send(message('native-signing', bytes))
     expect(categories).toEqual(['object'])
@@ -459,8 +463,9 @@ it.each(['text', new Uint8Array([0, 255, 42]), { nested: 'value' }])(
 it('finishes original native integrity before replay commit and reuses the exact cached restore Promise', async () => {
   /** Signing covers the original complete manifest including full backing digest/length. */
   const f = await fixture({ sign: (value) => value, verify: (value) => value }, true)
-  /** The original complete backing is retained, including bytes outside a selected view. */
-  const bytes = new Uint8Array([1, 2, 3, 4])
+  /** The large complete backing stays native, including bytes outside the original tiny view. */
+  const bytes = new Uint8Array(16385)
+  bytes.set([1, 2, 3, 4])
   /** This genuine protected physical packet retains the actual original sidecar identity. */
   const packet = await f.send(message('binary', bytes.subarray(1, 3)))
   expect(packet.sidecars?.[0]).toBe(bytes.buffer)

@@ -456,9 +456,10 @@ async function nativeTransferProbeCase(protection: IProbeProtection, mode: IProb
     })
   ])
   client = peers[0]!.memory
-  /** This original application backing must detach only after a supported physical transfer. */
-  const bytes = new Uint8Array([4, 5, 6]),
-    backing = bytes.buffer
+  /** Only signed transfer exceeds the inline threshold; encrypted refusal retains its three bytes. */
+  const backing = new ArrayBuffer(protection === 'signed' ? 16385 : 3),
+    bytes = new Uint8Array(backing, 0, 3)
+  bytes.set([4, 5, 6])
   try {
     expect(await client.send('transfer-right', 'reenter')).toBe(9)
     if (mode === 'reentrant') expect(await nested).toBe(9)

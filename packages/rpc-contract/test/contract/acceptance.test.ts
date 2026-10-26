@@ -34,6 +34,7 @@ describe('pure contract acceptance', () => {
      */
     const allowedBareSpecifiers = new Set<string>([
       '@migaia/serialize',
+      '@migaia/serialize/core',
       '@migaia/utils/bytes',
       '@migaia/utils/error',
       '@migaia/utils/string',

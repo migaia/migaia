@@ -95,8 +95,8 @@ it('preserves real native transfer backing, offset and borrowed parent cleanup o
       })
     ]
   })
-  /** A nonzero view offset proves transfer uses the original complete backing. */
-  const backing = new ArrayBuffer(16)
+  /** A large signed backing retains native transfer while the original tiny view keeps its offset. */
+  const backing = new ArrayBuffer(16385)
   /** Visible bytes remain separate from the prefix and suffix retained by the native backing. */
   const value = new Uint8Array(backing, 4, 3)
   value.set([7, 8, 9])
@@ -109,7 +109,7 @@ it('preserves real native transfer backing, offset and borrowed parent cleanup o
     expect(result).toBeInstanceOf(Uint8Array)
     expect(Array.from(result as Uint8Array)).toEqual([7, 8, 9])
     expect((result as Uint8Array).byteOffset).toBe(4)
-    expect((result as Uint8Array).buffer.byteLength).toBe(16)
+    expect((result as Uint8Array).buffer.byteLength).toBe(16385)
   } finally {
     await host.close()
   }

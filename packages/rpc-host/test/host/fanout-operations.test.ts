@@ -424,16 +424,19 @@ describe('host direct-target broadcast operations', () => {
       }
     })
     try {
-      /** A genuine transferable backing carries a nonzero business byte. */
-      const backing = new ArrayBuffer(8)
-      new Uint8Array(backing)[0] = 42
+      /** The complete signed backing exceeds inlining while retaining the original business bytes. */
+      const backing = new ArrayBuffer(16385)
+      /** Independent expected bytes retain ArrayBuffer delivery and the complete zero-filled suffix. */
+      const expected = new Uint8Array(16385)
+      expected[0] = 42
+      new Uint8Array(backing).set(expected)
       await pair.caller.native.notify('note', backing, { transfer: [backing] })
       expect(backing.byteLength).toBe(0)
       expect(pair.writes.mock.calls.some(([, transfer]) => transfer?.includes(backing))).toBe(true)
       /** Canonical restoration delivers an actual ArrayBuffer with its original bytes. */
       const value = await received.promise
       expect(value).toBeInstanceOf(ArrayBuffer)
-      expect([...new Uint8Array(value as ArrayBuffer)]).toEqual([42, 0, 0, 0, 0, 0, 0, 0])
+      expect(new Uint8Array(value as ArrayBuffer)).toEqual(expected)
       await nextTurn()
       expect(pair.replies).not.toHaveBeenCalled()
       /**

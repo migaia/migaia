@@ -40,6 +40,7 @@ const inwardOwners: Record<string, readonly string[]> = {
  */
 const contractBareAllowlist = new Set([
   '@migaia/serialize',
+  '@migaia/serialize/core',
   '@migaia/utils/bytes',
   '@migaia/utils/error',
   '@migaia/utils/function',
