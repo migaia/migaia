@@ -3,7 +3,14 @@
  * forwards a's calls to them by peer-name prefix.
  */
 import { RpcProbeStage } from '@migaia/rpc-contract/interfaces'
-import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
+import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'
+import {
+  createRpcHost,
+  defaultRpcReporter,
+  type IRpcHost,
+  type IRpcNamespace
+} from '@migaia/rpc-host'
+import { rpcFlowPlugin, rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { auth } from '@migaia/rpc-host/plugins/auth'
 import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'
 import { pool, RPC_POOL_PEER_ID } from '@migaia/rpc-plugin-pool'
@@ -78,71 +85,161 @@ const pythonPlugins = options.python
     ]
   : []
 
-/** Opening Promise of b; providers await it before touching children. */
-const opening: Promise<IRpcHost> = createRpcHost({
-  plugins: [
-    recorder.plugin,
-    processPlugin({ namespace: 'parent', connectToParent: true }),
-    threadPlugin({
+/** Configure the same four native namespace groups before any resource is acquired. */
+function isolatedNativeHost() {
+  /** The SDK borrows this actual Host's pipeline authority only after construction. */
+  const rpc = rpcHostPipelines(
+    () => host,
+    (name) => host.pipeline(name),
+    ['parent', 'thread', 'pool', 'coroutine']
+  )
+  /** Separate native use calls commit independent application installation transactions. */
+  const host = defineHost({
+    ...rpc,
+    host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
+  })
+  return host
+}
+
+/** Keep healthy native transports committed when the application expects one later start to fail. */
+class IsolatedStartup {
+  /** One genuine native owner retains every successful transport and the actual RPC domain. */
+  readonly #host = isolatedNativeHost()
+  /** Readiness joins both native installation transactions before calling the healthy children. */
+  #opening: Promise<void> | undefined
+
+  /** Start the application once; the rejected child installation is handled at its own boundary. */
+  open(): Promise<void> {
+    return (this.#opening ??= this.#open())
+  }
+
+  /** Publish this real Feature output through the parent transport's normal exposure authority. */
+  readonly #ready = async (): Promise<boolean> => {
+    await this.#opening
+    await Promise.all([
+      this.#namespace('pool').send(RPC_POOL_PEER_ID, Topology.ready),
+      this.#namespace('coroutine').send(Topology.coroutine, Topology.ready)
+    ])
+    return true
+  }
+
+  /** Read a namespace published by the real SDK installation, never a synthetic RPC facade. */
+  #namespace(name: string): IRpcNamespace {
+    return Reflect.get(this.#host, name) as IRpcNamespace
+  }
+
+  /** Cold flow placement precedes native transport use; only c belongs to the failing transaction. */
+  async #open(): Promise<void> {
+    /** The same actual service Feature supplies the readiness method advertised to a. */
+    const service = definePlugin({
+      name: Topology.b,
+      features: { readiness: defineFeature(() => ({ [Topology.ready]: this.#ready })) },
+      install: () => ({})
+    })
+    /** Parent bootstrap keeps b's actual process identity and publishes the readiness Feature. */
+    const parent = processPlugin({
+      namespace: 'parent',
+      connectToParent: true,
+      expose: [Topology.b]
+    })
+    /** The original wrong-secret thread uses the same real generation and authentication owner. */
+    const child = threadPlugin({
       name: Topology.c,
       spawn: { entry: threadEntry, data: options },
       features: threadFeatures
-    }),
-    ...(options.childProcess
-      ? [
-          processPlugin({
-            namespace: 'child',
-            name: Topology.d,
-            spawn: { entry: new URL('./topology-leaf-process.ts', import.meta.url) }
-          })
-        ]
-      : []),
-    threadPlugin({
+    })
+    /** Healthy pool and coroutine retain their original source recipes and policy Features. */
+    const members = threadPlugin({
       namespace: 'pool',
       spawn: { entry: threadEntry, data: {} },
       features: [pool({ size: 4 })]
-    }),
-    coroutinePlugin({ name: Topology.coroutine, spawn: coroutineTask }),
-    ...pythonPlugins
-  ],
-  provide: {
-    /** Wait until every child answers its own readiness provider. */
-    [Topology.ready]: async () => {
-      /** The opened host owning every child namespace. */
-      const host = await opening
-      await Promise.all([
-        ...(options.hopAuth === 'mismatch' ? [] : [host.thread.send(Topology.c, Topology.ready)]),
-        ...(options.childProcess ? [host.child.send(Topology.d, Topology.ready)] : []),
-        host.pool.send(RPC_POOL_PEER_ID, Topology.ready),
-        host.coroutine.send(Topology.coroutine, Topology.ready),
-        ...(options.python ? [host.foreign.send(Topology.python, Topology.echo, true)] : [])
-      ])
-      return true
-    },
-    /** Report b's forward rows and each leaf's counters. */
-    [Topology.inspect]: async () => {
-      /** The opened host owning every child namespace. */
-      const host = await opening
-      return {
-        selfId: host.self.instanceId,
-        selfName: host.self.name,
-        pid: process.pid,
-        forward: recorder.snapshot().filter((event) => event.stage === RpcProbeStage.forward),
-        auth: hopAuth.snapshot(),
-        ...(options.hopAuth === 'mismatch'
-          ? {}
-          : { c: await host.thread.send(Topology.c, Topology.inspect) }),
-        ...(options.childProcess ? { d: await host.child.send(Topology.d, Topology.inspect) } : {}),
-        co: coroutineLeaf.snapshot()
-      }
-    },
-    /** Close b gracefully shortly after replying, while a still has calls in flight. */
-    [Topology.shutdown]: async () => {
-      /** The opened host to close. */
-      const host = await opening
-      setTimeout(() => void host.close().then(() => process.exit(0)), 20)
-      return true
+    })
+    /** The same coroutine task still owns its public leaf host and generation port. */
+    const coroutine = coroutinePlugin({ name: Topology.coroutine, spawn: coroutineTask })
+    await this.#host.use(
+      service,
+      recorder.plugin,
+      rpcFlowPlugin([parent, child, members, coroutine])
+    )
+    await this.#host.use(parent, members, coroutine)
+    try {
+      await this.#host.use(child)
+    } catch (error) {
+      defaultRpcReporter(error)
     }
   }
-})
-await opening
+}
+
+if (options.hopAuth === 'mismatch') await new IsolatedStartup().open()
+else {
+  /** Opening Promise of b; providers await it before touching children. */
+  const opening: Promise<IRpcHost> = createRpcHost({
+    plugins: [
+      recorder.plugin,
+      processPlugin({ namespace: 'parent', connectToParent: true }),
+      threadPlugin({
+        name: Topology.c,
+        spawn: { entry: threadEntry, data: options },
+        features: threadFeatures
+      }),
+      ...(options.childProcess
+        ? [
+            processPlugin({
+              namespace: 'child',
+              name: Topology.d,
+              spawn: { entry: new URL('./topology-leaf-process.ts', import.meta.url) }
+            })
+          ]
+        : []),
+      threadPlugin({
+        namespace: 'pool',
+        spawn: { entry: threadEntry, data: {} },
+        features: [pool({ size: 4 })]
+      }),
+      coroutinePlugin({ name: Topology.coroutine, spawn: coroutineTask }),
+      ...pythonPlugins
+    ],
+    provide: {
+      /** Wait until every child answers its own readiness provider. */
+      [Topology.ready]: async () => {
+        /** The opened host owning every child namespace. */
+        const host = await opening
+        await Promise.all([
+          ...(options.hopAuth === 'mismatch' ? [] : [host.thread.send(Topology.c, Topology.ready)]),
+          ...(options.childProcess ? [host.child.send(Topology.d, Topology.ready)] : []),
+          host.pool.send(RPC_POOL_PEER_ID, Topology.ready),
+          host.coroutine.send(Topology.coroutine, Topology.ready),
+          ...(options.python ? [host.foreign.send(Topology.python, Topology.echo, true)] : [])
+        ])
+        return true
+      },
+      /** Report b's forward rows and each leaf's counters. */
+      [Topology.inspect]: async () => {
+        /** The opened host owning every child namespace. */
+        const host = await opening
+        return {
+          selfId: host.self.instanceId,
+          selfName: host.self.name,
+          pid: process.pid,
+          forward: recorder.snapshot().filter((event) => event.stage === RpcProbeStage.forward),
+          auth: hopAuth.snapshot(),
+          ...(options.hopAuth === 'mismatch'
+            ? {}
+            : { c: await host.thread.send(Topology.c, Topology.inspect) }),
+          ...(options.childProcess
+            ? { d: await host.child.send(Topology.d, Topology.inspect) }
+            : {}),
+          co: coroutineLeaf.snapshot()
+        }
+      },
+      /** Close b gracefully shortly after replying, while a still has calls in flight. */
+      [Topology.shutdown]: async () => {
+        /** The opened host to close. */
+        const host = await opening
+        setTimeout(() => void host.close().then(() => process.exit(0)), 20)
+        return true
+      }
+    }
+  })
+  await opening
+}

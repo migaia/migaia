@@ -58,7 +58,10 @@ async function openOrigin(options: ITopologyOptions = {}): Promise<IRpcHost> {
     report: () => undefined
   })
   try {
-    await host.process.send(Topology.b, Topology.ready)
+    await host.process.send(
+      Topology.b,
+      options.hopAuth === 'mismatch' ? `${Topology.b}.${Topology.ready}` : Topology.ready
+    )
     return host
   } catch (error) {
     await host.close()
