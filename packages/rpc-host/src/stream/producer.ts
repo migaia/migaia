@@ -27,7 +27,11 @@ import {
   type IRpcPortableValue,
   type IRpcCompletion
 } from '@migaia/rpc-contract/protocol'
-import { RpcCoreErrorCode, RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
+import {
+  RpcCoreErrorCode,
+  RpcContractErrorCode,
+  type IRpcCoreErrorCode
+} from '@migaia/rpc-contract/error-code'
 import {
   safeRead,
   RPC_CONTRACT_SOURCE,
@@ -35,7 +39,7 @@ import {
   identifyRpcBoundaryFailure
 } from '@migaia/rpc-contract/errors'
 import { RpcStreamErrorText } from './error-text.js'
-import { createRpcError, createRpcAbortError } from '../host/error-owner.js'
+import { createRpcError, createRpcAbortError, localRpcErrorCode } from '../host/error-owner.js'
 import { serializeHostWireError, deserializeHostWireError } from '../host/error-wire-metadata.js'
 import { sameTask } from '../call/envelope.js'
 import { resolveAbortReason } from '../host/abort-reason.js'
@@ -101,10 +105,22 @@ export class StreamProducer {
     if (this.#input.signal.aborted) this.#abort()
     if (!this.#terminal) {
       this.#pending += 1
-      void this.#send({ event: RpcStreamEvent.open, seq: 0 })
+      /** The existing native handoff fact distinguishes uncertain delivery from local admission. */
+      const open = { started: false }
+      void this.#send({ event: RpcStreamEvent.open, seq: 0 }, undefined, () => {
+        open.started = true
+      })
         .catch((error) => {
           this.#owner.report(error)
-          void this.close(error)
+          return this.#fail(
+            open.started
+              ? createRpcError(
+                  RpcCoreErrorCode.streamResultUnknown,
+                  RpcStreamErrorText.resultUnknown,
+                  error
+                )
+              : error
+          )
         })
         .finally(() => this.#release())
     }
@@ -115,7 +131,7 @@ export class StreamProducer {
   /** Retire only this producer when an admitted correlated hook fails, leaving its carrier live. */
   reject(envelope: IRpcEnvelope, reason: unknown): boolean {
     if (!sameTask(this.#input.envelope.task, envelope.task)) return false
-    void this.close(reason).catch(this.#owner.report)
+    void this.#fail(reason).catch(this.#owner.report)
     return true
   }
 
@@ -133,7 +149,7 @@ export class StreamProducer {
         this.#input.envelope.kind !== RpcWireKind.call ||
         this.#input.envelope.options.cancel !== RpcWireCancel
       ) {
-        await this.close(
+        await this.#fail(
           createRpcError(RpcCoreErrorCode.contractInvalid, RpcStreamErrorText.iterableInvalid)
         )
         return
@@ -152,7 +168,7 @@ export class StreamProducer {
     const error = checkRpcStreamProducerCredit(event, { seq: this.#seq, busy: this.#busy })
     if (error) {
       this.#owner.report(error)
-      await this.close(error)
+      await this.#fail(error)
       return
     }
     await this.#drive()
@@ -276,30 +292,46 @@ export class StreamProducer {
   /** Terminal cleanup preserves the original primary if iterator.return also fails. */
   async #fail(primary: unknown): Promise<void> {
     if (this.#terminal) return
-    /** Only the retained canonical completion can select cancellation without aborting new work. */
-    const streamTerminal =
-      this.#input.completion?.ok === false ? this.#input.completion.streamTerminal : undefined
-    this.#mark(this.#failure(primary, streamTerminal))
-    /** Original failures stay first when cleanup produces a different secondary failure. */
-    let failure = primary
+    /** Failure can start while no pull is active; its real return/write must retain this owner. */
+    this.#pending += 1
     try {
-      await this.#iterator.return?.()
-    } catch (error) {
-      if (error !== primary)
-        failure = new AggregateError([primary, error], RpcStreamErrorText.cleanupFailed)
-    }
-    this.#completion = this.#failure(failure, streamTerminal)
-    try {
-      await this.#send(
-        {
-          event: streamTerminal ?? RpcStreamEvent.fail,
-          seq: this.#seq,
-          error: this.#wire(failure)
-        },
-        failure
-      )
-    } catch (error) {
-      this.#owner.report(error)
+      /** Only the retained canonical completion can select cancellation without aborting new work. */
+      const streamTerminal =
+        this.#input.completion?.ok === false ? this.#input.completion.streamTerminal : undefined
+      this.#mark(this.#failure(primary, streamTerminal))
+      /** Original failures stay first when cleanup produces a different secondary failure. */
+      let failure = primary
+      try {
+        await this.#iterator.return?.()
+      } catch (error) {
+        if (error !== primary) {
+          /** The existing boundary reports the original cleanup object before aggregation. */
+          const cleanup = this.#boundary(error)
+          this.#owner.report(cleanup)
+          /** Only factory-minted Core codes come from this owner map; diagnostics stay mutable. */
+          const code = localRpcErrorCode(primary) as IRpcCoreErrorCode | undefined
+          failure = identifyRpcBoundaryFailure(
+            new AggregateError([primary, cleanup], RpcStreamErrorText.cleanupFailed),
+            code ?? RpcCoreErrorCode.internal,
+            RpcStreamErrorText.cleanupFailed
+          )
+        }
+      }
+      this.#completion = this.#failure(failure, streamTerminal)
+      try {
+        await this.#send(
+          {
+            event: streamTerminal ?? RpcStreamEvent.fail,
+            seq: this.#seq,
+            error: this.#wire(failure)
+          },
+          failure
+        )
+      } catch (error) {
+        this.#owner.report(error)
+      }
+    } finally {
+      this.#release()
     }
   }
 
