@@ -32,10 +32,6 @@ const migratedFiles: Readonly<Record<string, string>> = {
   'packages/rpc-contract/test/types.test.ts': 'packages/rpc-contract/test/contract/types.test.ts',
   'packages/web-rpc/test/adapters/broadcast-channel.test.ts':
     'packages/rpc-plugin-browser/test/browser/adapters/broadcast-channel.test.ts',
-  'packages/web-rpc/test/adapters/memory.test.ts':
-    'packages/rpc-host/test/core/adapters/memory.test.ts',
-  'packages/web-rpc/test/adapters/message-port.test.ts':
-    'packages/rpc-host/test/core/adapters/message-port.test.ts',
   'packages/web-rpc/test/adapters/rtc-data-channel.test.ts':
     'packages/rpc-plugin-browser/test/browser/adapters/rtc-data-channel.test.ts',
   'packages/web-rpc/test/adapters/window-source-proof.test.ts':
@@ -47,18 +43,12 @@ const migratedFiles: Readonly<Record<string, string>> = {
   'packages/web-rpc/test/architecture.test.ts': 'packages/rpc-host/test/core/architecture.test.ts',
   'packages/web-rpc/test/attachment-normalization.test.ts':
     'packages/rpc-host/test/core/attachment-normalization.test.ts',
-  'packages/web-rpc/test/authentication.integration.test.ts':
-    'packages/rpc-host/test/core/authentication.integration.test.ts',
   'packages/web-rpc/test/composed-fanout-contract.test.ts':
     'packages/rpc-host/test/core/composed-fanout-contract.test.ts',
-  'packages/web-rpc/test/composed-ping-parity.test.ts':
-    'packages/rpc-host/test/core/composed-ping-parity.test.ts',
   'packages/web-rpc/test/composed-receiver-identity.test.ts':
     'packages/rpc-host/test/core/composed-receiver-identity.test.ts',
   'packages/web-rpc/test/composed-remote-cancellation.test.ts':
     'packages/rpc-host/test/core/composed-remote-cancellation.test.ts',
-  'packages/web-rpc/test/composed-variation-capability.test.ts':
-    'packages/rpc-host/test/core/composed-variation-capability.test.ts',
   'packages/web-rpc/test/construction-hooks.test.ts':
     'packages/rpc-host/test/core/construction-hooks.test.ts',
   'packages/web-rpc/test/contract-endpoint.test.ts':
@@ -67,19 +57,11 @@ const migratedFiles: Readonly<Record<string, string>> = {
     'packages/rpc-host/test/core/custom-feature.test.ts',
   'packages/web-rpc/test/discovery-attachment-boundaries.test.ts':
     'packages/rpc-host/test/core/discovery-attachment-boundaries.test.ts',
-  'packages/web-rpc/test/discovery-semantic-coverage.test.ts':
-    'packages/rpc-host/test/core/discovery-semantic-coverage.test.ts',
   'packages/web-rpc/test/duplicate-owner-contract.test.ts':
     'packages/rpc-host/test/core/duplicate-owner-contract.test.ts',
-  'packages/web-rpc/test/endpoint-kernel.test.ts':
-    'packages/rpc-host/test/core/endpoint-kernel.test.ts',
-  'packages/web-rpc/test/endpoint.observer.test.ts':
-    'packages/rpc-host/test/core/endpoint.observer.test.ts',
   'packages/web-rpc/test/errors.test.ts': 'packages/rpc-host/test/core/errors.test.ts',
   'packages/web-rpc/test/event-subscriber-compat.test.ts':
     'packages/rpc-host/test/core/event-subscriber-compat.test.ts',
-  'packages/web-rpc/test/hardening-regressions.spec.ts':
-    'packages/rpc-host/test/core/hardening-regressions.spec.ts',
   'packages/web-rpc/test/internal-ownership-boundaries.test.ts':
     'packages/rpc-host/test/core/internal-ownership-boundaries.test.ts',
   'packages/web-rpc/test/internal/async-control.test.ts':
@@ -95,16 +77,12 @@ const migratedFiles: Readonly<Record<string, string>> = {
   'packages/web-rpc/test/internal/id.test.ts': 'packages/rpc-host/test/core/internal/id.test.ts',
   'packages/web-rpc/test/internal/identity.test.ts':
     'packages/rpc-host/test/core/internal/identity.test.ts',
-  'packages/web-rpc/test/internal/listener-safety.test.ts':
-    'packages/rpc-host/test/core/internal/listener-safety.test.ts',
   'packages/web-rpc/test/internal/message-listener-hub.test.ts':
     'packages/rpc-host/test/core/internal/message-listener-hub.test.ts',
   'packages/web-rpc/test/internal/operation-scope.test.ts':
     'packages/rpc-host/test/core/internal/operation-scope.test.ts',
   'packages/web-rpc/test/internal/outbound-sender.test.ts':
     'packages/rpc-host/test/core/internal/outbound-sender.test.ts',
-  'packages/web-rpc/test/internal/peers.test.ts':
-    'packages/rpc-host/test/core/internal/peers.test.ts',
   'packages/web-rpc/test/internal/pending.test.ts':
     'packages/rpc-host/test/core/internal/pending.test.ts',
   'packages/web-rpc/test/internal/provider-admission.test.ts':
@@ -121,18 +99,12 @@ const migratedFiles: Readonly<Record<string, string>> = {
     'packages/rpc-host/test/core/internal/resource-scope.test.ts',
   'packages/web-rpc/test/internal/safe-value.test.ts':
     'packages/rpc-host/test/core/internal/safe-value.test.ts',
-  'packages/web-rpc/test/internal/settlement.test.ts':
-    'packages/rpc-host/test/core/internal/settlement.test.ts',
   'packages/web-rpc/test/internal/web-rpc-plugin-host.test.ts':
     'packages/rpc-host/test/core/internal/web-rpc-plugin-host.test.ts',
   'packages/web-rpc/test/middleware/abort.test.ts':
     'packages/rpc-host/test/core/middleware/abort.test.ts',
-  'packages/web-rpc/test/middleware/authentication.test.ts':
-    'packages/rpc-host/test/core/middleware/authentication.test.ts',
   'packages/web-rpc/test/middleware/chunk.test.ts':
     'packages/rpc-host/test/core/middleware/chunk.test.ts',
-  'packages/web-rpc/test/middleware/connect.test.ts':
-    'packages/rpc-host/test/core/middleware/connect.test.ts',
   'packages/web-rpc/test/middleware/contract.test.ts':
     'packages/rpc-host/test/core/middleware/contract.test.ts',
   'packages/web-rpc/test/middleware/feature.test.ts':
@@ -149,28 +121,13 @@ const migratedFiles: Readonly<Record<string, string>> = {
     'packages/rpc-host/test/core/middleware/timeout.test.ts',
   'packages/web-rpc/test/middleware/uuid.test.ts':
     'packages/rpc-host/test/core/middleware/uuid.test.ts',
-  'packages/web-rpc/test/plugin-host/projection.test.ts':
-    'packages/rpc-host/test/core/plugin-host/projection.test.ts',
   'packages/web-rpc/test/plugin-host/topology-adapter.test.ts':
     'packages/rpc-host/test/core/plugin-host/topology-adapter.test.ts',
-  'packages/web-rpc/test/property.test.ts': 'packages/rpc-host/test/core/property.test.ts',
   'packages/web-rpc/test/provider-event-delegate.test.ts':
     'packages/rpc-host/test/core/provider-event-delegate.test.ts',
   'packages/web-rpc/test/provider-production-seam.test.ts':
     'packages/rpc-host/test/core/provider-production-seam.test.ts',
-  'packages/web-rpc/test/root-disposal.test.ts':
-    'packages/rpc-host/test/core/root-disposal.test.ts',
-  'packages/web-rpc/test/storage-v2-t53-event-trace.test.ts':
-    'packages/rpc-host/test/core/storage-v2-event-trace.test.ts',
   'packages/web-rpc/test/time-port.test.ts': 'packages/rpc-host/test/core/time-port.test.ts',
-  'packages/web-rpc/test/topology-rollback.test.ts':
-    'packages/rpc-host/test/core/topology-rollback.test.ts',
-  'packages/web-rpc/test/transaction-contract.test.ts':
-    'packages/rpc-host/test/core/transaction-contract.test.ts',
-  'packages/web-rpc/test/tree-shaking/continuation-b01.red.test.ts':
-    'packages/rpc-host/test/core/tree-shaking/continuation-retained-graph.test.ts',
-  'packages/web-rpc/test/tree-shaking/core-retained-causal.test.ts':
-    'packages/rpc-host/test/core/tree-shaking/core-retained-causal.test.ts',
   'packages/web-rpc/test/tree-shaking/retained-allocation-attribution.test.ts':
     'packages/rpc-host/test/core/tree-shaking/retained-allocation-attribution.test.ts',
   'packages/web-rpc/test/tree-shaking/slim-attachment-hardening.test.ts':
@@ -179,298 +136,14 @@ const migratedFiles: Readonly<Record<string, string>> = {
     'packages/rpc-host/test/core/tree-shaking/static-composition-contracts.test.ts',
   'packages/web-rpc/test/type-contract.test.ts':
     'packages/rpc-host/test/core/type-contract.test.ts',
-  'packages/web-rpc/test/wire.test.ts': 'packages/rpc-host/test/core/wire.test.ts',
-  'packages/web-rpc/test/worker-deterministic.test.ts':
-    'packages/rpc-host/test/core/worker-deterministic.test.ts'
+  'packages/web-rpc/test/wire.test.ts': 'packages/rpc-host/test/core/wire.test.ts'
 }
 /** Repository-relative result names distinguish matching titles in different package owners. */
 const repositoryRoot = resolve(packageRoot, '../..')
-/** Only retired historical custody suites may disappear from default test titles. */
-const retiredSuites = new Set([
-  'approved-migration-candidate.test.ts',
-  'provenance.test.ts',
-  'delivery-successor-transaction.test.ts',
-  'intended-cost-custody.test.ts',
-  'error-serialization.test.ts',
-  // The corresponding private preset implementations and their exclusive cost harness were deleted.
-  'core-retained-causal.test.ts',
-  'continuation-b01.red.test.ts',
-  'retained-inventory-equality.test.ts'
-])
-/** Exact historical titles retired by rpc-layering after deleting unused control code. */
-const retiredLayeringTitles = new Set([
-  // SC3/BC3: only the deleted private timeout callback/error-factory ordering has no producer.
-  'packages/web-rpc/test/internal/async-control.test.ts::async control contains synchronous timeout callbacks and observes diagnostics',
-  'packages/web-rpc/test/internal/async-control.test.ts::async control starts the timeout side effect before settling the timeout',
-  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix selected control roots keep dependencies private and disposal endpoint-local',
-  // Exact old preset selection, alias and cost titles retire with their deleted implementations.
-  'packages/web-rpc/test/composed-ping-parity.test.ts::composed root ping() parity root createEndpoint is the same value as createFullEndpoint',
-  'packages/web-rpc/test/tree-shaking/retained-allocation-attribution.test.ts::retained and allocation attribution binds pending byte drift to the current and historical retained graphs',
-  'packages/web-rpc/test/tree-shaking/retained-allocation-attribution.test.ts::retained and allocation attribution proves selected endpoint owner allocation is unique and attributable',
-  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts accepts every pair with one canonical outbound dependency closure',
-  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts constructs and disposes each remaining valid native singleton root',
-  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts constructs and disposes the valid client singleton preset',
-  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts constructs and disposes the valid provider singleton preset',
-  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts observes the current root without treating historical cost custody as live identity',
-  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts observes the exact full runtime allocation topology through the root factory',
-  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts projects selected root keys from exposed metadata',
-  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts publishes feature: ../../src/features/canonical-chunk.js',
-  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts publishes feature: ../../src/features/control.js',
-  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts publishes feature: ../../src/features/discovery.js',
-  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts publishes feature: ../../src/features/outbound.js',
-  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts publishes feature: ../../src/features/provider.js',
-  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts publishes preset: ../../src/client.js',
-  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts publishes preset: ../../src/core.js',
-  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts publishes preset: ../../src/full.js',
-  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts publishes preset: ../../src/provider.js',
-  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts requires every baseline owner category to declare a non-empty owner list',
-  'packages/web-rpc/test/type-contract.test.ts::factory type contract discriminates discovery mode and ping capability',
-
-  // Unconsumed datagram-only carrier is deleted; reliable webTransportPlugin remains covered separately.
-  'packages/web-rpc/test/adapters/web-transport.test.ts::WebTransport datagram adapter contains a reader acquisition failure at the transport boundary',
-  'packages/web-rpc/test/adapters/web-transport.test.ts::WebTransport datagram adapter contains an asynchronous reader failure at the transport boundary',
-  'packages/web-rpc/test/adapters/web-transport.test.ts::WebTransport datagram adapter declares its datagram reader and writer as owned',
-  'packages/web-rpc/test/adapters/web-transport.test.ts::WebTransport datagram adapter keeps the transport-owned reader across unsubscribe and resubscribe',
-  'packages/web-rpc/test/adapters/web-transport.test.ts::WebTransport datagram adapter returns reader release failures from close',
-  'packages/web-rpc/test/adapters/web-transport.test.ts::WebTransport datagram adapter shares the in-flight close promise',
-  'packages/web-rpc/test/adapters/web-transport.test.ts::WebTransport datagram adapter surfaces writer cleanup failure from close',
-  'packages/web-rpc/test/adapters/web-transport.test.ts::WebTransport datagram adapter treats a normal datagram EOF as terminal',
-  'packages/web-rpc/test/adapters/web-transport.test.ts::WebTransport datagram adapter waits for the read owner and rejects operations after close',
-  'packages/web-rpc/test/internal/control-task-registry.test.ts::ControlTaskRegistry purges expired unordered aborts before applying its hard cap',
-  'packages/web-rpc/test/internal/control-task-registry.test.ts::ControlTaskRegistry deduplicates control tasks before they reach the wire owner',
-  'packages/web-rpc/test/internal/control-task-registry.test.ts::ControlTaskRegistry keeps variation admission in the control owner',
-  'packages/web-rpc/test/internal/control-task-registry.test.ts::ControlTaskRegistry does not consume variation quota when replay capacity is full',
-  'packages/web-rpc/test/internal/control-task-registry.test.ts::ControlTaskRegistry requires a boolean lease decision and skips tombstones when retain rejects',
-  'packages/web-rpc/test/internal/async-control.test.ts::async control removes abort listeners when delay completes',
-  'packages/web-rpc/test/internal/async-control.test.ts::async control rolls back earlier delay listeners when a later registration fails',
-  'packages/web-rpc/test/internal/async-control.test.ts::async control observes delay listener cleanup failures without replacing the result',
-  'packages/web-rpc/test/internal-ownership-boundaries.test.ts::internal ownership boundary semantics keeps control and variation admission duplicate-safe and expiry-aware',
-  // Final-host reachability deletes these exact test-only owners; current lifecycle owners stay covered.
-  'packages/web-rpc/test/internal/peers.test.ts::PeerRegistry bounds learned peers without evicting configured targets',
-  'packages/web-rpc/test/internal/peers.test.ts::PeerRegistry clears all peer state at endpoint disposal',
-  'packages/web-rpc/test/internal/peers.test.ts::PeerRegistry expires learned peers while retaining configured targets',
-  'packages/web-rpc/test/internal/settlement.test.ts::settlement reports cleanup failure without replacing the primary result',
-  'packages/web-rpc/test/internal/settlement.test.ts::settlement runs cleanup and settles only once',
-  'packages/web-rpc/test/internal/settlement.test.ts::settlement still settles when cleanup throws',
-  'packages/web-rpc/test/property.test.ts::property invariants keeps settlement exactly-once across arbitrary completion races',
-  'packages/web-rpc/test/duplicate-owner-contract.test.ts::candidate-specific duplicate-owner contracts keeps peer leases in PeerRegistry',
-  'packages/web-rpc/test/hardening-regressions.spec.ts::#1 splitUtf8 会产出超过 maxBytes 的分片，接收端必然拒收 chunk budget 小于最大 UTF-8 code point 时拒绝配置',
-  'packages/web-rpc/test/internal-ownership-boundaries.test.ts::internal ownership boundary semantics expires learned peer knowledge while retaining configured-peer semantics',
-  // RPC-TEST-FB075BDD690B-C042 BC3 NoPASS: BC3: exact deleted RpcPortName/shared-output publication lookup, object identity, string alias or terminal getPort behavior; no current port/role registry is reintroduced.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts admits exactly one authentication provider, rejects forged keys, and isolates removal',
-  // RPC-TEST-FB075BDD690B-C042 BC3 NoPASS: BC3: exact deleted RpcPortName/shared-output publication lookup, object identity, string alias or terminal getPort behavior; no current port/role registry is reintroduced.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts admits exactly one connect provider, rejects forged keys, and isolates removal',
-  // RPC-TEST-FB075BDD690B-C030 BC3 NoPASS: Only four old sharedProvides/required/optional sharedConsumes declarations; canonical auth/transport/flow interfaces replace these keys.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts declares required connect and optional authentication shared consumption',
-  // RPC-TEST-FB075BDD690B-C035 BC3 NoPASS: Manual discoveryMode, receiverSelector, identifier, uniqueTargetId and exact shared connect object are removed SDK configuration/publication ports. The direct selector invocation on [] and its one-call/input-array ass...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts executes production connect discovery, selection, fixed unique target, and identity',
-  // RPC-TEST-FB075BDD690B-C043 BC3 NoPASS: C0 aggregate records the old injected required-port projection callback; all of its nested observation belongs to the removed SDK shape. ChildA002 is separately retained in the inventory.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts rejects admitted-but-unpublished authentication runtime output before activation',
-  // RPC-TEST-FB075BDD690B-C043 BC3 NoPASS: C0 aggregate records the old injected required-port projection callback; all of its nested observation belongs to the removed SDK shape. ChildA002 is separately retained in the inventory.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts rejects admitted-but-unpublished connect runtime output before activation',
-  // RPC-TEST-FB075BDD690B-C041 BC3 NoPASS: The assertion is tied to old authentication-at-install/connect-at-factory metadata capture, old protect(x,endpoint-context) or direct captured connect identifier invocation/undefined receiver. Those SDK input and phas...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts snapshots authentication at install and connect at factory with one read and receiver semantics',
-  // RPC-TEST-FB075BDD690B-C054 BC3 NoPASS: Five readFile/source-regex assertions inspect removed composed/kernel/bootstrap close branches; no close behavior executes. Does not retire any real close-once/error/Promise business oracle.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts rejects a second composed close owner after legacy cleanup deletion',
-  // RPC-TEST-FB075BDD690B-C067 BC3 NoPASS: Only private timeout getPort existence and two endpoint-local object identities; no deadline, timer or isolation behavior is exercised. Complete timeout instances replace that publication.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts actual timeout publication is present and isolated per endpoint',
-  // RPC-TEST-FB075BDD690B-C087 BC3 NoPASS: Injects old native install result ports:{} and checks deleted downstream claim parity/private getPort. The PLUGIN_INSTALL_FAILED wrapper belongs to that removed publication failure scenario; no general rollback/cause ...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts admitted-but-unpublished abort output fails downstream claim parity',
-  // RPC-TEST-FB075BDD690B-C087 BC3 NoPASS: Injects old native install result ports:{} and checks deleted downstream claim parity/private getPort. The PLUGIN_INSTALL_FAILED wrapper belongs to that removed publication failure scenario; no general rollback/cause ...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts admitted-but-unpublished timeout output fails downstream claim parity',
-  // RPC-TEST-FB075BDD690B-C077 BC3 NoPASS: Exact private createConstructionControl.signal.reason identity is deleted SDK surface. Current public construction reason is tested separately, without counting the private control identity as PASS.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts construction cancellation preserves the caller reason identity',
-  // RPC-TEST-FB075BDD690B-C088 BC3 NoPASS: BC3: direct duplicate timeout/abort sharedProvides admission record and old private preflight input; no new negative config is made.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts duplicate abort providers are rejected before Host mutation',
-  // RPC-TEST-FB075BDD690B-C088 BC3 NoPASS: BC3: direct duplicate timeout/abort sharedProvides admission record and old private preflight input; no new negative config is made.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts duplicate timeout providers are rejected before Host mutation',
-  // RPC-TEST-FB075BDD690B-C057 BC3 NoPASS: middleware-finalize.sharedOptionalConsumes is the deleted middleware role/claim schema.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts finalize declares timeout and abort as explicit optional consumers',
-  // RPC-TEST-FB075BDD690B-C086 BC3 NoPASS: Exact preflightFeatureClaims admission.sharedProvides hostile getter and snapshot/no-install/no-IO branch are removed native-role descriptor input under BC3; original RpcConfigurationError/INVALID_CONFIG/cause in this...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts hostile first-party metadata preserves the thrown Error as cause',
-  // RPC-TEST-FB075BDD690B-C085 BC3 NoPASS: Forged shared claims use removed role names and package-symbol metadata; all error/zero-residue/count checks follow a direct private preflight call without dispatch. Does not retire current real SDK definition validat...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts rejects a forged abort symbol cancellation shared claim',
-  // RPC-TEST-FB075BDD690B-C085 BC3 NoPASS: Forged shared claims use removed role names and package-symbol metadata; all error/zero-residue/count checks follow a direct private preflight call without dispatch. Does not retire current real SDK definition validat...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts rejects a forged timeout string cancellation shared claim',
-  // RPC-TEST-FB075BDD690B-C055 BC3 NoPASS: Frozen timeout Middleware object is the deleted install-plugin representation; R8/BC3 replaces it with an executable call feature, not that Middleware.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts timeout and abort factories expose native Host plugins',
-  // RPC-TEST-FB075BDD690B-C062 BC3 NoPASS: capabilities.set regex targets deleted core/middleware/timeout.ts; timeout implementation now belongs to the R8 call feature.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts timeout and abort middleware do not write the legacy capability registry',
-  // RPC-TEST-FB075BDD690B-C056 BC3 NoPASS: sharedProvides timeout key described the deleted second Host publication table.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts timeout and abort publish typed shared ports in one Host batch',
-  // RPC-TEST-FB075BDD690B-C097 BC3 NoPASS: Seven source-substring/regex checks for Store Worker/old host runtime assembly names, numeric timeout syntax and abort()/timeout() roots. No Worker behavior executes; actual direct-consumer behavior remains in separat...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts Store Worker direct consumers retain both cancellation middleware factories',
-  // RPC-TEST-FB075BDD690B-C066 BC3 NoPASS: Only frozen no-config abort middleware factory object identity/name. Abort is intrinsic Host call semantics in SDD3.5; no abort is performed in this case.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts abort no-config factory is receiver-free, frozen, and endpoint-local',
-  // RPC-TEST-FB075BDD690B-C059 BC3 NoPASS: providerCancellation shared-key equality pins a retired internal publication name.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts abort reuses the authorized provider-cancellation shared key',
-  // RPC-TEST-FB075BDD690B-C060 BC3 NoPASS: Exact old timeout install scope.signal===batch.construction.signal is a removed SDK construction-control identity. A public Host lifecycle signal is not claimed to be that private control.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts composed Host installs receive the canonical construction control',
-  // RPC-TEST-FB075BDD690B-C076 BC3 NoPASS: Exact deleted createConstructionControl/runConstructionInstall input, absolute deadlineAt/remaining and injected fake time port timer/disposal counts are BC3 NoPASS. Current complete per-call timeout business is verif...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts construction control keeps one absolute fake-time deadline and idempotent close',
-  // RPC-TEST-FB075BDD690B-C061 BC3 NoPASS: Absence of constructionController text only checks the deleted endpoint-bootstrap compatibility file; actual construction signal identity remains protected by retained C060.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts legacy non-deferred construction controller remains an isolated compatibility branch',
-  // RPC-TEST-FB075BDD690B-C078 BC3 NoPASS: Only asserts the retired src/core/endpoint.ts file does not exist. Contrary to title, no operation or late cancellation is executed.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts operation owner remains singular while late cancellation is observed',
-  // RPC-TEST-FB075BDD690B-C083 BC3 NoPASS: Only absence of optional private timeout/abort shared key after installation. No timeout/abort business observed.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts optional absent abort key stays absent without residue',
-  // RPC-TEST-FB075BDD690B-C083 BC3 NoPASS: Only absence of optional private timeout/abort shared key after installation. No timeout/abort business observed.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts optional absent timeout key stays absent without residue',
-  // RPC-TEST-FB075BDD690B-C058 BC3 NoPASS: Negative WebRpcPortName.abort source regex inspects the retired outbound-attachment file.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts outbound consumes the finalized prepared abort boolean, not the shared enablement port',
-  // RPC-TEST-FB075BDD690B-C091 BC3 NoPASS: Root-approved exact old timeout/abort injected result {extension,ports,dispose} race/gate and its role-specific residue are BC3 NoPASS. The original result.dispose call count is not relabeled as a different native own...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts real admitted native abort late resolve disposes its result once without diagnostic requirement',
-  // RPC-TEST-FB075BDD690B-C091 BC3 NoPASS: Root-approved exact old timeout/abort injected result {extension,ports,dispose} race/gate and its role-specific residue are BC3 NoPASS. The original result.dispose call count is not relabeled as a different native own...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts real admitted native timeout late resolve disposes its result once without diagnostic requirement',
-  // RPC-TEST-FB075BDD690B-C082 BC3 NoPASS: Reserved middleware:timeout/abort sharedProvides spoof rejected by deleted role preflight. Its INVALID_CONFIG/type/no-cause/zero-mutation checks are specific to that removed metadata language; no supported public call...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts real inventory rejects reserved middleware:abort spoof before Host mutation',
-  // RPC-TEST-FB075BDD690B-C082 BC3 NoPASS: Reserved middleware:timeout/abort sharedProvides spoof rejected by deleted role preflight. Its INVALID_CONFIG/type/no-cause/zero-mutation checks are specific to that removed metadata language; no supported public call...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts real inventory rejects reserved middleware:timeout spoof before Host mutation',
-  // RPC-TEST-FB075BDD690B-C074 BC3 NoPASS: Exact same-tick construction.timeoutMs0 plus pre-aborted injected batch, its native wrapper/kernel completion and physical counter projection belong to removed construction SDK input. Only the independently supported ...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts same-tick zero deadline and caller abort have one terminal outcome and no residue',
-  // RPC-TEST-FB075BDD690B-C073 BC3 NoPASS: Exact deleted createConstructionControl/runConstructionInstall input, absolute deadlineAt/remaining and injected fake time port timer/disposal counts are BC3 NoPASS. Current complete per-call timeout business is verif...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts zero and already-expired fake deadlines create no timer and clean once',
-  // RPC-TEST-FB075BDD690B-C112 BC3 NoPASS: Duplicates removed hooks/ping/uuid sharedProvides descriptor into private role preflight; no current native install or supported provider duplicate operation is executed.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts native hooks duplicate provider is rejected before Host mutation',
-  // RPC-TEST-FB075BDD690B-C114 BC3 NoPASS: Forged package symbol in removed role sharedProvides language; private preflight throw + unchanged snapshot only. Not a current wire/auth authority test.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts native hooks forged package symbol is rejected before Host mutation',
-  // RPC-TEST-FB075BDD690B-C113 BC3 NoPASS: Forged string key in removed role sharedProvides language; private preflight throw + unchanged snapshot only. Not a current wire/auth authority test.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts native hooks forged string key is rejected before Host mutation',
-  // RPC-TEST-FB075BDD690B-C112 BC3 NoPASS: Duplicates removed hooks/ping/uuid sharedProvides descriptor into private role preflight; no current native install or supported provider duplicate operation is executed.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts native ping duplicate provider is rejected before Host mutation',
-  // RPC-TEST-FB075BDD690B-C114 BC3 NoPASS: Forged package symbol in removed role sharedProvides language; private preflight throw + unchanged snapshot only. Not a current wire/auth authority test.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts native ping forged package symbol is rejected before Host mutation',
-  // RPC-TEST-FB075BDD690B-C113 BC3 NoPASS: Forged string key in removed role sharedProvides language; private preflight throw + unchanged snapshot only. Not a current wire/auth authority test.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts native ping forged string key is rejected before Host mutation',
-  // RPC-TEST-FB075BDD690B-C112 BC3 NoPASS: Duplicates removed hooks/ping/uuid sharedProvides descriptor into private role preflight; no current native install or supported provider duplicate operation is executed.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts native uuid duplicate provider is rejected before Host mutation',
-  // RPC-TEST-FB075BDD690B-C114 BC3 NoPASS: Forged package symbol in removed role sharedProvides language; private preflight throw + unchanged snapshot only. Not a current wire/auth authority test.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts native uuid forged package symbol is rejected before Host mutation',
-  // RPC-TEST-FB075BDD690B-C113 BC3 NoPASS: Forged string key in removed role sharedProvides language; private preflight throw + unchanged snapshot only. Not a current wire/auth authority test.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts native uuid forged string key is rejected before Host mutation',
-  // RPC-TEST-FB075BDD690B-C101 BC3 NoPASS: Only source regex for retired core/middleware/{hooks,ping}.ts and IRpcPlugin text; no operation executes. Hooks is explicitly deleted by SDD3.5.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts owning hooks file has no legacy registry write and is a native plugin',
-  // RPC-TEST-FB075BDD690B-C101 BC3 NoPASS: Only source regex for retired core/middleware/{hooks,ping}.ts and IRpcPlugin text; no operation executes. Hooks is explicitly deleted by SDD3.5.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts owning ping file has no legacy registry write and is a native plugin',
-  // RPC-TEST-FB075BDD690B-C101 BC3 NoPASS: Only source regex for retired core/middleware/{hooks,ping}.ts and IRpcPlugin text; no operation executes. Hooks is explicitly deleted by SDD3.5.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts owning uuid file has no legacy registry write and is a native plugin',
-  // RPC-TEST-FB075BDD690B-C099 BC3 NoPASS: Exact middleware-finalize optional nine-key descriptor arrays; canonical Host has no middleware-finalizer role.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts production finalizer exposes the exact nine-key optional schema',
-  // RPC-TEST-FB075BDD690B-C098 BC3 NoPASS: Exact old hooks/ping/uuid role inventory schema provides/consumes/optional arrays; no hook, ping or ID behavior is invoked.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts production inventory exposes the exact hooks role schema',
-  // RPC-TEST-FB075BDD690B-C098 BC3 NoPASS: Exact old hooks/ping/uuid role inventory schema provides/consumes/optional arrays; no hook, ping or ID behavior is invoked.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts production inventory exposes the exact ping role schema',
-  // RPC-TEST-FB075BDD690B-C098 BC3 NoPASS: Exact old hooks/ping/uuid role inventory schema provides/consumes/optional arrays; no hook, ping or ID behavior is invoked.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts production inventory exposes the exact uuid role schema',
-  // RPC-TEST-FB075BDD690B-C107 BC3 NoPASS: This exact hostile listeners/onHookError/generate getter input, cutoff/receiver, native wrapper error and no-mutation/no-IO snapshot branch belong to removed hooks/UUID factory configuration under BC3. The specific ne...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts hostile hooks snapshot getter listeners preserves exact cutoff and residue',
-  // RPC-TEST-FB075BDD690B-C107 BC3 NoPASS: This exact hostile listeners/onHookError/generate getter input, cutoff/receiver, native wrapper error and no-mutation/no-IO snapshot branch belong to removed hooks/UUID factory configuration under BC3. The specific ne...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts hostile hooks snapshot getter onHookError preserves exact cutoff and residue',
-  // RPC-TEST-FB075BDD690B-C107 BC3 NoPASS: This exact hostile listeners/onHookError/generate getter input, cutoff/receiver, native wrapper error and no-mutation/no-IO snapshot branch belong to removed hooks/UUID factory configuration under BC3. The specific ne...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts hostile uuid snapshot getter generate preserves exact cutoff and residue',
-  // RPC-TEST-FB075BDD690B-C119 BC3 NoPASS: BC3: removed hooks.listeners/uuid.generate option getters and their conditional native-role activation/subscription cutoff. No supported replacement getter or phase is invented; generic native installation errors rema...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts hostile hooks configuration preserves primary/cause and leaves zero activation residue',
-  // RPC-TEST-FB075BDD690B-C119 BC3 NoPASS: BC3: removed hooks.listeners/uuid.generate option getters and their conditional native-role activation/subscription cutoff. No supported replacement getter or phase is invented; generic native installation errors rema...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts hostile uuid configuration preserves primary/cause and leaves zero activation residue',
-  // RPC-TEST-FB075BDD690B-C100 BC3 NoPASS: Frozen role schema arrays plus ping enable marker own key/descriptor and finalizer eight optional keys. Ping now intrinsic lifecycle control; this case never sends a ping.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts package role schema and ping port shape are frozen exact contracts',
-  // RPC-TEST-FB075BDD690B-C103 BC3 NoPASS: Exact removed hooks/UUID/ping factory capture, scope/variation metadata, frozen enablement and private shared-port publication are NoPASS. No replacement public negative or fabricated port is created.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts real production builder snapshots hook/uuid factories at install',
-  // RPC-TEST-FB075BDD690B-C102 BC3 NoPASS: installPluginForLegacy source regex targets the deleted endpoint-bootstrap bridge. BC3/3.7/3.8 require that bridge to be absent, not a new compatibility implementation.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts no owning middleware file retains the removed compatibility installer',
-  // RPC-TEST-FB075BDD690B-C020 BC3 NoPASS: Exact endpoint-capabilities required providerCancellation port omission and INVALID_CONFIG cause are generated by the deleted required-shared-output validator. BC3 deletes that input and failure scenario; no current e...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts fails closed when a production required shared provider omits its runtime output',
-  // RPC-TEST-FB075BDD690B-C022 BC3 NoPASS: BC3: removed injected native-role/runtime output input and its conditional activation/publication validation; no current negative configuration or synthetic native role is created. primary is generated by injectRuntim...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts preserves activation runtime reject identity and removes all prior shared output',
-  // RPC-TEST-FB075BDD690B-C022 BC3 NoPASS: BC3: removed injected native-role/runtime output input and its conditional activation/publication validation; no current negative configuration or synthetic native role is created. primary is generated by injectRuntim...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts preserves activation runtime throw identity and removes all prior shared output',
-  // RPC-TEST-FB075BDD690B-C025 BC3 NoPASS: BC3: removed injected native-role/runtime output input and its conditional activation/publication validation; no current negative configuration or synthetic native role is created. Missing protocol/contract shared tok...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts rejects admitted contract runtime shared omission before activation with identity',
-  // RPC-TEST-FB075BDD690B-C025 BC3 NoPASS: BC3: removed injected native-role/runtime output input and its conditional activation/publication validation; no current negative configuration or synthetic native role is created. Missing protocol/contract shared tok...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts rejects admitted protocol runtime shared omission before activation with identity',
-  // RPC-TEST-FB075BDD690B-C019 BC3 NoPASS: BC3: removed injected native-role/runtime output input and its conditional activation/publication validation; no current negative configuration or synthetic native role is created. Accessor provide is injected into th...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts rejects an accessor runtime public output before projection escape and rolls back the production batch',
-  // RPC-TEST-FB075BDD690B-C012 BC3 NoPASS: Only preflightFeatureClaims fixed kernel/middleware/activation descriptors; no call or native resource is exercised. Valid/invalid role metadata belongs to the deleted second-assembly SDK.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts rejects fixed-role claim mismatches before Host mutation',
-  // RPC-TEST-FB075BDD690B-C001 BC3 NoPASS: BC3: removed injected native-role/runtime output input and its conditional activation/publication validation; no current negative configuration or synthetic native role is created. Null/primitive were returned only by...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts rejects injected native activation null output through the existing Host rollback path',
-  // RPC-TEST-FB075BDD690B-C001 BC3 NoPASS: BC3: removed injected native-role/runtime output input and its conditional activation/publication validation; no current negative configuration or synthetic native role is created. Null/primitive were returned only by...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts rejects injected native activation primitive output through the existing Host rollback path',
-  // RPC-TEST-FB075BDD690B-C018 BC3 NoPASS: BC3: removed injected native-role/runtime output input and its conditional activation/publication validation; no current negative configuration or synthetic native role is created. extra-shared/wrong-shared-value/miss...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts rejects production runtime activation-mismatch output with exact primary and zero residue',
-  // RPC-TEST-FB075BDD690B-C018 BC3 NoPASS: BC3: removed injected native-role/runtime output input and its conditional activation/publication validation; no current negative configuration or synthetic native role is created. extra-shared/wrong-shared-value/miss...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts rejects production runtime extra-public output with exact primary and zero residue',
-  // RPC-TEST-FB075BDD690B-C018 BC3 NoPASS: BC3: removed injected native-role/runtime output input and its conditional activation/publication validation; no current negative configuration or synthetic native role is created. extra-shared/wrong-shared-value/miss...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts rejects production runtime extra-shared output with exact primary and zero residue',
-  // RPC-TEST-FB075BDD690B-C018 BC3 NoPASS: BC3: removed injected native-role/runtime output input and its conditional activation/publication validation; no current negative configuration or synthetic native role is created. extra-shared/wrong-shared-value/miss...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts rejects production runtime missing-public output with exact primary and zero residue',
-  // RPC-TEST-FB075BDD690B-C018 BC3 NoPASS: BC3: removed injected native-role/runtime output input and its conditional activation/publication validation; no current negative configuration or synthetic native role is created. extra-shared/wrong-shared-value/miss...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts rejects production runtime route-mismatch output with exact primary and zero residue',
-  // RPC-TEST-FB075BDD690B-C018 BC3 NoPASS: BC3: removed injected native-role/runtime output input and its conditional activation/publication validation; no current negative configuration or synthetic native role is created. extra-shared/wrong-shared-value/miss...
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts rejects production runtime wrong-shared-value output with exact primary and zero residue',
-  // RPC-TEST-FB075BDD690B-C016 BC3 NoPASS: Exact protocol/contract descriptor sharedProvides and host.getPort shape, including protocol version1, are deleted. No normalizer or schema business is invoked.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts routes protocol and contract through typed Host shared ports without legacy registry writes',
-  // RPC-TEST-FB075BDD690B-C143 BC3 NoPASS: BC2/3: original selected legacy codec/middleware order encode→encrypt→sign→transport is replaced by revision13 §3.3 envelope.outbound before codec encode; old combined sequence cannot remain a supported requirement. C...
-  'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix real outbound order is encode then encrypt then sign then transport send',
-  // RPC-TEST-FB075BDD690B-C145 BC3 NoPASS: Only exact old descriptor root publicKeys and Object.keys(old composed endpoint) projection. No actual request/send/group/outcome or close result is asserted.
-  'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix descriptor four-key claims remain distinct from seven-key final projection',
-  // RPC-TEST-FB075BDD690B-C120 BC3 NoPASS: Only exact endpoint-capabilities role route/publicKeys/private shared port inventory. Root calls move to namespaces; variation and old outbound shared-port SDK are deleted.
-  'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix outbound inventory claims exact narrow shared ports',
-  // RPC-TEST-FB075BDD690B-C121 BC3 NoPASS: Only absence of old outboundAttachment sharedProvides flag; no resource disposal executes.
-  'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix outbound result uses Host-owned disposal without legacy blanket escape',
-  // RPC-TEST-FB075BDD690B-C122 BC3 NoPASS: Only frozen private outboundOperations/inboundIdentity/variationCoordinator ports and stable getPort references/absence of outboundAttachment. No send, identity verification, admission or disposal executes. Three help...
-  'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix outbound publishes typed operations and identity ports in one Host batch',
-  // RPC-TEST-FB075BDD690B-C127 BC3 NoPASS: Hostile getter exists only on deleted private createComposedEndpoint targetIds configuration. Exact INVALID_CONFIG+cause and read1 are that removed input field scenario; no supported new Host/Namespace option has this...
-  'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix hostile outbound target getter fails before activation with original cause',
-  // RPC-TEST-FB075BDD690B-C129 BC3 NoPASS: All three original variants inject removed id/version/encodedType codecs or input/outputEncodedType framers into the old composition constructor. Their specific unknown-to-string compatibility rejection has no current...
-  'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix directed unknown producers reject concrete string sinks before subscribe',
-  // RPC-TEST-FB075BDD690B-C128 BC3 NoPASS: The exact legacy encodedType producer/sink compatibility branch (including concrete-authentication coercion permitting subscribe) and its native-framer/codec/transport input descriptors were removed. This NoPASS is co...
-  'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix native framed output needs an opaque sink or concrete authentication before subscribe',
-  // RPC-TEST-FB075BDD690B-C135 BC3 NoPASS: The old CAPABILITY_CONFLICT for two differently named transport plugins is the explicitly removed host-wide mutual exclusion. It must not be replaced by the distinct same-namespace rejection.
-  'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix rejects duplicate plugin transports before either transport subscribes',
-  // RPC-TEST-FB075BDD690B-C132 BC3 NoPASS: INVALID_CONFIG is produced only by private createRuntimeEndpointComposition selected protocol/codec/framer descriptor grammar; new carrier four-stage codec and fixed protocol do not accept this input record. No public...
-  'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix rejects invalid selected codec empty id before subscribe',
-  // RPC-TEST-FB075BDD690B-C132 BC3 NoPASS: INVALID_CONFIG is produced only by private createRuntimeEndpointComposition selected protocol/codec/framer descriptor grammar; new carrier four-stage codec and fixed protocol do not accept this input record. No public...
-  'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix rejects invalid selected codec invalid encoded type before subscribe',
-  // RPC-TEST-FB075BDD690B-C132 BC3 NoPASS: INVALID_CONFIG is produced only by private createRuntimeEndpointComposition selected protocol/codec/framer descriptor grammar; new carrier four-stage codec and fixed protocol do not accept this input record. No public...
-  'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix rejects invalid selected codec noncallable decode before subscribe',
-  // RPC-TEST-FB075BDD690B-C132 BC3 NoPASS: INVALID_CONFIG is produced only by private createRuntimeEndpointComposition selected protocol/codec/framer descriptor grammar; new carrier four-stage codec and fixed protocol do not accept this input record. No public...
-  'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix rejects invalid selected codec noncallable encode before subscribe',
-  // RPC-TEST-FB075BDD690B-C132 BC3 NoPASS: INVALID_CONFIG is produced only by private createRuntimeEndpointComposition selected protocol/codec/framer descriptor grammar; new carrier four-stage codec and fixed protocol do not accept this input record. No public...
-  'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix rejects invalid selected codec zero version before subscribe',
-  // RPC-TEST-FB075BDD690B-C132 BC3 NoPASS: INVALID_CONFIG is produced only by private createRuntimeEndpointComposition selected protocol/codec/framer descriptor grammar; new carrier four-stage codec and fixed protocol do not accept this input record. No public...
-  'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix rejects invalid selected framer empty id before subscribe',
-  // RPC-TEST-FB075BDD690B-C132 BC3 NoPASS: INVALID_CONFIG is produced only by private createRuntimeEndpointComposition selected protocol/codec/framer descriptor grammar; new carrier four-stage codec and fixed protocol do not accept this input record. No public...
-  'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix rejects invalid selected framer invalid input domain before subscribe',
-  // RPC-TEST-FB075BDD690B-C132 BC3 NoPASS: INVALID_CONFIG is produced only by private createRuntimeEndpointComposition selected protocol/codec/framer descriptor grammar; new carrier four-stage codec and fixed protocol do not accept this input record. No public...
-  'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix rejects invalid selected framer invalid output domain before subscribe',
-  // RPC-TEST-FB075BDD690B-C132 BC3 NoPASS: INVALID_CONFIG is produced only by private createRuntimeEndpointComposition selected protocol/codec/framer descriptor grammar; new carrier four-stage codec and fixed protocol do not accept this input record. No public...
-  'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix rejects invalid selected framer noncallable accept before subscribe',
-  // RPC-TEST-FB075BDD690B-C132 BC3 NoPASS: INVALID_CONFIG is produced only by private createRuntimeEndpointComposition selected protocol/codec/framer descriptor grammar; new carrier four-stage codec and fixed protocol do not accept this input record. No public...
-  'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix rejects invalid selected framer noncallable close before subscribe',
-  // RPC-TEST-FB075BDD690B-C132 BC3 NoPASS: INVALID_CONFIG is produced only by private createRuntimeEndpointComposition selected protocol/codec/framer descriptor grammar; new carrier four-stage codec and fixed protocol do not accept this input record. No public...
-  'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix rejects invalid selected framer noncallable frame before subscribe',
-  // RPC-TEST-FB075BDD690B-C132 BC3 NoPASS: INVALID_CONFIG is produced only by private createRuntimeEndpointComposition selected protocol/codec/framer descriptor grammar; new carrier four-stage codec and fixed protocol do not accept this input record. No public...
-  'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix rejects invalid selected framer zero version before subscribe',
-  // RPC-TEST-FB075BDD690B-C132 BC3 NoPASS: INVALID_CONFIG is produced only by private createRuntimeEndpointComposition selected protocol/codec/framer descriptor grammar; new carrier four-stage codec and fixed protocol do not accept this input record. No public...
-  'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix rejects invalid selected protocol empty id before subscribe',
-  // RPC-TEST-FB075BDD690B-C132 BC3 NoPASS: INVALID_CONFIG is produced only by private createRuntimeEndpointComposition selected protocol/codec/framer descriptor grammar; new carrier four-stage codec and fixed protocol do not accept this input record. No public...
-  'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix rejects invalid selected protocol noncallable normalize before subscribe',
-  // RPC-TEST-FB075BDD690B-C132 BC3 NoPASS: INVALID_CONFIG is produced only by private createRuntimeEndpointComposition selected protocol/codec/framer descriptor grammar; new carrier four-stage codec and fixed protocol do not accept this input record. No public...
-  'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix rejects invalid selected protocol throwing id getter before subscribe',
-  // RPC-TEST-FB075BDD690B-C132 BC3 NoPASS: INVALID_CONFIG is produced only by private createRuntimeEndpointComposition selected protocol/codec/framer descriptor grammar; new carrier four-stage codec and fixed protocol do not accept this input record. No public...
-  'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix rejects invalid selected protocol zero version before subscribe',
-  // RPC-TEST-FB075BDD690B-C131 BC3 NoPASS: The zero calls are to injected legacy descriptor.frame/accept callbacks during old constructor snapshot, not business provider execution. Neither callback is a supported current carrier codec stage; current handshake ...
-  'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix selected descriptor getters run once without framing during construction',
-  // RPC-TEST-FB075BDD690B-C158 BC3 NoPASS: Direct private createRuntimeEndpointComposition disposal with synthetic cleanup faults; no same-name mapping to Root/native close.
-  'packages/web-rpc/test/middleware-ports.test.ts::discovery Host transactions preserves ordered route, replay, and registry cleanup leaves from one composed endpoint',
-  // Historical protocol factory: SC3/BC2/BC3 NoPASS, needs review. Removed normalize getter/pre-read input; the retained C027 cause/subscription atoms have their own exact BC2/3 disposition.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts preserves native protocol hostile configuration cause identity and zero residue',
-  // Historical contract factory: SC3/BC3 NoPASS, needs review. Removed contract.version getter/install-role error and its conditional ingress/debug cutoff; current wire/schema errors remain required.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts preserves native contract hostile configuration cause identity and zero residue',
-  // RPC-TEST-FB075BDD690B-C045 BC3 NoPASS: deleted connect configuration getter/input; the current Auth factory is not a substitute for that removed connect variant.
-  'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts preserves hostile connect config getter primary and cause identity'
-])
+/**
+ * Migrated receiver files deleted with the removed modules they exercised; their business is
+ * covered at public entries.
+ */
 
 /** Exact receiver fullNames preserve migrated business; missing reception still fails. */
 const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
@@ -1249,10 +922,9 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
     ]
 }
 
-/** Map each non-retired frozen title to all required current receiver cases. */
+/** Map each frozen title to all required current receiver cases. */
 function migratedTitles(title: string): readonly string[] {
   const [file, name] = title.split('::')
-  if (retiredSuites.has(file.split('/').at(-1) ?? '') || retiredLayeringTitles.has(title)) return []
   if (
     file === 'packages/web-rpc/test/middleware-ports.test.ts' ||
     file === 'packages/web-rpc/test/internal/async-control.test.ts' ||
@@ -1399,7 +1071,7 @@ function readerExists(path: string): boolean {
 }
 
 describe('migrated suite parity', () => {
-  it('keeps every non-retired legacy file and title passed', () => {
+  it('keeps every frozen legacy file and title passed', () => {
     /** Frozen expectations choose exact owner files, including every current concern in those files. */
     const expected = [...legacyTitles.contract, ...legacyTitles.core].flatMap(migratedTitles)
     /**
