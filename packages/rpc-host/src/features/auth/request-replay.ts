@@ -27,6 +27,13 @@ export type IRequestReplayEntry = Readonly<{
 /** Refused numeric correlations retain their original source and fixed short expiry. */
 type IRequestReplayRejection = Readonly<{ source: IRequestReplaySource; expiresAt: number }>
 
+/** Equal verified counters share one completed bucket; the source window bounds live buckets to64. */
+type IRequestReplayWindowBucket = {
+  readonly counter: bigint
+  readonly entries: Map<string, IRequestReplayEntry>
+  next?: IRequestReplayWindowBucket
+}
+
 /** Active entries never expire; completed entries follow false, signed-window or individual TTL. */
 export class RequestReplayLedger {
   /** Actual business completion alone may remove an in-flight correlation. */
@@ -35,6 +42,8 @@ export class RequestReplayLedger {
   readonly #completed = new Map<string, IRequestReplayEntry>()
   /** The original short numeric refusal history does not reserve accepted-entry capacity. */
   readonly #rejected = new Map<string, IRequestReplayRejection>()
+  /** Only completed window entries appear in counter order under their original source identity. */
+  readonly #windowHeads = new WeakMap<IRequestReplaySource, IRequestReplayWindowBucket>()
   /** Original lifecycle leases count numeric entries only for each admitted direct peer. */
   readonly #peerCounts = createStringLeaseRegistry()
   /** This derived scalar counts numeric active and completed entries without another index. */
@@ -90,27 +99,64 @@ export class RequestReplayLedger {
   settle(key: string, entry: IRequestReplayEntry, now: number): void {
     if (this.#active.get(key) !== entry) return
     this.#active.delete(key)
-    if (entry.retain === false || (entry.retain === 'window' && this.#outsideWindow(entry))) {
+    if (
+      entry.retain === false ||
+      (entry.retain === 'window' && this.#outsideWindow(entry.source, entry.counter!))
+    ) {
       this.#release(key, entry)
       return
     }
-    this.#completed.set(key, { ...entry, at: now })
+    /** Completion time still belongs to numeric TTL; window ordering uses the verified counter. */
+    const completed = { ...entry, at: now }
+    this.#completed.set(key, completed)
+    if (entry.retain === 'window') this.#queueWindow(key, completed)
   }
 
   /** The original signed window may release completed entries, never active business or streams. */
   advanceWindow(source: IRequestReplaySource): void {
-    for (const key of source.replayKeys) {
-      /** Only this source's exact completed entry participates in its verified counter advancement. */
-      const entry = this.#completed.get(key)
-      if (entry?.source !== source || entry.retain !== 'window' || !this.#outsideWindow(entry))
-        continue
-      this.#completed.delete(key)
-      this.#release(key, entry)
+    /** An ordered head lets advancement inspect only expired counters and the first live boundary. */
+    let head = this.#windowHeads.get(source)
+    while (head && this.#outsideWindow(source, head.counter)) {
+      for (const [key, entry] of head.entries) {
+        this.#completed.delete(key)
+        this.#release(key, entry)
+      }
+      head = head.next
     }
+    if (head) this.#windowHeads.set(source, head)
+    else this.#windowHeads.delete(source)
+  }
+
+  /** Insert out-of-order completions among at most64 live counters from the fixed64-slot window. */
+  #queueWindow(key: string, entry: IRequestReplayEntry): void {
+    this.advanceWindow(entry.source)
+    /** Old active requests settle directly when expired and never reach this completed queue. */
+    const counter = entry.counter!
+    /** Expired buckets were consumed above, so distinct counters here are bounded by64. */
+    const head = this.#windowHeads.get(entry.source)
+    if (!head || counter < head.counter) {
+      this.#windowHeads.set(entry.source, {
+        counter,
+        entries: new Map([[key, entry]]),
+        next: head
+      })
+      return
+    }
+    /** This walk is bounded by the protocol's fixed64 counters, independent of active key count. */
+    let bucket = head
+    while (bucket.next && bucket.next.counter <= counter) bucket = bucket.next
+    if (bucket.counter === counter) bucket.entries.set(key, entry)
+    else
+      bucket.next = {
+        counter,
+        entries: new Map([[key, entry]]),
+        next: bucket.next
+      }
   }
 
   /** Source retirement uses only its original owned keys and fences every late completion. */
   retire(source: IRequestReplaySource): void {
+    this.#windowHeads.delete(source)
     for (const key of source.replayKeys) {
       /** Exact original source identity prevents cleanup from touching a reused correlation. */
       const entry = this.#active.get(key) ?? this.#completed.get(key)
@@ -125,8 +171,8 @@ export class RequestReplayLedger {
   }
 
   /** These existing source/counter fields are present only after verified window-mode admission. */
-  #outsideWindow(entry: IRequestReplayEntry): boolean {
-    return entry.source.window!.high - entry.counter! >= 64n
+  #outsideWindow(source: IRequestReplaySource, counter: bigint): boolean {
+    return source.window!.high - counter >= 64n
   }
 
   /** Every caller removes its exact map entry first, so capacity and membership release once. */

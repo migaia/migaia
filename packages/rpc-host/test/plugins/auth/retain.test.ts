@@ -10,7 +10,10 @@ import type {
   IRpcTransportContext
 } from '@migaia/rpc-contract/interfaces'
 import type { IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
-import { RequestReplayLedger } from '../../../dist/features/auth/request-replay.js'
+import {
+  RequestReplayLedger,
+  type IRequestReplayEntry
+} from '../../../dist/features/auth/request-replay.js'
 import { ProviderDispatcher } from '../../../dist/dispatch/dispatcher.js'
 import { coreMemoryServer } from '../../host/core-fixture.js'
 import { MemoryCarrier } from '../../fixtures/core-carrier.js'
@@ -335,6 +338,67 @@ it('A30 advances the real signed window without releasing active requests or acc
     settled.mockRestore()
     accepted.mockRestore()
     admitted.mockRestore()
+  }
+})
+
+it('A30 advances only expired completed counters with many active identities', () => {
+  /** Counter movement is deterministic business state, not elapsed-time measurement. */
+  let high = 0n
+  /** This existing source getter observes which completed counter boundaries advancement inspects. */
+  let windowReads = 0
+  /** Original cleanup membership also contains active IDs that advancement must never traverse. */
+  const source = {
+    replayKeys: new Set<string>(),
+    window: {
+      get high() {
+        windowReads += 1
+        return high
+      }
+    }
+  }
+  /** Window mode does not reserve this deliberately tiny numeric retention capacity. */
+  const ledger = new RequestReplayLedger(1)
+  for (let index = 1; index <= 512; index++) {
+    high = BigInt(index)
+    ledger.admit(source, 'window-peer', `active-${index}`, 0, 'window', high)
+  }
+  /** Each completed correlation retains its exact original entry while completion order differs. */
+  const completions = new Map<bigint, Readonly<{ key: string; entry: IRequestReplayEntry }>>()
+  for (const counter of [513n, 514n, 515n, 516n]) {
+    high = counter
+    /** These actual admissions use current counters, before their providers finish out of order. */
+    const key = `completed-${counter}`
+    completions.set(counter, {
+      key,
+      entry: ledger.admit(source, 'window-peer', key, 0, 'window', counter)!
+    })
+  }
+  for (const counter of [515n, 513n, 516n, 514n]) {
+    /** A fast later provider must not keep an expired earlier counter behind it. */
+    const completed = completions.get(counter)!
+    ledger.settle(completed.key, completed.entry, 0)
+  }
+  /** These public Set observations never read or replace private ledger tables. */
+  const iterations = vi.spyOn(source.replayKeys, Symbol.iterator)
+  /** Exact removal order proves expired heads are consumed in counter order. */
+  const removed = vi.spyOn(source.replayKeys, 'delete')
+  try {
+    high = 578n
+    windowReads = 0
+    ledger.advanceWindow(source)
+    expect(iterations).not.toHaveBeenCalled()
+    expect(removed.mock.calls).toEqual([['completed-513'], ['completed-514']])
+    expect(windowReads).toBeLessThanOrEqual(3)
+    expect(ledger.has('completed-513', 0)).toBe(false)
+    expect(ledger.has('completed-514', 0)).toBe(false)
+    expect(ledger.has('completed-515', 0)).toBe(true)
+    expect(ledger.has('completed-516', 0)).toBe(true)
+    expect(ledger.has('active-1', 0)).toBe(true)
+    expect(source.replayKeys.size).toBe(514)
+  } finally {
+    iterations.mockRestore()
+    removed.mockRestore()
+    ledger.retire(source)
   }
 })
 
