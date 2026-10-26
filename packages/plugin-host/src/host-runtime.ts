@@ -341,6 +341,7 @@ class PluginHostConstructor<
     this.#installRuntime = this.#createInstallRuntime()
     this.#replaceRuntime = new PluginHostReplaceRuntime({
       invokeHook: this.#invokeHook,
+      operations: this.#operationRuntime,
       state: this.#state,
       publish: (installed, batch) => this.#publishInstallBatch(installed, batch),
       drainLeases: (registration) => this.#drainRegistrationLeases(registration),
@@ -352,6 +353,7 @@ class PluginHostConstructor<
     })
     this.#resumeRuntime = new PluginHostResumeRuntime({
       invokeHook: this.#invokeHook,
+      operations: this.#operationRuntime,
       state: this.#state,
       drainLeases: (registration) => this.#drainRegistrationLeases(registration),
       diagnostic: this.#diagnostic,

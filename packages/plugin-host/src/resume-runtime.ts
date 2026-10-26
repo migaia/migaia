@@ -13,11 +13,14 @@ import type { PluginHostState } from './host-state.js'
 import type { PluginHostInstallRuntime } from './install-runtime.js'
 import type { IRegistration } from './registry.js'
 import type { IPluginHostDiagnostic } from './typing.js'
+import type { PluginHostOperationRuntime } from './operation-runtime.js'
 
 /** Host authority used to resume suspended registrations after a provider becomes available. */
 type IPluginHostResumeRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   /** Preserves the original synchronous rebind invocation and its asynchronous return value. */
   readonly invokeHook: <T>(invoke: () => T) => T
+  /** Bounds each rebind hook by the Host mutation budget, like other lifecycle hooks. */
+  readonly operations: PluginHostOperationRuntime
   readonly state: PluginHostState<TDomainCore, TValue>
   drainLeases(registration: IRegistration<TDomainCore, TValue>): Promise<void>
   readonly diagnostic: IPluginHostDiagnostic
@@ -98,11 +101,16 @@ export class PluginHostResumeRuntime<TDomainCore extends object, TValue> {
       }
       if (step.action !== DependencyAction.rebind) continue
       try {
-        await this.#port.invokeHook(() =>
-          registration.plugin.onDependencyReplaced!(
-            provider,
-            providerRegistration.featureOutputs ?? Object.freeze({})
-          )
+        // An overdue rebind hook is a failed rebind and is replanned as a restart.
+        this.#port.operations.begin(registration)
+        await this.#port.operations.await(
+          this.#port.invokeHook(() =>
+            registration.plugin.onDependencyReplaced!(
+              provider,
+              providerRegistration.featureOutputs ?? Object.freeze({})
+            )
+          ),
+          registration
         )
         this.#port.state.setSuspended(registration, false)
         registration.featureExposeValid = true

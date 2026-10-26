@@ -9,11 +9,14 @@ import type { PluginHostState } from './host-state.js'
 import type { IInstallBatchContext, PluginHostInstallRuntime } from './install-runtime.js'
 import type { IInstallEntry, IRegistration } from './registry.js'
 import type { IPluginHostDiagnostic } from './typing.js'
+import type { PluginHostOperationRuntime } from './operation-runtime.js'
 
 /** Narrow Host authority used by one replacement transaction; every call runs inside the queue. */
 type IPluginHostReplaceRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   /** Marks only the original synchronous rebind call, leaving async waiting to its owner. */
   readonly invokeHook: <T>(invoke: () => T) => T
+  /** Bounds each rebind hook by the Host mutation budget, like other lifecycle hooks. */
+  readonly operations: PluginHostOperationRuntime
   /** Host-owned topology and registration status used by capability replacement plans. */
   readonly state: PluginHostState<TDomainCore, TValue>
   /** Publishes one prepared candidate at a single synchronous point. */
@@ -90,8 +93,12 @@ export class PluginHostReplaceRuntime<TDomainCore extends object, TValue> {
       if (!dependent) continue
       const hook = dependent.plugin.onDependencyReplaced!
       try {
-        await this.#port.invokeHook(() =>
-          hook(name, replacement.featureOutputs ?? Object.freeze({}))
+        // A rebind hook that exceeds the mutation budget is a failed rebind and falls back to
+        // restarting the dependent, instead of holding the mutation queue indefinitely.
+        this.#port.operations.begin(dependent)
+        await this.#port.operations.await(
+          this.#port.invokeHook(() => hook(name, replacement.featureOutputs ?? Object.freeze({}))),
+          dependent
         )
       } catch (error) {
         hookErrors.push(error)
