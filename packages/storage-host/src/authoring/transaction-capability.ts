@@ -76,10 +76,6 @@ function runTransactionCapabilityMethod(
     const api = (binding as unknown as { forTransaction(scope: object): unknown }).forTransaction(
       operationScope
     )
-    if (typeof api !== 'object' || api === null) throw invalidTransaction()
-    /** Borrow one actual native method and preserve its API receiver and returned value. */
-    const execute = (api as Record<string, unknown>)[method]
-    if (typeof execute !== 'function') throw invalidTransaction()
     return (api as Record<string, (...args: readonly unknown[]) => unknown>)[method]!(...args)
   })
 }
@@ -364,10 +360,6 @@ export function useTransactionCapability<
         const bound = (
           binding as unknown as { forTransaction(scope: object): unknown }
         ).forTransaction(scope)
-        if (typeof bound !== 'object' || bound === null) throw invalidTransaction()
-        /** One borrowed constructor keeps the actual shared chain and its source receiver intact. */
-        const query = (bound as Record<string, unknown>).query
-        if (typeof query !== 'function') throw invalidTransaction()
         return transactionRecordQuery(
           scope,
           (bound as { query(): IQueryResult<unknown, undefined> }).query()
@@ -390,10 +382,6 @@ export function useTransactionCapability<
         const bound = (
           binding as unknown as { forTransaction(scope: object): unknown }
         ).forTransaction(scope)
-        if (typeof bound !== 'object' || bound === null) throw invalidTransaction()
-        /** One native match lookup preserves receiver and canonical pattern capture. */
-        const match = (bound as Record<string, unknown>).match
-        if (typeof match !== 'function') throw invalidTransaction()
         return transactionRdfQuery(
           scope,
           (bound as { match(pattern: Partial<IQuad>): IRdfQuery<undefined> }).match(pattern)

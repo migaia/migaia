@@ -195,13 +195,8 @@ class ConcurrencyRunner<TResult> {
     const declaredLocks = request.options.lock
     this.#capturedOverride = request.options.concurrency
     if (this.#capturedOverride !== undefined) assertConcurrencyPolicy(this.#capturedOverride)
-    if (
-      (request.lock !== undefined && typeof request.lock !== 'function') ||
-      (request.prepare !== undefined && typeof request.prepare !== 'function') ||
-      (request.execute !== undefined && typeof request.execute !== 'function') ||
-      (request.executeAttempt !== undefined && typeof request.executeAttempt !== 'function') ||
-      (request.execute !== undefined && request.executeAttempt !== undefined)
-    )
+    /** Exactly one execution form may be declared; backend callbacks are typed, not re-checked. */
+    if (request.execute !== undefined && request.executeAttempt !== undefined)
       throw invalidConcurrencyArgument()
     this.#policy = request.policy ?? resolveConcurrencyPolicy(request.store, this.#capturedOverride)
     this.#inherited = concurrencyAttemptBudgets.get(request.options)

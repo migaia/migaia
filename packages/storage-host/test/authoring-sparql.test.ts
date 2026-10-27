@@ -168,8 +168,5 @@ describe('canonical SPARQL fragments and native binding', () => {
     expect(() =>
       implement(sparql, fixture.tag, { forTransaction: (() => ({})) as never })
     ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
-    expect(() => createSparqlTag({} as never)).toThrowError(
-      expect.objectContaining({ code: 'INVALID_ARGUMENT' })
-    )
   })
 })

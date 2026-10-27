@@ -464,16 +464,6 @@ export function createSqlTag<
   TValue extends ISqlValue = ISqlValue,
   TResult extends ISqlRunResult = ISqlRunResult
 >(options: ISqlBindingOptions<TValue, TResult>): ISqlTag<TValue, TResult> {
-  if (
-    typeof options !== 'object' ||
-    options === null ||
-    Array.isArray(options) ||
-    (options.dialect !== SqlDialect.sqlite && options.dialect !== SqlDialect.postgres) ||
-    typeof options.all !== 'function' ||
-    typeof options.get !== 'function' ||
-    typeof options.run !== 'function'
-  )
-    throw invalidSqlArgument()
   /** This small callable adapter creates the named per-query owner; it holds no mutable query state. */
   function tag<
     TRow extends object & { readonly [K in keyof TRow]: TValue } = Readonly<Record<string, TValue>>
@@ -536,12 +526,6 @@ export function deriveStorageSqlQuery<
 ): ISqlQuery<TRow, TResult> {
   /** Authentication preserves the original graph without expansion or compilation. */
   const node = sqlNode(fragment)
-  if (
-    typeof terminals.all !== 'function' ||
-    typeof terminals.get !== 'function' ||
-    typeof terminals.run !== 'function'
-  )
-    throw invalidSqlArgument()
   return new DerivedSqlQuery(node, terminals) as unknown as ISqlQuery<TRow, TResult>
 }
 
