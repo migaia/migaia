@@ -34,4 +34,9 @@ export type IRedisDriver<TClient extends object = object> = {
     run: (connection: IRedisConnection<TClient>) => Promise<TResult>
   ): Promise<TResult>
   subscribe(channel: string, listener: (message: string) => void): Promise<IStorageResource>
+  /**
+   * Close idle dedicated connections the driver opened itself. The store calls it on dispose; the
+   * caller's root client stays open because its creator closes it.
+   */
+  release?(): Promise<void>
 }

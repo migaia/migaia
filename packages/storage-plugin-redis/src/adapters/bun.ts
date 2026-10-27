@@ -8,7 +8,8 @@ import {
   captureCommands,
   execEntries,
   requireExecArray,
-  subscriptionResource
+  subscriptionResource,
+  RedisConnectionPool
 } from '../native.js'
 import { normalizeRedisError, invalidArgument, redisError } from '../errors.js'
 import { createStorageOperationReporter, reportCleanupError } from '@migaia/storage-host/sdk'
@@ -23,66 +24,66 @@ class BunRedisDriver implements IRedisDriver<IBunRedisClient> {
   constructor(root: IBunRedisClient) {
     this.#root = root
   }
+  /** Dedicated duplicates reused across callbacks; each one is UNWATCHed before reuse. */
+  readonly #pool = new RedisConnectionPool<IBunRedisClient>({
+    open: () => this.#root.duplicate(),
+    reset: async (owned) => {
+      await owned.send(RedisCommand.unwatch, [])
+    },
+    close: async (owned) => owned.close(),
+    report: (error) => reportCleanupError(this.#reporter, normalizeRedisError(error))
+  })
   /** Keep the complete original native callback inside the SDK's lease and unwind path. */
   readonly withConnection: IRedisDriver<IBunRedisClient>['withConnection'] = async <T>(
     run: (connection: IRedisConnection<IBunRedisClient>) => Promise<T>
   ): Promise<T> => {
     if (typeof run !== 'function') throw invalidArgument()
-    let owned: IBunRedisClient | undefined, result: T
     try {
-      owned = await this.#root.duplicate()
-      const connection = owned
-      result = await runRedisCallback(run, {
-        getClient: () => connection,
-        command: async (input) => {
-          const args = captureCommand(input, false) as string[]
-          try {
-            return await connection.send(args[0]!, args.slice(1))
-          } catch (error) {
-            throw normalizeRedisError(error)
-          }
-        },
-        exec: async (commands) => {
-          const captured = captureCommands(commands, false) as string[][]
-          if (captured.length === 0) return []
-          let started = false,
-            sent = false
-          try {
-            if ((await connection.send(RedisCommand.multi, [])) !== RedisReply.ok)
-              throw redisError(RedisErrorCode.decodeFailed)
-            started = true
-            for (const args of captured)
-              if ((await connection.send(args[0]!, args.slice(1))) !== RedisReply.queued)
+      return await this.#pool.run((connection) =>
+        runRedisCallback(run, {
+          getClient: () => connection,
+          command: async (input) => {
+            const args = captureCommand(input, false) as string[]
+            try {
+              return await connection.send(args[0]!, args.slice(1))
+            } catch (error) {
+              throw normalizeRedisError(error)
+            }
+          },
+          exec: async (commands) => {
+            const captured = captureCommands(commands, false) as string[][]
+            if (captured.length === 0) return []
+            let started = false,
+              sent = false
+            try {
+              if ((await connection.send(RedisCommand.multi, [])) !== RedisReply.ok)
                 throw redisError(RedisErrorCode.decodeFailed)
-            sent = true
-            const replies: unknown = await connection.send(RedisCommand.exec, [])
-            return replies === null ? null : execEntries(requireExecArray(replies))
-          } catch (error) {
-            if (started && !sent)
-              try {
-                await connection.send(RedisCommand.discard, [])
-              } catch (cleanup) {
-                reportCleanupError(this.#reporter, normalizeRedisError(cleanup))
-              }
-            throw normalizeRedisError(error)
+              started = true
+              for (const args of captured)
+                if ((await connection.send(args[0]!, args.slice(1))) !== RedisReply.queued)
+                  throw redisError(RedisErrorCode.decodeFailed)
+              sent = true
+              const replies: unknown = await connection.send(RedisCommand.exec, [])
+              return replies === null ? null : execEntries(requireExecArray(replies))
+            } catch (error) {
+              if (started && !sent)
+                try {
+                  await connection.send(RedisCommand.discard, [])
+                } catch (cleanup) {
+                  reportCleanupError(this.#reporter, normalizeRedisError(cleanup))
+                }
+              throw normalizeRedisError(error)
+            }
           }
-        }
-      })
-    } catch (error) {
-      try {
-        owned?.close()
-      } catch (cleanup) {
-        reportCleanupError(this.#reporter, normalizeRedisError(cleanup))
-      }
-      throw normalizeRedisError(error)
-    }
-    try {
-      owned?.close()
+        })
+      )
     } catch (error) {
       throw normalizeRedisError(error)
     }
-    return result
   }
+  /** Close the idle duplicates this driver opened; the caller's root client stays open. */
+  readonly release: NonNullable<IRedisDriver<IBunRedisClient>['release']> = () =>
+    this.#pool.release()
   /** Capture caller arguments before asynchronous native lease acquisition. */
   readonly command: IRedisDriver<IBunRedisClient>['command'] = (input) => {
     const args = captureCommand(input, false) as string[]

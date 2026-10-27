@@ -81,6 +81,12 @@ async function disposeRedisEnvironment(environment: IRedisEnvironment): Promise<
     }
   }
   environment.projections.clear()
+  /** Idle dedicated connections the driver opened for this store close with it. */
+  try {
+    await environment.driver.release?.()
+  } catch (error) {
+    failures.push(error)
+  }
   if (failures.length)
     throw redisError(
       RedisErrorCode.failed,

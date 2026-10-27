@@ -105,3 +105,72 @@ export async function runRedisCallback<TClient extends object, TResult>(
     throw normalizeRedisTransactionFailure(error)
   }
 }
+
+/** Idle dedicated connections a driver keeps for reuse; more than this are closed on return. */
+export const REDIS_IDLE_CONNECTION_LIMIT = 16
+
+/** How a driver opens, resets and closes one dedicated native connection. */
+export type IRedisConnectionPoolPorts<TConnection> = {
+  readonly open: () => Promise<TConnection>
+  /** Clears per-callback server state (WATCH) before the connection is reused. */
+  readonly reset: (connection: TConnection) => Promise<void>
+  readonly close: (connection: TConnection) => Promise<void>
+  readonly report: (error: unknown) => void
+}
+
+/**
+ * Dedicated connections a driver opened itself, reused across callbacks so each operation does not
+ * pay a connect and quit. A connection whose callback failed is closed instead of reused, since its
+ * server state is unknown. `release` closes the idle set; the caller's root client is never
+ * touched.
+ */
+export class RedisConnectionPool<TConnection> {
+  /** Open, reset and close behaviour of the owning driver. */
+  readonly #ports: IRedisConnectionPoolPorts<TConnection>
+  /** Connections that finished a callback cleanly and wait for the next one. */
+  readonly #idle: TConnection[] = []
+  /** After release, returned connections are closed instead of kept. */
+  #released = false
+  /** Capture the driver's connection ports without opening anything. */
+  constructor(ports: IRedisConnectionPoolPorts<TConnection>) {
+    this.#ports = ports
+  }
+  /** Run one callback on an idle or new dedicated connection, then reuse or close it. */
+  async run<TResult>(work: (connection: TConnection) => Promise<TResult>): Promise<TResult> {
+    const connection = this.#idle.pop() ?? (await this.#ports.open())
+    let result: TResult
+    try {
+      result = await work(connection)
+    } catch (error) {
+      await this.#discard(connection)
+      throw error
+    }
+    await this.#restore(connection)
+    return result
+  }
+  /** Close every idle connection; failures are reported, never thrown. */
+  async release(): Promise<void> {
+    this.#released = true
+    for (const connection of this.#idle.splice(0)) await this.#discard(connection)
+  }
+  /** Reset and keep a clean connection, or close it when the pool is full or released. */
+  async #restore(connection: TConnection): Promise<void> {
+    if (this.#released || this.#idle.length >= REDIS_IDLE_CONNECTION_LIMIT)
+      return this.#discard(connection)
+    try {
+      await this.#ports.reset(connection)
+    } catch (error) {
+      this.#ports.report(error)
+      return this.#discard(connection)
+    }
+    this.#idle.push(connection)
+  }
+  /** Close one connection and report a close failure instead of replacing the caller's outcome. */
+  async #discard(connection: TConnection): Promise<void> {
+    try {
+      await this.#ports.close(connection)
+    } catch (error) {
+      this.#ports.report(error)
+    }
+  }
+}
