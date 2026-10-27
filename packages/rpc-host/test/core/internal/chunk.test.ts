@@ -72,7 +72,9 @@ describe('canonical physical framing', () => {
       chunkBytes: 2,
       maxMessageBytes: 4,
       maxChunks: 2,
-      maxBufferedBytes: 4
+      maxBufferedBytes: 4,
+      /** This vector reaches global retained-byte refusal after each source passes its own quota. */
+      maxBufferedBytesPerSource: 4
     })
     const a = { source: 'a', messageId: 'a' },
       b = { source: 'b', messageId: 'b' }
