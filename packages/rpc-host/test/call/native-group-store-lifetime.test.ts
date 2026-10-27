@@ -79,7 +79,7 @@ function observeAdmission() {
   return { spy, before }
 }
 
-// RPC-TEST-B56300FABD2D-C001: full and fingerprint refusals never execute either original member.
+// Full and fingerprint refusals never execute either original member.
 it.each(['full', 'fingerprint'] as const)(
   'real group store %s refusal releases provisional leases and preserves the sealed key',
   async (refusal) => {
@@ -133,7 +133,7 @@ it.each(['full', 'fingerprint'] as const)(
   }
 )
 
-// RPC-TEST-0831F6A8CB3A-C001: move the original failing member through all three positions.
+// Move the original failing member through all three positions.
 it.each([0, 1, 2] as const)(
   'failed group member %i releases unused leases without executing its suffix',
   async (failureIndex) => {
@@ -180,7 +180,7 @@ it.each([0, 1, 2] as const)(
   }
 )
 
-// RPC-TEST-0831F6A8CB3A-C002: actual pending and done claims never run an unused group suffix.
+// Actual pending and done claims never run an unused group suffix.
 it.each(['done', 'pending'] as const)(
   'cached %s group completion preserves the fail-stop prefix without repeating business',
   async (cached) => {

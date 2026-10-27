@@ -296,7 +296,7 @@ fn invalid(code: &'static str) -> io::Error {
     io::Error::new(io::ErrorKind::InvalidData, code)
 }
 
-/// Read only required known fields; unknown protocol metadata is ignored under R17.
+/// Read required known fields and ignore unknown protocol metadata.
 fn has_fields(input: &Value, required: &[&str]) -> bool {
     matches!(input, Value::Object(_)) && required.iter().all(|key| input.has(key))
 }

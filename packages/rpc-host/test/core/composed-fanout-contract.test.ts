@@ -43,7 +43,7 @@ describe('composed sendAll/pingAll fanout contract', () => {
     /** A genuine method-less peer preserves fanout while leaving the original fulfilled keys exact. */
     const unavailable = await listener.connect('unavailable')
     try {
-      /** BC1 places this same broadcast under the transport namespace. */
+      /** Places this same broadcast under the transport namespace. */
       const result = await client.memory.request('echo', 'value')
       if (!result || typeof result !== 'object') return expect.unreachable()
       const { fulfilled, rejected } = result
@@ -60,7 +60,7 @@ describe('composed sendAll/pingAll fanout contract', () => {
   })
 
   it('SDK control ping retains the accepted __proto__ target identity', async () => {
-    /** BC1/BC3 move lifecycle control to the real transport setup port, outside business fanout. */
+    /** Move lifecycle control to the real transport setup port, outside business fanout. */
     const client = await controlListener('client-ping-fanout')
     /** Native acceptance and lookup must retain the unusual original peer identity. */
     const server = await client.server.connect('__proto__')

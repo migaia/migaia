@@ -155,7 +155,7 @@ it('isolates two original provider endpoints and prevents execution or replies a
     await secondClient.host.memory.send('r70-isolation-second', 'barrier', 'after-cross-endpoint')
     expect(secondExecutions).toBe(1)
 
-    /** BC21 retires the default name's departure reason together with its physical source. */
+    /** Retires the default name's departure reason together with its physical source. */
     await firstHost.close()
     await expect(
       firstClient.host.memory.send('r70-isolation-first', 'echo', 'r70-post-removal')

@@ -470,7 +470,7 @@ describe('runtime exposed methods serve after commit', () => {
   )
 
   it('holds an actual forwarded native candidate until its installing batch commits', async () => {
-    /** RPC-C6-SERVE-FORWARD-CANDIDATE-001 uses the same native install barrier and genuine IO. */
+    /** RPC-uses the same native install barrier and genuine IO. */
     const fixture = await installBarrier(false, true)
     /** The pending candidate must retain its actual native gate even after callable compilation. */
     const request = observe(fixture.caller.memory.request('business.request', 'forward-committed'))

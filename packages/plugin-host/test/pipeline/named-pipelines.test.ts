@@ -389,7 +389,7 @@ describe('named pipelines', () => {
     /** Reuse one cold payload; the test counts runner overhead, not input allocations. */
     const input = { count: 1 }
     try {
-      // The 1,000-run bound is the fixed A7 acceptance count, not a growable collection.
+      // The 1,000-run bound is the fixed acceptance count, not a growable collection.
       for (let index = 0; index < 1_000; index += 1)
         host.pipeline('numbers').run(input, (value) => {
           counts.terminals += 1
@@ -398,7 +398,7 @@ describe('named pipelines', () => {
       expect(counts).toEqual({ retained: 0, released: 0, terminals: 1_000 })
       expect(snapshot).not.toHaveBeenCalled()
       host.pipeline('numbers').use((value, next) => next({ count: value.count + 1 }))
-      // The same fixed A7 count exercises one unchanged nonempty lane revision.
+      // The same fixed count exercises one unchanged nonempty lane revision.
       for (let index = 0; index < 1_000; index += 1)
         expect(host.pipeline('numbers').run(input, (value) => value.count)).toBe(2)
       expect(counts.retained).toBe(1_000)
@@ -423,7 +423,7 @@ describe('named pipelines', () => {
     async (mode) => {
       /** Both supported failure paths must retain this exact original value. */
       const original = new Error('named execution failed')
-      /** The existing A7 observation counts actual acquisition and its original release callback. */
+      /** The existing observation counts actual acquisition and its original release callback. */
       const counts = { retained: 0, released: 0 }
       /** Delegation preserves the real quiescence tracker and its generation leases. */
       const originalRetain = StageLanes.prototype.retainLeases

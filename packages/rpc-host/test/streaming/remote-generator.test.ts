@@ -67,7 +67,7 @@ describe('streaming remote generators', () => {
       await expect(
         (fixture.b.memory.stream('count', null) as AsyncIterableIterator<unknown>).throw?.(reason)
       ).rejects.toBe(reason)
-      /** BC1/BC3 replace the retired stream facade lifetime with caller cancellation authority. */
+      /** Replace the retired stream facade lifetime with caller cancellation authority. */
       const controller = new AbortController()
       /** Cancellation still terminates already active public work with the original code. */
       const active = fixture.b.memory.stream('count', null, {

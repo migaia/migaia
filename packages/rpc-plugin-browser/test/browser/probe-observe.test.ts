@@ -420,7 +420,7 @@ describe('carriers: browser observe', () => {
         ).toEqual(carrier === 'rtc-data-channel' ? 'payload-😀' : new Uint8Array([1, 2, 3]))
         expect(native.reports).toHaveLength(2)
         for (const error of native.reports)
-          /** C003-A004: the real public emitter already used PROBE_FAILED at immutable47070348. */
+          /** The real public emitter already used PROBE_FAILED at immutable47070348. */
           expect(error).toMatchObject({
             source: 'rpc.endpoint',
             code: 'PROBE_FAILED',

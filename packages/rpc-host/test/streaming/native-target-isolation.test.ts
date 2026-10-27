@@ -84,7 +84,7 @@ async function waitForIntruder(input: IIntruderDelivery): Promise<void> {
   })
 }
 
-// RPC-TEST-F23B99228CD7-C002: exact produced2 and beta2/alpha1 order survive a real intruder.
+// Exact produced2 and beta2/alpha1 order survive a real intruder.
 it('isolates same-id producers by actual admitted sender before intruder pull and cancellation', async () => {
   /** Only genuine provider entry increments this original execution count. */
   const production = { calls: 0 }
@@ -270,7 +270,7 @@ async function waitForCreditOrder(
   })
 }
 
-// RPC-TEST-F23B99228CD7-C001: genuine distinct ids retain the original target/payload isolation.
+// Genuine distinct ids retain the original target/payload isolation.
 it('isolates a pending consumer from another actual target replaying its original task id', async () => {
   /** Each real provider waits independently while both original consumers are ready. */
   const alphaRelease = deferred<void>()

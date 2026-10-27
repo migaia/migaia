@@ -81,7 +81,7 @@ for (const declared of [3, 5]) {
       chunkBytes: 2,
       maxConcurrentMessages: 1,
       maxBufferedBytes: 8,
-      /** This case targets malformed length cleanup rather than BC29 source admission. */
+      /** This case targets malformed length cleanup rather than source admission. */
       maxBufferedBytesPerSource: 8,
       maxMessageBytes: 8,
       schedule: (task) => {

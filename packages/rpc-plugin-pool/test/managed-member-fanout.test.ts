@@ -132,11 +132,11 @@ it('opens three genuine managed units behind one logical Pool target', async () 
       })
     )
     expect(units).toHaveLength(3)
-    /** BC3: coroutine fingerprint strings are launcher-local; actual unit objects are distinct. */
+    /** Coroutine fingerprint strings are launcher-local; actual unit objects are distinct. */
     expect(new Set(units).size).toBe(3)
     expect(budget.inUse).toBe(3)
     expect(members).toHaveLength(3)
-    /** BC3 retires private member.request; original three ordinal results remain public business. */
+    /** Retires private member.request; original three ordinal results remain public business. */
     const values = await Promise.all(
       Array.from({ length: 3 }, () => host.coroutine.send('pool', 'value', { hold: true }))
     )
@@ -152,7 +152,7 @@ it('opens three genuine managed units behind one logical Pool target', async () 
       [2, 12],
       [3, 13]
     ])
-    /** D7A/BC7 retires only the custom always-first guarantee; one target still returns a scalar. */
+    /** D7A/retires only the custom always-first guarantee; one target still returns a scalar. */
     const beforeRequest = workload.calls.length
     expect([1, 2, 3]).toContain(await host.coroutine.request('value'))
     expect(workload.calls).toHaveLength(beforeRequest + 1)
@@ -170,7 +170,7 @@ it('opens three genuine managed units behind one logical Pool target', async () 
         code: 'TARGET_UNKNOWN'
       })
     }
-    /** BC3 retires the two deleted endpoint-constructor spies; no synthetic counter replaces them. */
+    /** Retires the two deleted endpoint-constructor spies; no synthetic counter replaces them. */
   } finally {
     await host.close()
     budget.close()

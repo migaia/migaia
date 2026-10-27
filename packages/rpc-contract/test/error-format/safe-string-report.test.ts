@@ -112,7 +112,7 @@ describe('safeString failure reporting', () => {
   })
 })
 
-// RPC-TEST-CCDBF0994A49-C003: original supported atoms received at their canonical owner; old alias/key facets stay NoPASS.
+// Original supported atoms received at their canonical owner; old alias/key facets stay NoPASS.
 it('contains hostile string conversion and preserves tuple boundaries', () => {
   const reports: unknown[] = []
   const hostile = {

@@ -262,7 +262,7 @@ it.each(['hooks', 'ping', 'uuid'] as const)(
       expect(releases).toEqual(['second', 'first'])
       expect(subscribed.mock.calls.length).toBe(0)
       expect(subscribed.mock.calls.length - carrier.unsubscribed).toBe(0)
-      // A007's kernel.state and A009's old shared ports are exact BC3 NoPASS retirements.
+      // Kernel.state and old shared ports are exact NoPASS retirements.
       expect(Reflect.has(host, 'memory')).toBe(false)
       /** The same native completion remains stable after partial rollback finished. */
       const firstDispose = host.dispose()

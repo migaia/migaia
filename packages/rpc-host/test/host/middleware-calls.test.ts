@@ -4,24 +4,24 @@ import { RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { connectedCoreHosts } from './core-fixture.js'
 
-// RPC-TEST-FB075BDD690B-C137: preserve business values; BC1 replaces deleted sendAll shape.
+// Preserve business values; replaces deleted sendAll shape.
 it('real outbound send and broadcast preserve canonical results', async () => {
   /** The original provider echoes the payload reached over the genuine accepted physical pair. */
   const fixture = await connectedCoreHosts({}, { echo: (value: unknown) => value })
   try {
     await expect(fixture.a.memory.send('b', 'echo', 'value')).resolves.toBe('value')
-    /** BC1's one-target broadcast returns its scalar; no one-peer dictionary is fabricated. */
+    /** One-target broadcast returns its scalar; no one-peer dictionary is fabricated. */
     const broadcast = await fixture.a.memory.request('echo', 'fanout')
     expect(broadcast).toBe('fanout')
-    /** C126-A002 keeps its original payload; BC1 replaces the old one-target result dictionary. */
+    /** Keeps its original payload; replaces the old one-target result dictionary. */
     await expect(fixture.a.memory.request('echo', 'snapshot')).resolves.toBe('snapshot')
-    // C137-A003's removed rejected:{} dictionary facet is retired under BC1, without PASS credit.
+    // The removed rejected:{} dictionary facet is retired without PASS credit.
   } finally {
     await fixture.close()
   }
 })
 
-// RPC-TEST-FB075BDD690B-C138: preserve both original public lifecycle assertions.
+// Preserve both original public lifecycle assertions.
 it('outbound close is host-owned, idempotent, and rejects later sends canonically', async () => {
   /** Handshake completes through the existing native fixture before terminal behavior is tested. */
   const fixture = await connectedCoreHosts()
@@ -43,7 +43,7 @@ it('outbound close is host-owned, idempotent, and rejects later sends canonicall
   }
 })
 
-// RPC-TEST-FB075BDD690B-C141: preserve the original consumer payload and public close Promise.
+// Preserve the original consumer payload and public close Promise.
 it('public send retains its canonical result and disposal Promise identity', async () => {
   /** The genuine provider owns the original echo business, not a synthetic endpoint facade. */
   const fixture = await connectedCoreHosts({}, { echo: (value: unknown) => value })
@@ -58,7 +58,7 @@ it('public send retains its canonical result and disposal Promise identity', asy
   }
 })
 
-// RPC-TEST-8F79B1713BC2-C002/C005 preserve validation through the public call owner.
+// /C005 preserve validation through the public call owner.
 it('validates method names and admits a dotted public method', async () => {
   /** A genuine accepted provider owns the original dotted method spelling. */
   const fixture = await connectedCoreHosts({}, { notes: { save: (value: unknown) => value } })

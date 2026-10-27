@@ -75,7 +75,7 @@ describe('control message-port transport error identity', () => {
   })
 })
 
-// RPC-TEST-00776736DCA7-C005: preserve the original Worker error event, report count and native cause.
+// Preserve the original Worker error event, report count and native cause.
 it('retains the original Worker ErrorEvent cause through the actual native Web launcher', async () => {
   /** The actual native cause must survive independently of the event's presentation message. */
   const original = new Error('audit worker cause')

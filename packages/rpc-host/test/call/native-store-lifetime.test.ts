@@ -15,7 +15,7 @@ async function* queuedValues(): AsyncGenerator<number, number> {
   return 42
 }
 
-// RPC-TEST-FB117C860AD5-C001: all fifteen original assertion atoms retain their exact business values.
+// All fifteen original assertion atoms retain their exact business values.
 it.each(['request', 'group', 'notify', 'stream'] as const)(
   'admitted queued %s is pending in the original store and seals cancellation before terminal',
   async (mode) => {
@@ -119,7 +119,7 @@ it.each(['request', 'group', 'notify', 'stream'] as const)(
       assert.equal(outcome.outcome.mode, mode)
       assert.equal(outcome.outcome.completion.ok, false)
       if (outcome.outcome.completion.ok) assert.fail('cancellation cannot fabricate success')
-      /** BC2 changes only flat error representation; the original cancellation code stays exact. */
+      /** Changes only flat error representation; the original cancellation code stays exact. */
       const error = outcome.outcome.completion.error
       assert.equal(error.nodes[error.root]!.code, RpcCoreErrorCode.cancelled)
       assert.equal(effects, 0)

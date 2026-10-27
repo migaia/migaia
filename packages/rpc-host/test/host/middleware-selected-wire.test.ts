@@ -257,7 +257,7 @@ it('preserves the original object echo between two independent public hosts', as
   }
 })
 
-// RPC-TEST-BB5D8E228A37-C004: actual whole-message Auth follows negotiated chunk reassembly.
+// Actual whole-message Auth follows negotiated chunk reassembly.
 it('rejects a forged business signature after real chunk assembly and admits a fresh trusted control', async () => {
   /** The original application signer and verifier share this one fixture signature vocabulary. */
   const signatures = { trusted: 'trusted', forged: 'forged' } as const
@@ -368,7 +368,7 @@ it('rejects a forged business signature after real chunk assembly and admits a f
   }
 })
 
-// RPC-TEST-771320C3619A-C001 retains application values, protection order and terminal rejection.
+// Retains application values, protection order and terminal rejection.
 it('preserves contract endpoint roundtrips and protection before actual writes', async () => {
   /** Only genuine Auth callbacks and original physical writes contribute these observations. */
   const physicalEvents: string[] = []

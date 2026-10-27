@@ -138,7 +138,7 @@ describe('probe-core outbound frames', () => {
       expect(await fixture.caller.memory!.send('frame-provider', 'echo', payload)).toEqual(payload)
       expect(calls).toBe(1)
       const sent = outbound(callerEvents)
-      /** BC13 protects once at envelopeOutbound; frameOutbound then emits the three real chunks. */
+      /** Protects once at envelopeOutbound; frameOutbound then emits the three real chunks. */
       expect(sent.map((event) => event.stage)).toEqual([
         RpcProbeStage.envelope,
         RpcProbeStage.protected,
@@ -363,7 +363,7 @@ describe('probe-core outbound frames', () => {
     }
   })
 
-  // BC3/R10 deletes the private fast path; its only no-frame oracle is retired in the receipt, not passed.
+  // Deletes the private fast path; its only no-frame oracle is retired in the receipt, not passed.
 
   it('emits one envelope event for every physical batch member', async () => {
     const events: IRpcProbeEventView[] = []
@@ -395,7 +395,7 @@ describe('probe-core outbound frames', () => {
       const writes = send.mock.calls.map(([frame]) => frame)
       expect(writes[1]).toMatchObject({ kind: 'extension', extension: 'batch@1' })
       const envelopes = outbound(events).filter((event) => event.stage === RpcProbeStage.envelope)
-      /** BC2/R16 observes each semantic input once before physical batch membership exists. */
+      /** Observes each semantic input once before physical batch membership exists. */
       const ids = prepare.mock.calls.map(([message]) => ('id' in message ? message.id : undefined))
       expect(prepare).toHaveBeenCalledTimes(3)
       expect(new Set(ids).size).toBe(3)

@@ -228,7 +228,7 @@ class OwnerPair {
 }
 
 describe('C2 ProviderDispatcher / Forwarder / StreamChannel owners', () => {
-  it('C2-P15 rejects non-string explicit failure metadata before sending any success', async () => {
+  it('rejects non-string explicit failure metadata before sending any success', async () => {
     /** Only the actual context helper grants failure authority in the new public contract. */
     const pair = new OwnerPair()
     pair.dispatcher.provide({ get: (_payload, context) => context.failed(42 as never, 'BAD') })
@@ -241,7 +241,7 @@ describe('C2 ProviderDispatcher / Forwarder / StreamChannel owners', () => {
     }
   })
 
-  it('C2-P16 returns the original stable failure when no provider owns the method', async () => {
+  it('returns the original stable failure when no provider owns the method', async () => {
     /** The canonical CallTable enters the actual Dispatcher rather than a facade provider map. */
     const pair = new OwnerPair()
     try {
@@ -254,7 +254,7 @@ describe('C2 ProviderDispatcher / Forwarder / StreamChannel owners', () => {
   })
 
   it.each(['schema', 'dispatch-id'] as const)(
-    'C2-P17 preserves %s exceptions and releases the exact completed invocation identity',
+    'preserves %s exceptions and releases the exact completed invocation identity',
     async (kind) => {
       /** Every row owns one real catalog, incoming table and native lifecycle context. */
       const pair = new OwnerPair()
@@ -293,7 +293,7 @@ describe('C2 ProviderDispatcher / Forwarder / StreamChannel owners', () => {
     }
   )
 
-  it('C2-P18 executes a dispatch-only provider once without emitting a response', async () => {
+  it('executes a dispatch-only provider once without emitting a response', async () => {
     /** The original business count is independent of physical notify handoff. */
     const provider = vi.fn((_payload: unknown, context: IRpcContext) => context.success('ignored'))
     /** Existing owner wiring exposes the actual business completion and response writes. */
@@ -309,7 +309,7 @@ describe('C2 ProviderDispatcher / Forwarder / StreamChannel owners', () => {
     }
   })
 
-  it('C2-P12 unwraps only its own success and sends the original frozen transfer snapshot', async () => {
+  it('unwraps only its own success and sends the original frozen transfer snapshot', async () => {
     /** This is actual native backing identity borrowed by the provider result helper. */
     const backing = new ArrayBuffer(8)
     /** Caller mutation after minting cannot reconfigure the admitted result's transfer metadata. */
@@ -335,7 +335,7 @@ describe('C2 ProviderDispatcher / Forwarder / StreamChannel owners', () => {
     await pair.close()
   })
 
-  it('C2-P13 preserves an explicit failure code/message without returning private input', async () => {
+  it('preserves an explicit failure code/message without returning private input', async () => {
     /** The exact helper result must select a failure rather than a successful business record. */
     const pair = new OwnerPair()
     pair.dispatcher.provide({ get: (_payload, context) => context.failed('denied', 'DENIED') })
@@ -349,7 +349,7 @@ describe('C2 ProviderDispatcher / Forwarder / StreamChannel owners', () => {
     await pair.close()
   })
 
-  it('C2-P14 rejects oversized transfer metadata before returning any physical transfer list', async () => {
+  it('rejects oversized transfer metadata before returning any physical transfer list', async () => {
     /** Admission still uses the original fixed provider helper limit before any carrier write. */
     const pair = new OwnerPair()
     pair.dispatcher.provide({
@@ -365,7 +365,7 @@ describe('C2 ProviderDispatcher / Forwarder / StreamChannel owners', () => {
     await pair.close()
   })
 
-  it('A40 describes native precedence once when scoped and global providers share a name', async () => {
+  it('describes native precedence once when scoped and global providers share a name', async () => {
     /** Both catalogs belong to the production dispatcher reached by the existing native owner pair. */
     const pair = new OwnerPair()
     try {
@@ -391,7 +391,7 @@ describe('C2 ProviderDispatcher / Forwarder / StreamChannel owners', () => {
     }
   })
 
-  it('C2-P01 captures descriptor order, method identity and original local receiver without getters', async () => {
+  it('captures descriptor order, method identity and original local receiver without getters', async () => {
     /** Original local group receiver is the actual object captured by descriptor compilation. */
     const receiver = {
       z: function (payload: unknown) {
@@ -420,7 +420,7 @@ describe('C2 ProviderDispatcher / Forwarder / StreamChannel owners', () => {
     await pair.close()
   })
 
-  it('C2-P02 preserves one then getter read and actual foreign thenable completion', async () => {
+  it('preserves one then getter read and actual foreign thenable completion', async () => {
     /** The supported foreign thenable getter must be observed exactly once. */
     let reads = 0
     /** Captured then resolves a normal portable scalar through the canonical return projector. */
@@ -439,8 +439,8 @@ describe('C2 ProviderDispatcher / Forwarder / StreamChannel owners', () => {
     await pair.close()
   })
 
-  // H2 retires only C2-P03's post-write remote cancellation oracle; completion and no-ACK remain.
-  it('C2-P03 releases notify cancellation after write while business completion adds no ordinary ACK', async () => {
+  // H2 retires only post-write remote cancellation oracle; completion and no-ACK remain.
+  it('releases notify cancellation after write while business completion adds no ordinary ACK', async () => {
     /** Business completion is deliberately later than physical notification handoff. */
     const release = deferred<void>()
     /** This Promise observes the actual captured provider context rather than fixture-private state. */
@@ -479,7 +479,7 @@ describe('C2 ProviderDispatcher / Forwarder / StreamChannel owners', () => {
     await pair.close()
   })
 
-  it('C2-P04 executes one group success prefix, first original failure and not-executed suffix', async () => {
+  it('executes one group success prefix, first original failure and not-executed suffix', async () => {
     /** Trace proves the actual invocation order and that the suffix never starts. */
     const trace: string[] = []
     /** Business failure retains exact native identity for local diagnostics. */
@@ -515,7 +515,7 @@ describe('C2 ProviderDispatcher / Forwarder / StreamChannel owners', () => {
     await pair.close()
   })
 
-  it('C2-P05 keeps stream lazy, single-credit demand and original generator final value', async () => {
+  it('keeps stream lazy, single-credit demand and original generator final value', async () => {
     /** Trace proves no eager construction/prefetch and exact business pull order. */
     const trace: string[] = []
     /**
@@ -550,7 +550,7 @@ describe('C2 ProviderDispatcher / Forwarder / StreamChannel owners', () => {
     await pair.close()
   })
 
-  it('C2-P06 unopened return performs no business work and before-start return drains the same iterator', async () => {
+  it('unopened return performs no business work and before-start return drains the same iterator', async () => {
     /** One trace records actual original iterator progress through finish-without-items. */
     const trace: number[] = []
     /** The provider remains the same synchronous iterable supported by the old stream owner. */
@@ -579,7 +579,7 @@ describe('C2 ProviderDispatcher / Forwarder / StreamChannel owners', () => {
     await pair.close()
   })
 
-  it('C2-P07 held forward callable fences same-name generation replacement before sending', async () => {
+  it('held forward callable fences same-name generation replacement before sending', async () => {
     /** Current accepted view changes while the original capability retains only compact identity. */
     let current: Readonly<{ carrierId: string; view: IRpcSessionView }> | undefined
     /** One selected method description is borrowed at cold capability construction. */
@@ -624,7 +624,7 @@ describe('C2 ProviderDispatcher / Forwarder / StreamChannel owners', () => {
     expect(sends).toBe(1)
   })
 
-  it('C2-P08 keeps close pending until the original outstanding next and return really settle', async () => {
+  it('keeps close pending until the original outstanding next and return really settle', async () => {
     /** A real provider next remains pending after its cancellation cleanup return has completed. */
     const pending = deferred<IteratorResult<IRpcPortableValue>>()
     /** This entry signal observes the exact second business next call. */
@@ -672,7 +672,7 @@ describe('C2 ProviderDispatcher / Forwarder / StreamChannel owners', () => {
     expect(trace.returns).toBe(1)
   })
 
-  it('C2-P09 compiles direct fullpath forwarding and refuses loops before downstream sends', async () => {
+  it('compiles direct fullpath forwarding and refuses loops before downstream sends', async () => {
     /**
      * Accepted direct methods include a dotted peer name and method, preserving longest prefix
      * metadata.
@@ -746,7 +746,7 @@ describe('C2 ProviderDispatcher / Forwarder / StreamChannel owners', () => {
     await pair.close()
   })
 
-  it('C2-P10 replies to stale selected generation admission instead of leaving the caller pending', async () => {
+  it('replies to stale selected generation admission instead of leaving the caller pending', async () => {
     /** A selected old generation is a normal supported failure at the actual provider boundary. */
     const pair = new OwnerPair()
     /** Business must not run merely because method text matches in a successor generation. */
@@ -767,7 +767,7 @@ describe('C2 ProviderDispatcher / Forwarder / StreamChannel owners', () => {
     await pair.close()
   })
 
-  it('C2-P11 failed physical open releases its own write before waiting for producer cleanup', async () => {
+  it('failed physical open releases its own write before waiting for producer cleanup', async () => {
     /** This real physical rejection previously made producer.start wait on its own pending write. */
     const failure = createRpcError(RpcCoreErrorCode.transport, 'fixture open write failed')
     /** The same actual pair injects only the original server open write failure. */

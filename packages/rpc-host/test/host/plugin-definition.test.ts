@@ -1,4 +1,4 @@
-/** Native authoring identity and cold configuration retain their business boundaries under BC3. */
+/** Native authoring identity and cold configuration retain their business boundaries. */
 import { describe, expect, it, vi } from 'vitest'
 import { isDefinedPlugin } from '@migaia/plugin-host'
 import { createRpcHost } from '@migaia/rpc-host'
@@ -32,7 +32,7 @@ describe('RPC plugin definitions', () => {
     let reads = 0
     /** Only actual installation may acquire the native source. */
     const open = vi.fn(() => ({ dispose: () => undefined }))
-    /** BC3 places the physical handshake budget on the actual carrier definition. */
+    /** Places the physical handshake budget on the actual carrier definition. */
     const plugin = defineTransportPlugin({
       name: 'transport',
       namespace: 'memory',
@@ -52,7 +52,7 @@ describe('RPC plugin definitions', () => {
   it('lets native extension admission reject surface getters without executing them', async () => {
     /** Accessors never become inert namespace capability metadata. */
     let reads = 0
-    /** BC3 contributes the surface through the actual installation's namespace extension port. */
+    /** Contributes the surface through the actual installation's namespace extension port. */
     const extension = defineFlowPlugin({
       name: 'extension',
       setup: () => ({
@@ -82,7 +82,7 @@ describe('RPC plugin definitions', () => {
     async (handshakeTimeoutMs) => {
       /** The actual source must remain untouched by native configuration rejection. */
       const open = vi.fn(() => ({ dispose: () => undefined }))
-      /** BC3 removes connect descriptors; the new definition lends its one budget to Session. */
+      /** Removes connect descriptors; the new definition lends its one budget to Session. */
       const transport = defineTransportPlugin({
         name: 'transport',
         namespace: 'memory',

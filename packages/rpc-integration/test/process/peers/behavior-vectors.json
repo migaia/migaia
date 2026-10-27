@@ -10,9 +10,7 @@
         "minor": 0
       }
     ],
-    "codecs": [
-      "json"
-    ],
+    "codecs": ["json"],
     "extensions": [],
     "peer": {
       "id": "behavior-caller",
@@ -33,10 +31,7 @@
       "methods": [
         {
           "name": "echo",
-          "supportedModes": [
-            "request",
-            "notify"
-          ],
+          "supportedModes": ["request", "notify"],
           "modeSource": "declared"
         }
       ]
@@ -150,10 +145,10 @@
         }
       },
       "retiredAssertions": [
-        "BC2 unknown-kind warning classification replaced by closed-frame rejection; same following echo and connection continuity remain required."
+        "unknown-kind warning classification replaced by closed-frame rejection; same following echo and connection continuity remain required."
       ],
       "behaviorChanges": [
-        "BC12/R21 appends the final close control after every original expected reply; all original frame and stderr assertions remain unchanged."
+        "appends the final close control after every original expected reply; all original frame and stderr assertions remain unchanged."
       ]
     },
     {
@@ -246,10 +241,10 @@
         ]
       },
       "retiredAssertions": [
-        "BC2 removed optional ping capability gate; retain original echo/wait/finish result/count/order, without sending the formerly ignored control."
+        "removed optional ping capability gate; retain original echo/wait/finish result/count/order, without sending the formerly ignored control."
       ],
       "behaviorChanges": [
-        "BC12/R21 appends the final close control after every original expected reply; all original frame and stderr assertions remain unchanged."
+        "appends the final close control after every original expected reply; all original frame and stderr assertions remain unchanged."
       ]
     },
     {
@@ -375,10 +370,10 @@
         ]
       },
       "retiredAssertions": [
-        "BC2 removed optional abort capability gate; retain original echo/wait/finish result/count/order, without sending the formerly ignored control."
+        "removed optional abort capability gate; retain original echo/wait/finish result/count/order, without sending the formerly ignored control."
       ],
       "behaviorChanges": [
-        "BC12/R21 appends the final close control after every original expected reply; all original frame and stderr assertions remain unchanged."
+        "appends the final close control after every original expected reply; all original frame and stderr assertions remain unchanged."
       ]
     },
     {
@@ -455,10 +450,10 @@
         ]
       },
       "retiredAssertions": [
-        "BC2 removed optional close capability gate; retain original echo/wait/finish result/count/order, without sending the formerly ignored control."
+        "removed optional close capability gate; retain original echo/wait/finish result/count/order, without sending the formerly ignored control."
       ],
       "behaviorChanges": [
-        "BC12/R21 appends the final close control after every original expected reply; all original frame and stderr assertions remain unchanged."
+        "appends the final close control after every original expected reply; all original frame and stderr assertions remain unchanged."
       ]
     },
     {
@@ -602,7 +597,7 @@
         }
       },
       "behaviorChanges": [
-        "BC12/R21 appends the final close control after every original expected reply; all original frame and stderr assertions remain unchanged."
+        "appends the final close control after every original expected reply; all original frame and stderr assertions remain unchanged."
       ]
     },
     {
@@ -721,7 +716,7 @@
         }
       },
       "behaviorChanges": [
-        "BC12/R21 appends the final close control after every original expected reply; all original frame and stderr assertions remain unchanged."
+        "appends the final close control after every original expected reply; all original frame and stderr assertions remain unchanged."
       ]
     },
     {
@@ -731,9 +726,7 @@
         "kind": "handshake",
         "step": "hello",
         "versions": [],
-        "codecs": [
-          "json"
-        ],
+        "codecs": ["json"],
         "extensions": [],
         "peer": {
           "id": "behavior-caller",
@@ -754,10 +747,7 @@
           "methods": [
             {
               "name": "echo",
-              "supportedModes": [
-                "request",
-                "notify"
-              ],
+              "supportedModes": ["request", "notify"],
               "modeSource": "declared"
             }
           ]
@@ -956,7 +946,7 @@
         ]
       },
       "behaviorChanges": [
-        "BC12/R21 appends the final close control after every original expected reply; all original frame and stderr assertions remain unchanged."
+        "appends the final close control after every original expected reply; all original frame and stderr assertions remain unchanged."
       ]
     },
     {
@@ -1078,7 +1068,7 @@
         ]
       },
       "behaviorChanges": [
-        "BC12/R21 appends the final close control after every original expected reply; all original frame and stderr assertions remain unchanged."
+        "appends the final close control after every original expected reply; all original frame and stderr assertions remain unchanged."
       ]
     },
     {
@@ -1099,9 +1089,7 @@
             "step": "accept"
           }
         ],
-        "stderrNot": [
-          "PEER_FAIL HANDSHAKE_INVALID"
-        ]
+        "stderrNot": ["PEER_FAIL HANDSHAKE_INVALID"]
       }
     },
     {
@@ -1124,7 +1112,7 @@
         }
       },
       "retiredAssertions": [
-        "BC2 old protocol-selection reject frame removed; invalid profile still fails before business with original exit/diagnostic."
+        "old protocol-selection reject frame removed; invalid profile still fails before business with original exit/diagnostic."
       ]
     },
     {
@@ -1298,7 +1286,7 @@
         ]
       },
       "behaviorChanges": [
-        "BC12/R21 appends the final close control after every original expected reply; all original frame and stderr assertions remain unchanged."
+        "appends the final close control after every original expected reply; all original frame and stderr assertions remain unchanged."
       ]
     },
     {
@@ -1322,16 +1310,12 @@
             "step": "accept"
           }
         ],
-        "stderrContains": [
-          "PEER_FAIL "
-        ],
-        "stderrNot": [
-          "ERROR peer session failed"
-        ]
+        "stderrContains": ["PEER_FAIL "],
+        "stderrNot": ["ERROR peer session failed"]
       }
     },
     {
-      "id": "r21-final-close-no-echo",
+      "id": "final-close-no-echo",
       "steps": [
         {
           "frame": {
@@ -1356,10 +1340,7 @@
                   "message": "closing",
                   "stack": "AggregateError: closing\n    at remote:1:1",
                   "cause": 1,
-                  "errors": [
-                    1,
-                    2
-                  ]
+                  "errors": [1, 2]
                 },
                 {
                   "source": "business",
@@ -1432,11 +1413,11 @@
         }
       },
       "requirements": [
-        "R21 receives the complete admitted close reason and stops this existing native reader; no ACK, no echo close, and no later provider execution."
+        "receives the complete admitted close reason and stops this existing native reader; no ACK, no echo close, and no later provider execution."
       ]
     },
     {
-      "id": "r21-drain-sends-complete-close-reason",
+      "id": "drain-sends-complete-close-reason",
       "steps": [
         {
           "frame": {
@@ -1493,10 +1474,7 @@
                   "message": "closing",
                   "stack": "AggregateError: closing\n    at remote:1:1",
                   "cause": 1,
-                  "errors": [
-                    1,
-                    2
-                  ]
+                  "errors": [1, 2]
                 },
                 {
                   "source": "business",
@@ -1552,10 +1530,7 @@
                   "message": "closing",
                   "stack": "AggregateError: closing\n    at remote:1:1",
                   "cause": 1,
-                  "errors": [
-                    1,
-                    2
-                  ]
+                  "errors": [1, 2]
                 },
                 {
                   "source": "business",
@@ -1582,12 +1557,12 @@
         }
       },
       "requirements": [
-        "R21 preserves drain as drain, writes its original result first, then emits exactly one actual close carrying every field and edge of the complete reason graph."
+        "preserves drain as drain, writes its original result first, then emits exactly one actual close carrying every field and edge of the complete reason graph."
       ]
     }
   ],
   "history": {
     "previousSchema": "migaia.rpc.peer-behavior/1",
-    "grammarChange": "BC2: bilateral hello, flat errors, full task/source generation, cancel/control replace variation; original IDs remain with business assertions."
+    "grammarChange": "bilateral hello, flat errors, full task/source generation, cancel/control replace variation; original IDs remain with business assertions."
   }
 }

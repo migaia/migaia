@@ -2,7 +2,7 @@
 import { assert, expect, it } from 'vitest'
 import { connectedCoreHosts } from '../host/core-fixture.js'
 
-// RPC-TEST-7F16F04DEAAC-C002: BC2 removes v2/batch flags; both original scalar results survive.
+// Removes v2/batch flags; both original scalar results survive.
 it('exchanges genuine directories and returns both original scalar baseline values', async () => {
   /** Both public Hosts own the original real Session negotiation and provider dispatch. */
   const fixture = await connectedCoreHosts({}, { echo: (value) => value })

@@ -1,4 +1,4 @@
-/** A29 exercises Auth callback representations through public Hosts and the original memory medium. */
+/** Exercises Auth callback representations through public Hosts and the original memory medium. */
 import { createHmac } from 'node:crypto'
 import { expect, it } from 'vitest'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
@@ -8,7 +8,7 @@ import type { IRpcPortableValue } from '@migaia/rpc-contract/protocol'
 import { RpcAuthenticationEnvelope } from '../../../dist/features/auth/constants.js'
 import { coreMemoryServer } from '../../host/core-fixture.js'
 
-/** The original A12 fixture uses this public key with SHA-256 over JSON.stringify(value). */
+/** The original fixture uses this public key with SHA-256 over JSON.stringify(value). */
 const signingKey = 'core-refactor-public-fixture-key'
 
 /** Only this test's real signer produces the value/signature pair consumed by its verifier. */
@@ -85,8 +85,8 @@ class PublicAuthenticationPair {
   }
 }
 
-// BC16 A: default object signing and the unchanged original native-object path.
-it('A29 signs default any bindings and object payloads with the original HMAC algorithm', async () => {
+// A: default object signing and the unchanged original native-object path.
+it('signs default any bindings and object payloads with the original HMAC algorithm', async () => {
   // These two storage modes are the fixed inline/native domain exercised by this public case.
   for (const nativeBinary of [false, true]) {
     /** Capture only client sign inputs and their counterpart server verification outputs. */
@@ -130,7 +130,7 @@ it('A29 signs default any bindings and object payloads with the original HMAC al
   }
 })
 
-it('A29 rejects a changed default binding in verify before public provider delivery', async () => {
+it('rejects a changed default binding in verify before public provider delivery', async () => {
   /** The existing native admission path sees this exact original verifier failure. */
   const failures: unknown[] = []
   /** No private emitter or alternate codec injects the changed signed object. */
@@ -169,9 +169,9 @@ it('A29 rejects a changed default binding in verify before public provider deliv
   }
 })
 
-// BC16 B: explicit text/byte categories and encryption encode the complete binding only once.
+// B: explicit text/byte categories and encryption encode the complete binding only once.
 it.each(['string', 'uint8array'] as const)(
-  'A29 delivers %s with a prefixed binding whose object payload needs only one JSON parse',
+  'delivers %s with a prefixed binding whose object payload needs only one JSON parse',
   async (encodedType) => {
     /** Client observations retain the exact explicit callback category after original preparation. */
     const signed: unknown[] = []
@@ -218,7 +218,7 @@ it.each(['string', 'uint8array'] as const)(
   }
 )
 
-it('A29 supplies encryption with prefixed text containing an object payload after one parse', async () => {
+it('supplies encryption with prefixed text containing an object payload after one parse', async () => {
   /** The original encrypt callback observes plaintext before the user signer sees its result. */
   const encrypted: unknown[] = []
   /** Both ends retain the original encrypt-sign/verify-decrypt transform ordering. */

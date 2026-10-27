@@ -29,7 +29,7 @@ it('preserves original provider failure,49/50 deadline and first counter result'
     () => undefined
   )
   try {
-    // RPC-TEST-A8A812EB6DDB-C001-A001: preserve the original explicit provider failure path.
+    // Preserve the original explicit provider failure path.
     await expect(fixture.a.memory.send('b', 'fail', null, { timeout: false })).rejects.toBeDefined()
     /** Observe the same public call before its real feature timer is advanced. */
     const outcome = fixture.a.memory
@@ -43,12 +43,12 @@ it('preserves original provider failure,49/50 deadline and first counter result'
     await entered.promise
     scheduler.advance(49)
     await Promise.resolve()
-    // RPC-TEST-A8A812EB6DDB-C003-A001: no terminal outcome before its original50 ms deadline.
+    // No terminal outcome before its original50 ms deadline.
     expect(settled).toBe(false)
     scheduler.advance(1)
-    // C001-A004/C003-A002: retain the strict canonical native timeout family.
+    // /retain the strict canonical native timeout family.
     expect(await outcome).toBeInstanceOf(RpcTimeoutError)
-    // RPC-TEST-A8A812EB6DDB-C003-A003: original counter business returns1 on its first call.
+    // Original counter business returns1 on its first call.
     await expect(fixture.a.memory.send('b', 'count', null, { timeout: false })).resolves.toBe(1)
   } finally {
     release.resolve('late')

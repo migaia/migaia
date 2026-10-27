@@ -1,4 +1,4 @@
-/** Original R3 identity and filtering observations use genuine public Hosts and native controls. */
+/** Original identity and filtering observations use genuine public Hosts and native controls. */
 import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
 import { defineTransportPlugin } from '@migaia/rpc-host/sdk'
 import type { IRpcSessionHandle, IRpcTransportContext } from '@migaia/rpc-contract/interfaces'
@@ -131,7 +131,7 @@ it('preserves variation identity through both real Peer directions and method fi
       await expect(
         endpoints[index]!.context!.ping(endpoints[index]!.handle!)
       ).resolves.toBeUndefined()
-      /** BC2 names the old announceClose/drain operation drain; this connection stays open. */
+      /** Names the old announceClose/drain operation drain; this connection stays open. */
       await endpoints[index]!.context!.drain(endpoints[index]!.handle!, 0)
       /** The original cancellation observes rejection before the actual caller abort occurs. */
       const controller = new AbortController()
@@ -159,7 +159,7 @@ it('preserves variation identity through both real Peer directions and method fi
             if (stage === RpcProbeStage.message) expect(event!.kind).toBe(RpcProbeKind.control)
           }
           if (stage === RpcProbeStage.message) {
-            /** BC2 exposes cancel as its own logical kind rather than an abort variation subtype. */
+            /** Exposes cancel as its own logical kind rather than an abort variation subtype. */
             const cancellation = events.find(
               (entry) =>
                 entry.stage === stage &&

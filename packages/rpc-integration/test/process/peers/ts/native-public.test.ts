@@ -136,7 +136,7 @@ async function business(active: Awaited<ReturnType<typeof nativeClient>>): Promi
       frame.kind === 'handshake' && frame.directory?.self.instanceId === identity.instanceId
   )
   expect(handshake).toBeDefined()
-  /** BC2 replaces the removed reserved-describe schemaVersion spelling with the sole wire profile. */
+  /** Replaces the removed reserved-describe schemaVersion spelling with the sole wire profile. */
   expect(handshake.profile).toBe(RpcWireProfile)
   /** The peer's actual directory remains a protocol-owned value, not a reconstructed fixture DTO. */
   const description = handshake.directory as IRpcDirectory

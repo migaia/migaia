@@ -214,7 +214,7 @@ it('warns for an ignored explicit self and preserves cleanup failure reports', a
   /** The original stream pair carries both native bootstrap and a genuine accepted Session. */
   const fixture = new NativeBootstrapFixture()
   fixture.cleanupFailure = cleanup
-  /** BC14 replaces the old identity rejection with one warning on this same child Host. */
+  /** Replaces the old identity rejection with one warning on this same child Host. */
   const warnings: IRpcWarning[] = []
   /** Only actual completed public Hosts enter this original cleanup set. */
   const hosts: Pick<IRpcHost, 'close'>[] = []

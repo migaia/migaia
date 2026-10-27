@@ -85,7 +85,7 @@ async function nativeControlPair() {
   return { first, second, hosts }
 }
 
-// RPC-TEST-B381D3E58268-C001: original ping/pong order and exact shared correlation remain live.
+// Original ping/pong order and exact shared correlation remain live.
 it('exchanges the original correlated ping and pong through genuine SDK controls', async () => {
   /** Only genuine installed SDK contexts may originate either control. */
   const pair = await nativeControlPair()
@@ -107,7 +107,7 @@ it('exchanges the original correlated ping and pong through genuine SDK controls
   })
   try {
     assert(pair.first.context && pair.first.handle)
-    /** BC1 removes old root ping's boolean result; successful SDK completion returns void. */
+    /** Removes old root ping's boolean result; successful SDK completion returns void. */
     await expect(
       pair.first.context.ping(pair.first.handle, { timeoutMs: 100 })
     ).resolves.toBeUndefined()
@@ -125,7 +125,7 @@ it('exchanges the original correlated ping and pong through genuine SDK controls
   }
 })
 
-// RPC-TEST-0B9D3E57477F-C001: actual peer close intention retains requester a and drain budget500.
+// Actual peer close intention retains requester a and drain budget500.
 it('receives the original drain intention once and retains malformed-duration rejection', async () => {
   /** Each real root owns its independent original native source and receiving Session. */
   const pair = await nativeControlPair()
@@ -173,7 +173,7 @@ it('receives the original drain intention once and retains malformed-duration re
   }
 })
 
-// RPC-TEST-0B9D3E57477F-C001-A004/A005/A006: both original invalid budgets reject synchronously.
+// /both original invalid budgets reject synchronously.
 it.each([-1, 2 ** 31])(
   'rejects original invalid drain budget %s synchronously before a physical write',
   async (budget) => {

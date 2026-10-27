@@ -322,7 +322,7 @@ it('waits for native readiness and closes only its created reader and writer onc
   }
 })
 
-it('A38 WebTransport rejects an oversized first length header before a handshake timeout', async () => {
+it('WebTransport rejects an oversized first length header before a handshake timeout', async () => {
   /** Only a length header is supplied, so parsing or buffering its payload cannot complete. */
   const header = new Uint8Array(4)
   new DataView(header.buffer).setUint32(0, 65_537)

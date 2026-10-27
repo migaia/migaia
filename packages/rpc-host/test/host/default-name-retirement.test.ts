@@ -1,4 +1,4 @@
-/** BC21 retires transient default names while preserving explicit-name departure diagnostics. */
+/** Retires transient default names while preserving explicit-name departure diagnostics. */
 import { createRpcHost } from '@migaia/rpc-host'
 import { expect, it, vi, type MockInstance as IMockInstance } from 'vitest'
 import { coreMemoryServer } from './core-fixture.js'
@@ -67,7 +67,7 @@ function prefixNodes(root: Map<string, IObservedPrefix>): number {
   return count
 }
 
-it('A34 releases default-name history after repeated public connection retirement', async () => {
+it('releases default-name history after repeated public connection retirement', async () => {
   /** This listener and all clients use the existing public Host/native transport path. */
   const server = coreMemoryServer('retirement-host')
   /** The host stays alive while successive physical generations retire. */
@@ -97,7 +97,7 @@ it('A34 releases default-name history after repeated public connection retiremen
     const defaultFailures: unknown[] = []
     // The three cycles are fixed fixture inputs, independent of runtime peer or request counts.
     for (const name of ['default-0', 'default-1', 'default-2']) {
-      /** Equality with instanceId is the default-name form defined by BC21. */
+      /** Equality with instanceId is the default-name form defined by . */
       const client = await server.connect(name, { provide: { value: () => 42 } })
       clients.push(client)
       await server.lookup(name)!.handle.close('default departure')

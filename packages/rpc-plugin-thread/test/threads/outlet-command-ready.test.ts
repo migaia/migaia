@@ -78,7 +78,7 @@ describe('thread outlet command readiness', () => {
             stack: expect.stringMatching(/\S/)
           })
         ])
-        /** BC11 preserves absence when intentional native retirement has no original error. */
+        /** Preserves absence when intentional native retirement has no original error. */
         expect((reported[0] as Error).cause).toBeUndefined()
       } finally {
         await host.dispose()

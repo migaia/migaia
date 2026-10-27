@@ -123,7 +123,7 @@ it('reports each native batch replay refusal and its exact physical write failur
     )
     expect(calls).toBe(1)
     expect(output.writes).toHaveLength(3)
-    /** BC2 changes only response DTO spelling; both original task correlations keep OVERLOADED. */
+    /** Changes only response DTO spelling; both original task correlations keep OVERLOADED. */
     const refused = responses.mock.calls
       .map(([prepared]) => prepared.message as IRpcSemanticFrame)
       .filter((message) => message.kind === RpcWireKind.error)
@@ -132,7 +132,7 @@ it('reports each native batch replay refusal and its exact physical write failur
       RpcCoreErrorCode.overloaded,
       RpcCoreErrorCode.overloaded
     ])
-    /** R1 reports each member's own dispatch refusal as well as its failed physical terminal. */
+    /** Each member reports its own dispatch refusal as well as its failed physical terminal. */
     await vi.waitFor(() => expect(failures).toHaveLength(4))
     expect(
       failures.filter((error) => (error as { code?: string }).code === RpcCoreErrorCode.overloaded)

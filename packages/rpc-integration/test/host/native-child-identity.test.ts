@@ -63,7 +63,7 @@ function parentPlugin(kind: 'process' | 'thread' | 'coroutine', name?: string) {
 }
 
 it.each(['process', 'thread', 'coroutine'] as const)(
-  'A26: %s parent name overrides explicit child self once outside report',
+  '%s parent name overrides explicit child self once outside report',
   async (kind) => {
     /** Only unexpected parent-side errors enter this independent error channel. */
     const reports: unknown[] = []
@@ -102,7 +102,7 @@ it.each(['process', 'thread', 'coroutine'] as const)(
 )
 
 it.each(['process', 'thread', 'coroutine'] as const)(
-  'A26: unnamed %s parent uses the child handshake name',
+  'unnamed %s parent uses the child handshake name',
   async (kind) => {
     /** A configured child name remains its original lookup name when native facts omit the name. */
     const host = await createRpcHost({ plugins: [parentPlugin(kind)], report: () => undefined })
@@ -131,7 +131,7 @@ it.each(['process', 'thread', 'coroutine'] as const)(
   15000
 )
 
-it('A26: omitted onWarning uses console.warn for the successful native name override', async () => {
+it('omitted onWarning uses console.warn for the successful native name override', async () => {
   /** The same-realm native task makes the actual default warning sink directly observable. */
   const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
   /** Native error reporting remains independently empty while the default warning sink fires. */
@@ -167,7 +167,7 @@ it('A26: omitted onWarning uses console.warn for the successful native name over
   }
 })
 
-it('A26: conflicting trusted parent startup facts still reject the public Host', async () => {
+it('conflicting trusted parent startup facts still reject the public Host', async () => {
   /** Two actual native ports back independently acquired sources within one cold transport. */
   const first = new MessageChannel()
   /** The second original source claims a different parent-assigned child identity. */
@@ -201,7 +201,7 @@ it('A26: conflicting trusted parent startup facts still reject the public Host',
   }
 })
 
-it('A26 fixture inspects its original child factory when a native call waits at installation commit', async () => {
+it('fixture inspects its original child factory when a native call waits at installation commit', async () => {
   /** A genuine native message pair completes the real bilateral Session handshake. */
   const channel = new MessageChannel()
   /** The original child factory is held only after its native Session becomes ready. */

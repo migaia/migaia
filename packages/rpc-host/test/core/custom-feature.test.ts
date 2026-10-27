@@ -138,7 +138,7 @@ async function closeFirstPartyFramer(): Promise<void> {
     closed.push(close)
     return { ...framer, close }
   })
-  /** BC3 moves implicit core chunking into its one explicit first-party Feature. */
+  /** Moves implicit core chunking into its one explicit first-party Feature. */
   const server = coreMemoryServer('native-first-party-chunk')
   /** The ordinary public RPC factory installs real chunk resources through genuine native setup. */
   const endpoint = await createRpcHost({
@@ -362,7 +362,7 @@ async function rejectForgedAndDuplicateRoots(): Promise<void> {
 function rejectAccessorAndSymbolDefinitions(): void {
   /** Native descriptor admission must reject without evaluating this original hostile getter. */
   let reads = 0
-  /** BC3 removes Feature.key; the corresponding actual native input is its own install descriptor. */
+  /** Removes Feature.key; the corresponding actual native input is its own install descriptor. */
   const accessor = {
     get install() {
       reads += 1

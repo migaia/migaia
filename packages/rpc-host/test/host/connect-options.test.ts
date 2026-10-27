@@ -59,7 +59,7 @@ function observeConnectionFailure(error: unknown): never {
   throw error
 }
 
-// RPC-TEST-FD465BC50212-C001: BC3 maps old deployment/managed placement to complete feature scopes.
+// Maps old deployment/managed placement to complete feature scopes.
 it.each(['deployment', 'managed'] as const)(
   'retains the key factory through its canonical feature installation (%s)',
   async (configuration) => {
@@ -104,7 +104,7 @@ it.each(['deployment', 'managed'] as const)(
     try {
       expect(await host.memory.request('api.value', 42)).toBe(42)
       expect(keyFactory).toHaveBeenCalledTimes(1)
-      // A003's deleted retryPort.dispatch interface is BC3; retain its one-admission business effect.
+      // The retryPort.dispatch interface is retired; retain its one-admission business effect.
       expect(received).toHaveLength(1)
       /** Project actual admitted semantic metadata and the real accepted declaration only. */
       const envelope = received[0]!
@@ -125,7 +125,7 @@ it.each(['deployment', 'managed'] as const)(
   }
 )
 
-// RPC-TEST-FD465BC50212-C002: BC2/BC3 retire initial/ACK diagnostics; Session keeps the 50 ms/remover effects.
+// Retire initial/ACK diagnostics; Session keeps the 50 ms/remover effects.
 it.each([undefined, 'silent-peer'])(
   'applies the SDK budget to a real message source with peerId %s',
   async (peerId) => {
@@ -172,7 +172,7 @@ it.each([undefined, 'silent-peer'])(
   }
 )
 
-// RPC-TEST-FD465BC50212-C003: genuine byte write/framing and physical rollback keep the old code.
+// Genuine byte write/framing and physical rollback keep the old code.
 it('maps the same SDK budget to the existing byte handshake timeout and physical rollback', async () => {
   /** The real canonical timer uses the original manual progression and receives no fake ready. */
   const scheduler = createManualScheduler()

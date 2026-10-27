@@ -4,7 +4,7 @@ import * as contract from '@migaia/rpc-host/contract'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { deserializeRpcError, serializeRpcError } from '@migaia/rpc-contract'
 
-/** The Host root retains only Host-owned symbols after BC30's contract-entry migration. */
+/** The Host root retains only Host-owned symbols after contract-entry migration. */
 const surface = core as Record<string, unknown>
 /** Contract diagnostics retain their runtime-facing names at the dedicated public entry. */
 const contractSurface = contract as Record<string, unknown>

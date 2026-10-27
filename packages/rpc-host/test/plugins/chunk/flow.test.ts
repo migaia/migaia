@@ -258,7 +258,7 @@ it('actual native chunk flow preserves negotiated split/reassembly, physical dra
     async () => undefined
   )
   expect(timers.size).toBe(1)
-  /** A44 admits another physical source while this source's message and byte quotas remain held. */
+  /** Admits another physical source while this source's message and byte quotas remain held. */
   const quotaFrames = partial.map((frame) => {
     /** Changing only the opaque message id admits a separate valid physical message. */
     const data = frame.data as { messageId: string }

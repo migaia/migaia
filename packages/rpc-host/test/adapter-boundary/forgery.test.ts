@@ -16,12 +16,12 @@ function expectPrivateWriter(name: string): void {
 }
 
 describe('public adapter resource boundaries', () => {
-  it('[C3-B1-registerBatchAgreement] exposes no arbitrary carrier batch qualifier', () => {
+  it('exposes no arbitrary carrier batch qualifier', () => {
     expectPrivateWriter('registerBatchAgreement')
   })
 
   it.each(['registerFastCodec', 'registerFastFramer'] as const)(
-    '[C3-B1-%s] exposes no retired component qualifier',
+    '%s exposes no retired component qualifier',
     (writer) => {
       expectPrivateWriter(writer)
     }
@@ -31,22 +31,22 @@ describe('public adapter resource boundaries', () => {
     'registerNativeReplayOwner',
     'registerLazyNativeReplayOwner',
     'bindNativeReplayTransport'
-  ] as const)('[C3-B1-%s] exposes no arbitrary replay qualification writer', (writer) => {
+  ] as const)('%s exposes no arbitrary replay qualification writer', (writer) => {
     expectPrivateWriter(writer)
   })
 
-  it('[C3-B1-registerJsonObjectPort] exposes no retired object-port qualifier', () => {
+  it('exposes no retired object-port qualifier', () => {
     expectPrivateWriter('registerJsonObjectPort')
   })
 
   it.each(['attachProviderBulkAdmission', 'attachProviderPreflight'] as const)(
-    '[C3-B1-%s] exposes no private provider policy writer',
+    '%s exposes no private provider policy writer',
     (writer) => {
       expectPrivateWriter(writer)
     }
   )
 
-  it('[C3-B1-OwnedCodec] exposes neither retired owned-JSON snapshot writer', () => {
+  it('exposes neither retired owned-JSON snapshot writer', () => {
     expectPrivateWriter('prepareOwnedJsonSnapshot')
     expectPrivateWriter('prepareOwnedBinaryJsonSnapshot')
   })

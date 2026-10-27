@@ -30,7 +30,7 @@ const nativeCloneSources: readonly INativeCloneSource[] = [
   }
 ]
 
-// RPC-TEST-00776736DCA7-C003: only removed synchronous send/builder placement changes under BC3.
+// Only the removed synchronous send/builder placement changes.
 it.each(nativeCloneSources)(
   'codes native clone rejection from $legacyFactory without changing its DOMException family',
   async ({ create }) => {

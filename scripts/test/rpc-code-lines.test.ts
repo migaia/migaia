@@ -10,7 +10,10 @@ import { parseSync } from 'oxc-parser'
 
 /** The immutable baseline is 59,454 code lines; the authorized 65% ceiling is rounded down. */
 const maximumCodeLines = 38_645
-/** These are exactly the eight production packages named by R11, without integration stubs. */
+/**
+ * These are exactly the eight production packages in the current runtime layout, without
+ * integration stubs.
+ */
 const packages = [
   'rpc-host',
   'rpc-contract',

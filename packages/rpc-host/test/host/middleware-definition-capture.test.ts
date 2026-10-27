@@ -55,7 +55,7 @@ function hostLocalDescriptor(core: IPluginHostCore) {
   return { expose: () => hostLocalMethods(name) }
 }
 
-// RPC-TEST-FB075BDD690B-C002: BC3 replaces root exposure with the real native Feature handle.
+// Replaces root exposure with the real native Feature handle.
 it('publishes dynamic native middleware keys before activation', async () => {
   /** Only the actual per-registration Feature construction increments the original counter. */
   let descriptors = 0
@@ -83,7 +83,7 @@ it('publishes dynamic native middleware keys before activation', async () => {
   }
 })
 
-// RPC-TEST-FB075BDD690B-C004: preserve one install and the original exposed business value.
+// Preserve one install and the original exposed business value.
 it('normalizes object middleware through the native installation path', async () => {
   /** The original native install callback remains the only counter producer. */
   let installs = 0
@@ -110,7 +110,7 @@ it('normalizes object middleware through the native installation path', async ()
   }
 })
 
-// RPC-TEST-FB075BDD690B-C005: BC3 replaces the deleted transport property with its SDK definition.
+// Replaces the deleted transport property with its SDK definition.
 it('selects an object middleware transport without a factory transport', async () => {
   /** The listener owns a genuine cold transport rather than a top-level transport option. */
   const server = coreMemoryServer('object-transport')
@@ -124,7 +124,7 @@ it('selects an object middleware transport without a factory transport', async (
   }
 })
 
-// RPC-TEST-FB075BDD690B-C006: old metadata.claims is retired; the original two counters remain.
+// Old metadata.claims is retired; the original two counters remain.
 it('captures object middleware install and metadata at definition time', async () => {
   /** The captured native callback alone may execute after the caller mutates its source object. */
   let capturedInstalls = 0
@@ -157,7 +157,7 @@ it('captures object middleware install and metadata at definition time', async (
   }
 })
 
-// RPC-TEST-FB075BDD690B-C009: one cold definition constructs distinct outputs on two real Hosts.
+// One cold definition constructs distinct outputs on two real Hosts.
 it('keeps dynamic native middleware keys isolated across concurrent Hosts', async () => {
   /** The original Host label is read through its genuine authenticated native integration. */
   const plugin = definePlugin('fixture-isolation', hostLocalDescriptor)
@@ -181,7 +181,7 @@ it('keeps dynamic native middleware keys isolated across concurrent Hosts', asyn
   }
 })
 
-// RPC-TEST-FB075BDD690B-C011: keep one install and cleanup after asynchronous publication starts.
+// Keep one install and cleanup after asynchronous publication starts.
 it('keeps the admitted install after post-snapshot mutation', async () => {
   /** Only the original captured hook may increment installation. */
   let installed = 0

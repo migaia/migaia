@@ -145,7 +145,7 @@ function containsCleanupIdentity(failure: unknown, expected: unknown): boolean {
   return false
 }
 
-// C117: BC11 retires the native disposal translator, retaining both actual owned cleanup leaves.
+// C117: retires the native disposal translator, retaining both actual owned cleanup leaves.
 it('C117 preserves both owned flow cleanup failures on the native disposal boundary', async () => {
   /** The original role label now identifies fixture errors, without recreating an RPC role. */
   const role = 'hooks'
@@ -215,7 +215,7 @@ it('C117 preserves both owned flow cleanup failures on the native disposal bound
   }
 })
 
-// RPC-TEST-49A21590A74A-C003: BC11 retires only the native disposal translation shell.
+// Retires only the native disposal translation shell.
 it('C003 retains a lifecycle diagnostic beside an independent native cleanup failure', async () => {
   /** This public diagnostic is one original leaf, never proof of the whole cleanup transaction. */
   const diagnostic = new RpcLifecycleError('application resource closed')
@@ -273,7 +273,7 @@ it('C003 retains a lifecycle diagnostic beside an independent native cleanup fai
   }
 })
 
-// RPC-TEST-00776736DCA7-C001: native disposal retains once and shared completion semantics.
+// Native disposal retains once and shared completion semantics.
 it('C001 publishes native disposal settlement before synchronous cleanup reentry', async () => {
   /** The existing listener joins the same genuine native Host as the original cleanup callback. */
   const server = coreMemoryServer('audit-native-disposal-reentry')

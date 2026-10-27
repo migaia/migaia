@@ -155,7 +155,7 @@ it('public Pool preserves exact cold-refill failure for its reserved head and as
   }
 })
 
-it('A39 retired public Pool origin cannot allocate another Session drain record', async () => {
+it('retired public Pool origin cannot allocate another Session drain record', async () => {
   /** A pass-through spy observes the original pool's genuine native publication. */
   const attach = SessionTable.prototype.attachOrigin
   /** Only the actual public construction below can fill this original-resource observation. */

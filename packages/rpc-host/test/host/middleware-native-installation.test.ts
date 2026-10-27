@@ -68,7 +68,7 @@ it.each([
   await runNativeInstallationBranch(name)
 })
 
-// RPC-TEST-FB075BDD690B-C150: preserve both original native failure and clean terminal receipts.
+// Preserve both original native failure and clean terminal receipts.
 it('native Feature install failure rolls back without retaining Host residue', async () => {
   /** The failing hook's exact native value must remain the installation error cause. */
   const primary = new Error('native observation install failure')
@@ -99,7 +99,7 @@ it('native Feature install failure rolls back without retaining Host residue', a
   })
 })
 
-// RPC-TEST-FB075BDD690B-C153: preserve exact reverse cleanup, native leaves and completion identity.
+// Preserve exact reverse cleanup, native leaves and completion identity.
 it('later native failure rolls back earlier owned resources in reverse order', async () => {
   /** The later install failure stays primary while the original two cleanup leaves remain ordered. */
   const rollback = new Error('observation later rollback')

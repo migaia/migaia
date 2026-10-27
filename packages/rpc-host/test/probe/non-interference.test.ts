@@ -296,7 +296,7 @@ async function encryptedProbeCase(mode: IProbeMode) {
     }
     await vi.waitFor(() => expect(admission.size).toBe(0))
     if (mode !== 'absent') {
-      /** R16/R23 authenticate once after the same actual fragments have been reassembled. */
+      /** Authenticate once after the same actual fragments have been reassembled. */
       const inbound = events.filter(
         (event) =>
           event.endpointId === 'encrypted-server' &&
@@ -320,7 +320,7 @@ async function encryptedProbeCase(mode: IProbeMode) {
         })
       }
     }
-    /** BC3 restores the same original native business graph directly, without the Peer wrapper. */
+    /** Restores the same original native business graph directly, without the Peer wrapper. */
     const failure = await client.memory
       .send('encrypted-server', 'fail', undefined)
       .catch((error: unknown) => error)

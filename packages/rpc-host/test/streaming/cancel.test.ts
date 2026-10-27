@@ -237,7 +237,7 @@ describe('streaming cancellation', () => {
   })
 
   it.each(['end', 'fail'] as const)(
-    'A45 absorbs an in-flight %s after local cancellation and removes its tombstone',
+    'absorbs an in-flight %s after local cancellation and removes its tombstone',
     async (event) => {
       /** The native terminal write is accepted before its delivery crosses local cancellation. */
       const accepted = deferred<void>()

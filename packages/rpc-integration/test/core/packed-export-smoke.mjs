@@ -108,7 +108,7 @@ async function main() {
     )
     const packedPackage = packedPackages['rpc-host']
     assertPackedContractSurface(packedPackages, packedConsumers)
-    console.log('CHECK A46-contract-entry PASS')
+    console.log('CHECK contract-entry PASS')
     assertPackedOwnerManifests(packedPackages)
     assertPackedContractIdentity({ ...packedPackages, ...packedConsumers })
     console.log('CHECK shared-contract-resolution PASS')
@@ -445,7 +445,7 @@ function packDependency(packageDirectory, dependency) {
 }
 
 /**
- * A46 compares real packed forwarding identities and the consumer peer boundary.
+ * Compares real packed forwarding identities and the consumer peer boundary.
  *
  * @param {Record<string, string>} packedPackages Extracted RPC package roots.
  * @param {Record<string, string>} packedConsumers Extracted tray and store-worker roots.
@@ -463,7 +463,7 @@ function assertPackedContractSurface(packedPackages, packedConsumers) {
       manifest.dependencies?.['@migaia/rpc-contract'] !== undefined ||
       manifest.peerDependencies?.['@migaia/rpc-contract'] !== contractVersion
     )
-      throw new Error(`A46 packed consumer must borrow the exact Contract peer: ${owner}`)
+      throw new Error(`Packed consumer must borrow the exact Contract peer: ${owner}`)
   }
   /** The probe executes through Node's actual packed export-map and ESM module cache. */
   const probe = join(consumerDirectory, 'contract-entry-probe.mjs')
@@ -491,8 +491,8 @@ const expected = {
 };
 assert.equal(Object.keys(forwarding).length, Object.keys(expected).length);
 for (const [name, identity] of Object.entries(expected)) {
-  assert.equal(forwarding[name], identity, 'A46 canonical identity: ' + name);
-  assert.equal(name in root, false, 'A46 retired root export: ' + name);
+  assert.equal(forwarding[name], identity, 'Canonical identity: ' + name);
+  assert.equal(name in root, false, 'Retired root export: ' + name);
 }
 /** Values constructed through either publication retain the exact native class identity. */
 const construction = new forwarding.RpcConstructionError('packed construction', undefined, []);
@@ -509,11 +509,11 @@ for (const [owner, directory] of Object.entries(consumers)) {
   /** ESM evaluates the physical forwarding module selected by that consumer. */
   const consumerForwarding = await import(pathToFileURL(require.resolve('@migaia/rpc-host/contract')).href);
   for (const [name, identity] of Object.entries(expected))
-    assert.equal(consumerForwarding[name], identity, 'A46 consumer identity: ' + owner + '/' + name);
+    assert.equal(consumerForwarding[name], identity, 'Consumer identity: ' + owner + '/' + name);
   assert.ok(construction instanceof consumerForwarding.RpcConstructionError);
   assert.ok(abort instanceof consumerForwarding.RpcAbortError);
 }
-console.log('CHECK A46-packed-identities PASS');
+console.log('CHECK packed-contract-identities PASS');
 `,
     'utf8'
   )

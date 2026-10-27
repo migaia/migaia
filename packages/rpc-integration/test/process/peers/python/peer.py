@@ -202,7 +202,7 @@ def baseline_reverse(reader: BinaryIO, writer: BinaryIO, control: dict[str, Any]
 
 
 def record(value: Any, required: set[str]) -> dict[str, Any]:
-    """Read required known fields in place; ignore unknown protocol metadata under R17."""
+    """Read required known fields in place and ignore unknown protocol metadata."""
     if not isinstance(value, dict) or not required <= value.keys():
         raise PeerFailure("PROTOCOL_INVALID")
     return value

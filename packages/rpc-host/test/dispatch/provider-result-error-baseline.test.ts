@@ -72,7 +72,7 @@ it.each(['sync', 'async'] as const)(
       /** Correlation is borrowed from the real outgoing call, never fabricated by the fixture. */
       const call = fixture.pair[0].written.find((frame) => frame.kind === 'call')
       assert(call?.kind === 'call')
-      /** BC2 changes response DTO spelling; the same actual error graph retains its public code. */
+      /** Changes response DTO spelling; the same actual error graph retains its public code. */
       const response = fixture.pair[1].written.find(
         (frame) => frame.kind === 'error' && frame.id === call.id
       )
@@ -124,7 +124,7 @@ it.each(['sync', 'async'] as const)(
       })
       await settleProviderDelivery()
       expect(reports).toEqual([primary])
-      /** The original physical terminal carries the same primary/cause graph across BC2 syntax. */
+      /** The original physical terminal carries the same primary/cause graph across syntax. */
       const response = fixture.pair[1].written.find((frame) => frame.kind === 'error')
       assert(response?.kind === 'error')
       expect(deserializeRpcWireError(response.error)).toMatchObject({
@@ -202,7 +202,7 @@ it.each(['params', 'result'] as const)(
         })
       })
       if (side === 'params') expect(executions).toBe(0)
-      /** BC2 flat graphs preserve the original serialized schema error and parser-cause atoms. */
+      /** Flat graphs preserve the original serialized schema error and parser-cause atoms. */
       const response = client.pair[0].written.find((frame) => frame.kind === 'error')
       assert(response?.kind === 'error')
       expect(deserializeRpcWireError(response.error)).toMatchObject({
@@ -242,7 +242,7 @@ it.each(['shape', 'overflow'] as const)(
       (error) => reports.push(error)
     )
     try {
-      /** BC11 restores the remote contract error directly, without the old scalar wrapper. */
+      /** Restores the remote contract error directly, without the old scalar wrapper. */
       const received: unknown = await fixture.a.memory.send('b', 'echo').catch((error) => error)
       await settleProviderDelivery()
       expect(reports).toHaveLength(1)

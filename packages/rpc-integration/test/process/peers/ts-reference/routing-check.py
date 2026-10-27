@@ -23,7 +23,7 @@ def main():
                    "peer": {"id": "ts-peer"}, "directory": {"schemaVersion": 3, "self": {"instanceId": "ts-peer"}}}]
     cases = [
         {"id": "U36-reference-discovery", "steps": [],
-         "retiredAssertions": ["BC2 discovery-query/response version,acceptVersions,type,resolvedTargetId and accepted/platform wire shape retired; true directory and accepted peer identity remain asserted."],
+         "retiredAssertions": ['discovery-query/response version,acceptVersions,type,resolvedTargetId and accepted/platform wire shape retired; true directory and accepted peer identity remain asserted.'],
          "expect": {"exit": 0, "frames": [*handshakes, {"kind": "control", "operation": "close"}]}},
         {"id": "U36-reference-addressed-response", "steps": [{"frame": {
             "profile": peer.PROTOCOL, "kind": "call", "id": "routing-echo", "options": {},

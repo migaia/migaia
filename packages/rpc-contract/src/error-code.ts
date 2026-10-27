@@ -40,7 +40,7 @@ export const RpcContractErrorCode = {
   /** The remote peer rejected its handshake; inspect the preserved remote cause. */
   handshakeRejected: 'HANDSHAKE_REJECTED',
   /**
-   * A required extension is unavailable or received extension traffic was not negotiated. R6 / BC2
+   * A required extension is unavailable or received extension traffic was not negotiated. Admission
    * rejects it before application execution; configure compatible extensions.
    */
   extensionNegotiationFailed: 'EXTENSION_NEGOTIATION_FAILED'
@@ -66,9 +66,9 @@ export const RPC_ENDPOINT_ERROR_SOURCE = 'rpc.endpoint'
 export const RpcCoreErrorCode = {
   /** Host creation requires one registered transport plugin. Add a transport before retrying. */
   hostTransportMissing: 'HOST_TRANSPORT_MISSING',
-  /** R3 / BC1 rejects duplicate transport namespaces before acquisition; choose distinct names. */
+  /** Duplicate transport namespaces are rejected before acquisition; choose distinct names. */
   hostNamespaceDuplicate: 'HOST_NAMESPACE_DUPLICATE',
-  /** R8 / A8 rejects two same-kind call features on one plugin; keep one complete instance. */
+  /** Two same-kind call features on one plugin are rejected; keep one complete instance. */
   featureCombinationConflict: 'FEATURE_COMBINATION_CONFLICT',
   /** Host creation received an object without SDK registration identity. Use the define tools. */
   hostPluginInvalid: 'HOST_PLUGIN_INVALID',
@@ -193,8 +193,8 @@ export const RpcCoreErrorCode = {
 
   /**
    * A keepalive call admitted during Session closing exceeds its in-flight prepared-message quota.
-   * R21 counts the captured metadata/manifest and native sidecars before optional feature overhead.
-   * The caller reduces the payload or waits for existing work to settle; final close is uncharged.
+   * Captured metadata, manifests and native sidecars count before optional feature overhead. The
+   * caller reduces the payload or waits for existing work to settle; final close is uncharged.
    */
   keepaliveQuotaExceeded: 'KEEPALIVE_QUOTA_EXCEEDED',
 

@@ -1,4 +1,4 @@
-/** Native listener/candidate lifetime uses actual Process serve and SDK owners after BC3. */
+/** Native listener/candidate lifetime uses actual Process serve and SDK owners after the migration. */
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { walkErrorCauses } from '@migaia/utils/error'

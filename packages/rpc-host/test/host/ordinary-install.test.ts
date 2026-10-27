@@ -119,7 +119,7 @@ describe('ordinary native Host RPC installation', () => {
     /** The native acquisition callback runs only after its own plugin pipeline declaration exists. */
     const open = vi.fn(() => ({ dispose: () => undefined }))
     try {
-      /** Public publication and the exact acquisition count receive the new R25 contract. */
+      /** Public publication and the exact acquisition count receive the new contract. */
       const outcome = await host
         .use(defineTransportPlugin({ name: 'worker', namespace: 'worker', open }))
         .then(
@@ -136,14 +136,14 @@ describe('ordinary native Host RPC installation', () => {
   it('keeps old publication after candidate failure and retires it only after successful replacement', async () => {
     /** This actual native host owns both original and candidate installation transactions. */
     const host = ordinaryHost()
-    /** BC1 makes the transport namespace explicit rather than addressing a registration outlet. */
+    /** Makes the transport namespace explicit rather than addressing a registration outlet. */
     const server = coreMemoryServer('first', 'first', 'worker')
     await host.use(namedTransport(server))
     /** A real physical client keeps the old generation callable throughout candidate acquisition. */
     const first = await server.connect('first-client', { provide: { value: () => 1 } })
     /** Only the original physical resource supplies the cleanup count. */
     const close = vi.spyOn(first.pair[0], 'close')
-    /** BC1 replaces the private Peer with this registration's original held namespace operation. */
+    /** Replaces the private Peer with this registration's original held namespace operation. */
     const held = namespace(host).request
     /** Native rejection must preserve this original candidate acquisition failure. */
     const failure = new Error('candidate listener failed')
@@ -230,7 +230,7 @@ describe('ordinary native Host RPC installation', () => {
     }
   })
 
-  it('A31 rejects removal of an in-use shared Auth wrapper and permits deletion after Session close', async () => {
+  it('rejects removal of an in-use shared Auth wrapper and permits deletion after Session close', async () => {
     /**
      * The same ordinary Host keeps its shared information-flow owner until all affected Sessions
      * close.
@@ -279,7 +279,7 @@ describe('ordinary native Host RPC installation', () => {
       expect(context.connectionSignal).toBeDefined()
       additions = vi.spyOn(LimitsGovernor.prototype, 'bind')
       retirements = vi.spyOn(LimitsGovernor.prototype, 'close')
-      /** BC18 replaces the old mid-session withdrawal oracle with native lifecycle refusal. */
+      /** Replaces the old mid-session withdrawal oracle with native lifecycle refusal. */
       await expect(host.unUse(flows.name)).rejects.toMatchObject({
         source: 'plugin.host',
         code: 'LIFECYCLE_MUTATION'
@@ -305,7 +305,7 @@ describe('ordinary native Host RPC installation', () => {
     }
   })
 
-  it('A31 protects a selected transport-local Feature while active and permits cold deletion and reconstruction', async () => {
+  it('protects a selected transport-local Feature while active and permits cold deletion and reconstruction', async () => {
     /** The local information-flow instance belongs to this original transport registration. */
     const server = coreMemoryServer('local-auth-server', 'local-auth-server', 'memory', [
       auth({ sign: (value) => value, verify: (value) => value })
@@ -345,7 +345,7 @@ describe('ordinary native Host RPC installation', () => {
     }
   })
 
-  it('A31 records a one-sided chunk outcome without imposing a compatibility guarantee', async () => {
+  it('records a one-sided chunk outcome without imposing a compatibility guarantee', async () => {
     /** Only this side installs chunk; the framework does not manufacture an opposite Feature. */
     const server = coreMemoryServer('one-sided-chunk-server')
     /** Reports retain native failure details separately from an optional public operation rejection. */
@@ -373,7 +373,7 @@ describe('ordinary native Host RPC installation', () => {
       } catch (error) {
         outcome = { status: 'rejected', failure: classifyOneSidedFailure(error) }
       }
-      console.info('A31-ONE-SIDED-CHUNK', {
+      console.info('ONE-SIDED-CHUNK', {
         outcome,
         reports: reports.map(classifyOneSidedFailure)
       })

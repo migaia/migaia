@@ -85,7 +85,7 @@ describe('one production wire error format', () => {
           if (!node.id || !/^(de)?serialize\w*Error$/.test(node.id.name)) return
           const name = node.id.name
           if (inspection.path === 'host/error-wire-metadata.ts') {
-            /** R29 wrappers may bookkeep without owning another wire format. */
+            /** Wrappers may bookkeep without owning another wire format. */
             const associated = name === 'serializeHostError'
             /** This delegate selects metadata for the existing preauthentication projection. */
             const handshake = name === 'serializeHostHandshakeError'

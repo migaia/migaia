@@ -135,7 +135,7 @@ describe('replay-window r12 authentication break', () => {
         (encryptedInput as string).slice(RpcAuthenticationEnvelope.prefix.length)
       ) as { version?: unknown; payload: { payload: unknown } }
       assert.equal(binding.version, 1, 'wrapper version')
-      /** BC16 keeps the complete call envelope as an object inside the single encoded binding. */
+      /** Keeps the complete call envelope as an object inside the single encoded binding. */
       assert.deepEqual(binding.payload.payload, payload, 'bound payload')
     } finally {
       await client.host.close()

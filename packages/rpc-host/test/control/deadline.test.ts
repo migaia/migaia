@@ -94,7 +94,7 @@ async function subtractReceiverResolutionDelay(): Promise<void> {
     clock.scheduler.advance(30)
     resolution.released.resolve()
     await vi.waitFor(() => expect(firstCall(provider.pair[0].written)).toBeDefined())
-    /** BC2 changes only request/timeoutMs field spelling; the same70ms budget and0 stamp remain. */
+    /** Changes only request/timeoutMs field spelling; the same70ms budget and0 stamp remain. */
     const sent = firstCall(provider.pair[0].written)
     expect(sent).toMatchObject({ kind: 'call', route: { remainingMs: 70, sentAt: 0 } })
     clock.scheduler.advance(70)
@@ -127,7 +127,7 @@ async function omitDisabledDeadline(): Promise<void> {
       }
     }
   })
-  /** BC3 moves the original timeout default into an installed complete link-policy feature. */
+  /** Moves the original timeout default into an installed complete link-policy feature. */
   const client = await server.connect('client', {
     plugins: [linkPolicy({ features: [timeout({ ms: 100, scheduler: clientScheduler })] })]
   })
@@ -176,7 +176,7 @@ async function rejectInjectedZeroDeadline(): Promise<void> {
   const client = await server.connect('client')
   try {
     await client.host.memory.send('provider', 'check', null)
-    /** BC2 rewrites the original request kind to call without changing its zero-deadline stimulus. */
+    /** Rewrites the original request kind to call without changing its zero-deadline stimulus. */
     const request = firstCall(client.pair[1].written)
     expect(request?.kind).toBe('call')
     if (request?.kind !== 'call') return
@@ -225,7 +225,7 @@ async function abortAtMonotonicDeadline(): Promise<void> {
   const client = await server.connect('client')
   /** Hold the original physical writer so only cancel delivery is absent, never provider timers. */
   const write = client.pair[1].write
-  /** BC2 makes cancel a core frame; dropping it at real IO preserves the old absent-control vector. */
+  /** Makes cancel a core frame; dropping it at real IO preserves the old absent-control vector. */
   const cancel = vi.spyOn(client.pair[1], 'write').mockImplementation((frame, options) => {
     if ((frame.data as { kind?: string }).kind === 'cancel') return Promise.resolve()
     return write(frame, options)
@@ -237,7 +237,7 @@ async function abortAtMonotonicDeadline(): Promise<void> {
   void result.catch(() => undefined)
   try {
     await providerStarted.promise
-    /** BC2 changes the wire fields, preserving the original100ms budget and diagnostic timestamp. */
+    /** Changes the wire fields, preserving the original100ms budget and diagnostic timestamp. */
     const requestFrame = firstCall(client.pair[1].written)
     expect(requestFrame).toMatchObject({ kind: 'call', route: { remainingMs: 100, sentAt: 0 } })
     clock.scheduler.advance(99)

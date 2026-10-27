@@ -16,7 +16,7 @@ import { header } from '../../../rpc-contract/test/fixtures/core-profile.js'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { BinaryShape, RPC_BINARY_MAX_BYTES } from '../../dist/sdk/wire/binary-shape.js'
 
-it('R18 actual JSON codec never measures ordinary request, notify or result slots', async () => {
+it('actual JSON codec never measures ordinary request, notify or result slots', async () => {
   /** The real executing media codec performs both outbound and inbound admission. */
   const codec = new RpcJsonCarrierCodec()
   /** Inline media uses the same capture walk without a native digest or manufactured transfer. */
@@ -41,7 +41,7 @@ it('R18 actual JSON codec never measures ordinary request, notify or result slot
   }
 })
 
-it('R18 actual binary stream item measures once in prepare and once in restore', async () => {
+it('actual binary stream item measures once in prepare and once in restore', async () => {
   /** The actual inline manifest carries a byte view through both original codec stages. */
   const codec = new RpcJsonCarrierCodec()
   /** Original inline capability facts are shared by both executing codec stages. */
@@ -72,7 +72,7 @@ it('R18 actual binary stream item measures once in prepare and once in restore',
   }
 })
 
-it('R18 receiver codec retains INVALID_ENVELOPE for an oversized item', async () => {
+it('receiver codec retains INVALID_ENVELOPE for an oversized item', async () => {
   /** A real decoded JSON frame reaches the default stream fallback without a binary manifest. */
   const codec = new RpcJsonCarrierCodec()
   /** These are the actual media facts used by the ordinary physical JSON carrier. */
@@ -118,7 +118,7 @@ it('R18 receiver codec retains INVALID_ENVELOPE for an oversized item', async ()
   )
 })
 
-it('BC9 SDK manifest and backing metadata ignore unknowns but validate known fields', async () => {
+it('SDK manifest and backing metadata ignore unknowns but validate known fields', async () => {
   /** Unsigned native bytes reach both fixed metadata validators without requiring a digest. */
   const bytes = new Uint8Array([1, 2]).buffer
   /** The sole real capture creates both original metadata records before unknown fields are added. */
@@ -208,7 +208,7 @@ it('BC9 SDK manifest and backing metadata ignore unknowns but validate known fie
   )
 })
 
-it('BC9 actual codec ignores operation-only fields outside their known variants', async () => {
+it('actual codec ignores operation-only fields outside their known variants', async () => {
   /** One actual media codec uses the same semantic admission as ordinary physical traffic. */
   const codec = new RpcJsonCarrierCodec()
   /** No binary ownership or transfer capability is fabricated by these extra metadata fields. */

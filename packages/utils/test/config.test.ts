@@ -10,7 +10,7 @@ import {
 } from '../src/config.js'
 
 describe('config primitives', () => {
-  it('[BC2-CONCAT] retains one accumulator while synchronous conflicts observe current contents', () => {
+  it('retains one accumulator while synchronous conflicts observe current contents', () => {
     /** Frozen input proves descriptor preservation cannot make the private builder unwritable. */
     const shared = Object.freeze([1])
     /** Both keys in the first source must keep the same builder through every later concat. */
@@ -47,7 +47,7 @@ describe('config primitives', () => {
     expect(Object.getOwnPropertyDescriptor(first.items, 'length')?.writable).toBe(false)
   })
 
-  it('[BC2-INDEX] keeps sparse index merges and retained aliases across multiple sources', () => {
+  it('keeps sparse index merges and retained aliases across multiple sources', () => {
     /** Initial aliases must follow index replacement and deletion on one frozen-input builder. */
     const shared = Object.freeze([1, 2, 3])
     /** A sparse incoming array changes only its present index, preserving earlier holes. */
@@ -97,7 +97,7 @@ describe('config primitives', () => {
     expect(0 in later).toBe(false)
   })
 
-  it('[BC2-SOURCE-ALIAS] joins incoming aliases to the private accumulator without changing sources', () => {
+  it('joins incoming aliases to the private accumulator without changing sources', () => {
     /** The right source supplies both an array alias and an element alias into the same graph. */
     const entry = { value: 2 }
     /** Frozen right arrays must never become the object receiving later in-place appends. */
@@ -122,7 +122,7 @@ describe('config primitives', () => {
     expect(Object.getOwnPropertyDescriptor(right.items, 'length')?.writable).toBe(false)
   })
 
-  it('[BC2-STRATEGY-ALIAS] preserves holes until concat reaches the same shared accumulator', () => {
+  it('preserves holes until concat reaches the same shared accumulator', () => {
     /** Different path policies can visit the same builder through its two aliases in one source. */
     const shared = [1, 2]
     /** A later sparse write creates a gap which concat must densify without rescanning the prefix. */
@@ -147,7 +147,7 @@ describe('config primitives', () => {
     expect(Object.keys(combined.indexed as unknown[])).toEqual(['0', '1', '2', '3', '4', '5', '6'])
   })
 
-  it('[BC2-REPLACEMENT] privately adopts selected arrays and preserves untouched descriptor flags', () => {
+  it('privately adopts selected arrays and preserves untouched descriptor flags', () => {
     /** The resolver can select either an owned incoming array or a separate frozen replacement. */
     const right = ownConfig({ items: Object.freeze([2]), untouched: Object.freeze([9]) })
     /** A replacement is copied before later concat; the caller keeps its frozen source unchanged. */
@@ -181,7 +181,7 @@ describe('config primitives', () => {
     expect(Object.getOwnPropertyDescriptor(combined.items, 'length')?.writable).toBe(true)
   })
 
-  it('[BC2-INDEX-PROTOTYPE] preserves the default Array species result for custom prototypes', () => {
+  it('preserves the default Array species result for custom prototypes', () => {
     /** Rich-runtime data can carry a custom prototype while still using the standard Array slice. */
     const prototype = Object.create(Array.prototype) as { tag?: string }
     prototype.tag = 'custom-prototype'
@@ -206,7 +206,7 @@ describe('config primitives', () => {
     expect((Object.getPrototypeOf(items) as { tag?: string }).tag).toBe('custom-prototype')
   })
 
-  it('[BC2-SELECTED-GRAPH] captures arrays inside resolver-selected records before nested conflicts', () => {
+  it('captures arrays inside resolver-selected records before nested conflicts', () => {
     /** Selecting this record must not lend its source array to the next nested callback. */
     const items = Object.freeze([1])
     /** A sibling alias must enter the same private builder at the record-selection boundary. */
@@ -242,7 +242,7 @@ describe('config primitives', () => {
     expect(selected.branch.items).toBe(selected.branch.alias)
   })
 
-  it('[BC2-SELF-SOURCE] bounds concat when a callback places its retained builder into a later source', () => {
+  it('bounds concat when a callback places its retained builder into a later source', () => {
     /** The callback deliberately creates a source-to-builder alias after ownership was established. */
     const later = ownConfig({ items: [] as unknown[] })
     /** This reference must receive the finite result without appending during a live self-iteration. */

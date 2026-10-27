@@ -349,7 +349,7 @@ it('physical retirement rejects queued members and joins the already started nat
   /** Both members keep the exact source reason, independent from a later native drain. */
   const reason = new Error('fixture physical close')
   f.source.abort(reason)
-  /** This terminal has no carrier.close; native R1 joins its started branch before settling. */
+  /** This terminal has no carrier.close; native joins its started branch before settling. */
   held.resolve()
   expect(await first).toBe(reason)
   expect(await queued).toBe(reason)

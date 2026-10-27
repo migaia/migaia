@@ -132,7 +132,7 @@ const opening: Promise<IRpcHost> = createRpcHost({
       }
       return true
     },
-    /** A27 exposes the real public install transaction; its original rejection returns to a. */
+    /** Exposes the real public install transaction; its original rejection returns to a. */
     [Topology.installThread]: async () => {
       /** The already opened host keeps its parent, pool and coroutine when this batch fails. */
       const host = await opening

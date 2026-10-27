@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://migaia.dev/rpc/protocol.schema.json",
   "title": "migaia.rpc/2 semantic protocol",
-  "$comment": "Self-contained JSON projection of rpc-contract ./protocol. Native binary/carrier extension shells are separate boundaries. Preserve object own-key order during encode/decode; schema does not sort data. JSON Schema checks representable structural constraints only; authoritative pure validators enforce all semantic admission. Fixed protocol records ignore unknown fields (core BC9); portable byte tags and method-schema definitions retain their own admission rules.",
+  "$comment": "Self-contained JSON projection of rpc-contract ./protocol. Native binary/carrier extension shells are separate boundaries. Preserve object own-key order during encode/decode; schema does not sort data. JSON Schema checks representable structural constraints only; authoritative pure validators enforce all semantic admission. Fixed protocol records ignore unknown fields (core ); portable byte tags and method-schema definitions retain their own admission rules.",
   "oneOf": [
     {
       "$ref": "#/$defs/hello"
@@ -956,12 +956,26 @@
       "type": "object",
       "required": ["profile", "kind", "step", "peer", "remainingMs"],
       "properties": {
-        "profile": { "const": "migaia.rpc/2" },
-        "kind": { "const": "handshake" },
-        "step": { "const": "pending" },
-        "peer": { "$ref": "#/$defs/peer" },
-        "remainingMs": { "type": "number", "minimum": 0, "maximum": 2147483647 },
-        "auth": { "$ref": "#/$defs/portable" }
+        "profile": {
+          "const": "migaia.rpc/2"
+        },
+        "kind": {
+          "const": "handshake"
+        },
+        "step": {
+          "const": "pending"
+        },
+        "peer": {
+          "$ref": "#/$defs/peer"
+        },
+        "remainingMs": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 2147483647
+        },
+        "auth": {
+          "$ref": "#/$defs/portable"
+        }
       },
       "$comment": "Only an already negotiated physical peer may extend waiting into name admission. Repeated pending notices cannot refresh the Session-owned admission deadline."
     },

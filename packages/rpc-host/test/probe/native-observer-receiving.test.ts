@@ -100,7 +100,7 @@ function unchanged(value: unknown): unknown {
   return value
 }
 
-// RPC-TEST-D82FEFDF8439: real method filters, ping/pong/close, cancellation and record codec.
+// Real method filters, ping/pong/close, cancellation and record codec.
 it('keeps genuine control and cancellation observations through both echo filters', async () => {
   /** This caller-owned collector is installed independently against both actual native hosts. */
   const devtools = devtoolsPlugin({ methods: ['echo'], maxEvents: 256 })
@@ -266,7 +266,7 @@ it('keeps genuine control and cancellation observations through both echo filter
   }
 })
 
-// RPC-TEST-B569E95AA42F-C002: actual acquisition rollback precedes descriptor publication.
+// Actual acquisition rollback precedes descriptor publication.
 it('rolls back the actual native observer before describing a failed Session', async () => {
   /** The actual acquisition failure must retain its original identity. */
   const original = new Error('endpoint construction fixture')
@@ -301,7 +301,7 @@ it('rolls back the actual native observer before describing a failed Session', a
   }
 })
 
-// RPC-TEST-B569E95AA42F-C003: supported physical failure and critical-before-observer release remain.
+// Supported physical failure and critical-before-observer release remain.
 it('keeps physical close first and preserves its original failure while releasing the observer once', async () => {
   /** Critical physical close failure remains first in the actual cleanup result. */
   const primary = new Error('primary close fixture')
@@ -360,7 +360,7 @@ it('keeps physical close first and preserves its original failure while releasin
   }
 })
 
-// RPC-TEST-552CD5F1E175-C001 and RPC-TEST-5F6EE362E07F-C002: observation adds no codec work.
+// And observation adds no codec work.
 it('keeps native business, exact codec traversal and released resources equal with an observer', async () => {
   /** Equal workloads retain only actual settled native media facts. */
   const snapshots: unknown[] = []
@@ -443,7 +443,7 @@ it('keeps native business, exact codec traversal and released resources equal wi
   expect(snapshots[1]).toEqual(snapshots[0])
 })
 
-// RPC-TEST-5F6EE362E07F-C003: native chunk execution replaces only the removed framer descriptor.
+// Native chunk execution replaces only the removed framer descriptor.
 it('keeps the original large public payload fragmented on both actual native directions', async () => {
   /** The canonical chunk Feature alone produces and assembles all fragments. */
   const fragments = chunk({ chunkBytes: 64 })
@@ -484,7 +484,7 @@ it('keeps the original large public payload fragmented on both actual native dir
   }
 })
 
-// C004-A001/A002 receive only provider values/order; opaque framing and equal keys remain pending.
+// Receive only provider values/order; opaque framing and equal keys remain pending.
 it('keeps original control and payload order from two actual public chunk sources', async () => {
   /** Every real native installation owns its own canonical chunk state. */
   const fragments = chunk({ chunkBytes: 64, required: true })

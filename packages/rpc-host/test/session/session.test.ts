@@ -428,7 +428,7 @@ describe('C2 Session and SessionTable owners', () => {
     await Promise.all([local.table.close(), old.table.close(), newcomer.table.close()])
   })
 
-  it('A45 replaces a timed-out same-name source without reporting its normal liveness failure', async () => {
+  it('replaces a timed-out same-name source without reporting its normal liveness failure', async () => {
     /** The old physical source is live but its actual health write no longer reaches the peer. */
     const local = await Host.create('a'),
       old = await Host.create('b', 'worker'),
@@ -450,7 +450,7 @@ describe('C2 Session and SessionTable owners', () => {
     await Promise.all([local.table.close(), old.table.close(), replacement.table.close()])
   })
 
-  it('A45 still reports a genuine name-probe transport failure while admitting its replacement', async () => {
+  it('still reports a genuine name-probe transport failure while admitting its replacement', async () => {
     /** A live incumbent reaches the real ping write before its native transport fails. */
     const local = await Host.create('probe-report-a')
     /** Both old and replacement instances intentionally advertise the same display name. */
@@ -783,7 +783,7 @@ it('records the original control.sent assertion through the real native Session 
   }
 })
 
-it('A36 handshake timeout closes locally without consulting a native terminal reason', async () => {
+it('handshake timeout closes locally without consulting a native terminal reason', async () => {
   /** Manual startup time exercises the genuine unpublished Session timeout. */
   const local = await Host.create('timeout-owner', 'timeout-owner', {}, { handshakeTimeoutMs: 5 })
   /** No linked peer means the actual hello remains unanswered. */
@@ -809,7 +809,7 @@ it('A36 handshake timeout closes locally without consulting a native terminal re
   }
 })
 
-it('A39 late track after physical retirement preserves its promise without allocating drain state', async () => {
+it('late track after physical retirement preserves its promise without allocating drain state', async () => {
   /** Both original Sessions first complete a genuine native handshake. */
   const left = await Host.create('late-track-a')
   /** The peer owns the opposite original physical endpoint. */
@@ -837,7 +837,7 @@ it('A39 late track after physical retirement preserves its promise without alloc
   }
 })
 
-it('A39 reentrant retirement track is inert while closing grace keeps its original tracking', async () => {
+it('reentrant retirement track is inert while closing grace keeps its original tracking', async () => {
   /** One real grace callback remains active before the Session seals its final writes. */
   const entered = deferred<void>()
   const release = deferred<void>()
@@ -900,7 +900,7 @@ it('A39 reentrant retirement track is inert while closing grace keeps its origin
   }
 })
 
-it('A38 accepted byte Session replaces the bootstrap cap with its configured frame limit', async () => {
+it('accepted byte Session replaces the bootstrap cap with its configured frame limit', async () => {
   /** A real accepted handshake fits within this smaller configured business-frame budget. */
   const left = await Host.create('byte-a', 'byte-a', {}, { maxFrameBytes: 1024 })
   /** The opposite actual Session negotiates using the same canonical byte carrier. */
@@ -985,7 +985,7 @@ it('labels a handshake scheduler failure without calling it disposal cleanup', a
   await host.table.close()
 })
 
-it('A40 closing keepalive queue leaves cancellation with its original caller', async () => {
+it('closing keepalive queue leaves cancellation with its original caller', async () => {
   /** Real accepted native sources enter the existing closing-write grace window. */
   const left = await Host.create('keepalive-queue-a')
   /** The actual peer remains able to receive the final close notification. */
@@ -1019,7 +1019,7 @@ it('A40 closing keepalive queue leaves cancellation with its original caller', a
   }
 })
 
-it('A40 closing a physically written pending ping reports no cancellation acknowledgment', async () => {
+it('closing a physically written pending ping reports no cancellation acknowledgment', async () => {
   /** Both original native Session owners first complete the genuine accepted handshake. */
   const left = await Host.create('closing-ping-a')
   const right = await Host.create('closing-ping-b')
@@ -1051,7 +1051,7 @@ it('A40 closing a physically written pending ping reports no cancellation acknow
   }
 })
 
-it('A45 errors delivered during native close keep their original cause after terminal selection', async () => {
+it('errors delivered during native close keep their original cause after terminal selection', async () => {
   /** Real accepted native sources expose the existing SessionTable send boundary. */
   const left = await Host.create('immutable-close-a')
   /** Its peer owns the closing Session and lends the same unmodified table send interface. */

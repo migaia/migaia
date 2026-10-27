@@ -84,7 +84,7 @@ describe('safeRead guarded property policy', () => {
   })
 })
 
-// RPC-TEST-CCDBF0994A49-C001: original supported atoms received at their canonical owner; old alias/key facets stay NoPASS.
+// Original supported atoms received at their canonical owner; old alias/key facets stay NoPASS.
 it('contains hostile property getters', () => {
   const failure = new Error('getter')
   const reported: unknown[] = []
@@ -105,7 +105,7 @@ it('contains hostile property getters', () => {
   expect(reported).toEqual([{ key: 'value', error: failure }])
 })
 
-// RPC-TEST-CCDBF0994A49-C005: original supported atoms received at their canonical owner; old alias/key facets stay NoPASS.
+// Original supported atoms received at their canonical owner; old alias/key facets stay NoPASS.
 it('keeps inherited getter receivers and performs no has or descriptor trap', () => {
   /** Each trap is observable at this untrusted property boundary. */
   const operations: string[] = []

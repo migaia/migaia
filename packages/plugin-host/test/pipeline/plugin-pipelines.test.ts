@@ -1,4 +1,4 @@
-/** A8 uses genuine definitions, Feature dependencies and the native owner transaction. */
+/** Uses genuine definitions, Feature dependencies and the native owner transaction. */
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import {
@@ -20,7 +20,7 @@ const hostOptions = {
   execution: { mutationTimeoutMs: false as const, pipelineDrainTimeoutMs: false as const }
 }
 
-it('A8: plugin and Feature register host and own lanes; dependency-qualified lookup obeys the existing graph', async () => {
+it('plugin and Feature register host and own lanes; dependency-qualified lookup obeys the existing graph', async () => {
   /** Runtime observations prove independent payloads and actual execution order. */
   const events: string[] = []
   /** The Feature borrows exact real declarations, retaining registration-only authority. */
@@ -116,7 +116,7 @@ it('A8: plugin and Feature register host and own lanes; dependency-qualified loo
   }
 })
 
-it('A8: failed groups roll back and host declarations cannot be overridden', async () => {
+it('failed groups roll back and host declarations cannot be overridden', async () => {
   /** The native domain owner retains only genuine construction requests. */
   const requests: IHostDomainCoreRequest[] = []
   /** No forged scope reaches candidate pipelines. */
@@ -169,7 +169,7 @@ it('A8: failed groups roll back and host declarations cannot be overridden', asy
   }
 })
 
-it('A8: native removal drains the real group before releasing its registered resources', async () => {
+it('native removal drains the real group before releasing its registered resources', async () => {
   /** The real target stage owns the in-flight execution until this explicit barrier opens. */
   const entered = deferred<void>()
   /** A shared gate avoids timeout-based synchronization. */

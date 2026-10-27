@@ -1,4 +1,4 @@
-/** Public single-profile grammar cases for core R6, R8, R15 and BC2/BC6. */
+/** Public single-profile grammar cases. */
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { RpcStreamEvent } from '@migaia/rpc-contract'
@@ -77,7 +77,7 @@ function graph() {
 }
 
 describe('single RPC wire profile', () => {
-  it('[CORE-R6-01] rejects legacy profiles and keeps notify ids mandatory', () => {
+  it('rejects legacy profiles and keeps notify ids mandatory', () => {
     expect(() => normalizeRpcFrame({ kind: 'request', id: 'old' })).toThrowError(
       expect.objectContaining({ code: 'INVALID_ENVELOPE' })
     )
@@ -95,12 +95,12 @@ describe('single RPC wire profile', () => {
     expect(() => normalizeRpcFrame({ ...notify, id: undefined })).toThrow()
   })
 
-  it('[CORE-R6-02] validates original metadata and retains business key order and binary identity', () => {
+  it('validates original metadata and retains business key order and binary identity', () => {
     /** Native binary is admitted by existing portable rules without copying its backing. */
     const bytes = new Uint8Array([1, 2])
     /** Key insertion order is intentional, including the integer-key order mandated by JS. */
     const input = { z: 1, a: { y: 2, x: 3 }, bytes }
-    /** BC9 reads known fields directly; the portable payload still uses its canonical validator. */
+    /** Reads known fields directly; the portable payload still uses its canonical validator. */
     let reads = 0
     const hostile = {
       ...header(),
@@ -120,7 +120,7 @@ describe('single RPC wire profile', () => {
     expect(Object.isFrozen(frame)).toBe(false)
   })
 
-  it('[CORE-R8-01] carries a bounded remaining deadline and ignores non-wire option fields', () => {
+  it('carries a bounded remaining deadline and ignores non-wire option fields', () => {
     /** Relative zero is valid and makes the receiving owner expire before execution. */
     const frame = { ...header(), route: { ...header().route, remainingMs: 0 }, options: {} }
     expect(normalizeRpcFrame(frame)).toMatchObject({ route: { remainingMs: 0 } })
@@ -132,7 +132,7 @@ describe('single RPC wire profile', () => {
     expect(normalizeRpcFrame(withLocalField)).toBe(withLocalField)
   })
 
-  it('[CORE-R6-03] negotiates only actual optional/required extensions and checks selected subsets', () => {
+  it('negotiates only actual optional/required extensions and checks selected subsets', () => {
     const local = normalizeRpcHandshake(hello('provider', ['batch@1']))
     const remote = normalizeRpcHandshake(hello('caller', ['chunk@1']))
     if (local.step !== 'hello' || remote.step !== 'hello')
@@ -149,7 +149,7 @@ describe('single RPC wire profile', () => {
     expect(() => normalizeRpcHandshake({ ...hello('caller'), profile: 'migaia.rpc' })).toThrow()
   })
 
-  it('[CORE-R6-04] preserves flat error shared/cyclic topology, native types and remote stacks', () => {
+  it('preserves flat error shared/cyclic topology, native types and remote stacks', () => {
     const normalized = normalizeRpcWireError(graph())
     const restored = deserializeRpcWireError(normalized) as AggregateError
     expect(restored).toBeInstanceOf(AggregateError)
@@ -164,7 +164,7 @@ describe('single RPC wire profile', () => {
     ).toThrowError(expect.objectContaining({ code: 'INVALID_WIRE_ERROR' }))
   })
 
-  it('[CORE-R6-FLAT-NODE-LIMIT] restores a 1024-node chain and rejects the 1025th node', () => {
+  it('restores a 1024-node chain and rejects the 1025th node', () => {
     /** Flat edges carry depth without recursively nesting the received JSON records. */
     const nodes = Array.from({ length: 1024 }, (_, index) => ({
       source: 'business',
@@ -196,7 +196,7 @@ describe('single RPC wire profile', () => {
     )
   })
 
-  it('[CORE-R6-05] reuses bounded source-error projection for cycles without recursion failure', () => {
+  it('reuses bounded source-error projection for cycles without recursion failure', () => {
     const source = new TypeError('business failure')
     Object.defineProperty(source, 'cause', { value: source })
     const flat = serializeRpcWireError(source, { report: () => undefined })
@@ -205,7 +205,7 @@ describe('single RPC wire profile', () => {
     expect(deserializeRpcWireError(flat)).toBeInstanceOf(TypeError)
   })
 
-  it('[CORE-R6-07] classifies malformed flat node and aggregate arrays as INVALID_WIRE_ERROR', () => {
+  it('classifies malformed flat node and aggregate arrays as INVALID_WIRE_ERROR', () => {
     /** Graph and aggregate container failures use the wire-error domain rather than envelopes. */
     const malformed = [
       { root: 0, nodes: {} },
@@ -237,7 +237,7 @@ describe('single RPC wire profile', () => {
     expect(reads).toBe(2)
   })
 
-  it('[CORE-R6-08] keeps a rejected handshake remote error topology reachable through cause', () => {
+  it('keeps a rejected handshake remote error topology reachable through cause', () => {
     /** The initiating offer is real admitted input, not a fabricated accepted-session capability. */
     const offer = normalizeRpcHandshake(hello('caller'))
     if (offer.step !== 'hello') throw new Error('unexpected fixture variant')
@@ -265,7 +265,7 @@ describe('single RPC wire profile', () => {
     expect((remote.cause as Error).stack).toBe('remote inner stack')
   })
 
-  it('[CORE-R15-01] admits cancel/error/stream frames with the original correlated task', () => {
+  it('admits cancel/error/stream frames with the original correlated task', () => {
     expect(
       normalizeRpcFrame({ ...header('notify'), kind: 'cancel', reason: graph() })
     ).toMatchObject({ kind: 'cancel', task: { mode: 'notify' } })
@@ -283,7 +283,7 @@ describe('single RPC wire profile', () => {
     ).toThrow()
   })
 
-  it('[CORE-R6-06] rejects unnegotiated extension frames and keeps sidecars exact', () => {
+  it('rejects unnegotiated extension frames and keeps sidecars exact', () => {
     const backing = new ArrayBuffer(8)
     const extension = {
       kind: 'extension',
@@ -313,7 +313,7 @@ const vectors = JSON.parse(
 ) as ICoreProfileVectors
 
 describe('shared core profile foreign vectors', () => {
-  it('[CORE-R21-CLOSE-REASON] preserves the complete close graph without an ACK or task', () => {
+  it('preserves the complete close graph without an ACK or task', () => {
     /** The existing error graph retains shared references and a cycle across the close boundary. */
     const reason = graph()
     /** Close carries only existing lifecycle correlation and the optional canonical reason. */
@@ -349,20 +349,20 @@ describe('shared core profile foreign vectors', () => {
     expect((error as AggregateError).errors).toEqual([error.cause, error.cause])
   })
 
-  it('[CORE-R6-VECTOR-PROFILE] declares only the sole profile', () => {
+  it('declares only the sole profile', () => {
     expect(vectors.profile).toBe(RpcWireProfile)
   })
 
-  it.each(vectors.valid)('[CORE-R6-VECTOR-VALID] $id', ({ frame }) => {
+  it.each(vectors.valid)('$id', ({ frame }) => {
     expect(() => normalizeRpcFrame(frame)).not.toThrow()
   })
 
-  it.each(vectors.invalid)('[CORE-R6-VECTOR-INVALID] $id', ({ frame }) => {
+  it.each(vectors.invalid)('$id', ({ frame }) => {
     expect(() => normalizeRpcFrame(frame)).toThrow()
   })
 })
 
-/** R17 uses each original public validator, with only the chosen known field made invalid. */
+/** Each original public validator receives only the chosen invalid known field. */
 type IRecordCase = {
   name: string
   value: Record<string, unknown>
@@ -610,8 +610,8 @@ const records: IRecordCase[] = [
   }
 ]
 
-describe('R17 direct record fields', () => {
-  it('[CORE-A33-MANIFEST] admits unsigned sidecars and canonical inline backings without trusting wire integrity claims', () => {
+describe('direct record fields', () => {
+  it('admits unsigned sidecars and canonical inline backings without trusting wire integrity claims', () => {
     /** The native profile keeps logical backing rows even when no physical sidecar is consumed. */
     const rows = [
       Object.freeze({ byteLength: 4 }),
@@ -649,7 +649,7 @@ describe('R17 direct record fields', () => {
     }
   })
 
-  it('[CORE-C004-TERMINAL] retains only actual failed-stream terminal facts after original field admission', () => {
+  it('retains only actual failed-stream terminal facts after original field admission', () => {
     /** The complete original graph and unknown metadata retain their input identities. */
     const completion = Object.freeze({
       ok: false,
@@ -681,27 +681,24 @@ describe('R17 direct record fields', () => {
     ).toThrowError(expect.objectContaining({ code: 'INVALID_ENVELOPE', pointer: '/outcome/error' }))
   })
 
-  it.each(records)(
-    '[CORE-A19-FIELD] $name retains native code and first missing/bad known pointer',
-    (entry) => {
-      expect(() => entry.validate({ ...entry.value, [entry.field]: undefined })).toThrowError(
-        expect.objectContaining({
-          source: 'rpc.contract',
-          code: entry.missingCode ?? entry.code ?? 'INVALID_ENVELOPE',
-          pointer: entry.pointer
-        })
-      )
-      expect(() => entry.validate({ ...entry.value, [entry.field]: entry.wrong })).toThrowError(
-        expect.objectContaining({
-          source: 'rpc.contract',
-          code: entry.code ?? 'INVALID_ENVELOPE',
-          pointer: entry.wrongPointer ?? entry.pointer
-        })
-      )
-    }
-  )
+  it.each(records)('$name retains native code and first missing/bad known pointer', (entry) => {
+    expect(() => entry.validate({ ...entry.value, [entry.field]: undefined })).toThrowError(
+      expect.objectContaining({
+        source: 'rpc.contract',
+        code: entry.missingCode ?? entry.code ?? 'INVALID_ENVELOPE',
+        pointer: entry.pointer
+      })
+    )
+    expect(() => entry.validate({ ...entry.value, [entry.field]: entry.wrong })).toThrowError(
+      expect.objectContaining({
+        source: 'rpc.contract',
+        code: entry.code ?? 'INVALID_ENVELOPE',
+        pointer: entry.wrongPointer ?? entry.pointer
+      })
+    )
+  })
 
-  it('[CORE-A19-OPTIONS] validates optional known fields without inventing required wire options', () => {
+  it('validates optional known fields without inventing required wire options', () => {
     expect(() => normalizeRpcCallOptions(null, 'request')).toThrowError(
       expect.objectContaining({ code: 'INVALID_ENVELOPE', pointer: '/options' })
     )
@@ -710,7 +707,7 @@ describe('R17 direct record fields', () => {
     )
   })
 
-  it('[CORE-A19-ORIGINAL] accepts two unknown fields on implementation/carrier/manifest/backing and keeps frozen originals', () => {
+  it('accepts two unknown fields on implementation/carrier/manifest/backing and keeps frozen originals', () => {
     const unknown = { futureA: () => undefined, futureB: new Map() }
     const implementation = Object.freeze({ name: 'fixture', version: '1', ...unknown })
     const offer = Object.freeze({
@@ -733,8 +730,8 @@ describe('R17 direct record fields', () => {
   })
 })
 
-describe('R19 forwarding contract', () => {
-  it('[CORE-A21-ROUTE] admits origin plus sixteen forwarding hosts and rejects overflow', () => {
+describe('forwarding contract', () => {
+  it('admits origin plus sixteen forwarding hosts and rejects overflow', () => {
     /** Stable unique node ids exercise only actual supported route length and spelling. */
     const route = Array.from({ length: RpcWireLimit.maxForwardRouteNodes }, (_, index) =>
       index.toString(16).padStart(32, '0')
@@ -765,7 +762,7 @@ describe('R19 forwarding contract', () => {
     expect(routes.get(restored)).toEqual(route)
   })
 
-  it('[CORE-A21-PROBE] appends forward without renumbering existing stage ids', () => {
+  it('appends forward without renumbering existing stage ids', () => {
     expect(RpcProbeStage).toEqual({
       peer: 0,
       message: 1,

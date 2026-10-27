@@ -15,7 +15,7 @@ it('rejects an explicit source byte quota smaller than the admitted message limi
 })
 
 for (const quota of ['messages', 'bytes'] as const) {
-  it(`A44 isolates ${quota} source quota while another source completes`, () => {
+  it(`isolates ${quota} source quota while another source completes`, () => {
     /** The canonical assembler retains global capacity beyond this sender's explicit subquota. */
     const assembler = createStringChunkAssembler({
       chunkBytes: 2,

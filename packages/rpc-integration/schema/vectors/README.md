@@ -5,7 +5,7 @@ portable-value vector, or `node generate.mjs --check` in a gate. Vectors must be
 with a descriptor version change or an explicit type-only/non-wire proof.
 
 `error-chain.json` version 2 is the language-neutral `wire-error` fixture. `valid` values normalize
-unchanged; `invalid` values report the listed first violation and JSON Pointer. `unknownFields` now checks BC9 acceptance; the legacy `ignoreExpected` snapshot retains the
+unchanged; `invalid` values report the listed first violation and JSON Pointer. `unknownFields` now checks acceptance; the legacy `ignoreExpected` snapshot retains the
 known error fields. Unknown metadata is ignored without a callback. `truncation` maps logical thrown values to canonical payloads;
 `{ "absent": true }` represents JavaScript `undefined` and may be skipped by languages without an
 absent value. `{ "logicalError": { ... } }` describes an Error-like graph without relying on a JS
@@ -59,8 +59,8 @@ describe responses.
 ## Core profile family
 
 `core-profile.json` is the sole live `migaia.rpc/2` semantic family. Its `valid` and `invalid`
-sections retain the existing protocol, correlation, portable-value and schema cases. Under R17/BC9,
-unknown metadata is accepted; the former frame/option unknown-field rejection cases now belong to
+sections retain the existing protocol, correlation, portable-value and schema cases.
+Unknown metadata is accepted; the former frame/option unknown-field rejection cases now belong to
 `valid`. `unknownIgnored` pairs a baseline with a frame containing exactly two unknown fields on
 one protocol record. Each language admits the original object and compares all remaining known
 content after removing only those two test fields. The extra fields are never business payloads,
@@ -75,9 +75,9 @@ were received or passed.
 
 `packages/rpc-contract/schema/protocol.schema.json` documents the JSON grammar. Pure validators
 remain authoritative for node-index bounds, text/depth budgets, handshake identity, group fail-stop
-ordering, method uniqueness and runtime state. Only the metadata admission rules changed in BC9.
+ordering, method uniqueness and runtime state. Only the metadata admission rules changed.
 
-R19/BC10 adds route-boundary vectors: `forwardRoute` and retained error-node provenance both
+Route-boundary vectors verify that `forwardRoute` and retained error-node provenance both
 accept the origin plus sixteen forwarding hosts (seventeen nodes), and reject eighteen nodes.
 Native peers use the same protocol maximum; this does not implement a foreign Host forwarding
 policy or change other portable, error-text, graph-node or schema budgets.

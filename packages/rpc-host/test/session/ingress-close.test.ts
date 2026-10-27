@@ -90,10 +90,7 @@ it.each(['fulfilled', 'rejected'] as const)(
       const before = failures.length
       if (outcome === 'fulfilled') verifier.release.resolve()
       else verifier.release.reject(original)
-      /**
-       * BC20 discards late success; an independent verifier rejection still reports its exact
-       * cause.
-       */
+      /** Discards late success; an independent verifier rejection still reports its exact cause. */
       await new Promise<void>((resolve) => setImmediate(resolve))
       expect(failures).toHaveLength(before + (outcome === 'rejected' ? 1 : 0))
       if (outcome === 'rejected') {

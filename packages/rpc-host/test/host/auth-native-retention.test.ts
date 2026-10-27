@@ -38,7 +38,7 @@ it('releases default completed request IDs beyond1024 on a genuine native Node W
   }
 }, 15_000)
 
-it('A30 preserves invalid connection retention as the public native Worker configuration failure', async () => {
+it('preserves invalid connection retention as the public native Worker configuration failure', async () => {
   /** Unexpected successful construction must still release its actual public Host and Worker. */
   let host: Pick<IRpcHost, 'close'> | undefined
   try {

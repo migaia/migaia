@@ -1,4 +1,4 @@
-/** A25 checks per-namespace flow execution during one actual Process-to-Worker forward. */
+/** Checks per-namespace flow execution during one actual Process-to-Worker forward. */
 import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { processPlugin } from '@migaia/rpc-plugin-process'
@@ -9,7 +9,7 @@ import {
   type IFeatureScopeForwardStats
 } from './fixtures/feature-scope-middle.ts'
 
-it('A25 forwards a through b to c using only the source and target namespace flow groups', async () => {
+it('forwards a through b to c using only the source and target namespace flow groups', async () => {
   /** Both real physical hops use the same actual auth Feature, independent of scope observation. */
   const host = await createRpcHost({
     plugins: [

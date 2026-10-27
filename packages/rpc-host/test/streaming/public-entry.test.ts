@@ -80,7 +80,7 @@ it.each([false, true])(
 )
 
 it.each(['item', 'end'] as const)(
-  'R18 public sender rejects an oversized %s without hanging',
+  'public sender rejects an oversized %s without hanging',
   async (event) => {
     /** Actual JSON media owns the sole sender measurement before native write. */
     const fixture = await connectedCoreHosts(
@@ -106,7 +106,7 @@ it.each(['item', 'end'] as const)(
   }
 )
 
-// RPC-TEST-28443200104E-C001-A001: preserve the original unknown-cancelled diagnostic code.
+// Preserve the original unknown-cancelled diagnostic code.
 it('reports INVALID_STREAM for an unknown cancelled frame on the actual accepted source', async () => {
   /** No genuine stream provider may execute for a terminal whose original id was never opened. */
   const count = vi.fn(function* () {
@@ -152,7 +152,7 @@ it('reports INVALID_STREAM for an unknown cancelled frame on the actual accepted
   }
 })
 
-// RPC-TEST-28443200104E-C004: original native open uncertainty and cleanup failure stay distinct.
+// Original native open uncertainty and cleanup failure stay distinct.
 it('C004 sends fail after an uncertain native open and reports the original cleanup Error', async () => {
   /** A failed actual iterator return must be counted once and reported by its original identity. */
   const cleanupError = new Error('cleanup failed')
@@ -221,7 +221,7 @@ it('C004 sends fail after an uncertain native open and reports the original clea
   }
 })
 
-// RPC-TEST-28443200104E-C005: one invalid real credit must fail without advancing the generator.
+// One invalid real credit must fail without advancing the generator.
 it('C005 rejects an out-of-sequence native pull without advancing the original provider', async () => {
   /** Generator advancement is observed only inside the original business generator body. */
   const advanced = { value: 0 }

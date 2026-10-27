@@ -3,7 +3,7 @@ import { PassThrough } from 'node:stream'
 import { createRpcByteCarrier, RpcEventByteIO, encodeRpcStreamFrame } from '@migaia/rpc-host/sdk'
 import { expect, it, vi } from 'vitest'
 
-it('A38 byte carrier rejects a length above 64 KiB before allocating or parsing its payload', async () => {
+it('byte carrier rejects a length above 64 KiB before allocating or parsing its payload', async () => {
   /** Native readable delivery remains owned by Node, rather than a copied test decoder. */
   const input = new PassThrough()
   /** The independent native writer permits ordinary carrier cleanup. */
@@ -49,7 +49,7 @@ it('A38 byte carrier rejects a length above 64 KiB before allocating or parsing 
   }
 })
 
-it('A45 byte carrier parses bounded JSON and exposes the accepted-frame-limit contract port', async () => {
+it('byte carrier parses bounded JSON and exposes the accepted-frame-limit contract port', async () => {
   /** Original Node streams carry one complete small physical frame. */
   const input = new PassThrough()
   /** Native writer lifetime is independent from the incoming fixture bytes. */

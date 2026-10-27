@@ -148,7 +148,7 @@ describe('public request cancellation through the canonical CallTable', () => {
           fixture.pair[0].written.filter((frame) => frame.kind === RpcWireKind.cancel)
         ).toHaveLength(1)
       })
-      /** BC2 gives cancellation its own canonical kind, retaining the original single frame. */
+      /** Gives cancellation its own canonical kind, retaining the original single frame. */
       const cancellations = fixture.pair[0].written.filter(
         (frame) => frame.kind === RpcWireKind.cancel
       )
@@ -275,7 +275,7 @@ it('preserves hostile caller listener failure cause and cleanup before any busin
   }
 })
 
-// RPC-TEST-2558A5FABE51-C001: retain only the original invalidData provider-reason branch here.
+// Retain only the original invalidData provider-reason branch here.
 it('aborts the actual provider with invalid cancellation data and reports one protocol failure', async () => {
   /** Only the actual running provider's signal can settle this original cancellation barrier. */
   const provider = new CancellationProvider()
@@ -396,7 +396,7 @@ function protocolFailureCount(reports: readonly unknown[]): number {
   return count
 }
 
-// RPC-TEST-2558A5FABE51-C001: original raw reason identity survives the current graph-shape refusal.
+// Original raw reason identity survives the current graph-shape refusal.
 it.each(originalLegacyCancellationReasons())(
   'preserves the original raw %s cancellation reason as the malformed provider cause',
   async (_variant, payload) => {

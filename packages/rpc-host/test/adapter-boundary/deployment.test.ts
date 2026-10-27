@@ -88,7 +88,7 @@ describe('cold raw adapter deployment', () => {
       const views = await Promise.all(channels.map((channel) => channel.ready))
       expect(views.map((view) => view.peerId)).toEqual(['right-instance', 'left-instance'])
       for (const carrier of carriers) {
-        // BC3 retires agreement.source; real bilateral readiness proves the original explicit peer.
+        // Retires agreement.source; real bilateral readiness proves the original explicit peer.
         expect(typeof carrier.write).toBe('function')
         expect('request' in carrier).toBe(false)
         expect('endpoint' in carrier).toBe(false)

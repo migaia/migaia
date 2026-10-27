@@ -66,7 +66,7 @@ for (const size of [64 * 1024, 1024 * 1024]) {
       assert.equal(captures[0]!.manifest, prepared.manifest)
       assert.ok('payload' in prepared.manifest.envelope)
       assert.ok(captures[0]!.roots.has(prepared.manifest.envelope.payload as object))
-      /** BC2 preserves admitted key order in the new canonical JSON codec, without legacy sorting. */
+      /** Preserves admitted key order in the new canonical JSON codec, without legacy sorting. */
       const encoded = codec.encode(
         {
           message: prepared.manifest.envelope,

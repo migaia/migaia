@@ -4,7 +4,7 @@ import { expect, it, vi } from 'vitest'
 import { MemoryCarrier } from '../fixtures/core-carrier.js'
 import { coreMemoryServer } from './core-fixture.js'
 
-// C130-A001 and C133-A001 retain subscription counts after the root shadow selector is removed.
+// Retains subscription counts after the root shadow selector is removed.
 it('subscribes each selected actual carrier exactly once', async () => {
   /** Each original listener lends its actual native attach authority to one physical endpoint. */
   const first = coreMemoryServer('selected-first')

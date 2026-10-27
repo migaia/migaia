@@ -60,7 +60,7 @@ it('releases admission and the original request identity when params validation 
   }
 })
 
-// RPC-TEST-784B581CEDC7-C003: original provider-side Promise shape is BC3; real IO/lease duties remain.
+// The original provider-side Promise shape is retired; real IO and lease duties remain.
 it('releases same-session capacity when the validation error reply write fails', async () => {
   /** This original validation failure occurs after the actual capacity-one admission. */
   const validation = createRpcSchemaValidationError('invalid params', { field: 'data' })

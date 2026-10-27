@@ -1,4 +1,4 @@
-/** A17 reads actual owner tables after 10,000 real operations, without production diagnostics. */
+/** Reads actual owner tables after 10,000 real operations, without production diagnostics. */
 import { execFileSync } from 'node:child_process'
 import { getEventListeners } from 'node:events'
 import { mkdirSync, writeFileSync } from 'node:fs'
@@ -558,7 +558,7 @@ function createResidueFixture() {
   }
 }
 
-it('A17 drains actual work, flow, session, listener and timer owners after 10000 mixed operations', async () => {
+it('drains actual work, flow, session, listener and timer owners after 10000 mixed operations', async () => {
   /** Explicit fixture context separates acquisition from the unchanged mixed-workload assertions. */
   const {
     scheduler,

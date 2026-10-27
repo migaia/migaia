@@ -267,7 +267,7 @@ describe('remote wire shapes', () => {
       )
     ).toMatchObject({ ok: false, reason: protocol.RpcShapeReason.schema })
     expect(reads).toBe(1)
-    /** BC9 reads this known method field directly and retains its original thrown cause. */
+    /** Reads this known method field directly and retains its original thrown cause. */
     const method = {
       name: 'resize',
       supportedModes: ['request'],

@@ -1,4 +1,4 @@
-/** A25 proves transport override with genuine Process and Worker children at the public boundary. */
+/** Proves transport override with genuine Process and Worker children at the public boundary. */
 import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { processPlugin } from '@migaia/rpc-plugin-process'
@@ -6,7 +6,7 @@ import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import { schema } from '@migaia/rpc-host/plugins/schema'
 import { FeatureScopeFixture as Fixture, featureScopeAuth } from './fixtures/feature-scope-child.js'
 
-it('A25 Process overrides Host auth once and scopes schema independently from Thread', async () => {
+it('Process overrides Host auth once and scopes schema independently from Thread', async () => {
   /** Each row is one actual signer invocation for the unique business payload. */
   const signed: { key: string; namespace: string }[] = []
   /** The Process-only parser's original failure proves that native local placement really executes. */

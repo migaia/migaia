@@ -3,7 +3,7 @@ import { normalizeRpcFrame, normalizeRpcStream, RpcWireKind } from '@migaia/rpc-
 import { expect, it } from 'vitest'
 import { header } from '../fixtures/core-profile.js'
 
-// RPC-TEST-99EA2C08027E-C001: BC2 moves the unchanged event data into the stream slot.
+// Moves the unchanged event data into the stream slot.
 it('admits the original portable open event without changing its stream data', () => {
   /** Only the representation and correlated task change; the original event stays exact. */
   const envelope = normalizeRpcFrame({

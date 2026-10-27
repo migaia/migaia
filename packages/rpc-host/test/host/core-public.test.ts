@@ -90,7 +90,7 @@ it('context dispatchTo keeps explicit targeting and excludes its original sender
   }
 })
 
-it('BC1 isolates same-named peers under two namespaces and keeps all RPC calls below the root', async () => {
+it('isolates same-named peers under two namespaces and keeps all RPC calls below the root', async () => {
   /** The one actual host owns two distinct transport namespaces with one global identity. */
   const process = coreMemoryServer('gateway', 'gateway', 'process')
   /** The other transport contributes no second host or root call facade. */
@@ -131,7 +131,7 @@ it('BC1 isolates same-named peers under two namespaces and keeps all RPC calls b
   }
 })
 
-it('BC1 rejects absent or duplicate transport namespaces before any native open', () => {
+it('rejects absent or duplicate transport namespaces before any native open', () => {
   /** Cold rejection must happen before the genuine SDK transport may acquire resources. */
   const open = vi.fn(() => ({ dispose: () => undefined }))
   /** Independent real definitions intentionally claim the same host-local namespace. */
@@ -172,7 +172,7 @@ it('BC1 rejects absent or duplicate transport namespaces before any native open'
   expect(open).toHaveBeenCalledTimes(0)
 })
 
-it('A5 forwards one real call across process and thread namespaces with the original hop route', async () => {
+it('forwards one real call across process and thread namespaces with the original hop route', async () => {
   /** The gateway is the only host bridging these two different logical carrier namespaces. */
   const process = coreMemoryServer('gateway', 'gateway', 'process')
   /** Both media still use the same sole protocol grammar, through independent actual carriers. */
@@ -209,7 +209,7 @@ it('A5 forwards one real call across process and thread namespaces with the orig
   }
 })
 
-it('A8 executes a supplied complete feature, honors false and rejects numeric policy syntax', async () => {
+it('executes a supplied complete feature, honors false and rejects numeric policy syntax', async () => {
   /** The installed complete timeout instance is the actual inherited fallback. */
   const inherited = new CountedTimeout()
   /** A supplied instance must execute instead of the inherited one. */

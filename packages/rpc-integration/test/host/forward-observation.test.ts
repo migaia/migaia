@@ -1,4 +1,4 @@
-/** A21 exercises configurable forwarding across actual Process and nested Worker sources. */
+/** Exercises configurable forwarding across actual Process and nested Worker sources. */
 import { expect, it } from 'vitest'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
 import { processPlugin } from '@migaia/rpc-plugin-process'
@@ -38,7 +38,7 @@ async function topology(options: IForwardFixtureOptions): Promise<IRpcHost> {
   }
 }
 
-it('A21 forwards two native hops and exposes each hop through probe and default Devtools', async () => {
+it('forwards two native hops and exposes each hop through probe and default Devtools', async () => {
   /** B and c use their unchanged default forwarding ceilings. */
   const host = await topology({ observed: true })
   try {
@@ -103,7 +103,7 @@ it('A21 forwards two native hops and exposes each hop through probe and default 
   }
 })
 
-it('A21 applies c own hop ceiling before d business is entered', async () => {
+it('applies c own hop ceiling before d business is entered', async () => {
   /** Only the second actual forwarding host changes its own admitted configuration. */
   const host = await topology({ observed: true, cMaxHops: 1 })
   try {
@@ -152,7 +152,7 @@ it('A21 applies c own hop ceiling before d business is entered', async () => {
 })
 
 it.each([0, 17, 1.5])(
-  'A21 rejects unsupported maxHops=%s during public construction',
+  'rejects unsupported maxHops=%s during public construction',
   async (maxHops) => {
     /** A valid cold source avoids testing an earlier missing-transport rejection. */
     const transport = processPlugin({
@@ -165,7 +165,7 @@ it.each([0, 17, 1.5])(
   }
 )
 
-it('A21 keeps actual native forwarding functional without probe or Devtools installed', async () => {
+it('keeps actual native forwarding functional without probe or Devtools installed', async () => {
   /**
    * This path installs neither observer plugin; allocation absence is paired with owner source
    * proof.

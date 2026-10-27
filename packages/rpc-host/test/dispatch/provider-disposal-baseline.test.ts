@@ -173,7 +173,7 @@ it('provider failure preserves INTERNAL and complete RPC Root close identity and
     await expect(endpointDispose).resolves.toBeUndefined()
     expect(fixture.pair[1].unsubscribed).toBe(1)
     expect(fixture.pair[1].closed).toBe(true)
-    /** R21 retains the remote close reason for later named calls to the retired provider. */
+    /** Retains the remote close reason for later named calls to the retired provider. */
     await expect(fixture.a.memory.send('b', 'fail', null)).rejects.toMatchObject({
       code: RpcCoreErrorCode.endpointDisposed
     })

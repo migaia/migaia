@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
 import { evidence, peers } from './fixtures/conformance-business.js'
 import { normalizeRpcFrame } from '@migaia/rpc-contract/protocol'
-/** R17 current semantic vectors are independent of the retired v1 TS endpoint runner. */
+/** Current semantic vectors are independent of the retired v1 TS endpoint runner. */
 const vectors = JSON.parse(
   readFileSync(new URL('../../schema/vectors/core-profile.json', import.meta.url), 'utf8')
 ) as {

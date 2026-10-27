@@ -2,7 +2,7 @@
 import { assert, expect, it, vi } from 'vitest'
 import { connectedCoreHosts } from '../host/core-fixture.js'
 
-// RPC-TEST-B9AD53FC3D12-C001: BC9 removes warnings, preserving all four original business entries.
+// Removes warnings, preserving all four original business entries.
 it('keeps processing three additive route records after the original directed request', async () => {
   /** Only the original provider entry changes this independent business count. */
   let calls = 0
@@ -29,7 +29,7 @@ it('keeps processing three additive route records after the original directed re
         }
       })
     await vi.waitFor(() => expect(calls).toBe(4))
-    /** R17/BC9 deliberately ignores unknown fields without the retired scanner or warning table. */
+    /** Deliberately ignores unknown fields without the retired scanner or warning table. */
     expect(reports).toEqual([])
   } finally {
     await fixture.close()

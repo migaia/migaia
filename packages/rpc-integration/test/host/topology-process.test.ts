@@ -346,7 +346,7 @@ describe('auth installed on one hop only', () => {
   })
 })
 
-it('A27: host-level auth applies to a late thread while the authenticated coroutine remains callable', async () => {
+it('host-level auth applies to a late thread while the authenticated coroutine remains callable', async () => {
   /** Both real transports must borrow this single host-level auth installation. */
   const counter = new HopAuthCounter()
   /** The task reuses the original topology business providers and its own real auth counter. */

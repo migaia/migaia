@@ -156,7 +156,7 @@ it('disposes the original late fulfilled setup once after caller cancellation is
   }
 })
 
-// RPC-TEST-CD50052EF4A5-C007/C009: preserve the original cancellation budget and throwing reporter.
+// /C009: preserve the original cancellation budget and throwing reporter.
 it('settles native construction within 100ms and isolates a throwing original late-failure reporter', async (test) => {
   /** The actual setup signals entry before caller cancellation starts its original budget. */
   const entered = deferred<void>()

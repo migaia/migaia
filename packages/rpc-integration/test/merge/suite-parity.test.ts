@@ -152,7 +152,7 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
     [
       'packages/rpc-host/test/host/installation-late-failure.test.ts::keeps caller cancellation terminal before reporting the original late setup failure'
     ],
-  // R7/BC3 removes the old listener fanout; its exact two callback errors are NoPASS.
+  // Removes the old listener fanout; its exact two callback errors are NoPASS.
   'packages/web-rpc/test/construction-hooks.test.ts::real construction diagnostic reporter isolates sync and async listener failures while preserving late delivery':
     [
       'packages/rpc-host/test/host/installation-late-failure.test.ts::keeps caller cancellation terminal before reporting the original late setup failure'
@@ -189,7 +189,7 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
     [
       'packages/utils/test/promise.test.ts::retains the race result and exact host diagnostic when its cleanup reporter throws'
     ],
-  // RPC-TEST-FB075BDD690B-C039: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts owns provider feature disposal once on success and rollback':
     [
       'packages/rpc-host/test/dispatch/provider-disposal-baseline.test.ts::installed native Host disposal preserves its Promise and removes the original subscription',
@@ -198,135 +198,135 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
       'packages/rpc-host/test/host/middleware-native-rollback-order.test.ts::preserves primary and rollback identities when kernel fails',
       'packages/rpc-host/test/host/middleware-native-rollback-order.test.ts::preserves primary and rollback identities when middleware:connect fails'
     ],
-  // RPC-TEST-FB075BDD690B-C031: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts accepts absent optional authentication and rejects absent required connect':
     [
       'packages/rpc-host/test/host/middleware-native-activation.test.ts::C124 installs one actual native carrier receiver and keeps its subscription active'
     ],
-  // RPC-TEST-FB075BDD690B-C044: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts closes owned success once, borrowed success zero, and repeats Host dispose Promise':
     [
       'packages/rpc-host/test/host/native-port-lifecycle.test.ts::closes owned success once, borrowed success zero, and repeats Host dispose Promise'
     ],
-  // RPC-TEST-FB075BDD690B-C050: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts closes owned transport once and leaves borrowed authentication partial failure closed':
     [
       'packages/rpc-host/test/host/native-port-lifecycle.test.ts::closes owned transport once and leaves borrowed authentication partial failure closed'
     ],
-  // RPC-TEST-FB075BDD690B-C050: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts closes owned transport once and leaves borrowed connect partial failure closed':
     [
       'packages/rpc-host/test/host/native-port-lifecycle.test.ts::closes owned transport once and leaves borrowed connect partial failure closed'
     ],
-  // RPC-TEST-FB075BDD690B-C036: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts invokes async uniqueTargetId factory during production finalization and preserves result':
     [
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C146 preserves native terminal cleanup',
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C147 preserves native terminal cleanup',
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C148 preserves native terminal cleanup'
     ],
-  // RPC-TEST-FB075BDD690B-C052: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts keeps activation primary while ordered owned close cleanup remains reachable':
     [
       'packages/rpc-host/test/host/native-port-lifecycle.test.ts::keeps activation primary while ordered owned close cleanup remains reachable'
     ],
-  // RPC-TEST-FB075BDD690B-C053: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts leaves no activation, shared, extension, registry, kernel, or projection residue':
     [
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::native Feature install failure rolls back without retaining Host residue'
     ],
-  // RPC-TEST-FB075BDD690B-C046: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts preserves authentication protect transform primary and cause identity':
     [
       'packages/rpc-host/test/plugins/auth/middleware-outbound.test.ts::hostile outbound authentication preserves native source/code/cause identity'
     ],
-  // RPC-TEST-FB075BDD690B-C046: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts preserves authentication unprotect transform primary and cause identity':
     [
       'packages/rpc-host/test/plugins/auth/middleware-outbound.test.ts::hostile outbound authentication preserves native source/code/cause identity'
     ],
-  // RPC-TEST-FB075BDD690B-C048: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts preserves each hostile authentication cleanup AggregateError children and outer order':
     [
       'packages/rpc-host/test/host/middleware-cleanup-boundaries.test.ts::preserves each hostile authentication cleanup AggregateError children and outer order'
     ],
-  // RPC-TEST-FB075BDD690B-C048: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts preserves each hostile connect cleanup AggregateError children and outer order':
     [
       'packages/rpc-host/test/host/middleware-cleanup-boundaries.test.ts::preserves each hostile connect cleanup AggregateError children and outer order'
     ],
-  // RPC-TEST-FB075BDD690B-C037: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts preserves hostile async uniqueTargetId factory primary and cause through finalizer':
     [
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::later native failure rolls back earlier owned resources in reverse order'
     ],
-  // RPC-TEST-FB075BDD690B-C045: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts preserves hostile authentication config getter primary and cause identity':
     [
       'packages/rpc-host/test/plugins/auth/middleware-outbound.test.ts::preserves the original authentication configuration getter cause at the public factory'
     ],
-  // RPC-TEST-FB075BDD690B-C047: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts preserves install primary and exact AggregateError rollback identities/order':
     [
       'packages/rpc-host/test/host/middleware-cleanup-boundaries.test.ts::preserves install primary and exact AggregateError rollback identities/order'
     ],
-  // RPC-TEST-FB075BDD690B-C032: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts preserves native authentication async failure identity':
     [
       'packages/rpc-host/test/host/middleware-subscription-lifetime.test.ts::C032 closes an actually acquired native resource once when preparation rejects'
     ],
-  // RPC-TEST-FB075BDD690B-C032: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts preserves native authentication sync failure identity':
     [
       'packages/rpc-host/test/host/middleware-subscription-lifetime.test.ts::C032 closes an actually acquired native resource once when preparation rejects'
     ],
-  // RPC-TEST-FB075BDD690B-C032: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts preserves native connect async failure identity':
     [
       'packages/rpc-host/test/host/middleware-subscription-lifetime.test.ts::C032 closes an actually acquired native resource once when preparation rejects'
     ],
-  // RPC-TEST-FB075BDD690B-C032: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts preserves native connect sync failure identity':
     [
       'packages/rpc-host/test/host/middleware-subscription-lifetime.test.ts::C032 closes an actually acquired native resource once when preparation rejects'
     ],
-  // RPC-TEST-FB075BDD690B-C033: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts preserves one transport close owner through the canonical factory':
     [
       'packages/rpc-host/test/host/middleware-close-owner.test.ts::preserves one transport close owner through the canonical factory'
     ],
-  // RPC-TEST-FB075BDD690B-C051: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts preserves transport close failure cause and repeated Host dispose Promise identity':
     [
       'packages/rpc-host/test/host/core-baseline.test.ts::public failed close preserves its completion identity and original native cleanup cause'
     ],
-  // RPC-TEST-FB075BDD690B-C029: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts publishes authentication and connect through typed Host shared ports':
     [
       'packages/rpc-host/test/host/middleware-auth-connect.test.ts::preserves original authentication transform order and values through actual provider delivery'
     ],
-  // RPC-TEST-FB075BDD690B-C038: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts records unified successful and rollback teardown order with stable repeated disposal':
     [
       'packages/rpc-host/test/host/native-disposal-settlement.test.ts::C038 later native failure preserves primary and releases the original callbacks once',
       'packages/rpc-host/test/host/native-disposal-settlement.test.ts::C038 native success preserves callback identities and stable final completion'
     ],
-  // RPC-TEST-FB075BDD690B-C049: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts releases authentication/connect resources in exact reverse order once':
     [
       'packages/rpc-host/test/host/middleware-native-rollback-order.test.ts::releases authentication/connect resources in exact reverse order once'
     ],
-  // RPC-TEST-FB075BDD690B-C040: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts repeats legacy endpoint disposal without a second transport release':
     [
       'packages/rpc-host/test/host/middleware-close-owner.test.ts::repeats endpoint disposal without a second transport release'
     ],
-  // RPC-TEST-FB075BDD690B-C034: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts runs production authentication encrypt-sign and verify-decrypt with exact published identity':
     [
       'packages/rpc-host/test/host/middleware-auth-connect.test.ts::preserves original authentication transform order and values through actual provider delivery'
     ],
-  // RPC-TEST-FB075BDD690B-C079: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts admitted native abort key publishes to downstream and removes exactly once':
     [
       'packages/rpc-host/test/host/middleware-definition-capture.test.ts::keeps the admitted install after post-snapshot mutation',
@@ -334,7 +334,7 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C147 preserves native terminal cleanup',
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C148 preserves native terminal cleanup'
     ],
-  // RPC-TEST-FB075BDD690B-C079: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts admitted native timeout key publishes to downstream and removes exactly once':
     [
       'packages/rpc-host/test/host/middleware-definition-capture.test.ts::keeps the admitted install after post-snapshot mutation',
@@ -342,134 +342,134 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C147 preserves native terminal cleanup',
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C148 preserves native terminal cleanup'
     ],
-  // RPC-TEST-FB075BDD690B-C075: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts composed operation abort preserves exact caller reason and terminal residue':
     [
       'packages/rpc-host/test/host/middleware-construction-lifetime.test.ts::public operation abort-first preserves its terminal outcome after the other signal',
       'packages/rpc-host/test/host/middleware-construction-lifetime.test.ts::public operation timeout-first preserves its terminal outcome after the other signal'
     ],
-  // RPC-TEST-FB075BDD690B-C070: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts hostile timeout config keeps the original getter cause and native config error':
     [
       'packages/rpc-host/test/host/middleware-construction-lifetime.test.ts::complete timeout capture retains the original hostile getter cause and one read'
     ],
-  // RPC-TEST-FB075BDD690B-C093: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts native abort async hostile install preserves the primary and zero residue':
     [
       'packages/rpc-host/test/host/middleware-async-rollback.test.ts::injected timeout async rejection preserves primary and full rollback residue',
       'packages/rpc-host/test/host/middleware-async-rollback.test.ts::native abort async hostile install preserves the primary and zero residue'
     ],
-  // RPC-TEST-FB075BDD690B-C094: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts operation abort-first barrier chooses one terminal identity and clears late provider state':
     [
       'packages/rpc-host/test/host/middleware-construction-lifetime.test.ts::public operation abort-first preserves its terminal outcome after the other signal',
       'packages/rpc-host/test/host/middleware-construction-lifetime.test.ts::public operation timeout-first preserves its terminal outcome after the other signal'
     ],
-  // RPC-TEST-FB075BDD690B-C095: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts operation timeout-first barrier remains terminal after a late caller abort':
     [
       'packages/rpc-host/test/host/middleware-construction-lifetime.test.ts::public operation abort-first preserves its terminal outcome after the other signal',
       'packages/rpc-host/test/host/middleware-construction-lifetime.test.ts::public operation timeout-first preserves its terminal outcome after the other signal'
     ],
-  // RPC-TEST-FB075BDD690B-C071: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts pre-aborted composed construction preserves exact reason identity':
     [
       'packages/rpc-host/test/host/middleware-construction-lifetime.test.ts::pre-aborted public construction retains the original caller reason'
     ],
-  // RPC-TEST-FB075BDD690B-C090: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts production root cleanup owns same-tick cancellation terminality':
     [
       'packages/rpc-host/test/host/middleware-construction-lifetime.test.ts::pre-aborted public construction retains the original caller reason'
     ],
-  // RPC-TEST-FB075BDD690B-C096: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts real abort-first operation reports a late provider rejection and drains residue':
     [
       'packages/rpc-host/test/dispatch/provider-signal-terminal.test.ts::caller cancellation late reject reports the original error with only its CANCELLED terminal',
       'packages/rpc-host/test/host/middleware-construction-lifetime.test.ts::public operation abort-first preserves its terminal outcome after the other signal',
       'packages/rpc-host/test/host/middleware-construction-lifetime.test.ts::public operation timeout-first preserves its terminal outcome after the other signal'
     ],
-  // RPC-TEST-FB075BDD690B-C092: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts real admitted native abort late reject reports distinct primary while caller reason remains terminal':
     [
       'packages/rpc-host/test/host/installation-late-failure.test.ts::keeps caller cancellation terminal before reporting the original late setup failure'
     ],
-  // RPC-TEST-FB075BDD690B-C092: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts real admitted native timeout late reject reports distinct primary while caller reason remains terminal':
     [
       'packages/rpc-host/test/host/installation-late-failure.test.ts::keeps caller cancellation terminal before reporting the original late setup failure'
     ],
-  // RPC-TEST-FB075BDD690B-C084: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts admitted abort publication is endpoint-local and rollback-removable':
     [
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::native Feature install failure rolls back without retaining Host residue'
     ],
-  // RPC-TEST-FB075BDD690B-C084: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts admitted timeout publication is endpoint-local and rollback-removable':
     [
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::native Feature install failure rolls back without retaining Host residue'
     ],
-  // RPC-TEST-FB075BDD690B-C072: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts during-install abort is terminal and post-success abort is inert':
     [
       'packages/rpc-plugin-process/test/process/bootstrap-source.test.ts::releases a late actual bootstrap after cancellation'
     ],
-  // RPC-TEST-FB075BDD690B-C080: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts generic PluginHost accepts an arbitrary feature outside first-party role schema':
     [
       'packages/rpc-host/test/host/middleware-native-feature-identity.test.ts::generic PluginHost accepts an arbitrary feature outside first-party role schema'
     ],
-  // RPC-TEST-FB075BDD690B-C068: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts injected abort native-role failure preserves identity and residue':
     [
       'packages/rpc-host/test/host/middleware-async-rollback.test.ts::injected timeout async rejection preserves primary and full rollback residue',
       'packages/rpc-host/test/host/middleware-async-rollback.test.ts::native abort async hostile install preserves the primary and zero residue'
     ],
-  // RPC-TEST-FB075BDD690B-C069: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts injected timeout async rejection preserves primary and full rollback residue':
     [
       'packages/rpc-host/test/host/middleware-async-rollback.test.ts::injected timeout async rejection preserves primary and full rollback residue',
       'packages/rpc-host/test/host/middleware-async-rollback.test.ts::native abort async hostile install preserves the primary and zero residue'
     ],
-  // RPC-TEST-FB075BDD690B-C068: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts injected timeout native-role failure preserves identity and residue':
     [
       'packages/rpc-host/test/host/middleware-async-rollback.test.ts::injected timeout async rejection preserves primary and full rollback residue',
       'packages/rpc-host/test/host/middleware-async-rollback.test.ts::native abort async hostile install preserves the primary and zero residue'
     ],
-  // RPC-TEST-FB075BDD690B-C064: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts native timeout install snapshots only after factory creation':
     [
       'packages/rpc-host/test/host/middleware-timeout-snapshot.test.ts::native timeout install snapshots only after factory creation',
       'packages/rpc-host/test/host/middleware-timeout-snapshot.test.ts::timeout config getter is read once and legacy middleware remains callable'
     ],
-  // RPC-TEST-FB075BDD690B-C089: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts native timeout snapshot survives post-install mutation':
     [
       'packages/rpc-host/test/host/middleware-timeout-snapshot.test.ts::native timeout snapshot survives post-install mutation'
     ],
-  // RPC-TEST-FB075BDD690B-C081: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts real inventory admits a non-reserved native plugin with an arbitrary feature':
     [
       'packages/rpc-host/test/host/middleware-native-feature-identity.test.ts::real inventory admits a non-reserved native plugin with an arbitrary feature'
     ],
-  // RPC-TEST-FB075BDD690B-C063: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts timeout config getter is read once and legacy middleware remains callable':
     [
       'packages/rpc-host/test/host/middleware-timeout-snapshot.test.ts::native timeout install snapshots only after factory creation',
       'packages/rpc-host/test/host/middleware-timeout-snapshot.test.ts::timeout config getter is read once and legacy middleware remains callable'
     ],
-  // RPC-TEST-FB075BDD690B-C065: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts timeout snapshots its configuration in receiver-free order':
     [
       'packages/rpc-host/test/host/middleware-timeout-snapshot.test.ts::timeout snapshots its configuration in receiver-free order'
     ],
-  // RPC-TEST-FB075BDD690B-C105: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts hooks and UUID snapshots preserve receiver, retry freshness, and async install barrier':
     [
       'packages/rpc-host/test/host/middleware-async-rollback.test.ts::injected timeout async rejection preserves primary and full rollback residue',
       'packages/rpc-host/test/host/middleware-async-rollback.test.ts::native abort async hostile install preserves the primary and zero residue'
     ],
-  // RPC-TEST-FB075BDD690B-C109: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts native hooks publication is endpoint-local and removed on rollback/dispose':
     [
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C146 preserves native terminal cleanup',
@@ -477,14 +477,14 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C148 preserves native terminal cleanup',
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::later native failure rolls back earlier owned resources in reverse order'
     ],
-  // RPC-TEST-FB075BDD690B-C111: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts native hooks publication is endpoint-local and terminal removal is exact':
     [
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C146 preserves native terminal cleanup',
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C147 preserves native terminal cleanup',
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C148 preserves native terminal cleanup'
     ],
-  // RPC-TEST-FB075BDD690B-C109: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts native ping publication is endpoint-local and removed on rollback/dispose':
     [
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C146 preserves native terminal cleanup',
@@ -492,14 +492,14 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C148 preserves native terminal cleanup',
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::later native failure rolls back earlier owned resources in reverse order'
     ],
-  // RPC-TEST-FB075BDD690B-C111: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts native ping publication is endpoint-local and terminal removal is exact':
     [
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C146 preserves native terminal cleanup',
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C147 preserves native terminal cleanup',
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C148 preserves native terminal cleanup'
     ],
-  // RPC-TEST-FB075BDD690B-C109: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts native uuid publication is endpoint-local and removed on rollback/dispose':
     [
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C146 preserves native terminal cleanup',
@@ -507,19 +507,19 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C148 preserves native terminal cleanup',
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::later native failure rolls back earlier owned resources in reverse order'
     ],
-  // RPC-TEST-FB075BDD690B-C111: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts native uuid publication is endpoint-local and terminal removal is exact':
     [
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C146 preserves native terminal cleanup',
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C147 preserves native terminal cleanup',
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C148 preserves native terminal cleanup'
     ],
-  // RPC-TEST-FB075BDD690B-C108: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts real ping factory has no config reads and publishes one frozen endpoint-local enablement':
     [
       'packages/rpc-host/test/host/middleware-native-activation.test.ts::C124 installs one actual native carrier receiver and keeps its subscription active'
     ],
-  // RPC-TEST-FB075BDD690B-C106: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts independent hooks trace proves failed retry, async barrier, and mutation isolation':
     [
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C146 preserves native terminal cleanup',
@@ -527,7 +527,7 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C148 preserves native terminal cleanup',
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::later native failure rolls back earlier owned resources in reverse order'
     ],
-  // RPC-TEST-FB075BDD690B-C106: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts independent uuid trace proves failed retry, async barrier, and mutation isolation':
     [
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C146 preserves native terminal cleanup',
@@ -535,42 +535,42 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C148 preserves native terminal cleanup',
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::later native failure rolls back earlier owned resources in reverse order'
     ],
-  // RPC-TEST-FB075BDD690B-C117: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts native-shaped hooks publication and endpoint disposal share one composed transaction':
     [
       'packages/rpc-host/test/host/middleware-close-owner.test.ts::C117 preserves both owned flow cleanup failures on the native disposal boundary'
     ],
-  // RPC-TEST-FB075BDD690B-C117: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts native-shaped ping publication and endpoint disposal share one composed transaction':
     [
       'packages/rpc-host/test/host/middleware-close-owner.test.ts::C117 preserves both owned flow cleanup failures on the native disposal boundary'
     ],
-  // RPC-TEST-FB075BDD690B-C117: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts native-shaped uuid publication and endpoint disposal share one composed transaction':
     [
       'packages/rpc-host/test/host/middleware-close-owner.test.ts::C117 preserves both owned flow cleanup failures on the native disposal boundary'
     ],
-  // RPC-TEST-FB075BDD690B-C116: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts baseline: legacy hooks partial rollback is reverse-once with exact cleanup children':
     [
       'packages/rpc-host/test/host/middleware-native-rollback-order.test.ts::baseline: legacy hooks partial rollback is reverse-once with exact cleanup children'
     ],
-  // RPC-TEST-FB075BDD690B-C116: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts baseline: legacy ping partial rollback is reverse-once with exact cleanup children':
     [
       'packages/rpc-host/test/host/middleware-native-rollback-order.test.ts::baseline: legacy ping partial rollback is reverse-once with exact cleanup children'
     ],
-  // RPC-TEST-FB075BDD690B-C116: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts baseline: legacy uuid partial rollback is reverse-once with exact cleanup children':
     [
       'packages/rpc-host/test/host/middleware-native-rollback-order.test.ts::baseline: legacy uuid partial rollback is reverse-once with exact cleanup children'
     ],
-  // RPC-TEST-FB075BDD690B-C110: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts conditional ping enablement and heartbeat cleanup remain legacy-equivalent':
     [
       'packages/rpc-host/test/host/middleware-native-activation.test.ts::C124 installs one actual native carrier receiver and keeps its subscription active'
     ],
-  // RPC-TEST-FB075BDD690B-C115: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   "packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts native 'hooks' 'async' install failure preserves primary and zero residue":
     [
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C146 preserves native terminal cleanup',
@@ -579,7 +579,7 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::later native failure rolls back earlier owned resources in reverse order',
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::native Feature install failure rolls back without retaining Host residue'
     ],
-  // RPC-TEST-FB075BDD690B-C115: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   "packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts native 'hooks' 'sync' install failure preserves primary and zero residue":
     [
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C146 preserves native terminal cleanup',
@@ -588,7 +588,7 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::later native failure rolls back earlier owned resources in reverse order',
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::native Feature install failure rolls back without retaining Host residue'
     ],
-  // RPC-TEST-FB075BDD690B-C115: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   "packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts native 'ping' 'async' install failure preserves primary and zero residue":
     [
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C146 preserves native terminal cleanup',
@@ -597,7 +597,7 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::later native failure rolls back earlier owned resources in reverse order',
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::native Feature install failure rolls back without retaining Host residue'
     ],
-  // RPC-TEST-FB075BDD690B-C115: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   "packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts native 'ping' 'sync' install failure preserves primary and zero residue":
     [
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C146 preserves native terminal cleanup',
@@ -606,7 +606,7 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::later native failure rolls back earlier owned resources in reverse order',
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::native Feature install failure rolls back without retaining Host residue'
     ],
-  // RPC-TEST-FB075BDD690B-C115: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   "packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts native 'uuid' 'async' install failure preserves primary and zero residue":
     [
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C146 preserves native terminal cleanup',
@@ -615,7 +615,7 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::later native failure rolls back earlier owned resources in reverse order',
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::native Feature install failure rolls back without retaining Host residue'
     ],
-  // RPC-TEST-FB075BDD690B-C115: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   "packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts native 'uuid' 'sync' install failure preserves primary and zero residue":
     [
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C146 preserves native terminal cleanup',
@@ -624,63 +624,63 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::later native failure rolls back earlier owned resources in reverse order',
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::native Feature install failure rolls back without retaining Host residue'
     ],
-  // RPC-TEST-FB075BDD690B-C118: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts production framer seam retains boundary and cleanup ownership':
     [
       'packages/rpc-host/test/host/middleware-selected-wire.test.ts::keeps acquired native subscriptions and concurrent disposal identities without optional legacy roles',
       'packages/rpc-host/test/host/middleware-selected-wire.test.ts::keeps selected schema parsing and Unicode fragment boundaries on the actual public pipeline'
     ],
-  // RPC-TEST-FB075BDD690B-C104: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts selected framers remain endpoint-local across concurrent production batches':
     [
       'packages/rpc-host/test/host/middleware-selected-wire.test.ts::keeps acquired native subscriptions and concurrent disposal identities without optional legacy roles'
     ],
-  // RPC-TEST-FB075BDD690B-C006: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts captures object middleware install and metadata at definition time':
     [
       'packages/rpc-host/test/host/middleware-definition-capture.test.ts::captures object middleware install and metadata at definition time'
     ],
-  // RPC-TEST-FB075BDD690B-C009: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts keeps dynamic native middleware keys isolated across concurrent Hosts':
     [
       'packages/rpc-host/test/host/middleware-definition-capture.test.ts::keeps dynamic native middleware keys isolated across concurrent Hosts'
     ],
-  // RPC-TEST-FB075BDD690B-C004: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts normalizes object middleware through the native installation path':
     [
       'packages/rpc-host/test/host/middleware-definition-capture.test.ts::normalizes object middleware through the native installation path'
     ],
-  // RPC-TEST-FB075BDD690B-C002: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts publishes dynamic native middleware keys before activation':
     [
       'packages/rpc-host/test/host/middleware-definition-capture.test.ts::publishes dynamic native middleware keys before activation'
     ],
-  // RPC-TEST-FB075BDD690B-C007: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts rejects explicit empty object publicKeys with a nonempty extension':
     [
       'packages/rpc-host/test/host/middleware-cleanup-boundaries.test.ts::releases native protocol resources exactly once on success and failure, and preserves factory disposal identity'
     ],
-  // RPC-TEST-FB075BDD690B-C008: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts rejects explicit empty object sharedProvides before ingress':
     [
       'packages/rpc-host/test/host/middleware-cleanup-boundaries.test.ts::releases native protocol resources exactly once on success and failure, and preserves factory disposal identity'
     ],
-  // RPC-TEST-FB075BDD690B-C003: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts retains WebRPC owned-resource cleanup for native Middleware':
     [
       'packages/rpc-host/test/host/middleware-native-feature-identity.test.ts::retains WebRPC owned-resource cleanup for native Middleware'
     ],
-  // RPC-TEST-FB075BDD690B-C005: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts selects an object middleware transport without a factory transport':
     [
       'packages/rpc-host/test/host/middleware-definition-capture.test.ts::selects an object middleware transport without a factory transport'
     ],
-  // RPC-TEST-FB075BDD690B-C024: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts accepts absent optional protocol and contract providers at the exact production seam':
     [
       'packages/rpc-host/test/host/middleware-selected-wire.test.ts::keeps acquired native subscriptions and concurrent disposal identities without optional legacy roles'
     ],
-  // RPC-TEST-FB075BDD690B-C014: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts drives every production role through one injected batch with identities and no residue':
     [
       'packages/rpc-host/test/host/middleware-native-rollback-order.test.ts::preserves primary and rollback identities when activation fails',
@@ -688,59 +688,59 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
       'packages/rpc-host/test/host/middleware-native-rollback-order.test.ts::preserves primary and rollback identities when kernel fails',
       'packages/rpc-host/test/host/middleware-native-rollback-order.test.ts::preserves primary and rollback identities when middleware:connect fails'
     ],
-  // RPC-TEST-FB075BDD690B-C010: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts invokes the captured middleware install once with an undefined receiver':
     [
       'packages/rpc-host/test/host/middleware-native-feature-identity.test.ts::retains WebRPC owned-resource cleanup for native Middleware'
     ],
-  // RPC-TEST-FB075BDD690B-C021: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts keeps a fresh native Host transaction isolated after an actual install failure':
     [
       'packages/rpc-host/test/host/middleware-subscription-lifetime.test.ts::C021 preserves a failed native primary and recovers an independent fresh subscription'
     ],
-  // RPC-TEST-FB075BDD690B-C017: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts keeps production shared publication isolated between endpoint Hosts':
     [
       'packages/rpc-host/test/host/middleware-subscription-lifetime.test.ts::C017 keeps two actual native subscriptions isolated when the left Host retires'
     ],
-  // RPC-TEST-FB075BDD690B-C011: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts keeps the admitted install after post-snapshot mutation':
     [
       'packages/rpc-host/test/host/middleware-definition-capture.test.ts::keeps the admitted install after post-snapshot mutation'
     ],
-  // RPC-TEST-FB075BDD690B-C015: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts preflights the production inventory and rejects static/runtime claim mismatches before Host mutation':
     [
       'packages/rpc-host/test/host/middleware-cold-definition.test.ts::C015 keeps a real native carrier untouched while its SDK definition is cold',
       'packages/rpc-host/test/host/middleware-native-activation.test.ts::C124 installs one actual native carrier receiver and keeps its subscription active'
     ],
-  // RPC-TEST-FB075BDD690B-C013: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts preserves primary and rollback identities when activation fails':
     [
       'packages/rpc-host/test/host/middleware-native-rollback-order.test.ts::preserves primary and rollback identities when activation fails'
     ],
-  // RPC-TEST-FB075BDD690B-C013: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts preserves primary and rollback identities when feature:outbound fails':
     [
       'packages/rpc-host/test/host/middleware-native-rollback-order.test.ts::preserves primary and rollback identities when feature:outbound fails'
     ],
-  // RPC-TEST-FB075BDD690B-C013: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts preserves primary and rollback identities when kernel fails':
     [
       'packages/rpc-host/test/host/middleware-native-rollback-order.test.ts::preserves primary and rollback identities when kernel fails'
     ],
-  // RPC-TEST-FB075BDD690B-C013: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts preserves primary and rollback identities when middleware:connect fails':
     [
       'packages/rpc-host/test/host/middleware-native-rollback-order.test.ts::preserves primary and rollback identities when middleware:connect fails'
     ],
-  // RPC-TEST-FB075BDD690B-C023: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts preserves custom protocol/contract behavior and read order through the production seam':
     [
       'packages/rpc-host/test/host/middleware-selected-wire.test.ts::keeps acquired native subscriptions and concurrent disposal identities without optional legacy roles',
       'packages/rpc-host/test/host/middleware-selected-wire.test.ts::keeps selected schema parsing and Unicode fragment boundaries on the actual public pipeline'
     ],
-  // RPC-TEST-FB075BDD690B-C026: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts preserves native contract install async identity and rollback residue':
     [
       'packages/rpc-host/test/host/middleware-native-rollback-order.test.ts::preserves primary and rollback identities when activation fails',
@@ -748,7 +748,7 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
       'packages/rpc-host/test/host/middleware-native-rollback-order.test.ts::preserves primary and rollback identities when kernel fails',
       'packages/rpc-host/test/host/middleware-native-rollback-order.test.ts::preserves primary and rollback identities when middleware:connect fails'
     ],
-  // RPC-TEST-FB075BDD690B-C026: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts preserves native contract install sync identity and rollback residue':
     [
       'packages/rpc-host/test/host/middleware-native-rollback-order.test.ts::preserves primary and rollback identities when activation fails',
@@ -756,7 +756,7 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
       'packages/rpc-host/test/host/middleware-native-rollback-order.test.ts::preserves primary and rollback identities when kernel fails',
       'packages/rpc-host/test/host/middleware-native-rollback-order.test.ts::preserves primary and rollback identities when middleware:connect fails'
     ],
-  // RPC-TEST-FB075BDD690B-C026: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts preserves native protocol install async identity and rollback residue':
     [
       'packages/rpc-host/test/host/middleware-native-rollback-order.test.ts::preserves primary and rollback identities when activation fails',
@@ -764,7 +764,7 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
       'packages/rpc-host/test/host/middleware-native-rollback-order.test.ts::preserves primary and rollback identities when kernel fails',
       'packages/rpc-host/test/host/middleware-native-rollback-order.test.ts::preserves primary and rollback identities when middleware:connect fails'
     ],
-  // RPC-TEST-FB075BDD690B-C026: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts preserves native protocol install sync identity and rollback residue':
     [
       'packages/rpc-host/test/host/middleware-native-rollback-order.test.ts::preserves primary and rollback identities when activation fails',
@@ -772,69 +772,69 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
       'packages/rpc-host/test/host/middleware-native-rollback-order.test.ts::preserves primary and rollback identities when kernel fails',
       'packages/rpc-host/test/host/middleware-native-rollback-order.test.ts::preserves primary and rollback identities when middleware:connect fails'
     ],
-  // RPC-TEST-FB075BDD690B-C028: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::atomic middleware and claim contracts releases native protocol resources exactly once on success and failure, and preserves factory disposal identity':
     [
       'packages/rpc-host/test/host/middleware-cleanup-boundaries.test.ts::releases native protocol resources exactly once on success and failure, and preserves factory disposal identity'
     ],
-  // RPC-TEST-FB075BDD690B-C141: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix supporting endpoint seam: send/RPC retains endpoint and disposal Promise identity':
     [
       'packages/rpc-host/test/host/middleware-calls.test.ts::public send retains its canonical result and disposal Promise identity'
     ],
-  // RPC-TEST-FB075BDD690B-C140: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix outbound cleanup proves exact order, failure identity, and terminal idempotence':
     [
       'packages/rpc-host/test/host/native-disposal-settlement.test.ts::C140 composed native boundary preserves both cleanup leaves and one completion',
       'packages/rpc-host/test/host/native-disposal-settlement.test.ts::C140 native cleanup retains all four original leaves in the actual close order',
       'packages/rpc-host/test/host/native-disposal-settlement.test.ts::C140 native success releases all three original resources and empties actual owners'
     ],
-  // RPC-TEST-FB075BDD690B-C142: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix caller cancellation preserves native cause and clears outbound pending state':
     [
       'packages/rpc-host/test/call/public-cancellation.test.ts::public request cancellation through the canonical CallTable leaves zero active providers after a local signal.abort() fired synchronously right after send()'
     ],
-  // RPC-TEST-FB075BDD690B-C144: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix hostile outbound authentication preserves native source/code/cause identity':
     [
       'packages/rpc-host/test/plugins/auth/middleware-outbound.test.ts::hostile outbound authentication preserves native source/code/cause identity'
     ],
-  // RPC-TEST-FB075BDD690B-C146: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix primitive native Feature installation reaches terminal cleanup':
     [
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C146 preserves native terminal cleanup'
     ],
-  // RPC-TEST-FB075BDD690B-C147: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix undefined native Feature installation reaches terminal cleanup':
     [
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C147 preserves native terminal cleanup'
     ],
-  // RPC-TEST-FB075BDD690B-C148: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix no-disposer native Feature installation has one terminal Host Promise':
     [
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C148 preserves native terminal cleanup'
     ],
-  // RPC-TEST-FB075BDD690B-C149: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix native Feature result disposer runs once at terminal cleanup':
     [
       'packages/rpc-host/test/host/middleware-close-owner.test.ts::native flow result disposer runs once at terminal cleanup'
     ],
-  // RPC-TEST-FB075BDD690B-C150: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix native Feature install failure rolls back without retaining Host residue':
     [
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::native Feature install failure rolls back without retaining Host residue'
     ],
-  // RPC-TEST-FB075BDD690B-C151: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix native result cleanup failure preserves identity and terminal Promise identity':
     [
       'packages/rpc-host/test/host/middleware-cleanup-boundaries.test.ts::native result cleanup failure preserves identity and terminal Promise identity'
     ],
-  // RPC-TEST-FB075BDD690B-C153: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix later native failure rolls back earlier owned resources in reverse order':
     [
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::later native failure rolls back earlier owned resources in reverse order'
     ],
-  // RPC-TEST-FB075BDD690B-C152: BC3 synthetic observer-fault dimension NoPASS; require native memoization and actual cleanup only, without claiming that old diagnostic callback ran.
+  // Synthetic observer-fault dimension NoPASS; require native memoization and actual cleanup only, without claiming that old diagnostic callback ran.
   'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix throwing cleanup observer is diagnostic-only and cannot alter disposal':
     [
       'packages/rpc-host/test/host/middleware-cleanup-boundaries.test.ts::native result cleanup failure preserves identity and terminal Promise identity',
@@ -842,67 +842,67 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C147 preserves native terminal cleanup',
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C148 preserves native terminal cleanup'
     ],
-  // RPC-TEST-FB075BDD690B-C123: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix outbound install does not subscribe or activate before final activation':
     [
       'packages/rpc-host/test/host/middleware-native-activation.test.ts::C123 keeps native installation pending and business gated until final commit'
     ],
-  // RPC-TEST-FB075BDD690B-C124: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix the untransformed native capability Feature activates one receiver':
     [
       'packages/rpc-host/test/host/middleware-native-activation.test.ts::C124 installs one actual native carrier receiver and keeps its subscription active'
     ],
-  // RPC-TEST-FB075BDD690B-C125: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix outbound typed ports are endpoint-local and never shared by identity':
     [
       'packages/rpc-host/test/dispatch/provider-disposal-baseline.test.ts::installed native Host disposal preserves its Promise and removes the original subscription'
     ],
-  // RPC-TEST-FB075BDD690B-C126: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix supporting baseline: endpoint construction owns target snapshot before outbound activation':
     [
       'packages/rpc-host/test/host/middleware-calls.test.ts::real outbound send and broadcast preserve canonical results'
     ],
-  // RPC-TEST-FB075BDD690B-C137: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix real outbound send and RPC fanout preserve canonical results':
     [
       'packages/rpc-host/test/host/middleware-calls.test.ts::real outbound send and broadcast preserve canonical results'
     ],
-  // RPC-TEST-FB075BDD690B-C138: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix outbound dispose is host-owned, idempotent, and rejects later sends canonically':
     [
       'packages/rpc-host/test/host/middleware-calls.test.ts::outbound close is host-owned, idempotent, and rejects later sends canonically'
     ],
-  // RPC-TEST-FB075BDD690B-C139: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix later activation failure rolls back outbound publication and leaves zero subscription residue':
     [
       'packages/rpc-host/test/host/native-port-lifecycle.test.ts::later activation failure rolls back outbound publication and leaves zero subscription residue'
     ],
-  // RPC-TEST-FB075BDD690B-C136: BC1/BC3 keeps the public missing-source business with HOST_TRANSPORT_MISSING; old private INVALID_CONFIG input/code receives NoPASS.
+  // Keeps the public missing-source business with HOST_TRANSPORT_MISSING; old private INVALID_CONFIG input/code receives NoPASS.
   'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix rejects a missing transport before Host construction':
     [
-      'packages/rpc-host/test/host/core-public.test.ts::BC1 rejects absent or duplicate transport namespaces before any native open'
+      'packages/rpc-host/test/host/core-public.test.ts::rejects absent or duplicate transport namespaces before any native open'
     ],
-  // RPC-TEST-FB075BDD690B-C134: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix selected class transport retains its private method receiver':
     [
       'packages/rpc-host/test/host/middleware-transport-selection.test.ts::subscribes each selected actual carrier exactly once'
     ],
-  // RPC-TEST-FB075BDD690B-C133: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix selected transport getters run once when top-level transport shadows a plugin':
     [
       'packages/rpc-host/test/host/middleware-transport-selection.test.ts::subscribes each selected actual carrier exactly once'
     ],
-  // RPC-TEST-FB075BDD690B-C130: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::outbound feature production-seam matrix top-level transport shadows one plugin transport before subscription':
     [
       'packages/rpc-host/test/host/middleware-transport-selection.test.ts::subscribes each selected actual carrier exactly once'
     ],
-  // RPC-TEST-FB075BDD690B-C154: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::discovery Host transactions publishes and removes the real discovery resolver in one Host transaction':
     [
       'packages/rpc-host/test/dispatch/provider-disposal-baseline.test.ts::installed native Host disposal preserves its Promise and removes the original subscription'
     ],
-  // RPC-TEST-FB075BDD690B-C156: BC3 synthetic discovery fault dimension NoPASS; preserve same-native completion and genuine cleanup leaves without replaying removed fault injection.
+  // Synthetic discovery fault dimension NoPASS; preserve same-native completion and genuine cleanup leaves without replaying removed fault injection.
   'packages/web-rpc/test/middleware-ports.test.ts::discovery Host transactions preserves the real discovery cleanup error identity and terminal residue':
     [
       'packages/rpc-host/test/host/middleware-cleanup-boundaries.test.ts::native result cleanup failure preserves identity and terminal Promise identity',
@@ -910,12 +910,12 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C147 preserves native terminal cleanup',
       'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C148 preserves native terminal cleanup'
     ],
-  // RPC-TEST-FB075BDD690B-C157: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::discovery Host transactions preserves the shared canonical Host and endpoint disposal Promise on cleanup failure':
     [
       'packages/rpc-host/test/host/native-disposal-settlement.test.ts::native cleanup failure retains shared completion and empties actual RPC resource tables'
     ],
-  // RPC-TEST-FB075BDD690B-C155: Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
+  // Exact original business is received by these existing actual cases; runtime still must pass. Exact removed input/role/translator facets receive no old-node credit.
   'packages/web-rpc/test/middleware-ports.test.ts::discovery Host transactions rolls back a published discovery resolver when a later real Host participant fails':
     [
       'packages/rpc-host/test/host/middleware-native-rollback-order.test.ts::preserves the complete later asynchronous native participant failure and disposal identity'

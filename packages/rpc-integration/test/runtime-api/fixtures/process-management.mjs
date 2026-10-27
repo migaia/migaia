@@ -128,7 +128,7 @@ try {
 console.log(
   JSON.stringify({
     runtime,
-    cases: ['A44-two-PID', 'A46-stop-zero', 'A46-kill', 'A46-pending-upgrade', 'A46-early-exit'],
+    cases: ['two-PID', 'stop-zero', 'kill', 'pending-upgrade', 'early-exit'],
     ok: true
   })
 )

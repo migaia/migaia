@@ -30,7 +30,7 @@ type IAuthentication = {
   verify(value: unknown): unknown
   onRejected?(rejection: unknown): void
 }
-/** Only the BC3 public factory names differ between the two measured versions. */
+/** Only the public factory names differ between the two measured versions. */
 type IFlowModule = {
   auth?: (options: IAuthentication) => unknown
   authFeature?: (options: IAuthentication) => unknown
@@ -72,7 +72,7 @@ const CorePerfText = {
   /** Count mismatches prevent an incomplete provider/client exchange from yielding timing credit. */
   counters: 'core-refactor fixture exchange counters disagree'
 } as const
-/** Exactly the eight R12 cells are measured; no broader benchmark matrix is introduced. */
+/** Exactly the eight cells are measured; no broader benchmark matrix is introduced. */
 const scenarios: readonly IScenario[] = [
   { name: 'small-request', mode: 'request', bytes: 64, chunks: 1 },
   { name: '64KiB-binary', mode: 'request', bytes: 65_536, chunks: 1 },
@@ -234,7 +234,7 @@ class CorePerformanceCell {
     const carrier = (await import('@migaia/rpc-plugin-browser')) as unknown as ICarrierModule
     /** Inspect only published export metadata to select the old/new public plugin paths. */
     const manifest = JSON.parse(readFileSync(join(packageRoot, 'rpc-host/package.json'), 'utf8'))
-    /** The module path changes only because BC3/BC5 move existing abilities to plugins. */
+    /** The module path changes only because move existing abilities to plugins. */
     const featureModule = enhanced
       ? ((await import(
           manifest.exports['./plugins'] ? '@migaia/rpc-host/plugins' : '@migaia/rpc-host/features'
@@ -273,7 +273,7 @@ class CorePerformanceCell {
     /** Factories create separate cold instances; no installed state is shared across hosts. */
     const plugins: unknown[] = [context.carrier.dedicatedWorkerPlugin({ worker: port })]
     if (context.features) {
-      /** Factory renames are the exact BC3 move recorded in the public-contract ledger. */
+      /** Factory renames are the exact move recorded in the public-contract ledger. */
       const auth = context.features.auth ?? context.features.authFeature!
       /** Auth and chunk always run together on the enhanced arm. */
       const chunk = context.features.chunk ?? context.features.chunkFeature!
@@ -414,7 +414,7 @@ async function measure(scenario: IScenario, enhanced: boolean): Promise<unknown>
   }
 }
 
-/** Run the authorized finite R12 matrix and bind results to the exact fixture and dist bytes. */
+/** Run the authorized finite matrix and bind results to the exact fixture and dist bytes. */
 async function main(): Promise<void> {
   /** Every arm uses the same sample policy and scenario order for paired comparisons. */
   const results: unknown[] = []

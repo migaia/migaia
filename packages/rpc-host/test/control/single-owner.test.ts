@@ -1,4 +1,4 @@
-/** Public control error identities stay canonical after BC2/BC4 remove old route/store surfaces. */
+/** Public control error identities stay canonical after remove old route/store surfaces. */
 import { expect, it } from 'vitest'
 import * as core from '@migaia/rpc-host'
 import { createRpcIdempotencyStore } from '@migaia/rpc-host/plugins/idempotency'
@@ -9,7 +9,7 @@ it('retains public cancellation and deadline identities at their sole error-code
   expect(Object.values(RpcContractErrorCode)).not.toContain('DEADLINE_EXCEEDED')
   expect(RpcCoreErrorCode.cancelled).toBe('CANCELLED')
   expect(RpcCoreErrorCode.deadlineExceeded).toBe('DEADLINE_EXCEEDED')
-  /** BC4 moves the existing store factory from the mandatory root into its optional owner. */
+  /** Moves the existing store factory from the mandatory root into its optional owner. */
   expect(Object.hasOwn(core, 'createRpcIdempotencyStore')).toBe(false)
   expect(createRpcIdempotencyStore).toBeTypeOf('function')
 })

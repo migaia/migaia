@@ -9,7 +9,7 @@ import { coreMemoryServer } from '../host/core-fixture.js'
 afterEach(() => vi.restoreAllMocks())
 
 describe('activated native probe slots', () => {
-  // RPC-TEST-9B1E264D9F68-C001: all nine original business/observation assertions remain.
+  // All nine original business/observation assertions remain.
   it.each(['absent', 'single', 'array'] as const)(
     'preserves real native results with %s probe definitions',
     async (mode) => {
@@ -29,7 +29,7 @@ describe('activated native probe slots', () => {
       const handle = defineProbe({ stages: ['peer', 'message', 'carrier'], emit })
       /** The original array arm supplies the same immutable handle through native rest input. */
       const handles = [handle]
-      /** BC3 removes Peer options; the same native plugin accepts individual or spread array inputs. */
+      /** Removes Peer options; the same native plugin accepts individual or spread array inputs. */
       const plugins =
         mode === 'absent' ? [] : [mode === 'single' ? probe(handle) : probe(...handles)]
       /** The original fixture acquires both actual endpoints through their existing source owner. */
@@ -68,7 +68,7 @@ describe('activated native probe slots', () => {
     }
   )
 
-  // RPC-TEST-9B1E264D9F68-C002-A002..A004: optional capability remains unused without a probe.
+  // ..optional capability remains unused without a probe.
   it('an unobserved native Session ignores the optional physical observation capability', async () => {
     /** A passthrough spy observes the actual acquired capability without installing it itself. */
     const observe = vi.spyOn(RpcCarrierObservation.prototype, 'subscribe')

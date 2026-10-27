@@ -103,8 +103,8 @@ function sourceFiles(directory: string): string[] {
 }
 
 describe('layer dependency direction', () => {
-  it('[CORE-A1-DEPENDENCIES] keeps five Host runtime dependencies and one exact Contract peer', () => {
-    /** BC26 borrows the application's Contract peer while Host retains five runtime dependencies. */
+  it('keeps five Host runtime dependencies and one exact Contract peer', () => {
+    /** Borrows the application's Contract peer while Host retains five runtime dependencies. */
     const manifest = JSON.parse(readFileSync(join(sourceRoot, '../package.json'), 'utf8')) as {
       dependencies: Record<string, string>
       peerDependencies: Record<string, string>

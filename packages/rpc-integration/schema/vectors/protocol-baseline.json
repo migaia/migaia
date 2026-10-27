@@ -95,11 +95,11 @@
   "retiredHandshake": [
     {
       "id": "missing-runtime-api",
-      "reason": "BC2 removed mandatory runtime-api@1/batch@1 negotiation"
+      "reason": "removed mandatory runtime-api@1/batch@1 negotiation"
     },
     {
       "id": "missing-batch",
-      "reason": "BC2 removed mandatory runtime-api@1/batch@1 negotiation"
+      "reason": "removed mandatory runtime-api@1/batch@1 negotiation"
     }
   ]
 }

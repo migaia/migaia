@@ -17,7 +17,7 @@ def request(identifier, method, local, remote, payload=None, mode="request"):
 class RuntimeBaseline(unittest.TestCase):
     """Keep original native identity, registry, receipt, error, mode and cleanup checks."""
 
-    # test_offered_baseline's only assertion was the removed runtime-api/batch capability gate (BC2).
+    # test_offered_baseline's only assertion was the removed runtime-api/batch capability gate ().
 
     def test_actual_v2_directory(self):
         """The same actual provider catalog is now schema3 and is published in handshake."""
@@ -41,7 +41,7 @@ class RuntimeBaseline(unittest.TestCase):
             self.assertIn(name, business.providers)
 
     def test_bridge_v2_batch_and_notification_share_business_state(self):
-        """Keep strict token validation and original ordered siblings over genuine native frames (BC2 bridge retired)."""
+        'Keep strict token validation and original ordered siblings over genuine native frames (bridge retired).'
         reader, writer = io.BytesIO(), io.BytesIO()
         hello = {**peer.own_offer("parent"), "auth": "unit-token"}
         local = Business().identity
@@ -66,7 +66,7 @@ class RuntimeBaseline(unittest.TestCase):
         self.assertEqual([reply["id"] for reply in responses], ["missing", "received"])
         self.assertEqual(responses[0]["error"]["nodes"][0]["code"], "PROVIDER_NOT_FOUND")
         self.assertEqual(responses[1]["result"], {"count": 1, "values": ["receipt"]})
-        # BC12 retains every original response and adds the final close before physical EOF.
+        # retains every original response and adds the final close before physical EOF.
         closing = peer.decode_frame(peer.read_frame(writer))
         self.assertEqual(closing["operation"], peer.CONTROL_CLOSE)
         self.assertEqual(closing["reason"]["nodes"][0]["code"], "ENDPOINT_DISPOSED")

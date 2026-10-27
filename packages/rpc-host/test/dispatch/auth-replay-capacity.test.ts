@@ -34,7 +34,7 @@ const clientAuthentication = auth({
   verifyCredentials: verifyReplayCredential
 })
 
-// RPC-TEST-7E9092061053-C001 and RPC-TEST-CD7E447F6280-C001 share one real workload.
+// And share one real workload.
 it.each([undefined, 1101])(
   'retains the default1024 and explicit%s completed Auth workload without business overflow',
   async (maximum) => {
@@ -101,7 +101,7 @@ it.each([undefined, 1101])(
   }
 )
 
-// RPC-TEST-7E9092061053-C002: BC3 moves validation from private composition to the public factory.
+// Moves validation from private composition to the public factory.
 it.each([0, -1, 1.5, NaN])('rejects invalid explicit Auth replay limit%s', (value) => {
   expect(() =>
     auth({
@@ -112,7 +112,7 @@ it.each([0, -1, 1.5, NaN])('rejects invalid explicit Auth replay limit%s', (valu
   ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }))
 })
 
-// RPC-TEST-7E7E5257C750-C004: hooks DTOs retire; public refusals and observer causes remain.
+// Hooks DTOs retire; public refusals and observer causes remain.
 it.each(['none', 'ok', 'throw', 'reject'] as const)(
   'preserves request and notify Auth replay refusal with%s rejection observer',
   async (mode) => {

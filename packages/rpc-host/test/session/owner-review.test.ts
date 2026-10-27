@@ -153,7 +153,7 @@ function observePeerClose(namespace: object, listener: (event: unknown) => void)
   subscribe(listener)
 }
 
-it('A36 local bad-frame failure keeps its own reason, sends close and does not await native exit', async () => {
+it('local bad-frame failure keeps its own reason, sends close and does not await native exit', async () => {
   /** The provider proves the outgoing request was written before local decoding fails. */
   const entered = deferred<void>()
   /** Application work is released independently during fixture cleanup. */
@@ -209,7 +209,7 @@ it('A36 local bad-frame failure keeps its own reason, sends close and does not a
   }
 })
 
-it('A36 physical EOF still uses its native terminal reason and publishes peer closure', async () => {
+it('physical EOF still uses its native terminal reason and publishes peer closure', async () => {
   /** The public native stage observes the actual connection signal without replacing its owner. */
   const gate = new ClosingAcceptGate()
   gate.hold = false
@@ -251,7 +251,7 @@ it('A36 physical EOF still uses its native terminal reason and publishes peer cl
   }
 })
 
-it('A45 public transport controls preserve closing-window errors after native reason selection', async () => {
+it('public transport controls preserve closing-window errors after native reason selection', async () => {
   /** Both public Hosts acquire native carriers through the existing SDK transport hook. */
   const gate = new ClosingAcceptGate()
   gate.hold = false
@@ -344,7 +344,7 @@ it('A45 public transport controls preserve closing-window errors after native re
 })
 
 it.each(['acknowledgment', 'genuine failure'] as const)(
-  'A40 suspended handshake accept preserves closing %s diagnostics',
+  'suspended handshake accept preserves closing %s diagnostics',
   async (mode) => {
     /** Only the optional genuine business error may be reported after ordinary close. */
     const lateError = new Error('late handshake business failure')
@@ -386,7 +386,7 @@ it.each(['acknowledgment', 'genuine failure'] as const)(
 )
 
 it.each(['caller', 'session'] as const)(
-  'A40 %s cancellation while encoding does not report a late failure',
+  '%s cancellation while encoding does not report a late failure',
   async (cancelledBy) => {
     /** Actual codec suspension makes cancellation happen before physical handoff. */
     const entered = deferred<void>()

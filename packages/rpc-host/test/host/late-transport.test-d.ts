@@ -1,4 +1,4 @@
-/** A27 namespace widening belongs to the awaited use result, not a mutable Host type assertion. */
+/** Namespace widening belongs to the awaited use result, not a mutable Host type assertion. */
 import { createRpcHost } from '@migaia/rpc-host'
 import { defineFlowFeature, defineTransportPlugin } from '@migaia/rpc-host/sdk'
 import type { IPluginRemoval } from '@migaia/plugin-host'

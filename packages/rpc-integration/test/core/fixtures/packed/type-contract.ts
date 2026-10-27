@@ -16,23 +16,23 @@ import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'
 
 // @ts-expect-error Complete endpoint factories are not a public Host entry.
 import { createEndpoint } from '@migaia/rpc-host'
-// @ts-expect-error Full endpoint presets were deleted by BC3.
+// @ts-expect-error Full endpoint presets were deleted by .
 import { createFullEndpoint } from '@migaia/rpc-host'
 // @ts-expect-error One-way endpoint construction is not a second public entry.
 import { createFullOneWayEndpoint } from '@migaia/rpc-host'
-// @ts-expect-error Per-session Peer constructors were deleted by BC3.
+// @ts-expect-error Per-session Peer constructors were deleted by .
 import { createRuntimePeer } from '@migaia/rpc-host/sdk'
-// @ts-expect-error Managed Peer constructors were deleted by BC3.
+// @ts-expect-error Managed Peer constructors were deleted by .
 import { createManagedRuntimePeer } from '@migaia/rpc-host/sdk'
 // @ts-expect-error The legacy runtime plugin is replaced by registered transport definitions.
 import { createRuntimePlugin } from '@migaia/rpc-host/sdk'
-// @ts-expect-error Remote host constructors were deleted by BC3.
+// @ts-expect-error Remote host constructors were deleted by .
 import { createRemoteHost } from '@migaia/rpc-host/sdk'
 // @ts-expect-error Remote plugin construction is not a user or author public entry.
 import { createRemotePlugin } from '@migaia/rpc-host/sdk'
-// @ts-expect-error Standalone serve constructors were deleted by BC3.
+// @ts-expect-error Standalone serve constructors were deleted by .
 import { serveRemoteHost } from '@migaia/rpc-host/sdk'
-// @ts-expect-error Standalone serve constructors were deleted by BC3.
+// @ts-expect-error Standalone serve constructors were deleted by .
 import { serveRemotePlugin } from '@migaia/rpc-host/sdk'
 // @ts-expect-error Endpoint preset subpaths no longer compete with createRpcHost.
 import { createComposedEndpoint } from '@migaia/rpc-host/composed'
@@ -43,7 +43,7 @@ import { createProviderEndpoint } from '@migaia/rpc-host/provider'
 // @ts-expect-error Endpoint preset subpaths no longer compete with createRpcHost.
 import { createFullEndpoint as fullPreset } from '@migaia/rpc-host/full'
 
-/** A46 forwarding keeps every moved contract type equal to its canonical declaration. */
+/** Forwarding keeps every moved contract type equal to its canonical declaration. */
 import type * as IHostContract from '@migaia/rpc-host/contract'
 import type * as ICanonicalErrors from '@migaia/rpc-contract/errors'
 import type * as ICanonicalPortable from '@migaia/rpc-contract/portable'
@@ -97,35 +97,35 @@ type IContractTypesMatch = IAssertSame<
 /** Type evidence is consumed only during the packed declaration check. */
 declare const contractTypesMatch: IContractTypesMatch
 void contractTypesMatch
-// @ts-expect-error BC30 removes contract types from the Host root.
+// @ts-expect-error removes contract types from the Host root.
 import type { RpcError as IRemovedRpcError } from '@migaia/rpc-host'
-// @ts-expect-error BC30 removes contract types from the Host root.
+// @ts-expect-error removes contract types from the Host root.
 import type { RpcSchemaValidationError as IRemovedRpcSchemaValidationError } from '@migaia/rpc-host'
-// @ts-expect-error BC30 removes contract types from the Host root.
+// @ts-expect-error removes contract types from the Host root.
 import type { RpcConfigurationError as IRemovedRpcConfigurationError } from '@migaia/rpc-host'
-// @ts-expect-error BC30 removes contract types from the Host root.
+// @ts-expect-error removes contract types from the Host root.
 import type { RpcConstructionError as IRemovedRpcConstructionError } from '@migaia/rpc-host'
-// @ts-expect-error BC30 removes contract types from the Host root.
+// @ts-expect-error removes contract types from the Host root.
 import type { RpcSerializationError as IRemovedRpcSerializationError } from '@migaia/rpc-host'
-// @ts-expect-error BC30 removes contract types from the Host root.
+// @ts-expect-error removes contract types from the Host root.
 import type { RpcProtocolError as IRemovedRpcProtocolError } from '@migaia/rpc-host'
-// @ts-expect-error BC30 removes contract types from the Host root.
+// @ts-expect-error removes contract types from the Host root.
 import type { RpcContractError as IRemovedRpcContractError } from '@migaia/rpc-host'
-// @ts-expect-error BC30 removes contract types from the Host root.
+// @ts-expect-error removes contract types from the Host root.
 import type { RpcTransportError as IRemovedRpcTransportError } from '@migaia/rpc-host'
-// @ts-expect-error BC30 removes contract types from the Host root.
+// @ts-expect-error removes contract types from the Host root.
 import type { RpcAuthenticationError as IRemovedRpcAuthenticationError } from '@migaia/rpc-host'
-// @ts-expect-error BC30 removes contract types from the Host root.
+// @ts-expect-error removes contract types from the Host root.
 import type { RpcChunkError as IRemovedRpcChunkError } from '@migaia/rpc-host'
-// @ts-expect-error BC30 removes contract types from the Host root.
+// @ts-expect-error removes contract types from the Host root.
 import type { RpcRemoteError as IRemovedRpcRemoteError } from '@migaia/rpc-host'
-// @ts-expect-error BC30 removes contract types from the Host root.
+// @ts-expect-error removes contract types from the Host root.
 import type { RpcAbortError as IRemovedRpcAbortError } from '@migaia/rpc-host'
-// @ts-expect-error BC30 removes contract types from the Host root.
+// @ts-expect-error removes contract types from the Host root.
 import type { RpcTimeoutError as IRemovedRpcTimeoutError } from '@migaia/rpc-host'
-// @ts-expect-error BC30 removes contract types from the Host root.
+// @ts-expect-error removes contract types from the Host root.
 import type { IRpcError as IRemovedIRpcError } from '@migaia/rpc-host'
-// @ts-expect-error BC30 removes contract types from the Host root.
+// @ts-expect-error removes contract types from the Host root.
 import type { IRpcCleanupError as IRemovedIRpcCleanupError } from '@migaia/rpc-host'
 /** Negative root imports remain used so missing exports supply the actual diagnostic. */
 type IRemovedContractBindings = [
@@ -240,7 +240,7 @@ async function verifyPackedHostContracts(): Promise<void> {
   // @ts-expect-error Unpublished native extension keys cannot appear on a namespace.
   void created.process.missingNativeKey
   await created.close()
-  // @ts-expect-error Root call aliases were removed by BC1.
+  // @ts-expect-error Root call aliases were removed by .
   void created.request('echo', 1)
   // @ts-expect-error Per-call timeout requires a complete feature or false.
   host.process.send('worker', 'echo', 1, { timeout: 100 })
@@ -254,7 +254,7 @@ void verifyPackedHostContracts
 function authorSetup() {
   return { hooks: {}, namespaceExtensions: authorNamespaceExtensions }
 }
-/** These exact literal values retain the old application surface after BC1 namespace projection. */
+/** These exact literal values retain the old application surface after namespace projection. */
 function authorNamespaceExtensions() {
   return { foo: 1 as const, bar: () => 'packed-bar' as const, custom: () => 'packed-custom' }
 }

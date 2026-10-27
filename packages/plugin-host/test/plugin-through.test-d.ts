@@ -1,4 +1,4 @@
-/** A9 keeps through payloads exact and preserves use as stage-only registration. */
+/** Keeps through payloads exact and preserves use as stage-only registration. */
 import { defineHost, pipelineSpec, type IPluginHostCoreFor } from '../src/index.js'
 
 /** Genuine declarations provide both the current registration and target-name payload types. */

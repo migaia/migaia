@@ -1,4 +1,4 @@
-/** A27 keeps late and cold installation on the same public native transaction boundary. */
+/** Keeps late and cold installation on the same public native transaction boundary. */
 import { expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import {
@@ -9,7 +9,7 @@ import {
 } from '@migaia/rpc-host/sdk'
 import { coreMemoryServer } from './core-fixture.js'
 
-it('A27: late use returns the same public Host, inherits one shared setup and preserves the cold local override', async () => {
+it('late use returns the same public Host, inherits one shared setup and preserves the cold local override', async () => {
   /** The shared installation must exist even while every cold namespace overrides its placement. */
   const sharedDispatch = vi.fn()
   /** The local placement must remain isolated after a new namespace inherits the shared one. */
@@ -81,7 +81,7 @@ it('A27: late use returns the same public Host, inherits one shared setup and pr
   }
 })
 
-it('A27: a failed late batch preserves its original cause and old calls; duplicate and unUse retain native results', async () => {
+it('a failed late batch preserves its original cause and old calls; duplicate and unUse retain native results', async () => {
   /**
    * A previously committed real listener and physical Session remain usable after another batch
    * fails.
@@ -158,7 +158,7 @@ it('A27: a failed late batch preserves its original cause and old calls; duplica
   }
 })
 
-it('A27: cold construction rolls back every acquired transport and the shared flow installation', async () => {
+it('cold construction rolls back every acquired transport and the shared flow installation', async () => {
   /** Shared setup is a real host-level native Feature installation, even before any Session exists. */
   const sharedDispose = vi.fn()
   /** Cold outer construction must release this committed flow prefix after transport failure. */

@@ -42,7 +42,7 @@ async function decodeHandshake(value: string | Uint8Array) {
   return codec.restore(prepared, codecContext)
 }
 
-// RPC-TEST-C10EC8C625D8-C001: codec/extension priority and both peer views survive BC2's sole2.0.
+// Codec/extension priority and both peer views survive sole2.0.
 it('keeps initiator codec priority, shared extensions and both admitted peers', () => {
   /** The responder sees the actual admitted remote hello rather than an old agreement facade. */
   const received = normalizeRpcHandshake(initiator)
@@ -62,7 +62,7 @@ it('keeps initiator codec priority, shared extensions and both admitted peers', 
   })
 })
 
-// RPC-TEST-C10EC8C625D8-C002: only lower-v1 negotiation retires; peer facts/auth/JSON remain.
+// Only lower-v1 negotiation retires; peer facts/auth/JSON remain.
 it('keeps optional peer details and portable auth in the actual admitted hello', () => {
   /** The original caller facts are carried by a genuine current-profile record. */
   const caller = normalizeRpcHandshake({
@@ -90,7 +90,7 @@ it('keeps optional peer details and portable auth in the actual admitted hello',
   expect(completeRpcHandshake(caller, answer)).toMatchObject({ major: 2, minor: 0 })
 })
 
-// RPC-TEST-C10EC8C625D8-C003: preserve all9 malformed business inputs and the actual JSON error.
+// Preserve all9 malformed business inputs and the actual JSON error.
 it('rejects malformed first-message fields at the genuine handshake boundary', async () => {
   /** Original malformed domains remain unchanged apart from the current extension field name. */
   const malformed: readonly [unknown, string][] = [
@@ -109,7 +109,7 @@ it('rejects malformed first-message fields at the genuine handshake boundary', a
     [{ ...initiator, versions: [{ major: 0, minor: 0 }] }, 'type'],
     [{ ...initiator, codecs: ['json', 'json'] }, 'duplicate'],
     [{ ...initiator, extensions: ['abort@1', 'abort@1'] }, 'duplicate'],
-    // A19's confirmed missing/wrong-shape branches must not hide behind generic envelope errors.
+    // Confirmed missing/wrong-shape branches must not hide behind generic envelope errors.
     [{ ...initiator, peer: undefined }, 'required'],
     [{ ...initiator, peer: null }, 'type']
   ]
@@ -123,7 +123,7 @@ it('rejects malformed first-message fields at the genuine handshake boundary', a
   })
 })
 
-// RPC-TEST-C10EC8C625D8-C004: old ok/reply DTO retires, actual error/coded reject/cause do not.
+// Old ok/reply DTO retires, actual error/coded reject/cause do not.
 it('keeps negotiation failure and the original remote error cause on completion', () => {
   /** This actual unsupported offer causes the real canonical negotiator to reject. */
   let incompatible: unknown
@@ -155,7 +155,7 @@ it('keeps negotiation failure and the original remote error cause on completion'
   )
 })
 
-// RPC-TEST-C10EC8C625D8-C005: no fixture size guard repairs a missing actual media boundary.
+// No fixture size guard repairs a missing actual media boundary.
 it('keeps JSON baseline, duplicate versions, byte budgets and encoding rejection', async () => {
   expect
     .soft(() => normalizeRpcHandshake({ ...initiator, codecs: ['cbor'] }))
@@ -188,7 +188,7 @@ it('keeps JSON baseline, duplicate versions, byte budgets and encoding rejection
     .toThrow(expect.objectContaining({ code: 'HANDSHAKE_INVALID', violation: 'type' }))
 })
 
-// RPC-TEST-C10EC8C625D8-C006: actual current accept records retain mismatch and wire-cause oracles.
+// Actual current accept records retain mismatch and wire-cause oracles.
 it('rejects accepts outside the offer and retains invalid remote error diagnostics', () => {
   /** Only the canonical negotiator supplies the unmodified valid response. */
   const valid = acceptRpcHandshake(initiator, responder)
@@ -223,7 +223,7 @@ it('rejects accepts outside the offer and retains invalid remote error diagnosti
     )
 })
 
-// RPC-TEST-C10EC8C625D8-C007: unknown-field scan/order is BC9 NoPASS; known-field reads remain.
+// Unknown-field scan/order is NoPASS; known-field reads remain.
 it('ignores additive hello fields and preserves a hostile known-field getter cause', () => {
   /** Unknown metadata cannot change the actual negotiated known-field result. */
   const additive = normalizeRpcHandshake({ ...initiator, z: 1, a: 2 })

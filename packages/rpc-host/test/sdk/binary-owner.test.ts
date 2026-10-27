@@ -30,7 +30,7 @@ async function digest(backing: ArrayBuffer): Promise<string> {
   return createHash('sha256').update(new Uint8Array(backing)).digest('hex')
 }
 
-it('C2-B01 captures inline bytes before returning and preserves view offset and own-key order', async () => {
+it('captures inline bytes before returning and preserves view offset and own-key order', async () => {
   /** Prefix and suffix distinguish visible-byte capture from copying the complete backing. */
   const source = new Uint8Array([9, 1, 2, 8])
   /** The original business record order must survive both tag construction and restoration. */
@@ -55,7 +55,7 @@ it('C2-B01 captures inline bytes before returning and preserves view offset and 
   assert.ok(hasRpcPortableBinary(value))
 })
 
-it('C2-B02 retains original native backing aliases and checks invisible bytes with full digest', async () => {
+it('retains original native backing aliases and checks invisible bytes with full digest', async () => {
   /** Only one original complete backing is physically eligible for transfer. */
   const bytes = new Uint8Array(16_385)
   bytes.set([9, 1, 2, 8])
@@ -116,7 +116,7 @@ it('C2-B02 retains original native backing aliases and checks invisible bytes wi
   )
 })
 
-it('C2-B03 starts prehash and the first original digest synchronously, then hashes in backing order', async () => {
+it('starts prehash and the first original digest synchronously, then hashes in backing order', async () => {
   /** Distinct original storage proves the digest order without a second transport fixture. */
   const first = new ArrayBuffer(16_385)
   /** The later hash must wait for the original first Promise. */
@@ -156,7 +156,7 @@ it('C2-B03 starts prehash and the first original digest synchronously, then hash
   )
 })
 
-it('C2-B04 rejects whole-backing overflow before any digest and never executes business accessors', async () => {
+it('rejects whole-backing overflow before any digest and never executes business accessors', async () => {
   /** A tiny visible view cannot hide a complete over-budget backing. */
   const backing = new ArrayBuffer(16_385)
   /** Original expensive hash work is forbidden before the full graph is admitted. */
@@ -193,7 +193,7 @@ it('C2-B04 rejects whole-backing overflow before any digest and never executes b
   assert.equal(reads, 0)
 })
 
-it('C2-B05 measures original stream bytes in the same codec walk, independently of base64 tuple size', async () => {
+it('measures original stream bytes in the same codec walk, independently of base64 tuple size', async () => {
   /** This native value fits exactly even though its inline tagged/base64 spelling is larger. */
   const value = new Uint8Array(RpcStreamLimit.maxItemValueBytes)
   /** A real stream item uses the same task/route admission as an ordinary call. */
@@ -226,7 +226,7 @@ it('C2-B05 measures original stream bytes in the same codec walk, independently 
   )
 })
 
-it('C2-B06 SDK proof is produced by the original serialize walker finish hook without copying backings', () => {
+it('SDK proof is produced by the original serialize walker finish hook without copying backings', () => {
   /** Native leaf identity is borrowed while only its containing records/arrays are snapshotted. */
   const bytes = new Uint8Array([1, 2])
   /** Held SDK state owns the canonical executing walker and its actual binary proof. */

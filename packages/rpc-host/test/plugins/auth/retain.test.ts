@@ -190,7 +190,7 @@ class RetentionConnection {
   }
 }
 
-it('A30 completes 5000 sequential requests and releases every actual default replay entry', async () => {
+it('completes 5000 sequential requests and releases every actual default replay entry', async () => {
   /** One peer deliberately has a numeric-mode capacity below the number of sequential requests. */
   const pair = new PublicRetentionPair()
   /** The genuine original owner performs each settlement before its actual state is inspected. */
@@ -221,7 +221,7 @@ it('A30 completes 5000 sequential requests and releases every actual default rep
   }
 })
 
-it('A30 silently drops an in-flight request ID while executing its provider exactly once', async () => {
+it('silently drops an in-flight request ID while executing its provider exactly once', async () => {
   /** The original public request stays active while a newly signed duplicate enters the same source. */
   const pair = new PublicRetentionPair()
   /** Actual Auth admission supplies the original active identity and its canonical ledger owner. */
@@ -261,7 +261,7 @@ it('A30 silently drops an in-flight request ID while executing its provider exac
   }
 })
 
-it('A30 retains numeric IDs for 1000ms, rejects numeric capacity and executes after expiry', async () => {
+it('retains numeric IDs for 1000ms, rejects numeric capacity and executes after expiry', async () => {
   /** A deterministic monotonic input drives expiry without measuring elapsed wall time. */
   let now = performance.now()
   /** The public pair remains responsible for all original physical work and cleanup. */
@@ -305,7 +305,7 @@ it('A30 retains numeric IDs for 1000ms, rejects numeric capacity and executes af
   }
 })
 
-it('A30 advances the real signed window without releasing active requests or accumulating history', async () => {
+it('advances the real signed window without releasing active requests or accumulating history', async () => {
   /** The first request stays active while 64 genuine signed requests move the source counter. */
   const pair = new PublicRetentionPair()
   /** Exact original entries expose source membership, not a fixture-maintained occupancy count. */
@@ -373,7 +373,7 @@ it('A30 advances the real signed window without releasing active requests or acc
   }
 })
 
-it('A30 advances only expired completed counters with many active identities', () => {
+it('advances only expired completed counters with many active identities', () => {
   /** Counter movement is deterministic business state, not elapsed-time measurement. */
   let high = 0n
   /** This existing source getter observes which completed counter boundaries advancement inspects. */
@@ -441,7 +441,7 @@ it('A30 advances only expired completed counters with many active identities', (
   }
 })
 
-it('A30 does not inspect unexpired numeric or window replay bodies on lookup and admission', () => {
+it('does not inspect unexpired numeric or window replay bodies on lookup and admission', () => {
   /** These two supported numeric choices stand for configuration and connection override values. */
   const numeric = [
     { source: { replayKeys: new Set<string>() }, retain: 10_000 },
@@ -482,7 +482,7 @@ it('A30 does not inspect unexpired numeric or window replay bodies on lookup and
     // The outer collection is the fixed two-duration fixture above, not a growable nested scan.
     for (const [sourceIndex, configured] of numeric.entries())
       for (let index = 0; index < 256; index++) {
-        /** Each provider really completes before retention starts, as in the public A30 cases. */
+        /** Each provider really completes before retention starts, as in the public cases. */
         const key = `numeric-${sourceIndex}-${index}`
         /** Admission supplies the same entry later transferred into completed storage. */
         const entry = ledger.admit(
@@ -549,7 +549,7 @@ it('A30 does not inspect unexpired numeric or window replay bodies on lookup and
   }
 })
 
-it('A30 gives the public transport connection retain precedence over its installed Auth option', async () => {
+it('gives the public transport connection retain precedence over its installed Auth option', async () => {
   /** The original listener owns the opposite physical source; no accepted Session is fabricated. */
   const listener = coreMemoryServer('retain-origin')
   /** Server requests can reissue exact original metadata through the real plaintext stage. */
@@ -596,7 +596,7 @@ it('A30 gives the public transport connection retain precedence over its install
   }
 })
 
-it('A30 rejects unsigned window retention and every illegal numeric retention category', () => {
+it('rejects unsigned window retention and every illegal numeric retention category', () => {
   /**
    * Zero, negative, fractional, nonfinite and unsafe values cover the declared invalid number
    * domain.
@@ -611,7 +611,7 @@ it('A30 rejects unsigned window retention and every illegal numeric retention ca
   )
 })
 
-it('A30 rejects invalid public connection numbers, null and unsigned window as configuration', async () => {
+it('rejects invalid public connection numbers, null and unsigned window as configuration', async () => {
   /** Each invalid supported category enters the actual public transport configuration path. */
   const invalid = [
     0,

@@ -51,7 +51,7 @@ it('complete timeout capture retains the original hostile getter cause and one r
   const hostile = new Error('timeout config getter')
   /** One actual descriptor acquisition belongs to the complete timeout factory. */
   let reads = 0
-  /** BC3 changes only the field and capture phase; native acquisition retains this descriptor. */
+  /** Changes only the field and capture phase; native acquisition retains this descriptor. */
   const config = {
     get ms(): number {
       reads += 1

@@ -1,4 +1,4 @@
-/** A40 shares directory preparation without changing split-horizon publication or deduplication. */
+/** Shares directory preparation without changing split-horizon publication or deduplication. */
 import { createRpcHost, type IRpcNamespace } from '@migaia/rpc-host'
 import { expect, it, vi } from 'vitest'
 import { Forwarder } from '../../dist/forward/forwarder.js'
@@ -20,7 +20,7 @@ async function barrier(client: IDirectoryClient, name = 'memory'): Promise<void>
   await namespace(client, name).send(hostName, 'barrier')
 }
 
-it('A40 prepares one directory and fingerprint per namespace for a public broadcast', async () => {
+it('prepares one directory and fingerprint per namespace for a public broadcast', async () => {
   /** Two installed namespaces each have two accepted physical clients. */
   const memory = coreMemoryServer(hostName)
   /** This namespace shares the same root providers while keeping its own direct membership. */
@@ -67,7 +67,7 @@ it('A40 prepares one directory and fingerprint per namespace for a public broadc
   }
 })
 
-it('A40 skips a receiver own contribution and an unchanged public directory broadcast', async () => {
+it('skips a receiver own contribution and an unchanged public directory broadcast', async () => {
   /** Two aliases of one peer identity exercise exclusion across distinct namespace connections. */
   const memory = coreMemoryServer(hostName)
   /** A change on the first carrier must not produce an identical directory on the second. */
@@ -116,7 +116,7 @@ it('A40 skips a receiver own contribution and an unchanged public directory broa
   }
 })
 
-it('A40 preserves prefix-collision fallback when excluding each receiver own contribution', async () => {
+it('preserves prefix-collision fallback when excluding each receiver own contribution', async () => {
   /** These two names can contribute the same full advertised method through different prefixes. */
   const server = coreMemoryServer(hostName)
   /** A public publication pulse forces fresh directories after both sources are accepted. */

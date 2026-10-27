@@ -339,7 +339,7 @@ describe('store-worker exports', () => {
     try {
       /** This actual round trip completes negotiation before physical-send accounting begins. */
       await expect(client.request('ready')).resolves.toBe('ready')
-      /** BC2 directory publication is metadata traffic, not a provider completion or notify ACK. */
+      /** Directory publication is metadata traffic, not a provider completion or notify ACK. */
       const beforeNotice = await workerFrames(workerPosts)
       const workerPostsBeforeNotice = beforeNotice.filter(
         (frame) => frame.kind !== RpcWireKind.directory
@@ -487,7 +487,7 @@ describe('store-worker exports', () => {
     expect(worker.dispose!()).toBe(firstDispose)
     await expect(pending).rejects.toMatchObject({ name: 'RpcLifecycleError' })
     await firstDispose
-    /** BC2 handshake metadata may precede close; no business call may be admitted afterward. */
+    /** Handshake metadata may precede close; no business call may be admitted afterward. */
     const prepared = await workerFrames(frames)
     /** Count actual admitted business frames after all original cleanup has completed. */
     const sends = prepared.filter((frame) => frame.kind === RpcWireKind.call).length

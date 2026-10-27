@@ -295,7 +295,7 @@ func (context *runtimeSchemaContext) visit(value any, path string) bool {
 	return true
 }
 
-// hasFields reads only required known fields; unknown protocol metadata is ignored under R17.
+// hasFields reads required known fields and ignores unknown protocol metadata.
 func hasFields(value any, required []string) bool {
 	fields := field(value)
 	if fields == nil {

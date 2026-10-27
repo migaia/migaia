@@ -3,7 +3,7 @@ import { createRpcHost } from '@migaia/rpc-host'
 import { defineFlowPlugin, defineTransportPlugin } from '@migaia/rpc-host/sdk'
 import { expect, it, vi } from 'vitest'
 
-// RPC-TEST-49A21590A74A-C004-A001: original native entropy cause remains a real public producer.
+// Original native entropy cause remains a real public producer.
 it('retains the original native entropy failure before cold transport acquisition', async () => {
   /** The same native exception must remain the configuration diagnostic's exact original cause. */
   const original = new Error('native entropy unavailable')
@@ -47,7 +47,7 @@ it('retains the original native entropy failure before cold transport acquisitio
   }
 })
 
-// RPC-TEST-00776736DCA7-C004: a real public setup callback still preserves original identity and code.
+// A real public setup callback still preserves original identity and code.
 it('classifies the original native flow setup failure without replacing its Error', async () => {
   /** This is the unchanged original user callback error and its native stack. */
   const original = new Error('audit installation failed')

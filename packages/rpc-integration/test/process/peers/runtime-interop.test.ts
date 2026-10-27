@@ -127,7 +127,7 @@ for (const fixture of peers.filter((peer) => peer.language !== 'ts-reference')) 
         expect(failedWire).toBeDefined()
         assert.equal(failedWire!.root, 0)
         assert.equal(failedWire!.nodes[0]!.cause, 1)
-        /** BC11 removes only the local scalar wrapper; both original wire nodes remain exact. */
+        /** Removes only the local scalar wrapper; both original wire nodes remain exact. */
         const restored = receivedError as Record<string, unknown> & {
           cause: Record<string, unknown>
         }

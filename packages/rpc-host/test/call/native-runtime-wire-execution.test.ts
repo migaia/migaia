@@ -22,7 +22,7 @@ import { ProviderAdmissionRegistry } from '../../dist/features/limits/provider-a
 import { SessionTable } from '../../dist/session/table.js'
 import { coreMemoryServer } from '../host/core-fixture.js'
 
-// RPC-TEST-4B6A7AF67437-C001: the original 16MiB result and 500ms deadline remain exact.
+// The original 16MiB result and 500ms deadline remain exact.
 /** Both capture and final encoding failures must seal the same genuine completed group exactly once. */
 async function assertOversizedGroupResult(encoding: 'ascii' | 'unicode'): Promise<void> {
   /** Only this original provider changes the real execution count. */
@@ -101,7 +101,7 @@ async function assertOversizedGroupResult(encoding: 'ascii' | 'unicode'): Promis
     assert.equal(outcome.state, 'done')
     if (outcome.state !== 'done' || outcome.outcome.completion.ok)
       assert.fail('actual failed group completion must be retained')
-    /** BC2 changes only flat error representation; the original public code/stack remain exact. */
+    /** Changes only flat error representation; the original public code/stack remain exact. */
     const error = outcome.outcome.completion.error
     assert.equal(error.nodes[error.root]!.code, 'PAYLOAD_INVALID')
     assert.ok(error.nodes[error.root]!.stack)
@@ -116,7 +116,7 @@ it('oversized complete group result fails PAYLOAD_INVALID and seals that failure
 it('oversized Unicode group result fails at actual encoding and seals PAYLOAD_INVALID', () =>
   assertOversizedGroupResult('unicode'))
 
-// RPC-TEST-4B6A7AF67437-C002: exact R17/BC9 dispositions apply only to old local step shapes.
+// Exact dispositions apply only to old local step shapes.
 it.each(['options', 'target', 'mode', 'empty', 'getter', 'revoked'] as const)(
   'local group %s preserves current step admission before real physical send or provider effect',
   async (shape) => {
@@ -169,7 +169,7 @@ it.each(['options', 'target', 'mode', 'empty', 'getter', 'revoked'] as const)(
         assert.equal(calls, 0)
         assert.equal(reads, 0)
       } else {
-        /** BC9 explicitly permits these four old step shapes; these are new-behavior assertions. */
+        /** Explicitly permits these four old step shapes; these are new-behavior assertions. */
         const result = await client.host.memory.group(steps as never)
         assert.deepEqual(result, [{ state: 'success', result: 42 }])
         assert.equal(send.mock.calls.length, 1)
@@ -184,7 +184,7 @@ it.each(['options', 'target', 'mode', 'empty', 'getter', 'revoked'] as const)(
   }
 )
 
-// RPC-TEST-4B6A7AF67437-C003: BC2 retires v1 response grammar; the complete-tuple oracle survives.
+// Retires v1 response grammar; the complete-tuple oracle survives.
 it('a mismatched response cannot settle a new task that requires the full authenticated generation tuple', async () => {
   /** The original provider holds only its actual business completion. */
   const blocked = deferred<void>()
@@ -265,7 +265,7 @@ it('a mismatched response cannot settle a new task that requires the full authen
   }
 })
 
-// RPC-TEST-4B6A7AF67437-C004: physical notification completion and actual store lifetime differ.
+// Physical notification completion and actual store lifetime differ.
 it('notify send completion precedes business completion while its before-start receipt and keyed outcome stay live', async () => {
   /** The original provider alone controls its real terminal boundary. */
   const blocked = deferred<void>()
@@ -335,7 +335,7 @@ it('notify send completion precedes business completion while its before-start r
   }
 })
 
-// RPC-TEST-4B6A7AF67437-C005: refuse only the original physical writer after genuine admission.
+// Refuse only the original physical writer after genuine admission.
 it('before-start notify rejects a failed physical write after send admission instead of leaving its public Promise pending', async () => {
   /** No business may run after the original native writer refuses its first request. */
   let effects = 0
@@ -387,7 +387,7 @@ it('before-start notify rejects a failed physical write after send admission ins
   }
 })
 
-// RPC-TEST-4B6A7AF67437-C006: read actual ready before dispatch, never a descriptive fake Peer.
+// Read actual ready before dispatch, never a descriptive fake Peer.
 it('genuine bilateral describe binds each peer generation before business dispatch', async () => {
   /** Existing original attachment returns the true Session readiness receipt. */
   const attaching = vi.spyOn(SessionTable.prototype, 'attach')
@@ -415,7 +415,7 @@ it('genuine bilateral describe binds each peer generation before business dispat
   }
 })
 
-// RPC-TEST-4B6A7AF67437-C007: original provider order, values, native error family and suffix stay.
+// Original provider order, values, native error family and suffix stay.
 it('a real namespace group executes through the original provider and returns fail-stop outcomes', async () => {
   /** Only original application entry records these ordered effects. */
   const effects: string[] = []
@@ -441,7 +441,7 @@ it('a real namespace group executes through the original provider and returns fa
   /** The public caller holds only the actual namespace's receiver-free callable. */
   const client = await server.connect('parent', {}, 'parent-1')
   try {
-    /** BC1 removes Peer placement; this is the same real Host group call mode. */
+    /** Removes Peer placement; this is the same real Host group call mode. */
     const group = client.host.memory.group
     assert.equal(typeof group, 'function', 'the genuine namespace exposes group')
     /** Every original method and its original declared order remain unchanged. */
@@ -455,7 +455,7 @@ it('a real namespace group executes through the original provider and returns fa
     assert.equal(result[1]!.state, 'failure')
     if (result[0]!.state === 'success') assert.equal(result[0]!.result, 42)
     if (result[1]!.state === 'failure') {
-      /** BC2's flat error graph keeps the exact native class and nonempty original stack. */
+      /** Flat error graph keeps the exact native class and nonempty original stack. */
       const error = result[1]!.error
       assert.equal(error.nodes[error.root]!.name, 'RangeError')
       assert.ok(error.nodes[error.root]!.stack)
@@ -466,7 +466,7 @@ it('a real namespace group executes through the original provider and returns fa
   }
 })
 
-// RPC-TEST-4B6A7AF67437-C008: the same optional quota owner releases real ordered task leases.
+// The same optional quota owner releases real ordered task leases.
 it('real ordered requests share provider leases; queued cancel wins and started cancel cannot abort business', async () => {
   /** Only the actual provider completion can release the original started business. */
   const blocked = deferred<void>()
@@ -559,7 +559,7 @@ it('real ordered requests share provider leases; queued cancel wins and started 
   }
 })
 
-// RPC-TEST-4B6A7AF67437-C009: only actual store queries prove unknown/pending/done without effects.
+// Only actual store queries prove unknown/pending/done without effects.
 it('real outcome lookup observes the original pending claim and complete sealed group without executing business', async () => {
   /** The original provider hold alone controls its real keyed terminal. */
   const blocked = deferred<void>()
@@ -635,7 +635,7 @@ it('real outcome lookup observes the original pending claim and complete sealed 
   }
 })
 
-// RPC-TEST-E1A1C1DA273B-C003: only the removed private512selector changes to the real media ceiling.
+// Only the removed private512selector changes to the real media ceiling.
 it('rejects an ordinary oversized byte frame during capture with its original RangeError and sends its survivor', async () => {
   /** The provider alone proves which original ordinary requests actually reached business. */
   const calls: string[] = []
@@ -670,7 +670,7 @@ it('rejects an ordinary oversized byte frame during capture with its original Ra
     codec: new RpcJsonCarrierCodec(),
     report: physical.report
   })
-  /** BC28 lets this original codec reject its real JSON byte size before physical framing. */
+  /** Lets this original codec reject its real JSON byte size before physical framing. */
   const right = createRpcByteCarrier({
     id: 'ordinary-oversize-caller-carrier',
     io: new RpcEventByteIO(streams.downstream, streams.upstream, physical.close, physical).value,
@@ -733,7 +733,7 @@ it('rejects an ordinary oversized byte frame during capture with its original Ra
     assert.deepEqual(calls, [])
     /** Releasing the original native callback drains the first request and its surviving sibling. */
     streams.upstream.uncork()
-    /** BC28 preserves the capture RangeError itself without manufacturing an IO wrapper. */
+    /** Preserves the capture RangeError itself without manufacturing an IO wrapper. */
     const failure = await oversized
     assert.ok(failure instanceof RangeError)
     assert.equal(Reflect.get(failure, 'code'), RpcContractErrorCode.frameLimitExceeded)

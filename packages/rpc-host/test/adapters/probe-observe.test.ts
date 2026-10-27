@@ -151,7 +151,7 @@ describe('Core physical carrier observation', () => {
     right.subscribe({ frame: receive, close() {}, error() {} })
     /** Native payload identity remains the original caller object. */
     const payload = { value: 7 }
-    /** BC2 adds only the actual current carrier frame container. */
+    /** Adds only the actual current carrier frame container. */
     const frame: IRpcCarrierFrame = { kind: 'message', data: payload }
     try {
       await left.write(frame)

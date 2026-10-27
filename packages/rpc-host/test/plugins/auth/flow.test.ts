@@ -313,7 +313,7 @@ it('retains the original 64-slot window, concurrent single commit and physical-s
   await f.flow.dispose()
 })
 
-// RPC-TEST-D12BE7E44139-C003/C004: retain the original counter inputs on the genuine native owner.
+// /C004: retain the original counter inputs on the genuine native owner.
 it('receives the original 64-slot boundaries and isolated concurrent verification', async () => {
   /** The same installed Auth owner allocates every original sequence before receive order changes. */
   const f = await fixture({ sign: (value) => value, verify: (value) => value })
@@ -363,7 +363,7 @@ it('receives the original 64-slot boundaries and isolated concurrent verificatio
   }
 })
 
-// RPC-TEST-D12BE7E44139-C002: exercise original nonce failure inside the authentic Auth stage.
+// Exercise original nonce failure inside the authentic Auth stage.
 it.each(['missing', 'throwing'] as const)(
   'receives original %s nonce entropy failure without replacing its cause',
   async (mode) => {
@@ -403,7 +403,7 @@ it.each(['missing', 'throwing'] as const)(
   }
 )
 
-// RPC-TEST-D12BE7E44139-C007: mutate only the original seven signed binding fields.
+// Mutate only the original seven signed binding fields.
 it('rejects the original malformed versions counters and nonces after actual native verification', async () => {
   /** Native sign-only any exposes the authentic complete binding as an object to this callback. */
   const state = { change: {} as Record<string, unknown> }
@@ -440,7 +440,7 @@ it('rejects the original malformed versions counters and nonces after actual nat
   }
 })
 
-// RPC-TEST-D12BE7E44139-C008: payload categories remain business data beneath prepared metadata.
+// Payload categories remain business data beneath prepared metadata.
 it.each(['text', new Uint8Array([0, 255, 42]), { nested: 'value' }])(
   'retains the original authenticated payload category %# through the actual codec',
   async (value) => {

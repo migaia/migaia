@@ -1,4 +1,4 @@
-/** Preserve migrated public routing, fanout and name-admission assertions under BC1 namespaces. */
+/** Preserve migrated public routing, fanout and name-admission assertions under namespaces. */
 import { deferred } from '@migaia/utils/promise'
 import type { IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
 import { createRpcHost } from '@migaia/rpc-host'
@@ -113,7 +113,7 @@ describe('RPC namespace routing', () => {
           code: 'PROVIDER_NOT_FOUND'
         })
         await c.host.close()
-        /** R20 rejects the withdrawn dotted method locally once the current directory arrives. */
+        /** Rejects the withdrawn dotted method locally once the current directory arrives. */
         await vi.waitFor(() => expect(a.host.memory.peers.b).not.toHaveProperty('c.render'))
         await expect(a.host.memory.send('b', 'c.render', 1)).rejects.toMatchObject({
           code: 'PROVIDER_NOT_FOUND'

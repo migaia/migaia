@@ -103,7 +103,7 @@ it('C123 keeps native installation pending and business gated until final commit
     const carrier = input.client!.pair[0]
     expect(input.entered).toBe(true)
     expect(settled).toBe(false)
-    // C123-A003/A004: old activation subscribe0/physical-send0 retire under BC2/BC3, without PASS.
+    // Old activation subscribe0/physical-send0 retire under , without PASS.
     /** This new public witness is independent of the old fixture's physical-send counter. */
     const pending = input.client!.host.memory.request('activation-provider.echo', 'before-commit')
     void pending.catch(() => undefined)
@@ -176,7 +176,7 @@ it('C124 installs one actual native carrier receiver and keeps its subscription 
   }
 })
 
-// RPC-TEST-CD50052EF4A5-C003/C004: retain real subscription counts without an activation facade.
+// /C004: retain real subscription counts without an activation facade.
 it.each(['commit', 'rollback'] as const)(
   'transaction %s keeps the preceding observer unsubscribed and preserves actual acquisition counts',
   async (outcome) => {

@@ -48,10 +48,7 @@ function invalidHello(change: Record<string, unknown>, code = 'HANDSHAKE_INVALID
   return invalid(() => normalizeRpcHandshake({ ...HELLO, ...change }), code)
 }
 
-/**
- * BC9 no longer reflects record prototypes; the existing public privacy operation keeps this
- * oracle.
- */
+/** No longer reflects record prototypes; the existing public privacy operation keeps this oracle. */
 function reflected(cause: unknown): unknown {
   return redactRpcHandshakeFailure(cause)
 }

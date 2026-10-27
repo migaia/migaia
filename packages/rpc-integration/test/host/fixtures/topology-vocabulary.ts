@@ -13,7 +13,7 @@ export const Topology = {
   python: 'py',
   /** Provider names on forwarding hosts and leaves. */
   ready: 'ready',
-  /** A27 starts c only after b's original parent, pool and coroutine have committed. */
+  /** Starts c only after b's original parent, pool and coroutine have committed. */
   installThread: 'installThread',
   /** Explicit held-forward methods form the ruled loop without reflected directory routes. */
   loop: 'loop',

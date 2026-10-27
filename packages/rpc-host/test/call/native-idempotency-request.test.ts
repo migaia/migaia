@@ -98,7 +98,7 @@ function keyedPortHost(port: MessagePort, name: string, provide?: IRpcHostOption
   })
 }
 
-// RPC-TEST-17D89AA0779A-C001: exact original result, backing length and execution count.
+// Exact original result, backing length and execution count.
 it('retains the original keyed transfer result without detaching the provider backing', async () => {
   /** Original bytes and complete backing length are the retained public business vector. */
   const buffer = new Uint8Array([1, 2, 3])
@@ -141,7 +141,7 @@ it('retains the original keyed transfer result without detaching the provider ba
   }
 })
 
-// RPC-TEST-17D89AA0779A-C007: the original overlapping reply pair remains [7, 7], effect count one.
+// The original overlapping reply pair remains [7, 7], effect count one.
 it('makes the original overlapping keyed requests share the owner result seven exactly once', async () => {
   /** Real provider entry establishes an executing claim before the duplicate is sent. */
   const entered = deferred<void>()
@@ -195,7 +195,7 @@ it('makes the original overlapping keyed requests share the owner result seven e
   }
 })
 
-// RPC-TEST-7376FBDEF575-C003: actual retry preserves the original rejected value before any send.
+// Actual retry preserves the original rejected value before any send.
 it('keeps the original key factory failure as a rejected Promise without a business write', async () => {
   /** Exact identity is the original public callback failure oracle, not a coded replacement. */
   const failure = new Error('factory')
@@ -235,7 +235,7 @@ it('keeps the original key factory failure as a rejected Promise without a busin
   }
 })
 
-// RPC-TEST-17D89AA0779A-C003: the executing original claim owns the sole bounded store slot.
+// The executing original claim owns the sole bounded store slot.
 it('rejects a new key while the real bounded store owns an executing request', async () => {
   /** Only the real provider enters and increments this original execution count. */
   let count = 0
@@ -283,7 +283,7 @@ it('rejects a new key while the real bounded store owns an executing request', a
   }
 })
 
-// RPC-TEST-17D89AA0779A-C004: malformed store input fails construction before any provider work.
+// Malformed store input fails construction before any provider work.
 it('rejects the original malformed injected store during native construction', async () => {
   /** This cold listener owns no provider or physical Session before genuine native installation. */
   const server = coreMemoryServer('invalid-key-store-server')
@@ -301,7 +301,7 @@ it('rejects the original malformed injected store during native construction', a
   }
 })
 
-// RPC-TEST-17D89AA0779A-C006 and RPC-TEST-7376FBDEF575-C002: original caller key errors stay local.
+// And original caller key errors stay local.
 it('replays original sequential keys and rejects invalid keys before any real business write', async () => {
   /** Actual execution alone supplies the original one/two count and returned values. */
   let count = 0
@@ -353,7 +353,7 @@ it('replays original sequential keys and rejects invalid keys before any real bu
   }
 })
 
-// RPC-TEST-7376FBDEF575-C001: explicit key bypasses allocation and reaches the actual native write.
+// Explicit key bypasses allocation and reaches the actual native write.
 it('retains the original explicit key through genuine retry and the physical request', async () => {
   /** Original explicit-key admission must never ask the complete retry feature for a new key. */
   const keyFactory = vi.fn(() => 'factory-key')

@@ -24,7 +24,7 @@ function pendingEffect(): Promise<never> {
   return new Promise<never>(() => undefined)
 }
 
-// RPC-TEST-5290F9B073CA-C001: negotiate real chunk hooks over the canonical encoded medium.
+// Negotiate real chunk hooks over the canonical encoded medium.
 it('passes a large payload through the canonical chunk root without duplicate feature admission', async () => {
   /** Both endpoints use the actual SDK JSON codec so chunk sees the real encoded frame. */
   const server = coreMemoryServer('server', 'server', 'memory', [], [], {
@@ -51,7 +51,7 @@ it('passes a large payload through the canonical chunk root without duplicate fe
   }
 })
 
-// RPC-TEST-5290F9B073CA-C002: paired actual auth hooks must sign and verify equally often.
+// Paired actual auth hooks must sign and verify equally often.
 it('uses canonical authentication transforms on a real connected request and response', async () => {
   /** One shared original callback pair records both physical directions independently. */
   const sign = vi.fn((value: unknown) => value)
@@ -86,7 +86,7 @@ it('uses canonical authentication transforms on a real connected request and res
   }
 })
 
-// RPC-TEST-5290F9B073CA-C003: BC3 maps host defaults to transport, feature fallback to link policy.
+// Maps host defaults to transport, feature fallback to link policy.
 it('keeps call then transport then link-policy timeout precedence', async () => {
   /** The old host-level 500 ms default is the native transport's complete timeout instance. */
   const server = coreMemoryServer('server', 'server', 'memory', [timeout({ ms: 500 })])
@@ -132,7 +132,7 @@ it('keeps call then transport then link-policy timeout precedence', async () => 
   }
 })
 
-// RPC-TEST-5290F9B073CA-C004: keep the original unknown-result code even if current source is RED.
+// Keep the original unknown-result code even if current source is RED.
 it('reports an unknown non-idempotent result after physical departure instead of replaying it', async () => {
   /** Ordinary listener sessions expose no fabricated generation or readiness authority. */
   const server = coreMemoryServer('server', 'server', 'memory', [retry()])
@@ -166,7 +166,7 @@ it('reports an unknown non-idempotent result after physical departure instead of
   }
 })
 
-// RPC-TEST-5290F9B073CA-C005: preserve both real listener reconnect and caller-abort branches.
+// Preserve both real listener reconnect and caller-abort branches.
 it.each(['reconnect', 'abort'] as const)(
   'waits for the real same-name session after an idempotent request departs (%s)',
   async (outcome) => {

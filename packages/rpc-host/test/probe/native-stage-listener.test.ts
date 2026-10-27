@@ -9,7 +9,7 @@ import {
 import { expect, it } from 'vitest'
 import { coreMemoryServer } from '../host/core-fixture.js'
 
-// RPC-TEST-00776736DCA7-C002: retain the same original handle and early failing subscription.
+// Retain the same original handle and early failing subscription.
 it('rebuilds the native installed probe after an earlier stage listener throws', async () => {
   /** Only actual message observations increment the original before/after traffic count. */
   let events = 0

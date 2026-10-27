@@ -490,7 +490,7 @@ describe('launch-wrap revision 5', () => {
   })
 
   it('records the immediately exiting wrapper phase without fixing a timing-dependent code', async () => {
-    /** BC1 gives this source its own real Host, without a duplicate default namespace. */
+    /** Gives this source its own real Host, without a duplicate default namespace. */
     const host = createHost()
     /** All original error layers remain available for the observed phase record. */
     const reports: unknown[] = []
@@ -527,10 +527,7 @@ describe('launch-wrap revision 5', () => {
       expect(outcome.installed).toBe(false)
       if (outcome.installed) return
       expect(outcome.error).toMatchObject(hostFailure)
-      /**
-       * BC11 keeps the actual bootstrap phase and native cause without requiring a duplicate
-       * wrapper.
-       */
+      /** Keeps the actual bootstrap phase and native cause without requiring a duplicate wrapper. */
       const failed = causes(outcome.error).find(
         (error) => error.source === 'supervision' && error.code === 'LAUNCH_FAILED'
       )
@@ -564,7 +561,7 @@ describe('launch-wrap revision 5', () => {
           })
         )
       }
-      /** BC1 replaces the old shared outlet event surface with uncommitted namespace absence. */
+      /** Replaces the old shared outlet event surface with uncommitted namespace absence. */
       expect(Reflect.get(host, 'process')).toBeUndefined()
     } finally {
       await host.dispose()

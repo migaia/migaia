@@ -59,7 +59,7 @@ it('checks actual encoded UTF-8 length after a lower-bound capture admits escape
   })
 })
 
-it('A43 rejects depth64 repeated references during capture within the frame byte budget', async () => {
+it('rejects depth64 repeated references during capture within the frame byte budget', async () => {
   /** The actual public media codec owns capture before encoding or any physical write. */
   const codec = new RpcJsonCarrierCodec()
   /** Getter visits bound the original traversal without permitting exponential pre-fix work. */

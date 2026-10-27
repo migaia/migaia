@@ -82,7 +82,7 @@ it.each(['unknown', 'type', 'missing', 'ordered-errors'] as const)(
     /** A real JSON result fixes property ownership and strips live object machinery. */
     const decoded = JSON.parse(JSON.stringify(input)) as unknown
     if (shape === 'unknown') {
-      /** BC9 ignores the extra field without making a metadata copy. */
+      /** Ignores the extra field without making a metadata copy. */
       assert.equal(normalizeRpcFrame(decoded), decoded)
       const prepared = await prepareRpcBinary(decoded as IRpcEnvelope, {
         storage: RpcBinaryStorage.inline
@@ -120,7 +120,7 @@ it.each(['unknown', 'type', 'missing', 'ordered-errors'] as const)(
 it.each([new Date(0), new Map()] as const)(
   'metadata records use known fields without a prototype gate',
   async (route) => {
-    /** BC9 validates known metadata fields independently from Date/Map prototypes. */
+    /** Validates known metadata fields independently from Date/Map prototypes. */
     const decoded = { ...wireInput(), route }
     /** The known fields are valid independently from the metadata object's native prototype. */
     Object.assign(route, wireInput().route)
@@ -139,7 +139,7 @@ it.each([new Date(0), new Map()] as const)(
 it('live metadata reads its known accessor instead of rejecting the descriptor', () => {
   /** The canonical public protocol entry owns live in-process object admission. */
   const input = wireInput()
-  /** BC9 explicitly permits direct known-field reads in this shared in-process trust domain. */
+  /** Explicitly permits direct known-field reads in this shared in-process trust domain. */
   let reads = 0
   Object.defineProperty(input, 'id', {
     enumerable: true,

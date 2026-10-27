@@ -43,7 +43,7 @@ const businessVectors = JSON.parse(
 const contract = JSON.parse(
   await readFile(new URL('../../../schema/vectors/remote-contract.json', import.meta.url), 'utf8')
 ).contracts[0].value
-/** Historical bridge schema data remains available only to receiving cases pending BC2 retirement. */
+/** Historical bridge schema data remains available only to receiving cases pending retirement. */
 const bridgeContract = {
   ...contract,
   features: {

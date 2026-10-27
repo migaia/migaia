@@ -1,4 +1,4 @@
-/** A8 keeps own and dependency-qualified names tied to genuine declarations. */
+/** Keeps own and dependency-qualified names tied to genuine declarations. */
 import {
   defineFeature,
   defineHost,

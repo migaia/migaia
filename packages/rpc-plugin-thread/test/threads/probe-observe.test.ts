@@ -66,7 +66,7 @@ const cases: readonly [
 ][] = [
   ['node channel', (report) => createNodeThreadCarrier(nodePort(), 'peer', report)],
   ['web channel', (report) => createWebThreadCarrier(new WebPortFixture().value, 'peer', report)],
-  // BC3 removes the separate parent-channel wrapper; real parent uses this same Node native owner.
+  // Removes the separate parent-channel wrapper; real parent uses this same Node native owner.
   ['parent channel', (report) => createNodeThreadCarrier(nodePort(), 'peer', report)],
   [
     'node factory',
@@ -114,7 +114,7 @@ class ThreadProbeCapture {
   readonly receive = (event: IRpcCarrierObservationEvent): void => {
     this.#emitter.emit({ ...event, stage: RpcProbeStage.carrier })
   }
-  /** BC2 frames are containers; inspect fixture-owned bytes before the actual transfer detaches. */
+  /** Frames are containers; inspect fixture-owned bytes before the actual transfer detaches. */
   readonly #observe = (view: IRpcProbeEventView): void => {
     /** This finite fixture payload is the actual carrier frame, not a reconstructed business root. */
     const data = (view.content as IRpcCarrierFrame).data
@@ -161,7 +161,7 @@ describe('Thread channels inherit canonical physical observation', () => {
        */
       const remove = carrier.subscribe({ frame: receive, close: () => undefined, error: errors })
       try {
-        /** The existing transferred bytes occupy a canonical carrier container under BC2. */
+        /** The existing transferred bytes occupy a canonical carrier container. */
         const bytes = new Uint8Array([4, 6, 8])
         /** This exact physical frame is borrowed by the observer and the native sender. */
         const frame: IRpcCarrierFrame = { kind: 'message', data: bytes }

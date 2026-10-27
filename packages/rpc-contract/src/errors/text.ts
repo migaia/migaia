@@ -64,7 +64,7 @@ export const RpcCoreErrorText = {
   endpointRegistrationFailed: 'Endpoint registration failed',
   /** Stable lifecycle rejection once the canonical kernel closes admission. */
   endpointDisposed: 'Endpoint disposed',
-  /** Session-owned R21 admission rejects excess keepalive bytes before queueing any frame. */
+  /** Session admission rejects excess keepalive bytes before queueing any frame. */
   keepaliveQuotaExceeded: 'Keepalive byte quota exceeded',
   /** Session closing byte and time budgets require positive integer configuration at admission. */
   keepaliveInvalid: 'Keepalive limits must be positive integers',

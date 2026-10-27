@@ -294,7 +294,7 @@ fn native_baseline(counts: &mut Counts) {
         let accepted = replies.get(1).unwrap_or(&Value::Null);
         let directory = field(accepted, "directory");
         counts.case(
-            "u36-runtime-baseline",
+            "runtime-baseline",
             profile,
             &object(&[("id", string("v2-directory"))]),
             text(accepted, "step") == "accept"
@@ -308,7 +308,7 @@ fn native_baseline(counts: &mut Counts) {
                 }),
         );
         counts.case(
-            "u36-runtime-baseline",
+            "runtime-baseline",
             profile,
             &object(&[("id", string("old-describe-refused"))]),
             replies
@@ -316,11 +316,11 @@ fn native_baseline(counts: &mut Counts) {
                 .is_some_and(|frame| text(frame, "id") == "old" && text(frame, "kind") == "error"),
         );
         counts.case(
-            "u36-runtime-baseline",
+            "runtime-baseline",
             profile,
             &object(&[("id", string("batch-isolation"))]),
             result.is_ok()
-                // BC12 retains all six original frames and appends the final native close.
+                // retains all six original frames and appends the final native close.
                 && replies.len() == 7
                 && text(&replies[6], "kind") == "control"
                 && text(&replies[6], "operation") == crate::CONTROL_CLOSE
@@ -421,7 +421,7 @@ fn notification_and_cancel(counts: &mut Counts) {
         "u41",
         "bridge",
         &object(&[("id", string("v2-batch-notification-isolation"))]),
-        // Every original receipt/error/cancellation frame remains before the R21 final close.
+        // Every original receipt/error/cancellation frame remains before the final close.
         replies.len() == 7
             && text(&replies[6], "kind") == "control"
             && text(&replies[6], "operation") == crate::CONTROL_CLOSE
@@ -675,7 +675,7 @@ fn finish_order(counts: &mut Counts) {
         ))
         .unwrap();
     counts.check(
-        "section33/finish-lexical-order",
+        "finish-lexical-order",
         replies
             .iter()
             .map(|reply| text(reply, "id"))
@@ -705,7 +705,7 @@ fn incompatible_reason(counts: &mut Counts) {
         None,
     );
     counts.check(
-        "section33/incompatible-local-and-wire-code",
+        "incompatible-local-and-wire-code",
         result
             .as_ref()
             .is_err_and(|error| error.to_string() == "HANDSHAKE_INCOMPATIBLE")

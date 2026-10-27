@@ -1,4 +1,4 @@
-/** BC3/BC5 contract snapshots describe the actual supported authoring and capability boundaries. */
+/** Contract snapshots describe the actual supported authoring and capability boundaries. */
 import { readFileSync } from 'node:fs'
 import { expect, it } from 'vitest'
 import * as root from '@migaia/rpc-host'

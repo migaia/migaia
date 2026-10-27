@@ -1,4 +1,4 @@
-/** A33 uses actual public Hosts, JSON capture and HMAC to prove conditional backing integrity. */
+/** Uses actual public Hosts, JSON capture and HMAC to prove conditional backing integrity. */
 import { createHmac } from 'node:crypto'
 import { expect, it, vi } from 'vitest'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
@@ -11,7 +11,7 @@ import { RpcProtocolError } from '@migaia/rpc-contract/errors'
 import { deferred } from '@migaia/utils/promise'
 import { coreMemoryServer } from '../../host/core-fixture.js'
 
-/** This public test key uses the unchanged A29 HMAC callback algorithm. */
+/** This public test key uses the unchanged HMAC callback algorithm. */
 const signingKey = 'core-refactor-public-fixture-key'
 
 /** Count real native digest invocations separately for each actual prepare and restore operation. */
@@ -192,7 +192,7 @@ class BinaryIntegrityPair {
   }
 }
 
-it('A33 unsigned native bytes preserve actual transfer and execute zero SHA-256 calls', async () => {
+it('unsigned native bytes preserve actual transfer and execute zero SHA-256 calls', async () => {
   /** Ordinary unsigned native storage retains caller-owned complete backing identity. */
   const bytes = new Uint8Array([7, 8, 9])
   /** One public connection exercises both prepare and restore on request and echo. */
@@ -209,7 +209,7 @@ it('A33 unsigned native bytes preserve actual transfer and execute zero SHA-256 
   }
 })
 
-it('A33 explicit signed transfer keeps a small backing native while an ungranted echo is inline', async () => {
+it('explicit signed transfer keeps a small backing native while an ungranted echo is inline', async () => {
   /** The three-byte caller grant must retain original native handoff instead of copying inline. */
   const bytes = new Uint8Array([7, 8, 9])
   /** The echo has no return transfer grant and therefore uses the signed small-backing policy. */
@@ -229,7 +229,7 @@ it('A33 explicit signed transfer keeps a small backing native while an ungranted
 })
 
 it.each([1125, 1126])(
-  'A33 signed whole-backing boundary %i preserves bytes and rejects actual wire tampering',
+  'signed whole-backing boundary %i preserves bytes and rejects actual wire tampering',
   async (size) => {
     /** A tiny view leaves byte zero invisible while the complete backing selects storage policy. */
     const bytes = new Uint8Array(size)
@@ -288,7 +288,7 @@ it.each([1125, 1126])(
   }
 )
 
-it('A33 mixed logical backings retain aliases and transfer only the actual large sidecar subset', async () => {
+it('mixed logical backings retain aliases and transfer only the actual large sidecar subset', async () => {
   /** Small signed storage remains inline when the caller grants no ownership handoff for it. */
   const small = new Uint8Array([1, 2]).buffer
   /** Two aliases and a tiny final-byte view all borrow this one complete native backing. */

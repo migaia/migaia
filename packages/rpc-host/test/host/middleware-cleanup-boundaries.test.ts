@@ -159,7 +159,7 @@ it('releases native protocol resources exactly once on success and failure, and 
 
     /** This branch originally used the endpoint factory rather than the native Host directly. */
     const endpointServer = coreMemoryServer('native-factory-equivalence')
-    /** BC1 maps the factory endpoint's disposal spelling to its actual public Root.close. */
+    /** Maps the factory endpoint's disposal spelling to its actual public Root.close. */
     const endpoint = await createRpcHost(endpointServer.options)
     /** The public factory owns one stable global completion. */
     const endpointDispose = endpoint.close()
@@ -170,7 +170,7 @@ it('releases native protocol resources exactly once on success and failure, and 
   }
 })
 
-// C047: BC11 removes only the deleted RPC scope shell; native aggregates and their order remain.
+// C047: removes only the deleted RPC scope shell; native aggregates and their order remain.
 it('preserves install primary and exact AggregateError rollback identities/order', async () => {
   /** The original primary must remain separate from both original cleanup aggregates. */
   const primary = new Error('authentication-connect install primary')
@@ -244,7 +244,7 @@ it.each(['authentication', 'connect'] as const)(
         ? [otherCleanup, hostileCleanup]
         : [hostileCleanup, otherCleanup]
     expect(rollbackErrors).toEqual(expectedOuter)
-    /** BC11 removes only the old RPC scope shell, keeping the exact hostile native aggregate. */
+    /** Removes only the old RPC scope shell, keeping the exact hostile native aggregate. */
     const hostileAggregate = rollbackErrors?.find((error) => error === hostileCleanup) as
       | AggregateError
       | undefined
@@ -257,7 +257,7 @@ it.each(['authentication', 'connect'] as const)(
   }
 )
 
-// C151: BC11 receives native.dispose's real result; RpcRoot.close remains a separate public contract.
+// C151: receives native.dispose's real result; RpcRoot.close remains a separate public contract.
 it('native result cleanup failure preserves identity and terminal Promise identity', async () => {
   /** The original native resource failure must retain its exact identity if disposal rejects. */
   const cleanup = new Error('native observation result cleanup failure')

@@ -1,4 +1,4 @@
-/** A46 keeps the explicit Host contract entry identical to its single canonical peer package. */
+/** Keeps the explicit Host contract entry identical to its single canonical peer package. */
 import { expect, it } from 'vitest'
 import * as host from '@migaia/rpc-host'
 import {
@@ -29,7 +29,7 @@ const expected = {
 /** Resolve the real manifest subpath at runtime, so the missing pre-migration entry fails in-test. */
 const contractEntry = '@migaia/rpc-host/contract'
 
-it('A46 publishes each named contract symbol with its original runtime identity', async () => {
+it('publishes each named contract symbol with its original runtime identity', async () => {
   /** Import rejection is an assertion failure when the real package does not publish the entry. */
   await expect(import(contractEntry)).resolves.toBeDefined()
   /** The native module namespace must contain exactly the agreed runtime subset. */
@@ -39,12 +39,12 @@ it('A46 publishes each named contract symbol with its original runtime identity'
   for (const [name, value] of Object.entries(expected)) expect(contract[name]).toBe(value)
 })
 
-it('A46 removes every contract runtime symbol from the Host root without compatibility exports', () => {
+it('removes every contract runtime symbol from the Host root without compatibility exports', () => {
   // The nine keys are fixed by the explicit entry contract above.
   for (const name of Object.keys(expected)) expect(host).not.toHaveProperty(name)
 })
 
-it('A46 keeps instanceof symmetric for lifecycle, construction and abort errors', async () => {
+it('keeps instanceof symmetric for lifecycle, construction and abort errors', async () => {
   /** These runtime constructors resolve through the exact same application peer installation. */
   const contract = await import(contractEntry)
   /** The cause is caller-owned and must survive either package entry unchanged. */

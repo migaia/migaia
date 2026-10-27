@@ -3,7 +3,7 @@ import { createRpcHost } from '@migaia/rpc-host'
 import { expect, it } from 'vitest'
 import { coreMemoryServer } from '../host/core-fixture.js'
 
-// RPC-TEST-366FF2AC3AFB-C006-A002: public directory retains the original captured provider count.
+// Public directory retains the original captured provider count.
 it('retains one captured provider after public source mutation', async () => {
   /** The actual native listener performs no acquisition during cold configuration construction. */
   const server = coreMemoryServer('provider-snapshot-host')
@@ -30,7 +30,7 @@ it('retains one captured provider after public source mutation', async () => {
   }
 })
 
-// RPC-TEST-366FF2AC3AFB-C011-A002: all three captured providers remain publicly callable.
+// All three captured providers remain publicly callable.
 it('retains three captured providers and their results after public source mutation', async () => {
   /** These original functions enter the public catalog as supported own data descriptors. */
   const providerMap = { alpha: (): unknown => 'alpha', beta: () => 'beta', gamma: () => 'gamma' }

@@ -249,7 +249,7 @@ class NativeMemberFixture {
   }
 }
 
-// RPC-TEST-19CE78390954-C007: late acquired physical resources close before actual local attach.
+// Late acquired physical resources close before actual local attach.
 it('closes a real carrier returned after member release before Session attachment', async () => {
   /** Only the original acquired source delivery is held. */
   const acquired = deferred<void>()
@@ -287,7 +287,7 @@ it('closes a real carrier returned after member release before Session attachmen
   }
 })
 
-// RPC-TEST-19CE78390954-C010: initial and replacement use the one genuine SDK resource owner.
+// Initial and replacement use the one genuine SDK resource owner.
 it('shares actual member preparation and closes both accepted Session and carrier generations', async () => {
   /** Original reports remain unfiltered through both genuine native generations. */
   const fixture = new NativeMemberFixture('proxy-shared-member')
@@ -315,7 +315,7 @@ it('shares actual member preparation and closes both accepted Session and carrie
   }
 })
 
-// RPC-TEST-19CE78390954-C011: original2 callback slots are a separate NoPASS shape component.
+// Original2 callback slots are a separate NoPASS shape component.
 it('retains the actual departing candidate until physical cleanup finishes across six generations', async () => {
   /** The original acquired carrier cleanup, rather than a synthetic endpoint, is held. */
   const closing = deferred<void>()
@@ -371,7 +371,7 @@ it('retains the actual departing candidate until physical cleanup finishes acros
   }
 })
 
-// RPC-TEST-19CE78390954-C012 / A35: only the most recent departed generation retains its reason.
+// / only the most recent departed generation retains its reason.
 it('retains only the latest native leave reason and closes older generation observers without causes', async () => {
   /** Each lower-level unit failure must remain the actual Supervisor exit error's original cause. */
   const reasons = Array.from({ length: 5 }, (_, index) => new Error(`exit ${index + 1}`))
@@ -431,7 +431,7 @@ it('retains only the latest native leave reason and closes older generation obse
   }
 })
 
-// A35: a failed newer native candidate cannot retire the still-serving accepted generation.
+// A failed newer native candidate cannot retire the still-serving accepted generation.
 it('preserves the older active generation after a newer native replacement fails', async () => {
   /** This failure belongs to the real second native unit, while its predecessor remains ready. */
   const replacementFailure = new Error('replacement failed')
@@ -477,7 +477,7 @@ it('preserves the older active generation after a newer native replacement fails
   }
 })
 
-// RPC-TEST-19CE78390954-C014: terminal comes from the actual native restart policy.
+// Terminal comes from the actual native restart policy.
 it('rejects actual terminal and released readiness without reviving an old native generation', async () => {
   /** Existing never-restart policy enters terminal on the genuine first failed unit. */
   const fixture = new NativeMemberFixture('proxy-terminal-member')
@@ -502,7 +502,7 @@ it('rejects actual terminal and released readiness without reviving an old nativ
   }
 })
 
-// RPC-TEST-19CE78390954-C015: raw original leaves and rollback order remain canonical SDK output.
+// Raw original leaves and rollback order remain canonical SDK output.
 it('preserves native aggregate release errors and exact primary rollback error order', async () => {
   /** Original unfiltered reports span both real release and failed replacement. */
   const reports: unknown[] = []
@@ -667,7 +667,7 @@ it('does not report a shared native rebind closed by its own member release', as
   }
 })
 
-// RPC-TEST-19CE78390954-C002: R8 removes the automatic default; explicit retry owns the same replay.
+// Removes the automatic default; explicit retry owns the same replay.
 it('replays a written idempotent public request through the complete retry feature', async () => {
   /** The first real provider invocation remains unsettled until after its native generation leaves. */
   const first = deferred<string>()
@@ -727,7 +727,7 @@ it('replays a written idempotent public request through the complete retry featu
   }
 })
 
-// RPC-TEST-19CE78390954-C003: preserve the original release trigger and unknown-result code.
+// Preserve the original release trigger and unknown-result code.
 it('settles a physically written public request when its actual member is released', async () => {
   /** Real request dispatch supplies the physical-write checkpoint without a synthetic sent flag. */
   const entered = deferred<void>()
@@ -764,7 +764,7 @@ it('settles a physically written public request when its actual member is releas
   }
 })
 
-// RPC-TEST-19CE78390954-C004: public publication/rebind and the actual held callable stay distinct.
+// Public publication/rebind and the actual held callable stay distinct.
 it('publishes real ready generations and fences an actual held callable across native rebind', async () => {
   /** The original business values and payloads belong to each real provider invocation. */
   const request = vi.fn((_payload: IRpcPortableValue | undefined) => 'result')
@@ -812,7 +812,7 @@ it('publishes real ready generations and fences an actual held callable across n
     expect(outcome.generation).toBeGreaterThan(first)
     expect(fixture.namespace).toBe(namespace)
     await expect(namespace.send('remote', 'p.f.request', ['second'])).resolves.toBe('result')
-    /** R20/BC11 item24 preserves the held-generation fence; readiness alone cannot prove it. */
+    /** Item24 preserves the held-generation fence; readiness alone cannot prove it. */
     await expect(held(['closed'])).rejects.toMatchObject({ code: 'TARGET_UNKNOWN' })
     expect(request.mock.calls.map(([payload]) => payload)).toEqual([['first'], ['second']])
     await fixture.member.close()
@@ -823,7 +823,7 @@ it('publishes real ready generations and fences an actual held callable across n
   }
 })
 
-// RPC-TEST-19CE78390954-C006: actual handshake replaces only the removed describe stimulus.
+// Actual handshake replaces only the removed describe stimulus.
 it('rejects native departure during a real handshake and closes its actual candidate', async () => {
   /** The genuine inbound handshake remains pending when native departure occurs. */
   const gate = new NativeHandshakeGate()
@@ -868,7 +868,7 @@ it('rejects native departure during a real handshake and closes its actual candi
   }
 })
 
-// RPC-TEST-19CE78390954-C008 / A37: each caller can abandon only its own shared rebind wait.
+// / each caller can abandon only its own shared rebind wait.
 it('keeps shared native rebind alive when its first caller cancels only its own wait', async () => {
   /** Only the first caller receives cancellation; its original reason remains reachable. */
   const controller = new AbortController()
@@ -919,7 +919,7 @@ it('keeps shared native rebind alive when its first caller cancels only its own 
   }
 })
 
-// RPC-TEST-19CE78390954-C009-A002/A003: old unavailable REMOTE_CLOSED atom remains pending.
+// /old unavailable REMOTE_CLOSED atom remains pending.
 it('keeps unavailable public work off the wire and reports the original native leave listener error', async () => {
   /** This actual listener error is retained without stringifying it at the reporting boundary. */
   const failure = new Error('listener')
@@ -947,7 +947,7 @@ it('keeps unavailable public work off the wire and reports the original native l
   }
 })
 
-// RPC-TEST-19CE78390954-C013: real complete timeout features replace removed private options DTOs.
+// Real complete timeout features replace removed private options DTOs.
 it('caps public scalar and stream deadlines while one notify creates no scalar request record', async () => {
   /**
    * Remote notification entry is the actual business completion checkpoint, not a local write

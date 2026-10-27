@@ -163,7 +163,7 @@ it('caller cancellation late resolve emits only its CANCELLED terminal and no fa
     await provider.finished.promise
     await pending
     await settleProviderDelivery()
-    /** BC2 retires the old zero-frame shape; no late business result may become the call result. */
+    /** Retires the old zero-frame shape; no late business result may become the call result. */
     const terminals = fixture.pair[1].written.filter(
       (message) =>
         (message.kind === RpcWireKind.result || message.kind === RpcWireKind.error) &&
@@ -268,7 +268,7 @@ it('caller cancellation late reject reports the original error with only its CAN
   }
 })
 
-// A40 / owner review M8: acknowledging this operation's abort is normal provider completion.
+// / owner review M8: acknowledging this operation's abort is normal provider completion.
 it('caller cancellation acknowledgment does not report the original provider signal reason', async () => {
   /** The same provider holds business completion until its actual remote signal aborts. */
   const provider = new SignalTerminalProvider()

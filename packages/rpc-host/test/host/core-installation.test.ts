@@ -172,7 +172,7 @@ it('preserves real native Feature exposure and releases an ordinary transport ex
     expect(await surface.send('client', 'value')).toBe(17)
     expect(await native.unUse(server.transport.name)).toMatchObject({ ok: true })
     expect(close).toHaveBeenCalledTimes(1)
-    /** BC1 replaces the old registration-addressed outlet with an explicitly retired namespace. */
+    /** Replaces the old registration-addressed outlet with an explicitly retired namespace. */
     await expect(surface.send('client', 'value')).rejects.toMatchObject({
       code: 'ENDPOINT_DISPOSED'
     })
@@ -187,7 +187,7 @@ it('preserves real native Feature exposure and releases an ordinary transport ex
 it('rolls back actual native members in reverse opening order without replacing the assembly failure', async () => {
   /** The two actual receiving installations keep their own native Session authority. */
   const contexts: IRpcTransportContext[] = []
-  /** BC3 moves assembly into the genuine native installation transaction. */
+  /** Moves assembly into the genuine native installation transaction. */
   const namespaces = ['first', 'second'] as const
   /** Each remote listener accepts a real physical pair before local construction fails. */
   const remote = await createRpcHost({
@@ -268,7 +268,7 @@ it('rolls back actual native members in reverse opening order without replacing 
 it('reclaims a silent same-name Session with one ping and rejects a third concurrent candidate', async () => {
   /** The one actual listener accepts every candidate through its installed SessionTable. */
   const server = coreMemoryServer('server')
-  /** BC3 moves the old exit observation to its canonical readonly probe consumer. */
+  /** Moves the old exit observation to its canonical readonly probe consumer. */
   const exits: IRpcProbeEventView[] = []
   /** This original provider proves the old pending call belongs to the retired physical source. */
   const entered = deferred<void>()
@@ -355,7 +355,7 @@ it('reclaims a silent same-name Session with one ping and rejects a third concur
   }
 })
 
-// RPC-TEST-CD50052EF4A5-C002: preserve same-batch value identity and both acquired cleanup receipts.
+// Preserve same-batch value identity and both acquired cleanup receipts.
 it('rolls back both native dependency owners once without replacing their original value or primary', async () => {
   /** Both selected Feature outputs and RPC declarations belong to this same real native Host. */
   const rpc = rpcHostPipelines(
@@ -465,7 +465,7 @@ it('rolls back both native dependency owners once without replacing their origin
   }
 })
 
-// RPC-TEST-CD50052EF4A5-C002-A001: the public factory preserves the same transaction primary.
+// The public factory preserves the same transaction primary.
 it('public construction preserves the original primary after both native dependency resources roll back', async () => {
   /** The original native provider and its actual dependent consumer must share this exact object. */
   const firstValue = Object.freeze({ owner: 'first' })

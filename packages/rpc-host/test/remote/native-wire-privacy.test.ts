@@ -133,10 +133,7 @@ describe('application-selected contract error privacy through public native Host
          */
         const frames = fixture.pair[1].written.slice(start)
         expect(frames).toHaveLength(1)
-        /**
-         * BC2's actual error frame replaces the old response/ok:false DTO, preserving the error
-         * atom.
-         */
+        /** Actual error frame replaces the old response/ok:false DTO, preserving the error atom. */
         const frame = frames[0]
         expect(frame).toMatchObject({ kind: 'error', task: { method: 'describe' } })
         assert(frame?.kind === 'error')

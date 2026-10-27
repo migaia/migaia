@@ -126,7 +126,7 @@ describe('public probe non-interference', () => {
         expect(batches.some((members) => members !== undefined && members.length > 1)).toBe(true)
         expect(sending.mock.calls.length).toBeLessThan(64)
         expect(batches.reduce((total, members) => total + (members?.length ?? 1), 0)).toBe(64)
-        /** BC3 removed the Peer wrapper; the same original native error is restored directly. */
+        /** Removed the Peer wrapper; the same original native error is restored directly. */
         const error = await client.host.memory
           .send('probe-server', 'fail')
           .catch((failure: unknown) => failure)

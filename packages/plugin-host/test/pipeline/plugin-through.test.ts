@@ -1,4 +1,4 @@
-/** A9 exercises through at the public named-pipeline registration and native lifetime boundaries. */
+/** Exercises through at the public named-pipeline registration and native lifetime boundaries. */
 import { expect, it, vi } from 'vitest'
 import { defineHost, definePlugin, pipelineSpec, type IPluginHostCoreFor } from '../../src/index.js'
 import { StageLanes } from '../../src/stage-lanes.js'
@@ -23,7 +23,7 @@ function createThroughHost(order: 'install' | 'reverse' = 'install') {
 /** Native install callbacks infer all named lanes from this one actual Host declaration. */
 type IThroughCore = IPluginHostCoreFor<ReturnType<typeof createThroughHost>>
 
-it('A9: through splices every target stage before the remaining source and exposes its result', async () => {
+it('through splices every target stage before the remaining source and exposes its result', async () => {
   /** These entries observe original stage entry and post-next continuation order. */
   const events: string[] = []
   /** Target stages receive the actual result returned by the source terminal. */
@@ -81,7 +81,7 @@ it('A9: through splices every target stage before the remaining source and expos
   }
 })
 
-it('A9: a target short circuit skips the remaining source stages and terminal', async () => {
+it('a target short circuit skips the remaining source stages and terminal', async () => {
   /** The remaining source callback cannot run after the target deliberately withholds next. */
   const after = vi.fn()
   /** The actual terminal remains independently observable from source stage entry. */
@@ -111,8 +111,8 @@ it('A9: a target short circuit skips the remaining source stages and terminal', 
   }
 })
 
-it('A9: an empty target adds no lease beyond the original nonempty source lane', async () => {
-  /** R7 already observes this canonical lease method; no production counter is introduced. */
+it('an empty target adds no lease beyond the original nonempty source lane', async () => {
+  /** The existing behavior test observes this canonical lease method without a production counter. */
   const retained = vi.spyOn(StageLanes.prototype, 'retainLeases')
   /** The source has a real through occurrence while the target has no visible stage. */
   const host = createThroughHost()
@@ -136,7 +136,7 @@ it('A9: an empty target adds no lease beyond the original nonempty source lane',
   }
 })
 
-it('A9: the through occurrence follows the source pipeline reverse order', async () => {
+it('the through occurrence follows the source pipeline reverse order', async () => {
   /** Source order applies to the bridge at its actual registration position. */
   const events: string[] = []
   /** Only the source reverses its installation sequence. */
@@ -173,7 +173,7 @@ it('A9: the through occurrence follows the source pipeline reverse order', async
 it.each([
   ['synchronous', 'PIPELINE_MODE_MISMATCH'],
   ['multipleTarget', 'INVALID_PIPELINE_OPTION']
-] as const)('A9: through rejects incompatible %s at registration', async (target, code) => {
+] as const)('through rejects incompatible %s at registration', async (target, code) => {
   /** The target name is known; the deliberate assertion bypass reaches runtime option admission. */
   const host = createThroughHost()
   try {
@@ -193,7 +193,7 @@ it.each([
   }
 })
 
-it('A9: through rejects a registration cycle without corrupting the preceding acyclic link', async () => {
+it('through rejects a registration cycle without corrupting the preceding acyclic link', async () => {
   /** The target remains traversable exactly once after the rejected reverse edge. */
   const reached = vi.fn()
   /** Cycle admission is exercised on one actual native registration generation. */
@@ -222,7 +222,7 @@ it('A9: through rejects a registration cycle without corrupting the preceding ac
   }
 })
 
-it('A9: compatible multiple lanes retain both source continuations and their original order', async () => {
+it('compatible multiple lanes retain both source continuations and their original order', async () => {
   /** Every original target branch reaches the source terminal once. */
   const completed: number[] = []
   /** Both lanes explicitly permit multiple calls to their continuation. */
@@ -253,7 +253,7 @@ it('A9: compatible multiple lanes retain both source continuations and their ori
   }
 })
 
-it('A9: through and use return the same idempotent native occurrence removal handle', async () => {
+it('through and use return the same idempotent native occurrence removal handle', async () => {
   /** The original target callback remains installed after only its caller occurrence is removed. */
   const reached = vi.fn()
   /** One native install lends its actual bridge removal receipt to the public assertion. */
@@ -293,7 +293,7 @@ it('A9: through and use return the same idempotent native occurrence removal han
   }
 })
 
-it('A9: unusing the native caller removes its through occurrence while the target owner remains', async () => {
+it('unusing the native caller removes its through occurrence while the target owner remains', async () => {
   /** The target belongs to a different actual native registration. */
   const reached = vi.fn()
   /** This Host owns declared lanes; the bridge itself belongs only to the caller plugin. */

@@ -109,7 +109,7 @@ func finishOrderChecks(suite *vectorSuite) {
 	for _, reply := range replies {
 		ids = append(ids, stringField(field(reply), "id"))
 	}
-	suite.check("section33/finish-lexical-order", err == nil && strings.Join(ids, ",") == "a,m,z,finish")
+	suite.check("finish-lexical-order", err == nil && strings.Join(ids, ",") == "a,m,z,finish")
 
 }
 
@@ -232,15 +232,15 @@ func nativeBusinessChecks(suite *vectorSuite) {
 	accept, acceptErr := receive(&output, true)
 	description := field(field(hello)["directory"])
 	identity := field(description["self"])
-	suite.check("u36/describe/business-host-false", err == nil && helloErr == nil && integerField(description, "schemaVersion") == 3 && identity["name"] == "go-peer" && identity["instanceId"] == "go-peer" && validRuntimeDescription(field(hello)["directory"], "go-peer"))
-	suite.check("u41/bridge/baseline", acceptErr == nil && field(accept)["step"] == "accept" && field(accept)["profile"] == protocol)
+	suite.check("describe/business-host-false", err == nil && helloErr == nil && integerField(description, "schemaVersion") == 3 && identity["name"] == "go-peer" && identity["instanceId"] == "go-peer" && validRuntimeDescription(field(hello)["directory"], "go-peer"))
+	suite.check("bridge/baseline", acceptErr == nil && field(accept)["step"] == "accept" && field(accept)["profile"] == protocol)
 	first, firstErr := receive(&output, false)
 	second, secondErr := receive(&output, false)
-	// BC12 appends one final close after every original business response and before EOF.
+	// Appends one final close after every original business response and before EOF.
 	closing, closingErr := receive(&output, false)
 	_, eof := receive(&output, false)
 	received := field(field(second)["result"])
-	suite.check("u41/bridge/v2-batch-notification-isolation", err == nil && firstErr == nil && secondErr == nil && closingErr == nil && field(closing)["kind"] == "control" && field(closing)["operation"] == controlClose && errorRoot(field(closing)["reason"])["code"] == "ENDPOINT_DISPOSED" && eof == io.EOF && field(first)["id"] == "missing" && errorRoot(field(first)["error"])["code"] == "PROVIDER_NOT_FOUND" && field(second)["id"] == "received" && integerField(received, "count") == 1 && runtimeSchemaEqual(received["values"], []any{"receipt"}))
+	suite.check("bridge/v2-batch-notification-isolation", err == nil && firstErr == nil && secondErr == nil && closingErr == nil && field(closing)["kind"] == "control" && field(closing)["operation"] == controlClose && errorRoot(field(closing)["reason"])["code"] == "ENDPOINT_DISPOSED" && eof == io.EOF && field(first)["id"] == "missing" && errorRoot(field(first)["error"])["code"] == "PROVIDER_NOT_FOUND" && field(second)["id"] == "received" && integerField(received, "count") == 1 && runtimeSchemaEqual(received["values"], []any{"receipt"}))
 	// Both old directories advertised echo request/notify and peer.wait request-only; schema3 preserves that rule.
 	echo, wait := false, false
 	for _, raw := range entries(description["methods"]) {
@@ -252,12 +252,12 @@ func nativeBusinessChecks(suite *vectorSuite) {
 			wait = runtimeSchemaEqual(method["supportedModes"], []any{"request"})
 		}
 	}
-	suite.check("u36/describe/modes", echo && wait)
+	suite.check("describe/modes", echo && wait)
 	state := newBusiness(local, runtimeDescription(remote, false), true)
 	replies, waitErr := state.native(requestFor("wait-notify", "peer.wait", "notify", nil, local, remote))
-	suite.check("u36/modes/wait-notify-no-pending-host-false", waitErr == nil && len(replies) == 0 && len(state.waiting) == 0)
+	suite.check("modes/wait-notify-no-pending-host-false", waitErr == nil && len(replies) == 0 && len(state.waiting) == 0)
 	_, oldFailure := state.invoke("migaia.remote.describe", nil, nil)
-	suite.check("u36/describe/v1-removed-host-false", oldFailure != nil && errorRoot(oldFailure)["code"] == "PROVIDER_NOT_FOUND")
+	suite.check("describe/v1-removed-host-false", oldFailure != nil && errorRoot(oldFailure)["code"] == "PROVIDER_NOT_FOUND")
 }
 
 // siblingChecks preserves first/missing/last business reply values and order in coalesced canonical frames.
@@ -273,14 +273,14 @@ func siblingChecks(suite *vectorSuite) {
 		sessionErr := serveBusiness(&input, &output, local, "", "", business)
 		hello, helloErr := receive(&output, true)
 		_, acceptErr := receive(&output, true)
-		suite.check(fmt.Sprintf("u36/describe/live-business-%t", business), sessionErr == nil && helloErr == nil && acceptErr == nil && validRuntimeDescription(field(hello)["directory"], "go-peer"))
+		suite.check(fmt.Sprintf("describe/live-business-%t", business), sessionErr == nil && helloErr == nil && acceptErr == nil && validRuntimeDescription(field(hello)["directory"], "go-peer"))
 		first, firstErr := receive(&output, false)
 		missing, missingErr := receive(&output, false)
 		last, lastErr := receive(&output, false)
 		// Keep the original ordered sibling assertions and strengthen the final native close boundary.
 		closing, closingErr := receive(&output, false)
 		_, eof := receive(&output, false)
-		suite.check(fmt.Sprintf("u36/batch/member-isolation-business-%t", business), sessionErr == nil && firstErr == nil && missingErr == nil && lastErr == nil && closingErr == nil && field(closing)["kind"] == "control" && field(closing)["operation"] == controlClose && errorRoot(field(closing)["reason"])["code"] == "ENDPOINT_DISPOSED" && eof == io.EOF && field(first)["id"] == "first" && field(first)["result"] == "one" && field(missing)["id"] == "missing" && errorRoot(field(missing)["error"])["code"] == "PROVIDER_NOT_FOUND" && field(last)["id"] == "last" && field(last)["result"] == "two")
+		suite.check(fmt.Sprintf("batch/member-isolation-business-%t", business), sessionErr == nil && firstErr == nil && missingErr == nil && lastErr == nil && closingErr == nil && field(closing)["kind"] == "control" && field(closing)["operation"] == controlClose && errorRoot(field(closing)["reason"])["code"] == "ENDPOINT_DISPOSED" && eof == io.EOF && field(first)["id"] == "first" && field(first)["result"] == "one" && field(missing)["id"] == "missing" && errorRoot(field(missing)["error"])["code"] == "PROVIDER_NOT_FOUND" && field(last)["id"] == "last" && field(last)["result"] == "two")
 	}
 }
 

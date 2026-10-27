@@ -79,7 +79,7 @@ it('shares the same two factories and original flow-control values across public
   expect(flow.IpcSendClass).toBe(IpcSendClass)
   expect(flow.IpcLogEventName).toBe(IpcLogEventName)
   expect(IpcSendClass).toBe(canonicalSendClass)
-  /** BC3 removes the old Host/plugin log alias; Process remains the single event vocabulary. */
+  /** Removes the old Host/plugin log alias; Process remains the single event vocabulary. */
   expect(Object.keys(flow).toSorted()).toEqual([
     'IpcFlowControl',
     'IpcLogEventName',
@@ -137,7 +137,7 @@ it('applies explicit data capacity while preserving control capacity on one actu
     expect(
       records.filter((record) => record.name === IpcLogEventName['ipc.backlog.rejected'])
     ).toHaveLength(2)
-    /** BC3 retires deleted ipc.log fallback input, not the selected native log sink above. */
+    /** Retires deleted ipc.log fallback input, not the selected native log sink above. */
     released.resolve()
     await Promise.all([pending, acceptedControl])
     expect(await host.process.request('echo', 43)).toBe(43)

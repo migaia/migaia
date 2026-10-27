@@ -1,4 +1,4 @@
-/** A28 public warning subscriptions observe real trusted native parent admission. */
+/** Public warning subscriptions observe real trusted native parent admission. */
 import { expect, expectTypeOf, it, vi } from 'vitest'
 import {
   createRpcHost,
@@ -123,7 +123,7 @@ class WarningPair {
   }
 }
 
-it('A28 delivers one original warning to the option then host SDK plugins in registration order', async () => {
+it('delivers one original warning to the option then host SDK plugins in registration order', async () => {
   /** Recipient identity and order are observed on the same actual warning object. */
   const deliveries: { recipient: string; warning: IRpcWarning }[] = []
   /** A successful warning must never enter the independent background error channel. */
@@ -243,7 +243,7 @@ it('calls SDK setup and observation callbacks without a configuration receiver',
   }
 })
 
-it('A26 warns only about an ignored instanceId when the configured name matches the parent', async () => {
+it('warns only about an ignored instanceId when the configured name matches the parent', async () => {
   /** The actual parent and child names agree; only their configured instance addresses differ. */
   const warnings: IRpcWarning[] = []
   /** Successful native reconciliation must not report an error. */
@@ -270,7 +270,7 @@ it('A26 warns only about an ignored instanceId when the configured name matches 
   }
 })
 
-it('A26 keeps an unconfigured child name equal to its parent-assigned instanceId', async () => {
+it('keeps an unconfigured child name equal to its parent-assigned instanceId', async () => {
   /** Defaults are replaced without warning because the child configured no competing identity. */
   const warnings: IRpcWarning[] = []
   /** This public parent deliberately omits the name from its genuine attachment facts. */
@@ -285,7 +285,7 @@ it('A26 keeps an unconfigured child name equal to its parent-assigned instanceId
   }
 })
 
-it('A26 retains the accepted parent name when a later namespace repeats only its instanceId', async () => {
+it('retains the accepted parent name when a later namespace repeats only its instanceId', async () => {
   /** No explicit child identity competes with either trusted native assignment. */
   const warnings: IRpcWarning[] = []
   /** The first source names the child; the second supplies only the same instance assignment. */
@@ -300,7 +300,7 @@ it('A26 retains the accepted parent name when a later namespace repeats only its
   }
 })
 
-it('A28 uses console.warn exactly once when neither warning recipient is installed', async () => {
+it('uses console.warn exactly once when neither warning recipient is installed', async () => {
   /** The original successful decision reaches the existing console sink only when unobserved. */
   const consoleWarning = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
   /** Warning delivery must remain separate from error diagnostics. */
@@ -327,7 +327,7 @@ it('A28 uses console.warn exactly once when neither warning recipient is install
   }
 })
 
-it('A28 lets a host SDK subscriber receive the warning without an onWarning option', async () => {
+it('lets a host SDK subscriber receive the warning without an onWarning option', async () => {
   /** The actual SDK subscriber is the only configured recipient. */
   const receive = vi.fn<(warning: IRpcWarning) => void>()
   /** Plugin-only reception must suppress the fallback console sink. */
@@ -360,7 +360,7 @@ it('A28 lets a host SDK subscriber receive the warning without an onWarning opti
   }
 })
 
-it('A28 reports each original failing recipient and still delivers the same warning to later plugins', async () => {
+it('reports each original failing recipient and still delivers the same warning to later plugins', async () => {
   /** Exact original errors prove neither option nor plugin failures replace the warning record. */
   const optionFailure = new Error('warning option failed')
   /** The second independent recipient fails after the option has already reported its error. */
@@ -410,7 +410,7 @@ it('A28 reports each original failing recipient and still delivers the same warn
   }
 })
 
-it('A28 rejects local subscriber plugins and host-only warning callbacks returned by Features', async () => {
+it('rejects local subscriber plugins and host-only warning callbacks returned by Features', async () => {
   /** A host subscription is a real SDK plugin, rather than an information-flow Feature. */
   const plugin = defineFlowPlugin({
     name: 'warning-misplaced-plugin',
@@ -514,7 +514,7 @@ it('reports a readonly SDK observer rejection without interrupting business', as
 })
 
 it.each([false, true])(
-  'A32 keeps warnings and recipient reports original without calling errorMap, subscriber first %s',
+  'keeps warnings and recipient reports original without calling errorMap, subscriber first %s',
   async (subscriberFirst) => {
     /** The warning recipient's exact error belongs only to the local report channel. */
     const recipientFailure = new Error('A32 warning recipient failed')

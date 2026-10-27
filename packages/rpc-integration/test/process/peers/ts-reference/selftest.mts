@@ -246,7 +246,7 @@ function checkHandshake(directory: string, verdict: IVerdict, prefix: string): v
     retire(
       verdict,
       `handshake/agreement/${item.id}`,
-      'BC2 sole major2/minor0/json profile replaces old multiversion/cbor/capability agreement'
+      'sole major2/minor0/json profile replaces old multiversion/cbor/capability agreement'
     )
   for (const item of handshake.invalid as IRecord[])
     check(verdict, `handshake/invalid/${item.id}`, () => {
@@ -272,7 +272,7 @@ function checkEnvelopes(directory: string, verdict: IVerdict, prefix: string, _b
   const envelopes = vector(directory, `${prefix}envelope.json`)
   for (const item of envelopes.valid as IRecord[]) {
     if (String(item.id).startsWith('discovery-'))
-      retire(verdict, `envelope/valid/${item.id}`, 'BC2 discovery replaced by canonical directory')
+      retire(verdict, `envelope/valid/${item.id}`, 'discovery replaced by canonical directory')
     else
       check(verdict, `envelope/valid/${item.id}`, () => {
         validateFrame(envelopeFixture(item.value))
@@ -281,7 +281,7 @@ function checkEnvelopes(directory: string, verdict: IVerdict, prefix: string, _b
   for (const section of ['invalid', 'order', 'unknownFields'])
     for (const item of envelopes[section] as IRecord[]) {
       if (item.id === 'wrong-route-type') {
-        retire(verdict, `envelope/${section}/${item.id}`, 'BC2 redundant route.type removed')
+        retire(verdict, `envelope/${section}/${item.id}`, 'redundant route.type removed')
         continue
       }
       check(verdict, `envelope/${section}/${item.id}`, () => {
@@ -328,11 +328,7 @@ function checkControls(directory: string, verdict: IVerdict, prefix: string): vo
       else validateFrame(base)
     })
     if (item.id === 'unknown')
-      retire(
-        verdict,
-        'control/unknown/warn',
-        'BC2 unknown semantic control now fails closed admission'
-      )
+      retire(verdict, 'control/unknown/warn', 'unknown semantic control now fails closed admission')
   }
 }
 /** Check every stream payload, sequence and byte-budget row. */
@@ -464,7 +460,7 @@ function checkWireErrors(directory: string, verdict: IVerdict): void {
     retire(
       verdict,
       `wire/jsonrpc/${item.id}`,
-      'BC2 semantic JSONRPC foreign error mapper removed; native flat text/cause/stack budgets retained'
+      'semantic JSONRPC foreign error mapper removed; native flat text/cause/stack budgets retained'
     )
 }
 /** Check framing entry boundaries and every physical chunk vector through the real byte codec. */
@@ -503,11 +499,7 @@ function checkFraming(directory: string, verdict: IVerdict): void {
 /** Runs all existing vector families with one independent verdict ledger. */
 function run(directory: string): IVerdict {
   const verdict: IVerdict = { passed: 0, failed: 0, pending: [], failures: [], retired: [] }
-  retire(
-    verdict,
-    'required-baseline-offer',
-    'BC2 mandatory runtime-api/batch capability gate removed'
-  )
+  retire(verdict, 'required-baseline-offer', 'mandatory runtime-api/batch capability gate removed')
   for (const section of ['valid', 'invalid'])
     for (const item of vector(directory, 'core-profile.json')[section] as IRecord[])
       check(verdict, String(item.id), () => {
@@ -528,7 +520,7 @@ function run(directory: string): IVerdict {
     assert.throws(() => decoder.push(Buffer.from([1, 0, 0, 1])), { code: 'FRAME_LIMIT_EXCEEDED' })
     assert.throws(() => new FrameDecoder().push(Buffer.alloc(4)), { code: 'INVALID_FRAME' })
   })
-  check(verdict, 'section33/error-route-seventeen', () => {
+  check(verdict, 'error-route-seventeen', () => {
     /** Seventeen admitted nodes preserve the full origin-plus-forwarding route. */
     const route = Array.from({ length: 17 }, () => 'a'.repeat(32))
     const graph = {
@@ -543,7 +535,7 @@ function run(directory: string): IVerdict {
       })
     )
   })
-  check(verdict, 'section33/final-close-admitted', () => {
+  check(verdict, 'final-close-admitted', () => {
     validateFrame({
       profile: REFERENCE_PROFILE,
       kind: 'control',

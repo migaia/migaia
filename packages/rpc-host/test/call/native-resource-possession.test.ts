@@ -4,7 +4,7 @@ import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { expect, it } from 'vitest'
 import { coreMemoryServer } from '../host/core-fixture.js'
 
-// RPC-TEST-E7037E9F9422-C001: BC2/BC3 retire only the old selector/capture/spread interleaving.
+// Retire only the old selector/capture/spread interleaving.
 it('sole-profile request retains caller option counts before codec capture', async () => {
   /** Current sole-profile admission reads both original options before its one codec capture. */
   const payload = { value: 41 }
@@ -41,7 +41,7 @@ it('sole-profile request retains caller option counts before codec capture', asy
   }
 })
 
-// RPC-TEST-E7037E9F9422-C003: exact payload42/99, directsend43 and real close Promise identity.
+// Exact payload42/99, directsend43 and real close Promise identity.
 it('snapshots the original public request synchronously and retains direct send and close identity', async () => {
   /** Both physical endpoints borrow the canonical codec's actual synchronous portable capture. */
   const server = coreMemoryServer('provider', 'resource-1', 'memory', [], [], {
@@ -50,7 +50,7 @@ it('snapshots the original public request synchronously and retains direct send 
   })
   /** The genuine provider alone returns the original received echo argument. */
   const host = await createRpcHost({ ...server.options, provide: { echo: (value) => value } })
-  /** BC1's actual async factory has already completed its real bilateral handshake. */
+  /** Actual async factory has already completed its real bilateral handshake. */
   const client = await server.connect('caller', {}, 'resource-0')
   /** Native disposal can withdraw properties; the original public namespace is held beforehand. */
   const memory = client.host.memory
@@ -71,7 +71,7 @@ it('snapshots the original public request synchronously and retains direct send 
   }
 })
 
-// RPC-TEST-E7037E9F9422-C004: BC1 retires only before-ready capture; the old ready branch was lazy.
+// Retires only before-ready capture; the old ready branch was lazy.
 it('ready public stream keeps lazy input until first pull and preserves complete lifetime', async () => {
   /** Only original application generator entry/finally can change these lifetime counts. */
   const lifetime = { constructed: 0, cleaned: 0 }
@@ -96,7 +96,7 @@ it('ready public stream keeps lazy input until first pull and preserves complete
       }
     }
   })
-  /** BC1 removes before-factory resources; this is an already admitted genuine public source. */
+  /** Removes before-factory resources; this is an already admitted genuine public source. */
   const client = await server.connect('caller', {}, 'resource-0')
   /** No before-ready resource exists; this input belongs to the genuine already-ready branch. */
   const readyPayload = { value: 42 }
@@ -120,7 +120,7 @@ it('ready public stream keeps lazy input until first pull and preserves complete
   }
 })
 
-// RPC-TEST-E7037E9F9422-C005: only the original observable lazy business survives fake binding.
+// Only the original observable lazy business survives fake binding.
 it('the original lazy pull vector executes through a genuine public stream', async () => {
   /** Only the original provider generator body changes its actual pull-entry count. */
   let pulls = 0

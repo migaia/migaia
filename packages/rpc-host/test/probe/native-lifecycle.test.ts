@@ -10,7 +10,7 @@ import {
 import { assert, expect, it } from 'vitest'
 import { coreMemoryServer } from '../host/core-fixture.js'
 
-// RPC-TEST-B569E95AA42F-C001: the acquired native Session owns lifecycle and reentrant close.
+// The acquired native Session owns lifecycle and reentrant close.
 it('probe observes native handshake, ready and reentrant close without changing calls', async () => {
   /** Copy the original borrowed synchronous view only at this observer consumer boundary. */
   const seen: Readonly<IRpcProbeEventView>[] = []
@@ -59,7 +59,7 @@ it('probe observes native handshake, ready and reentrant close without changing 
   }
 })
 
-// RPC-TEST-552CD5F1E175-C002: authentication facts come from the one actual Feature installation.
+// Authentication facts come from the one actual Feature installation.
 it('describes native encryption from the actual authentication configuration owner', async () => {
   /** Successful native publication alone may expose these immutable protection facts. */
   const descriptors: IRpcProbeDescriptor[] = []

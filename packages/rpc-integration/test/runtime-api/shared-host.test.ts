@@ -173,7 +173,7 @@ class SharedHostBusiness {
   readonly releaseQuota = (): void => this.#quotaHeld.resolve()
 }
 
-// RPC-TEST-96BAE5A2A7EA-C001: native ordering is demonstrated by the real public call, not old flags.
+// Native ordering is demonstrated by the real public call, not old flags.
 it('default native source retains ordinary Host calls and truthfully negotiated ordering', async () => {
   /** Reports preserve original actual failures; no qualifier or old capability table is fabricated. */
   const failures: unknown[] = []
@@ -189,7 +189,7 @@ it('default native source retains ordinary Host calls and truthfully negotiated 
     ...rpc,
     host: { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } }
   })
-  /** BC3 moves former transport provide to ordinary Feature exposure without another Host. */
+  /** Moves former transport provide to ordinary Feature exposure without another Host. */
   await host.use(servicePlugin({ baseline: () => 42 }))
   /** Original preparation failure identity is observed independently from business calls. */
   let preparationFailure: unknown
@@ -219,7 +219,7 @@ it('default native source retains ordinary Host calls and truthfully negotiated 
     /** The child originates both calls back across the genuine process stream to this Host. */
     const caller = namespace(host, 'process')
     assert.equal(await caller.request('invoke', { method: 'service.baseline' }), 42)
-    // C001-A003's old agreement.capabilities interface is BC3; real orderKey call remains below.
+    // The old agreement.capabilities interface is retired; the real orderKey call remains below.
     assert.equal(
       await caller.request('invoke', {
         method: 'service.baseline',
@@ -234,7 +234,7 @@ it('default native source retains ordinary Host calls and truthfully negotiated 
   }
 }, 15_000)
 
-// RPC-TEST-96BAE5A2A7EA-C002: one real ordinary Host owns both native providers and shared FIFO.
+// One real ordinary Host owns both native providers and shared FIFO.
 it('genuine process and thread Plugin installs share one final Host provider key owner', async () => {
   /** Original native acquisition and business errors retain their complete exact objects. */
   const failures: unknown[] = []
@@ -312,7 +312,7 @@ it('genuine process and thread Plugin installs share one final Host provider key
     /** This record is produced by the real Worker source, not the former simulated thread plugin. */
     const threadConnection = await clients[1]!.members.get('thread-source')
     assert.ok(processConnection && threadConnection)
-    // C002-A006/A007/A010: exact private registry pointer/size checks are BC3, not business oracles.
+    // Exact private registry pointer and size checks describe implementation details, not business behavior.
     finish()
     assert.deepEqual(await Promise.all(calls), [1, 2])
     assert.equal(failures.length, 0)
@@ -331,7 +331,7 @@ it('genuine process and thread Plugin installs share one final Host provider key
       ),
       (error: unknown) => hasOriginalCause(error, primary)
     )
-    // BC3 removes candidate providerLimits input; original post-failure concurrent2 stays business.
+    // Removes candidate providerLimits input; original post-failure concurrent2 stays business.
     for (const index of [0, 1]) {
       /** Both actual inbound provider entries retain independently held business completion. */
       const call = clients[index]!.request('invoke', {

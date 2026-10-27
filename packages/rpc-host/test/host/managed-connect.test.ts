@@ -37,12 +37,12 @@ function restartProviders(ordinal: number, finished: Promise<void>, entered: () 
   }
 }
 
-/** BC1's namespace selector returns the original D4 empty null-prototype maps after real departure. */
+/** Namespace selector returns the original D4 empty null-prototype maps after real departure. */
 function expectNoNativeTargets(result: unknown): void {
   expect(result).toStrictEqual({ fulfilled: Object.create(null), rejected: Object.create(null) })
 }
 
-// RPC-TEST-FD465BC50212-C004: retain all 18 original business nodes.
+// Retain all 18 original business nodes.
 it('keeps one host and feature installation through the original supervisor restart', async () => {
   /** The original budget and native restart policy remain the sole generation authority. */
   const budget = createUnitBudget({ kind: 'host-memory', maxUnits: 1, launchRate: false })
@@ -107,7 +107,7 @@ it('keeps one host and feature installation through the original supervisor rest
   const cleanup = vi.fn()
   /** Setup count must remain one while the actual remote generation changes. */
   const setup = vi.fn()
-  /** BC3 changes the cold hook shape; the original setup/dispose business stays unchanged. */
+  /** Changes the cold hook shape; the original setup/dispose business stays unchanged. */
   const feature = defineFlowPlugin({
     name: 'lifetime',
     setup() {
@@ -138,7 +138,7 @@ it('keeps one host and feature installation through the original supervisor rest
     units[0]!.exit({ error: crashed })
     units[0]!.finish()
     await vi.waitFor(() => expect(supervisor.generation).toBe(2))
-    // C004-A004: BC1 removes the retained single-Peer call surface; zero namespace targets use D4.
+    // Removes the retained single-Peer call surface; zero namespace targets use D4.
     expectNoNativeTargets(await host.memory.request('value'))
     /** A request in flight when its unit crashes has an unknown remote result. */
     expect(await pending).toMatchObject({ source: 'rpc.remote', code: 'REMOTE_RESULT_UNKNOWN' })
@@ -169,7 +169,7 @@ it('keeps one host and feature installation through the original supervisor rest
   expect(units).toHaveLength(2)
 })
 
-// RPC-TEST-FD465BC50212-C005: retain all nine original business nodes.
+// Retain all nine original business nodes.
 it('applies the SDK handshake budget again when an original managed generation reconnects', async () => {
   /** An independent real listener supplies the first generation's successful handshake. */
   const server = coreMemoryServer('remote', 'reconnect-remote')
@@ -277,7 +277,7 @@ it('applies the SDK handshake budget again when an original managed generation r
     expect(events.listenerCount('message')).toBe(0)
     expect(units).toHaveLength(2)
     expect(recovered).not.toHaveBeenCalled()
-    // C005-A006: the same approved BC1 zero-target selection applies after failed replacement.
+    // The same approved zero-target selection applies after failed replacement.
     expectNoNativeTargets(await host.memory.request('value'))
   } finally {
     observing = false

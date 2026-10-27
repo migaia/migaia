@@ -471,7 +471,7 @@ export class CallTable {
           }
     /** Preparation is temporary; the record copies only compact identity fields. */
     const prepared = this.#prepare(current, command, { ...keyed, signal, remainingMs })
-    /** Caller signal remains independent from the feature's per-attempt signal for BC6. */
+    /** Caller signal remains independent from the feature's per-attempt signal. */
     const record = new CallRecord(
       this.#recordOwner,
       current.carrierId,

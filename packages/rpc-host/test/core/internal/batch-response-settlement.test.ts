@@ -19,7 +19,7 @@ import { RpcFlowProgram } from '../../../dist/sdk/flow-program.js'
 import { coreMemoryServer } from '../../host/core-fixture.js'
 import { MemoryCarrier } from '../../fixtures/core-carrier.js'
 
-/** Only this case retains a real caller Root for A17's fixed private-table observation. */
+/** Only this case retains a real caller Root for fixed private-table observation. */
 const inspectorRoot = '__rpcBatchResponseCaller'
 /** Node exposes actual private descriptors beyond the bundled inspector declaration. */
 type IProperties = Runtime.GetPropertiesReturnType & {
@@ -28,7 +28,7 @@ type IProperties = Runtime.GetPropertiesReturnType & {
 /** Only actual successfully encoded provider results contribute correlation IDs. */
 type IReply = Extract<IRpcSemanticFrame, { kind: typeof RpcWireKind.result }>
 
-/** Reuse A17's engine-read pattern for exactly the actual caller CallTable records, without hooks. */
+/** Reuse engine-read pattern for exactly the actual caller CallTable records, without hooks. */
 class PendingInspector {
   /** The in-process inspector opens no network listener and executes no private owner method. */
   readonly #session = new InspectorSession()
@@ -61,7 +61,7 @@ class PendingInspector {
 
   /** Read one existing private descriptor without invoking the owning class. */
   async #field(object: Runtime.RemoteObject, name: string): Promise<Runtime.RemoteObject> {
-    /** A17 uses this same read-only engine descriptor operation. */
+    /** Uses this same read-only engine descriptor operation. */
     const properties: IProperties = await this.#session.post('Runtime.getProperties', {
       objectId: object.objectId!,
       ownProperties: true
@@ -209,7 +209,7 @@ for (const customCodec of [false, true]) {
       })
       /** The caller's report channel retains original receive/parse failures unchanged. */
       const failures: unknown[] = []
-      /** Retain A17's real Root, then use its genuine native open and public namespace. */
+      /** Retain real Root, then use its genuine native open and public namespace. */
       const owner = new RpcHost({
         self: { name: 'caller', instanceId: 'caller' },
         provide: { busy: () => 'busy' },

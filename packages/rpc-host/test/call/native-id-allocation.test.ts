@@ -4,7 +4,7 @@ import { it, vi } from 'vitest'
 import { RpcCallIdAllocator } from '../../dist/call/id.js'
 import { NativeDefaultIdText } from '../../dist/call/id-text.js'
 
-// RPC-TEST-96C1E6C992FE-C003: keep the original million allocations and all four exact predicates.
+// Keep the original million allocations and all four exact predicates.
 it('allocates one million unique 36-character IDs without a completed-ID cache', () => {
   /** The genuine CallTable and StreamChannel share this same nonce/counter implementation. */
   const allocator = new RpcCallIdAllocator()
@@ -19,7 +19,7 @@ it('allocates one million unique 36-character IDs without a completed-ID cache',
   assert.equal(first.slice(23), '0000000000001')
 })
 
-// RPC-TEST-96C1E6C992FE-C006: fail the same native entropy operation before any allocation.
+// Fail the same native entropy operation before any allocation.
 it('preserves the original throwing secure entropy cause as INVALID_CONFIG', () => {
   /** This original native family and identity must survive current constructor classification. */
   const cause = new RangeError('fixture entropy failure')
@@ -42,7 +42,7 @@ it('preserves the original throwing secure entropy cause as INVALID_CONFIG', () 
   }
 })
 
-// RPC-TEST-96C1E6C992FE-C001: migrate only the original internal starting-counter input.
+// Migrate only the original internal starting-counter input.
 it('rejects exhaustion with the default reporter without allocating another ID', () => {
   /** The same canonical owner receives the original internal exhausted-state constructor input. */
   const allocator = new RpcCallIdAllocator(undefined, 0xffffffffffffffffn)
@@ -56,7 +56,7 @@ it('rejects exhaustion with the default reporter without allocating another ID',
   )
 })
 
-// RPC-TEST-96C1E6C992FE-C002: the sole current allocator preserves its own reported failure.
+// The sole current allocator preserves its own reported failure.
 it('preserves genuine exhaustion through the canonical RPC ID allocation owner', () => {
   /** Keep original diagnostic identities without replacing the allocator or its report callback. */
   const reported: unknown[] = []
@@ -74,7 +74,7 @@ it('preserves genuine exhaustion through the canonical RPC ID allocation owner',
   assert.equal(reported.length, 1)
 })
 
-// RPC-TEST-96C1E6C992FE-C004: keep all five original final-value/report/type-code predicates.
+// Keep all five original final-value/report/type-code predicates.
 it('returns uint64 max then reports and throws the same exhaustion object', () => {
   /** The original report sink retains the same object later thrown by this canonical owner. */
   const reported: unknown[] = []

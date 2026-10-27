@@ -26,14 +26,14 @@ import { ProviderDispatcher } from '../../dist/dispatch/dispatcher.js'
 import { ProviderInvocation } from '../../dist/dispatch/invocation.js'
 import { coreMemoryServer } from '../host/core-fixture.js'
 
-/** A17's in-process engine inspection retains only this case's genuine provider operation owner. */
+/** In-process engine inspection retains only this case's genuine provider operation owner. */
 const inspectorRoot = '__rpcKeyedGroupProvider'
 /** Node exposes real private descriptors beyond its bundled protocol declarations. */
 type IProperties = Runtime.GetPropertiesReturnType & {
   privateProperties?: readonly { name: string; value?: Runtime.RemoteObject }[]
 }
 
-/** Reuse A17's fixed private-Map read for the actual replacement of the old controller registry. */
+/** Reuse fixed private-Map read for the actual replacement of the old controller registry. */
 class IncomingInspector {
   /** In-process inspection opens no network listener and invokes no private owner method. */
   readonly #session = new InspectorSession()
@@ -58,7 +58,7 @@ class IncomingInspector {
       objectId: owner.result.objectId,
       ownProperties: true
     })
-    /** This is the sole fixed production path read by the reused A17 observation seam. */
+    /** This is the sole fixed production path read by the reused observation seam. */
     const incoming = properties.privateProperties?.find((field) => field.name === '#incoming')
     /** Missing descriptors must fail rather than becoming a fabricated empty table. */
     const size = /^Map\((\d+)\)$/u.exec(incoming?.value?.description ?? '')
@@ -102,7 +102,7 @@ function clonedStreamClaim(
       : claim
 }
 
-// RPC-TEST-3CA7BB5939FE-C005: all original retained-completion predicates remain unchanged.
+// All original retained-completion predicates remain unchanged.
 it('a send adapter forged FRAME_LIMIT code cannot rewrite the original completed group replay outcome', async () => {
   /** The actual optional feature receives this original injectable memory store. */
   const store = createRpcIdempotencyStore()
@@ -175,7 +175,7 @@ it('a send adapter forged FRAME_LIMIT code cannot rewrite the original completed
   }
 })
 
-// RPC-TEST-3CA7BB5939FE-C007: real claims, leases and two original physical terminals are observed.
+// Real claims, leases and two original physical terminals are observed.
 it('an original pending keyed claim prevents duplicate execution and seals the complete group before terminal send', async () => {
   /** Exactly this original production store owns both the first claim and its pending observer. */
   const originalStore = createRpcIdempotencyStore()
@@ -185,7 +185,7 @@ it('an original pending keyed claim prevents duplicate execution and seals the c
   const store: IRpcIdempotencyStore = { claim: claiming, lookup: originalStore.lookup }
   /** Actual native limits supply the original six-provider capacity rather than a fake registry. */
   const admitting = vi.spyOn(ProviderAdmissionRegistry.prototype, 'acquireMany')
-  /** Original dispatcher invocations identify the one real provider owner for final A17 inspection. */
+  /** Original dispatcher invocations identify the one real provider owner for final inspection. */
   const dispatching = vi.spyOn(ProviderDispatcher.prototype, 'accept')
   /** The original hold provider alone controls when the keyed business actually completes. */
   const release = deferred<void>()
@@ -237,7 +237,7 @@ it('an original pending keyed claim prevents duplicate execution and seals the c
       (owner): owner is ProviderAdmissionRegistry => owner instanceof ProviderAdmissionRegistry
     )
     assert(admission)
-    /** A17 reads this exact real dispatcher; there is no replacement controller or work table. */
+    /** Reads this exact real dispatcher; there is no replacement controller or work table. */
     const dispatcher = dispatching.mock.contexts.find(
       (owner): owner is ProviderDispatcher => owner instanceof ProviderDispatcher
     )
@@ -245,7 +245,7 @@ it('an original pending keyed claim prevents duplicate execution and seals the c
     inspector = new IncomingInspector(dispatcher)
     assert.equal(effects, 1, 'pending original claim cannot run the first duplicate member')
     assert.equal(admission.size, 2)
-    /** BC2 changes only the semantic profile; the actual scope callback keeps the same peer token. */
+    /** Changes only the semantic profile; the actual scope callback keeps the same peer token. */
     const scope = JSON.stringify([RpcWireProfile, 'provider', 'peer'])
     assert.deepEqual(store.lookup!(scope, 'key', performance.now()), { state: 'pending' })
     release.resolve()
@@ -298,7 +298,7 @@ async function clonedStreamReplay(
   const admitting = vi.spyOn(ProviderAdmissionRegistry.prototype, 'acquireMany')
   /** Original run contexts expose the genuine replay invocation's existing readonly signal getter. */
   const executing = vi.spyOn(ProviderInvocation.prototype, 'run')
-  /** A17's fixed engine-read follows the real dispatcher that accepted these original operations. */
+  /** Fixed engine-read follows the real dispatcher that accepted these original operations. */
   const dispatching = vi.spyOn(ProviderDispatcher.prototype, 'accept')
   /** This application-owned predecessor holds the actual native orderKey permission. */
   const release = deferred<void>()
@@ -411,7 +411,7 @@ async function clonedStreamReplay(
       (owner): owner is ProviderAdmissionRegistry => owner instanceof ProviderAdmissionRegistry
     )
     assert(admission)
-    /** Inspect the authentic accepted dispatcher through the same finite A17 descriptor pattern. */
+    /** Inspect the authentic accepted dispatcher through the same finite descriptor pattern. */
     const dispatcher = dispatching.mock.contexts.find(
       (owner): owner is ProviderDispatcher => owner instanceof ProviderDispatcher
     )
@@ -442,7 +442,7 @@ async function clonedStreamReplay(
   }
 }
 
-// RPC-TEST-3CA7BB5939FE-C004: exact wire/brand spellings retire; all business atoms remain asserted.
+// Exact wire/brand spellings retire; all business atoms remain asserted.
 it.each([RpcCoreErrorCode.cancelled, RpcCoreErrorCode.deadlineExceeded] as const)(
   'genuine stored %s stream replay restores only wire cancellation after store cloning',
   clonedStreamReplay

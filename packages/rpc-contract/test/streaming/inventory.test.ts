@@ -13,7 +13,7 @@ it('retains the unknown-kind rejection for unregistered future kinds', () => {
   )
 })
 
-/** Frozen pre-R18 string loop is the value-parity oracle, not another production measuring path. */
+/** The prior string loop is the value-parity oracle, not another production measuring path. */
 function legacyStringBytes(value: string): number {
   /** The old budget includes the two surrounding JSON quotation marks. */
   let size = 2
@@ -57,7 +57,7 @@ it.each([
   ['paired-surrogate', 'a😀z'],
   ['unpaired-high-surrogate', '\ud800x'],
   ['unpaired-low-surrogate', '\udfff']
-] as const)('R18 preserves the original %s string budget', (_kind, value) => {
+] as const)('preserves the original %s string budget', (_kind, value) => {
   expect(measurePortableStreamValue(value)).toBe(legacyStringBytes(value))
   if (!Number.isFinite(legacyStringBytes(value)))
     expect(() => normalizeRpcStream({ event: 'item', seq: 0, value })).toThrow(
@@ -65,7 +65,7 @@ it.each([
     )
 })
 
-it('R18 ordinary ASCII bypasses the character loop', () => {
+it('ordinary ASCII bypasses the character loop', () => {
   /** Passthrough observes the actual intrinsic without substituting a counting implementation. */
   const character = vi.spyOn(String.prototype, 'charCodeAt')
   try {

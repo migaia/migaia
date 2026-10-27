@@ -1,4 +1,4 @@
-/** A25 uses one actual Process middle and one actual Worker leaf, with no synthetic routing. */
+/** Uses one actual Process middle and one actual Worker leaf, with no synthetic routing. */
 import { isMainThread, workerData } from 'node:worker_threads'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
 import {

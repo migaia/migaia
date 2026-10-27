@@ -40,7 +40,7 @@ class DisposalInspector {
 
   /** Capture true owner references while their original native registration is still live. */
   async retain(carrierId: string, pending = false): Promise<void> {
-    /** Evaluate only the exact test-local reference, as in A17's existing fixed engine seam. */
+    /** Evaluate only the exact test-local reference, as in existing fixed engine seam. */
     const evaluated = await this.#inspector.post('Runtime.evaluate', {
       expression: 'globalThis[' + JSON.stringify(inspectorRoot) + ']',
       objectGroup: inspectorRoot
@@ -168,7 +168,7 @@ class DisposalInspector {
   }
 }
 
-/** Real native dispose is BC11#28's receiving boundary; public RpcRoot.close is not substituted. */
+/** Real native dispose is #28's receiving boundary; public RpcRoot.close is not substituted. */
 async function nativeCleanupFailure(): Promise<void> {
   /** The original sole cleanup leaf is neither reconstructed nor annotated by this receiver. */
   const cleanup = new Error('cycle-l discovery cleanup failed')
@@ -219,7 +219,7 @@ async function nativeCleanupFailure(): Promise<void> {
     /** The canonical native promise is observed before, during and after the failed cleanup. */
     const firstDispose = host.dispose()
     expect(host.dispose()).toBe(firstDispose)
-    /** BC11#28 removes the RPC translation shell while retaining original native error leaves. */
+    /** #28 removes the RPC translation shell while retaining original native error leaves. */
     const result = await firstDispose
     expect(result.logicalTerminal).toBe(true)
     expect(result.cleanupComplete).toBe(true)
@@ -271,7 +271,7 @@ async function nativeCleanupFailure(): Promise<void> {
   }
 }
 
-// RPC-TEST-FB075BDD690B-C157: native completion, original cleanup leaf and true current table0.
+// Native completion, original cleanup leaf and true current table0.
 it(
   'native cleanup failure retains shared completion and empties actual RPC resource tables',
   nativeCleanupFailure

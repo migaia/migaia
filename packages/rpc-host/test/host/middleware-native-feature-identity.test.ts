@@ -24,7 +24,7 @@ function ownedMethods() {
   return { ownedMiddleware: () => 'ready' }
 }
 
-// RPC-TEST-FB075BDD690B-C003: retain the original value and owned resource release count.
+// Retain the original value and owned resource release count.
 it('retains WebRPC owned-resource cleanup for native Middleware', async () => {
   /** Only the genuine native resource callback may record a release. */
   let releases = 0
@@ -56,7 +56,7 @@ it('retains WebRPC owned-resource cleanup for native Middleware', async () => {
   }
 })
 
-// RPC-TEST-FB075BDD690B-C080: preserve the original arbitrary native Feature object identity.
+// Preserve the original arbitrary native Feature object identity.
 it('generic PluginHost accepts an arbitrary feature outside first-party role schema', async () => {
   /** An ordinary native Feature key has no relationship to the removed RPC role inventory. */
   const arbitraryKey = 'generic-plugin-key'
@@ -80,7 +80,7 @@ it('generic PluginHost accepts an arbitrary feature outside first-party role sch
   }
 })
 
-// RPC-TEST-FB075BDD690B-C081: keep exact identity for the original frozen custom Feature value.
+// Keep exact identity for the original frozen custom Feature value.
 it('real inventory admits a non-reserved native plugin with an arbitrary feature', async () => {
   /** The genuine native registry admits this original key without a first-party role alias. */
   const arbitraryKey = 'custom-native-key'

@@ -5,7 +5,7 @@ import { createManualScheduler } from '@migaia/utils/testing'
 import { expect, it, vi } from 'vitest'
 import { coreMemoryServer } from './core-fixture.js'
 
-// C063/C064: BC3 captures configuration at the complete feature factory, before installation.
+// C063/C064: captures configuration at the complete feature factory, before installation.
 it.each(
   [
     {
@@ -49,7 +49,7 @@ it('timeout snapshots its configuration in receiver-free order', async () => {
       return 25
     }
   }
-  /** The complete factory is the new BC3 policy-capture boundary. */
+  /** The complete factory is the new policy-capture boundary. */
   const strategy = timeout(config)
   /** Genuine native installation consumes the exact captured feature instance. */
   const server = coreMemoryServer('timeout-fields', 'timeout-fields', 'memory', [strategy])
@@ -67,7 +67,7 @@ it('timeout snapshots its configuration in receiver-free order', async () => {
 it('native timeout snapshot survives post-install mutation', async () => {
   /** The original logical-setting tag exposes any repeated descriptor read. */
   const reads: string[] = []
-  /** BC3 moves capture to factory creation; set the original admitted value before that boundary. */
+  /** Moves capture to factory creation; set the original admitted value before that boundary. */
   let timeoutMs = 99
   /** This existing scheduler owns real timeout tasks and allows inspecting their actual delays. */
   const scheduler = createManualScheduler()

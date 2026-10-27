@@ -35,7 +35,7 @@ def check():
     try:
         session.send(session.request("reverse-1", "peer.reverse", {"method": "parentEcho", "payload": "reverse"}))
         called = session.receive()
-        # BC2 removed reserved directory discovery; the existing handshake directory supplies the same whitelist.
+        # removed reserved directory discovery; the existing handshake directory supplies the same whitelist.
         assert called["kind"] == "call" and called["task"]["method"] == "parentEcho" and called["payload"] == "reverse"
         session.send(session.request("forward-while-reverse", "echo", "reader-live"))
         forward = session.receive()

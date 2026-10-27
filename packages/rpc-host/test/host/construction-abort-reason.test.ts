@@ -29,7 +29,7 @@ it('keeps the original failed reason read on CANCELLED before acquiring a carrie
   expect(open).not.toHaveBeenCalled()
 })
 
-// RPC-TEST-B82B7D9A9C2A-C007: the supported SDK exposes the one canonical reason reader.
+// The supported SDK exposes the one canonical reason reader.
 it('exposes the canonical SDK helper without rereading a failed abort reason', () => {
   /** The same getter error remains data rather than another thrown cancellation failure. */
   const original = new Error('helper reason')
@@ -40,7 +40,7 @@ it('exposes the canonical SDK helper without rereading a failed abort reason', (
   expect(source.reads()).toBe(1)
 })
 
-// RPC-TEST-B82B7D9A9C2A-C005: the original pending install owns cleanup before cancellation.
+// The original pending install owns cleanup before cancellation.
 it('cancels a held native install with the failed reason read and releases its owned resource', async (test) => {
   /** The same original getter exception must become this construction's cancellation cause. */
   const original = new Error('mid-install reason')

@@ -22,12 +22,12 @@ describe('process channel upstream inventory', () => {
   })
 
   it('records the sole v2 carrier protocol and retained native capability vocabulary', () => {
-    // BC2 retires the v1 framer outputEncodedType oracle; this is the actual canonical v2 profile.
+    // Retires the v1 framer outputEncodedType oracle; this is the actual canonical v2 profile.
     expect(RpcWireProfile).toBe('migaia.rpc/2')
     expect(RpcWireVersion).toMatchObject({ major: 2, minor: 0 })
     expect(RpcWireJsonCodec).toBe('json')
-    // BC2 makes control and stream core grammar rather than opt-in v1 capability strings.
-    // BC12 appends graceful close while preserving the original three control operations.
+    // Makes control and stream core grammar rather than opt-in v1 capability strings.
+    // Appends graceful close while preserving the original three control operations.
     expect(RpcWireControlOperation).toEqual({
       ping: 'ping',
       pong: 'pong',

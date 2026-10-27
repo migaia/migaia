@@ -32,13 +32,13 @@ function admittedCall(carrier: MemoryCarrier, method: string) {
   return frame
 }
 
-// RPC-TEST-366FF2AC3AFB-C081: same completed task must not execute again; no key is invented.
+// Same completed task must not execute again; no key is invented.
 it('installed replay suppresses a completed task repeated at actual ingress', async () => {
   /** This original provider alone owns the execution observation. */
   let executions = 0
   /** The actual listener admits the original caller before either duplicate is delivered. */
   const server = coreMemoryServer('provider-admission-fixture')
-  /** BC3 moves the original optional replay policy to its real complete plugin owner. */
+  /** Moves the original optional replay policy to its real complete plugin owner. */
   const host = await createRpcHost({
     ...server.options,
     plugins: [auth({ ...replayAuthenticationOptions, retain: 310_000 }), ...server.options.plugins],
@@ -66,7 +66,7 @@ it('installed replay suppresses a completed task repeated at actual ingress', as
   }
 })
 
-// RPC-TEST-366FF2AC3AFB-C085: reentrant delivery occurs inside the original synchronous provider.
+// Reentrant delivery occurs inside the original synchronous provider.
 it('installed replay preserves one execution for the original reentrant task', async () => {
   /** Reentry reads the original physical frame only after public send has written it. */
   let resend: (() => Promise<void>) | undefined
@@ -103,7 +103,7 @@ it('installed replay preserves one execution for the original reentrant task', a
   }
 })
 
-// RPC-TEST-366FF2AC3AFB-C090: private providerState snapshots retire; business/frame counts remain.
+// Private providerState snapshots retire; business/frame counts remain.
 it('concurrent task replay executes once and sends one terminal on its original subscription', async () => {
   /** Spy passthrough observes the genuine subscription receipt without changing the fixture. */
   const subscription = vi.spyOn(MemoryCarrier.prototype, 'subscribe')
@@ -159,7 +159,7 @@ it('concurrent task replay executes once and sends one terminal on its original 
   }
 })
 
-// RPC-TEST-366FF2AC3AFB-C091: real optional limits retain their original default per-peer capacity64.
+// Real optional limits retain their original default per-peer capacity64.
 it('native admission rejects one of65 unique calls and releases all64 running providers', async () => {
   /** Original subscribe passthrough and remover counts observe only this actual server endpoint. */
   const subscription = vi.spyOn(MemoryCarrier.prototype, 'subscribe')
@@ -230,7 +230,7 @@ it('native admission rejects one of65 unique calls and releases all64 running pr
   }
 })
 
-// RPC-TEST-784B581CEDC7-C015: actual limits and Auth replace only the old injected refusal ports.
+// Actual limits and Auth replace only the old injected refusal ports.
 it.each([
   { reason: 'concurrency', mode: 'request' },
   { reason: 'concurrency', mode: 'notify' },
@@ -342,7 +342,7 @@ it.each([
       )
       expect(sent).toHaveLength(dispatchOnly ? 0 : 1)
       if (!dispatchOnly) {
-        /** BC2 removes ok:false DTO spelling; the same actual physical error keeps OVERLOADED. */
+        /** Removes ok:false DTO spelling; the same actual physical error keeps OVERLOADED. */
         const response = sent[0]
         assert(response?.kind === 'error')
         expect(deserializeRpcWireError(response.error)).toMatchObject({ code: 'OVERLOADED' })

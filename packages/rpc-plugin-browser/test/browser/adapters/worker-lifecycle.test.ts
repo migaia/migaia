@@ -247,7 +247,7 @@ describe('dedicated-worker native lifecycle', () => {
   })
 
   it('retains the final failure subscription when cleanup fails', async () => {
-    /** Actual native cleanup executes once; old subscriber rollback/retry state is retired by BC3. */
+    /** Actual native cleanup executes once; old subscriber rollback/retry state is retired by . */
     let removals = 0
     /** The exact original native failure must survive actual Worker close aggregation. */
     const primary = new Error('error listener removal failed')

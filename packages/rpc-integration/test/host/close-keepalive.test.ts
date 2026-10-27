@@ -1,4 +1,4 @@
-/** A23 uses genuine Process and Worker children, with no fabricated Session or close observer. */
+/** Uses genuine Process and Worker children, with no fabricated Session or close observer. */
 import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { processPlugin } from '@migaia/rpc-plugin-process'
@@ -63,7 +63,7 @@ class ClosingWriteGate {
 }
 
 it.each(['process', 'thread'] as const)(
-  'A23 %s writes keepalive calls before the close frame and retains the remote cause',
+  '%s writes keepalive calls before the close frame and retains the remote cause',
   async (kind) => {
     /** Provider rows are appended only by actual messages received from the child. */
     const received: unknown[] = []
@@ -143,7 +143,7 @@ it.each(['process', 'thread'] as const)(
 )
 
 it.each(['process', 'thread'] as const)(
-  'A23 %s bounds an unanswered closing request and reports hook errors without replacing close',
+  '%s bounds an unanswered closing request and reports hook errors without replacing close',
   async (kind) => {
     /** Reports preserve the actual thrown hook Error identity rather than a synthetic projection. */
     const reports: unknown[] = []
@@ -180,7 +180,7 @@ it.each(['process', 'thread'] as const)(
 )
 
 it.each(['maxBytes', 'timeoutMs'] as const)(
-  'A23 rejects invalid keepalive.%s before acquisition',
+  'rejects invalid keepalive.%s before acquisition',
   (key) => {
     for (const value of [0, -1, 1.5])
       expect(() =>
@@ -190,7 +190,7 @@ it.each(['maxBytes', 'timeoutMs'] as const)(
 )
 
 it.each(['process', 'thread'] as const)(
-  'A23 %s distinguishes Host disposal, liquidation and idle close notifications',
+  '%s distinguishes Host disposal, liquidation and idle close notifications',
   async (kind) => {
     for (const mode of ['host', 'limits', 'idle'] as const) {
       /** Each policy owns a separate real child so retirement cannot reuse another case's facts. */
@@ -231,7 +231,7 @@ it.each(['process', 'thread'] as const)(
   20000
 )
 
-it('A23 preserves the actual killed Process signal when no close frame could be written', async () => {
+it('preserves the actual killed Process signal when no close frame could be written', async () => {
   /** Public native members retain the original supervisor; the fixture does not replace it. */
   const host = await createRpcHost({
     plugins: [transport('process')] as const,
@@ -256,7 +256,7 @@ it('A23 preserves the actual killed Process signal when no close frame could be 
 }, 15000)
 
 it.each(['process', 'thread'] as const)(
-  'A23 %s keeps local and remote reasons distinct when both endpoints close',
+  '%s keeps local and remote reasons distinct when both endpoints close',
   async (kind) => {
     /** Actual application reply suspension first proves the child is already closing. */
     const childClosing = deferred<void>()
@@ -321,7 +321,7 @@ it.each(['process', 'thread'] as const)(
 )
 
 it.each(['process', 'thread'] as const)(
-  'A23 %s charges the same captured payload that its closing FIFO writes',
+  '%s charges the same captured payload that its closing FIFO writes',
   async (kind) => {
     /** This is a genuine optional stage in the Host's one declared outbound pipeline. */
     const gate = new ClosingWriteGate()

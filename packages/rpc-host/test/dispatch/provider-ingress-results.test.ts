@@ -6,7 +6,7 @@ import { deferred } from '@migaia/utils/promise'
 import { assert, expect, it, vi } from 'vitest'
 import { coreMemoryServer } from '../host/core-fixture.js'
 
-// RPC-TEST-366FF2AC3AFB-C080: only the old response DTO spelling/correlation allocation is BC2.
+// Only the old response DTO spelling/correlation allocation is .
 it('accepted provider ingress checks receiver identity before a second execution', async () => {
   /** Only the original echo business changes this count; the barrier has no echo side effect. */
   let executions = 0
@@ -56,7 +56,7 @@ it('accepted provider ingress checks receiver identity before a second execution
   }
 })
 
-// RPC-TEST-366FF2AC3AFB-C082: notify replaces the removed v1 dispatchOnly route field.
+// Notify replaces the removed v1 dispatchOnly route field.
 it('accepted notify executes once without any correlated physical terminal', async () => {
   /** The original echo execution, not a physical-write counter, proves notification delivery. */
   let executions = 0
@@ -98,7 +98,7 @@ it('accepted notify executes once without any correlated physical terminal', asy
   }
 })
 
-// RPC-TEST-366FF2AC3AFB-C083: the actual server, not the caller's directory, rejects this method.
+// The actual server, not the caller's directory, rejects this method.
 it('accepted physical ingress returns the original missing-provider error code', async () => {
   /** The real error write completes this observation without polling or synthetic endpoint replies. */
   const terminal = deferred<Extract<IRpcSemanticFrame, { kind: 'error' }>>()

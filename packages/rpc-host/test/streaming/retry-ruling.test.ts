@@ -1,4 +1,4 @@
-/** R20 keeps the original one-consumption stream even when complete retry instances are selected. */
+/** Keeps the original one-consumption stream even when complete retry instances are selected. */
 import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import {

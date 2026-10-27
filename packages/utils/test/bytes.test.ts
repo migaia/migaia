@@ -248,7 +248,7 @@ describe('byte primitives', () => {
   })
 })
 
-// RPC-TEST-CCDBF0994A49-C006: original supported atoms received at their canonical owner; old alias/key facets stay NoPASS.
+// Original supported atoms received at their canonical owner; old alias/key facets stay NoPASS.
 it('reuses the canonical intrinsic brand across realms and subclasses', () => {
   const foreignBytes = runInNewContext('new Uint8Array([1])') as Uint8Array
   class ByteSubclass extends Uint8Array {}

@@ -272,19 +272,19 @@ async function retainPrimaryAndCloseLeaf(): Promise<void> {
   }
 }
 
-// RPC-TEST-FB075BDD690B-C044: all four original disposal/count assertions retain their values.
+// All four original disposal/count assertions retain their values.
 it(
   'closes owned success once, borrowed success zero, and repeats Host dispose Promise',
   closeOwnedAndBorrowed
 )
 
-// RPC-TEST-FB075BDD690B-C050: two original rows retain owned/borrowed failure and repeated cleanup.
+// Two original rows retain owned/borrowed failure and repeated cleanup.
 it.each(['authentication', 'connect'] as const)(
   'closes owned transport once and leaves borrowed %s partial failure closed',
   partialFailure
 )
 
-// RPC-TEST-FB075BDD690B-C052: primary, ordered cleanup identity and actual raw close count remain.
+// Primary, ordered cleanup identity and actual raw close count remain.
 it(
   'keeps activation primary while ordered owned close cleanup remains reachable',
   retainPrimaryAndCloseLeaf
@@ -334,7 +334,7 @@ async function rollbackAttachedSubscription(): Promise<void> {
   }
 }
 
-// RPC-TEST-FB075BDD690B-C139: preserve actual failure/subscription business; old ports get no credit.
+// Preserve actual failure/subscription business; old ports get no credit.
 it(
   'later activation failure rolls back outbound publication and leaves zero subscription residue',
   rollbackAttachedSubscription

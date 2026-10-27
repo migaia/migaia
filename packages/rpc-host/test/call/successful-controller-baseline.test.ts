@@ -41,7 +41,7 @@ describe('successful request completion', () => {
     try {
       assert.equal(await left.memory.send('a-right', 'echo', 'one'), 'one')
       assert.equal(await right.memory.send('a-left', 'echo', 'two'), 'two')
-      // C001-A003 exact4 is an internal BC3 allocation metric, not an original business PASS.
+      // Exact4 is an internal allocation metric, not an original business PASS.
       console.info('successful request native controller allocation metric', { constructions })
       assert.equal(aborts, 0, 'ordinary success must not invoke native abort')
     } finally {

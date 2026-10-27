@@ -48,7 +48,7 @@ it('factory Root close preserves two acquired cleanup errors and reverse release
       cleanupTransport('second', rejectedRelease(cleanupOrder, 'second', secondCleanup))
     ]
   })
-  /** BC1 changes only the factory disposal spelling to the public Root.close owner. */
+  /** Changes only the factory disposal spelling to the public Root.close owner. */
   const endpointDispose = endpoint.close()
   expect(endpoint.close()).toBe(endpointDispose)
   /** Observe the same public completion without translating or manufacturing cleanup errors. */

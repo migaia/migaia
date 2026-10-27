@@ -115,7 +115,7 @@ it('preserves schema-depth-counts-directory embedding from the original foreign 
   const vector = vectors.cases.find((entry) => entry.id === 'schema-depth-counts-directory')
   assert.ok(vector)
   assert.equal(vector.valid, false)
-  /** BC2 changed only surrounding directory identity/version, never the original nested schema. */
+  /** Changed only surrounding directory identity/version, never the original nested schema. */
   const input = {
     ...valid(),
     methods: [{ ...valid().methods[0], input: vector.value.methods[0]!.input }]

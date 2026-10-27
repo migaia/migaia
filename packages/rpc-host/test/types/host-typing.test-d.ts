@@ -67,7 +67,7 @@ expectTypeOf(single.memory.request('resize', 800)).toEqualTypeOf<
 expectTypeOf(single.memory.request('math.add', [20, 22])).toEqualTypeOf<
   Promise<number | IRpcFanoutResult<number>>
 >()
-// @ts-expect-error Nested method declarations still reject an unknown member after BC1.
+// @ts-expect-error Nested method declarations still reject an unknown member after the migration.
 single.memory.request('math.missing', [20, 22])
 // @ts-expect-error The original declared pair cannot be replaced by an unrelated payload.
 single.memory.request('math.add', 'wrong')
@@ -121,7 +121,7 @@ dynamic.memory.request('render', new Date())
 // @ts-expect-error Untyped dispatch also checks portable payloads.
 dynamic.memory.dispatch('peer', 'render', () => 1)
 
-/** BC3 removes arbitrary feature-surface factories; only installed complete plugins add methods. */
+/** Removes arbitrary feature-surface factories; only installed complete plugins add methods. */
 // @ts-expect-error RPC calls require an installed namespace even when a remote API is declared.
 single.request('resize', 800)
 // @ts-expect-error The complete feature is required; numeric timeout configuration is not callable policy.

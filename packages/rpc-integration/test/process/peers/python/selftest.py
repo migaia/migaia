@@ -196,24 +196,24 @@ def check_envelope(results: Results, data: dict[str, Any], label: str, minor: in
     """Keep original acceptance scenarios at the sole live native grammar boundary."""
     for case in data["valid"]:
         if case["id"].startswith("discovery-"):
-            results.retire(f"{label}/valid/{case['id']}", "BC2 discovery replaced by directory admission")
+            results.retire(f"{label}/valid/{case['id']}", 'discovery replaced by directory admission')
         else:
             results.check(f"{label}/valid/{case['id']}", lambda case=case: peer.validate_frame(envelope_fixture(case["value"])))
     for section in ("invalid", "order", "unknownFields"):
         for case in data[section]:
             if case["id"] == "wrong-route-type":
-                results.retire(f"{label}/{section}/{case['id']}", "BC2 redundant route.type removed")
+                results.retire(f"{label}/{section}/{case['id']}", 'redundant route.type removed')
                 continue
             results.check(f"{label}/{section}/{case['id']}", lambda case=case, section=section: expect(admits(lambda: peer.validate_frame(envelope_fixture(case["value"]))), section == "unknownFields"))
             if section == "unknownFields":
-                results.retire(f"{label}/{section}/{case['id']}/lexical-reports", "BC9 unknown protocol fields are ignored without a callback")
-    results.retire(f"{label}/warnings/sequence", "BC2 unknown-field warning deduplication removed")
+                results.retire(f"{label}/{section}/{case['id']}/lexical-reports", 'unknown protocol fields are ignored without a callback')
+    results.retire(f"{label}/warnings/sequence", 'unknown-field warning deduplication removed')
 
 
 def check_handshake(results: Results, data: dict[str, Any], label: str) -> None:
     """Preserve malformed selection cases while retiring the old profile's negotiation rules."""
     for case in data["agreement"]:
-        results.retire(f"{label}/agreement/{case['id']}", "BC2 sole major2/minor0/json replaces v1 multiversion/cbor/capability selection")
+        results.retire(f"{label}/agreement/{case['id']}", 'sole major2/minor0/json replaces v1 multiversion/cbor/capability selection')
     for case in data["invalid"]:
         def check(case=case):
             local, offer = peer.own_offer("provider"), peer.own_offer("caller")
@@ -248,7 +248,7 @@ def check_control(results: Results, data: dict[str, Any], label: str) -> None:
             expect(admits(lambda: peer.validate_frame(value)), case["action"] not in ("report", "warn"))
         results.check(f"{label}/{case['id']}", check)
         if case["id"] == "unknown":
-            results.retire(f"{label}/unknown/warn", "BC2 unknown controls now fail closed admission")
+            results.retire(f"{label}/unknown/warn", 'unknown controls now fail closed admission')
 
 def check_stream(results: Results, data: dict[str, Any]) -> None:
     """Check payload shape, sequence credit, portable byte budget and 1.1."""
@@ -461,9 +461,9 @@ def check_framing(results: Results, data: list[dict[str, Any]]) -> None:
 
 
 def check_host_control(results: Results, data: dict[str, Any]) -> None:
-    """Expose each removed Host control as explicit BC3 retirement."""
+    'Expose each removed Host control as explicit retirement.'
     for case in data["controls"]:
-        results.retire(f"host/controls/{case['id']}", "BC3 Host=true use/unUse/inspect/describe facade removed")
+        results.retire(f"host/controls/{case['id']}", 'Host=true use/unUse/inspect/describe facade removed')
 
 
 def directory_fixture(value: dict[str, Any]) -> dict[str, Any]:
@@ -504,7 +504,7 @@ def check_batch(results: Results, data: dict[str, Any]) -> None:
     """Retain sibling isolation at individual frame admission; retire wrapper-only predicates."""
     for section in ("valid", "invalid"):
         for case in data[section]:
-            results.retire(f"batch/{case['id']}", "BC2 batch envelope/capability removed; optional plugin owns aggregation")
+            results.retire(f"batch/{case['id']}", 'batch envelope/capability removed; optional plugin owns aggregation')
     for case in data["isolated"]:
         def check(case=case):
             indexes = [index for index, value in enumerate(case["value"]["envelopes"]) if admits(lambda value=value: peer.validate_frame(envelope_fixture(value)))]

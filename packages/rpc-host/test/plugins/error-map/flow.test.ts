@@ -1,4 +1,4 @@
-/** A32 maps only outbound errors while public local diagnostics retain their original identities. */
+/** Maps only outbound errors while public local diagnostics retain their original identities. */
 import { expect, it, vi } from 'vitest'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
 import { auth } from '@migaia/rpc-host/plugins/auth'
@@ -13,7 +13,7 @@ import { coreMemoryServer } from '../../host/core-fixture.js'
 import { MemoryCarrier } from '../../fixtures/core-carrier.js'
 
 it.each([false, true])(
-  'A32 maps a public business failure while logger and report retain the original error, logger first %s',
+  'maps a public business failure while logger and report retain the original error, logger first %s',
   async (loggerFirst) => {
     /** This exact provider-owned graph is never replaced in local diagnostics. */
     const cause = new Error('A32 private business cause')
@@ -93,7 +93,7 @@ it.each([false, true])(
   }
 )
 
-it('A32 selects a transport-local mapper only for that namespace and inherits the host mapper elsewhere', async () => {
+it('selects a transport-local mapper only for that namespace and inherits the host mapper elsewhere', async () => {
   /** Both namespaces throw the same genuine local primary so selection is the only changing input. */
   const primary = new RpcError(RpcCoreErrorCode.internal, 'A32 namespace private failure')
   /** Explicit public mappings remain distinct without changing their original semantic code. */
@@ -139,7 +139,7 @@ it('A32 selects a transport-local mapper only for that namespace and inherits th
 })
 
 it.each(['none', 'throw'] as const)(
-  'A32 sends the original full graph on an authenticated Session with mapper mode %s',
+  'sends the original full graph on an authenticated Session with mapper mode %s',
   async (mode) => {
     /** The original provider failure and cause remain intact before any optional outbound map. */
     const cause = new TypeError('A32 fallback cause')
@@ -192,7 +192,7 @@ it.each(['none', 'throw'] as const)(
   }
 )
 
-it('A32 falls back to the original remote error and reports one mapped serialization failure', async () => {
+it('falls back to the original remote error and reports one mapped serialization failure', async () => {
   /** The original provider graph remains available even when the mapper's replacement is unreadable. */
   const cause = new TypeError('A32 original serialization fallback cause')
   const primary = new RpcError(
@@ -258,7 +258,7 @@ it('A32 falls back to the original remote error and reports one mapped serializa
   }
 })
 
-it('A32 rejects a returned Promise as configuration, sends the original error and reports its late rejection once', async () => {
+it('rejects a returned Promise as configuration, sends the original error and reports its late rejection once', async () => {
   /**
    * The provider's original failure remains distinct from both mapper configuration and late
    * rejection.
@@ -324,7 +324,7 @@ it('A32 rejects a returned Promise as configuration, sends the original error an
   }
 })
 
-it('A32 delivers the next message on the same Session without waiting for a never-settling mapper Promise', async () => {
+it('delivers the next message on the same Session without waiting for a never-settling mapper Promise', async () => {
   /**
    * This native provider failure is observed immediately even while the mapper Promise stays
    * pending.
@@ -385,7 +385,7 @@ it('A32 delivers the next message on the same Session without waiting for a neve
 })
 
 it.each(['verifier', 'resolver'] as const)(
-  'A32 preserves the original local %s error through a public transport construction rejection',
+  'preserves the original local %s error through a public transport construction rejection',
   async (mode) => {
     /** This same local native exception must stay reachable by identity, even with private text. */
     const primary = new Error(`A32 local ${mode} credential cause`)
@@ -428,7 +428,7 @@ it.each(['verifier', 'resolver'] as const)(
   }
 )
 
-it('A32 keeps an unauthenticated wire rejection redacted while the local verifier cause remains original', async () => {
+it('keeps an unauthenticated wire rejection redacted while the local verifier cause remains original', async () => {
   /** A unique local credential-bearing error distinguishes local retention from wire disclosure. */
   const primary = new Error('A32 pre-auth credential detail')
   /** The original memory media expose the exact real rejection written before authentication. */

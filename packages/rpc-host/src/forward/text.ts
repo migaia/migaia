@@ -1,5 +1,5 @@
 /** Cold forwarding configuration diagnostics belong to the forwarding owner. */
 export const ForwardErrorText = {
-  /** R19 bounds this host's forwarding policy before any native transport can open. */
+  /** Forwarding policy is bounded before opening any native transport. */
   maxHopsInvalid: 'RPC forward maxHops must be an integer from 1 to 16'
 } as const
