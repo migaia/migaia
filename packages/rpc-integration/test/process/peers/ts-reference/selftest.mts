@@ -284,15 +284,10 @@ function checkEnvelopes(directory: string, verdict: IVerdict, prefix: string, _b
         retire(verdict, `envelope/${section}/${item.id}`, 'BC2 redundant route.type removed')
         continue
       }
-      check(verdict, `envelope/${section}/${item.id}`, () =>
-        assert.throws(() => validateFrame(envelopeFixture(item.value)))
-      )
-      if (section === 'unknownFields')
-        retire(
-          verdict,
-          `envelope/${section}/${item.id}/lexical-reports`,
-          'BC2 closed fields reject rather than invoke old warning callback'
-        )
+      check(verdict, `envelope/${section}/${item.id}`, () => {
+        if (section === 'unknownFields') validateFrame(envelopeFixture(item.value))
+        else assert.throws(() => validateFrame(envelopeFixture(item.value)))
+      })
     }
 }
 /** Original abort reason, health and drain budgets reach current semantic admission. */
@@ -403,14 +398,9 @@ function checkWireErrors(directory: string, verdict: IVerdict): void {
       else assert.throws(() => validateWire(actual))
     })
   for (const item of wires.unknownFields as IRecord[]) {
-    check(verdict, `wire/unknownFields/${item.id}`, () =>
-      assert.throws(() => validateWire(item.wire))
-    )
-    retire(
-      verdict,
-      `wire/unknownFields/${item.id}/ignore-and-reports`,
-      'BC2 flat graph is closed; old ignore/projection/report mode removed'
-    )
+    check(verdict, `wire/unknownFields/${item.id}`, () => {
+      validateWire(item.wire)
+    })
   }
   for (const item of wires.truncation as IRecord[]) {
     check(verdict, `wire/truncation/${item.id}`, () => {
@@ -537,6 +527,36 @@ function run(directory: string): IVerdict {
     const decoder = new FrameDecoder()
     assert.throws(() => decoder.push(Buffer.from([1, 0, 0, 1])), { code: 'FRAME_LIMIT_EXCEEDED' })
     assert.throws(() => new FrameDecoder().push(Buffer.alloc(4)), { code: 'INVALID_FRAME' })
+  })
+  check(verdict, 'section33/error-route-seventeen', () => {
+    /** Seventeen admitted nodes preserve the full origin-plus-forwarding route. */
+    const route = Array.from({ length: 17 }, () => 'a'.repeat(32))
+    const graph = {
+      root: 0,
+      nodes: [{ source: 's', code: 'C', name: 'Error', message: 'm', stack: 'Error: m', route }]
+    }
+    currentWireError(graph)
+    assert.throws(() =>
+      currentWireError({
+        ...graph,
+        nodes: [{ ...graph.nodes[0], route: [...route, 'b'.repeat(32)] }]
+      })
+    )
+  })
+  check(verdict, 'section33/final-close-admitted', () => {
+    validateFrame({
+      profile: REFERENCE_PROFILE,
+      kind: 'control',
+      id: 'close-final',
+      route: {
+        applicationVersion: '1',
+        senderId: 'caller',
+        targetId: 'ts-peer',
+        receiverId: 'ts-peer',
+        sentAt: 0
+      },
+      operation: 'close'
+    })
   })
   checkWireErrors(directory, verdict)
   checkFraming(directory, verdict)

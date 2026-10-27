@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict'
+import { spawn } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
+import { createRpcByteCarrier, defineTransportPlugin, RpcEventByteIO } from '@migaia/rpc-host/sdk'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import { peers, NativeInteropObservations } from './runtime-interop-fixture.js'
 import {
@@ -146,3 +148,71 @@ for (const fixture of peers.filter((peer) => peer.language !== 'ts-reference')) 
     }
   }, 30_000)
 }
+
+/** The handwritten reference borrows stdio without the process plugin's bootstrap protocol. */
+it('production SDK standard request → ts-reference', async () => {
+  /** Existing reference entry remains the independently authored semantic peer. */
+  const fixture = peers.find((peer) => peer.language === 'ts-reference')!
+  /** This test owns one native child and releases it after the Host's carrier closes. */
+  const child = spawn(fixture.command, ['--stdio', '--role', 'responder'], {
+    stdio: ['pipe', 'pipe', 'pipe']
+  })
+  child.stderr.resume()
+  /** Keep protocol reports observable without recording native frames or credentials. */
+  const failures: unknown[] = []
+  /** Reuse the public SDK's native subscription and write-settlement owner. */
+  const io = new RpcEventByteIO(
+    child.stdout,
+    child.stdin,
+    () => {
+      child.stdin.end()
+    },
+    {
+      closedError: () => new Error('reference native stream ended'),
+      report: (error) => failures.push(error)
+    }
+  )
+  /** The real inbound handshake provides the schema3 directory used for admission. */
+  const observed = new NativeInteropObservations()
+  /** This native SDK plugin attaches the actual byte carrier, with no process bootstrap shim. */
+  const plugin = defineTransportPlugin({
+    name: 'reference-native',
+    namespace: 'reference',
+    /** Public readiness follows the real reference handshake before native ownership returns. */
+    async open(context) {
+      /** Each direction retains its sole native byte reader. */
+      const carrier = createRpcByteCarrier({
+        id: 'reference-native',
+        io: io.value,
+        report: context.report
+      })
+      await context.attach(carrier, { expectedPeerId: 'ts-peer' }).ready
+      return { dispose: () => io.value.close() }
+    }
+  })
+  try {
+    /** Construction must negotiate with the executable reference before any request is possible. */
+    const active = await createRpcHost({
+      self: { name: 'sdk-reference-caller', instanceId: 'sdk-reference-caller' },
+      plugins: [observed.plugin, plugin],
+      report: (error) => failures.push(error)
+    })
+    try {
+      expect(observed.directory?.schemaVersion).toBe(3)
+      expect(observed.directory?.self.instanceId).toBe('ts-peer')
+      expect(await active.reference.request('echo', { reference: true })).toEqual({ reference: true })
+      expect(
+        await Promise.all([active.reference.request('echo', 1), active.reference.request('echo', 2)])
+      ).toEqual([1, 2])
+      expect(failures).toEqual([])
+    } finally {
+      await active.close()
+    }
+  } finally {
+    try {
+      await io.value.close()
+    } finally {
+      child.kill()
+    }
+  }
+}, 30_000)

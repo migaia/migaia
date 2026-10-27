@@ -24,7 +24,7 @@ def main():
     cases = [
         {"id": "U36-reference-discovery", "steps": [],
          "retiredAssertions": ["BC2 discovery-query/response version,acceptVersions,type,resolvedTargetId and accepted/platform wire shape retired; true directory and accepted peer identity remain asserted."],
-         "expect": {"exit": 0, "frames": handshakes}},
+         "expect": {"exit": 0, "frames": [*handshakes, {"kind": "control", "operation": "close"}]}},
         {"id": "U36-reference-addressed-response", "steps": [{"frame": {
             "profile": peer.PROTOCOL, "kind": "call", "id": "routing-echo", "options": {},
             "route": peer.route("routing-caller", "ts-peer"), "payload": "addressed",
@@ -32,7 +32,7 @@ def main():
                      "callerGeneration": HELLO["directory"]["self"]["generation"],
                      "targetGeneration": {"kind": "session", "value": 0, "providerId": "ts-peer"}}}}],
          "expect": {"exit": 0, "frames": [*handshakes, {"kind": "result", "id": "routing-echo",
-                    "route": {"receiverId": "routing-caller"}, "result": "addressed"}]}}
+                    "route": {"receiverId": "routing-caller"}, "result": "addressed"}, {"kind": "control", "operation": "close"}]}}
     ]
     failures = [case["id"] for case in cases if not run_case(command, HELLO, case)]
     print(json.dumps({"language": "ts-reference", "passed": len(cases) - len(failures), "total": len(cases), "failures": failures}))

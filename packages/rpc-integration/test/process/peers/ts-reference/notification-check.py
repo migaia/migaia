@@ -42,6 +42,7 @@ def main():
                 {"kind": "result", "id": "receipt-query", "result": 1},
                 {"kind": "result", "id": "pending-request", "result": None},
                 {"kind": "result", "id": "valid-finish", "result": None},
+                {"kind": "control", "operation": "close", "reason": {"root": 0, "nodes": [{"code": "ENDPOINT_DISPOSED"}]}},
             ],
             "stderr": {"PEER_ERROR PROVIDER_NOT_FOUND": 1,
                        "PEER_ERROR CAPABILITY_UNSUPPORTED": 1},
