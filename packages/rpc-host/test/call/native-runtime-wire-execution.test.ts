@@ -13,8 +13,7 @@ import {
   RpcEventByteIO,
   RpcJsonCarrierCodec
 } from '@migaia/rpc-host/sdk'
-import { RpcTransportError } from '@migaia/rpc-contract/errors'
-import { RpcCoreErrorCode, RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
+import { RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
 import { deferred, type IAbortSignal } from '@migaia/utils/promise'
 import type { IRpcEnvelope } from '@migaia/rpc-contract/protocol'
 import { it, vi } from 'vitest'
@@ -630,7 +629,7 @@ it('real outcome lookup observes the original pending claim and complete sealed 
 })
 
 // RPC-TEST-E1A1C1DA273B-C003: only the removed private512selector changes to the real media ceiling.
-it('rejects an ordinary queued oversized byte frame with its original RangeError and sends its survivor', async () => {
+it('rejects an ordinary oversized byte frame during capture with its original RangeError and sends its survivor', async () => {
   /** The provider alone proves which original ordinary requests actually reached business. */
   const calls: string[] = []
   /** Reuse the original runtime-wire pair of native streams, not a second frame queue. */
@@ -664,7 +663,7 @@ it('rejects an ordinary queued oversized byte frame with its original RangeError
     codec: new RpcJsonCarrierCodec(),
     report: physical.report
   })
-  /** This original caller framer, rather than a custom bad codec, rejects the real physical size. */
+  /** BC28 lets this original codec reject its real JSON byte size before physical framing. */
   const right = createRpcByteCarrier({
     id: 'ordinary-oversize-caller-carrier',
     io: new RpcEventByteIO(streams.downstream, streams.upstream, physical.close, physical).value,
@@ -690,9 +689,11 @@ it('rejects an ordinary queued oversized byte frame with its original RangeError
     plugins: [batch(), transport],
     report: physical.report
   })
+  /** The original capture rejection stays observable without executing another encoding path. */
+  const preparing = vi.spyOn(right.codec, 'prepare')
   /** Default spies retain actual once-only codec, carrier and native stream results unchanged. */
   const encoded = vi.spyOn(right.codec, 'encode')
-  /** Carrier attempts include the framing failure; native stream writes must exclude it. */
+  /** Carrier attempts contain only the two valid frames after earlier capture admission. */
   const sending = vi.spyOn(right, 'write')
   /** This native PassThrough is the original actual byte writer, not a synthesized physical sink. */
   const writing = vi.spyOn(streams.upstream, 'write')
@@ -712,36 +713,40 @@ it('rejects an ordinary queued oversized byte frame with its original RangeError
       .send('ordinary-oversize-provider', 'echo', 'x'.repeat(RPC_STREAM_MAX_FRAME_BYTES + 1))
       .catch((error: unknown) => error)
     pending.push(oversized)
-    /** Actual original encode completion fixes this ordinary input before the valid sibling starts. */
-    await vi.waitFor(() => assert.equal(encoded.mock.calls.length, 2))
+    /** The actual second preparation rejects this ordinary input before encoding or the writer. */
+    await vi.waitFor(() => assert.equal(preparing.mock.calls.length, 2))
+    assert.equal(encoded.mock.calls.length, 1)
     /** One smaller ordinary call follows the oversized member in the same real source lane. */
     const survivor = client.memory
       .send('ordinary-oversize-provider', 'echo', 'survivor')
       .catch((error: unknown) => error)
     pending.push(survivor)
-    await vi.waitFor(() => assert.equal(encoded.mock.calls.length, 3))
+    await vi.waitFor(() => assert.equal(encoded.mock.calls.length, 2))
     assert.equal(writing.mock.calls.length, 1)
     assert.deepEqual(calls, [])
-    /** Releasing the original native callback drains first, rejects oversize and continues FIFO. */
+    /** Releasing the original native callback drains the first request and its surviving sibling. */
     streams.upstream.uncork()
-    /** The real public failure owns the original framing exception rather than a fixture error. */
+    /** BC28 preserves the capture RangeError itself without manufacturing an IO wrapper. */
     const failure = await oversized
-    assert.ok(failure instanceof RpcTransportError)
-    assert.equal(failure.code, RpcCoreErrorCode.transport)
-    assert.ok(failure.cause instanceof RangeError)
-    assert.equal(Reflect.get(failure.cause, 'code'), RpcContractErrorCode.frameLimitExceeded)
-    /** Borrow the already-rejected original carrier Promise; no second framing execution occurs. */
-    const nativeFailure = await Promise.resolve(sending.mock.results[1]!.value).catch(
+    assert.ok(failure instanceof RangeError)
+    assert.equal(Reflect.get(failure, 'code'), RpcContractErrorCode.frameLimitExceeded)
+    /** Borrow the already-rejected original prepare Promise; no second capture execution occurs. */
+    const captureFailure = await Promise.resolve(preparing.mock.results[1]!.value).catch(
       (error: unknown) => error
     )
-    assert.equal(failure.cause, nativeFailure)
+    assert.equal(failure, captureFailure)
     assert.equal(await first, 'first')
     assert.equal(await survivor, 'survivor')
     assert.deepEqual(calls, ['first', 'survivor'])
     assert.equal(writing.mock.calls.length, 2, 'oversized ordinary frame never reaches native IO')
-    assert.equal(sending.mock.calls.length, 3, 'both valid frames and one framing refusal settle')
+    assert.equal(
+      sending.mock.calls.length,
+      2,
+      'only the two valid frames reach the physical carrier'
+    )
   } finally {
     streams.upstream.uncork()
+    preparing.mockRestore()
     encoded.mockRestore()
     sending.mockRestore()
     writing.mockRestore()

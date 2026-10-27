@@ -16,6 +16,7 @@ import {
 import { isCanonicalBase64url } from '@migaia/serialize/core'
 import { createContractError, type IRpcErrorWireMetadata } from '@migaia/rpc-contract/errors'
 import { RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
+import { markRpcCarrierAdmissionFailure } from '../carrier/admission.js'
 import { BinaryShape } from './binary-shape.js'
 import { projectRpcFrameSlots } from './frame-slots.js'
 import { markRpcPortableBinary } from './portable.js'
@@ -248,10 +249,12 @@ class BinaryCapture {
       (this.#state.hasBinary ? this.#state.taggedJsonBytes : this.#state.semanticJsonBytes) >
       this.#state.limit
     )
-      throw createContractError(
-        RpcContractErrorCode.frameLimitExceeded,
-        undefined,
-        this.#state.errorMetadata
+      throw markRpcCarrierAdmissionFailure(
+        createContractError(
+          RpcContractErrorCode.frameLimitExceeded,
+          undefined,
+          this.#state.errorMetadata
+        )
       )
   }
 
