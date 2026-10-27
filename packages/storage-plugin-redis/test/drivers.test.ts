@@ -133,20 +133,18 @@ for (const [name, url] of services)
         key = 'driver-reuse:' + crypto.randomUUID()
       await client.connect()
       const driver = ioredisDriver(client)
-      /** The server counts every accepted connection; churn shows up as a growing total. */
-      const accepted = async () => {
-        const info = String(await client.call('INFO', 'stats'))
-        return Number(/total_connections_received:(\d+)/.exec(info)![1])
-      }
+      /** Server-side ids of the dedicated connections the driver handed to callbacks. */
+      const ids = new Set<string>()
       try {
         await driver.command(['SET', key, '0'])
-        await driver.withConnection((connection) => connection.command(['GET', key]))
-        const before = await accepted()
         for (let index = 0; index < 50; index++) {
           await driver.command(['INCR', key])
-          await driver.withConnection((connection) => connection.command(['GET', key]))
+          await driver.withConnection(async (connection) => {
+            ids.add(String(await connection.command(['CLIENT', 'ID'])))
+          })
         }
-        expect((await accepted()) - before).toBeLessThanOrEqual(2)
+        /** Sequential callbacks reuse one connection; before pooling each one opened a new one. */
+        expect(ids.size).toBe(1)
         expect(await driver.command(['GET', key])).toBe('50')
       } finally {
         await driver.command(['DEL', key])
