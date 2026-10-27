@@ -210,7 +210,7 @@ frame 管道允许多次提交。每次 `await next(payload)` 的失败交给当
 
 `chunk({ maxConcurrentMessagesPerSource, maxBufferedBytesPerSource })` 为每个物理来源设置子配额。默认分别为 64 条未完成消息和 16 MiB，低于默认全局 256 条和 64 MiB；默认来源并发取 `min(64, max(1, floor(maxConcurrentMessages / 4)))`，默认来源字节取 `max(maxMessageBytes, min(16777216, floor(maxBufferedBytes / 4)))`，保证一条允许的完整消息能获得预留。显式 `maxBufferedBytesPerSource` 小于 `maxMessageBytes` 时，构造会按既有配置错误拒绝。首片按完整声明长度预留来源字节额度，完成、过期或来源关闭时归还。超出来源配额只拒绝该来源的新分片消息，已接纳消息继续使用其预留额度；其他来源仍受各自子配额和原全局实际保留字节预算约束。字符串额度单位为 UTF-16 code unit，二进制为字节。
 
-本地 codec capture 在原遍历中累计所选 JSON 表示的 UTF-8 字节；超过当前 `maxFrameBytes` 时立即拒绝为 `FRAME_LIMIT_EXCEEDED`，不等指数展开的共享引用全部复制。未超限的共享引用仍按 JSON 逐次展开，线上表示保持不变。
+本地 codec capture 在原遍历中按节点累计常数时间 JSON 字节下界，不对字符串、键、二进制标签或元数据调用 `JSON.stringify`。下界超过当前 `maxFrameBytes` 时立即以 `FRAME_LIMIT_EXCEEDED` 拒绝，避免共享引用的指数展开；下界未超限时，唯一的实际编码出口仍按真实 UTF-8 长度检查同一上限。下界不会大于真实 JSON 字节数；正常共享引用仍按 JSON 逐次展开，线上表示保持不变。
 
 载体可选实现 `reserveWrite(options)`，借用原有流控 owner，返回带 `release()` 的容量凭据。Session 在编码之后为一次逻辑写出预留一次，等这次 frame 管道实际结算后释放；chunk 的所有分片借用同一凭据，batch 各成员保留各自凭据，合并的物理写出借用仍存活成员的凭据。载体的 `write` 仍在实际物理接纳后完成，不应再把分片或 batch 重复计为新的逻辑调用。凭据不进入线上数据。
 

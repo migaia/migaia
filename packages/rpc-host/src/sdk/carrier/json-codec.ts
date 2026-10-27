@@ -27,6 +27,8 @@ import type { IRpcJsonTextParser } from './types.js'
 import { splitRpcPreparedMetadata, joinRpcPreparedMetadata } from './prepared.js'
 import { decodeRpcCarrierText } from './json.js'
 import { captureRpcWirePortableRecord } from '@migaia/rpc-contract/portable'
+import { utf8ByteLength } from '@migaia/utils/bytes'
+import { markRpcCarrierAdmissionFailure } from './admission.js'
 
 /** Physical byte wrappers use the canonical codec parser before installed frame hooks inspect them. */
 const physicalJson = jsonParser() as unknown as IRpcJsonTextParser
@@ -117,12 +119,25 @@ export class RpcJsonCarrierCodec implements IRpcCarrierCodec {
     }
   }
   /** Consume the same prepared metadata after hooks; no business projection or key sorting occurs. */
-  encode(value: IRpcPreparedMessage, _context: IRpcCodecContext): IRpcCarrierFrame {
+  encode(value: IRpcPreparedMessage, context: IRpcCodecContext): IRpcCarrierFrame {
     /** Hook-produced metadata is the exact message embedded in this operation's protected manifest. */
     const selected = joinRpcPreparedMetadata(value)
+    /** The one real encoding owns escapes, Unicode and metadata omitted from capture's lower bound. */
+    const text = this.#json.encode(selected)[1]
+    if (
+      text.length > context.maxFrameBytes ||
+      (text.length * 3 > context.maxFrameBytes && utf8ByteLength(text) > context.maxFrameBytes)
+    )
+      throw markRpcCarrierAdmissionFailure(
+        createContractError(
+          RpcContractErrorCode.frameLimitExceeded,
+          undefined,
+          context.errorMetadata
+        )
+      )
     return {
       kind: RpcCarrierFrameKind.message,
-      data: this.#json.encode(selected)[1],
+      data: text,
       ...(value.sidecars.length ? { sidecars: value.sidecars } : {})
     }
   }

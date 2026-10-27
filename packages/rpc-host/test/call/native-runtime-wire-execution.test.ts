@@ -23,7 +23,8 @@ import { SessionTable } from '../../dist/session/table.js'
 import { coreMemoryServer } from '../host/core-fixture.js'
 
 // RPC-TEST-4B6A7AF67437-C001: the original 16MiB result and 500ms deadline remain exact.
-it('oversized complete group result fails PAYLOAD_INVALID and seals that failure instead of hanging', async () => {
+/** Both capture and final encoding failures must seal the same genuine completed group exactly once. */
+async function assertOversizedGroupResult(encoding: 'ascii' | 'unicode'): Promise<void> {
   /** Only this original provider changes the real execution count. */
   let effects = 0
   /** Real native streams lend the SDK its actual physical length-framing boundary. */
@@ -39,7 +40,7 @@ it('oversized complete group result fails PAYLOAD_INVALID and seals that failure
     provide: {
       large: () => {
         effects++
-        return 'x'.repeat(16 * 1024 * 1024)
+        return encoding === 'ascii' ? 'x'.repeat(16 * 1024 * 1024) : '保'.repeat(6 * 1024 * 1024)
       }
     },
     report: (error) => failures.push(error)
@@ -53,7 +54,7 @@ it('oversized complete group result fails PAYLOAD_INVALID and seals that failure
       streams.downstream.destroy()
     }
   }
-  /** The provider's real byte carrier alone owns the 16MiB framing decision. */
+  /** The provider's original byte carrier and codec retain the real frame byte ceiling. */
   const left = createRpcByteCarrier({
     id: 'runtime-wire-provider',
     io: new RpcEventByteIO(streams.upstream, streams.downstream, physical.close, physical).value,
@@ -107,7 +108,13 @@ it('oversized complete group result fails PAYLOAD_INVALID and seals that failure
   } finally {
     await Promise.all([client.close(), host.close()])
   }
-})
+}
+
+it('oversized complete group result fails PAYLOAD_INVALID and seals that failure instead of hanging', () =>
+  assertOversizedGroupResult('ascii'))
+
+it('oversized Unicode group result fails at actual encoding and seals PAYLOAD_INVALID', () =>
+  assertOversizedGroupResult('unicode'))
 
 // RPC-TEST-4B6A7AF67437-C002: exact R17/BC9 dispositions apply only to old local step shapes.
 it.each(['options', 'target', 'mode', 'empty', 'getter', 'revoked'] as const)(

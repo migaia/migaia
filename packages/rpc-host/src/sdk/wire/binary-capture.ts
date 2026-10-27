@@ -1,5 +1,5 @@
 /** Original synchronous binary capture migrated to its executing SDK owner. */
-import { isArrayBuffer, isUint8Array, utf8ByteLength } from '@migaia/utils/bytes'
+import { isArrayBuffer, isUint8Array } from '@migaia/utils/bytes'
 import {
   normalizeRpcFrame,
   isRpcOperationalFrame,
@@ -66,10 +66,8 @@ function binaryCaptureState(
   const capturedRoots = encoding ? new Map<object, number>() : undefined
   /** JSON bounds are accumulated as tag tuples are constructed, without a later sizing walk. */
   let jsonByteUpperBound = 0
-  /** Ordinary and tagged JSON share this traversal; only the selected representation spends budget. */
-  let semanticJsonBytes = 0
-  /** A later native leaf selects tagged bytes already charged for preceding ordinary values. */
-  let taggedJsonBytes = 0
+  /** Constant-time node charges bound expansion without encoding strings or measuring metadata. */
+  let jsonBytesLowerBound = 0
   /** Inline JSON owns its constructed tags; native signer inputs retain their original mutability. */
   const immutableInline = encoding !== undefined && storage === RpcBinaryStorage.inline
 
@@ -83,8 +81,7 @@ function binaryCaptureState(
     encodeInline,
     capturedRoots,
     jsonByteUpperBound,
-    semanticJsonBytes,
-    taggedJsonBytes,
+    jsonBytesLowerBound,
     immutableInline,
     message,
     storage,
@@ -150,11 +147,6 @@ class BinaryCapture {
     /** An explicit shape receiver retains its never-returning admission gate for type narrowing. */
     const shape: BinaryShape = this.#state.shape
     if (!isRpcOperationalFrame(envelope)) shape.invalid()
-    /** Header metadata is already admitted; replacing slots avoids revisiting any business graph. */
-    const metadata = projectRpcFrameSlots(envelope, () => null)
-    /** Each placeholder replaces precisely one captured root whose JSON bytes were already charged. */
-    const metadataBytes = utf8ByteLength(JSON.stringify(metadata)) - this.#state.roots.length * 4
-    this.#consumeJson(metadataBytes, metadataBytes)
     if (
       this.#state.sidecars.length > 0 &&
       this.#state.transferRequiresIntegrity &&
@@ -238,17 +230,12 @@ class BinaryCapture {
   }
 
   /**
-   * Charge punctuation and scalar JSON bytes before descending; aliases retain their normal
-   * expansion.
+   * Charge a constant-time lower bound before descending; only final encoding measures actual
+   * bytes.
    */
-  #consumeJson(semantic: number, tagged: number, native = false): void {
-    this.#state.semanticJsonBytes += semantic
-    this.#state.taggedJsonBytes += tagged
-    if (native) this.#state.hasBinary = true
-    if (
-      (this.#state.hasBinary ? this.#state.taggedJsonBytes : this.#state.semanticJsonBytes) >
-      this.#state.limit
-    )
+  #consumeJsonLowerBound(bytes: number): void {
+    this.#state.jsonBytesLowerBound += bytes
+    if (this.#state.jsonBytesLowerBound > this.#state.limit)
       throw markRpcCarrierAdmissionFailure(
         createContractError(
           RpcContractErrorCode.frameLimitExceeded,
@@ -295,34 +282,29 @@ class BinaryCapture {
     )
       this.#state.shape.semanticValue(value as IRpcPortableValue)
     if (value === null) {
-      this.#consumeJson(4, T.null.length + 4)
+      this.#consumeJsonLowerBound(4)
       return this.#publish([T.null], T.null.length + 4, null)
     }
     if (typeof value === 'boolean') {
-      this.#consumeJson(value ? 4 : 5, T.boolean.length + (value ? 9 : 10))
+      this.#consumeJsonLowerBound(4)
       return this.#publish([T.boolean, value], T.boolean.length + 10, value)
     }
     if (typeof value === 'number') {
       if (!Number.isFinite(value)) this.#state.shape.invalid()
-      /** Finite JSON numbers preserve the same spelling as the later canonical stringify. */
-      const bytes = String(value).length
-      this.#consumeJson(bytes, T.number.length + 5 + bytes)
+      this.#consumeJsonLowerBound(1)
       return this.#publish([T.number, value], T.number.length + 37, value)
     }
     if (typeof value === 'string') {
-      /** Stringifying one scalar preserves native escaping without another object traversal. */
-      const bytes = utf8ByteLength(JSON.stringify(value))
-      this.#consumeJson(bytes, T.string.length + 5 + bytes)
+      this.#consumeJsonLowerBound(value.length + 2)
       return this.#publish([T.string, value], T.string.length + value.length * 6 + 7, value)
     }
     if (isArrayBuffer(value)) {
       this.#state.shape.semanticValue(value)
+      /** The tag and its brackets/quotes exist in both inline and native binary representations. */
+      this.#consumeJsonLowerBound(T.buffer.length + 4)
       if (this.#state.storage === RpcBinaryStorage.native) {
         /** Native row indexes have no recursive business values. */
         const tuple = [T.buffer, this.#index(value)]
-        /** The selected tag representation spends its actual JSON bytes. */
-        const bytes = utf8ByteLength(JSON.stringify(tuple))
-        this.#consumeJson(bytes, bytes, true)
         return this.#publish(tuple, T.buffer.length + 37, value, true)
       }
       ;(0, this.#state.consume)(this.#state.shape.backingLength(value))
@@ -332,16 +314,13 @@ class BinaryCapture {
       const encodeInline = this.#state.encodeInline!
       /** Recursive encode remains the original canonical binary visitor. */
       const encoded = encodeInline(bytes)
-      this.#consumeJson(
-        T.buffer.length + encoded.length + 7,
-        T.buffer.length + encoded.length + 7,
-        true
-      )
       return this.#publish([T.buffer, encoded], T.buffer.length + encoded.length + 7, value, true)
     }
     if (isUint8Array(value)) {
       this.#state.shape.semanticValue(value)
       const selected = this.#state.shape.view(value)
+      /** Ignore offset, length and payload spelling; the fixed tag alone is a safe lower bound. */
+      this.#consumeJsonLowerBound(T.uint8array.length + 4)
       if (this.#state.storage === RpcBinaryStorage.native) {
         /** The native leaf preserves its complete backing index and exact visible boundaries. */
         const tuple = [
@@ -350,9 +329,6 @@ class BinaryCapture {
           selected.offset,
           selected.length
         ]
-        /** Native metadata is shallow and contains no user callbacks. */
-        const bytes = utf8ByteLength(JSON.stringify(tuple))
-        this.#consumeJson(bytes, bytes, true)
         return this.#publish(tuple, T.uint8array.length + 103, value, true)
       }
       ;(0, this.#state.consume)(selected.offset + selected.length)
@@ -364,9 +340,6 @@ class BinaryCapture {
       const encoded = encodeInline(bytes)
       /** Inline view tags contain only captured base64 text and one admitted numeric offset. */
       const tuple = [T.uint8array, selected.offset, encoded]
-      /** This leaf's JSON is bounded independently of alias expansion in its parent containers. */
-      const jsonBytes = utf8ByteLength(JSON.stringify(tuple))
-      this.#consumeJson(jsonBytes, jsonBytes, true)
       return this.#publish(tuple, T.uint8array.length + encoded.length + 40, value, true)
     }
     if (!value || typeof value !== 'object' || this.#state.active.has(value))
@@ -377,10 +350,7 @@ class BinaryCapture {
         /** Dense children retain their original codec order, each visited exactly once. */
         const items = this.#state.shape.array(value)
         this.#state.shape.semanticContainer(items.length)
-        this.#consumeJson(
-          2 + Math.max(0, items.length - 1),
-          T.array.length + 7 + Math.max(0, items.length - 1)
-        )
+        this.#consumeJsonLowerBound(2 + Math.max(0, items.length - 1))
         /** Child pairs populate both output arrays during this same original traversal. */
         const children: IRpcPortableValue[] = []
         /** Only newly constructed semantic containers are frozen; native leaves retain identity. */
@@ -409,10 +379,7 @@ class BinaryCapture {
       /** Independent repeated references keep their existing independently encoded tuples. */
       const fields = data ? this.#state.shape.keys(data) : record!.entries
       this.#state.shape.semanticContainer(fields.length)
-      this.#consumeJson(
-        2 + Math.max(0, fields.length - 1),
-        T.object.length + 7 + Math.max(0, fields.length - 1)
-      )
+      this.#consumeJsonLowerBound(2 + Math.max(0, fields.length - 1))
       /** Own-key order is retained while both semantic and physical bounds are charged. */
       const children: IRpcPortableValue[] = []
       /** Reuse the pure capture's output instead of allocating a second ordinary record. */
@@ -424,9 +391,7 @@ class BinaryCapture {
         const key = typeof field === 'string' ? field : field[0]
         if (record && record.tag === undefined) assertRpcPortableRecordKey(key, this.#recordContext)
         this.#state.shape.semanticKey(key)
-        /** One captured key pays its ordinary colon or tagged pair punctuation before its child. */
-        const keyBytes = utf8ByteLength(JSON.stringify(key))
-        this.#consumeJson(keyBytes + 1, keyBytes + 3)
+        this.#consumeJsonLowerBound(key.length + 3)
         keyBound += key.length * 6 + 5
         /** Only constructed pair containers are frozen for the private owned JSON capture. */
         const child = this.#encode(typeof field === 'string' ? data![key] : field[1], depth + 1)

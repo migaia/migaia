@@ -1144,6 +1144,12 @@ export class Session {
       encoded = await this.#options.carrier.codec.encode(prepared, context)
     } catch (cause) {
       if (bootstrap) throw cause
+      if (
+        isRpcCarrierAdmissionFailure(cause) &&
+        safeRead(cause, 'source') === RPC_CONTRACT_SOURCE &&
+        safeRead(cause, 'code') === RpcContractErrorCode.frameLimitExceeded
+      )
+        throw cause
       throw createRpcSerializationError(RpcCoreErrorText.protocolEncodeFailed, cause)
     }
     /** Explicit grants retain native handoff even when the codec metadata does not reference them. */
