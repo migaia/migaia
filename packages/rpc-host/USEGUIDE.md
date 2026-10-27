@@ -2,6 +2,14 @@
 
 [README](./README.md) · [English](./USEGUIDE.en.md)
 
+## 安装
+
+同时安装 `@migaia/rpc-host`、`@migaia/rpc-contract` 和所需传输插件，三者使用相同版本。contract 是精确 lockstep 的 peer 依赖，由应用提供同一份安装；开发者显式引入的重复副本不在支持范围内。
+
+```bash
+pnpm add @migaia/rpc-host @migaia/rpc-contract @migaia/rpc-plugin-coroutines
+```
+
 contract 只定义协议、接口、可移植值和错误契约。host 负责 RPC 的会话、握手、调用、provider、转发、取消与截止时间传递。传输 plugin 负责原生连接、代际和编解码；信息流 plugin 与依附于 plugin 的 feature 各自实现可选能力。
 
 一个 host 支持多个传输命名空间，但通常选择一种传输，不建议混用。所有调用写成 `host.<ns>.*`；`provide` 与整个 host 的 `close` 留在根上。完整可运行的双向协程示例见 [README](./README.md#开始使用)。

@@ -15,6 +15,7 @@ import {
   writeFileSync
 } from 'node:fs'
 import { tmpdir } from 'node:os'
+import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { chromium } from '@playwright/test'
@@ -101,6 +102,8 @@ async function main() {
     )
     const packedPackage = packedPackages['rpc-host']
     assertPackedOwnerManifests(packedPackages)
+    assertPackedContractIdentity(packedPackages)
+    console.log('CHECK shared-contract-resolution PASS')
     console.log('CHECK five-packed-artifacts PASS')
     assertIdentityObserverDeclarationsHidden(packedPackage)
     console.log('CHECK identity-observer-hidden PASS')
@@ -433,11 +436,26 @@ function packDependency(packageDirectory, dependency) {
   return join(packDirectory, tarballs[0])
 }
 
+/** Prove hosts and transports resolve the same application-owned Contract entry. */
+function assertPackedContractIdentity(packedPackages) {
+  /** Every real packed owner must resolve the same Contract entry from its own installation. */
+  const contractEntry = createRequire(join(packedPackages['rpc-contract'], 'package.json')).resolve(
+    '@migaia/rpc-contract'
+  )
+  for (const [owner, directory] of Object.entries(packedPackages)) {
+    if (
+      createRequire(join(directory, 'package.json')).resolve('@migaia/rpc-contract') !==
+      contractEntry
+    )
+      throw new Error(`Packed owner resolves a duplicate Contract installation: ${owner}`)
+  }
+}
+
 /** Assert the actual artifacts' names, exact lockstep peers and complete ordinary emitted entries. */
 function assertPackedOwnerManifests(packedPackages) {
   const expectedPeers = {
     'rpc-contract': [],
-    'rpc-host': [],
+    'rpc-host': ['@migaia/rpc-contract'],
     'rpc-plugin-process': ['@migaia/rpc-contract', '@migaia/rpc-host'],
     'rpc-plugin-thread': ['@migaia/rpc-contract', '@migaia/rpc-host'],
     'rpc-plugin-browser': ['@migaia/rpc-contract', '@migaia/rpc-host'],
@@ -458,14 +476,13 @@ function assertPackedOwnerManifests(packedPackages) {
     const rpcPeers = orderStringKeys(
       Object.keys(manifest.peerDependencies ?? {}).filter((peer) => peer.startsWith('@migaia/rpc-'))
     )
-    /** The Host owns its Contract runtime; optional transports borrow both exact peer owners. */
+    /** Hosts and transports borrow the application's single exact Contract installation. */
     const rpcDependencies = orderStringKeys(
       Object.keys(manifest.dependencies ?? {}).filter((name) => name.startsWith('@migaia/rpc-'))
     )
     if (
       JSON.stringify(rpcPeers) !== JSON.stringify(expectedPeers[owner]) ||
-      JSON.stringify(rpcDependencies) !==
-        JSON.stringify(owner === 'rpc-host' ? ['@migaia/rpc-contract'] : [])
+      JSON.stringify(rpcDependencies) !== JSON.stringify([])
     )
       throw new Error(`Packed dependency direction or required peers drifted: ${owner}`)
     for (const [peer, version] of [

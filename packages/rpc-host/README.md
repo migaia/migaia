@@ -12,6 +12,8 @@
 pnpm add @migaia/rpc-host @migaia/rpc-contract @migaia/rpc-plugin-coroutines
 ```
 
+`@migaia/rpc-contract` 是精确 lockstep 的 peer 依赖，必须与 host 和传输插件一起安装相同版本。它们共用应用提供的同一份 contract；开发者显式安装的重复副本不在支持范围内。
+
 下面建立两个同一事件循环内的真实 host。父端的 timeout feature 安装在 coroutine plugin 上；子端接收本代专属 connect 句柄。输出 `42`，finally 关闭原生资源。
 
 ```ts doc-test=run

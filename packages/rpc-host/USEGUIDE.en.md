@@ -2,6 +2,14 @@
 
 [README](./README.en.md) · [中文](./USEGUIDE.md)
 
+## Installation
+
+Install `@migaia/rpc-host`, `@migaia/rpc-contract`, and the required transport plugin at the same version. The contract is an exact lockstep peer dependency shared from the application installation. Explicitly introduced duplicate copies are unsupported.
+
+```bash
+pnpm add @migaia/rpc-host @migaia/rpc-contract @migaia/rpc-plugin-coroutines
+```
+
 Contract defines protocol, interfaces, portable values, and errors. Host owns RPC sessions, handshake, calls, providers, forwarding, cancellation, and deadline propagation. Transport plugins own native connections, generations, and codecs. Flow plugins and plugin-owned features implement optional capabilities.
 
 A host supports multiple transport namespaces, but normally choose one transport kind; mixing kinds is not recommended. Calls live under `host.<ns>.*`; provider registration and whole-host closure remain on the root. See the [README](./README.en.md#start-here) for a complete runnable coroutine connection.

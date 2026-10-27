@@ -103,13 +103,13 @@
   "dependencies": {
     "@migaia/lifecycle": "workspace:^",
     "@migaia/plugin-host": "workspace:^",
-    "@migaia/rpc-contract": "workspace:*",
     "@migaia/serialize": "workspace:^",
     "@migaia/supervision": "workspace:^",
     "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
     "@migaia/capability": "workspace:^",
+    "@migaia/rpc-contract": "workspace:*",
     "@types/node": "24.13.2",
     "cborg": "6.1.1",
     "elysia": "1.4.30",
@@ -117,6 +117,9 @@
     "protobufjs": "8.8.0",
     "typescript": "^7.0.2",
     "vitest": "^4.1.10"
+  },
+  "peerDependencies": {
+    "@migaia/rpc-contract": "workspace:*"
   },
   "engines": {
     "node": ">=18"

@@ -12,6 +12,8 @@ A host can install multiple transports with calls isolated under `host.<ns>`. Mi
 pnpm add @migaia/rpc-host @migaia/rpc-contract @migaia/rpc-plugin-coroutines
 ```
 
+`@migaia/rpc-contract` is an exact lockstep peer dependency. Install the same version alongside the host and transport plugins. They share the application's single contract installation; explicitly installed duplicate copies are unsupported.
+
 This creates two real hosts in one event loop. The parent installs its timeout feature on the coroutine plugin. The child receives the generation-local connect handle. It prints `42` and releases native resources in finally.
 
 ```ts doc-test=run
