@@ -1,6 +1,7 @@
 import type { IBackendKind } from '@migaia/storage-contract'
 import { StorageOperation } from '../constants.js'
 import { StorageError, StorageErrorCode } from '../types/errors.js'
+import { StorageErrorText } from '../error-text.js'
 
 // Transaction types and option validation guards belong to `@migaia/storage-contract`. Re-exports preserve existing import paths.
 export type { ITransactionScope, ITransactionWriteOptions } from '@migaia/storage-contract'
@@ -15,6 +16,6 @@ export const assertTransactionScopeActive = (active: boolean, backend: IBackendK
   throw new StorageError(StorageErrorCode.transactionFailed, {
     backend,
     operation: StorageOperation.transactionScope,
-    cause: new Error('transaction scope is no longer active')
+    cause: new Error(StorageErrorText.transactionScopeInactive)
   })
 }

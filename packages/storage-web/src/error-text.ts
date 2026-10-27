@@ -1,6 +1,12 @@
 import { IndexedDbFeature } from './constants.js'
 /** Stable diagnostic text shared by backend, entity, Host and reactive boundaries. */
 export const StorageErrorText = Object.freeze({
+  /** Cause text when work arrives after the owning transaction callback settled. */
+  transactionScopeInactive: 'transaction scope is no longer active',
+  /** Cause text when a range read needs IDBKeyRange and the realm does not provide it. */
+  indexedDbKeyRangeUnavailable: 'IDBKeyRange is unavailable; pass options.keyRange explicitly',
+  /** Cause text when an existing channel object store declares an in-line keyPath. */
+  indexedDbChannelKeyPathInvalid: 'IndexedDB channel stores must use caller-supplied keys',
   /** Cookie validation keeps the original scalar value failure text. */
   cookieValueInvalid: 'cookie value must be a string',
   /** Cookie expiry validation rejects unsafe relative seconds before native assignment. */

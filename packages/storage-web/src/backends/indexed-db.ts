@@ -526,7 +526,7 @@ export const toIdbRange = (
   if (!KeyRange)
     throw new StorageError(StorageErrorCode.unavailable, {
       backend: StorageBackend.indexedDb,
-      cause: new Error('IDBKeyRange is unavailable; pass options.keyRange explicitly')
+      cause: new Error(StorageErrorText.indexedDbKeyRangeUnavailable)
     })
   if (rangeSnapshot.lower !== undefined && rangeSnapshot.upper !== undefined)
     return KeyRange.bound(
@@ -1294,7 +1294,7 @@ function validatePhysicalLayout<TValue>(
         throw new StorageError(StorageErrorCode.invalidConfig, {
           backend: StorageBackend.indexedDb,
           operation: StorageOperation.indexedDbSchema,
-          cause: new TypeError('IndexedDB channel stores must use caller-supplied keys')
+          cause: new TypeError(StorageErrorText.indexedDbChannelKeyPathInvalid)
         })
     }
     for (const storeName of [REVISIONS_STORE_NAME, META_STORE_NAME]) {

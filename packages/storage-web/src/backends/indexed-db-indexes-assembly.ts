@@ -1559,7 +1559,7 @@ export async function* indexedDbIndexRows<TValue>(
     if (!iteratorState.indexedDbContext.keyRange)
       throw new StorageError(StorageErrorCode.unavailable, {
         backend: StorageBackend.indexedDb,
-        cause: new Error('IDBKeyRange is unavailable; pass options.keyRange explicitly')
+        cause: new Error(StorageErrorText.indexedDbKeyRangeUnavailable)
       })
     iteratorState.range = snapshotKeyRange(iteratorState.query.range, StorageBackend.indexedDb)
     iteratorState.direction = iteratorState.query.direction === 'prev' ? 'prev' : 'next'
