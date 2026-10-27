@@ -419,9 +419,6 @@ export const PluginHostInternalText = {
   /** Optional budget validation used during Host option admission. */
   TIMEOUT_OPTION: (label: string): string =>
     `${label} must be false or a non-negative finite number`,
-  /** Mandatory execution budgets must be supplied explicitly rather than defaulted. */
-  TIMEOUT_REQUIRED: (label: string): string =>
-    `${label} must be provided as false or a non-negative finite number`,
   /** Config record admission rejects arrays and non-plain prototypes with the same native text. */
   RECORD_OBJECT: (label: string): string => `${label} must be a plain object`,
   /** Config snapshots cannot retain symbol keys across the public string-path boundary. */
@@ -443,8 +440,8 @@ export const PluginHostInternalText = {
     `domain core key "${String(key)}" is reserved`,
   /** Domain properties are captured once instead of publishing live accessors. */
   DOMAIN_CORE_DATA: 'domain core must contain enumerable data properties',
-  /** Construction requires independent mutation and pipeline-drain budgets. */
-  EXECUTION_REQUIRED: 'execution must provide mutation and pipeline drain budgets',
+  /** A supplied execution policy must be an object; omission selects the default budgets. */
+  EXECUTION_OBJECT: 'execution must be an object when provided',
   /** Scheduler admission needs both clock and scheduling capabilities. */
   SCHEDULER_FUNCTIONS: 'scheduler must provide now() and schedule() functions',
   /** Functional plugin definition fields are read from own data descriptors only. */

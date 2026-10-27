@@ -13,7 +13,7 @@ import { PluginHostErrorCode } from './error-code.js'
  * These read the caller's options and nothing else — no host state, no runtime — so they sit beside
  * the host rather than inside it. Every budget is either a finite non-negative number of
  * milliseconds or `false`, which means "wait without a deadline"; `undefined` means the caller left
- * it to the default, and only the mandatory ones reject it.
+ * it to the default.
  */
 
 /** Validates a configurable timeout: `undefined`/`false` are legal, a number must be finite ≥ 0. */
@@ -21,16 +21,6 @@ export const assertTimeoutOption = (value: number | false | undefined, label: st
   if (value === undefined || value === false) return
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0)
     throw createPluginHostTypeError(PluginHostInternalText.TIMEOUT_OPTION(label))
-}
-
-/** Rejects an omitted mandatory execution budget before any unrelated option is observed. */
-export const assertRequiredTimeoutOption = (
-  value: number | false | undefined,
-  label: string
-): void => {
-  if (value === undefined)
-    throw createPluginHostTypeError(PluginHostInternalText.TIMEOUT_REQUIRED(label))
-  assertTimeoutOption(value, label)
 }
 
 /**

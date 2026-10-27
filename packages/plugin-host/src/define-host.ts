@@ -107,8 +107,11 @@ export type IDefineHostOptions<
   TPipelines extends IPipelineDefinitions = Record<never, never>,
   TValue = never
 > = Readonly<{
-  /** Forwarded to the host unchanged; identical in shape to the class constructor's options. */
-  readonly host: IPluginHostOptions
+  /**
+   * Forwarded to the host unchanged; identical in shape to the class constructor's options.
+   * Omission uses every Host default.
+   */
+  readonly host?: IPluginHostOptions
   /** Named payload declarations inferred independently of the default pipeline value. */
   readonly pipelines?: TPipelines
   /**
@@ -282,10 +285,11 @@ export type IHostHandle<
  * the same terms as a class instance: a composing package branches on what a value _is_, not on
  * which of the two entries produced it.
  *
- * Host.execution must explicitly select finite nonnegative mutation/drain budgets or false for
- * unbounded waiting. domainCore and surface are optional; their defaults add no domain members.
- * Invalid input is rejected before a usable handle escapes. Custom disposal middleware failures
- * retain their native identity or cause under CALLBACK_FAILED, rather than becoming cleanup rows.
+ * Options are optional. Host.execution budgets default to 5000 ms each; a caller may pass finite
+ * nonnegative numbers or false for unbounded waiting. domainCore and surface are optional; their
+ * defaults add no domain members. Invalid input is rejected before a usable handle escapes. Custom
+ * disposal middleware failures retain their native identity or cause under CALLBACK_FAILED, rather
+ * than becoming cleanup rows.
  */
 export function defineHost<
   TDomainCore extends object = Record<string, never>,
@@ -294,7 +298,7 @@ export function defineHost<
   TPublicSurface extends object = Record<never, never>,
   const TPipelines extends IPipelineDefinitions = Record<never, never>
 >(
-  options: IDefineHostOptions<TDomainCore, TPublicSurface, TPipelines, TValue>
+  options: IDefineHostOptions<TDomainCore, TPublicSurface, TPipelines, TValue> = {}
 ): IHostHandle<TDomainCore, TValue, TInstalled, TPublicSurface, TPipelines> {
   /** Snapshot descriptors before acquiring a runtime; do not evaluate domain accessors. */
   let surfaceDescriptors: PropertyDescriptorMap | undefined
@@ -348,7 +352,7 @@ export function defineHost<
   })
   reference.handle = handle
   /** Identity and managed-host provenance belong to the exact public proxy rather than its target. */
-  const identity = issueHostIdentity(handle, options.host.identity?.name, runtime)
+  const identity = issueHostIdentity(handle, options.host?.identity?.name, runtime)
   Object.defineProperty(handleSurface, 'identity', {
     value: identity,
     enumerable: true,

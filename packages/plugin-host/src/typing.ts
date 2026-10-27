@@ -806,20 +806,18 @@ export type IPluginHostOptions<TPipelines extends IPipelineDefinitions = Record<
     /** Defaults to DEFAULT; a supplied label must be a nonempty string and need not be unique. */
     readonly name?: string
   }>
-  /** Explicit operation and pipeline drain budgets; `false` opts into unbounded waiting. */
-  readonly execution: {
+  /** Operation and pipeline drain budgets; each defaults to 5000 ms, `false` waits unbounded. */
+  readonly execution?: {
     /**
-     * Maximum time for one admitted install, update, or removal hook; `false` waits without a
-     * deadline. Required numeric values must be finite and nonnegative; there is no implicit
-     * default.
+     * Maximum time for one admitted install, update, or removal hook. Defaults to 5000 ms; `false`
+     * waits without a deadline. Numeric values must be finite and nonnegative.
      */
-    readonly mutationTimeoutMs: number | false
+    readonly mutationTimeoutMs?: number | false
     /**
-     * Maximum time to drain active pipeline leases before logical removal continues; `false` waits
-     * until zero. Required numeric values must be finite and nonnegative; there is no implicit
-     * default.
+     * Maximum time to drain active pipeline leases before logical removal continues. Defaults to
+     * 5000 ms; `false` waits until zero. Numeric values must be finite and nonnegative.
      */
-    readonly pipelineDrainTimeoutMs: number | false
+    readonly pipelineDrainTimeoutMs?: number | false
   }
   /** Optional runner configuration; omission selects mode sync. */
   pipeline?: IPipelineConfig

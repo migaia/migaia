@@ -17,7 +17,7 @@ Install the root package first. Each section is independently runnable and uses 
 pnpm add @migaia/plugin-host
 ```
 
-Shared parameters: defineHost requires host constructor options. Nested execution.mutationTimeoutMs and execution.pipelineDrainTimeoutMs are required without defaults, bounding active mutation and pipeline draining. Both are 5000 ms here; false waits without a deadline. Omitted pipeline.mode is sync. Omitted domainCore returns an empty object, and omitted custom dispose uses core structured cleanup.
+Shared parameters: defineHost's host options are optional. Nested execution.mutationTimeoutMs and execution.pipelineDrainTimeoutMs bound active mutation and pipeline draining; each defaults to 5000 ms, and the examples spell out the same value. false waits without a deadline. Omitted pipeline.mode is sync. Omitted domainCore returns an empty object, and omitted custom dispose uses core structured cleanup.
 
 ## Install a plugin and read its extension
 
@@ -25,7 +25,7 @@ An application needs to add a named capability and later release its resources. 
 
 Assigning plugin methods directly onto an object does not define when installation commits or who owns cleanup. Returning before an asynchronous installer finishes also exposes methods before their resources exist.
 
-defineHost creates the lifecycle owner, and await host.use() returns the installed registration. Both execution budgets are required and set to 5000 ms here; they have no implicit defaults. Dispose the host after use.
+defineHost creates the lifecycle owner, and await host.use() returns the installed registration. Both execution budgets are set to 5000 ms here, the same as their defaults. Dispose the host after use.
 
 definePlugin requires the nonempty name greeting and an install callback returning an ordinary extension object. greet is a plugin-defined no-argument method returning a string. host.use takes a plugin batch and returns handles in input order.
 
@@ -487,7 +487,7 @@ Simple options or composed functions can suffice for a few static extension poin
 
 The class entry can override `createPluginDomainCore()` to create a domain core for each installation. The default is an empty object. Domain cores must be ordinary objects with enumerable data properties. They cannot override config, onDispose, or the four use*Pipeline core members. Invalid surfaces retain native TypeError with INVALID_OPTION.
 
-`defineHost(options)` returns one frozen canonical handle. It supports the class behavior and exposes the class-protected useSync and runPipeline methods to the owner holding that handle. Its required `host` field has the same shape as the class constructor options.
+`defineHost(options)` returns one frozen canonical handle. It supports the class behavior and exposes the class-protected useSync and runPipeline methods to the owner holding that handle. Its optional `host` field has the same shape as the class constructor options.
 
 | defineHost field                | Default and meaning                                                                                                                                    |
 | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -499,20 +499,20 @@ The class entry can override `createPluginDomainCore()` to create a domain core 
 
 `surface` accepts an object or a factory. Object-form own descriptors are captured once before Runtime acquisition; accessors remain live, and all canonical Host keys, including identity, use, and unUse, remain reserved. The factory form `surface: (native) => ({ ... })` runs once while creating the final handle. It receives the frozen native `use` and `unUse` operations and may compose and replace those two methods; other canonical Host keys remain reserved. Domain members, Host identity, shared outlets, and fluent pipeline methods belong to the same frozen handle. Composing packages should provide methods through surface rather than copy the returned handle. Surface-read or factory failures retain the original through CALLBACK_FAILED. Existing object forms and calls with three type parameters remain valid.
 
-The class constructor requires options; defineHost requires the same data under host.
+Class constructor options are optional, and so is defineHost's host field; omitted fields use the defaults below.
 
-| Field                                               | Default                               | Behavior                                                                                                     |
-| --------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `identity?: { name?: string }`                      | name is `'DEFAULT'`                   | Optional readable name; the Host issues a unique id separately                                               |
-| `execution.mutationTimeoutMs: number \| false`      | Required; none                        | Active mutation hook budget; false removes the deadline                                                      |
-| `execution.pipelineDrainTimeoutMs: number \| false` | Required; none                        | Pipeline lease drain budget; false waits for actual draining                                                 |
-| `pipeline?.mode`                                    | `'sync'`                              | sync / async / generator / async-generator; fixed after construction                                         |
-| `diagnostic(message, code?, error?)`                | No-op                                 | Diagnostics and exact contained failure objects                                                              |
-| `onDiagnosticFailure(error)`                        | globalThis.reportError when available | Terminal outlet for a diagnostic callback that throws or rejects                                             |
-| `scheduler?: IScheduler`                            | Internal systemScheduler              | Shared now()/schedule() clock and timer owner                                                                |
-| `queueAdmissionTimeoutMs?: number \| false`         | undefined                             | Report-only by default; a number rejects queued work at its limit; false disables related timers and reports |
-| `queueAdmissionDiagnosticMs?: number \| false`      | 1000                                  | Report threshold only without an admission rejection limit; false disables its timer                         |
-| `disposeStepTimeoutMs?: number \| false`            | 5000                                  | Wait limit for one ordinary cleanup step; false waits without a deadline                                     |
+| Field                                                | Default                               | Behavior                                                                                                     |
+| ---------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `identity?: { name?: string }`                       | name is `'DEFAULT'`                   | Optional readable name; the Host issues a unique id separately                                               |
+| `execution.mutationTimeoutMs?: number \| false`      | `5000`                                | Active mutation hook budget; false removes the deadline                                                      |
+| `execution.pipelineDrainTimeoutMs?: number \| false` | `5000`                                | Pipeline lease drain budget; false waits for actual draining                                                 |
+| `pipeline?.mode`                                     | `'sync'`                              | sync / async / generator / async-generator; fixed after construction                                         |
+| `diagnostic(message, code?, error?)`                 | No-op                                 | Diagnostics and exact contained failure objects                                                              |
+| `onDiagnosticFailure(error)`                         | globalThis.reportError when available | Terminal outlet for a diagnostic callback that throws or rejects                                             |
+| `scheduler?: IScheduler`                             | Internal systemScheduler              | Shared now()/schedule() clock and timer owner                                                                |
+| `queueAdmissionTimeoutMs?: number \| false`          | undefined                             | Report-only by default; a number rejects queued work at its limit; false disables related timers and reports |
+| `queueAdmissionDiagnosticMs?: number \| false`       | 1000                                  | Report threshold only without an admission rejection limit; false disables its timer                         |
+| `disposeStepTimeoutMs?: number \| false`             | 5000                                  | Wait limit for one ordinary cleanup step; false waits without a deadline                                     |
 
 Time values must be finite and non-negative. Invalid options, nonfunction callbacks, or a scheduler without now()/schedule() retain TypeError with INVALID_OPTION. Directly install utils if importing its scheduler entry.
 
@@ -660,7 +660,7 @@ A composition owner reads revision/getCurrentSnapshot(), captures definitions wi
 
 Calling createDataOrderSlot reserves its order immediately. Disablement, recovery, and replacement reuse it. Retire it only when a definition is permanently removed or the session ends. prepareUnUseBatch accepts exact tokens in the owner's cleanup order. commitPreparedUnUseBatch(prepared, { beforeCleanup? }) first commits logical revocation, then waits for the fence and generation-specific pipeline leases. beforeCleanup is optional without a default promise; when supplied it completes before cleanup.
 
-Managed cleanup requires execution.pipelineDrainTimeoutMs. A number is shared across the batch's leases and cleanup steps; exhaustion continues later steps even if ordinary disposeStepTimeoutMs is false. Explicit pipelineDrainTimeoutMs false instead waits for actual completion step by step, bypassing ordinary limits. The budget does not revoke running work. Observe all physicalCompletion continuations for physical release, or let the outer realm owner terminate its actual execution environment.
+Managed cleanup uses execution.pipelineDrainTimeoutMs (default 5000). A number is shared across the batch's leases and cleanup steps; exhaustion continues later steps even if ordinary disposeStepTimeoutMs is false. Explicit pipelineDrainTimeoutMs false instead waits for actual completion step by step, bypassing ordinary limits. The budget does not revoke running work. Observe all physicalCompletion continuations for physical release, or let the outer realm owner terminate its actual execution environment.
 
 createView(token) exposes only that exact registration's extensions, without Host, config, shared, or mutation capability. Repeated views keep function references and concrete Host receivers. Token views remain valid during disablement; complete Host views reject then and recover their original function references on enablement. Removal revokes both. Foreign or revoked tokens fail closed. Migration: the old root createRegistrationView and IPluginRegistrationReceipt were removed; use composition createView/IRegistrationToken.
 

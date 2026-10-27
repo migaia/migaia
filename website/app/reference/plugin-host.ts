@@ -765,20 +765,20 @@ const hostOptionMembers: Readonly<Record<string, IMemberDoc>> = {
   },
   'execution.mutationTimeoutMs': {
     summary: t(
-      'Required nonnegative finite milliseconds or false, with no default. Bounds setup/install/update; expiry aborts the operation and rolls back with MUTATION_EXECUTION_TIMEOUT. false removes this deadline; removal hooks and disposers use disposeStepTimeoutMs.',
-      '必填非负有限毫秒数或 `false`，无默认值；限制准备、安装及更新，到期取消并以 `MUTATION_EXECUTION_TIMEOUT` 回滚，`false` 关闭此期限，卸载钩子与释放另用 `disposeStepTimeoutMs`。'
+      'Optional nonnegative finite milliseconds or false; defaults to 5000. Bounds setup/install/update; expiry aborts the operation and rolls back with MUTATION_EXECUTION_TIMEOUT. false removes this deadline; removal hooks and disposers use disposeStepTimeoutMs.',
+      '可选非负有限毫秒数或 `false`，默认 `5000`；限制准备、安装及更新，到期取消并以 `MUTATION_EXECUTION_TIMEOUT` 回滚，`false` 关闭此期限，卸载钩子与释放另用 `disposeStepTimeoutMs`。'
     )
   },
   'execution.pipelineDrainTimeoutMs': {
     summary: t(
-      'Required nonnegative finite milliseconds or false; no default. Bounds pipeline draining during removal, replacement and host disposal; false waits until no leases remain.',
-      '必填非负有限毫秒数或 `false`，无默认值；约束卸载、替换及宿主销毁时的管线排空，`false` 等待全部租约结束。'
+      'Optional nonnegative finite milliseconds or false; defaults to 5000. Bounds pipeline draining during removal, replacement and host disposal; false waits until no leases remain.',
+      '可选非负有限毫秒数或 `false`，默认 `5000`；约束卸载、替换及宿主销毁时的管线排空，`false` 等待全部租约结束。'
     )
   },
   execution: {
     summary: t(
-      'Required execution budgets: mutationTimeoutMs bounds setup/install/update; pipelineDrainTimeoutMs bounds pipeline draining and is a shared managed-removal cleanup deadline. Ordinary removal steps use disposeStepTimeoutMs. false disables the corresponding deadline.',
-      '必填执行预算：变更时限约束准备、安装及更新，排空时限约束管线且作为托管卸载共享清理期限；普通卸载步骤用独立步骤时限，传 `false` 关闭对应期限。'
+      'Optional execution budgets, each defaulting to 5000 ms: mutationTimeoutMs bounds setup/install/update; pipelineDrainTimeoutMs bounds pipeline draining and is a shared managed-removal cleanup deadline. Ordinary removal steps use disposeStepTimeoutMs. false disables the corresponding deadline.',
+      '可选执行预算，两项默认均为 `5000` 毫秒：变更时限约束准备、安装及更新，排空时限约束管线且作为托管卸载共享清理期限；普通卸载步骤用独立步骤时限，传 `false` 关闭对应期限。'
     )
   },
   pipeline: {
@@ -876,8 +876,8 @@ if (isManagedHost(host)) console.log(openComposition(host).revision)`
       ),
       params: {
         options: t(
-          'Required IPluginHostOptions, including explicit mutation and pipeline-drain execution budgets; optional identity, pipeline and diagnostics configure this Host only.',
-          '必填宿主选项，包含显式变更与管线排空执行预算；可选身份、管线与诊断仅配置当前宿主。'
+          'Optional IPluginHostOptions; mutation and pipeline-drain budgets default to 5000 ms each. Identity, pipeline and diagnostics configure this Host only.',
+          '可选宿主选项；变更与管线排空预算默认各为 `5000` 毫秒；身份、管线与诊断仅配置当前宿主。'
         )
       },
       returns: t(
@@ -919,8 +919,8 @@ if (isManagedHost(host)) console.log(openComposition(host).revision)`
     definePlugin: {
       role: 'enhancer',
       purpose: t(
-        'Defines a plugin without running installation hooks. Function form builds a fresh descriptor per registration; object form also declares configuration, setup and lifecycle hooks. Config is captured when defining, not when the caller later mutates it.\n\nExamples pass host.execution.mutationTimeoutMs and pipelineDrainTimeoutMs as 5000 ms: required active-mutation and pipeline-drain budgets, with no defaults; false explicitly removes either deadline. host.config.get(path) uses plugin-name dot paths and returns undefined for an absent path.',
-        '定义插件但不执行安装钩子，函数形式为各登记创建新描述，对象形式还声明配置、准备与生命周期钩子；配置在定义时捕获，不随调用者后续修改变化。\n\n示例把 `host.execution.mutationTimeoutMs` 与 `pipelineDrainTimeoutMs` 均设为 `5000` 毫秒，分别为必填的活动变更和管线排空预算，无默认值，`false` 显式去掉对应截止时间；`host.config.get(path)` 使用插件名开头的点路径，缺席路径返回 `undefined`。'
+        'Defines a plugin without running installation hooks. Function form builds a fresh descriptor per registration; object form also declares configuration, setup and lifecycle hooks. Config is captured when defining, not when the caller later mutates it.\n\nExamples pass host.execution.mutationTimeoutMs and pipelineDrainTimeoutMs as 5000 ms, the same as their defaults; false explicitly removes either deadline. host.config.get(path) uses plugin-name dot paths and returns undefined for an absent path.',
+        '定义插件但不执行安装钩子，函数形式为各登记创建新描述，对象形式还声明配置、准备与生命周期钩子；配置在定义时捕获，不随调用者后续修改变化。\n\n示例把 `host.execution.mutationTimeoutMs` 与 `pipelineDrainTimeoutMs` 均设为 `5000` 毫秒，与默认值相同，`false` 显式去掉对应截止时间；`host.config.get(path)` 使用插件名开头的点路径，缺席路径返回 `undefined`。'
       ),
       params: {
         name: t(
@@ -953,8 +953,8 @@ if (isManagedHost(host)) console.log(openComposition(host).revision)`
     defineFeature: {
       role: 'enhancer',
       purpose: t(
-        'Defines an opaque Feature, a synchronous factory whose output supplies a plugin capability. Construction records the factory and dependencies without invoking them; installation resolves the dependency graph and freezes each output object.\n\nExamples create a host with required host.execution.mutationTimeoutMs and pipelineDrainTimeoutMs budgets of 5000 ms, with no implicit defaults; false removes the corresponding active-mutation or pipeline-drain deadline. The graph orders capability startup, not reactive data changes.',
-        '定义功能，即输出插件能力的同步工厂；定义阶段记录工厂与依赖而不调用，安装时解析依赖图并冻结各输出对象。\n\n示例创建宿主时提供必填的 `host.execution.mutationTimeoutMs` 与 `pipelineDrainTimeoutMs`，均为 `5000` 毫秒，没有隐式默认值，`false` 去掉对应活动变更或管线排空期限；此图安排功能启动，不追踪响应式数据变化。'
+        'Defines an opaque Feature, a synchronous factory whose output supplies a plugin capability. Construction records the factory and dependencies without invoking them; installation resolves the dependency graph and freezes each output object.\n\nExamples create a host with host.execution.mutationTimeoutMs and pipelineDrainTimeoutMs set to 5000 ms, the same as their defaults; false removes the corresponding active-mutation or pipeline-drain deadline. The graph orders capability startup, not reactive data changes.',
+        '定义功能，即输出插件能力的同步工厂；定义阶段记录工厂与依赖而不调用，安装时解析依赖图并冻结各输出对象。\n\n示例创建宿主时把 `host.execution.mutationTimeoutMs` 与 `pipelineDrainTimeoutMs` 设为 `5000` 毫秒，与默认值相同，`false` 去掉对应活动变更或管线排空期限；此图安排功能启动，不追踪响应式数据变化。'
       ),
       params: {
         factory: t(

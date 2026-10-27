@@ -34,11 +34,11 @@ export class PluginHost<
   TPipelines extends IPipelineDefinitions = Record<never, never>
 > extends RuntimeHost<TDomainCore, TValue, TInstalled, TPipelines> {
   /**
-   * Creates an empty Host with explicit mutation and pipeline-drain budgets in options.execution.
+   * Creates an empty Host. options.execution budgets default to 5000 ms each and may be overridden.
    * Invalid budgets/options fail before plugin hooks run; no plugin is installed by construction.
    * Own the resulting Host until its shared dispose() completion has been observed.
    */
-  constructor(options: import('./typing.js').IPluginHostOptions<TPipelines>) {
+  constructor(options: import('./typing.js').IPluginHostOptions<TPipelines> = {}) {
     super(options, readDefinedPluginDefinition)
   }
 }

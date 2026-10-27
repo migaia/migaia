@@ -20,11 +20,7 @@ import { PluginHostState } from './host-state.js'
 import type { IHostCoreConstructionRequest } from './define-host.js'
 import { reportQueueWait, translateQueueRejection } from './host-queue.js'
 import { drainPipelineLeases } from './pipeline-runtime.js'
-import {
-  admitHostScheduler,
-  assertRequiredTimeoutOption,
-  assertTimeoutOption
-} from './host-options.js'
+import { admitHostScheduler, assertTimeoutOption } from './host-options.js'
 import { asyncDisposeKey } from './symbols.js'
 import {
   createMutationQueue,
@@ -160,6 +156,17 @@ const DEFAULT_QUEUE_ADMISSION_DIAGNOSTIC_MS = 1000
  */
 const DEFAULT_DISPOSE_STEP_TIMEOUT_MS = 5000
 /**
+ * Default budget for one install, update or removal hook. Bounded so a hook that never settles
+ * rolls back with MUTATION_EXECUTION_TIMEOUT instead of blocking the FIFO mutation queue forever.
+ * Hosts with slow hooks (for example remote handshakes) override it or pass `false`.
+ */
+const DEFAULT_MUTATION_TIMEOUT_MS = 5000
+/**
+ * Default budget for draining active pipeline leases during removal and disposal. Bounded so a run
+ * that never finishes cannot keep removal waiting forever; `false` waits for the real drain.
+ */
+const DEFAULT_PIPELINE_DRAIN_TIMEOUT_MS = 5000
+/**
  * Runtime-neutral owner of plugin registration, configuration, pipeline leases and resource
  * cleanup. Async mutations share a FIFO queue; synchronous owner installation is a separate
  * explicit path. Handles address names, while captured callable views retain exact-generation
@@ -243,26 +250,30 @@ class PluginHostConstructor<
   #activationRequests = new Map<string, Promise<IPluginHandle<IPluginConstraint<any>>>>()
 
   /**
-   * Creates an empty Host with required execution budgets. Numeric budgets must be finite and
-   * nonnegative; false explicitly waits without a deadline. Pipeline mode defaults to sync,
-   * diagnostics to no-op, queue diagnostics to 1000 ms and disposal steps to 5000 ms. Invalid
-   * options fail admission; the scheduler defaults to systemScheduler and secure Host identity
-   * requires host cryptographic randomness.
+   * Creates an empty Host. Mutation and pipeline-drain budgets each default to 5000 ms; numeric
+   * budgets must be finite and nonnegative and false waits without a deadline. Pipeline mode
+   * defaults to sync, diagnostics to no-op, queue diagnostics to 1000 ms and disposal steps to 5000
+   * ms. Invalid options fail admission; the scheduler defaults to systemScheduler and secure Host
+   * identity requires host cryptographic randomness.
    */
   constructor(
-    options: IPluginHostOptions<TPipelines>,
+    options: IPluginHostOptions<TPipelines> = {},
     trustedDefinitionReader?: ITrustedDefinitionReader
   ) {
     this.#trustedDefinitionReader = trustedDefinitionReader
-    // Validate the mandatory execution policy before reading the remaining options. Field
-    // initializers have already created the basic lifecycle and shared-state owners.
-    const execution = options.execution
+    // Validate the execution policy before reading the remaining options. Field initializers have
+    // already created the basic lifecycle and shared-state owners.
+    /** Supplied execution policy; only omission selects the defaults, null stays invalid. */
+    const execution = options.execution === undefined ? {} : options.execution
     if (execution === null || typeof execution !== 'object')
-      throw createPluginHostTypeError(PluginHostInternalText.EXECUTION_REQUIRED)
-    const mutationTimeoutMs = execution.mutationTimeoutMs
-    const pipelineDrainTimeoutMs = execution.pipelineDrainTimeoutMs
-    assertRequiredTimeoutOption(mutationTimeoutMs, 'mutationTimeoutMs')
-    assertRequiredTimeoutOption(pipelineDrainTimeoutMs, 'pipelineDrainTimeoutMs')
+      throw createPluginHostTypeError(PluginHostInternalText.EXECUTION_OBJECT)
+    assertTimeoutOption(execution.mutationTimeoutMs, 'mutationTimeoutMs')
+    assertTimeoutOption(execution.pipelineDrainTimeoutMs, 'pipelineDrainTimeoutMs')
+    /** Admitted per-hook budget; omission selects the bounded default. */
+    const mutationTimeoutMs = execution.mutationTimeoutMs ?? DEFAULT_MUTATION_TIMEOUT_MS
+    /** Admitted lease-drain budget; omission selects the bounded default. */
+    const pipelineDrainTimeoutMs =
+      execution.pipelineDrainTimeoutMs ?? DEFAULT_PIPELINE_DRAIN_TIMEOUT_MS
     this.identity = issueHostIdentity(this, options.identity?.name)
     if (options.diagnostic !== undefined && typeof options.diagnostic !== 'function')
       throw createPluginHostTypeError(ERROR_TEXT.DIAGNOSTIC_OPTION)

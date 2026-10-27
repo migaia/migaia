@@ -20,9 +20,22 @@ describe('PluginHost V2 runtime contract', () => {
     expect(pipelineRead).toBe(false)
   })
 
-  it('rejects either missing execution budget before touching unrelated option getters', () => {
-    /** Each partial policy must fail before the unrelated pipeline option is read. */
-    for (const execution of [{ pipelineDrainTimeoutMs: false }, { mutationTimeoutMs: false }]) {
+  it('fills omitted execution budgets with defaults instead of rejecting construction', async () => {
+    /** Omitted options, omitted execution and each partial policy all construct a usable Host. */
+    for (const options of [
+      undefined,
+      {},
+      { execution: { pipelineDrainTimeoutMs: false } },
+      { execution: { mutationTimeoutMs: false } }
+    ]) {
+      const host = new V2Host(options as never)
+      await host.dispose()
+    }
+  })
+
+  it('rejects an invalid execution budget before touching unrelated option getters', () => {
+    /** Each invalid budget must fail before the unrelated pipeline option is read. */
+    for (const execution of [{ mutationTimeoutMs: -1 }, { pipelineDrainTimeoutMs: Number.NaN }]) {
       let pipelineRead = false
       const options = { execution } as unknown as Record<string, unknown>
       Object.defineProperty(options, 'pipeline', {
