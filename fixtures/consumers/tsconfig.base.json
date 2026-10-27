@@ -22,8 +22,8 @@
       "@migaia/store-devtools": ["../../packages/store-devtools/dist/index.d.ts"],
       "@migaia/store-ssr": ["../../packages/store-ssr/dist/index.d.ts"],
       "@migaia/serialize": ["../../packages/serialize/dist/index.d.ts"],
-      "@migaia/storage-web": ["../../packages/storage-web/dist/index.d.ts"],
-      "@migaia/storage-web/*": ["../../packages/storage-web/dist/*"],
+      "@migaia/storage-plugin-browser": ["../../packages/storage-plugin-browser/dist/index.d.ts"],
+      "@migaia/storage-plugin-browser/*": ["../../packages/storage-plugin-browser/dist/*"],
       "@migaia/storage-host": ["../../packages/storage-host/dist/index.d.ts"],
       "@migaia/lifecycle": ["../../packages/lifecycle/dist/index.d.ts"],
       "@migaia/utils/promise": ["../../packages/utils/dist/promise.d.ts"]

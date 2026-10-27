@@ -1173,9 +1173,9 @@
       "./bun": ["bunSqliteDriver"],
       "./features/maintenance": ["sqliteMaintenanceFeature"]
     },
-    "@migaia/storage-web": {
+    "@migaia/storage-plugin-browser": {
       ".": [
-        "STORAGE_WEB_SOURCE",
+        "STORAGE_BROWSER_SOURCE",
         "StorageError",
         "StorageErrorCode",
         "StorageErrorText",

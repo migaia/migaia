@@ -152,7 +152,7 @@ Not sure where to start? Begin with the problem you have:
 | Package                                                        | What it does                                                                                          |
 | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | [`storage-contract`](./packages/storage-contract/README.en.md) | Define common interfaces for key-value and record storage so applications can use different backends. |
-| [`storage-web`](./packages/storage-web/README.en.md)           | Read and write data in Web Storage, cookies, IndexedDB, and memory through a common interface.        |
+| [`storage-plugin-browser`](./packages/storage-plugin-browser/README.en.md)           | Read and write data in Web Storage, cookies, IndexedDB, and memory through a common interface.        |
 | [`serialize`](./packages/serialize/README.en.md)               | Encode application data for storage or transmission and decode it when reading.                       |
 | [`wasm`](./packages/wasm/README.en.md)                         | Allocate reusable byte buffers and transcode between JSON and MessagePack.                            |
 
@@ -193,7 +193,7 @@ The packages form layers. A higher layer may depend on a lower one, never the ot
 
 ```text
 Integration            micro-hub   tray
-State and storage      store-*     storage-web
+State and storage      store-*     storage-plugin-browser
 RPC                    rpc-host + rpc-plugin-{process,thread,browser,coroutines,pool,devtools}
 Plugins and switches   plugin-host   capability
 Shared foundations     reactive   resource   serialize   storage-contract   supervision

@@ -18,7 +18,7 @@ Choose a persistence adapter for your state shape and manage hydration, write ou
 Save each example as its own .ts file and run it in an ESM project with Node 24. They use real memoryStorageHost rather than browser localStorage or IndexedDB; data survives only while that backend instance lives. Install the models you need; this command covers all six examples:
 
 ```bash
-pnpm add @migaia/store-persist @migaia/storage-web @migaia/store-light @migaia/store-indexed @migaia/store-keyed @migaia/reactive
+pnpm add @migaia/store-persist @migaia/storage-plugin-browser @migaia/store-light @migaia/store-indexed @migaia/store-keyed @migaia/reactive
 ```
 
 ## Keep edits made while an archive is loading
@@ -376,7 +376,7 @@ This package connects state changes to storage: it reads archives, reconciles lo
 | `@migaia/store-persist/indexed` | persistCollection, IPersistableCollection, IPersistCollectionOptions.                                                                 |
 | `@migaia/store-persist/keyed`   | persistKeyed, clearFamily, IPersistKeyedOptions, IPersistKeyedHandle.                                                                 |
 
-reactive, storage-contract, utils, and lifecycle are runtime dependencies. store-light, store-indexed, and store-keyed are optional peers: install the model you use. Install storage-web only when using its backend or codec. Directly install packages your code imports rather than relying on transitive visibility. Obtain memoryStorageHost, localStorageHost, or indexedDbHost from storage-web's precise backend subentries; this package does not depend on concrete storage-web runtime values.
+reactive, storage-contract, utils, and lifecycle are runtime dependencies. store-light, store-indexed, and store-keyed are optional peers: install the model you use. Install storage-plugin-browser only when using its backend or codec. Directly install packages your code imports rather than relying on transitive visibility. Obtain memoryStorageHost, localStorageHost, or indexedDbHost from storage-plugin-browser's precise backend subentries; this package does not depend on concrete storage-plugin-browser runtime values.
 
 ### Shared options and synchronous callbacks
 

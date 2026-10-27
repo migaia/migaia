@@ -145,7 +145,7 @@ describe('V2 capability contracts', () => {
     for (const moduleName of ['secondary-index.ts', 'change-feed.ts']) {
       const source = readFileSync(resolve(sourceRoot, moduleName), 'utf8')
       expect(source).not.toMatch(
-        /from ['"](?:@migaia\/(?:storage-web|reactive|store)|node:|(?:idb|dom))/i
+        /from ['"](?:@migaia\/(?:storage-plugin-browser|reactive|store)|node:|(?:idb|dom))/i
       )
       expect(source).not.toMatch(/\b(?:IDBDatabase|IDBIndex|AbortSignal|BroadcastChannel|NodeJS)\b/)
     }

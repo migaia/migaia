@@ -152,7 +152,7 @@ close database
 | 包                                                          | 用来做什么                                                       |
 | ----------------------------------------------------------- | ---------------------------------------------------------------- |
 | [`storage-contract`](./packages/storage-contract/README.md) | 为键值和记录存储定义统一接口，让应用可以接入不同存储后端。       |
-| [`storage-web`](./packages/storage-web/README.md)           | 通过统一接口读写 Web Storage、cookie、IndexedDB 和内存中的数据。 |
+| [`storage-plugin-browser`](./packages/storage-plugin-browser/README.md)           | 通过统一接口读写 Web Storage、cookie、IndexedDB 和内存中的数据。 |
 | [`serialize`](./packages/serialize/README.md)               | 把应用数据编码为可存储或传输的格式，并在读取时解码。             |
 | [`wasm`](./packages/wasm/README.md)                         | 分配可复用的字节缓冲区，并在 JSON 与 MessagePack 之间转码。      |
 
@@ -193,7 +193,7 @@ RPC（远程过程调用）让你像调用本地函数一样调用另一个线�
 
 ```text
 应用集成          micro-hub   tray
-状态与存储适配     store-*     storage-web
+状态与存储适配     store-*     storage-plugin-browser
 RPC              rpc-host + rpc-plugin-{process,thread,browser,coroutines,pool,devtools}
 插件与开关         plugin-host   capability
 通用基础          reactive   resource   serialize   storage-contract   supervision

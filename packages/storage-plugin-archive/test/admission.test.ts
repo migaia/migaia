@@ -1,6 +1,6 @@
 import { it, expect } from 'vitest'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
-import { indexedDbBackendPlugin } from '@migaia/storage-web/indexed-db'
+import { indexedDbBackendPlugin } from '@migaia/storage-plugin-browser/indexed-db'
 import { createStorageHost, memoryBackendPlugin, definePlugin } from '@migaia/storage-host'
 import { archivePlugin } from '../src/index.js'
 

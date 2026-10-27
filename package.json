@@ -27,7 +27,7 @@
     "@logger": "pnpm --filter ./packages/logger run",
     "@event-subscriber": "pnpm --filter ./packages/event-subscriber run",
     "@plugin-host": "pnpm --filter ./packages/plugin-host run",
-    "@storage-web": "pnpm --filter ./packages/storage-web run",
+    "@storage-plugin-browser": "pnpm --filter ./packages/storage-plugin-browser run",
     "@capability": "pnpm --filter ./packages/capability run",
     "@lifecycle": "pnpm --filter ./packages/lifecycle run",
     "@middleware-pipeline": "pnpm --filter ./packages/middleware-pipeline run",

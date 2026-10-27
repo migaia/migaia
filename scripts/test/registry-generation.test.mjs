@@ -595,7 +595,7 @@ test('source domains agreed runtime domain inventory', () => {
   /** These are main's only exempt declarations; derive their sources through the real parser. */
   const deferredFiles = [
     'packages/storage-contract/src/error-code.ts',
-    'packages/storage-web/src/error-code.ts'
+    'packages/storage-plugin-browser/src/error-code.ts'
   ]
   /** A separate parser root preserves path-based exemption without guessing source spellings. */
   const root = fixture()

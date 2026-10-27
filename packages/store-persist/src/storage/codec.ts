@@ -70,7 +70,7 @@ function observeCodec(
 /**
  * Provides the default JSON codec with round-trip support for `Map` and `Set`. It delegates to the
  * canonical collections codec through `fromValueCodec`. The package does not depend on concrete
- * `@migaia/storage-web` values. Encodes the whole supplied value rather than validating an
+ * `@migaia/storage-plugin-browser` values. Encodes the whole supplied value rather than validating an
  * envelope. Encoding failures reject with ENCODE_FAILED and cause; non-string or invalid decoding
  * rejects with ENVELOPE_INVALID. Old collection markers and tuples remain ordinary data. The
  * canonical portable value-domain rejects non-finite numbers and other invalid values.
@@ -110,7 +110,7 @@ export const defaultJsonCodec: ICodec = Object.freeze({
 /**
  * 选路：codec.output 与后端 capabilities 是否匹配，决定编码后的值往 text 通道还是 bytes 通道落地。
  *
- * 只覆盖 text/binary 两种 output——`structured` 需要 storage-web L1 `IRecordStore` 的
+ * 只覆盖 text/binary 两种 output——`structured` 需要 storage-plugin-browser L1 `IRecordStore` 的
  * `putRecord`/`getRecord`，这个最小 `IPersistStorage` 形状不声明这两个方法， 传入 structured codec 会在写入时明确抛错，而不是静默按
  * text 处理。
  */

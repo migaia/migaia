@@ -32,7 +32,7 @@
 pnpm add @migaia/micro-hub
 ```
 
-需要共享异步值时再装可选 peer `@migaia/resource`；持久化需要一个存储后端，例如 `@migaia/storage-web`。
+需要共享异步值时再装可选 peer `@migaia/resource`；持久化需要一个存储后端，例如 `@migaia/storage-plugin-browser`。
 
 ### Module Federation 配置
 
@@ -75,7 +75,7 @@ import { createMicroHub } from '@migaia/micro-hub'
 import { events } from '@migaia/micro-hub/events'
 import { state } from '@migaia/micro-hub/state'
 import { persist } from '@migaia/micro-hub/persist'
-import { localStorageHost } from '@migaia/storage-web/local-storage'
+import { localStorageHost } from '@migaia/storage-plugin-browser/local-storage'
 
 createMicroHub({
   plugins: [events(), state(), persist({ store: localStorageHost({ namespace: 'shop' }) })]

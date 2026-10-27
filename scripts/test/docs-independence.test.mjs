@@ -135,7 +135,7 @@ test('scans tracked test and script sources', () => {
       violations.push(`${path}:scripts.${name} ${value}`)
   }
   assert.deepEqual(violations, [], violations.join('\n'))
-  assert.ok(!paths.includes('packages/storage-web/test/reconcile-error-registry.mjs'))
+  assert.ok(!paths.includes('packages/storage-plugin-browser/test/reconcile-error-registry.mjs'))
 })
 
 /** Explicit refs keep unrelated earlier production changes out of this preserve check. */

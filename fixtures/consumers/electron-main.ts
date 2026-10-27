@@ -1,4 +1,4 @@
-// @migaia/storage-web 故意不在这里引入：web-only 包，Electron 主进程是
+// @migaia/storage-plugin-browser 故意不在这里引入：web-only 包，Electron 主进程是
 // Node 环境，没有 localStorage/document.cookie/IndexedDB。渲染进程见
 // electron-renderer.ts。
 import { PluginHost } from '@migaia/plugin-host'

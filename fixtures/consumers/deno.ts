@@ -1,4 +1,4 @@
-// @migaia/storage-web 故意不在这里引入：web-only 包，Deno 没有 localStorage/
+// @migaia/storage-plugin-browser 故意不在这里引入：web-only 包，Deno 没有 localStorage/
 // document.cookie/IndexedDB 这套浏览器全局对象。
 import { PluginHost } from '@migaia/plugin-host'
 

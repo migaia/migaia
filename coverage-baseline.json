@@ -464,7 +464,7 @@
         "pct": 84.09
       }
     },
-    "storage-web": {
+    "storage-plugin-browser": {
       "lines": {
         "covered": 4096,
         "total": 4425,
@@ -21190,7 +21190,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/backends/batch.ts": {
+    "packages/storage-plugin-browser/src/backends/batch.ts": {
       "lines": {
         "covered": 46,
         "total": 47,
@@ -21212,7 +21212,7 @@
         "pct": 84
       }
     },
-    "packages/storage-web/src/backends/construction.ts": {
+    "packages/storage-plugin-browser/src/backends/construction.ts": {
       "lines": {
         "covered": 5,
         "total": 5,
@@ -21234,7 +21234,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/backends/cookie.ts": {
+    "packages/storage-plugin-browser/src/backends/cookie.ts": {
       "lines": {
         "covered": 238,
         "total": 267,
@@ -21256,7 +21256,7 @@
         "pct": 85.47
       }
     },
-    "packages/storage-web/src/backends/errors.ts": {
+    "packages/storage-plugin-browser/src/backends/errors.ts": {
       "lines": {
         "covered": 18,
         "total": 24,
@@ -21278,7 +21278,7 @@
         "pct": 14.28
       }
     },
-    "packages/storage-web/src/backends/execution.ts": {
+    "packages/storage-plugin-browser/src/backends/execution.ts": {
       "lines": {
         "covered": 30,
         "total": 30,
@@ -21300,7 +21300,7 @@
         "pct": 89.28
       }
     },
-    "packages/storage-web/src/backends/index.ts": {
+    "packages/storage-plugin-browser/src/backends/index.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -21322,7 +21322,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/backends/indexed-db-assembly.ts": {
+    "packages/storage-plugin-browser/src/backends/indexed-db-assembly.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -21344,7 +21344,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/backends/indexed-db-base-access.ts": {
+    "packages/storage-plugin-browser/src/backends/indexed-db-base-access.ts": {
       "lines": {
         "covered": 30,
         "total": 52,
@@ -21366,7 +21366,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/backends/indexed-db-batch-assembly.ts": {
+    "packages/storage-plugin-browser/src/backends/indexed-db-batch-assembly.ts": {
       "lines": {
         "covered": 80,
         "total": 80,
@@ -21388,7 +21388,7 @@
         "pct": 96.15
       }
     },
-    "packages/storage-web/src/backends/indexed-db-change-feed-assembly.ts": {
+    "packages/storage-plugin-browser/src/backends/indexed-db-change-feed-assembly.ts": {
       "lines": {
         "covered": 8,
         "total": 8,
@@ -21410,7 +21410,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/backends/indexed-db-coordination.ts": {
+    "packages/storage-plugin-browser/src/backends/indexed-db-coordination.ts": {
       "lines": {
         "covered": 151,
         "total": 175,
@@ -21432,7 +21432,7 @@
         "pct": 75.33
       }
     },
-    "packages/storage-web/src/backends/indexed-db-deadline-metadata.ts": {
+    "packages/storage-plugin-browser/src/backends/indexed-db-deadline-metadata.ts": {
       "lines": {
         "covered": 37,
         "total": 39,
@@ -21454,7 +21454,7 @@
         "pct": 84.21
       }
     },
-    "packages/storage-web/src/backends/indexed-db-images.ts": {
+    "packages/storage-plugin-browser/src/backends/indexed-db-images.ts": {
       "lines": {
         "covered": 70,
         "total": 78,
@@ -21476,7 +21476,7 @@
         "pct": 85.71
       }
     },
-    "packages/storage-web/src/backends/indexed-db-indexes-assembly.ts": {
+    "packages/storage-plugin-browser/src/backends/indexed-db-indexes-assembly.ts": {
       "lines": {
         "covered": 522,
         "total": 539,
@@ -21498,7 +21498,7 @@
         "pct": 88.83
       }
     },
-    "packages/storage-web/src/backends/indexed-db-journal-assembly.ts": {
+    "packages/storage-plugin-browser/src/backends/indexed-db-journal-assembly.ts": {
       "lines": {
         "covered": 76,
         "total": 85,
@@ -21520,7 +21520,7 @@
         "pct": 85.45
       }
     },
-    "packages/storage-web/src/backends/indexed-db-journal.ts": {
+    "packages/storage-plugin-browser/src/backends/indexed-db-journal.ts": {
       "lines": {
         "covered": 32,
         "total": 38,
@@ -21542,7 +21542,7 @@
         "pct": 75
       }
     },
-    "packages/storage-web/src/backends/indexed-db-keyset-assembly.ts": {
+    "packages/storage-plugin-browser/src/backends/indexed-db-keyset-assembly.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -21564,7 +21564,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/backends/indexed-db-locks.ts": {
+    "packages/storage-plugin-browser/src/backends/indexed-db-locks.ts": {
       "lines": {
         "covered": 21,
         "total": 21,
@@ -21586,7 +21586,7 @@
         "pct": 87.5
       }
     },
-    "packages/storage-web/src/backends/indexed-db-notifications-assembly.ts": {
+    "packages/storage-plugin-browser/src/backends/indexed-db-notifications-assembly.ts": {
       "lines": {
         "covered": 28,
         "total": 28,
@@ -21608,7 +21608,7 @@
         "pct": 95.83
       }
     },
-    "packages/storage-web/src/backends/indexed-db-revisions.ts": {
+    "packages/storage-plugin-browser/src/backends/indexed-db-revisions.ts": {
       "lines": {
         "covered": 24,
         "total": 26,
@@ -21630,7 +21630,7 @@
         "pct": 90.47
       }
     },
-    "packages/storage-web/src/backends/indexed-db-transaction.ts": {
+    "packages/storage-plugin-browser/src/backends/indexed-db-transaction.ts": {
       "lines": {
         "covered": 107,
         "total": 115,
@@ -21652,7 +21652,7 @@
         "pct": 81.25
       }
     },
-    "packages/storage-web/src/backends/indexed-db-ttl-assembly.ts": {
+    "packages/storage-plugin-browser/src/backends/indexed-db-ttl-assembly.ts": {
       "lines": {
         "covered": 51,
         "total": 52,
@@ -21674,7 +21674,7 @@
         "pct": 77.77
       }
     },
-    "packages/storage-web/src/backends/indexed-db-ttl.ts": {
+    "packages/storage-plugin-browser/src/backends/indexed-db-ttl.ts": {
       "lines": {
         "covered": 97,
         "total": 100,
@@ -21696,7 +21696,7 @@
         "pct": 92.1
       }
     },
-    "packages/storage-web/src/backends/indexed-db.ts": {
+    "packages/storage-plugin-browser/src/backends/indexed-db.ts": {
       "lines": {
         "covered": 1216,
         "total": 1311,
@@ -21718,7 +21718,7 @@
         "pct": 86.61
       }
     },
-    "packages/storage-web/src/backends/local-storage.ts": {
+    "packages/storage-plugin-browser/src/backends/local-storage.ts": {
       "lines": {
         "covered": 7,
         "total": 7,
@@ -21740,7 +21740,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/backends/native-value-write.ts": {
+    "packages/storage-plugin-browser/src/backends/native-value-write.ts": {
       "lines": {
         "covered": 33,
         "total": 34,
@@ -21762,7 +21762,7 @@
         "pct": 79.16
       }
     },
-    "packages/storage-web/src/backends/organizations.ts": {
+    "packages/storage-plugin-browser/src/backends/organizations.ts": {
       "lines": {
         "covered": 23,
         "total": 23,
@@ -21784,7 +21784,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/backends/session-storage.ts": {
+    "packages/storage-plugin-browser/src/backends/session-storage.ts": {
       "lines": {
         "covered": 7,
         "total": 7,
@@ -21806,7 +21806,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/backends/text-redo.ts": {
+    "packages/storage-plugin-browser/src/backends/text-redo.ts": {
       "lines": {
         "covered": 199,
         "total": 209,
@@ -21828,7 +21828,7 @@
         "pct": 85.52
       }
     },
-    "packages/storage-web/src/backends/web-storage-events.ts": {
+    "packages/storage-plugin-browser/src/backends/web-storage-events.ts": {
       "lines": {
         "covered": 10,
         "total": 17,
@@ -21850,7 +21850,7 @@
         "pct": 87.5
       }
     },
-    "packages/storage-web/src/backends/web-storage.ts": {
+    "packages/storage-plugin-browser/src/backends/web-storage.ts": {
       "lines": {
         "covered": 205,
         "total": 227,
@@ -21872,7 +21872,7 @@
         "pct": 82.75
       }
     },
-    "packages/storage-web/src/constants.ts": {
+    "packages/storage-plugin-browser/src/constants.ts": {
       "lines": {
         "covered": 17,
         "total": 17,
@@ -21894,7 +21894,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/cookies.ts": {
+    "packages/storage-plugin-browser/src/cookies.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -21916,7 +21916,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/core/transaction.ts": {
+    "packages/storage-plugin-browser/src/core/transaction.ts": {
       "lines": {
         "covered": 0,
         "total": 3,
@@ -21938,7 +21938,7 @@
         "pct": 0
       }
     },
-    "packages/storage-web/src/error-code.ts": {
+    "packages/storage-plugin-browser/src/error-code.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -21960,7 +21960,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/error-text.ts": {
+    "packages/storage-plugin-browser/src/error-text.ts": {
       "lines": {
         "covered": 5,
         "total": 6,
@@ -21982,7 +21982,7 @@
         "pct": 50
       }
     },
-    "packages/storage-web/src/features/blobs.ts": {
+    "packages/storage-plugin-browser/src/features/blobs.ts": {
       "lines": {
         "covered": 31,
         "total": 34,
@@ -22004,7 +22004,7 @@
         "pct": 94.11
       }
     },
-    "packages/storage-web/src/features/indexed-db-assembly-feature.ts": {
+    "packages/storage-plugin-browser/src/features/indexed-db-assembly-feature.ts": {
       "lines": {
         "covered": 3,
         "total": 3,
@@ -22026,7 +22026,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/features/indexed-db-batch.ts": {
+    "packages/storage-plugin-browser/src/features/indexed-db-batch.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -22048,7 +22048,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/features/indexed-db-change-feed.ts": {
+    "packages/storage-plugin-browser/src/features/indexed-db-change-feed.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -22070,7 +22070,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/features/indexed-db-indexes.ts": {
+    "packages/storage-plugin-browser/src/features/indexed-db-indexes.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -22092,7 +22092,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/features/indexed-db-journal.ts": {
+    "packages/storage-plugin-browser/src/features/indexed-db-journal.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -22114,7 +22114,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/features/indexed-db-keyset.ts": {
+    "packages/storage-plugin-browser/src/features/indexed-db-keyset.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -22136,7 +22136,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/features/indexed-db-notifications.ts": {
+    "packages/storage-plugin-browser/src/features/indexed-db-notifications.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -22158,7 +22158,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/features/indexed-db-ttl.ts": {
+    "packages/storage-plugin-browser/src/features/indexed-db-ttl.ts": {
       "lines": {
         "covered": 1,
         "total": 1,
@@ -22180,7 +22180,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/features/reactive.ts": {
+    "packages/storage-plugin-browser/src/features/reactive.ts": {
       "lines": {
         "covered": 52,
         "total": 59,
@@ -22202,7 +22202,7 @@
         "pct": 77.35
       }
     },
-    "packages/storage-web/src/host/builtin-kinds.ts": {
+    "packages/storage-plugin-browser/src/host/builtin-kinds.ts": {
       "lines": {
         "covered": 4,
         "total": 4,
@@ -22224,7 +22224,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/host/reactive.ts": {
+    "packages/storage-plugin-browser/src/host/reactive.ts": {
       "lines": {
         "covered": 289,
         "total": 322,
@@ -22246,7 +22246,7 @@
         "pct": 81.95
       }
     },
-    "packages/storage-web/src/host/state-constants.ts": {
+    "packages/storage-plugin-browser/src/host/state-constants.ts": {
       "lines": {
         "covered": 4,
         "total": 4,
@@ -22268,7 +22268,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/host/types.ts": {
+    "packages/storage-plugin-browser/src/host/types.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -22290,7 +22290,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/indexed-db.ts": {
+    "packages/storage-plugin-browser/src/indexed-db.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -22312,7 +22312,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/local-storage.ts": {
+    "packages/storage-plugin-browser/src/local-storage.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -22334,7 +22334,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/plugins/builtin-factory.ts": {
+    "packages/storage-plugin-browser/src/plugins/builtin-factory.ts": {
       "lines": {
         "covered": 18,
         "total": 19,
@@ -22356,7 +22356,7 @@
         "pct": 69.23
       }
     },
-    "packages/storage-web/src/plugins/cookies.ts": {
+    "packages/storage-plugin-browser/src/plugins/cookies.ts": {
       "lines": {
         "covered": 3,
         "total": 3,
@@ -22378,7 +22378,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/plugins/indexed-db.ts": {
+    "packages/storage-plugin-browser/src/plugins/indexed-db.ts": {
       "lines": {
         "covered": 36,
         "total": 36,
@@ -22400,7 +22400,7 @@
         "pct": 94.11
       }
     },
-    "packages/storage-web/src/plugins/local-storage.ts": {
+    "packages/storage-plugin-browser/src/plugins/local-storage.ts": {
       "lines": {
         "covered": 3,
         "total": 3,
@@ -22422,7 +22422,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/plugins/session-storage.ts": {
+    "packages/storage-plugin-browser/src/plugins/session-storage.ts": {
       "lines": {
         "covered": 3,
         "total": 3,
@@ -22444,7 +22444,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/session-storage.ts": {
+    "packages/storage-plugin-browser/src/session-storage.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -22466,7 +22466,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/types/capabilities.ts": {
+    "packages/storage-plugin-browser/src/types/capabilities.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -22488,7 +22488,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/types/context.ts": {
+    "packages/storage-plugin-browser/src/types/context.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -22510,7 +22510,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/types/cookie.ts": {
+    "packages/storage-plugin-browser/src/types/cookie.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -22532,7 +22532,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/types/errors.ts": {
+    "packages/storage-plugin-browser/src/types/errors.ts": {
       "lines": {
         "covered": 25,
         "total": 27,
@@ -22554,7 +22554,7 @@
         "pct": 44.44
       }
     },
-    "packages/storage-web/src/types/index.ts": {
+    "packages/storage-plugin-browser/src/types/index.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -22576,7 +22576,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/types/storage.ts": {
+    "packages/storage-plugin-browser/src/types/storage.ts": {
       "lines": {
         "covered": 0,
         "total": 0,
@@ -22598,7 +22598,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/utils/availability.ts": {
+    "packages/storage-plugin-browser/src/utils/availability.ts": {
       "lines": {
         "covered": 19,
         "total": 20,
@@ -22620,7 +22620,7 @@
         "pct": 85.71
       }
     },
-    "packages/storage-web/src/utils/cookie-string.ts": {
+    "packages/storage-plugin-browser/src/utils/cookie-string.ts": {
       "lines": {
         "covered": 39,
         "total": 39,
@@ -22642,7 +22642,7 @@
         "pct": 96.66
       }
     },
-    "packages/storage-web/src/utils/idb-request.ts": {
+    "packages/storage-plugin-browser/src/utils/idb-request.ts": {
       "lines": {
         "covered": 69,
         "total": 71,
@@ -22664,7 +22664,7 @@
         "pct": 76.19
       }
     },
-    "packages/storage-web/src/utils/key.ts": {
+    "packages/storage-plugin-browser/src/utils/key.ts": {
       "lines": {
         "covered": 73,
         "total": 74,
@@ -22686,7 +22686,7 @@
         "pct": 93.75
       }
     },
-    "packages/storage-web/src/utils/quota.ts": {
+    "packages/storage-plugin-browser/src/utils/quota.ts": {
       "lines": {
         "covered": 10,
         "total": 10,
@@ -22708,7 +22708,7 @@
         "pct": 100
       }
     },
-    "packages/storage-web/src/utils/storage-iterator.ts": {
+    "packages/storage-plugin-browser/src/utils/storage-iterator.ts": {
       "lines": {
         "covered": 13,
         "total": 15,
