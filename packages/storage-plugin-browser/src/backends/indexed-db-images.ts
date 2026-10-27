@@ -18,12 +18,12 @@ import {
 } from '@migaia/storage-host/sdk'
 import {
   StorageError as JournalError,
-  StorageErrorCode as JournalErrorCode,
   StorageErrorText as JournalErrorText,
   type IStorageJournalChange,
   type IStorageJournalImage,
   type IStorageJournalTarget
 } from '@migaia/storage-host'
+import { StorageHostErrorCode as JournalErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageBackend } from '../constants.js'
 /** Original physical channels retain their native store names and public lock identities. */
 export type IIndexedDbImageChannel = 'value' | 'bytes' | 'record'

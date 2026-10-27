@@ -2,7 +2,8 @@ import type { IAbortSignal } from '@migaia/utils/promise'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import { isStorageErrorFamily, type IStorageErrorFamily } from '../backends/errors.js'
 import type { IStorageOperationRuntime } from '@migaia/storage-host/sdk'
-import { StorageError, StorageErrorCode } from '../types/errors.js'
+import { StorageError } from '../types/errors.js'
+import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import { normalizeStorageException } from './quota.js'
 import { readAbortReason } from '@migaia/storage-host/sdk'
 import { assertOperationContext } from '@migaia/storage-contract'
@@ -25,8 +26,8 @@ export type IIdbOperationContext = { readonly signal?: IAbortSignal }
 
 const normalizeTransactionAbort = (error: unknown): StorageError | StorageContractError => {
   const normalized = normalizeStorageException(error, StorageBackend.indexedDb)
-  if (normalized.code === StorageErrorCode.quotaExceeded) return normalized
-  return new StorageError(StorageErrorCode.transactionFailed, {
+  if (normalized.code === StorageBrowserErrorCode.quotaExceeded) return normalized
+  return new StorageError(StorageBrowserErrorCode.transactionFailed, {
     backend: StorageBackend.indexedDb,
     cause: error
   })
@@ -35,9 +36,9 @@ const normalizeTransactionAbort = (error: unknown): StorageError | StorageContra
 export const normalizeIdbRequestFailure = (error: unknown): IStorageErrorFamily => {
   if (isStorageErrorFamily(error)) return error
   const normalized = normalizeStorageException(error, StorageBackend.indexedDb)
-  return normalized.code === StorageErrorCode.quotaExceeded
+  return normalized.code === StorageBrowserErrorCode.quotaExceeded
     ? normalized
-    : new StorageError(StorageErrorCode.transactionFailed, {
+    : new StorageError(StorageBrowserErrorCode.transactionFailed, {
         backend: StorageBackend.indexedDb,
         cause: error
       })
@@ -247,7 +248,7 @@ function observeIdbCommitFailure(commitState: IIdbCommitState, event: Event | un
     target !== undefined && target !== null && target !== commitState.transaction
       ? readIdbRequestError(target as IDBRequest)
       : readIdbTransactionError(commitState.transaction)
-  commitState.firstFailure ??= new StorageError(StorageErrorCode.transactionFailed, {
+  commitState.firstFailure ??= new StorageError(StorageBrowserErrorCode.transactionFailed, {
     backend: StorageBackend.indexedDb,
     cause
   })

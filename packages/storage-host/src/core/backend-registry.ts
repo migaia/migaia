@@ -16,7 +16,8 @@ import {
 import { snapshotRecordStore, snapshotKeyValueStoreDetailed } from '../authoring/store.js'
 import { assertTransactionOwner } from '../authoring/transaction.js'
 import { hasStorageCapability, useStorageCapability } from '../authoring/capability.js'
-import { StorageError, StorageErrorCode } from '../errors.js'
+import { StorageError } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import type { IStorageEnvelopeStages } from '../types.js'
 
 import type { IBackendChangeController, IBackendLifecycleController } from './change-types.js'
@@ -299,7 +300,7 @@ export const getBackendEntityQueryMethods = (store: object): object | undefined 
   for (const binding of controllerRegistry.get(store)?.envelopes ?? []) {
     const selected = binding.queryMethods?.()
     if (selectedBinding && methods !== selected)
-      throw new StorageError(StorageErrorCode.invalidConfig)
+      throw new StorageError(StorageHostErrorCode.invalidConfig)
     methods = selected
     selectedBinding = true
   }

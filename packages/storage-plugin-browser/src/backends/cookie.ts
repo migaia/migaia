@@ -36,7 +36,8 @@ import {
   serializeCookieAssignment,
   serializeCookieRemoval
 } from '../utils/cookie-string.js'
-import { StorageError, StorageErrorCode, createStorageTypeError } from '../types/errors.js'
+import { StorageError, createStorageTypeError } from '../types/errors.js'
+import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.js'
 import { normalizeStorageException } from '../utils/quota.js'
 import { StorageBackend, StorageOperation, storageBackendOperation } from '../constants.js'
@@ -140,7 +141,7 @@ const snapshotCookieWriteContext = (
  */
 function snapshotCookieScope(scope: unknown): ICookieScope {
   if (typeof scope !== 'object' || scope === null || Array.isArray(scope)) {
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.cookie,
       cause: new TypeError('cookie scope must be an object')
     })
@@ -155,17 +156,17 @@ function snapshotCookieScope(scope: unknown): ICookieScope {
     (secure !== undefined && typeof secure !== 'boolean') ||
     (partitioned !== undefined && typeof partitioned !== 'boolean')
   )
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.cookie,
       cause: new TypeError('cookie scope contains an invalid attribute')
     })
   if (sameSite === 'none' && !secure)
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.cookie,
       cause: new TypeError('SameSite=None requires Secure')
     })
   if (partitioned && !secure)
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.cookie,
       cause: new TypeError('Partitioned requires Secure')
     })
@@ -276,7 +277,7 @@ function configureCookieNamespace(cookieContext: ICookieContext): void {
   /** Constructor admission consumes fields synchronously; native state below owns later work. */
   const options = cookieContext.options
   if (options === null || typeof options !== 'object' || Array.isArray(options))
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.cookie,
       cause: new TypeError('cookie options must be an object')
     })
@@ -288,7 +289,7 @@ function configureCookieNamespace(cookieContext: ICookieContext): void {
       backend: StorageBackend.cookie
     })
   if (typeof namespace !== 'string' || namespace.length === 0)
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.cookie,
       cause: new TypeError('namespace must be non-empty and namespaceCodec must be callable')
     })
@@ -308,13 +309,13 @@ function configureCookieNamespace(cookieContext: ICookieContext): void {
       ? (globalThis as { document?: ICookieDocument }).document
       : options.document
   if (documentCandidate === undefined)
-    throw new StorageError(StorageErrorCode.unavailable, { backend: StorageBackend.cookie })
+    throw new StorageError(StorageBrowserErrorCode.unavailable, { backend: StorageBackend.cookie })
   if (
     typeof documentCandidate !== 'object' ||
     documentCandidate === null ||
     Array.isArray(documentCandidate)
   )
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.cookie,
       cause: new TypeError('cookie document must expose a string cookie property')
     })
@@ -323,13 +324,13 @@ function configureCookieNamespace(cookieContext: ICookieContext): void {
   try {
     initialCookie = documentCandidate.cookie
   } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.cookie,
       cause
     })
   }
   if (typeof initialCookie !== 'string')
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.cookie,
       cause: new TypeError('cookie document must expose a string cookie property')
     })
@@ -441,12 +442,12 @@ function readCookie(cookieContext: ICookieContext, operation: string, key?: ISto
     const value: unknown = cookieContext.doc.cookie
     if (typeof value !== 'string')
       throw createStorageTypeError(
-        StorageErrorCode.unavailable,
+        StorageBrowserErrorCode.unavailable,
         StorageErrorText.cookieDocumentBecameInvalid
       )
     return value
   } catch (cause) {
-    throw new StorageError(StorageErrorCode.unavailable, {
+    throw new StorageError(StorageBrowserErrorCode.unavailable, {
       backend: StorageBackend.cookie,
       key,
       operation,
@@ -465,7 +466,7 @@ function writeCookie(
   try {
     cookieContext.doc.cookie = value
   } catch (cause) {
-    throw new StorageError(StorageErrorCode.writeFailed, {
+    throw new StorageError(StorageBrowserErrorCode.writeFailed, {
       backend: StorageBackend.cookie,
       key,
       operation,
@@ -497,7 +498,7 @@ function namespacedEntries(
     )
     if (stripped === undefined) continue
     if (seenPhysicalKeys.has(rawKey))
-      throw new StorageError(StorageErrorCode.cookieScopeAmbiguous, {
+      throw new StorageError(StorageBrowserErrorCode.cookieScopeAmbiguous, {
         backend: StorageBackend.cookie,
         key: stripped,
         operation,
@@ -526,7 +527,7 @@ function readVisibleCookie(
     visible = value
   }
   if (matches > 1)
-    throw new StorageError(StorageErrorCode.cookieScopeAmbiguous, {
+    throw new StorageError(StorageBrowserErrorCode.cookieScopeAmbiguous, {
       backend: StorageBackend.cookie,
       key: logicalKey,
       operation,
@@ -606,7 +607,7 @@ function prepareCookie(
   const context = ctx
   snapshotSyncWriteOptions(context)
   if (typeof value !== 'string')
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.cookie,
       key,
       cause: new TypeError(StorageErrorText.cookieValueInvalid)
@@ -623,13 +624,13 @@ function prepareCookie(
   const maxAge = context?.maxAge
   const expires = context?.expires
   if (maxAge !== undefined && !Number.isSafeInteger(maxAge))
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.cookie,
       key,
       cause: new RangeError(StorageErrorText.cookieMaxAgeInvalid)
     })
   if (expires !== undefined && (typeof expires !== 'object' || expires === null))
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.cookie,
       key,
       cause: new RangeError(StorageErrorText.cookieExpiresInvalid)
@@ -640,14 +641,14 @@ function prepareCookie(
     expiresTime =
       expires === undefined ? undefined : ((expires as { getTime(): unknown }).getTime() as number)
   } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.cookie,
       key,
       cause
     })
   }
   if (expiresTime !== undefined && !Number.isFinite(expiresTime))
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.cookie,
       key,
       cause: new RangeError(StorageErrorText.cookieExpiresInvalid)
@@ -691,13 +692,13 @@ function prepareCookie(
         return
       }
       if (visible !== undefined)
-        throw new StorageError(StorageErrorCode.cookieScopeAmbiguous, {
+        throw new StorageError(StorageBrowserErrorCode.cookieScopeAmbiguous, {
           backend: StorageBackend.cookie,
           key,
           operation: StorageOperation.cookieSet,
           cause: new Error(StorageErrorText.cookieRedoScopeMismatch)
         })
-      throw new StorageError(StorageErrorCode.writeFailed, {
+      throw new StorageError(StorageBrowserErrorCode.writeFailed, {
         backend: StorageBackend.cookie,
         key,
         operation: StorageOperation.cookieSet,
@@ -823,7 +824,7 @@ function readCookieBatch(
     }
     const key = physical[index]!
     if (ambiguous.has(key))
-      throw new StorageError(StorageErrorCode.cookieScopeAmbiguous, {
+      throw new StorageError(StorageBrowserErrorCode.cookieScopeAmbiguous, {
         backend: StorageBackend.cookie,
         key: entry.key,
         operation

@@ -10,7 +10,8 @@ import {
 import { inspectFeatures } from '@migaia/plugin-host/composition'
 import type { IStorageBase } from '@migaia/storage-contract'
 import type { IScheduler } from '@migaia/utils/scheduler'
-import { createStorageTypeError, StorageErrorCode } from './errors.js'
+import { createStorageTypeError } from './errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { installStorageFeatures, type IStorageFeatureProjection } from './feature-install.js'
 import { pluginNameFromBackendId } from './names.js'
 import {
@@ -153,7 +154,7 @@ function requireTargets(target: unknown): readonly object[] {
     selected.some((kind) => typeof kind !== 'object' || kind === null || !kinds.has(kind))
   )
     throw createStorageTypeError(
-      StorageErrorCode.backendKindMismatch,
+      StorageHostErrorCode.backendKindMismatch,
       StorageErrorText.backendKindMismatch
     )
   return [...selected]
@@ -171,7 +172,7 @@ export const defineFeature: IStorageDefineFeature = ((
     const expected = featureTargets.get(dependency)
     if (expected === undefined || selected.some((kind) => !expected.includes(kind)))
       throw createStorageTypeError(
-        StorageErrorCode.backendKindMismatch,
+        StorageHostErrorCode.backendKindMismatch,
         StorageErrorText.backendKindMismatch
       )
   }
@@ -369,7 +370,7 @@ function registerStorageTransfer(
 ): void {
   if (context.transferred)
     throw createStorageTypeError(
-      StorageErrorCode.backendPluginInvalid,
+      StorageHostErrorCode.backendPluginInvalid,
       StorageErrorText.backendPluginInvalid
     )
   if (!context.transferActive) {
@@ -378,7 +379,7 @@ function registerStorageTransfer(
       context.nativeCore.registerStore(store)
     }
     throw createStorageTypeError(
-      StorageErrorCode.backendPluginInvalid,
+      StorageHostErrorCode.backendPluginInvalid,
       StorageErrorText.backendPluginInvalid
     )
   }
@@ -401,7 +402,7 @@ function captureStorageDescriptor(
       (!('value' in property) || (key !== 'kind' && typeof property.value !== 'function'))
     )
       throw createStorageTypeError(
-        StorageErrorCode.backendPluginInvalid,
+        StorageHostErrorCode.backendPluginInvalid,
         StorageErrorText.backendPluginInvalid
       )
     metadata[key] = property?.value
@@ -420,7 +421,7 @@ function captureStorageDescriptor(
 function assertStorageFeatureTargets(context: IStorageNativeDescriptorContext): void {
   if (context.kind !== undefined && !kinds.has(context.kind))
     throw createStorageTypeError(
-      StorageErrorCode.backendKindMismatch,
+      StorageHostErrorCode.backendKindMismatch,
       StorageErrorText.backendKindMismatch
     )
   for (const feature of context.registration.definition.plan?.ordered ?? []) {
@@ -432,7 +433,7 @@ function assertStorageFeatureTargets(context: IStorageNativeDescriptorContext): 
         : expected !== undefined
     )
       throw createStorageTypeError(
-        StorageErrorCode.backendKindMismatch,
+        StorageHostErrorCode.backendKindMismatch,
         StorageErrorText.backendKindMismatch
       )
   }
@@ -462,7 +463,7 @@ async function finishStorageNativeInstall(
   const extensions = install === undefined ? {} : await install()
   if (context.kind !== undefined && !context.registration.transferred)
     throw createStorageTypeError(
-      StorageErrorCode.backendPluginInvalid,
+      StorageHostErrorCode.backendPluginInvalid,
       StorageErrorText.backendPluginInvalid
     )
   if (context.kind !== undefined && context.journalBinding !== undefined) {
@@ -541,7 +542,7 @@ function projectStorageNativeFeatureExpose(
     STORAGE_RESERVED_EXPOSE.some((key) => key in expose)
   )
     throw createStorageTypeError(
-      StorageErrorCode.backendPluginInvalid,
+      StorageHostErrorCode.backendPluginInvalid,
       StorageErrorText.backendPluginInvalid
     )
   /** Lazy reads preserve pre-Feature initialization and later registration expiry semantics. */
@@ -572,7 +573,7 @@ export const readStorageNativePluginDefinition = (plugin: object) =>
 export const assertStorageBackendId: (id: unknown) => asserts id is string = (id) => {
   if (typeof id !== 'string' || !/^[A-Za-z][A-Za-z0-9._-]{0,63}$/.test(id))
     throw createStorageTypeError(
-      StorageErrorCode.backendIdInvalid,
+      StorageHostErrorCode.backendIdInvalid,
       StorageErrorText.backendIdInvalid
     )
 }

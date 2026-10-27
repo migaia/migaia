@@ -17,7 +17,8 @@ import {
 import { raceWithAbort, type IAbortSignal } from '@migaia/utils/promise'
 import { subscribeToAbort } from './errors.js'
 import type { IStorageErrorFamily } from './errors.js'
-import { StorageErrorCode, createStorageAggregateError } from '../types/errors.js'
+import { createStorageAggregateError } from '../types/errors.js'
+import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.js'
 import { StorageBackend } from '../constants.js'
 import {
@@ -224,7 +225,7 @@ export async function runNativeIndexedDbTransaction<
     )
     if (attemptState.cleanupFailures.length > 0)
       throw createStorageAggregateError(
-        StorageErrorCode.transactionFailed,
+        StorageBrowserErrorCode.transactionFailed,
         attemptState.primary?.message ?? StorageErrorText.indexedDbTransactionEndedEarly,
         [attemptState.primary, ...attemptState.cleanupFailures]
       )

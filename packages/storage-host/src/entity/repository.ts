@@ -25,7 +25,8 @@ import {
 } from '../authoring/transaction.js'
 import { lockKey } from '../authoring/concurrency.js'
 import { isStorageErrorFamily } from '../core/error-family.js'
-import { StorageError, StorageErrorCode } from '../errors.js'
+import { StorageError } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.js'
 import { readStorageHookFailureCode } from '../hooks.js'
 import { selectCodec } from '../serialize/index.js'
@@ -165,7 +166,7 @@ export class EntityRepositoryOwner<
       (this.#codecStages !== undefined && this.#codecStages.kind !== StorageStageKind.codec) ||
       (this.#queryStages !== undefined && this.#queryStages.kind !== StorageStageKind.query)
     )
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageHostErrorCode.invalidConfig, {
         backend: this.#store.backend,
         cause: new TypeError(StorageErrorText.backendKindMismatch)
       })
@@ -389,7 +390,7 @@ export class EntityRepositoryOwner<
         envelope: assertVersionedEnvelope({ version: this.#version, state: stored })
       }
     } catch (cause) {
-      throw new StorageError(StorageErrorCode.serializeFailed, { cause })
+      throw new StorageError(StorageHostErrorCode.serializeFailed, { cause })
     }
   }
 
@@ -424,7 +425,7 @@ export class EntityRepositoryOwner<
       return envelope
     } catch (cause) {
       stages?.onVersionRejected(undefined, StorageContractErrorCode.envelopeInvalid)
-      throw new StorageError(StorageErrorCode.deserializeFailed, { cause })
+      throw new StorageError(StorageHostErrorCode.deserializeFailed, { cause })
     }
   }
 
@@ -449,7 +450,7 @@ export class EntityRepositoryOwner<
       handler !== 'throw' &&
       typeof handler !== 'function'
     )
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageHostErrorCode.invalidConfig, {
         backend: this.#store.backend,
         cause: new TypeError(EntityText.oninvalidMustBeSkipThrowOrAHandler)
       })
@@ -502,12 +503,12 @@ export class EntityRepositoryOwner<
     /** Missing assembly is an operation failure, never corrupt data eligible for skipping. */
     if (
       isStorageErrorFamily(issue.cause) &&
-      issue.cause.code === StorageErrorCode.entityFeatureRequired
+      issue.cause.code === StorageHostErrorCode.entityFeatureRequired
     )
       throw issue.cause
     if (handler === undefined || handler === 'skip' || handler === 'throw') return handler ?? 'skip'
     if (typeof handler !== 'function')
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageHostErrorCode.invalidConfig, {
         backend: this.#store.backend,
         key: issue.key,
         cause: new TypeError(EntityText.oninvalidMustBeSkipThrowOrAHandler)
@@ -515,15 +516,16 @@ export class EntityRepositoryOwner<
     try {
       const action = handler(issue)
       if (action !== 'skip' && action !== 'throw')
-        throw new StorageError(StorageErrorCode.invalidConfig, {
+        throw new StorageError(StorageHostErrorCode.invalidConfig, {
           backend: this.#store.backend,
           key: issue.key,
           cause: new TypeError(EntityText.oninvalidHandlerMustReturnSkipOrThrow)
         })
       return action
     } catch (cause) {
-      if (isStorageErrorFamily(cause) && cause.code === StorageErrorCode.invalidConfig) throw cause
-      throw new StorageError(StorageErrorCode.validationFailed, {
+      if (isStorageErrorFamily(cause) && cause.code === StorageHostErrorCode.invalidConfig)
+        throw cause
+      throw new StorageError(StorageHostErrorCode.validationFailed, {
         backend: this.#store.backend,
         key: issue.key,
         cause
@@ -537,10 +539,10 @@ export class EntityRepositoryOwner<
     if (isStorageErrorFamily(issue.cause)) throw issue.cause
     const code =
       issue.stage === StorageRecordStage.migrate
-        ? StorageErrorCode.migrationFailed
+        ? StorageHostErrorCode.migrationFailed
         : issue.stage === StorageRecordStage.decode
-          ? StorageErrorCode.deserializeFailed
-          : StorageErrorCode.validationFailed
+          ? StorageHostErrorCode.deserializeFailed
+          : StorageHostErrorCode.validationFailed
     throw new StorageError(code, {
       backend: this.#store.backend,
       key: issue.key,
@@ -564,10 +566,10 @@ export class EntityRepositoryOwner<
       const stage = (cause as Partial<IStageFailure>).stage ?? StorageRecordStage.validate
       const code =
         stage === StorageRecordStage.migrate
-          ? StorageErrorCode.migrationFailed
+          ? StorageHostErrorCode.migrationFailed
           : stage === StorageRecordStage.decode
-            ? StorageErrorCode.deserializeFailed
-            : StorageErrorCode.validationFailed
+            ? StorageHostErrorCode.deserializeFailed
+            : StorageHostErrorCode.validationFailed
       throw new StorageError(code, { backend: this.#store.backend, key: id, cause })
     }
   }
@@ -793,7 +795,7 @@ export class EntityRepositoryOwner<
         binding.expectedIdentity !== undefined &&
         compareStorageKeys(id, binding.expectedIdentity) !== 0
       )
-        throw new StorageError(StorageErrorCode.invalidConfig, {
+        throw new StorageError(StorageHostErrorCode.invalidConfig, {
           backend: this.#store.backend,
           cause: new TypeError(EntityText.queryIdentityChanged)
         })
@@ -989,7 +991,7 @@ export class EntityRepositoryOwner<
   #apiBatch: IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods>['batch'] = (run, ctx) => {
     if (typeof run !== 'function')
       return Promise.reject(
-        new StorageError(StorageErrorCode.invalidConfig, {
+        new StorageError(StorageHostErrorCode.invalidConfig, {
           backend: this.#store.backend,
           cause: new TypeError(EntityText.batchCallbackMustBeAFunction)
         })

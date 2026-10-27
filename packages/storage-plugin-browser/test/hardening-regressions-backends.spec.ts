@@ -1,6 +1,9 @@
 /** Round-2 hardening regressions. Permanent. */
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
-import { STORAGE_HOST_SOURCE } from '@migaia/storage-host'
+import {
+  STORAGE_HOST_ERROR_SOURCE,
+  STORAGE_BROWSER_ERROR_SOURCE
+} from '@migaia/storage-contract/error-code'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { describe, expect, it } from 'vitest'
 import {
@@ -9,7 +12,6 @@ import {
   createLocalTestStore
 } from './helpers/installed-backends.js'
 import { fakeCookieDocument } from '../src/testing/fake-cookie-document.js'
-import { STORAGE_BROWSER_SOURCE } from '../src/index.js'
 
 /** A failed real installation must expose the browser failure without selecting a memory fallback. */
 const expectUnavailableInstallation = async (
@@ -21,9 +23,12 @@ const expectUnavailableInstallation = async (
     () => undefined,
     (cause: unknown) => cause
   )
-  expect(failure).toMatchObject({ source: STORAGE_HOST_SOURCE, code: 'BACKEND_INSTALL_FAILED' })
+  expect(failure).toMatchObject({
+    source: STORAGE_HOST_ERROR_SOURCE,
+    code: 'BACKEND_INSTALL_FAILED'
+  })
   expect(walkErrorCauses(failure)).toContainEqual(
-    expect.objectContaining({ source: STORAGE_BROWSER_SOURCE, code: 'BACKEND_UNAVAILABLE' })
+    expect.objectContaining({ source: STORAGE_BROWSER_ERROR_SOURCE, code: 'BACKEND_UNAVAILABLE' })
   )
   expect(walkErrorCauses(failure)).toContain(original)
 }

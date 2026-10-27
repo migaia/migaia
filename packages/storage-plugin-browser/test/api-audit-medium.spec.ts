@@ -1,7 +1,8 @@
 import { entityTestFeatures } from './helpers/entity-features.js'
 import { describe, expect, it } from 'vitest'
 import { lengthPrefixedNamespaceCodec } from '../src/index.js'
-import { StorageError, StorageErrorCode } from '@migaia/storage-host'
+import { StorageError } from '@migaia/storage-host'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { defineEntity } from '@migaia/storage-host/entity'
 import { fromStandardSchema } from '@migaia/storage-host/entity'
 import { createMemoryTestStore } from './helpers/installed-backends.js'
@@ -27,7 +28,7 @@ describe('storage-plugin-browser audit medium severity regressions', () => {
     const leaf = new Error('leaf')
     /** StorageError is frozen, so missing operation metadata requires a traceable wrapper. */
     const primary = new StorageError(
-      StorageErrorCode.validationFailed,
+      StorageHostErrorCode.validationFailed,
       { cause: leaf },
       'application validation message'
     )

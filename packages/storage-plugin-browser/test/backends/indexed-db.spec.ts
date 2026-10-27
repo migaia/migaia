@@ -22,8 +22,11 @@ import {
   type IRecordIndexBackfillStore
 } from '@migaia/storage-host/entity'
 import type { IKeyValueStore } from '@migaia/storage-contract'
-import { createOrgId, createStorageHost, STORAGE_HOST_SOURCE } from '@migaia/storage-host'
-import { STORAGE_BROWSER_SOURCE } from '../../src/index.js'
+import { createOrgId, createStorageHost } from '@migaia/storage-host'
+import {
+  STORAGE_HOST_ERROR_SOURCE,
+  STORAGE_BROWSER_ERROR_SOURCE
+} from '@migaia/storage-contract/error-code'
 import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
 import { UTILS_SOURCE, UtilsTimeoutError, walkErrorCauses } from '@migaia/utils/error'
 import { normalizeIndexedDbOperationError } from '../../src/backends/indexed-db.js'
@@ -44,8 +47,11 @@ const expectNativeInstallationFailure = async (
     (cause: unknown) => cause
   )
   const identity = failure as { readonly source?: unknown } | undefined
-  if (identity?.source !== STORAGE_BROWSER_SOURCE)
-    expect(failure).toMatchObject({ source: STORAGE_HOST_SOURCE, code: 'BACKEND_INSTALL_FAILED' })
+  if (identity?.source !== STORAGE_BROWSER_ERROR_SOURCE)
+    expect(failure).toMatchObject({
+      source: STORAGE_HOST_ERROR_SOURCE,
+      code: 'BACKEND_INSTALL_FAILED'
+    })
   expect(walkErrorCauses(failure)).toContainEqual(expect.objectContaining(expected))
 }
 
@@ -190,7 +196,7 @@ describe('indexedDbHost backend', () => {
         await scope.use(records).query().page(1)
       })
     ).rejects.toMatchObject({
-      source: STORAGE_BROWSER_SOURCE,
+      source: STORAGE_BROWSER_ERROR_SOURCE,
       code: 'INDEXED_DB_FEATURE_NOT_INSTALLED',
       message: expect.stringContaining('indexedDbKeysetFeature')
     })
@@ -205,7 +211,7 @@ describe('indexedDbHost backend', () => {
         await scope.set('first', 'rolled back')
         await scope.set('invalid', 42 as never)
       })
-    ).rejects.toMatchObject({ source: STORAGE_BROWSER_SOURCE, code: 'INVALID_CONFIG' })
+    ).rejects.toMatchObject({ source: STORAGE_BROWSER_ERROR_SOURCE, code: 'INVALID_CONFIG' })
     expect(await store.get('first')).toBeNull()
     expect(await store.get('invalid')).toBeNull()
   })
@@ -273,7 +279,7 @@ describe('indexedDbHost backend', () => {
       const failure: unknown = await host.dropOrg(org).catch((error: unknown) => error)
       expect(walkErrorCauses(failure)).toContainEqual(
         expect.objectContaining({
-          source: STORAGE_BROWSER_SOURCE,
+          source: STORAGE_BROWSER_ERROR_SOURCE,
           code: 'BACKEND_UNAVAILABLE',
           operation: 'indexeddb.delete',
           cause
@@ -308,7 +314,7 @@ describe('indexedDbHost backend', () => {
     })
     await store.dispose()
     await expectNativeInstallationFailure(createIndexedDbTestStore(options), {
-      source: STORAGE_BROWSER_SOURCE,
+      source: STORAGE_BROWSER_ERROR_SOURCE,
       code: 'VERSION_UNSUPPORTED',
       operation: 'indexeddb.schema'
     })
@@ -370,7 +376,11 @@ describe('indexedDbHost backend', () => {
         createStorageHost({
           plugins: [indexedDbBackendPlugin({ factory, keyRange: IDBKeyRange, dbName })]
         }),
-        { source: STORAGE_BROWSER_SOURCE, code: 'INVALID_CONFIG', operation: 'indexeddb.schema' }
+        {
+          source: STORAGE_BROWSER_ERROR_SOURCE,
+          code: 'INVALID_CONFIG',
+          operation: 'indexeddb.schema'
+        }
       )
       expect(await factory.databases()).toContainEqual({ name: dbName, version: 1 })
     }

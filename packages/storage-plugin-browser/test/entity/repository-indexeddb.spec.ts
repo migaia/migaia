@@ -5,7 +5,8 @@ import { describe, expect, it, vi } from 'vitest'
 import { defineEntity, type IRecordIndexBackfillStore } from '@migaia/storage-host/entity'
 import * as entityOwner from '@migaia/storage-host/entity'
 import { createIndexedDbTestStore } from '../helpers/installed-backends.js'
-import { StorageError, StorageErrorCode } from '../../src/types/errors'
+import { StorageError } from '../../src/types/errors'
+import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import type { IStorageKey } from '../../src/types/context'
 import { createStorageHost, definePlugin } from '@migaia/storage-host'
 import { defineConcurrencyPolicy, type ITransactionOptions } from '@migaia/storage-contract'
@@ -1308,7 +1309,7 @@ describe('repository over real indexedDbHost backend', () => {
       calls += 1
       if (calls === 2)
         return Promise.reject(
-          new StorageError(StorageErrorCode.transactionFailed, {
+          new StorageError(StorageBrowserErrorCode.transactionFailed, {
             backend: 'indexed-db',
             operation: 'transaction.commit'
           })

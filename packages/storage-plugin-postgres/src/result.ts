@@ -1,6 +1,6 @@
 import type { ISqlRow, ISqlValue } from '@migaia/storage-contract'
 import { postgresError } from './errors.js'
-import { PostgresErrorCode } from './error-code.js'
+import { PostgresErrorCode } from '@migaia/storage-contract/error-code'
 import { PostgresErrorText } from './error-text.js'
 /** PostgreSQL's fixed wire OIDs distinguish scalars that must never share a lossy JS parser. */
 const PgOid = {

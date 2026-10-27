@@ -55,7 +55,7 @@ import {
   normalizeTransactionFailure,
   sparqlError
 } from './errors.js'
-import { ERROR_SOURCE, SparqlErrorCode } from './error-code.js'
+import { STORAGE_SPARQL_ERROR_SOURCE, SparqlErrorCode } from '@migaia/storage-contract/error-code'
 import { SparqlText } from './text.js'
 import { parseSparqlResults } from './results.js'
 import { parseRdfDocument } from './ntriples.js'
@@ -170,7 +170,7 @@ function uncertain(backendContext: ISparqlBackendContext, error: unknown): Error
   const failure =
     error instanceof Error &&
     'source' in error &&
-    error.source === ERROR_SOURCE &&
+    error.source === STORAGE_SPARQL_ERROR_SOURCE &&
     'code' in error &&
     error.code === SparqlErrorCode.commitUnknown
       ? error
@@ -430,7 +430,7 @@ async function writing(
     if (
       error instanceof Error &&
       'source' in error &&
-      error.source === ERROR_SOURCE &&
+      error.source === STORAGE_SPARQL_ERROR_SOURCE &&
       'code' in error &&
       error.code === SparqlErrorCode.requestFailed
     )

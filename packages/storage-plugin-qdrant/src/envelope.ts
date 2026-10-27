@@ -3,7 +3,7 @@ import type { ICodecValue } from '@migaia/serialize/codec'
 import { encodeOrderedStorageKey } from '@migaia/storage-host/sdk'
 import { QdrantText } from './constants.js'
 import { invalidArgument, qdrantError } from './errors.js'
-import { QdrantErrorCode } from './error-code.js'
+import { QdrantErrorCode } from '@migaia/storage-contract/error-code'
 /** The canonical portable codec owns all payload escaping, reserved tags and value admission. */
 const codec = defineJsonCodec({ version: 1 })
 /**

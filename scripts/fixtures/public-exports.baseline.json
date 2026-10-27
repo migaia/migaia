@@ -1061,15 +1061,36 @@
         "ttl",
         "vector"
       ],
+      "./error-code": [
+        "ArchiveErrorCode",
+        "CacheErrorCode",
+        "ObjectErrorCode",
+        "PostgresErrorCode",
+        "QdrantErrorCode",
+        "RedisErrorCode",
+        "STORAGE_ARCHIVE_ERROR_SOURCE",
+        "STORAGE_BROWSER_ERROR_SOURCE",
+        "STORAGE_CACHE_ERROR_SOURCE",
+        "STORAGE_HOST_ERROR_SOURCE",
+        "STORAGE_OBJECT_ERROR_SOURCE",
+        "STORAGE_POSTGRES_ERROR_SOURCE",
+        "STORAGE_QDRANT_ERROR_SOURCE",
+        "STORAGE_REDIS_ERROR_SOURCE",
+        "STORAGE_SPARQL_ERROR_SOURCE",
+        "STORAGE_SQLITE_ERROR_SOURCE",
+        "SparqlErrorCode",
+        "SqliteErrorCode",
+        "StorageBrowserErrorCode",
+        "StorageContractErrorCode",
+        "StorageHostErrorCode"
+      ],
       "./conformance": [
         "runConformance"
       ]
     },
     "@migaia/storage-host": {
       ".": [
-        "STORAGE_HOST_SOURCE",
         "StorageError",
-        "StorageErrorCode",
         "StorageErrorText",
         "StorageHostFacade",
         "assertStorageBackendId",
@@ -1259,16 +1280,12 @@
     },
     "@migaia/storage-plugin-archive": {
       ".": [
-        "ArchiveErrorCode",
-        "ERROR_SOURCE",
         "archivePlugin"
       ]
     },
     "@migaia/storage-plugin-browser": {
       ".": [
-        "STORAGE_BROWSER_SOURCE",
         "StorageError",
-        "StorageErrorCode",
         "StorageErrorText",
         "lengthPrefixedNamespaceCodec"
       ],
@@ -1330,9 +1347,7 @@
     },
     "@migaia/storage-plugin-cache": {
       ".": [
-        "CacheErrorCode",
         "CacheWriteMode",
-        "ERROR_SOURCE",
         "cacheBackendKind",
         "cacheKey",
         "cachePlugin"
@@ -1343,9 +1358,7 @@
     },
     "@migaia/storage-plugin-object": {
       ".": [
-        "ERROR_SOURCE",
         "ObjectDriverKind",
-        "ObjectErrorCode",
         "objectBackendKind",
         "objectBackendPlugin"
       ],
@@ -1361,7 +1374,6 @@
     },
     "@migaia/storage-plugin-postgres": {
       ".": [
-        "PostgresErrorCode",
         "postgresBackendKind",
         "postgresBackendPlugin"
       ],
@@ -1392,8 +1404,6 @@
     },
     "@migaia/storage-plugin-qdrant": {
       ".": [
-        "ERROR_SOURCE",
-        "QdrantErrorCode",
         "qdrantBackendKind",
         "qdrantBackendPlugin"
       ],
@@ -1421,8 +1431,6 @@
     },
     "@migaia/storage-plugin-redis": {
       ".": [
-        "ERROR_SOURCE",
-        "RedisErrorCode",
         "redisBackendKind",
         "redisBackendPlugin"
       ],
@@ -1456,8 +1464,6 @@
     },
     "@migaia/storage-plugin-sparql": {
       ".": [
-        "ERROR_SOURCE",
-        "SparqlErrorCode",
         "sparqlBackendKind",
         "sparqlBackendPlugin"
       ],
@@ -1476,7 +1482,6 @@
     },
     "@migaia/storage-plugin-sqlite": {
       ".": [
-        "SqliteErrorCode",
         "sqliteBackendKind",
         "sqliteBackendPlugin"
       ],

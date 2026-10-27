@@ -1,7 +1,7 @@
 import type { IOperationContext } from '@migaia/storage-contract'
 import { throwIfAborted } from '@migaia/storage-host/sdk'
 import { QdrantRoute, QdrantText } from './constants.js'
-import { QdrantErrorCode } from './error-code.js'
+import { QdrantErrorCode } from '@migaia/storage-contract/error-code'
 import { QdrantErrorText } from './error-text.js'
 import { invalidArgument, normalizeQdrantError, qdrantError } from './errors.js'
 import { nativeResult } from './protocol.js'

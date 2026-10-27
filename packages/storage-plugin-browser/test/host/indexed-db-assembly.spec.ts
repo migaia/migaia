@@ -21,7 +21,10 @@ import { indexedDbTtlFeature } from '../../src/features/indexed-db-ttl.js'
 import { indexedDbBatchFeature } from '../../src/features/indexed-db-batch.js'
 import { indexedDbNotificationsFeature } from '../../src/features/indexed-db-notifications.js'
 import { indexedDbChangeFeedFeature } from '../../src/features/indexed-db-change-feed.js'
-import { StorageErrorCode, STORAGE_BROWSER_SOURCE } from '../../src/types/errors.js'
+import {
+  StorageBrowserErrorCode,
+  STORAGE_BROWSER_ERROR_SOURCE
+} from '@migaia/storage-contract/error-code'
 
 /** Each case uses the real public plugin and its original native transaction owner. */
 const options = () => ({ factory: new IDBFactory(), keyRange: IDBKeyRange })
@@ -63,8 +66,8 @@ describe('explicit IndexedDB assembly', () => {
       expect(await store.getRecord('row')).toEqual({ value: 1 })
       expect(await store.use(records).query().all()).toHaveLength(1)
       await expect(store.use(records).query().page(1)).rejects.toMatchObject({
-        source: STORAGE_BROWSER_SOURCE,
-        code: StorageErrorCode.indexedDbFeatureNotInstalled,
+        source: STORAGE_BROWSER_ERROR_SOURCE,
+        code: StorageBrowserErrorCode.indexedDbFeatureNotInstalled,
         message: expect.stringContaining('indexedDbKeysetFeature')
       })
       expect(await store.transaction((scope) => scope.getRecord('row'))).toEqual({ value: 1 })
@@ -90,8 +93,8 @@ describe('explicit IndexedDB assembly', () => {
         () => store.undo!('missing')
       ]) {
         await expect(Promise.resolve().then<unknown>(() => invoke())).rejects.toMatchObject({
-          source: STORAGE_BROWSER_SOURCE,
-          code: StorageErrorCode.indexedDbFeatureNotInstalled
+          source: STORAGE_BROWSER_ERROR_SOURCE,
+          code: StorageBrowserErrorCode.indexedDbFeatureNotInstalled
         })
       }
     } finally {
@@ -138,16 +141,16 @@ describe('explicit IndexedDB assembly', () => {
       expect(nativePut).toHaveBeenCalled()
       expect(() => store.subscribeChanges(() => undefined)).toThrowError(
         expect.objectContaining({
-          source: STORAGE_BROWSER_SOURCE,
-          code: StorageErrorCode.indexedDbFeatureNotInstalled,
+          source: STORAGE_BROWSER_ERROR_SOURCE,
+          code: StorageBrowserErrorCode.indexedDbFeatureNotInstalled,
           message: expect.stringContaining('indexedDbNotificationsFeature')
         })
       )
       await expect(
         store.use(kv).setMany([{ key: 'ttl-missing', value: 'not-written', ttlMs: 1 }])
       ).rejects.toMatchObject({
-        source: STORAGE_BROWSER_SOURCE,
-        code: StorageErrorCode.indexedDbFeatureNotInstalled,
+        source: STORAGE_BROWSER_ERROR_SOURCE,
+        code: StorageBrowserErrorCode.indexedDbFeatureNotInstalled,
         message: expect.stringContaining('indexedDbTtlFeature')
       })
       expect(await store.get('ttl-missing')).toBeNull()
@@ -174,8 +177,8 @@ describe('explicit IndexedDB assembly', () => {
       expect(nativePut).toHaveBeenCalled()
       expect(() => store.watch('key')).toThrowError(
         expect.objectContaining({
-          source: STORAGE_BROWSER_SOURCE,
-          code: StorageErrorCode.indexedDbFeatureNotInstalled,
+          source: STORAGE_BROWSER_ERROR_SOURCE,
+          code: StorageBrowserErrorCode.indexedDbFeatureNotInstalled,
           message: expect.stringContaining('indexedDbChangeFeedFeature')
         })
       )
@@ -187,8 +190,8 @@ describe('explicit IndexedDB assembly', () => {
           throw primary
         })
       ).rejects.toMatchObject({
-        source: STORAGE_BROWSER_SOURCE,
-        code: StorageErrorCode.transactionFailed,
+        source: STORAGE_BROWSER_ERROR_SOURCE,
+        code: StorageBrowserErrorCode.transactionFailed,
         cause: primary
       })
       expect(await store.get('key')).toBe('value')
@@ -206,8 +209,8 @@ describe('explicit IndexedDB assembly', () => {
     try {
       expect(() => host.backend('indexed-db').watch('key')).toThrowError(
         expect.objectContaining({
-          source: STORAGE_BROWSER_SOURCE,
-          code: StorageErrorCode.indexedDbFeatureNotInstalled,
+          source: STORAGE_BROWSER_ERROR_SOURCE,
+          code: StorageBrowserErrorCode.indexedDbFeatureNotInstalled,
           message: expect.stringContaining('indexedDbNotificationsFeature')
         })
       )
@@ -348,8 +351,8 @@ describe('independent IndexedDB native owners', () => {
     }).catch((error: unknown) => error)
     expect([...walkErrorCauses(failure)]).toContainEqual(
       expect.objectContaining({
-        source: STORAGE_BROWSER_SOURCE,
-        code: StorageErrorCode.indexedDbFeatureNotInstalled,
+        source: STORAGE_BROWSER_ERROR_SOURCE,
+        code: StorageBrowserErrorCode.indexedDbFeatureNotInstalled,
         message: expect.stringContaining('indexedDbJournalFeature')
       })
     )
@@ -365,8 +368,8 @@ describe('independent IndexedDB native owners', () => {
     )
     expect([...walkErrorCauses(failure)]).toContainEqual(
       expect.objectContaining({
-        source: STORAGE_BROWSER_SOURCE,
-        code: StorageErrorCode.indexedDbFeatureNotInstalled,
+        source: STORAGE_BROWSER_ERROR_SOURCE,
+        code: StorageBrowserErrorCode.indexedDbFeatureNotInstalled,
         message: expect.stringContaining('indexedDbJournalFeature')
       })
     )

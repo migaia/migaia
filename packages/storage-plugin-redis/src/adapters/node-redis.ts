@@ -10,7 +10,7 @@ import {
 } from 'redis'
 import { createStorageOperationReporter, reportCleanupError } from '@migaia/storage-host/sdk'
 import { RedisCommand, RedisReply, RedisText } from '../constants.js'
-import { RedisErrorCode } from '../error-code.js'
+import { RedisErrorCode } from '@migaia/storage-contract/error-code'
 import type { IRedisConnection, IRedisDriver } from '../driver.js'
 import { normalizeRedisError, invalidArgument, redisError } from '../errors.js'
 import {

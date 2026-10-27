@@ -2,7 +2,11 @@ import { memoryTestFeatures } from '../helpers/memory-features.js'
 import { createRuntime } from '@migaia/reactive'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import { records } from '@migaia/storage-contract'
-import { createStorageHost, STORAGE_HOST_SOURCE, StorageErrorCode } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import {
+  STORAGE_HOST_ERROR_SOURCE,
+  StorageHostErrorCode
+} from '@migaia/storage-contract/error-code'
 import { memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
@@ -79,8 +83,8 @@ describe('reactive Feature', () => {
         await expect(store.getRecord('record')).resolves.toEqual({ value: 'base remains usable' })
         expect(() => store.use(records).query().live({ runtime: createRuntime() })).toThrow(
           expect.objectContaining({
-            source: STORAGE_HOST_SOURCE,
-            code: StorageErrorCode.changeControllerNotAssembled
+            source: STORAGE_HOST_ERROR_SOURCE,
+            code: StorageHostErrorCode.changeControllerNotAssembled
           })
         )
         expect(register).not.toHaveBeenCalled()

@@ -23,7 +23,7 @@ import { featureInteger, readStreamRows } from '../feature-input.js'
 import { decodeRedisChange } from '../changes.js'
 import { replyString, RedisSuffix } from '../layout.js'
 import { redisError, invalidArgument, normalizeRedisTransactionFailure } from '../errors.js'
-import { RedisErrorCode } from '../error-code.js'
+import { RedisErrorCode } from '@migaia/storage-contract/error-code'
 /** Reliable change cursors are actual native Stream IDs, with no client-side acknowledgement ledger. */
 export type IRedisChangeStreamOutput = IStorageFeatureOutput<
   readonly [ICapabilityImpl<typeof durableChangeFeed, IDurableChangeFeedApi>],

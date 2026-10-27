@@ -11,7 +11,8 @@ import {
   type IUndoImage,
   type ILogPayload
 } from './logger-runtime.js'
-import { StorageError, StorageErrorCode } from '../errors.js'
+import { StorageError } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.js'
 import type { IStorageJournalBackendAccess } from './binding.js'
 import type {
@@ -163,7 +164,7 @@ export function readStorageUndoRows(
       }
     })
   } catch (cause) {
-    if (cause instanceof StorageError && cause.code === StorageErrorCode.journalRecordInvalid)
+    if (cause instanceof StorageError && cause.code === StorageHostErrorCode.journalRecordInvalid)
       throw cause
     return invalidStorageJournalRecord(cause)
   }
@@ -193,7 +194,7 @@ async function executeStorageJournalUndo(
   /** The borrowed logger returns only its original committed transaction index entry. */
   const stored = await context.options.undo.get(txId)
   if (stored === undefined)
-    throw new StorageError(StorageErrorCode.undoNotFound, {}, StorageErrorText.undoNotFound)
+    throw new StorageError(StorageHostErrorCode.undoNotFound, {}, StorageErrorText.undoNotFound)
   /** All mirror validation completes before the original business locks are acquired. */
   const rows = readStorageUndoRows(stored, context.options.target, context.options.backend)
   /** The backend maps metadata onto its existing point; canonical ordering remains in tx().lock. */
@@ -215,7 +216,7 @@ async function executeStorageJournalUndo(
         current.present !== row.after.present ||
         (current.present && row.after.present && current.value !== row.after.value)
       )
-        throw new StorageError(StorageErrorCode.undoConflict, {}, StorageErrorText.undoConflict)
+        throw new StorageError(StorageHostErrorCode.undoConflict, {}, StorageErrorText.undoConflict)
     }
     for (const row of rows) await context.binding.writeImage!(scope, row.target, row.before)
     return { txId: info.id }

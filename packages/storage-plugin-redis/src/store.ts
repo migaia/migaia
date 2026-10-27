@@ -77,11 +77,15 @@ import { isUint8Array } from '@migaia/utils/bytes'
 import { sleep } from '@migaia/utils/promise'
 import {
   StorageError,
-  StorageErrorCode,
   type IStoragePluginCore,
   type IStorageOrgBinding,
   type IStorageJournalBackendBinding
 } from '@migaia/storage-host'
+import {
+  StorageHostErrorCode,
+  RedisErrorCode,
+  STORAGE_REDIS_ERROR_SOURCE
+} from '@migaia/storage-contract/error-code'
 import { RedisDraft, validateRedisExec } from './transaction.js'
 import { createRedisJournalBinding } from './journal.js'
 import { createRedisLocks, RedisLockConflict } from './locks.js'
@@ -104,7 +108,6 @@ import {
   redisError
 } from './errors.js'
 import { RedisText } from './constants.js'
-import { RedisErrorCode, ERROR_SOURCE } from './error-code.js'
 import { encodeRedisChange, decodeRedisChange } from './changes.js'
 import {
   redisCapabilities,
@@ -249,13 +252,13 @@ function redisExtensionFailure(
   return normalizeError(
     error,
     (cause) =>
-      new StorageError(StorageErrorCode.extensionFailed, {
+      new StorageError(StorageHostErrorCode.extensionFailed, {
         backend: RedisText.backend,
         operation,
         cause
       }),
     (value): value is Error =>
-      value instanceof Error && Reflect.get(value, 'source') === ERROR_SOURCE
+      value instanceof Error && Reflect.get(value, 'source') === STORAGE_REDIS_ERROR_SOURCE
   )
 }
 /** Selected native writes are sealed after an unknown outcome without discarding read access. */

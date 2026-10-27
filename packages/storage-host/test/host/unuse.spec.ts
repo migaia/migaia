@@ -1,7 +1,8 @@
 import { expect, it } from 'vitest'
 import { Logger } from '@migaia/logger'
 import { level } from '@migaia/logger/plugins'
-import { createStorageHost, definePlugin, StorageErrorCode } from '../../src/index.js'
+import { createStorageHost, definePlugin } from '../../src/index.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { memoryBackendPlugin } from '../../src/plugins/memory.js'
 import { storageJournalPlugin } from '../../src/journal.js'
 import { storageProbe } from '../../src/plugins/probe/index.js'
@@ -35,7 +36,7 @@ it('refuses a borrowed backend until its borrower is removed', async () => {
   await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
   const extended = await host.use(borrower('memory'))
   await expect(extended.unUse('memory')).rejects.toMatchObject({
-    code: StorageErrorCode.backendInUse
+    code: StorageHostErrorCode.backendInUse
   })
   expect(host.hasBackend('memory')).toBe(true)
   await extended.unUse('borrower')
@@ -56,14 +57,14 @@ it('rejects an unknown id, a configured journal plugin and removal during an ins
     ]
   })
   await expect(host.unUse('missing' as never)).rejects.toMatchObject({
-    code: StorageErrorCode.backendNotInstalled
+    code: StorageHostErrorCode.backendNotInstalled
   })
   await expect(host.unUse('storage-journal')).rejects.toMatchObject({
-    code: StorageErrorCode.invalidConfig
+    code: StorageHostErrorCode.invalidConfig
   })
   const installing = host.use(memoryBackendPlugin({ id: 'later' }))
   await expect(host.unUse('memory')).rejects.toMatchObject({
-    code: StorageErrorCode.storageHostBusy
+    code: StorageHostErrorCode.storageHostBusy
   })
   await installing
   await host.dispose()

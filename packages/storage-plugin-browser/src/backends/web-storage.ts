@@ -34,7 +34,8 @@ import {
 import type { INamespaceCodec } from '../utils/key.js'
 import { probeWebStorage } from '../utils/availability.js'
 import { normalizeStorageException } from '../utils/quota.js'
-import { StorageError, StorageErrorCode, createStorageTypeError } from '../types/errors.js'
+import { StorageError, createStorageTypeError } from '../types/errors.js'
+import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.js'
 import { StorageBackend, StorageOperation, storageBackendOperation } from '../constants.js'
 import { subscribeLocalStorageEvents } from './web-storage-events.js'
@@ -87,7 +88,7 @@ export const assertWebStorageOptions: (
   options: unknown
 ) => asserts options is IWebStorageOptions = (options) => {
   if (options === null || typeof options !== 'object' || Array.isArray(options))
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       cause: new TypeError('web storage options must be an object')
     })
 }
@@ -99,7 +100,7 @@ const assertWebStorageInjection: (
 ) => asserts storage is IWebStorageLike = (storage, backend) => {
   if (storage === undefined) return
   if (typeof storage !== 'object' || storage === null || Array.isArray(storage))
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend,
       cause: new TypeError('web storage injection must implement the Storage surface')
     })
@@ -116,7 +117,7 @@ const assertWebStorageInjection: (
     length < 0
   )
     throw createStorageTypeError(
-      StorageErrorCode.invalidConfig,
+      StorageBrowserErrorCode.invalidConfig,
       StorageErrorText.webStorageInjectionInvalid
     )
 }
@@ -248,7 +249,7 @@ function configureWebStorageNamespace(webStorageContext: IWebStorageContext): vo
       : webStorageContext.options.namespaceCodec
 
   if (typeof webStorageContext.namespace !== 'string' || webStorageContext.namespace.length === 0)
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: webStorageContext.backend,
       cause: new TypeError('namespace must be non-empty and namespaceCodec must be callable')
     })
@@ -281,7 +282,7 @@ function configureWebStorageNamespace(webStorageContext: IWebStorageContext): vo
       }
     )
   ) {
-    throw new StorageError(StorageErrorCode.unavailable, {
+    throw new StorageError(StorageBrowserErrorCode.unavailable, {
       backend: webStorageContext.backend,
       cause: webStorageContext.probeCause
     })
@@ -435,19 +436,19 @@ function namespacedEntries(webStorageContext: IWebStorageContext): Array<{
   const length = webStorageContext.live.length
   if (!Number.isSafeInteger(length) || length < 0)
     throw createStorageTypeError(
-      StorageErrorCode.unavailable,
+      StorageBrowserErrorCode.unavailable,
       StorageErrorText.webStorageLengthInvalid
     )
   for (let index = 0; index < length; index += 1) {
     const rawKey = webStorageContext.live.key(index)
     if (typeof rawKey !== 'string')
       throw createStorageTypeError(
-        StorageErrorCode.unavailable,
+        StorageBrowserErrorCode.unavailable,
         StorageErrorText.webStorageKeyInvalid
       )
     if (seenPhysicalKeys.has(rawKey))
       throw createStorageTypeError(
-        StorageErrorCode.unavailable,
+        StorageBrowserErrorCode.unavailable,
         StorageErrorText.webStorageKeyDuplicate
       )
     seenPhysicalKeys.add(rawKey)
@@ -512,7 +513,7 @@ function createWebStorageSync(webStorageContext: IWebStorageContext): IWebStorag
       assertLive(webStorageContext)
       snapshotSyncWriteOptions(options)
       if (typeof value !== 'string')
-        throw new StorageError(StorageErrorCode.invalidConfig, {
+        throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
           backend: webStorageContext.backend,
           key,
           cause: new TypeError('storage value must be a string')

@@ -35,7 +35,7 @@ import { IdentifyError } from '@migaia/utils/error'
 import type { IScheduledTask } from '@migaia/utils/scheduler'
 import { CacheText, CacheWriteMode, CacheOperation, CacheHook } from './constants.js'
 import { cacheError, invalidArgument, missingCapability } from './errors.js'
-import { CacheErrorCode } from './error-code.js'
+import { CacheErrorCode } from '@migaia/storage-contract/error-code'
 import {
   snapshotCachePolicy,
   shorten,

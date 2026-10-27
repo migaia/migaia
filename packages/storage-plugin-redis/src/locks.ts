@@ -23,7 +23,7 @@ import {
   type IRedisChannel
 } from './layout.js'
 import { redisError, unsupported } from './errors.js'
-import { RedisErrorCode } from './error-code.js'
+import { RedisErrorCode } from '@migaia/storage-contract/error-code'
 import { RedisText } from './constants.js'
 import { lockLost } from './transaction.js'
 

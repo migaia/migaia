@@ -16,7 +16,7 @@ import {
 } from './layout.js'
 import { readRedisHash } from './transaction.js'
 import { redisError, invalidArgument, unsupported } from './errors.js'
-import { RedisErrorCode } from './error-code.js'
+import { RedisErrorCode } from '@migaia/storage-contract/error-code'
 import type { IRedisConnection } from './driver.js'
 /** Native schema, field and reply names have one owner for every selected vector path. */
 export const RedisVector = {

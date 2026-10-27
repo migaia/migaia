@@ -37,7 +37,7 @@ import {
 } from './native.js'
 import type { IPgConfiguration, IPgTables } from './schema.js'
 import { invalidArgument, postgresError } from './errors.js'
-import { PostgresErrorCode } from './error-code.js'
+import { PostgresErrorCode } from '@migaia/storage-contract/error-code'
 import { PgNames } from './constants.js'
 import { deferred } from '@migaia/utils/promise'
 import { base64ToBytes, bytesToBase64 } from '@migaia/utils/bytes'

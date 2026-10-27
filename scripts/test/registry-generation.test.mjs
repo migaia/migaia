@@ -444,44 +444,54 @@ const domainInventory = Object.freeze([
     source: 'storage.contract'
   },
   {
-    file: 'packages/storage-host/src/error-code.ts',
-    source: 'storage.host'
+    file: 'packages/storage-contract/src/domains/error-code.ts',
+    source: 'storage.host',
+    table: 'StorageHostErrorCode'
   },
   {
-    file: 'packages/storage-plugin-archive/src/error-code.ts',
-    source: 'storage.backend.archive'
+    file: 'packages/storage-contract/src/domains/error-code.ts',
+    source: 'storage.backend.archive',
+    table: 'ArchiveErrorCode'
   },
   {
-    file: 'packages/storage-plugin-browser/src/error-code.ts',
-    source: 'storage.backend.browser'
+    file: 'packages/storage-contract/src/domains/error-code.ts',
+    source: 'storage.backend.browser',
+    table: 'StorageBrowserErrorCode'
   },
   {
-    file: 'packages/storage-plugin-cache/src/error-code.ts',
-    source: 'storage.backend.cache'
+    file: 'packages/storage-contract/src/domains/error-code.ts',
+    source: 'storage.backend.cache',
+    table: 'CacheErrorCode'
   },
   {
-    file: 'packages/storage-plugin-object/src/error-code.ts',
-    source: 'storage.backend.object'
+    file: 'packages/storage-contract/src/domains/error-code.ts',
+    source: 'storage.backend.object',
+    table: 'ObjectErrorCode'
   },
   {
-    file: 'packages/storage-plugin-postgres/src/error-code.ts',
-    source: 'storage.backend.postgres'
+    file: 'packages/storage-contract/src/domains/error-code.ts',
+    source: 'storage.backend.postgres',
+    table: 'PostgresErrorCode'
   },
   {
-    file: 'packages/storage-plugin-qdrant/src/error-code.ts',
-    source: 'storage.backend.qdrant'
+    file: 'packages/storage-contract/src/domains/error-code.ts',
+    source: 'storage.backend.qdrant',
+    table: 'QdrantErrorCode'
   },
   {
-    file: 'packages/storage-plugin-redis/src/error-code.ts',
-    source: 'storage.backend.redis'
+    file: 'packages/storage-contract/src/domains/error-code.ts',
+    source: 'storage.backend.redis',
+    table: 'RedisErrorCode'
   },
   {
-    file: 'packages/storage-plugin-sparql/src/error-code.ts',
-    source: 'storage.backend.sparql'
+    file: 'packages/storage-contract/src/domains/error-code.ts',
+    source: 'storage.backend.sparql',
+    table: 'SparqlErrorCode'
   },
   {
-    file: 'packages/storage-plugin-sqlite/src/error-code.ts',
-    source: 'storage.backend.sqlite'
+    file: 'packages/storage-contract/src/domains/error-code.ts',
+    source: 'storage.backend.sqlite',
+    table: 'SqliteErrorCode'
   },
   {
     file: 'packages/utils/src/error-code.ts',
@@ -657,7 +667,8 @@ for (const { file, source, table } of domainInventory)
     assert.ok(
       table
         ? declaration.includes(`@error-source ${source}\n`) &&
-            declaration.includes(`export const ${table} = {`)
+            (declaration.includes(`export const ${table} = {`) ||
+              declaration.includes(`export const ${table} = Object.freeze({`))
         : declaration.includes(`export const ERROR_SOURCE = '${source}'`),
       `SOURCE_DOMAIN_OWNER: ${file}`
     )

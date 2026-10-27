@@ -9,7 +9,8 @@ import { UtilsErrorCode } from '@migaia/utils/error'
 
 import type { IStorageOperationRuntime } from './operation-reporter.js'
 import type { IBackendKind } from '@migaia/storage-contract'
-import { StorageError, StorageErrorCode, type IExtensionStage } from '../errors.js'
+import { StorageError, type IExtensionStage } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { throwIfAborted } from './operation.js'
 
 /** Execute developer-provided extension code behind one stable error boundary. */
@@ -63,7 +64,7 @@ export const invokeExtension = async <T>(
     }
     if (isStorageContractError(error)) throw error
     if (normalizeFailure !== undefined) throw normalizeFailure(error, operation, extensionStage)
-    throw new StorageError(StorageErrorCode.extensionFailed, {
+    throw new StorageError(StorageHostErrorCode.extensionFailed, {
       backend,
       cause: error,
       operation,

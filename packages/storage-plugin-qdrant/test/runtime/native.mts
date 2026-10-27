@@ -2,7 +2,8 @@ import assert from 'node:assert/strict'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { vector, ttl, DeleteCountMode } from '@migaia/storage-contract'
 import { lockKey } from '@migaia/storage-host/sdk'
-import { qdrantBackendPlugin, ERROR_SOURCE, type IQdrantHttp } from '@migaia/storage-plugin-qdrant'
+import { qdrantBackendPlugin, type IQdrantHttp } from '@migaia/storage-plugin-qdrant'
+import { STORAGE_QDRANT_ERROR_SOURCE } from '@migaia/storage-contract/error-code'
 import { fetchHttp } from '@migaia/storage-plugin-qdrant/http'
 import { qdrantClientHttp } from '@migaia/storage-plugin-qdrant/client'
 import { qdrantManagementFeature } from '@migaia/storage-plugin-qdrant/features/management'
@@ -14,7 +15,7 @@ import { QdrantClient } from '@qdrant/js-client-rest'
 /** The shared service launcher supplies every runtime's identical native endpoint. */
 const url = process.env.MIGAIA_QDRANT_URL
 assert.ok(url, 'configured native Qdrant service required')
-assert.equal(ERROR_SOURCE, 'storage.backend.qdrant')
+assert.equal(STORAGE_QDRANT_ERROR_SOURCE, 'storage.backend.qdrant')
 /** One function boundary keeps actual public consumer inference independent of the transport loop. */
 async function exercise(native: IQdrantHttp, url: string): Promise<void> {
   const created: string[] = [],

@@ -7,7 +7,8 @@ import { describe, expect, it } from 'vitest'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { defineEntity } from '../../src/entity.js'
 import { memoryBackend } from '../helpers/memory.js'
-import { StorageError, StorageErrorCode } from '../../src/errors.js'
+import { StorageError } from '../../src/errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { composeRepositoryKey } from '../../src/entity/key.js'
 import {
   StorageContractError,
@@ -680,7 +681,7 @@ describe('自定义 schema（normalize/encode/decode 全链路）', () => {
       schema: {
         name: 'throws-storage-error',
         validate: async () => {
-          throw new StorageError(StorageErrorCode.invalidConfig)
+          throw new StorageError(StorageHostErrorCode.invalidConfig)
         }
       }
     })

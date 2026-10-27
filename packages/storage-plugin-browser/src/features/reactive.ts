@@ -3,7 +3,6 @@ import { IndexedDbFeature } from '../constants.js'
 import {
   defineFeature,
   StorageError as HostStorageError,
-  StorageErrorCode as HostStorageErrorCode,
   StorageErrorText as HostStorageErrorText,
   type IStorageBackendKind,
   type IStorageFeature,
@@ -11,6 +10,10 @@ import {
   type IStorageFeatureOutput,
   type IStorageFeatureTarget
 } from '@migaia/storage-host'
+import {
+  StorageHostErrorCode as HostStorageErrorCode,
+  StorageBrowserErrorCode
+} from '@migaia/storage-contract/error-code'
 import { memoryBackendKind } from '@migaia/storage-host/plugins/memory'
 import { createStorageOperationReporter, reportCleanupError } from '@migaia/storage-host/sdk'
 import type {
@@ -33,7 +36,7 @@ import type {
 } from '../host/types.js'
 import { StorageReactiveVisibility } from '../host/state-constants.js'
 import { StorageErrorText } from '../error-text.js'
-import { StorageError, StorageErrorCode } from '../types/errors.js'
+import { StorageError } from '../types/errors.js'
 
 export type { ILiveQuery, ILiveQueryOptions } from '../host/types.js'
 
@@ -128,7 +131,7 @@ const nativeConsistency = (
 const validateLiveOptions = <T>(options: IChainLiveQueryOptions<T>): void => {
   if (options === null || (typeof options !== 'object' && typeof options !== 'function'))
     throw new StorageError(
-      StorageErrorCode.reactiveFeatureInvalid,
+      StorageBrowserErrorCode.reactiveFeatureInvalid,
       {},
       StorageErrorText.reactiveFeatureInvalid
     )
@@ -154,7 +157,7 @@ const validateLiveOptions = <T>(options: IChainLiveQueryOptions<T>): void => {
     (options.report !== undefined && typeof options.report !== 'function')
   )
     throw new StorageError(
-      StorageErrorCode.reactiveFeatureInvalid,
+      StorageBrowserErrorCode.reactiveFeatureInvalid,
       {},
       StorageErrorText.reactiveFeatureInvalid
     )
@@ -242,7 +245,7 @@ function createReactiveLiveQuery<TQuery extends IQueryShape>(
   validateLiveOptions(options)
   if (typeof query.all !== 'function')
     throw new StorageError(
-      StorageErrorCode.reactiveFeatureInvalid,
+      StorageBrowserErrorCode.reactiveFeatureInvalid,
       {},
       StorageErrorText.reactiveFeatureInvalid
     )

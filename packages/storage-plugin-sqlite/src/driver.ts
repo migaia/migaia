@@ -8,7 +8,7 @@ import type {
   ISqliteRunResult
 } from './types.js'
 import { normalizeSqliteFailure, sqliteError } from './errors.js'
-import { SqliteErrorCode } from './error-code.js'
+import { SqliteErrorCode } from '@migaia/storage-contract/error-code'
 import { SqliteErrorText } from './error-text.js'
 /** Native statements are captured by their actual adapter, without a second statement cache. */
 export type INativeStatement = {

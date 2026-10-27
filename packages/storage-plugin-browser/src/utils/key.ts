@@ -1,5 +1,6 @@
 import type { IBackendKind } from '../types/capabilities.js'
-import { StorageError, StorageErrorCode, createStorageTypeError } from '../types/errors.js'
+import { StorageError, createStorageTypeError } from '../types/errors.js'
+import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.js'
 import { normalizeError } from '../backends/errors.js'
 import { utf8ByteLength } from '@migaia/utils/bytes'
@@ -97,14 +98,14 @@ export const admitNamespaceCodec = (
   backend: IBackendKind = 'local'
 ): INamespaceCodec => {
   if (typeof codec !== 'object' || codec === null || Array.isArray(codec))
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend,
       cause: new TypeError(StorageErrorText.namespaceCodecInvalid)
     })
   /** Method validation keeps the original object so class private fields retain their receiver. */
   const candidate = codec as INamespaceCodec
   if (typeof candidate.encode !== 'function' || typeof candidate.decode !== 'function')
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend,
       cause: new TypeError(StorageErrorText.namespaceCodecInvalid)
     })
@@ -113,7 +114,7 @@ export const admitNamespaceCodec = (
     (typeof candidate.encodeStorageKey !== 'function' ||
       typeof candidate.decodeStorageKey !== 'function')
   )
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend,
       cause: new TypeError(StorageErrorText.namespaceTypedCodecInvalid)
     })
@@ -135,7 +136,7 @@ export const namespacedStorageKey = (
     const physicalKey = codec.encodeStorageKey(namespace, key)
     if (typeof physicalKey !== 'string')
       throw createStorageTypeError(
-        StorageErrorCode.extensionFailed,
+        StorageBrowserErrorCode.extensionFailed,
         StorageErrorText.namespaceCodecEncodeInvalid
       )
     return physicalKey
@@ -143,7 +144,7 @@ export const namespacedStorageKey = (
     throw normalizeError(
       cause,
       backend,
-      StorageErrorCode.extensionFailed,
+      StorageBrowserErrorCode.extensionFailed,
       'namespace.encode',
       'codec'
     )
@@ -166,7 +167,7 @@ export const stripStorageNamespace = (
     try {
       return snapshotStorageKey(key, backend)
     } catch (cause) {
-      throw new StorageError(StorageErrorCode.extensionFailed, {
+      throw new StorageError(StorageBrowserErrorCode.extensionFailed, {
         backend,
         operation: 'namespace.decode',
         extensionStage: 'codec',
@@ -177,7 +178,7 @@ export const stripStorageNamespace = (
     throw normalizeError(
       cause,
       backend,
-      StorageErrorCode.extensionFailed,
+      StorageBrowserErrorCode.extensionFailed,
       'namespace.decode',
       'codec'
     )
@@ -192,7 +193,7 @@ export const namespacedKey = (
   backend: IBackendKind = 'local'
 ): string => {
   if (typeof namespace !== 'string' || typeof key !== 'string')
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend,
       cause: new TypeError(StorageErrorText.namespaceKeyInvalid)
     })
@@ -200,7 +201,7 @@ export const namespacedKey = (
     const physicalKey = codec.encode(namespace, key)
     if (typeof physicalKey !== 'string')
       throw createStorageTypeError(
-        StorageErrorCode.extensionFailed,
+        StorageBrowserErrorCode.extensionFailed,
         StorageErrorText.namespaceCodecEncodeInvalid
       )
     return physicalKey
@@ -208,7 +209,7 @@ export const namespacedKey = (
     throw normalizeError(
       cause,
       backend,
-      StorageErrorCode.extensionFailed,
+      StorageBrowserErrorCode.extensionFailed,
       'namespace.encode',
       'codec'
     )
@@ -223,7 +224,7 @@ export const stripNamespace = (
   backend: IBackendKind = 'local'
 ): string | undefined => {
   if (typeof namespace !== 'string' || typeof physicalKey !== 'string')
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend,
       cause: new TypeError(StorageErrorText.namespacePhysicalKeyInvalid)
     })
@@ -231,7 +232,7 @@ export const stripNamespace = (
     const key = codec.decode(namespace, physicalKey)
     if (key !== undefined && typeof key !== 'string')
       throw createStorageTypeError(
-        StorageErrorCode.extensionFailed,
+        StorageBrowserErrorCode.extensionFailed,
         StorageErrorText.namespaceCodecDecodeInvalid
       )
     return key
@@ -239,7 +240,7 @@ export const stripNamespace = (
     throw normalizeError(
       cause,
       backend,
-      StorageErrorCode.extensionFailed,
+      StorageBrowserErrorCode.extensionFailed,
       'namespace.decode',
       'codec'
     )

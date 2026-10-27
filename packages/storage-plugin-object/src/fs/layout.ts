@@ -14,7 +14,7 @@ import {
   readAbortReason
 } from '@migaia/storage-host/sdk'
 import { ObjectDriverKind, ObjectNames } from '../constants.js'
-import { ObjectErrorCode } from '../error-code.js'
+import { ObjectErrorCode } from '@migaia/storage-contract/error-code'
 import { ObjectErrorText } from '../error-text.js'
 import { invalidArgument, isMissing, normalizeObjectError, objectError } from '../errors.js'
 import type { IObjectNative, IObjectOpenContext, IObjectRead } from '../types.js'

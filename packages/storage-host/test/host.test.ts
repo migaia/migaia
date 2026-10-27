@@ -8,9 +8,9 @@ import {
   StorageHostFacade,
   definePlugin,
   defineFeature,
-  defineStorageBackendKind,
-  StorageErrorCode
+  defineStorageBackendKind
 } from '../src/index.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { memoryBackendKind, memoryBackendPlugin } from '../src/plugins/memory.js'
 import type { IStoragePluginCore } from '../src/index.js'
 import type { IStorageBase } from '@migaia/storage-contract'
@@ -114,7 +114,7 @@ describe('neutral storage installation', () => {
     ])
     await expect(createStorageHost({ plugins: [definition] })).rejects.toMatchObject({
       source: 'storage.host',
-      code: StorageErrorCode.backendInstallFailed
+      code: StorageHostErrorCode.backendInstallFailed
     })
     expect(factory).not.toHaveBeenCalled()
     expect(create).not.toHaveBeenCalled()

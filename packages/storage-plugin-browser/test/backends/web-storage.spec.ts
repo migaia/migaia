@@ -1,8 +1,10 @@
 import { createLocalTestStore, createSessionTestStore } from '../helpers/installed-backends.js'
-import { STORAGE_HOST_SOURCE } from '@migaia/storage-host'
+import {
+  STORAGE_HOST_ERROR_SOURCE,
+  STORAGE_BROWSER_ERROR_SOURCE
+} from '@migaia/storage-contract/error-code'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { describe, expect, it, vi } from 'vitest'
-import { STORAGE_BROWSER_SOURCE } from '../../src/index.js'
 import { fakeWebStorage } from '../../src/testing/fake-web-storage.js'
 
 /** Installation wrappers retain the browser failure and its original native cause. */
@@ -15,10 +17,13 @@ const expectNativeInstallationFailure = async (
     () => undefined,
     (cause: unknown) => cause
   )
-  if ((failure as { readonly source?: unknown })?.source !== STORAGE_BROWSER_SOURCE)
-    expect(failure).toMatchObject({ source: STORAGE_HOST_SOURCE, code: 'BACKEND_INSTALL_FAILED' })
+  if ((failure as { readonly source?: unknown })?.source !== STORAGE_BROWSER_ERROR_SOURCE)
+    expect(failure).toMatchObject({
+      source: STORAGE_HOST_ERROR_SOURCE,
+      code: 'BACKEND_INSTALL_FAILED'
+    })
   expect(walkErrorCauses(failure)).toContainEqual(
-    expect.objectContaining({ source: STORAGE_BROWSER_SOURCE, ...expected })
+    expect.objectContaining({ source: STORAGE_BROWSER_ERROR_SOURCE, ...expected })
   )
   return failure
 }

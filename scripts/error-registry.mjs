@@ -178,10 +178,10 @@ export const collectErrorRegistry = (root = repositoryRoot) => {
     /** Re-exports and empty tables own no codes and therefore need no source declaration. */
     const entries = [...text.matchAll(entryPattern)]
     if (entries.length === 0) continue
-    /** Flat constant tables are the canonical error-code declaration syntax. */
+    /** Flat constant tables, optionally frozen, are the canonical error-code declaration syntax. */
     const tables = []
     for (const table of text.matchAll(
-      /(?:\/\*\*((?:(?!\*\/)[\s\S])*?)\*\/\s*)?export const [A-Za-z][A-Za-z0-9]*\s*=\s*\{([\s\S]*?)\}\s*(?:as const)?/g
+      /(?:\/\*\*((?:(?!\*\/)[\s\S])*?)\*\/\s*)?export const [A-Za-z][A-Za-z0-9]*\s*=\s*(?:Object\.freeze\(\s*)?\{([\s\S]*?)\}\s*(?:as const)?/g
     )) {
       /** Read each table annotation once rather than rescanning it for every code. */
       const tableSource = table[1]?.match(/@error-source[ \t]*([^\s*]*)/)?.[1]

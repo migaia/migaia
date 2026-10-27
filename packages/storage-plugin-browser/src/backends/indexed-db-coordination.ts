@@ -14,7 +14,8 @@ import {
 } from '@migaia/storage-host/sdk'
 import type { IBackendKeyLockPort } from '@migaia/storage-host/sdk'
 import { StorageErrorText } from '../error-text.js'
-import { StorageErrorCode, createStorageTypeError } from '../types/errors.js'
+import { createStorageTypeError } from '../types/errors.js'
+import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 /** Versioned metadata-only message shape used by admitted IndexedDB transports. */
 type IIndexedDbWireHint = {
   readonly version: 1
@@ -175,7 +176,7 @@ const decodeWireHint = (
         const decoded = decodeFlatStorageKey(encoded)
         if (decoded === undefined)
           throw createStorageTypeError(
-            StorageErrorCode.deserializeFailed,
+            StorageBrowserErrorCode.deserializeFailed,
             StorageErrorText.indexedDbChangeHintKeyInvalid
           )
         return decoded

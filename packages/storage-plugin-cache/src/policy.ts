@@ -4,7 +4,7 @@ import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import type { ICodecValue } from '@migaia/serialize/codec'
 import { jitter } from '@migaia/utils/number'
 import { CacheText, CacheWriteMode } from './constants.js'
-import { CacheErrorCode } from './error-code.js'
+import { CacheErrorCode } from '@migaia/storage-contract/error-code'
 import { cacheError, invalidArgument } from './errors.js'
 import type { ICacheOptions, ICacheCallOptions } from './types.js'
 

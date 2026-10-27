@@ -20,13 +20,9 @@ import type {
 } from '@migaia/storage-contract'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { markRecordIndexBackfillContentionFailure } from '@migaia/storage-host/entity'
-import {
-  StorageError,
-  StorageErrorCode,
-  type IExtensionStage,
-  type IStorageChannel,
-  type IStorageErrorCode
-} from '../types/errors.js'
+import { StorageError, type IExtensionStage, type IStorageChannel } from '../types/errors.js'
+import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
+import type { IStorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageBackend, StorageConflictPolicy, type IStorageConflictPolicy } from '../constants.js'
 import { indexUniqueConflictText } from '../error-text.js'
 
@@ -44,7 +40,7 @@ export const isStorageErrorFamily = (value: unknown): value is IStorageErrorFami
 export const normalizeError = (
   error: unknown,
   backend: IBackendKind,
-  code: IStorageErrorCode = StorageErrorCode.transactionFailed,
+  code: IStorageBrowserErrorCode = StorageBrowserErrorCode.transactionFailed,
   operation?: string,
   extensionStage?: IExtensionStage
 ): IStorageErrorFamily =>
@@ -87,7 +83,7 @@ export const invokeExtension = <T>(
           error.message
         )
       }
-      return normalizeError(error, backend, StorageErrorCode.extensionFailed, op, stage)
+      return normalizeError(error, backend, StorageBrowserErrorCode.extensionFailed, op, stage)
     }
   )
 
@@ -112,7 +108,7 @@ export const planChannelWrite = (
     existing,
     policy,
     backend,
-    (details) => new StorageError(StorageErrorCode.duplicateKey, details)
+    (details) => new StorageError(StorageBrowserErrorCode.duplicateKey, details)
   )
 
 /** Unique-key collection supplies Web-owned errors while retaining the shared final-state rules. */
@@ -122,10 +118,11 @@ export const collectUniqueIndexOwners = (
   backend: IBackendKind
 ): ReadonlyMap<string, IUniqueIndexOwner> =>
   collectOwners(definitions, records, backend, {
-    invalidConfig: (owner) => new StorageError(StorageErrorCode.invalidConfig, { backend: owner }),
+    invalidConfig: (owner) =>
+      new StorageError(StorageBrowserErrorCode.invalidConfig, { backend: owner }),
     uniqueConflict: (owner, key, indexName) =>
       new StorageError(
-        StorageErrorCode.indexUniqueConflict,
+        StorageBrowserErrorCode.indexUniqueConflict,
         { backend: owner, key },
         indexUniqueConflictText(indexName)
       )
@@ -134,7 +131,7 @@ export const collectUniqueIndexOwners = (
 /** Preserve the native Web contention diagnostic while the host owns its private classification. */
 export const createBackfillContentionFailure = (): StorageError => {
   /** This original error remains reachable unchanged through an entity fallback decision. */
-  const failure = new StorageError(StorageErrorCode.unavailable, {
+  const failure = new StorageError(StorageBrowserErrorCode.unavailable, {
     backend: StorageBackend.indexedDb
   })
   markRecordIndexBackfillContentionFailure(failure)

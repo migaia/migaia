@@ -1,6 +1,5 @@
 export { postgresBackendKind, postgresBackendPlugin } from './plugin.js'
-export { PostgresErrorCode } from './error-code.js'
-export type { IPostgresErrorCode } from './error-code.js'
+
 export type { IPgCapabilityProbeHookPayload, IPgNotifyHookPayload } from './hooks.js'
 export type {
   IPgNativeOperation,

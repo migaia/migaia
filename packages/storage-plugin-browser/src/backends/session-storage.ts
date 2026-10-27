@@ -5,7 +5,8 @@ import {
   type IWebStorageOptions
 } from './web-storage.js'
 import type { IKeyValueStore, ISyncCapableStore, IWebStorageLike } from '../types/storage.js'
-import { StorageError, StorageErrorCode } from '../types/errors.js'
+import { StorageError } from '../types/errors.js'
+import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageBackend } from '../constants.js'
 import type {
   IBackendConstruction,
@@ -42,7 +43,7 @@ export const sessionStorageHost = (
   try {
     storage ??= globalThis.sessionStorage
   } catch (cause) {
-    throw new StorageError(StorageErrorCode.unavailable, {
+    throw new StorageError(StorageBrowserErrorCode.unavailable, {
       backend: StorageBackend.session,
       cause
     })

@@ -1,5 +1,6 @@
 import { definePlugin } from '../../contracts.js'
-import { createStorageTypeError, StorageErrorCode } from '../../errors.js'
+import { createStorageTypeError } from '../../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../../error-text.js'
 import { STORAGE_PROBE_PLUGIN_ID } from '../../state-constants.js'
 import type { IStorageHookMap, IStorageHooks } from '../../hook-types.js'
@@ -46,7 +47,7 @@ class StorageProbeObserver {
   ): () => void {
     if (typeof handler !== 'function')
       throw createStorageTypeError(
-        StorageErrorCode.invalidConfig,
+        StorageHostErrorCode.invalidConfig,
         StorageErrorText.invalidHookHandler
       )
     const orgId = context.orgId
@@ -72,11 +73,11 @@ class StorageProbeObserver {
 /** Rejects a handler map that is not a plain object of functions before the plugin is created. */
 function assertProbeHandlers(handlers: unknown): asserts handlers is IStorageProbeHandlers {
   if (typeof handlers !== 'object' || handlers === null || Array.isArray(handlers))
-    throw createStorageTypeError(StorageErrorCode.invalidConfig, StorageErrorText.invalidHooks)
+    throw createStorageTypeError(StorageHostErrorCode.invalidConfig, StorageErrorText.invalidHooks)
   for (const handler of Object.values(handlers))
     if (handler !== undefined && typeof handler !== 'function')
       throw createStorageTypeError(
-        StorageErrorCode.invalidConfig,
+        StorageHostErrorCode.invalidConfig,
         StorageErrorText.invalidHookHandler
       )
 }

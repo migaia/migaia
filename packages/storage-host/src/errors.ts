@@ -1,12 +1,8 @@
 import type { IBackendKind } from '@migaia/storage-contract'
 import type { IStorageKey } from '@migaia/storage-contract'
-import { ERROR_SOURCE, StorageErrorCode, type IStorageErrorCode } from './error-code.js'
+import { STORAGE_HOST_ERROR_SOURCE } from '@migaia/storage-contract/error-code'
+import type { IStorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from './error-text.js'
-
-export { StorageErrorCode, type IStorageErrorCode }
-
-/** `source` value stamped onto every error this package throws. */
-export const STORAGE_HOST_SOURCE = ERROR_SOURCE
 
 /**
  * Optional diagnostic context for a frozen StorageError; nested values and cause retain their
@@ -32,30 +28,30 @@ export type IStorageErrorDetails = {
 /** Native admission error enriched with this package's stable boundary identity. */
 export type IStorageTypeError = TypeError & {
   readonly source: string
-  readonly code: IStorageErrorCode
+  readonly code: IStorageHostErrorCode
 }
 
 /** Native generic error enriched with this package's stable boundary identity. */
 export type IStorageNativeError = Error & {
   readonly source: string
-  readonly code: IStorageErrorCode
+  readonly code: IStorageHostErrorCode
 }
 
 /** Native range error enriched with this package's stable boundary identity. */
 export type IStorageRangeError = RangeError & {
   readonly source: string
-  readonly code: IStorageErrorCode
+  readonly code: IStorageHostErrorCode
 }
 
 /** Attach the public package identity without replacing the supplied native error instance. */
 const attachStorageErrorIdentity = <T extends Error>(
   error: T,
-  code: IStorageErrorCode
-): T & { readonly source: string; readonly code: IStorageErrorCode } => {
+  code: IStorageHostErrorCode
+): T & { readonly source: string; readonly code: IStorageHostErrorCode } => {
   Object.defineProperty(error, 'source', {
     configurable: false,
     enumerable: false,
-    value: STORAGE_HOST_SOURCE,
+    value: STORAGE_HOST_ERROR_SOURCE,
     writable: false
   })
   Object.defineProperty(error, 'code', {
@@ -64,12 +60,12 @@ const attachStorageErrorIdentity = <T extends Error>(
     value: code,
     writable: false
   })
-  return error as T & { readonly source: string; readonly code: IStorageErrorCode }
+  return error as T & { readonly source: string; readonly code: IStorageHostErrorCode }
 }
 
 /** Create a coded native Error for internal failures that may cross the package boundary. */
 export const createStorageError = (
-  code: IStorageErrorCode,
+  code: IStorageHostErrorCode,
   message: string,
   cause?: unknown
 ): IStorageNativeError =>
@@ -77,7 +73,7 @@ export const createStorageError = (
 
 /** Create a coded native RangeError while preserving its runtime prototype. */
 export const createStorageRangeError = (
-  code: IStorageErrorCode,
+  code: IStorageHostErrorCode,
   message: string,
   cause?: unknown
 ): IStorageRangeError =>
@@ -89,7 +85,7 @@ export const createStorageRangeError = (
 /** Native aggregate carrying storage-host identity while preserving every cleanup failure object. */
 export type IStorageAggregateError = AggregateError & {
   readonly source: string
-  readonly code: IStorageErrorCode
+  readonly code: IStorageHostErrorCode
 }
 
 /**
@@ -97,7 +93,7 @@ export type IStorageAggregateError = AggregateError & {
  * failures.
  */
 export const createStorageAggregateError = (
-  code: IStorageErrorCode,
+  code: IStorageHostErrorCode,
   message: string,
   errors: readonly unknown[]
 ): IStorageAggregateError => {
@@ -108,7 +104,7 @@ export const createStorageAggregateError = (
   Object.defineProperty(aggregate, 'source', {
     configurable: false,
     enumerable: false,
-    value: STORAGE_HOST_SOURCE,
+    value: STORAGE_HOST_ERROR_SOURCE,
     writable: false
   })
   Object.defineProperty(aggregate, 'code', {
@@ -126,7 +122,7 @@ export const createStorageAggregateError = (
  * branch on TypeError and still traverse the original failure.
  */
 export const createStorageTypeError = (
-  code: IStorageErrorCode,
+  code: IStorageHostErrorCode,
   message: string,
   cause?: unknown
 ): IStorageTypeError => {
@@ -158,7 +154,7 @@ export class StorageError extends Error {
   /** Canonical storage-host diagnostic source. */
   readonly source!: string
   /** Semantic failure scenario; branch on this rather than message text. */
-  readonly code!: IStorageErrorCode
+  readonly code!: IStorageHostErrorCode
   /** Backend associated with this operation. */
   readonly backend?: IBackendKind
   /** Logical key associated with this operation. */
@@ -176,7 +172,7 @@ export class StorageError extends Error {
 
   /** Capture diagnostic details once and freeze this error without replacing its original cause. */
   constructor(
-    code: IStorageErrorCode,
+    code: IStorageHostErrorCode,
     details: IStorageErrorDetails = {},
     message?: string,
     stage?: 'decode' | 'migrate' | 'validate'
@@ -184,7 +180,7 @@ export class StorageError extends Error {
     super(message ?? StorageErrorText.defaultError(code), { cause: details.cause })
     this.name = 'StorageError'
     Object.defineProperties(this, {
-      source: { value: STORAGE_HOST_SOURCE, enumerable: true },
+      source: { value: STORAGE_HOST_ERROR_SOURCE, enumerable: true },
       code: { value: code, enumerable: true }
     })
     this.backend = details.backend

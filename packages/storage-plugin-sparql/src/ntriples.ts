@@ -3,7 +3,7 @@ import type { Term, Quad } from '@rdfjs/types'
 import { term, snapshotStorageRdfTerm } from '@migaia/storage-host/sdk'
 import { RdfTermType, type IRdfTerm, type IRawQuad } from '@migaia/storage-contract'
 import { sparqlError } from './errors.js'
-import { SparqlErrorCode } from './error-code.js'
+import { SparqlErrorCode } from '@migaia/storage-contract/error-code'
 import { SparqlErrorText } from './error-text.js'
 import type { IRdfGraphDocument, IRdfGraphFormat } from './endpoint.js'
 /** Real RDF/JS terms map to the shared complete RDF 1.1 term domain. */

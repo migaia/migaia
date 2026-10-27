@@ -114,7 +114,7 @@ import {
   normalizeSqliteFailure,
   transactionCleanupFailure
 } from './errors.js'
-import { SqliteErrorCode } from './error-code.js'
+import { SqliteErrorCode } from '@migaia/storage-contract/error-code'
 import { SqliteErrorText } from './error-text.js'
 import { decodeKey, decodeHexKey, keyHex } from './key-codec.js'
 import { createSqliteStatements, createSqliteExecutor } from './sql.js'

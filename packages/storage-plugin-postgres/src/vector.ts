@@ -44,7 +44,7 @@ import { pgKey, pgTextKey, encodePgRecord, decodePgRecord } from './codec.js'
 import { quotePgIdentifier } from './copy-command.js'
 import { pgVectorCondition, pgVectorFilter, pgVectorProjection } from './vector-filter.js'
 import { invalidArgument, postgresError } from './errors.js'
-import { PostgresErrorCode } from './error-code.js'
+import { PostgresErrorCode } from '@migaia/storage-contract/error-code'
 import { PgNames, PgQuantizedMode } from './constants.js'
 import { encodePgJournalImage, decodePgJournalImage, type IPgJournalVectorPort } from './journal.js'
 /** One native table belongs to the store-wide logical collection rather than one organization. */

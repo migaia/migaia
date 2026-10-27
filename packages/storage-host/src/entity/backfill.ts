@@ -5,7 +5,8 @@ import type {
   IRecordIndexProjection,
   IRecordIndexReadiness
 } from '@migaia/storage-contract'
-import { StorageError, StorageErrorCode } from '../errors.js'
+import { StorageError } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.js'
 import { resolveBackendCapabilityOwner } from '../core/backend-registry.js'
 
@@ -27,7 +28,7 @@ export type IRecordIndexBackfillPhase =
 /** Mark the original already-coded native contention failure without changing its identity. */
 export const markRecordIndexBackfillContentionFailure = (error: object): void => {
   if ((typeof error !== 'object' && typeof error !== 'function') || error === null)
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageHostErrorCode.invalidConfig, {
       cause: new TypeError(StorageErrorText.backfillFailureObject)
     })
   fallbackSafeFailures.add(error)
@@ -144,7 +145,7 @@ export const registerRecordIndexBackfillStore = <TValue>(
   capability: IRecordIndexBackfillStore<TValue>
 ): void => {
   if ((typeof backend !== 'object' && typeof backend !== 'function') || backend === null)
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageHostErrorCode.invalidConfig, {
       cause: new TypeError(StorageErrorText.backfillBackendObject)
     })
   backfillStores.set(

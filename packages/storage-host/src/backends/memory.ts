@@ -145,7 +145,8 @@ import { storageJournalLockKey, StorageJournalLock } from '../journal/keys.js'
 import { encodeStorageJournalImage, decodeStorageJournalImage } from '../journal/image.js'
 import { detectServerRuntime } from '@migaia/utils'
 import { isUint8Array, utf8ByteLength } from '@migaia/utils/bytes'
-import { StorageError, StorageErrorCode, type IStorageChannel } from '../errors.js'
+import { StorageError, type IStorageChannel } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.js'
 import type { IStoragePluginCore } from '../types.js'
 import { STORAGE_MEMORY_BACKEND } from '../state-constants.js'
@@ -386,7 +387,7 @@ class MemoryBackendOwner<T> {
     }
     if (assembly.iterator !== undefined && assembly.controller === undefined)
       throw new StorageError(
-        StorageErrorCode.changeControllerNotAssembled,
+        StorageHostErrorCode.changeControllerNotAssembled,
         {},
         StorageErrorText.changeControllerNotAssembled
       )
@@ -892,7 +893,7 @@ function normalize<T>(
 ) {
   return isStorageErrorFamily(cause)
     ? cause
-    : new StorageError(StorageErrorCode.transactionFailed, {
+    : new StorageError(StorageHostErrorCode.transactionFailed, {
         backend: STORAGE_MEMORY_BACKEND,
         ...(expiredScope ? { operation: MemoryOperation.transactionScope } : {}),
         cause
@@ -1085,7 +1086,7 @@ function clone<T, V>(namespaceContext: IMemoryNamespaceContext<T>, value: V, key
   try {
     return (globalThis as unknown as { structuredClone<W>(input: W): W }).structuredClone(value)
   } catch (cause) {
-    throw new StorageError(StorageErrorCode.serializeFailed, {
+    throw new StorageError(StorageHostErrorCode.serializeFailed, {
       backend: STORAGE_MEMORY_BACKEND,
       key,
       cause
@@ -1116,7 +1117,7 @@ function cloneBytes<T>(
   try {
     return new Uint8Array(value.buffer, value.byteOffset, value.byteLength).slice()
   } catch (cause) {
-    throw new StorageError(StorageErrorCode.serializeFailed, {
+    throw new StorageError(StorageHostErrorCode.serializeFailed, {
       backend: STORAGE_MEMORY_BACKEND,
       key,
       cause
@@ -1132,13 +1133,13 @@ function prepare<T>(
   key: IStorageKey
 ): unknown {
   if (channel === 'value' && typeof value !== 'string')
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageHostErrorCode.invalidConfig, {
       backend: STORAGE_MEMORY_BACKEND,
       key,
       cause: new TypeError(StorageErrorText.memoryTextValue)
     })
   if (channel === 'bytes' && !isUint8Array(value))
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageHostErrorCode.invalidConfig, {
       backend: STORAGE_MEMORY_BACKEND,
       key,
       cause: new TypeError(StorageErrorText.memoryBytesValue)
@@ -1631,7 +1632,7 @@ function watchChanges<T>(
 ): IStorageIterator<IStorageChange> {
   if (namespaceContext.assembly.iterator === undefined)
     throw new StorageError(
-      StorageErrorCode.changeIteratorNotAssembled,
+      StorageHostErrorCode.changeIteratorNotAssembled,
       {},
       StorageErrorText.changeIteratorNotAssembled
     )
@@ -4653,7 +4654,7 @@ function blobFailure<T>(
 ) {
   return isStorageErrorFamily(cause)
     ? cause
-    : new StorageError(StorageErrorCode.serializeFailed, {
+    : new StorageError(StorageHostErrorCode.serializeFailed, {
         backend: STORAGE_MEMORY_BACKEND,
         key,
         cause

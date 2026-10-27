@@ -1,5 +1,6 @@
 import type { IBackendKind, IStorageKey } from '@migaia/storage-contract'
-import { StorageError, StorageErrorCode, type IStorageChannel } from '../errors.js'
+import { StorageError, type IStorageChannel } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { STORAGE_MEMORY_BACKEND } from '../state-constants.js'
 
 /** Existing physical channel presence is supplied by the real backend. */
@@ -33,7 +34,7 @@ export function planChannelWrite(
       existingChannel: conflicts[0]!,
       attemptedChannel: attempted
     }
-    throw onConflict?.(details) ?? new StorageError(StorageErrorCode.duplicateKey, details)
+    throw onConflict?.(details) ?? new StorageError(StorageHostErrorCode.duplicateKey, details)
   }
   return { remove: conflicts }
 }

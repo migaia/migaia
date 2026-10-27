@@ -17,7 +17,8 @@ import {
   safeJsonPayloadByteLength,
   createStorageToken
 } from '@migaia/storage-host/sdk'
-import { createStorageAggregateError, StorageError, StorageErrorCode } from '../types/errors.js'
+import { createStorageAggregateError, StorageError } from '../types/errors.js'
+import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import { indexBackfillFailureText, StorageErrorText } from '../error-text.js'
 import { StorageBackend, StorageOperation, StorageTransactionOperation } from '../constants.js'
 import { collectUniqueIndexOwners } from './errors.js'
@@ -434,7 +435,7 @@ export async function readBatch<TValue>(
     (metadataState.lease as { ownerToken?: string } | undefined)?.ownerToken !==
       sessionState.ownerToken
   )
-    throw new StorageError(StorageErrorCode.unavailable, {
+    throw new StorageError(StorageBrowserErrorCode.unavailable, {
       backend: StorageBackend.indexedDb
     })
   metadataStore.put(
@@ -660,7 +661,7 @@ export function indexedDbBackfillRenew<TValue>(
     )
       throw state?.handle?.generation !== sessionState.handle.generation
         ? staleIndexHandleError()
-        : new StorageError(StorageErrorCode.unavailable, {
+        : new StorageError(StorageBrowserErrorCode.unavailable, {
             backend: StorageBackend.indexedDb
           })
     const currentLease = state.lease
@@ -771,7 +772,7 @@ export async function commitIndexedDbBackfillNative<TValue>(
     commitState.batch.generation !== commitState.sessionState.handle.generation ||
     commitState.batch.ownerToken !== commitState.sessionState.ownerToken
   )
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.indexedDb
     })
 
@@ -882,7 +883,7 @@ export function indexedDbBackfillFail<TValue>(
     )
       throw state?.handle?.generation !== sessionState.handle.generation
         ? staleIndexHandleError()
-        : new StorageError(StorageErrorCode.unavailable, {
+        : new StorageError(StorageBrowserErrorCode.unavailable, {
             backend: StorageBackend.indexedDb
           })
     const readiness = (state as { readiness?: IRecordIndexReadiness }).readiness ?? {
@@ -914,7 +915,7 @@ export function indexedDbBackfillFail<TValue>(
       await idbTransactionCommit(transaction, { signal: failOperation?.signal }, failRuntime)
     } catch (persistFailure) {
       throw createStorageAggregateError(
-        StorageErrorCode.indexBackfillFailed,
+        StorageBrowserErrorCode.indexBackfillFailed,
         indexBackfillFailureText(sessionState.handle.scope),
         [cause, persistFailure]
       )
@@ -939,7 +940,7 @@ export function validateIndexedDbBackfillSession<TValue>(
     typeof sessionState.options !== 'object' ||
     Array.isArray(sessionState.options)
   )
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.indexedDb
     })
 
@@ -960,7 +961,7 @@ export function validateIndexedDbBackfillSession<TValue>(
     sessionState.physicalRange.upper === undefined ||
     typeof sessionState.options.allowComplete !== 'boolean'
   )
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.indexedDb
     })
 
@@ -973,7 +974,7 @@ export function validateIndexedDbBackfillSession<TValue>(
     sessionState.batchSize < INDEX_BACKFILL_MIN_BATCH_SIZE ||
     sessionState.batchSize > INDEX_BACKFILL_MAX_BATCH_SIZE
   )
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.indexedDb
     })
 
@@ -982,7 +983,7 @@ export function validateIndexedDbBackfillSession<TValue>(
     sessionState.leaseMs < INDEX_BACKFILL_MIN_LEASE_MS ||
     sessionState.leaseMs > INDEX_BACKFILL_MAX_LEASE_MS
   )
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.indexedDb
     })
 }
@@ -1007,12 +1008,12 @@ export async function acquireIndexedDbBackfillLease<TValue>(
     sessionState.phase !== RecordIndexBackfillPhase.canonical &&
     sessionState.phase !== RecordIndexBackfillPhase.legacy
   )
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.indexedDb
     })
 
   if (sessionState.phase === RecordIndexBackfillPhase.legacy && !sessionState.includeLegacy)
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.indexedDb
     })
 
@@ -1100,7 +1101,7 @@ export async function prepareIndexedDbBackfillCandidates<TValue>(
     for (const candidate of rawCandidates) {
       const preparation = await readOptions.prepare(candidate)
       if (!Number.isFinite(preparation.decodedBytes) || preparation.decodedBytes < 0)
-        throw new StorageError(StorageErrorCode.invalidConfig, {
+        throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
           backend: StorageBackend.indexedDb
         })
       const metrics = estimateBackfillProjectionMetrics(
@@ -1203,7 +1204,7 @@ export async function validateIndexedDbBackfillCommit<TValue>(
       commitState.batch.nextCheckpoint !== undefined &&
       compareStorageKeys(commitState.batch.nextCheckpoint, commitState.state.checkpoint) <= 0)
   )
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.indexedDb
     })
   const issuedManifest = commitState.state.issued
@@ -1227,7 +1228,7 @@ export async function validateIndexedDbBackfillCommit<TValue>(
         issued[index]?.revision !== projection.expectedRevision
     )
   )
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.indexedDb
     })
   if (
@@ -1235,7 +1236,7 @@ export async function validateIndexedDbBackfillCommit<TValue>(
     (commitState.batch.nextCheckpoint === undefined ||
       encodeFlatStorageKey(commitState.batch.nextCheckpoint) !== issued[issued.length - 1]!.key)
   )
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.indexedDb
     })
   let projectionRows = 0
@@ -1561,7 +1562,7 @@ export async function* indexedDbIndexRows<TValue>(
   try {
     throwIfAborted(iteratorState.signal)
     if (!iteratorState.indexedDbContext.keyRange)
-      throw new StorageError(StorageErrorCode.unavailable, {
+      throw new StorageError(StorageBrowserErrorCode.unavailable, {
         backend: StorageBackend.indexedDb,
         cause: new Error(StorageErrorText.indexedDbKeyRangeUnavailable)
       })
@@ -1729,7 +1730,7 @@ export async function readIndexedDbIndexNativePage<TValue>(
       if (value === undefined && !(await nativeState.expiredRecord(recordKey)))
         pageState.iteratorState.runtime.reporter(
           new StorageError(
-            StorageErrorCode.indexOrphan,
+            StorageBrowserErrorCode.indexOrphan,
             { backend: StorageBackend.indexedDb, key: recordKey },
             StorageErrorText.indexOrphan
           )
@@ -1776,7 +1777,7 @@ export async function assertIndexedDbIndexPage<TValue>(
     pageState.iteratorState.expectedEpoch.scope !== scopeEpoch
   )
     throw new StorageError(
-      StorageErrorCode.indexQueryInvalidated,
+      StorageBrowserErrorCode.indexQueryInvalidated,
       { backend: StorageBackend.indexedDb },
       StorageErrorText.indexQueryInvalidated
     )
@@ -1790,7 +1791,7 @@ export async function assertIndexedDbIndexPage<TValue>(
   if (state?.handle?.generation !== pageState.iteratorState.query.handle.generation)
     throw staleIndexHandleError()
   if (state.readiness?.status !== 'complete')
-    throw new StorageError(StorageErrorCode.unavailable, {
+    throw new StorageError(StorageBrowserErrorCode.unavailable, {
       backend: StorageBackend.indexedDb,
       cause: new Error('record index is not complete; caller must use fallback scan')
     })
@@ -1897,14 +1898,14 @@ function validateIndexedDbIndexSchema(database: IDBDatabase): void {
     keyPath: readonly string[]
   ): void => {
     if (!sidecar.indexNames.contains(name))
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
         backend: StorageBackend.indexedDb,
         operation: StorageOperation.indexedDbSchema,
         cause: new TypeError(`IndexedDB sidecar index ${name} is missing`)
       })
     const index = sidecar.index(name)
     if (!sameKeyPath(index.keyPath, keyPath) || index.unique || index.multiEntry)
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
         backend: StorageBackend.indexedDb,
         operation: StorageOperation.indexedDbSchema,
         cause: new TypeError(`IndexedDB sidecar index ${name} has an incompatible signature`)
@@ -1919,7 +1920,7 @@ function validateIndexedDbIndexSchema(database: IDBDatabase): void {
     }
     actualNames.sort()
     if (actualNames.join('\u0000') !== ['lookup', 'record'].join('\u0000'))
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
         backend: StorageBackend.indexedDb,
         operation: StorageOperation.indexedDbSchema,
         cause: new TypeError('IndexedDB sidecar index set is incompatible')
@@ -1930,7 +1931,7 @@ function validateIndexedDbIndexSchema(database: IDBDatabase): void {
     .objectStore(INDEX_RECORDS_STORE_NAME)
   const keyPath = sidecar.keyPath
   if (!sameKeyPath(keyPath, ['scope', 'indexName', 'generation', 'indexValue', 'recordKey']))
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.indexedDb,
       operation: StorageOperation.indexedDbSchema,
       cause: new TypeError('IndexedDB sidecar layout is incompatible')
@@ -1981,7 +1982,7 @@ async function validateIndexedDbUniqueOwners<TValue, T>(
     }
     if (liveOwners > 1)
       throw new StorageError(
-        StorageErrorCode.indexUniqueConflict,
+        StorageBrowserErrorCode.indexUniqueConflict,
         { backend: StorageBackend.indexedDb },
         indexUniqueConflictText(indexName)
       )
@@ -2047,7 +2048,9 @@ class IndexedDbTransactionIndexSource<
     await assertHandle(this.#nativeState, this.#query.handle)
     const context = this.#nativeState.attemptState.logicalTransaction.indexedDbContext
     if (context.keyRange === undefined)
-      throw new StorageError(StorageErrorCode.unavailable, { backend: StorageBackend.indexedDb })
+      throw new StorageError(StorageBrowserErrorCode.unavailable, {
+        backend: StorageBackend.indexedDb
+      })
     const direction = this.#query.direction === 'prev' ? 'prev' : 'next'
     const prefix = [this.#query.handle.scope, this.#query.index, this.#query.handle.generation]
     return this.#nativeState.native
@@ -2072,7 +2075,7 @@ class IndexedDbTransactionIndexSource<
       if (value !== undefined) return [key, value]
     } else if (await this.#nativeState.ttlAccess.expired('record', key)) return undefined
     throw new StorageError(
-      StorageErrorCode.indexOrphan,
+      StorageBrowserErrorCode.indexOrphan,
       { backend: StorageBackend.indexedDb },
       StorageErrorText.indexOrphan
     )

@@ -1,7 +1,8 @@
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import { normalizeError } from '@migaia/storage-host/sdk'
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { ERROR_SOURCE, RedisErrorCode, type IRedisErrorCode } from './error-code.js'
+import { STORAGE_REDIS_ERROR_SOURCE, RedisErrorCode } from '@migaia/storage-contract/error-code'
+import type { IRedisErrorCode } from '@migaia/storage-contract/error-code'
 import { RedisText } from './constants.js'
 /** The normalization boundary always returns an actual registered identity. */
 export type IRedisFailure = Error & { readonly source: string; readonly code: string }
@@ -9,7 +10,7 @@ export type IRedisFailure = Error & { readonly source: string; readonly code: st
 export function isRedisError(value: unknown): value is IRedisFailure {
   return (
     value instanceof Error &&
-    Reflect.get(value, 'source') === ERROR_SOURCE &&
+    Reflect.get(value, 'source') === STORAGE_REDIS_ERROR_SOURCE &&
     Object.values(RedisErrorCode).includes(Reflect.get(value, 'code'))
   )
 }
@@ -36,12 +37,12 @@ export function redisError(code: IRedisErrorCode, cause?: unknown): IRedisFailur
                 : new Error(message, { cause })
     if (typeof DOMException !== 'undefined' && error instanceof DOMException)
       Object.defineProperty(error, 'cause', { value: cause })
-    return attachErrorIdentity(error, { source: ERROR_SOURCE, code }) as IRedisFailure
+    return attachErrorIdentity(error, { source: STORAGE_REDIS_ERROR_SOURCE, code }) as IRedisFailure
   }
   return cause instanceof Error && cause.stack
     ? (attachErrorIdentity(
         cause,
-        { source: ERROR_SOURCE, code },
+        { source: STORAGE_REDIS_ERROR_SOURCE, code },
         { onConflict: fallback, onFailure: fallback }
       ) as IRedisFailure)
     : fallback()

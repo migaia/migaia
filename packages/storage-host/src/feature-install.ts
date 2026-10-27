@@ -10,7 +10,8 @@ import type {
   ICapabilityInstallPort,
   IStorageBase
 } from '@migaia/storage-contract'
-import { createStorageTypeError, StorageErrorCode } from './errors.js'
+import { createStorageTypeError } from './errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from './error-text.js'
 import type {
   IStorageExecutionPort,
@@ -22,7 +23,7 @@ import { STORAGE_CHAIN_FAMILIES } from './state-constants.js'
 /** A closed output-shape failure stays at the existing backend definition boundary. */
 function invalid(cause?: unknown): never {
   throw createStorageTypeError(
-    StorageErrorCode.backendPluginInvalid,
+    StorageHostErrorCode.backendPluginInvalid,
     StorageErrorText.backendPluginInvalid,
     cause
   )

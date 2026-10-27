@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
 import { records } from '@migaia/storage-contract'
-import { createStorageHost, STORAGE_HOST_SOURCE, StorageErrorCode } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import {
+  STORAGE_HOST_ERROR_SOURCE,
+  StorageHostErrorCode
+} from '@migaia/storage-contract/error-code'
 import { memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'
 import { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-change-feed'
@@ -20,14 +24,14 @@ describe('explicit memory owners used by web Features', () => {
     expect(store.capabilities.changeFeed).toBe(false)
     expect(() => store.subscribeChanges(() => undefined)).toThrow(
       expect.objectContaining({
-        source: STORAGE_HOST_SOURCE,
-        code: StorageErrorCode.changeControllerNotAssembled
+        source: STORAGE_HOST_ERROR_SOURCE,
+        code: StorageHostErrorCode.changeControllerNotAssembled
       })
     )
     expect(() => store.watch('key')).toThrow(
       expect.objectContaining({
-        source: STORAGE_HOST_SOURCE,
-        code: StorageErrorCode.changeIteratorNotAssembled
+        source: STORAGE_HOST_ERROR_SOURCE,
+        code: StorageHostErrorCode.changeIteratorNotAssembled
       })
     )
   })
@@ -57,8 +61,8 @@ describe('explicit memory owners used by web Features', () => {
     expect(store.capabilities.changeFeed).toBe(false)
     expect(() => store.watch('row')).toThrow(
       expect.objectContaining({
-        source: STORAGE_HOST_SOURCE,
-        code: StorageErrorCode.changeIteratorNotAssembled
+        source: STORAGE_HOST_ERROR_SOURCE,
+        code: StorageHostErrorCode.changeIteratorNotAssembled
       })
     )
   })
@@ -70,8 +74,8 @@ describe('explicit memory owners used by web Features', () => {
     }).catch((error: unknown) => error)
     expect(walkErrorCauses(failure)).toContainEqual(
       expect.objectContaining({
-        source: STORAGE_HOST_SOURCE,
-        code: StorageErrorCode.changeControllerNotAssembled
+        source: STORAGE_HOST_ERROR_SOURCE,
+        code: StorageHostErrorCode.changeControllerNotAssembled
       })
     )
   })

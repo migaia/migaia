@@ -1,7 +1,8 @@
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { normalizeError } from '@migaia/storage-host/sdk'
-import { ERROR_SOURCE, SparqlErrorCode, type ISparqlErrorCode } from './error-code.js'
+import { STORAGE_SPARQL_ERROR_SOURCE, SparqlErrorCode } from '@migaia/storage-contract/error-code'
+import type { ISparqlErrorCode } from '@migaia/storage-contract/error-code'
 import { SparqlErrorText } from './error-text.js'
 import { SparqlText } from './text.js'
 /** Native errors retain their type and stack, with immutable/conflicting identities on cause. */
@@ -30,7 +31,7 @@ export function sparqlError(code: ISparqlErrorCode, cause?: unknown): Error {
             : new Error(text, { cause })
     if (typeof DOMException !== 'undefined' && error instanceof DOMException)
       Object.defineProperty(error, 'cause', { value: cause })
-    return attachErrorIdentity(error, { source: ERROR_SOURCE, code })
+    return attachErrorIdentity(error, { source: STORAGE_SPARQL_ERROR_SOURCE, code })
   }
   if (
     cause instanceof TypeError ||
@@ -39,14 +40,14 @@ export function sparqlError(code: ISparqlErrorCode, cause?: unknown): Error {
   )
     return attachErrorIdentity<Error>(
       cause,
-      { source: ERROR_SOURCE, code },
+      { source: STORAGE_SPARQL_ERROR_SOURCE, code },
       { onConflict: wrap, onFailure: wrap }
     )
   return wrap()
 }
 /** The original family boundary recognizes already-normalized native protocol errors. */
 function isSparqlError(error: unknown): error is Error {
-  return error instanceof Error && 'source' in error && error.source === ERROR_SOURCE
+  return error instanceof Error && 'source' in error && error.source === STORAGE_SPARQL_ERROR_SOURCE
 }
 /** Native read failures gain protocol identity while existing error owners stay unchanged. */
 export function normalizeSparqlError(error: unknown): Error {

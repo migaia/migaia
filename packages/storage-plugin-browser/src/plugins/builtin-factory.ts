@@ -12,7 +12,8 @@ import {
   type IStoragePluginCore
 } from '@migaia/storage-host'
 import type { IBackendConstruction } from '../backends/construction.js'
-import { StorageError, StorageErrorCode } from '../types/errors.js'
+import { StorageError } from '../types/errors.js'
+import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import type { IBackendKind } from '@migaia/storage-contract'
 
 /** Read the optional factory id without allowing an options accessor to leave the Web boundary. */
@@ -24,7 +25,7 @@ export function readBuiltInPluginId<TId extends string>(
   try {
     return (options.id ?? fallback) as TId
   } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidConfig, { backend, cause })
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, { backend, cause })
   }
 }
 

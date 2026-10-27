@@ -11,10 +11,9 @@ import * as storageWeb from '../src/index.js'
  * 用 process.cwd() 而不是 import.meta.url：vitest 在 jsdom environment 下 转换后的 import.meta.url 不总是真实
  * file:// scheme，new URL() 会抛错； vitest 的 cwd 固定是本包根目录（vitest.config.ts 所在处），足够可靠。
  */
+/** The error domain and code table live in `@migaia/storage-contract/error-code`, not on this root. */
 const expectedRootExports = [
-  'STORAGE_BROWSER_SOURCE',
   'StorageError',
-  'StorageErrorCode',
   'StorageErrorText',
   'lengthPrefixedNamespaceCodec'
 ] as const

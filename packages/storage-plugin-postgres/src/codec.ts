@@ -5,7 +5,7 @@ import {
   defineCollectionsJsonCodec,
   type ICollectionsCodecValue
 } from '@migaia/serialize/codecs/collections-json'
-import { PostgresErrorCode } from './error-code.js'
+import { PostgresErrorCode } from '@migaia/storage-contract/error-code'
 import { PostgresErrorText } from './error-text.js'
 import { postgresError } from './errors.js'
 import { PgNames } from './constants.js'

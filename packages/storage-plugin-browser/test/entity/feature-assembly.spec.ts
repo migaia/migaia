@@ -6,7 +6,13 @@ import {
   STORAGE_CONTRACT_SOURCE,
   StorageContractErrorCode
 } from '@migaia/storage-contract'
-import { createStorageHost, STORAGE_HOST_SOURCE, StorageErrorCode } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import {
+  STORAGE_HOST_ERROR_SOURCE,
+  StorageHostErrorCode,
+  STORAGE_BROWSER_ERROR_SOURCE,
+  StorageBrowserErrorCode as WebErrorCode
+} from '@migaia/storage-contract/error-code'
 import { defineEntity } from '@migaia/storage-host/entity'
 import { entityQueryFeature } from '@migaia/storage-host/entity/features/query'
 import { entityUniqueFeature } from '@migaia/storage-host/entity/features/unique'
@@ -16,7 +22,6 @@ import { entityKeysetFeature } from '@migaia/storage-host/entity/features/keyset
 import { walkErrorCauses } from '@migaia/utils/error'
 import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
 import { indexedDbIndexesFeature } from '../../src/features/indexed-db-indexes.js'
-import { STORAGE_BROWSER_SOURCE, StorageErrorCode as WebErrorCode } from '../../src/types/errors.js'
 
 /** One domain retains identical records while each case selects only its actual owners. */
 type IRow = { id: string; group: string }
@@ -28,8 +33,8 @@ function options() {
 /** Missing entity units remain attributable to the original host boundary. */
 function missing(name: string) {
   return {
-    source: STORAGE_HOST_SOURCE,
-    code: StorageErrorCode.entityFeatureRequired,
+    source: STORAGE_HOST_ERROR_SOURCE,
+    code: StorageHostErrorCode.entityFeatureRequired,
     message: expect.stringContaining('@migaia/storage-host/entity/' + name)
   }
 }
@@ -126,8 +131,8 @@ describe('explicit entity Features over the web IndexedDB entry', () => {
       .catch((error: unknown) => error)
     expect(walkErrorCauses(failure)).toContainEqual(
       expect.objectContaining({
-        source: STORAGE_HOST_SOURCE,
-        code: StorageErrorCode.indexUniqueConflict
+        source: STORAGE_HOST_ERROR_SOURCE,
+        code: StorageHostErrorCode.indexUniqueConflict
       })
     )
     expect(await repository.get('b')).toBeUndefined()
@@ -202,7 +207,7 @@ describe('explicit entity Features over the web IndexedDB entry', () => {
       'records'
     )
     await expect(store.use(records).query().page(1)).rejects.toMatchObject({
-      source: STORAGE_BROWSER_SOURCE,
+      source: STORAGE_BROWSER_ERROR_SOURCE,
       code: WebErrorCode.indexedDbFeatureNotInstalled,
       message: expect.stringContaining('indexedDbKeysetFeature')
     })
@@ -297,8 +302,8 @@ describe('explicit entity Features over the web IndexedDB entry', () => {
       code: StorageContractErrorCode.queryNotPushable
     })
     await expect(repository.query().index('group').onInvalid('throw').all()).rejects.toMatchObject({
-      source: STORAGE_HOST_SOURCE,
-      code: StorageErrorCode.extensionFailed
+      source: STORAGE_HOST_ERROR_SOURCE,
+      code: StorageHostErrorCode.extensionFailed
     })
     expect(native).not.toHaveBeenCalled()
   })

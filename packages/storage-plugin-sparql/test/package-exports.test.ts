@@ -20,7 +20,9 @@ describe('SPARQL public entries', () => {
       expect(Object.keys(exports).sort()).toEqual(
         baseline.packages['@migaia/storage-plugin-sparql']![entry]
       )
-    expect(entries['.'].ERROR_SOURCE).toBe('storage.backend.sparql')
+    expect((await import('@migaia/storage-contract/error-code')).STORAGE_SPARQL_ERROR_SOURCE).toBe(
+      'storage.backend.sparql'
+    )
     expect(entries['.']).not.toHaveProperty('oxigraphEndpoint')
     expect(entries['.']).not.toHaveProperty('graphStoreFeature')
   })

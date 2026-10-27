@@ -14,7 +14,7 @@ import {
 import type { IOperationContext } from '@migaia/storage-contract'
 import { Archive } from './constants.js'
 import { invalidSegment, archiveError } from './errors.js'
-import { ArchiveErrorCode } from './error-code.js'
+import { ArchiveErrorCode } from '@migaia/storage-contract/error-code'
 
 /** One canonical versioned codec owns hot comparison, wire lines and restored values. */
 export const archiveCodec = defineCollectionsJsonCodec({ version: 1 })

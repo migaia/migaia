@@ -11,14 +11,15 @@ import type {
   IIndexedDbTransactionScope
 } from './indexed-db.js'
 import type { IBrowserBatchApi } from './construction.js'
-import { StorageError, StorageErrorCode } from '../types/errors.js'
+import { StorageError } from '../types/errors.js'
+import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import { indexedDbFeatureMissingText } from '../error-text.js'
 import { StorageBackend } from '../constants.js'
 /** Missing optional operations fail before native admission and identify their required Feature. */
 export const indexedDbFeatureMissing = {
   fail(feature: string): never {
     throw new StorageError(
-      StorageErrorCode.indexedDbFeatureNotInstalled,
+      StorageBrowserErrorCode.indexedDbFeatureNotInstalled,
       { backend: StorageBackend.indexedDb },
       indexedDbFeatureMissingText(feature)
     )

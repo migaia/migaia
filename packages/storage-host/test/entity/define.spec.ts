@@ -6,7 +6,7 @@ import { entityKeysetFeature } from '../../src/entity/keyset.js'
 import { describe, expect, it } from 'vitest'
 import { defineEntity } from '../../src/entity.js'
 import { memoryBackend } from '../helpers/memory.js'
-import { StorageErrorCode } from '../../src/errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageContractErrorCode } from '@migaia/storage-contract'
 
 describe('defineEntity runtime contract', () => {
@@ -17,7 +17,7 @@ describe('defineEntity runtime contract', () => {
         key: 'id',
         indexes: { id: { path: 'id' } }
       } as never)
-    ).toThrowError(expect.objectContaining({ code: StorageErrorCode.invalidConfig }))
+    ).toThrowError(expect.objectContaining({ code: StorageHostErrorCode.invalidConfig }))
   })
 
   it('retains parsed indexes and rejects ambiguous declarations', () => {
@@ -59,7 +59,7 @@ describe('defineEntity runtime contract', () => {
           } as never
         }
       })
-    ).toThrowError(expect.objectContaining({ code: StorageErrorCode.invalidConfig }))
+    ).toThrowError(expect.objectContaining({ code: StorageHostErrorCode.invalidConfig }))
     expect(() =>
       defineEntity<{ id: string }>()({
         features: [
@@ -77,7 +77,7 @@ describe('defineEntity runtime contract', () => {
           } as never
         }
       })
-    ).toThrowError(expect.objectContaining({ code: StorageErrorCode.invalidConfig }))
+    ).toThrowError(expect.objectContaining({ code: StorageHostErrorCode.invalidConfig }))
   })
   it.each([
     ['', 'entity name must be non-empty'],
@@ -95,12 +95,12 @@ describe('defineEntity runtime contract', () => {
         name,
         key: 'id'
       })
-    ).toThrow(StorageErrorCode.invalidConfig)
+    ).toThrow(StorageHostErrorCode.invalidConfig)
   })
 
   it('rejects invalid version and incomplete migration graph', () => {
     expect(() => defineEntity({ name: 'null-version', key: 'id', version: null } as never)).toThrow(
-      StorageErrorCode.invalidConfig
+      StorageHostErrorCode.invalidConfig
     )
     expect(() =>
       defineEntity<{ id: string }>({
@@ -115,7 +115,7 @@ describe('defineEntity runtime contract', () => {
         key: 'id',
         version: 0
       })
-    ).toThrowError(expect.objectContaining({ code: StorageErrorCode.invalidConfig }))
+    ).toThrowError(expect.objectContaining({ code: StorageHostErrorCode.invalidConfig }))
     expect(() =>
       defineEntity<{ id: string }>({
         features: [
@@ -130,7 +130,7 @@ describe('defineEntity runtime contract', () => {
         version: 3,
         migrations: { 2: async (value) => value }
       })
-    ).toThrowError(expect.objectContaining({ code: StorageErrorCode.invalidConfig }))
+    ).toThrowError(expect.objectContaining({ code: StorageHostErrorCode.invalidConfig }))
     expect(() =>
       defineEntity<{ id: string }>({
         features: [
@@ -144,7 +144,7 @@ describe('defineEntity runtime contract', () => {
         key: 'id',
         version: Number.MAX_SAFE_INTEGER + 1
       })
-    ).toThrowError(expect.objectContaining({ code: StorageErrorCode.invalidConfig }))
+    ).toThrowError(expect.objectContaining({ code: StorageHostErrorCode.invalidConfig }))
     expect(() =>
       defineEntity<{ id: string }>({
         features: [
@@ -159,7 +159,7 @@ describe('defineEntity runtime contract', () => {
         version: Number.MAX_SAFE_INTEGER,
         migrations: { '9007199254740993': async (value: unknown) => value } as never
       })
-    ).toThrowError(expect.objectContaining({ code: StorageErrorCode.invalidConfig }))
+    ).toThrowError(expect.objectContaining({ code: StorageHostErrorCode.invalidConfig }))
     expect(() =>
       defineEntity<{ id: string }>({
         features: [
@@ -174,13 +174,13 @@ describe('defineEntity runtime contract', () => {
         version: Number.MAX_SAFE_INTEGER,
         migrations: { 2: async (value: unknown) => value }
       })
-    ).toThrowError(expect.objectContaining({ code: StorageErrorCode.invalidConfig }))
+    ).toThrowError(expect.objectContaining({ code: StorageHostErrorCode.invalidConfig }))
   })
 
   it('normalizes null, arrays, and primitive runtime definitions to INVALID_ARGUMENT', () => {
     for (const value of [null, undefined, [], 'entity', 42, true])
       expect(() => defineEntity(value as never)).toThrowError(
-        expect.objectContaining({ code: StorageErrorCode.invalidConfig })
+        expect.objectContaining({ code: StorageHostErrorCode.invalidConfig })
       )
   })
 
@@ -198,7 +198,7 @@ describe('defineEntity runtime contract', () => {
     })
     for (const store of [null, undefined, [], {}, { backend: 'memory' }])
       expect(() => entity.connect(store as never)).toThrowError(
-        expect.objectContaining({ code: StorageErrorCode.invalidConfig })
+        expect.objectContaining({ code: StorageHostErrorCode.invalidConfig })
       )
     const actual = await memoryBackend()
     expect(() => entity.connect(actual)).not.toThrow()
@@ -215,7 +215,7 @@ describe('defineEntity runtime contract', () => {
       dispose: async () => undefined
     }
     expect(() => entity.connect(alienStore as never)).toThrowError(
-      expect.objectContaining({ code: StorageErrorCode.invalidConfig })
+      expect.objectContaining({ code: StorageHostErrorCode.invalidConfig })
     )
     expect(() =>
       entity.connect({
@@ -223,7 +223,7 @@ describe('defineEntity runtime contract', () => {
         backend: 'memory',
         capabilities: { syncRead: 'yes' }
       } as never)
-    ).toThrowError(expect.objectContaining({ code: StorageErrorCode.invalidConfig }))
+    ).toThrowError(expect.objectContaining({ code: StorageHostErrorCode.invalidConfig }))
     expect(() =>
       entity.connect({
         ...alienStore,
@@ -238,7 +238,7 @@ describe('defineEntity runtime contract', () => {
           maxValueBytes: 1.5
         }
       } as never)
-    ).toThrowError(expect.objectContaining({ code: StorageErrorCode.invalidConfig }))
+    ).toThrowError(expect.objectContaining({ code: StorageHostErrorCode.invalidConfig }))
   })
 
   it('rejects malformed custom codecs at definition time', () => {
@@ -272,7 +272,7 @@ describe('defineEntity runtime contract', () => {
     const invalidSchemas = [null, [], {}, { name: 'schema' }, { name: 'schema', validate: true }]
     for (const schema of invalidSchemas)
       expect(() => defineEntity({ name: 'schema-guard', key: 'id', schema } as never)).toThrow(
-        StorageErrorCode.invalidConfig
+        StorageHostErrorCode.invalidConfig
       )
     /** A legitimate private field proves definition admission borrows the original schema. */
     class ValidSchema {
@@ -307,7 +307,7 @@ describe('defineEntity runtime contract', () => {
     for (const validateOnRead of [null, 'yes', 1, []])
       expect(() =>
         defineEntity({ name: 'validate-on-read-guard', key: 'id', validateOnRead } as never)
-      ).toThrowError(expect.objectContaining({ code: StorageErrorCode.invalidConfig }))
+      ).toThrowError(expect.objectContaining({ code: StorageHostErrorCode.invalidConfig }))
   })
 
   it('rejects malformed key, diagnostic, ordering, and schema contracts', () => {
@@ -323,13 +323,13 @@ describe('defineEntity runtime contract', () => {
         name: 'invalid-key',
         key: ''
       })
-    ).toThrow(StorageErrorCode.invalidConfig)
+    ).toThrow(StorageHostErrorCode.invalidConfig)
     expect(() =>
       defineEntity({ name: 'invalid-diagnostic', key: 'id', onDiagnostic: 'warn' } as never)
-    ).toThrowError(expect.objectContaining({ code: StorageErrorCode.invalidConfig }))
+    ).toThrowError(expect.objectContaining({ code: StorageHostErrorCode.invalidConfig }))
     expect(() =>
       defineEntity({ name: 'invalid-order', key: 'id', defaultOrderBy: 'order' } as never)
-    ).toThrowError(expect.objectContaining({ code: StorageErrorCode.invalidConfig }))
+    ).toThrowError(expect.objectContaining({ code: StorageHostErrorCode.invalidConfig }))
     for (const field of ['encode', 'decode', 'normalize'])
       expect(() =>
         defineEntity({
@@ -337,7 +337,7 @@ describe('defineEntity runtime contract', () => {
           key: 'id',
           schema: { name: 'schema', validate: async (value: unknown) => value, [field]: true }
         } as never)
-      ).toThrowError(expect.objectContaining({ code: StorageErrorCode.invalidConfig }))
+      ).toThrowError(expect.objectContaining({ code: StorageHostErrorCode.invalidConfig }))
   })
 
   it('rejects malformed migration containers at definition time', () => {
@@ -350,7 +350,7 @@ describe('defineEntity runtime contract', () => {
           version: 1,
           migrations
         } as never)
-      ).toThrowError(expect.objectContaining({ code: StorageErrorCode.invalidConfig }))
+      ).toThrowError(expect.objectContaining({ code: StorageHostErrorCode.invalidConfig }))
   })
 
   it('ignores prototype migration steps under the shared current-only plan', () => {

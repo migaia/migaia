@@ -12,7 +12,8 @@ import {
 } from '@migaia/storage-host'
 import { indexedDbBackendKind } from '../host/builtin-kinds.js'
 import { INDEXED_DB_BLOB_STORE, StorageBackend } from '../constants.js'
-import { StorageError, StorageErrorCode } from '../types/errors.js'
+import { StorageError } from '../types/errors.js'
+import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.js'
 import { fromIdbRequest, normalizeIdbRequestFailure } from '../utils/idb-request.js'
 
@@ -52,7 +53,7 @@ export function indexedDbBlobFeature(options?: {
       (configured !== undefined && (typeof configured !== 'string' || configured.length === 0))
     )
       throw new StorageError(
-        StorageErrorCode.invalidConfig,
+        StorageBrowserErrorCode.invalidConfig,
         { backend: StorageBackend.indexedDb },
         StorageErrorText.indexedDbSchemaDeclarationInvalid
       )
@@ -60,7 +61,7 @@ export function indexedDbBlobFeature(options?: {
   } catch (cause) {
     if (cause instanceof StorageError) throw cause
     throw new StorageError(
-      StorageErrorCode.invalidConfig,
+      StorageBrowserErrorCode.invalidConfig,
       { backend: StorageBackend.indexedDb, cause },
       StorageErrorText.indexedDbSchemaDeclarationInvalid
     )

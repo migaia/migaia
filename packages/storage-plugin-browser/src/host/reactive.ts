@@ -7,9 +7,9 @@ import type { IReactiveComputed, IRuntime } from '@migaia/reactive'
 import {
   createStorageAggregateError,
   createStorageTypeError,
-  StorageError,
-  StorageErrorCode
+  StorageError
 } from '../types/errors.js'
+import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.js'
 import type { IBackendChangeController } from '@migaia/storage-host/sdk'
 import { reportCleanupError } from '@migaia/storage-host/sdk'
@@ -208,7 +208,7 @@ function registerAdapter(
     adapterState.serviceState.adapters.has(adapterState.input.backendId)
   )
     throw new StorageError(
-      StorageErrorCode.reactiveFeatureInvalid,
+      StorageBrowserErrorCode.reactiveFeatureInvalid,
       {},
       StorageErrorText.reactiveFeatureInvalid
     )
@@ -218,7 +218,7 @@ function registerAdapter(
     adapterState.input.consistency.mode !== 'polling'
   )
     throw new StorageError(
-      StorageErrorCode.reactiveFeatureInvalid,
+      StorageBrowserErrorCode.reactiveFeatureInvalid,
       {},
       StorageErrorText.reactiveFeatureInvalid
     )
@@ -233,7 +233,7 @@ function registerAdapter(
     !isStorageReactiveVisibility(adapterState.input.consistency.visibility)
   )
     throw new StorageError(
-      StorageErrorCode.reactiveFeatureInvalid,
+      StorageBrowserErrorCode.reactiveFeatureInvalid,
       {},
       StorageErrorText.reactiveFeatureInvalid
     )
@@ -342,7 +342,7 @@ function startSource(adapterState: IReactiveAdapterContext): void {
   } catch (error) {
     adapterState.adapterScope.close()
     throw createStorageTypeError(
-      StorageErrorCode.reactiveFeatureInvalid,
+      StorageBrowserErrorCode.reactiveFeatureInvalid,
       StorageErrorText.reactiveFeatureInvalid,
       error
     )
@@ -392,7 +392,7 @@ function acquireQuery(
 
   if (leaseState.adapterState.adapterScope.lifecycle !== 'open')
     throw new StorageError(
-      StorageErrorCode.reactiveAdapterNotInstalled,
+      StorageBrowserErrorCode.reactiveAdapterNotInstalled,
       {},
       StorageErrorText.reactiveAdapterNotInstalled
     )
@@ -473,7 +473,7 @@ function terminate(leaseState: IReactiveLeaseContext): Promise<void> {
     releaseQuery(leaseState, recordFailure)
     if (failures.length > 0)
       throw createStorageAggregateError(
-        StorageErrorCode.liveQueryDisposeFailed,
+        StorageBrowserErrorCode.liveQueryDisposeFailed,
         StorageErrorText.liveQueryDisposeFailed,
         failures
       )
@@ -634,7 +634,11 @@ function markTerminal<T>(queryState: IReactiveQueryContext<T>): unknown {
     ? new StorageContractError(StorageContractErrorCode.aborted, {
         cause: queryState.externalAbortReason
       })
-    : new StorageError(StorageErrorCode.liveQueryDisposed, {}, StorageErrorText.liveQueryDisposed)
+    : new StorageError(
+        StorageBrowserErrorCode.liveQueryDisposed,
+        {},
+        StorageErrorText.liveQueryDisposed
+      )
   const value = current !== undefined && 'value' in current ? { value: current.value } : {}
   queryState.disposedState = {
     status: LiveQueryStateStatus.disposed,
@@ -727,7 +731,7 @@ function rollbackConstruction<T>(
   }
   if (failures.length === 1) throw primary
   throw createStorageAggregateError(
-    StorageErrorCode.liveQueryDisposeFailed,
+    StorageBrowserErrorCode.liveQueryDisposeFailed,
     StorageErrorText.liveQueryDisposeFailed,
     failures
   )
@@ -908,7 +912,7 @@ function requireReactiveAdapter(
   const adapter = adapters.get(backendId)
   if (adapter === undefined)
     throw new StorageError(
-      StorageErrorCode.reactiveAdapterNotInstalled,
+      StorageBrowserErrorCode.reactiveAdapterNotInstalled,
       {},
       StorageErrorText.reactiveAdapterNotInstalled
     )
@@ -919,7 +923,7 @@ function requireReactiveAdapter(
 function admitReactiveQuery<T>(queryState: IReactiveQueryContext<T>): void {
   if (queryState.serviceScope.lifecycle !== 'open')
     throw new StorageError(
-      StorageErrorCode.reactiveAdapterNotInstalled,
+      StorageBrowserErrorCode.reactiveAdapterNotInstalled,
       {},
       StorageErrorText.reactiveAdapterNotInstalled
     )
@@ -1045,7 +1049,7 @@ function allocateReactiveResource<T>(queryState: IReactiveQueryContext<T>): void
           .catch((cause) => {
             if (cause instanceof StorageContractError) throw cause
             throw new StorageError(
-              StorageErrorCode.extensionFailed,
+              StorageBrowserErrorCode.extensionFailed,
               { cause, operation: 'liveQuery' },
               StorageErrorText.liveQueryFailed
             )

@@ -3,7 +3,7 @@ import { entityTestFeatures } from '../test/helpers/entity-features.js'
 import { indexedDbTestFeatures } from '../test/helpers/indexed-db-features.js'
 import '../test/helpers/browser-program-app.js'
 import { walkErrorCauses } from '@migaia/utils/error'
-import { STORAGE_BROWSER_SOURCE } from '../src/index.js'
+import { STORAGE_BROWSER_ERROR_SOURCE } from '@migaia/storage-contract/error-code'
 import './native-transaction-scenario.js'
 import './native-batch-scenario.js'
 import './native-ttl-scenario.js'
@@ -51,7 +51,7 @@ const browserFailure = (error: unknown): { code?: string; cause?: unknown } =>
       cause !== null &&
       typeof cause === 'object' &&
       'source' in cause &&
-      cause.source === STORAGE_BROWSER_SOURCE
+      cause.source === STORAGE_BROWSER_ERROR_SOURCE
   ) ?? error) as {
     code?: string
     cause?: unknown

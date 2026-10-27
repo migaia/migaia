@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest'
 import { serializeRpcError, deserializeRpcError, reachRpcError } from '@migaia/rpc-contract'
-import { StorageError, StorageErrorCode } from '../../src/types/errors.js'
+import { StorageError } from '../../src/types/errors.js'
+import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 
 describe('storage 错误家族经 web-rpc serializer 往返', () => {
   it('StorageError（web）往返后 (source, code, name, message, cause) 一致', () => {
     const cause = new Error('root cause')
-    const error = new StorageError(StorageErrorCode.quotaExceeded, { cause })
+    const error = new StorageError(StorageBrowserErrorCode.quotaExceeded, { cause })
     const serialized = serializeRpcError(error, { report: () => {} })
     expect(serialized.source).toBe('storage.backend.browser')
     expect(serialized.code).toBe('QUOTA_EXCEEDED')

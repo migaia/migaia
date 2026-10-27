@@ -1,7 +1,8 @@
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import { createStringLeaseRegistry, createAbortController } from '@migaia/lifecycle'
 import { IdentifyError, isNativeErrorValue } from '@migaia/utils/error'
-import { StorageError, StorageErrorCode } from '../errors.js'
+import { StorageError } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.js'
 import type {
   IBackendChangeControllerOptions,
@@ -68,7 +69,7 @@ class BackendLifecycleController implements IBackendLifecycleController {
       } catch (cause) {
         if (isNativeErrorValue(cause) && IdentifyError.identityOf(cause) !== undefined) throw cause
         throw new StorageError(
-          StorageErrorCode.storageHostDisposeFailed,
+          StorageHostErrorCode.storageHostDisposeFailed,
           { backend: this.snapshot.backend, cause },
           StorageErrorText.storageHostDisposeFailed
         )

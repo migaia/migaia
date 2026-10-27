@@ -10,7 +10,8 @@ import {
   type IStorageFeatureStoreCompatibility,
   type IStoragePluginCore
 } from '@migaia/storage-host'
-import { StorageError, StorageErrorCode } from '../types/errors.js'
+import { StorageError } from '../types/errors.js'
+import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.js'
 import { StorageBackend, IndexedDbFeature } from '../constants.js'
 /** One installed backend owns its schema declarations and optional assembly selection. */
@@ -104,7 +105,7 @@ class IndexedDbPluginInstallation<F extends IStorageFeatureRecord> {
   /** Preserve the existing adapter configuration code and stable schema diagnostic. */
   invalidDeclaration(): never {
     throw new StorageError(
-      StorageErrorCode.invalidConfig,
+      StorageBrowserErrorCode.invalidConfig,
       { backend: StorageBackend.indexedDb },
       StorageErrorText.indexedDbSchemaDeclarationInvalid
     )

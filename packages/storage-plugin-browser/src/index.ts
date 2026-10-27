@@ -1,9 +1,6 @@
 // The root intentionally exposes only storage-plugin-browser's stable error and namespace contract.
 export {
   StorageError,
-  StorageErrorCode,
-  STORAGE_BROWSER_SOURCE,
-  type IStorageErrorCode,
   type IStorageErrorDetails,
   type IStorageChannel,
   type IExtensionStage

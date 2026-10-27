@@ -48,12 +48,8 @@ import {
 } from '@migaia/storage-contract'
 import { raceWithAbort, type INativeAbortSignal } from '@migaia/utils/promise'
 import { observeThenableRejection } from '@migaia/utils/function'
-import {
-  createStorageTypeError,
-  createStorageAggregateError,
-  StorageError,
-  StorageErrorCode
-} from './errors.js'
+import { createStorageTypeError, createStorageAggregateError, StorageError } from './errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from './error-text.js'
 import { readStorageNativePluginDefinition, readStorageNativePluginMetadata } from './contracts.js'
 import { forwardStorageExecution } from './execution.js'
@@ -428,7 +424,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     assertOperationContext({ orgId: this.#orgId })
     if (autoDetect !== undefined && typeof autoDetect !== 'boolean')
       throw createStorageTypeError(
-        StorageErrorCode.invalidConfig,
+        StorageHostErrorCode.invalidConfig,
         StorageErrorText.invalidAutoDetect
       )
     this.#scheduler =
@@ -442,7 +438,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     const installTimeoutMs = installTimeoutOption ?? 30_000
     if (!Number.isFinite(installTimeoutMs) || installTimeoutMs < 0) {
       throw createStorageTypeError(
-        StorageErrorCode.backendPluginInvalid,
+        StorageHostErrorCode.backendPluginInvalid,
         StorageErrorText.backendPluginInvalid
       )
     }
@@ -489,7 +485,11 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
   ): Promise<IStorageHost<readonly [...P, ...TPlugins]>> {
     this.#assertOpen()
     if (this.#state === 'installing') {
-      throw new StorageError(StorageErrorCode.storageHostBusy, {}, StorageErrorText.storageHostBusy)
+      throw new StorageError(
+        StorageHostErrorCode.storageHostBusy,
+        {},
+        StorageErrorText.storageHostBusy
+      )
     }
     this.#state = 'installing'
     /** Probe handlers of this batch, subscribed before its first lifecycle event. */
@@ -522,12 +522,12 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         /** Preserve the original failure under the correct host boundary identity. */
         const primary = batchToken.active
           ? new StorageError(
-              StorageErrorCode.backendInstallFailed,
+              StorageHostErrorCode.backendInstallFailed,
               { cause: error },
               StorageErrorText.backendInstallFailed
             )
           : new StorageError(
-              StorageErrorCode.storageHostDisposed,
+              StorageHostErrorCode.storageHostDisposed,
               { cause: error },
               StorageErrorText.storageHostDisposed
             )
@@ -564,20 +564,24 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
   async unUse(id: string): Promise<void> {
     this.#assertOpen()
     if (this.#state === 'installing')
-      throw new StorageError(StorageErrorCode.storageHostBusy, {}, StorageErrorText.storageHostBusy)
+      throw new StorageError(
+        StorageHostErrorCode.storageHostBusy,
+        {},
+        StorageErrorText.storageHostBusy
+      )
     const context = [...this.#detectContexts].find((candidate) => candidate.id === id)
     if (context === undefined)
       throw new StorageError(
-        StorageErrorCode.backendNotInstalled,
+        StorageHostErrorCode.backendNotInstalled,
         {},
         StorageErrorText.backendNotInstalled
       )
     const store = this.#registry.get(id)
     if (store !== undefined && (this.#borrowCounts.get(store) ?? 0) > 0)
-      throw new StorageError(StorageErrorCode.backendInUse, {}, StorageErrorText.backendInUse)
+      throw new StorageError(StorageHostErrorCode.backendInUse, {}, StorageErrorText.backendInUse)
     if (id === STORAGE_JOURNAL_PLUGIN_ID && this.#journal !== undefined)
       throw new StorageError(
-        StorageErrorCode.invalidConfig,
+        StorageHostErrorCode.invalidConfig,
         {},
         StorageErrorText.journalPluginInUse
       )
@@ -668,7 +672,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     const context = row?.context
     if (context === undefined || this.#registry.get(context.id) !== context.storeCell.get())
       throw createStorageTypeError(
-        StorageErrorCode.backendPluginInvalid,
+        StorageHostErrorCode.backendPluginInvalid,
         StorageErrorText.backendPluginInvalid
       )
     return context.getObservers(row!.native, row!.orgId)
@@ -713,7 +717,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     const context = row?.context
     if (context === undefined || this.#registry.get(context.id) !== context.storeCell.get())
       throw createStorageTypeError(
-        StorageErrorCode.backendPluginInvalid,
+        StorageHostErrorCode.backendPluginInvalid,
         StorageErrorText.backendPluginInvalid
       )
     return context.getEnvelopeStages(operation, row!.orgId)
@@ -749,7 +753,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     const store = this.#registry.get(id)
     if (store === undefined)
       throw new StorageError(
-        StorageErrorCode.backendNotInstalled,
+        StorageHostErrorCode.backendNotInstalled,
         {},
         StorageErrorText.backendNotInstalled
       )
@@ -791,7 +795,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       if (configuration === undefined) continue
       if (!first || this.#journal !== undefined)
         throw new StorageError(
-          StorageErrorCode.invalidConfig,
+          StorageHostErrorCode.invalidConfig,
           {},
           StorageErrorText.journalConfigurationLate
         )
@@ -806,7 +810,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
   #requireJournalRuntime(): IStorageJournalRuntime {
     if (this.#journalRuntime === undefined)
       throw new StorageError(
-        StorageErrorCode.journalNotAssembled,
+        StorageHostErrorCode.journalNotAssembled,
         {},
         StorageErrorText.journalNotAssembled
       )
@@ -841,7 +845,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
             (published === undefined ? undefined : this.#storeContexts.get(published)?.context)
           if (context === undefined)
             throw new StorageError(
-              StorageErrorCode.backendNotInstalled,
+              StorageHostErrorCode.backendNotInstalled,
               {},
               StorageErrorText.backendNotInstalled
             )
@@ -1016,13 +1020,13 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       const snapshot = snapshotStorageBaseDetailed(native, { asyncDisposeKey })
       if (!snapshot.valid)
         throw createStorageTypeError(
-          StorageErrorCode.backendPluginInvalid,
+          StorageHostErrorCode.backendPluginInvalid,
           StorageErrorText.backendPluginInvalid,
           snapshot.cause
         )
       if (snapshot.backend !== context.getKind()?.name)
         throw createStorageTypeError(
-          StorageErrorCode.backendKindMismatch,
+          StorageHostErrorCode.backendKindMismatch,
           StorageErrorText.backendKindMismatch
         )
       const ports = context.getOrgContext(orgId)
@@ -1153,7 +1157,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     }
     if (failures.length !== 0)
       throw createStorageAggregateError(
-        StorageErrorCode.orgDeleteFailed,
+        StorageHostErrorCode.orgDeleteFailed,
         StorageErrorText.orgDeleteFailed,
         failures
       )
@@ -1166,7 +1170,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     const store = this.#registry.get(id)
     if (store === undefined)
       throw new StorageError(
-        StorageErrorCode.backendNotInstalled,
+        StorageHostErrorCode.backendNotInstalled,
         {},
         StorageErrorText.backendNotInstalled
       )
@@ -1210,7 +1214,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       try {
         this.#closing.abort(
           new StorageError(
-            StorageErrorCode.storageHostDisposed,
+            StorageHostErrorCode.storageHostDisposed,
             {},
             StorageErrorText.storageHostDisposed
           )
@@ -1229,10 +1233,10 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
           if (this.#events.hasListeners(Hook.onHostCloseError))
             this.#events.emit(Hook.onHostCloseError, () => ({
               backendCount,
-              code: StorageErrorCode.storageHostDisposeFailed
+              code: StorageHostErrorCode.storageHostDisposeFailed
             }))
           throw createStorageAggregateError(
-            StorageErrorCode.storageHostDisposeFailed,
+            StorageHostErrorCode.storageHostDisposeFailed,
             StorageErrorText.storageHostDisposeFailed,
             cleanupErrors
           )
@@ -1261,7 +1265,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
   #assertOpen(): void {
     if (this.#state === 'closing' || this.#state === 'closed') {
       throw new StorageError(
-        StorageErrorCode.storageHostDisposed,
+        StorageHostErrorCode.storageHostDisposed,
         {},
         StorageErrorText.storageHostDisposed
       )
@@ -1287,7 +1291,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       this.#state !== 'installing'
     ) {
       throw new StorageError(
-        StorageErrorCode.storageHostDisposed,
+        StorageHostErrorCode.storageHostDisposed,
         {},
         StorageErrorText.storageHostDisposed
       )
@@ -1305,7 +1309,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       const metadata = readStorageNativePluginMetadata(plugin)
       if (metadata === undefined)
         throw new StorageError(
-          StorageErrorCode.backendPluginInvalid,
+          StorageHostErrorCode.backendPluginInvalid,
           {},
           StorageErrorText.backendPluginInvalid
         )
@@ -1322,7 +1326,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       const backendId = nativeMetadata[index]!.id
       if (admittedBackendIds.has(backendId))
         throw new StorageError(
-          StorageErrorCode.backendDuplicate,
+          StorageHostErrorCode.backendDuplicate,
           {},
           StorageErrorText.backendDuplicate
         )
@@ -1483,7 +1487,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
 
     if (entryState.definition === undefined)
       throw new StorageError(
-        StorageErrorCode.backendPluginInvalid,
+        StorageHostErrorCode.backendPluginInvalid,
         {},
         StorageErrorText.backendPluginInvalid
       )
@@ -1547,9 +1551,9 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         })
         if (this.#journalRuntime !== undefined)
           throw new StorageError(
-            StorageErrorCode.invalidConfig,
+            StorageHostErrorCode.invalidConfig,
             {},
-            StorageErrorText.defaultError(StorageErrorCode.invalidConfig)
+            StorageErrorText.defaultError(StorageHostErrorCode.invalidConfig)
           )
         this.#journalRuntime = runtime
       },
@@ -1574,7 +1578,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       registerDetect: (check) => {
         if (typeof check !== 'function')
           throw createStorageTypeError(
-            StorageErrorCode.invalidConfig,
+            StorageHostErrorCode.invalidConfig,
             StorageErrorText.invalidDetectCheck
           )
         /** Original onDispose admission enforces exactly the existing installation window. */
@@ -1717,7 +1721,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     store = this.#registry.get(id)
     if (store === undefined)
       throw new StorageError(
-        StorageErrorCode.backendNotInstalled,
+        StorageHostErrorCode.backendNotInstalled,
         {},
         StorageErrorText.backendNotInstalled
       )
@@ -1877,7 +1881,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     const snapshot = snapshotStorageBaseDetailed(store, { asyncDisposeKey })
     if (!snapshot.valid)
       throw createStorageTypeError(
-        StorageErrorCode.backendPluginInvalid,
+        StorageHostErrorCode.backendPluginInvalid,
         StorageErrorText.backendPluginInvalid,
         snapshot.cause
       )
@@ -1888,7 +1892,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     ) {
       void this.#disposeLateStore(snapshot)
       throw new StorageError(
-        StorageErrorCode.storageHostDisposed,
+        StorageHostErrorCode.storageHostDisposed,
         {},
         StorageErrorText.storageHostDisposed
       )
@@ -1909,7 +1913,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     }
     if (entryState.kind === undefined || snapshot.backend !== entryState.kind.name)
       throw createStorageTypeError(
-        StorageErrorCode.backendKindMismatch,
+        StorageHostErrorCode.backendKindMismatch,
         StorageErrorText.backendKindMismatch
       )
     /** Every admitted base, including frozen raw stores, shares this host's observer owner. */
@@ -1950,7 +1954,7 @@ export async function createStorageHost<
       await facade.dispose()
     } catch (cleanupError) {
       throw createStorageAggregateError(
-        StorageErrorCode.backendInstallFailed,
+        StorageHostErrorCode.backendInstallFailed,
         StorageErrorText.backendInstallFailed,
         [error, cleanupError]
       )
@@ -2023,7 +2027,7 @@ function createStorageNativeAuthoringPorts(registration: IStorageRegistrationAss
       registration.registrationCore!.onDispose(() => release?.())
       if (context.storeCell.get() !== store)
         throw createStorageTypeError(
-          StorageErrorCode.backendPluginInvalid,
+          StorageHostErrorCode.backendPluginInvalid,
           StorageErrorText.backendPluginInvalid
         )
       release = registerBackendChangeController(store, controller)
@@ -2034,7 +2038,7 @@ function createStorageNativeAuthoringPorts(registration: IStorageRegistrationAss
       registration.registrationCore!.onDispose(() => release?.())
       if (context.storeCell.get() !== store)
         throw createStorageTypeError(
-          StorageErrorCode.backendPluginInvalid,
+          StorageHostErrorCode.backendPluginInvalid,
           StorageErrorText.backendPluginInvalid
         )
       release = registerBackendValueCommit(store, commit)
@@ -2101,7 +2105,7 @@ function createStorageExecutionPorts(registration: IStorageRegistrationAssembly)
     registerStore: (store: IStorageBase) => {
       if (registration.registrationCore === undefined)
         throw new StorageError(
-          StorageErrorCode.backendPluginInvalid,
+          StorageHostErrorCode.backendPluginInvalid,
           {},
           StorageErrorText.backendPluginInvalid
         )
@@ -2116,7 +2120,7 @@ function requireChangeControllerFactory(
 ): import('./core/change-types.js').IBackendChangeControllerFactory {
   if (factory === undefined)
     throw new StorageError(
-      StorageErrorCode.changeControllerNotAssembled,
+      StorageHostErrorCode.changeControllerNotAssembled,
       {},
       StorageErrorText.changeControllerNotAssembled
     )

@@ -1,7 +1,7 @@
 import { memoryTestFeatures } from '../test/helpers/memory-features.js'
 import { indexedDbTestFeatures } from '../test/helpers/indexed-db-features.js'
 import { walkErrorCauses } from '@migaia/utils/error'
-import { STORAGE_BROWSER_SOURCE } from '../src/index.js'
+import { STORAGE_BROWSER_ERROR_SOURCE } from '@migaia/storage-contract/error-code'
 import { cookieBackendPlugin } from '../src/cookies.js'
 import { indexedDbBackendPlugin } from '../src/indexed-db.js'
 import { localStorageBackendPlugin } from '../src/local-storage.js'
@@ -29,7 +29,7 @@ const getFailureCode = async (
         cause !== null &&
         typeof cause === 'object' &&
         'source' in cause &&
-        cause.source === STORAGE_BROWSER_SOURCE
+        cause.source === STORAGE_BROWSER_ERROR_SOURCE
     )
     return (native as { code?: string } | undefined)?.code
   }

@@ -40,9 +40,9 @@ import {
 import type { IStorageJournalBackendBinding, IStorageJournalChange } from '@migaia/storage-host'
 import {
   StorageError as JournalError,
-  StorageErrorCode as JournalErrorCode,
   StorageErrorText as JournalErrorText
 } from '@migaia/storage-host'
+import { StorageHostErrorCode as JournalErrorCode } from '@migaia/storage-contract/error-code'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import type { IBackendRuntime, IBrowserBatchApi } from './construction.js'
 import { snapshotBrowserBatchEntries, observeBrowserBatch, BrowserBatchMethod } from './batch.js'

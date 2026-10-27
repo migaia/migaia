@@ -6,7 +6,7 @@ import { nativeResult } from './protocol.js'
 import { qdrantWireValue } from './wire.js'
 import { normalizeQdrantError } from './errors.js'
 import { QdrantRoute } from './constants.js'
-import { QdrantErrorCode } from './error-code.js'
+import { QdrantErrorCode } from '@migaia/storage-contract/error-code'
 import { qdrantError } from './errors.js'
 import type { IQdrantHttp, IQdrantOperationName } from './types.js'
 /** Borrow one real SDK client; its timeout/configuration and lifetime remain caller-owned. */

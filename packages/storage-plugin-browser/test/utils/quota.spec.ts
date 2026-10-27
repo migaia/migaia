@@ -1,16 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { normalizeStorageException } from '../../src/utils/quota'
-import { StorageError, StorageErrorCode } from '../../src/types/errors'
+import { StorageError } from '../../src/types/errors'
+import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 
 describe('normalizeStorageException', () => {
   it('已经是 StorageError 时原样返回', () => {
-    const original = new StorageError(StorageErrorCode.invalidConfig)
+    const original = new StorageError(StorageBrowserErrorCode.invalidConfig)
     expect(normalizeStorageException(original, 'local')).toBe(original)
   })
 
   it('为缺少 owner 的 StorageError 补充 operation 且保留原始协议字段', () => {
     const cause = new Error('codec')
-    const original = new StorageError(StorageErrorCode.extensionFailed, {
+    const original = new StorageError(StorageBrowserErrorCode.extensionFailed, {
       backend: 'local',
       extensionStage: 'codec',
       cause
@@ -58,7 +59,7 @@ describe('normalizeStorageException', () => {
 })
 
 it('不覆盖已有 StorageError owner', () => {
-  const original = new StorageError(StorageErrorCode.unavailable, {
+  const original = new StorageError(StorageBrowserErrorCode.unavailable, {
     backend: 'session',
     key: 'owned-key',
     operation: 'session.keys'
@@ -67,7 +68,7 @@ it('不覆盖已有 StorageError owner', () => {
 })
 
 it('补充 owner 时采用外层 backend/key 作为缺失字段', () => {
-  const original = new StorageError(StorageErrorCode.unavailable)
+  const original = new StorageError(StorageBrowserErrorCode.unavailable)
   expect(
     normalizeStorageException(original, 'session', 'key', 'session.clearValues')
   ).toMatchObject({

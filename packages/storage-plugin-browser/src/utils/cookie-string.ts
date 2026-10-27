@@ -1,4 +1,5 @@
-import { StorageError, StorageErrorCode } from '../types/errors.js'
+import { StorageError } from '../types/errors.js'
+import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageBackend } from '../constants.js'
 import type { ICookieRemoveContext, ICookieScope, ICookieWriteContext } from '../types/cookie.js'
 import { utf8ByteLength } from '@migaia/utils/bytes'
@@ -60,7 +61,7 @@ export const serializeCookieAssignment = (
   if (ctx?.partitioned) parts.push('partitioned')
   const serialized = parts.join('; ')
   if (utf8ByteLength(serialized) > MAX_COOKIE_VALUE_BYTES)
-    throw new StorageError(StorageErrorCode.valueTooLarge, {
+    throw new StorageError(StorageBrowserErrorCode.valueTooLarge, {
       backend: StorageBackend.cookie,
       key: name
     })

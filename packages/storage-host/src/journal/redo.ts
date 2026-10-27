@@ -19,7 +19,8 @@ import {
   readStorageJournalIntentTarget,
   storageJournalTargetsMatch
 } from './wal.js'
-import { StorageError, StorageErrorCode } from '../errors.js'
+import { StorageError } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.js'
 import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.js'
 
@@ -51,10 +52,10 @@ type IStorageRedoContext = {
 /** A possibly applied draft or durable completion never becomes a false rollback. */
 function failStorageRedo(context: IStorageRedoContext, cause: unknown): never {
   const error =
-    cause instanceof StorageError && cause.code === StorageErrorCode.journalRecordInvalid
+    cause instanceof StorageError && cause.code === StorageHostErrorCode.journalRecordInvalid
       ? cause
       : new StorageError(
-          StorageErrorCode.journalRecoveryFailed,
+          StorageHostErrorCode.journalRecoveryFailed,
           { cause },
           StorageErrorText.journalRecoveryFailed
         )

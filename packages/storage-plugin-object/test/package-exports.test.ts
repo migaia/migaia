@@ -16,7 +16,9 @@ describe('object package entries', () => {
     expect(root).not.toHaveProperty('fsObjectDriver')
     expect(root).not.toHaveProperty('s3ObjectDriver')
     expect(root).not.toHaveProperty('objectPresignFeature')
-    expect(root.ERROR_SOURCE).toBe('storage.backend.object')
+    expect((await import('@migaia/storage-contract/error-code')).STORAGE_OBJECT_ERROR_SOURCE).toBe(
+      'storage.backend.object'
+    )
     const fs = await import('@migaia/storage-plugin-object/fs')
     const s3 = await import('@migaia/storage-plugin-object/s3')
     const feature = await import('@migaia/storage-plugin-object/features/presign')

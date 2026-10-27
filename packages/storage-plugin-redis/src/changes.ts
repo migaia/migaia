@@ -3,7 +3,7 @@ import { type IStorageChange } from '@migaia/storage-contract'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { createRedisLayout, redisUnhex } from './layout.js'
 import { redisError } from './errors.js'
-import { RedisErrorCode } from './error-code.js'
+import { RedisErrorCode } from '@migaia/storage-contract/error-code'
 import { RedisText } from './constants.js'
 import type { IRedisDraftEntry } from './transaction.js'
 

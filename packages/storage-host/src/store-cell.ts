@@ -1,6 +1,10 @@
 import type { IChainMethods, IStorageBase, IStorageResource } from '@migaia/storage-contract'
 import { createErrorCollector } from '@migaia/lifecycle'
-import { StorageError, StorageErrorCode, STORAGE_HOST_SOURCE } from './errors.js'
+import { StorageError } from './errors.js'
+import {
+  StorageHostErrorCode,
+  STORAGE_HOST_ERROR_SOURCE
+} from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from './error-text.js'
 import type { IStorageFeatureProjection } from './feature-install.js'
 import type {
@@ -136,7 +140,7 @@ class StorageStoreCell implements IStorageStoreCell {
       try {
         await releases[index]!()
       } catch (error) {
-        errors.add(STORAGE_HOST_SOURCE, error)
+        errors.add(STORAGE_HOST_ERROR_SOURCE, error)
       }
     }
     errors.finalize(StorageErrorText.storageHostDisposeFailed)
@@ -175,7 +179,7 @@ class StorageStoreCell implements IStorageStoreCell {
       try {
         await release()
       } catch (error) {
-        errors.add(STORAGE_HOST_SOURCE, error)
+        errors.add(STORAGE_HOST_ERROR_SOURCE, error)
       }
     }
     this.#orgViews.clear()
@@ -234,7 +238,7 @@ class StorageStoreCell implements IStorageStoreCell {
   readonly bind: IStorageStoreCell['bind'] = (store) => {
     if (this.#value !== undefined && this.#value !== store)
       throw new StorageError(
-        StorageErrorCode.backendPluginInvalid,
+        StorageHostErrorCode.backendPluginInvalid,
         {},
         StorageErrorText.backendPluginInvalid
       )
@@ -244,7 +248,7 @@ class StorageStoreCell implements IStorageStoreCell {
   readonly set: IStorageStoreCell['set'] = (store) => {
     if (this.#admitted || (this.#value !== undefined && this.#value !== store))
       throw new StorageError(
-        StorageErrorCode.backendPluginInvalid,
+        StorageHostErrorCode.backendPluginInvalid,
         {},
         StorageErrorText.backendPluginInvalid
       )
@@ -255,7 +259,7 @@ class StorageStoreCell implements IStorageStoreCell {
   readonly get: IStorageStoreCell['get'] = () => {
     if (!this.#admitted || this.#value === undefined)
       throw new StorageError(
-        StorageErrorCode.backendPluginInvalid,
+        StorageHostErrorCode.backendPluginInvalid,
         {},
         StorageErrorText.backendPluginInvalid
       )

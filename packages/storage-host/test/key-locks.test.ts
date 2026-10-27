@@ -24,9 +24,9 @@ import {
   definePlugin,
   defineStorageBackendKind,
   StorageError,
-  StorageErrorCode,
   type IStoragePluginCore
 } from '../src/index.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import type { IBackendKeyLockPort, IBackendChangeController } from '../src/authoring/backend.js'
 import { catalog } from './helpers/catalog.js'
 
@@ -58,7 +58,7 @@ async function fixture(shared?: IBackendKeyLockPort) {
       state.store.dispose = () => controller.dispose()
       createTransactionOwner(
         state.store,
-        (cause) => new StorageError(StorageErrorCode.extensionFailed, { cause })
+        (cause) => new StorageError(StorageHostErrorCode.extensionFailed, { cause })
       )
       port = shared ?? core.createKeyLockPort()
       core.registerStore(state.store)

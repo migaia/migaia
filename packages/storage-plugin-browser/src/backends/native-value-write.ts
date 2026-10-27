@@ -5,7 +5,7 @@ import {
   type IBackendKind
 } from '@migaia/storage-contract'
 import { ENTITY_UNIQUE_WRITE_LOCK, StorageOperation } from '../constants.js'
-import { StorageErrorCode } from '../error-code.js'
+import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import { normalizeError } from './errors.js'
 import { readAbortReason, throwIfAborted } from '@migaia/storage-host/sdk'
 import { subscribeToAbort } from './errors.js'
@@ -82,7 +82,7 @@ const withPhysicalValueWrite = async <T>(
     throw normalizeError(
       cause,
       backend,
-      StorageErrorCode.transactionFailed,
+      StorageBrowserErrorCode.transactionFailed,
       StorageOperation.entityUniqueWrite
     )
   } finally {

@@ -71,12 +71,8 @@ import type {
   IStorageJournalTarget,
   IStorageJournalAttempt
 } from '@migaia/storage-host'
-import {
-  createStorageAggregateError,
-  StorageError,
-  StorageErrorCode,
-  createStorageError
-} from '../types/errors.js'
+import { createStorageAggregateError, StorageError, createStorageError } from '../types/errors.js'
+import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.js'
 import {
   StorageBackend,
@@ -182,7 +178,7 @@ const indexedDbSignalFailure = (
         cause: cause.cause ?? cause
       })
     if (isStorageContractError(cause)) return cause
-    return new StorageError(StorageErrorCode.invalidConfig, {
+    return new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.indexedDb,
       cause
     })
@@ -398,7 +394,9 @@ export const isValidIndexGeneration = (value: unknown): value is string =>
 export const createIndexGeneration = (): string => {
   const generation = createStorageToken()
   if (!isValidIndexGeneration(generation))
-    throw new StorageError(StorageErrorCode.invalidConfig, { backend: StorageBackend.indexedDb })
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
+      backend: StorageBackend.indexedDb
+    })
   return generation
 }
 
@@ -439,7 +437,7 @@ export const assertBackfillProjectionLimits = (
   const rowLimit =
     scope === 'record' ? INDEX_BACKFILL_RECORD_ROW_CAP : INDEX_BACKFILL_PROJECTION_ROW_CAP
   if (metrics.rows > rowLimit || metrics.bytes > INDEX_BACKFILL_PROJECTION_BYTE_CAP)
-    throw new StorageError(StorageErrorCode.valueTooLarge, {
+    throw new StorageError(StorageBrowserErrorCode.valueTooLarge, {
       backend: StorageBackend.indexedDb,
       cause: new RangeError(StorageErrorText.indexBackfillProjectionTooLarge)
     })
@@ -468,7 +466,7 @@ export const normalizeIndexedDbOperationError = (
       cause: error
     })
   if (isStorageErrorFamily(error)) return error
-  return new StorageError(StorageErrorCode.transactionFailed, {
+  return new StorageError(StorageBrowserErrorCode.transactionFailed, {
     backend: StorageBackend.indexedDb,
     operation: expiredScope ? StorageOperation.transactionScope : undefined,
     cause: error
@@ -477,7 +475,7 @@ export const normalizeIndexedDbOperationError = (
 
 /** Create the canonical bounded decoded-payload failure without exposing record data. */
 export const backfillDecodedTooLarge = (): StorageError =>
-  new StorageError(StorageErrorCode.valueTooLarge, {
+  new StorageError(StorageBrowserErrorCode.valueTooLarge, {
     backend: StorageBackend.indexedDb,
     cause: new RangeError(StorageErrorText.indexBackfillDecodedTooLarge)
   })
@@ -487,7 +485,7 @@ export const snapshotWriteValue = <T>(value: T, key: IStorageKey): T => {
   try {
     return structuredClone(value)
   } catch (cause) {
-    throw new StorageError(StorageErrorCode.serializeFailed, {
+    throw new StorageError(StorageBrowserErrorCode.serializeFailed, {
       backend: StorageBackend.indexedDb,
       key,
       cause
@@ -517,7 +515,7 @@ export const toIdbRange = (
   const rangeSnapshot = range
   if (!rangeSnapshot) return undefined
   if (!KeyRange)
-    throw new StorageError(StorageErrorCode.unavailable, {
+    throw new StorageError(StorageBrowserErrorCode.unavailable, {
       backend: StorageBackend.indexedDb,
       cause: new Error(StorageErrorText.indexedDbKeyRangeUnavailable)
     })
@@ -887,7 +885,7 @@ function indexGenerationMetadataKey(scope: string, generation: string): IDBValid
 /** Creates the public error used when a raw mutation has rotated an index handle. */
 export function staleIndexHandleError(): StorageError {
   return new StorageError(
-    StorageErrorCode.indexBackfillStale,
+    StorageBrowserErrorCode.indexBackfillStale,
     { backend: StorageBackend.indexedDb },
     StorageErrorText.indexBackfillStale
   )
@@ -1178,7 +1176,7 @@ function createIndexedDbController<TValue>(
       }
       if (failures.length > 0)
         throw createStorageAggregateError(
-          StorageErrorCode.backendDisposeFailed,
+          StorageBrowserErrorCode.backendDisposeFailed,
           StorageErrorText.backendDisposeFailed,
           failures
         )
@@ -1253,7 +1251,7 @@ function closeForTransition<TValue>(
   const cause = tryCloseDatabase(database)
   if (cause !== undefined) {
     indexedDbContext.activeDatabase = database
-    throw new StorageError(StorageErrorCode.unavailable, {
+    throw new StorageError(StorageBrowserErrorCode.unavailable, {
       backend: StorageBackend.indexedDb,
       operation: StorageOperation.indexedDbClose,
       cause
@@ -1284,7 +1282,7 @@ function validatePhysicalLayout<TValue>(
       indexedDbContext.recordsStoreName
     ]) {
       if (transaction.objectStore(storeName).keyPath !== null)
-        throw new StorageError(StorageErrorCode.invalidConfig, {
+        throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
           backend: StorageBackend.indexedDb,
           operation: StorageOperation.indexedDbSchema,
           cause: new TypeError(StorageErrorText.indexedDbChannelKeyPathInvalid)
@@ -1292,7 +1290,7 @@ function validatePhysicalLayout<TValue>(
     }
     for (const storeName of [REVISIONS_STORE_NAME, META_STORE_NAME]) {
       if (transaction.objectStore(storeName).keyPath !== null)
-        throw new StorageError(StorageErrorCode.invalidConfig, {
+        throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
           backend: StorageBackend.indexedDb,
           operation: StorageOperation.indexedDbSchema,
           cause: new TypeError('IndexedDB internal stores must use private keys')
@@ -1301,7 +1299,7 @@ function validatePhysicalLayout<TValue>(
     indexedDbContext.assemblies.indexes?.validateSchema(database)
   } catch (cause) {
     if (isStorageErrorFamily(cause)) throw cause
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.indexedDb,
       operation: StorageOperation.indexedDbSchema,
       cause
@@ -1313,8 +1311,8 @@ function validatePhysicalLayout<TValue>(
 function isTerminalPrepareFailure(cause: unknown): boolean {
   return (
     cause instanceof StorageError &&
-    (cause.code === StorageErrorCode.invalidConfig ||
-      cause.code === StorageErrorCode.versionUnsupported)
+    (cause.code === StorageBrowserErrorCode.invalidConfig ||
+      cause.code === StorageBrowserErrorCode.versionUnsupported)
   )
 }
 
@@ -1536,7 +1534,7 @@ async function readLegacyBatch<TValue>(
   lastKey: IDBValidKey | undefined
 ): Promise<Array<{ readonly key: IDBValidKey; readonly value: unknown }>> {
   if (lastKey !== undefined && !indexedDbContext.keyRange)
-    throw new StorageError(StorageErrorCode.unavailable, {
+    throw new StorageError(StorageBrowserErrorCode.unavailable, {
       backend: StorageBackend.indexedDb,
       operation: StorageOperation.indexedDbLegacyMigration,
       cause: new Error('IDBKeyRange is required to resume legacy migration')
@@ -1555,7 +1553,7 @@ async function readLegacyBatch<TValue>(
     throw normalizeError(
       cause,
       StorageBackend.indexedDb,
-      StorageErrorCode.transactionFailed,
+      StorageBrowserErrorCode.transactionFailed,
       'indexeddb.legacy.cursor'
     )
   }
@@ -1576,7 +1574,7 @@ async function readLegacyBatch<TValue>(
         normalizeError(
           rootCause,
           StorageBackend.indexedDb,
-          StorageErrorCode.transactionFailed,
+          StorageBrowserErrorCode.transactionFailed,
           'indexeddb.legacy.cursor'
         )
       )
@@ -1675,7 +1673,7 @@ function openOnce<TValue>(
         normalizeError(
           rootCause,
           StorageBackend.indexedDb,
-          StorageErrorCode.unavailable,
+          StorageBrowserErrorCode.unavailable,
           StorageOperation.indexedDbOpen
         )
       )
@@ -1711,7 +1709,7 @@ function openOnce<TValue>(
             const database = readIdbRequestResult(request)
             if (!transaction)
               throw createStorageError(
-                StorageErrorCode.transactionFailed,
+                StorageBrowserErrorCode.transactionFailed,
                 StorageErrorText.indexedDbUpgradeTransactionMissing
               )
             ensureStores(indexedDbContext, database, transaction)
@@ -1805,7 +1803,7 @@ export function open<TValue>(
           throw normalizeError(
             cause,
             StorageBackend.indexedDb,
-            StorageErrorCode.unavailable,
+            StorageBrowserErrorCode.unavailable,
             StorageOperation.indexedDbOpen
           )
         }
@@ -1855,7 +1853,7 @@ export function open<TValue>(
           : normalizeError(
               cause,
               StorageBackend.indexedDb,
-              StorageErrorCode.unavailable,
+              StorageBrowserErrorCode.unavailable,
               StorageOperation.indexedDbOpen
             )
       }
@@ -1889,7 +1887,7 @@ export function createTransaction(
     throw normalizeError(
       cause,
       StorageBackend.indexedDb,
-      StorageErrorCode.transactionFailed,
+      StorageBrowserErrorCode.transactionFailed,
       StorageOperation.indexedDbTransaction
     )
   }
@@ -1911,7 +1909,7 @@ async function ensureMeta<TValue>(
     const schemaVersion = (current as { version?: unknown }).version
     if (schemaVersion === CURRENT_SCHEMA_VERSION) return
     if (typeof schemaVersion === 'number' && schemaVersion > CURRENT_SCHEMA_VERSION)
-      throw new StorageError(StorageErrorCode.versionUnsupported, {
+      throw new StorageError(StorageBrowserErrorCode.versionUnsupported, {
         backend: StorageBackend.indexedDb,
         operation: StorageOperation.indexedDbSchema,
         cause: new Error(
@@ -2030,7 +2028,7 @@ async function readFrom<TValue, T>(
     throw normalizeError(
       cause,
       StorageBackend.indexedDb,
-      StorageErrorCode.transactionFailed,
+      StorageBrowserErrorCode.transactionFailed,
       StorageOperation.indexedDbRead
     )
   } finally {
@@ -2064,7 +2062,7 @@ async function writeTo<TValue>(
       /* already settled */
     }
     /** Capture the original write failure before waiting for native rollback cleanup. */
-    const failure = new StorageError(StorageErrorCode.transactionFailed, {
+    const failure = new StorageError(StorageBrowserErrorCode.transactionFailed, {
       backend: StorageBackend.indexedDb,
       cause
     })
@@ -2663,7 +2661,7 @@ function dropData<TValue>(indexedDbContext: IIndexedDbContext<TValue>): Promise<
         throw normalizeError(
           cause,
           StorageBackend.indexedDb,
-          StorageErrorCode.unavailable,
+          StorageBrowserErrorCode.unavailable,
           StorageOperation.indexedDbDelete
         )
       })
@@ -2731,7 +2729,7 @@ function captureIndexedDbConfiguration<TValue>(indexedDbContext: IIndexedDbConte
     typeof indexedDbContext.options !== 'object' ||
     Array.isArray(indexedDbContext.options)
   )
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.indexedDb,
       cause: new TypeError('IndexedDB options must be an object')
     })
@@ -2761,7 +2759,7 @@ function captureIndexedDbConfiguration<TValue>(indexedDbContext: IIndexedDbConte
     if (typeof indexedDbContext.ownerLabel !== 'string')
       throw new TypeError(StorageErrorText.indexedDbOwnerInvalid)
   } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.indexedDb,
       cause
     })
@@ -2830,19 +2828,21 @@ function resolveIndexedDbLayout<TValue>(indexedDbContext: IIndexedDbContext<TVal
     (indexedDbContext.configuredFactory === undefined ||
       indexedDbContext.factory === indexedDbContext.realmDefaultFactory)
   )
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.indexedDb,
       cause: new TypeError(StorageErrorText.indexedDbJournalFactoryMustBeInjected)
     })
 
   if (typeof indexedDbContext.cleanupLegacyRecords !== 'boolean')
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.indexedDb,
       cause: new TypeError('cleanupLegacyRecords must be a boolean')
     })
 
   if (!indexedDbContext.factory)
-    throw new StorageError(StorageErrorCode.unavailable, { backend: StorageBackend.indexedDb })
+    throw new StorageError(StorageBrowserErrorCode.unavailable, {
+      backend: StorageBackend.indexedDb
+    })
 
   if (
     (typeof indexedDbContext.factory !== 'object' &&
@@ -2850,7 +2850,7 @@ function resolveIndexedDbLayout<TValue>(indexedDbContext: IIndexedDbContext<TVal
     indexedDbContext.factory === null ||
     typeof (indexedDbContext.factory as { open?: unknown }).open !== 'function'
   )
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.indexedDb,
       cause: new TypeError('IndexedDB factory must provide open()')
     })
@@ -2862,7 +2862,7 @@ function resolveIndexedDbLayout<TValue>(indexedDbContext: IIndexedDbContext<TVal
       typeof (indexedDbContext.keyRange as typeof IDBKeyRange).lowerBound !== 'function' ||
       typeof (indexedDbContext.keyRange as typeof IDBKeyRange).upperBound !== 'function')
   )
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.indexedDb,
       cause: new TypeError('IDBKeyRange must provide bound/lowerBound/upperBound')
     })
@@ -2892,7 +2892,7 @@ function resolveIndexedDbLayout<TValue>(indexedDbContext: IIndexedDbContext<TVal
     ) ||
     new Set(indexedDbContext.featureStoreNames).size !== indexedDbContext.featureStoreNames.length
   )
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
       backend: StorageBackend.indexedDb,
       cause: new TypeError(
         'IndexedDB channel store names must be non-empty, unique, and non-reserved'
@@ -3029,7 +3029,9 @@ function createIndexedDbConstruction<TValue>(
     indexedDbContext.controller,
     () => {
       if (indexedDbContext.activeDatabase === undefined)
-        throw new StorageError(StorageErrorCode.unavailable, { backend: StorageBackend.indexedDb })
+        throw new StorageError(StorageBrowserErrorCode.unavailable, {
+          backend: StorageBackend.indexedDb
+        })
       return indexedDbContext.activeDatabase
     },
     async () => {
@@ -3785,7 +3787,7 @@ function createIndexedDbScopeText<TValue, T>(
         (_view, { key, value, options }) => {
           assertStringStorageKey(key, StorageBackend.indexedDb)
           if (typeof value !== 'string')
-            throw new StorageError(StorageErrorCode.invalidConfig, {
+            throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
               backend: StorageBackend.indexedDb,
               key,
               cause: new TypeError(StorageErrorText.storageValueInvalid)
@@ -3848,7 +3850,7 @@ function createIndexedDbScopeBytes<TValue, T>(
         (_view, { key, value, options }) => {
           assertStringStorageKey(key, StorageBackend.indexedDb)
           if (!isUint8Array(value))
-            throw new StorageError(StorageErrorCode.invalidConfig, {
+            throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
               backend: StorageBackend.indexedDb,
               key,
               cause: new TypeError(StorageErrorText.storageBytesInvalid)
@@ -4180,7 +4182,7 @@ function createIndexedDbStoreText<TValue>(
         ({ key, value }, context) => {
           assertStringStorageKey(key, StorageBackend.indexedDb)
           if (typeof value !== 'string')
-            throw new StorageError(StorageErrorCode.invalidConfig, {
+            throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
               backend: StorageBackend.indexedDb,
               key,
               cause: new TypeError(StorageErrorText.storageValueInvalid)
@@ -4358,7 +4360,7 @@ function createIndexedDbStoreBytes<TValue>(
         ({ key, value }, context) => {
           assertStringStorageKey(key, StorageBackend.indexedDb)
           if (!isUint8Array(value))
-            throw new StorageError(StorageErrorCode.invalidConfig, {
+            throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
               backend: StorageBackend.indexedDb,
               key,
               cause: new TypeError(StorageErrorText.storageBytesInvalid)
@@ -4640,7 +4642,7 @@ class IndexedDbRecordCursor<TValue> {
   #failure(cause: unknown): StorageError | StorageContractError {
     return isStorageContractError(cause)
       ? cause
-      : new StorageError(StorageErrorCode.transactionFailed, {
+      : new StorageError(StorageBrowserErrorCode.transactionFailed, {
           backend: StorageBackend.indexedDb,
           operation: StorageOperation.indexedDbCursor,
           cause: cause instanceof StorageError ? (cause.cause ?? cause) : cause
@@ -4767,7 +4769,7 @@ class IndexedDbRecordCursor<TValue> {
       this.#finish(() =>
         this.#reject(
           isStorageContractError(cause) ||
-            (cause instanceof StorageError && cause.code === StorageErrorCode.invalidConfig)
+            (cause instanceof StorageError && cause.code === StorageBrowserErrorCode.invalidConfig)
             ? cause
             : this.#failure(cause)
         )

@@ -7,9 +7,9 @@ import {
   createStorageHost,
   definePlugin,
   defineStorageBackendKind,
-  STORAGE_HOST_SOURCE,
   type IStoragePluginCore
 } from '../../src/index.js'
+import { STORAGE_HOST_ERROR_SOURCE } from '@migaia/storage-contract/error-code'
 import { memoryBackend } from '../helpers/memory.js'
 
 /** Admission baselines supply the same resource label without requiring memory-native ports. */
@@ -193,7 +193,7 @@ describe('PluginHost materialization', () => {
     await Promise.resolve()
     await Promise.resolve()
     expect(await reported.promise).toMatchObject({
-      source: STORAGE_HOST_SOURCE,
+      source: STORAGE_HOST_ERROR_SOURCE,
       code: 'STORAGE_HOST_DISPOSED'
     })
     expect(disposals).toBe(1)
@@ -245,7 +245,7 @@ describe('PluginHost materialization', () => {
     await Promise.resolve()
     await Promise.resolve()
     expect(await reported.promise).toMatchObject({
-      source: STORAGE_HOST_SOURCE,
+      source: STORAGE_HOST_ERROR_SOURCE,
       code: 'STORAGE_HOST_DISPOSED'
     })
     expect(disposals).toBe(1)
@@ -447,7 +447,7 @@ describe('PluginHost materialization', () => {
     }
     expect(invalidIdError).toBeInstanceOf(TypeError)
     expect(invalidIdError).toMatchObject({
-      source: STORAGE_HOST_SOURCE,
+      source: STORAGE_HOST_ERROR_SOURCE,
       code: 'BACKEND_ID_INVALID'
     })
 
@@ -463,7 +463,7 @@ describe('PluginHost materialization', () => {
     const failure = await host.use(plugin).catch((error: unknown) => error)
     expect(failure).toMatchObject({
       code: 'BACKEND_INSTALL_FAILED',
-      cause: { cause: { source: STORAGE_HOST_SOURCE, code: 'BACKEND_PLUGIN_INVALID' } }
+      cause: { cause: { source: STORAGE_HOST_ERROR_SOURCE, code: 'BACKEND_PLUGIN_INVALID' } }
     })
     await host.dispose()
   })

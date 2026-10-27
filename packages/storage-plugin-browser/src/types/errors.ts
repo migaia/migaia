@@ -1,11 +1,7 @@
 import type { IBackendKind } from './capabilities.js'
 import type { IStorageKey } from './context.js'
-import { ERROR_SOURCE, StorageErrorCode, type IStorageErrorCode } from '../error-code.js'
-
-export { StorageErrorCode, type IStorageErrorCode }
-
-/** `source` value stamped onto every error this package throws. */
-export const STORAGE_BROWSER_SOURCE = ERROR_SOURCE
+import { STORAGE_BROWSER_ERROR_SOURCE } from '@migaia/storage-contract/error-code'
+import type { IStorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 
 /**
  * Optional diagnostic context for a frozen StorageError; nested values and cause retain their
@@ -31,30 +27,30 @@ export type IStorageErrorDetails = {
 /** Native admission error enriched with this package's stable boundary identity. */
 export type IStorageTypeError = TypeError & {
   readonly source: string
-  readonly code: IStorageErrorCode
+  readonly code: IStorageBrowserErrorCode
 }
 
 /** Native generic error enriched with this package's stable boundary identity. */
 export type IStorageNativeError = Error & {
   readonly source: string
-  readonly code: IStorageErrorCode
+  readonly code: IStorageBrowserErrorCode
 }
 
 /** Native range error enriched with this package's stable boundary identity. */
 export type IStorageRangeError = RangeError & {
   readonly source: string
-  readonly code: IStorageErrorCode
+  readonly code: IStorageBrowserErrorCode
 }
 
 /** Attach the public package identity without replacing the supplied native error instance. */
 const attachStorageErrorIdentity = <T extends Error>(
   error: T,
-  code: IStorageErrorCode
-): T & { readonly source: string; readonly code: IStorageErrorCode } => {
+  code: IStorageBrowserErrorCode
+): T & { readonly source: string; readonly code: IStorageBrowserErrorCode } => {
   Object.defineProperty(error, 'source', {
     configurable: false,
     enumerable: false,
-    value: STORAGE_BROWSER_SOURCE,
+    value: STORAGE_BROWSER_ERROR_SOURCE,
     writable: false
   })
   Object.defineProperty(error, 'code', {
@@ -63,12 +59,12 @@ const attachStorageErrorIdentity = <T extends Error>(
     value: code,
     writable: false
   })
-  return error as T & { readonly source: string; readonly code: IStorageErrorCode }
+  return error as T & { readonly source: string; readonly code: IStorageBrowserErrorCode }
 }
 
 /** Create a coded native Error for internal failures that may cross the package boundary. */
 export const createStorageError = (
-  code: IStorageErrorCode,
+  code: IStorageBrowserErrorCode,
   message: string,
   cause?: unknown
 ): IStorageNativeError =>
@@ -76,7 +72,7 @@ export const createStorageError = (
 
 /** Create a coded native RangeError while preserving its runtime prototype. */
 export const createStorageRangeError = (
-  code: IStorageErrorCode,
+  code: IStorageBrowserErrorCode,
   message: string,
   cause?: unknown
 ): IStorageRangeError =>
@@ -91,7 +87,7 @@ export const createStorageRangeError = (
  */
 export type IStorageAggregateError = AggregateError & {
   readonly source: string
-  readonly code: IStorageErrorCode
+  readonly code: IStorageBrowserErrorCode
 }
 
 /**
@@ -99,7 +95,7 @@ export type IStorageAggregateError = AggregateError & {
  * failures.
  */
 export const createStorageAggregateError = (
-  code: IStorageErrorCode,
+  code: IStorageBrowserErrorCode,
   message: string,
   errors: readonly unknown[]
 ): IStorageAggregateError => {
@@ -109,7 +105,7 @@ export const createStorageAggregateError = (
   Object.defineProperty(aggregate, 'source', {
     configurable: false,
     enumerable: false,
-    value: STORAGE_BROWSER_SOURCE,
+    value: STORAGE_BROWSER_ERROR_SOURCE,
     writable: false
   })
   Object.defineProperty(aggregate, 'code', {
@@ -127,7 +123,7 @@ export const createStorageAggregateError = (
  * branch on TypeError and still traverse the original failure.
  */
 export const createStorageTypeError = (
-  code: IStorageErrorCode,
+  code: IStorageBrowserErrorCode,
   message: string,
   cause?: unknown
 ): IStorageTypeError => {
@@ -153,7 +149,7 @@ export class StorageError extends Error {
   /** Canonical storage-plugin-browser diagnostic source. */
   readonly source: string
   /** Semantic failure scenario; branch on this rather than message text. */
-  readonly code: IStorageErrorCode
+  readonly code: IStorageBrowserErrorCode
   /** Backend associated with this operation. */
   readonly backend?: IBackendKind
   /** Logical key associated with this operation. */
@@ -171,14 +167,14 @@ export class StorageError extends Error {
 
   /** Capture diagnostic details once and freeze this error without replacing its original cause. */
   constructor(
-    code: IStorageErrorCode,
+    code: IStorageBrowserErrorCode,
     details: IStorageErrorDetails = {},
     message?: string,
     stage?: 'decode' | 'migrate' | 'validate'
   ) {
     super(message ?? `[storage-web] ${code}`, { cause: details.cause })
     this.name = 'StorageError'
-    this.source = STORAGE_BROWSER_SOURCE
+    this.source = STORAGE_BROWSER_ERROR_SOURCE
     this.code = code
     this.backend = details.backend
     this.key = details.key

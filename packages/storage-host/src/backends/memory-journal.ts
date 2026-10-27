@@ -11,7 +11,8 @@ import {
   type ITransactionScope
 } from '@migaia/storage-contract'
 import type { IStorageJournalNamespace, IStorageJournalNamespaceView } from '../journal/types.js'
-import { StorageError, StorageErrorCode } from '../errors.js'
+import { StorageError } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.js'
 
 /** Commit evidence stays in the same private physical data universe as original log namespaces. */
@@ -422,7 +423,7 @@ function memoryJournalHasMarker(
       if (value === null) return false
       if (value === markerValue) return true
       throw new StorageError(
-        StorageErrorCode.journalRecordInvalid,
+        StorageHostErrorCode.journalRecordInvalid,
         {},
         StorageErrorText.journalRecordInvalid
       )

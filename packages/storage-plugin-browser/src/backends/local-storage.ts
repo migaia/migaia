@@ -5,7 +5,8 @@ import {
   type IWebStorageOptions
 } from './web-storage.js'
 import type { IKeyValueStore, ISyncCapableStore, IWebStorageLike } from '../types/storage.js'
-import { StorageError, StorageErrorCode } from '../types/errors.js'
+import { StorageError } from '../types/errors.js'
+import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageBackend } from '../constants.js'
 import type { ITextChangeFeedApi } from '@migaia/storage-contract'
 import type {
@@ -40,7 +41,7 @@ export const localStorageHost = (
   try {
     storage ??= globalThis.localStorage
   } catch (cause) {
-    throw new StorageError(StorageErrorCode.unavailable, {
+    throw new StorageError(StorageBrowserErrorCode.unavailable, {
       backend: StorageBackend.local,
       cause
     })

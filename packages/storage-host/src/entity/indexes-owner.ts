@@ -18,12 +18,8 @@ import {
 import { compareStorageKeys, encodeOrderedStorageKey } from '../authoring/key.js'
 import { createRecordQueryWithoutKeyset } from '../authoring/query.js'
 
-import {
-  StorageError,
-  StorageErrorCode,
-  createStorageTypeError,
-  createStorageAggregateError
-} from '../errors.js'
+import { StorageError, createStorageTypeError, createStorageAggregateError } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { indexBackfillFailureText, StorageErrorText } from '../error-text.js'
 
 import { composeRepositoryKey, decodeRepositoryKey, repositoryEntityRange } from './key.js'
@@ -133,7 +129,7 @@ export class EntityIndexesOwner<
           batch.preparations === undefined ||
           batch.preparations.length !== batch.candidates.length
         )
-          throw new StorageError(StorageErrorCode.invalidConfig, {
+          throw new StorageError(StorageHostErrorCode.invalidConfig, {
             backend: this.#context.store.backend
           })
         if (canonicalOnlyScan === undefined)
@@ -189,7 +185,7 @@ export class EntityIndexesOwner<
         await session.fail(cause, ctx)
       } catch (persistFailure) {
         throw createStorageAggregateError(
-          StorageErrorCode.indexBackfillFailed,
+          StorageHostErrorCode.indexBackfillFailed,
           indexBackfillFailureText(this.#context.name),
           [cause, persistFailure]
         )
@@ -223,7 +219,7 @@ export class EntityIndexesOwner<
     onInvalid = options.onInvalid
 
     if (typeof index !== 'string' || index.length === 0)
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageHostErrorCode.invalidConfig, {
         backend: this.#context.store.backend,
         cause: new TypeError(EntityText.indexedListIndexMustBeANonEmptyString)
       })
@@ -269,7 +265,7 @@ export class EntityIndexesOwner<
   ): IStorageIterator<readonly [IStorageKey, IMatch<TDomain>]> => {
     const index = this.#context.config.indexes[snapshot.index]
     if (index === undefined)
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageHostErrorCode.invalidConfig, {
         backend: this.#context.store.backend,
         cause: new TypeError(EntityText.indexMissing(this.#context.name, snapshot.index))
       })
@@ -422,13 +418,13 @@ export class EntityIndexesOwner<
     ctx = snapshotOperationContext(ctx)
     const index = this.#context.config.indexes[snapshot.index]
     if (index === undefined)
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageHostErrorCode.invalidConfig, {
         backend: this.#context.store.backend,
         cause: new TypeError(EntityText.indexMissing(this.#context.name, snapshot.index))
       })
     const comparator = snapshot.options?.orderBy ?? this.#context.defaultOrderBy
     if (comparator !== undefined && snapshot.options?.limit === undefined)
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageHostErrorCode.invalidConfig, {
         backend: this.#context.store.backend,
         cause: new TypeError(EntityText.comparatorLimit)
       })
@@ -445,7 +441,7 @@ export class EntityIndexesOwner<
             const compared = comparator(left.value, right.value)
             if (!Number.isFinite(compared))
               throw createStorageTypeError(
-                StorageErrorCode.extensionFailed,
+                StorageHostErrorCode.extensionFailed,
                 StorageErrorText.entityComparatorInvalid
               )
             const tie =
@@ -453,7 +449,7 @@ export class EntityIndexesOwner<
             const result = compared || tie
             return snapshot.options?.direction === 'prev' ? -result : result
           } catch (cause) {
-            throw new StorageError(StorageErrorCode.extensionFailed, {
+            throw new StorageError(StorageHostErrorCode.extensionFailed, {
               backend: this.#context.store.backend,
               cause,
               operation: StorageOperation.entityOrderBy,
@@ -481,7 +477,7 @@ export class EntityIndexesOwner<
       undefined
     )
     if (this.#context.config.indexes[index] === undefined)
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageHostErrorCode.invalidConfig, {
         backend: this.#context.store.backend,
         cause: new TypeError(EntityText.indexMissing(this.#context.name, index))
       })
@@ -587,7 +583,7 @@ export class EntityIndexesOwner<
               throw new TypeError(StorageErrorText.entityComparatorInvalid)
             }
           } catch (cause) {
-            throw new StorageError(StorageErrorCode.extensionFailed, {
+            throw new StorageError(StorageHostErrorCode.extensionFailed, {
               backend: this.#context.store.backend,
               cause,
               operation: StorageOperation.entityOrderBy,
@@ -650,7 +646,7 @@ export class EntityIndexesOwner<
       domain = await this.#context.materialize(envelope, ctx, runtime)
     } catch (cause) {
       /** Missing assembly cannot be persisted as a skipped invalid business record. */
-      if (isStorageErrorFamily(cause) && cause.code === StorageErrorCode.entityFeatureRequired)
+      if (isStorageErrorFamily(cause) && cause.code === StorageHostErrorCode.entityFeatureRequired)
         throw cause
       this.#context.emitDiagnostic(
         EntityText.storageWebEntitySkippedInvalidIndexBackfillRecord(

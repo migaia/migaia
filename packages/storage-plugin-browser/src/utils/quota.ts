@@ -3,7 +3,8 @@ import {
   type StorageContractError,
   type IStorageKey
 } from '@migaia/storage-contract'
-import { StorageError, StorageErrorCode } from '../types/errors.js'
+import { StorageError } from '../types/errors.js'
+import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import type { IBackendKind } from '../types/capabilities.js'
 
 /**
@@ -47,11 +48,16 @@ export const normalizeStorageException = (
   }
   if (isStorageContractError(error)) return error
   if (isQuotaException(error))
-    return new StorageError(StorageErrorCode.quotaExceeded, {
+    return new StorageError(StorageBrowserErrorCode.quotaExceeded, {
       backend,
       key,
       operation,
       cause: error
     })
-  return new StorageError(StorageErrorCode.unavailable, { backend, key, operation, cause: error })
+  return new StorageError(StorageBrowserErrorCode.unavailable, {
+    backend,
+    key,
+    operation,
+    cause: error
+  })
 }

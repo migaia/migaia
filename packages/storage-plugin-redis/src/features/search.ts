@@ -67,7 +67,7 @@ import {
 import { readRedisHash, type RedisDraft } from '../transaction.js'
 import { replyInteger, replyRevision } from '../layout.js'
 import { invalidArgument, unsupported, redisError } from '../errors.js'
-import { RedisErrorCode } from '../error-code.js'
+import { RedisErrorCode } from '@migaia/storage-contract/error-code'
 import type { IRedisStore } from '../types.js'
 import type { IRedisConnection } from '../driver.js'
 /**

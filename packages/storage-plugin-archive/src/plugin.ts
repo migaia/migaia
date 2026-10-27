@@ -30,7 +30,7 @@ import {
 } from '@migaia/storage-contract'
 import type { ICollectionsCodecValue } from '@migaia/serialize/codecs/collections-json'
 import { Archive } from './constants.js'
-import { ArchiveErrorCode } from './error-code.js'
+import { ArchiveErrorCode } from '@migaia/storage-contract/error-code'
 import {
   archiveError,
   invalidSegment,

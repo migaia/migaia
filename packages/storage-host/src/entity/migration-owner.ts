@@ -16,7 +16,8 @@ import {
 import { encodeOrderedStorageKey } from '../authoring/key.js'
 import { readTransactionOperationContext } from '../authoring/transaction.js'
 import { migrateEnvelope } from '../authoring/migration.js'
-import { StorageError, StorageErrorCode } from '../errors.js'
+import { StorageError } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 
 import {
   composeFlatKey,
@@ -77,7 +78,7 @@ export class EntityMigrationOwner<
     options: IMigrateOptions<TDomain>
   ): { readonly batchSize: number; readonly onInvalid: IMigrateOptions<TDomain>['onInvalid'] } => {
     if (options === null || typeof options !== 'object' || Array.isArray(options))
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageHostErrorCode.invalidConfig, {
         backend: this.#context.store.backend,
         cause: new TypeError(EntityText.migrateOptionsMustBeAnObject)
       })
@@ -88,7 +89,7 @@ export class EntityMigrationOwner<
 
     const normalizedBatchSize = batchSize === undefined ? 100 : batchSize
     if (!Number.isSafeInteger(normalizedBatchSize) || normalizedBatchSize < 1)
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageHostErrorCode.invalidConfig, {
         backend: this.#context.store.backend,
         cause: new RangeError(EntityText.migrateBatchSizeMustBeAPositiveSafeInteger)
       })
@@ -617,7 +618,7 @@ export class EntityMigrationOwner<
               throw normalizeError(
                 retryCause,
                 this.#context.store.backend,
-                StorageErrorCode.transactionFailed,
+                StorageHostErrorCode.transactionFailed,
                 'entity.migrate'
               )
             }
@@ -626,7 +627,7 @@ export class EntityMigrationOwner<
           throw normalizeError(
             cause,
             this.#context.store.backend,
-            StorageErrorCode.transactionFailed,
+            StorageHostErrorCode.transactionFailed,
             'entity.migrate'
           )
         }
@@ -673,11 +674,11 @@ export class EntityMigrationOwner<
         cause.code === StorageContractErrorCode.versionUnsupported
       ) {
         stages?.onVersionRejected(envelope.version, cause.code)
-        throw new StorageError(StorageErrorCode.versionUnsupported, { cause })
+        throw new StorageError(StorageHostErrorCode.versionUnsupported, { cause })
       }
       if (isStorageContractError(cause) && cause.code === StorageContractErrorCode.migrationFailed)
         throw new StorageError(
-          StorageErrorCode.migrationFailed,
+          StorageHostErrorCode.migrationFailed,
           { cause },
           undefined,
           StorageRecordStage.migrate

@@ -21,7 +21,8 @@ import {
   readTransactionOperationContext
 } from '../authoring/transaction.js'
 
-import { StorageError, StorageErrorCode, createStorageTypeError } from '../errors.js'
+import { StorageError, createStorageTypeError } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.js'
 import { readStorageHookFailureCode } from '../hooks.js'
 
@@ -144,7 +145,7 @@ export class EntityQueryOwner<
     validateLimit(limit, this.#context.store.backend)
     validateOrderBy(orderBy, this.#context.store.backend)
     if (direction !== undefined && direction !== 'next' && direction !== 'prev')
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageHostErrorCode.invalidConfig, {
         backend: this.#context.store.backend,
         cause: new TypeError(EntityText.listDirectionMustBeNextOrPrev)
       })
@@ -238,7 +239,7 @@ export class EntityQueryOwner<
   ): IRecordQueryBase<TDomain, IOperationContext> => {
     const comparator = options?.orderBy ?? this.#context.defaultOrderBy
     if (comparator !== undefined && options?.limit === undefined)
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageHostErrorCode.invalidConfig, {
         backend: this.#context.store.backend,
         cause: new TypeError(EntityText.comparatorLimit)
       })
@@ -284,12 +285,12 @@ export class EntityQueryOwner<
             const result = comparator(left, right)
             if (!Number.isFinite(result))
               throw createStorageTypeError(
-                StorageErrorCode.extensionFailed,
+                StorageHostErrorCode.extensionFailed,
                 StorageErrorText.entityComparatorInvalid
               )
             return options?.direction === 'prev' ? -result : result
           } catch (cause) {
-            throw new StorageError(StorageErrorCode.extensionFailed, {
+            throw new StorageError(StorageHostErrorCode.extensionFailed, {
               backend: this.#context.store.backend,
               cause,
               operation: StorageOperation.entityOrderBy,
@@ -454,7 +455,7 @@ export class EntityQueryOwner<
       }
       return result
     } catch (cause) {
-      throw new StorageError(StorageErrorCode.extensionFailed, {
+      throw new StorageError(StorageHostErrorCode.extensionFailed, {
         backend: this.#context.store.backend,
         cause,
         operation: StorageOperation.queryWhere,
@@ -476,7 +477,7 @@ export class EntityQueryOwner<
         throw new TypeError(EntityText.querySelectorKey, { cause })
       }
     } catch (cause) {
-      throw new StorageError(StorageErrorCode.extensionFailed, {
+      throw new StorageError(StorageHostErrorCode.extensionFailed, {
         backend: this.#context.store.backend,
         cause,
         operation: StorageOperation.querySelector,
@@ -491,7 +492,7 @@ export class EntityQueryOwner<
     try {
       return await fn(value)
     } catch (cause) {
-      throw new StorageError(StorageErrorCode.extensionFailed, {
+      throw new StorageError(StorageHostErrorCode.extensionFailed, {
         backend: this.#context.store.backend,
         cause,
         operation: StorageOperation.querySelect,
@@ -511,7 +512,7 @@ export class EntityQueryOwner<
       }
       return result
     } catch (cause) {
-      throw new StorageError(StorageErrorCode.extensionFailed, {
+      throw new StorageError(StorageHostErrorCode.extensionFailed, {
         backend: this.#context.store.backend,
         cause,
         operation: StorageOperation.queryComparator,
@@ -574,7 +575,7 @@ export class EntityQueryOwner<
   queryMissingLimit: Parameters<
     typeof createEntityQuery<TDomain, TIndexes, IOperationContext, TAugmentMethods>
   >[0]['missingLimit'] = () => {
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageHostErrorCode.invalidConfig, {
       backend: this.#context.store.backend,
       cause: new TypeError(EntityText.comparatorLimit)
     })
@@ -583,7 +584,7 @@ export class EntityQueryOwner<
   queryInvalidState: Parameters<
     typeof createEntityQuery<TDomain, TIndexes, IOperationContext, TAugmentMethods>
   >[0]['invalidState'] = (cause) => {
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageHostErrorCode.invalidConfig, {
       backend: this.#context.store.backend,
       cause: cause ?? new TypeError(EntityText.queryState)
     })
@@ -1182,7 +1183,7 @@ export class EntityQueryOwner<
     )
     const physicalId = physicalIds.get(encodeFlatStorageKey(id))
     if (physicalId === undefined)
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageHostErrorCode.invalidConfig, {
         backend: this.#context.store.backend,
         cause: new TypeError(EntityText.queryIdentityChanged)
       })

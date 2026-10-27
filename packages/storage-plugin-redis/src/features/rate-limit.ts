@@ -7,7 +7,7 @@ import { readNativeFeaturePort } from '../native-feature.js'
 import { featureName, featureInteger } from '../feature-input.js'
 import { RedisSuffix, replyInteger } from '../layout.js'
 import { redisError } from '../errors.js'
-import { RedisErrorCode } from '../error-code.js'
+import { RedisErrorCode } from '@migaia/storage-contract/error-code'
 /** Fixed windows use only Redis's clock and reject without increasing an exhausted counter. */
 export type IRedisRateLimitOptions = { readonly limit: number; readonly windowMs: number }
 /** Reset time is the native TTL remaining in this same atomic server-side operation. */

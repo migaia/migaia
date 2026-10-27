@@ -6,7 +6,7 @@ import {
   reportCleanupError
 } from '@migaia/storage-host/sdk'
 import { isUint8Array } from '@migaia/utils/bytes'
-import { RedisErrorCode } from './error-code.js'
+import { RedisErrorCode } from '@migaia/storage-contract/error-code'
 import { redisExecCause } from './constants.js'
 import {
   invalidArgument,

@@ -10,8 +10,6 @@ export type {
 export type { IBackendKind, IStorageCapabilities } from './capabilities.js'
 export {
   StorageError,
-  StorageErrorCode,
-  type IStorageErrorCode,
   type IStorageErrorDetails,
   type IStorageChannel,
   type IExtensionStage

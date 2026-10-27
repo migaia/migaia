@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { StorageErrorCode } from '../../src/error-code.js'
+import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import { storageWebErrorCodeInventory } from '../fixtures/error-code-registry.js'
 
 describe('storage-plugin-browser error registry', () => {
   it('keeps source codes and tracked package inventory synchronized', () => {
-    expect(Object.values(StorageErrorCode).sort()).toEqual([...storageWebErrorCodeInventory].sort())
+    expect(Object.values(StorageBrowserErrorCode).sort()).toEqual(
+      [...storageWebErrorCodeInventory].sort()
+    )
   })
 })

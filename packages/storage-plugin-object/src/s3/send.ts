@@ -16,7 +16,7 @@ import {
   StorageContractErrorCode,
   type IOperationContext
 } from '@migaia/storage-contract'
-import { ObjectErrorCode } from '../error-code.js'
+import { ObjectErrorCode } from '@migaia/storage-contract/error-code'
 import { ObjectNames } from '../constants.js'
 import { ObjectErrorText } from '../error-text.js'
 import { normalizeObjectError, objectError } from '../errors.js'

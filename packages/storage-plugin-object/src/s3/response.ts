@@ -1,7 +1,7 @@
 import type { GetObjectCommandOutput, HeadObjectCommandOutput } from '@aws-sdk/client-s3'
 import type { IBlobInfo } from '@migaia/storage-contract'
 import { objectError } from '../errors.js'
-import { ObjectErrorCode } from '../error-code.js'
+import { ObjectErrorCode } from '@migaia/storage-contract/error-code'
 /** Required native metadata cannot be reconstructed from the local clock or upload request. */
 export function responseInfo(
   key: string,

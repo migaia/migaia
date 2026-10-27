@@ -1,8 +1,8 @@
 import {
   StorageError as JournalError,
-  StorageErrorCode as JournalErrorCode,
   StorageErrorText as JournalErrorText
 } from '@migaia/storage-host'
+import { StorageHostErrorCode as JournalErrorCode } from '@migaia/storage-contract/error-code'
 import { encodeFlatStorageKey, createStorageToken } from '@migaia/storage-host/sdk'
 import { type IStorageKey } from '@migaia/storage-contract'
 /** One physical point retains its birth across deletion and a version for each native attempt. */

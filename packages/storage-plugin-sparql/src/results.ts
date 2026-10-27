@@ -1,7 +1,7 @@
 import { term, snapshotStorageRdfTerm } from '@migaia/storage-host/sdk'
 import { RdfTermType, type IRdfBindingTerm, type ISparqlRow } from '@migaia/storage-contract'
 import { sparqlError } from './errors.js'
-import { SparqlErrorCode } from './error-code.js'
+import { SparqlErrorCode } from '@migaia/storage-contract/error-code'
 import { SparqlErrorText } from './error-text.js'
 /** Invalid native protocol fields stay on the response family rather than becoming user arguments. */
 function malformed(): never {

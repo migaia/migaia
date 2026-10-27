@@ -68,7 +68,7 @@ import {
   qdrantError,
   responseStatus
 } from './errors.js'
-import { QdrantErrorCode } from './error-code.js'
+import { QdrantErrorCode } from '@migaia/storage-contract/error-code'
 import { nativeId } from './id.js'
 import { encodePointPayload, decodePointPayload, assertPointPayload } from './envelope.js'
 import { nativeCondition, orgFilter, type IQdrantFilter } from './filter.js'

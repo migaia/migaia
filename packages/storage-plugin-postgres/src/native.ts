@@ -17,7 +17,7 @@ import type { IPgConnection, IPgNativeParameter } from './types.js'
 import type { IPgTables } from './schema.js'
 import { pgKey, pgKeyHex, pgRecordKey, pgTextKey } from './codec.js'
 import { postgresError } from './errors.js'
-import { PostgresErrorCode } from './error-code.js'
+import { PostgresErrorCode } from '@migaia/storage-contract/error-code'
 import { PgNames } from './constants.js'
 /** These channels are real physical tables, rather than a second public data model. */
 export type IPgChannel = 'text' | 'bytes' | 'record' | 'metadata'

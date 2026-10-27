@@ -37,7 +37,7 @@ import { raceWithAbort, UtilsAbortError } from '@migaia/utils/promise'
 import { cacheBackendKind } from '../kind.js'
 import { cacheKey } from '../key.js'
 import { cacheError, invalidArgument, missingCapability } from '../errors.js'
-import { CacheErrorCode } from '../error-code.js'
+import { CacheErrorCode } from '@migaia/storage-contract/error-code'
 import { CacheText, CacheOperation, CacheHook } from '../constants.js'
 import type {} from '../hooks.js'
 

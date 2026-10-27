@@ -10,12 +10,8 @@ import { deferred } from '@migaia/utils/promise'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { composeRepositoryKey } from '../../src/entity/key.js'
 import { defineEntity } from '../../src/entity.js'
-import {
-  createStorageHost,
-  defineFeature,
-  StorageError,
-  StorageErrorCode
-} from '../../src/index.js'
+import { createStorageHost, defineFeature, StorageError } from '../../src/index.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { memoryBackendPlugin, memoryBackendKind } from '../../src/plugins/memory.js'
 import { memoryBackend } from '../helpers/memory.js'
 
@@ -337,7 +333,7 @@ it('keeps a mapped stream advance active until disposal can drain it', async () 
 it('wraps original query callback failures even when they already carry a code', async () => {
   const repo = rows.connect(await memoryBackend())
   await repo.put({ id: 'a', group: 'one', score: 1 })
-  const original = new StorageError(StorageErrorCode.invalidConfig)
+  const original = new StorageError(StorageHostErrorCode.invalidConfig)
   for (const [operation, query] of [
     [
       'query.where',

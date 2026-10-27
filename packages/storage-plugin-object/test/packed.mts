@@ -90,11 +90,12 @@ try {
     `import assert from 'node:assert/strict'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { blob } from '@migaia/storage-contract'
-import { objectBackendPlugin, ERROR_SOURCE } from '@migaia/storage-plugin-object'
+import { objectBackendPlugin } from '@migaia/storage-plugin-object'
+import { STORAGE_OBJECT_ERROR_SOURCE } from '@migaia/storage-contract/error-code'
 import { fsObjectDriver } from '@migaia/storage-plugin-object/fs'
 import { s3ObjectDriver } from '@migaia/storage-plugin-object/s3'
 import { objectPresignFeature } from '@migaia/storage-plugin-object/features/presign'
-assert.equal(ERROR_SOURCE, 'storage.backend.object')
+assert.equal(STORAGE_OBJECT_ERROR_SOURCE, 'storage.backend.object')
 assert.equal(s3ObjectDriver({ config: { region: 'us-east-1' }, bucket: 'objects' }).kind, 's3')
 assert.ok(objectPresignFeature())
 const host = await createStorageHost({ plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: './objects' }) })] })

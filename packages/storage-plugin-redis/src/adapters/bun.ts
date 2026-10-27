@@ -1,6 +1,6 @@
 import type { RedisClient as IBunRedisClient } from 'bun'
 import type { IRedisConnection, IRedisDriver } from '../driver.js'
-import { RedisErrorCode } from '../error-code.js'
+import { RedisErrorCode } from '@migaia/storage-contract/error-code'
 import { RedisCommand, RedisReply } from '../constants.js'
 import {
   runRedisCallback,
