@@ -18,6 +18,10 @@ export const RpcChunkLimit = {
   maxBufferedBytes: 64 * 1024 * 1024,
   /** Incomplete source/message assemblies allowed at once. */
   maxConcurrentMessages: 256,
+  /** One physical source may reserve only one quarter of the default global message slots. */
+  maxConcurrentMessagesPerSource: 64,
+  /** Complete declared lengths reserve this per-source allowance before retaining first fragments. */
+  maxBufferedBytesPerSource: 16 * 1024 * 1024,
   /** Original retention timer for incomplete assemblies. */
   assemblyTimeoutMs: 30_000
 } as const

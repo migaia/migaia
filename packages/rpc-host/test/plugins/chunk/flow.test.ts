@@ -2,7 +2,7 @@ import { expect, it } from 'vitest'
 import { defineHost, definePlugin } from '@migaia/plugin-host'
 import { deferred } from '@migaia/utils/promise'
 import type { IRpcFlowContext, IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
-import { chunk } from '../../../dist/features/chunk/index.js'
+import { chunk } from '@migaia/rpc-host/plugins/chunk'
 import { FlowRegistry, type IRpcFlowGroup } from '../../../dist/flow/registry.js'
 import {
   rpcHostPipelines,
@@ -44,6 +44,8 @@ it('actual native chunk flow preserves negotiated split/reassembly, physical dra
     required: true,
     chunkBytes: 2,
     maxMessageBytes: 8,
+    maxConcurrentMessagesPerSource: 1,
+    maxBufferedBytesPerSource: 8,
     schedule: (task) => {
       timers.set(++token, task)
       return token
@@ -200,6 +202,39 @@ it('actual native chunk flow preserves negotiated split/reassembly, physical dra
     },
     async () => undefined
   )
+  expect(timers.size).toBe(1)
+  /** A44 admits another physical source while this source's message and byte quotas remain held. */
+  const quotaFrames = partial.map((frame) => {
+    /** Changing only the opaque message id admits a separate valid physical message. */
+    const data = frame.data as { messageId: string }
+    return { ...frame, data: { ...data, messageId: `${data.messageId}:quota` } }
+  })
+  await expect(
+    pipelines.pipeline(RpcFlowPoint.frameInbound, 'test').run(
+      {
+        frame: quotaFrames[0]!,
+        context: { ...context(source.signal, new Set(['chunk@1'])), direction: 'inbound' }
+      },
+      async () => undefined
+    )
+  ).rejects.toMatchObject({ code: 'FRAME_LIMIT_EXCEEDED' })
+  /** The second physical source completes the same valid fragment sequence while A stays pending. */
+  const independent: IRpcCarrierFrame[] = []
+  for (const frame of quotaFrames)
+    await pipelines.pipeline(RpcFlowPoint.frameInbound, 'test').run(
+      {
+        frame,
+        context: {
+          ...context(source.signal, new Set(['chunk@1'])),
+          direction: 'inbound',
+          carrierId: 'source-b'
+        }
+      },
+      async (payload) => {
+        independent.push(payload.frame)
+      }
+    )
+  expect(independent).toEqual([original])
   expect(timers.size).toBe(1)
   source.abort()
   expect(timers.size).toBe(0)

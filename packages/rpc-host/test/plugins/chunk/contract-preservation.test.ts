@@ -251,6 +251,8 @@ describe('migrated chunk contract assertions', () => {
       chunkBytes: 2,
       maxMessageBytes: 4,
       maxBufferedBytes: 4,
+      /** Keep this cleanup race within its explicit per-source admission allowance. */
+      maxBufferedBytesPerSource: 4,
       schedule: () => 1,
       cancel: () => {
         cancellations++

@@ -54,6 +54,21 @@ function snapshotOptions(options: IRpcChunkOptions = {}) {
     maxChunks: options.maxChunks ?? RpcChunkLimit.maxChunks,
     maxBufferedBytes: options.maxBufferedBytes ?? RpcChunkLimit.maxBufferedBytes,
     maxConcurrentMessages: options.maxConcurrentMessages ?? RpcChunkLimit.maxConcurrentMessages,
+    maxConcurrentMessagesPerSource:
+      options.maxConcurrentMessagesPerSource ??
+      Math.min(
+        RpcChunkLimit.maxConcurrentMessagesPerSource,
+        Math.max(
+          1,
+          Math.floor((options.maxConcurrentMessages ?? RpcChunkLimit.maxConcurrentMessages) / 4)
+        )
+      ),
+    maxBufferedBytesPerSource:
+      options.maxBufferedBytesPerSource ??
+      Math.min(
+        RpcChunkLimit.maxBufferedBytesPerSource,
+        Math.max(1, Math.floor((options.maxBufferedBytes ?? RpcChunkLimit.maxBufferedBytes) / 4))
+      ),
     assemblyTimeoutMs: options.assemblyTimeoutMs ?? RpcChunkLimit.assemblyTimeoutMs,
     errorMetadata: options.errorMetadata,
     schedule: options.schedule,
@@ -65,6 +80,8 @@ function snapshotOptions(options: IRpcChunkOptions = {}) {
     result.maxChunks,
     result.maxBufferedBytes,
     result.maxConcurrentMessages,
+    result.maxConcurrentMessagesPerSource,
+    result.maxBufferedBytesPerSource,
     result.assemblyTimeoutMs
   ]) {
     if (!Number.isSafeInteger(value) || value <= 0)
@@ -127,6 +144,8 @@ function fragmentFramerState<TKind extends 'string' | 'binary', TEncoded extends
   const options = snapshotOptions(input)
   /** Source and message identifiers isolate incomplete fragment buffers from unrelated senders. */
   const buffers = new Map<string, Map<string, IBuffer<TEncoded>>>()
+  /** Declared complete lengths reserve source capacity so admitted messages can finish their quota. */
+  const sourceReservations = new Map<string, number>()
   /** Keep opaque source/message lookup separate from global eviction order. */
   const terminal = new Map<string, Map<string, ITerminalState>>()
   /** Map key order avoids scanning or moving the bounded recent-terminal entries. */
@@ -141,6 +160,7 @@ function fragmentFramerState<TKind extends 'string' | 'binary', TEncoded extends
   return {
     options,
     buffers,
+    sourceReservations,
     terminal,
     terminalOrder,
     bufferedBytes,
@@ -265,6 +285,10 @@ class FragmentFramer<TKind extends 'string' | 'binary', TEncoded extends IEncode
     const timer = buffer.timer
     buffer.timer = undefined
     this.#state.bufferedBytes -= buffer.bytes
+    /** Return this message's whole reservation before any timer cancellation can reenter. */
+    const reserved = this.#state.sourceReservations.get(source)! - buffer.expectedLength
+    if (reserved === 0) this.#state.sourceReservations.delete(source)
+    else this.#state.sourceReservations.set(source, reserved)
     sourceMap.delete(messageId)
     if (sourceMap.size === 0) this.#state.buffers.delete(source)
     this.#state.activeBuffers -= 1
@@ -385,10 +409,15 @@ class FragmentFramer<TKind extends 'string' | 'binary', TEncoded extends IEncode
       }
     let buffer = this.#state.buffers.get(source)?.get(messageId)
     if (!buffer) {
+      /** Source admission charges complete length once; later fragments reuse the same reservation. */
+      const reserved = this.#state.sourceReservations.get(source) ?? 0
       if (
         index !== 0 ||
         this.#state.activeBuffers >= this.#state.options.maxConcurrentMessages ||
-        this.#state.bufferedBytes + bytes > this.#state.options.maxBufferedBytes
+        this.#state.bufferedBytes + bytes > this.#state.options.maxBufferedBytes ||
+        (this.#state.buffers.get(source)?.size ?? 0) >=
+          this.#state.options.maxConcurrentMessagesPerSource ||
+        reserved + length > this.#state.options.maxBufferedBytesPerSource
       )
         return {
           status: 'rejected',
@@ -407,6 +436,7 @@ class FragmentFramer<TKind extends 'string' | 'binary', TEncoded extends IEncode
         this.#markTerminal(entry.source, entry.messageId, true)
       }, this.#state.options.assemblyTimeoutMs)
       this.#sourceBuffers(source).set(messageId, buffer)
+      this.#state.sourceReservations.set(source, reserved + length)
       this.#state.activeBuffers += 1
     }
     if (buffer.count !== count || buffer.expectedLength !== length || index !== buffer.next)
