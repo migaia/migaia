@@ -1,3 +1,4 @@
+import { storageProbe } from '../../src/plugins/probe/index.js'
 import { entityQueryFeature } from '../../src/entity/query-feature.js'
 import { entityUniqueFeature } from '../../src/entity/unique-feature.js'
 import { entityMigrationFeature } from '../../src/entity/migration-feature.js'
@@ -32,12 +33,14 @@ const definition = defineEntity<IRow>()({
 it('selects declared equality indexes once without opening a source during explain', async () => {
   const reads: number[] = []
   await using host = await createStorageHost({
-    plugins: [memoryBackendPlugin()] as const,
-    hooks: {
-      afterQuery: (info) => {
-        reads.push(info.stats.readCount)
-      }
-    }
+    plugins: [
+      storageProbe({
+        afterQuery: (info) => {
+          reads.push(info.stats.readCount)
+        }
+      }),
+      memoryBackendPlugin()
+    ] as const
   })
   const store = host.backend('memory')
   const repo = definition.connect(store, { queryStages: host.queryStages(store) })

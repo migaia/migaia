@@ -167,10 +167,11 @@ afterArchiveRun 观察成功结果；业务仍应读取方法返回的进度。
 
 ```ts doc-test=run
 import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { archivePlugin } from '@migaia/storage-plugin-archive'
 
 await using base = await createStorageHost({
-  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]
+  plugins: [storageProbe(), memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]
 })
 const host = await base.use(
   archivePlugin({
@@ -189,7 +190,7 @@ const host = await base.use(
 )
 await host.detect()
 const hot = host.backend('hot')
-host.hooks.on('afterArchiveRun', (event) => console.log(event.archived))
+host.extensions.observe('afterArchiveRun', (event) => console.log(event.archived))
 await hot.putRecord({ createdAt: 0, value: 42 }, 'event:a')
 const result = await host.extensions.archiveRun()
 console.log(result.segments)

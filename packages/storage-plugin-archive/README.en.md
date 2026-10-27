@@ -103,7 +103,7 @@ Publish hot/cold first, then call host.use(archivePlugin(...)) and detect. Opera
 | Archive events older than a day    | rule + archiveRun         | [Archive by retention time](./USEGUIDE.en.md#archive-by-retention-time)                 |
 | Read history and restore on demand | archiveGet + archiveSweep | [Read restore and clean up](./USEGUIDE.en.md#read-restore-and-clean-up)                 |
 | Share rules across organizations   | host.org + historyRun/Get | [Organizations and custom prefixes](./USEGUIDE.en.md#organizations-and-custom-prefixes) |
-| Monitor a partially completed job  | hooks + progress results  | [Observe committed progress](./USEGUIDE.en.md#observe-committed-progress)               |
+| Monitor a partially completed job  | probe plugin + progress   | [Observe committed progress](./USEGUIDE.en.md#observe-committed-progress)               |
 
 ## Install
 

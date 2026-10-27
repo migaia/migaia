@@ -1,3 +1,4 @@
+import { storageProbe } from '../src/plugins/probe/index.js'
 import { describe, expect, it, vi } from 'vitest'
 import { assertVersionedEnvelope } from '@migaia/storage-contract'
 import {
@@ -70,20 +71,24 @@ describe('envelope observation binding', () => {
     /** Observe one true boundary through the same package-owned endpoint consumed by entity. */
     const seen: string[] = []
     const first = await createStorageHost({
-      plugins: [definePlugin('first', descriptor)],
-      hooks: {
-        beforeEnvelopeCheck: (event) => {
-          seen.push(event.backendId)
-        }
-      }
+      plugins: [
+        storageProbe({
+          beforeEnvelopeCheck: (event) => {
+            seen.push(event.backendId)
+          }
+        }),
+        definePlugin('first', descriptor)
+      ]
     })
     await using second = await createStorageHost({
-      plugins: [definePlugin('second', descriptor)],
-      hooks: {
-        beforeEnvelopeCheck: (event) => {
-          seen.push(event.backendId)
-        }
-      }
+      plugins: [
+        storageProbe({
+          beforeEnvelopeCheck: (event) => {
+            seen.push(event.backendId)
+          }
+        }),
+        definePlugin('second', descriptor)
+      ]
     })
     getBackendEnvelopeStages(raw, {
       operation: 'shared-read',
@@ -103,7 +108,7 @@ describe('envelope observation binding', () => {
   })
 
   it('borrows the original sync and async migration observer with immutable operation metadata', async () => {
-    await using host = await createStorageHost({ plugins: [plugin()] })
+    await using host = await createStorageHost({ plugins: [storageProbe(), plugin()] })
     /** Metadata changes after binding must never affect concurrent recovery observations. */
     const metadata = { operation: 'recover', targetVersion: 1 }
     /** One binding borrows real envelope boundaries without retaining envelope state. */
@@ -116,17 +121,17 @@ describe('envelope observation binding', () => {
     const received: Array<
       IStorageHookMap['beforeEnvelopeCheck'] | IStorageHookMap['beforeMigrationStep']
     > = []
-    host.hooks.on('beforeEnvelopeCheck', (payload) => {
+    host.extensions.observe('beforeEnvelopeCheck', (payload) => {
       order.push('check')
       received.push(payload)
     })
-    host.hooks.on('afterEnvelopeCheck', () => order.push('checked'))
-    host.hooks.on('beforeMigrationStep', (payload) => {
+    host.extensions.observe('afterEnvelopeCheck', () => order.push('checked'))
+    host.extensions.observe('beforeMigrationStep', (payload) => {
       order.push('before')
       received.push(payload)
     })
-    host.hooks.on('afterMigrationStep', () => order.push('after'))
-    host.hooks.on('afterMigrate', () => order.push('migrated'))
+    host.extensions.observe('afterMigrationStep', () => order.push('after'))
+    host.extensions.observe('afterMigrate', () => order.push('migrated'))
     /** The sole canonical plan executes both original entry points. */
     const plan = createMigrationPlan({ version: 1, steps: { 1: (value) => Number(value) + 1 } })
     stages.beforeEnvelopeCheck()
@@ -159,7 +164,7 @@ describe('envelope observation binding', () => {
     const original = new Error('migration listener failed')
     /** Reporting remains observational and never becomes a migration failure. */
     const report = vi.fn()
-    await using host = await createStorageHost({ plugins: [plugin()], report })
+    await using host = await createStorageHost({ plugins: [storageProbe(), plugin()], report })
     /** A preconstructed port observes later registration and cancellation on the shared hub. */
     const stages = host.envelopeStages(host.backend('catalog'), {
       operation: 'read',
@@ -168,12 +173,12 @@ describe('envelope observation binding', () => {
     /** The original plan owns state recovery and executes each step exactly once. */
     const step = vi.fn((state: unknown) => state)
     /** Listener failure is unrelated to the original migration result. */
-    const off = host.hooks.on('beforeMigrationStep', () => {
+    const off = host.extensions.observe('beforeMigrationStep', () => {
       throw original
     })
     /** Keep version absence distinct from an actual version zero. */
     const rejected = vi.fn()
-    host.hooks.on('onVersionRejected', rejected)
+    host.extensions.observe('onVersionRejected', rejected)
     /** Explicit reset-free migration uses the actual contract observer entry. */
     const plan = createMigrationPlan({ version: 1, steps: { 1: step } })
     expect(

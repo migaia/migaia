@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict'
 import { createStorageHost } from '@migaia/storage-host'
+import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import { defineEntity } from '@migaia/storage-host/entity'
 import { entityQueryFeature } from '@migaia/storage-host/entity/query'
@@ -23,8 +24,8 @@ const connection =
 let iterationCloses = 0
 /** The actual public plugin installs its own native store. */
 const host = await createStorageHost({
-  hooks: { onStorageIterationClose: () => iterationCloses++ },
   plugins: [
+    storageProbe({ onStorageIterationClose: () => iterationCloses++ }),
     sqliteBackendPlugin({ driver: connection, maxLockMs: mode === 'hold' ? 1000 : undefined })
   ]
 })

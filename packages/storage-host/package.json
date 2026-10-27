@@ -26,6 +26,10 @@
       "types": "./dist/journal.d.ts",
       "default": "./dist/journal.js"
     },
+    "./plugins/probe": {
+      "types": "./dist/plugins/probe/index.d.ts",
+      "default": "./dist/plugins/probe.js"
+    },
     "./entity": {
       "types": "./dist/entity.d.ts",
       "default": "./dist/entity.js"

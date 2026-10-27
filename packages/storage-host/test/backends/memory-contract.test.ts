@@ -1,3 +1,4 @@
+import { storageProbe } from '../../src/plugins/probe/index.js'
 import { describe, expect, it } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import {
@@ -38,14 +39,17 @@ describe('memory native contract integration', () => {
       }
     }))
     await using host = await createStorageHost({
-      plugins: [memoryBackendPlugin(), counting],
-      hooks: {
-        beforeStorageOperation: (payload) => {
-          beforePayloads.push(payload)
-          observations.push(`before:${payload.operation}`)
-        },
-        afterStorageOperation: ({ operation }) => observations.push(`after:${operation}`)
-      }
+      plugins: [
+        storageProbe({
+          beforeStorageOperation: (payload) => {
+            beforePayloads.push(payload)
+            observations.push(`before:${payload.operation}`)
+          },
+          afterStorageOperation: ({ operation }) => observations.push(`after:${operation}`)
+        }),
+        memoryBackendPlugin(),
+        counting
+      ]
     })
     const store = host.backend('memory')
     const text = store.use(kv)
@@ -104,15 +108,17 @@ describe('memory native contract integration', () => {
     /** Failure payloads retain only the original identity, operation, code and batch count. */
     const errors: IStorageHookMap['onStorageOperationError'][] = []
     await using host = await createStorageHost({
-      plugins: [memoryBackendPlugin()],
-      hooks: {
-        beforeTransaction: () => {
-          transactions++
-        },
-        onStorageOperationError: (payload) => {
-          errors.push(payload)
-        }
-      }
+      plugins: [
+        storageProbe({
+          beforeTransaction: () => {
+            transactions++
+          },
+          onStorageOperationError: (payload) => {
+            errors.push(payload)
+          }
+        }),
+        memoryBackendPlugin()
+      ]
     })
     const store = host.backend('memory')
     const text = store.use(kv)
@@ -163,12 +169,15 @@ describe('memory native contract integration', () => {
       }
     }))
     await using host = await createStorageHost({
-      plugins: [memoryBackendPlugin(), counting],
-      hooks: {
-        beforeStorageOperation: () => {
-          observations++
-        }
-      }
+      plugins: [
+        storageProbe({
+          beforeStorageOperation: () => {
+            observations++
+          }
+        }),
+        memoryBackendPlugin(),
+        counting
+      ]
     })
     const store = host.backend('memory')
     expect(await store.getMany([])).toEqual([])

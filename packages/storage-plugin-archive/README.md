@@ -103,7 +103,7 @@ archive 在上传后用热层事务重新比较记录、提交归档引用，再
 | 归档一天前的事件     | rule + archiveRun         | [按保留时间归档](./USEGUIDE.md#按保留时间归档)     |
 | 查历史并按需恢复     | archiveGet + archiveSweep | [读取恢复与清理](./USEGUIDE.md#读取恢复与清理)     |
 | 同一规则服务多个组织 | host.org + historyRun/Get | [组织与自定义前缀](./USEGUIDE.md#组织与自定义前缀) |
-| 监控部分完成的任务   | hooks + 返回进度          | [观察提交进度](./USEGUIDE.md#观察提交进度)         |
+| 监控部分完成的任务   | probe 插件 + 返回进度     | [观察提交进度](./USEGUIDE.md#观察提交进度)         |
 
 ## 安装
 

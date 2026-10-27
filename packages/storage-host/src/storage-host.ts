@@ -70,6 +70,8 @@ import type {
   IStoragePluginCallContext,
   IStorageBorrowedBackend
 } from './types.js'
+import { readStorageProbeHandlers } from './plugins/probe/handlers.js'
+import type { IStorageHookMap } from './hook-types.js'
 import { readStorageJournalConfiguration } from './journal/plugin-configuration.js'
 import { storageJournalAccess, type IStorageJournalBackendAccess } from './journal/binding.js'
 import {
@@ -391,8 +393,11 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
   readonly #report: (error: unknown) => void
   /** One shared subscriber owns all host, constructor and registration listener boundaries. */
   readonly #events: ReturnType<typeof createStorageHooks>
-  /** Saved public listener ports continue to enforce the existing host admission boundary. */
-  readonly #publicHooks: IStorageHooks
+  /**
+   * Unsubscribe functions for the handlers of an installed `storageProbe(handlers)`. The host owns
+   * them because it subscribes before the probe's batch emits its first event.
+   */
+  #probeHandlerSubscriptions: (() => void)[] = []
   /** A non-owning reverse index resolves only committed exact stores to their existing context. */
   readonly #storeContexts = new WeakMap<
     object,
@@ -417,7 +422,6 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       installTimeoutMs: installTimeoutOption,
       scheduler: schedulerOption,
       report,
-      hooks,
       org,
       autoDetect
     } = options ?? {}
@@ -455,22 +459,6 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     }
 
     this.#events = createStorageHooks(this.#report)
-    this.#publicHooks = {
-      on: (name, handler) => {
-        this.#assertOpen()
-        return this.#events.hooks.on(name, handler)
-      }
-    }
-    if (hooks !== undefined) {
-      if (typeof hooks !== 'object' || hooks === null || Array.isArray(hooks))
-        throw createStorageTypeError(StorageErrorCode.invalidConfig, StorageErrorText.invalidHooks)
-      /** Capture declared ordinary handlers before acquiring any listener registration. */
-      const hookEntries = Object.entries(hooks)
-      for (const [name, handler] of hookEntries) {
-        if (handler !== undefined)
-          this.#events.hooks.on(name as keyof typeof hooks, handler as never)
-      }
-    }
     this.#inner = createStoragePluginHost({
       pipeline: { mode: 'async' },
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
@@ -499,6 +487,8 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       throw new StorageError(StorageErrorCode.storageHostBusy, {}, StorageErrorText.storageHostBusy)
     }
     this.#state = 'installing'
+    /** Probe handlers of this batch, subscribed before its first lifecycle event. */
+    const probeSubscriptions = this.#subscribeProbeHandlers(plugins)
     if (this.#events.hasListeners(Hook.beforeHostInstall))
       this.#events.emit(Hook.beforeHostInstall, () => ({ pluginCount: plugins.length }))
     /** Only this live batch token can publish its native install results. */
@@ -521,6 +511,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         this.#activeBatchToken = undefined
         if (this.#state === 'installing') this.#state = 'open'
         this.#installing = undefined
+        this.#probeHandlerSubscriptions.push(...probeSubscriptions)
         if (this.#events.hasListeners(Hook.afterHostInstall))
           this.#events.emit(Hook.afterHostInstall, () => ({ pluginCount: plugins.length }))
         return this as unknown as IStorageHost<readonly [...P, ...TPlugins]>
@@ -554,16 +545,29 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
             pluginCount: plugins.length,
             code: primary.code
           }))
+        /** The probe of a failed batch was never installed, so its handlers stop here. */
+        for (const unsubscribe of probeSubscriptions) unsubscribe()
         throw primary
       }
     )
     return settled
   }
 
-  /** Public listener registration shares the same subscriber used by every backend stage. */
-  get hooks(): IStorageHooks {
+  /**
+   * Subscribe the handlers of every `storageProbe(handlers)` in this batch to the host registry.
+   * Runs before the batch emits `beforeHostInstall`, so the probe observes the whole batch.
+   */
+  #subscribeProbeHandlers(plugins: readonly IStorageBackendPluginHandle[]): (() => void)[] {
     this.#assertOpen()
-    return this.#publicHooks
+    const subscriptions: (() => void)[] = []
+    for (const plugin of plugins) {
+      const handlers = readStorageProbeHandlers(plugin)
+      if (handlers === undefined) continue
+      for (const [name, handler] of Object.entries(handlers))
+        if (handler !== undefined)
+          subscriptions.push(this.#events.hooks.on(name as keyof IStorageHookMap, handler as never))
+    }
+    return subscriptions
   }
 
   /** Execute original checks in installation order; failure retains no result from this pass. */
@@ -1027,15 +1031,6 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       const store = this.backend(id as keyof IPluginStoreMap<P> & string)
       return this.#projectBackend(store, orgId)
     }
-    /** Root hooks retain one subscriber; each view filters invocation identities at delivery. */
-    const hooks: IStorageHooks = {
-      on: (name, handler) => {
-        this.#assertOpen()
-        return this.#events.hooks.on(name, (payload) => {
-          if ('orgId' in payload && payload.orgId === orgId) handler(payload)
-        })
-      }
-    }
     /** Original cells retain selected outputs while this getter retains only immutable org identity. */
     const projectExtensions = () => {
       this.#assertOpen()
@@ -1062,7 +1057,6 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         return new Map([...this.#registry.keys()].map((id) => [id, backend(id)]))
       },
       detect: () => this.detect(),
-      hooks,
       get api() {
         const result = Object.create(null)
         for (const [id, store] of view.backends())
@@ -1999,6 +1993,8 @@ function createStorageExecutionPorts(registration: IStorageRegistrationAssembly)
           return release
         }
       }) satisfies IStorageHooks,
+    subscribeStorageHook: ((name, handler) =>
+      context.hooks.on(name, handler)) satisfies IStorageHooks['on'],
     emit: ((name, payload) => context.emit(name, payload)) satisfies IStorageHookEmitter,
     setStorageKind: context.setKind,
     execution: forwardStorageExecution(

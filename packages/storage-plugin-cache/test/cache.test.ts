@@ -1,3 +1,4 @@
+import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'
 import { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-change-feed'
 import { describe, it, expect } from 'vitest'
@@ -17,7 +18,11 @@ import { cachePlugin, CacheErrorCode, type ICacheOptions } from '../src/index.js
 /** Every case owns fresh native memory tiers and an independently installed cache. */
 async function fixture(options: Partial<ICacheOptions> = {}) {
   const host = await createStorageHost({
-    plugins: [memoryBackendPlugin({ id: 'fast' }), memoryBackendPlugin({ id: 'slow' })]
+    plugins: [
+      storageProbe(),
+      memoryBackendPlugin({ id: 'fast' }),
+      memoryBackendPlugin({ id: 'slow' })
+    ]
   })
   const configured = await host.use(
     cachePlugin({
@@ -46,7 +51,9 @@ describe('borrowed multi-tier cache', () => {
       { tiers: [{ backend: 'a', offload: { backend: 'objects', minBytes: 1024 } }] }
     ]
     for (const options of invalid) {
-      const host = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'a' })] })
+      const host = await createStorageHost({
+        plugins: [storageProbe(), memoryBackendPlugin({ id: 'a' })]
+      })
       try {
         expect(() => cachePlugin({ tiers: [{ backend: 'a' }], ...options })).toThrowError(
           expect.objectContaining({ source: 'storage.backend.cache', code: 'CACHE_TIER_INVALID' })
@@ -61,6 +68,7 @@ describe('borrowed multi-tier cache', () => {
     ] as const) {
       const host = await createStorageHost({
         plugins: [
+          storageProbe(),
           memoryBackendPlugin(
             { id: 'a' },
             { notifications: memoryNotificationsFeature(), changeFeed: memoryChangeFeedFeature() }
@@ -85,7 +93,7 @@ describe('borrowed multi-tier cache', () => {
       }
     }
     for (const sameBatch of [false, true]) {
-      const host = await createStorageHost()
+      const host = await createStorageHost({ plugins: [storageProbe()] })
       try {
         const plugin = cachePlugin({ tiers: [{ backend: 'future' }] })
         const failure = await (
@@ -122,7 +130,9 @@ describe('borrowed multi-tier cache', () => {
         return {}
       }
     }))
-    const host = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'a' }), raw] })
+    const host = await createStorageHost({
+      plugins: [storageProbe(), memoryBackendPlugin({ id: 'a' }), raw]
+    })
     try {
       const failure = await host
         .use(cachePlugin({ propagate: false, tiers: [{ backend: 'a' }, { backend: 'empty' }] }))
@@ -207,7 +217,7 @@ describe('borrowed multi-tier cache', () => {
         reports.push(error)
         reported.resolve()
       },
-      plugins: [memoryBackendPlugin({ id: 'tier' })]
+      plugins: [storageProbe(), memoryBackendPlugin({ id: 'tier' })]
     })
     const host = await base.use(
       cachePlugin({
@@ -280,7 +290,12 @@ describe('borrowed multi-tier cache', () => {
       report: (error) => {
         reports.push(error)
       },
-      plugins: [memoryBackendPlugin({ id: 'fast' }), memoryBackendPlugin({ id: 'slow' }), observer]
+      plugins: [
+        storageProbe(),
+        memoryBackendPlugin({ id: 'fast' }),
+        memoryBackendPlugin({ id: 'slow' }),
+        observer
+      ]
     })
     const host = await base.use(
       cachePlugin({
@@ -291,7 +306,7 @@ describe('borrowed multi-tier cache', () => {
     )
     await host.detect()
     const dropped: unknown[] = []
-    host.hooks.on('onCacheWriteBackDropped', (event) => {
+    host.extensions.observe('onCacheWriteBackDropped', (event) => {
       dropped.push(event)
     })
     try {
@@ -350,6 +365,7 @@ describe('borrowed multi-tier cache', () => {
         reports.push(error)
       },
       plugins: [
+        storageProbe(),
         memoryBackendPlugin({ id: 'zero' }),
         memoryBackendPlugin({ id: 'one' }),
         memoryBackendPlugin({ id: 'two' }),
@@ -384,16 +400,16 @@ describe('borrowed multi-tier cache', () => {
         }
       })
       expect(builds).toBe(0)
-      host.hooks.on('onCacheHit', (event) => {
+      host.extensions.observe('onCacheHit', (event) => {
         hits.push(event)
       })
-      host.hooks.on('onCacheMiss', (event) => {
+      host.extensions.observe('onCacheMiss', (event) => {
         misses.push(event)
       })
-      host.hooks.on('onCacheLoad', (event) => {
+      host.extensions.observe('onCacheLoad', (event) => {
         loads.push(event)
       })
-      host.hooks.on('onCacheTierError', (event) => {
+      host.extensions.observe('onCacheTierError', (event) => {
         errors.push(event)
       })
       const raw = (value: string) =>
@@ -442,14 +458,14 @@ describe('borrowed multi-tier cache', () => {
       ).toContain(2)
       failing = false
       expect(await base.backend('one').get('cache:cache:new')).toContain('source')
-      host.hooks.on('onCacheHit', () => {
+      host.extensions.observe('onCacheHit', () => {
         throw original
       })
       expect(await host.backend('cache').getOrLoad('new', async () => 'wrong')).toBe('source')
       expect(reports).toContain(original)
       const cache = host.backend('cache'),
         invalidations: unknown[] = []
-      host.hooks.on('onCacheInvalidate', (event) => {
+      host.extensions.observe('onCacheInvalidate', (event) => {
         invalidations.push(event)
       })
       await cache.getOrLoad('negative', async () => undefined)

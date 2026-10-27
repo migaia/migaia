@@ -1,3 +1,4 @@
+import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
 import { describe, expect, it, vi } from 'vitest'
 import { IDBDatabase, IDBFactory, IDBKeyRange } from 'fake-indexeddb'
@@ -19,6 +20,7 @@ describe('standard native KV batches', () => {
   it('keeps a scoped invalid batch on the original first-failure path', async () => {
     await using host = await createStorageHost({
       plugins: [
+        storageProbe(),
         indexedDbBackendPlugin(
           { factory: new IDBFactory(), keyRange: IDBKeyRange },
           indexedDbTestFeatures
@@ -42,6 +44,7 @@ describe('standard native KV batches', () => {
   it('preserves scoped entry getter order before unsupported TTL and duplicate failures', async () => {
     await using host = await createStorageHost({
       plugins: [
+        storageProbe(),
         indexedDbBackendPlugin(
           { factory: new IDBFactory(), keyRange: IDBKeyRange },
           indexedDbTestFeatures
@@ -111,6 +114,7 @@ describe('standard native KV batches', () => {
     }))
     await using host = await createStorageHost({
       plugins: [
+        storageProbe(),
         indexedDbBackendPlugin(
           { factory: new IDBFactory(), keyRange: IDBKeyRange },
           indexedDbTestFeatures
@@ -124,9 +128,9 @@ describe('standard native KV batches', () => {
     const before = vi.fn()
     const after = vi.fn()
     const failed = vi.fn()
-    host.hooks.on('beforeStorageOperation', before)
-    host.hooks.on('afterStorageOperation', after)
-    host.hooks.on('onStorageOperationError', failed)
+    host.extensions.observe('beforeStorageOperation', before)
+    host.extensions.observe('afterStorageOperation', after)
+    host.extensions.observe('onStorageOperationError', failed)
     /** Database preparation is complete before counting native batch admission. */
     const transaction = vi.spyOn(IDBDatabase.prototype, 'transaction')
     try {
@@ -227,6 +231,7 @@ describe('standard native KV batches', () => {
   it('observes scoped batches once through their original transaction identity', async () => {
     await using host = await createStorageHost({
       plugins: [
+        storageProbe(),
         indexedDbBackendPlugin(
           { factory: new IDBFactory(), keyRange: IDBKeyRange },
           indexedDbTestFeatures
@@ -236,8 +241,8 @@ describe('standard native KV batches', () => {
     const store = host.backend('indexed-db')
     const before = vi.fn()
     const after = vi.fn()
-    host.hooks.on('beforeStorageOperation', before)
-    host.hooks.on('afterStorageOperation', after)
+    host.extensions.observe('beforeStorageOperation', before)
+    host.extensions.observe('afterStorageOperation', after)
     await store.transaction(async (scope) => {
       const api = scope.use(kv)
       await api.getMany([])

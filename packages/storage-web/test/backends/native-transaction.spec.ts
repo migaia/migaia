@@ -1,3 +1,4 @@
+import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
 import {
   IDBDatabase,
@@ -70,6 +71,7 @@ describe('IndexedDB complete native transaction views', () => {
     }))
     await using host = await createStorageHost({
       plugins: [
+        storageProbe(),
         indexedDbBackendPlugin(
           { id: 'holder', factory, keyRange: IDBKeyRange },
           indexedDbTestFeatures
@@ -139,6 +141,7 @@ describe('IndexedDB complete native transaction views', () => {
     }))
     await using host = await createStorageHost({
       plugins: [
+        storageProbe(),
         indexedDbBackendPlugin(
           { id: 'holder', factory, keyRange: IDBKeyRange },
           indexedDbTestFeatures
@@ -213,6 +216,7 @@ describe('IndexedDB complete native transaction views', () => {
     }))
     await using host = await createStorageHost({
       plugins: [
+        storageProbe(),
         indexedDbBackendPlugin(
           { id: 'holder', factory, keyRange: IDBKeyRange },
           indexedDbTestFeatures
@@ -284,6 +288,7 @@ describe('IndexedDB complete native transaction views', () => {
      */
     const host = await createStorageHost({
       plugins: [
+        storageProbe(),
         indexedDbBackendPlugin(
           { factory: new IDBFactory(), keyRange: IDBKeyRange },
           indexedDbTestFeatures
@@ -337,6 +342,7 @@ describe('IndexedDB complete native transaction views', () => {
     /** Closing the second member must leave the first native transaction and shared port usable. */
     const host = await createStorageHost({
       plugins: [
+        storageProbe(),
         indexedDbBackendPlugin(
           { id: 'first', factory, keyRange: IDBKeyRange },
           indexedDbTestFeatures
@@ -409,6 +415,7 @@ describe('IndexedDB complete native transaction views', () => {
     /** Both registrations share only the real physical database's lock owner. */
     const host = await createStorageHost({
       plugins: [
+        storageProbe(),
         indexedDbBackendPlugin(
           {
             id: 'first',
@@ -489,6 +496,7 @@ describe('IndexedDB complete native transaction views', () => {
     /** The native factory provides actual requests without claiming a real browser activity test. */
     const host = await createStorageHost({
       plugins: [
+        storageProbe(),
         indexedDbBackendPlugin(
           { factory: new IDBFactory(), keyRange: IDBKeyRange },
           indexedDbTestFeatures
@@ -531,6 +539,7 @@ describe('IndexedDB complete native transaction views', () => {
     /** The public plugin provides both authentic capabilities on its original store. */
     const host = await createStorageHost({
       plugins: [
+        storageProbe(),
         indexedDbBackendPlugin(
           { factory: new IDBFactory(), keyRange: IDBKeyRange },
           indexedDbTestFeatures
@@ -594,6 +603,7 @@ describe('IndexedDB complete native transaction views', () => {
       /** Both channels retain the same canonical tuple identity in one physical transaction. */
       const host = await createStorageHost({
         plugins: [
+          storageProbe(),
           indexedDbBackendPlugin(
             { factory: new IDBFactory(), keyRange: IDBKeyRange },
             indexedDbTestFeatures
@@ -633,6 +643,7 @@ describe('IndexedDB complete native transaction views', () => {
     /** All work uses real installed stores and the original shared logical/native owners. */
     await using host = await createStorageHost({
       plugins: [
+        storageProbe(),
         indexedDbBackendPlugin(
           { id: 'first', factory: new IDBFactory(), keyRange: IDBKeyRange },
           indexedDbTestFeatures
@@ -728,6 +739,7 @@ describe('IndexedDB complete native transaction views', () => {
     /** The same factory and database are retained for independent post-rollback reads. */
     const host = await createStorageHost({
       plugins: [
+        storageProbe(),
         indexedDbBackendPlugin(
           { factory: new IDBFactory(), keyRange: IDBKeyRange },
           indexedDbTestFeatures
@@ -764,6 +776,7 @@ describe('IndexedDB complete native transaction views', () => {
     /** No native transaction starts outside this one public transaction entry. */
     const host = await createStorageHost({
       plugins: [
+        storageProbe(),
         indexedDbBackendPlugin(
           { factory: new IDBFactory(), keyRange: IDBKeyRange },
           indexedDbTestFeatures
@@ -783,7 +796,7 @@ describe('IndexedDB complete native transaction views', () => {
     const observedIds: Array<string | undefined> = []
     /** The user view supplies identity only while it is genuinely active. */
     let transactionId: string | undefined
-    host.hooks.on('beforeCommit', (payload) => {
+    host.extensions.observe('beforeCommit', (payload) => {
       calls.push(3)
       observedIds.push(payload.transactionId)
     })

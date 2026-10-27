@@ -1,3 +1,4 @@
+import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { describe, expect, it, vi } from 'vitest'
 import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
 import { vector, ttl, DeleteCountMode, type IVectorCollection } from '@migaia/storage-contract'
@@ -24,7 +25,7 @@ async function fixture(options: Partial<ISemanticCacheOptions> = {}) {
   const scheduler = createManualScheduler()
   const initial = await createStorageHost({
     scheduler,
-    plugins: [memoryBackendPlugin({ id: 'vectors' })]
+    plugins: [storageProbe(), memoryBackendPlugin({ id: 'vectors' })]
   })
   const host = await initial.use(
     cachePlugin(
@@ -90,7 +91,7 @@ describe('semantic cache over real Memory vectors', () => {
     const diagnostics = vi.spyOn(console, 'error').mockImplementation(() => {})
     try {
       const errors = vi.fn()
-      host.hooks.on('onCacheTierError', errors)
+      host.extensions.observe('onCacheTierError', errors)
       await semantic.set('first', 'one')
       await semantic.set('second', 'two')
       await semantic.set('third', 'three')
@@ -330,7 +331,7 @@ describe('semantic cache over real Memory vectors', () => {
         }
       })
     try {
-      host.hooks.on('onCacheTierError', observed)
+      host.extensions.observe('onCacheTierError', observed)
       await expect(semantic.set('first', 'skipped')).resolves.toBeUndefined()
       expect(await collection.near([1, 0]).topK(10).all()).toEqual([])
       expect(await semantic.get('first')).toBeUndefined()
@@ -429,6 +430,7 @@ describe('semantic cache over real Memory vectors', () => {
     )
     const failed = createStorageHost({
       plugins: [
+        storageProbe(),
         memoryBackendPlugin({ id: 'vectors' }),
         cachePlugin(
           { tiers: [{ backend: 'vectors' }] },
@@ -440,7 +442,9 @@ describe('semantic cache over real Memory vectors', () => {
       code: 'BACKEND_INSTALL_FAILED',
       cause: { cause: { code: 'BACKEND_NOT_INSTALLED' } }
     })
-    const initial = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'vectors' })] })
+    const initial = await createStorageHost({
+      plugins: [storageProbe(), memoryBackendPlugin({ id: 'vectors' })]
+    })
     try {
       const host = await initial.use(cachePlugin({ id: 'text', tiers: [{ backend: 'vectors' }] }))
       await expect(

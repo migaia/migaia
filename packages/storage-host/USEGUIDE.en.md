@@ -239,6 +239,8 @@ The base host does not import journal runtime, notification controllers or chang
 
 Journal configuration goes into `storageJournalPlugin(options)` from `@migaia/storage-host/journal`, placed in the first `createStorageHost` plugin batch before the backends it records; the host has no separate `journal` option. A configured journal plugin installed later, or passed twice, rejects with `INVALID_CONFIG`. For `storageLogStore()` alone, install `storageJournalPlugin()` without options; missing assembly raises `JOURNAL_NOT_ASSEMBLED`. Journal configuration, stored records and transaction semantics retain their existing contract.
 
+`host.unUse(id)` removes one installed plugin: its backend, extension methods and probe listeners are withdrawn first, then its resources are released in reverse order. While another plugin borrows the backend (for example a cache tier) it rejects with `BACKEND_IN_USE`; remove the borrower first. An unknown id rejects with `BACKEND_NOT_INSTALLED`, removal during an install with `STORAGE_HOST_BUSY`, and a configured journal plugin with `INVALID_CONFIG`. The same id can be installed again afterwards; call `detect()` as usual.
+
 Memory notifications and feeds use separate Feature roots:
 
 ```ts

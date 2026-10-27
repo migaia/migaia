@@ -1,7 +1,7 @@
 import type { IBackendValueCommit } from './core/backend-registry.js'
 import type { IBackendRevisionPort } from './backends/revisions.js'
 import type { IBackendKeyLockPort } from './backends/key-locks.js'
-import type { IStorageHooks, IStorageHookMap } from './hook-types.js'
+import type { IStorageHooks } from './hook-types.js'
 import type { IStorageHookEmitter } from './hooks.js'
 import type {
   IPluginHostCore,
@@ -353,6 +353,11 @@ export type IStoragePluginCore<F extends IStorageFeatureRecord = {}> = Pick<
     readonly defaultOrgId: string
     readonly execution: IStorageExecutionPort
     readonly hooks: IStorageHooks
+    /**
+     * Subscribe to the host event registry at any time, not only during `install()`. The caller
+     * owns the returned unsubscribe function and must call it when its plugin is disposed.
+     */
+    readonly subscribeStorageHook: IStorageHooks['on']
     readonly stageBindings: IBackendStageBindings
     /** Project selected transaction methods onto the original backend-created view before freeze. */
     createTransactionApi(scope: object): object | undefined
@@ -588,7 +593,6 @@ export type IStorageHostOptions = {
   readonly installTimeoutMs?: number
   readonly scheduler?: IScheduler
   readonly report?: (error: unknown) => void | PromiseLike<void>
-  readonly hooks?: { readonly [K in keyof IStorageHookMap]?: (payload: IStorageHookMap[K]) => void }
 }
 /** Exact initial tuple participates in duplicate admission and store inference. */
 export type IStorageHostCreateOptions<P extends readonly IStorageBackendPluginHandle[]> =
@@ -607,7 +611,6 @@ export type IStorageHost<
   J extends import('./journal/types.js').IStorageJournalConfiguration | undefined =
     import('./journal/types.js').IStorageJournalOf<P>
 > = import('@migaia/storage-contract').IStorageResource & {
-  readonly hooks: IStorageHooks
   detect(): Promise<void>
   org(orgId: string): IStorageOrgView<P, J>
   dropOrg(orgId: string): Promise<void>
@@ -712,6 +715,7 @@ export type IStorageDefinePlugin = {
         | 'execution'
         | 'defaultOrgId'
         | 'hooks'
+        | 'subscribeStorageHook'
         | 'emit'
         | 'registerDetect'
         | 'getPublishedBackend'

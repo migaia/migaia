@@ -1,3 +1,4 @@
+import type { IStorageProbePluginHandle } from '@migaia/storage-host/plugins/probe'
 import type { IStoragePluginCore, IStorageHost } from '@migaia/storage-host'
 
 declare module '@migaia/storage-host' {
@@ -10,9 +11,9 @@ declare module '@migaia/storage-host' {
 /** The installed core retains the augmented event name and exact payload. */
 declare const core: IStoragePluginCore
 /** Public root declarations must route augmentation to the actual runtime host listener API. */
-declare const host: IStorageHost<readonly []>
+declare const host: IStorageHost<readonly [IStorageProbePluginHandle]>
 core.emit('onCatalogProbe', () => ({ count: 1 }))
-host.hooks.on('onCatalogProbe', (payload) => {
+host.extensions.observe('onCatalogProbe', (payload) => {
   const count: number = payload.count
   void count
 })

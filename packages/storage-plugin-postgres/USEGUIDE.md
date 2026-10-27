@@ -174,6 +174,7 @@ CREATE PUBLICATION migaia_storage_publication
 import { appendFile } from 'node:fs/promises'
 import { Pool } from 'pg'
 import { createStorageHost } from '@migaia/storage-host'
+import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { durableChangeFeed } from '@migaia/storage-contract'
 import { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'
 import { pgDriver } from '@migaia/storage-plugin-postgres/pg'
@@ -182,8 +183,8 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL })
 try {
   await using host = await createStorageHost({
     report: console.error,
-    hooks: { onCapabilityProbe: (facts) => console.log(facts.retainedWalBytes) },
     plugins: [
+      storageProbe({ onCapabilityProbe: (facts) => console.log(facts.retainedWalBytes) }),
       postgresBackendPlugin(
         { driver: pgDriver(pool) },
         {

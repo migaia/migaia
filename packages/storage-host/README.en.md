@@ -136,6 +136,8 @@ The base host does not import journal runtime, notification controllers or chang
 
 Journal configuration goes into `storageJournalPlugin(options)` from `@migaia/storage-host/journal`, placed in the first `createStorageHost` plugin batch before the backends it records; the host has no separate `journal` option. A configured journal plugin installed later, or passed twice, rejects with `INVALID_CONFIG`. For `storageLogStore()` alone, install `storageJournalPlugin()` without options; missing assembly raises `JOURNAL_NOT_ASSEMBLED`. Journal configuration, stored records and transaction semantics retain their existing contract.
 
+Observation events are subscribed only through `storageProbe(handlers)` from `@migaia/storage-host/plugins/probe`; the host has no `hooks` option and no `host.hooks`. A probe in the `createStorageHost` plugins receives events from the first install event of that batch. After installation, `host.extensions.observe(name, handler)` adds a listener and returns its unsubscribe function; on a view of a non-default organization it receives only that organization's events. A host has at most one probe. Listener failures go to `report` and never change storage results.
+
 Memory notifications and feeds use separate Feature roots:
 
 ```ts

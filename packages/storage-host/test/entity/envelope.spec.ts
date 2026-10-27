@@ -1,3 +1,4 @@
+import { storageProbe } from '../../src/plugins/probe/index.js'
 import { entityQueryFeature } from '../../src/entity/query-feature.js'
 import { entityUniqueFeature } from '../../src/entity/unique-feature.js'
 import { entityMigrationFeature } from '../../src/entity/migration-feature.js'
@@ -191,22 +192,26 @@ describe('entity envelopes through the shared plan owner', () => {
     const firstRaw = rawPlugin()
     const seen: string[] = []
     const first = await createStorageHost({
-      plugins: [firstRaw.plugin],
-      hooks: {
-        beforeEnvelopeCheck: () => {
-          seen.push('first')
-        }
-      }
+      plugins: [
+        storageProbe({
+          beforeEnvelopeCheck: () => {
+            seen.push('first')
+          }
+        }),
+        firstRaw.plugin
+      ]
     })
     const store = firstRaw.getStore()
     const secondRaw = rawPlugin(store)
     await using second = await createStorageHost({
-      plugins: [secondRaw.plugin],
-      hooks: {
-        beforeEnvelopeCheck: () => {
-          seen.push('second')
-        }
-      }
+      plugins: [
+        storageProbe({
+          beforeEnvelopeCheck: () => {
+            seen.push('second')
+          }
+        }),
+        secondRaw.plugin
+      ]
     })
     expect(second.backend('raw')).toBe(store)
     const repo = defineEntity<{ id: string }>({
@@ -234,25 +239,27 @@ describe('entity envelopes through the shared plan owner', () => {
     const order: string[] = []
     const raw = rawPlugin()
     await using host = await createStorageHost({
-      plugins: [raw.plugin],
-      hooks: {
-        beforeEnvelopeCheck: () => {
-          order.push('check')
-        },
-        afterEnvelopeCheck: () => {
-          order.push('checked')
-        },
-        beforeMigrationStep: () => {
-          order.push('step')
-        },
-        afterMigrationStep: () => {
-          order.push('stepped')
-        },
-        afterMigrate: (event) => {
-          expect(event.stepCount).toBe(1)
-          order.push('migrated')
-        }
-      }
+      plugins: [
+        storageProbe({
+          beforeEnvelopeCheck: () => {
+            order.push('check')
+          },
+          afterEnvelopeCheck: () => {
+            order.push('checked')
+          },
+          beforeMigrationStep: () => {
+            order.push('step')
+          },
+          afterMigrationStep: () => {
+            order.push('stepped')
+          },
+          afterMigrate: (event) => {
+            expect(event.stepCount).toBe(1)
+            order.push('migrated')
+          }
+        }),
+        raw.plugin
+      ]
     })
     const store = raw.getStore()
     expect(host.backend('raw')).toBe(store)

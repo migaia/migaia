@@ -136,6 +136,8 @@ pnpm add --workspace @migaia/logger
 
 日志配置写在从 `@migaia/storage-host/journal` 导入的 `storageJournalPlugin(options)` 里，放在 `createStorageHost` 第一批插件中、要记录的后端之前；宿主没有单独的 `journal` 选项。后装或重复传入带配置的日志插件会报 `INVALID_CONFIG`。只用 `storageLogStore()` 时装 `storageJournalPlugin()` 即可，缺少插件时报 `JOURNAL_NOT_ASSEMBLED`。配置格式、日志内容和事务提交语义保持原契约。
 
+观察事件只通过 `@migaia/storage-host/plugins/probe` 的 `storageProbe(handlers)` 订阅，宿主没有 `hooks` 选项，也没有 `host.hooks`。probe 放进 `createStorageHost` 的 plugins 时，从这一批的第一个安装事件起就能收到；安装后用 `host.extensions.observe(name, handler)` 追加监听，返回值是退订函数。在非默认组织的视图上调用时只收到该组织的事件。一个宿主只装一个 probe；监听器失败交给 `report`，不改变存储结果。
+
 memory 通知和变更流分别由两个 Feature 装配：
 
 ```ts

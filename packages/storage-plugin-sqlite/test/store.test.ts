@@ -1,3 +1,4 @@
+import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -359,8 +360,10 @@ describe('native SQLite installation', () => {
     const counts: number[] = []
     const connection = nodeSqliteDriver(':memory:')
     const host = await createStorageHost({
-      hooks: { onStorageIterationClose: ({ count }) => counts.push(count) },
-      plugins: [sqliteBackendPlugin({ driver: connection })] as const
+      plugins: [
+        storageProbe({ onStorageIterationClose: ({ count }) => counts.push(count) }),
+        sqliteBackendPlugin({ driver: connection })
+      ] as const
     })
     onTestFinished(async () => {
       await host.dispose()
@@ -408,12 +411,15 @@ describe('native SQLite installation', () => {
     }))
     /** Hooks receive only the canonical operation/count identity, never the batch values. */
     const host = await createStorageHost({
-      hooks: {
-        afterStorageOperation: (payload) => {
-          observations.push({ operation: payload.operation, count: payload.count })
-        }
-      },
-      plugins: [execution, sqliteBackendPlugin({ driver: connection })] as const
+      plugins: [
+        storageProbe({
+          afterStorageOperation: (payload) => {
+            observations.push({ operation: payload.operation, count: payload.count })
+          }
+        }),
+        execution,
+        sqliteBackendPlugin({ driver: connection })
+      ] as const
     })
     onTestFinished(async () => {
       await host.dispose()

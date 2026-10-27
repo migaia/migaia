@@ -1,3 +1,4 @@
+import { storageProbe } from '../src/plugins/probe/index.js'
 import { entityQueryFeature } from '../src/entity/query-feature.js'
 import { entityUniqueFeature } from '../src/entity/unique-feature.js'
 import { entityIndexesFeature } from '../src/entity/indexes-feature.js'
@@ -34,6 +35,7 @@ describe('immutable storage organizations', () => {
     await using host = await createStorageHost({
       org: defaultOrg,
       plugins: [
+        storageProbe(),
         memoryBackendPlugin(
           { id: 'prefs', namespace: 'preferences' },
           {
@@ -101,6 +103,7 @@ describe('immutable storage organizations', () => {
   it('publishes root changes across organizations and filters each captured organization subscription', async () => {
     await using host = await createStorageHost({
       plugins: [
+        storageProbe(),
         memoryBackendPlugin(
           { namespace: 'notifications' },
           {
@@ -138,7 +141,7 @@ describe('immutable storage organizations', () => {
     ])
     /** Real native batch observations use the same immutable organization as change delivery. */
     const observed: string[] = []
-    host.org(first).hooks.on('afterStorageOperation', ({ orgId }) => observed.push(orgId))
+    host.org(first).extensions.observe('afterStorageOperation', ({ orgId }) => observed.push(orgId))
     await host
       .org(second)
       .backend('memory')
@@ -189,6 +192,7 @@ describe('immutable storage organizations', () => {
     })
     const base = await createStorageHost({
       plugins: [
+        storageProbe(),
         memoryBackendPlugin(undefined, {
           feature,
           notifications: memoryNotificationsFeature(),
@@ -266,7 +270,7 @@ describe('immutable storage organizations', () => {
         return {}
       }
     }))
-    await using host = await createStorageHost({ plugins: [first, broken, third] })
+    await using host = await createStorageHost({ plugins: [storageProbe(), first, broken, third] })
     const org = createOrgId()
     await host.org(org).backend('first').set('key', 'first')
     await host.org(org).backend('third').set('key', 'third')
@@ -283,6 +287,7 @@ describe('immutable storage organizations', () => {
   it('connects entity business access only to exact authenticated organization views', async () => {
     const host = await createStorageHost({
       plugins: [
+        storageProbe(),
         memoryBackendPlugin(undefined, {
           notifications: memoryNotificationsFeature(),
           changeFeed: memoryChangeFeedFeature()

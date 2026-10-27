@@ -1,3 +1,4 @@
+import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { describe, it, expect, vi } from 'vitest'
 import { createStorageHost, memoryBackendPlugin, definePlugin } from '@migaia/storage-host'
 import { blob } from '@migaia/storage-contract'
@@ -16,6 +17,7 @@ async function fixture(
   const initial = await createStorageHost({
     report,
     plugins: [
+      storageProbe(),
       memoryBackendPlugin({ id: 'hot' }),
       memoryBackendPlugin({ id: 'cold' }),
       definePlugin('observer', (core) => ({
@@ -462,16 +464,16 @@ describe('Archive finite read, cancellation and observation behavior', () => {
       restore: unknown[] = [],
       swept: unknown[] = [],
       errors: unknown[] = []
-    host.hooks.on('afterArchiveRun', (value) => {
+    host.extensions.observe('afterArchiveRun', (value) => {
       results.push(value)
     })
-    host.hooks.on('afterArchiveRestore', (value) => {
+    host.extensions.observe('afterArchiveRestore', (value) => {
       restore.push(value)
     })
-    host.hooks.on('afterArchiveSweep', (value) => {
+    host.extensions.observe('afterArchiveSweep', (value) => {
       swept.push(value)
     })
-    host.hooks.on('onArchiveRunError', (value) => {
+    host.extensions.observe('onArchiveRunError', (value) => {
       errors.push(value)
     })
     try {
@@ -504,7 +506,11 @@ describe('Archive rule and wire admission', () => {
   it('captures rule order and compiles one cutoff per selected rule', async () => {
     let whereCalls = 0
     const initial = await createStorageHost({
-      plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]
+      plugins: [
+        storageProbe(),
+        memoryBackendPlugin({ id: 'hot' }),
+        memoryBackendPlugin({ id: 'cold' })
+      ]
     })
     const rules = [
       {
@@ -684,10 +690,10 @@ describe('Archive opaque maintenance and observer boundaries', () => {
     })
     const failures = [new RangeError('sync observer'), new Error('async observer')]
     try {
-      host.hooks.on('beforeArchiveRun', () => {
+      host.extensions.observe('beforeArchiveRun', () => {
         throw failures[0]
       })
-      host.hooks.on('afterArchiveRun', () => Promise.reject(failures[1]) as never)
+      host.extensions.observe('afterArchiveRun', () => Promise.reject(failures[1]) as never)
       await hot.putRecord({ old: true }, 'event:a')
       expect(await archive.run()).toEqual({ archived: 1, skipped: 0, segments: 1 })
       await Promise.resolve()
@@ -738,6 +744,7 @@ it('gives an overlapping candidate only to its first selected rule even when its
     whereCalls = 0
   const initial = await createStorageHost({
     plugins: [
+      storageProbe(),
       memoryBackendPlugin({ id: 'hot' }),
       memoryBackendPlugin({ id: 'cold' }),
       definePlugin('overlap', (core) => ({
@@ -803,7 +810,11 @@ it('gives an overlapping candidate only to its first selected rule even when its
 
 it('handles maximum UTF-16 prefixes without visiting private tuple metadata', async () => {
   const initial = await createStorageHost({
-    plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]
+    plugins: [
+      storageProbe(),
+      memoryBackendPlugin({ id: 'hot' }),
+      memoryBackendPlugin({ id: 'cold' })
+    ]
   })
   const host = await initial.use(
     archivePlugin({

@@ -197,6 +197,8 @@ type IStorageNativeCore = IPluginHostCore<IStoragePipelineInput> & {
   readonly execution: IStorageExecutionPort
   getStageBindings(): IBackendStageBindings
   getStorageHooks(): IStorageHooks
+  /** Subscribe after installation; the caller owns removal. Only `storageProbe()` uses it. */
+  subscribeStorageHook: IStorageHooks['on']
   readonly emit: IStorageHookEmitter
   readonly createKeyLockPort: IStoragePluginCore['createKeyLockPort']
   readonly createOrgAuthoringPort: IStoragePluginCore['createOrgAuthoringPort']
@@ -330,6 +332,7 @@ function createStorageRegistrationCore(
     get hooks() {
       return context.nativeCore.getStorageHooks()
     },
+    subscribeStorageHook: context.nativeCore.subscribeStorageHook,
     get stageBindings() {
       return context.nativeCore.getStageBindings()
     },

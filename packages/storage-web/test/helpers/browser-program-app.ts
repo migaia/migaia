@@ -1,3 +1,4 @@
+import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { entityTestFeatures } from './entity-features.js'
 import { storageJournalPlugin } from '@migaia/storage-host/journal'
 import { indexedDbTestFeatures } from './indexed-db-features.js'
@@ -42,15 +43,15 @@ window.runStorageProgramAutomaticIndex = async () => {
   /** A fresh physical database keeps the twelve fixture rows independent of other cases. */
   const host = await createStorageHost({
     plugins: [
+      storageProbe({
+        afterQuery: ({ stats }) => readCounts.push(stats.readCount)
+      }),
       storageJournalPlugin(),
       indexedDbBackendPlugin(
         { dbName: 'program-index-' + crypto.randomUUID() },
         indexedDbTestFeatures
       )
-    ],
-    hooks: {
-      afterQuery: ({ stats }) => readCounts.push(stats.readCount)
-    }
+    ]
   })
   try {
     /** The real browser backend owns both index readiness and the native lookup cursor. */
@@ -107,15 +108,15 @@ window.runStorageProgramApplication = async () => {
   const host = await createStorageHost({
     org: createOrgId(),
     plugins: [
+      storageProbe({
+        beforeStorageOperation: ({ operation }) => events.push('before:' + operation),
+        afterStorageOperation: ({ operation }) => events.push('after:' + operation),
+        onStorageOperationError: ({ operation }) => events.push('error:' + operation)
+      }),
       storageJournalPlugin({ logger, namespace: 'program' }),
       indexedDbBackendPlugin({ dbName: 'program-' + crypto.randomUUID() }, indexedDbTestFeatures),
       observed
-    ],
-    hooks: {
-      beforeStorageOperation: ({ operation }) => events.push('before:' + operation),
-      afterStorageOperation: ({ operation }) => events.push('after:' + operation),
-      onStorageOperationError: ({ operation }) => events.push('error:' + operation)
-    }
+    ]
   })
   try {
     const store = host.backend('indexed-db')

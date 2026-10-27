@@ -41,6 +41,7 @@ export default defineConfig({
         'entity/indexes': 'src/entity/indexes.ts',
         'entity/keyset': 'src/entity/keyset.ts',
         journal: 'src/journal.ts',
+        'plugins/probe': 'src/plugins/probe/index.ts',
         'authoring/backend': 'src/authoring/backend.ts',
         'authoring/codec': 'src/authoring/codec.ts',
         'authoring/migration': 'src/authoring/migration.ts',

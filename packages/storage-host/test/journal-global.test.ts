@@ -1,3 +1,4 @@
+import { storageProbe } from '../src/plugins/probe/index.js'
 import { storageJournalPlugin } from '../src/journal.js'
 import { memoryNotificationsFeature } from '../src/features/memory-notifications.js'
 import { memoryChangeFeedFeature } from '../src/features/memory-change-feed.js'
@@ -39,6 +40,7 @@ describe('global native storage journal', () => {
     const initialized: string[] = []
     await using host = await createStorageHost({
       plugins: [
+        storageProbe(),
         storageJournalPlugin(async ({ orgId, storageLogStore }) => {
           initialized.push(orgId)
           const records = await storageLogStore('memory', { prefix: 'binlog' })
@@ -147,6 +149,7 @@ describe('global native storage journal', () => {
     let pause = false
     await using host = await createStorageHost({
       plugins: [
+        storageProbe(),
         storageJournalPlugin(async ({ storageLogStore }) => {
           const records = await storageLogStore('memory', { prefix: 'capacity-binlog' })
           const images = await storageLogStore('memory', { prefix: 'capacity-undo' })
@@ -191,7 +194,7 @@ describe('global native storage journal', () => {
       ]
     })
     try {
-      host.hooks.on('onEvict', (event) => {
+      host.extensions.observe('onEvict', (event) => {
         evicted.push(event.count)
       })
       const store = host.backend('memory')
@@ -231,6 +234,7 @@ describe('global native storage journal', () => {
     await expect(
       createStorageHost({
         plugins: [
+          storageProbe(),
           storageJournalPlugin(async ({ storageLogStore }) => {
             acquired = await storageLogStore('memory', { prefix: 'failed-initializer' })
             throw original
@@ -249,6 +253,7 @@ describe('global native storage journal', () => {
     let logger: ReturnType<typeof createJournalLogger> | undefined
     await using host = await createStorageHost({
       plugins: [
+        storageProbe(),
         storageJournalPlugin(async ({ storageLogStore }) => {
           const records = await storageLogStore('memory', { prefix: 'clear-binlog' })
           const images = await storageLogStore('memory', { prefix: 'clear-undo' })
@@ -351,6 +356,11 @@ describe('external storage binlog', () => {
     }
     await using host = await createStorageHost({
       plugins: [
+        storageProbe({
+          onBinlogAppendError: (event) => {
+            failures.push(event)
+          }
+        }),
         storageJournalPlugin({ logger: borrowed, namespace: 'external' }),
         memoryBackendPlugin(undefined, {
           notifications: memoryNotificationsFeature(),
@@ -359,11 +369,6 @@ describe('external storage binlog', () => {
       ],
       report: (error) => {
         reports.push(error)
-      },
-      hooks: {
-        onBinlogAppendError: (event) => {
-          failures.push(event)
-        }
       }
     })
     try {

@@ -1,3 +1,4 @@
+import { storageProbe } from '../src/plugins/probe/index.js'
 import { describe, expect, it, vi } from 'vitest'
 import {
   createStorageHost,
@@ -45,12 +46,12 @@ describe('the shared storage observation owner', () => {
   it('adds explicit batch counts while preserving the exact original single-operation payload', async () => {
     /** The existing catalog registration supplies the same real operation observer adapter. */
     const fixture = observedCatalog()
-    await using host = await createStorageHost({ plugins: [fixture.plugin] })
+    await using host = await createStorageHost({ plugins: [storageProbe(), fixture.plugin] })
     /** Original hooks receive one payload, never keys, values or another execution owner. */
     const before = vi.fn()
     const failed = vi.fn()
-    host.hooks.on('beforeStorageOperation', before)
-    host.hooks.on('onStorageOperationError', failed)
+    host.extensions.observe('beforeStorageOperation', before)
+    host.extensions.observe('onStorageOperationError', failed)
     /** This public port is bound to the exact admitted catalog store. */
     const stages = host.operationStages(fixture.state().store)
     stages.beforeStorageOperation?.('read')
@@ -88,9 +89,9 @@ describe('the shared storage observation owner', () => {
   })
 
   it('rejects a malformed hook before any backend is opened', async () => {
-    await expect(
-      createStorageHost({ hooks: { beforeHostClose: 42 as never } })
-    ).rejects.toMatchObject({ source: '@migaia/storage-host', code: 'INVALID_CONFIG' })
+    expect(() => storageProbe({ beforeHostClose: 42 as never })).toThrowError(
+      expect.objectContaining({ source: '@migaia/storage-host', code: 'INVALID_CONFIG' })
+    )
   })
 
   it('binds construction observers before handoff and observes later registration and cancellation', async () => {
@@ -103,9 +104,8 @@ describe('the shared storage observation owner', () => {
     /** Constructor observation proves the real install path can emit before publication. */
     const installing = vi.fn()
     await using host = await createStorageHost({
-      plugins: [fixture.plugin],
-      report,
-      hooks: { beforeEncode: installing }
+      plugins: [storageProbe({ beforeEncode: installing }), fixture.plugin],
+      report
     })
     expect(installing).toHaveBeenCalledWith(
       expect.objectContaining({ operation: 'install', backendId: 'observed' })
@@ -114,7 +114,7 @@ describe('the shared storage observation owner', () => {
     const beforeEncode = fixture.codec().beforeEncode!
     beforeEncode('read', 'json@1')
     /** No stale listener snapshot is stored in the neutral observer. */
-    const release = host.hooks.on('beforeEncode', (payload) => {
+    const release = host.extensions.observe('beforeEncode', (payload) => {
       expect(payload).toEqual({
         backendId: 'observed',
         backend: 'catalog',
@@ -152,13 +152,15 @@ describe('the shared storage observation owner', () => {
     /** Constructor options register on the same event channel as later host listeners. */
     const order: string[] = []
     await using host = await createStorageHost({
-      plugins: [fixture.plugin],
-      report,
-      hooks: {
-        beforeSql: () => {
-          order.push('constructor')
-        }
-      }
+      plugins: [
+        storageProbe({
+          beforeSql: () => {
+            order.push('constructor')
+          }
+        }),
+        fixture.plugin
+      ],
+      report
     })
     fixture.core().emit('beforeDecode', () => {
       constructed += 1
@@ -171,11 +173,11 @@ describe('the shared storage observation owner', () => {
       }
     })
     expect(constructed).toBe(0)
-    host.hooks.on('beforeSql', () => {
+    host.extensions.observe('beforeSql', () => {
       order.push('host')
       throw primary
     })
-    host.hooks.on(
+    host.extensions.observe(
       'beforeSql',
       () =>
         new Proxy(Promise.resolve(), {
@@ -185,7 +187,7 @@ describe('the shared storage observation owner', () => {
           }
         }) as never
     )
-    host.hooks.on('beforeSql', () => Promise.reject(primary) as never)
+    host.extensions.observe('beforeSql', () => Promise.reject(primary) as never)
     fixture.core().emit('beforeSql', () => {
       constructed += 1
       return {
@@ -223,14 +225,14 @@ describe('the shared storage observation owner', () => {
       }
     }))
     /** A saved public hook port must not reopen the terminal host. */
-    const host = await createStorageHost({ plugins: [plugin] })
+    const host = await createStorageHost({ plugins: [storageProbe(), plugin] })
     /** Reentrant cleanup must observe this same cached completion rather than start another close. */
     let reentrant: Promise<void> | undefined
-    host.hooks.on('beforeHostClose', () => {
+    host.extensions.observe('beforeHostClose', () => {
       reentrant = host.dispose()
     })
     /** Keep the actual public registration endpoint for a post-close admission assertion. */
-    const hooks = host.hooks
+    const observe = host.extensions.observe
     expect(() => installedCore.hooks.on('beforeSql', listener)).toThrowError(
       expect.objectContaining({ code: 'RESOURCE_OUTSIDE_INSTALL' })
     )
@@ -253,8 +255,9 @@ describe('the shared storage observation owner', () => {
       settle()
       await disposed
     }
-    expect(() => hooks.on('beforeSql', listener)).toThrowError(
-      expect.objectContaining({ code: 'STORAGE_HOST_DISPOSED' })
+    /** A saved extension method follows every plugin extension: the closed host rejects it. */
+    expect(() => observe('beforeSql', listener)).toThrowError(
+      expect.objectContaining({ code: 'HOST_DISPOSED' })
     )
     expect(() =>
       installedCore.emit('beforeSql', () => ({

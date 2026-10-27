@@ -1,3 +1,4 @@
+import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { it, expect, expectTypeOf, onTestFinished } from 'vitest'
 import {
   createStorageHost,
@@ -33,8 +34,10 @@ it('commits persistence and native SQL through one original transaction', async 
   const operations: string[] = []
   const connection = nodeSqliteDriver(':memory:')
   const host = await createStorageHost({
-    hooks: { beforeStorageOperation: ({ operation }) => operations.push(operation) },
-    plugins: [sqliteBackendPlugin({ driver: connection })] as const
+    plugins: [
+      storageProbe({ beforeStorageOperation: ({ operation }) => operations.push(operation) }),
+      sqliteBackendPlugin({ driver: connection })
+    ] as const
   })
   const storage = host.backend('sqlite')
   expect(storage.use(sql).sql).toBe(storage.sql)
