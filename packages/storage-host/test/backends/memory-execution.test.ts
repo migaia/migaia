@@ -65,7 +65,7 @@ describe('memory execution and the original concurrency budget', () => {
     await new Promise<void>((resolve) => setTimeout(resolve, 35))
     ready.resolve()
     await expect(pending).rejects.toMatchObject({
-      source: '@migaia/storage-contract',
+      source: 'storage.contract',
       code: 'ABORTED'
     })
     expect(await store.get('late')).toBeNull()

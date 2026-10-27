@@ -230,7 +230,7 @@ try {
 
 `ready` observes initial work, `refresh()` joins active work or requests a new generation, and `state` is a readonly computed. `keepPreviousData` defaults to `true`; `equals` defaults to no suppression. Optional `scope` and `matches` filter invalidations; predicate failures report and refresh conservatively. `timeoutMs` applies per generation, while `signal` cancels the query lifetime. Cleanup leaves the caller-owned Runtime usable.
 
-Sources are eventual and preserve native visibility. Local/session/cookie/IndexedDB use hybrid invalidation with 1000 ms reconciliation; memory from `@migaia/storage-host` uses instance-local push without polling. No source promises immediate capture of arbitrary external writes.
+Sources are eventual and preserve native visibility. Local/session/cookie/IndexedDB use hybrid invalidation with 1000 ms reconciliation; memory from `storage.host` uses instance-local push without polling. No source promises immediate capture of arbitrary external writes.
 
 ## Errors and shutdown
 

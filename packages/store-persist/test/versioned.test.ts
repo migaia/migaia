@@ -62,7 +62,7 @@ describe('versioned persistence', () => {
         expect.objectContaining({
           source: 'store.persist',
           code: 'INVALID_OPTION',
-          cause: expect.objectContaining({ source: '@migaia/storage-contract' })
+          cause: expect.objectContaining({ source: 'storage.contract' })
         })
       )
     }
@@ -90,7 +90,7 @@ describe('versioned persistence', () => {
       }
     })
     await expect(handle.ready).rejects.toMatchObject({
-      source: '@migaia/storage-contract',
+      source: 'storage.contract',
       code: 'MIGRATION_FAILED',
       cause: primary
     })

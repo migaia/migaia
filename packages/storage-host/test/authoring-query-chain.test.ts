@@ -220,7 +220,7 @@ describe('canonical declarative conditions', () => {
       cycle
     ]) {
       expect(() => compileStorageWhere(where as IWhere<IOrder>)).toThrowError(
-        expect.objectContaining({ source: '@migaia/storage-contract', code: 'INVALID_ARGUMENT' })
+        expect.objectContaining({ source: 'storage.contract', code: 'INVALID_ARGUMENT' })
       )
     }
   })
@@ -859,7 +859,7 @@ describe('record query terminals', () => {
     await expect(empty.maybe()).resolves.toEqual({ some: false })
     await expect(empty.exists()).resolves.toBe(false)
     await expect(empty.firstOrThrow()).rejects.toMatchObject({
-      source: '@migaia/storage-contract',
+      source: 'storage.contract',
       code: 'QUERY_EMPTY_RESULT'
     })
     expect(close).toHaveBeenCalledTimes(7)
@@ -1452,7 +1452,7 @@ describe('bounded record execution', () => {
         .limit(2)
         .all()
     ).rejects.toBe(original)
-    expect(original).toMatchObject({ source: '@migaia/storage-contract', code: 'INVALID_ARGUMENT' })
+    expect(original).toMatchObject({ source: 'storage.contract', code: 'INVALID_ARGUMENT' })
     expect(closed).toBe(1)
   })
 })
@@ -2146,7 +2146,7 @@ describe('root mapped read cleanup', () => {
         mapping.reject(original)
         await expect(pending).rejects.toBe(original)
         expect(original).toMatchObject({
-          source: '@migaia/storage-contract',
+          source: 'storage.contract',
           code: 'INVALID_ARGUMENT'
         })
       } else {

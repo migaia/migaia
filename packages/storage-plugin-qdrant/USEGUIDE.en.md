@@ -91,7 +91,7 @@ undefined
 
 Deletion includes expired points that physically remain. Default precount issues an exact count and a wait:true deletion with the same filter. Concurrent changes may make the count differ from the final deletion. scroll collects matching IDs before deleting them in batches and returns successfully committed IDs. Scanning is not a snapshot: new points may be seen or left behind, and collected IDs are deleted even if they later stop matching.
 
-If a condition cannot be represented exactly, precount and management deleteByFilter reject with source `@migaia/storage-contract`, code UNSUPPORTED_CAPABILITY. Explicit `count: 'scroll'` supports common predicates by scanning this organization's candidates.
+If a condition cannot be represented exactly, precount and management deleteByFilter reject with source `storage.contract`, code UNSUPPORTED_CAPABILITY. Explicit `count: 'scroll'` supports common predicates by scanning this organization's candidates.
 
 ## Multivector reranking
 

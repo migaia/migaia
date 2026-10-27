@@ -229,4 +229,4 @@ try {
 | `OBJECT_COMMIT_UNKNOWN`           | Commit was sent but confirmation is unknown; inspect head/content before replaying       |
 | `OBJECT_FAILED`                   | Inspect cause; `committed: true` means the write succeeded and metadata follow-up failed |
 
-Object errors use `source: 'storage.backend.object'`; shared validation and condition errors come from `@migaia/storage-contract`. Retain causes for diagnosis. Explicit cleanup rejects on failure; resource syntax reports cleanup failures to preserve a primary error. Release read objects before closing the host. Supplied S3 clients remain yours to close. Shutdown does not delete stored content.
+Object errors use `source: 'storage.backend.object'`; shared validation and condition errors come from `storage.contract`. Retain causes for diagnosis. Explicit cleanup rejects on failure; resource syntax reports cleanup failures to preserve a primary error. Release read objects before closing the host. Supplied S3 clients remain yours to close. Shutdown does not delete stored content.

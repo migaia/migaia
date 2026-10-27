@@ -153,7 +153,7 @@ describe('entity envelopes through the shared plan owner', () => {
         }
       }).connect(store)
       await expect(unique.put({ id: 'new', email: 'one' })).rejects.toMatchObject({
-        source: '@migaia/storage-contract',
+        source: 'storage.contract',
         code: 'UNSUPPORTED_CAPABILITY'
       })
       await expect(unique.migrate()).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
@@ -311,18 +311,18 @@ describe('entity envelopes through the shared plan owner', () => {
       JSON.stringify({ __v: 2, data: { id: 'old' } })
     )
     await expect(repo.get('old')).rejects.toMatchObject({
-      source: '@migaia/storage-host',
+      source: 'storage.host',
       code: 'DESERIALIZE_FAILED',
-      cause: { source: '@migaia/storage-contract', code: 'ENVELOPE_INVALID' }
+      cause: { source: 'storage.contract', code: 'ENVELOPE_INVALID' }
     })
     await store.set(
       composeFlatKey('invalid', 'future'),
       JSON.stringify({ version: 3, state: { id: 'future' } })
     )
     await expect(repo.get('future')).rejects.toMatchObject({
-      source: '@migaia/storage-host',
+      source: 'storage.host',
       code: 'VERSION_UNSUPPORTED',
-      cause: { source: '@migaia/storage-contract', code: 'VERSION_UNSUPPORTED' }
+      cause: { source: 'storage.contract', code: 'VERSION_UNSUPPORTED' }
     })
     const invalidWrite = defineEntity<{ id: string }, null>({
       features: [
@@ -341,9 +341,9 @@ describe('entity envelopes through the shared plan owner', () => {
       }
     }).connect(store)
     await expect(invalidWrite.put({ id: 'a' })).rejects.toMatchObject({
-      source: '@migaia/storage-host',
+      source: 'storage.host',
       code: 'SERIALIZE_FAILED',
-      cause: { source: '@migaia/storage-contract', code: 'ENVELOPE_INVALID' }
+      cause: { source: 'storage.contract', code: 'ENVELOPE_INVALID' }
     })
     expect(await store.get(composeFlatKey('null-state', 'a'))).toBeNull()
   })
@@ -378,7 +378,7 @@ describe('entity envelopes through the shared plan owner', () => {
     await expect(repo.get('a')).rejects.toMatchObject({
       code: 'MIGRATION_FAILED',
       stage: 'migrate',
-      cause: { source: '@migaia/storage-contract', code: 'MIGRATION_FAILED', cause: original }
+      cause: { source: 'storage.contract', code: 'MIGRATION_FAILED', cause: original }
     })
   })
 })

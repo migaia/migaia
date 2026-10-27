@@ -1,5 +1,5 @@
 /** Existing SQLite error identity remains stable while source-domain migration is deferred. */
-export const ERROR_SOURCE = '@migaia/storage-plugin-sqlite'
+export const ERROR_SOURCE = 'storage.backend.sqlite'
 /** SQLite boundary codes keep native failures reachable through cause. */
 export const SqliteErrorCode = {
   /** Native opening, SQL, schema or close failed; inspect the preserved cause. */

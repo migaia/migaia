@@ -1,12 +1,16 @@
 import type { IBackendKind } from './capabilities.js'
 import type { IStorageKey } from './context.js'
 import type { ILockKey, IConcurrencyHolder } from './concurrency.js'
-import { StorageContractErrorCode, type IStorageContractErrorCode } from './error-code.js'
+import {
+  ERROR_SOURCE,
+  StorageContractErrorCode,
+  type IStorageContractErrorCode
+} from './error-code.js'
 
 export { StorageContractErrorCode, type IStorageContractErrorCode }
 
 /** `source` value stamped onto every contract-level error this package throws. */
-export const STORAGE_CONTRACT_SOURCE = '@migaia/storage-contract'
+export const STORAGE_CONTRACT_SOURCE = ERROR_SOURCE
 
 /** Contains neutral contract error details. Provider-specific diagnostics stay with their owner. */
 export type IStorageContractErrorDetails = {

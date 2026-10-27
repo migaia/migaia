@@ -117,7 +117,7 @@ describe('storage environment checks', () => {
     /** The highest actual native client boundary answers whether any business work was invoked. */
     const read = vi.spyOn(state.client, 'get')
     await expect(host.backend('delayed').get('key')).rejects.toMatchObject({
-      source: '@migaia/storage-contract',
+      source: 'storage.contract',
       code: 'UNSUPPORTED_CAPABILITY'
     })
     expect(prefix).not.toHaveBeenCalled()
@@ -278,7 +278,7 @@ describe('storage environment checks', () => {
     /** Each installed registration reports its check pass; every one carries the configured org. */
     expect([...new Set(identities)]).toEqual([org])
     await expect(createStorageHost({ org: 'UPPERCASE', plugins: [plugin] })).rejects.toMatchObject({
-      source: '@migaia/storage-contract',
+      source: 'storage.contract',
       code: 'INVALID_ARGUMENT'
     })
     expect(install).toHaveBeenCalledTimes(1)

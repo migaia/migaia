@@ -101,7 +101,7 @@ describe('Host capability and computed state', () => {
     })
     const failure = await query.ready.catch((error: unknown) => error)
     expect(failure).toMatchObject({
-      source: '@migaia/storage-plugin-browser',
+      source: 'storage.backend.browser',
       code: 'EXTENSION_FAILED',
       cause
     })

@@ -1,9 +1,14 @@
 /**
+ * Registered error domain stamped as `source` on every error this package throws. A domain never
+ * names the package or a path, so moving or renaming the package keeps it unchanged.
+ */
+export const ERROR_SOURCE = 'storage.backend.browser'
+
+/**
  * Defines the error codes owned by `@migaia/storage-plugin-browser` in one place.
  *
- * The `(source, code)` pair uniquely identifies one public semantic failure. `source` is always
- * `@migaia/storage-plugin-browser`. Throw sites reference these constants rather than inline
- * literals.
+ * The `(source, code)` pair uniquely identifies one public semantic failure; `source` is
+ * `ERROR_SOURCE`. Throw sites reference these constants rather than inline literals.
  *
  * Code values are public API, so renaming one is a breaking change. Five contract codes move to
  * `@migaia/storage-contract`: `UNSUPPORTED_CAPABILITY`, `ABORTED`, `STORE_DISPOSED`,

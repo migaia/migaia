@@ -180,7 +180,7 @@ try {
 - Cookie scope 在安装时固定。HttpOnly Cookie 不可见，`has: false` 不证明其不存在。
 - 释放先封闭新接纳，再排空已接纳工作。显式清理通过返回的 Promise 传播失败，原始原因链保留。
 - 宿主开始安装后的失败以 `@migaia/storage-host` 的 `BACKEND_INSTALL_FAILED` 拒绝，原浏览器错误保留在原因链。
-- 按 `(source, code)` 分支。浏览器错误来源为 `@migaia/storage-plugin-browser`，共享并发、取消与所有权错误保留原包身份。
+- 按 `(source, code)` 分支。浏览器错误来源为 `storage.backend.browser`，共享并发、取消与所有权错误保留原包身份。
 
 选项、原生活跃窗口与生命周期详见[使用指南](./USEGUIDE.md)。
 
@@ -236,7 +236,7 @@ localStorage/sessionStorage/Cookie 可用 `redo: true` 显式启用文本事务�
 
 Cookie 的 `redo: true` 复用同一原事务/WAL 协议；普通和 redo 写入共用原 cookie 编码、4096-byte 校验、固定 scope 与可见性检查。批量读取仍由同一原解析器读取一次可见 header，再合入当前 draft。redo 模式把 maxAge 在准备时转换为绝对 expiresAt 镜像，重放不续期；超过原生 Date 域的 maxAge 只在该新组合修改前拒绝，普通 Cookie maxAge 域和 Max-Age 优先级不变。该模式仅记录 JS 可见 cookie，HttpOnly/未知 scope 的原限制保持。
 
-普通 localStorage、sessionStorage 与 Cookie 声明 `capabilities.batch: false`；显式选择 batch Feature 的 IndexedDB 与显式 redo/WAL 组合声明为 true。启用 commit journal 时不提供原生 IndexedDB 句柄，错误 source 为 `@migaia/storage-contract`、code 为 `UNSUPPORTED_CAPABILITY`。IndexedDB 不提供向量引擎。本仓库网站在新 host 包发布前继续使用已发布的 storage-plugin-browser 0.0.8。
+普通 localStorage、sessionStorage 与 Cookie 声明 `capabilities.batch: false`；显式选择 batch Feature 的 IndexedDB 与显式 redo/WAL 组合声明为 true。启用 commit journal 时不提供原生 IndexedDB 句柄，错误 source 为 `storage.contract`、code 为 `UNSUPPORTED_CAPABILITY`。IndexedDB 不提供向量引擎。本仓库网站在新 host 包发布前继续使用已发布的 storage-plugin-browser 0.0.8。
 
 ## 实体编解码器与复制边界
 

@@ -112,7 +112,7 @@ pnpm add --workspace @migaia/logger
 - The default `org` is the zero UUID. Explicit IDs must be canonical lowercase UUIDs; `createOrgId()` generates one. An organization view cannot install plugins, drop organizations or close the host. `dropOrg()` attempts every backend; successful deletions remain if another fails. `ORG_DELETE_FAILED` exposes the failures through `AggregateError.errors`.
 - Capabilities depend on the actual backend instance. A non-default organization does not automatically inherit a custom capability attached only to the root backend; check `has(token)`. Native SQL/SPARQL entry points are unavailable through organization views.
 - Explicit `dispose()` rejects on cleanup failure and reuses its Promise on repeated calls. `await using` cleanup reports failures and completes so it does not replace a primary business error. See each backend's guide for closing caller-supplied native clients.
-- Host errors use `source: '@migaia/storage-host'`. Shared argument and capability errors come from `@migaia/storage-contract`. Inspect `source`, `code` and `cause` together rather than matching message text.
+- Host errors use `source: 'storage.host'`. Shared argument and capability errors come from `storage.contract`. Inspect `source`, `code` and `cause` together rather than matching message text.
 
 ## Moving backend authoring imports
 

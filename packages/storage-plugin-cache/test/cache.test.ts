@@ -141,7 +141,7 @@ describe('borrowed multi-tier cache', () => {
         (error) => IdentifyError.identityOf(error)?.code === 'UNSUPPORTED_CAPABILITY'
       )
       expect(missing).toMatchObject({
-        source: '@migaia/storage-contract',
+        source: 'storage.contract',
         code: 'UNSUPPORTED_CAPABILITY',
         message: expect.stringContaining('1')
       })

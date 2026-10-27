@@ -55,7 +55,7 @@ describe('storage-plugin-browser audit medium severity regressions', () => {
         (error: unknown) => error
       )
       expect(failure).toMatchObject({
-        source: '@migaia/storage-host',
+        source: 'storage.host',
         code: 'VALIDATION_FAILED',
         message: primary.message
       })
@@ -84,7 +84,7 @@ describe('storage-plugin-browser audit medium severity regressions', () => {
     await current.put({ id: 'current' })
     await expect(current.get('current')).resolves.toEqual({ id: 'current' })
     await expect(current.get('old')).rejects.toMatchObject({
-      source: '@migaia/storage-host',
+      source: 'storage.host',
       code: 'VERSION_UNSUPPORTED'
     })
     await store.dispose()
@@ -104,7 +104,7 @@ describe('storage-plugin-browser audit medium severity regressions', () => {
       }
     })
     await expect(schema.validate('input')).rejects.toMatchObject({
-      source: '@migaia/storage-host',
+      source: 'storage.host',
       code: 'VALIDATION_FAILED',
       cause: primary
     })
@@ -144,7 +144,7 @@ describe('storage-plugin-browser audit medium severity regressions', () => {
         (error: unknown) => error
       )
       expect(failure).toMatchObject({
-        source: '@migaia/storage-host',
+        source: 'storage.host',
         code: 'VALIDATION_FAILED',
         stage: 'validate',
         extensionStage: 'schema'

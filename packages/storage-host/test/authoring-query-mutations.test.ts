@@ -310,7 +310,7 @@ describe('original query mutation callbacks', () => {
         })
     }).delete()
     await expect(rejected).rejects.toBe(primary)
-    expect(primary).toHaveProperty('source', '@migaia/storage-contract')
+    expect(primary).toHaveProperty('source', 'storage.contract')
     expect(primary).toMatchObject({ errors: [cleanup] })
   })
 })

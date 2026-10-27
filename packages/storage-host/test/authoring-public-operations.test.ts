@@ -21,7 +21,7 @@ describe('public transaction admission', () => {
     for (const invalid of [undefined, null, 42, {}])
       expect(() => assertTransactionCallback(invalid, 'memory')).toThrow(
         expect.objectContaining({
-          source: '@migaia/storage-contract',
+          source: 'storage.contract',
           code: 'INVALID_ARGUMENT',
           cause: expect.any(TypeError)
         })
@@ -172,7 +172,7 @@ describe('public codec and operation snapshots', () => {
     ])
       expect(() => snapshotSyncWriteOptions(invalid)).toThrow(
         expect.objectContaining({
-          source: '@migaia/storage-contract',
+          source: 'storage.contract',
           code: 'INVALID_ARGUMENT',
           cause: expect.any(TypeError)
         })

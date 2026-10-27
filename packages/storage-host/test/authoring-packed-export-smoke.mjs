@@ -118,7 +118,7 @@ if (hasStorageCapability(raw, token) || Object.hasOwn(raw, 'use')) throw new Err
 /** The real package-root error remains the declared unsupported failure rather than a missing export. */
 let missing
 try { useStorageCapability(raw, token) } catch (error) { missing = error }
-if (missing?.source !== '@migaia/storage-contract' || missing.code !== 'UNSUPPORTED_CAPABILITY' || missing.backend !== 'packed-fixture' || Object.hasOwn(raw, 'use')) throw new Error('packed missing capability identity mismatch')
+if (missing?.source !== 'storage.contract' || missing.code !== 'UNSUPPORTED_CAPABILITY' || missing.backend !== 'packed-fixture' || Object.hasOwn(raw, 'use')) throw new Error('packed missing capability identity mismatch')
 /** Admission callbacks fail if a token lookup unexpectedly performs native work. */
 const noAdmissionIo = () => { throw new Error('capability admission performed I/O') }
 /** Packed RDF/vector publication preserves exact native APIs without generic vector transactions. */

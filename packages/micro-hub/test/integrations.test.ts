@@ -116,7 +116,7 @@ describe('persistence integration', () => {
       .connect('owner')
       .own(contract, { persist: ['count'] })
     await expect(owned.persistence!.ready).rejects.toMatchObject({
-      source: '@migaia/storage-contract',
+      source: 'storage.contract',
       code: 'VERSION_UNSUPPORTED'
     })
     await expect(owned.persistence!.flush()).rejects.toBe(owned.persistence!.hydrationError.value)

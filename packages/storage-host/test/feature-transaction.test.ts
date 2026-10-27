@@ -93,7 +93,7 @@ describe('Feature transaction methods on original native views', () => {
       saved = scope.api.identity
     })
     await expect(saved()).rejects.toMatchObject({
-      source: '@migaia/storage-host',
+      source: 'storage.host',
       code: 'TRANSACTION_FAILED'
     })
     await store

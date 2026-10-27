@@ -85,7 +85,7 @@ describe('storage-plugin-browser confirmed audit suspicions', () => {
       await expect(
         repo.query().index('byValue', { lower: 'saved', upper: 'saved' }).all()
       ).rejects.toMatchObject({
-        source: '@migaia/storage-host',
+        source: 'storage.host',
         code: 'INDEX_BACKFILL_FAILED',
         cause: primary,
         errors: [primary, secondary]
@@ -130,7 +130,7 @@ describe('storage-plugin-browser confirmed audit suspicions', () => {
           [{ name: 'value', unique: false, multiEntry: false, revision: 1 }],
           { timeoutMs: 2 }
         )
-      ).rejects.toMatchObject({ source: '@migaia/storage-contract', code: 'ABORTED' })
+      ).rejects.toMatchObject({ source: 'storage.contract', code: 'ABORTED' })
       expect(factory.delivered).toBe(false)
     } finally {
       await store.dispose()
@@ -166,7 +166,7 @@ describe('storage-plugin-browser confirmed audit suspicions', () => {
       expect((await cursor.next()).done).toBe(false)
       await new Promise((resolve) => setTimeout(resolve, 70))
       await expect(cursor.next()).rejects.toMatchObject({
-        source: '@migaia/storage-contract',
+        source: 'storage.contract',
         code: 'ABORTED'
       })
     } finally {

@@ -65,7 +65,7 @@ Host `/sdk` owns publication, store has/use and transaction implementation looku
 
 ## Errors and accepted boundaries
 
-`StorageContractError` retains source `@migaia/storage-contract`, its public code, original cause and stack, and extension details. No code was added or renamed. `INVALID_ARGUMENT` denotes argument shape, `INVALID_KEY` denotes the typed-key domain, and `UNSUPPORTED_CAPABILITY` denotes missing requested behavior. Runtime owners reuse the existing lifecycle, query, concurrency and migration codes.
+`StorageContractError` retains source `storage.contract`, its public code, original cause and stack, and extension details. No code was added or renamed. `INVALID_ARGUMENT` denotes argument shape, `INVALID_KEY` denotes the typed-key domain, and `UNSUPPORTED_CAPABILITY` denotes missing requested behavior. Runtime owners reuse the existing lifecycle, query, concurrency and migration codes.
 
 Error instances retain their existing frozen behavior; cause objects are not frozen with them. Archive migration reports progress failures through the existing `onArchiveRunError` hook rather than modifying the frozen error. Codec admission does not clone or freeze: pure `assertCodec` validates, while host `snapshotCodec` returns the same admitted instance so class-private methods keep their receiver.
 

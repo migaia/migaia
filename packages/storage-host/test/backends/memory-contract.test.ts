@@ -285,7 +285,7 @@ describe('memory native contract integration', () => {
     const expiredFailure = await expired.getRecord('one').catch((error) => error)
     expect(expiredFailure).toBeInstanceOf(StorageError)
     expect(expiredFailure).toMatchObject({
-      source: '@migaia/storage-host',
+      source: 'storage.host',
       code: 'TRANSACTION_FAILED',
       operation: 'transaction.scope'
     })
@@ -334,7 +334,7 @@ describe('memory native contract integration', () => {
       })
     ).toThrowError(
       expect.objectContaining({
-        source: '@migaia/storage-host',
+        source: 'storage.host',
         code: 'INVALID_CONFIG',
         cause: original
       })
@@ -356,7 +356,7 @@ describe('memory native contract integration', () => {
         }
       })
     ).rejects.toSatisfy((error: unknown) => error === first)
-    expect(first).toMatchObject({ source: '@migaia/storage-host', code: 'DUPLICATE_KEY' })
+    expect(first).toMatchObject({ source: 'storage.host', code: 'DUPLICATE_KEY' })
     /** Ordinary callback normalization retains its own native cause without expiry metadata. */
     const original = new TypeError('ordinary transaction callback')
     const failure = await store
@@ -376,7 +376,7 @@ describe('memory native contract integration', () => {
           { key: ['duplicate', 1], value: 'second' }
         ])
       )
-    ).rejects.toMatchObject({ source: '@migaia/storage-contract', code: 'INVALID_ARGUMENT' })
+    ).rejects.toMatchObject({ source: 'storage.contract', code: 'INVALID_ARGUMENT' })
     expect(await store.transaction((scope) => scope.use(kv).getMany([['duplicate', 1]]))).toEqual([
       undefined
     ])

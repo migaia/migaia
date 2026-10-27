@@ -60,7 +60,7 @@ describe('organization RDF graph mapping', () => {
     const prefix = getStorageOrgGraphPrefix(firstOrg)
     for (const suffix of ['', 'd:extra', 'n:', 'n:relative', 'n:urn%3agraph', 'n:%C0%AF'])
       expect(() => unprefixStorageOrgGraph(firstOrg, term.iri(prefix + suffix))).toThrowError(
-        expect.objectContaining({ source: '@migaia/storage-contract', code: 'INVALID_ARGUMENT' })
+        expect.objectContaining({ source: 'storage.contract', code: 'INVALID_ARGUMENT' })
       )
     for (const graph of [term.blank('raw'), term.literal('literal'), undefined]) {
       expect(() => prefixStorageOrgGraph(firstOrg, graph as never)).toThrowError(
@@ -104,7 +104,7 @@ describe('canonical organization identity', () => {
     null
   ])('rejects noncanonical organization identity %# before key work', (orgId) => {
     expect(() => assertOperationContext({ orgId } as IOperationContext)).toThrowError(
-      expect.objectContaining({ source: '@migaia/storage-contract', code: 'INVALID_ARGUMENT' })
+      expect.objectContaining({ source: 'storage.contract', code: 'INVALID_ARGUMENT' })
     )
     expect(() => prefixStorageOrgKey(orgId as string, 'key')).toThrowError(
       expect.objectContaining({ code: 'INVALID_ARGUMENT' })
@@ -211,7 +211,7 @@ describe('organization key segments', () => {
     ['$o', secondOrg, 'key']
   ])('rejects malformed or cross-org key envelopes %#', (physical) => {
     expect(() => unprefixStorageOrgKey(firstOrg, physical)).toThrowError(
-      expect.objectContaining({ source: '@migaia/storage-contract', code: 'INVALID_ARGUMENT' })
+      expect.objectContaining({ source: 'storage.contract', code: 'INVALID_ARGUMENT' })
     )
   })
 

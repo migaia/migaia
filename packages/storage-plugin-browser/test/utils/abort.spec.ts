@@ -121,13 +121,13 @@ describe('mergeSignals', () => {
   it('keeps the timeout error identity reachable through the storage abort cause', () => {
     const merged = mergeSignals({ timeoutMs: 0 }, noopReporter)
     const timeoutReason = merged.signal?.reason
-    expect(timeoutReason).toMatchObject({ source: '@migaia/storage-contract', code: 'ABORTED' })
+    expect(timeoutReason).toMatchObject({ source: 'storage.contract', code: 'ABORTED' })
     try {
       throwIfAborted(merged.signal)
       throw new Error('expected timeout abort')
     } catch (error) {
       expect(error).toMatchObject({
-        source: '@migaia/storage-contract',
+        source: 'storage.contract',
         code: 'ABORTED',
         cause: timeoutReason
       })

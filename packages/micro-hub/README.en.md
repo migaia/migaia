@@ -32,7 +32,7 @@ Most community solutions cover only one part of the problem. qiankun's `initGlob
 pnpm add @migaia/micro-hub
 ```
 
-Install the optional peer `@migaia/resource` only when you share asynchronous values. Persistence needs a storage backend, for example `@migaia/storage-plugin-browser`.
+Install the optional peer `@migaia/resource` only when you share asynchronous values. Persistence needs a storage backend, for example `storage.backend.browser`.
 
 ### Module Federation configuration
 

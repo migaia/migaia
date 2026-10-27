@@ -41,7 +41,7 @@ describe('StorageContractError 家族', () => {
       cause: new TypeError('bad')
     })
     expect(error.source).toBe(STORAGE_CONTRACT_SOURCE)
-    expect(error.source).toBe('@migaia/storage-contract')
+    expect(error.source).toBe('storage.contract')
     expect(error.code).toBe('INVALID_ARGUMENT')
     expect(error.name).toBe('StorageContractError')
     expect(error.cause).toBeInstanceOf(TypeError)

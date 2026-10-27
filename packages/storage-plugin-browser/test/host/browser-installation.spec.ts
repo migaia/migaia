@@ -75,10 +75,10 @@ describe('browser backend installation through the neutral host', () => {
       expect((await host.backend('indexed-db').api.client()).name).toBe('browser-installation')
       expect(host.backend('local').has(kv)).toBe(true)
       for (const [api, source, code] of [
-        [host.backend('local').use(kv), '@migaia/storage-plugin-browser', 'INVALID_CONFIG'],
-        [host.backend('session').use(kv), '@migaia/storage-plugin-browser', 'INVALID_CONFIG'],
-        [host.backend('cookies').use(kv), '@migaia/storage-plugin-browser', 'INVALID_CONFIG'],
-        [host.backend('indexed-db').use(kv), '@migaia/storage-contract', 'INVALID_ARGUMENT']
+        [host.backend('local').use(kv), 'storage.backend.browser', 'INVALID_CONFIG'],
+        [host.backend('session').use(kv), 'storage.backend.browser', 'INVALID_CONFIG'],
+        [host.backend('cookies').use(kv), 'storage.backend.browser', 'INVALID_CONFIG'],
+        [host.backend('indexed-db').use(kv), 'storage.contract', 'INVALID_ARGUMENT']
       ] as const) {
         expect('dispose' in api).toBe(false)
         expect(asyncDisposeKey in api).toBe(false)
@@ -112,7 +112,7 @@ describe('browser backend installation through the neutral host', () => {
       await host.backend('prefs').dispose()
       expect(await host.backend('cache').get('key')).toBe('cached')
       await expect(host.backend('prefs').get('key')).rejects.toMatchObject({
-        source: '@migaia/storage-contract',
+        source: 'storage.contract',
         code: 'STORE_DISPOSED'
       })
     } finally {
@@ -186,12 +186,12 @@ describe('browser backend installation through the neutral host', () => {
         expect(await host.backend('first').api.native(scope)).toBe(native)
         expect(native.objectStoreNames.contains('assets')).toBe(true)
         await expect(host.backend('second').api.native(scope)).rejects.toMatchObject({
-          source: '@migaia/storage-contract',
+          source: 'storage.contract',
           code: 'INVALID_ARGUMENT'
         })
       })
       await expect(host.backend('first').api.native(oldScope)).rejects.toMatchObject({
-        source: '@migaia/storage-contract',
+        source: 'storage.contract',
         code: 'INVALID_ARGUMENT'
       })
     } finally {
@@ -218,7 +218,7 @@ describe('browser backend installation through the neutral host', () => {
       ]
     }).catch((cause: unknown) => cause)
     expect(failure).toMatchObject({
-      source: '@migaia/storage-host',
+      source: 'storage.host',
       code: 'BACKEND_INSTALL_FAILED'
     })
     expect(walkErrorCauses(failure)).toContainEqual(

@@ -407,7 +407,7 @@ describe('Resource-backed queries', () => {
       }
       expect(thrown).toBeInstanceOf(AggregateError)
       expect(thrown).toMatchObject({
-        source: '@migaia/storage-plugin-browser',
+        source: 'storage.backend.browser',
         code: 'LIVE_QUERY_DISPOSE_FAILED',
         message: 'live query failed to dispose'
       })
@@ -571,7 +571,7 @@ describe('Resource-backed queries', () => {
       const firstError = await firstRefresh.catch((error: unknown) => error)
       expect(firstError).toMatchObject({
         name: 'StorageError',
-        source: '@migaia/storage-plugin-browser',
+        source: 'storage.backend.browser',
         code: 'LIVE_QUERY_DISPOSED',
         message: 'live query is disposed; create a new live query'
       })
@@ -633,7 +633,7 @@ describe('Resource-backed queries', () => {
     const readyError = await ready.catch((error: unknown) => error)
     expect(readyError).toMatchObject({
       name: 'StorageContractError',
-      source: '@migaia/storage-contract',
+      source: 'storage.contract',
       code: 'ABORTED'
     })
     expect((readyError as Error).cause).toBe(reason)
@@ -678,7 +678,7 @@ describe('Resource-backed queries', () => {
     const refreshError = await refresh.catch((error: unknown) => error)
     expect(refreshError).toMatchObject({
       name: 'StorageContractError',
-      source: '@migaia/storage-contract',
+      source: 'storage.contract',
       code: 'ABORTED'
     })
     expect((refreshError as Error).cause).toBe(refreshReason)
@@ -725,7 +725,7 @@ describe('Resource-backed queries', () => {
       const failure = await firstDispose.catch((error: unknown) => error)
       expect(failure).toBeInstanceOf(AggregateError)
       expect(failure).toMatchObject({
-        source: '@migaia/storage-plugin-browser',
+        source: 'storage.backend.browser',
         code: 'LIVE_QUERY_DISPOSE_FAILED',
         message: 'live query failed to dispose'
       })
@@ -778,7 +778,7 @@ describe('Resource-backed queries', () => {
       ])
       expect((failure as Error).cause).toBe(resourceFailure)
       expect(failure).toMatchObject({
-        source: '@migaia/storage-plugin-browser',
+        source: 'storage.backend.browser',
         code: 'LIVE_QUERY_DISPOSE_FAILED',
         message: 'live query failed to dispose'
       })

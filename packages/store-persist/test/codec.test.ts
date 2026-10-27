@@ -75,7 +75,7 @@ describe('defaultJsonCodec Map/Set 往返', () => {
         source: 'store.persist',
         code: 'ENCODE_FAILED',
         cause: {
-          source: '@migaia/storage-contract',
+          source: 'storage.contract',
           code: 'INVALID_ARGUMENT',
           cause: { source: 'serialization', code: 'ENCODE_FAILED' }
         }
@@ -85,7 +85,7 @@ describe('defaultJsonCodec Map/Set 往返', () => {
       source: 'store.persist',
       code: 'ENVELOPE_INVALID',
       cause: {
-        source: '@migaia/storage-contract',
+        source: 'storage.contract',
         code: 'INVALID_ARGUMENT',
         cause: {
           source: 'serialization',

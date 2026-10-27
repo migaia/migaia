@@ -32,7 +32,7 @@
 pnpm add @migaia/micro-hub
 ```
 
-需要共享异步值时再装可选 peer `@migaia/resource`；持久化需要一个存储后端，例如 `@migaia/storage-plugin-browser`。
+需要共享异步值时再装可选 peer `@migaia/resource`；持久化需要一个存储后端，例如 `storage.backend.browser`。
 
 ### Module Federation 配置
 

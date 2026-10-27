@@ -144,7 +144,7 @@ describe('public archive boundaries', () => {
       }
       expect(failure).toBeInstanceOf(StorageContractError)
       expect(failure).toMatchObject({
-        source: '@migaia/storage-contract',
+        source: 'storage.contract',
         code: 'ENVELOPE_INVALID'
       })
       expect(store.count).toBe(1)

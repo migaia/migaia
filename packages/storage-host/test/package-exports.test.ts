@@ -88,7 +88,7 @@ describe('storage host package exports', () => {
     /** Dynamic self-import exercises the built package entry rather than an internal source alias. */
     const runtime = await import('@migaia/storage-host')
     expect(Object.keys(runtime).sort()).toEqual(baseline.packages['@migaia/storage-host']!['.'])
-    expect(runtime.STORAGE_HOST_SOURCE).toBe('@migaia/storage-host')
+    expect(runtime.STORAGE_HOST_SOURCE).toBe('storage.host')
     await using host = await runtime.createStorageHost()
     expect(host.backends().size).toBe(0)
   })

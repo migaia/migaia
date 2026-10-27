@@ -1,12 +1,12 @@
 import type { IBackendKind } from '@migaia/storage-contract'
 import type { IStorageKey } from '@migaia/storage-contract'
-import { StorageErrorCode, type IStorageErrorCode } from './error-code.js'
+import { ERROR_SOURCE, StorageErrorCode, type IStorageErrorCode } from './error-code.js'
 import { StorageErrorText } from './error-text.js'
 
 export { StorageErrorCode, type IStorageErrorCode }
 
 /** `source` value stamped onto every error this package throws. */
-export const STORAGE_HOST_SOURCE = '@migaia/storage-host'
+export const STORAGE_HOST_SOURCE = ERROR_SOURCE
 
 /**
  * Optional diagnostic context for a frozen StorageError; nested values and cause retain their

@@ -132,7 +132,7 @@ describe('capability identity and provider ownership', () => {
     ]) {
       expect(read).toThrowError(
         expect.objectContaining({
-          source: '@migaia/storage-contract',
+          source: 'storage.contract',
           code: 'UNSUPPORTED_CAPABILITY',
           backend: 'original-backend',
           message: 'backend original-backend does not provide capability missing'

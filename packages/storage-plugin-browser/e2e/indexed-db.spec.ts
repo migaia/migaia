@@ -17,7 +17,7 @@ for (const mode of Object.values(NativeTransactionActivity))
     } else {
       expect(result).toMatchObject({
         failed: true,
-        source: '@migaia/storage-plugin-browser',
+        source: 'storage.backend.browser',
         code: 'TRANSACTION_FAILED',
         causeName: 'TransactionInactiveError',
         text: 'before',

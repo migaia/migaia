@@ -90,7 +90,7 @@ describe('the shared storage observation owner', () => {
 
   it('rejects a malformed hook before any backend is opened', async () => {
     expect(() => storageProbe({ beforeHostClose: 42 as never })).toThrowError(
-      expect.objectContaining({ source: '@migaia/storage-host', code: 'INVALID_CONFIG' })
+      expect.objectContaining({ source: 'storage.host', code: 'INVALID_CONFIG' })
     )
   })
 

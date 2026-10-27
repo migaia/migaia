@@ -107,7 +107,7 @@ describe('storage-plugin-browser audit high severity regressions', () => {
       }).connect(store)
       await users.put({ id: 'first', email: 'same' })
       await expect(users.put({ id: 'second', email: 'same' })).rejects.toMatchObject({
-        source: '@migaia/storage-host',
+        source: 'storage.host',
         code: 'INDEX_UNIQUE_CONFLICT'
       })
       expect(

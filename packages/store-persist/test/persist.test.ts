@@ -299,7 +299,7 @@ describe('persist（store-light）', () => {
     const store = createStore({ count: 0 })
     const handle = persist(store, { key: 'versioned', storage, version: 1 })
     await expect(handle.ready).rejects.toMatchObject({
-      source: '@migaia/storage-contract',
+      source: 'storage.contract',
       code: 'VERSION_UNSUPPORTED'
     })
     expect(handle.status.value).toBe('error')

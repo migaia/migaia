@@ -190,7 +190,7 @@ Browser sources retain eventual visibility: local storage is document-eventual, 
 - Cookie scope is fixed at installation. HttpOnly cookies remain invisible; `has: false` does not prove their absence.
 - Disposal seals new work and drains admitted work. Explicit cleanup reports failure through its returned Promise; errors preserve their original cause chain.
 - After host installation starts, failure rejects with `@migaia/storage-host` `BACKEND_INSTALL_FAILED`; the original browser error remains in its cause chain.
-- Branch on `(source, code)`. Web errors use `@migaia/storage-plugin-browser`; shared concurrency, cancellation, and owner errors retain their package identity.
+- Branch on `(source, code)`. Web errors use `storage.backend.browser`; shared concurrency, cancellation, and owner errors retain their package identity.
 
 See [the usage guide](./USEGUIDE.en.md) for options, native activity, and lifecycle details.
 
@@ -286,7 +286,7 @@ Redo resolves maxAge to an absolute expiresAt image during preparation, so repla
 
 Only JS-visible cookies participate; original HttpOnly/unknown-scope limits remain.
 
-Ordinary localStorage, sessionStorage and Cookie stores declare `capabilities.batch: false`; IndexedDB with its batch Feature and explicit redo/WAL stores declare it true. Native IndexedDB handles are unavailable with commit journaling and reject with source `@migaia/storage-contract`, code `UNSUPPORTED_CAPABILITY`. IndexedDB does not provide a vector engine. The repository website stays on published storage-plugin-browser 0.0.8 until the new host packages are published.
+Ordinary localStorage, sessionStorage and Cookie stores declare `capabilities.batch: false`; IndexedDB with its batch Feature and explicit redo/WAL stores declare it true. Native IndexedDB handles are unavailable with commit journaling and reject with source `storage.contract`, code `UNSUPPORTED_CAPABILITY`. IndexedDB does not provide a vector engine. The repository website stays on published storage-plugin-browser 0.0.8 until the new host packages are published.
 
 ## Entity codecs and copy boundaries
 

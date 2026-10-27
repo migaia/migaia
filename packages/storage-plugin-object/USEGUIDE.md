@@ -229,4 +229,4 @@ try {
 | `OBJECT_COMMIT_UNKNOWN`           | 已发出提交但确认未知；先 head/读取确认，不盲目重放             |
 | `OBJECT_FAILED`                   | 检查 cause；若 `committed: true`，写入已成功，仅后续元数据失败 |
 
-对象错误 source 是 `storage.backend.object`，共享校验与条件错误来自 `@migaia/storage-contract`。保留 cause 供诊断。显式关闭失败会拒绝；资源语法会报告清理失败，避免覆盖主错误。先释放读取对象，再关闭宿主；调用方注入的 S3Client 仍需自己关闭。关闭不删除已保存内容。
+对象错误 source 是 `storage.backend.object`，共享校验与条件错误来自 `storage.contract`。保留 cause 供诊断。显式关闭失败会拒绝；资源语法会报告清理失败，避免覆盖主错误。先释放读取对象，再关闭宿主；调用方注入的 S3Client 仍需自己关闭。关闭不删除已保存内容。

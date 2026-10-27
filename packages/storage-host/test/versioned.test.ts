@@ -442,7 +442,7 @@ describe('migration step observation', () => {
       for (const original of [
         new Error('observer failed'),
         new StorageContractError(StorageContractErrorCode.invalidArgument),
-        { source: '@migaia/storage-contract', code: 'MIGRATION_FAILED' }
+        { source: 'storage.contract', code: 'MIGRATION_FAILED' }
       ]) {
         /** Collects observation or utility failures without affecting the migration result. */
         const report = vi.fn(() => undefined)

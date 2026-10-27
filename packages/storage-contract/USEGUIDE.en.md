@@ -1,6 +1,6 @@
 # storage-contract usage guide
 
-Import types, tokens, definitions, errors and pure validators from `@migaia/storage-contract`. Input retention, query execution and resources use the [host entry table](./README.en.md#entries-and-dependency-direction).
+Import types, tokens, definitions, errors and pure validators from `storage.contract`. Input retention, query execution and resources use the [host entry table](./README.en.md#entries-and-dependency-direction).
 
 ## Validate a key without copying
 

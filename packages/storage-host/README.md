@@ -112,7 +112,7 @@ pnpm add --workspace @migaia/logger
 - `org` 默认零 UUID；显式组织 ID 必须是规范的小写 UUID，可用 `createOrgId()` 生成。`org()` 返回的视图不能安装插件、删除组织或关闭宿主。删除组织尝试所有后端，部分失败不会撤回已成功的删除，错误为 `ORG_DELETE_FAILED`，具体失败在 `AggregateError.errors` 中。
 - 后端支持什么能力由实际实例决定。非默认组织不会自动得到只绑定到根后端的自定义能力；先检查 `has(token)`。组织视图不支持原生 SQL/SPARQL 入口。
 - 显式 `dispose()` 的失败会拒绝，重复调用复用同一个 Promise。`await using` 清理会报告失败并完成，以免覆盖业务代码的主错误。调用方提供的原生客户端是否需要单独关闭，见相应后端说明。
-- 宿主错误的 `source` 为 `@migaia/storage-host`；共享参数和能力错误来自 `@migaia/storage-contract`。排查时同时读取 `source`、`code` 与 `cause`，不要匹配错误文案。
+- 宿主错误的 `source` 为 `storage.host`；共享参数和能力错误来自 `storage.contract`。排查时同时读取 `source`、`code` 与 `cause`，不要匹配错误文案。
 
 ## 后端作者入口迁移
 

@@ -41,7 +41,7 @@ const declareCodes = (root, directory, name, declaration, subdirectory = '') => 
   const file = join(sourceRoot, 'error-code.ts')
   writeFileSync(
     file,
-    declaration.includes('export const ERROR_SOURCE') || directory.startsWith('storage-')
+    declaration.includes('export const ERROR_SOURCE')
       ? declaration
       : `export const ERROR_SOURCE = 'fixture.${directory}'\n${declaration}`
   )
@@ -440,6 +440,50 @@ test('merged source changes generate identical and idempotent registration bytes
 /** Frozen public domain inventory distinguishes valid spelling from the agreed migration. */
 const domainInventory = Object.freeze([
   {
+    file: 'packages/storage-contract/src/error-code.ts',
+    source: 'storage.contract'
+  },
+  {
+    file: 'packages/storage-host/src/error-code.ts',
+    source: 'storage.host'
+  },
+  {
+    file: 'packages/storage-plugin-archive/src/error-code.ts',
+    source: 'storage.backend.archive'
+  },
+  {
+    file: 'packages/storage-plugin-browser/src/error-code.ts',
+    source: 'storage.backend.browser'
+  },
+  {
+    file: 'packages/storage-plugin-cache/src/error-code.ts',
+    source: 'storage.backend.cache'
+  },
+  {
+    file: 'packages/storage-plugin-object/src/error-code.ts',
+    source: 'storage.backend.object'
+  },
+  {
+    file: 'packages/storage-plugin-postgres/src/error-code.ts',
+    source: 'storage.backend.postgres'
+  },
+  {
+    file: 'packages/storage-plugin-qdrant/src/error-code.ts',
+    source: 'storage.backend.qdrant'
+  },
+  {
+    file: 'packages/storage-plugin-redis/src/error-code.ts',
+    source: 'storage.backend.redis'
+  },
+  {
+    file: 'packages/storage-plugin-sparql/src/error-code.ts',
+    source: 'storage.backend.sparql'
+  },
+  {
+    file: 'packages/storage-plugin-sqlite/src/error-code.ts',
+    source: 'storage.backend.sqlite'
+  },
+  {
     file: 'packages/utils/src/error-code.ts',
     source: 'foundation.utils'
   },
@@ -592,42 +636,17 @@ const domainInventory = Object.freeze([
 ])
 
 test('source domains agreed runtime domain inventory', () => {
-  /** These are main's only exempt declarations; derive their sources through the real parser. */
-  const deferredFiles = [
-    'packages/storage-contract/src/error-code.ts',
-    'packages/storage-plugin-browser/src/error-code.ts'
-  ]
-  /** A separate parser root preserves path-based exemption without guessing source spellings. */
-  const root = fixture()
-  try {
-    for (const file of deferredFiles) {
-      /** Package ownership comes from the frozen main path, not from the source value. */
-      const directory = file.split('/')[1]
-      /** Preserve the existing package fallback only for the deferred declarations. */
-      const manifest = JSON.parse(
-        readFileSync(join(repositoryRoot, 'packages', directory, 'package.json'), 'utf8')
-      )
-      declareCodes(root, directory, manifest.name, readFileSync(join(repositoryRoot, file), 'utf8'))
-    }
-    /** The exemption is scoped by declaration paths; source spellings remain parser-owned. */
-    const deferredSources = new Set(
-      registry.checkErrorRegistrySources(root).map(({ source }) => source)
-    )
-    /** The full public collector must emit all and only the agreed non-exempt domains. */
-    const actual = registry
-      .checkErrorRegistrySources()
-      .map(({ source }) => source)
-      .filter((source) => !deferredSources.has(source))
-      .sort()
-    assert.equal(actual.length, 35, 'SOURCE_DOMAIN_DOMAIN_COUNT')
-    assert.deepEqual(
-      actual,
-      domainInventory.map(({ source }) => source).sort(),
-      'SOURCE_DOMAIN_DOMAIN_SET'
-    )
-  } finally {
-    rmSync(root, { recursive: true, force: true })
-  }
+  /** The full public collector must emit all and only the agreed domains. */
+  const actual = registry
+    .checkErrorRegistrySources()
+    .map(({ source }) => source)
+    .sort()
+  assert.equal(actual.length, 46, 'SOURCE_DOMAIN_DOMAIN_COUNT')
+  assert.deepEqual(
+    actual,
+    domainInventory.map(({ source }) => source).sort(),
+    'SOURCE_DOMAIN_DOMAIN_SET'
+  )
 })
 
 /** Per-owner cases cannot be hidden by the first failing collection-level assertion. */

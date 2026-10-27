@@ -25,7 +25,7 @@ describe('finite backend authoring functions', () => {
     try {
       expect(() => createStorageToken()).toThrowError(
         expect.objectContaining({
-          source: '@migaia/storage-contract',
+          source: 'storage.contract',
           code: 'UNSUPPORTED_CAPABILITY',
           cause: original
         })
@@ -39,7 +39,7 @@ describe('finite backend authoring functions', () => {
     expect(resolveStorageNamespace('prefs')).toBe('prefs')
     expect(resolveStorageNamespace(otherOrg)).toBe(otherOrg)
     expect(() => resolveStorageNamespace(`prefs/${otherOrg}`)).toThrowError(
-      expect.objectContaining({ source: '@migaia/storage-contract', code: 'INVALID_ARGUMENT' })
+      expect.objectContaining({ source: 'storage.contract', code: 'INVALID_ARGUMENT' })
     )
     expect(resolveStorageNamespace('prefs', defaultOrg, defaultOrg)).toBe('prefs')
     expect(resolveStorageNamespace('prefs', otherOrg, defaultOrg)).toBe(`prefs/${otherOrg}`)
@@ -50,7 +50,7 @@ describe('finite backend authoring functions', () => {
     )
     expect(resolveStorageNamespace('prefs', otherOrg, otherOrg)).toBe('prefs')
     expect(() => resolveStorageNamespace(`prefs/${otherOrg}`, defaultOrg, defaultOrg)).toThrowError(
-      expect.objectContaining({ source: '@migaia/storage-contract', code: 'INVALID_ARGUMENT' })
+      expect.objectContaining({ source: 'storage.contract', code: 'INVALID_ARGUMENT' })
     )
     expect(() => resolveStorageNamespace('prefs', 'INVALID', defaultOrg)).toThrowError(
       expect.objectContaining({ code: 'INVALID_ARGUMENT' })

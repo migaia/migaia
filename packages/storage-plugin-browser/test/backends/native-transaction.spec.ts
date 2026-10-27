@@ -320,7 +320,7 @@ describe('IndexedDB complete native transaction views', () => {
       expect(store.dispose()).toBe(disposal)
       const failure = await disposal.catch((error: unknown) => error)
       expect(failure).toMatchObject({
-        source: '@migaia/storage-plugin-browser',
+        source: 'storage.backend.browser',
         code: 'BACKEND_DISPOSE_FAILED',
         cause
       })
@@ -473,7 +473,7 @@ describe('IndexedDB complete native transaction views', () => {
           }
         )
       ).rejects.toMatchObject({
-        source: '@migaia/storage-contract',
+        source: 'storage.contract',
         code: 'LOCK_REJECTED',
         holder: { label: 'agent-a', scope: 'local', status: 'held' }
       })
@@ -624,7 +624,7 @@ describe('IndexedDB complete native transaction views', () => {
               await scope.use(kv).setMany([{ key: ['shared', 1], value: 'text' }])
             }
           })
-        ).rejects.toMatchObject({ source: '@migaia/storage-plugin-browser', code: 'DUPLICATE_KEY' })
+        ).rejects.toMatchObject({ source: 'storage.backend.browser', code: 'DUPLICATE_KEY' })
         expect(await store.getRecord(['shared', 1])).toBeUndefined()
         await store.transaction(async (scope) => {
           expect(await scope.use(kv).getMany([['shared', 1]])).toEqual([undefined])
@@ -765,7 +765,7 @@ describe('IndexedDB complete native transaction views', () => {
         .catch((error: unknown) => error)
       expect(failure).toBe(firstFailure)
       expect(failure).toMatchObject({
-        source: '@migaia/storage-plugin-browser',
+        source: 'storage.backend.browser',
         code: 'INVALID_CONFIG'
       })
       expect(await store.get('text')).toBeNull()
@@ -827,7 +827,7 @@ describe('IndexedDB complete native transaction views', () => {
       expect(await store.get('checked')).toBe('yes')
       for (const view of views)
         await expect(view.getRecord(1)).rejects.toMatchObject({
-          source: '@migaia/storage-plugin-browser',
+          source: 'storage.backend.browser',
           code: 'TRANSACTION_FAILED'
         })
     } finally {

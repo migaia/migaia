@@ -13,10 +13,10 @@ import {
 /** Failed installation retains the native validation failure below the actual host wrapper. */
 const expectInvalidInstallation = async (pending: Promise<unknown>): Promise<void> => {
   const failure: unknown = await pending.catch((cause: unknown) => cause)
-  expect(failure).toMatchObject({ source: '@migaia/storage-host', code: 'BACKEND_INSTALL_FAILED' })
+  expect(failure).toMatchObject({ source: 'storage.host', code: 'BACKEND_INSTALL_FAILED' })
   expect(walkErrorCauses(failure)).toContainEqual(
     expect.objectContaining({
-      source: '@migaia/storage-plugin-browser',
+      source: 'storage.backend.browser',
       code: 'INVALID_CONFIG'
     })
   )

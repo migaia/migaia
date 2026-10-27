@@ -67,7 +67,7 @@ publication、store has/use 和 transaction implementation lookup 统一由 host
 
 ## 错误与已接受边界
 
-`StorageContractError` 保持 `source: '@migaia/storage-contract'`、公开 code、原 `cause`、原 stack 与扩展 details。未改名或新增错误码。`INVALID_ARGUMENT` 表示输入结构问题，`INVALID_KEY` 表示 typed-key 域问题，`UNSUPPORTED_CAPABILITY` 表示缺少已请求能力；执行拥有者继续使用本包既有生命周期、并发、查询和迁移码。
+`StorageContractError` 保持 `source: 'storage.contract'`、公开 code、原 `cause`、原 stack 与扩展 details。未改名或新增错误码。`INVALID_ARGUMENT` 表示输入结构问题，`INVALID_KEY` 表示 typed-key 域问题，`UNSUPPORTED_CAPABILITY` 表示缺少已请求能力；执行拥有者继续使用本包既有生命周期、并发、查询和迁移码。
 
 错误实例保留既有冻结行为，cause 对象不会随之冻结。归档迁移的进度错误通过既有 `onArchiveRunError` 通道报告，不修改已冻结错误实例。codec 不承诺冻结或复制：纯 `assertCodec` 只校验；host `snapshotCodec` 校验后返回同一实例，使 `#private` 方法保持 receiver。
 

@@ -72,7 +72,7 @@ describe('store-persist audit regressions', () => {
       if (results[0].status === 'rejected' && results[1].status === 'rejected') {
         expect(results[0].reason).toBe(results[1].reason)
         expect(results[0].reason).toMatchObject({
-          source: '@migaia/storage-contract',
+          source: 'storage.contract',
           code: 'STORE_DISPOSED'
         })
         expect(handle.writeError.value).toBe(results[0].reason)

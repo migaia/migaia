@@ -655,7 +655,7 @@ describe('native SQLite installation', () => {
     )
     await store.metadata.set('\ud800\u0000', { keep: true })
     await expect(store.setBytes('text', new Uint8Array([5]))).rejects.toMatchObject({
-      source: '@migaia/storage-plugin-sqlite',
+      source: 'storage.backend.sqlite',
       code: 'DUPLICATE_KEY'
     })
     await store.setBytes('text', new Uint8Array([5]), { conflictPolicy: 'replace' })

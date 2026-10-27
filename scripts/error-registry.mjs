@@ -129,37 +129,20 @@ const firstSentence = (body) => {
 /** Lowercase semantic domains allow dotted segments and hyphens within each segment. */
 const SOURCE_PATTERN = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*(?:\.[a-z][a-z0-9]*(?:-[a-z0-9]+)*)*$/
 /**
- * Temporary package-directory exemption. Remove only when the storage follow-up migrates all
- * storage declarations and readers, and lands together with the domain migration. Merging the
- * storage program with its old source values does not remove this exemption.
- */
-const DEFERRED_STORAGE_PREFIX = 'storage-'
-
-/**
- * Reads an explicit domain from an already loaded declaration. Only deferred storage packages
- * preserve the old package-name fallback.
+ * Reads an explicit domain from an already loaded declaration.
  *
  * @param {string} file Absolute declaration path.
  * @param {string} text Already loaded declaration text.
  * @param {string} root Repository root that owns the package directory.
  * @param {string} [tableSource] Explicit per-table domain for a centralized declaration.
  * @returns {string} Registry source.
- * @throws {Error} Missing or malformed non-exempt domain with its stable diagnostic code.
+ * @throws {Error} Missing or malformed domain with its stable diagnostic code.
  */
 const sourceFor = (file, text, root, tableSource) => {
   /** Empty is a declared invalid value, distinct from a missing declaration. */
   const declaredSource = tableSource ?? text.match(/^export const ERROR_SOURCE = '([^']*)'/m)?.[1]
-  /** Only the direct package directory selects the temporary storage exemption. */
+  /** Repository-relative path reported in source diagnostics. */
   const path = relative(root, file)
-  const parts = path.split('/')
-  if (parts[0] === 'packages' && parts[1]?.startsWith(DEFERRED_STORAGE_PREFIX)) {
-    if (declaredSource) return declaredSource
-    /** The exempt owner's manifest preserves its current wire contract until the follow-up. */
-    const manifest = JSON.parse(
-      readFileSync(join(root, 'packages', parts[1], 'package.json'), 'utf8')
-    )
-    return manifest.name
-  }
   if (declaredSource === undefined)
     throw withCode(ErrorRegistryErrorCode.sourceMissing, RegistryText.sourceMissing(path))
   if (!SOURCE_PATTERN.test(declaredSource) || declaredSource.includes('migaia'))

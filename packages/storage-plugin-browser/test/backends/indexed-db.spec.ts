@@ -2474,7 +2474,7 @@ describe('indexedDbHost backend', () => {
       expect(result.done).toBe(true)
       expect(reported[0]).toEqual(
         expect.objectContaining({
-          source: '@migaia/storage-plugin-browser',
+          source: 'storage.backend.browser',
           code: 'INDEX_ORPHAN',
           message: 'indexed record index contains orphan sidecar row',
           key: 'missing-record'
@@ -3514,7 +3514,7 @@ describe('indexedDbHost backend', () => {
     await expectNativeInstallationFailure(
       createIndexedDbTestStore({ factory: failingFactory, dbName: 'x' }),
       {
-        source: '@migaia/storage-plugin-browser',
+        source: 'storage.backend.browser',
         code: 'BACKEND_UNAVAILABLE',
         backend: 'indexed-db',
         operation: 'indexeddb.open',

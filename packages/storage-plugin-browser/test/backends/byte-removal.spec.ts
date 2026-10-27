@@ -85,14 +85,14 @@ describe.each(backends)('%s per-key byte deletion', (_backend, createStore) => {
         .removeBytes('target', { signal: controller.signal })
         .catch((error: unknown) => error)
       expect(failure).toMatchObject({
-        source: '@migaia/storage-contract',
+        source: 'storage.contract',
         code: 'ABORTED'
       })
       expect((failure as Error).cause).toBe(reason)
       await expect(store.getBytes('target')).resolves.toEqual(new Uint8Array([1]))
       await store.dispose()
       await expect(store.removeBytes('target')).rejects.toMatchObject({
-        source: '@migaia/storage-contract',
+        source: 'storage.contract',
         code: 'STORE_DISPOSED'
       })
       expect(changes).toEqual([])

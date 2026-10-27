@@ -364,7 +364,7 @@ it('wraps original query callback failures even when they already carry a code',
     if (operation.endsWith('Comparator')) await repo.put({ id: 'b', group: 'one', score: 2 })
     const failure = await query.all().catch((cause) => cause)
     expect(failure).toMatchObject({
-      source: '@migaia/storage-host',
+      source: 'storage.host',
       code: 'EXTENSION_FAILED',
       operation
     })

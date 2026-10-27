@@ -287,7 +287,7 @@ it('shares the original attempt context with cancellable transaction composition
   const failure = await result
   expect((failure as Error).cause).toBe(cancelledWorkFailure)
   expect(failure).toMatchObject({
-    source: '@migaia/storage-plugin-sqlite',
+    source: 'storage.backend.sqlite',
     code: 'TRANSACTION_FAILED',
     cause: cancelledWorkFailure
   })

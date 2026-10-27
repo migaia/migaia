@@ -1,3 +1,9 @@
+/**
+ * Registered error domain stamped as `source` on every error this package throws. A domain never
+ * names the package or a path, so moving or renaming the package keeps it unchanged.
+ */
+export const ERROR_SOURCE = 'storage.host'
+
 /** Canonical host boundary codes. */
 export const StorageErrorCode = {
   /** Journal configuration requires the explicit /journal plugin before backend installation. */

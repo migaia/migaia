@@ -113,7 +113,7 @@ describe('neutral storage installation', () => {
       { wrong: feature }
     ])
     await expect(createStorageHost({ plugins: [definition] })).rejects.toMatchObject({
-      source: '@migaia/storage-host',
+      source: 'storage.host',
       code: StorageErrorCode.backendInstallFailed
     })
     expect(factory).not.toHaveBeenCalled()
@@ -156,10 +156,10 @@ describe('neutral storage installation', () => {
     }))
     await using host = await createStorageHost({ plugins: [item.plugin, intervention] })
     expect(() => host.backend('values').voidSync()).toThrowError(
-      expect.objectContaining({ source: '@migaia/storage-contract', code: 'ABORTED' })
+      expect.objectContaining({ source: 'storage.contract', code: 'ABORTED' })
     )
     await expect(host.backend('values').original()).rejects.toMatchObject({
-      source: '@migaia/storage-contract',
+      source: 'storage.contract',
       code: 'ABORTED'
     })
   })
@@ -285,7 +285,7 @@ describe('neutral storage installation', () => {
     const primary = host.dispose()
     const failure = await primary.catch((error) => error)
     expect(failure).toMatchObject({
-      source: '@migaia/storage-host',
+      source: 'storage.host',
       code: 'STORAGE_HOST_DISPOSE_FAILED'
     })
     expect(failure.errors[0].cause).toBe(original)
@@ -339,7 +339,7 @@ describe('neutral storage installation', () => {
         report
       }).catch((error) => error)
       expect(failure).toMatchObject({
-        source: '@migaia/storage-host',
+        source: 'storage.host',
         code: 'BACKEND_INSTALL_FAILED'
       })
       /** Walk only the bounded existing cause chain to identify the primary semantic rejection. */
