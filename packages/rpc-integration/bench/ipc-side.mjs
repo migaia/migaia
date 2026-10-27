@@ -36,18 +36,12 @@ export async function runIpcSide(unit, side, options = {}) {
       typeof Deno !== 'undefined' ||
       process.versions.bun ||
       !['stdio-framed', 'worker'].includes(unit.carrier) ||
-      unit.wire === 'jsonrpc' ||
       (unit.peerRuntime && unit.peerRuntime !== 'node') ||
       unit.topology ||
       unit.direction === 'reverse' ||
       options.check)
   )
     throw new TypeError(IpcBenchErrorText.diagnosticMode)
-  if (unit.carrier === 'browser-worker') {
-    /** Chromium owns its actual endpoint processes; this Node parent is only the driver. */
-    const { runBrowserSide } = await import('./browser-side.mjs')
-    return runBrowserSide(unit, side, options)
-  }
   /** The exact shared admission stops preparation before starting a peer or a measured window. */
   const { admitConformanceToolchains } =
     await import('../../rpc-plugin-process/test/process/fixtures/conformance-toolchains.mjs')
@@ -76,7 +70,7 @@ export async function runIpcSide(unit, side, options = {}) {
   let receipt
   /** Each started native profiler is stopped even when an actual exchange fails. */
   let parentCapturing = false
-  /** Peer capture uses the same separate observation channel, without adding any RPC method. */
+  /** Peer capture stays outside business timing; process peers use the existing OOB channel. */
   let peerCapturing = false
   /** The local observer serializes failures identically to the OOB peer response. */
   const readDiagnostic = (value) => {
@@ -202,7 +196,7 @@ export async function runIpcSide(unit, side, options = {}) {
       peerPid: session.peerPid,
       encodedBytes: Buffer.byteLength(JSON.stringify(payload)),
       concurrency: unit.concurrency,
-      warmup: options.warmup ?? 100,
+      warmup: options.check ? 0 : (options.warmup ?? 100),
       toolchains: admission,
       foreignExecutable: session.foreignExecutable ?? null
     }
@@ -241,7 +235,9 @@ export async function runIpcSide(unit, side, options = {}) {
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
   /** JSON argument contains configuration only; authentication never appears in this interface. */
-  const input = JSON.parse(process.argv[2])
+  const check = process.argv[2] === '--check'
+  const input = JSON.parse(process.argv[check ? 3 : 2])
+  if (check) input.options = { ...input.options, check: true }
   runIpcSide(input.unit, input.side, input.options).then(
     (receipt) => console.log(JSON.stringify(receipt)),
     (error) => {

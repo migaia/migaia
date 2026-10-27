@@ -195,10 +195,9 @@ export function judgeBaselineRegression(rounds, baseline, noiseBand) {
   /** Nearest rank is recomputed from full samples, including original browser clock observations. */
   const ratiosByRound = rounds.map(({ bare, rpc }) => {
     /** Browser clock resolution can produce genuine zero samples; no sample is clamped or removed. */
-    const options = { allowClockResolutionZero: bare.unit.carrier === 'browser-worker' }
-    const denominator = nearestRank(bare.latenciesNs, 0.5, options)
+    const denominator = nearestRank(bare.latenciesNs, 0.5)
     if (!(denominator > 0)) throw new Error(IpcBenchErrorText.paired)
-    return nearestRank(rpc.latenciesNs, 0.5, options) / denominator
+    return nearestRank(rpc.latenciesNs, 0.5) / denominator
   })
   /** Three original pairs determine the median without selecting a favorable launch. */
   const candidateRatio = orderStatistic(ratiosByRound, 1)
@@ -642,13 +641,11 @@ async function pairedMain() {
   const { tmpdir } = await import('node:os')
   const { createHash } = await import('node:crypto')
   /** Inventory bytes and selected IDs are preserved before a subprocess launches. */
-  const inventoryBytes = await readFile(
-    new URL(scenario === 'deno' ? './deno-units.json' : './support-units.json', import.meta.url)
-  )
+  const inventoryBytes = await readFile(new URL('./support-units.json', import.meta.url))
   const inventory = JSON.parse(inventoryBytes)
   /** Concurrent floors are already registered alongside their exact carriers and payloads. */
   const candidates = scenario === 'concurrency' ? inventory.concurrentUnits : inventory.units
-  if (!['sequential', 'concurrency', 'deno'].includes(scenario) || !candidates?.length)
+  if (!['sequential', 'concurrency'].includes(scenario) || !candidates?.length)
     throw new Error(IpcBenchErrorText.inventory)
   /** A selected missing ID is a configuration failure, never an empty successful matrix. */
   const units = selectedId ? candidates.filter((unit) => unit.id === selectedId) : candidates
@@ -673,8 +670,8 @@ async function pairedMain() {
           new URL(freezeSdk ? './frozen-baseline.json' : './public-baseline.json', import.meta.url)
         )
       )
-  /** New final-source values live separately from the immutable 76-cell pre-program baseline. */
-  const needsSdk = scenario === 'concurrency' || scenario === 'deno'
+  /** New final-source values live separately from the retained historical native baseline. */
+  const needsSdk = scenario === 'concurrency'
   const sdkBaseline =
     needsSdk && !prepare && !freezeSdk
       ? JSON.parse(await readFile(new URL('./sdk-baseline.json', import.meta.url)))
@@ -692,8 +689,7 @@ async function pairedMain() {
       units.some((unit) => !sdkBaseline.cells[unit.id] || !noise.sdkCells?.[unit.id]))
   )
     throw new Error(IpcBenchErrorText.paired)
-  if (!prepare && scenario !== 'deno')
-    for (const unit of units) resolveBaselineGuard(unit.id, baseline, noise)
+  if (!prepare) for (const unit of units) resolveBaselineGuard(unit.id, baseline, noise)
   if (
     !prepare &&
     (!inventory.frozen || units.some((unit) => unit.status !== 'supported' || !unit.evidence))
@@ -750,7 +746,7 @@ async function pairedMain() {
         unit,
         rounds,
         ...(freezeSdk && !prepare ? { sdkFreeze: 'unfrozen-candidate' } : {}),
-        ...(scenario !== 'deno' && !prepare
+        ...(!prepare
           ? { w3Reference: freezeSdk ? IpcW3Reference.historical : IpcW3Reference.public }
           : {}),
         inventorySHA256: createHash('sha256').update(inventoryBytes).digest('hex')
@@ -798,11 +794,7 @@ function judgePairedUnit(unit, rounds, context) {
         scenario === 'concurrency' ? 'concurrency' : unit.payloadBytes <= 1024 ? 'small' : 'large',
         unit.throughputFloor,
         {
-          ...(scenario === 'deno'
-            ? {}
-            : {
-                ...resolveBaselineGuard(unit.id, baseline, noise)
-              }),
+          ...resolveBaselineGuard(unit.id, baseline, noise),
           ...(sdkBaseline
             ? {
                 sdk: {
@@ -840,7 +832,7 @@ function readPairedInvocation(args) {
     else if (args[index] === '--output') output = args[++index]
     else if (args[index] === '--noise') noisePath = args[++index]
     else if (args[index] === '--freeze-sdk') freezeSdk = true
-    else if (args[index] === '--prepare') prepare = true
+    else if (args[index] === '--prepare' || args[index] === '--check') prepare = true
     else if (args[index] === '--list') list = true
     else throw new Error(IpcBenchErrorText.inventory)
   }

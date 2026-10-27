@@ -13,19 +13,7 @@ const candidates = [
   { executable: process.execPath, runtime: 'node', carrier: 'socket-framed', codec: 'json' },
   { executable: process.execPath, runtime: 'node', carrier: 'worker', codec: 'identity' },
   { executable: 'bun', runtime: 'bun', carrier: 'stdio-framed', codec: 'json' },
-  { executable: 'bun', runtime: 'bun', carrier: 'socket-framed', codec: 'json' },
-  ...['node', 'bun'].flatMap((runtime) =>
-    ['python', 'rust', 'go'].flatMap((peerRuntime) =>
-      ['stdio-content-length', 'socket-content-length'].map((carrier) => ({
-        executable: runtime === 'node' ? process.execPath : 'bun',
-        runtime,
-        peerRuntime,
-        wire: 'jsonrpc',
-        carrier,
-        codec: 'json'
-      }))
-    )
-  )
+  { executable: 'bun', runtime: 'bun', carrier: 'socket-framed', codec: 'json' }
 ]
 
 /** Complete deterministic receipts test the ratio oracle without running real performance work. */
@@ -139,7 +127,7 @@ describe('IPC pairing contract', () => {
       [64, 1024, 65536, 1048576].map((payloadBytes) => ({ ...candidate, payloadBytes }))
     )
   )(
-    'starts independent $runtime $carrier $peerRuntime $payloadBytes bare/RPC endpoints',
+    'starts independent $runtime $carrier $payloadBytes bare/RPC endpoints',
     async (candidate) => {
       const unit = { ...candidate, payloadBytes: candidate.payloadBytes, concurrency: 1 }
       for (const side of ['bare', 'rpc']) {
@@ -147,12 +135,13 @@ describe('IPC pairing contract', () => {
           candidate.executable,
           [
             new URL('../../bench/ipc-side.mjs', import.meta.url).pathname,
-            JSON.stringify({ unit, side, options: { check: true } })
+            '--check',
+            JSON.stringify({ unit, side })
           ],
           { timeout: 15000 }
         )
         const result = JSON.parse(stdout)
-        expect(result).toMatchObject({ type: 'ipc-preparation', echoes: 3, side, unit })
+        expect(result).toMatchObject({ type: 'ipc-preparation', echoes: 3, warmup: 0, side, unit })
         expect(result.parentPid).toBeGreaterThan(0)
         if (candidate.carrier === 'worker') expect(result.peerPid).toBe(result.parentPid)
         else expect(result.peerPid).not.toBe(result.parentPid)
@@ -168,6 +157,32 @@ describe('IPC pairing contract', () => {
     },
     30000
   )
+
+  it('lists only current native carriers for preparation', async () => {
+    /** Listing reads the actual CLI inventory and cannot start a measured side. */
+    const { stdout } = await execute(process.execPath, [
+      new URL('../../bench/ipc.mjs', import.meta.url).pathname,
+      '--list'
+    ])
+    /** Retired browser and JSON-RPC cells cannot reach the default preparation loop. */
+    const listed = JSON.parse(stdout)
+    expect(
+      listed.units.every((unit: { carrier: string }) =>
+        ['stdio-framed', 'socket-framed', 'worker'].includes(unit.carrier)
+      )
+    ).toBe(true)
+    /** Direct invocation cannot recover the retired browser measurement implementation. */
+    const failed = await execute(process.execPath, [
+      new URL('../../bench/ipc-side.mjs', import.meta.url).pathname,
+      '--check',
+      JSON.stringify({
+        unit: { carrier: 'browser-worker', payloadBytes: 64, concurrency: 1 },
+        side: 'rpc'
+      })
+    ]).catch((error: { code: number; stdout: string; stderr: string }) => error)
+    expect(failed).toMatchObject({ code: 1, stdout: '' })
+    expect(JSON.parse(failed.stderr).error.message).toBe('Undelivered carrier: browser-worker')
+  })
 
   it('keeps bench explicit and within fmt/lint paths', async () => {
     const manifest = JSON.parse(

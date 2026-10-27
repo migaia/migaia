@@ -823,11 +823,42 @@ export async function runRoadmap(args) {
   return recomputeRoadmap(options.output)
 }
 
+/**
+ * Check the retained native fixture without selecting a historical base or recording timing.
+ *
+ * @returns {Promise<object>} Three exact echoes per native side with actual endpoint PIDs.
+ * @throws {unknown} Original native setup, exchange or cleanup error.
+ */
+async function checkRoadmap() {
+  /** The same IPC runner owns current public installation and native close. */
+  const { runIpcSide } = await import('../../bench/ipc-side.mjs')
+  /** Only the two original roadmap cells are exercised; no new matrix is introduced. */
+  const inventory = JSON.parse(
+    await readFile(new URL('../../bench/support-units.json', import.meta.url), 'utf8')
+  )
+  /** Compact check receipts retain the exact independent native role identities. */
+  const sides = []
+  for (const id of unitIds) {
+    const unit = inventory.units.find((candidate) => candidate.id === id)
+    for (const side of ['bare', 'rpc']) {
+      const receipt = await runIpcSide(unit, side, { check: true })
+      sides.push({
+        id,
+        side,
+        echoes: receipt.echoes,
+        parentPid: receipt.parentPid,
+        peerPid: receipt.peerPid
+      })
+    }
+  }
+  return { type: 'native-roadmap-preparation', timing: false, sides }
+}
+
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url))
-  runRoadmap(process.argv.slice(2)).then(
+  (process.argv[2] === '--check' ? checkRoadmap() : runRoadmap(process.argv.slice(2))).then(
     (summary) => {
       console.log(JSON.stringify(summary))
-      if (!summary.complete) process.exitCode = 1
+      if (summary.complete === false) process.exitCode = 1
     },
     (error) => {
       console.error(JSON.stringify(classifyTree(error)))

@@ -38,7 +38,7 @@ node "$(git rev-parse --path-format=absolute --git-common-dir)/../scripts/exclus
 | `test:coverage:family`         | 合并九个测试 owner：contract、Host、六个 plugin 包与本私有工作区；覆盖八个当前运行时源码 owner，迁出的协程测试在新 owner 统计。                            |
 | `typecheck` / `typecheck:test` | 对测试、bench 和配置做类型检查（本包没有 `src` 运行时代码，两者检查同一份配置）。                                                                          |
 | `fmt` / `lint`                 | 格式化和 lint 测试、bench 与 vitest 配置。                                                                                                                 |
-| `bench:ipc` / `bench:probe`    | IPC 性能测量驱动，见[第 6 节](#6-性能测量)。                                                                                                               |
+| `bench:ipc`                    | IPC 性能测量驱动，见[第 6 节](#6-性能测量)。                                                                                                               |
 
 仓库根目录也提供简写：`pnpm @rpc-integration <脚本>`。
 

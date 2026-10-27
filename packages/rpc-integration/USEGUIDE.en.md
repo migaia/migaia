@@ -38,7 +38,7 @@ node "$(git rev-parse --path-format=absolute --git-common-dir)/../scripts/exclus
 | `test:coverage:family`         | Runs nine test owners together: contract, Host, six plugin packages, and this private integration workspace. Coverage includes the eight current runtime source owners; moved coroutine tests are counted at their new owner.                                        |
 | `typecheck` / `typecheck:test` | Type-check the tests, benches and configuration (this package has no runtime `src`, so both check the same configuration).                                                                                                                                           |
 | `fmt` / `lint`                 | Format and lint the tests, benches and vitest configurations.                                                                                                                                                                                                        |
-| `bench:ipc` / `bench:probe`    | IPC measurement drivers; see [section 6](#6-performance-measurement).                                                                                                                                                                                                |
+| `bench:ipc`                    | IPC measurement drivers; see [section 6](#6-performance-measurement).                                                                                                                                                                                                |
 
 The repository root also offers a shortcut: `pnpm @rpc-integration <script>`.
 

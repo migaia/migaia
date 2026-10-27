@@ -1,21 +1,3 @@
-/** Stable assertion diagnostics consumed by the offline canonical FD fixture loader. */
-export const IpcBenchPreparationText = Object.freeze({
-  /** Missing function boundaries prevent loading a partial or unrelated fixture. */
-  fdDeclarationMissing: 'Canonical FD fixture declaration missing',
-  /** Every runtime import referenced by the erased body must match its maintained preamble. */
-  fdImportsDrifted: 'Canonical FD fixture imports drifted from benchmark preamble'
-})
-
-/** Private cold messages transfer the separate observation port before runtime endpoint startup. */
-export const IpcBenchControl = Object.freeze({
-  /** The native launcher transfers this port before its channel factory consumes the actual ACK. */
-  observation: 'ipc-bench-observation',
-  /** This marker travels only on the observation port, never through an RPC transport. */
-  ready: 'ipc-bench-observation-ready',
-  /** Bun snapshot requests run only at cold boundaries outside the measured business window. */
-  snapshot: 'bench.snapshot'
-})
-
 /** Peer heap evidence is opt-in and remains separate from ordinary timing diagnostics. */
 export const IpcBenchObservation = Object.freeze({
   /** Only the ignored soak driver enables explicit peer collection at snapshot boundaries. */
@@ -97,26 +79,6 @@ export const IpcBenchDiagnostic = Object.freeze({
     'V8 allocation samples including collected objects and OOB control work; excludes external/native allocation; not exact event counts'
 })
 
-/** Explicit revision-2 stage modes retain the original probe CLI behavior when omitted. */
-export const IpcProbeBenchStages = Object.freeze({
-  /** One CLI option selects a fixed stage set for both Core and genuine collector arms. */
-  option: '--stage-mode',
-  /** Actual parent, Worker and process isolates inherit this same fixture selection. */
-  environment: 'PROBE_BENCH_STAGE_MODE',
-  /** Production collector defaults are exercised without supplying a stages override. */
-  default: 'default',
-  /** Explicit physical-stage measurements report small-cell overhead without changing guards. */
-  all: 'all',
-  /** Omitted selection preserves revision-1 all-stage fixed-budget CLI behavior. */
-  legacy: 'legacy-all',
-  /** This declared default is shared by the near-noop Core sink and collector mask assertion. */
-  defaultStages: Object.freeze(['message', 'peer']),
-  /** Report receipts distinguish optional small-cell overhead from fixed acceptance budgets. */
-  reportOnly: 'REPORT_ONLY',
-  /** Default-stage cells and every 1 MiB cell retain the fixed acceptance budgets. */
-  fixedBudget: 'FIXED_BUDGET'
-})
-
 /**
  * Frozen reference ownership is retained in every baseline result so primitive history stays
  * distinct.
@@ -131,47 +93,10 @@ export const IpcW3Reference = Object.freeze({
   public: 'public-peer'
 })
 
-/**
- * Fixed supplemental graphs declare their actual carriers and methods without changing budget
- * cells.
- */
+/** Native benchmark methods are provided by the current public Host fixtures. */
 export const RuntimeBench = Object.freeze({
-  /** Worker itself issues and times reverse calls through the independently accepted parent route. */
-  reverse: 'reverse',
-  /** All supplemental and original native providers keep the same scalar echo method. */
+  /** Every RPC side proves a complete scalar request and response on the current native protocol. */
   echo: 'bench.echo',
-  /** Diagnostic probes distinguish reverse execution from the parent's trigger request. */
-  reverseProbe: 'bench.reverseProbe',
-  /** One trigger starts a full original 100/1000 measurement inside the real Worker isolate. */
-  measure: 'bench.measure',
-  /** Host-owned native Worker uses the same physical message carrier as the original Worker cell. */
-  managed: 'managed',
-  /** Relay is a process with an independently owned Worker leaf, preserving strict source selection. */
-  oneHop: 'one-hop',
-  /** Actual mixed topology has one byte hop and one native message hop. */
-  mixedCarrier: 'stdio-framed+worker',
-  /** The public compiled route addresses the relay's real leaf connection. */
-  forwardedEcho: 'leaf.bench.echo',
-  /** Private fixture readiness waits for the real relay Host transaction. */
-  ready: 'bench.ready',
-  /** Snapshots remain diagnostic operations outside the measured business window. */
-  snapshot: 'bench.snapshot',
-  /** Explicit leaf withdrawal uses the relay's actual Host before its process is terminated. */
-  releaseLeaf: 'bench.releaseLeaf',
-  /** Caller-created fixture token is bootstrap input and is always redacted from retained stderr. */
-  token: 'runtime-bench-token'
-})
-
-/** Fixed directed-fixture labels are local protocol data, never resource authority. */
-export const CrossRuntimeBench = Object.freeze({
-  /** The original directed fixture bootstrap token remains outside public configuration. */
-  token: 'xrt-local',
-  /** Native TS readiness is consumed before warmup. */
-  ready: 'XRT_READY\n',
-  /** The controlled foreign loop exists only on its Content-Length fixture profile. */
-  reverse: 'peer.reverse',
-  /** Existing independent foreign business handlers keep their published fixture method. */
-  request: 'p.f.request',
-  /** Full raw timing/counter receipts retain the frozen directed inventory seed. */
-  seed: 'xrt-20261009-v1'
+  /** Peer isolate evidence is sampled outside the measured business window. */
+  snapshot: 'bench.snapshot'
 })

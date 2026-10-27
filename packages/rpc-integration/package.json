@@ -13,7 +13,6 @@
     "test:suite-parity": "vitest run --config vitest.suite-parity.config.ts --coverage.enabled=false",
     "test:packed": "pnpm -r --workspace-concurrency=2 --filter @migaia/rpc-contract --filter @migaia/rpc-host --filter @migaia/rpc-plugin-process --filter @migaia/rpc-plugin-thread --filter @migaia/rpc-plugin-browser --filter @migaia/rpc-plugin-coroutines --filter @migaia/rpc-plugin-pool --filter @migaia/rpc-plugin-devtools run build && node test/core/packed-export-smoke.mjs",
     "bench:ipc": "node bench/ipc.mjs",
-    "bench:probe": "node bench/probe.mjs",
     "test:coverage:family": "vitest run --config vitest.family.config.ts --coverage"
   },
   "devDependencies": {
