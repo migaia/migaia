@@ -41,8 +41,6 @@ const migratedFiles: Readonly<Record<string, string>> = {
   'packages/web-rpc/test/adapters/worker-metadata.test.ts':
     'packages/rpc-plugin-browser/test/browser/adapters/worker-metadata.test.ts',
   'packages/web-rpc/test/architecture.test.ts': 'packages/rpc-host/test/core/architecture.test.ts',
-  'packages/web-rpc/test/attachment-normalization.test.ts':
-    'packages/rpc-host/test/core/attachment-normalization.test.ts',
   'packages/web-rpc/test/composed-fanout-contract.test.ts':
     'packages/rpc-host/test/core/composed-fanout-contract.test.ts',
   'packages/web-rpc/test/composed-receiver-identity.test.ts':
@@ -60,67 +58,34 @@ const migratedFiles: Readonly<Record<string, string>> = {
   'packages/web-rpc/test/duplicate-owner-contract.test.ts':
     'packages/rpc-host/test/core/duplicate-owner-contract.test.ts',
   'packages/web-rpc/test/errors.test.ts': 'packages/rpc-host/test/core/errors.test.ts',
-  'packages/web-rpc/test/event-subscriber-compat.test.ts':
-    'packages/rpc-host/test/core/event-subscriber-compat.test.ts',
-  'packages/web-rpc/test/internal-ownership-boundaries.test.ts':
-    'packages/rpc-host/test/core/internal-ownership-boundaries.test.ts',
   'packages/web-rpc/test/internal/async-control.test.ts':
     'packages/rpc-host/test/core/internal/async-control.test.ts',
   'packages/web-rpc/test/internal/chunk.test.ts':
     'packages/rpc-host/test/core/internal/chunk.test.ts',
   'packages/web-rpc/test/internal/contract.test.ts':
     'packages/rpc-host/test/core/internal/contract.test.ts',
-  'packages/web-rpc/test/internal/discovery-registry.test.ts':
-    'packages/rpc-host/test/core/internal/discovery-registry.test.ts',
-  'packages/web-rpc/test/internal/hooks.test.ts':
-    'packages/rpc-host/test/core/internal/hooks.test.ts',
-  'packages/web-rpc/test/internal/id.test.ts': 'packages/rpc-host/test/core/internal/id.test.ts',
-  'packages/web-rpc/test/internal/identity.test.ts':
-    'packages/rpc-host/test/core/internal/identity.test.ts',
-  'packages/web-rpc/test/internal/message-listener-hub.test.ts':
-    'packages/rpc-host/test/core/internal/message-listener-hub.test.ts',
-  'packages/web-rpc/test/internal/operation-scope.test.ts':
-    'packages/rpc-host/test/core/internal/operation-scope.test.ts',
   'packages/web-rpc/test/internal/outbound-sender.test.ts':
     'packages/rpc-host/test/core/internal/outbound-sender.test.ts',
-  'packages/web-rpc/test/internal/pending.test.ts':
-    'packages/rpc-host/test/core/internal/pending.test.ts',
   'packages/web-rpc/test/internal/provider-admission.test.ts':
     'packages/rpc-host/test/core/internal/provider-admission.test.ts',
   'packages/web-rpc/test/internal/provider-executor-result.test.ts':
     'packages/rpc-host/test/core/internal/provider-executor-result.test.ts',
   'packages/web-rpc/test/internal/provider.test.ts':
     'packages/rpc-host/test/core/internal/provider.test.ts',
-  'packages/web-rpc/test/internal/replay.test.ts':
-    'packages/rpc-host/test/core/internal/replay.test.ts',
-  'packages/web-rpc/test/internal/request-replay-ledger.test.ts':
-    'packages/rpc-host/test/core/internal/request-replay-ledger.test.ts',
   'packages/web-rpc/test/internal/resource-scope.test.ts':
     'packages/rpc-host/test/core/internal/resource-scope.test.ts',
   'packages/web-rpc/test/internal/safe-value.test.ts':
     'packages/rpc-host/test/core/internal/safe-value.test.ts',
   'packages/web-rpc/test/internal/web-rpc-plugin-host.test.ts':
     'packages/rpc-host/test/core/internal/web-rpc-plugin-host.test.ts',
-  'packages/web-rpc/test/middleware/abort.test.ts':
-    'packages/rpc-host/test/core/middleware/abort.test.ts',
   'packages/web-rpc/test/middleware/chunk.test.ts':
     'packages/rpc-host/test/core/middleware/chunk.test.ts',
   'packages/web-rpc/test/middleware/contract.test.ts':
     'packages/rpc-host/test/core/middleware/contract.test.ts',
-  'packages/web-rpc/test/middleware/feature.test.ts':
-    'packages/rpc-host/test/core/middleware/feature.test.ts',
-  'packages/web-rpc/test/middleware/hooks.test.ts':
-    'packages/rpc-host/test/core/middleware/hooks.test.ts',
   'packages/web-rpc/test/middleware/middleware.test.ts':
     'packages/rpc-host/test/core/middleware/middleware.test.ts',
-  'packages/web-rpc/test/middleware/ping.test.ts':
-    'packages/rpc-host/test/core/middleware/ping.test.ts',
-  'packages/web-rpc/test/middleware/protocol.test.ts':
-    'packages/rpc-host/test/core/middleware/protocol.test.ts',
   'packages/web-rpc/test/middleware/timeout.test.ts':
     'packages/rpc-host/test/core/middleware/timeout.test.ts',
-  'packages/web-rpc/test/middleware/uuid.test.ts':
-    'packages/rpc-host/test/core/middleware/uuid.test.ts',
   'packages/web-rpc/test/plugin-host/topology-adapter.test.ts':
     'packages/rpc-host/test/core/plugin-host/topology-adapter.test.ts',
   'packages/web-rpc/test/provider-event-delegate.test.ts':
@@ -134,8 +99,6 @@ const migratedFiles: Readonly<Record<string, string>> = {
     'packages/rpc-host/test/core/tree-shaking/slim-attachment-hardening.test.ts',
   'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts':
     'packages/rpc-host/test/core/tree-shaking/static-composition-contracts.test.ts',
-  'packages/web-rpc/test/type-contract.test.ts':
-    'packages/rpc-host/test/core/type-contract.test.ts',
   'packages/web-rpc/test/wire.test.ts': 'packages/rpc-host/test/core/wire.test.ts'
 }
 /** Repository-relative result names distinguish matching titles in different package owners. */
@@ -147,13 +110,712 @@ const repositoryRoot = resolve(packageRoot, '../..')
 
 /** Exact receiver fullNames preserve migrated business; missing reception still fails. */
 const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
+  // These canonical-owner receivers follow the existing migration receipts; removed SDK-only predicates remain retired.
+  'packages/web-rpc/test/duplicate-owner-contract.test.ts::projection and public lifecycle surface projection avoids last-write-wins merge and returns the exact Host Promise':
+    [
+      'packages/rpc-host/test/host/core-baseline.test.ts::public close shares one Promise and retires concurrent calls with one lifecycle error',
+      'packages/rpc-host/test/dispatch/provider-disposal-baseline.test.ts::cold native Host disposal preserves the original Promise before any installation'
+    ],
+  'packages/web-rpc/test/duplicate-owner-contract.test.ts::candidate-specific duplicate-owner contracts delegates rollback ownership to one PluginHost':
+    [
+      'packages/rpc-host/test/host/duplicate-owner-rollback.test.ts::rolls back native resources and public publication without replacing the install cause'
+    ],
+  'packages/web-rpc/test/duplicate-owner-contract.test.ts::candidate-specific duplicate-owner contracts keeps diagnostic cleanup at the Host disposal boundary':
+    [
+      'packages/rpc-host/test/host/core-baseline.test.ts::public failed close preserves its completion identity and original native cleanup cause'
+    ],
+  'packages/web-rpc/test/errors.test.ts::error boundary helpers does not let a hostile code getter escape':
+    [
+      'packages/rpc-contract/test/error-format/boundary-helpers.test.ts::error boundary helpers reports a hostile code getter as PROPERTY_READ_FAILED with the original cause'
+    ],
+  'packages/web-rpc/test/errors.test.ts::error boundary helpers keeps protocol-family error codes distinct':
+    [
+      'packages/rpc-contract/test/error-format/boundary-helpers.test.ts::error boundary helpers keeps protocol-family error codes distinct'
+    ],
+  'packages/web-rpc/test/errors.test.ts::error boundary helpers keeps the (source, code) contract: 38 unique codes and a constant source':
+    [
+      'packages/rpc-contract/test/error-format/boundary-helpers.test.ts::error boundary helpers keeps unique registered codes and a constant source'
+    ],
+  'packages/web-rpc/test/errors.test.ts::error boundary helpers tagWebRpcError keeps the native runtime type while attaching (source, code)':
+    [
+      'packages/rpc-contract/test/error-format/boundary-helpers.test.ts::error boundary helpers tagRpcError keeps the native runtime type while attaching (source, code)'
+    ],
+  'packages/web-rpc/test/errors.test.ts::error boundary helpers uses standard AbortError/TimeoutError names for cross-realm type checks':
+    [
+      'packages/rpc-contract/test/error-format/boundary-helpers.test.ts::error boundary helpers uses standard AbortError/TimeoutError names for cross-realm type checks'
+    ],
+  'packages/web-rpc/test/internal/contract.test.ts::contract error normalization does not let hostile issue getters replace the stable schema error':
+    [
+      'packages/rpc-host/test/plugins/schema/validate.test.ts::contract error normalization does not let hostile issue getters replace the stable schema error'
+    ],
+  'packages/web-rpc/test/internal/contract.test.ts::contract error normalization falls back when the issues collection itself is hostile':
+    [
+      'packages/rpc-host/test/plugins/schema/validate.test.ts::contract error normalization falls back when the issues collection itself is hostile'
+    ],
+  'packages/web-rpc/test/internal/contract.test.ts::contract error normalization ignores absent and non-parser schemas and executes valid parsers':
+    [
+      'packages/rpc-host/test/plugins/schema/validate.test.ts::contract error normalization ignores absent and non-parser schemas and executes valid parsers'
+    ],
+  'packages/web-rpc/test/internal/contract.test.ts::contract error normalization snapshots normal schema issues and filters hostile path elements':
+    [
+      'packages/rpc-host/test/plugins/schema/validate.test.ts::contract error normalization snapshots normal schema issues and filters hostile path elements'
+    ],
+  'packages/web-rpc/test/internal/contract.test.ts::contract error normalization uses a stable fallback for errors without issue arrays':
+    [
+      'packages/rpc-host/test/plugins/schema/validate.test.ts::contract error normalization uses a stable fallback for errors without issue arrays'
+    ],
+  'packages/web-rpc/test/internal/provider-admission.test.ts::ProviderAdmissionRegistry enforces global and per-peer limits and releases leases':
+    [
+      'packages/rpc-host/test/plugins/limits/provider-admission.test.ts::ProviderAdmissionRegistry enforces global and per-peer limits and releases leases'
+    ],
+  'packages/web-rpc/test/internal/provider-admission.test.ts::ProviderAdmissionRegistry rejects non-positive or unsafe admission limits':
+    [
+      'packages/rpc-host/test/plugins/limits/provider-admission.test.ts::ProviderAdmissionRegistry rejects non-positive or unsafe admission limits'
+    ],
+  'packages/web-rpc/test/internal/provider.test.ts::provider registry ownership rejects duplicate providers and clears every callback table':
+    [
+      'packages/rpc-host/test/dispatch/provider-catalog.test.ts::clears the sole provider index and its pending reservations on repeated close'
+    ],
+  'packages/web-rpc/test/internal/resource-scope.test.ts::ResourceScope reaches zero after concurrent releaseAll callers share one result':
+    [
+      'packages/rpc-host/test/host/resource-lifecycle.test.ts::shares the public close Promise and releases an asynchronous resource exactly once'
+    ],
+  'packages/web-rpc/test/internal/resource-scope.test.ts::ResourceScope releases critical transport resources before application disposers':
+    [
+      'packages/rpc-host/test/host/resource-lifecycle.test.ts::releases actual transport resources before application flow disposers'
+    ],
+  'packages/web-rpc/test/internal/resource-scope.test.ts::ResourceScope releases reverse order and aggregates failures':
+    [
+      'packages/rpc-host/test/host/resource-lifecycle.test.ts::releases actual native resources in reverse order and collects exactly one failure'
+    ],
+  'packages/web-rpc/test/internal/resource-scope.test.ts::ResourceScope shares the release promise across concurrent callers':
+    [
+      'packages/rpc-host/test/host/resource-lifecycle.test.ts::shares the public close Promise and releases an asynchronous resource exactly once'
+    ],
+  'packages/web-rpc/test/internal/safe-value.test.ts::safe-value utilities accepts only safe integer values':
+    ['packages/utils/test/safe-value-primitives.test.ts::accepts only safe integer values'],
+  'packages/web-rpc/test/internal/safe-value.test.ts::safe-value utilities contains hostile property getters':
+    [
+      'packages/rpc-contract/test/error-format/guarded-read-policy.test.ts::contains hostile property getters'
+    ],
+  'packages/web-rpc/test/internal/safe-value.test.ts::safe-value utilities contains hostile string conversion and preserves tuple boundaries':
+    [
+      'packages/rpc-contract/test/error-format/safe-string-report.test.ts::contains hostile string conversion and preserves tuple boundaries'
+    ],
+  'packages/web-rpc/test/internal/safe-value.test.ts::safe-value utilities returns a null-prototype dictionary for attacker-controlled keys':
+    [
+      'packages/utils/test/safe-value-primitives.test.ts::returns a null-prototype dictionary for attacker-controlled keys'
+    ],
+  'packages/web-rpc/test/internal/safe-value.test.ts::safe-value utilities reuses the canonical intrinsic brand across realms and subclasses':
+    [
+      'packages/utils/test/bytes.test.ts::reuses the canonical intrinsic brand across realms and subclasses'
+    ],
+  'packages/web-rpc/test/internal/web-rpc-plugin-host.test.ts::WebRPC PluginHost shell keeps fixed kernel-to-activation order and prevents activation after rollback':
+    [
+      'packages/plugin-host/test/async-setup.test.ts::async setup installation rolls setup resources back in reverse order and retains the primary cause'
+    ],
+  'packages/web-rpc/test/internal/web-rpc-plugin-host.test.ts::WebRPC PluginHost shell preserves async and direct-host synchronous rollback identities':
+    [
+      'packages/plugin-host/test/install-failure-detail.test.ts::PluginHost install failure detail preserves async primary and two rollback identities in reverse order when diagnostic throws',
+      'packages/plugin-host/test/install-failure-detail.test.ts::PluginHost install failure detail publishes immutable sync detail and resolves final rollback identities after completion'
+    ],
+  'packages/web-rpc/test/internal/web-rpc-plugin-host.test.ts::WebRPC PluginHost shell uses typed shared symbols and one host rollback transaction':
+    [
+      'packages/plugin-host/test/async-setup.test.ts::async setup installation rolls setup resources back in reverse order and retains the primary cause',
+      'packages/rpc-host/test/host/duplicate-owner-rollback.test.ts::rolls back native resources and public publication without replacing the install cause'
+    ],
+  'packages/web-rpc/test/middleware/chunk.test.ts::canonical framing contract does not retain the former root chunk middleware export':
+    [
+      'packages/rpc-host/test/plugins/chunk/unicode.test.ts::canonical framing contract does not retain the former root chunk middleware export'
+    ],
+  'packages/web-rpc/test/middleware/chunk.test.ts::canonical framing contract frames and reassembles unicode without a WebRPC middleware splitter':
+    [
+      'packages/rpc-host/test/plugins/chunk/unicode.test.ts::canonical framing contract frames and reassembles unicode without a WebRPC middleware splitter'
+    ],
+  'packages/web-rpc/test/middleware/contract.test.ts::contract plugin exposes schema validation through the typed shared result':
+    [
+      'packages/rpc-host/test/plugins/schema/validate.test.ts::Core contract validation exposes schema validation through the typed shared result'
+    ],
+  'packages/web-rpc/test/middleware/contract.test.ts::contract plugin preserves a __proto__ schema method as an own key':
+    [
+      'packages/rpc-host/test/plugins/schema/validate.test.ts::Core contract validation preserves a __proto__ schema method as an own key'
+    ],
+  'packages/web-rpc/test/middleware/middleware.test.ts::middleware capabilities rejects invalid middleware configuration during installation':
+    [
+      'packages/rpc-host/test/features/timeout-config.test.ts::public timeout feature configuration rejects the original negative duration before installation'
+    ],
+  'packages/web-rpc/test/middleware/middleware.test.ts::middleware capabilities rejects null built-in middleware descriptors with INVALID_CONFIG':
+    [
+      'packages/rpc-host/test/features/timeout-config.test.ts::public timeout feature configuration rejects the original null descriptor with INVALID_CONFIG'
+    ],
+  'packages/web-rpc/test/middleware/middleware.test.ts::middleware capabilities rejects unreadable timeout descriptors with INVALID_CONFIG':
+    [
+      'packages/rpc-host/test/features/timeout-config.test.ts::public timeout feature configuration rejects the original unreadable descriptor with INVALID_CONFIG'
+    ],
+  'packages/web-rpc/test/middleware/timeout.test.ts::timeout middleware resolves per-call override before middleware default':
+    [
+      'packages/rpc-host/test/host/core-public.test.ts::executes a supplied complete feature, honors false and rejects numeric policy syntax'
+    ],
+  'packages/web-rpc/test/tree-shaking/retained-allocation-attribution.test.ts::retained and allocation attribution exercises composed discovery and chunk settlement through the shared kernel':
+    [
+      'packages/rpc-host/test/host/middleware-selected-wire.test.ts::preserves the original long echo payload through two real eight-unit chunk peers'
+    ],
+  'packages/web-rpc/test/tree-shaking/retained-allocation-attribution.test.ts::retained and allocation attribution keeps multi-receiver fanout isolated and settles an aborted request once':
+    [
+      'packages/rpc-host/test/host/core-routing.test.ts::RPC namespace routing uses scalar single-target calls and null-prototype zero/multiple-target settlements',
+      'packages/rpc-host/test/call/public-cancellation.test.ts::public request cancellation through the canonical CallTable leaves zero active providers after a local signal.abort() fired synchronously right after send()'
+    ],
+  'packages/web-rpc/test/tree-shaking/retained-allocation-attribution.test.ts::retained and allocation attribution rejects an unauthenticated chunk before allocating assembly, operation, or expiry timer':
+    [
+      'packages/rpc-host/test/host/middleware-selected-wire.test.ts::rejects a forged business signature after real chunk assembly and admits a fresh trusted control'
+    ],
+  'packages/web-rpc/test/tree-shaking/slim-attachment-hardening.test.ts::slim attachment hostile equivalence cancels a pending request on caller abort and endpoint disposal':
+    [
+      'packages/rpc-host/test/call/public-cancellation.test.ts::public request cancellation through the canonical CallTable leaves zero active providers after a local signal.abort() fired synchronously right after send()'
+    ],
+  'packages/web-rpc/test/tree-shaking/slim-attachment-hardening.test.ts::slim attachment hostile equivalence rejects a hostile abort signal with the original cause before sending':
+    [
+      'packages/rpc-host/test/call/public-cancellation.test.ts::preserves hostile caller listener failure cause and cleanup before any business write'
+    ],
+  'packages/web-rpc/test/tree-shaking/slim-attachment-hardening.test.ts::slim attachment hostile equivalence routes caller abort through the verified provider variation owner':
+    [
+      'packages/rpc-host/test/call/public-cancellation.test.ts::preserves started-before-abort and the original cancelled provider result through public namespaces'
+    ],
+  'packages/web-rpc/test/tree-shaking/static-composition-contracts.test.ts::static composition contracts executes a recursive provider request through distinct slim runtimes':
+    [
+      'packages/rpc-host/test/host/middleware-selected-wire.test.ts::preserves the original object echo between two independent public hosts'
+    ],
+  // Existing phase and owner receipts retain these public business receivers; retired private facets receive no credit.
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix production seam preserves canonical owner timing and identities':
+    [
+      'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C146 preserves native terminal cleanup',
+      'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C147 preserves native terminal cleanup',
+      'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C148 preserves native terminal cleanup',
+      'packages/rpc-host/test/host/middleware-selected-wire.test.ts::keeps acquired native subscriptions and concurrent disposal identities without optional legacy roles'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix real transaction baseline: provider RPC and public boundary execute before projection checks':
+    [
+      'packages/rpc-host/test/dispatch/provider-entry-source.test.ts::real transaction baseline: provider RPC executes through its public namespace'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix real transaction: provider success and endpoint-local disposal remain stable':
+    [
+      'packages/rpc-host/test/dispatch/provider-isolation-baseline.test.ts::public provider registration isolation baseline retains provider results and the second registration after closing the first namespace'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix real provider security baseline rejects a forged receiver without execution':
+    [
+      'packages/rpc-host/test/dispatch/provider-entry-source.test.ts::real provider security baseline rejects a forged receiver without execution'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix real provider response baseline preserves native provider error code and residue':
+    [
+      'packages/rpc-host/test/dispatch/provider-entry-source.test.ts::real provider response baseline preserves native provider error code and cause chain'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix real provider abort baseline preserves caller terminal reason and releases controller':
+    [
+      'packages/rpc-host/test/call/provider-cancellation-baseline.test.ts::public provider cancellation baseline preserves the caller DOMException cause and releases the running provider'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix config snapshot baseline reads the provider object once before installation':
+    [
+      'packages/rpc-host/test/dispatch/provider-input-snapshot.test.ts::retains one captured provider after public source mutation'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix later invalid provider entry preserves primary failure and terminal residue':
+    [
+      'packages/rpc-host/test/dispatch/provider-registration.test.ts::rejects the later invalid provider entry and keeps a fresh registration independent',
+      'packages/rpc-host/test/dispatch/provider-disposal-baseline.test.ts::installed native Host disposal preserves its Promise and removes the original subscription',
+      'packages/rpc-host/test/host/duplicate-owner-rollback.test.ts::rolls back native resources and public publication without replacing the install cause'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix real provider snapshot reads outer config and every provider entry once':
+    [
+      'packages/rpc-host/test/dispatch/provider-input-snapshot.test.ts::retains three captured providers and their results after public source mutation'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix actual provider endpoint isolation and terminal removal preserve independent identity':
+    [
+      'packages/rpc-host/test/dispatch/provider-isolation-baseline.test.ts::public provider registration isolation baseline removes only the closed provider registration and retains both close Promise identities'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix provider cancellation reuses the existing verified abort path and releases terminal state':
+    [
+      'packages/rpc-host/test/call/provider-cancellation-baseline.test.ts::public provider cancellation baseline repeated caller abort preserves the cause, releases work and retains its one provider'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix hostile provider-map getter at first position preserves failedName and original cause':
+    [
+      'packages/rpc-host/test/dispatch/provider-disposal-baseline.test.ts::installed native Host disposal preserves its Promise and removes the original subscription',
+      'packages/rpc-host/test/host/duplicate-owner-rollback.test.ts::rolls back native resources and public publication without replacing the install cause'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix hostile provider-map getter at middle position preserves failedName and original cause':
+    [
+      'packages/rpc-host/test/dispatch/provider-disposal-baseline.test.ts::installed native Host disposal preserves its Promise and removes the original subscription',
+      'packages/rpc-host/test/host/duplicate-owner-rollback.test.ts::rolls back native resources and public publication without replacing the install cause'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix hostile provider-map getter at last position preserves failedName and original cause':
+    [
+      'packages/rpc-host/test/dispatch/provider-disposal-baseline.test.ts::installed native Host disposal preserves its Promise and removes the original subscription',
+      'packages/rpc-host/test/host/duplicate-owner-rollback.test.ts::rolls back native resources and public publication without replacing the install cause'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix Host-installed provider verifies receiver admission before execution':
+    [
+      'packages/rpc-host/test/dispatch/provider-ingress-results.test.ts::accepted provider ingress checks receiver identity before a second execution'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix Host-installed replay ledger suppresses duplicate task execution':
+    [
+      'packages/rpc-host/test/dispatch/provider-admission-replay.test.ts::installed replay suppresses a completed task repeated at actual ingress'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix Host-installed dispatch-only execution sends no response':
+    [
+      'packages/rpc-host/test/dispatch/provider-ingress-results.test.ts::accepted notify executes once without any correlated physical terminal'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix Host-installed missing provider returns the canonical not-found response':
+    [
+      'packages/rpc-host/test/dispatch/provider-ingress-results.test.ts::accepted physical ingress returns the original missing-provider error code'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix Host-installed reentrant duplicate request remains idempotent':
+    [
+      'packages/rpc-host/test/dispatch/provider-admission-replay.test.ts::installed replay preserves one execution for the original reentrant task'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix concurrent Host endpoints preserve endpoint-local provider identity':
+    [
+      'packages/rpc-host/test/dispatch/provider-isolation-baseline.test.ts::public provider registration isolation baseline keeps concurrent provider executions on their original endpoint-local identities'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix Host-installed async provider rejection preserves terminal controller residue':
+    [
+      'packages/rpc-host/test/dispatch/provider-result-error-baseline.test.ts::async provider failure preserves raw reporting and the correlated INTERNAL code'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix Host-installed transfer overflow preserves the native provider failure code':
+    [
+      'packages/rpc-host/test/dispatch/provider-result-error-baseline.test.ts::provider transfer overflow preserves the native contract failure graph and report'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix real Host admission rejects forged source, sender, receiver, and cross-endpoint frames':
+    [
+      'packages/rpc-host/test/dispatch/provider-registration.test.ts::keeps the original execution and single terminal after foreign route and source ingress'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix concurrent duplicate requests preserve replay response uniqueness and controller release':
+    [
+      'packages/rpc-host/test/dispatch/provider-admission-replay.test.ts::concurrent task replay executes once and sends one terminal on its original subscription'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix real Host admission capacity rejects one of 65 concurrent unique tasks and releases all':
+    [
+      'packages/rpc-host/test/dispatch/provider-admission-replay.test.ts::native admission rejects one of65 unique calls and releases all64 running providers'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix real Host schema failure preserves serialized native identity and residue':
+    [
+      'packages/rpc-host/test/dispatch/provider-result-error-baseline.test.ts::params schema failure preserves the serialized native family and parser cause'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix late provider rejection reports the original error and releases operation state':
+    [
+      'packages/rpc-host/test/dispatch/provider-result-error-baseline.test.ts::async provider failure preserves raw reporting and the correlated INTERNAL code'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix canonical endpoint disposal preserves Promise identity and terminal provider residue':
+    [
+      'packages/rpc-host/test/dispatch/provider-disposal-baseline.test.ts::provider failure preserves INTERNAL and complete RPC Root close identity and completion'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix two real Host transactions isolate cross-endpoint and post-removal requests':
+    [
+      'packages/rpc-host/test/dispatch/provider-registration.test.ts::isolates two original provider endpoints and prevents execution or replies after removal',
+      'packages/rpc-host/test/dispatch/provider-disposal-baseline.test.ts::installed native Host disposal preserves its Promise and removes the original subscription'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix synchronous provider failure preserves raw report identity and terminal release':
+    [
+      'packages/rpc-host/test/dispatch/provider-result-error-baseline.test.ts::sync provider failure preserves raw reporting and the correlated INTERNAL code'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix post-terminal late resolve has no response and leaves no provider state':
+    [
+      'packages/rpc-host/test/dispatch/provider-disposal-baseline.test.ts::installed native Host disposal preserves its Promise and removes the original subscription',
+      'packages/rpc-host/test/dispatch/provider-result-error-baseline.test.ts::post-terminal late resolve preserves reports and sends no response'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix post-terminal late reject reports the distinct raw primary without a response':
+    [
+      'packages/rpc-host/test/dispatch/provider-disposal-baseline.test.ts::installed native Host disposal preserves its Promise and removes the original subscription',
+      'packages/rpc-host/test/dispatch/provider-result-error-baseline.test.ts::post-terminal late reject preserves reports and sends no response'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix result schema failure retains raw cause in serialized error graph':
+    [
+      'packages/rpc-host/test/dispatch/provider-result-error-baseline.test.ts::result schema failure preserves the serialized native family and parser cause'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix synchronous provider WebRPC error serializes primary and cause across the real seam':
+    [
+      'packages/rpc-host/test/dispatch/provider-result-error-baseline.test.ts::sync provider RpcError preserves the primary graph, native cause and exact report',
+      'packages/rpc-host/test/dispatch/provider-disposal-baseline.test.ts::installed native Host disposal preserves its Promise and removes the original subscription'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix asynchronous provider WebRPC error serializes primary and cause across the real seam':
+    [
+      'packages/rpc-host/test/dispatch/provider-result-error-baseline.test.ts::async provider RpcError preserves the primary graph, native cause and exact report',
+      'packages/rpc-host/test/dispatch/provider-disposal-baseline.test.ts::installed native Host disposal preserves its Promise and removes the original subscription'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix post-terminal late WebRPC rejection reports native cause identity without response':
+    [
+      'packages/rpc-host/test/dispatch/provider-disposal-baseline.test.ts::installed native Host disposal preserves its Promise and removes the original subscription',
+      'packages/rpc-host/test/dispatch/provider-result-error-baseline.test.ts::post-terminal late native-reject preserves reports and sends no response'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix invalid provider transfer shape preserves native contract failure and release':
+    [
+      'packages/rpc-host/test/dispatch/provider-disposal-baseline.test.ts::installed native Host disposal preserves its Promise and removes the original subscription',
+      'packages/rpc-host/test/dispatch/provider-result-error-baseline.test.ts::provider transfer shape preserves the native contract failure graph and report'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix params schema failure preserves exact parser cause in serialized graph':
+    [
+      'packages/rpc-host/test/dispatch/provider-result-error-baseline.test.ts::params schema failure preserves the serialized native family and parser cause'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix transfer overflow preserves native failure identity and requires serialized error graph':
+    [
+      'packages/rpc-host/test/dispatch/provider-disposal-baseline.test.ts::installed native Host disposal preserves its Promise and removes the original subscription',
+      'packages/rpc-host/test/dispatch/provider-result-error-baseline.test.ts::provider transfer overflow preserves the native contract failure graph and report'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix providerCancellation aborts an active Host-installed task by task id':
+    [
+      'packages/rpc-host/test/dispatch/provider-signal-terminal.test.ts::active repeated caller cancellation aborts the original provider exactly once'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix providerCancellation rejects cross-endpoint task control and isolates release':
+    [
+      'packages/rpc-host/test/dispatch/provider-signal-terminal.test.ts::caller cancellation stays isolated between two independently installed provider Hosts'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix providerCancellation after completion is idempotent and preserves Host disposal identity':
+    [
+      'packages/rpc-host/test/dispatch/provider-disposal-baseline.test.ts::installed native Host disposal preserves its Promise and removes the original subscription'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix repeated same-tick providerCancellation aborts one controller exactly once':
+    [
+      'packages/rpc-host/test/dispatch/provider-signal-terminal.test.ts::active repeated caller cancellation aborts the original provider exactly once'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix providerCancellation late resolve emits no response and releases canonical state':
+    [
+      'packages/rpc-host/test/dispatch/provider-signal-terminal.test.ts::caller cancellation late resolve emits only its CANCELLED terminal and no failure report'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix providerCancellation late reject reports the raw error without a second response':
+    [
+      'packages/rpc-host/test/dispatch/provider-signal-terminal.test.ts::caller cancellation late reject reports the original error with only its CANCELLED terminal'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix caller primitive abort reason remains exact on the endpoint-owned path':
+    [
+      'packages/rpc-host/test/call/provider-cancellation-baseline.test.ts::public provider cancellation baseline preserves the primitive caller cause and both original namespace close Promises'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix real provider completion releases one identity admission lease before terminal disposal':
+    [
+      'packages/rpc-host/test/dispatch/provider-disposal-baseline.test.ts::installed native Host disposal preserves its Promise and removes the original subscription'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix repeated shared-port cancellation and late settlement release one identity lease':
+    [
+      'packages/rpc-host/test/dispatch/provider-disposal-baseline.test.ts::installed native Host disposal preserves its Promise and removes the original subscription'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix provider failure releases one identity admission lease and preserves the raw report':
+    [
+      'packages/rpc-host/test/dispatch/provider-admission-release-baseline.test.ts::reports the original provider failure once with INTERNAL through its public diagnostic owner',
+      'packages/rpc-host/test/dispatch/provider-disposal-baseline.test.ts::installed native Host disposal preserves its Promise and removes the original subscription'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix duplicate identity observation registration uses tokens and unregisters fail-closed':
+    [
+      'packages/rpc-host/test/dispatch/provider-disposal-baseline.test.ts::installed native Host disposal preserves its Promise and removes the original subscription'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix built declarations and package exports hide the identity observer callables':
+    [
+      'packages/rpc-host/test/host/exports.test.ts::publishes exactly the final Host package entries and runtime symbols'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix owned provider transport closes once after successful canonical disposal':
+    [
+      'packages/rpc-host/test/dispatch/provider-disposal-baseline.test.ts::installed native Host disposal preserves its Promise and removes the original subscription'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix borrowed provider transport remains open after repeated canonical disposal':
+    [
+      'packages/rpc-plugin-browser/test/browser/plugin.test.ts::runs bidirectional scalar and stream calls over a borrowed window source',
+      'packages/rpc-plugin-browser/test/browser/plugin.test.ts::runs bidirectional scalar and stream calls over a borrowed shared source',
+      'packages/rpc-plugin-browser/test/browser/plugin.test.ts::runs bidirectional scalar and stream calls over a borrowed rtc source'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix unchanged discovery/control consumers run through the ordered provider bridge transaction':
+    [
+      'packages/rpc-host/test/host/middleware-close-owner.test.ts::native flow result disposer runs once at terminal cleanup'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix provider and adjacent-consumer artifacts expose the final removed provider-bridge boundary':
+    [
+      'packages/rpc-host/test/host/exports.test.ts::publishes exactly the final Host package entries and runtime symbols'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix chunk is an explicitly inventoried provider-bridge consumer with canonical assembly ownership':
+    [
+      'packages/rpc-host/test/dispatch/provider-control-cleanup.test.ts::sends the original non-empty Unicode payload through the actual chunk provider path'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix terminal disposal leaves no provider-bridge compatibility installation':
+    [
+      'packages/rpc-host/test/dispatch/provider-disposal-baseline.test.ts::installed native Host disposal preserves its Promise and removes the original subscription'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix superseded missing-member injection has no internal export seam':
+    [
+      'packages/rpc-host/test/host/exports.test.ts::publishes exactly the final Host package entries and runtime symbols'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix superseded prototype injection has no packed deep-import seam':
+    [
+      'packages/rpc-host/test/host/exports.test.ts::publishes exactly the final Host package entries and runtime symbols'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix cross-endpoint final composition has no compatibility publication':
+    [
+      'packages/rpc-host/test/dispatch/provider-disposal-baseline.test.ts::separate native Hosts keep consumer ping absent and both disposal identities without failures'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix Host disposal removes all final outbound compatibility residue':
+    [
+      'packages/rpc-host/test/dispatch/provider-disposal-baseline.test.ts::installed native Host disposal preserves its Promise and removes the original subscription'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix composed discovery schedules and clears its exact timer through the endpoint time port':
+    [
+      'packages/rpc-host/test/host/middleware-close-owner.test.ts::native flow result disposer runs once at terminal cleanup'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix admitted-unpublished control publication fails with the same Host transaction evidence':
+    [
+      'packages/rpc-host/test/host/middleware-native-rollback-order.test.ts::releases authentication/connect resources in exact reverse order once',
+      'packages/rpc-host/test/host/middleware-native-installation.test.ts::native Feature install failure rolls back without retaining Host residue'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix terminal control disposal removes narrow shared state exactly once':
+    [
+      'packages/rpc-host/test/host/middleware-cleanup-boundaries.test.ts::releases native protocol resources exactly once on success and failure, and preserves factory disposal identity'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix successful control transaction preserves canonical cleanup and repeated Host Promise identity':
+    [
+      'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C146 preserves native terminal cleanup',
+      'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C147 preserves native terminal cleanup',
+      'packages/rpc-host/test/host/middleware-native-installation.test.ts::RPC-TEST-FB075BDD690B-C148 preserves native terminal cleanup',
+      'packages/rpc-host/test/host/middleware-cleanup-boundaries.test.ts::releases native protocol resources exactly once on success and failure, and preserves factory disposal identity'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix canonical control endpoint disposal exposes the same stable Host and endpoint Promises':
+    [
+      'packages/rpc-host/test/host/middleware-cleanup-boundaries.test.ts::releases native protocol resources exactly once on success and failure, and preserves factory disposal identity'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix canonical control ping abort and timeout preserve peer and terminal isolation':
+    [
+      'packages/rpc-host/test/host/middleware-close-owner.test.ts::native flow result disposer runs once at terminal cleanup'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix canonical control endpoint translates two cleanup leaves on one transaction':
+    [
+      'packages/rpc-host/test/dispatch/provider-control-cleanup.test.ts::factory Root close preserves two acquired cleanup errors and reverse release order'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix concurrent reused control modules preserve independent endpoint snapshots':
+    [
+      'packages/rpc-host/test/host/middleware-close-owner.test.ts::native flow result disposer runs once at terminal cleanup'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix disposed control endpoint rejects a later operation without reviving state':
+    [
+      'packages/rpc-host/test/host/middleware-close-owner.test.ts::native flow result disposer runs once at terminal cleanup'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix control abort and disposal race leaves no late pending state':
+    [
+      'packages/rpc-host/test/host/middleware-close-owner.test.ts::native flow result disposer runs once at terminal cleanup'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix late control delivery after timeout cannot resettle or revive terminal state':
+    [
+      'packages/rpc-host/test/host/middleware-close-owner.test.ts::native flow result disposer runs once at terminal cleanup'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix endpoint time owner advances control timeout and clears its exact timer':
+    [
+      'packages/rpc-host/test/host/middleware-close-owner.test.ts::native flow result disposer runs once at terminal cleanup'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix keeps one-way sender pending empty and releases receiver admission after physical delivery':
+    [
+      'packages/rpc-host/test/call/one-way-delivery.test.ts::one-way delivery does not wait for business or emit a response and releases its provider lease'
+    ],
+  'packages/web-rpc/test/provider-production-seam.test.ts::provider production-seam matrix preserves a physical one-way rejection before a later delivery':
+    [
+      'packages/rpc-host/test/call/one-way-delivery.test.ts::one-way physical rejection preserves its exact cause before a later real delivery'
+    ],
+  "packages/web-rpc/test/internal/outbound-sender.test.ts::outbound sender encoded type boundary classifies unchunked authentication 'rejects asynchronously' as AUTHENTICATION_FAILED":
+    [
+      'packages/rpc-host/test/plugins/auth/middleware-outbound.test.ts::classifies original outbound authentication that rejects asynchronously before any physical write'
+    ],
+  "packages/web-rpc/test/internal/outbound-sender.test.ts::outbound sender encoded type boundary classifies unchunked authentication 'returns an invalid encoded value' as AUTHENTICATION_FAILED":
+    [
+      'packages/rpc-host/test/plugins/auth/middleware-outbound.test.ts::classifies original outbound authentication that returns an invalid encoded value before any physical write'
+    ],
+  "packages/web-rpc/test/internal/outbound-sender.test.ts::outbound sender encoded type boundary classifies unchunked authentication 'throws synchronously' as AUTHENTICATION_FAILED":
+    [
+      'packages/rpc-host/test/plugins/auth/middleware-outbound.test.ts::classifies original outbound authentication that throws synchronously before any physical write'
+    ],
+  "packages/web-rpc/test/internal/outbound-sender.test.ts::outbound sender encoded type boundary does not send framed messages when authentication 'rejects asynchronously'":
+    [
+      'packages/rpc-host/test/plugins/auth/middleware-outbound.test.ts::classifies original outbound authentication that rejects asynchronously before any physical write'
+    ],
+  "packages/web-rpc/test/internal/outbound-sender.test.ts::outbound sender encoded type boundary does not send framed messages when authentication 'returns an invalid encoded value'":
+    [
+      'packages/rpc-host/test/plugins/auth/middleware-outbound.test.ts::classifies original outbound authentication that returns an invalid encoded value before any physical write'
+    ],
+  "packages/web-rpc/test/internal/outbound-sender.test.ts::outbound sender encoded type boundary does not send framed messages when authentication 'throws synchronously'":
+    [
+      'packages/rpc-host/test/plugins/auth/middleware-outbound.test.ts::classifies original outbound authentication that throws synchronously before any physical write'
+    ],
+  'packages/web-rpc/test/internal/outbound-sender.test.ts::outbound sender encoded type boundary does not send when the selected codec rejects before framing':
+    [
+      'packages/rpc-host/test/call/outbound-encode-baseline.test.ts::rejects the original codec failure selected codec failed before any physical write'
+    ],
+  'packages/web-rpc/test/internal/outbound-sender.test.ts::outbound sender encoded type boundary encodes once and sends every frame produced by the selected framer':
+    [
+      'packages/rpc-host/test/host/middleware-selected-wire.test.ts::keeps selected schema parsing and Unicode fragment boundaries on the actual public pipeline'
+    ],
+  'packages/web-rpc/test/internal/outbound-sender.test.ts::outbound sender encoded type boundary keeps an authentication failure reachable through the sender boundary':
+    [
+      'packages/rpc-host/test/plugins/auth/middleware-outbound.test.ts::keeps the original locally owned authentication failure identity through a public request'
+    ],
+  'packages/web-rpc/test/internal/outbound-sender.test.ts::outbound sender encoded type boundary keeps the owned transfer snapshot through caller mutation and exposes the physical failure cause':
+    [
+      'packages/rpc-host/test/call/outbound-transfer-baseline.test.ts::keeps the owned transfer snapshot through caller mutation and exposes the physical failure cause'
+    ],
+  'packages/web-rpc/test/internal/outbound-sender.test.ts::outbound sender encoded type boundary normalizes a synchronous transport throw into a rejected promise':
+    [
+      'packages/rpc-host/test/host/fanout-operations.test.ts::host direct-target broadcast operations notify transfers an actual native backing through postMessage and preserves native write failure cause'
+    ],
+  'packages/web-rpc/test/internal/outbound-sender.test.ts::outbound sender encoded type boundary preserves a semantic encode error before framing':
+    [
+      'packages/rpc-host/test/call/outbound-encode-baseline.test.ts::preserves a semantic encode error before framing'
+    ],
+  'packages/web-rpc/test/internal/outbound-sender.test.ts::outbound sender encoded type boundary rejects a codec failure before send':
+    [
+      'packages/rpc-host/test/call/outbound-encode-baseline.test.ts::rejects a codec serialization failure before send'
+    ],
+  'packages/web-rpc/test/internal/outbound-sender.test.ts::outbound sender encoded type boundary reports one semantic encode failure before framing or transport send':
+    [
+      'packages/rpc-host/test/call/outbound-encode-baseline.test.ts::rejects the original codec failure frame encode failed before any physical write'
+    ],
+  'packages/web-rpc/test/internal/outbound-sender.test.ts::outbound sender encoded type boundary reports transport failure when any selected frame send fails':
+    [
+      'packages/rpc-host/test/host/middleware-selected-wire.test.ts::reports transport failure from an actual negotiated chunk fragment write'
+    ],
+  'packages/web-rpc/test/internal/outbound-sender.test.ts::outbound sender encoded type boundary snapshots transfer once and sends the owned list only on the unchunked frame':
+    [
+      'packages/rpc-host/test/call/outbound-transfer-baseline.test.ts::snapshots transfer once and sends the owned list only on the unchunked frame'
+    ],
+  'packages/web-rpc/test/internal/provider-executor-result.test.ts::ProviderExecutor result normalization dispatches events to an explicit peer or every peer except the sender':
+    [
+      'packages/rpc-host/test/host/core-public.test.ts::context dispatchTo keeps explicit targeting and excludes its original sender from default peers'
+    ],
+  'packages/web-rpc/test/internal/provider-executor-result.test.ts::ProviderExecutor result normalization executes dispatch-only providers without emitting responses':
+    [
+      'packages/rpc-host/test/dispatch/core-owners.test.ts::C2 ProviderDispatcher / Forwarder / StreamChannel owners executes a dispatch-only provider once without emitting a response'
+    ],
+  'packages/web-rpc/test/internal/provider-executor-result.test.ts::ProviderExecutor result normalization maps provider schema exceptions and invalid dispatch ids without leaking controllers':
+    [
+      'packages/rpc-host/test/dispatch/core-owners.test.ts::C2 ProviderDispatcher / Forwarder / StreamChannel owners preserves schema exceptions and releases the exact completed invocation identity',
+      'packages/rpc-host/test/dispatch/core-owners.test.ts::C2 ProviderDispatcher / Forwarder / StreamChannel owners preserves dispatch-id exceptions and releases the exact completed invocation identity'
+    ],
+  'packages/web-rpc/test/internal/provider-executor-result.test.ts::ProviderExecutor result normalization releases admission and identity when params validation fails':
+    [
+      'packages/rpc-host/test/dispatch/provider-results.test.ts::releases admission and the original request identity when params validation fails'
+    ],
+  'packages/web-rpc/test/internal/provider-executor-result.test.ts::ProviderExecutor result normalization releases admission even when validation failure response cannot be sent':
+    [
+      'packages/rpc-host/test/dispatch/provider-results.test.ts::releases same-session capacity when the validation error reply write fails'
+    ],
+  'packages/web-rpc/test/internal/provider-executor-result.test.ts::ProviderExecutor result normalization returns a stable failure when no provider owns the method':
+    [
+      'packages/rpc-host/test/dispatch/core-owners.test.ts::C2 ProviderDispatcher / Forwarder / StreamChannel owners returns the original stable failure when no provider owns the method'
+    ],
+  'packages/web-rpc/test/internal/provider-executor-result.test.ts::ProviderExecutor result normalization sends branded provider failures without exposing params':
+    [
+      'packages/rpc-host/test/dispatch/core-owners.test.ts::C2 ProviderDispatcher / Forwarder / StreamChannel owners preserves an explicit failure code/message without returning private input'
+    ],
+  'packages/web-rpc/test/internal/provider-executor-result.test.ts::ProviderExecutor result normalization sends branded success data and a frozen transfer snapshot':
+    [
+      'packages/rpc-host/test/dispatch/core-owners.test.ts::C2 ProviderDispatcher / Forwarder / StreamChannel owners unwraps only its own success and sends the original frozen transfer snapshot'
+    ],
+  'packages/web-rpc/test/discovery-attachment-boundaries.test.ts::discovery attachment boundary semantics proves response-wins and dispose-wins terminal races without late re-settlement':
+    [
+      'packages/rpc-host/test/host/core-baseline.test.ts::public close shares one Promise and retires concurrent calls with one lifecycle error'
+    ],
+  // Pure contracts retain the original portable/error assertions under the current package boundary.
+  'packages/rpc-contract/test/acceptance.test.ts::architecture and export boundary publishes only runtime-neutral root/framing exports and dependencies':
+    [
+      'packages/rpc-contract/test/contract/acceptance.test.ts::pure contract acceptance publishes only runtime-neutral pure contract/protocol exports with an explicit dependency allowlist'
+    ],
+  // Current metadata reads and supported portable admission replace the retired envelope snapshot facade.
+  'packages/rpc-contract/test/acceptance.test.ts::hostile normalization snapshots every envelope getter once and fails closed with causes':
+    [
+      'packages/rpc-contract/test/core-wire.test.ts::single RPC wire profile validates original metadata and retains business key order and binary identity',
+      'packages/rpc-host/test/contract/preserve-contract.test.ts::retains the exact original payload getter failure through current preparation',
+      'packages/rpc-contract/test/control/envelope-admission.test.ts::rejects unsupported kinds before routing and refuses the original accessor payload'
+    ],
+  'packages/rpc-contract/test/acceptance.test.ts::portable vectors accepts canonical values and rejects the complete forbidden matrix':
+    [
+      'packages/rpc-contract/test/contract/acceptance.test.ts::pure contract acceptance accepts canonical values and rejects the complete forbidden matrix'
+    ],
+  'packages/rpc-contract/test/acceptance.test.ts::serialized error graphs preserves foreign realm identity, stack, cause order, and aggregate errors':
+    [
+      'packages/rpc-contract/test/contract/acceptance.test.ts::pure contract acceptance preserves foreign realm identity, stack, cause order, and aggregate errors'
+    ],
+  // Fragmentation moved to the optional chunk owner with the original business assertions intact.
+  'packages/rpc-contract/test/acceptance.test.ts::framing matrix covers empty, exact-boundary, fragmentation, order, duplicate, and limits':
+    [
+      'packages/rpc-host/test/plugins/chunk/contract-preservation.test.ts::migrated chunk contract assertions covers empty, exact-boundary, fragmentation, order, duplicate, and limits'
+    ],
+  'packages/rpc-contract/test/acceptance.test.ts::framing matrix prepares native ingress once without reflecting opaque custom frames':
+    [
+      'packages/rpc-host/test/plugins/chunk/contract-preservation.test.ts::preserves single frame-field reads and the exact native getter failure',
+      'packages/rpc-contract/test/api-audit.test.ts::keeps custom physical data opaque at the canonical carrier shell boundary'
+    ],
+  'packages/rpc-contract/test/acceptance.test.ts::framing races and cleanup expires missing fragments and rejects late completion without rebuilding state':
+    [
+      'packages/rpc-host/test/plugins/chunk/contract-preservation.test.ts::migrated chunk contract assertions expires missing fragments and rejects late completion without rebuilding state'
+    ],
+  'packages/rpc-contract/test/acceptance.test.ts::framing races and cleanup isolates sources, bounds concurrency, and keeps cleanup failures secondary':
+    [
+      'packages/rpc-host/test/plugins/chunk/contract-preservation.test.ts::migrated chunk contract assertions isolates sources, bounds concurrency, and keeps cleanup failures secondary'
+    ],
+  'packages/rpc-contract/test/acceptance.test.ts::framing races and cleanup keeps NUL-delimited source/message pairs collision-free and drains resources':
+    [
+      'packages/rpc-host/test/plugins/chunk/contract-preservation.test.ts::migrated chunk contract assertions keeps NUL-delimited source/message pairs collision-free and drains resources'
+    ],
+  'packages/rpc-contract/test/contract.test.ts::rpc-contract reassembles ordered strings and isolates source keys':
+    [
+      'packages/rpc-host/test/plugins/chunk/contract-preservation.test.ts::migrated chunk contract assertions reassembles ordered strings and isolates source keys'
+    ],
+  'packages/rpc-contract/test/contract.test.ts::rpc-contract rejects a complete carrier from the wrong fixed framer profile':
+    [
+      'packages/rpc-host/test/plugins/chunk/contract-preservation.test.ts::migrated chunk contract assertions rejects a complete carrier from the wrong fixed framer profile'
+    ],
+  'packages/rpc-contract/test/contract.test.ts::rpc-contract rejects out-of-order and over-limit binary fragments before semantic decoding':
+    [
+      'packages/rpc-host/test/plugins/chunk/contract-preservation.test.ts::migrated chunk contract assertions rejects out-of-order and over-limit binary fragments before semantic decoding'
+    ],
+  'packages/rpc-contract/test/contract.test.ts::rpc-contract reports expiration and bounds terminal history after an assembly timeout':
+    [
+      'packages/rpc-host/test/plugins/chunk/contract-preservation.test.ts::migrated chunk contract assertions reports expiration and bounds terminal history after an assembly timeout'
+    ],
+  'packages/rpc-contract/test/contract.test.ts::rpc-contract round-trips a bounded serialized error graph without replacing native types':
+    [
+      'packages/rpc-contract/test/contract/contract.test.ts::rpc-contract pure business boundary round-trips a bounded serialized error graph without replacing native types'
+    ],
+  'packages/rpc-contract/test/contract.test.ts::rpc-contract snapshots hostile envelope fields and rejects unsupported shapes':
+    [
+      'packages/rpc-contract/test/contract/contract.test.ts::rpc-contract pure business boundary rejects non-portable caller values',
+      'packages/rpc-contract/test/core-wire.test.ts::single RPC wire profile validates original metadata and retains business key order and binary identity',
+      'packages/rpc-contract/test/control/envelope-admission.test.ts::rejects unsupported kinds before routing and refuses the original accessor payload'
+    ],
+  // Exhaustive narrowing follows the sole supported semantic profile; retired descriptor APIs receive no credit.
+  'packages/rpc-contract/test/types.test.ts::rpc-contract declarations preserves descriptor literals and exhaustive envelope narrowing':
+    [
+      'packages/rpc-contract/test/contract/types.test.ts::rpc-contract declarations preserves sole-profile literals and exhaustive semantic frame narrowing'
+    ],
+  // Native target identity survives on SDK control; the removed pingAll map presentation receives no credit.
+  'packages/web-rpc/test/composed-fanout-contract.test.ts::composed sendAll/pingAll fanout contract pingAll keys results by the tagged fanoutDeliveryKey shape and tolerates a __proto__ target':
+    [
+      'packages/rpc-host/test/core/composed-fanout-contract.test.ts::composed sendAll/pingAll fanout contract SDK control ping retains the accepted __proto__ target identity'
+    ],
+  'packages/web-rpc/test/composed-remote-cancellation.test.ts::composed remote cancellation on caller-side settlement notifies the remote and leaves zero active controllers after a local timeoutMs expiry':
+    [
+      'packages/rpc-host/test/call/public-cancellation.test.ts::public request cancellation through the canonical CallTable notifies the remote and leaves zero active providers after a complete timeout expires'
+    ],
+  'packages/web-rpc/test/composed-remote-cancellation.test.ts::composed remote cancellation on caller-side settlement notifies the remote and leaves zero active controllers after a local signal.abort() fired synchronously right after send()':
+    [
+      'packages/rpc-host/test/call/public-cancellation.test.ts::public request cancellation through the canonical CallTable leaves zero active providers after a local signal.abort() fired synchronously right after send()'
+    ],
+  'packages/web-rpc/test/contract-endpoint.test.ts::contract endpoint pipeline uses paired public endpoints for request-response, codec/framer work, frame protection, and disposal':
+    [
+      'packages/rpc-host/test/host/middleware-selected-wire.test.ts::preserves contract endpoint roundtrips and protection before actual writes'
+    ],
+  'packages/web-rpc/test/plugin-host/topology-adapter.test.ts::capability topology adapter preserves transitive order while keeping one installer path':
+    [
+      'packages/rpc-host/test/host/native-topology-baseline.test.ts::native capability topology preserves transitive order while keeping one installer path'
+    ],
+  'packages/web-rpc/test/plugin-host/topology-adapter.test.ts::capability topology adapter rejects undefined native dependencies and retired arrays before installation':
+    [
+      'packages/rpc-host/test/host/native-topology-baseline.test.ts::native capability topology rejects undefined native dependencies before invoking their factory'
+    ],
+  'packages/web-rpc/test/wire.test.ts::wire boundary rejects empty method names at entry': [
+    'packages/rpc-host/test/host/middleware-calls.test.ts::validates method names and admits a dotted public method'
+  ],
+  'packages/web-rpc/test/wire.test.ts::wire boundary rejects non-string and empty methods': [
+    'packages/rpc-host/test/host/middleware-calls.test.ts::validates method names and admits a dotted public method'
+  ],
   // Late construction diagnostics retain once-only reporting and the original Error, without hooks DTOs.
   'packages/web-rpc/test/construction-hooks.test.ts::real construction diagnostic reporter delivers the exact late install error after factory rejection and Host rollback':
-    [
-      'packages/rpc-host/test/host/installation-late-failure.test.ts::keeps caller cancellation terminal before reporting the original late setup failure'
-    ],
-  // Removes the old listener fanout; its exact two callback errors are NoPASS.
-  'packages/web-rpc/test/construction-hooks.test.ts::real construction diagnostic reporter isolates sync and async listener failures while preserving late delivery':
     [
       'packages/rpc-host/test/host/installation-late-failure.test.ts::keeps caller cancellation terminal before reporting the original late setup failure'
     ],
@@ -926,6 +1588,10 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
 function migratedTitles(title: string): readonly string[] {
   const [file, name] = title.split('::')
   if (
+    Object.hasOwn(currentCaseReceivers, title) ||
+    file === 'packages/rpc-contract/test/acceptance.test.ts' ||
+    file === 'packages/rpc-contract/test/contract.test.ts' ||
+    file === 'packages/rpc-contract/test/types.test.ts' ||
     file === 'packages/web-rpc/test/middleware-ports.test.ts' ||
     file === 'packages/web-rpc/test/internal/async-control.test.ts' ||
     file === 'packages/web-rpc/test/construction-hooks.test.ts'
@@ -939,13 +1605,16 @@ function migratedTitles(title: string): readonly string[] {
   const path = migratedFiles[file]
   expect(path, file).toBeDefined()
   const mappedName = name
+    .replace('BroadcastChannel adapter ', 'BroadcastChannel native owner ')
+    .replace('dedicated-worker adapter lifecycle ', 'dedicated-worker native lifecycle ')
+    .replace('shared-worker adapter lifecycle ', 'shared-worker native lifecycle ')
+    .replace('service-worker adapter lifecycle ', 'service-worker native lifecycle ')
+    .replace('worker adapter source metadata ', 'worker native source admission ')
+    .replace('provider event dispatch delegate ', '')
+    .replace('endpoint-local time port ', 'canonical endpoint timer resources ')
     .replace(
       'preserves configured peers while bounding learned peers and translating cleanup leaves',
       'preserves cleanup leaves when translating disposal failures'
-    )
-    .replace(
-      'publishes only runtime-neutral root/framing exports and dependencies',
-      'publishes only runtime-neutral contract/framing exports with an explicit dependency allowlist'
     )
     .replace('tagWebRpcError keeps', 'tagRpcError keeps')
     .replace('38 unique codes', '22 unique codes')
@@ -1128,7 +1797,7 @@ describe('migrated suite parity', () => {
         )
       )
     )
-    for (const title of expected) expect(actual.get(title), title).toBe('passed')
+    expect(expected.filter((title) => actual.get(title) !== 'passed')).toEqual([])
     // The single child collects exact current legacy files across all nine owners; package gates remain separate.
   }, 300_000)
 
