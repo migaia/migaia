@@ -212,6 +212,11 @@ export type IRpcCarrier = Readonly<{
    * forever.
    */
   terminalReason?(): Promise<unknown>
+  /**
+   * Session sets the accepted inbound byte budget before sending accept. Byte carriers start at 64
+   * KiB and apply this limit to length framing and JSON parsing; other media may omit this port.
+   */
+  setInboundFrameLimit?(maxFrameBytes: number): void
   /** Only an actual raw native observer can advertise carrier-stage capability. */
   observation?: IRpcCarrierObservation
   /** Native storage and transferable handoff differ; reject unsupported explicit transfer here. */

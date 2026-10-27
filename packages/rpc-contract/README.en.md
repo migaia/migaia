@@ -26,6 +26,8 @@ Every RPC package may declare a direct dependency on this package. `sideEffects:
 
 `/interfaces` provides pure flow payload types; native named-pipeline stage types come from `@migaia/rpc-host/sdk`.
 
+`IRpcCarrier.setInboundFrameLimit?(maxFrameBytes)` is the optional inbound frame-budget port. Session calls it after handshake admission and before sending accept. Byte carriers start at 64 KiB and use the current limit for length checks, JSON parsing, and extension-frame recognition. Other media may omit the port; Session does not identify concrete byte-carrier implementations.
+
 ```ts doc-test=check
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import type {

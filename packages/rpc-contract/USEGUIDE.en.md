@@ -92,6 +92,8 @@ Outbound: `prepare → envelope.outbound → encode → frame.outbound → write
 
 Ordinary carrier frames are `{kind:'message',data,sidecars?}`; extension frames are `{kind:'extension',extension,data,sidecars?}`. The common JSON byte carrier uses a four-byte unsigned big-endian length followed by UTF-8 JSON. Length excludes the header; nonempty payloads are limited to16MiB. Readers support arbitrary chunk boundaries and reject partial-frame EOF. Stateful decoders/codecs belong to the Host SDK or transport, not contract exports.
 
+`IRpcCarrier` may implement `setInboundFrameLimit?(maxFrameBytes: number): void`. After handshake admission and before sending accept, Session supplies `maxFrameBytes`. Byte carriers start at 64 KiB, then enforce the current limit while checking lengths and parsing JSON, including extension frames. Oversized input is rejected before allocating the complete payload or parsing JSON; Session needs no dependency on a concrete carrier.
+
 Binary manifests retain `profile: 'migaia.rpc.portable-binary/1'`, `storage: 'inline' | 'native'`, the original `envelope`, and a logical `backings` array. This versions a binary representation rather than another RPC grammar. `storage: 'inline'` keeps visible bytes inline, with empty `backings` and physical sidecars. Each row under `storage: 'native'` describes one complete backing:
 
 | Field        | Rule                                                                                                                                                 |

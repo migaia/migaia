@@ -49,7 +49,7 @@ it('A38 byte carrier rejects a length above 64 KiB before allocating or parsing 
   }
 })
 
-it('A38 byte carrier hands bounded UTF-8 text to the codec without parsing JSON itself', async () => {
+it('A45 byte carrier parses bounded JSON and exposes the accepted-frame-limit contract port', async () => {
   /** Original Node streams carry one complete small physical frame. */
   const input = new PassThrough()
   /** Native writer lifetime is independent from the incoming fixture bytes. */
@@ -82,15 +82,30 @@ it('A38 byte carrier hands bounded UTF-8 text to the codec without parsing JSON 
     close: () => undefined,
     error: (error) => reports.push(error)
   })
-  /** Semantic JSON stays an opaque string until its configured codec consumes it. */
+  /** Byte framing parses JSON before the configured frame hooks inspect extension records. */
   const text = '{"fixture":"codec owns parsing"}'
-  /** The native JSON parser must remain unused at physical text handoff. */
+  /** The same original parser executes once at physical byte handoff. */
   const parse = vi.spyOn(JSON, 'parse')
   try {
     input.emit('data', encodeRpcStreamFrame(new TextEncoder().encode(text)))
-    expect(frames).toEqual([{ kind: 'message', data: text }])
-    expect(parse).not.toHaveBeenCalled()
-    expect(reports).toEqual([])
+    expect(frames).toEqual([{ kind: 'message', data: { fixture: 'codec owns parsing' } }])
+    expect(parse).toHaveBeenCalledOnce()
+    expect(typeof carrier.setInboundFrameLimit).toBe('function')
+    carrier.setInboundFrameLimit?.(1024)
+    /** The current accepted limit also covers the byte carrier's extension-wrapper parser. */
+    const extension = { kind: 'extension', extension: 'chunk@1', data: { fixture: 'bounded' } }
+    input.emit('data', encodeRpcStreamFrame(new TextEncoder().encode(JSON.stringify(extension))))
+    expect(frames).toEqual([
+      { kind: 'message', data: { fixture: 'codec owns parsing' } },
+      extension
+    ])
+    expect(parse).toHaveBeenCalledTimes(2)
+    /** The contract port changes the actual decoder's existing budget, including header-only input. */
+    const header = new Uint8Array(4)
+    new DataView(header.buffer).setUint32(0, 1025)
+    input.emit('data', header)
+    expect(reports).toEqual([expect.objectContaining({ code: 'FRAME_LIMIT_EXCEEDED' })])
+    expect(parse).toHaveBeenCalledTimes(2)
   } finally {
     parse.mockRestore()
     await carrier.close()

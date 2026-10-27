@@ -92,6 +92,8 @@ group按顺序执行，首个失败后的步骤为`not-executed`；步骤结果�
 
 普通载体帧为 `{kind:'message',data,sidecars?}`，扩展为 `{kind:'extension',extension,data,sidecars?}`。通用JSON byte载体使用四字节无符号大端长度+UTF-8 JSON；长度不含四字节头，非空payload上限16MiB。读取必须支持任意切块，EOF半帧是错误。编解码器和有状态decoder属于host SDK/实际传输，不再从contract导出。
 
+`IRpcCarrier` 可实现 `setInboundFrameLimit?(maxFrameBytes: number): void`。Session 在握手准入后、发送 accept 前传入 `maxFrameBytes`；byte carrier 初始使用 64 KiB，随后按当前上限检查长度并自行解析 JSON（包括扩展帧）。超限在分配完整 payload 或 JSON 解析前拒绝，不引入 Session 对具体 carrier 的依赖。
+
 二进制清单保留 `profile: 'migaia.rpc.portable-binary/1'`、`storage: 'inline' | 'native'`、原 `envelope` 和逻辑 `backings` 数组。这是二进制表示版本，不是另一套 RPC 语法。`storage: 'inline'` 沿用可见字节内联，`backings` 与物理 sidecars 均为空；`storage: 'native'` 的每行描述一个完整 backing：
 
 | 字段         | 规则                                                                                                           |

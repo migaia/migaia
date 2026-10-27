@@ -34,7 +34,7 @@ const physicalJson = jsonParser() as unknown as IRpcJsonTextParser
 /** Decode the byte transport wrapper once; ordinary semantic objects stay with the existing codec. */
 export function decodeRpcJsonPhysicalFrame(
   frame: IRpcCarrierFrame,
-  context: IRpcCodecContext
+  context: Pick<IRpcCodecContext, 'maxFrameBytes' | 'errorMetadata'>
 ): IRpcCarrierFrame {
   if (frame.kind !== RpcCarrierFrameKind.message || typeof frame.data !== 'string') return frame
   /** The same bounded text admission also protects serialized extension wrappers before frame hooks. */

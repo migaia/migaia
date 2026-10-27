@@ -26,6 +26,8 @@ pnpm add @migaia/rpc-contract
 
 `/interfaces` 提供纯 flow payload 类型；原生命名管道的 stage 类型由 `@migaia/rpc-host/sdk` 提供。
 
+`IRpcCarrier.setInboundFrameLimit?(maxFrameBytes)` 是可选的入站帧预算端口。Session 在握手准入后、发送 accept 前调用它；byte carrier 从 64 KiB 启动，并用当前上限完成长度检查、JSON 解析与扩展帧识别。其他介质可以省略此端口；Session 不识别具体 byte carrier 实现。
+
 ```ts doc-test=check
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import type {
