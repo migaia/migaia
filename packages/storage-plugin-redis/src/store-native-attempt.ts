@@ -217,17 +217,23 @@ async function redisCommitNativeAttempt<R>(
         ],
         [RedisCommand.publish, attempt.organization.layout.changes, change.wire]
       )
-      if (attempt.organization.environment.durableMaxLen !== undefined)
-        commands.push([
-          RedisCommand.xadd,
+      /** Each change enters the shared Stream (root readers) and its own org Stream (org readers). */
+      const durableMaxLen = attempt.organization.environment.durableMaxLen
+      if (durableMaxLen !== undefined)
+        for (const stream of [
           attempt.organization.layout.durableChanges,
-          RedisCommand.maxlen,
-          '~',
-          String(attempt.organization.environment.durableMaxLen),
-          '*',
-          RedisSuffix.changeField,
-          change.wire
+          attempt.organization.layout.orgDurableChanges
         ])
+          commands.push([
+            RedisCommand.xadd,
+            stream,
+            RedisCommand.maxlen,
+            '~',
+            String(durableMaxLen),
+            '*',
+            RedisSuffix.changeField,
+            change.wire
+          ])
     }
     throwIfAborted(attempt.context.signal)
     let replies: Awaited<ReturnType<IRedisConnection['exec']>>

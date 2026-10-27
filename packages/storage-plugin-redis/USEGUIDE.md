@@ -153,7 +153,7 @@ try {
 }
 ```
 
-maxLen 必须是正安全整数，使用原生近似 MAXLEN 裁剪。readChanges({after,limit}) 默认limit100，从排他游标读起。处理效果和检查点应在回调成功前完成；tail 只在 onChange 成功后推进，失败报告并关闭，不越过失败项。游标是原生 Stream ID，按原样保存，不转成不精确的 JS number。
+每次提交同时追加到两条 Stream：共享的一条和本组织自己的一条。根 store 读共享 Stream，能看到所有组织；组织 store 只读自己的 Stream，所以一个写得很多的组织不会把安静组织的历史挤出保留窗口，也不会让它的读取扫过别的组织的条目。游标只属于返回它的那个 store 所读的 Stream，不要把根 store 的游标交给组织 store，反过来也一样。dropOrg 保留该组织的变更历史。maxLen 必须是正安全整数，对每条 Stream 分别生效，使用原生近似 MAXLEN 裁剪。readChanges({after,limit}) 默认limit100，从排他游标读起。处理效果和检查点应在回调成功前完成；tail 只在 onChange 成功后推进，失败报告并关闭，不越过失败项。游标是原生 Stream ID，按原样保存，不转成不精确的 JS number。
 
 非初始游标落后于保留首项时报 CHANGE_CURSOR_EXPIRED。0-0 也不是“忽略丢失历史”：只有 XINFO 证明从未移除记录时可继续，裁剪后同样拒绝。跨裁剪边界保守拒绝。这份历史只覆盖标准库提交，不承诺外部原生命令或纯自然过期事件；普通 best-effort 变更提示也不能代替它。
 

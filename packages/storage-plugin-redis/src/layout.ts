@@ -129,6 +129,9 @@ export function createRedisLayout(prefix: string, orgId: string) {
     revisions: context.tag + ':' + RedisSuffix.revisions,
     changes: context.tag + ':' + RedisSuffix.changes,
     durableChanges: context.tag + ':' + RedisSuffix.durableChanges,
+    /** This organization's own durable Stream; trimmed by its own writes only. */
+    orgDurableChanges:
+      context.tag + ':' + RedisSuffix.durableChanges + ':' + redisPortableIdentity(context.orgId),
     journal: (namespace: string): string =>
       context.tag + ':' + RedisSuffix.journal + ':' + redisLayoutEncode(context, namespace),
     encode: (value: IStorageKey) => redisLayoutEncode(context, value),
