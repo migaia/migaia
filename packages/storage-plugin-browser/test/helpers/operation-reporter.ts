@@ -1,5 +1,5 @@
 /** The stable prefix emitted by Storage-Web's default cleanup reporter. */
-const operationCleanupPrefix = '[storage-web] operation cleanup failed'
+const operationCleanupPrefix = '[storage-host] operation cleanup failed'
 
 /**
  * Captures expected cleanup diagnostics without hiding unrelated console failures. Hostile cleanup

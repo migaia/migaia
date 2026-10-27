@@ -8,7 +8,7 @@ beforeEach(() => {
   const originalWarning = console.warn
   /** Per-test spy avoids changing the production default diagnostic contract. */
   const warning = vi.spyOn(console, 'warn').mockImplementation((...args: unknown[]) => {
-    if (typeof args[0] === 'string' && args[0].startsWith('[storage-web] entity ')) return
+    if (typeof args[0] === 'string' && args[0].startsWith('[storage-host] entity ')) return
     originalWarning(...args)
   })
   restoreWarningReporter = () => warning.mockRestore()

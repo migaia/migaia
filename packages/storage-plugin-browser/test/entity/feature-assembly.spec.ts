@@ -281,10 +281,10 @@ describe('explicit entity Features over the web IndexedDB entry', () => {
       { id: 'a', group: 'one' }
     ])
     expect(diagnostics).toContain(
-      '[storage-web] entity "invalid-current-only" index "group" uses authoritative full-scan fallback'
+      '[storage-host] entity "invalid-current-only" index "group" uses authoritative full-scan fallback'
     )
     expect(diagnostics).toContain(
-      '[storage-web] entity "invalid-current-only" skipped invalid record invalid'
+      '[storage-host] entity "invalid-current-only" skipped invalid record invalid'
     )
     /** The backend-issued handle used by writes exposes the authoritative readiness receipt. */
     const capability = asSecondaryIndexRecordStore(store)

@@ -457,7 +457,7 @@ describe('repository over real indexedDbHost backend', () => {
         cause: expect.any(RangeError)
       })
       expect(report).toHaveBeenCalledWith(
-        '[storage-web] operation cleanup failed',
+        '[storage-host] operation cleanup failed',
         expect.objectContaining({ code: 'VALUE_TOO_LARGE' })
       )
     } finally {
@@ -509,7 +509,7 @@ describe('repository over real indexedDbHost backend', () => {
         cause: expect.any(RangeError)
       })
       expect(report).toHaveBeenCalledWith(
-        '[storage-web] operation cleanup failed',
+        '[storage-host] operation cleanup failed',
         expect.objectContaining({ code: 'VALUE_TOO_LARGE' })
       )
     } finally {

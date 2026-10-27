@@ -65,12 +65,12 @@ const installExpectedDiagnosticContainment = (): void => {
   const originalError = console.error
   const originalWarn = console.warn
   console.error = ((...args: unknown[]) => {
-    if (String(args[0]).startsWith('[storage-web] operation cleanup failed')) return
+    if (String(args[0]).startsWith('[storage-host] operation cleanup failed')) return
     originalError(...args)
   }) as typeof console.error
   console.warn = ((...args: unknown[]) => {
     if (
-      String(args[0]).startsWith('[storage-web] entity ') &&
+      String(args[0]).startsWith('[storage-host] entity ') &&
       String(args[0]).includes(' skipped invalid record ')
     )
       return
