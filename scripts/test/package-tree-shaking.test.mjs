@@ -806,7 +806,8 @@ test('closure packet proves exact exclusions, frozen budgets, browser wasm, and 
       }
       if (packageCase.name === 'wasm') {
         assert.match(minimal.code, /byte_len_of/)
-        assert.doesNotMatch(minimal.code, /json_to_msgpack|msgpack_to_json|alloc_bytes/)
+        /** Match exact API names; retained dealloc_bytes documentation is a different identifier. */
+        assert.doesNotMatch(minimal.code, /\b(?:json_to_msgpack|msgpack_to_json|alloc_bytes)\b/)
       }
     }
 
