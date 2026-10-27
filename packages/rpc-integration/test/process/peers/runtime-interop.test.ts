@@ -200,9 +200,14 @@ it('production SDK standard request → ts-reference', async () => {
     try {
       expect(observed.directory?.schemaVersion).toBe(3)
       expect(observed.directory?.self.instanceId).toBe('ts-peer')
-      expect(await active.reference.request('echo', { reference: true })).toEqual({ reference: true })
+      expect(await active.reference.request('echo', { reference: true })).toEqual({
+        reference: true
+      })
       expect(
-        await Promise.all([active.reference.request('echo', 1), active.reference.request('echo', 2)])
+        await Promise.all([
+          active.reference.request('echo', 1),
+          active.reference.request('echo', 2)
+        ])
       ).toEqual([1, 2])
       expect(failures).toEqual([])
     } finally {
