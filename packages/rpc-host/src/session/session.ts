@@ -1429,7 +1429,7 @@ export class Session {
       if (
         error !== this.#reason &&
         error !== this.#closeError &&
-        safeRead(error, 'cause') !== this.#reason
+        !isLocalRpcError(error, RpcLifecycleError)
       )
         this.#options.report(error)
       return

@@ -52,6 +52,97 @@ class ClosingAcceptGate {
   }
 }
 
+/** A suspended original hello can reject after native close has selected a different final reason. */
+class LateHelloFailure {
+  /** Native Session construction reaches this real handshake hook before the test sends EOF. */
+  readonly entered = deferred<void>()
+  /** Release with the exact earlier lifecycle error obtained from this Session's public control. */
+  readonly failure = deferred<unknown>()
+  /** The actual transport installs the held work under its ordinary flow lifetime. */
+  readonly feature = defineFlowFeature({
+    name: 'late-hello-failure',
+    setup: () => ({ stages: { [RpcFlowPoint.handshakeOutbound]: this.#wait } })
+  })
+
+  /** Keep the genuine initial hello pending, then reject it with the independently captured error. */
+  readonly #wait: IRpcFlowStage<typeof RpcFlowPoint.handshakeOutbound> = async (payload, next) => {
+    if (payload.handshake.step === RpcWireHandshakeStep.hello) {
+      this.entered.resolve()
+      throw await this.failure.promise
+    }
+    await next(payload)
+  }
+}
+
+it('does not report an earlier closing acknowledgment after its native reason is refined', async () => {
+  /** Native completion remains the sole owner of terminal reason selection. */
+  const terminal = deferred<unknown>()
+  /** Observe the actual closing phase before issuing the control that captures its first reason. */
+  const selecting = deferred<void>()
+  /** The real startup hook remains pending independently from the physical EOF path. */
+  const gate = new LateHelloFailure()
+  /** This endpoint emits only a native close; it does not implement a fake peer protocol. */
+  const left = new MemoryCarrier('late-close-left')
+  /** The acquired closing-capable carrier lends the unchanged Session lifecycle and codec. */
+  const right = new MemoryCarrier('late-close-right', undefined, undefined, false, true)
+  left.link(right)
+  right.link(left)
+  /** Earlier errors must retain this initial native cause even after terminal refinement. */
+  const eof = new Error('initial physical close')
+  /** Final native completion chooses a different reason without mutating delivered wrappers. */
+  const final = new Error('later native close')
+  /** Only real diagnostics from the original Session and native plugin are recorded. */
+  const reports: unknown[] = []
+  /** Capture supported native controls rather than reaching into private Session methods. */
+  let context!: IRpcTransportContext
+  /** This is the exact stable handle returned by native attachment. */
+  let handle!: IRpcSessionHandle
+  Object.assign(right, {
+    terminalReason: () => {
+      selecting.resolve()
+      return terminal.promise
+    }
+  })
+  /** Failed public construction remains observed while the test controls only native completion. */
+  const opening = createRpcHost({
+    self: { name: 'late-close', instanceId: 'late-close' },
+    plugins: [
+      defineTransportPlugin({
+        name: 'late-close-native',
+        namespace: 'memory',
+        closingWrites: true,
+        features: [gate.feature],
+        open: async (native) => {
+          context = native
+          handle = native.attach(right)
+          await handle.ready
+          return { dispose: () => undefined }
+        }
+      })
+    ],
+    report: (error) => reports.push(error)
+  }).catch((error: unknown) => error)
+  try {
+    await gate.entered.promise
+    await left.close(eof)
+    await selecting.promise
+    /** The original Session creates this lifecycle wrapper during its initial closing window. */
+    const failure = await context.ping(handle).catch((error: unknown) => error)
+    expect(failure).toMatchObject({ code: 'ENDPOINT_DISPOSED', cause: eof })
+    terminal.resolve(final)
+    await handle.closed
+    gate.failure.resolve(failure)
+    await opening
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    expect(failure).toMatchObject({ cause: eof })
+    expect(reports).toEqual([])
+  } finally {
+    terminal.resolve(final)
+    gate.failure.resolve(final)
+    await opening
+  }
+})
+
 /** The fixture erases optional native capabilities; inspect its real public namespace method. */
 function observePeerClose(namespace: object, listener: (event: unknown) => void): void {
   /** Closing-capable construction installs this original namespace callback at runtime. */
