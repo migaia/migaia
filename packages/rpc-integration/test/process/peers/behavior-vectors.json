@@ -1151,6 +1151,13 @@
         "stderr": {
           "PEER_FAIL HANDSHAKE_INVALID": 1
         }
+      },
+      "expectByLanguage": {
+        "rust": {
+          "stderr": {
+            "PEER_FAIL HANDSHAKE_INCOMPATIBLE": 1
+          }
+        }
       }
     },
     {

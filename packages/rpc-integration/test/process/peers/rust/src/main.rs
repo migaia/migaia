@@ -1134,7 +1134,7 @@ fn handshake(
                             ),
                         ]),
                     )?;
-                    return Err(invalid("HANDSHAKE_INVALID"));
+                    return Err(invalid("HANDSHAKE_INCOMPATIBLE"));
                 }
                 if local_id > remote_id {
                     let mut accepted = accept(local);
@@ -1658,6 +1658,10 @@ fn run() -> io::Result<()> {
 fn main() {
     if let Err(error) = run() {
         let label = if error.kind() == io::ErrorKind::InvalidData
+            && error.to_string() == "HANDSHAKE_INCOMPATIBLE"
+        {
+            "HANDSHAKE_INCOMPATIBLE"
+        } else if error.kind() == io::ErrorKind::InvalidData
             && error.to_string() == "HANDSHAKE_INVALID"
         {
             "HANDSHAKE_INVALID"

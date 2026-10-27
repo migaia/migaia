@@ -647,6 +647,37 @@ fn flat_error_boundaries(counts: &mut Counts) {
         );
     }
 }
+/// A syntactically valid but unsupported version keeps its local and wire refusal labels aligned.
+fn incompatible_reason(counts: &mut Counts) {
+    let local = crate::identity();
+    let remote = caller();
+    let mut incompatible = crate::hello(&remote, false, None);
+    crate::set(
+        &mut incompatible,
+        "versions",
+        Value::Array(vec![object(&[("major", number(3)), ("minor", number(0))])]),
+    );
+    let mut input = Vec::new();
+    write_frame(&mut input, &incompatible).unwrap();
+    let mut output = Vec::new();
+    let result = crate::handshake(
+        &mut &input[..],
+        &mut output,
+        &crate::hello(&local, false, None),
+        None,
+        None,
+    );
+    counts.check(
+        "section33/incompatible-local-and-wire-code",
+        result
+            .as_ref()
+            .is_err_and(|error| error.to_string() == "HANDSHAKE_INCOMPATIBLE")
+            && frames(&output).iter().any(|frame| {
+                text(frame, "step") == "reject"
+                    && text(error_root(field(frame, "error")), "code") == "HANDSHAKE_INCOMPATIBLE"
+            }),
+    );
+}
 pub fn run(root: &Path) -> io::Result<()> {
     let mut counts = Counts {
         passed: 0,
@@ -657,6 +688,7 @@ pub fn run(root: &Path) -> io::Result<()> {
     canonical_vectors(root, &mut counts);
     stream_vectors(root, &mut counts);
     native_baseline(&mut counts);
+    incompatible_reason(&mut counts);
     notification_and_cancel(&mut counts);
     closing_group_admission(&mut counts);
     stream_finish_releases_before_drain(&mut counts);

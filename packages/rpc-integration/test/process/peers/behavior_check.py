@@ -153,7 +153,9 @@ def main():
     vectors = json.loads((PEERS / "behavior-vectors.json").read_text())
     if vectors.get("schema") != "migaia.rpc.peer-behavior/2":
         raise SystemExit("BEHAVIOR_SCHEMA_INVALID")
-    rows = [{"id": case["id"], "ok": run_case(COMMANDS[args.language], vectors["hello"], case, PEER_IDS[args.language])} for case in vectors["cases"]]
+    # A language's explicitly changed local diagnostic retains the same physical-frame assertions.
+    cases = [{**case, "expect": {**case["expect"], **case.get("expectByLanguage", {}).get(args.language, {})}} for case in vectors["cases"]]
+    rows = [{"id": case["id"], "ok": run_case(COMMANDS[args.language], vectors["hello"], case, PEER_IDS[args.language])} for case in cases]
     failures = [row["id"] for row in rows if not row["ok"]]
     print(json.dumps({"language": args.language, "passed": len(rows) - len(failures), "failed": len(failures), "failures": failures, "rows": rows}))
     return 1 if failures else 0
