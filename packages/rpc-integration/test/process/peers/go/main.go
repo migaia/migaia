@@ -479,7 +479,13 @@ func handshake(reader io.Reader, writer io.Writer, local *orderedRecord, token, 
 	var remoteHello, selected *orderedRecord
 	for {
 		remote, err := receive(reader, true)
-		if err != nil || !validHandshake(remote) {
+		if err != nil {
+			if remoteHello != nil {
+				return nil, err
+			}
+			return nil, errHandshakeInvalid
+		}
+		if !validHandshake(remote) {
 			return nil, errHandshakeInvalid
 		}
 		value := field(remote)
@@ -501,15 +507,15 @@ func handshake(reader io.Reader, writer io.Writer, local *orderedRecord, token, 
 			continue
 		}
 		if value["step"] == "hello" {
+			if !supportsVersion(value) || len(entries(value["requiredExtensions"])) > 0 {
+				if err := send(writer, object("profile", protocol, "kind", "handshake", "step", "reject", "error", wireError("HANDSHAKE_INCOMPATIBLE", "rpc handshake incompatible", "rpc.contract"))); err != nil {
+					return nil, err
+				}
+				return nil, errHandshakeIncompatible
+			}
 			if localID < remoteID {
 				remoteHello = remote
 				continue
-			}
-			if !supportsVersion(value) {
-				return nil, errHandshakeIncompatible
-			}
-			if len(entries(value["requiredExtensions"])) > 0 {
-				return nil, errHandshakeIncompatible
 			}
 			accept := acceptance(local)
 			if err := send(writer, accept); err != nil {
@@ -597,6 +603,20 @@ func serveUnix(path, role string) error {
 	return responder(connection, connection)
 }
 
+// peerFailureLabel preserves registered local failure categories without exposing native error text.
+func peerFailureLabel(err error) string {
+	switch {
+	case errors.Is(err, errHandshakeInvalid):
+		return "HANDSHAKE_INVALID"
+	case errors.Is(err, errHandshakeIncompatible):
+		return "HANDSHAKE_INCOMPATIBLE"
+	case errors.Is(err, errProtocol):
+		return "PROTOCOL_INVALID"
+	default:
+		return "IO"
+	}
+}
+
 // main keeps the existing CLI/transport owner while removing semantic-v1/JSON-RPC/remote-Host selectors.
 func main() {
 	// A lost parent closes stdout: preserve EPIPE so existing descendant cleanup defers still run.
@@ -643,7 +663,7 @@ func main() {
 		}
 	}
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "PEER_FAIL SESSION_ERROR")
+		fmt.Fprintln(os.Stderr, "PEER_FAIL "+peerFailureLabel(err))
 		os.Exit(1)
 	}
 }

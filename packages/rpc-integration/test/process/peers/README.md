@@ -59,10 +59,10 @@ implement the process plugin's native bootstrap. The current SDK can attach
 its byte carrier directly to this reference peer.
 
 Rust pending requests use `BTreeMap`: one logarithmic insertion or cancellation
-and one linear lexical drain. Go keeps a lexical slice index alongside its
-request map: one binary search and at most one linear move per insertion or
-cancellation, then one linear drain. `peer.finish` preserves lexical request-ID
-order without sorting a growing collection.
+and one linear lexical drain. Go keeps an AVL index alongside its request map:
+one logarithmic insertion or cancellation, then one linear traversal.
+`peer.finish` preserves lexical request-ID order without sorting a growing
+collection.
 
 `--bare-jsonrpc` selects a separate pure-JSON fixture baseline, without native
 RPC handshake or dispatch. It parses and serializes each JSON payload and uses

@@ -469,7 +469,7 @@ def handshake(reader: BinaryIO, writer: BinaryIO, local: dict[str, Any], token: 
                     accepted = negotiate(remote, local)
                 except PeerFailure as error:
                     write_json(writer, {"profile": PROTOCOL, "kind": "handshake", "step": "reject", "error": wire_error(error.code, "handshake incompatible", "rpc.contract")})
-                    raise PeerFailure("HANDSHAKE_INVALID") from error
+                    raise PeerFailure("HANDSHAKE_INCOMPATIBLE") from error
                 if "auth" in local:
                     accepted["auth"] = local["auth"]
                 write_json(writer, accepted)

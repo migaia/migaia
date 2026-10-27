@@ -357,6 +357,9 @@ func (state *businessState) native(message *orderedRecord) ([]*orderedRecord, er
 		return nil, nil
 	case "cancel":
 		if pending := state.waiting[id]; pending != nil && runtimeSchemaEqual(field(pending)["task"], value["task"]) {
+			if state.closing {
+				fmt.Fprintln(os.Stderr, "PEER_EVENT ABORT_DURING_DRAIN")
+			}
 			state.removeWaiting(id)
 			reason := field(value["reason"])
 			if reason != nil {
@@ -557,11 +560,13 @@ func serveBusiness(reader io.Reader, writer io.Writer, identity *orderedRecord, 
 		}
 		message := received.message
 		if !validFrame(message) {
-			return errProtocol
+			fmt.Fprintln(os.Stderr, "PEER_ERROR PROTOCOL_INVALID")
+			continue
 		}
 		replies, err := state.native(message)
 		if err != nil {
-			return err
+			fmt.Fprintln(os.Stderr, "PEER_ERROR PROTOCOL_INVALID")
+			continue
 		}
 		for _, reply := range replies {
 			if err := send(writer, reply); err != nil {

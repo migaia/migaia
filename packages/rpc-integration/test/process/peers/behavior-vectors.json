@@ -10,7 +10,9 @@
         "minor": 0
       }
     ],
-    "codecs": ["json"],
+    "codecs": [
+      "json"
+    ],
     "extensions": [],
     "peer": {
       "id": "behavior-caller",
@@ -31,7 +33,10 @@
       "methods": [
         {
           "name": "echo",
-          "supportedModes": ["request", "notify"],
+          "supportedModes": [
+            "request",
+            "notify"
+          ],
           "modeSource": "declared"
         }
       ]
@@ -726,7 +731,9 @@
         "kind": "handshake",
         "step": "hello",
         "versions": [],
-        "codecs": ["json"],
+        "codecs": [
+          "json"
+        ],
         "extensions": [],
         "peer": {
           "id": "behavior-caller",
@@ -747,7 +754,10 @@
           "methods": [
             {
               "name": "echo",
-              "supportedModes": ["request", "notify"],
+              "supportedModes": [
+                "request",
+                "notify"
+              ],
               "modeSource": "declared"
             }
           ]
@@ -1089,7 +1099,9 @@
             "step": "accept"
           }
         ],
-        "stderrNot": ["PEER_FAIL HANDSHAKE_INVALID"]
+        "stderrNot": [
+          "PEER_FAIL HANDSHAKE_INVALID"
+        ]
       }
     },
     {
@@ -1149,14 +1161,7 @@
           }
         ],
         "stderr": {
-          "PEER_FAIL HANDSHAKE_INVALID": 1
-        }
-      },
-      "expectByLanguage": {
-        "rust": {
-          "stderr": {
-            "PEER_FAIL HANDSHAKE_INCOMPATIBLE": 1
-          }
+          "PEER_FAIL HANDSHAKE_INCOMPATIBLE": 1
         }
       }
     },
@@ -1317,8 +1322,12 @@
             "step": "accept"
           }
         ],
-        "stderrContains": ["PEER_FAIL "],
-        "stderrNot": ["ERROR peer session failed"]
+        "stderrContains": [
+          "PEER_FAIL "
+        ],
+        "stderrNot": [
+          "ERROR peer session failed"
+        ]
       }
     },
     {
@@ -1347,7 +1356,10 @@
                   "message": "closing",
                   "stack": "AggregateError: closing\n    at remote:1:1",
                   "cause": 1,
-                  "errors": [1, 2]
+                  "errors": [
+                    1,
+                    2
+                  ]
                 },
                 {
                   "source": "business",
@@ -1481,7 +1493,10 @@
                   "message": "closing",
                   "stack": "AggregateError: closing\n    at remote:1:1",
                   "cause": 1,
-                  "errors": [1, 2]
+                  "errors": [
+                    1,
+                    2
+                  ]
                 },
                 {
                   "source": "business",
@@ -1537,7 +1552,10 @@
                   "message": "closing",
                   "stack": "AggregateError: closing\n    at remote:1:1",
                   "cause": 1,
-                  "errors": [1, 2]
+                  "errors": [
+                    1,
+                    2
+                  ]
                 },
                 {
                   "source": "business",

@@ -178,8 +178,7 @@ async function readJson(reader: FrameReader, maxBytes = MAX_FRAME): Promise<unkn
 /** Check required known fields; profile2 ignores unknown metadata for each active variant. */
 function requiredFields(
   value: unknown,
-  required: readonly string[],
-  _optional: readonly string[] = []
+  required: readonly string[]
 ): IRecord {
   if (!isRecord(value) || required.some((key) => !Object.hasOwn(value, key)))
     throw new PeerFault('PROTOCOL_INVALID')
@@ -312,8 +311,7 @@ export function validateWire(value: unknown): IRecord {
   for (const raw of graph.nodes) {
     const node = requiredFields(
       raw,
-      ['source', 'code', 'name', 'message', 'stack'],
-      ['cause', 'errors', 'data', 'truncated', 'route']
+      ['source', 'code', 'name', 'message', 'stack']
     )
     for (const key of ['source', 'code', 'name', 'message', 'stack']) {
       const size = textBytes(node[key])
@@ -359,7 +357,7 @@ export function validateWire(value: unknown): IRecord {
 }
 /** Admit the schema3 provider directory independently, before publishing any callable route. */
 export function validateDirectory(value: unknown): IRecord {
-  const input = requiredFields(value, ['schemaVersion', 'self', 'methods'], ['nodeId'])
+  const input = requiredFields(value, ['schemaVersion', 'self', 'methods'])
   const self = requiredFields(input.self, ['name', 'instanceId', 'generation'])
   if (
     input.schemaVersion !== 3 ||
@@ -379,8 +377,7 @@ export function validateDirectory(value: unknown): IRecord {
   for (const raw of input.methods) {
     const entry = requiredFields(
       raw,
-      ['name', 'supportedModes', 'modeSource'],
-      ['idempotent', 'forwardedVia', 'input', 'output', 'yield']
+      ['name', 'supportedModes', 'modeSource']
     )
     if (
       !method(entry.name) ||
@@ -463,10 +460,9 @@ export function validateHandshake(value: unknown): IRecord {
       'directory',
       'extensions',
       ...(value.step === 'hello' ? ['versions', 'codecs'] : ['major', 'minor', 'codec'])
-    ],
-    value.step === 'hello' ? ['auth', 'requiredExtensions'] : ['auth']
+    ]
   )
-  const peer = requiredFields(value.peer, ['id', 'runtime'], ['runtimeVersion', 'implementation'])
+  const peer = requiredFields(value.peer, ['id', 'runtime'])
   const directory = validateDirectory(value.directory)
   if (
     !identifier(peer.id) ||
@@ -626,7 +622,7 @@ function route(senderId: string, targetId: string, trace?: unknown): IRecord {
 }
 /** Stream field ownership and semantic byte budgets are part of the sole live parser. */
 export function validateStream(value: unknown): void {
-  const input = requiredFields(value, ['event', 'seq'], ['value', 'error', 'reason'])
+  const input = requiredFields(value, ['event', 'seq'])
   const fields: Record<string, string | undefined> = {
     open: undefined,
     pull: undefined,
@@ -646,8 +642,7 @@ export function validateStream(value: unknown): void {
     throw new PeerFault('PROTOCOL_INVALID')
   requiredFields(
     input,
-    ['event', 'seq', ...(['item', 'fail'].includes(String(input.event)) ? [field!] : [])],
-    field ? [field] : []
+    ['event', 'seq', ...(['item', 'fail'].includes(String(input.event)) ? [field!] : [])]
   )
   if (field && Object.hasOwn(input, field)) {
     if (field === 'value') {
@@ -662,7 +657,7 @@ function validateGroup(value: unknown): void {
   for (const raw of value) {
     const item = raw as IRecord
     if (item?.state === 'success' && !failed) {
-      requiredFields(item, ['state'], ['result'])
+      requiredFields(item, ['state'])
       if (Object.hasOwn(item, 'result')) portableBytes(item.result)
     } else if (item?.state === 'failure' && !failed) {
       requiredFields(item, ['state', 'error'])
@@ -696,11 +691,10 @@ export function validateFrame(value: unknown): IRecord {
   }
   const shape = fields[String(value.kind)]
   if (!shape) throw new PeerFault('PROTOCOL_INVALID')
-  requiredFields(value, ['profile', 'kind', 'id', 'route', ...shape[0]], shape[1])
+  requiredFields(value, ['profile', 'kind', 'id', 'route', ...shape[0]])
   const routing = requiredFields(
     value.route,
-    ['applicationVersion', 'senderId', 'targetId', 'receiverId', 'sentAt'],
-    ['remainingMs', 'trace', 'forwardRoute']
+    ['applicationVersion', 'senderId', 'targetId', 'receiverId', 'sentAt']
   )
   if (
     !identifier(value.id) ||
@@ -732,8 +726,7 @@ export function validateFrame(value: unknown): IRecord {
   const task = Object.hasOwn(value, 'task')
     ? requiredFields(
         value.task,
-        ['mode', 'callerId', 'callerGeneration', 'targetGeneration'],
-        ['method']
+        ['mode', 'callerId', 'callerGeneration', 'targetGeneration']
       )
     : undefined
   if (task) {
@@ -756,7 +749,7 @@ export function validateFrame(value: unknown): IRecord {
     portableBytes(value.extensions)
   }
   if (value.kind === 'call' || value.kind === 'group') {
-    const options = requiredFields(value.options, [], ['orderKey', 'cancel', 'idempotencyKey'])
+    const options = requiredFields(value.options, [])
     if (
       ['orderKey', 'idempotencyKey'].some(
         (key) => Object.hasOwn(options, key) && !identifier(options[key])
@@ -778,7 +771,7 @@ export function validateFrame(value: unknown): IRecord {
     if (!Array.isArray(value.steps) || value.steps.length === 0)
       throw new PeerFault('PROTOCOL_INVALID')
     for (const raw of value.steps) {
-      const step = requiredFields(raw, ['method'], ['payload'])
+      const step = requiredFields(raw, ['method'])
       if (!method(step.method)) throw new PeerFault('PROTOCOL_INVALID')
       if (Object.hasOwn(step, 'payload')) portableBytes(step.payload)
     }
@@ -806,16 +799,14 @@ function validateOutcome(value: IRecord): void {
   if (value.operation === 'lookup') {
     requiredFields(
       value,
-      ['profile', 'kind', 'id', 'route', 'task', 'operation', 'idempotencyKey'],
-      ['extensions']
+      ['profile', 'kind', 'id', 'route', 'task', 'operation', 'idempotencyKey']
     )
     if (!identifier(value.idempotencyKey)) throw new PeerFault('PROTOCOL_INVALID')
     return
   }
   requiredFields(
     value,
-    ['profile', 'kind', 'id', 'route', 'task', 'operation', 'state', 'store'],
-    ['outcome', 'extensions']
+    ['profile', 'kind', 'id', 'route', 'task', 'operation', 'state', 'store']
   )
   const store = value.store as IRecord
   if (store?.kind === 'unavailable') {
@@ -839,14 +830,14 @@ function validateOutcome(value: IRecord): void {
   if (value.state === 'done') {
     const outcome = requiredFields(value.outcome, ['mode', 'targetGeneration', 'completion'])
     generation(outcome.targetGeneration)
-    const completion = requiredFields(outcome.completion, ['ok'], ['result', 'error'])
+    const completion = requiredFields(outcome.completion, ['ok'])
     if (
       !['request', 'notify', 'stream', 'group'].includes(String(outcome.mode)) ||
       typeof completion.ok !== 'boolean'
     )
       throw new PeerFault('PROTOCOL_INVALID')
     if (completion.ok) {
-      requiredFields(completion, ['ok'], ['result'])
+      requiredFields(completion, ['ok'])
       if (outcome.mode === 'group') validateGroup(completion.result)
       else if (Object.hasOwn(completion, 'result')) portableBytes(completion.result)
     } else {
@@ -894,7 +885,7 @@ async function handshake(reader: FrameReader, destination: Writable): Promise<IR
             step: 'reject',
             error: wireError('HANDSHAKE_INCOMPATIBLE')
           })
-          throw new PeerFault('HANDSHAKE_INVALID')
+          throw new PeerFault('HANDSHAKE_INCOMPATIBLE')
         }
         if (local.auth !== undefined) accepted.auth = local.auth
         await writeJson(destination, accepted)
