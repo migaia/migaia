@@ -517,7 +517,7 @@ it.each([false, true])(
   'keeps warnings and recipient reports original without calling errorMap, subscriber first %s',
   async (subscriberFirst) => {
     /** The warning recipient's exact error belongs only to the local report channel. */
-    const recipientFailure = new Error('A32 warning recipient failed')
+    const recipientFailure = new Error('warning recipient failed')
     /** Both recipients receive this same actual warning record from trusted native parent admission. */
     const warnings: IRpcWarning[] = []
     const reports: unknown[] = []

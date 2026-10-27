@@ -10,7 +10,7 @@ it('Process overrides Host auth once and scopes schema independently from Thread
   /** Each row is one actual signer invocation for the unique business payload. */
   const signed: { key: string; namespace: string }[] = []
   /** The Process-only parser's original failure proves that native local placement really executes. */
-  const schemaFailure = new TypeError('A25 Process accepts string arguments only')
+  const schemaFailure = new TypeError('Process accepts string arguments only')
   /** Native children verify the exact expected key, so successful echo is independent proof. */
   const host = await createRpcHost({
     plugins: [

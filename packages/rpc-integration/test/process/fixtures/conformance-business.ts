@@ -130,7 +130,7 @@ function deployment(
   bridge = false,
   budget?: IUnitBudget<'process'>
 ) {
-  if (bridge) throw new TypeError('JSON-RPC semantic profile retired by BC2')
+  if (bridge) throw new TypeError('JSON-RPC semantic profile retired')
   /** One set of receipts belongs to this actual native deployment. */
   const observed = new BusinessNativeObservations()
   /** The production launcher still owns spawn, bootstrap, signals and the native exit receipt. */
@@ -260,7 +260,7 @@ async function business(
   _peerId: string,
   bridge = false
 ) {
-  if (bridge) throw new TypeError('JSON-RPC semantic profile retired by BC2')
+  if (bridge) throw new TypeError('JSON-RPC semantic profile retired')
   const namespace = active.namespace
   expect(
     await namespace.request('p.f.request', [expected.request.input], {

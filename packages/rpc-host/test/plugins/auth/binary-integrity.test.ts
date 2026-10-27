@@ -126,7 +126,7 @@ class BinaryIntegrityPair {
     /** The counterpart signer is the only producer of this test representation. */
     const signed = input as { value: unknown; signature: string }
     if (signed.signature !== this.#signature(signed.value))
-      throw new Error('A33 fixture signature mismatch')
+      throw new Error('fixture signature mismatch')
     this.verifies++
     return signed.value
   }

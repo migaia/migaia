@@ -133,7 +133,7 @@ class ResidueBusiness {
     hold.entered.resolve()
     try {
       if (!context.signal.aborted) await aborted.promise
-      return context.failed('A17 provider cancelled', 'CANCELLED')
+      return context.failed('provider cancelled', 'CANCELLED')
     } finally {
       context.signal.removeEventListener('abort', onAbort)
       this.active -= 1
@@ -164,7 +164,7 @@ class ResidueInspector {
       generatePreview: true
     })
     if (result.exceptionDetails || !result.result.objectId)
-      throw new Error(`A17 inspector cannot retain ${name}`)
+      throw new Error(`inspector cannot retain ${name}`)
     return result.result
   }
   /** Private descriptors are read by the engine; no owner method or private function is invoked. */
@@ -179,7 +179,7 @@ class ResidueInspector {
     const descriptor = name.startsWith('#')
       ? result.privateProperties?.find((property) => property.name === name)
       : result.result.find((property) => property.name === name)
-    if (!descriptor?.value) throw new Error(`A17 inspector field unavailable: ${name}`)
+    if (!descriptor?.value) throw new Error(`inspector field unavailable: ${name}`)
     return descriptor.value
   }
   /** Engine Map/Set descriptions expose their actual size without an owner diagnostic seam. */
@@ -187,7 +187,7 @@ class ResidueInspector {
     /** Node supplies Map(n)/Set(n) on the exact built-in collection reference. */
     const match = /^(?:Map|Set)\((\d+)\)$/u.exec(object.description ?? '')
     if ((object.subtype !== 'map' && object.subtype !== 'set') || !match)
-      throw new Error(`A17 inspector collection unavailable: ${object.description}`)
+      throw new Error(`inspector collection unavailable: ${object.description}`)
     return Number(match[1])
   }
   /** Traverse a fixed actual private path and return its real collection size. */
@@ -443,13 +443,13 @@ async function operate(
       )
       .then(
         () => {
-          throw new Error('A17 held provider unexpectedly resolved')
+          throw new Error('held provider unexpectedly resolved')
         },
         (error: unknown) => error
       )
     await hold.entered.promise
     /** This original native reason must remain the public local cancellation's exact cause. */
-    const reason = new RangeError('A17 caller cancelled after provider entry')
+    const reason = new RangeError('caller cancelled after provider entry')
     if (kind === 'cancel') caller.abort(reason)
     else scheduler.advance(1000)
     /** The actual public result must retain its distinct expected native family and code. */

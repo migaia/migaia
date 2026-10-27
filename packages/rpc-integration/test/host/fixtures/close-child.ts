@@ -12,14 +12,14 @@ export type ICloseFixtureMode = 'namespace' | 'host' | 'limits' | 'idle'
 export const CloseFixture = {
   child: 'worker',
   namespace: 'native',
-  primary: 'A23 native close',
-  cause: 'A23 original close cause',
+  primary: 'native close',
+  cause: 'original close cause',
   notify: 'closing-notify',
   request: 'closing-request',
   summary: 'closing-summary',
-  hook: 'A23 closing hook failure',
+  hook: 'closing hook failure',
   invalid: 'Unexpected native closing fixture result',
-  local: 'A23 independent parent close'
+  local: 'independent parent close'
 } as const
 
 /** Both transports serialize the same native error chain without custom protocol handling. */

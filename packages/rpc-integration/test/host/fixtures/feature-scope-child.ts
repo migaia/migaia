@@ -11,7 +11,7 @@ export const FeatureScopeFixture = {
   hostKey: 'a25-key-A',
   processKey: 'a25-key-B',
   marker: 'a25-scope-probe',
-  signatureInvalid: 'A25 fixture signature belongs to another flow scope'
+  signatureInvalid: 'fixture signature belongs to another flow scope'
 } as const
 
 /** The real transform proves key selection without retaining payloads or adding a diagnostic path. */

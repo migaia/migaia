@@ -30,8 +30,7 @@ function signBinding(value: unknown): ISignedBinding {
 function verifyBinding(value: unknown): unknown {
   /** The public signer is the sole producer of this fixture's protected representation. */
   const signed = value as ISignedBinding
-  if (signed.signature !== signature(signed.value))
-    throw new Error('A29 fixture signature mismatch')
+  if (signed.signature !== signature(signed.value)) throw new Error('fixture signature mismatch')
   return signed.value
 }
 
@@ -115,7 +114,7 @@ it('signs default any bindings and object payloads with the original HMAC algori
         }
       )
       /** Binary application data proves that native storage still uses the original object path. */
-      const payload = { label: 'A29 roundtrip', bytes: new Uint8Array([0, 17, 255]) }
+      const payload = { label: 'roundtrip', bytes: new Uint8Array([0, 17, 255]) }
       expect(await pair.echo(payload)).toEqual(payload)
       /** This final client signature belongs to the completed public request, before cleanup. */
       const binding = signed.at(-1) as IBinding
@@ -162,7 +161,7 @@ it('rejects a changed default binding in verify before public provider delivery'
       )
     ).rejects.toMatchObject({ source: 'rpc.endpoint', code: 'AUTHENTICATION_FAILED' })
     expect(failures).not.toHaveLength(0)
-    expect(failures[0]).toMatchObject({ message: 'A29 fixture signature mismatch' })
+    expect(failures[0]).toMatchObject({ message: 'fixture signature mismatch' })
     expect(pair.delivered).toEqual([])
   } finally {
     await pair.close()
