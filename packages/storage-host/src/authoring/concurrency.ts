@@ -1,61 +1,60 @@
 import {
   type ILockKey,
   type IConcurrencyPolicy,
-  type ITransactionOptions,
-  ConcurrencyHolderState,
-  type IConcurrencyHolder,
   type IConcurrencyDecision,
   type IConcurrencyStageObserver,
   type IConcurrencyConflict,
-  type ILockHolding,
   ConcurrencyLocking,
   invalidConcurrencyArgument,
   assertConcurrencyPolicy,
   readConcurrencyPolicy,
   defineConcurrencyPolicy,
-  LockChannel,
   type INormalizedLockKey,
-  invalidLockArgument,
-  assertLockKey,
   type IConcurrencyAttempt,
   type IConcurrencyAttemptContext,
   type IConcurrencyPort,
   type IConcurrencyRequest,
-  assertStringStorageKey,
-  type IQuad,
   type IBackendKind,
   StorageContractError,
   StorageContractErrorCode,
-  StorageContractErrorText,
   type IConflictPolicy,
-  type IOperationContext,
-  type IStorageKey
+  type IOperationContext
 } from '@migaia/storage-contract'
 import {
   createAbortTimeoutSignal,
   raceWithAbort,
   sleep,
-  withTimeout,
-  hostRethrowReporter,
-  type IAbortTimeoutSignal,
   type IUtilsReporter
 } from '@migaia/utils/promise'
-import { IdentifyError, isUtilsAbortError, isUtilsTimeoutError } from '@migaia/utils/error'
-import { observeThenableRejection } from '@migaia/utils/function'
+import { IdentifyError } from '@migaia/utils/error'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { snapshotOperationContext } from './context.js'
 import { readTransactionConcurrency, resolveConcurrencyPolicy } from './transaction.js'
 import {
-  snapshotStorageKey,
-  encodeOrderedStorageKey,
-  snapshotStorageKeyPrefix,
-  storageKeyBytesIdentity,
-  sortStorageByteIdentities
-} from './key.js'
-import { snapshotStorageRdfQuad, encodeRdfQuadSnapshot } from './rdf.js'
-
-/** Stable decision values stay in the original concurrency owner. */
-const ConcurrencyAction = { wait: 'wait', reject: 'reject', retry: 'retry' } as const
+  concurrencyAttemptBudgets,
+  snapshotLockIdentities,
+  reportConcurrencyFailure,
+  ConcurrencyAdmission,
+  ConcurrencyAttemptExecution,
+  concurrencyAbort,
+  ConcurrencyExecutionStatus,
+  readConcurrencyStage,
+  observeConcurrencyResult,
+  ConcurrencyAttemptStatus,
+  ConcurrencyPhase,
+  waitForConcurrency,
+  ConcurrencyWaitKind,
+  readConcurrencyDecision,
+  concurrencyLockFailure
+} from './concurrency-attempt.js'
+import type { IConcurrencyBudget, IAttemptExecution } from './concurrency-attempt.js'
+import {
+  normalizeLockKeys,
+  snapshotConcurrencyExtensions,
+  uniqueNormalizedLockKeys,
+  snapshotLockKey
+} from './concurrency-lock-keys.js'
+import { ConcurrencyAction } from './concurrency-attempt.js'
 
 /** Preset labels describe policy behavior and never authorize a structurally copied policy. */
 const ConcurrencyPreset = { wait: 'wait', fail: 'fail', optimistic: 'optimistic' } as const
@@ -132,637 +131,6 @@ export const ConcurrencyPolicy = Object.freeze({
     })
   }
 })
-
-/** Disjoint channel markers prevent equal user keys in different channels from colliding. */
-const LockChannelRank = { text: 1, bytes: 2, record: 3, vector: 4, rdf: 5 } as const
-
-/** Capture text identity before queued lock admission can observe caller key changes. */
-function parseTextLock(
-  value: Extract<ILockKey, { channel: 'text' }>,
-  backend: IBackendKind | undefined
-): ILockKey {
-  return { channel: LockChannel.text, key: snapshotStorageKey(value.key, backend) }
-}
-
-/** Bytes retain the existing string-only key domain without allocating another key image. */
-function parseBytesLock(value: Extract<ILockKey, { channel: 'bytes' }>): ILockKey {
-  return { channel: LockChannel.bytes, key: value.key }
-}
-
-/** Capture mutable record key components before the real lock queue yields. */
-function parseRecordLock(
-  value: Extract<ILockKey, { channel: 'record' }>,
-  backend: IBackendKind | undefined
-): ILockKey {
-  return { channel: LockChannel.record, key: snapshotStorageKey(value.key, backend) }
-}
-
-/** Vector point identity consists only of its collection/id strings. */
-function parseVectorLock(value: Extract<ILockKey, { channel: 'vector' }>): ILockKey {
-  return { channel: LockChannel.vector, collection: value.collection, id: value.id }
-}
-
-/** Ground quad fields span queued lock admission and share the canonical RDF capture owner. */
-function parseRdfLock(
-  value: Extract<ILockKey, { channel: 'rdf' }>,
-  backend: IBackendKind | undefined
-): ILockKey {
-  return { channel: LockChannel.rdf, quad: snapshotStorageRdfQuad(value.quad, backend) }
-}
-
-/** Dispatch the supported channel once; each channel owns exactly its actual input fields. */
-export function snapshotLockKey(value: unknown, backend: IBackendKind | undefined): ILockKey {
-  assertLockKey(value, backend)
-  /** Only the snapshot boundary detaches mutable keys or ground term objects for queued use. */
-  const key = value
-  switch (key.channel) {
-    case LockChannel.text:
-      return parseTextLock(key, backend)
-    case LockChannel.bytes:
-      return parseBytesLock(key)
-    case LockChannel.record:
-      return parseRecordLock(key, backend)
-    case LockChannel.vector:
-      return parseVectorLock(key)
-    case LockChannel.rdf:
-      return parseRdfLock(key, backend)
-    default:
-      throw invalidLockArgument(backend)
-  }
-}
-
-/** Public factories snapshot immediately without inventing a backend when no store exists yet. */
-export const lockKey = Object.freeze({
-  /** Text locks use the same typed key domain as single and batch text identity. */
-  text(key: IStorageKey): Extract<ILockKey, { readonly channel: 'text' }> {
-    return snapshotLockKey({ channel: LockChannel.text, key }, undefined) as Extract<
-      ILockKey,
-      { readonly channel: 'text' }
-    >
-  },
-  /** Byte locks retain their existing string-only physical channel. */
-  bytes(key: string): Extract<ILockKey, { readonly channel: 'bytes' }> {
-    return snapshotLockKey({ channel: LockChannel.bytes, key }, undefined) as Extract<
-      ILockKey,
-      { readonly channel: 'bytes' }
-    >
-  },
-  /** Record locks detach Dates, buffers and nested arrays through the existing validator. */
-  record(key: IStorageKey): Extract<ILockKey, { readonly channel: 'record' }> {
-    return snapshotLockKey({ channel: LockChannel.record, key }, undefined) as Extract<
-      ILockKey,
-      { readonly channel: 'record' }
-    >
-  },
-  /** Vector locks share one exact collection/point identity with native writes and TTL. */
-  vector(collection: string, id: string): Extract<ILockKey, { readonly channel: 'vector' }> {
-    return snapshotLockKey({ channel: LockChannel.vector, collection, id }, undefined) as Extract<
-      ILockKey,
-      { readonly channel: 'vector' }
-    >
-  },
-  /** RDF locks detach a complete ground quad through its canonical term owner. */
-  rdf(quad: IQuad): Extract<ILockKey, { readonly channel: 'rdf' }> {
-    return snapshotLockKey({ channel: LockChannel.rdf, quad }, undefined) as Extract<
-      ILockKey,
-      { readonly channel: 'rdf' }
-    >
-  }
-})
-
-/** Encodes only canonical channel content for both native identity and unchanged diagnostics. */
-function encodeLockContent(key: ILockKey, backend: IBackendKind | undefined): Uint8Array {
-  return key.channel === LockChannel.rdf
-    ? encodeRdfQuadSnapshot(key.quad)
-    : encodeOrderedStorageKey(
-        key.channel === LockChannel.vector ? [key.collection, key.id] : key.key,
-        backend
-      )
-}
-
-/** Adds only channel identity around the sole canonical ordered-key encoder. */
-function encodeLockIdentity(key: ILockKey, backend: IBackendKind | undefined): Uint8Array {
-  /** Key-order and RDF own all self-delimiting content bytes. */
-  const ordered = encodeLockContent(key, backend)
-  /** New vector/RDF markers follow the unchanged text < bytes < record order. */
-  const encoded = new Uint8Array(ordered.length + 1)
-  encoded[0] = LockChannelRank[key.channel]
-  encoded.set(ordered, 1)
-  return encoded
-}
-
-/**
- * Detaches only the current inspection rows and orders them with the original stable byte radix.
- * Equal keys retain their individual holder/lease rows; no lock or resource authority is granted.
- */
-export function snapshotConcurrencyLockHoldings(
-  rows: readonly ILockHolding[]
-): readonly ILockHolding[] {
-  if (!Array.isArray(rows)) throw invalidLockArgument(undefined)
-  /** Encodings belong only to this inspection and never replace authentic attempt metadata. */
-  const entries: { readonly encoded: Uint8Array; readonly row: ILockHolding }[] = []
-  for (const row of rows) {
-    /** Public diagnostics can retain and mutate Date/binary keys while the lease remains active. */
-    const captured = { ...row, key: snapshotLockKey(row.key, undefined) }
-    entries.push({ encoded: encodeLockIdentity(captured.key, undefined), row: captured })
-  }
-  sortStorageByteIdentities(entries)
-  return entries.map((entry) => entry.row)
-}
-
-/** Adjacent deduplication charges each compared encoding at most twice. */
-function equalLockIdentity(left: Uint8Array, right: Uint8Array): boolean {
-  if (left.length !== right.length) return false
-  for (let index = 0; index < left.length; index += 1)
-    if (left[index] !== right[index]) return false
-  return true
-}
-
-/**
- * Internal owner/builder normalization snapshots once, encodes once and sorts by actual byte
- * suffixes. The immutable result has independent keys and no comparison sort or global cache.
- */
-export function normalizeLockKeys(
-  keys: unknown,
-  backend: IBackendKind
-): readonly INormalizedLockKey[] {
-  if (!Array.isArray(keys)) throw invalidLockArgument(backend)
-  /** Normalization keeps only this input's independent key snapshots and encodings. */
-  const entries: INormalizedLockKey[] = []
-  for (const value of keys) {
-    /** Mutable key components must survive actual queued acquisition and asynchronous retries. */
-    const key = snapshotLockKey(value, backend)
-    entries.push({ key, encoded: encodeLockIdentity(key, backend) })
-  }
-  return uniqueNormalizedLockKeys(entries)
-}
-
-/** Reuses captured byte identities when original options acquire additional implicit locks. */
-function uniqueNormalizedLockKeys(entries: INormalizedLockKey[]): readonly INormalizedLockKey[] {
-  sortStorageByteIdentities(entries)
-  /** Only adjacent canonical identities are compared; mutable object identity never deduplicates. */
-  const unique: INormalizedLockKey[] = []
-  for (const entry of entries) {
-    /** The last retained item is already in canonical order. */
-    const previous = unique[unique.length - 1]
-    if (!previous || !equalLockIdentity(previous.encoded, entry.encoded)) unique.push(entry)
-  }
-  return unique
-}
-
-/**
- * Captures one canonical lock set and its matching immutable identities without granting admission
- * authority. Consumers share the original key snapshot, ordered encoder and stable deduplication.
- */
-export function snapshotConcurrencyLockKeys(
-  keys: unknown,
-  backend: IBackendKind
-): { readonly keys: readonly ILockKey[]; readonly identities: readonly string[] } {
-  /** One normalization supplies both detached logical keys and their already captured bytes. */
-  const locks = normalizeLockKeys(keys, backend)
-  return {
-    keys: locks.map((entry) => entry.key),
-    identities: snapshotLockIdentities(locks)
-  }
-}
-
-/**
- * Projects one channel or typed prefix into the same half-open hexadecimal identity interval as
- * active locks. This is a pure range snapshot, without a lock table or acquisition authority.
- */
-export function snapshotConcurrencyLockRange(
-  range: { readonly channel: ILockKey['channel']; readonly prefix?: IStorageKey },
-  backend: IBackendKind
-): { readonly lower: string; readonly upper: string } {
-  if (typeof range !== 'object' || range === null || Array.isArray(range))
-    throw invalidLockArgument(backend)
-  /** Scalar channel/prefix intent is consumed synchronously by the canonical encoder. */
-  const { channel, prefix } = range
-  if (
-    channel !== LockChannel.text &&
-    channel !== LockChannel.bytes &&
-    channel !== LockChannel.record &&
-    channel !== LockChannel.vector &&
-    channel !== LockChannel.rdf
-  )
-    throw invalidLockArgument(backend)
-  /** Only the original channel owner supplies its finite physical ordering. */
-  const rank = LockChannelRank[channel]
-  if (prefix === undefined)
-    return {
-      lower: storageKeyBytesIdentity(new Uint8Array([rank])),
-      upper: storageKeyBytesIdentity(new Uint8Array([rank + 1]))
-    }
-  if (channel === LockChannel.vector || channel === LockChannel.rdf)
-    throw invalidLockArgument(backend)
-  if (channel === LockChannel.bytes) assertStringStorageKey(prefix, backend)
-  /** The original prefix writer owns all type tags, variable terminators and strict successors. */
-  const bounds = snapshotStorageKeyPrefix(prefix, backend)
-  /** Each bound adds only the same channel byte used by individual lock normalization. */
-  const withChannel = (bytes: Uint8Array): string => {
-    /** One allocation holds the captured channel and the original bound bytes. */
-    const encoded = new Uint8Array(bytes.length + 1)
-    encoded[0] = rank
-    encoded.set(bytes, 1)
-    return storageKeyBytesIdentity(encoded)
-  }
-  return { lower: withChannel(bounds.lower), upper: withChannel(bounds.upper) }
-}
-
-/** Fixed fields have already been captured by the original option/context admission path. */
-const capturedConcurrencyFields = {
-  lock: true,
-  concurrency: true,
-  signal: true,
-  timeoutMs: true,
-  pageSize: true,
-  conflictPolicy: true,
-  orgId: true
-}
-
-/**
- * Captures backend extension fields once for contexts that cross real preparation and attempt
- * awaits.
- */
-function snapshotConcurrencyExtensions(options: ITransactionOptions): object {
-  /** Plain owned properties preserve native option values and symbol fields on every attempt. */
-  const extensions = {}
-  for (const key of Reflect.ownKeys(options)) {
-    if (Object.hasOwn(capturedConcurrencyFields, key)) continue
-    Object.defineProperty(extensions, key, {
-      value: options[key as keyof ITransactionOptions],
-      enumerable: true
-    })
-  }
-  return extensions
-}
-
-/** Canonical attempt states stay with the original concurrency loop. */
-const ConcurrencyAttemptStatus = { committed: 'committed', conflict: 'conflict' } as const
-
-/** Only an actual policy decision can change a subsequent attempt to waiting admission. */
-const ConcurrencyAdmission = { try: 'try', wait: 'wait' } as const
-
-/** Acquisition refusal and completed-rollback conflicts have distinct public failure codes. */
-const ConcurrencyPhase = { acquire: 'acquire', commit: 'commit' } as const
-
-/** A pipeline may return a recovery value or preserve the exact failure it observed. */
-const ConcurrencyExecutionStatus = { returned: 'returned', threw: 'threw' } as const
-
-/** One logical operation owns timing and conflict counters, including nested persist admission. */
-type IConcurrencyBudget = {
-  readonly cancellation: IAbortTimeoutSignal
-  readonly deadlineFailure: StorageContractError
-  readonly backend: IBackendKind
-  readonly report: IUtilsReporter
-  waitedMs: number
-  logicalWaitedMs: number
-  conflicts: number
-}
-
-/**
- * Captured options share canonical lock metadata and an optional running budget without granting
- * authority.
- */
-const concurrencyAttemptBudgets = new WeakMap<
-  ITransactionOptions,
-  {
-    readonly budget?: IConcurrencyBudget
-    readonly locks: readonly INormalizedLockKey[] | undefined
-    readonly identities: readonly string[]
-  }
->()
-
-/**
- * Builder-only metadata shares the existing options table and creates no timing or transaction
- * owner.
- */
-export function associateNormalizedLockKeys(
-  options: ITransactionOptions,
-  locks: readonly INormalizedLockKey[]
-): void {
-  concurrencyAttemptBudgets.set(options, { locks, identities: snapshotLockIdentities(locks) })
-}
-
-/** One immutable ordered string list is retained with the original normalized option metadata. */
-function snapshotLockIdentities(
-  locks: readonly INormalizedLockKey[] | undefined
-): readonly string[] {
-  return locks?.map((entry) => storageKeyBytesIdentity(entry.encoded)) ?? []
-}
-
-/**
- * Reads the same active attempt's normalized, sorted and deduplicated lock identities. Repeated
- * reads and nested native attempts share one immutable string list; no logical key is inspected or
- * re-encoded here. Forged, builder-only and settled contexts reject with INVALID_ARGUMENT. This
- * grants no transaction, registration, lock acquisition or lifecycle authority.
- */
-export function readConcurrencyLockIdentities(ctx: IConcurrencyAttemptContext): readonly string[] {
-  /** Only the original live attempt metadata can grant read access to its immutable identities. */
-  const captured = concurrencyAttemptBudgets.get(ctx)
-  if (captured?.budget === undefined) throw invalidConcurrencyArgument()
-  return captured.identities
-}
-
-/** Internal managed waits distinguish logical policy budgets from physical database scheduling. */
-const ConcurrencyWaitKind = { logical: 'logical', physical: 'physical' } as const
-
-/** An observation failure never replaces an operation result, even if the configured reporter fails. */
-function reportConcurrencyFailure(
-  stages: IConcurrencyStageObserver | undefined,
-  error: unknown
-): void {
-  observeThenableRejection(undefined, { error }, (failure) => {
-    if (stages) stages.report(failure)
-    else hostRethrowReporter(failure, { operation: 'raceWithAbort', phase: 'late-rejection' })
-  })
-}
-
-/** Invoke an actual stage method with its receiver and observe ordinary Promise completion. */
-function observeConcurrencyResult(
-  stages: IConcurrencyStageObserver,
-  name: Exclude<keyof IConcurrencyStageObserver, 'kind' | 'report'>,
-  args: readonly unknown[]
-): void {
-  try {
-    /** The stage registry owns the callback receiver; no detached method or then getter is captured. */
-    const result = (
-      stages as unknown as Record<string, (...values: readonly unknown[]) => unknown>
-    )[name]!(...args)
-    if (result !== undefined)
-      void Promise.resolve(result).catch((error) => reportConcurrencyFailure(stages, error))
-  } catch (error) {
-    reportConcurrencyFailure(stages, error)
-  }
-}
-
-/** Optional stage selection does not grant cancellation or admission authority. */
-function readConcurrencyStage<
-  TName extends Exclude<keyof IConcurrencyStageObserver, 'kind' | 'report'>
->(stages: IConcurrencyStageObserver | undefined, name: TName): IConcurrencyStageObserver[TName] {
-  return stages?.[name]
-}
-
-/** Constructs lock diagnostics once at failure, detached from mutable policy/backend key views. */
-function concurrencyLockFailure(
-  code: typeof StorageContractErrorCode.lockRejected | typeof StorageContractErrorCode.lockTimeout,
-  backend: IBackendKind,
-  keys: readonly ILockKey[],
-  holder: IConcurrencyHolder | undefined,
-  cause?: unknown
-): StorageContractError {
-  /** Error keys own their mutable components and cannot change a later attempt's physical identity. */
-  const snapshot = keys.map((key) => snapshotLockKey(key, backend))
-  /** Canonical bytes retain binary identity while JSON keeps ordinary logical keys readable. */
-  const keyDescription =
-    holder === undefined
-      ? undefined
-      : JSON.stringify(
-          snapshot.map((key) => ({
-            ...key,
-            encoded: storageKeyBytesIdentity(encodeLockContent(key, backend))
-          }))
-        )
-  /** Handoff is a real identity gap, never a substituted old label. */
-  const holderDescription =
-    holder?.status === ConcurrencyHolderState.held
-      ? (holder.label ?? holder.owner)
-      : ConcurrencyHolderState.handingOff
-  return new StorageContractError(
-    code,
-    { backend, keys: snapshot, holder, cause },
-    keyDescription === undefined
-      ? undefined
-      : StorageContractErrorText.lockFailure(code, keyDescription, holderDescription)
-  )
-}
-
-/**
- * Maps only cancellation owned by this operation; backend failures otherwise pass through
- * unchanged.
- */
-function concurrencyAbort(
-  budget: IConcurrencyBudget,
-  physical: boolean,
-  keys: readonly ILockKey[] = []
-): StorageContractError | undefined {
-  /** The single merged signal owns first-abort identity and preserves an external reason. */
-  const signal = budget.cancellation.signal
-  if (!signal?.aborted) return undefined
-  /** This original signal retains the operation's first cancellation reason. */
-  const reason = signal.reason
-  if (reason === budget.deadlineFailure)
-    return physical
-      ? concurrencyLockFailure(
-          StorageContractErrorCode.lockTimeout,
-          budget.backend,
-          keys,
-          undefined,
-          reason
-        )
-      : budget.deadlineFailure
-  return new StorageContractError(StorageContractErrorCode.aborted, {
-    backend: budget.backend,
-    cause: reason
-  })
-}
-
-/**
- * Uses utils waiting primitives only. Timeout ends this wait, never an accepted native attempt; the
- * backend must remove its queued waiter and finish cleanup before its attempt settles.
- */
-async function waitForConcurrency<T>(
-  budget: IConcurrencyBudget,
-  pending: Promise<T>,
-  kind: (typeof ConcurrencyWaitKind)[keyof typeof ConcurrencyWaitKind],
-  logicalTimeoutMs: number | undefined,
-  keys: readonly ILockKey[],
-  holder: IConcurrencyHolder | undefined
-): Promise<T> {
-  /**
-   * The pending Promise already exists; observe it even if utils rejects before starting its lazy
-   * operation.
-   */
-  let started = false
-  void pending.catch((error) => {
-    if (!started) {
-      /** Only this operation's own reason acknowledges cancellation. */
-      const acknowledgement = error === budget.cancellation.signal?.reason
-      if (!acknowledgement)
-        budget.report(error, { operation: 'raceWithAbort', phase: 'late-rejection' })
-    }
-  })
-  /** Only this actual blocking interval contributes to cumulative admission statistics. */
-  const start = systemScheduler.now()
-  try {
-    /** The lazy operation transfers rejection observation to the canonical utils implementation. */
-    const operation = (): Promise<T> => {
-      started = true
-      return pending
-    }
-    if (kind === ConcurrencyWaitKind.logical && logicalTimeoutMs !== undefined)
-      return await withTimeout(operation, {
-        timeoutMs: Math.max(0, logicalTimeoutMs - budget.logicalWaitedMs),
-        signal: budget.cancellation.signal,
-        report: budget.report
-      })
-    return await raceWithAbort(operation, {
-      signal: budget.cancellation.signal,
-      report: budget.report
-    })
-  } catch (error) {
-    /**
-     * Physical deadlines have their own public classification; external cancellation keeps its
-     * reason.
-     */
-    const aborted = concurrencyAbort(budget, kind === ConcurrencyWaitKind.physical, keys)
-    if (aborted) throw aborted
-    if (kind === ConcurrencyWaitKind.logical && isUtilsTimeoutError(error))
-      throw concurrencyLockFailure(
-        StorageContractErrorCode.lockTimeout,
-        budget.backend,
-        keys,
-        holder,
-        error
-      )
-    if (isUtilsAbortError(error))
-      throw new StorageContractError(StorageContractErrorCode.aborted, {
-        backend: budget.backend,
-        cause: error.cause
-      })
-    throw error
-  } finally {
-    /** Callback and cleanup execution are deliberately outside these measured waiting intervals. */
-    const elapsed = Math.max(0, systemScheduler.now() - start)
-    budget.waitedMs += elapsed
-    if (kind === ConcurrencyWaitKind.logical) budget.logicalWaitedMs += elapsed
-  }
-}
-
-/**
- * Captures policy fields once and rejects inapplicable combinations after the old attempt is
- * closed.
- */
-function readConcurrencyDecision(
-  value: unknown,
-  phase: IConcurrencyConflict['phase']
-): IConcurrencyDecision {
-  if (typeof value !== 'object' || value === null || Array.isArray(value))
-    throw new TypeError(StorageContractErrorText.concurrencyDecision)
-  /** A changing result cannot supply different action/budget fields during validation and use. */
-  const { action, timeoutMs, delayMs } = value as IConcurrencyDecision
-  if (action === ConcurrencyAction.reject && timeoutMs === undefined && delayMs === undefined)
-    return value as IConcurrencyDecision
-  if (
-    action === ConcurrencyAction.wait &&
-    phase === ConcurrencyPhase.acquire &&
-    delayMs === undefined &&
-    (timeoutMs === undefined || (Number.isFinite(timeoutMs) && timeoutMs >= 0))
-  )
-    return value as IConcurrencyDecision
-  if (
-    action === ConcurrencyAction.retry &&
-    timeoutMs === undefined &&
-    (delayMs === undefined || (Number.isFinite(delayMs) && delayMs >= 0))
-  )
-    return value as IConcurrencyDecision
-  throw new TypeError(StorageContractErrorText.concurrencyDecision)
-}
-
-/** Original pipeline segment outcomes are observed before another native attempt begins. */
-type IAttemptExecution<TResult> = {
-  readonly ready: Promise<void>
-  readonly completed: Promise<
-    | {
-        readonly status: typeof ConcurrencyExecutionStatus.returned
-        readonly value: Awaited<TResult>
-      }
-    | { readonly status: typeof ConcurrencyExecutionStatus.threw; readonly cause: unknown }
-  >
-  readonly entered: boolean
-  resolve(value: Awaited<TResult>): void
-  reject(cause: unknown): void
-}
-
-/** A segment borrows only its real pipeline callback and the original loop’s preparation port. */
-type IAttemptExecutionPort<TResult> = {
-  execute(invoke: () => Promise<Awaited<TResult>>): Awaited<TResult> | PromiseLike<Awaited<TResult>>
-  prepare(): StorageContractError | undefined
-}
-
-/** Own one segment’s terminal admission and native result without another loop or timing owner. */
-class ConcurrencyAttemptExecution<TResult> implements IAttemptExecution<TResult> {
-  /** The runner owns the actual preparation and executeAttempt callbacks. */
-  readonly #port: IAttemptExecutionPort<TResult>
-  /**
-   * Native settlement stays pending through acquisition refusals and resolves only after actual
-   * cleanup.
-   */
-  readonly #native: Promise<Awaited<TResult>>
-  /** Complete the exact native Promise borrowed by the pipeline terminal. */
-  #resolveNative!: (value: Awaited<TResult>) => void
-  /** Preserve the exact coded failure observed by catch and recovery. */
-  #rejectNative!: (cause: unknown) => void
-  /** Wake the original loop at terminal admission or actual pipeline completion. */
-  #resolveReady!: () => void
-  /** A terminal can admit native work once for this actual segment. */
-  #invoked = false
-  /** Successful preparation is the sole authority to begin this segment’s native attempts. */
-  #entered = false
-  /** Original loop waits for terminal admission or a legal stage halt. */
-  readonly ready: Promise<void>
-  /** Both outcomes are observed before a completed segment is released. */
-  readonly completed: IAttemptExecution<TResult>['completed']
-  /** Build all result ports before invoking the real pipeline callback. */
-  constructor(port: IAttemptExecutionPort<TResult>) {
-    this.#port = port
-    this.#native = new Promise((resolve, reject) => {
-      this.#resolveNative = resolve
-      this.#rejectNative = reject
-    })
-    void this.#native.then(undefined, () => undefined)
-    this.ready = new Promise((resolve) => {
-      this.#resolveReady = resolve
-    })
-    this.completed = this.#complete()
-  }
-  /** Admission facts have no setter and grant no native port to callers. */
-  get entered(): boolean {
-    return this.#entered
-  }
-  /** Actual native commit settlement resumes the pipeline’s after-next path. */
-  resolve(value: Awaited<TResult>): void {
-    this.#resolveNative(value)
-  }
-  /** Actual native conflict/failure resumes that same pipeline’s catch/finally path. */
-  reject(cause: unknown): void {
-    this.#rejectNative(cause)
-  }
-  /** Duplicate calls reject before key derivation or native admission. */
-  #enter(): Promise<Awaited<TResult>> {
-    if (this.#invoked) return Promise.reject(invalidConcurrencyArgument())
-    this.#invoked = true
-    /** Preparation runs synchronously at the original terminal before it yields to the native loop. */
-    const aborted = this.#port.prepare()
-    if (aborted) return Promise.reject(aborted)
-    this.#entered = true
-    this.#resolveReady()
-    return this.#native
-  }
-  /** Observe the original segment’s complete asynchronous unwind, including legal early return. */
-  async #complete(): IAttemptExecution<TResult>['completed'] {
-    try {
-      return {
-        status: ConcurrencyExecutionStatus.returned,
-        value: await this.#port.execute(() => this.#enter())
-      }
-    } catch (cause) {
-      return { status: ConcurrencyExecutionStatus.threw, cause }
-    } finally {
-      this.#resolveReady()
-    }
-  }
-}
 
 /** All logical retry state belongs to one named runner and the original transaction registration. */
 class ConcurrencyRunner<TResult> {
@@ -1226,3 +594,15 @@ export async function runWithConcurrency<TResult>(
 ): Promise<Awaited<TResult>> {
   return await new ConcurrencyRunner(request, port).run()
 }
+export {
+  snapshotLockKey,
+  lockKey,
+  snapshotConcurrencyLockHoldings,
+  normalizeLockKeys,
+  snapshotConcurrencyLockKeys,
+  snapshotConcurrencyLockRange
+} from './concurrency-lock-keys.js'
+export {
+  associateNormalizedLockKeys,
+  readConcurrencyLockIdentities
+} from './concurrency-attempt.js'
