@@ -119,3 +119,5 @@ try {
 自定义 probe 从 `@migaia/rpc-host/plugins/probe` 导入；SDK 从 `@migaia/rpc-host/sdk` 导入。物理 carrier/protected 阶段依赖实际路径，不用语义消息伪造。诊断失败不得替换原业务结果；错误 source 为 rpc.devtools，包含 INVALID_OPTION、CLOSED、RECORD_ACTIVE/RECORD_NOT_ACTIVE、RECORD_FORMAT_INVALID、REDACT_FAILED、SERVICE_RESULT_INVALID，保留原类型与 cause。
 
 默认包含转发事件。查询或记录有序事件后，可关联 `messageId`、`route` 与调用方可选 `trace`，查看各 host 的 `hop`、`maxHops` 和拒绝原因。既有环在保留事件时复制借用路由；实时 probe 回调仍只借用该数组。
+
+stats 的原始 endpoint/method 统计最多保留 4096 对，独立于事件环和名称表。新组合按首次写入顺序淘汰最早的组合；更新旧组合不刷新顺序。`stats().evictedPairs` 是本次 clear 周期内淘汰的组合数，`clear()` 将它重置为 0。

@@ -49,7 +49,7 @@ const service: IRpcDevtoolsServiceApi = {
   watch: async function* () {
     yield { events: [], dropped: 0 }
   },
-  stats: () => ({ since: 0, methods: [] }),
+  stats: () => ({ since: 0, evictedPairs: 0, methods: [] }),
   record: {
     start: () => {},
     stop: () => encodeRpcDevtoolsRecord({ header: RpcDevtoolsRecordFormat, events: [] })
@@ -75,7 +75,7 @@ describe('public scaffold', () => {
   })
 
   it('retains a typed service implementation and typed namespace stats request', () => {
-    expect(service.stats()).toEqual({ since: 0, methods: [] })
+    expect(service.stats()).toEqual({ since: 0, evictedPairs: 0, methods: [] })
     expectTypeOf(requestStats).returns.toEqualTypeOf<Promise<IRpcDevtoolsStats>>()
   })
 })

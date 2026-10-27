@@ -16,12 +16,16 @@ import { classifyRpcFailure, RpcDevtoolsFailure } from './failure.js'
 /** Five counters and the terminal-bin maximum precede the 24 histogram bins without padding. */
 const StatsWidth = 6 + CollectorLimit.histogram
 
-/** Numeric statistics grow only for a new endpoint/method pair, independent of ring eviction. */
+/** Bounded endpoint/method histograms retain first-insertion order independently of event rings. */
 export class CollectorStats {
   /** Raw endpoint/method pairs select dense fixed-width statistics slots. */
   #slots = new Map<string, Map<string, number>>()
   /** Pair count indexes fixed-width counters independently of endpoint map size. */
   #count = 0
+  /** Slot insertion order identifies the oldest retained raw pair without scanning the pair index. */
+  #order = new Map<number, undefined>()
+  /** Lost raw pairs remain visible even when bounded name projection merges public rows. */
+  #evictedPairs = 0
   /** Numeric counts avoid per-event object or array allocation after warm-up. */
   #data = new Float64Array(16 * StatsWidth)
   /** Endpoint references remain raw until stats() crosses its public boundary. */
@@ -51,28 +55,9 @@ export class CollectorStats {
       view.outcome !== RpcProbeOutcome.rejected
     )
       return
-    /** String pair lookup performs no concatenation or intern-table operation on settlement. */
-    let methods = this.#slots.get(view.endpointId)
-    if (methods === undefined) {
-      methods = new Map()
-      this.#slots.set(view.endpointId, methods)
-    }
-    /** First observation of a pair owns its raw identity and its aggregation slot. */
-    let slot = methods.get(view.method)
-    if (slot === undefined) {
-      slot = this.#count++
-      if (slot === this.#endpoints.length) {
-        /** Numeric growth occurs only on first observation of a new supported pair. */
-        const data = new Float64Array(this.#data.length * 2)
-        data.set(this.#data)
-        this.#data = data
-        this.#endpoints.length *= 2
-        this.#methods.length *= 2
-      }
-      methods.set(view.method, slot)
-      this.#endpoints[slot] = view.endpointId
-      this.#methods[slot] = view.method
-    }
+    /** Existing observations keep their original insertion age; only new pairs can evict. */
+    let slot = this.#slots.get(view.endpointId)?.get(view.method)
+    if (slot === undefined) slot = this.#admit(view.endpointId, view.method)
     /** Offset selects the fixed counter block without constructing an aggregate object. */
     const offset = slot * StatsWidth
     this.#data[offset]!++
@@ -92,6 +77,43 @@ export class CollectorStats {
     this.#data[offset + 6 + bucket]!++
     /** The terminal bin's measured maximum keeps interpolation useful for long calls. */
     if (view.durationMs > this.#data[offset + 5]!) this.#data[offset + 5] = view.durationMs
+  }
+
+  /** Reuse the oldest fixed-width slot at capacity, removing every retained raw identity it owned. */
+  #admit(endpoint: string, method: string): number {
+    /** A slot remains stable until its raw pair leaves the FIFO budget. */
+    let slot: number
+    if (this.#count === CollectorLimit.statisticsPairs) {
+      slot = this.#order.keys().next().value!
+      this.#order.delete(slot)
+      /** The endpoint index loses its last empty method map with the evicted pair. */
+      const previous = this.#slots.get(this.#endpoints[slot]!)!
+      previous.delete(this.#methods[slot]!)
+      if (previous.size === 0) this.#slots.delete(this.#endpoints[slot]!)
+      this.#data.fill(0, slot * StatsWidth, (slot + 1) * StatsWidth)
+      this.#evictedPairs++
+    } else {
+      slot = this.#count++
+      if (slot === this.#endpoints.length) {
+        /** Doubling stops at the compile-time pair ceiling rather than following input cardinality. */
+        const data = new Float64Array(this.#data.length * 2)
+        data.set(this.#data)
+        this.#data = data
+        this.#endpoints.length *= 2
+        this.#methods.length *= 2
+      }
+    }
+    /** Pair indexes are admitted after eviction, including replacement of the same endpoint. */
+    let methods = this.#slots.get(endpoint)
+    if (methods === undefined) {
+      methods = new Map()
+      this.#slots.set(endpoint, methods)
+    }
+    methods.set(method, slot)
+    this.#endpoints[slot] = endpoint
+    this.#methods[slot] = method
+    this.#order.set(slot, undefined)
+    return slot
   }
 
   /** Interpolate a rank within its histogram bucket; no sorting or retained samples are needed. */
@@ -129,7 +151,7 @@ export class CollectorStats {
      * keys.
      */
     const methodIds: number[] = []
-    for (let rawSlot = 0; rawSlot < this.#count; rawSlot++) {
+    for (const rawSlot of this.#order.keys()) {
       if (excluded?.has(this.#endpoints[rawSlot]!)) continue
       /**
        * Service exclusion precedes projection so overflow cannot merge a hidden endpoint into a
@@ -195,13 +217,15 @@ export class CollectorStats {
         p99Ms: this.#percentile(data, offset, 0.99)
       })
     }
-    return { since: this.#since, methods }
+    return { since: this.#since, evictedPairs: this.#evictedPairs, methods }
   }
 
   /** Clear resets aggregates while preserving already allocated numeric capacity. */
   clear(): void {
     this.#slots.clear()
     this.#count = 0
+    this.#order.clear()
+    this.#evictedPairs = 0
     this.#endpoints.fill(undefined)
     this.#methods.fill(undefined)
     this.#data.fill(0)

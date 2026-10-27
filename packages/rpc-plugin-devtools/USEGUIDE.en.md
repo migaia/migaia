@@ -119,3 +119,5 @@ End your watches and recording, close business Hosts, then close the caller-owne
 Import custom probes from `@migaia/rpc-host/plugins/probe` and deployment SDK from `@migaia/rpc-host/sdk`. Physical carrier/protected stages depend on actual paths, without semantic messages presented as raw data. Diagnostics must not replace business results. Errors use source rpc.devtools, including INVALID_OPTION, CLOSED, RECORD_ACTIVE/RECORD_NOT_ACTIVE, RECORD_FORMAT_INVALID, REDACT_FAILED, SERVICE_RESULT_INVALID, with original native type and cause.
 
 Forwarding rows are included by default. Query or record the ordered rows and correlate `messageId`, `route`, and the caller’s optional `trace` to inspect each host’s `hop`, `maxHops`, and refusal reason. The existing ring copies borrowed routes when retaining rows; live probe callbacks still borrow them.
+
+Raw endpoint/method statistics retain at most 4096 pairs, independently of the event ring and name table. New pairs evict the earliest first insertion; updating an existing pair does not refresh its age. `stats().evictedPairs` reports the number of raw pairs evicted in the current clear epoch; `clear()` resets it to zero.

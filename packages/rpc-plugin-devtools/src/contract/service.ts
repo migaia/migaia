@@ -56,6 +56,8 @@ export type IRpcDevtoolsPage = Readonly<{
 export type IRpcDevtoolsStats = Readonly<{
   /** Wall-clock epoch milliseconds at this statistics window's start; clear starts a new window. */
   since: number
+  /** Raw endpoint/method pairs evicted by the 4096-pair FIFO budget since the last clear. */
+  evictedPairs: number
   /** Endpoint/method aggregates, independent of retained query-ring eviction. */
   methods: readonly Readonly<{
     /** Endpoint supplying the observation. */

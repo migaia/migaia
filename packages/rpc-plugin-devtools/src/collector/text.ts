@@ -34,6 +34,8 @@ export const CollectorLimit = {
   events: 10_000,
   contentBytes: 8 * 1024 * 1024,
   interned: 65_536,
+  /** Raw endpoint/method histograms retain at most this many first-inserted pairs per clear epoch. */
+  statisticsPairs: 4096,
   query: 1000,
   batch: 256,
   batches: 64,
