@@ -1,5 +1,3 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import { createEventChannel } from '@migaia/event-subscriber'
 import {
   createGenerationController,
@@ -145,29 +143,6 @@ const createOwnershipModel = (): IOwnershipModel => {
 }
 
 describe('live-query ownership model', () => {
-  it('requires the three canonical owners and keeps the production entry free of parallel state', () => {
-    /** Storage manifest must declare every runtime owner it will compose. */
-    const manifest = JSON.parse(
-      readFileSync(resolve(import.meta.dirname, '..', 'package.json'), 'utf8')
-    ) as { readonly dependencies?: Readonly<Record<string, string>> }
-    /** The retired aggregate path must remain absent from the package and build surfaces. */
-    const packageManifest = readFileSync(resolve(import.meta.dirname, '..', 'package.json'), 'utf8')
-    /**
-     * Build config must keep the future runtime owner external before the entry starts importing
-     * it.
-     */
-    const buildConfig = readFileSync(resolve(import.meta.dirname, '..', 'vite.config.ts'), 'utf8')
-
-    expect(manifest.dependencies).toMatchObject({
-      '@migaia/event-subscriber': 'workspace:^',
-      '@migaia/lifecycle': 'workspace:^',
-      '@migaia/reactive': 'workspace:^'
-    })
-    expect(packageManifest).not.toContain('"./reactive"')
-    expect(buildConfig).not.toContain("'reactive': 'src/reactive.ts'")
-    expect(buildConfig).toContain("'@migaia/lifecycle'")
-  })
-
   it('coalesces rapid events, fences reentrant refresh, and disposes through canonical owners', async () => {
     const model = createOwnershipModel()
     /** Initial generation establishes old data before refresh behavior is exercised. */

@@ -5,7 +5,7 @@ import {
   repositoryEntityRange
 } from '../../src/entity/key.js'
 
-describe('repository v2 physical key space', () => {
+describe('repository physical key space', () => {
   it('round trips scalar and nested ids without colliding with raw keys', () => {
     const scalar = composeRepositoryKey('users', 'u1')
     const nested = composeRepositoryKey('users', ['u1', 1])
