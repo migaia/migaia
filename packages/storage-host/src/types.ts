@@ -583,7 +583,6 @@ export type IRejectInstalledOrDuplicateIds<
     : never
 /** Construction captures timing and diagnostic ownership before a plugin runs. */
 export type IStorageHostOptions = {
-  readonly journal?: import('./journal/types.js').IStorageJournalConfiguration
   readonly org?: string
   readonly autoDetect?: boolean
   readonly installTimeoutMs?: number
@@ -592,15 +591,10 @@ export type IStorageHostOptions = {
   readonly hooks?: { readonly [K in keyof IStorageHookMap]?: (payload: IStorageHookMap[K]) => void }
 }
 /** Exact initial tuple participates in duplicate admission and store inference. */
-export type IStorageHostCreateOptions<
-  P extends readonly IStorageBackendPluginHandle[],
-  J extends import('./journal/types.js').IStorageJournalConfiguration | undefined =
-    | import('./journal/types.js').IStorageJournalConfiguration
-    | undefined
-> = Omit<IStorageHostOptions, 'journal'> & {
-  readonly journal?: J
-  readonly plugins?: IRejectInstalledOrDuplicateIds<{}, P>
-}
+export type IStorageHostCreateOptions<P extends readonly IStorageBackendPluginHandle[]> =
+  IStorageHostOptions & {
+    readonly plugins?: IRejectInstalledOrDuplicateIds<{}, P>
+  }
 /** Only an actual statically selected undo extension adds the public undo business method. */
 type IStorageJournalUndoSurface<J> = (
   J extends (...args: never[]) => infer R ? Awaited<R> : J
@@ -610,7 +604,8 @@ type IStorageJournalUndoSurface<J> = (
 /** Neutral host registry and lifetime; backend implementations remain separate from installation. */
 export type IStorageHost<
   P extends readonly IStorageBackendPluginHandle[],
-  J extends import('./journal/types.js').IStorageJournalConfiguration | undefined = undefined
+  J extends import('./journal/types.js').IStorageJournalConfiguration | undefined =
+    import('./journal/types.js').IStorageJournalOf<P>
 > = import('@migaia/storage-contract').IStorageResource & {
   readonly hooks: IStorageHooks
   detect(): Promise<void>
@@ -657,7 +652,8 @@ export type IStorageHost<
 /** A business view retains inference while lifecycle and installation stay with its root host. */
 export type IStorageOrgView<
   P extends readonly IStorageBackendPluginHandle[],
-  J extends import('./journal/types.js').IStorageJournalConfiguration | undefined = undefined
+  J extends import('./journal/types.js').IStorageJournalConfiguration | undefined =
+    import('./journal/types.js').IStorageJournalOf<P>
 > = Omit<
   IStorageHost<P, J>,
   'use' | 'dropOrg' | 'dispose' | typeof Symbol.asyncDispose | 'backend' | 'backends' | 'org'

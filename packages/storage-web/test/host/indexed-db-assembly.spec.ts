@@ -339,10 +339,12 @@ describe('independent IndexedDB native owners', () => {
 
   it('identifies the missing backend journal Feature before configured global journal preparation', async () => {
     const failure = await createStorageHost({
-      plugins: [storageJournalPlugin(), indexedDbBackendPlugin(options())],
-      journal: () => {
-        throw new RangeError('journal initializer must not run without the native Feature')
-      }
+      plugins: [
+        storageJournalPlugin(() => {
+          throw new RangeError('journal initializer must not run without the native Feature')
+        }),
+        indexedDbBackendPlugin(options())
+      ]
     }).catch((error: unknown) => error)
     expect([...walkErrorCauses(failure)]).toContainEqual(
       expect.objectContaining({
@@ -376,27 +378,26 @@ it('captures and undoes native images with journal alone while leaving TTL and n
   let logger: ReturnType<typeof createAssemblyLogger> | undefined
   await using host = await createStorageHost({
     plugins: [
-      storageJournalPlugin(),
+      storageJournalPlugin(async ({ storageLogStore }) => {
+        /** The original private log namespace stores committed business steps. */
+        const records = await storageLogStore('indexed-db', { prefix: 'assembly-binlog' })
+        /** Undo images remain in their own original durable namespace. */
+        const images = await storageLogStore('indexed-db', { prefix: 'assembly-undo' })
+        logger = createAssemblyLogger(records, images)
+        return {
+          logger,
+          namespace: 'journal-only',
+          indexedDbUndo: true,
+          atomicBinlog: { 'indexed-db': records },
+          atomicUndo: { 'indexed-db': images },
+          binlogValues: true
+        }
+      }),
       indexedDbBackendPlugin(
         { ...options(), journalFactoryIsPrivate: true },
         { journal: indexedDbJournalFeature() }
       )
-    ],
-    journal: async ({ storageLogStore }) => {
-      /** The original private log namespace stores committed business steps. */
-      const records = await storageLogStore('indexed-db', { prefix: 'assembly-binlog' })
-      /** Undo images remain in their own original durable namespace. */
-      const images = await storageLogStore('indexed-db', { prefix: 'assembly-undo' })
-      logger = createAssemblyLogger(records, images)
-      return {
-        logger,
-        namespace: 'journal-only',
-        indexedDbUndo: true,
-        atomicBinlog: { 'indexed-db': records },
-        atomicUndo: { 'indexed-db': images },
-        binlogValues: true
-      }
-    }
+    ]
   })
   try {
     /** Without TTL or notifications, images still use the canonical physical point revisions. */

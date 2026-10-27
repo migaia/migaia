@@ -30,7 +30,19 @@ describe('global IndexedDB native journal', () => {
     let logger: ReturnType<typeof createLogger> | undefined
     await using host = await createStorageHost({
       plugins: [
-        storageJournalPlugin(),
+        storageJournalPlugin(async ({ storageLogStore }) => {
+          const records = await storageLogStore('indexed-db', { prefix: 'binlog' })
+          const images = await storageLogStore('indexed-db', { prefix: 'undo' })
+          logger = createLogger(records, images)
+          return {
+            logger,
+            namespace: 'application',
+            indexedDbUndo: true,
+            atomicBinlog: { 'indexed-db': records },
+            atomicUndo: { 'indexed-db': images },
+            binlogValues: true
+          }
+        }),
         indexedDbBackendPlugin(
           {
             factory,
@@ -40,20 +52,7 @@ describe('global IndexedDB native journal', () => {
           },
           indexedDbTestFeatures
         )
-      ],
-      journal: async ({ storageLogStore }) => {
-        const records = await storageLogStore('indexed-db', { prefix: 'binlog' })
-        const images = await storageLogStore('indexed-db', { prefix: 'undo' })
-        logger = createLogger(records, images)
-        return {
-          logger,
-          namespace: 'application',
-          indexedDbUndo: true,
-          atomicBinlog: { 'indexed-db': records },
-          atomicUndo: { 'indexed-db': images },
-          binlogValues: true
-        }
-      }
+      ]
     })
     try {
       const store = host.backend('indexed-db')
@@ -114,19 +113,21 @@ describe('global IndexedDB native journal', () => {
     }
     let logger: ReturnType<typeof createLogger> | undefined
     await using host = await createStorageHost({
-      plugins: [storageJournalPlugin(), indexedDbBackendPlugin(options, indexedDbTestFeatures)],
-      journal: async ({ storageLogStore }) => {
-        const records = await storageLogStore('indexed-db', { prefix: 'binlog' })
-        const images = await storageLogStore('indexed-db', { prefix: 'undo' })
-        logger = createLogger(records, images)
-        return {
-          logger,
-          namespace: 'application',
-          indexedDbUndo: true,
-          atomicBinlog: { 'indexed-db': records },
-          atomicUndo: { 'indexed-db': images }
-        }
-      }
+      plugins: [
+        storageJournalPlugin(async ({ storageLogStore }) => {
+          const records = await storageLogStore('indexed-db', { prefix: 'binlog' })
+          const images = await storageLogStore('indexed-db', { prefix: 'undo' })
+          logger = createLogger(records, images)
+          return {
+            logger,
+            namespace: 'application',
+            indexedDbUndo: true,
+            atomicBinlog: { 'indexed-db': records },
+            atomicUndo: { 'indexed-db': images }
+          }
+        }),
+        indexedDbBackendPlugin(options, indexedDbTestFeatures)
+      ]
     })
     await using peer = await createStorageHost({
       plugins: [storageJournalPlugin(), indexedDbBackendPlugin(options, indexedDbTestFeatures)]
@@ -155,7 +156,19 @@ describe('global IndexedDB native journal', () => {
     await using host = await createStorageHost({
       scheduler,
       plugins: [
-        storageJournalPlugin(),
+        storageJournalPlugin(async ({ orgId, storageLogStore }) => {
+          const records = await storageLogStore('indexed-db', { prefix: 'binlog' })
+          const images = await storageLogStore('indexed-db', { prefix: 'undo' })
+          const logger = createLogger(records, images)
+          loggers.set(orgId, logger)
+          return {
+            logger,
+            namespace: 'application',
+            indexedDbUndo: true,
+            atomicBinlog: { 'indexed-db': records },
+            atomicUndo: { 'indexed-db': images }
+          }
+        }),
         indexedDbBackendPlugin(
           {
             factory: new IDBFactory(),
@@ -164,20 +177,7 @@ describe('global IndexedDB native journal', () => {
           },
           indexedDbTestFeatures
         )
-      ],
-      journal: async ({ orgId, storageLogStore }) => {
-        const records = await storageLogStore('indexed-db', { prefix: 'binlog' })
-        const images = await storageLogStore('indexed-db', { prefix: 'undo' })
-        const logger = createLogger(records, images)
-        loggers.set(orgId, logger)
-        return {
-          logger,
-          namespace: 'application',
-          indexedDbUndo: true,
-          atomicBinlog: { 'indexed-db': records },
-          atomicUndo: { 'indexed-db': images }
-        }
-      }
+      ]
     })
     try {
       const orgId = createOrgId()
@@ -244,25 +244,24 @@ describe('global IndexedDB native journal', () => {
       let logger: ReturnType<typeof createLogger> | undefined
       await using host = await createStorageHost({
         plugins: [
-          storageJournalPlugin(),
+          storageJournalPlugin(async ({ storageLogStore }) => {
+            if (!active) return { logger: telemetryLogger, namespace: 'telemetry', telemetry: true }
+            const records = await storageLogStore('indexed-db', { prefix: 'binlog' })
+            const images = await storageLogStore('indexed-db', { prefix: 'undo' })
+            logger = createLogger(records, images)
+            return {
+              logger,
+              namespace: 'application',
+              indexedDbUndo: true,
+              atomicBinlog: { 'indexed-db': records },
+              atomicUndo: { 'indexed-db': images }
+            }
+          }),
           indexedDbBackendPlugin(
             { factory: new IDBFactory(), keyRange: IDBKeyRange, journalFactoryIsPrivate: true },
             { ...indexedDbTestFeatures, blobs: indexedDbBlobFeature() }
           )
-        ],
-        journal: async ({ storageLogStore }) => {
-          if (!active) return { logger: telemetryLogger, namespace: 'telemetry', telemetry: true }
-          const records = await storageLogStore('indexed-db', { prefix: 'binlog' })
-          const images = await storageLogStore('indexed-db', { prefix: 'undo' })
-          logger = createLogger(records, images)
-          return {
-            logger,
-            namespace: 'application',
-            indexedDbUndo: true,
-            atomicBinlog: { 'indexed-db': records },
-            atomicUndo: { 'indexed-db': images }
-          }
-        }
+        ]
       })
       try {
         const store = host.org(createOrgId()).backend('indexed-db')

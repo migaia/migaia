@@ -20,11 +20,13 @@ it('observes original native keys once and hides private work and short views', 
   })
   const initialized: string[] = []
   const host = await createStorageHost({
-    plugins: [storageJournalPlugin(), sqliteBackendPlugin({ driver: connection })] as const,
-    journal({ orgId }) {
-      initialized.push(orgId)
-      return { logger, namespace: 'native-telemetry', telemetry: true }
-    }
+    plugins: [
+      storageJournalPlugin(({ orgId }) => {
+        initialized.push(orgId)
+        return { logger, namespace: 'native-telemetry', telemetry: true }
+      }),
+      sqliteBackendPlugin({ driver: connection })
+    ] as const
   })
   onTestFinished(async () => {
     await host.dispose()
@@ -96,8 +98,10 @@ it('retains ordinary operations with telemetry disabled', async () => {
     entries.push(entry)
   })
   const host = await createStorageHost({
-    plugins: [storageJournalPlugin(), sqliteBackendPlugin({ driver: connection })] as const,
-    journal: { logger, namespace: 'disabled', telemetry: false }
+    plugins: [
+      storageJournalPlugin({ logger, namespace: 'disabled', telemetry: false }),
+      sqliteBackendPlugin({ driver: connection })
+    ] as const
   })
   onTestFinished(async () => {
     await host.dispose()

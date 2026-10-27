@@ -219,7 +219,7 @@ try {
 
 ## IndexedDB 全局日志与显式 undo
 
-在 Host 的 `journal` 初始化函数中，用当前组织的 `storageLogStore` 打开原生 binlog 与 undo 仓库，再将同一对象交给 logger 插件及 `atomicBinlog` / `atomicUndo`。选择带 undo 插件的 logger 时必须显式设置 `indexedDbUndo: true`；缺省或 false 在业务原生事务前报 `UNSUPPORTED_CAPABILITY`。通过 Host 配置得到的后端与组织视图可调用 `undo(txId)`，恢复由原事务 builder 执行。
+在 `storageJournalPlugin` 的初始化函数中，用当前组织的 `storageLogStore` 打开原生 binlog 与 undo 仓库，再将同一对象交给 logger 插件及 `atomicBinlog` / `atomicUndo`。选择带 undo 插件的 logger 时必须显式设置 `indexedDbUndo: true`；缺省或 false 在业务原生事务前报 `UNSUPPORTED_CAPABILITY`。通过 Host 配置得到的后端与组织视图可调用 `undo(txId)`，恢复由原事务 builder 执行。
 
 文本、字节、记录、清空与绝对 TTL 元数据的实际写入顺序保留在同一原生事务中；重复写入不按通道重排。原生 complete 才发布日志索引，回滚不增加日志序列。首次组织只读同样完成该组织的一次配置；惰性过期删除与日志一起提交。所有契约写入维护原生点修订，删除或清空后保留墓碑，因此其它无日志契约句柄的 clear/recreate 也会使旧 undo 报 `UNDO_CONFLICT`，在恢复任何目标前拒绝。undo 比对原物理镜像，恢复原绝对期限，不延长过期时间。
 

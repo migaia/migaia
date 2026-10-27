@@ -41,6 +41,31 @@ export type IStorageJournalConfiguration =
   | ((
       context: IStorageJournalInitializerContext
     ) => IStorageJournalAnyOptions | PromiseLike<IStorageJournalAnyOptions>)
+/**
+ * Type-only key that carries a journal plugin's configuration type through the plugin tuple, so
+ * `createStorageHost` can add `undo` to backends. No runtime value exists.
+ */
+export declare const storageJournalConfigurationBrand: unique symbol
+/** Plugin handle returned by `storageJournalPlugin(options)`; `J` is the given configuration type. */
+export type IStorageJournalPluginHandle<J extends IStorageJournalConfiguration | undefined> =
+  import('../types.js').IStorageBackendPluginHandle & {
+    readonly id: typeof import('../state-constants.js').STORAGE_JOURNAL_PLUGIN_ID
+    readonly [storageJournalConfigurationBrand]: { readonly configuration: J }
+  }
+/** Journal configuration type selected by the plugin tuple `P`, or `undefined` when none is. */
+export type IStorageJournalOf<P extends readonly unknown[]> = [
+  P[number] extends infer X
+    ? X extends { readonly [storageJournalConfigurationBrand]: { readonly configuration: infer J } }
+      ? J
+      : never
+    : never
+] extends [infer R]
+  ? [R] extends [never]
+    ? undefined
+    : R extends IStorageJournalConfiguration | undefined
+      ? R
+      : undefined
+  : undefined
 /** Undo restores a committed target only after its original revision and value checks. */
 export type IUndoableStore = {
   undo(

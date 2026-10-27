@@ -64,8 +64,14 @@ const createTextParticipant = async (owner: ITextRedoOwner) => {
         ? sessionStorageBackendPlugin({ namespace: owner.namespace, redo: true })
         : localStorageBackendPlugin({ namespace: owner.namespace, redo: true })
   const host = await createStorageHost({
-    plugins: [storageJournalPlugin(), plugin],
-    journal: { logger: owner.logger, namespace: owner.namespace, redoWal: owner.logger.wal }
+    plugins: [
+      storageJournalPlugin({
+        logger: owner.logger,
+        namespace: owner.namespace,
+        redoWal: owner.logger.wal
+      }),
+      plugin
+    ]
   })
   return {
     host,

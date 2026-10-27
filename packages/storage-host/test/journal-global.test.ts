@@ -39,26 +39,25 @@ describe('global native storage journal', () => {
     const initialized: string[] = []
     await using host = await createStorageHost({
       plugins: [
-        storageJournalPlugin(),
+        storageJournalPlugin(async ({ orgId, storageLogStore }) => {
+          initialized.push(orgId)
+          const records = await storageLogStore('memory', { prefix: 'binlog' })
+          const images = await storageLogStore('memory', { prefix: 'undo' })
+          const logger = createJournalLogger(records, images)
+          loggers.set(orgId, logger)
+          logs.set(orgId, records)
+          return {
+            logger,
+            namespace: 'application',
+            atomicBinlog: { memory: records },
+            atomicUndo: { memory: images }
+          }
+        }),
         memoryBackendPlugin(undefined, {
           notifications: memoryNotificationsFeature(),
           changeFeed: memoryChangeFeedFeature()
         })
-      ],
-      journal: async ({ orgId, storageLogStore }) => {
-        initialized.push(orgId)
-        const records = await storageLogStore('memory', { prefix: 'binlog' })
-        const images = await storageLogStore('memory', { prefix: 'undo' })
-        const logger = createJournalLogger(records, images)
-        loggers.set(orgId, logger)
-        logs.set(orgId, records)
-        return {
-          logger,
-          namespace: 'application',
-          atomicBinlog: { memory: records },
-          atomicUndo: { memory: images }
-        }
-      }
+      ]
     })
     try {
       expect(initialized).toHaveLength(1)
@@ -148,7 +147,40 @@ describe('global native storage journal', () => {
     let pause = false
     await using host = await createStorageHost({
       plugins: [
-        storageJournalPlugin(),
+        storageJournalPlugin(async ({ storageLogStore }) => {
+          const records = await storageLogStore('memory', { prefix: 'capacity-binlog' })
+          const images = await storageLogStore('memory', { prefix: 'capacity-undo' })
+          logger = createJournalLogger(records, images)
+          const original = logger
+          /** A supported borrowed logger facade delays the real already-started native append. */
+          const binlog = {
+            ...original.binlog,
+            append: async (...args: Parameters<typeof original.binlog.append>) => {
+              const result = await original.binlog.append(...args)
+              if (pause) {
+                pause = false
+                entered.resolve()
+                await resume.promise
+              }
+              return result
+            }
+          }
+          const borrowed = {
+            dispatchRaw: original.dispatchRaw,
+            onFailure: original.onFailure,
+            hook: original.hook,
+            flush: original.flush,
+            defer: original.defer,
+            binlog,
+            undo: original.undo
+          }
+          return {
+            logger: borrowed,
+            namespace: 'capacity',
+            atomicBinlog: { memory: records },
+            atomicUndo: { memory: images }
+          }
+        }),
         memoryBackendPlugin(
           { capacity: { maxEntries: 2, eviction: 'lru' } },
           {
@@ -156,41 +188,7 @@ describe('global native storage journal', () => {
             changeFeed: memoryChangeFeedFeature()
           }
         )
-      ],
-      journal: async ({ storageLogStore }) => {
-        const records = await storageLogStore('memory', { prefix: 'capacity-binlog' })
-        const images = await storageLogStore('memory', { prefix: 'capacity-undo' })
-        logger = createJournalLogger(records, images)
-        const original = logger
-        /** A supported borrowed logger facade delays the real already-started native append. */
-        const binlog = {
-          ...original.binlog,
-          append: async (...args: Parameters<typeof original.binlog.append>) => {
-            const result = await original.binlog.append(...args)
-            if (pause) {
-              pause = false
-              entered.resolve()
-              await resume.promise
-            }
-            return result
-          }
-        }
-        const borrowed = {
-          dispatchRaw: original.dispatchRaw,
-          onFailure: original.onFailure,
-          hook: original.hook,
-          flush: original.flush,
-          defer: original.defer,
-          binlog,
-          undo: original.undo
-        }
-        return {
-          logger: borrowed,
-          namespace: 'capacity',
-          atomicBinlog: { memory: records },
-          atomicUndo: { memory: images }
-        }
-      }
+      ]
     })
     try {
       host.hooks.on('onEvict', (event) => {
@@ -233,16 +231,15 @@ describe('global native storage journal', () => {
     await expect(
       createStorageHost({
         plugins: [
-          storageJournalPlugin(),
+          storageJournalPlugin(async ({ storageLogStore }) => {
+            acquired = await storageLogStore('memory', { prefix: 'failed-initializer' })
+            throw original
+          }),
           memoryBackendPlugin(undefined, {
             notifications: memoryNotificationsFeature(),
             changeFeed: memoryChangeFeedFeature()
           })
-        ],
-        journal: async ({ storageLogStore }) => {
-          acquired = await storageLogStore('memory', { prefix: 'failed-initializer' })
-          throw original
-        }
+        ]
       })
     ).rejects.toMatchObject({ code: 'BACKEND_INSTALL_FAILED', cause: { cause: original } })
     await expect(acquired!.lastSeq()).rejects.toMatchObject({ code: 'STORE_DISPOSED' })
@@ -252,23 +249,22 @@ describe('global native storage journal', () => {
     let logger: ReturnType<typeof createJournalLogger> | undefined
     await using host = await createStorageHost({
       plugins: [
-        storageJournalPlugin(),
+        storageJournalPlugin(async ({ storageLogStore }) => {
+          const records = await storageLogStore('memory', { prefix: 'clear-binlog' })
+          const images = await storageLogStore('memory', { prefix: 'clear-undo' })
+          logger = createJournalLogger(records, images)
+          return {
+            logger,
+            namespace: 'clear',
+            atomicBinlog: { memory: records },
+            atomicUndo: { memory: images }
+          }
+        }),
         memoryBackendPlugin(undefined, {
           notifications: memoryNotificationsFeature(),
           changeFeed: memoryChangeFeedFeature()
         })
-      ],
-      journal: async ({ storageLogStore }) => {
-        const records = await storageLogStore('memory', { prefix: 'clear-binlog' })
-        const images = await storageLogStore('memory', { prefix: 'clear-undo' })
-        logger = createJournalLogger(records, images)
-        return {
-          logger,
-          namespace: 'clear',
-          atomicBinlog: { memory: records },
-          atomicUndo: { memory: images }
-        }
-      }
+      ]
     })
     try {
       const store = host.backend('memory')
@@ -355,13 +351,12 @@ describe('external storage binlog', () => {
     }
     await using host = await createStorageHost({
       plugins: [
-        storageJournalPlugin(),
+        storageJournalPlugin({ logger: borrowed, namespace: 'external' }),
         memoryBackendPlugin(undefined, {
           notifications: memoryNotificationsFeature(),
           changeFeed: memoryChangeFeedFeature()
         })
       ],
-      journal: { logger: borrowed, namespace: 'external' },
       report: (error) => {
         reports.push(error)
       },

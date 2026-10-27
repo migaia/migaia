@@ -235,6 +235,6 @@ try {
 - 文本、记录使用支持 Map/Set 的便携集合编码，字节复制。记录键用规范保序字节，其它通道用同一身份的 hex。文本/字节缺失为 null，记录/metadata 缺失为 undefined。私有表不能当应用 SQL 接口；JSONB payload 只是过滤投影。
 - SQL 的 int8 返回 bigint，numeric/date/JSON/array 保留原生文本，bytea 返回独立 Uint8Array。不安装全局 parser。postgres.js 字符串参数使用 TEXT，需要其它类型时由应用 SQL 显式转换。
 - 本包错误 source 为 storage.backend.postgres，码为 SQL_FAILED、DECODE_FAILED、TRANSACTION_FAILED、DUPLICATE_KEY。校验、取消、期限和并发错误保留各自 source；原错误可沿 cause 或 aggregate errors 找到。观察回调错误只报告；要改变操作，请用 pipeline。
-- 宿主 journal 显式启用日志。text/bytes/record/托管 vector 的完整镜像及绝对期限在数据事务内捕获；外置 binlog 在提交后追加并等待完成，失败只报告，不能撤回数据。完整镜像模式在执行前拒绝原生 SQL、COPY、自有向量表终点。
+- 用 `@migaia/storage-host/journal` 的 `storageJournalPlugin(options)` 显式启用日志。text/bytes/record/托管 vector 的完整镜像及绝对期限在数据事务内捕获；外置 binlog 在提交后追加并等待完成，失败只报告，不能撤回数据。完整镜像模式在执行前拒绝原生 SQL、COPY、自有向量表终点。
 - 原生日志在每个数据库事务内串行更新 head/record，不跨操作缓存索引。外置 WAL 先写 intent，再随数据写独立 marker，重开时区分已提交和未完成修改。undo 仅在宿主支持的日志组合中出现，先锁定全部目标并核对完整修订和镜像，再恢复；组织重建不让旧镜像重新有效，缺少 birth 的旧镜像以 UNDO_CONFLICT 拒绝，不能跨组织恢复。
 - 日志按执行顺序保留重复写和中间值。undo 核对最终修订、恢复原绝对期限，不刷新已过期期限。telemetry 独立启用，每个根操作或完整事务跨重试只发一条完成事件，不接管 logger；先释放 host，再释放 logger 及其载体。

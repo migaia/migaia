@@ -277,7 +277,7 @@ Native Web Locks retain the original lifetime exclusion and cached path; a confl
 
 ## IndexedDB global journal and explicit undo
 
-Inside the Host `journal` initializer, open native binlog and undo stores with the current org's `storageLogStore`, then pass those same objects to the logger plugins and `atomicBinlog` / `atomicUndo`. A logger with the undo plugin requires explicit `indexedDbUndo: true`; omission or false reports `UNSUPPORTED_CAPABILITY` before the business native transaction. The configured backend and org views expose `undo(txId)`, restored through the original transaction builder.
+Inside the `storageJournalPlugin` initializer, open native binlog and undo stores with the current org's `storageLogStore`, then pass those same objects to the logger plugins and `atomicBinlog` / `atomicUndo`. A logger with the undo plugin requires explicit `indexedDbUndo: true`; omission or false reports `UNSUPPORTED_CAPABILITY` before the business native transaction. The configured backend and org views expose `undo(txId)`, restored through the original transaction builder.
 
 Text, bytes, records, clear and absolute TTL metadata retain their actual write order in one native transaction, including repeated writes. Only native complete publishes the log index; rollback does not advance its sequence. A first org read also prepares that org's once-only configuration, and lazy expiry deletion commits with its log. All contract writers maintain native point revisions and retain tombstones after delete or clear, so clear/recreate by another non-journal contract handle also rejects stale undo with `UNDO_CONFLICT` before restoring any target. Undo compares physical images and restores the original absolute deadline without extending expiry.
 

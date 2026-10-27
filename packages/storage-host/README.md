@@ -86,7 +86,7 @@ Map 适合局部数据；需要多后端、事务或统一释放时，再使用�
 pnpm add --workspace @migaia/storage-host @migaia/storage-contract
 ```
 
-内置 memory 不需要数据库客户端。其它后端由各自的插件提供。只有配置 `journal` 或导入 `/journal` 时才需要可选 peer：
+内置 memory 不需要数据库客户端。其它后端由各自的插件提供。只有导入 `/journal`（使用 `storageJournalPlugin`）时才需要可选 peer：
 
 ```bash
 pnpm add --workspace @migaia/logger
@@ -132,9 +132,9 @@ pnpm add --workspace @migaia/logger
 
 ## 显式装配可选能力
 
-基础宿主不导入 journal runtime、通知控制器或变更迭代器。此前 journal 选项会自动加载日志实现，memory 默认提供变更通知和 watch；现在这些能力由业务显式选择，避免基础存读包含未使用代码。
+基础宿主不导入 journal runtime、通知控制器或变更迭代器。此前宿主的 journal 选项会自动加载日志实现，memory 默认提供变更通知和 watch；现在这些能力由业务显式选择，避免基础存读包含未使用代码。
 
-使用 journal 选项或 `storageLogStore()` 前，在同一插件列表中把从 `@migaia/storage-host/journal` 导入的 `storageJournalPlugin()` 放到后端前。缺少插件时报 `JOURNAL_NOT_ASSEMBLED`。配置格式、日志内容和事务提交语义保持原契约。
+日志配置写在从 `@migaia/storage-host/journal` 导入的 `storageJournalPlugin(options)` 里，放在 `createStorageHost` 第一批插件中、要记录的后端之前；宿主没有单独的 `journal` 选项。后装或重复传入带配置的日志插件会报 `INVALID_CONFIG`。只用 `storageLogStore()` 时装 `storageJournalPlugin()` 即可，缺少插件时报 `JOURNAL_NOT_ASSEMBLED`。配置格式、日志内容和事务提交语义保持原契约。
 
 memory 通知和变更流分别由两个 Feature 装配：
 

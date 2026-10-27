@@ -211,11 +211,11 @@ try {
 
 Log records are separate from business keys. Business enumeration, clear and capacity limits do not touch them. A backend must support the required log storage; opening it first recovers confirmed state. Exclusive storage permits one open handle for an organization and prefix, while shared transactional storage may permit several. Truncation does not reuse sequence numbers. An unconfirmed write stops further operations: close and reopen the log to recover. Old log handles reject with `STORE_DISPOSED` after `dropOrg()`.
 
-Opening a log does not enable automatic business logging. Configure `createStorageHost({ plugins: [storageJournalPlugin(), backend], journal: ... })` for that. Supply `{ logger, namespace, ... }` directly, or use an asynchronous initializer for each organization. The initializer receives `orgId` and asynchronous `storageLogStore(id, { prefix })`. The host borrows the logger and does not shut it down.
+Opening a log does not enable automatic business logging. Configure `createStorageHost({ plugins: [storageJournalPlugin(options), backend] })` for that. `options` supplies `{ logger, namespace, ... }` directly, or is an asynchronous initializer for each organization. The initializer receives `orgId` and asynchronous `storageLogStore(id, { prefix })`. The host borrows the logger and does not shut it down.
 
 Choose binlog, WAL, undo and same-transaction log stores as needed. `atomicBinlog` / `atomicUndo` select real log stores by backend ID and require a shared transaction with the business backend. Other combinations depend on backend support and reject before business mutation when unavailable. Failed external binlog appends are reported without rolling back committed business data. Do not recover unknown results by blindly replaying writes. Undo checks stored data and revisions first; conflicts use `UNDO_CONFLICT`, and missing history uses `UNDO_NOT_FOUND`.
 
-`telemetry: true` additionally requires the logger level plugin. Logs can include operation payloads and errors; configure the logger for the application's needs. Even telemetry-only configuration installs an asynchronous stage, so use asynchronous data methods; synchronous reads and writes reject with `ASYNC_STAGE_IN_SYNC_ENTRY`. With neither journal configuration nor a `/journal` import, the host does not load logger at runtime. See the [logger guide](../logger/USEGUIDE.en.md) for logger configuration.
+`telemetry: true` additionally requires the logger level plugin. Logs can include operation payloads and errors; configure the logger for the application's needs. Even telemetry-only configuration installs an asynchronous stage, so use asynchronous data methods; synchronous reads and writes reject with `ASYNC_STAGE_IN_SYNC_ENTRY`. Without a `/journal` import, the host does not load logger at runtime. See the [logger guide](../logger/USEGUIDE.en.md) for logger configuration.
 
 ## Handle errors and finish work
 
@@ -235,9 +235,9 @@ For backend implementations, see the [README migration table](./README.en.md#mov
 
 ## Assemble optional capabilities explicitly
 
-The base host does not import journal runtime, notification controllers or change iterators. Previously journal options loaded logging automatically and memory enabled notifications and watch by default. Applications now select these capabilities so basic reads and writes do not include unused code.
+The base host does not import journal runtime, notification controllers or change iterators. Previously the host's journal option loaded logging automatically and memory enabled notifications and watch by default. Applications now select these capabilities so basic reads and writes do not include unused code.
 
-Before using journal options or `storageLogStore()`, import `storageJournalPlugin()` from `@migaia/storage-host/journal` and place it before the backend in the same plugin list. Missing assembly raises `JOURNAL_NOT_ASSEMBLED`. Journal configuration, stored records and transaction semantics retain their existing contract.
+Journal configuration goes into `storageJournalPlugin(options)` from `@migaia/storage-host/journal`, placed in the first `createStorageHost` plugin batch before the backends it records; the host has no separate `journal` option. A configured journal plugin installed later, or passed twice, rejects with `INVALID_CONFIG`. For `storageLogStore()` alone, install `storageJournalPlugin()` without options; missing assembly raises `JOURNAL_NOT_ASSEMBLED`. Journal configuration, stored records and transaction semantics retain their existing contract.
 
 Memory notifications and feeds use separate Feature roots:
 

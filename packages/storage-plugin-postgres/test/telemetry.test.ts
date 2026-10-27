@@ -26,13 +26,12 @@ it('observes complete original retry loops once with canonical native keys and f
   })
   const host = await createStorageHost({
     plugins: [
-      storageJournalPlugin(),
+      storageJournalPlugin({ logger, namespace: 'telemetry', telemetry: true }),
       postgresBackendPlugin({
         driver: pgDriver(pool),
         prefix: 'pg_telemetry_' + randomUUID().slice(0, 8)
       })
-    ] as const,
-    journal: { logger, namespace: 'telemetry', telemetry: true }
+    ] as const
   })
   onTestFinished(async () => {
     await host.dispose()
@@ -138,24 +137,22 @@ it('keeps disabled level methods unread and contains a closed logger failure', a
   }
   const disabled = await createStorageHost({
     plugins: [
-      storageJournalPlugin(),
+      storageJournalPlugin({ logger: borrowed, namespace: 'disabled' }),
       postgresBackendPlugin({
         driver: pgDriver(pool),
         prefix: 'pg_telemetry_off_' + randomUUID().slice(0, 8)
       })
-    ] as const,
-    journal: { logger: borrowed, namespace: 'disabled' }
+    ] as const
   })
   const reports: unknown[] = []
   const enabled = await createStorageHost({
     plugins: [
-      storageJournalPlugin(),
+      storageJournalPlugin({ logger, namespace: 'enabled', telemetry: true }),
       postgresBackendPlugin({
         driver: pgDriver(pool),
         prefix: 'pg_telemetry_closed_' + randomUUID().slice(0, 8)
       })
     ] as const,
-    journal: { logger, namespace: 'enabled', telemetry: true },
     report: (error) => {
       reports.push(error)
     }

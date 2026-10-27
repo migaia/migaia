@@ -70,6 +70,7 @@ import type {
   IStoragePluginCallContext,
   IStorageBorrowedBackend
 } from './types.js'
+import { readStorageJournalConfiguration } from './journal/plugin-configuration.js'
 import { storageJournalAccess, type IStorageJournalBackendAccess } from './journal/binding.js'
 import {
   snapshotStorageJournalConfiguration,
@@ -330,11 +331,17 @@ type IStorageInstallEntryContext = {
 }
 /** Storage facade over the canonical PluginHost lifecycle owner and its batch transaction. */
 export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] = readonly []> {
-  /** One original facade owns immutable org preparation data, never another backend registry. */
-  readonly #journal:
+  /**
+   * Journal configuration taken from a `storageJournalPlugin(options)` in the first install batch.
+   * It is set once, before that batch plans its journal bootstrap, and cleared if that batch
+   * fails.
+   */
+  #journal:
     | IStorageJournalConfigurationSnapshot
     | Extract<IStorageJournalConfiguration, Function>
     | undefined
+  /** True once any install batch has started; journal configuration is admitted only before it. */
+  #batchStarted = false
   /** Resolved optional code is reused directly inside native transaction activity windows. */
   #journalRuntime: IStorageJournalRuntime | undefined
   /**
@@ -412,13 +419,8 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       report,
       hooks,
       org,
-      autoDetect,
-      journal
+      autoDetect
     } = options ?? {}
-    this.#journal =
-      typeof journal === 'function' || journal === undefined
-        ? journal
-        : snapshotStorageJournalConfiguration(journal)
     this.#orgId = org === undefined ? STORAGE_DEFAULT_ORG : org
     assertOperationContext({ orgId: this.#orgId })
     if (autoDetect !== undefined && typeof autoDetect !== 'boolean')
@@ -541,6 +543,12 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         this.#activeBatchToken = undefined
         if (this.#state === 'installing') this.#state = 'open'
         this.#installing = undefined
+        if (this.#registry.size === 0) {
+          /** A failed first batch leaves no backend, so its journal configuration is discarded. */
+          this.#journal = undefined
+          this.#journalOrgs = undefined
+          this.#batchStarted = false
+        }
         if (this.#events.hasListeners(Hook.onHostInstallError))
           this.#events.emit(Hook.onHostInstallError, () => ({
             pluginCount: plugins.length,
@@ -703,6 +711,30 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         context.assertExecution()
         return context.storeCell.retainJournalResource(resource)
       }
+    }
+  }
+
+  /**
+   * Take journal configuration from a `storageJournalPlugin(options)` in this batch. Only the first
+   * batch may carry it, because backends installed earlier were set up without journal ports; a
+   * later batch, or two configured journal plugins, is rejected with INVALID_CONFIG.
+   */
+  #admitJournalConfiguration(plugins: readonly IStorageBackendPluginHandle[]): void {
+    const first = !this.#batchStarted
+    this.#batchStarted = true
+    for (const plugin of plugins) {
+      const configuration = readStorageJournalConfiguration(plugin)?.configuration
+      if (configuration === undefined) continue
+      if (!first || this.#journal !== undefined)
+        throw new StorageError(
+          StorageErrorCode.invalidConfig,
+          {},
+          StorageErrorText.journalConfigurationLate
+        )
+      this.#journal =
+        typeof configuration === 'function'
+          ? configuration
+          : snapshotStorageJournalConfiguration(configuration)
     }
   }
 
@@ -1236,6 +1268,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         )
       return metadata
     })
+    this.#admitJournalConfiguration(plugins)
     /**
      * Storage owns duplicate backend admission before any backend factory or PluginHost install
      * runs.
@@ -1814,43 +1847,10 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
 /**
  * Create a Host and atomically install the optional initial plugin tuple. Defaults to no backends
  * and a 30000 ms install budget. Browser storage is acquired only by selected backend plugins;
- * failed initial installation disposes its newly created facade before rejecting.
+ * failed initial installation disposes its newly created facade before rejecting. A
+ * `storageJournalPlugin(options)` in the tuple adds journal recording, and `undo` when its logger
+ * selects the undo extension.
  */
-export function createStorageHost<
-  const TPlugins extends readonly IStorageBackendPluginHandle[] = readonly [],
-  const TOptions extends Exclude<
-    import('./journal/types.js').IStorageJournalConfiguration,
-    Function
-  > = Exclude<import('./journal/types.js').IStorageJournalConfiguration, Function>
->(
-  options: Omit<IStorageHostCreateOptions<TPlugins>, 'journal'> & {
-    readonly journal: (
-      context: import('./journal/types.js').IStorageJournalInitializerContext
-    ) => TOptions | PromiseLike<TOptions>
-  }
-): Promise<
-  IStorageHost<
-    TPlugins,
-    (
-      context: import('./journal/types.js').IStorageJournalInitializerContext
-    ) => TOptions | PromiseLike<TOptions>
-  >
->
-/** Direct options retain the actual selected logger extension instead of widening it. */
-export function createStorageHost<
-  const TPlugins extends readonly IStorageBackendPluginHandle[] = readonly [],
-  const TOptions extends Exclude<
-    import('./journal/types.js').IStorageJournalConfiguration,
-    Function
-  > = Exclude<import('./journal/types.js').IStorageJournalConfiguration, Function>
->(
-  options: Omit<IStorageHostCreateOptions<TPlugins>, 'journal'> & { readonly journal: TOptions }
-): Promise<IStorageHost<TPlugins, TOptions>>
-/** Broad named options and existing one-parameter callers retain their prior inference. */
-export function createStorageHost<
-  const TPlugins extends readonly IStorageBackendPluginHandle[] = readonly []
->(options?: IStorageHostCreateOptions<TPlugins>): Promise<IStorageHost<TPlugins>>
-/** Original runtime factory remains the only implementation of every type overload. */
 export async function createStorageHost<
   const TPlugins extends readonly IStorageBackendPluginHandle[] = readonly []
 >(options?: IStorageHostCreateOptions<TPlugins>): Promise<IStorageHost<TPlugins>> {

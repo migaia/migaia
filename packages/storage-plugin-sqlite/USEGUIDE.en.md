@@ -123,7 +123,7 @@ Package failures use source @migaia/storage-plugin-sqlite and SQLITE_FAILED, TRA
 
 ## Optional journals
 
-Enable journals explicitly through the host's journal option. SQLite captures complete values, every actual mutation and absolute expiry inside the data transaction, retaining repeated writes and intermediate values. Undo locks and checks every target's final revision/image before restoring. It restores original absolute deadlines, without extending expired data. Recreated organizations and reopened non-WAL coordination groups cannot reuse old undo images. Metadata is excluded from business mutation logs.
+Enable journals explicitly with `storageJournalPlugin(options)` from `@migaia/storage-host/journal`. SQLite captures complete values, every actual mutation and absolute expiry inside the data transaction, retaining repeated writes and intermediate values. Undo locks and checks every target's final revision/image before restoring. It restores original absolute deadlines, without extending expired data. Recreated organizations and reopened non-WAL coordination groups cannot reuse old undo images. Metadata is excluded from business mutation logs.
 
 External binlog append happens after commit; failure reports but cannot undo committed data. Supported WAL combinations use a marker committed with the data, and recovery does not replay known committed changes. Raw SQL has no complete standard-image target and rejects before execution when commit logging is selected. Global journal configuration uses an asynchronous pipeline, so synchronous entries fail with ASYNC_STAGE_IN_SYNC_ENTRY; installations without journals retain synchronous APIs.
 

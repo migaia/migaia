@@ -30,8 +30,10 @@ it.each([
       ]
     })
     const host = await createStorageHost({
-      plugins: [storageJournalPlugin(), sqliteBackendPlugin({ driver: connection })] as const,
-      journal: { logger, namespace: 'expiry', binlogValues: true }
+      plugins: [
+        storageJournalPlugin({ logger, namespace: 'expiry', binlogValues: true }),
+        sqliteBackendPlugin({ driver: connection })
+      ] as const
     })
     onTestFinished(async () => {
       vi.restoreAllMocks()

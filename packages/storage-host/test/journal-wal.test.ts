@@ -161,8 +161,7 @@ describe('external storage WAL', () => {
       plugins: [binlog({ store: records }), wal({ store: intents })]
     })
     await using host = await createStorageHost({
-      plugins: [storageJournalPlugin(), memoryBackendPlugin()],
-      journal: { logger, namespace: 'automatic-wal' }
+      plugins: [storageJournalPlugin({ logger, namespace: 'automatic-wal' }), memoryBackendPlugin()]
     })
     try {
       const store = host.backend('memory')
@@ -207,8 +206,10 @@ describe('external storage WAL', () => {
       plugins: [undoLog({ store: images }), wal({ store: intents })]
     })
     await using host = await createStorageHost({
-      plugins: [storageJournalPlugin(), memoryBackendPlugin()],
-      journal: { logger, namespace: 'external-undo-only' }
+      plugins: [
+        storageJournalPlugin({ logger, namespace: 'external-undo-only' }),
+        memoryBackendPlugin()
+      ]
     })
     try {
       const store = host.backend('memory')

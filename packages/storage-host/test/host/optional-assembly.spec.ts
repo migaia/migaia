@@ -64,3 +64,24 @@ it('opens private logs only through the selected native journal plugin', async (
   expect(await log.lastSeq()).toBe(1)
   expect(host.backend('memory').capabilities.changeFeed).toBe(true)
 })
+
+it('accepts journal configuration only once, in the first install batch', async () => {
+  /** Rejection happens before any organization initializes, so the initializer never runs. */
+  const unused = () => {
+    throw new Error('journal initializer must not run')
+  }
+  await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+  await expect(
+    host.use(storageJournalPlugin(unused), memoryBackendPlugin({ id: 'late' }))
+  ).rejects.toMatchObject({
+    code: StorageErrorCode.backendInstallFailed,
+    cause: { code: StorageErrorCode.invalidConfig }
+  })
+  expect(host.hasBackend('late')).toBe(false)
+  await expect(
+    createStorageHost({
+      // @ts-expect-error Two journal plugins share one plugin id, which the types already reject.
+      plugins: [storageJournalPlugin(unused), storageJournalPlugin(unused), memoryBackendPlugin()]
+    })
+  ).rejects.toMatchObject({ cause: { code: StorageErrorCode.invalidConfig } })
+})

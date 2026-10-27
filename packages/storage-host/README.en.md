@@ -86,7 +86,7 @@ These storage packages are currently `private: true` workspace packages in this 
 pnpm add --workspace @migaia/storage-host @migaia/storage-contract
 ```
 
-Memory needs no database client. Install other backends through their own plugins. The optional peer below is needed only when configuring `journal` or importing `/journal`:
+Memory needs no database client. Install other backends through their own plugins. The optional peer below is needed only when importing `/journal` (for `storageJournalPlugin`):
 
 ```bash
 pnpm add --workspace @migaia/logger
@@ -132,9 +132,9 @@ Entity assembly changes: `/entity` provides basic reads/writes. Previously autom
 
 ## Assemble optional capabilities explicitly
 
-The base host does not import journal runtime, notification controllers or change iterators. Previously journal options loaded logging automatically and memory enabled notifications and watch by default. Applications now select these capabilities so basic reads and writes do not include unused code.
+The base host does not import journal runtime, notification controllers or change iterators. Previously the host's journal option loaded logging automatically and memory enabled notifications and watch by default. Applications now select these capabilities so basic reads and writes do not include unused code.
 
-Before using journal options or `storageLogStore()`, import `storageJournalPlugin()` from `@migaia/storage-host/journal` and place it before the backend in the same plugin list. Missing assembly raises `JOURNAL_NOT_ASSEMBLED`. Journal configuration, stored records and transaction semantics retain their existing contract.
+Journal configuration goes into `storageJournalPlugin(options)` from `@migaia/storage-host/journal`, placed in the first `createStorageHost` plugin batch before the backends it records; the host has no separate `journal` option. A configured journal plugin installed later, or passed twice, rejects with `INVALID_CONFIG`. For `storageLogStore()` alone, install `storageJournalPlugin()` without options; missing assembly raises `JOURNAL_NOT_ASSEMBLED`. Journal configuration, stored records and transaction semantics retain their existing contract.
 
 Memory notifications and feeds use separate Feature roots:
 

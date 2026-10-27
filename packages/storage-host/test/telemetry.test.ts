@@ -19,11 +19,13 @@ describe('ordinary storage telemetry', () => {
     /** Every first endpoint shares the original once-per-org initializer. */
     const preparations = new Map<string, number>()
     await using host = await createStorageHost({
-      plugins: [storageJournalPlugin(), memoryBackendPlugin()],
-      journal: ({ orgId }) => {
-        preparations.set(orgId, (preparations.get(orgId) ?? 0) + 1)
-        return { logger, namespace: 'telemetry', telemetry: true }
-      }
+      plugins: [
+        storageJournalPlugin(({ orgId }) => {
+          preparations.set(orgId, (preparations.get(orgId) ?? 0) + 1)
+          return { logger, namespace: 'telemetry', telemetry: true }
+        }),
+        memoryBackendPlugin()
+      ]
     })
     try {
       const store = host.backend('memory')
@@ -131,15 +133,19 @@ describe('ordinary storage telemetry', () => {
       }
     }
     await using disabled = await createStorageHost({
-      plugins: [storageJournalPlugin(), memoryBackendPlugin()],
-      journal: { logger: borrowed, namespace: 'disabled' }
+      plugins: [
+        storageJournalPlugin({ logger: borrowed, namespace: 'disabled' }),
+        memoryBackendPlugin()
+      ]
     })
     await disabled.backend('memory').set('key', 'value')
     expect(calls).toBe(0)
     const reports: unknown[] = []
     await using enabled = await createStorageHost({
-      plugins: [storageJournalPlugin(), memoryBackendPlugin()],
-      journal: { logger, namespace: 'enabled', telemetry: true },
+      plugins: [
+        storageJournalPlugin({ logger, namespace: 'enabled', telemetry: true }),
+        memoryBackendPlugin()
+      ],
       report: (error) => {
         reports.push(error)
       }

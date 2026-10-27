@@ -123,7 +123,7 @@ driver 必填；table 默认 migaia；concurrency 选择冲突策略，maxLockMs
 
 ## 可选日志
 
-通过宿主 journal 配置显式启用。完整值、每次实际修改和绝对期限在 SQLite 事务中捕获，保留同键多写与中间值。undo 先锁定并检查全部目标的最终修订和镜像，再恢复；恢复原绝对期限，不刷新过期数据。组织重建或非 WAL 本地协调组重新打开后，旧镜像不能继续使用。metadata 不产生业务修改日志。
+通过 `@migaia/storage-host/journal` 的 `storageJournalPlugin(options)` 显式启用。完整值、每次实际修改和绝对期限在 SQLite 事务中捕获，保留同键多写与中间值。undo 先锁定并检查全部目标的最终修订和镜像，再恢复；恢复原绝对期限，不刷新过期数据。组织重建或非 WAL 本地协调组重新打开后，旧镜像不能继续使用。metadata 不产生业务修改日志。
 
 外置 binlog 在提交后写入，失败报告但不能撤回数据。支持的 WAL 组合使用与数据共同提交的 marker，恢复不重放已提交修改。raw SQL 无完整标准镜像目标，选择提交日志时在执行前拒绝。全局 journal 使用异步 pipeline，因此同步入口报 ASYNC_STAGE_IN_SYNC_ENTRY；普通无日志安装仍有同步 API。
 

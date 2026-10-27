@@ -57,13 +57,12 @@ it.each(['memory', 'sqlite', 'redis', 'postgres'] as const)(
             : postgresBackendPlugin({ id: 'data', driver: pgDriver(pg), prefix })
     const host = await createStorageHost({
       org: createOrgId(),
-      plugins: [storageJournalPlugin(), selectPlugin(), observed],
+      plugins: [storageJournalPlugin({ logger, namespace: 'program' }), selectPlugin(), observed],
       hooks: {
         beforeStorageOperation: ({ operation }) => events.push('before:' + operation),
         afterStorageOperation: ({ operation }) => events.push('after:' + operation),
         onStorageOperationError: ({ operation }) => events.push('error:' + operation)
-      },
-      journal: { logger, namespace: 'program' }
+      }
     })
     try {
       const store = host.backend('data')

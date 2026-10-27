@@ -38,8 +38,15 @@ describe('text redo through the original host and WAL owners', () => {
           ? localStorageBackendPlugin({ storage, namespace: kind, redo: true })
           : sessionStorageBackendPlugin({ storage, namespace: kind, redo: true })
       const host = await createStorageHost({
-        plugins: [storageJournalPlugin(), plugin],
-        journal: { logger, namespace: 'text-redo', redoWal: logger.wal, binlogValues: true }
+        plugins: [
+          storageJournalPlugin({
+            logger,
+            namespace: 'text-redo',
+            redoWal: logger.wal,
+            binlogValues: true
+          }),
+          plugin
+        ]
       })
       try {
         const store = host.backend(kind)
@@ -94,8 +101,10 @@ describe('text redo through the original host and WAL owners', () => {
           : sessionStorageBackendPlugin({ storage, namespace: kind, redo: true })
       /** Installation keeps transaction admission and persistence under their original owners. */
       const host = await createStorageHost({
-        plugins: [storageJournalPlugin(), plugin],
-        journal: { logger, namespace: 'text-redo', redoWal: logger.wal }
+        plugins: [
+          storageJournalPlugin({ logger, namespace: 'text-redo', redoWal: logger.wal }),
+          plugin
+        ]
       })
       try {
         /** The selected original store owns every root and transaction operation below. */
@@ -159,8 +168,10 @@ describe('text redo through the original host and WAL owners', () => {
           : sessionStorageBackendPlugin({ storage, namespace: kind, redo: true })
       /** No test-only transaction or journal adapter participates in installation. */
       const host = await createStorageHost({
-        plugins: [storageJournalPlugin(), plugin],
-        journal: { logger, namespace: 'text-redo', redoWal: logger.wal }
+        plugins: [
+          storageJournalPlugin({ logger, namespace: 'text-redo', redoWal: logger.wal }),
+          plugin
+        ]
       })
       try {
         /** Root operations retain this original backend identity throughout cleanup. */
@@ -203,8 +214,7 @@ describe('text redo through the original host and WAL owners', () => {
     const options = { storage, namespace: 'partial', redo: true as const }
     const journal = { logger, namespace: 'text-redo', redoWal: logger.wal }
     const host = await createStorageHost({
-      plugins: [storageJournalPlugin(), localStorageBackendPlugin(options)],
-      journal
+      plugins: [storageJournalPlugin(journal), localStorageBackendPlugin(options)]
     })
     const original = new DOMException('native assignment failure', 'QuotaExceededError')
     const setItem = storage.setItem
@@ -228,8 +238,7 @@ describe('text redo through the original host and WAL owners', () => {
       fail.mockRestore()
       await host.dispose()
       await using recovered = await createStorageHost({
-        plugins: [storageJournalPlugin(), localStorageBackendPlugin(options)],
-        journal
+        plugins: [storageJournalPlugin(journal), localStorageBackendPlugin(options)]
       })
       expect(await recovered.backend('local').get('a')).toBe('one')
       expect(await recovered.backend('local').get('b')).toBe('two')
@@ -253,12 +262,10 @@ describe('text redo through the original host and WAL owners', () => {
     const options = { storage, namespace: 'complete', redo: true as const }
     const journal = { logger, namespace: 'text-redo', redoWal: logger.wal }
     const host = await createStorageHost({
-      plugins: [storageJournalPlugin(), localStorageBackendPlugin(options)],
-      journal
+      plugins: [storageJournalPlugin(journal), localStorageBackendPlugin(options)]
     })
     const peer = await createStorageHost({
-      plugins: [storageJournalPlugin(), localStorageBackendPlugin(options)],
-      journal
+      plugins: [storageJournalPlugin(journal), localStorageBackendPlugin(options)]
     })
     const original = new RangeError('durable completion failed')
     const failure = vi.spyOn(carrier, 'setState').mockRejectedValueOnce(original)
@@ -290,10 +297,9 @@ describe('text redo through the original host and WAL owners', () => {
     const storage = fakeWebStorage()
     const host = await createStorageHost({
       plugins: [
-        storageJournalPlugin(),
+        storageJournalPlugin({ logger, namespace: 'text-redo', redoWal: logger.wal }),
         localStorageBackendPlugin({ storage, namespace: 'same-instance', redo: true })
-      ],
-      journal: { logger, namespace: 'text-redo', redoWal: logger.wal }
+      ]
     })
     const store = host.backend('local')
     const entered = deferred<void>()
@@ -333,12 +339,10 @@ describe('text redo through the original host and WAL owners', () => {
     const options = { storage, namespace: 'cancel', redo: true as const }
     const journal = { logger, namespace: 'text-redo', redoWal: logger.wal }
     const host = await createStorageHost({
-      plugins: [storageJournalPlugin(), localStorageBackendPlugin(options)],
-      journal
+      plugins: [storageJournalPlugin(journal), localStorageBackendPlugin(options)]
     })
     const peer = await createStorageHost({
-      plugins: [storageJournalPlugin(), localStorageBackendPlugin(options)],
-      journal
+      plugins: [storageJournalPlugin(journal), localStorageBackendPlugin(options)]
     })
     const entered = deferred<void>()
     const release = deferred<void>()
@@ -377,8 +381,10 @@ describe('text redo through the original host and WAL owners', () => {
     try {
       await expect(
         createStorageHost({
-          plugins: [storageJournalPlugin(), localStorageBackendPlugin({ storage, redo: true })],
-          journal: { logger, namespace: 'missing' }
+          plugins: [
+            storageJournalPlugin({ logger, namespace: 'missing' }),
+            localStorageBackendPlugin({ storage, redo: true })
+          ]
         })
       ).rejects.toBeDefined()
       expect(storage.length).toBe(0)
@@ -387,8 +393,10 @@ describe('text redo through the original host and WAL owners', () => {
       try {
         await expect(
           createStorageHost({
-            plugins: [storageJournalPlugin(), localStorageBackendPlugin({ storage, redo: true })],
-            journal: { logger: durable, namespace: 'unselected' }
+            plugins: [
+              storageJournalPlugin({ logger: durable, namespace: 'unselected' }),
+              localStorageBackendPlugin({ storage, redo: true })
+            ]
           })
         ).rejects.toBeDefined()
         expect(storage.length).toBe(0)
@@ -402,12 +410,14 @@ describe('text redo through the original host and WAL owners', () => {
       try {
         await expect(
           createStorageHost({
-            plugins: [storageJournalPlugin(), localStorageBackendPlugin({ storage })],
-            journal: {
-              logger: walOnly,
-              namespace: 'missing-backend-selection',
-              redoWal: walOnly.wal
-            }
+            plugins: [
+              storageJournalPlugin({
+                logger: walOnly,
+                namespace: 'missing-backend-selection',
+                redoWal: walOnly.wal
+              }),
+              localStorageBackendPlugin({ storage })
+            ]
           })
         ).rejects.toBeDefined()
         expect(storage.length).toBe(0)
@@ -445,11 +455,10 @@ describe('text redo through the original host and WAL owners', () => {
     }))
     const host = await createStorageHost({
       plugins: [
-        storageJournalPlugin(),
+        storageJournalPlugin({ logger, namespace: 'text-redo', redoWal: logger.wal }),
         localStorageBackendPlugin({ storage, namespace: 'pipeline', redo: true }),
         intervention
-      ],
-      journal: { logger, namespace: 'text-redo', redoWal: logger.wal }
+      ]
     })
     try {
       operations.length = 0
@@ -511,13 +520,12 @@ describe('text redo through the original host and WAL owners', () => {
     const initialized: string[] = []
     const host = await createStorageHost({
       plugins: [
-        storageJournalPlugin(),
+        storageJournalPlugin(({ orgId }) => {
+          initialized.push(orgId)
+          return { logger, namespace: 'observation', telemetry: true }
+        }),
         localStorageBackendPlugin({ storage, namespace: 'observation' })
-      ],
-      journal: ({ orgId }) => {
-        initialized.push(orgId)
-        return { logger, namespace: 'observation', telemetry: true }
-      }
+      ]
     })
     try {
       const org = createOrgId()
@@ -549,8 +557,7 @@ describe('text redo through the original host and WAL owners', () => {
     const options = { storage, namespace: 'corrupt', redo: true as const }
     const journal = { logger, namespace: 'text-redo', redoWal: logger.wal }
     const host = await createStorageHost({
-      plugins: [storageJournalPlugin(), localStorageBackendPlugin(options)],
-      journal
+      plugins: [storageJournalPlugin(journal), localStorageBackendPlugin(options)]
     })
     const fail = vi.spyOn(storage, 'setItem').mockImplementationOnce(() => {
       throw new DOMException('capture persisted intent', 'QuotaExceededError')
@@ -569,8 +576,7 @@ describe('text redo through the original host and WAL owners', () => {
       await logger.wal.abort(row.seq)
       await logger.wal.begin(row.kind, payload)
       const failure = await createStorageHost({
-        plugins: [storageJournalPlugin(), localStorageBackendPlugin(options)],
-        journal
+        plugins: [storageJournalPlugin(journal), localStorageBackendPlugin(options)]
       }).catch((error) => error)
       expect(walkErrorCauses(failure)).toContainEqual(
         expect.objectContaining({ code: 'JOURNAL_RECORD_INVALID' })

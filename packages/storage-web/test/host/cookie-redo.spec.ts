@@ -32,8 +32,7 @@ describe('visible-cookie redo', () => {
     }
     const journal = { logger, namespace: 'cookies', redoWal: logger.wal }
     const host = await createStorageHost({
-      plugins: [storageJournalPlugin(), cookieBackendPlugin(options)],
-      journal
+      plugins: [storageJournalPlugin(journal), cookieBackendPlugin(options)]
     })
     const original = Object.getOwnPropertyDescriptor(document, 'cookie')!.set!
     let writes = 0
@@ -55,8 +54,7 @@ describe('visible-cookie redo', () => {
       failure.mockRestore()
       await host.dispose()
       await using reopened = await createStorageHost({
-        plugins: [storageJournalPlugin(), cookieBackendPlugin(options)],
-        journal
+        plugins: [storageJournalPlugin(journal), cookieBackendPlugin(options)]
       })
       const reads = vi.spyOn(document, 'cookie', 'get')
       expect(await reopened.backend('cookies').use(kv).getMany(['a', 'b', 'a'])).toEqual([
@@ -93,8 +91,7 @@ describe('visible-cookie redo', () => {
     const options = { document, namespace: 'cookie-expiry', redo: true as const }
     const journal = { logger, namespace: 'cookies', redoWal: logger.wal }
     const host = await createStorageHost({
-      plugins: [storageJournalPlugin(), cookieBackendPlugin(options)],
-      journal
+      plugins: [storageJournalPlugin(journal), cookieBackendPlugin(options)]
     })
     const fail = vi
       .spyOn(carrier, 'setState')
@@ -118,8 +115,7 @@ describe('visible-cookie redo', () => {
       await host.dispose()
       clock = vi.spyOn(Date, 'now').mockReturnValue(image.expiresAt + 1000)
       await using reopened = await createStorageHost({
-        plugins: [storageJournalPlugin(), cookieBackendPlugin(options)],
-        journal
+        plugins: [storageJournalPlugin(journal), cookieBackendPlugin(options)]
       })
       expect(await reopened.backend('cookies').get('expiring')).toBeNull()
       expect(await logger.wal.pending()).toHaveLength(0)

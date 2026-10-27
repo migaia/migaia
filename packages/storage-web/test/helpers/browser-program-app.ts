@@ -107,7 +107,7 @@ window.runStorageProgramApplication = async () => {
   const host = await createStorageHost({
     org: createOrgId(),
     plugins: [
-      storageJournalPlugin(),
+      storageJournalPlugin({ logger, namespace: 'program' }),
       indexedDbBackendPlugin({ dbName: 'program-' + crypto.randomUUID() }, indexedDbTestFeatures),
       observed
     ],
@@ -115,8 +115,7 @@ window.runStorageProgramApplication = async () => {
       beforeStorageOperation: ({ operation }) => events.push('before:' + operation),
       afterStorageOperation: ({ operation }) => events.push('after:' + operation),
       onStorageOperationError: ({ operation }) => events.push('error:' + operation)
-    },
-    journal: { logger, namespace: 'program' }
+    }
   })
   try {
     const store = host.backend('indexed-db')

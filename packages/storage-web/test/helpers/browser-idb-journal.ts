@@ -77,20 +77,22 @@ const createNativeJournalLogger = (
 async function runIndexedDbGlobalJournal(dbName: string) {
   const loggers: Array<ReturnType<typeof createNativeJournalLogger>> = []
   const host = await createStorageHost({
-    plugins: [storageJournalPlugin(), indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)],
-    journal: async ({ storageLogStore }) => {
-      const records = await storageLogStore('indexed-db', { prefix: 'binlog' })
-      const images = await storageLogStore('indexed-db', { prefix: 'undo' })
-      const logger = createNativeJournalLogger(records, images)
-      loggers.push(logger)
-      return {
-        logger,
-        namespace: 'browser',
-        indexedDbUndo: true,
-        atomicBinlog: { 'indexed-db': records },
-        atomicUndo: { 'indexed-db': images }
-      }
-    }
+    plugins: [
+      storageJournalPlugin(async ({ storageLogStore }) => {
+        const records = await storageLogStore('indexed-db', { prefix: 'binlog' })
+        const images = await storageLogStore('indexed-db', { prefix: 'undo' })
+        const logger = createNativeJournalLogger(records, images)
+        loggers.push(logger)
+        return {
+          logger,
+          namespace: 'browser',
+          indexedDbUndo: true,
+          atomicBinlog: { 'indexed-db': records },
+          atomicUndo: { 'indexed-db': images }
+        }
+      }),
+      indexedDbBackendPlugin({ dbName }, indexedDbTestFeatures)
+    ]
   })
   try {
     const store = host.org(createOrgId()).backend('indexed-db')

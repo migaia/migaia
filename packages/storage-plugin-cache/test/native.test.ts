@@ -106,15 +106,14 @@ describe('native borrowed cache tiers', () => {
       }),
       host = await createStorageHost({
         plugins: [
-          storageJournalPlugin(),
+          storageJournalPlugin({ logger, namespace: 'shared-business', binlogValues: true }),
           memoryBackendPlugin(),
           sqliteBackendPlugin({ driver: connection }),
           postgresBackendPlugin({
             driver: pgDriver(pg),
             prefix: 'shared_log_' + crypto.randomUUID().slice(0, 8)
           })
-        ] as const,
-        journal: { logger, namespace: 'shared-business', binlogValues: true }
+        ] as const
       }),
       stores = [host.backend('memory'), host.backend('sqlite'), host.backend('postgres')]
     try {

@@ -211,11 +211,11 @@ try {
 
 日志记录与业务键分开；业务枚举、clear 和容量限制不会操作日志。后端必须支持所需日志存储，打开时先恢复已确认状态。独占存储上的同一组织与前缀只允许一个打开句柄；支持共享事务的存储可允许多个句柄。序号不因截断而重用。写入是否提交无法确认时，日志停止接纳操作，应关闭后重新打开恢复。`dropOrg()` 后旧日志句柄报 `STORE_DISPOSED`。
 
-打开日志不等于开启自动业务日志。自动记录需要 `createStorageHost({ plugins: [storageJournalPlugin(), backend], journal: ... })`；配置可以直接提供 `{ logger, namespace, ... }`，或用异步初始化函数为每个组织准备配置。初始化函数接收 `orgId` 和异步 `storageLogStore(id, { prefix })`。宿主借用 logger，不负责 shutdown。
+打开日志不等于开启自动业务日志。自动记录需要 `createStorageHost({ plugins: [storageJournalPlugin(options), backend] })`；`options` 可以直接提供 `{ logger, namespace, ... }`，或用异步初始化函数为每个组织准备配置。初始化函数接收 `orgId` 和异步 `storageLogStore(id, { prefix })`。宿主借用 logger，不负责 shutdown。
 
 根据需要选择 binlog、WAL、undo 与同事务日志对象。`atomicBinlog` / `atomicUndo` 按后端 ID 指定真实日志存储；需要它们与业务后端能在同一事务提交。其它组合是否可用由实际后端支持决定，不支持会在业务修改前拒绝。外置 binlog 追加失败会报告，已提交业务数据不回滚；结果未知不能通过盲目重放写入恢复。undo 先检查记录与修订，冲突为 `UNDO_CONFLICT`，缺失为 `UNDO_NOT_FOUND`。
 
-开启 `telemetry: true` 还需要 logger 的 level 插件；日志可能包含操作 payload 和错误，应按应用要求配置 logger。只开 telemetry 也会安装异步阶段，此时使用异步数据方法；同步读写会报 `ASYNC_STAGE_IN_SYNC_ENTRY`。没有配置 journal 且没有导入 `/journal` 时，宿主运行时不加载 logger。更多 logger 配置见 [logger 指南](../logger/USEGUIDE.md)。
+开启 `telemetry: true` 还需要 logger 的 level 插件；日志可能包含操作 payload 和错误，应按应用要求配置 logger。只开 telemetry 也会安装异步阶段，此时使用异步数据方法；同步读写会报 `ASYNC_STAGE_IN_SYNC_ENTRY`。没有导入 `/journal` 时，宿主运行时不加载 logger。更多 logger 配置见 [logger 指南](../logger/USEGUIDE.md)。
 
 ## 检查错误与结束工作
 
@@ -235,9 +235,9 @@ try {
 
 ## 显式装配可选能力
 
-基础宿主不导入 journal runtime、通知控制器或变更迭代器。此前 journal 选项会自动加载日志实现，memory 默认提供变更通知和 watch；现在这些能力由业务显式选择，避免基础存读包含未使用代码。
+基础宿主不导入 journal runtime、通知控制器或变更迭代器。此前宿主的 journal 选项会自动加载日志实现，memory 默认提供变更通知和 watch；现在这些能力由业务显式选择，避免基础存读包含未使用代码。
 
-使用 journal 选项或 `storageLogStore()` 前，在同一插件列表中把从 `@migaia/storage-host/journal` 导入的 `storageJournalPlugin()` 放到后端前。缺少插件时报 `JOURNAL_NOT_ASSEMBLED`。配置格式、日志内容和事务提交语义保持原契约。
+日志配置写在从 `@migaia/storage-host/journal` 导入的 `storageJournalPlugin(options)` 里，放在 `createStorageHost` 第一批插件中、要记录的后端之前；宿主没有单独的 `journal` 选项。后装或重复传入带配置的日志插件会报 `INVALID_CONFIG`。只用 `storageLogStore()` 时装 `storageJournalPlugin()` 即可，缺少插件时报 `JOURNAL_NOT_ASSEMBLED`。配置格式、日志内容和事务提交语义保持原契约。
 
 memory 通知和变更流分别由两个 Feature 装配：
 
