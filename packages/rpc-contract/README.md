@@ -28,6 +28,8 @@ pnpm add @migaia/rpc-contract
 
 `IRpcCarrier.setInboundFrameLimit?(maxFrameBytes)` 是可选的入站帧预算端口。Session 在握手准入后、发送 accept 前调用它；byte carrier 从 64 KiB 启动，并用当前上限完成长度检查、JSON 解析与扩展帧识别。其他介质可以省略此端口；Session 不识别具体 byte carrier 实现。
 
+`IRpcCarrier.startupMessagesMayBeLost?: true` 表示对端安装监听前的原生消息可能丢失。声明此事实的介质上，非应答方第一次收到对端 hello 时补发一次原 hello；应答方对同一对端的重复 hello 幂等。Window 声明此事实；BroadcastChannel 复用既有 targeted join 在语义 hello 之前安装路由的等价机制，不重复补发。可靠介质不增加握手帧。
+
 ```ts doc-test=check
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import type {

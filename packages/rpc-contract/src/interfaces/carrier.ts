@@ -202,6 +202,11 @@ export type IRpcCarrierObservation = Readonly<{
  * and returns its one owned Promise; no request table or provider execution lives here.
  */
 export type IRpcCarrier = Readonly<{
+  /**
+   * Native delivery can drop startup messages before the opposite listener is installed. Session
+   * resends the initiator's original hello once after its first peer hello on this medium.
+   */
+  startupMessagesMayBeLost?: true
   /** The acquired native medium permits writes until Session completes its bounded closing phase. */
   closingWrites?: true
   /** Only the actual transport maps trusted policy retirement to its own native error domain. */

@@ -94,6 +94,8 @@ Ordinary carrier frames are `{kind:'message',data,sidecars?}`; extension frames 
 
 `IRpcCarrier` may implement `setInboundFrameLimit?(maxFrameBytes: number): void`. After handshake admission and before sending accept, Session supplies `maxFrameBytes`. Byte carriers start at 64 KiB, then enforce the current limit while checking lengths and parsing JSON, including extension frames. Oversized input is rejected before allocating the complete payload or parsing JSON; Session needs no dependency on a concrete carrier.
 
+A carrier may declare `startupMessagesMayBeLost: true` when native delivery drops messages before the opposite listener starts. Upon its first peer hello, the initiator resends the original offer once, adding at most one frame. The responder reuses its reserved or accepted session for repeated hellos from that peer, without creating another candidate or repeating authentication. Window uses this fact. BroadcastChannel reuses its existing targeted join to install the remote route before semantic hello; other reliable carriers retain their original frame count. No periodic retry or separate handshake state table is added.
+
 Binary manifests retain `profile: 'migaia.rpc.portable-binary/1'`, `storage: 'inline' | 'native'`, the original `envelope`, and a logical `backings` array. This versions a binary representation rather than another RPC grammar. `storage: 'inline'` keeps visible bytes inline, with empty `backings` and physical sidecars. Each row under `storage: 'native'` describes one complete backing:
 
 | Field        | Rule                                                                                                                                                 |

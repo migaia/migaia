@@ -44,6 +44,8 @@ export async function callFrame(target: Window, origin: string) {
 
 对端指向本页面并提供 `title`。目标 Window 与本地 receiver 分别指定，origin 必须非空；通配符另需显式 `allowUnsafeTargetOrigin: true`。校验真实 source，不为被拒绝的来源读取业务载荷；自报身份不能绕过原生来源校验。
 
+Window 在对端监听安装前会丢弃消息，载体通过 `startupMessagesMayBeLost: true` 声明这一事实。id 较小的非应答方第一次收到对方 hello 后补发一次原 hello；应答方对同一对端的重复 hello 复用原候选或会话，不重复接纳。其他可靠载体不增加握手帧。
+
 ## SharedWorker 多端口
 
 ```ts doc-test=check
@@ -79,6 +81,8 @@ export async function listenOnChannel(channel: BroadcastChannel) {
 ```
 
 调用者最终先 `await host.close()`，再按自身归属关闭 channel。发现/握手决定当前 RPC 参与者集合；原生广播不等于接纳所有消息为业务。`host.broadcastChannel.request` 使用当前集合，`send` 指定一个当前对端；空集合和重连 downtime 不能解释为业务完成。该原生 API 没有 transfer list。
+
+首次广播 join 即使在另一参与者创建前丢失，后来的参与者仍会广播自己的 join。现有 listener 会先回复 targeted join，再发送语义 hello；同一原生发送方的有序投递使对端先安装路由。这里复用已有发现机制，不再叠加语义 hello 补发。
 
 ## ServiceWorker 的发送与接收
 

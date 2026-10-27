@@ -974,6 +974,7 @@ export class Session {
 
   /** Bilateral accepts confirm both admission decisions before either side reports readiness. */
   async #handshake(message: IRpcHandshake): Promise<void> {
+    if (this.#repeatedStartupHello(message)) return
     /** Hooks see a pure-admitted handshake before any accepted identity can be indexed. */
     const remote = await this.#transformHandshake(message, 'inbound')
     if (remote.step === H.reject) {
@@ -990,6 +991,8 @@ export class Session {
       throw createRpcProtocolError(SessionText.identityMismatch)
     if (this.#remoteId !== undefined && this.#remoteId !== remote.peer.id)
       throw createRpcProtocolError(SessionText.identityMismatch)
+    /** The existing negotiation identity records whether this is the first received peer hello. */
+    const firstHello = remote.step === H.hello && this.#remoteId === undefined
     this.#remoteId = remote.peer.id
     await this.#offered.promise
     this.#assertOpen()
@@ -1019,7 +1022,12 @@ export class Session {
             hostErrorWireMetadata
           )
         : completeRpcHandshake(offer, remote, hostErrorWireMetadata)
-    if (remote.step === H.hello && !responder) return
+    if (remote.step === H.hello && !responder) {
+      /** The already-transformed offer keeps its original identity, credentials and directory. */
+      if (firstHello && this.#options.carrier.startupMessagesMayBeLost)
+        await this.#encode(offer, undefined, true)
+      return
+    }
     if (remote.step === H.accept && responder) {
       const view = this.#candidate
       if (
@@ -1060,6 +1068,15 @@ export class Session {
     )
     await this.#reply
     if (!responder) this.#publish(view)
+  }
+
+  /** A lossy medium's repeated hello cannot repeat auth hooks or replace the responder's candidate. */
+  #repeatedStartupHello(message: IRpcHandshake): boolean {
+    if (!this.#options.carrier.startupMessagesMayBeLost || message.step !== H.hello) return false
+    return (
+      this.#options.self().instanceId > message.peer.id &&
+      (this.#candidate?.peerId === message.peer.id || this.#view?.peerId === message.peer.id)
+    )
   }
 
   /** Ready is fulfilled only after the table's exact reserved view has become selectable. */

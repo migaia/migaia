@@ -44,6 +44,8 @@ export async function callFrame(target: Window, origin: string) {
 
 The other side targets this page and provides `title`. Configure target Window separately from the local receiver. Origin is required; a wildcard additionally requires `allowUnsafeTargetOrigin: true`. Actual source filtering does not read a rejected source's business payload; a claimed identity cannot bypass it.
 
+Window drops messages sent before the opposite listener is installed, so its carrier declares `startupMessagesMayBeLost: true`. The initiator with the smaller id resends its original hello once after receiving its first peer hello. The responder reuses the original candidate or session for repeated hellos from that peer. Other reliable carriers send no additional handshake frames.
+
 ## SharedWorker ports
 
 ```ts doc-test=check
@@ -79,6 +81,8 @@ export async function listenOnChannel(channel: BroadcastChannel) {
 ```
 
 The caller eventually awaits host.close, then closes its own channel. Discovery/handshake determine RPC membership; native broadcasting does not admit every message as business. `host.broadcastChannel.request` uses the current set and `send` selects a direct peer. Neither an empty set nor reconnect downtime establishes business completion. The native API has no transfer list.
+
+Even when the first broadcast join is lost before another participant exists, the later participant broadcasts its own join. The existing listener replies with a targeted join before sending semantic hello. Ordered delivery from that native sender installs the remote route first. This reuses existing discovery without another semantic-hello retry.
 
 ## ServiceWorker target and receiver
 

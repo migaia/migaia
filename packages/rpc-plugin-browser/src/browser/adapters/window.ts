@@ -50,16 +50,19 @@ export function createWindowCarrier(
     throw createBrowserConfigurationError(
       BrowserRpcErrorText.wildcardTargetOriginRequiresAllowUnsafeTargetOrigin
     )
-  return browserMessageCarrier(
-    {
-      receiver,
-      origin: origin === '*' ? undefined : origin,
-      send: (value, transfer) => options.target.postMessage(value, origin, transfer),
-      accept: (event) =>
-        event.source === options.target && (origin === '*' || event.origin === origin)
-    },
-    context,
-    RpcCarrierPlatform.iframe,
-    RpcCarrierTopology.multiplexed
+  return Object.assign(
+    browserMessageCarrier(
+      {
+        receiver,
+        origin: origin === '*' ? undefined : origin,
+        send: (value, transfer) => options.target.postMessage(value, origin, transfer),
+        accept: (event) =>
+          event.source === options.target && (origin === '*' || event.origin === origin)
+      },
+      context,
+      RpcCarrierPlatform.iframe,
+      RpcCarrierTopology.multiplexed
+    ),
+    { startupMessagesMayBeLost: true as const }
   )
 }
