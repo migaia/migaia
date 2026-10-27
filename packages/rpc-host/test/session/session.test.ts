@@ -8,7 +8,7 @@ import {
 import { createProbeEmitter } from '../../dist/plugins/probe/emitter.js'
 import { createDirectorySnapshot } from '../../dist/session/view.js'
 import { MemoryCarrier } from '../fixtures/core-carrier.js'
-import { assert, describe, expect, it, vi } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { deferred } from '@migaia/utils/promise'
 import { defineHost, definePlugin } from '@migaia/plugin-host'
@@ -428,7 +428,7 @@ describe('C2 Session and SessionTable owners', () => {
     await Promise.all([local.table.close(), old.table.close(), newcomer.table.close()])
   })
 
-  it('replaces only a failed same-name source and clears its health deadline', async () => {
+  it('A45 replaces a timed-out same-name source without reporting its normal liveness failure', async () => {
     /** The old physical source is live but its actual health write no longer reaches the peer. */
     const local = await Host.create('a'),
       old = await Host.create('b', 'worker'),
@@ -446,7 +446,41 @@ describe('C2 Session and SessionTable owners', () => {
     expect(local.table.get('process', 'b')).toBeUndefined()
     expect(first.a.unsubscribed).toBe(1)
     expect(local.scheduler.pendingCount).toBe(0)
+    expect(local.report).not.toHaveBeenCalled()
     await Promise.all([local.table.close(), old.table.close(), replacement.table.close()])
+  })
+
+  it('A45 still reports a genuine name-probe transport failure while admitting its replacement', async () => {
+    /** A live incumbent reaches the real ping write before its native transport fails. */
+    const local = await Host.create('probe-report-a')
+    /** Both old and replacement instances intentionally advertise the same display name. */
+    const old = await Host.create('probe-report-b', 'worker')
+    /** Replacement remains eligible after the original source fails its probe. */
+    const replacement = await Host.create('probe-report-c', 'worker')
+    /** Genuine handshake publication installs the original name entry before failure injection. */
+    const first = connect(local, old)
+    await Promise.all([first.first.ready, first.second.ready])
+    /** Only this exact native write failure must retain diagnostic ownership. */
+    const failure = new Error('native probe write failed')
+    /** All unrelated native writes keep their existing delivery and physical lifecycle. */
+    const write = first.a.write
+    vi.spyOn(first.a, 'write').mockImplementation((frame, options) => {
+      /** Identity-codec frames expose the original control without rebuilding the message. */
+      const message = frame.data as IRpcSemanticFrame
+      if (message.kind === 'control' && message.operation === 'ping') throw failure
+      return write(frame, options)
+    })
+    try {
+      /** Name arbitration still owns one real ping and one replacement admission. */
+      const next = connect(local, replacement)
+      await next.first.ready
+      expect(local.table.get('process', 'worker')?.carrierId).toBe(next.a.id)
+      expect(local.report).toHaveBeenCalledExactlyOnceWith(
+        expect.objectContaining({ code: RpcCoreErrorCode.transport, cause: failure })
+      )
+    } finally {
+      await Promise.all([local.table.close(), old.table.close(), replacement.table.close()])
+    }
   })
 
   it('enforces trusted parent identity and rejects equal global identities with the canonical native error', async () => {

@@ -26,11 +26,14 @@ import type { IRpcDirectory, IRpcSemanticFrame } from '@migaia/rpc-contract/prot
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import {
   RpcCoreErrorText,
+  RpcLifecycleError,
+  RpcTimeoutError,
   tagRpcError,
   identifyRpcBoundaryFailure
 } from '@migaia/rpc-contract/errors'
 import {
   createRpcError,
+  isLocalRpcError,
   createRpcConfigurationError,
   createRpcLifecycleError
 } from '../host/error-owner.js'
@@ -1001,7 +1004,13 @@ export class SessionTable {
           .then(
             () => true,
             (error) => {
-              if (!session.closing && this.#sessions.get(previous.carrierId) === incumbent)
+              if (
+                !session.closing &&
+                !(incumbent instanceof Session && incumbent.closing) &&
+                !isLocalRpcError(error, RpcTimeoutError) &&
+                !isLocalRpcError(error, RpcLifecycleError) &&
+                this.#sessions.get(previous.carrierId) === incumbent
+              )
                 this.#options.report(error)
               return false
             }
