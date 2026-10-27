@@ -265,44 +265,24 @@ export function snapshotQuerySource(source: IRecordQuerySource): IQuerySourceSna
   /** The captured declaration cannot change direction or key-budget interpretation later. */
   let tieBreakByKey: IRecordQuerySource['tieBreakByKey']
   if (keyOrder !== undefined) {
-    if (typeof keyOrder !== 'object' || keyOrder === null || Array.isArray(keyOrder))
-      throw invalidQueryArgument()
-    /** Each descriptor field is borrowed once under the original source-admission boundary. */
+    /** Backend authors declare this typed descriptor; its fields are copied, not re-validated. */
     const { direction, parts } = keyOrder
-    if (
-      (direction !== QueryKeyDirection.next && direction !== QueryKeyDirection.prev) ||
-      (parts !== undefined && parts !== true)
-    )
-      throw invalidQueryArgument()
     tieBreakByKey = { direction, ...(parts === undefined ? {} : { parts }) }
   }
   /** The source key is captured once; omission retains the native symbol's existing semantics. */
   const configuredAsyncDisposeKey = source.asyncDisposeKey
-  if (configuredAsyncDisposeKey !== undefined && typeof configuredAsyncDisposeKey !== 'symbol')
-    throw invalidQueryArgument()
   /** Extended native controls are never inferred from legacy support arrays alone. */
   const nativeSteps = source.nativeSteps
-  if (nativeSteps !== undefined && nativeSteps !== true) throw invalidQueryArgument()
   /** Source identity is captured once and is used only for Boolean cursor compatibility checks. */
   const cursorSource = source.cursorSource
-  if (
-    cursorSource !== undefined &&
-    (cursorSource === null ||
-      (typeof cursorSource !== 'object' && typeof cursorSource !== 'function'))
-  )
-    throw invalidQueryArgument()
   /** Optional native terminal support captures one callable rather than inferring another runner. */
   const reduce = source.reduce
-  if (reduce !== undefined && typeof reduce !== 'function') throw invalidQueryArgument()
   /** One captured author callback retains original pipeline and native transaction authority. */
   const mutate = source.mutate
-  if (mutate !== undefined && typeof mutate !== 'function') throw invalidQueryArgument()
   /** A declared native watcher supplies its own original subscription resource and timing owner. */
   const watch = source.watch
-  if (watch !== undefined && typeof watch !== 'function') throw invalidQueryArgument()
   /** Pure planning authority is borrowed once, just like the original native callbacks. */
   const plan = source.plan
-  if (plan !== undefined && typeof plan !== 'function') throw invalidQueryArgument()
   return {
     receiver: source as unknown as IQuerySourcePort,
     execute,

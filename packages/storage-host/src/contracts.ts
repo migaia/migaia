@@ -42,8 +42,9 @@ const nativePluginMetadata = new WeakMap<object, { readonly id: string }>()
 type IStorageNativeProjectionFields = Readonly<Record<PropertyKey, unknown>>
 
 /**
- * Project ordinary own descriptors for native admission. Promise outputs remain the actual native
- * Promise so PluginHost can reject and observe their rejection without another assimilation owner.
+ * Copy a plugin's own fields for native admission by reading them directly; the prototype is kept
+ * so class-based outputs still resolve their methods. Promise outputs stay the actual Promise so
+ * PluginHost can observe their rejection.
  */
 function createNativeDataProjection(
   value: unknown,
@@ -52,36 +53,19 @@ function createNativeDataProjection(
   projectValue?: (key: PropertyKey, value: unknown, receiver: object) => unknown
 ): unknown {
   if (value === null || typeof value !== 'object' || value instanceof Promise) return value
-  /** Keep the original prototype and own data/accessor shape for PluginHost's closed boundary. */
-  const output = Object.create(Object.getPrototypeOf(value))
-  for (const key of Reflect.ownKeys(value)) {
-    /** Captured definitions survive later caller mutation while keeping native rejection semantics. */
-    const descriptor = Object.getOwnPropertyDescriptor(value, key)!
-    if (projectValue !== undefined && 'value' in descriptor)
-      Object.defineProperty(output, key, {
-        ...descriptor,
-        value: projectValue(key, descriptor.value, value),
-        configurable: true
-      })
-    else if (
-      preserveMethodReceiver &&
-      key !== 'then' &&
-      'value' in descriptor &&
-      typeof descriptor.value === 'function'
-    )
-      Object.defineProperty(output, key, {
-        ...descriptor,
-        value: (...args: unknown[]) => Reflect.apply(descriptor.value, value, args),
-        configurable: true
-      })
-    else Object.defineProperty(output, key, { ...descriptor, configurable: true })
+  const source = value as Record<PropertyKey, unknown>
+  const output = Object.create(Object.getPrototypeOf(value)) as Record<PropertyKey, unknown>
+  for (const key of Reflect.ownKeys(source)) {
+    const member = source[key]
+    output[key] =
+      projectValue !== undefined
+        ? projectValue(key, member, source)
+        : preserveMethodReceiver && key !== 'then' && typeof member === 'function'
+          ? (...args: unknown[]) => Reflect.apply(member, source, args)
+          : member
   }
   for (const key of Reflect.ownKeys(fields))
-    if (!Object.hasOwn(value, key))
-      Object.defineProperty(output, key, {
-        ...Object.getOwnPropertyDescriptor(fields, key),
-        configurable: true
-      })
+    if (!Object.hasOwn(source, key)) output[key] = fields[key]
   return output
 }
 
@@ -95,38 +79,22 @@ type IStorageDescriptorHooks = Readonly<{
   readonly expose: (hook: IStorageDescriptorHook) => () => unknown
 }>
 
-/** Preserve unknown keys and invalid descriptors so native admission remains their single owner. */
+/**
+ * Copy a plugin descriptor for native admission, dropping author-only metadata and wrapping the
+ * install, featureExpose and expose hooks. Fields are read directly; native admission still owns
+ * validation of whatever the author supplied.
+ */
 function createNativeDescriptorProjection(value: unknown, hooks: IStorageDescriptorHooks): unknown {
   if (value === null || typeof value !== 'object' || value instanceof Promise) return value
-  /** Author-only metadata is removed before the original closed descriptor admission. */
-  const output = Object.create(Object.getPrototypeOf(value))
-  /** Native always receives installation and Feature bridges; expose remains optional. */
-  const keys = new Set([
-    ...Reflect.ownKeys(value).filter(
-      (key) => !STORAGE_DESCRIPTOR_METADATA.some((field) => field === key)
-    ),
-    ...STORAGE_DESCRIPTOR_HOOKS.filter((key) => key !== 'expose')
-  ])
-  for (const key of keys) {
-    /** Only own data callbacks are bridged; accessors retain the native rejection path. */
-    const descriptor = Object.getOwnPropertyDescriptor(value, key)
-    if (
-      typeof key === 'string' &&
-      STORAGE_DESCRIPTOR_HOOKS.some((hook) => hook === key) &&
-      (key !== 'expose' || descriptor !== undefined) &&
-      (descriptor === undefined ||
-        ('value' in descriptor && typeof descriptor.value === 'function'))
-    )
-      Object.defineProperty(output, key, {
-        value: hooks[key as keyof IStorageDescriptorHooks](
-          descriptor?.value as IStorageDescriptorHook
-        ),
-        enumerable: descriptor?.enumerable ?? true,
-        configurable: true,
-        writable: true
-      })
-    else if (descriptor !== undefined)
-      Object.defineProperty(output, key, { ...descriptor, configurable: true })
+  const source = value as Record<PropertyKey, unknown>
+  const output = Object.create(Object.getPrototypeOf(value)) as Record<PropertyKey, unknown>
+  for (const key of Reflect.ownKeys(source))
+    if (!STORAGE_DESCRIPTOR_METADATA.some((field) => field === key)) output[key] = source[key]
+  for (const key of STORAGE_DESCRIPTOR_HOOKS) {
+    const hook = source[key]
+    if (key === 'expose' && hook === undefined) continue
+    if (hook === undefined || typeof hook === 'function')
+      output[key] = hooks[key as keyof IStorageDescriptorHooks](hook as IStorageDescriptorHook)
   }
   return output
 }

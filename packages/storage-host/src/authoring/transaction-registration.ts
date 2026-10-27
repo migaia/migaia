@@ -306,14 +306,7 @@ function registerTransactionState<TScope extends object>(
   scope: TScope,
   options: ITransactionRegistrationOptions<TScope>
 ): ITransactionState {
-  if (
-    typeof scope !== 'object' ||
-    scope === null ||
-    transactionRegistrations.has(scope) ||
-    typeof options.createScope !== 'function' ||
-    typeof options.onFailure !== 'function' ||
-    (options.beforeCommit !== undefined && typeof options.beforeCommit !== 'function')
-  )
+  if (typeof scope !== 'object' || scope === null || transactionRegistrations.has(scope))
     throw invalidTransaction()
   /** This backend context spans accepted asynchronous operations and finalizer callbacks. */
   const context = snapshotOperationContext(options.context)
@@ -449,9 +442,7 @@ class TransactionIterator<TScope extends object, T> {
       !this.#state ||
       this.#state.owner !== registration ||
       this.#state.closed ||
-      this.#state.firstFailure ||
-      typeof port.next !== 'function' ||
-      typeof port.close !== 'function'
+      this.#state.firstFailure
     )
       throw invalidTransaction()
     this.#scope = scope
@@ -588,10 +579,8 @@ class TransactionOwner<TBaseScope extends object> implements ITransactionOwner<T
     const asyncDisposeKey: typeof Symbol.asyncDispose =
       options?.asyncDisposeKey ?? Symbol.asyncDispose
     if (
-      typeof normalizeFailure !== 'function' ||
-      typeof asyncDisposeKey !== 'symbol' ||
-      (this.#activityMode !== TransactionActivityMode.managed &&
-        this.#activityMode !== TransactionActivityMode.native)
+      this.#activityMode !== TransactionActivityMode.managed &&
+      this.#activityMode !== TransactionActivityMode.native
     )
       throw invalidTransaction()
     if (options?.defaultPolicy !== undefined) assertConcurrencyPolicy(options.defaultPolicy)
@@ -717,8 +706,6 @@ export function deriveTransactionIterator<T, TResult>(
   /** Only an original actual registration can create a resource in that same scope. */
   const resource = transactionRegistrations.get(iterator)
   if (resource?.kind !== RegistrationKind.iterator) return undefined
-  if (typeof read !== 'function' || (close !== undefined && typeof close !== 'function'))
-    throw invalidTransaction()
   return resource.derive(
     read as (
       next: () => Promise<IteratorResult<unknown>>,

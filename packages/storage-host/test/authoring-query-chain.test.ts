@@ -1224,15 +1224,6 @@ describe('bounded record execution', () => {
     ).rejects.toMatchObject({ code: 'INVALID_KEY' })
   })
 
-  it('rejects an invalid key tie direction before opening a source', () => {
-    /** New optional metadata uses the existing source-admission error boundary. */
-    const execute = vi.fn(() => ownedRows([]))
-    expect(() =>
-      createRecordQuery({ pushdown: noPushdown, execute, tieBreakByKey: 'sideways' as never })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
-    expect(execute).not.toHaveBeenCalled()
-  })
-
   it('streams from the original source lazily and stops ordinary limit without reading another candidate', async () => {
     /** Source advancement is observable independently of construction and terminal materialization. */
     let advanced = 0
@@ -2084,15 +2075,6 @@ describe('root mapped read cleanup', () => {
     } finally {
       enqueue.mockRestore()
     }
-  })
-
-  it('validates only an explicitly supplied resource key before source execution', () => {
-    /** Invalid author facts fail through the existing descriptor boundary without opening a cursor. */
-    const execute = vi.fn(() => ownedRows([]))
-    expect(() =>
-      createRecordQuery({ pushdown: noPushdown, execute, asyncDisposeKey: 'bad-key' as never })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
-    expect(execute).not.toHaveBeenCalled()
   })
 
   it.each(['resolve', 'reject'] as const)(
