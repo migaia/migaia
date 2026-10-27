@@ -208,7 +208,7 @@ frame 管道允许多次提交。每次 `await next(payload)` 的失败交给当
 
 `auth` 对完整消息执行保护，再由 `chunk` 拆成物理帧；接收端先重组，再还原保护。probe 的 `protected` 事件对应整条消息，`frame` 事件保留实际 `chunkIndex`、`chunkCount` 和 `members`。物理 batch 的成员数在 batch frame 上观察；`envelope` 事件仍对每条逻辑消息观察一次。
 
-`chunk({ maxConcurrentMessagesPerSource, maxBufferedBytesPerSource })` 为每个物理来源设置子配额。默认分别为 64 条未完成消息和 16 MiB，低于默认全局 256 条和 64 MiB；自定义默认子配额分别取 `min(64, max(1, floor(maxConcurrentMessages / 4)))` 和 `min(16777216, max(1, floor(maxBufferedBytes / 4)))`；全局值大于 1 时子配额严格更小，全局值为 1 时保留有效最小值 1。首片按完整声明长度预留来源字节额度，完成、过期或来源关闭时归还。超出来源配额只拒绝该来源的新分片消息，已接纳消息继续使用其预留额度；其他来源仍受各自子配额和原全局实际保留字节预算约束。字符串额度单位为 UTF-16 code unit，二进制为字节。
+`chunk({ maxConcurrentMessagesPerSource, maxBufferedBytesPerSource })` 为每个物理来源设置子配额。默认分别为 64 条未完成消息和 16 MiB，低于默认全局 256 条和 64 MiB；默认来源并发取 `min(64, max(1, floor(maxConcurrentMessages / 4)))`，默认来源字节取 `max(maxMessageBytes, min(16777216, floor(maxBufferedBytes / 4)))`，保证一条允许的完整消息能获得预留。显式 `maxBufferedBytesPerSource` 小于 `maxMessageBytes` 时，构造会按既有配置错误拒绝。首片按完整声明长度预留来源字节额度，完成、过期或来源关闭时归还。超出来源配额只拒绝该来源的新分片消息，已接纳消息继续使用其预留额度；其他来源仍受各自子配额和原全局实际保留字节预算约束。字符串额度单位为 UTF-16 code unit，二进制为字节。
 
 本地 codec capture 在原遍历中累计所选 JSON 表示的 UTF-8 字节；超过当前 `maxFrameBytes` 时立即拒绝为 `FRAME_LIMIT_EXCEEDED`，不等指数展开的共享引用全部复制。未超限的共享引用仍按 JSON 逐次展开，线上表示保持不变。
 

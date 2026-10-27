@@ -132,12 +132,67 @@ it('actual native chunk flow preserves negotiated split/reassembly, physical dra
       }
     })
   )
+  /** A second public feature uses default source bytes with an explicitly larger legal message. */
+  const largeProgram = new RpcTransportFlowProgram([
+    chunk({ chunkBytes: 1024 * 1024, maxMessageBytes: 32 * 1024 * 1024 })
+  ])
+  await flow.use(
+    definePlugin({
+      name: 'large',
+      pipelines: RpcFlowPipelines,
+      features: largeProgram.features,
+      async install(core) {
+        groups.set(
+          'large',
+          await registry.prepareTransport(core, largeProgram, setup.signal, {
+            signal: setup.signal,
+            report: (error) => {
+              errors.push(error)
+            },
+            retire: async () => undefined,
+            call: async () => undefined
+          })
+        )
+        return {}
+      }
+    })
+  )
   registry.start()
   /** The same genuine owner retains each point payload axis while lending native execution. */
   const pipelines = owners.get('test')!
   expect(registry.facts('test').extensions).toEqual(['chunk@1'])
   expect(registry.facts('test').required).toEqual(['chunk@1'])
   expect(registry.facts('other').extensions).toEqual([])
+  /** The genuine native feature hooks split and reassemble exactly thirty-two MiB. */
+  const largePipelines = owners.get('large')!
+  /** The ordinary fixture facts are relabeled to this genuine feature group's namespace. */
+  const largeSource = context(setup.signal, new Set(['chunk@1']))
+  /** Both directions borrow the same accepted source without a second assembly fixture. */
+  const largeContext = {
+    ...largeSource,
+    namespace: 'large',
+    carrierId: 'large-source',
+    session: { ...largeSource.session!, namespace: 'large' }
+  }
+  /** This payload exceeds the former sixteen-MiB source default while fitting maxMessageBytes. */
+  const largeOriginal: IRpcCarrierFrame = { kind: 'message', data: 'x'.repeat(32 * 1024 * 1024) }
+  /** Physical output is read from the real public feature's outbound pipeline. */
+  const largeFrames: IRpcCarrierFrame[] = []
+  await largePipelines
+    .pipeline(RpcFlowPoint.frameOutbound, 'large')
+    .run({ frame: largeOriginal, context: largeContext }, async (payload) => {
+      largeFrames.push(payload.frame)
+    })
+  expect(largeFrames).toHaveLength(32)
+  /** The only delivered complete message comes from the original inbound assembly owner. */
+  const largeDelivered: IRpcCarrierFrame[] = []
+  for (const frame of largeFrames)
+    await largePipelines
+      .pipeline(RpcFlowPoint.frameInbound, 'large')
+      .run({ frame, context: { ...largeContext, direction: 'inbound' } }, async (payload) => {
+        largeDelivered.push(payload.frame)
+      })
+  expect(largeDelivered).toEqual([largeOriginal])
   /** One accepted source owns its actual retirement signal. */
   const source = new AbortController()
   /** Native drain is deliberately held independently from the plugin Promise. */

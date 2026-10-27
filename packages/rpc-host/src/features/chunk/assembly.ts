@@ -65,9 +65,12 @@ function snapshotOptions(options: IRpcChunkOptions = {}) {
       ),
     maxBufferedBytesPerSource:
       options.maxBufferedBytesPerSource ??
-      Math.min(
-        RpcChunkLimit.maxBufferedBytesPerSource,
-        Math.max(1, Math.floor((options.maxBufferedBytes ?? RpcChunkLimit.maxBufferedBytes) / 4))
+      Math.max(
+        options.maxMessageBytes ?? RpcChunkLimit.maxMessageBytes,
+        Math.min(
+          RpcChunkLimit.maxBufferedBytesPerSource,
+          Math.floor((options.maxBufferedBytes ?? RpcChunkLimit.maxBufferedBytes) / 4)
+        )
       ),
     assemblyTimeoutMs: options.assemblyTimeoutMs ?? RpcChunkLimit.assemblyTimeoutMs,
     errorMetadata: options.errorMetadata,
@@ -89,7 +92,8 @@ function snapshotOptions(options: IRpcChunkOptions = {}) {
   }
   if (
     result.chunkBytes > result.maxMessageBytes ||
-    result.maxMessageBytes > result.maxBufferedBytes
+    result.maxMessageBytes > result.maxBufferedBytes ||
+    result.maxBufferedBytesPerSource < result.maxMessageBytes
   )
     throw createContractError(
       RpcContractErrorCode.frameLimitExceeded,

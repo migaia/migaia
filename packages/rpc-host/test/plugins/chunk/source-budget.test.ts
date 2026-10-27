@@ -2,12 +2,24 @@ import assert from 'node:assert/strict'
 import { it } from 'vitest'
 import { createStringChunkAssembler } from '../../../dist/features/chunk/assembly.js'
 
+it('rejects an explicit source byte quota smaller than the admitted message limit at construction', () => {
+  assert.throws(
+    () =>
+      createStringChunkAssembler({
+        chunkBytes: 2,
+        maxMessageBytes: 8,
+        maxBufferedBytesPerSource: 4
+      }),
+    { source: 'rpc.contract', code: 'FRAME_LIMIT_EXCEEDED' }
+  )
+})
+
 for (const quota of ['messages', 'bytes'] as const) {
   it(`A44 isolates ${quota} source quota while another source completes`, () => {
     /** The canonical assembler retains global capacity beyond this sender's explicit subquota. */
     const assembler = createStringChunkAssembler({
       chunkBytes: 2,
-      maxMessageBytes: 8,
+      maxMessageBytes: 4,
       maxBufferedBytes: 16,
       maxConcurrentMessages: 8,
       maxConcurrentMessagesPerSource: quota === 'messages' ? 1 : 4,

@@ -75,7 +75,10 @@ export type IRpcChunkOptions = Readonly<{
   maxConcurrentMessages?: number
   /** Defaults to min(64, max(1, floor(maxConcurrentMessages / 4))) incomplete messages per source. */
   maxConcurrentMessagesPerSource?: number
-  /** Defaults to min(16777216, max(1, floor(maxBufferedBytes / 4))) declared units per source. */
+  /**
+   * Defaults to max(maxMessageBytes, min(16777216, floor(maxBufferedBytes / 4))); must admit one
+   * message.
+   */
   maxBufferedBytesPerSource?: number
   /** Defaults to 30000 ms; positive safe-integer retention lifetime for an incomplete assembly. */
   assemblyTimeoutMs?: number
