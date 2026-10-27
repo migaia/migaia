@@ -208,6 +208,8 @@ Builtin positions are fixed: outbound plaintext → schema → idempotency → l
 
 `auth` protects each complete message before `chunk` splits it into physical frames. The receiver reassembles the message before restoring protection. Probe `protected` events describe the complete message; `frame` events retain actual `chunkIndex`, `chunkCount` and `members`. Physical batch membership is observed on its batch frame, while each logical message has one `envelope` observation.
 
+Local codec capture accumulates UTF-8 bytes of the selected JSON representation during its original traversal. Exceeding the current `maxFrameBytes` rejects immediately with `FRAME_LIMIT_EXCEEDED`, before shared references can expand exponentially. In-budget aliases retain their ordinary independent JSON expansion and unchanged wire representation.
+
 A carrier may implement `reserveWrite(options)` by borrowing its existing flow-control owner and returning a receipt with `release()`. Session reserves once per logical write after encoding and releases when that frame pipeline actually settles. Chunk fragments share the same receipt; a batch retains each member's receipt and borrows a surviving member's receipt for its coalesced physical write. `write` still completes at actual physical acceptance, without counting fragments or batches as new logical calls. Receipts never enter wire data.
 
 The same `auth`, `chunk`, `batch`, `idempotency`, `limits`, `errorMap`, and `schema` factories support host `plugins` and transport `features`; transport placement overrides only its namespace. Host `limits` shares quotas; transport `limits` owns separate quotas. `probe`, `typegen`, and Devtools are host-only. Remove the former `namespaces` scope option and place the feature on its transport.

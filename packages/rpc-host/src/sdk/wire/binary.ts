@@ -1,5 +1,7 @@
 /** Execute the original bounded capture/whole-backing digest algorithm outside contract. */
 import { bytesToBase64 } from '@migaia/utils/bytes'
+import { safeRead, RPC_CONTRACT_SOURCE } from '@migaia/rpc-contract/errors'
+import { RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
 import type { IRpcEnvelope, IRpcBinaryManifest } from '@migaia/rpc-contract/protocol'
 import { BinaryShape, RPC_BINARY_MAX_BYTES } from './binary-shape.js'
 import { captureRpcBinary } from './binary-capture.js'
@@ -37,6 +39,15 @@ export function prepareRpcBinary(
     )
     return finishRpcBinaryCapture(capture, options, shape)
   } catch (cause) {
+    /**
+     * Capture byte admission keeps its existing frame diagnostic rather than becoming shape
+     * failure.
+     */
+    if (
+      safeRead(cause, 'source') === RPC_CONTRACT_SOURCE &&
+      safeRead(cause, 'code') === RpcContractErrorCode.frameLimitExceeded
+    )
+      return Promise.reject(cause)
     try {
       return new BinaryShape(options.limit, options.errorMetadata).invalid(cause)
     } catch (error) {
