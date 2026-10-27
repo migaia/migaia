@@ -419,20 +419,32 @@ async function detectCacheFeeds(
       cacheContext.subscriptions.push(() => tail.dispose())
     }
 }
+/**
+ * Invalidate every organization for one lower tier: mark the feed untrusted for organizations that
+ * bind later, then reset each existing projection. Plain and durable feeds both use it for a reset
+ * without orgId, which the change-feed contract defines as covering all organizations.
+ */
+async function resetCacheFeed(cacheContext: ICacheBackendContext, index: number): Promise<void> {
+  cacheContext.untrustedFeeds.add(index)
+  for (const projection of cacheContext.projections.values()) await projection.reset(index)
+}
 /** Ephemeral feed changes retain their explicit organization and original mutation lease. */
 function propagateCacheChange(
   cacheContext: ICacheBackendContext,
   index: number,
   change: IStorageChange
 ): Promise<void> {
-  /** Unscoped native changes follow the original default organization. */
-  const orgId = change.orgId ?? cacheContext.core.defaultOrgId
   /** Native propagation remains admitted until the existing invalidation settles. */
   const release = cacheContext.controller.beginMutation()
-  return bind(cacheContext, orgId)
-    .propagation(change, index)
-    .catch((error) => report(cacheContext, error))
-    .finally(release)
+  /** An unscoped reset covers every organization; other unscoped changes use the default one. */
+  const work =
+    change.kind === 'reset' && change.orgId === undefined
+      ? resetCacheFeed(cacheContext, index)
+      : bind(cacheContext, change.orgId ?? cacheContext.core.defaultOrgId).propagation(
+          change,
+          index
+        )
+  return work.catch((error) => report(cacheContext, error)).finally(release)
 }
 /** Durable feed state belongs to its one original native subscription and finite reset path. */
 class CacheDurableTail {
@@ -468,9 +480,7 @@ class CacheDurableTail {
   }
   /** Reset marks future organizations untrusted and clears every existing projection before ack. */
   async #reset(): Promise<void> {
-    this.#cacheContext.untrustedFeeds.add(this.#index)
-    for (const projection of this.#cacheContext.projections.values())
-      await projection.reset(this.#index)
+    await resetCacheFeed(this.#cacheContext, this.#index)
   }
   /** Callback identity stays stable across the original native subscription/replacement calls. */
   readonly #onChange = async (
