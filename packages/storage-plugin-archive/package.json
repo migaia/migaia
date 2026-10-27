@@ -34,6 +34,7 @@
     "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
+    "@migaia/storage-host": "workspace:^",
     "@migaia/storage-plugin-object": "workspace:^",
     "@migaia/storage-plugin-postgres": "workspace:^",
     "@migaia/storage-plugin-sqlite": "workspace:^",

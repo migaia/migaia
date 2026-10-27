@@ -49,6 +49,7 @@
     "@rdfjs/types": "2.0.1"
   },
   "devDependencies": {
+    "@migaia/storage-host": "workspace:^",
     "@types/n3": "1.26.1",
     "n3": "1.26.0",
     "oxigraph": "0.4.11"

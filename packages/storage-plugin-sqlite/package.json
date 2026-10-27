@@ -58,6 +58,7 @@
   },
   "devDependencies": {
     "@migaia/logger": "workspace:^",
+    "@migaia/storage-host": "workspace:^",
     "@migaia/store-light": "workspace:^",
     "@migaia/store-persist": "workspace:^"
   },

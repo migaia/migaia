@@ -859,13 +859,13 @@ importers:
       '@migaia/storage-contract':
         specifier: workspace:^
         version: link:../storage-contract
-      '@migaia/storage-host':
-        specifier: workspace:^
-        version: link:../storage-host
       '@migaia/utils':
         specifier: workspace:^
         version: link:../utils
     devDependencies:
+      '@migaia/storage-host':
+        specifier: workspace:^
+        version: link:../storage-host
       '@migaia/storage-plugin-object':
         specifier: workspace:^
         version: link:../storage-plugin-object
@@ -896,9 +896,6 @@ importers:
       '@migaia/storage-contract':
         specifier: workspace:^
         version: link:../storage-contract
-      '@migaia/storage-host':
-        specifier: workspace:^
-        version: link:../storage-host
       '@migaia/utils':
         specifier: workspace:^
         version: link:../utils
@@ -906,6 +903,9 @@ importers:
       '@migaia/logger':
         specifier: workspace:^
         version: link:../logger
+      '@migaia/storage-host':
+        specifier: workspace:^
+        version: link:../storage-host
       '@migaia/storage-plugin-postgres':
         specifier: workspace:^
         version: link:../storage-plugin-postgres
@@ -936,9 +936,6 @@ importers:
       '@migaia/storage-contract':
         specifier: workspace:^
         version: link:../storage-contract
-      '@migaia/storage-host':
-        specifier: workspace:^
-        version: link:../storage-host
       '@migaia/utils':
         specifier: workspace:^
         version: link:../utils
@@ -949,6 +946,9 @@ importers:
       '@aws-sdk/s3-request-presigner':
         specifier: 3.1140.0
         version: 3.1140.0
+      '@migaia/storage-host':
+        specifier: workspace:^
+        version: link:../storage-host
 
   packages/storage-plugin-postgres:
     dependencies:
@@ -961,9 +961,6 @@ importers:
       '@migaia/storage-contract':
         specifier: workspace:^
         version: link:../storage-contract
-      '@migaia/storage-host':
-        specifier: workspace:^
-        version: link:../storage-host
       '@migaia/utils':
         specifier: workspace:^
         version: link:../utils
@@ -971,6 +968,9 @@ importers:
       '@migaia/logger':
         specifier: workspace:^
         version: link:../logger
+      '@migaia/storage-host':
+        specifier: workspace:^
+        version: link:../storage-host
       '@types/bun':
         specifier: 1.4.3
         version: 1.4.3
@@ -1004,13 +1004,13 @@ importers:
       '@migaia/storage-contract':
         specifier: workspace:^
         version: link:../storage-contract
-      '@migaia/storage-host':
-        specifier: workspace:^
-        version: link:../storage-host
       '@migaia/utils':
         specifier: workspace:^
         version: link:../utils
     devDependencies:
+      '@migaia/storage-host':
+        specifier: workspace:^
+        version: link:../storage-host
       '@qdrant/js-client-rest':
         specifier: 1.11.0
         version: 1.11.0(typescript@7.0.2)
@@ -1023,9 +1023,6 @@ importers:
       '@migaia/storage-contract':
         specifier: workspace:^
         version: link:../storage-contract
-      '@migaia/storage-host':
-        specifier: workspace:^
-        version: link:../storage-host
       '@migaia/utils':
         specifier: workspace:^
         version: link:../utils
@@ -1033,6 +1030,9 @@ importers:
       '@migaia/logger':
         specifier: workspace:^
         version: link:../logger
+      '@migaia/storage-host':
+        specifier: workspace:^
+        version: link:../storage-host
       '@migaia/storage-plugin-postgres':
         specifier: workspace:^
         version: link:../storage-plugin-postgres
@@ -1054,9 +1054,6 @@ importers:
       '@migaia/storage-contract':
         specifier: workspace:^
         version: link:../storage-contract
-      '@migaia/storage-host':
-        specifier: workspace:^
-        version: link:../storage-host
       '@migaia/utils':
         specifier: workspace:^
         version: link:../utils
@@ -1064,6 +1061,9 @@ importers:
         specifier: 2.0.1
         version: 2.0.1
     devDependencies:
+      '@migaia/storage-host':
+        specifier: workspace:^
+        version: link:../storage-host
       '@types/n3':
         specifier: 1.26.1
         version: 1.26.1
@@ -1088,9 +1088,6 @@ importers:
       '@migaia/storage-contract':
         specifier: workspace:^
         version: link:../storage-contract
-      '@migaia/storage-host':
-        specifier: workspace:^
-        version: link:../storage-host
       '@migaia/utils':
         specifier: workspace:^
         version: link:../utils
@@ -1098,6 +1095,9 @@ importers:
       '@migaia/logger':
         specifier: workspace:^
         version: link:../logger
+      '@migaia/storage-host':
+        specifier: workspace:^
+        version: link:../storage-host
       '@migaia/store-light':
         specifier: workspace:^
         version: link:../store-light
@@ -1125,9 +1125,6 @@ importers:
       '@migaia/storage-contract':
         specifier: workspace:^
         version: link:../storage-contract
-      '@migaia/storage-host':
-        specifier: workspace:^
-        version: link:../storage-host
       '@migaia/utils':
         specifier: workspace:^
         version: link:../utils
@@ -1138,6 +1135,9 @@ importers:
       '@migaia/rpc-contract':
         specifier: workspace:*
         version: link:../rpc-contract
+      '@migaia/storage-host':
+        specifier: workspace:^
+        version: link:../storage-host
       '@migaia/store-persist':
         specifier: workspace:*
         version: link:../store-persist
