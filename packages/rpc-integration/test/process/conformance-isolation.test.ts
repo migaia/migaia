@@ -6,6 +6,7 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { inspect } from 'node:util'
+import { createConnection } from 'node:net'
 import { describe, expect, it, vi } from 'vitest'
 import { serializeRpcError, type IRpcSerializedError } from '@migaia/rpc-contract/errors'
 import { RpcProbeLifecycle } from '@migaia/rpc-contract/interfaces'
@@ -13,12 +14,9 @@ import { createRpcHost } from '@migaia/rpc-host'
 import { auth } from '@migaia/rpc-host/plugins/auth'
 import { probe } from '@migaia/rpc-host/plugins/probe'
 import { timeout } from '@migaia/rpc-host/features/timeout'
-import { encodeRpcStreamFrame } from '@migaia/rpc-host/sdk'
+import { encodeRpcStreamFrame, RpcEventByteIO, type IRpcByteIO } from '@migaia/rpc-host/sdk'
 import { processPlugin } from '@migaia/rpc-plugin-process'
-import { DEFAULT_MAX_CONNECTIONS } from '../../../rpc-plugin-process/dist/process/resilience/constants.js'
 import { ipcLog, type IIpcLogContext } from '@migaia/rpc-plugin-process/features'
-import { dialProcessByteChannel } from '../../../rpc-plugin-process/dist/process/adapters/node-socket.js'
-import type { IProcessByteChannel } from '../../../rpc-plugin-process/dist/process/types.js'
 import {
   peers,
   evidence,
@@ -29,6 +27,33 @@ import {
 import { type IScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { deferred } from '@migaia/utils/promise'
+
+/**
+ * Native listener default from rpc-plugin-process/src/process/resilience/constants.ts; not a public
+ * export.
+ */
+const listenerCapacity = 64
+
+/** Fixture-owned raw socket terminal text never replaces a production protocol or Session error. */
+const nativeSocketClosed = 'isolation native socket closed'
+
+/** Borrow Node's actual socket through the public byte owner, without importing a private adapter. */
+async function dialIsolationSocket(address: string): Promise<IRpcByteIO> {
+  /** Every supported address in this fixture is its owned local socket path. */
+  const socket = createConnection({ path: address })
+  /** Pause and subscribe before native connect can deliver an early peer frame. */
+  const raw = new RpcEventByteIO(socket, socket, () => socket.destroy(), {
+    closedError: () => new Error(nativeSocketClosed),
+    report: () => undefined
+  }).value
+  try {
+    await once(socket, 'connect')
+    return raw
+  } catch (error) {
+    await raw.close()
+    throw error
+  }
+}
 
 /** Observe actual child descriptors; lsof is never used as a simulated admission counter. */
 function descriptors(pid: number): number {
@@ -59,7 +84,7 @@ async function client(_peer: typeof fixturePeer, _host: boolean, token: string, 
   return observedClient(token, address)
 }
 /** One already-open raw socket remains fixture-owned while public Host performs the real handshake. */
-async function connectRaw(raw: IProcessByteChannel, token: string, reports: unknown[]) {
+async function connectRaw(raw: IRpcByteIO, token: string, reports: unknown[]) {
   return installBusinessClient(
     { reports },
     {
@@ -84,6 +109,7 @@ type IResult = {
 }
 /** The actual child independently counts executions, cancellation and lifecycle replacement. */
 type IStats = {
+  targetInstance: string
   executions: number
   contexts: Array<IResult['session'] & { method: string }>
   aborts: Array<IResult['session'] & { label: string; code?: string; localTimeout: boolean }>
@@ -224,7 +250,7 @@ describe('real process session and principal isolation', () => {
       report: (error) => reports.push(error)
     })
     /** This real initiator sends its canonical hello without installing credentials. */
-    const raw = await dialProcessByteChannel({ address: join(directory, 'reverse.sock') })
+    const raw = await dialIsolationSocket(join(directory, 'reverse.sock'))
     let candidate: Awaited<ReturnType<typeof createRpcHost>> | undefined
     try {
       await expect(
@@ -276,9 +302,9 @@ describe('real process session and principal isolation', () => {
     /** The provider's descriptor baseline includes two established sockets. */
     const sessions: Awaited<ReturnType<typeof client>>[] = []
     /** Unauthenticated native candidates reserve the remaining real listener slots until released. */
-    const held: IProcessByteChannel[] = []
+    const held: IRpcByteIO[] = []
     /** Refused ports remain fixture-owned until finally, even if their remote end already closes. */
-    const refused: Awaited<ReturnType<typeof dialProcessByteChannel>>[] = []
+    const refused: Awaited<ReturnType<typeof dialIsolationSocket>>[] = []
     /** Channel establishment errors preserve native public error identity. */
     const reports: unknown[] = []
     try {
@@ -286,13 +312,13 @@ describe('real process session and principal isolation', () => {
         sessions.push(await client(fixturePeer, false, token, peer.address))
       const baseline = descriptors(peer.child.pid!)
       /** The canonical default is 64, so two ready sessions leave exactly 62 pending slots. */
-      for (let index = 2; index < DEFAULT_MAX_CONNECTIONS; index++)
-        held.push(await dialProcessByteChannel({ address: peer.address }))
+      for (let index = 2; index < listenerCapacity; index++)
+        held.push(await dialIsolationSocket(peer.address))
       await vi.waitFor(() =>
-        expect(descriptors(peer.child.pid!)).toBe(baseline + DEFAULT_MAX_CONNECTIONS - 2)
+        expect(descriptors(peer.child.pid!)).toBe(baseline + listenerCapacity - 2)
       )
       for (let index = 0; index < 12; index++) {
-        const raw = await dialProcessByteChannel({ address: peer.address })
+        const raw = await dialIsolationSocket(peer.address)
         refused.push(raw)
         /** The raw peer close is independent from the managed caller's startup error projection. */
         const closed = vi.fn()
@@ -344,7 +370,7 @@ describe('real process session and principal isolation', () => {
     /** Each invalid candidate has its own unique credential sentinel. */
     const sentinel = randomUUID()
     /** These raw ports are used only to observe handshake reject bytes. */
-    const raws: Awaited<ReturnType<typeof dialProcessByteChannel>>[] = []
+    const raws: Awaited<ReturnType<typeof dialIsolationSocket>>[] = []
     /** Actual responder rejects are decoded by the public frame owner. */
     const received: Uint8Array[] = []
     /** Verifier exceptions must not survive in the initiator's cause or serialization. */
@@ -352,7 +378,7 @@ describe('real process session and principal isolation', () => {
     /** A valid observer session remains alive after both invalid candidates. */
     let valid: Awaited<ReturnType<typeof client>> | undefined
     try {
-      const raw = await dialProcessByteChannel({ address: peer.address })
+      const raw = await dialIsolationSocket(peer.address)
       raws.push(raw)
       const closed = new Promise<void>((resolve) => raw.onClose(() => resolve()))
       raw.onData((chunk) => received.push(chunk.slice()))
@@ -379,7 +405,7 @@ describe('real process session and principal isolation', () => {
       hello.kind = sentinel
       await raw.write(encodeRpcStreamFrame(new TextEncoder().encode(JSON.stringify(hello))))
       await closed
-      const invalid = await dialProcessByteChannel({ address: peer.address })
+      const invalid = await dialIsolationSocket(peer.address)
       raws.push(invalid)
       invalid.onData((chunk) => received.push(chunk.slice()))
       let failure: unknown
@@ -628,7 +654,7 @@ describe('real process session and principal isolation', () => {
     }
   })
 
-  it.each(['shared'] as const)(
+  it.each(['shared', 'per-connection'] as const)(
     '%s provider deadlines close only the offending borrowed socket',
     async (mode) => {
       /** One real child contains either one shared Host or one Host per physical connection. */
@@ -649,6 +675,17 @@ describe('real process session and principal isolation', () => {
         sessions.push(await observedClient(peer.tokens.bob, peer.address))
         const first = sessions[0]!
         const other = sessions[1]!
+        /**
+         * Actual application targets distinguish real per-connection construction from a renamed
+         * shared fixture.
+         */
+        const firstTarget = await stats(first)
+        const otherTarget = await stats(other)
+        expect(firstTarget.pid).toBe(peer.child.pid)
+        expect(otherTarget.pid).toBe(peer.child.pid)
+        if (mode === 'per-connection')
+          expect(firstTarget.targetInstance).not.toBe(otherTarget.targetInstance)
+        else expect(firstTarget.targetInstance).toBe(otherTarget.targetInstance)
         /** Observe original remote EOF rather than disposal requested by this test. */
         const offenderClosed = vi.fn()
         const otherClosed = vi.fn()
@@ -673,6 +710,7 @@ describe('real process session and principal isolation', () => {
         expect(outcomes.every((error) => error instanceof Error)).toBe(true)
         /** The actual provider proves trusted local timeout instances, not deserialized wire codes. */
         const receipt = await stats(other)
+        expect(receipt.pid).toBe(peer.child.pid)
         expect(receipt.aborts).toHaveLength(3)
         expect(
           receipt.aborts.every((event) => event.localTimeout && event.code === 'DEADLINE_EXCEEDED')
