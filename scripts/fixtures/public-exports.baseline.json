@@ -589,16 +589,17 @@
       ]
     },
     "@migaia/rpc-host": {
-      ".": [
+      ".": ["RpcWarningCode", "createRpcHost", "defaultRpcReporter"],
+      "./contract": [
         "RPC_CORE_ERROR_SOURCE",
+        "RpcAbortError",
+        "RpcConstructionError",
         "RpcLifecycleError",
-        "RpcWarningCode",
-        "createRpcHost",
-        "defaultRpcReporter",
         "isRpcError",
         "isRpcErrorInstance",
         "isRpcRemoteError",
-        "isRpcTimeoutError"
+        "isRpcTimeoutError",
+        "normalizeRpcPortable"
       ],
       "./features": ["retry", "timeout"],
       "./features/retry": ["default", "retry"],
