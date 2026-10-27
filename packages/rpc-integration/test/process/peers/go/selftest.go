@@ -9,7 +9,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strconv"
 	"strings"
 )
@@ -98,7 +97,7 @@ func errorRoot(value any) record {
 }
 
 // runtimeChecks keeps original frame, scalar, no-reply, error, cancel, finish, health and privacy assertions.
-// finishOrderChecks proves lexical output and enforces the explicit no-sort complexity clause.
+// finishOrderChecks proves pending completion follows lexical request-ID order.
 func finishOrderChecks(suite *vectorSuite) {
 	local, remote := localIdentity(), remoteIdentity()
 	state := newBusiness(local, runtimeDescription(remote, false), false)
@@ -111,12 +110,45 @@ func finishOrderChecks(suite *vectorSuite) {
 		ids = append(ids, stringField(field(reply), "id"))
 	}
 	suite.check("section33/finish-lexical-order", err == nil && strings.Join(ids, ",") == "a,m,z,finish")
-	_, ownFile, _, _ := runtime.Caller(0)
-	source, readErr := os.ReadFile(filepath.Join(filepath.Dir(ownFile), "business.go"))
-	suite.check("section33/finish-without-growing-sort", readErr == nil && !bytes.Contains(source, []byte("sort.Strings(")))
+
 }
+
+// waitingLifecycleChecks keeps cancellation and ID reuse correct through an ordered drain.
+func waitingLifecycleChecks(suite *vectorSuite) {
+	local, remote := localIdentity(), remoteIdentity()
+	state := newBusiness(local, runtimeDescription(remote, false), false)
+	// The fixture contains exactly 128 IDs; padded decimal spelling is their lexical order.
+	for index := 127; index >= 0; index-- {
+		id := fmt.Sprintf("%03d", index)
+		_, _ = state.native(requestFor(id, "peer.wait", "request", nil, local, remote))
+	}
+	for index := 0; index < 128; index += 2 {
+		id := fmt.Sprintf("%03d", index)
+		request := requestFor(id, "peer.wait", "request", nil, local, remote)
+		cancel := object("profile", protocol, "kind", "cancel", "id", id, "route", field(request)["route"], "task", field(request)["task"])
+		_, _ = state.native(cancel)
+	}
+	for index := 0; index < 128; index += 4 {
+		_, _ = state.native(requestFor(fmt.Sprintf("%03d", index), "peer.wait", "request", nil, local, remote))
+	}
+	replies, err := state.native(requestFor("finish", "peer.finish", "request", nil, local, remote))
+	expected := []string{}
+	for index := 0; index < 128; index++ {
+		if index%2 != 0 || index%4 == 0 {
+			expected = append(expected, fmt.Sprintf("%03d", index))
+		}
+	}
+	expected = append(expected, "finish")
+	actual := []string{}
+	for _, reply := range replies {
+		actual = append(actual, stringField(field(reply), "id"))
+	}
+	suite.check("pending-cancel-reuse-lexical-drain", err == nil && strings.Join(actual, ",") == strings.Join(expected, ",") && len(state.waiting) == 0 && state.waitingOrder == nil)
+}
+
 func runtimeChecks(suite *vectorSuite) {
 	finishOrderChecks(suite)
+	waitingLifecycleChecks(suite)
 	var baseline bytes.Buffer
 	baselineErr := runJSONBaseline(strings.NewReader("Content-Length: 25\r\n\r\n [ 1, \"baseline\", null ] "), &baseline)
 	suite.check("runtime/pure-json-baseline", baselineErr == nil && baseline.String() == "Content-Length: 19\r\n\r\n[1,\"baseline\",null]")

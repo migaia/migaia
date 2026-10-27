@@ -43,8 +43,8 @@ type businessState struct {
 	pongs, closes    int
 	received, aborts []any
 	waiting          map[string]*orderedRecord
-	// Pending IDs stay lexical; each insertion/removal uses one binary search and one linear move.
-	waitingOrder []string
+	// The AVL index preserves lexical completion with logarithmic admission and cancellation.
+	waitingOrder *waitingOrderNode
 	streams      map[string]*businessStream
 }
 
@@ -192,26 +192,130 @@ func (state *businessState) admitted(message *orderedRecord) bool {
 	return true
 }
 
-// addWaiting keeps replacements at their existing lexical index without copying payloads.
+// waitingOrderNode stores only an ID and AVL balance metadata; headers remain in waiting.
+type waitingOrderNode struct {
+	id          string
+	height      int
+	left, right *waitingOrderNode
+}
+
+// waitingHeight treats an absent child as the zero-height subtree.
+func waitingHeight(node *waitingOrderNode) int {
+	if node == nil {
+		return 0
+	}
+	return node.height
+}
+
+// refreshWaitingHeight records the current child heights after one local tree mutation.
+func refreshWaitingHeight(node *waitingOrderNode) {
+	node.height = 1 + max(waitingHeight(node.left), waitingHeight(node.right))
+}
+
+// rotateWaitingLeft restores local balance without changing lexical traversal order.
+func rotateWaitingLeft(node *waitingOrderNode) *waitingOrderNode {
+	next := node.right
+	node.right = next.left
+	next.left = node
+	refreshWaitingHeight(node)
+	refreshWaitingHeight(next)
+	return next
+}
+
+// rotateWaitingRight is the symmetric local AVL rotation.
+func rotateWaitingRight(node *waitingOrderNode) *waitingOrderNode {
+	next := node.left
+	node.left = next.right
+	next.right = node
+	refreshWaitingHeight(node)
+	refreshWaitingHeight(next)
+	return next
+}
+
+// balanceWaiting performs constant work at each ancestor on the one indexed search path.
+func balanceWaiting(node *waitingOrderNode) *waitingOrderNode {
+	refreshWaitingHeight(node)
+	if waitingHeight(node.left)-waitingHeight(node.right) > 1 {
+		if waitingHeight(node.left.left) < waitingHeight(node.left.right) {
+			node.left = rotateWaitingLeft(node.left)
+		}
+		return rotateWaitingRight(node)
+	}
+	if waitingHeight(node.right)-waitingHeight(node.left) > 1 {
+		if waitingHeight(node.right.right) < waitingHeight(node.right.left) {
+			node.right = rotateWaitingRight(node.right)
+		}
+		return rotateWaitingLeft(node)
+	}
+	return node
+}
+
+// insertWaiting walks one logarithmic search path for a previously absent request ID.
+func insertWaiting(node *waitingOrderNode, id string) *waitingOrderNode {
+	if node == nil {
+		return &waitingOrderNode{id: id, height: 1}
+	}
+	if id < node.id {
+		node.left = insertWaiting(node.left, id)
+	} else {
+		node.right = insertWaiting(node.right, id)
+	}
+	return balanceWaiting(node)
+}
+
+// detachFirstWaiting extracts the successor during the same logarithmic removal operation.
+func detachFirstWaiting(node *waitingOrderNode) (*waitingOrderNode, *waitingOrderNode) {
+	if node.left == nil {
+		return node.right, node
+	}
+	var first *waitingOrderNode
+	node.left, first = detachFirstWaiting(node.left)
+	return balanceWaiting(node), first
+}
+
+// removeWaitingNode removes one admitted ID and rebalances only its original search ancestors.
+func removeWaitingNode(node *waitingOrderNode, id string) *waitingOrderNode {
+	if id < node.id {
+		node.left = removeWaitingNode(node.left, id)
+	} else if id > node.id {
+		node.right = removeWaitingNode(node.right, id)
+	} else {
+		if node.left == nil {
+			return node.right
+		}
+		if node.right == nil {
+			return node.left
+		}
+		var first *waitingOrderNode
+		node.right, first = detachFirstWaiting(node.right)
+		node.id = first.id
+	}
+	return balanceWaiting(node)
+}
+
+// appendWaitingReplies visits each indexed ID once and releases the same map-owned header.
+func appendWaitingReplies(node *waitingOrderNode, waiting map[string]*orderedRecord, replies *[]*orderedRecord) {
+	if node == nil {
+		return
+	}
+	appendWaitingReplies(node.left, waiting, replies)
+	*replies = append(*replies, businessResponse(waiting[node.id], nil, false, nil))
+	delete(waiting, node.id)
+	appendWaitingReplies(node.right, waiting, replies)
+}
+
+// addWaiting keeps replacements at the same lexical position without indexing an ID twice.
 func (state *businessState) addWaiting(id string, header *orderedRecord) {
 	if _, exists := state.waiting[id]; !exists {
-		index, _ := slices.BinarySearch(state.waitingOrder, id)
-		state.waitingOrder = append(state.waitingOrder, "")
-		copy(state.waitingOrder[index+1:], state.waitingOrder[index:])
-		state.waitingOrder[index] = id
+		state.waitingOrder = insertWaiting(state.waitingOrder, id)
 	}
 	state.waiting[id] = header
 }
 
-// removeWaiting updates the ordered index once after a matching cancellation.
+// removeWaiting updates the ID index once after a matching task cancellation.
 func (state *businessState) removeWaiting(id string) {
 	delete(state.waiting, id)
-	index, exists := slices.BinarySearch(state.waitingOrder, id)
-	if exists {
-		copy(state.waitingOrder[index:], state.waitingOrder[index+1:])
-		state.waitingOrder[len(state.waitingOrder)-1] = ""
-		state.waitingOrder = state.waitingOrder[:len(state.waitingOrder)-1]
-	}
+	state.waitingOrder = removeWaitingNode(state.waitingOrder, id)
 }
 
 // native dispatch owns request/notify completion, original cancel reasons, and one credit per item.
@@ -328,11 +432,8 @@ func (state *businessState) native(message *orderedRecord) ([]*orderedRecord, er
 			return []*orderedRecord{businessStreamFrame(message, "open", 0, nil)}, nil
 		}
 		if method == "peer.finish" {
-			replies := make([]*orderedRecord, 0, len(state.waitingOrder)+1)
-			for _, id := range state.waitingOrder {
-				replies = append(replies, businessResponse(state.waiting[id], nil, false, nil))
-				delete(state.waiting, id)
-			}
+			replies := make([]*orderedRecord, 0, len(state.waiting)+1)
+			appendWaitingReplies(state.waitingOrder, state.waiting, &replies)
 			state.waitingOrder = nil
 			payload, present := value["payload"]
 			if mode != "notify" {

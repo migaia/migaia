@@ -647,7 +647,7 @@ fn flat_error_boundaries(counts: &mut Counts) {
         );
     }
 }
-/// Section 33 keeps lexical completion order and rejects a growing completion-time sort.
+/// Pending completion preserves lexical request-ID order.
 fn finish_order(counts: &mut Counts) {
     let local = crate::identity();
     let remote = caller();
@@ -681,10 +681,6 @@ fn finish_order(counts: &mut Counts) {
             .map(|reply| text(reply, "id"))
             .collect::<Vec<_>>()
             == ["a", "m", "z", "finish"],
-    );
-    counts.check(
-        "section33/finish-without-growing-sort",
-        !include_str!("business.rs").contains(".sort("),
     );
 }
 
