@@ -25,6 +25,8 @@ export const RedisVector = {
   create: 'FT.CREATE',
   alter: 'FT.ALTER',
   search: 'FT.SEARCH',
+  /** Per-query TIMEOUT word; 0 disables the server limit so FT.SEARCH never truncates silently. */
+  timeout: 'TIMEOUT',
   on: 'ON',
   hash: 'HASH',
   prefix: 'PREFIX',

@@ -305,6 +305,58 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_REDIS_STACK_URL'] as const)
           } while (cursor !== '0')
         }
       }, 120000)
+      it('disables the server query timeout on every search so results are never silently truncated', async () => {
+        if (!connected) await create()
+        /** Every FT.SEARCH argument list sent by near and deleteWhere is recorded. */
+        const searches: string[][] = []
+        const record = (args: readonly (string | Uint8Array)[]) => {
+          if (args[0] === 'FT.SEARCH') searches.push(args.map((arg) => String(arg)))
+        }
+        const observed: IRedisDriver = {
+          ...driver,
+          withConnection: (run) =>
+            driver.withConnection((connection) =>
+              run({
+                ...connection,
+                command: (args) => {
+                  record(args)
+                  return connection.command(args)
+                },
+                binaryCommand: (args) => {
+                  record(args)
+                  return connection.binaryCommand!(args)
+                }
+              })
+            )
+        }
+        const prefix = crypto.randomUUID()
+        const host = await createStorageHost({
+          plugins: [
+            redisBackendPlugin({ driver: observed, prefix }, { vector: rediSearchVectorFeature() })
+          ] as const
+        })
+        hosts.push(host)
+        namespaces.push(prefix)
+        const collection = host
+          .backend('redis')
+          .use(vector)
+          .collection<{ group: string }>('no-timeout', { dimensions: 2, metric: 'dot' })
+        await collection.upsert([
+          { id: 'a', vector: [1, 0], payload: { group: 'one' } },
+          { id: 'b', vector: [0, 1], payload: { group: 'two' } }
+        ])
+        expect((await collection.near([1, 0]).topK(2).all()).map((hit) => hit.id)).toEqual([
+          'a',
+          'b'
+        ])
+        expect(await collection.deleteWhere({ group: 'two' })).toBe(1)
+        expect(searches.length).toBeGreaterThanOrEqual(2)
+        for (const args of searches) {
+          const index = args.indexOf('TIMEOUT')
+          expect(index).toBeGreaterThan(0)
+          expect(args[index + 1]).toBe('0')
+        }
+      })
       it('keeps the absolute HASH deadline and native ranking projection in one EXEC', async () => {
         const batches: Parameters<IRedisConnection['exec']>[0][] = [],
           { host, store, prefix } = await create((commands) => batches.push(commands)),

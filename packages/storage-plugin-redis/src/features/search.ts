@@ -366,6 +366,8 @@ async function redisSearchVector<TPayload>(
       RedisVector.payload,
       RedisVector.score,
       ...(actual.withVector ? [field] : []),
+      RedisVector.timeout,
+      '0',
       RedisVector.dialect,
       '2'
     ])
@@ -697,6 +699,8 @@ class RedisVectorCollection<TPayload> implements IVectorCollection<TPayload, fal
               '2',
               RedisVector.id,
               RedisVector.collection,
+              RedisVector.timeout,
+              '0',
               RedisVector.dialect,
               '2'
             ])
