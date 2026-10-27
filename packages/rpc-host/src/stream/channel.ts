@@ -166,9 +166,11 @@ export class StreamChannel {
       sameTask(cancelled, envelope.task) &&
       envelope.kind === RpcWireKind.stream &&
       (envelope.stream.event === RpcStreamEvent.item ||
-        envelope.stream.event === RpcStreamEvent.cancelled)
+        envelope.stream.event === RpcStreamEvent.cancelled ||
+        envelope.stream.event === RpcStreamEvent.end ||
+        envelope.stream.event === RpcStreamEvent.fail)
     ) {
-      if (envelope.stream.event === RpcStreamEvent.cancelled)
+      if (envelope.stream.event !== RpcStreamEvent.item)
         this.#remove(this.#cancelledConsumers, carrierId, envelope.id, cancelled)
       return true
     }

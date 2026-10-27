@@ -236,6 +236,92 @@ describe('streaming cancellation', () => {
     }
   })
 
+  it.each(['end', 'fail'] as const)(
+    'A45 absorbs an in-flight %s after local cancellation and removes its tombstone',
+    async (event) => {
+      /** The native terminal write is accepted before its delivery crosses local cancellation. */
+      const accepted = deferred<void>()
+      /** Release only this original native terminal after local cancellation becomes observable. */
+      const deliver = deferred<void>()
+      /** Caller diagnostics must absorb the expected first terminal. */
+      const reports: unknown[] = []
+      /** Genuine provider failure retains its separate reporting owner. */
+      const providerReports: unknown[] = []
+      /** The fail variant must report this exact original application Error at the provider. */
+      const failure = new Error('natural stream failure')
+      /** Both endpoints use their real public Host and streaming implementation. */
+      const fixture = await connectedCoreHosts(
+        {
+          values: function* () {
+            yield 0
+            if (event === 'fail') throw failure
+          },
+          barrier: () => true
+        },
+        {},
+        (error) => providerReports.push(error),
+        undefined,
+        (error) => reports.push(error)
+      )
+      /** Keep the genuine terminal frame for one duplicate after its marker has been consumed. */
+      let terminal: IRpcCarrierFrame | undefined
+      /** Hold only native delivery; production remains the sole terminal-construction owner. */
+      const write = fixture.pair[0].write
+      /** The native write spy preserves every unrelated frame and its real physical options. */
+      const delivery = vi
+        .spyOn(fixture.pair[0], 'write')
+        .mockImplementation(async (frame, options) => {
+          /** Identity codec frames expose the exact original semantic terminal. */
+          const message = frame.data as IRpcSemanticFrame
+          if (message.kind === RpcWireKind.stream && message.stream.event === event) {
+            terminal = frame
+            await options?.onWriteStart?.()
+            accepted.resolve()
+            await deliver.promise
+            return write(frame, { ...options, onWriteStart: undefined })
+          }
+          /** A lost cancellation acknowledgment leaves the marker for the natural terminal. */
+          if (
+            message.kind === RpcWireKind.stream &&
+            message.stream.event === RpcStreamEvent.cancelled
+          )
+            return
+          await write(frame, options)
+        })
+      try {
+        /** Caller cancellation controls its existing stream lifetime without retiring the source. */
+        const caller = new AbortController()
+        /** Iterator rejection must preserve this original caller-owned reason. */
+        const reason = new Error('consumer cancelled before terminal delivery')
+        /** The actual consumer admits its genuine provider before the terminal is intercepted. */
+        const stream = fixture.b.memory.stream('values', null, {
+          signal: caller.signal
+        }) as AsyncIterableIterator<unknown>
+        expect(await stream.next()).toEqual({ done: false, value: 0 })
+        /** Real pull demand causes the provider to emit its natural terminal. */
+        const pending = stream.next()
+        /** Observe rejection before aborting to keep all promise ownership explicit. */
+        const rejection = expect(pending).rejects.toBe(reason)
+        await accepted.promise
+        caller.abort(reason)
+        await rejection
+        deliver.resolve()
+        await fixture.b.memory.send('a', 'barrier')
+        expect(reports).toEqual([])
+        expect(providerReports).toEqual(event === 'fail' ? [failure] : [])
+        expect(terminal).toBeDefined()
+        /** Replaying the already-consumed terminal is unclaimed, proving marker removal. */
+        await write(terminal!)
+        await fixture.b.memory.send('a', 'barrier')
+        expect(reports).toEqual([expect.objectContaining({ code: 'INVALID_STREAM' })])
+      } finally {
+        deliver.resolve()
+        delivery.mockRestore()
+        await fixture.close()
+      }
+    }
+  )
+
   it('sends one cancel and receives the producer cleanup acknowledgement', async () => {
     /** The complete call-only feature owns this clock; the Host retains its real clock. */
     const clientClock = controlledDeadlineScheduler()
