@@ -102,8 +102,6 @@ export const StorageErrorText = {
   backendPluginInvalid: 'storage backend plugin is invalid',
   /** Stable text for backend factory, preparation, or PluginHost install failure. */
   backendInstallFailed: 'storage backend installation failed',
-  /** Stable text for rejecting host mutation while another batch is installing. */
-  storageHostBusy: 'storage host is busy installing plugins',
   /** Message for BACKEND_IN_USE: another installed plugin still borrows the backend. */
   backendInUse: 'storage backend is still borrowed by another installed plugin',
   /** Message when unUse targets a journal plugin whose recording is bound to installed backends. */

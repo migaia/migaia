@@ -107,7 +107,7 @@ pnpm add --workspace @migaia/logger
 
 ## Behavior to know
 
-- Plugin IDs must be unique. A batch becomes visible only after every installation succeeds; failed installation releases resources created by that batch. Overlapping batches reject with `STORAGE_HOST_BUSY`.
+- Plugin IDs must be unique. A batch becomes visible only after every installation succeeds; failed installation releases resources created by that batch. Overlapping `use` and `unUse` calls queue in call order; each starts after the previous one settles, whether it succeeded or failed.
 - `autoDetect` defaults to `true`; `installTimeoutMs` defaults to `30000` and limits each plugin's install separately (plugins in one batch are timed individually); `0` disables it. With `autoDetect: false`, call `await host.detect()` before data operations. Operations whose checks are unfinished reject with `UNSUPPORTED_CAPABILITY`. Check newly added backends after `use()` as well.
 - The default `org` is the zero UUID. Explicit IDs must be canonical lowercase UUIDs; `createOrgId()` generates one. An organization view cannot install plugins, drop organizations or close the host. `dropOrg()` attempts every backend; successful deletions remain if another fails. `ORG_DELETE_FAILED` exposes the failures through `AggregateError.errors`.
 - Capabilities depend on the actual backend instance. A non-default organization does not automatically inherit a custom capability attached only to the root backend; check `has(token)`. Native SQL/SPARQL entry points are unavailable through organization views.

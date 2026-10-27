@@ -1092,7 +1092,7 @@
       ".": [
         "StorageError",
         "StorageErrorText",
-        "StorageHostFacade",
+        "StorageHost",
         "assertStorageBackendId",
         "createOrgId",
         "createStorageHost",

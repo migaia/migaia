@@ -62,11 +62,13 @@ it('rejects an unknown id, a configured journal plugin and removal during an ins
   await expect(host.unUse('storage-journal')).rejects.toMatchObject({
     code: StorageHostErrorCode.invalidConfig
   })
+  /** A removal issued during an install waits for it, then runs in call order. */
   const installing = host.use(memoryBackendPlugin({ id: 'later' }))
-  await expect(host.unUse('memory')).rejects.toMatchObject({
-    code: StorageHostErrorCode.storageHostBusy
-  })
+  const removing = host.unUse('memory')
   await installing
+  await removing
+  expect(host.hasBackend('memory')).toBe(false)
+  expect(host.hasBackend('later')).toBe(true)
   await host.dispose()
   await logger.shutdown('manual')
 })

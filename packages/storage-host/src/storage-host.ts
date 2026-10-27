@@ -1,59 +1,31 @@
-import { isStorageErrorFamily } from './core/error-family.js'
-import {
-  createStorageHooks,
-  readStorageHookFailureCode,
-  type IStorageHookEmitter
-} from './hooks.js'
+import { createStorageHooks, type IStorageHookEmitter } from './hooks.js'
 import type { IStorageHooks } from './hook-types.js'
 import { createStorageObservers, type IStorageObserverSet } from './stages.js'
-import { createBackendRevisionPort } from './backends/revisions.js'
-import { createStorageEnvelopeStages } from './envelope-stages.js'
-import {
-  registerBackendChangeController,
-  registerBackendEnvelopeStages,
-  registerBackendValueCommit,
-  getBackendChangeController,
-  registerBackendEntityAccess,
-  type IBackendChangeController
-} from './core/backend-registry.js'
 import { StorageHookName as Hook } from './hook-names.js'
 import { borrowStorageBackend } from './borrow.js'
-import { createBackendKeyLockPort } from './backends/key-locks.js'
 import {
   STORAGE_DEFAULT_ORG,
-  STORAGE_JOURNAL_BOOTSTRAP_PREFIX,
   STORAGE_JOURNAL_PLUGIN_ID,
   STORAGE_PROBE_PLUGIN_ID
 } from './state-constants.js'
 import type { IBackendStageBindings } from '@migaia/storage-contract'
 import {
-  defineHost,
-  definePlugin as defineNativePlugin,
   asyncDisposeKey,
   PluginHostErrorCode,
-  getPluginRuntimeIntegration,
   type IHostHandle,
-  type IPluginHostOptions,
   type IPlugin,
-  type IPluginConstraint,
   type IPluginHostCore
 } from '@migaia/plugin-host'
 import { createAbortController, snapshotScheduler, mergeCleanupResults } from '@migaia/lifecycle'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
-import { snapshotStorageBaseDetailed } from './authoring/store.js'
-import {
-  assertOperationContext,
-  StorageContractError,
-  StorageContractErrorCode
-} from '@migaia/storage-contract'
-import { raceWithAbort, type INativeAbortSignal } from '@migaia/utils/promise'
+import { assertOperationContext } from '@migaia/storage-contract'
+import type { INativeAbortSignal } from '@migaia/utils/promise'
 import { observeThenableRejection } from '@migaia/utils/function'
 import { createStorageTypeError, createStorageAggregateError, StorageError } from './errors.js'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from './error-text.js'
 import { readStorageNativePluginDefinition, readStorageNativePluginMetadata } from './contracts.js'
-import { forwardStorageExecution } from './execution.js'
-import { createStorageStoreCell, type IStorageStoreCell } from './store-cell.js'
+import type { IStorageStoreCell } from './store-cell.js'
 import type { IStorageBase, IStorageBaseAdmission } from '@migaia/storage-contract'
 import type {
   IStorageBackendPluginHandle,
@@ -68,21 +40,18 @@ import type {
   IStorageEnvelopeStages,
   IStorageOrgView,
   IStorageBackendOrgContext,
-  IStoragePluginCallContext,
   IStorageBorrowedBackend
 } from './types.js'
 import { pluginNameFromBackendId } from './names.js'
 import { readStorageProbeHandlers } from './plugins/probe/handlers.js'
 import type { IStorageHookMap } from './hook-types.js'
-import { readStorageJournalConfiguration } from './journal/plugin-configuration.js'
 import { storageJournalAccess, type IStorageJournalBackendAccess } from './journal/binding.js'
-import {
-  snapshotStorageJournalConfiguration,
-  type IStorageJournalConfigurationSnapshot
-} from './journal/configuration-options.js'
-import type { IStorageJournalConfiguration, IStorageJournalExecutionPort } from './journal/types.js'
-import type { IStorageJournalRuntime } from './journal/loader.js'
-import type { prepareStorageJournalConfiguration } from './journal/configuration.js'
+import type { IStorageJournalExecutionPort } from './journal/types.js'
+import { StorageHostJournal } from './host-journal.js'
+import { StorageHostInstaller } from './host-install.js'
+import { createStoragePluginHost } from './host-ports.js'
+import { StorageHostBatch } from './host-batch.js'
+import { StorageHostProjection } from './host-projection.js'
 
 /** Deliver final reporter failures through the existing utility host exception boundary. */
 function reportStorageUnhandledFailure(error: unknown): void {
@@ -92,22 +61,22 @@ function reportStorageUnhandledFailure(error: unknown): void {
 }
 
 /** Minimal PluginHost domain core; storage materializers do not expose host mutation to plugins. */
-type IStorageHostCore = object
+export type IStorageHostCore = object
 
 /** Narrow lifecycle core required by a backend materializer. */
-type IStorageInstallCore = Pick<
+export type IStorageInstallCore = Pick<
   IPluginHostCore<IStoragePipelineInput>,
   'onDispose' | 'operation' | 'config' | 'lifecycle'
 >
 
 /** A check retains only its original callback and currently running work for lifecycle draining. */
-type IStorageDetectCheck = {
+export type IStorageDetectCheck = {
   readonly check: (signal: INativeAbortSignal) => Promise<void>
   pending?: Promise<void>
 }
 
 /** One native registration's single-assignment store bridge into its PluginHost core. */
-type IStorageNativeRegistrationContext = {
+export type IStorageNativeRegistrationContext = {
   readonly registerJournalRuntime: IStoragePluginCore['registerJournalRuntime']
   readonly getJournal: (orgId: string) => IStorageJournalExecutionPort | undefined
   readonly observeExecution?: <R>(
@@ -149,13 +118,13 @@ type IStorageNativeRegistrationContext = {
  * Built with `defineHost` rather than by extending `PluginHost`: the shell needed one domain-core
  * hook and one extra setter, and inheritance handed it the host's entire surface as well.
  */
-type IStoragePluginHost = IHostHandle<IStorageHostCore, IStoragePipelineInput, readonly []> &
+export type IStoragePluginHost = IHostHandle<IStorageHostCore, IStoragePipelineInput, readonly []> &
   Readonly<{
     setNativeContexts(contexts: ReadonlyMap<string, IStorageNativeRegistrationContext>): void
   }>
 
 /** One native registration retains only its install core and original construction context. */
-type IStorageRegistrationAssembly = {
+export type IStorageRegistrationAssembly = {
   /** The native batch entry owns store, org and stage authority. */
   readonly context: IStorageNativeRegistrationContext
   /** The canonical PluginHost owns the existing pipeline and resource scope. */
@@ -163,83 +132,9 @@ type IStorageRegistrationAssembly = {
   /** Installation supplies this core before invoking registration callbacks. */
   registrationCore: IStorageInstallCore | undefined
 }
-/** Assemble native ports without creating another install or resource owner. */
-function createStorageRegistrationCore(registration: IStorageRegistrationAssembly): object {
-  /** Ports borrow the same original context and PluginHost. */
-  const { context } = registration
-  return {
-    setStorageRegistrationCore: (core: IStorageInstallCore) => {
-      registration.registrationCore = core
-      context.setRegistrationCore(core)
-    },
-    getStore: context.storeCell.get,
-    registerJournalRuntime: context.registerJournalRuntime,
-    journal: context.getJournal(context.defaultOrgId),
-    setStorageFeatureProjection: context.storeCell.setFeatureProjection,
-    getStorageFeatureClientResolver: context.storeCell.getFeatureClientResolver,
-    setStorageJournalBinding: (
-      binding: import('./journal/types.js').IStorageJournalBackendBinding
-    ) => {
-      /** Admission remains inside the original registration's installation window. */
-      registration.registrationCore!.onDispose(context.storeCell.releaseJournalResources)
-      context.storeCell.setJournalBinding(binding)
-    },
-    createTransactionApi: context.storeCell.createTransactionApi,
-    getChainMethods: context.storeCell.getChainMethods,
-    getOrgContext: context.getOrgContext,
-    captureStorageExtension: (key: PropertyKey, value: unknown, receiver: object) => {
-      /** The native descriptor reader captures each original source value exactly once. */
-      context.storeCell.captureExtension(key, value, receiver)
-      return context.storeCell.projectExtension(
-        key,
-        context.getOrgContext(context.defaultOrgId).callContext,
-        context.assertCurrent
-      )
-    },
-    getBackendId: () => context.id,
-    defaultOrgId: context.defaultOrgId,
-    getScheduler: () => context.scheduler,
-    getStageBindings: context.getStageBindings,
-    ...createStorageNativeAuthoringPorts(registration),
-    ...createStorageExecutionPorts(registration)
-  }
-}
-/** Own the native batch bridge while delegating lifecycle and pipelines to PluginHost. */
-class StoragePluginHostAssembly {
-  /** Storage registration context of each plugin in the active batch, keyed by native plugin name. */
-  #nativeContexts: ReadonlyMap<string, IStorageNativeRegistrationContext> = new Map()
-  /** The canonical managed host owns installation, resources and pipeline execution. */
-  #host: IHostHandle<IStorageHostCore, IStoragePipelineInput, readonly []>
-  /** Allocate only the batch bridge; PluginHost retains the full managed lifecycle. */
-  constructor(options: IPluginHostOptions) {
-    this.#host = defineHost<IStorageHostCore, IStoragePipelineInput>({
-      host: options,
-      domainCore: (request) => this.#createDomainCore(request.pluginName)
-    })
-  }
-  /** Materialize native ports for the plugin named by PluginHost; other plugins get none. */
-  #createDomainCore(pluginName: string): object {
-    const context = this.#nativeContexts.get(pluginName)
-    if (context === undefined) return {}
-    return createStorageRegistrationCore({ context, host: this.#host, registrationCore: undefined })
-  }
-  /** Publish original managed host ports together with native batch configuration. */
-  construct(): IStoragePluginHost {
-    return {
-      ...this.#host,
-      setNativeContexts: (contexts) => {
-        this.#nativeContexts = contexts
-      }
-    } as IStoragePluginHost
-  }
-}
-/** Create the storage bridge around one canonical managed PluginHost. */
-function createStoragePluginHost(options: IPluginHostOptions): IStoragePluginHost {
-  return new StoragePluginHostAssembly(options).construct()
-}
 
 /** Internal facade state used to enforce one in-flight storage batch. */
-type IStorageHostState = 'open' | 'installing' | 'closing' | 'closed'
+export type IStorageHostState = 'open' | 'installing' | 'closing' | 'closed'
 
 /** Internal registry snapshot containing exact stores after a committed PluginHost batch. */
 type IStorageRegistry = ReadonlyMap<string, IStorageBase>
@@ -248,12 +143,12 @@ type IStorageRegistry = ReadonlyMap<string, IStorageBase>
  * Marks one install batch as the live one. Disposal or a newer batch clears `active`, so a batch
  * that resumes after `await` cannot publish. Timeouts belong to PluginHost, not to this token.
  */
-type IStorageBatchToken = {
+export type IStorageBatchToken = {
   active: boolean
 }
 
 /** One install batch shares only journal-preparation authority and its ordered registration bridge. */
-type IStorageInstallBatchContext = {
+export type IStorageInstallBatchContext = {
   /** Original token selects the sole live batch and retains its deadline origin. */
   readonly batchToken: IStorageBatchToken
   /** Final journal bootstrap temporarily admits already-materialized native candidates. */
@@ -264,12 +159,12 @@ type IStorageInstallBatchContext = {
   nativeContexts: Map<number, IStorageNativeRegistrationContext>
 }
 /** One materialized native definition retains the single original store handoff. */
-type IStorageInstallEntryResult = {
+export type IStorageInstallEntryResult = {
   readonly plugin: IPlugin<IStorageInstallCore, Record<string, unknown>>
   readonly storeCell: IStorageStoreCell
 }
 /** One original registration owns its store handoff, dependency borrows and native context ports. */
-type IStorageInstallEntryContext = {
+export type IStorageInstallEntryContext = {
   /** Original installState is captured before native construction begins. */
   readonly installState: IStorageInstallBatchContext
   /**
@@ -318,43 +213,9 @@ type IStorageInstallEntryContext = {
   definition: ReturnType<typeof readStorageNativePluginDefinition>
 }
 /** Storage facade over the canonical PluginHost lifecycle owner and its batch transaction. */
-export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] = readonly []> {
-  /**
-   * Journal configuration taken from a `storageJournalPlugin(options)` in the first install batch.
-   * It is set once, before that batch plans its journal bootstrap, and cleared if that batch
-   * fails.
-   */
-  #journal:
-    | IStorageJournalConfigurationSnapshot
-    | Extract<IStorageJournalConfiguration, Function>
-    | undefined
+export class StorageHost<P extends readonly IStorageBackendPluginHandle[] = readonly []> {
   /** True once any install batch has started; journal configuration is admitted only before it. */
   #batchStarted = false
-  /** Resolved optional code is reused directly inside native transaction activity windows. */
-  #journalRuntime: IStorageJournalRuntime | undefined
-  /**
-   * Concurrent first endpoints share one exact initializer and per-registration preparation
-   * Promise.
-   */
-  #journalOrgs:
-    | Map<
-        string,
-        {
-          readonly options: Promise<IStorageJournalConfigurationSnapshot>
-          configuration?: IStorageJournalConfigurationSnapshot
-          readonly backends: Map<
-            IStorageStoreCell,
-            {
-              readonly promise: Promise<void>
-              value?: Awaited<ReturnType<typeof prepareStorageJournalConfiguration>>
-              complete: boolean
-            }
-          >
-        }
-      >
-    | undefined
-  /** The original successful bootstrap owns one async stage and its canonical sync-entry guard. */
-  #journalPipelineInstalled = false
   /** Canonical PluginHost owns lifecycle and eventual mutation queue semantics. */
   readonly #inner: IStoragePluginHost
   /** Registry is swapped only after the complete inner batch has committed. */
@@ -365,6 +226,8 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
   #state: IStorageHostState = 'open'
   /** Current batch promise, retained only while the facade is installing. */
   #installing: Promise<void> | undefined
+  /** Settlement of the last queued `use` or `unUse` call; undefined while the queue is idle. */
+  #queueTail: Promise<void> | undefined
   /** Ownership token invalidated synchronously when disposal wins an active batch race. */
   #activeBatchToken: IStorageBatchToken | undefined
   /** Stable idempotent disposal promise shared by every caller. */
@@ -410,6 +273,17 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
   #detectRunning = false
   /** Default organization is captured once and never stored in a shared current-call slot. */
   readonly #orgId: string
+  /** Journal configuration, per-organization journal preparation and the journal port for this host. */
+  readonly #journalOwner: StorageHostJournal
+  /** Per-plugin install entries and the registration context each backend plugin installs through. */
+  readonly #installer: StorageHostInstaller
+  /**
+   * Runs one install batch through PluginHost and publishes its stores, extensions and journal
+   * bootstrap.
+   */
+  readonly #batch: StorageHostBatch
+  /** Projects committed stores into borrowed backend views per organization. */
+  readonly #projection: StorageHostProjection
 
   /** Creates the shell and snapshots lifecycle/deadline inputs before any plugin runs. */
   constructor(options: IStorageHostOptions = {}) {
@@ -473,24 +347,51 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
           for (const failure of error.errors) this.#report(failure)
       }
     })
+    this.#journalOwner = new StorageHostJournal(this)
+    this.#installer = new StorageHostInstaller(this)
+    this.#batch = new StorageHostBatch(this)
+    this.#projection = new StorageHostProjection(this)
   }
 
   /**
-   * Install one atomic native plugin batch; publication happens only after complete success. A
-   * concurrent mutation throws STORAGE_HOST_BUSY synchronously, while setup/timeout failures reject
+   * Install one atomic native plugin batch; publication happens only after complete success. An
+   * overlapping call waits for the running `use`/`unUse` call; setup and timeout failures reject
    * and roll back newly owned Stores.
    */
   use<const TPlugins extends readonly IStorageBackendPluginHandle[]>(
     ...plugins: IRejectInstalledOrDuplicateIds<{ [N in P[number]['id']]: true }, TPlugins>
   ): Promise<IStorageHost<readonly [...P, ...TPlugins]>> {
     this.#assertOpen()
-    if (this.#state === 'installing') {
-      throw new StorageError(
-        StorageHostErrorCode.storageHostBusy,
-        {},
-        StorageErrorText.storageHostBusy
-      )
-    }
+    return this.#enqueue(() =>
+      this.#install<TPlugins>(plugins as unknown as readonly IStorageBackendPluginHandle[])
+    )
+  }
+
+  /**
+   * Run `use` and `unUse` calls one at a time in call order. An idle host runs the call at once, so
+   * its synchronous start is unchanged; a busy host starts it after the running call settles,
+   * whether that call succeeded or failed.
+   */
+  #enqueue<T>(work: () => Promise<T>): Promise<T> {
+    const tail = this.#queueTail
+    const result = tail === undefined ? work() : tail.then(work, work)
+    /** The queue only orders calls; each caller still sees its own outcome. */
+    const settled: Promise<void> = result.then(
+      () => undefined,
+      () => undefined
+    )
+    this.#queueTail = settled
+    void settled.then(() => {
+      if (this.#queueTail === settled) this.#queueTail = undefined
+    })
+    return result
+  }
+
+  /** Install one batch; runs only when no other `use` or `unUse` call is running. */
+  #install<TPlugins extends readonly IStorageBackendPluginHandle[]>(
+    plugins: readonly IStorageBackendPluginHandle[]
+  ): Promise<IStorageHost<readonly [...P, ...TPlugins]>> {
+    this.#assertOpen()
     this.#state = 'installing'
     /** Probe handlers of this batch, subscribed before its first lifecycle event. */
     const probeSubscriptions = this.#subscribeProbeHandlers(plugins)
@@ -502,12 +403,12 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     /** Reject a cancelled or losing batch before the next publication step. */
 
     /** This Promise owns native installation and the one atomic store publication. */
-    const batch = Promise.resolve().then(() => this.#runInstallBatch(plugins, batchToken))
+    const batch = Promise.resolve().then(() => this.#batch.runInstallBatch(plugins, batchToken))
     this.#installing = batch
     /** Only the current batch may reopen admission and return the narrowed host. */
     const settled = batch.then(
       () => {
-        this.#assertBatchOwner(batchToken)
+        this.#batch.assertBatchOwner(batchToken)
         batchToken.active = false
         this.#activeBatchToken = undefined
         if (this.#state === 'installing') this.#state = 'open'
@@ -537,8 +438,8 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         this.#installing = undefined
         if (this.#registry.size === 0) {
           /** A failed first batch leaves no backend, so its journal configuration is discarded. */
-          this.#journal = undefined
-          this.#journalOrgs = undefined
+          this.#journalOwner.journal = undefined
+          this.#journalOwner.journalOrgs = undefined
           this.#batchStarted = false
         }
         if (this.#events.hasListeners(Hook.onHostInstallError))
@@ -558,17 +459,21 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
    * Remove one installed plugin by id. Its store, extension methods and probe listeners are
    * withdrawn first, then PluginHost releases its resources in reverse order. Rejects with
    * BACKEND_NOT_INSTALLED for an unknown id, BACKEND_IN_USE while another plugin borrows the
-   * backend, STORAGE_HOST_BUSY during an install batch, and INVALID_CONFIG for a configured journal
-   * plugin, whose recording is bound to the backends installed with it.
+   * backend, and INVALID_CONFIG for a configured journal plugin, whose recording is bound to the
+   * backends installed with it.
    */
-  async unUse(id: string): Promise<void> {
+  unUse(id: string): Promise<void> {
+    try {
+      this.#assertOpen()
+    } catch (error) {
+      return Promise.reject(error)
+    }
+    return this.#enqueue(() => this.#remove(id))
+  }
+
+  /** Remove one plugin; runs only when no other `use` or `unUse` call is running. */
+  async #remove(id: string): Promise<void> {
     this.#assertOpen()
-    if (this.#state === 'installing')
-      throw new StorageError(
-        StorageHostErrorCode.storageHostBusy,
-        {},
-        StorageErrorText.storageHostBusy
-      )
     const context = [...this.#detectContexts].find((candidate) => candidate.id === id)
     if (context === undefined)
       throw new StorageError(
@@ -579,7 +484,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     const store = this.#registry.get(id)
     if (store !== undefined && (this.#borrowCounts.get(store) ?? 0) > 0)
       throw new StorageError(StorageHostErrorCode.backendInUse, {}, StorageErrorText.backendInUse)
-    if (id === STORAGE_JOURNAL_PLUGIN_ID && this.#journal !== undefined)
+    if (id === STORAGE_JOURNAL_PLUGIN_ID && this.#journalOwner.journal !== undefined)
       throw new StorageError(
         StorageHostErrorCode.invalidConfig,
         {},
@@ -740,336 +645,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
 
   /** Internal journal consumers resolve one admitted registration without exposing the native store. */
   [storageJournalAccess](id: string): IStorageJournalBackendAccess {
-    return this.#journalAccess(id, this.#orgId)
-  }
-
-  /**
-   * Fixed-org access borrows only original private I/O and the registration's resource release
-   * hook.
-   */
-  #journalAccess(id: string, orgId: string): IStorageJournalBackendAccess {
-    this.#assertOpen()
-    this.#requireJournalRuntime()
-    const store = this.#registry.get(id)
-    if (store === undefined)
-      throw new StorageError(
-        StorageHostErrorCode.backendNotInstalled,
-        {},
-        StorageErrorText.backendNotInstalled
-      )
-    const context = this.#storeContexts.get(store)!.context
-    return this.#journalContextAccess(context, orgId)
-  }
-
-  /** Candidate bootstrap and published lookups consume the same exact original registration facts. */
-  #journalContextAccess(
-    context: IStorageNativeRegistrationContext,
-    orgId: string
-  ): IStorageJournalBackendAccess {
-    this.#assertOpen()
-    context.assertExecution()
-    const binding = context.storeCell.journalForOrg(orgId)
-    return {
-      registration: context.storeCell.journalIdentity,
-      orgId,
-      backendInstanceId: context.id,
-      binding,
-      retain: (resource: import('@migaia/storage-contract').IStorageResource) => {
-        this.#assertOpen()
-        context.assertExecution()
-        return context.storeCell.retainJournalResource(resource)
-      }
-    }
-  }
-
-  /**
-   * Take journal configuration from a `storageJournalPlugin(options)` in this batch. Only the first
-   * batch may carry it, because backends installed earlier were set up without journal ports; a
-   * later batch, or two configured journal plugins, is rejected with INVALID_CONFIG.
-   */
-  #admitJournalConfiguration(plugins: readonly IStorageBackendPluginHandle[]): void {
-    const first = !this.#batchStarted
-    this.#batchStarted = true
-    for (const plugin of plugins) {
-      const configuration = readStorageJournalConfiguration(plugin)?.configuration
-      if (configuration === undefined) continue
-      if (!first || this.#journal !== undefined)
-        throw new StorageError(
-          StorageHostErrorCode.invalidConfig,
-          {},
-          StorageErrorText.journalConfigurationLate
-        )
-      this.#journal =
-        typeof configuration === 'function'
-          ? configuration
-          : snapshotStorageJournalConfiguration(configuration)
-    }
-  }
-
-  /** Require the explicitly installed journal plugin before invoking optional journal code. */
-  #requireJournalRuntime(): IStorageJournalRuntime {
-    if (this.#journalRuntime === undefined)
-      throw new StorageError(
-        StorageHostErrorCode.journalNotAssembled,
-        {},
-        StorageErrorText.journalNotAssembled
-      )
-    return this.#journalRuntime
-  }
-
-  /** One original org cell shares the initializer Promise without opening stores in org(). */
-  #journalOptions(orgId: string, candidates?: readonly IStorageNativeRegistrationContext[]) {
-    this.#assertOpen()
-    const existing = this.#journalOrgs?.get(orgId)
-    if (existing !== undefined) return existing.options
-    const source = this.#journal!
-    const options = Promise.resolve().then(async () => {
-      this.#assertOpen()
-      if (typeof source !== 'function') {
-        this.#journalOrgs!.get(orgId)!.configuration = source
-        return source
-      }
-      /** Load optional logging only when this organization initializes its journal. */
-      const runtime = this.#requireJournalRuntime()
-      this.#journalRuntime = runtime
-      const configured = await source({
-        orgId,
-        storageLogStore: (id: string, options: { readonly prefix: string }) => {
-          this.#assertOpen()
-          const candidate = candidates?.find(
-            (context) => context.id === id && context.getKind() !== undefined
-          )
-          const published = this.#registry.get(id)
-          const context =
-            candidate ??
-            (published === undefined ? undefined : this.#storeContexts.get(published)?.context)
-          if (context === undefined)
-            throw new StorageError(
-              StorageHostErrorCode.backendNotInstalled,
-              {},
-              StorageErrorText.backendNotInstalled
-            )
-          return runtime.openStorageLogStore(
-            this.#journalContextAccess(context, orgId),
-            runtime.snapshotStorageLogPrefix(options)
-          )
-        }
-      })
-      this.#assertOpen()
-      const snapshot = snapshotStorageJournalConfiguration(configured)
-      this.#journalOrgs!.get(orgId)!.configuration = snapshot
-      return snapshot
-    })
-    ;(this.#journalOrgs ??= new Map()).set(orgId, { options, backends: new Map() })
-    return options
-  }
-
-  /** Each original backend cell prepares once under its org's already fixed configuration. */
-  #prepareJournalBackend(
-    context: IStorageNativeRegistrationContext,
-    orgId: string,
-    candidates?: readonly IStorageNativeRegistrationContext[]
-  ) {
-    context.assertExecution()
-    const options = this.#journalOptions(orgId, candidates)
-    const backends = this.#journalOrgs!.get(orgId)!.backends
-    const existing = backends.get(context.storeCell)
-    if (existing !== undefined) return existing
-    let entry!: {
-      readonly promise: Promise<void>
-      value?: Awaited<ReturnType<typeof prepareStorageJournalConfiguration>>
-      complete: boolean
-    }
-    const promise = options.then(async (configured) => {
-      context.assertExecution()
-      if (configured.logger.undo !== undefined) {
-        /** Only the original physical backend may publish its undo endpoint; frozen bases stay raw. */
-        let undo: unknown
-        try {
-          undo = Reflect.get(context.storeCell.forOrg(orgId, this.#orgId), 'undo')
-        } catch (cause) {
-          if (isStorageErrorFamily(cause)) throw cause
-          throw new StorageContractError(StorageContractErrorCode.invalidArgument, { cause })
-        }
-        if (typeof undo !== 'function')
-          throw new StorageContractError(StorageContractErrorCode.unsupported)
-      }
-      /** Load optional code before preparing the native journal transaction resources. */
-      const runtime = this.#requireJournalRuntime()
-      this.#journalRuntime = runtime
-      entry.value = await runtime.prepareStorageJournalConfiguration(
-        configured,
-        this.#journalContextAccess(context, orgId),
-        context.storeCell.get().backend,
-        {
-          report: this.#report,
-          onBinlogAppendError: (txId, error) => {
-            this.#report(error)
-            this.#events.emit(Hook.onBinlogAppendError, () => ({
-              backendId: context.id,
-              backend: context.storeCell.get().backend,
-              orgId,
-              namespace: configured.namespace,
-              backendInstanceId: context.id,
-              txId,
-              code: readStorageHookFailureCode(error, this.#report)
-            }))
-          },
-          beforeRecover: () =>
-            this.#events.emit(Hook.beforeJournalRecover, () => ({
-              backendId: context.id,
-              backend: context.storeCell.get().backend,
-              orgId,
-              namespace: configured.namespace,
-              backendInstanceId: context.id
-            })),
-          afterRecover: (count, elapsedMs) =>
-            this.#events.emit(Hook.afterJournalRecover, () => ({
-              backendId: context.id,
-              backend: context.storeCell.get().backend,
-              orgId,
-              namespace: configured.namespace,
-              backendInstanceId: context.id,
-              count,
-              elapsedMs
-            })),
-          onRecoverError: (error) =>
-            this.#events.emit(Hook.onJournalRecoverError, () => ({
-              backendId: context.id,
-              backend: context.storeCell.get().backend,
-              orgId,
-              namespace: configured.namespace,
-              backendInstanceId: context.id,
-              code: readStorageHookFailureCode(error, this.#report)
-            }))
-        }
-      )
-      entry.complete = true
-    })
-    entry = { promise, complete: false }
-    backends.set(context.storeCell, entry)
-    return entry
-  }
-
-  /** Backend authors receive only fixed-org preparation, initial locks and original-scope recording. */
-  #journalPort(
-    context: IStorageNativeRegistrationContext,
-    orgId: string
-  ): IStorageJournalExecutionPort | undefined {
-    if (this.#journal === undefined) return undefined
-    const prepared = () => {
-      context.assertExecution()
-      const entry = this.#journalOrgs?.get(orgId)?.backends.get(context.storeCell)
-      if (!entry?.complete) throw new StorageContractError(StorageContractErrorCode.unsupported)
-      return entry.value
-    }
-    return {
-      prepare: () => this.#prepareJournalBackend(context, orgId).promise,
-      runRedo: (run, signal) => {
-        const value = prepared()
-        if (value === undefined || !('runRedo' in value))
-          return Promise.reject(new StorageContractError(StorageContractErrorCode.unsupported))
-        return value.runRedo(run, signal)
-      },
-      beginRedo: (scope) => {
-        const value = prepared()
-        if (value === undefined || !('runRedo' in value)) return undefined
-        return value.begin(scope)
-      },
-      active: () => prepared() !== undefined,
-      headLocks: () => prepared()?.headLocks ?? [],
-      begin: (scope: Omit<import('@migaia/storage-contract').ITransactionScope, 'use'>) =>
-        prepared()?.begin(scope),
-      undo: (txId, run) => {
-        const undo = prepared()?.undo
-        if (undo === undefined)
-          return Promise.reject(new StorageContractError(StorageContractErrorCode.unsupported))
-        return undo(txId, run)
-      }
-    }
-  }
-
-  /** Observe prepared operations synchronously so native I/O starts in its original active task. */
-  #observeJournalExecution<R>(
-    orgId: string,
-    describe: () => IStoragePipelineInput,
-    invoke: (observing: boolean) => Promise<R>
-  ): Promise<R> {
-    /** The initial install path may observe before preparation loads the optional module. */
-    const observe = (runtime: IStorageJournalRuntime) =>
-      runtime.observeStorageTelemetry(
-        () => this.#journalOrgs?.get(orgId)?.configuration,
-        describe,
-        invoke,
-        () => this.#scheduler.now(),
-        this.#report
-      )
-    return observe(this.#requireJournalRuntime())
-  }
-
-  /** Resolve native organization data through its original registration, then remove ownership. */
-  #projectBackend(store: IStorageBase, orgId: string): ReturnType<typeof borrowStorageBackend> {
-    this.#assertOpen()
-    const context = this.#storeContexts.get(store)?.context
-    if (context === undefined)
-      throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-    context.assertExecution()
-    return context.storeCell.projectOrgBackend(orgId, () => {
-      const native = context.storeCell.forOrg(orgId, this.#orgId)
-      /** The original base admission also governs a custom backend's newly exposed physical view. */
-      const snapshot = snapshotStorageBaseDetailed(native, { asyncDisposeKey })
-      if (!snapshot.valid)
-        throw createStorageTypeError(
-          StorageHostErrorCode.backendPluginInvalid,
-          StorageErrorText.backendPluginInvalid,
-          snapshot.cause
-        )
-      if (snapshot.backend !== context.getKind()?.name)
-        throw createStorageTypeError(
-          StorageHostErrorCode.backendKindMismatch,
-          StorageErrorText.backendKindMismatch
-        )
-      const ports = context.getOrgContext(orgId)
-      const api = context.storeCell.createOrgApi(native, ports.callContext, ports.execution)
-      const view = borrowStorageBackend(
-        native,
-        () => {
-          this.#assertOpen()
-          context.assertExecution()
-        },
-        { orgId, ...(api === undefined ? {} : { api }) }
-      )
-      this.#storeContexts.set(view, { context, native, orgId })
-      /** Entity borrows the same controller, filtered through this immutable organization boundary. */
-      const controller = getBackendChangeController(native) ?? getBackendChangeController(store)
-      if (controller !== undefined) {
-        const projectedController: IBackendChangeController = {
-          ...controller,
-          publish: (change) => controller.publish({ ...change, orgId }),
-          subscribe: (listener) =>
-            controller.subscribe((change) => {
-              if (change.orgId === orgId) return listener(change)
-            })
-        }
-        context.storeCell.retainOrgBinding(
-          registerBackendChangeController(view, projectedController)
-        )
-      }
-      context.storeCell.retainOrgBinding(
-        registerBackendEnvelopeStages(
-          view,
-          (operation) => context.getEnvelopeStages(operation, orgId),
-          () => context.storeCell.getChainMethods('query')
-        )
-      )
-      context.storeCell.retainOrgBinding(
-        registerBackendEntityAccess(view, native, () => {
-          this.#assertOpen()
-          context.assertExecution()
-        })
-      )
-      return view
-    }) as ReturnType<typeof borrowStorageBackend>
+    return this.#journalOwner.journalAccess(id, this.#orgId)
   }
 
   /**
@@ -1082,7 +658,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     /** Every lookup observes the current original committed registry and closes over this org. */
     const backend = (id: string) => {
       const store = this.backend(id as keyof IPluginStoreMap<P> & string)
-      return this.#projectBackend(store, orgId)
+      return this.#projection.projectBackend(store, orgId)
     }
     /** Original cells retain selected outputs while this getter retains only immutable org identity. */
     const projectExtensions = () => {
@@ -1100,7 +676,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     }
     /** The view shell has no dispose, drop, installation or mutable registration methods. */
     const view = {
-      [storageJournalAccess]: (id: string) => this.#journalAccess(id, orgId),
+      [storageJournalAccess]: (id: string) => this.#journalOwner.journalAccess(id, orgId),
       orgId,
       org: (next: string) => this.org(next),
       backend,
@@ -1246,8 +822,8 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       })
       .finally(() => {
         this.#state = 'closed'
-        this.#journalOrgs?.clear()
-        this.#journalOrgs = undefined
+        this.#journalOwner.journalOrgs?.clear()
+        this.#journalOwner.journalOrgs = undefined
         this.#events.clear()
       })
       .then(completion.resolve, completion.reject)
@@ -1283,649 +859,114 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     }
   }
 
-  /** Reject a cancelled or losing batch before the next publication step. */
-  #assertBatchOwner(batchToken: IStorageBatchToken): void {
-    if (
-      !batchToken.active ||
-      this.#activeBatchToken !== batchToken ||
-      this.#state !== 'installing'
-    ) {
-      throw new StorageError(
-        StorageHostErrorCode.storageHostDisposed,
-        {},
-        StorageErrorText.storageHostDisposed
-      )
-    }
+  /** Install owner port: project one committed backend for an organization. */
+  get projectBackend(): (
+    store: IStorageBase,
+    orgId: string
+  ) => ReturnType<typeof borrowStorageBackend> {
+    return (store, orgId) => this.#projection.projectBackend(store, orgId)
   }
-  /** Install one native batch using the canonical PluginHost transaction and existing deadline. */
-  async #runInstallBatch(
-    plugins: readonly IStorageBackendPluginHandle[],
-    batchToken: IStorageBatchToken
-  ): Promise<void> {
-    this.#assertBatchOwner(batchToken)
-    /** Resolve only trusted plugin identities before constructing backends. */
-    const nativeMetadata = plugins.map((plugin) => {
-      /** Read the captured storage-owned metadata without invoking native getters. */
-      const metadata = readStorageNativePluginMetadata(plugin)
-      if (metadata === undefined)
-        throw new StorageError(
-          StorageHostErrorCode.backendPluginInvalid,
-          {},
-          StorageErrorText.backendPluginInvalid
-        )
-      return metadata
-    })
-    this.#admitJournalConfiguration(plugins)
-    /**
-     * Storage owns duplicate backend admission before any backend factory or PluginHost install
-     * runs.
-     */
-    const admittedBackendIds = new Set(this.#registry.keys())
-    for (const [index] of plugins.entries()) {
-      /** Check duplicate public ids independently of native name encoding. */
-      const backendId = nativeMetadata[index]!.id
-      if (admittedBackendIds.has(backendId))
-        throw new StorageError(
-          StorageHostErrorCode.backendDuplicate,
-          {},
-          StorageErrorText.backendDuplicate
-        )
-      admittedBackendIds.add(backendId)
-    }
-    this.#assertBatchOwner(batchToken)
-    /** Only the final original batch preparation admits already completed candidate reads. */
-    const installState = { batchToken, preparingJournal: false } as IStorageInstallBatchContext
-    /** Each batch entry retains exactly one original store handoff. */
-    installState.nativeContexts = new Map<number, IStorageNativeRegistrationContext>()
-    /** Materialize original definitions in the same order as native registration. */
-    const entries = plugins.map((plugin, index) =>
-      this.#createInstallEntry(installState, plugin, nativeMetadata[index]!, index)
-    )
-    /** Pass only the original definitions to the canonical install batch. */
-    const materialized = entries.map((entry) => entry.plugin)
-    /** A final original registration prepares candidates before the atomic public registry swap. */
-    installState.installedJournalPipeline = false
-    const candidates = [...installState.nativeContexts.values()]
-    if (
-      this.#journal !== undefined &&
-      (candidates.length !== 0 || !this.#journalOrgs?.has(this.#orgId))
-    ) {
-      materialized.push(
-        defineNativePlugin(
-          STORAGE_JOURNAL_BOOTSTRAP_PREFIX + (nativeMetadata[0]?.id ?? this.#orgId),
-          (core) => ({
-            install: () => this.#installJournalBootstrap(installState, candidates, core)
-          })
-        ) as (typeof materialized)[number]
-      )
-    }
-    this.#inner.setNativeContexts(
-      new Map(
-        [...installState.nativeContexts].map(([index, context]) => [
-          pluginNameFromBackendId(nativeMetadata[index]!.id),
-          context
-        ])
-      )
-    )
-    /** Committed native handles retain their original guarded extension methods. */
-    const innerHandles = await this.#inner.use(
-      ...(materialized as IPluginConstraint<IStorageHostCore>[])
-    )
-    this.#assertBatchOwner(batchToken)
-    if (installState.installedJournalPipeline) this.#journalPipelineInstalled = true
-    this.#publishInstallBatch(plugins, installState, entries, innerHandles)
+  /** Install owner port: dispose a store whose install lost its batch. */
+  get disposeLateStore(): (
+    snapshot: Extract<IStorageBaseAdmission, { readonly valid: true }>
+  ) => Promise<void> {
+    return (snapshot) => this.#disposeLateStore(snapshot)
   }
-
-  /** Atomically publish the native handles only after the original PluginHost batch commits. */
-  #publishInstallBatch(
-    plugins: readonly IStorageBackendPluginHandle[],
-    installState: IStorageInstallBatchContext,
-    entries: readonly IStorageInstallEntryResult[],
-    innerHandles: readonly { readonly extensions: object }[]
-  ): void {
-    /** Prepare the next store registry before its atomic public swap. */
-    const nextRegistry = new Map(this.#registry)
-    /** Merge original guarded descriptors without rebuilding extension methods. */
-    const nextExtensions = Object.create(null) as Record<PropertyKey, unknown>
-    for (const source of [this.#extensions, ...innerHandles.map((handle) => handle.extensions)])
-      for (const key of Reflect.ownKeys(source)) {
-        Object.defineProperty(nextExtensions, key, Object.getOwnPropertyDescriptor(source, key)!)
-      }
-    for (const [index] of plugins.entries()) {
-      /** Retain only this entry original trusted definition metadata. */
-      const native = installState.nativeContexts.get(index)
-      this.#extensionKeys.set(native!.id, Reflect.ownKeys(innerHandles[index]!.extensions))
-      this.#detectContexts.add(native!)
-      if (native!.getKind() !== undefined) {
-        nextRegistry.set(native!.id, entries[index]!.storeCell.get())
-        this.#storeContexts.set(entries[index]!.storeCell.get(), {
-          context: native!,
-          native: entries[index]!.storeCell.get()
-        })
-      }
-    }
-    this.#registry = nextRegistry
-    this.#extensions = nextExtensions
-    if (!this.#detectRunning) this.#detectPromise = undefined
+  /** Install owner port: the current lifecycle state. */
+  get state(): IStorageHostState {
+    return this.#state
   }
-  /** Prepare journal candidates within the original batch deadline before native publication. */
-  async #installJournalBootstrap(
-    installState: IStorageInstallBatchContext,
-    candidates: readonly IStorageNativeRegistrationContext[],
-    core: Pick<IPluginHostCore<never>, 'useAsyncPipeline'>
-  ): Promise<Record<string, never>> {
-    await this.#prepareInstallJournal(installState, candidates)
-    if (!this.#journalPipelineInstalled) {
-      core.useAsyncPipeline(async (input, next) => next(input))
-      installState.installedJournalPipeline = true
-    }
-    return {}
+  /** Install owner port: the canonical PluginHost. */
+  get inner(): IStoragePluginHost {
+    return this.#inner
   }
-  /** Grant only the original bootstrap's temporary prepared-candidate authority. */
-  async #prepareInstallJournal(
-    installState: IStorageInstallBatchContext,
-    candidates: readonly IStorageNativeRegistrationContext[]
-  ): Promise<void> {
-    installState.preparingJournal = true
-    try {
-      await this.#journalOptions(this.#orgId, candidates)
-      for (const context of candidates)
-        if (context.getKind() !== undefined)
-          await this.#prepareJournalBackend(context, this.#orgId, candidates).promise
-    } finally {
-      installState.preparingJournal = false
-    }
+  /** Install owner port: aborted once when the host starts closing. */
+  get closing() {
+    return this.#closing
   }
-  /** Materialize one registration with a single store handoff and original native plugin definition. */
-  #createInstallEntry(
-    installState: IStorageInstallBatchContext,
-    plugin: IStorageBackendPluginHandle,
-    metadata: NonNullable<ReturnType<typeof readStorageNativePluginMetadata>>,
-    index: number
-  ): IStorageInstallEntryResult {
-    /** Initialize registration facts in original construction order before any callback can publish. */
-    const entryState = {
-      installState,
-      plugin,
-      metadata,
-      index,
-      installSettled: false
-    } as IStorageInstallEntryContext
-
-    /** Retain only this entry original trusted definition metadata. */
-    entryState.native = entryState.metadata
-
-    /** Preserve the exact admitted store with one single-assignment handoff. */
-    entryState.storeCell = createStorageStoreCell()
-
-    /** A late installation cannot regain authority after its deadline. */
-
-    /** Checks belong to this original registration and retain registration order. */
-    entryState.checks = new Set<IStorageDetectCheck>()
-
-    /** A successful complete host pass admits this registration's real execution endpoints. */
-    entryState.detected = false
-
-    /** Immutable identity does not retain a shared current-store or current-organization slot. */
-    entryState.observerBinding = {
-      identity: () => ({
-        backendId: entryState.native.id,
-        backend: entryState.kind?.name ?? entryState.native.id,
-        orgId: this.#orgId
-      }),
-      assertCurrent: () => this.#assertRegistration(entryState),
-      emit: this.#events.emit,
-      hasListeners: this.#events.hasListeners,
-      report: this.#report
-    }
-    entryState.context = this.#createInstallRegistrationContext(entryState)
-
-    entryState.installState.nativeContexts.set(entryState.index, entryState.context)
-
-    /** The original PluginHost definition remains the registration and lifecycle owner. */
-    entryState.definition = readStorageNativePluginDefinition(entryState.plugin)
-
-    if (entryState.definition === undefined)
-      throw new StorageError(
-        StorageHostErrorCode.backendPluginInvalid,
-        {},
-        StorageErrorText.backendPluginInvalid
-      )
-    return {
-      plugin: entryState.definition as IPlugin<IStorageInstallCore, Record<string, unknown>>,
-      storeCell: entryState.storeCell
-    }
+  /** Install owner port: the token of the batch currently allowed to publish. */
+  get activeBatchToken(): IStorageBatchToken | undefined {
+    return this.#activeBatchToken
   }
-
-  /** The original owners validate both unpublished candidates and committed registrations. */
-  #assertRegistration(entryState: IStorageInstallEntryContext): void {
-    /** Original config admission accepts the actual candidate in its current install operation. */
-    if (entryState.installState.preparingJournal)
-      getPluginRuntimeIntegration(entryState.registrationCore).assertPreparedRegistration()
-    else void entryState.registrationCore!.config.get()
-    if (!entryState.installState.batchToken.active)
-      getPluginRuntimeIntegration(entryState.registrationCore).assertCurrent()
+  /** Install owner port: live borrow counts per published store. */
+  get borrowCounts(): Map<IStorageBase, number> {
+    return this.#borrowCounts
   }
-
-  /** Observations retain original registration validity and agree with the one store handoff. */
-  #bindObservers(
-    entryState: IStorageInstallEntryContext,
-    store: IStorageBase
-  ): IStorageObserverSet {
-    entryState.observerBinding.assertCurrent()
-    entryState.storeCell.bind(store)
-    return createStorageObservers(entryState.observerBinding, () => store)
+  /** Install owner port: the journal owner. */
+  get journalOwner(): StorageHostJournal {
+    return this.#journalOwner
   }
-
-  /** Each call context closes over its organization and only installation-captured dependencies. */
-  #callContext(entryState: IStorageInstallEntryContext, orgId: string): IStoragePluginCallContext {
-    return {
-      orgId,
-      backend: (view) => {
-        this.#assertRegistration(entryState)
-        const source = entryState.borrowed?.get(view)
-        if (source === undefined)
-          throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-        return this.#projectBackend(source, orgId) as typeof view
-      }
-    }
+  /** Batch owner port: the committed registry, replaced only after a whole batch commits. */
+  set registry(value: IStorageRegistry) {
+    this.#registry = value
   }
-
-  /** Bind the next domain core to its matching entry in this install batch. */
-  #createInstallRegistrationContext(
-    entryState: IStorageInstallEntryContext
-  ): IStorageInstallEntryContext['context'] {
-    return {
-      ...(this.#journal === undefined
-        ? {}
-        : {
-            observeExecution: <R>(
-              orgId: string,
-              describe: () => IStoragePipelineInput,
-              invoke: (observing: boolean) => Promise<R>
-            ) => this.#observeJournalExecution(orgId, describe, invoke)
-          }),
-      registerJournalRuntime: (runtime) => {
-        entryState.registrationCore!.onDispose(() => {
-          if (this.#journalRuntime === runtime) this.#journalRuntime = undefined
-        })
-        if (this.#journalRuntime !== undefined)
-          throw new StorageError(
-            StorageHostErrorCode.invalidConfig,
-            {},
-            StorageErrorText.defaultError(StorageHostErrorCode.invalidConfig)
-          )
-        this.#journalRuntime = runtime
-      },
-      getJournal: (orgId) => this.#journalPort(entryState.context, orgId),
-      id: entryState.native.id,
-      defaultOrgId: this.#orgId,
-      getOrgContext: (orgId: Parameters<IStorageNativeRegistrationContext['getOrgContext']>[0]) =>
-        this.#installGetOrgContext(entryState, orgId),
-      assertCurrent: () => this.#assertRegistration(entryState),
-      assertExecution: () => {
-        this.#assertRegistration(entryState)
-        if (!entryState.installState.batchToken.active && !entryState.detected)
-          throw new StorageContractError(StorageContractErrorCode.unsupported)
-      },
-      isDetected: () => entryState.detected,
-      completeDetect: () => {
-        entryState.detected = true
-      },
-      getPublishedBackend: (
-        id: Parameters<IStorageNativeRegistrationContext['getPublishedBackend']>[0]
-      ) => this.#installGetPublishedBackend(entryState, id),
-      registerDetect: (check) => {
-        if (typeof check !== 'function')
-          throw createStorageTypeError(
-            StorageHostErrorCode.invalidConfig,
-            StorageErrorText.invalidDetectCheck
-          )
-        /** Original onDispose admission enforces exactly the existing installation window. */
-        const entry: IStorageDetectCheck = { check }
-        entryState.registrationCore!.onDispose(() => {
-          entryState.checks.delete(entry)
-        })
-        entryState.checks.add(entry)
-      },
-      runDetect: () => this.#installRunDetect(entryState),
-      setRegistrationCore: (core) => {
-        entryState.registrationCore = core
-      },
-      hooks: this.#events.hooks,
-      emit: (name, payload) => {
-        /** Accepted native work may settle during close; optional diagnostics cannot mask it. */
-        if (this.#state === 'closing') return
-        this.#assertRegistration(entryState)
-        this.#events.emit(name, payload)
-      },
-      getObservers: (store, orgId) =>
-        createStorageObservers(
-          orgId === undefined
-            ? entryState.observerBinding
-            : {
-                ...entryState.observerBinding,
-                identity: () => ({ ...entryState.observerBinding.identity(), orgId })
-              },
-          () => store
-        ),
-      getEnvelopeStages: (operation, orgId) =>
-        createStorageEnvelopeStages(
-          orgId === undefined
-            ? entryState.observerBinding
-            : {
-                ...entryState.observerBinding,
-                identity: () => ({ ...entryState.observerBinding.identity(), orgId })
-              },
-          operation
-        ),
-      getStageBindings: () =>
-        (entryState.stageBindings ??= {
-          backendStages: createStorageObservers(
-            entryState.observerBinding,
-            entryState.storeCell.get
-          ).backend,
-          operationStages: (store) => this.#bindObservers(entryState, store).operation,
-          codecStages: (store) => this.#bindObservers(entryState, store).codec,
-          transactionStages: (store) => this.#bindObservers(entryState, store).transaction,
-          concurrencyStages: (store) => this.#bindObservers(entryState, store).concurrency,
-          sqlStages: (store) => this.#bindObservers(entryState, store).sql,
-          queryStages: (store) => this.#bindObservers(entryState, store).query
-        }),
-      scheduler: this.#scheduler,
-      getKind: () => entryState.kind,
-      setKind: (value) => {
-        entryState.kind = value
-      },
-      storeCell: entryState.storeCell,
-      runInstall: <T>(operation: () => Promise<T>) =>
-        this.#installRunInstall(entryState, operation),
-      isInstallExpired: () =>
-        !entryState.installSettled && !this.#isRegistrationCurrent(entryState),
-      registerStore: (
-        store: Parameters<IStorageNativeRegistrationContext['registerStore']>[0],
-        core: Parameters<IStorageNativeRegistrationContext['registerStore']>[1]
-      ) => this.#installRegisterStore(entryState, store, core)
-    }
+  /** Batch owner port: extensions published with the matching registry, without the open check. */
+  get publishedExtensions(): Readonly<Record<PropertyKey, unknown>> {
+    return this.#extensions
   }
-  /** Project the original native execution, journal and observers for one organization. */
-  #installGetOrgContext(
-    entryState: IStorageInstallEntryContext,
-    orgId: Parameters<IStorageNativeRegistrationContext['getOrgContext']>[0]
-  ): ReturnType<IStorageNativeRegistrationContext['getOrgContext']> {
-    this.#assertRegistration(entryState)
-    assertOperationContext({ orgId })
-    /** Read-only ports point to the same original execution and observer implementations. */
-    const binding = {
-      ...entryState.observerBinding,
-      identity: () => ({ ...entryState.observerBinding.identity(), orgId })
-    }
-    const execution = forwardStorageExecution(
-      this.#inner,
-      entryState.context.assertExecution,
-      () => ({
-        backendId: entryState.native.id,
-        backend: entryState.kind?.name ?? entryState.native.id,
-        orgId
-      }),
-      entryState.context.observeExecution === undefined
-        ? undefined
-        : (describe, invoke) => entryState.context.observeExecution!(orgId, describe, invoke)
-    )
-    const contextForOrg = this.#callContext(entryState, orgId)
-    const observe = (store: IStorageBase) => createStorageObservers(binding, () => store)
-    return {
-      journal: entryState.context.getJournal(orgId),
-      orgId,
-      execution,
-      callContext: contextForOrg,
-      stageBindings: {
-        backendStages: createStorageObservers(binding, entryState.storeCell.get).backend,
-        operationStages: (store) => observe(store).operation,
-        codecStages: (store) => observe(store).codec,
-        transactionStages: (store) => observe(store).transaction,
-        concurrencyStages: (store) => observe(store).concurrency,
-        sqlStages: (store) => observe(store).sql,
-        queryStages: (store) => observe(store).query
-      },
-      createTransactionApi: (scope) =>
-        entryState.storeCell.createOrgTransactionApi(
-          scope,
-          entryState.storeCell.forOrg(orgId, this.#orgId),
-          contextForOrg,
-          execution
-        )
-    }
+  /** Batch owner port: replace the published extensions together with the registry. */
+  set publishedExtensions(value: Readonly<Record<PropertyKey, unknown>>) {
+    this.#extensions = value
   }
-  /** Borrow a committed registration and release its borrowed facts with this installation. */
-  #installGetPublishedBackend(
-    entryState: IStorageInstallEntryContext,
-    id: Parameters<IStorageNativeRegistrationContext['getPublishedBackend']>[0]
-  ): ReturnType<IStorageNativeRegistrationContext['getPublishedBackend']> {
-    /** Original scope admission enforces the install window before any lookup. */
-    let view: ReturnType<typeof borrowStorageBackend> | undefined
-    /** Aliases borrow the source registration's existing facts and release with this borrower. */
-    const releases: Array<() => void> = []
-    /** The borrowed store, read after the release is registered so a failed lookup releases nothing. */
-    let store: IStorageBase | undefined
-    entryState.registrationCore!.onDispose(() => {
-      if (view !== undefined) {
-        entryState.borrowed?.delete(view)
-        const remaining = (this.#borrowCounts.get(store!) ?? 1) - 1
-        if (remaining === 0) this.#borrowCounts.delete(store!)
-        else this.#borrowCounts.set(store!, remaining)
-      }
-      for (const release of releases) release()
-    })
-    /** Current-batch and future stores never enter this committed registry. */
-    store = this.#registry.get(id)
-    if (store === undefined)
-      throw new StorageError(
-        StorageHostErrorCode.backendNotInstalled,
-        {},
-        StorageErrorText.backendNotInstalled
-      )
-    /** Its existing context retains the exact original lifecycle and enablement guards. */
-    const source = this.#storeContexts.get(store)!
-    const assertBorrowed = () => {
-      this.#assertRegistration(entryState)
-      source.context.assertCurrent()
-    }
-    view = borrowStorageBackend(store, assertBorrowed)
-    releases.push(registerBackendEntityAccess(view, store, assertBorrowed))
-    releases.push(
-      registerBackendEnvelopeStages(
-        view,
-        (operation) => source.context.getEnvelopeStages(operation),
-        () => source.context.storeCell.getChainMethods('query')
-      )
-    )
-    const controller = getBackendChangeController(store)
-    if (controller !== undefined) releases.push(registerBackendChangeController(view, controller))
-    ;(entryState.borrowed ??= new Map()).set(view, store)
-    this.#borrowCounts.set(store, (this.#borrowCounts.get(store) ?? 0) + 1)
-    return view as ReturnType<IStoragePluginCore['getPublishedBackend']>
+  /** Batch owner port: extension keys each installed plugin published, by plugin id. */
+  get extensionKeys(): Map<string, readonly PropertyKey[]> {
+    return this.#extensionKeys
   }
-  /** Run original checks in registration order and retain their pending work for disposal. */
-  async #installRunDetect(
-    entryState: IStorageInstallEntryContext
-  ): ReturnType<IStorageNativeRegistrationContext['runDetect']> {
-    this.#assertRegistration(entryState)
-    /** Timings describe one backend's real checks without adding a check deadline. */
-    const startedAt = this.#scheduler.now()
-    /** Read the original registration signal, which seals with the resource owner. */
-    const signal = entryState.registrationCore!.lifecycle.signal
-    /** Only checks actually invoked contribute to the fixed observation payload. */
-    let checkCount = 0
-    this.#events.emit(Hook.beforeDetect, entryState.observerBinding.identity)
-    try {
-      for (const entry of entryState.checks) {
-        this.#assertOpen()
-        this.#assertRegistration(entryState)
-        checkCount += 1
-        entry.pending = Promise.resolve().then(() => entry.check(signal))
-        try {
-          await entry.pending
-        } finally {
-          entry.pending = undefined
-        }
-      }
-      this.#assertOpen()
-      if (this.#events.hasListeners(Hook.afterDetect))
-        this.#events.emit(Hook.afterDetect, () => ({
-          ...entryState.observerBinding.identity(),
-          checkCount,
-          elapsedMs: Math.max(0, this.#scheduler.now() - startedAt)
-        }))
-    } catch (error) {
-      if (this.#events.hasListeners(Hook.onDetectError))
-        this.#events.emit(Hook.onDetectError, () => ({
-          ...entryState.observerBinding.identity(),
-          code: readStorageHookFailureCode(error, this.#report)
-        }))
-      throw error
-    }
+  /** Batch owner port: registration contexts in installation order, for detection. */
+  get detectContexts(): Set<IStorageNativeRegistrationContext> {
+    return this.#detectContexts
   }
-  /** Apply the original batch deadline to one native installation and drain accepted checks. */
-  async #installRunInstall<T>(
-    entryState: IStorageInstallEntryContext,
-    operation: () => Promise<T>
-  ): Promise<T> {
-    if (entryState.kind !== undefined) {
-      this.#events.emit(Hook.beforeBackendPluginInstall, entryState.observerBinding.identity)
-      this.#events.emit(Hook.beforeBackendCreate, entryState.observerBinding.identity)
-    }
-    try {
-      /**
-       * The complete original install hook includes selected Feature publication. PluginHost owns
-       * its deadline; a rejection after the registration stopped being current goes to `report`.
-       */
-      const installed = await this.#settleInstall(entryState, operation())
-      /**
-       * Register last in the original install window so accepted checks drain before any resource
-       * they may inspect, even when a Feature registered them before the store.
-       */
-      entryState.registrationCore!.onDispose(async () => {
-        for (const entry of entryState.checks) await entry.pending?.catch(this.#report)
-      })
-      if (entryState.kind !== undefined) {
-        this.#events.emit(Hook.afterBackendPluginInstall, entryState.observerBinding.identity)
-        this.#events.emit(Hook.afterBackendInstall, entryState.observerBinding.identity)
-      }
-      return installed
-    } catch (error) {
-      if (entryState.kind !== undefined) {
-        if (this.#events.hasListeners(Hook.onBackendRejected))
-          this.#events.emit(Hook.onBackendRejected, () => ({
-            ...entryState.observerBinding.identity(),
-            code: readStorageHookFailureCode(error, this.#report)
-          }))
-        if (this.#events.hasListeners(Hook.onBackendPluginInstallError))
-          this.#events.emit(Hook.onBackendPluginInstallError, () => ({
-            ...entryState.observerBinding.identity(),
-            code: readStorageHookFailureCode(error, this.#report)
-          }))
-      }
-      throw error
-    }
+  /** Batch owner port: whether a detection pass is running. */
+  get detectRunning(): boolean {
+    return this.#detectRunning
   }
-  /**
-   * True while PluginHost still accepts work from this registration. A plugin whose install
-   * outlived `mutationTimeoutMs`, or whose host closed, is no longer current.
-   */
-  #isRegistrationCurrent(entryState: IStorageInstallEntryContext): boolean {
-    if (entryState.registrationCore === undefined) return true
-    try {
-      // During install this checks the install operation is still current; afterwards, the commit.
-      getPluginRuntimeIntegration(entryState.registrationCore).assertPreparedRegistration()
-      return true
-    } catch {
-      // assertCurrent signals expiry by throwing; expiry is the answer, not a failure to report.
-      return false
-    }
+  /** Batch owner port: the shared detection Promise. */
+  get detectPromise(): Promise<void> | undefined {
+    return this.#detectPromise
   }
-  /**
-   * Await one plugin's install work. A rejection that arrives after PluginHost gave up on the
-   * registration (timeout or close) has no caller left, so it is reported instead of lost.
-   */
-  async #settleInstall<T>(
-    entryState: IStorageInstallEntryContext,
-    pending: Promise<T>
-  ): Promise<T> {
-    void pending.then(
-      () => {
-        entryState.installSettled = true
-      },
-      () => {
-        entryState.installSettled = true
-      }
-    )
-    try {
-      return await raceWithAbort(() => pending, {
-        signal: this.#closing.signal,
-        report: (error) => this.#report(error)
-      })
-    } catch (error) {
-      if (!this.#closing.signal.aborted && !this.#isRegistrationCurrent(entryState))
-        this.#report(error)
-      throw error
-    }
+  /** Batch owner port: a new publication invalidates a settled detection result. */
+  set detectPromise(value: Promise<void> | undefined) {
+    this.#detectPromise = value
   }
-  /** Admit one native store and hand its original disposer and identity to PluginHost. */
-  #installRegisterStore(
-    entryState: IStorageInstallEntryContext,
-    store: Parameters<IStorageNativeRegistrationContext['registerStore']>[0],
-    core: Parameters<IStorageNativeRegistrationContext['registerStore']>[1]
-  ): ReturnType<IStorageNativeRegistrationContext['registerStore']> {
-    /** Use contract-owned admission and its captured original disposal receiver. */
-    const snapshot = snapshotStorageBaseDetailed(store, { asyncDisposeKey })
-    if (!snapshot.valid)
-      throw createStorageTypeError(
-        StorageHostErrorCode.backendPluginInvalid,
-        StorageErrorText.backendPluginInvalid,
-        snapshot.cause
-      )
-    if (
-      !entryState.installState.batchToken.active ||
-      this.#activeBatchToken !== entryState.installState.batchToken ||
-      !this.#isRegistrationCurrent(entryState)
-    ) {
-      void this.#disposeLateStore(snapshot)
-      throw new StorageError(
-        StorageHostErrorCode.storageHostDisposed,
-        {},
-        StorageErrorText.storageHostDisposed
-      )
-    }
-    try {
-      core.onDispose(() => {
-        this.#events.emit(Hook.onBackendDisposeStart, entryState.observerBinding.identity)
-        /** The original captured disposer retains its receiver and one cleanup execution. */
-        const disposed = snapshot.store.dispose()
-        if (!this.#events.hasListeners(Hook.afterBackendDispose)) return disposed
-        return Promise.resolve(disposed).then(() =>
-          this.#events.emit(Hook.afterBackendDispose, entryState.observerBinding.identity)
-        )
-      })
-    } catch (error) {
-      void this.#disposeLateStore(snapshot)
-      throw error
-    }
-    if (entryState.kind === undefined || snapshot.backend !== entryState.kind.name)
-      throw createStorageTypeError(
-        StorageHostErrorCode.backendKindMismatch,
-        StorageErrorText.backendKindMismatch
-      )
-    /** Every admitted base, including frozen raw stores, shares this host's observer owner. */
-    let releaseEnvelope: (() => void) | undefined
-    core.onDispose(() => releaseEnvelope?.())
-    releaseEnvelope = registerBackendEnvelopeStages(
-      snapshot.store,
-      entryState.context.getEnvelopeStages,
-      () => entryState.context.storeCell.getChainMethods('query')
-    )
-    entryState.storeCell.set(snapshot.store)
-    this.#events.emit(Hook.afterBackendCreate, entryState.observerBinding.identity)
+  /** Batch owner port: the installer that builds per-plugin install entries. */
+  get installer(): StorageHostInstaller {
+    return this.#installer
+  }
+  /** Journal owner port: reject work after the host started closing. */
+  get assertOpen(): () => void {
+    return () => this.#assertOpen()
+  }
+  /** Journal owner port: whether any install batch has started. */
+  get batchStarted(): boolean {
+    return this.#batchStarted
+  }
+  /** Journal owner port: the journal marks the first batch as started when it admits configuration. */
+  set batchStarted(value: boolean) {
+    this.#batchStarted = value
+  }
+  /** Journal owner port: the host's one event subscriber. */
+  get events(): ReturnType<typeof createStorageHooks> {
+    return this.#events
+  }
+  /** Journal owner port: the default organization captured at construction. */
+  get orgId(): string {
+    return this.#orgId
+  }
+  /** Journal owner port: the committed backend registry. */
+  get registry(): IStorageRegistry {
+    return this.#registry
+  }
+  /** Journal owner port: the caller's diagnostic reporter. */
+  get report(): (error: unknown) => void {
+    return this.#report
+  }
+  /** Journal owner port: the scheduler shared with PluginHost. */
+  get scheduler(): IScheduler {
+    return this.#scheduler
+  }
+  /** Journal owner port: committed store contexts by store object. */
+  get storeContexts() {
+    return this.#storeContexts
   }
 }
 
@@ -1940,7 +981,7 @@ export async function createStorageHost<
   const TPlugins extends readonly IStorageBackendPluginHandle[] = readonly []
 >(options?: IStorageHostCreateOptions<TPlugins>): Promise<IStorageHost<TPlugins>> {
   /** Constructor options are consumed synchronously before plugin installation can yield. */
-  const facade = new StorageHostFacade(options)
+  const facade = new StorageHost(options)
   /** Rest arguments detach the initial plugin list before installation begins. */
   const plugins = options?.plugins
   /** Detection selection must remain stable while native installation awaits. */
@@ -1961,168 +1002,4 @@ export async function createStorageHost<
     }
     throw error
   }
-}
-
-/** Borrow native authoring ports from the original install and resource scope. */
-function createStorageNativeAuthoringPorts(registration: IStorageRegistrationAssembly) {
-  /** Native authoring retains the batch entry's original store cell. */
-  const { context } = registration
-  return {
-    createKeyLockPort: (() => {
-      /** Only original window admission is acquired; the physical backend owns final release. */
-      registration.registrationCore!.onDispose(() => undefined)
-      return createBackendKeyLockPort()
-    }) satisfies IStoragePluginCore['createKeyLockPort'],
-    createOrgAuthoringPort: (() => {
-      /** Only this original installation can capture late child construction authority. */
-      registration.registrationCore!.onDispose(context.storeCell.releaseOrgBindings)
-      return {
-        createChangeController: (options, factory) => {
-          context.assertExecution()
-          const controller = requireChangeControllerFactory(factory)(options)
-          context.storeCell.retainOrgBinding(() => controller.dispose())
-          return controller
-        },
-        createKeyLockPort: () => {
-          context.assertExecution()
-          return createBackendKeyLockPort()
-        },
-        createRevisionPort: () => {
-          context.assertExecution()
-          return createBackendRevisionPort()
-        },
-        registerChangeController: (store, controller) => {
-          context.assertExecution()
-          context.storeCell.retainOrgBinding(registerBackendChangeController(store, controller))
-          /** Root observers retain all organizations through their original controller channel. */
-          const root = getBackendChangeController(context.storeCell.get())
-          if (root !== undefined && root !== controller && 'subscribe' in controller)
-            context.storeCell.retainOrgBinding(
-              (controller as IBackendChangeController).subscribe((change) =>
-                root.publishExternal(change)
-              )
-            )
-        },
-        registerValueCommit: (store, commit) => {
-          context.assertExecution()
-          context.storeCell.retainOrgBinding(registerBackendValueCommit(store, commit))
-        }
-      } satisfies ReturnType<IStoragePluginCore['createOrgAuthoringPort']>
-    }) satisfies IStoragePluginCore['createOrgAuthoringPort'],
-    createRevisionPort: (() => {
-      /** Window admission belongs to the original owner; physical backends retain the facts. */
-      registration.registrationCore!.onDispose(() => undefined)
-      return createBackendRevisionPort()
-    }) satisfies IStoragePluginCore['createRevisionPort'],
-    createChangeController: ((options, factory) => {
-      /** Original resource admission owns partial-construction cleanup and the install window. */
-      let controller: IBackendChangeController | undefined
-      registration.registrationCore!.onDispose(() => controller?.dispose())
-      controller = requireChangeControllerFactory(factory)(options)
-      return controller
-    }) satisfies IStoragePluginCore['createChangeController'],
-    registerChangeController: ((store, controller) => {
-      /** Exact registry release is attached to the same original registration scope. */
-      let release: (() => void) | undefined
-      registration.registrationCore!.onDispose(() => release?.())
-      if (context.storeCell.get() !== store)
-        throw createStorageTypeError(
-          StorageHostErrorCode.backendPluginInvalid,
-          StorageErrorText.backendPluginInvalid
-        )
-      release = registerBackendChangeController(store, controller)
-    }) satisfies IStoragePluginCore['registerChangeController'],
-    registerValueCommit: ((store, commit) => {
-      /** The original installation window owns both admission and exact registration cleanup. */
-      let release: (() => void) | undefined
-      registration.registrationCore!.onDispose(() => release?.())
-      if (context.storeCell.get() !== store)
-        throw createStorageTypeError(
-          StorageHostErrorCode.backendPluginInvalid,
-          StorageErrorText.backendPluginInvalid
-        )
-      release = registerBackendValueCommit(store, commit)
-    }) satisfies IStoragePluginCore['registerValueCommit'],
-    registerOrgBinding: ((store, binding) => {
-      /** The original window and exact store cell remain the only registration authority. */
-      registration.registrationCore!.onDispose(context.storeCell.releaseOrgBindings)
-      if (context.storeCell.get() !== store)
-        throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-      context.storeCell.setOrgBinding(binding)
-    }) satisfies IStoragePluginCore['registerOrgBinding'],
-    registerFeatureClientResolver: ((store, resolver) => {
-      /** Window admission precedes callbacks, reflection, or any native client acquisition. */
-      registration.registrationCore!.onDispose(() => undefined)
-      if (context.storeCell.get() !== store)
-        throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-      context.storeCell.setFeatureClientResolver(resolver)
-    }) satisfies IStoragePluginCore['registerFeatureClientResolver']
-  }
-}
-/** Publish operation and installation ports through the canonical managed host. */
-function createStorageExecutionPorts(registration: IStorageRegistrationAssembly) {
-  /** Execution uses the original registration context and sole PluginHost pipeline. */
-  const { context, host } = registration
-  return {
-    getChangeController: () => {
-      context.assertCurrent()
-      return getBackendChangeController(context.storeCell.get())
-    },
-    getPublishedBackend: context.getPublishedBackend,
-    registerDetect: context.registerDetect,
-    getStorageHooks: () =>
-      ({
-        on(name, handler) {
-          /** Original resource admission owns the lifetime of this exact subscription handle. */
-          const release = context.hooks.on(name, handler)
-          try {
-            registration.registrationCore!.onDispose(release)
-          } catch (error) {
-            release()
-            throw error
-          }
-          return release
-        }
-      }) satisfies IStorageHooks,
-    subscribeStorageHook: ((name, handler) =>
-      context.hooks.on(name, handler)) satisfies IStorageHooks['on'],
-    emit: ((name, payload) => context.emit(name, payload)) satisfies IStorageHookEmitter,
-    setStorageKind: context.setKind,
-    execution: forwardStorageExecution(
-      host,
-      context.assertExecution,
-      () => ({
-        backendId: context.id,
-        backend: context.getKind()?.name ?? context.id,
-        orgId: context.defaultOrgId
-      }),
-      context.observeExecution === undefined
-        ? undefined
-        : (describe, invoke) => context.observeExecution!(context.defaultOrgId, describe, invoke)
-    ),
-    runStorageInstall: context.runInstall,
-    isStorageInstallExpired: context.isInstallExpired,
-    registerStore: (store: IStorageBase) => {
-      if (registration.registrationCore === undefined)
-        throw new StorageError(
-          StorageHostErrorCode.backendPluginInvalid,
-          {},
-          StorageErrorText.backendPluginInvalid
-        )
-      context.registerStore(store, registration.registrationCore)
-    }
-  }
-}
-
-/** Missing notification assembly is rejected before acquiring a channel or lifecycle resource. */
-function requireChangeControllerFactory(
-  factory: import('./core/change-types.js').IBackendChangeControllerFactory | undefined
-): import('./core/change-types.js').IBackendChangeControllerFactory {
-  if (factory === undefined)
-    throw new StorageError(
-      StorageHostErrorCode.changeControllerNotAssembled,
-      {},
-      StorageErrorText.changeControllerNotAssembled
-    )
-  return factory
 }

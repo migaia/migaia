@@ -49,11 +49,6 @@ export const StorageHostErrorCode = {
    */
   backendInUse: 'BACKEND_IN_USE',
   /**
-   * A host mutation was requested while another install batch is active. Callers must wait for that
-   * batch to settle and explicitly retry.
-   */
-  storageHostBusy: 'STORAGE_HOST_BUSY',
-  /**
    * A host or its public operation was used after sealing or terminal disposal. Callers must create
    * a new host instead of reviving this one.
    */

@@ -1,4 +1,4 @@
-export { createStorageHost, StorageHostFacade } from './storage-host.js'
+export { createStorageHost, StorageHost } from './storage-host.js'
 export { createOrgId } from './org.js'
 export {
   assertStorageBackendId,

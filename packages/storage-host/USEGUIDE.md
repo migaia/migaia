@@ -245,7 +245,7 @@ try {
 
 日志配置写在从 `@migaia/storage-host/plugins/journal` 导入的 `storageJournalPlugin(options)` 里，放在 `createStorageHost` 第一批插件中、要记录的后端之前；宿主没有单独的 `journal` 选项。后装或重复传入带配置的日志插件会报 `INVALID_CONFIG`。只用 `storageLogStore()` 时装 `storageJournalPlugin()` 即可，缺少插件时报 `JOURNAL_NOT_ASSEMBLED`。配置格式、日志内容和事务提交语义保持原契约。
 
-`host.unUse(id)` 卸载一个已安装的插件：先撤下它的后端、扩展方法和 probe 监听，再按逆序释放资源。后端仍被其他插件借用（例如 cache 的某一层）时报 `BACKEND_IN_USE`，应先卸载借用方；未知 id 报 `BACKEND_NOT_INSTALLED`；安装进行中报 `STORAGE_HOST_BUSY`；带配置的日志插件不能卸载，报 `INVALID_CONFIG`。卸载后可用同一个 id 重新安装，之后照常调用 `detect()`。
+`host.unUse(id)` 卸载一个已安装的插件：先撤下它的后端、扩展方法和 probe 监听，再按逆序释放资源。后端仍被其他插件借用（例如 cache 的某一层）时报 `BACKEND_IN_USE`，应先卸载借用方；未知 id 报 `BACKEND_NOT_INSTALLED`；安装进行中调用时会排在该安装之后执行；带配置的日志插件不能卸载，报 `INVALID_CONFIG`。卸载后可用同一个 id 重新安装，之后照常调用 `detect()`。
 
 观察事件只通过 `@migaia/storage-host/plugins/probe` 的 `storageProbe(handlers)` 订阅，宿主没有 `hooks` 选项，也没有 `host.hooks`。probe 放进 `createStorageHost` 的 plugins 时，从这一批的第一个安装事件起就能收到；安装后用 `host.extensions.observe(name, handler)` 追加监听，返回值是退订函数。在非默认组织的视图上调用时只收到该组织的事件。一个宿主只装一个 probe；监听器失败交给 `report`，不改变存储结果。
 
