@@ -294,7 +294,8 @@ async function redisSearchVector<TPayload>(
     connection,
     layout,
     query.state.name,
-    query.state.configuration
+    query.state.configuration,
+    { signal }
   )
   query.state.configuration = schema.configuration
   if (query.metric !== undefined && query.metric !== schema.configuration.metric) unsupported()
@@ -657,7 +658,8 @@ function createRedisVectorCollectionApi<TPayload>(
               draft.connection,
               draft.layout,
               collection.name,
-              collection.current.configuration
+              collection.current.configuration,
+              { signal: ctx?.signal }
             ),
             names = vectorNames(draft.layout, collection.name),
             translated = vectorCondition(actual, schema.fields)

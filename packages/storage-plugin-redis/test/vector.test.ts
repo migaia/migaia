@@ -229,6 +229,82 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_REDIS_STACK_URL'] as const)
         ).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
         expect(commands).toBe(before)
       })
+      it('ranks only after the index background scan finishes, so fresh points are never missed', async () => {
+        if (!connected) await create()
+        /** Unrelated keys make the scans started by FT.CREATE and FT.ALTER last several seconds. */
+        const filler = 'vector-scan-filler:' + crypto.randomUUID()
+        for (let offset = 0; offset < 100000; offset += 5000)
+          await driver.withConnection((connection) =>
+            connection.exec(
+              Array.from({ length: 5000 }, (_, index) => [
+                'SET',
+                filler + ':' + (offset + index),
+                'x'
+              ])
+            )
+          )
+        /** Each FT.SEARCH records whether its index was still scanning when the query was sent. */
+        const scanning: string[] = []
+        const observed: IRedisDriver = {
+          ...driver,
+          withConnection: (run) =>
+            driver.withConnection((connection) =>
+              run({
+                ...connection,
+                binaryCommand: async (args) => {
+                  if (args[0] === 'FT.SEARCH') {
+                    const info = (await driver.command(['FT.INFO', String(args[1])])) as unknown
+                    scanning.push(
+                      String(
+                        Array.isArray(info)
+                          ? info[info.indexOf('indexing') + 1]
+                          : (info as Record<string, unknown>).indexing
+                      )
+                    )
+                  }
+                  return connection.binaryCommand!(args)
+                }
+              })
+            )
+        }
+        const prefix = crypto.randomUUID()
+        const host = await createStorageHost({
+          plugins: [
+            redisBackendPlugin({ driver: observed, prefix }, { vector: rediSearchVectorFeature() })
+          ] as const
+        })
+        hosts.push(host)
+        namespaces.push(prefix)
+        try {
+          const collection = host
+            .backend('redis')
+            .use(vector)
+            .collection<{ group: string }>('fresh-scan', { dimensions: 2, metric: 'dot' })
+          await collection.upsert([
+            { id: 'a', vector: [4, 1], payload: { group: 'one' } },
+            { id: 'b', vector: [3, 2], payload: { group: 'two' } },
+            { id: 'c', vector: [2, 3], payload: { group: 'one' } },
+            { id: 'd', vector: [1, 4], payload: { group: 'two' } }
+          ])
+          const hits = await collection.near([1, 0], { exact: true }).topK(4).all()
+          expect(hits.map((hit) => hit.id)).toEqual(['a', 'b', 'c', 'd'])
+          expect(scanning).toEqual(['0'])
+        } finally {
+          let cursor = '0'
+          do {
+            const reply = (await driver.command([
+              'SCAN',
+              cursor,
+              'MATCH',
+              filler + ':*',
+              'COUNT',
+              '5000'
+            ])) as [string, string[]]
+            cursor = reply[0]
+            if (reply[1].length) await driver.command(['DEL', ...reply[1]])
+          } while (cursor !== '0')
+        }
+      }, 120000)
       it('keeps the absolute HASH deadline and native ranking projection in one EXEC', async () => {
         const batches: Parameters<IRedisConnection['exec']>[0][] = [],
           { host, store, prefix } = await create((commands) => batches.push(commands)),
