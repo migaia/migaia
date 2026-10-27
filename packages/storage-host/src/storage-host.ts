@@ -41,7 +41,7 @@ import {
   StorageContractError,
   StorageContractErrorCode
 } from '@migaia/storage-contract'
-import { withTimeout, type INativeAbortSignal } from '@migaia/utils/promise'
+import { raceWithAbort, type INativeAbortSignal } from '@migaia/utils/promise'
 import { observeThenableRejection } from '@migaia/utils/function'
 import {
   createStorageTypeError,
@@ -70,6 +70,7 @@ import type {
   IStoragePluginCallContext,
   IStorageBorrowedBackend
 } from './types.js'
+import { pluginNameFromBackendId } from './names.js'
 import { readStorageProbeHandlers } from './plugins/probe/handlers.js'
 import type { IStorageHookMap } from './hook-types.js'
 import { readStorageJournalConfiguration } from './journal/plugin-configuration.js'
@@ -149,10 +150,7 @@ type IStorageNativeRegistrationContext = {
  */
 type IStoragePluginHost = IHostHandle<IStorageHostCore, IStoragePipelineInput, readonly []> &
   Readonly<{
-    setNativeContexts(
-      contexts: Array<IStorageNativeRegistrationContext | undefined>,
-      expectedEntries: number
-    ): void
+    setNativeContexts(contexts: ReadonlyMap<string, IStorageNativeRegistrationContext>): void
   }>
 
 /** One native registration retains only its install core and original construction context. */
@@ -207,51 +205,35 @@ function createStorageRegistrationCore(registration: IStorageRegistrationAssembl
 }
 /** Own the native batch bridge while delegating lifecycle and pipelines to PluginHost. */
 class StoragePluginHostAssembly {
-  /** One bridge slot belongs to each entry in the active native install batch. */
-  #nativeContexts: Array<IStorageNativeRegistrationContext | undefined> = []
-  /** Each domain core consumes its matching slot exactly once. */
-  #contextIndex = 0
+  /** Storage registration context of each plugin in the active batch, keyed by native plugin name. */
+  #nativeContexts: ReadonlyMap<string, IStorageNativeRegistrationContext> = new Map()
   /** The canonical managed host owns installation, resources and pipeline execution. */
   #host: IHostHandle<IStorageHostCore, IStoragePipelineInput, readonly []>
   /** Allocate only the batch bridge; PluginHost retains the full managed lifecycle. */
   constructor(options: IPluginHostOptions) {
     this.#host = defineHost<IStorageHostCore, IStoragePipelineInput>({
       host: options,
-      domainCore: () => this.#createDomainCore()
+      domainCore: (request) => this.#createDomainCore(request.pluginName)
     })
   }
-  /** Materialize native ports only for the matching batch entry. */
-  #createDomainCore(): object {
-    /** The next entry may deliberately have no storage bridge. */
-    const context = this.#nativeContexts[this.#contextIndex++]
+  /** Materialize native ports for the plugin named by PluginHost; other plugins get none. */
+  #createDomainCore(pluginName: string): object {
+    const context = this.#nativeContexts.get(pluginName)
     if (context === undefined) return {}
     return createStorageRegistrationCore({ context, host: this.#host, registrationCore: undefined })
-  }
-  /** Require a complete registration-order bridge before PluginHost starts the batch. */
-  #setNativeContexts(
-    contexts: Array<IStorageNativeRegistrationContext | undefined>,
-    expectedEntries: number
-  ): void {
-    if (contexts.length !== expectedEntries)
-      throw new StorageError(
-        StorageErrorCode.backendPluginInvalid,
-        {},
-        StorageErrorText.backendPluginInvalid
-      )
-    this.#nativeContexts = contexts
-    this.#contextIndex = 0
   }
   /** Publish original managed host ports together with native batch configuration. */
   construct(): IStoragePluginHost {
     return {
       ...this.#host,
-      setNativeContexts: (contexts, expectedEntries) =>
-        this.#setNativeContexts(contexts, expectedEntries)
+      setNativeContexts: (contexts) => {
+        this.#nativeContexts = contexts
+      }
     } as IStoragePluginHost
   }
 }
 /** Create the storage bridge around one canonical managed PluginHost. */
-export function createStoragePluginHost(options: IPluginHostOptions): IStoragePluginHost {
+function createStoragePluginHost(options: IPluginHostOptions): IStoragePluginHost {
   return new StoragePluginHostAssembly(options).construct()
 }
 
@@ -261,10 +243,11 @@ type IStorageHostState = 'open' | 'installing' | 'closing' | 'closed'
 /** Internal registry snapshot containing exact stores after a committed PluginHost batch. */
 type IStorageRegistry = ReadonlyMap<string, IStorageBase>
 
-/** One facade-owned batch controller and its immutable start time. */
+/**
+ * Marks one install batch as the live one. Disposal or a newer batch clears `active`, so a batch
+ * that resumes after `await` cannot publish. Timeouts belong to PluginHost, not to this token.
+ */
 type IStorageBatchToken = {
-  readonly controller: ReturnType<typeof createAbortController>
-  readonly startedAt: number
   active: boolean
 }
 
@@ -288,6 +271,11 @@ type IStorageInstallEntryResult = {
 type IStorageInstallEntryContext = {
   /** Original installState is captured before native construction begins. */
   readonly installState: IStorageInstallBatchContext
+  /**
+   * Set when this plugin's install work settles. An install that has not settled while its
+   * registration is no longer current timed out; only that case may hand over a late store.
+   */
+  installSettled: boolean
   /** Original plugin is captured before native construction begins. */
   readonly plugin: IStorageBackendPluginHandle
   /** Original metadata is captured before native construction begins. */
@@ -300,9 +288,6 @@ type IStorageInstallEntryContext = {
 
   /** Preserve the exact admitted store with one single-assignment handoff. */
   storeCell: IStorageStoreCell
-
-  /** A late installation cannot regain authority after its deadline. */
-  installExpired: boolean
 
   /** Kind is captured per registration, never in reusable definition metadata. */
   kind: IStorageBackendKind | undefined
@@ -398,6 +383,11 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
    * them because it subscribes before the probe's batch emits its first event.
    */
   #probeHandlerSubscriptions: (() => void)[] = []
+  /**
+   * Aborted once when the host starts closing. A running plugin install stops being awaited at that
+   * point; PluginHost itself would wait for it to finish.
+   */
+  readonly #closing = createAbortController()
   /** A non-owning reverse index resolves only committed exact stores to their existing context. */
   readonly #storeContexts = new WeakMap<
     object,
@@ -436,7 +426,10 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       schedulerOption === undefined
         ? systemScheduler
         : (snapshotScheduler(schedulerOption) ?? systemScheduler)
-    /** One finite deadline applies to the entire native install batch. */
+    /**
+     * Per-plugin install deadline, enforced by PluginHost's `mutationTimeoutMs`; 0 disables it.
+     * Each plugin of a batch has its own deadline (the batch no longer shares one budget).
+     */
     const installTimeoutMs = installTimeoutOption ?? 30_000
     if (!Number.isFinite(installTimeoutMs) || installTimeoutMs < 0) {
       throw createStorageTypeError(
@@ -461,7 +454,10 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     this.#events = createStorageHooks(this.#report)
     this.#inner = createStoragePluginHost({
       pipeline: { mode: 'async' },
-      execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+      execution: {
+        mutationTimeoutMs: this.#installTimeoutMs === 0 ? false : this.#installTimeoutMs,
+        pipelineDrainTimeoutMs: false
+      },
       scheduler: this.#scheduler,
       diagnostic: (_message, code, error) => {
         // Provisional rollback returns original cleanup failures through its existing diagnostic.
@@ -492,11 +488,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     if (this.#events.hasListeners(Hook.beforeHostInstall))
       this.#events.emit(Hook.beforeHostInstall, () => ({ pluginCount: plugins.length }))
     /** Only this live batch token can publish its native install results. */
-    const batchToken: IStorageBatchToken = {
-      controller: createAbortController(),
-      startedAt: this.#scheduler.now(),
-      active: true
-    }
+    const batchToken: IStorageBatchToken = { active: true }
     this.#activeBatchToken = batchToken
     /** Reject a cancelled or losing batch before the next publication step. */
 
@@ -751,17 +743,6 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
         StorageErrorText.journalNotAssembled
       )
     return this.#journalRuntime
-  }
-
-  /** Both native installs and the final bootstrap consume the same original batch deadline. */
-  #awaitInstall<T>(pending: Promise<T>, token: IStorageBatchToken, elapsed: number): Promise<T> {
-    return withTimeout(() => pending, {
-      timeoutMs: Math.max(0, this.#installTimeoutMs - elapsed),
-      signals: [token.controller.signal],
-      scheduler: this.#scheduler,
-      report: (error) => this.#report(error),
-      zeroTimeoutBehavior: 'skip'
-    })
   }
 
   /** One original org cell shares the initializer Promise without opening stores in org(). */
@@ -1155,11 +1136,11 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       this.#events.emit(Hook.beforeHostClose, () => ({ backendCount }))
     if (this.#activeBatchToken !== undefined) {
       /** Only this live batch token can publish its native install results. */
-      const batchToken = this.#activeBatchToken
+      // Closing stops the running install from being awaited and from publishing.
       this.#activeBatchToken.active = false
       this.#activeBatchToken = undefined
       try {
-        batchToken.controller.abort(
+        this.#closing.abort(
           new StorageError(
             StorageErrorCode.storageHostDisposed,
             {},
@@ -1307,8 +1288,12 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       )
     }
     this.#inner.setNativeContexts(
-      materialized.map((_, index) => installState.nativeContexts.get(index)),
-      materialized.length
+      new Map(
+        [...installState.nativeContexts].map(([index, context]) => [
+          pluginNameFromBackendId(nativeMetadata[index]!.id),
+          context
+        ])
+      )
     )
     /** Committed native handles retain their original guarded extension methods. */
     const innerHandles = await this.#inner.use(
@@ -1356,12 +1341,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     candidates: readonly IStorageNativeRegistrationContext[],
     core: Pick<IPluginHostCore<never>, 'useAsyncPipeline'>
   ): Promise<Record<string, never>> {
-    const elapsed = Math.max(0, this.#scheduler.now() - installState.batchToken.startedAt)
-    await this.#awaitInstall(
-      this.#prepareInstallJournal(installState, candidates),
-      installState.batchToken,
-      elapsed
-    )
+    await this.#prepareInstallJournal(installState, candidates)
     if (!this.#journalPipelineInstalled) {
       core.useAsyncPipeline(async (input, next) => next(input))
       installState.installedJournalPipeline = true
@@ -1391,7 +1371,13 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     index: number
   ): IStorageInstallEntryResult {
     /** Initialize registration facts in original construction order before any callback can publish. */
-    const entryState = { installState, plugin, metadata, index } as IStorageInstallEntryContext
+    const entryState = {
+      installState,
+      plugin,
+      metadata,
+      index,
+      installSettled: false
+    } as IStorageInstallEntryContext
 
     /** Retain only this entry original trusted definition metadata. */
     entryState.native = entryState.metadata
@@ -1400,7 +1386,6 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     entryState.storeCell = createStorageStoreCell()
 
     /** A late installation cannot regain authority after its deadline. */
-    entryState.installExpired = false
 
     /** Checks belong to this original registration and retain registration order. */
     entryState.checks = new Set<IStorageDetectCheck>()
@@ -1582,7 +1567,8 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       storeCell: entryState.storeCell,
       runInstall: <T>(operation: () => Promise<T>) =>
         this.#installRunInstall(entryState, operation),
-      isInstallExpired: () => entryState.installExpired,
+      isInstallExpired: () =>
+        !entryState.installSettled && !this.#isRegistrationCurrent(entryState),
       registerStore: (
         store: Parameters<IStorageNativeRegistrationContext['registerStore']>[0],
         core: Parameters<IStorageNativeRegistrationContext['registerStore']>[1]
@@ -1728,30 +1714,12 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       this.#events.emit(Hook.beforeBackendPluginInstall, entryState.observerBinding.identity)
       this.#events.emit(Hook.beforeBackendCreate, entryState.observerBinding.identity)
     }
-    /** Consume the original batch deadline instead of resetting it per backend. */
-    const elapsed = Math.max(
-      0,
-      this.#scheduler.now() - entryState.installState.batchToken.startedAt
-    )
-    /** Observe the actual native work even when timeout wins first. */
-    const pending = operation()
-    /** Distinguish an operation failure from work still running after expiry. */
-    let operationSettled = false
-    void pending.then(
-      () => {
-        operationSettled = true
-      },
-      () => {
-        operationSettled = true
-      }
-    )
     try {
-      /** The complete original install hook includes selected Feature publication. */
-      const installed = await this.#awaitInstall(
-        pending,
-        entryState.installState.batchToken,
-        elapsed
-      )
+      /**
+       * The complete original install hook includes selected Feature publication. PluginHost owns
+       * its deadline; a rejection after the registration stopped being current goes to `report`.
+       */
+      const installed = await this.#settleInstall(entryState, operation())
       /**
        * Register last in the original install window so accepted checks drain before any resource
        * they may inspect, even when a Feature registered them before the store.
@@ -1765,7 +1733,6 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       }
       return installed
     } catch (error) {
-      entryState.installExpired = !operationSettled
       if (entryState.kind !== undefined) {
         if (this.#events.hasListeners(Hook.onBackendRejected))
           this.#events.emit(Hook.onBackendRejected, () => ({
@@ -1778,6 +1745,48 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
             code: readStorageHookFailureCode(error, this.#report)
           }))
       }
+      throw error
+    }
+  }
+  /**
+   * True while PluginHost still accepts work from this registration. A plugin whose install
+   * outlived `mutationTimeoutMs`, or whose host closed, is no longer current.
+   */
+  #isRegistrationCurrent(entryState: IStorageInstallEntryContext): boolean {
+    if (entryState.registrationCore === undefined) return true
+    try {
+      // During install this checks the install operation is still current; afterwards, the commit.
+      getPluginRuntimeIntegration(entryState.registrationCore).assertPreparedRegistration()
+      return true
+    } catch {
+      // assertCurrent signals expiry by throwing; expiry is the answer, not a failure to report.
+      return false
+    }
+  }
+  /**
+   * Await one plugin's install work. A rejection that arrives after PluginHost gave up on the
+   * registration (timeout or close) has no caller left, so it is reported instead of lost.
+   */
+  async #settleInstall<T>(
+    entryState: IStorageInstallEntryContext,
+    pending: Promise<T>
+  ): Promise<T> {
+    void pending.then(
+      () => {
+        entryState.installSettled = true
+      },
+      () => {
+        entryState.installSettled = true
+      }
+    )
+    try {
+      return await raceWithAbort(() => pending, {
+        signal: this.#closing.signal,
+        report: (error) => this.#report(error)
+      })
+    } catch (error) {
+      if (!this.#closing.signal.aborted && !this.#isRegistrationCurrent(entryState))
+        this.#report(error)
       throw error
     }
   }
@@ -1797,7 +1806,8 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
       )
     if (
       !entryState.installState.batchToken.active ||
-      this.#activeBatchToken !== entryState.installState.batchToken
+      this.#activeBatchToken !== entryState.installState.batchToken ||
+      !this.#isRegistrationCurrent(entryState)
     ) {
       void this.#disposeLateStore(snapshot)
       throw new StorageError(

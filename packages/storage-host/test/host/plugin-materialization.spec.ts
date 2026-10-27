@@ -251,6 +251,51 @@ describe('PluginHost materialization', () => {
     expect(disposals).toBe(1)
   })
 
+  it('gives each plugin of a batch its own install deadline', async () => {
+    const scheduler = createManualScheduler()
+    /** Lets queued install continuations run between manual clock steps. */
+    const flush = async () => {
+      for (let step = 0; step < 20; step += 1) await Promise.resolve()
+    }
+    const gates = [deferred<void>(), deferred<void>()] as const
+    /** Each plugin waits for its own gate; together they exceed one budget, alone neither does. */
+    const waiting = <const N extends string>(id: N, gate: (typeof gates)[number]) =>
+      definePlugin(id, () => ({
+        install: async () => {
+          await gate.promise
+          return {}
+        }
+      }))
+    const host = await createStorageHost({ scheduler, installTimeoutMs: 10 })
+    const installation = host.use(waiting('first', gates[0]), waiting('second', gates[1]))
+    await flush()
+    scheduler.advance(6)
+    gates[0].resolve()
+    await flush()
+    scheduler.advance(6)
+    gates[1].resolve()
+    await expect(installation).resolves.toBe(host)
+    await host.dispose()
+  })
+
+  it('reports an install timeout with the PluginHost timeout on its cause chain', async () => {
+    const scheduler = createManualScheduler()
+    const never = definePlugin('never', () => ({
+      install: () => new Promise<Record<string, never>>(() => {})
+    }))
+    const host = await createStorageHost({ scheduler, installTimeoutMs: 10 })
+    const installation = host.use(never).catch((error: unknown) => error)
+    for (let step = 0; step < 20; step += 1) await Promise.resolve()
+    scheduler.advance(10)
+    const failure = await installation
+    expect(failure).toMatchObject({ code: 'BACKEND_INSTALL_FAILED' })
+    const codes: unknown[] = []
+    for (let current: unknown = failure; current instanceof Error; current = current.cause)
+      codes.push((current as { readonly code?: unknown }).code)
+    expect(codes).toContain('MUTATION_EXECUTION_TIMEOUT')
+    await host.dispose()
+  })
+
   it('rolls back a registered Store when native install times out, then accepts a retry', async () => {
     const scheduler = createManualScheduler()
     const late = deferred<void>()

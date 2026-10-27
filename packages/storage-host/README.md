@@ -106,7 +106,7 @@ pnpm add --workspace @migaia/logger
 ## 使用边界
 
 - `plugins` 的 ID 必须唯一。一批插件全部成功才会出现在查找结果中；安装失败会释放本批已创建的资源。重叠安装批次报 `STORAGE_HOST_BUSY`。
-- `autoDetect` 默认 `true`，`installTimeoutMs` 默认 `30000` 毫秒。设 `autoDetect: false` 后，应先 `await host.detect()` 再执行数据操作；检查未完成的操作会报 `UNSUPPORTED_CAPABILITY`。追加插件后也要检查新增后端。
+- `autoDetect` 默认 `true`，`installTimeoutMs` 默认 `30000` 毫秒，是每个插件各自的安装时限（同一批中的插件分别计时），`0` 表示不限时。设 `autoDetect: false` 后，应先 `await host.detect()` 再执行数据操作；检查未完成的操作会报 `UNSUPPORTED_CAPABILITY`。追加插件后也要检查新增后端。
 - `org` 默认零 UUID；显式组织 ID 必须是规范的小写 UUID，可用 `createOrgId()` 生成。`org()` 返回的视图不能安装插件、删除组织或关闭宿主。删除组织尝试所有后端，部分失败不会撤回已成功的删除，错误为 `ORG_DELETE_FAILED`，具体失败在 `AggregateError.errors` 中。
 - 后端支持什么能力由实际实例决定。非默认组织不会自动得到只绑定到根后端的自定义能力；先检查 `has(token)`。组织视图不支持原生 SQL/SPARQL 入口。
 - 显式 `dispose()` 的失败会拒绝，重复调用复用同一个 Promise。`await using` 清理会报告失败并完成，以免覆盖业务代码的主错误。调用方提供的原生客户端是否需要单独关闭，见相应后端说明。
