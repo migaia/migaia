@@ -504,7 +504,9 @@ assert.ok(new canonical.RpcAbortError() instanceof forwarding.RpcAbortError);
 /** Consumer-relative resolution must retain the same canonical forwarding module and classes. */
 const consumers = ${JSON.stringify(packedConsumers)};
 for (const [owner, directory] of Object.entries(consumers)) {
+  /** Resolve from the consumer archive's actual installation, not the harness root. */
   const require = createRequire(directory + '/package.json');
+  /** ESM evaluates the physical forwarding module selected by that consumer. */
   const consumerForwarding = await import(pathToFileURL(require.resolve('@migaia/rpc-host/contract')).href);
   for (const [name, identity] of Object.entries(expected))
     assert.equal(consumerForwarding[name], identity, 'A46 consumer identity: ' + owner + '/' + name);
