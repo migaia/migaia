@@ -1116,6 +1116,7 @@
         "createBackendJournalNamespace",
         "createBackendLifecycleController",
         "createMigrationPlan",
+        "createOrderedRecordIndex",
         "createRdfQuery",
         "createRecordQuery",
         "createRecordQueryWithoutKeyset",

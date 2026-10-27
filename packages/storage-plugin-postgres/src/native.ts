@@ -477,6 +477,10 @@ export async function commitPgRevisions(
   }
   for (const identity of increments) identities.add(identity)
   if (identities.size === 0) return
+  /**
+   * Kept sort: revision rows are locked in one fixed order so concurrent transactions cannot
+   * deadlock. The input is this one transaction's touched keys, not a store-wide collection.
+   */
   const ordered = [...identities].sort()
   await preparePgRevisionRows(state, tables, ordered)
   const rows = await readPgRevisionRows(state, tables, ordered, true)

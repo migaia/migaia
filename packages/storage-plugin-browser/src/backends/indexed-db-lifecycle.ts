@@ -216,7 +216,8 @@ export function classifyLegacyMutationBatch(keys: readonly IStorageKey[]): IRawM
     else unscopedPresent = true
   }
   return {
-    canonicalScopes: [...scopes].sort(),
+    /** Each scope is handled independently, so insertion order is enough; no sort. */
+    canonicalScopes: [...scopes],
     unscopedPresent
   }
 }

@@ -62,20 +62,11 @@ export async function redisPage(
     throw redisError(RedisErrorCode.decodeFailed, nativeMembers)
   // Hex preserves the original ordered writer's bytes and matches native ZSET member order.
   const candidates = draft
-    ? [
-        ...new Set([
-          ...(nativeMembers as string[]),
-          ...[...draft.entries.values()]
-            .filter((entry) => entry.channel === channel && entry.value !== undefined)
-            .map((entry) => entry.encoded)
-        ])
-      ]
-        .filter(
-          (encoded) =>
-            (lower[0] === '[' ? encoded >= lower.slice(1) : encoded > lower.slice(1)) &&
-            (upper[0] === '[' ? encoded <= upper.slice(1) : encoded < upper.slice(1))
-        )
-        .sort()
+    ? mergeRedisMembers(
+        nativeMembers as string[],
+        draft.rangeMembers(channel, lower, upper, size + 1),
+        size + 1
+      )
     : (nativeMembers as string[])
   const members = candidates.slice(0, size),
     done = nativeMembers.length < size && candidates.length <= size
@@ -401,4 +392,34 @@ export function redisMutate(
       return true
     }
   })
+}
+
+/**
+ * Merge two member lists that are each in native order into one ordered, duplicate-free list of at
+ * most `limit` members. Linear in the members read.
+ */
+function mergeRedisMembers(
+  native: readonly string[],
+  drafted: readonly string[],
+  limit: number
+): string[] {
+  const merged: string[] = []
+  let left = 0,
+    right = 0
+  while (merged.length < limit && (left < native.length || right < drafted.length)) {
+    const a = native[left],
+      b = drafted[right]
+    if (b === undefined || (a !== undefined && a < b)) {
+      merged.push(a!)
+      left++
+    } else if (a === undefined || b < a) {
+      merged.push(b)
+      right++
+    } else {
+      merged.push(a)
+      left++
+      right++
+    }
+  }
+  return merged
 }

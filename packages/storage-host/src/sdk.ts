@@ -21,3 +21,9 @@ export * from './authoring/transaction.js'
 export * from './authoring/ttl.js'
 export * from './authoring/vector.js'
 export * from './vector/mmr.js'
+export {
+  createOrderedRecordIndex,
+  type IOrderedRecordIndex,
+  type IOrderedRecordLeaf,
+  type IOrderedRecordRange
+} from './core/ordered-record-index.js'

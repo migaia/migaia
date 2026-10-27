@@ -395,11 +395,28 @@ async function redisSearchVector<TPayload>(
       }
     ])
   }
-  return hits.sort(
-    (left, right) =>
-      right[1].score - left[1].score ||
-      (left[1].id < right[1].id ? -1 : left[1].id > right[1].id ? 1 : 0)
-  )
+  return orderVectorHits(hits)
+}
+/**
+ * FT.SEARCH already returns hits by distance (SORTBY score), which is score order for both metrics.
+ * Only runs of equal score still need the id tie-break, so only those runs are sorted; distinct
+ * scores cost one linear pass.
+ */
+function orderVectorHits<
+  T extends readonly [unknown, { readonly score: number; readonly id: string }]
+>(hits: T[]): T[] {
+  let start = 0
+  for (let index = 1; index <= hits.length; index++) {
+    if (index < hits.length && hits[index]![1].score === hits[start]![1].score) continue
+    if (index - start > 1) {
+      const run = hits
+        .slice(start, index)
+        .sort((left, right) => (left[1].id < right[1].id ? -1 : left[1].id > right[1].id ? 1 : 0))
+      for (let offset = 0; offset < run.length; offset++) hits[start + offset] = run[offset]!
+    }
+    start = index
+  }
+  return hits
 }
 /** Bind the canonical vector query owner to this explicit native source and cursor. */
 function redisVectorQuery<TPayload>(

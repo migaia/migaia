@@ -614,8 +614,10 @@ function validateIndexedDbIndexSchema(database: IDBDatabase): void {
       const name = sidecar.indexNames.item(index)
       if (name !== null) actualNames.push(name)
     }
-    actualNames.sort()
-    if (actualNames.join('\u0000') !== ['lookup', 'record'].join('\u0000'))
+    /** Exactly the two owned indexes, in any order; checked without sorting. */
+    const exact =
+      actualNames.length === 2 && actualNames.includes('lookup') && actualNames.includes('record')
+    if (!exact)
       throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
         backend: StorageBackend.indexedDb,
         operation: StorageOperation.indexedDbSchema,
