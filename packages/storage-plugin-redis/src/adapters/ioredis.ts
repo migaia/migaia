@@ -10,10 +10,7 @@ import {
   subscriptionResource,
   requireExecArray
 } from '../native.js'
-import {
-  createStorageOperationReporter,
-  reportCleanupError
-} from '@migaia/storage-host/authoring/backend'
+import { createStorageOperationReporter, reportCleanupError } from '@migaia/storage-host/sdk'
 
 /** Owned duplicates never replay an unacknowledged command or mutate the injected root options. */
 function duplicate<M extends 'legacy' | 'resp3'>(client: Redis<M>) {

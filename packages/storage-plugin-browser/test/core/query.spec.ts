@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isStorageKeyInRange } from '@migaia/storage-host/authoring/backend'
+import { isStorageKeyInRange } from '@migaia/storage-host/sdk'
 
 describe('shared query range owner', () => {
   it('uses shared comparator for inclusive and exclusive bounds', () => {

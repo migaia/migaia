@@ -1,4 +1,4 @@
-import { term, snapshotStorageRdfTerm } from '@migaia/storage-host/authoring/rdf'
+import { term, snapshotStorageRdfTerm } from '@migaia/storage-host/sdk'
 import { RdfTermType, type IRdfBindingTerm, type ISparqlRow } from '@migaia/storage-contract'
 import { sparqlError } from './errors.js'
 import { SparqlErrorCode } from './error-code.js'

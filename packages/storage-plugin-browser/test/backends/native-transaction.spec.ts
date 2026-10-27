@@ -12,9 +12,10 @@ import { asyncDisposeKey } from '@migaia/plugin-host'
 import { createStorageHost, definePlugin } from '@migaia/storage-host'
 import {
   assertTransactionOwner,
-  registerTransactionFinalizer
-} from '@migaia/storage-host/authoring/transaction'
-import { ConcurrencyPolicy, lockKey } from '@migaia/storage-host/authoring/concurrency'
+  registerTransactionFinalizer,
+  ConcurrencyPolicy,
+  lockKey
+} from '@migaia/storage-host/sdk'
 import {
   defineConcurrencyPolicy,
   kv,

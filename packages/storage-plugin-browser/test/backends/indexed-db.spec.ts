@@ -27,7 +27,7 @@ import { STORAGE_BROWSER_SOURCE } from '../../src/index.js'
 import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
 import { UTILS_SOURCE, UtilsTimeoutError, walkErrorCauses } from '@migaia/utils/error'
 import { normalizeIndexedDbOperationError } from '../../src/backends/indexed-db.js'
-import { encodeFlatStorageKey } from '@migaia/storage-host/authoring/backend'
+import { encodeFlatStorageKey } from '@migaia/storage-host/sdk'
 import { captureOperationCleanup } from '../helpers/operation-reporter.js'
 import {
   createIndexedDbTestStore,

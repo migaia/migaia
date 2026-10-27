@@ -93,15 +93,7 @@ function main() {
     writeFileSync(
       join(consumerDirectory, 'identity.mjs'),
       `import { defineStorageCapability, implement, sql, blob, durableChangeFeed, sparql, rdf, vector, DeleteCountMode } from '@migaia/storage-contract'
-import { provideCapabilities, hasStorageCapability, useStorageCapability } from '@migaia/storage-host/authoring/capability'
-import { createSqlTag, deriveStorageSqlQuery } from '@migaia/storage-host/authoring/sql'
-import { snapshotStorageBlobPut, snapshotStorageBlobGet, snapshotStorageBlobList, createStorageBlobObject } from '@migaia/storage-host/authoring/blob'
-import { orderStorageKeysByBytes, encodeStorageOrgStringPrefix, encodeOrderedStorageKey, decodeOrderedStorageKey, prefixStorageOrgKey } from '@migaia/storage-host/authoring/key'
-import { sparqlFragment, createSparqlTag } from '@migaia/storage-host/authoring/sparql'
-import { term } from '@migaia/storage-host/authoring/rdf'
-import { snapshotStorageVectorIds, snapshotStorageDeleteCountMode } from '@migaia/storage-host/authoring/vector'
-import { createStorageIteratorLifetime } from '@migaia/storage-host/authoring/resource'
-import { createRecordQuery, snapshotStorageWhere, compileStorageQueryCondition } from '@migaia/storage-host/authoring/query'
+import { provideCapabilities, hasStorageCapability, useStorageCapability, createSqlTag, deriveStorageSqlQuery, snapshotStorageBlobPut, snapshotStorageBlobGet, snapshotStorageBlobList, createStorageBlobObject, orderStorageKeysByBytes, encodeStorageOrgStringPrefix, encodeOrderedStorageKey, decodeOrderedStorageKey, prefixStorageOrgKey, sparqlFragment, createSparqlTag, term, snapshotStorageVectorIds, snapshotStorageDeleteCountMode, createStorageIteratorLifetime, createRecordQuery, snapshotStorageWhere, compileStorageQueryCondition } from '@migaia/storage-host/sdk'
 import * as conformance from '@migaia/storage-contract/conformance'
 import { isArrayBuffer as utilsBuffer, isUint8Array as utilsBytes } from '@migaia/utils/bytes'
 /** Independent resource bases exercise package-root capability reads without acquiring external clients. */

@@ -16,20 +16,22 @@ import '../test/helpers/browser-text-redo.js'
 import { cookieBackendPlugin } from '../src/cookies.js'
 import { indexedDbBackendPlugin, type IIndexedDbBackendStore } from '../src/indexed-db.js'
 import { localStorageBackendPlugin } from '../src/local-storage.js'
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { defineEntity } from '@migaia/storage-host/entity'
 import { fromStandardSchema } from '@migaia/storage-host/entity'
 import { assertVersionedEnvelope } from '@migaia/storage-contract'
-import { createMigrationPlan, migrateEnvelope } from '@migaia/storage-host/authoring/migration'
+import {
+  createMigrationPlan,
+  migrateEnvelope,
+  mergeSignals,
+  withAbort,
+  createStorageOperationRuntime,
+  snapshotOperationContext
+} from '@migaia/storage-host/sdk'
 import { jsonCodec, selectCodec } from '@migaia/storage-host/entity'
 import type { IRecordIndexHandle, IStorageChange } from '@migaia/storage-contract'
 import { fromIdbRequest, idbTransactionCommit } from '../src/utils/idb-request'
-import {
-  mergeSignals,
-  withAbort,
-  createStorageOperationRuntime
-} from '@migaia/storage-host/authoring/backend'
-import { snapshotOperationContext } from '@migaia/storage-host/authoring/context'
 import { deferred } from '@migaia/utils/promise'
 import { isKeyValueStore, isRecordStore } from '../src/types/storage'
 import type { IStorageKey } from '../src/types/context'

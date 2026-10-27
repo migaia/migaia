@@ -1,7 +1,7 @@
 import { IDBFactory } from 'fake-indexeddb'
 import { describe, expect, it } from 'vitest'
 import { fromIdbRequest, idbTransactionCommit } from '../../src/utils/idb-request.js'
-import { createStorageOperationRuntime } from '@migaia/storage-host/authoring/backend'
+import { createStorageOperationRuntime } from '@migaia/storage-host/sdk'
 import { captureOperationCleanup } from '../helpers/operation-reporter.js'
 
 const openDb = (): Promise<IDBDatabase> => {

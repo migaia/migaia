@@ -1,10 +1,10 @@
 import { type IStorageResource } from '@migaia/storage-contract'
-import { createStorageIteratorLifetime } from '@migaia/storage-host/authoring/resource'
 import {
+  createStorageIteratorLifetime,
   asyncDisposeKey,
   createStorageOperationReporter,
   reportCleanupError
-} from '@migaia/storage-host/authoring/backend'
+} from '@migaia/storage-host/sdk'
 import { isUint8Array } from '@migaia/utils/bytes'
 import { RedisErrorCode } from './error-code.js'
 import { redisExecCause } from './constants.js'

@@ -1,5 +1,9 @@
-import { snapshotStorageKey, snapshotStorageKeyPrefix } from '@migaia/storage-host/authoring/key'
-import { snapshotConcurrencyLockKeys, lockKey } from '@migaia/storage-host/authoring/concurrency'
+import {
+  snapshotStorageKey,
+  snapshotStorageKeyPrefix,
+  snapshotConcurrencyLockKeys,
+  lockKey
+} from '@migaia/storage-host/sdk'
 import {
   type IStorageKey,
   type IStorageBatchKey,

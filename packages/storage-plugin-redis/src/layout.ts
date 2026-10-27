@@ -3,7 +3,7 @@ import {
   encodeStorageOrgKey,
   decodeStorageOrgKey,
   snapshotStorageOrgKeyPrefix
-} from '@migaia/storage-host/authoring/key'
+} from '@migaia/storage-host/sdk'
 import { type IStorageKey } from '@migaia/storage-contract'
 import { asCodecValue, type ICodecValue } from '@migaia/serialize/codec'
 import { bytesToBase64, base64ToBytes } from '@migaia/serialize/core'

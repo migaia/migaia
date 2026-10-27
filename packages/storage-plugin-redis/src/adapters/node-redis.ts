@@ -8,10 +8,7 @@ import {
   type RespVersions,
   type TypeMapping
 } from 'redis'
-import {
-  createStorageOperationReporter,
-  reportCleanupError
-} from '@migaia/storage-host/authoring/backend'
+import { createStorageOperationReporter, reportCleanupError } from '@migaia/storage-host/sdk'
 import { RedisCommand, RedisReply, RedisText } from '../constants.js'
 import { RedisErrorCode } from '../error-code.js'
 import type { IRedisConnection, IRedisDriver } from '../driver.js'

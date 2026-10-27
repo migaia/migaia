@@ -1,4 +1,4 @@
-import { createRecordQuery } from '@migaia/storage-host/authoring/query'
+import { createRecordQuery } from '@migaia/storage-host/sdk'
 
 /** Raw IDB keyset queries borrow the canonical planner, cursor and resource owner unchanged. */
 export class IndexedDbKeysetAssembly {

@@ -3,7 +3,7 @@ import type { ICookiesOptions } from '../../src/backends/cookie.js'
 import type { ICookieScope } from '../../src/types/cookie.js'
 import type { IExtensionStage } from '../../src/types/errors.js'
 import type { ISyncCapableStore } from '../../src/types/storage.js'
-import type { IMemoryBackendStore } from '@migaia/storage-host'
+import type { IMemoryBackendStore } from '@migaia/storage-host/plugins/memory'
 
 expectTypeOf<ICookiesOptions>().toMatchTypeOf<{ scope?: ICookieScope }>()
 expectTypeOf<IExtensionStage>().toEqualTypeOf<

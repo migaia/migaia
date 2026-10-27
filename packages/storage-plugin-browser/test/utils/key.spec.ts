@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { decodeFlatStorageKey, encodeFlatStorageKey } from '@migaia/storage-host/authoring/backend'
+import { decodeFlatStorageKey, encodeFlatStorageKey } from '@migaia/storage-host/sdk'
 import {
   lengthPrefixedNamespaceCodec,
   namespacedKey,

@@ -3,12 +3,8 @@ import { describe, expect, it } from 'vitest'
 import { counter, ttl, rdf, records } from '@migaia/storage-contract'
 import { lockKey } from '../src/authoring/concurrency.js'
 import { term } from '../src/authoring/rdf.js'
-import {
-  createStorageHost,
-  createOrgId,
-  memoryBackendPlugin,
-  type IStorageJournalChange
-} from '../src/index.js'
+import { createStorageHost, createOrgId, type IStorageJournalChange } from '../src/index.js'
+import { memoryBackendPlugin } from '../src/plugins/memory.js'
 import { resolveStorageJournalBinding } from '../src/journal/binding.js'
 
 describe('original memory ordered journal capture', () => {

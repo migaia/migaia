@@ -3,7 +3,7 @@ import { Pool } from 'pg'
 import postgres from 'postgres'
 import { it, expect, onTestFinished, describe } from 'vitest'
 import { createStorageHost } from '@migaia/storage-host'
-import { storageJournalPlugin, storageLogStore } from '@migaia/storage-host/journal'
+import { storageJournalPlugin, storageLogStore } from '@migaia/storage-host/plugins/journal'
 import { Logger } from '@migaia/logger'
 import {
   binlog,
@@ -14,7 +14,7 @@ import {
   type ILogStore
 } from '@migaia/logger/plugins/durable'
 import { kv, vector, ttl } from '@migaia/storage-contract'
-import { lockKey } from '@migaia/storage-host/authoring/concurrency'
+import { lockKey } from '@migaia/storage-host/sdk'
 import { deferred } from '@migaia/utils/promise'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { postgresBackendPlugin } from '../src/index.js'

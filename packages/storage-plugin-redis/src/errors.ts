@@ -1,5 +1,5 @@
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
-import { normalizeError } from '@migaia/storage-host/authoring/backend'
+import { normalizeError } from '@migaia/storage-host/sdk'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { ERROR_SOURCE, RedisErrorCode, type IRedisErrorCode } from './error-code.js'
 import { RedisText } from './constants.js'

@@ -4,13 +4,13 @@ import { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-ch
 import { describe, it, expect } from 'vitest'
 import {
   createStorageHost,
-  memoryBackendPlugin,
   definePlugin,
   defineStorageBackendKind,
   type IStoragePluginCore
 } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { kv, ttl, type IStorageBase } from '@migaia/storage-contract'
-import { lockKey } from '@migaia/storage-host/authoring/concurrency'
+import { lockKey } from '@migaia/storage-host/sdk'
 import { deferred } from '@migaia/utils/promise'
 import { IdentifyError, walkErrorCauses } from '@migaia/utils/error'
 import { cachePlugin, CacheErrorCode, type ICacheOptions } from '../src/index.js'

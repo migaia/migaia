@@ -10,7 +10,12 @@ import {
   type ILockKey,
   type IStorageKey
 } from '@migaia/storage-contract'
-import { snapshotConcurrencyLockKeys } from '@migaia/storage-host/authoring/concurrency'
+import {
+  snapshotConcurrencyLockKeys,
+  decodeFlatStorageKey,
+  encodeFlatStorageKey,
+  encodeStorageJournalImage
+} from '@migaia/storage-host/sdk'
 import {
   StorageError as JournalError,
   StorageErrorCode as JournalErrorCode,
@@ -19,11 +24,6 @@ import {
   type IStorageJournalImage,
   type IStorageJournalTarget
 } from '@migaia/storage-host'
-import {
-  decodeFlatStorageKey,
-  encodeFlatStorageKey,
-  encodeStorageJournalImage
-} from '@migaia/storage-host/authoring/backend'
 import { StorageBackend } from '../constants.js'
 /** Original physical channels retain their native store names and public lock identities. */
 export type IIndexedDbImageChannel = 'value' | 'bytes' | 'record'

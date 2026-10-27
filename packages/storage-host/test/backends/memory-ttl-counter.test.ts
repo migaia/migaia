@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { ttl, counter, kv, type ITransactionTtlApi } from '@migaia/storage-contract'
 import { lockKey, ConcurrencyPolicy } from '../../src/authoring/concurrency.js'
-import { createStorageHost, memoryBackendPlugin, definePlugin } from '../../src/index.js'
+import { createStorageHost, definePlugin } from '../../src/index.js'
+import { memoryBackendPlugin } from '../../src/plugins/memory.js'
 
 /** Real native memory capabilities share their original host, clock and transaction owner. */
 describe('memory TTL and counter capabilities', () => {

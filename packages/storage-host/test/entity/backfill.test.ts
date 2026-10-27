@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
-import { createStorageHost, memoryBackendPlugin } from '../../src/index.js'
+import { createStorageHost } from '../../src/index.js'
+import { memoryBackendPlugin } from '../../src/plugins/memory.js'
 import {
   registerRecordIndexBackfillStore,
   markRecordIndexBackfillContentionFailure,

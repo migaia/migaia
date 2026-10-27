@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { defineEntity } from '@migaia/storage-host/entity'
 import { createMemoryTestStore } from './helpers/installed-backends.js'
 import { createReactiveServiceFixture } from './helpers/reactive-service.js'
-import { safeJsonPayloadByteLength } from '@migaia/storage-host/authoring/backend'
+import { safeJsonPayloadByteLength } from '@migaia/storage-host/sdk'
 import { utf8ByteLength } from '@migaia/utils/bytes'
 
 type IIndexedUser = {

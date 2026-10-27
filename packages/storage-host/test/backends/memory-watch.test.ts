@@ -10,7 +10,8 @@ import {
   type IStorageChange
 } from '@migaia/storage-contract'
 import { term } from '../../src/authoring/rdf.js'
-import { createOrgId, createStorageHost, memoryBackendPlugin } from '../../src/index.js'
+import { createOrgId, createStorageHost } from '../../src/index.js'
+import { memoryBackendPlugin } from '../../src/plugins/memory.js'
 import { createBackendChangeController } from '../../src/core/change-controller.js'
 import { createBackendChangeIterator } from '../../src/authoring/change-iterator.js'
 

@@ -3,7 +3,7 @@ import {
   StorageContractErrorCode,
   type ITransactionScope
 } from '@migaia/storage-contract'
-import { runTransactionOperation } from '@migaia/storage-host/authoring/transaction'
+import { runTransactionOperation } from '@migaia/storage-host/sdk'
 import type { IStorageJournalNamespaceView } from '@migaia/storage-host'
 import { createEventChannel } from '@migaia/event-subscriber'
 

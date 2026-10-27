@@ -10,7 +10,7 @@ import {
   subscribeToAbort,
   readAbortReason,
   throwIfAborted
-} from '@migaia/storage-host/authoring/backend'
+} from '@migaia/storage-host/sdk'
 import { attachSecondaryErrors } from '@migaia/utils/error'
 import type { IPgDriver, IPgConnection, IPgResult, IPgNativeParameter } from './types.js'
 import { encodePgParameters } from './parameters.js'

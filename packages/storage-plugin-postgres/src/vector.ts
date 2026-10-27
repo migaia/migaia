@@ -19,22 +19,21 @@ import {
   type ITtlTarget,
   type IStorageChange
 } from '@migaia/storage-contract'
-import { snapshotStorageWhere, createVectorQuery } from '@migaia/storage-host/authoring/query'
-import { createStorageIteratorLifetime } from '@migaia/storage-host/authoring/resource'
-import { lockKey } from '@migaia/storage-host/authoring/concurrency'
 import {
+  snapshotStorageWhere,
+  createVectorQuery,
+  createStorageIteratorLifetime,
+  lockKey,
   recommendStorageVector,
   snapshotStorageVectorCollection,
   snapshotStorageVector,
   snapshotStorageVectorUpsert,
   snapshotStorageVectorSearch,
   snapshotStorageVectorIds,
-  snapshotStorageDeleteCountMode
-} from '@migaia/storage-host/authoring/vector'
-import {
+  snapshotStorageDeleteCountMode,
   asyncDisposeKey,
   createStorageOperationReporter
-} from '@migaia/storage-host/authoring/backend'
+} from '@migaia/storage-host/sdk'
 import type { IPgConfiguration, IPgTables } from './schema.js'
 import { ensurePgQuantizedIndex, pgQuantizedExpression } from './schema.js'
 import type { IPgQuantizedOptions } from './features/quantized.js'

@@ -3,7 +3,7 @@ import {
   StorageErrorCode as JournalErrorCode,
   StorageErrorText as JournalErrorText
 } from '@migaia/storage-host'
-import { encodeFlatStorageKey, createStorageToken } from '@migaia/storage-host/authoring/backend'
+import { encodeFlatStorageKey, createStorageToken } from '@migaia/storage-host/sdk'
 import { type IStorageKey } from '@migaia/storage-contract'
 /** One physical point retains its birth across deletion and a version for each native attempt. */
 export type IIndexedDbPointRevision = { readonly birth: string | null; readonly version: number }

@@ -14,7 +14,8 @@
 下面把一天前的 event 归档，新记录仍留在热层。
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { archivePlugin } from '@migaia/storage-plugin-archive'
 
 await using base = await createStorageHost({
@@ -66,7 +67,8 @@ segmentBytes 默认 1,048,576，按未压缩 UTF-8 行字节计算，必须为�
 有引用的冷段不能清理。恢复最后一条记录后，段才可被 Sweep 回收。
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { archivePlugin } from '@migaia/storage-plugin-archive'
 
 await using base = await createStorageHost({
@@ -118,7 +120,8 @@ Sweep 通过 blob 原生 opaque 分页扫描本插件前缀，只有 format/vers
 id 为 history 时公开 historyRun、historyGet、historySweep；组织视图正常调用同样的平铺函数。
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { archivePlugin } from '@migaia/storage-plugin-archive'
 
 await using base = await createStorageHost({
@@ -166,7 +169,8 @@ true
 afterArchiveRun 观察成功结果；业务仍应读取方法返回的进度。
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { archivePlugin } from '@migaia/storage-plugin-archive'
 

@@ -1,12 +1,8 @@
 import { expect, it } from 'vitest'
 import { Logger } from '@migaia/logger'
 import { level } from '@migaia/logger/plugins'
-import {
-  createStorageHost,
-  definePlugin,
-  memoryBackendPlugin,
-  StorageErrorCode
-} from '../../src/index.js'
+import { createStorageHost, definePlugin, StorageErrorCode } from '../../src/index.js'
+import { memoryBackendPlugin } from '../../src/plugins/memory.js'
 import { storageJournalPlugin } from '../../src/journal.js'
 import { storageProbe } from '../../src/plugins/probe/index.js'
 

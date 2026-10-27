@@ -12,12 +12,11 @@ import { composeRepositoryKey } from '../../src/entity/key.js'
 import { defineEntity } from '../../src/entity.js'
 import {
   createStorageHost,
-  memoryBackendPlugin,
   defineFeature,
-  memoryBackendKind,
   StorageError,
   StorageErrorCode
 } from '../../src/index.js'
+import { memoryBackendPlugin, memoryBackendKind } from '../../src/plugins/memory.js'
 import { memoryBackend } from '../helpers/memory.js'
 
 /** One domain definition drives root and authentic transaction queries. */

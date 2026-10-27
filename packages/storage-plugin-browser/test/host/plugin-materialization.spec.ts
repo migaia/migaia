@@ -1,11 +1,7 @@
 import { memoryTestFeatures } from '../helpers/memory-features.js'
 import { records } from '@migaia/storage-contract'
-import {
-  createStorageHost,
-  defineFeature,
-  memoryBackendKind,
-  memoryBackendPlugin
-} from '@migaia/storage-host'
+import { createStorageHost, defineFeature } from '@migaia/storage-host'
+import { memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { describe, expect, it } from 'vitest'
 import { cookieBackendPlugin } from '../../src/cookies.js'
 import { localStorageBackendPlugin } from '../../src/local-storage.js'

@@ -8,7 +8,7 @@ import {
   type IMigrationStep,
   type IMigrationReset
 } from '@migaia/storage-contract'
-import { createMigrationPlan } from '@migaia/storage-host/authoring/migration'
+import { createMigrationPlan } from '@migaia/storage-host/sdk'
 
 /** Binds observations without allowing a public observer's accessor or callback to veto work. */
 export function bindPersistStages<

@@ -2,7 +2,11 @@ import { RedisOperation } from '../constants.js'
 import { RedisCommand, RedisText } from '../constants.js'
 import type { IRedisConnection } from '../driver.js'
 import { defineFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
-import { asyncDisposeKey, throwIfAborted } from '@migaia/storage-host/authoring/backend'
+import {
+  asyncDisposeKey,
+  throwIfAborted,
+  createStorageIteratorLifetime
+} from '@migaia/storage-host/sdk'
 import {
   durableChangeFeed,
   implement,
@@ -13,7 +17,6 @@ import {
   type ICapabilityImpl,
   type IStorageResource
 } from '@migaia/storage-contract'
-import { createStorageIteratorLifetime } from '@migaia/storage-host/authoring/resource'
 import { redisBackendKind } from '../plugin.js'
 import { readNativeFeaturePort, type IRedisNativeFeaturePort } from '../native-feature.js'
 import { featureInteger, readStreamRows } from '../feature-input.js'

@@ -1,8 +1,5 @@
 import { asyncDisposeKey } from '@migaia/plugin-host'
-import {
-  createStorageOperationReporter,
-  reportCleanupError
-} from '@migaia/storage-host/authoring/backend'
+import { createStorageOperationReporter, reportCleanupError } from '@migaia/storage-host/sdk'
 import type {
   ISqliteConnection,
   ISqliteStatement,

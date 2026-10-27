@@ -15,7 +15,8 @@
 Install base tiers first, then add the cache through `host.use(cachePlugin(...))`. A loader's `undefined` result is cached only when `negativeTtlMs` is configured.
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { cachePlugin } from '@migaia/storage-plugin-cache'
 
 const base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'data' })] })
@@ -50,7 +51,8 @@ Ordinary `get/set` read and write plain string entries, not the encoded objects 
 Order `tiers` from fastest to slowest. Each tier defaults to `write: 'through'`. This complete example uses two independent memory instances; install SQLite, Redis or PostgreSQL under the same IDs when replacing them in an application.
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { cachePlugin, CacheWriteMode } from '@migaia/storage-plugin-cache'
 
 const base = await createStorageHost({
@@ -90,7 +92,8 @@ Cache has no cross-tier transactions. Tier failures are reported and degrade to 
 This example demonstrates refresh and bypass without waiting for expiry. Refresh stores the new value; bypass returns its value only to that call.
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { cachePlugin } from '@migaia/storage-plugin-cache'
 
 const base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'data' })] })
@@ -133,7 +136,8 @@ A loader receives the cache-closing signal. `options.ctx.signal` cancels only th
 Tag indexes need records and TTL; offload storage needs blob, and its reference tier must have TTL. This complete example uses built-in memory capabilities. An application can replace the object tier with the object-storage plugin.
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { cachePlugin } from '@migaia/storage-plugin-cache'
 
 const base = await createStorageHost({
@@ -174,7 +178,8 @@ Invalidation removes references rather than immediately deleting objects that an
 Import `semanticCacheFeature` from its separate entry and select it in the cache plugin's second argument. The two-dimensional embedding below demonstrates an exact repeated prompt. Use a real model in an application, with dimensions, metric and model version matching the collection.
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { cachePlugin } from '@migaia/storage-plugin-cache'
 import { semanticCacheFeature } from '@migaia/storage-plugin-cache/features/semantic'
 

@@ -1,7 +1,7 @@
 import { indexedDbKeysetFeature } from '../../src/features/indexed-db-keyset.js'
 import { indexedDbIndexesFeature } from '../../src/features/indexed-db-indexes.js'
 import { indexedDbJournalFeature } from '../../src/features/indexed-db-journal.js'
-import { storageJournalPlugin, storageLogStore } from '@migaia/storage-host/journal'
+import { storageJournalPlugin, storageLogStore } from '@migaia/storage-host/plugins/journal'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { IDBFactory, IDBIndex, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
 import { afterEach, describe, expect, it, vi } from 'vitest'

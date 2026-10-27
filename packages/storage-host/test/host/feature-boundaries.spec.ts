@@ -7,10 +7,9 @@ import {
   defineFeature,
   definePlugin,
   defineStorageBackendKind,
-  memoryBackendKind,
-  memoryBackendPlugin,
   type IStoragePluginCore
 } from '../../src/index.js'
+import { memoryBackendKind, memoryBackendPlugin } from '../../src/plugins/memory.js'
 import { catalog } from '../helpers/catalog.js'
 
 /** The shared definition retains one kind while every installed native resource stays distinct. */

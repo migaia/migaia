@@ -10,9 +10,9 @@ import {
 } from '@migaia/storage-contract'
 import {
   assertTransactionOwner,
-  runTransactionOperation
-} from '@migaia/storage-host/authoring/transaction'
-import { snapshotStorageTtlTarget } from '@migaia/storage-host/authoring/ttl'
+  runTransactionOperation,
+  snapshotStorageTtlTarget
+} from '@migaia/storage-host/sdk'
 import { StorageBackend, BrowserTtlMethod, StorageTransactionOperation } from '../constants.js'
 import { type ITransactionScope } from '@migaia/storage-contract'
 import {

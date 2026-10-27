@@ -3,7 +3,7 @@ import type { IKeyValueStore } from '@migaia/storage-contract'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { describe, expect, it, onTestFinished } from 'vitest'
 import { createStorageHost, defineFeature } from '@migaia/storage-host'
-import type { IBackendChangeController } from '@migaia/storage-host/authoring/backend'
+import type { IBackendChangeController } from '@migaia/storage-host/sdk'
 import { cookieBackendPlugin, cookieBackendKind } from '../../src/cookies.js'
 import { localStorageBackendPlugin, localStorageBackendKind } from '../../src/local-storage.js'
 import {

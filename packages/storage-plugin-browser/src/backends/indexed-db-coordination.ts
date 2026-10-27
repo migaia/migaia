@@ -6,12 +6,13 @@ import {
   type IEventChannel
 } from '@migaia/event-subscriber'
 import { isPlainObject } from '@migaia/utils/object'
-import { decodeFlatStorageKey, encodeFlatStorageKey } from '@migaia/storage-host/authoring/backend'
 import {
+  decodeFlatStorageKey,
+  encodeFlatStorageKey,
   safeJsonPayloadByteLength,
   reportCleanupError
-} from '@migaia/storage-host/authoring/backend'
-import type { IBackendKeyLockPort } from '@migaia/storage-host/authoring/backend'
+} from '@migaia/storage-host/sdk'
+import type { IBackendKeyLockPort } from '@migaia/storage-host/sdk'
 import { StorageErrorText } from '../error-text.js'
 import { StorageErrorCode, createStorageTypeError } from '../types/errors.js'
 /** Versioned metadata-only message shape used by admitted IndexedDB transports. */

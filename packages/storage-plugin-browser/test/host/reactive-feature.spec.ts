@@ -2,13 +2,8 @@ import { memoryTestFeatures } from '../helpers/memory-features.js'
 import { createRuntime } from '@migaia/reactive'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import { records } from '@migaia/storage-contract'
-import {
-  createStorageHost,
-  memoryBackendKind,
-  memoryBackendPlugin,
-  STORAGE_HOST_SOURCE,
-  StorageErrorCode
-} from '@migaia/storage-host'
+import { createStorageHost, STORAGE_HOST_SOURCE, StorageErrorCode } from '@migaia/storage-host'
+import { memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
 import { reactiveFeature } from '../../src/features/reactive.js'

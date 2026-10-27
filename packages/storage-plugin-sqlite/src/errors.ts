@@ -1,4 +1,4 @@
-import { isStorageErrorFamily } from '@migaia/storage-host/authoring/backend'
+import { isStorageErrorFamily } from '@migaia/storage-host/sdk'
 import {
   isStorageContractError,
   StorageContractError,

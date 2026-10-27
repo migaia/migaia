@@ -1,4 +1,4 @@
-import { storageJournalPlugin } from '@migaia/storage-host/journal'
+import { storageJournalPlugin } from '@migaia/storage-host/plugins/journal'
 // @vitest-environment node
 import { locks } from 'node:worker_threads'
 import { deferred } from '@migaia/utils/promise'
@@ -7,13 +7,14 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Logger, type ILogEntry } from '@migaia/logger'
 import { level } from '@migaia/logger/plugins'
 import { binlog, memoryLogStore, wal } from '@migaia/logger/plugins/durable'
-import { ConcurrencyPolicy, lockKey } from '@migaia/storage-host/authoring/concurrency'
-import { kv } from '@migaia/storage-contract'
-import { createStorageHost, createOrgId, definePlugin } from '@migaia/storage-host'
 import {
+  ConcurrencyPolicy,
+  lockKey,
   decodeStorageJournalImage,
   encodeStorageJournalImage
-} from '@migaia/storage-host/authoring/backend'
+} from '@migaia/storage-host/sdk'
+import { kv } from '@migaia/storage-contract'
+import { createStorageHost, createOrgId, definePlugin } from '@migaia/storage-host'
 import { localStorageBackendPlugin } from '../../src/local-storage.js'
 import { sessionStorageBackendPlugin } from '../../src/session-storage.js'
 import { fakeWebStorage } from '../../src/testing/fake-web-storage.js'

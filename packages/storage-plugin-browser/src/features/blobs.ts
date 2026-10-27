@@ -4,13 +4,12 @@ import {
   StorageContractErrorCode,
   type IOperationContext
 } from '@migaia/storage-contract'
-import { runTransactionOperation } from '@migaia/storage-host/authoring/transaction'
+import { runTransactionOperation, createStorageOperationRuntime } from '@migaia/storage-host/sdk'
 import {
   defineFeature,
   type IStorageFeature,
   type IStorageFeatureOutput
 } from '@migaia/storage-host'
-import { createStorageOperationRuntime } from '@migaia/storage-host/authoring/backend'
 import { indexedDbBackendKind } from '../host/builtin-kinds.js'
 import { INDEXED_DB_BLOB_STORE, StorageBackend } from '../constants.js'
 import { StorageError, StorageErrorCode } from '../types/errors.js'

@@ -5,14 +5,14 @@ import { describe, it, expect, vi, onTestFinished } from 'vitest'
 import { runConformance } from '@migaia/storage-contract/conformance'
 import {
   createStorageHost,
-  memoryBackendPlugin,
   createOrgId,
   definePlugin,
   STORAGE_HOST_SOURCE,
   StorageError
 } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { vector, ttl, DeleteCountMode } from '@migaia/storage-contract'
-import { lockKey, ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'
+import { lockKey, ConcurrencyPolicy } from '@migaia/storage-host/sdk'
 import { qdrantBackendPlugin } from '../src/index.js'
 import { fetchHttp } from '../src/http.js'
 import { qdrantManagementFeature } from '../src/features/management.js'

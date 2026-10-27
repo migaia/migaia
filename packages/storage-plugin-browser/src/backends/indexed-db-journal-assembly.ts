@@ -18,20 +18,19 @@ import {
 import {
   assertTransactionOwner,
   runTransactionOperation,
-  createTransactionBuilder
-} from '@migaia/storage-host/authoring/transaction'
-import { runWithConcurrency, ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'
-import {
+  createTransactionBuilder,
+  runWithConcurrency,
+  ConcurrencyPolicy,
   createBackendJournalNamespace,
   storageJournalLockKey,
   StorageJournalLock,
   encodeStorageJournalImage,
   decodeStorageJournalImage,
-  reportCleanupError
-} from '@migaia/storage-host/authoring/backend'
+  reportCleanupError,
+  encodeFlatStorageKey
+} from '@migaia/storage-host/sdk'
 import type { IStorageJournalBackendBinding } from '@migaia/storage-host'
 import { StorageBackend } from '../constants.js'
-import { encodeFlatStorageKey } from '@migaia/storage-host/authoring/backend'
 import type { IOperationContext } from '../types/context.js'
 import { type ITransactionScope } from '@migaia/storage-contract'
 import {

@@ -1,6 +1,8 @@
-import type { IBackendLifecycleController } from '@migaia/storage-host/authoring/change-controller'
-import { createBackendChangeController } from '@migaia/storage-host/authoring/change-controller'
-import type { IBackendChangeController } from '@migaia/storage-host/authoring/backend'
+import type {
+  IBackendLifecycleController,
+  IBackendChangeController
+} from '@migaia/storage-host/sdk'
+import { createBackendChangeController } from '@migaia/storage-host/sdk'
 import { type IStorageChange } from '@migaia/storage-contract'
 import { acquireIndexedDbCoordination } from './indexed-db-coordination.js'
 import {

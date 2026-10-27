@@ -5,8 +5,8 @@ import type { StorageStageKind } from './stage-kind.js'
 export type ICodecOutput = 'text' | 'binary' | 'structured'
 
 /**
- * Defines an open serialization contract without tying it to a library. `storage-plugin-browser` supplies
- * three common implementations in `jsonCodec`, `structured.ts`, and `binary.ts`. Custom
+ * Defines an open serialization contract without tying it to a library. `storage-plugin-browser`
+ * supplies three common implementations in `jsonCodec`, `structured.ts`, and `binary.ts`. Custom
  * compression, encryption, and Worker-based recoding implement the same contract. This package
  * neither supplies nor depends on those custom implementations.
  */

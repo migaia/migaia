@@ -1,7 +1,8 @@
 import { it, expect } from 'vitest'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { indexedDbBackendPlugin } from '@migaia/storage-plugin-browser/indexed-db'
-import { createStorageHost, memoryBackendPlugin, definePlugin } from '@migaia/storage-host'
+import { createStorageHost, definePlugin } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { archivePlugin } from '../src/index.js'
 
 /** Genuine IndexedDB installation must be rejected without attempting a cold object operation. */

@@ -11,7 +11,7 @@ import {
   type IStorageOperationReporter,
   type IStorageOperationRuntime,
   type IUniqueIndexOwner
-} from '@migaia/storage-host/authoring/backend'
+} from '@migaia/storage-host/sdk'
 import type {
   IBackendKind,
   IRecordIndexDefinition,

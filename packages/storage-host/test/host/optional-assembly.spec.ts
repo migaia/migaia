@@ -1,10 +1,6 @@
 import { expect, it } from 'vitest'
-import {
-  createStorageHost,
-  memoryBackendPlugin,
-  STORAGE_HOST_SOURCE,
-  StorageErrorCode
-} from '../../src/index.js'
+import { createStorageHost, STORAGE_HOST_SOURCE, StorageErrorCode } from '../../src/index.js'
+import { memoryBackendPlugin } from '../../src/plugins/memory.js'
 import { storageLogStore, storageJournalPlugin } from '../../src/journal.js'
 import { memoryNotificationsFeature } from '../../src/features/memory-notifications.js'
 import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.js'

@@ -4,12 +4,12 @@ import { indexedDbTestFeatures } from './indexed-db-features.js'
 import { onTestFinished, vi } from 'vitest'
 import * as entityOwner from '@migaia/storage-host/entity'
 import type { IRecordIndexBackfillStore } from '@migaia/storage-host/entity'
+import { createStorageHost } from '@migaia/storage-host'
 import {
-  createStorageHost,
   memoryBackendPlugin,
   type IMemoryBackendStore,
   type IMemoryOptions
-} from '@migaia/storage-host'
+} from '@migaia/storage-host/plugins/memory'
 import {
   localStorageBackendPlugin,
   type ILocalStorageOptions,

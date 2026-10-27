@@ -11,8 +11,8 @@ import {
   StorageErrorCode
 } from '../types/errors.js'
 import { StorageErrorText } from '../error-text.js'
-import type { IBackendChangeController } from '@migaia/storage-host/authoring/backend'
-import { reportCleanupError } from '@migaia/storage-host/authoring/backend'
+import type { IBackendChangeController } from '@migaia/storage-host/sdk'
+import { reportCleanupError } from '@migaia/storage-host/sdk'
 import {
   StorageContractError,
   StorageContractErrorCode,

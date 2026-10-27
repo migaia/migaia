@@ -1,6 +1,7 @@
 import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { describe, it, expect, vi } from 'vitest'
-import { createStorageHost, memoryBackendPlugin, definePlugin } from '@migaia/storage-host'
+import { createStorageHost, definePlugin } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { blob } from '@migaia/storage-contract'
 import type { IStoragePipelineInput } from '@migaia/storage-host'
 import { archivePlugin } from '../src/index.js'

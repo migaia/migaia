@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { DeleteCountMode } from '@migaia/storage-contract'
 import { qdrantBackendPlugin, type IQdrantHttp } from '@migaia/storage-plugin-qdrant'
 import { fetchHttp } from '@migaia/storage-plugin-qdrant/http'

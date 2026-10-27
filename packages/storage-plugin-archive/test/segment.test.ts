@@ -1,5 +1,5 @@
 import { it, expect } from 'vitest'
-import { createStorageBlobObject } from '@migaia/storage-host/authoring/blob'
+import { createStorageBlobObject } from '@migaia/storage-host/sdk'
 import { deferred } from '@migaia/utils/promise'
 import { readSegment } from '../src/segment.js'
 
@@ -96,7 +96,8 @@ it('keeps the original abort first when native cancellation cleanup also rejects
 
 it('measures exact UTF-8 line budgets and keeps embedded newlines inside their canonical record', async () => {
   const { defineCollectionsJsonCodec } = await import('@migaia/serialize/codecs/collections-json')
-  const { createStorageHost, memoryBackendPlugin } = await import('@migaia/storage-host')
+  const { createStorageHost } = await import('@migaia/storage-host')
+  const { memoryBackendPlugin } = await import('@migaia/storage-host/plugins/memory')
   const { archivePlugin } = await import('../src/index.js')
   const codec = defineCollectionsJsonCodec({ version: 1 }),
     value = { old: true, text: 'a\nb' }

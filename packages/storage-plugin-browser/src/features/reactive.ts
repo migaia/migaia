@@ -2,7 +2,6 @@ import { indexedDbFeatureMissing } from '../backends/indexed-db-base-access.js'
 import { IndexedDbFeature } from '../constants.js'
 import {
   defineFeature,
-  memoryBackendKind,
   StorageError as HostStorageError,
   StorageErrorCode as HostStorageErrorCode,
   StorageErrorText as HostStorageErrorText,
@@ -12,10 +11,8 @@ import {
   type IStorageFeatureOutput,
   type IStorageFeatureTarget
 } from '@migaia/storage-host'
-import {
-  createStorageOperationReporter,
-  reportCleanupError
-} from '@migaia/storage-host/authoring/backend'
+import { memoryBackendKind } from '@migaia/storage-host/plugins/memory'
+import { createStorageOperationReporter, reportCleanupError } from '@migaia/storage-host/sdk'
 import type {
   IOperationContext,
   IQueryResultOf,

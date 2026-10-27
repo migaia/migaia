@@ -1,18 +1,17 @@
 import { memoryTestFeatures } from './memory-features.js'
+import { createStorageHost, defineFeature } from '@migaia/storage-host'
 import {
-  createStorageHost,
-  defineFeature,
   memoryBackendKind,
   memoryBackendPlugin,
   type IMemoryBackendStore
-} from '@migaia/storage-host'
+} from '@migaia/storage-host/plugins/memory'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import { onTestFinished } from 'vitest'
 import {
   createStorageReactiveService,
   type IStorageReactiveService
 } from '../../src/host/reactive.js'
-import type { IBackendChangeController } from '@migaia/storage-host/authoring/backend'
+import type { IBackendChangeController } from '@migaia/storage-host/sdk'
 
 /** The fixture exposes a finite view of the original host rather than another facade. */
 type IReactiveServiceFixture = {

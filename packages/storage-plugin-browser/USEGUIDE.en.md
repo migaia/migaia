@@ -109,7 +109,7 @@ Without TTL, the canonical capability owner rejects `store.use(ttl)` with `@miga
 
 Keep the TTL Feature when reopening a database that uses deadlines; basic reads do not interpret expiry metadata. A client without TTL clears inherited deadlines in the same native transaction when overwriting, deleting or clearing targets. Replacement values remain unlimited and another TTL client cannot remove them using the old deadlines.
 
-`indexedDbJournalFeature()` supplies native images, private log namespaces and undo. Global capture additionally requires `storageJournalPlugin()` from `@migaia/storage-host/journal`, explicitly installed before the backend in the same plugin list, plus the original `journal` configuration.
+`indexedDbJournalFeature()` supplies native images, private log namespaces and undo. Global capture additionally requires `storageJournalPlugin()` from `@migaia/storage-host/plugins/journal`, explicitly installed before the backend in the same plugin list, plus the original `journal` configuration.
 
 Journal images read and restore existing physical deadlines without enabling TTL expiry policy. Basic writes retain physical mutation versions and tombstones so another journal-enabled instance can detect update/delete/recreate conflicts; they capture no images and create no log.
 
@@ -160,7 +160,7 @@ Await only native operations and activity-preserving microtasks within the callb
 
 ## Entity repositories
 
-Basic `defineEntity` supplies definition, connection and reads/writes. Select `entityQueryFeature()` from `@migaia/storage-host/entity/query` in the definition's `features` array for queries; `entityUniqueFeature()` from `/entity/unique` for uniqueness; `entityMigrationFeature()` from `/entity/migration` for migration; `entityIndexesFeature()` from `/entity/indexes` for index planning; and `entityKeysetFeature()` from `/entity/keyset` for keyset pages. Index queries combine query and indexes; pages combine query and keyset. Native IndexedDB indexes also require the backend's `indexedDbIndexesFeature()`. Each selection is explicit.
+Basic `defineEntity` supplies definition, connection and reads/writes. Select `entityQueryFeature()` from `@migaia/storage-host/entity/features/query` in the definition's `features` array for queries; `entityUniqueFeature()` from `/entity/features/unique` for uniqueness; `entityMigrationFeature()` from `/entity/features/migration` for migration; `entityIndexesFeature()` from `/entity/features/indexes` for index planning; and `entityKeysetFeature()` from `/entity/features/keyset` for keyset pages. Index queries combine query and indexes; pages combine query and keyset. Native IndexedDB indexes also require the backend's `indexedDbIndexesFeature()`. Each selection is explicit.
 
 Import the neutral repository owner from `@migaia/storage-host/entity` and connect it to the actual installed IndexedDB store.
 
@@ -274,7 +274,7 @@ try {
 }
 ```
 
-With `indexedDbJournalFeature()` selected, IndexedDB supports `storageLogStore(hostOrOrg, 'indexed-db', { prefix })` from `@migaia/storage-host/journal`. Its private rows use an array-key namespace in the existing META store. Business `clearAll` leaves history intact; organization deletion invalidates old log handles, while the original business view can reopen. In cached mode, dispose a log before opening the same physical organization and prefix again. Native transactions commit head/state/records together and publish the cached index from the actual complete event.
+With `indexedDbJournalFeature()` selected, IndexedDB supports `storageLogStore(hostOrOrg, 'indexed-db', { prefix })` from `@migaia/storage-host/plugins/journal`. Its private rows use an array-key namespace in the existing META store. Business `clearAll` leaves history intact; organization deletion invalidates old log handles, while the original business view can reopen. In cached mode, dispose a log before opening the same physical organization and prefix again. Native transactions commit head/state/records together and publish the cached index from the actual complete event.
 
 Native Web Locks retain the original lifetime exclusion and cached path; a conflicting open reports LOCK_REJECTED. Without Web Locks or an actual private-factory declaration, the original namespace declares `indexExclusive:false`. storageLogStore remains available: each operation recovers/reads current lastSeq, state and records inside the original journal-store readwrite transaction, retaining no index across operations. Injected factories use the original cached path when Web Locks are available. `journalFactoryIsPrivate:true` applies only to an actual data universe confined to this realm without forwarding shared persistent storage; that path retains the original logical lock and cached owner. Object identity alone never proves isolation. This namespace support does not enable automatic global capture or opt-in undo by itself.
 

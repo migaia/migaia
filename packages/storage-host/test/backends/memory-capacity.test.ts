@@ -6,7 +6,8 @@ import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections
 import { utf8ByteLength } from '@migaia/utils/bytes'
 import { ConcurrencyPolicy, lockKey } from '../../src/authoring/concurrency.js'
 import { counter, kv, ttl, vector } from '@migaia/storage-contract'
-import { createStorageHost, createOrgId, memoryBackendPlugin } from '../../src/index.js'
+import { createStorageHost, createOrgId } from '../../src/index.js'
+import { memoryBackendPlugin } from '../../src/plugins/memory.js'
 import { createMemoryCapacityIndex } from '../../src/backends/memory-capacity.js'
 
 /**

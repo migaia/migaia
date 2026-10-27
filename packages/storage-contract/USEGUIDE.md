@@ -16,7 +16,7 @@ console.log((key as [string, Date])[1].getTime()) // 0
 纯校验不打开 store，也不复制键。需要在异步写入前保留键时，由 host 原作者入口复制可变组件：
 
 ```ts
-import { snapshotStorageKey } from '@migaia/storage-host/authoring/key'
+import { snapshotStorageKey } from '@migaia/storage-host/sdk'
 
 const input = ['orders', new Date(0)] as const
 const saved = snapshotStorageKey(input, 'memory') as [string, Date]
@@ -38,7 +38,7 @@ assertSyncWriteOptions({ conflictPolicy: 'replace' })
 这两个函数不运行取消、计时或写入。非法字段沿现有 `INVALID_ARGUMENT` 边界；省略字段不插入后端默认值。signal 是原 live signal，已取消的有效信号也符合 shape。
 
 ```ts
-import { snapshotOperationContext } from '@migaia/storage-host/authoring/context'
+import { snapshotOperationContext } from '@migaia/storage-host/sdk'
 
 const controller = new AbortController()
 const options = { signal: controller.signal, timeoutMs: 10 }
@@ -70,7 +70,7 @@ const facts: IStorageCapabilities = {
 console.log(isStorageCapabilities(facts)) // true
 ```
 
-`batch` 省略表示不提供完整批量写；共享 conformance 的该组记为不适用。shape guard 不创建规范化副本。需要在宿主异步准入期间保存事实时，从 `/authoring/store` 使用 `snapshotStorageCapabilities`。
+`batch` 省略表示不提供完整批量写；共享 conformance 的该组记为不适用。shape guard 不创建规范化副本。需要在宿主异步准入期间保存事实时，从 `/sdk` 使用 `snapshotStorageCapabilities`。
 
 ## 定义 token 与实现
 
@@ -83,11 +83,11 @@ const definition = implement(status, api)
 console.log(isCapabilityToken(status), typeof definition) // true object
 ```
 
-这一步没有发布 store。发布和 has/use 在 host `/authoring/capability`；定义 token 的名字不能替代原对象身份。完整资源和清理示例见 [host 指南](../storage-host/USEGUIDE.md)。
+这一步没有发布 store。发布和 has/use 在 host `/sdk`；定义 token 的名字不能替代原对象身份。完整资源和清理示例见 [host 指南](../storage-host/USEGUIDE.md)。
 
 ## codec 与原方法 receiver
 
-`assertCodec(codec)` 只检查普通对象或合法 class 的公开结构。`snapshotCodec` 已归 host `/authoring/codec`，现在校验后借用同一对象；它不复制 `{name, output, encode, decode}`，因此 `#private` 方法不会丢失 receiver。调用使用 `codec.encode(value)` / `codec.decode(raw)`。格式转换适配仍使用同入口的 `fromValueCodec`。
+`assertCodec(codec)` 只检查普通对象或合法 class 的公开结构。`snapshotCodec` 已归 host `/sdk`，现在校验后借用同一对象；它不复制 `{name, output, encode, decode}`，因此 `#private` 方法不会丢失 receiver。调用使用 `codec.encode(value)` / `codec.decode(raw)`。格式转换适配仍使用同入口的 `fromValueCodec`。
 
 ## 原错误与进度报告
 

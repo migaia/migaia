@@ -9,12 +9,8 @@ import {
 } from '@migaia/storage-contract'
 import { lockKey, ConcurrencyPolicy } from '../../src/authoring/concurrency.js'
 import { registerTransactionFinalizer } from '../../src/authoring/transaction.js'
-import {
-  createStorageHost,
-  definePlugin,
-  memoryBackendPlugin,
-  StorageError
-} from '../../src/index.js'
+import { createStorageHost, definePlugin, StorageError } from '../../src/index.js'
+import { memoryBackendPlugin } from '../../src/plugins/memory.js'
 import type { IStorageHookMap } from '../../src/index.js'
 
 /** The selected row domain belongs to the actual native memory record channel. */

@@ -15,7 +15,8 @@
 基础层必须先安装，再用 `host.use(cachePlugin(...))` 追加缓存。只有配置 `negativeTtlMs` 后，加载结果 `undefined` 才会被短期保存。
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { cachePlugin } from '@migaia/storage-plugin-cache'
 
 const base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'data' })] })
@@ -50,7 +51,8 @@ try {
 `tiers` 按从快到慢排列，默认每层 `write: 'through'`。下面用两个独立 memory 实例展示配置；换成 SQLite、Redis 或 PostgreSQL 时，先安装对应后端并保留相同 ID。
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { cachePlugin, CacheWriteMode } from '@migaia/storage-plugin-cache'
 
 const base = await createStorageHost({
@@ -90,7 +92,8 @@ through 写入从最慢层向上完成；命中慢层会回填更快层。back �
 下面在不等待到期的情况下演示强制刷新与绕过：refresh 写入新值，bypass 的值只返回给本次调用。
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { cachePlugin } from '@migaia/storage-plugin-cache'
 
 const base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'data' })] })
@@ -133,7 +136,8 @@ try {
 标签索引需要 records 与 TTL；offload 需要 blob，且引用层必须有 TTL。下面均用内置 memory 能力展示完整组合，应用可换成对象存储插件保存大值。
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { cachePlugin } from '@migaia/storage-plugin-cache'
 
 const base = await createStorageHost({
@@ -174,7 +178,8 @@ try {
 从独立入口导入 `semanticCacheFeature`，在缓存插件第二参数选择。下面的两维嵌入只演示精确重复；真实应用应接自己的模型，维度、metric 和模型版本需与 collection 一致。
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { cachePlugin } from '@migaia/storage-plugin-cache'
 import { semanticCacheFeature } from '@migaia/storage-plugin-cache/features/semantic'
 

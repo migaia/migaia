@@ -8,12 +8,12 @@ import {
   type IStorageKey,
   type ILockKey
 } from '@migaia/storage-contract'
-import { snapshotStorageCounterIncrement } from '@migaia/storage-host/authoring/counter'
 import {
+  snapshotStorageCounterIncrement,
   createStorageOperationReporter,
-  reportCleanupError
-} from '@migaia/storage-host/authoring/backend'
-import { planChannelWrite } from '@migaia/storage-host/authoring/backend'
+  reportCleanupError,
+  planChannelWrite
+} from '@migaia/storage-host/sdk'
 import type { IStorageJournalAttempt } from '@migaia/storage-host'
 import { captureRedisJournalStage, redisJournalTarget, type IRedisJournalStage } from './journal.js'
 import type { IRedisConnection, IRedisExecEntry } from './driver.js'

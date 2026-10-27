@@ -15,7 +15,8 @@ import {
 import { blob, counter, kv, rdf, ttl, vector } from '@migaia/storage-contract'
 import { lockKey } from '../src/authoring/concurrency.js'
 import { term } from '../src/authoring/rdf.js'
-import { createOrgId, createStorageHost, memoryBackendPlugin } from '../src/index.js'
+import { createOrgId, createStorageHost } from '../src/index.js'
+import { memoryBackendPlugin } from '../src/plugins/memory.js'
 
 /** Real durable scheduling keeps failures observable without writing test diagnostics to stdout. */
 const runtimeManager = {

@@ -20,7 +20,7 @@ Node 24+ 使用下列完整示例；Bun 把驱动入口换为 `/bun` 的 `bunSql
 ```ts doc-test=run
 import { createStorageHost } from '@migaia/storage-host'
 import { kv, records, ttl, counter } from '@migaia/storage-contract'
-import { lockKey } from '@migaia/storage-host/authoring/concurrency'
+import { lockKey } from '@migaia/storage-host/sdk'
 import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
 import { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'
 await using connection = nodeSqliteDriver('./example-settings.sqlite')
@@ -58,7 +58,7 @@ TTL 使用本地 Date.now，值和期限共同写入。覆盖活值保留期限�
 
 ```ts doc-test=run
 import { createStorageHost } from '@migaia/storage-host'
-import { sqlFragment } from '@migaia/storage-host/authoring/sql'
+import { sqlFragment } from '@migaia/storage-host/sdk'
 import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
 import { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'
 await using connection = nodeSqliteDriver(':memory:')
@@ -111,7 +111,7 @@ backup 使用 VACUUM INTO，要求目标不存在且路径可写，不预删、�
 
 文件库默认 wal:true，安装会请求并确认实际模式；已有 journal_mode=OFF 的连接拒绝。内存库默认 false，显式 true 拒绝。wal:false 保留真实 BEGIN/COMMIT/ROLLBACK，但逻辑锁只协调当前进程，不承诺跨进程。
 
-通过 tx().lock(lockKey.text(...)).run 使用逻辑键锁。锁策略从 `@migaia/storage-host/authoring/concurrency` 选择。只有相同逻辑键才产生逻辑冲突；SQLite writer 串行等待不是业务键冲突。inspectLocks 返回实际持锁方和过期信息。maxLockMs 默认30000ms，无 heartbeat，取消是协作式。
+通过 tx().lock(lockKey.text(...)).run 使用逻辑键锁。锁策略从 `@migaia/storage-host/sdk` 选择。只有相同逻辑键才产生逻辑冲突；SQLite writer 串行等待不是业务键冲突。inspectLocks 返回实际持锁方和过期信息。maxLockMs 默认30000ms，无 heartbeat，取消是协作式。
 
 ## 数据与错误边界
 
@@ -123,8 +123,8 @@ driver 必填；table 默认 migaia；concurrency 选择冲突策略，maxLockMs
 
 ## 可选日志
 
-通过 `@migaia/storage-host/journal` 的 `storageJournalPlugin(options)` 显式启用。完整值、每次实际修改和绝对期限在 SQLite 事务中捕获，保留同键多写与中间值。undo 先锁定并检查全部目标的最终修订和镜像，再恢复；恢复原绝对期限，不刷新过期数据。组织重建或非 WAL 本地协调组重新打开后，旧镜像不能继续使用。metadata 不产生业务修改日志。
+通过 `@migaia/storage-host/plugins/journal` 的 `storageJournalPlugin(options)` 显式启用。完整值、每次实际修改和绝对期限在 SQLite 事务中捕获，保留同键多写与中间值。undo 先锁定并检查全部目标的最终修订和镜像，再恢复；恢复原绝对期限，不刷新过期数据。组织重建或非 WAL 本地协调组重新打开后，旧镜像不能继续使用。metadata 不产生业务修改日志。
 
 外置 binlog 在提交后写入，失败报告但不能撤回数据。支持的 WAL 组合使用与数据共同提交的 marker，恢复不重放已提交修改。raw SQL 无完整标准镜像目标，选择提交日志时在执行前拒绝。全局 journal 使用异步 pipeline，因此同步入口报 ASYNC_STAGE_IN_SYNC_ENTRY；普通无日志安装仍有同步 API。
 
-`storageLogStore` 从 `@migaia/storage-host/journal` 单独导入，可在初始化器内打开同库日志。内存连接的同 namespace 日志独占使用，释放后可重开；文件日志每次在 BEGIN IMMEDIATE 中读取当前索引，允许多连接共用。业务 clear 不清私有日志。选中提交日志时，读取触发的惰性过期删除也进入日志；仅遥测或初始化器不启用该写入行为。遥测每个根操作或完整事务只发一条，logger 与日志载体仍由调用方在 host 之后释放。
+`storageLogStore` 从 `@migaia/storage-host/plugins/journal` 单独导入，可在初始化器内打开同库日志。内存连接的同 namespace 日志独占使用，释放后可重开；文件日志每次在 BEGIN IMMEDIATE 中读取当前索引，允许多连接共用。业务 clear 不清私有日志。选中提交日志时，读取触发的惰性过期删除也进入日志；仅遥测或初始化器不启用该写入行为。遥测每个根操作或完整事务只发一条，logger 与日志载体仍由调用方在 host 之后释放。

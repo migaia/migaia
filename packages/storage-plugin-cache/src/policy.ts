@@ -1,5 +1,5 @@
 import { assertCodec, type ICodec } from '@migaia/storage-contract'
-import { fromValueCodec } from '@migaia/storage-host/authoring/codec'
+import { fromValueCodec } from '@migaia/storage-host/sdk'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import type { ICodecValue } from '@migaia/serialize/codec'
 import { jitter } from '@migaia/utils/number'

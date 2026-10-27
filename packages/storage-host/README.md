@@ -23,7 +23,8 @@
 下面把状态写入 memory，再从同一个后端读取。支持顶层 `await` 的 TypeScript 环境可直接使用。
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 
 const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
 try {
@@ -76,7 +77,7 @@ Map 适合局部数据；需要多后端、事务或统一释放时，再使用�
 | 多项写入一起提交       | memory transaction                 | [事务与记录查询](./USEGUIDE.md#事务与记录查询) |
 | 保存和查询带主键的对象 | `/entity` + memory 或 records 后端 | [实体](./USEGUIDE.md#使用实体仓储)             |
 | 同一应用服务多个组织   | `host.org(id)`                     | [组织数据](./USEGUIDE.md#隔离组织数据)         |
-| 保存应用日志记录       | `/journal` + 可选 logger           | [日志](./USEGUIDE.md#打开日志存储)             |
+| 保存应用日志记录       | `/plugins/journal` + 可选 logger   | [日志](./USEGUIDE.md#打开日志存储)             |
 
 ## 安装
 
@@ -86,7 +87,7 @@ Map 适合局部数据；需要多后端、事务或统一释放时，再使用�
 pnpm add --workspace @migaia/storage-host @migaia/storage-contract
 ```
 
-内置 memory 不需要数据库客户端。其它后端由各自的插件提供。只有导入 `/journal`（使用 `storageJournalPlugin`）时才需要可选 peer：
+内置 memory 不需要数据库客户端。其它后端由各自的插件提供。只有导入 `/plugins/journal`（使用 `storageJournalPlugin`）时才需要可选 peer：
 
 ```bash
 pnpm add --workspace @migaia/logger
@@ -115,17 +116,19 @@ pnpm add --workspace @migaia/logger
 
 ## 后端作者入口迁移
 
+子路径已经收敛：原来的 `/authoring/*` 和 `/vector/mmr` 合并为 `/sdk`；`/journal` 改为 `/plugins/journal`；`/entity/<名称>` 改为 `/entity/features/<名称>`；memory 后端从根入口移到 `/plugins/memory`。旧路径直接删除，不保留别名。
+
 应用只调用 `backend()` 时无需导入作者工具。实现后端时，运行时工具从以下入口获取；类型、能力 token、定义和纯校验继续从 contract 获取。
 
-表中的 `/authoring/...` 均以 `@migaia/storage-host` 开头。
+表中的 `/sdk` 均以 `@migaia/storage-host` 开头。
 
-| 原 contract 运行时用途     | 当前入口                                                      |
-| -------------------------- | ------------------------------------------------------------- |
-| 查询创建与条件执行         | `@migaia/storage-host/authoring/query`                        |
-| 并发策略与事务执行         | `/authoring/concurrency`、`/authoring/transaction`            |
-| 键编码、输入快照、资源管理 | `/authoring/key`、`/authoring/context`、`/authoring/resource` |
-| 能力发布与数据转换         | `/authoring/capability`、`/authoring/codec`                   |
-| SQL、SPARQL 与数据通道工具 | `/authoring/sql`、`/authoring/sparql`、相应通道入口           |
+| 原 contract 运行时用途     | 当前入口                   |
+| -------------------------- | -------------------------- |
+| 查询创建与条件执行         | `@migaia/storage-host/sdk` |
+| 并发策略与事务执行         | `/sdk`                     |
+| 键编码、输入快照、资源管理 | `/sdk`                     |
+| 能力发布与数据转换         | `/sdk`                     |
+| SQL、SPARQL 与数据通道工具 | `/sdk`、相应通道入口       |
 
 完整路径和依赖说明见 [storage-contract](../storage-contract/README.md#入口与依赖方向)。旧 contract 根入口不保留这些运行时导出。
 
@@ -135,14 +138,15 @@ pnpm add --workspace @migaia/logger
 
 基础宿主不导入 journal runtime、通知控制器或变更迭代器。此前宿主的 journal 选项会自动加载日志实现，memory 默认提供变更通知和 watch；现在这些能力由业务显式选择，避免基础存读包含未使用代码。
 
-日志配置写在从 `@migaia/storage-host/journal` 导入的 `storageJournalPlugin(options)` 里，放在 `createStorageHost` 第一批插件中、要记录的后端之前；宿主没有单独的 `journal` 选项。后装或重复传入带配置的日志插件会报 `INVALID_CONFIG`。只用 `storageLogStore()` 时装 `storageJournalPlugin()` 即可，缺少插件时报 `JOURNAL_NOT_ASSEMBLED`。配置格式、日志内容和事务提交语义保持原契约。
+日志配置写在从 `@migaia/storage-host/plugins/journal` 导入的 `storageJournalPlugin(options)` 里，放在 `createStorageHost` 第一批插件中、要记录的后端之前；宿主没有单独的 `journal` 选项。后装或重复传入带配置的日志插件会报 `INVALID_CONFIG`。只用 `storageLogStore()` 时装 `storageJournalPlugin()` 即可，缺少插件时报 `JOURNAL_NOT_ASSEMBLED`。配置格式、日志内容和事务提交语义保持原契约。
 
 观察事件只通过 `@migaia/storage-host/plugins/probe` 的 `storageProbe(handlers)` 订阅，宿主没有 `hooks` 选项，也没有 `host.hooks`。probe 放进 `createStorageHost` 的 plugins 时，从这一批的第一个安装事件起就能收到；安装后用 `host.extensions.observe(name, handler)` 追加监听，返回值是退订函数。在非默认组织的视图上调用时只收到该组织的事件。一个宿主只装一个 probe；监听器失败交给 `report`，不改变存储结果。
 
 memory 通知和变更流分别由两个 Feature 装配：
 
 ```ts
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'
 import { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-change-feed'
 
@@ -159,7 +163,7 @@ await host.dispose()
 
 未选择变更流时，memory 的 `capabilities.changeFeed` 为 `false`；调用 watch 报 `CHANGE_ITERATOR_NOT_ASSEMBLED`。只选通知可调用 `subscribeChanges()`；变更流依赖通知，缺少通知时报 `CHANGE_CONTROLLER_NOT_ASSEMBLED`。基础读写与物理资源关闭仍由轻量生命周期 owner 负责。
 
-后端作者从 `/authoring/change-controller` 导入通知工厂，并显式传给 `core.createChangeController(options, createBackendChangeController)`。基础物理资源可使用同入口的 `createBackendLifecycleController`。变更迭代器改从 `/authoring/change-iterator` 导入，不再从 `/authoring/backend` 转出。
+后端作者从 `/sdk` 导入通知工厂，并显式传给 `core.createChangeController(options, createBackendChangeController)`。基础物理资源可使用同入口的 `createBackendLifecycleController`。变更迭代器也从同一个 `/sdk` 入口导入。
 
 ### 严格索引查询迁移
 

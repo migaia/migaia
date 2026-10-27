@@ -1,10 +1,9 @@
-import { storageJournalPlugin } from '@migaia/storage-host/journal'
+import { storageJournalPlugin, storageLogStore } from '@migaia/storage-host/plugins/journal'
 import { indexedDbTestFeatures } from './indexed-db-features.js'
 import { Logger } from '@migaia/logger'
 import { binlog, undoLog } from '@migaia/logger/plugins/durable'
 import { createOrgId, createStorageHost } from '@migaia/storage-host'
-import { decodeFlatStorageKey } from '@migaia/storage-host/authoring/backend'
-import { storageLogStore } from '@migaia/storage-host/journal'
+import { decodeFlatStorageKey } from '@migaia/storage-host/sdk'
 import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
 
 /** Each page retains only its own original host and borrowed log until explicit fixture cleanup. */

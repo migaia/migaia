@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { ConcurrencyPolicy } from '../../src/authoring/concurrency.js'
-import { createStorageHost, definePlugin, memoryBackendPlugin } from '../../src/index.js'
+import { createStorageHost, definePlugin } from '../../src/index.js'
+import { memoryBackendPlugin } from '../../src/plugins/memory.js'
 import { MemoryOperation } from '../../src/backends/memory-constants.js'
 
 describe('memory execution and the original concurrency budget', () => {

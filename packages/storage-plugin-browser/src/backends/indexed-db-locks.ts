@@ -1,5 +1,5 @@
 import type { acquireIndexedDbCoordination } from './indexed-db-coordination.js'
-import type { IBackendKeyLockPort } from '@migaia/storage-host/authoring/backend'
+import type { IBackendKeyLockPort } from '@migaia/storage-host/sdk'
 /** Physical identity, independent of notification layout, owns one logical key-lock port. */
 type IIndexedDbLockEntry = { readonly keyPort: IBackendKeyLockPort; members: number }
 /** Factory identities isolate native universes; database names share their original lock domain. */

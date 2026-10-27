@@ -1,6 +1,6 @@
 # @migaia/storage-contract
 
-Runtime-neutral storage contracts. The root owns types, capability tokens/definitions, errors, enum-like constants and pure validators. Execution, resources and authoring snapshots belong to `@migaia/storage-host/authoring/*`. This package does not depend on host, browser storage or database clients.
+Runtime-neutral storage contracts. The root owns types, capability tokens/definitions, errors, enum-like constants and pure validators. Execution, resources and authoring snapshots belong to `@migaia/storage-host/sdk`. This package does not depend on host, browser storage or database clients.
 
 ## Entries and dependency direction
 
@@ -8,25 +8,25 @@ Runtime-neutral storage contracts. The root owns types, capability tokens/defini
 - `@migaia/storage-contract/conformance`: backend contract groups run by the consumer's existing runner. It supplies no runner and imports no host runtime.
 - Host and backends depend inward on this package. Runtime authoring APIs use the entries below; the root retains no old runtime re-export or compatibility alias.
 
-| Host entry suffix                      | Existing responsibility                                                |
-| -------------------------------------- | ---------------------------------------------------------------------- |
-| `/authoring/capability`                | Publication, original store has/use, transaction implementation lookup |
-| `/authoring/query`                     | Record/vector/RDF queries, condition compilation and snapshots         |
-| `/authoring/concurrency`               | Policies, lock factories, the concurrency loop and lock snapshots      |
-| `/authoring/transaction`               | Transaction owner, builder, execution and iterator derivation          |
-| `/authoring/key`                       | Key copies, ordered/organization encoding and batch capture/projection |
-| `/authoring/context`                   | Operation and reduced sync-write snapshots                             |
-| `/authoring/store`                     | Store admission and capability descriptor snapshots                    |
-| `/authoring/resource`                  | Original iterator lifetime                                             |
-| `/authoring/sql`, `/authoring/sparql`  | Fragments, native tags and terminal binding                            |
-| `/authoring/rdf`                       | Term factories, snapshots, encoding and organization graphs            |
-| `/authoring/vector`                    | Vector input snapshots and recommendation synthesis                    |
-| `/authoring/ttl`, `/authoring/counter` | Original scalar input helpers                                          |
-| `/authoring/blob`                      | Input snapshots, upload readers and object resources                   |
-| `/authoring/codec`                     | Value-codec adapter and original codec admission                       |
-| `/authoring/migration`                 | Migration plans, execution and envelope recovery                       |
+| Host entry suffix | Existing responsibility                                                |
+| ----------------- | ---------------------------------------------------------------------- |
+| `/sdk`            | Publication, original store has/use, transaction implementation lookup |
+| `/sdk`            | Record/vector/RDF queries, condition compilation and snapshots         |
+| `/sdk`            | Policies, lock factories, the concurrency loop and lock snapshots      |
+| `/sdk`            | Transaction owner, builder, execution and iterator derivation          |
+| `/sdk`            | Key copies, ordered/organization encoding and batch capture/projection |
+| `/sdk`            | Operation and reduced sync-write snapshots                             |
+| `/sdk`            | Store admission and capability descriptor snapshots                    |
+| `/sdk`            | Original iterator lifetime                                             |
+| `/sdk`            | Fragments, native tags and terminal binding                            |
+| `/sdk`            | Term factories, snapshots, encoding and organization graphs            |
+| `/sdk`            | Vector input snapshots and recommendation synthesis                    |
+| `/sdk`            | Original scalar input helpers                                          |
+| `/sdk`            | Input snapshots, upload readers and object resources                   |
+| `/sdk`            | Value-codec adapter and original codec admission                       |
+| `/sdk`            | Migration plans, execution and envelope recovery                       |
 
-All these entries belong to `@migaia/storage-host`. `/authoring/backend` retains its finite backend ports. Shared template capture remains a private SQL/SPARQL module. See the [usage guide](./USEGUIDE.en.md) and [host guide](../storage-host/USEGUIDE.en.md).
+All these entries belong to `@migaia/storage-host`. `/sdk` retains its finite backend ports. Shared template capture remains a private SQL/SPARQL module. See the [usage guide](./USEGUIDE.en.md) and [host guide](../storage-host/USEGUIDE.en.md).
 
 ## Types and pure validators
 
@@ -61,7 +61,7 @@ Guards accept ordinary supported inputs. They promise no hostile getter, Proxy o
 
 Custom and standard capability tokens plus `implement` stay here. Names are diagnostics; same-name tokens are not interchangeable. `readCapabilityTokenFacts` and `readStorageImplementation` inspect canonical definition identity without publication, callback execution or per-store state.
 
-Host `/authoring/capability` owns publication, store has/use and transaction implementation lookup. It uses the same token and original API identity, including legitimate class receivers. Query, transaction, lock and iterator runtime state belongs only to host.
+Host `/sdk` owns publication, store has/use and transaction implementation lookup. It uses the same token and original API identity, including legitimate class receivers. Query, transaction, lock and iterator runtime state belongs only to host.
 
 ## Errors and accepted boundaries
 
@@ -75,4 +75,4 @@ Ordinary store, option, query and snapshot records are not a freezing protocol. 
 
 The `@migaia/serialize` format encoders used by storage codecs now emit fields in the object's own property enumeration order instead of sorting field names. Objects with equal fields and values but different insertion orders can produce different bytes. Decoded fields and values are unchanged. Regenerate snapshots, signature inputs or cache keys that depend on the former sorted bytes.
 
-For recursive `Map` and `Set` values, select `defineCollectionsJsonCodec` from `@migaia/serialize/codecs/collections-json` and adapt it with `fromValueCodec` from `@migaia/storage-host/authoring/codec`. Plain JSON does not enable collection encoding implicitly. Older consumers must migrate together before reading the new format. See the [serialize guide](../serialize/USEGUIDE.en.md).
+For recursive `Map` and `Set` values, select `defineCollectionsJsonCodec` from `@migaia/serialize/codecs/collections-json` and adapt it with `fromValueCodec` from `@migaia/storage-host/sdk`. Plain JSON does not enable collection encoding implicitly. Older consumers must migrate together before reading the new format. See the [serialize guide](../serialize/USEGUIDE.en.md).

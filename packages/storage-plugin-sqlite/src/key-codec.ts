@@ -1,4 +1,4 @@
-import { encodeOrderedStorageKey, snapshotStorageKey } from '@migaia/storage-host/authoring/key'
+import { encodeOrderedStorageKey, snapshotStorageKey } from '@migaia/storage-host/sdk'
 import { type IStorageKey } from '@migaia/storage-contract'
 import { sqliteError } from './errors.js'
 import { SqliteErrorCode } from './error-code.js'

@@ -1,5 +1,5 @@
 import type { IOperationContext } from '@migaia/storage-contract'
-import { throwIfAborted } from '@migaia/storage-host/authoring/backend'
+import { throwIfAborted } from '@migaia/storage-host/sdk'
 import { QdrantRoute, QdrantText } from './constants.js'
 import { QdrantErrorCode } from './error-code.js'
 import { QdrantErrorText } from './error-text.js'

@@ -8,9 +8,10 @@ import {
 import {
   snapshotStorageBatchKeys,
   createStorageBatchKeyCapture,
-  snapshotStorageKeyPrefix
-} from '@migaia/storage-host/authoring/key'
-import { observeStorageBatch, withAbort } from '@migaia/storage-host/authoring/backend'
+  snapshotStorageKeyPrefix,
+  observeStorageBatch,
+  withAbort
+} from '@migaia/storage-host/sdk'
 import { storageBackendOperation } from '../constants.js'
 import { StorageErrorText } from '../error-text.js'
 import type { IBackendKind } from '../types/capabilities.js'

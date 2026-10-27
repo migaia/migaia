@@ -1,9 +1,10 @@
-import { runTransactionOperation } from '@migaia/storage-host/authoring/transaction'
-import { snapshotConcurrencyLockRange, lockKey } from '@migaia/storage-host/authoring/concurrency'
 import {
+  runTransactionOperation,
+  snapshotConcurrencyLockRange,
+  lockKey,
   snapshotStorageKeyPrefix,
   snapshotStorageBatchKeys
-} from '@migaia/storage-host/authoring/key'
+} from '@migaia/storage-host/sdk'
 import {
   StorageBackend,
   StorageConflictPolicy,

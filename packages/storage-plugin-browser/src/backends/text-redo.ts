@@ -21,17 +21,14 @@ import {
 } from '@migaia/storage-contract'
 import {
   snapshotStorageBatchKeys,
-  snapshotStorageKeyPrefix
-} from '@migaia/storage-host/authoring/key'
-import {
+  snapshotStorageKeyPrefix,
   createTransactionOwner,
   assertTransactionOwner,
   runTransactionOperation,
   useTransactionCapability,
-  createTransactionBuilder
-} from '@migaia/storage-host/authoring/transaction'
-import { runWithConcurrency, lockKey } from '@migaia/storage-host/authoring/concurrency'
-import {
+  createTransactionBuilder,
+  runWithConcurrency,
+  lockKey,
   encodeFlatStorageKey,
   encodeStorageJournalImage,
   decodeStorageJournalImage,
@@ -39,7 +36,7 @@ import {
   throwIfAborted,
   reportCleanupError,
   type IBackendChangeController
-} from '@migaia/storage-host/authoring/backend'
+} from '@migaia/storage-host/sdk'
 import type { IStorageJournalBackendBinding, IStorageJournalChange } from '@migaia/storage-host'
 import {
   StorageError as JournalError,

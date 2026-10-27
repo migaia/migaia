@@ -4,12 +4,8 @@ import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.j
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { blob, type IBlobApi, type IStorageChange } from '@migaia/storage-contract'
-import {
-  createOrgId,
-  createStorageHost,
-  definePlugin,
-  memoryBackendPlugin
-} from '../../src/index.js'
+import { createOrgId, createStorageHost, definePlugin } from '../../src/index.js'
+import { memoryBackendPlugin } from '../../src/plugins/memory.js'
 import { MemoryOperation } from '../../src/backends/memory-constants.js'
 
 /** Installed stores exercise the reference object backend through the authentic capability token. */

@@ -1,5 +1,27 @@
-import { createBackendChangeIterator } from '@migaia/storage-host/authoring/change-iterator'
-import { createBackendChangeController } from '@migaia/storage-host/authoring/change-controller'
+import {
+  createBackendChangeIterator,
+  createBackendChangeController,
+  snapshotStorageKey,
+  snapshotStorageBatchKeys,
+  createStorageBatchKeyCapture,
+  runTransactionOperation,
+  assertTransactionOwner,
+  useTransactionCapability,
+  createTransactionBuilder,
+  runWithConcurrency,
+  createStorageIteratorLifetime,
+  createSqlTag,
+  createRecordQuery,
+  provideCapabilities,
+  snapshotStorageTtlTarget,
+  snapshotStorageCounterIncrement,
+  asyncDisposeKey,
+  snapshotKeyRange,
+  createStorageOperationReporter,
+  reportCleanupError,
+  throwIfAborted,
+  type IBackendChangeController
+} from '@migaia/storage-host/sdk'
 import type { IPgQuantizedOptions } from './features/quantized.js'
 import {
   StorageContractError,
@@ -38,38 +60,12 @@ import {
   type IStorageChange,
   type IStorageStore
 } from '@migaia/storage-contract'
-import {
-  snapshotStorageKey,
-  snapshotStorageBatchKeys,
-  createStorageBatchKeyCapture
-} from '@migaia/storage-host/authoring/key'
-import {
-  runTransactionOperation,
-  assertTransactionOwner,
-  useTransactionCapability,
-  createTransactionBuilder
-} from '@migaia/storage-host/authoring/transaction'
-import { runWithConcurrency } from '@migaia/storage-host/authoring/concurrency'
-import { createStorageIteratorLifetime } from '@migaia/storage-host/authoring/resource'
-import { createSqlTag } from '@migaia/storage-host/authoring/sql'
-import { createRecordQuery } from '@migaia/storage-host/authoring/query'
-import { provideCapabilities } from '@migaia/storage-host/authoring/capability'
-import { snapshotStorageTtlTarget } from '@migaia/storage-host/authoring/ttl'
-import { snapshotStorageCounterIncrement } from '@migaia/storage-host/authoring/counter'
 import type {
   IStoragePluginCore,
   IStorageBackendOrgContext,
   IStorageOrgBinding,
   IStorageJournalBackendBinding
 } from '@migaia/storage-host'
-import {
-  asyncDisposeKey,
-  snapshotKeyRange,
-  createStorageOperationReporter,
-  reportCleanupError,
-  throwIfAborted,
-  type IBackendChangeController
-} from '@migaia/storage-host/authoring/backend'
 import {
   snapshotPostgresOptions,
   postgresTables,

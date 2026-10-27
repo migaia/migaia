@@ -28,7 +28,8 @@ pnpm add @migaia/store-persist @migaia/store-light @migaia/storage-host
 
 ```ts doc-test=run
 import { createStore } from '@migaia/store-light'
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { persist } from '@migaia/store-persist/light'
 
 await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })
@@ -59,7 +60,8 @@ key 是本例存档名，storage 为调用方创建的内存后端；persist 从
 
 ```ts doc-test=check
 import { createStore } from '@migaia/store-light'
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 
 const store = createStore({ count: 0 })
 await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })
@@ -178,7 +180,7 @@ clearFamily(storage, namespace) 的两个参数均必填，返回 `Promise<numbe
 
 ### 加载、版本迁移与本地修改
 
-创建时构造唯一迁移计划，再订阅。水合复用 storage-contract 的 assertVersionedEnvelope 与 storage-host/authoring/migration 的 migrateEnvelopeSync。同版本保留状态；可升级旧档执行连续步骤或一次 reset，未来版本报 VERSION_UNSUPPORTED。水合错误原样传出并阻止写入；升级与恢复本身不写回，应用变化与 flush 沿原调度保存。
+创建时构造唯一迁移计划，再订阅。水合复用 storage-contract 的 assertVersionedEnvelope 与 storage-host/sdk 的 migrateEnvelopeSync。同版本保留状态；可升级旧档执行连续步骤或一次 reset，未来版本报 VERSION_UNSUPPORTED。水合错误原样传出并阻止写入；升级与恢复本身不写回，应用变化与 flush 沿原调度保存。
 
 缺省 merge 对普通对象（Object.prototype 或 null 原型）按字段浅比较：以构造时启动快照为基线，用 Object.is 比较当前字段；本地已改字段保留当前值，未改字段接受存档值，同时保留未归档的当前字段。它不是深度冲突解决，嵌套引用内部变化不自动得到逐层比较；重试也沿用这一启动基线。非普通对象、数组、Map、Set 等整体接受持久化形状，自定义 merge 则负责应用自己的规则。
 
@@ -270,9 +272,10 @@ STORE_PERSIST_SOURCE 为 store.persist；稳定码由 StorePersistErrorCode 维�
 ## Canonical codec composition and observation
 
 ```ts
-import { fromValueCodec } from '@migaia/storage-host/authoring/codec'
+import { fromValueCodec } from '@migaia/storage-host/sdk'
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { createStore } from '@migaia/store-light'
 import { persist } from '@migaia/store-persist/light'
 
@@ -302,7 +305,8 @@ The default codec already preserves collections. Use `{ ...row }` to project a n
 
 ```ts doc-test=check
 import { createStore } from '@migaia/store-light'
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { persistTransaction } from '@migaia/store-persist'
 import { persist } from '@migaia/store-persist/light'
 

@@ -1,12 +1,13 @@
-import { entityMigrationFeature } from '@migaia/storage-host/entity/migration'
+import { entityMigrationFeature } from '@migaia/storage-host/entity/features/migration'
 import { afterEach, describe, expect, it } from 'vitest'
 import { defineEntity } from '@migaia/storage-host/entity'
-import { entityUniqueFeature } from '@migaia/storage-host/entity/unique'
-import { entityQueryFeature } from '@migaia/storage-host/entity/query'
-import { entityIndexesFeature } from '@migaia/storage-host/entity/indexes'
-import { entityKeysetFeature } from '@migaia/storage-host/entity/keyset'
+import { entityUniqueFeature } from '@migaia/storage-host/entity/features/unique'
+import { entityQueryFeature } from '@migaia/storage-host/entity/features/query'
+import { entityIndexesFeature } from '@migaia/storage-host/entity/features/indexes'
+import { entityKeysetFeature } from '@migaia/storage-host/entity/features/keyset'
 import { StorageErrorCode } from '../../src/error-code.js'
-import { createStorageHost, memoryBackendPlugin, STORAGE_HOST_SOURCE } from '@migaia/storage-host'
+import { createStorageHost, STORAGE_HOST_SOURCE } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 /** These public-entry cases keep one emitted package identity for host, transactions and entities. */
 const hosts: Array<{ dispose(): Promise<void> }> = []
 afterEach(async () => {

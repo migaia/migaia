@@ -1,10 +1,7 @@
 import type { IStorageIterator, IOperationContext } from '@migaia/storage-contract'
 import type { IStorageExecutionPort } from '@migaia/storage-host'
 import { asyncDisposeKey } from '@migaia/plugin-host'
-import {
-  createStorageOperationReporter,
-  reportCleanupError
-} from '@migaia/storage-host/authoring/backend'
+import { createStorageOperationReporter, reportCleanupError } from '@migaia/storage-host/sdk'
 
 /** The original execution endpoint supplies admission without taking generator ownership. */
 type IStorageIteratorEndpoint = {

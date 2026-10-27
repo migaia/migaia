@@ -1,6 +1,6 @@
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import { attachErrorIdentity, walkErrorCauses } from '@migaia/utils/error'
-import { normalizeError } from '@migaia/storage-host/authoring/backend'
+import { normalizeError } from '@migaia/storage-host/sdk'
 import { StorageError, StorageErrorCode } from '@migaia/storage-host'
 import { ERROR_SOURCE, QdrantErrorCode, type IQdrantErrorCode } from './error-code.js'
 import { QdrantErrorText } from './error-text.js'

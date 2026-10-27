@@ -1,5 +1,6 @@
 import { expectTypeOf } from 'vitest'
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { kv, ttl } from '@migaia/storage-contract'
 import { cachePlugin, type ICacheEntryInfo, type ICacheStats } from '@migaia/storage-plugin-cache'
 import {

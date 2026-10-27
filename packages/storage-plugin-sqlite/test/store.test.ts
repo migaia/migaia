@@ -6,9 +6,12 @@ import { describe, it, expect, onTestFinished, vi } from 'vitest'
 import { createStorageHost, createOrgId, definePlugin } from '@migaia/storage-host'
 import { deferred } from '@migaia/utils/promise'
 import { kv, ttl, counter, records, sql, type IStorageKey } from '@migaia/storage-contract'
-import { sqlFragment } from '@migaia/storage-host/authoring/sql'
-import { lockKey, ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'
-import { compareStorageKeys } from '@migaia/storage-host/authoring/key'
+import {
+  sqlFragment,
+  lockKey,
+  ConcurrencyPolicy,
+  compareStorageKeys
+} from '@migaia/storage-host/sdk'
 import { runConformance } from '@migaia/storage-contract/conformance'
 import { sqliteBackendPlugin, type ISqliteValue } from '../src/index.js'
 import { nodeSqliteDriver } from '../src/node.js'

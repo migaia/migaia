@@ -1,8 +1,19 @@
-import { createBackendChangeController } from '@migaia/storage-host/authoring/change-controller'
+import {
+  createBackendChangeController,
+  resolveStorageNamespace,
+  lockKey,
+  snapshotStorageBatchKeys,
+  snapshotOperationContext,
+  snapshotSyncWriteOptions,
+  throwIfAborted,
+  withAbort,
+  reportCleanupError,
+  createStorageOperationReporter,
+  type IBackendValueCommit
+} from '@migaia/storage-host/sdk'
 import { createTextRedo, type ITextPrepared, type ITextRedoStore } from './text-redo.js'
 import { bindBrowserExecution, textExecutionKeys } from './execution.js'
 import { createBrowserOrgBinding } from './organizations.js'
-import { resolveStorageNamespace } from '@migaia/storage-host/authoring/backend'
 import { createTextBatchApi, BrowserBatchMethod } from './batch.js'
 import {
   implement,
@@ -12,13 +23,6 @@ import {
   type IStorageChange,
   type IStorageStore
 } from '@migaia/storage-contract'
-import { lockKey } from '@migaia/storage-host/authoring/concurrency'
-import { snapshotStorageBatchKeys } from '@migaia/storage-host/authoring/key'
-import {
-  snapshotOperationContext,
-  snapshotSyncWriteOptions
-} from '@migaia/storage-host/authoring/context'
-import { throwIfAborted, withAbort } from '@migaia/storage-host/authoring/backend'
 import {
   lengthPrefixedNamespaceCodec,
   namespacedKey,
@@ -48,11 +52,6 @@ import type { IStorageCapabilities } from '../types/capabilities.js'
 import type { IOperationContext, IStorageKey } from '../types/context.js'
 import type { ISyncCapableStore } from '../types/storage.js'
 import { asyncDisposeKey } from '@migaia/plugin-host'
-import {
-  reportCleanupError,
-  createStorageOperationReporter,
-  type IBackendValueCommit
-} from '@migaia/storage-host/authoring/backend'
 import {
   provideBackendConstruction,
   browserKeyValueApi,

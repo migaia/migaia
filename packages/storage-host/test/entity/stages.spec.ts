@@ -9,12 +9,8 @@ import { asyncDisposeKey } from '@migaia/plugin-host'
 import { deferred } from '@migaia/utils/promise'
 import { assertTransactionOwner } from '../../src/authoring/transaction.js'
 import { type ICodecStageObserver, type IQueryStageObserver } from '@migaia/storage-contract'
-import {
-  createStorageHost,
-  definePlugin,
-  memoryBackendKind,
-  type IStoragePluginCore
-} from '../../src/index.js'
+import { createStorageHost, definePlugin, type IStoragePluginCore } from '../../src/index.js'
+import { memoryBackendKind } from '../../src/plugins/memory.js'
 import { createMemoryBackend } from '../../src/backends/memory.js'
 import { defineEntity } from '../../src/entity.js'
 

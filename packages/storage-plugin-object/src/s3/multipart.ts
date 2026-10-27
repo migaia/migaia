@@ -10,12 +10,12 @@ import {
   type PutObjectCommandOutput
 } from '@aws-sdk/client-s3'
 import { StorageContractError, type IBlobApi } from '@migaia/storage-contract'
-import { createStorageBlobBodyReader } from '@migaia/storage-host/authoring/blob'
 import {
+  createStorageBlobBodyReader,
   subscribeToAbort,
   readAbortReason,
   throwIfAborted
-} from '@migaia/storage-host/authoring/backend'
+} from '@migaia/storage-host/sdk'
 import { isUint8Array } from '@migaia/utils/bytes'
 import { ObjectNames } from '../constants.js'
 import { ObjectErrorText } from '../error-text.js'

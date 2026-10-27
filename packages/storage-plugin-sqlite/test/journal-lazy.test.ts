@@ -1,4 +1,4 @@
-import { storageJournalPlugin } from '@migaia/storage-host/journal'
+import { storageJournalPlugin } from '@migaia/storage-host/plugins/journal'
 import { expect, it, onTestFinished, vi } from 'vitest'
 import { Logger } from '@migaia/logger'
 import { binlog, undoLog, wal, memoryLogStore } from '@migaia/logger/plugins/durable'

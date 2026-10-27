@@ -1,6 +1,6 @@
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { normalizeError } from '@migaia/storage-host/authoring/backend'
+import { normalizeError } from '@migaia/storage-host/sdk'
 import { ERROR_SOURCE, SparqlErrorCode, type ISparqlErrorCode } from './error-code.js'
 import { SparqlErrorText } from './error-text.js'
 import { SparqlText } from './text.js'

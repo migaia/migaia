@@ -1,4 +1,5 @@
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
 import { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'
 import { redisBackendPlugin } from '@migaia/storage-plugin-redis'

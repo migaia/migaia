@@ -1,5 +1,5 @@
 import { bytesToBase64 } from '@migaia/utils/bytes'
-import { throwIfAborted } from '@migaia/storage-host/authoring/backend'
+import { throwIfAborted } from '@migaia/storage-host/sdk'
 import { invalidArgument, sparqlError } from './errors.js'
 import { SparqlErrorCode } from './error-code.js'
 import { SparqlErrorText } from './error-text.js'

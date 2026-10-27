@@ -107,7 +107,7 @@ try {
 
 重新打开曾使用 TTL 的数据库时保留 TTL Feature 声明；基础读取不解释到期元数据。未声明 TTL 的客户端覆盖、删除或清空目标时，会在同一原生事务清除该目标的旧期限；后续重建值不继承期限，也不会被另一 TTL 客户端按旧期限删除。
 
-`indexedDbJournalFeature()` 提供原生镜像、私有日志 namespace 和 undo 端点；全局记录还须在同一插件列表的后端之前显式安装 `storageJournalPlugin()`（来自 `@migaia/storage-host/journal`），并保留原 `journal` 配置。journal 镜像读取和恢复原有物理期限，不替调用方启用 TTL 到期策略。物理写入版本与墓碑保留在基础写路径，使已装 journal 的其他实例仍可识别修改、删除和重建冲突；基础路径不捕获镜像或创建日志。
+`indexedDbJournalFeature()` 提供原生镜像、私有日志 namespace 和 undo 端点；全局记录还须在同一插件列表的后端之前显式安装 `storageJournalPlugin()`（来自 `@migaia/storage-host/plugins/journal`），并保留原 `journal` 配置。journal 镜像读取和恢复原有物理期限，不替调用方启用 TTL 到期策略。物理写入版本与墓碑保留在基础写路径，使已装 journal 的其他实例仍可识别修改、删除和重建冲突；基础路径不捕获镜像或创建日志。
 
 原始 `store.use(records).query().page()` 与 `.after()` 另外需要在后端 Feature 配置中选择 `@migaia/storage-plugin-browser/features/indexed-db-keyset` 的 `indexedDbKeysetFeature()`；基础 `.all()` 仍可使用。该单元借用 host 规范游标实现，不自动启用原生索引。缺少声明时，分页会在打开 reader 前报 `@migaia/storage-plugin-browser / INDEXED_DB_FEATURE_NOT_INSTALLED` 并指出缺少的工厂。实体分页独立选择 `entityKeysetFeature()`，不要求这个原始查询 Feature。
 
@@ -158,7 +158,7 @@ try {
 
 ## 实体仓储
 
-基础 `defineEntity` 只定义、连接和读写。查询在实体配置的 `features` 中选择 `entityQueryFeature()`（`@migaia/storage-host/entity/query`）；唯一约束选择 `/entity/unique` 的 `entityUniqueFeature()`；迁移选择 `/entity/migration` 的 `entityMigrationFeature()`；索引规划选择 `/entity/indexes` 的 `entityIndexesFeature()`；keyset 分页选择 `/entity/keyset` 的 `entityKeysetFeature()`。索引查询组合 query 与 indexes，分页组合 query 与 keyset；IndexedDB 原生索引还需后端的 `indexedDbIndexesFeature()`。各项独立声明，不会自动安装。
+基础 `defineEntity` 只定义、连接和读写。查询在实体配置的 `features` 中选择 `entityQueryFeature()`（`@migaia/storage-host/entity/features/query`）；唯一约束选择 `/entity/features/unique` 的 `entityUniqueFeature()`；迁移选择 `/entity/features/migration` 的 `entityMigrationFeature()`；索引规划选择 `/entity/features/indexes` 的 `entityIndexesFeature()`；keyset 分页选择 `/entity/features/keyset` 的 `entityKeysetFeature()`。索引查询组合 query 与 indexes，分页组合 query 与 keyset；IndexedDB 原生索引还需后端的 `indexedDbIndexesFeature()`。各项独立声明，不会自动安装。
 
 从 `@migaia/storage-host/entity` 导入中立仓储定义，并连接实际已安装的 IndexedDB 存储。
 
@@ -272,7 +272,7 @@ try {
 }
 ```
 
-显式选择 `indexedDbJournalFeature()` 后，IndexedDB 支持从 `@migaia/storage-host/journal` 调用 `storageLogStore(hostOrOrg, 'indexed-db', { prefix })`。私有行使用既有 META 对象仓库内的数组键命名空间。业务 `clearAll` 保留历史；删除组织使旧日志句柄失效，原业务视图仍可重新打开。缓存模式下，重新打开同一物理组织和前缀前须释放原日志。head、state 与记录随原生事务一同提交，缓存索引在真实 complete 事件内发布。
+显式选择 `indexedDbJournalFeature()` 后，IndexedDB 支持从 `@migaia/storage-host/plugins/journal` 调用 `storageLogStore(hostOrOrg, 'indexed-db', { prefix })`。私有行使用既有 META 对象仓库内的数组键命名空间。业务 `clearAll` 保留历史；删除组织使旧日志句柄失效，原业务视图仍可重新打开。缓存模式下，重新打开同一物理组织和前缀前须释放原日志。head、state 与记录随原生事务一同提交，缓存索引在真实 complete 事件内发布。
 
 有原生 Web Locks 时，原资源期间独占与缓存路径保持，冲突打开报 LOCK_REJECTED。缺少 Web Locks、又未声明实际私有 factory 时，原 namespace 声明 `indexExclusive:false`：storageLogStore 不再拒绝，而是在每个操作的原 journal-store readwrite 事务内恢复/读取最新 lastSeq、state 与记录，不跨操作保留索引。注入 factory 有 Web Locks 时同样使用原缓存路径；`journalFactoryIsPrivate:true` 仅适用于数据宇宙局限当前 realm 且不转发共享持久库的真实私有 factory，继续复用原逻辑锁与缓存拥有者。对象身份本身不证明隔离。此命名空间支持本身不启用全局自动捕获或显式选择的 undo。
 

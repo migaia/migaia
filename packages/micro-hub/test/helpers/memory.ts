@@ -1,9 +1,6 @@
 import { onTestFinished } from 'vitest'
-import {
-  createStorageHost,
-  memoryBackendPlugin,
-  type IMemoryBackendStore
-} from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin, type IMemoryBackendStore } from '@migaia/storage-host/plugins/memory'
 
 /** Acquire the real memory registration and release its original host after the case settles. */
 export async function createMemoryTestStore(): Promise<IMemoryBackendStore> {

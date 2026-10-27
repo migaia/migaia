@@ -93,8 +93,8 @@ describe('package-owner bundle boundary', () => {
     )
     expect(source).toContain('from "@migaia/utils/promise"')
     expect(source).toContain('from "@migaia/utils/bytes"')
-    expect(source).toContain('from "@migaia/storage-host/authoring/change-controller"')
-    expect(notifications).toContain('from "@migaia/storage-host/authoring/change-controller"')
+    expect(source).toContain('from "@migaia/storage-host/sdk"')
+    expect(notifications).toContain('from "@migaia/storage-host/sdk"')
     expect(notifications).toContain('from "@migaia/event-subscriber"')
     expect(controllerEntry).toContain(
       "export { createBackendChangeController } from '../core/change-controller.js'"

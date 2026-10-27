@@ -1,13 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
 import { records } from '@migaia/storage-contract'
-import {
-  createStorageHost,
-  memoryBackendKind,
-  memoryBackendPlugin,
-  STORAGE_HOST_SOURCE,
-  StorageErrorCode
-} from '@migaia/storage-host'
+import { createStorageHost, STORAGE_HOST_SOURCE, StorageErrorCode } from '@migaia/storage-host'
+import { memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'
 import { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-change-feed'
 import { walkErrorCauses } from '@migaia/utils/error'

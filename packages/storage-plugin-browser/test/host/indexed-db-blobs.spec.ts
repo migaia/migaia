@@ -4,12 +4,8 @@ import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
 import { IDBFactory, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
 import { describe, expect, it, vi, onTestFinished } from 'vitest'
 import { walkErrorCauses } from '@migaia/utils/error'
-import {
-  createStorageHost,
-  createOrgId,
-  defineFeature,
-  memoryBackendPlugin
-} from '@migaia/storage-host'
+import { createStorageHost, createOrgId, defineFeature } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { indexedDbBackendPlugin, indexedDbBackendKind } from '../../src/indexed-db.js'
 import { indexedDbBlobFeature } from '../../src/features/blobs.js'
 

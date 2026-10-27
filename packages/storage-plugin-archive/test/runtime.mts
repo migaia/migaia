@@ -1,4 +1,5 @@
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { archivePlugin } from '@migaia/storage-plugin-archive'
 /** All runtimes reach the same built neutral Archive and native WHATWG gzip implementation. */
 const initial = await createStorageHost({

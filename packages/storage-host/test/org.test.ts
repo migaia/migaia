@@ -17,14 +17,13 @@ import { lockKey } from '../src/authoring/concurrency.js'
 import {
   createStorageHost,
   createOrgId,
-  memoryBackendPlugin,
-  memoryBackendKind,
   definePlugin,
   defineFeature,
   defineStorageBackendKind,
   type IStoragePluginCore,
   type IStoragePluginCallContext
 } from '../src/index.js'
+import { memoryBackendPlugin, memoryBackendKind } from '../src/plugins/memory.js'
 import { catalog } from './helpers/catalog.js'
 import { defineEntity } from '../src/entity.js'
 

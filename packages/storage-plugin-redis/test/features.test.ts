@@ -1,12 +1,8 @@
 import { postgresBackendPlugin, type IPgDriver } from '@migaia/storage-plugin-postgres'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { createClientPool } from 'redis'
-import {
-  createStorageHost,
-  createOrgId,
-  definePlugin,
-  memoryBackendPlugin
-} from '@migaia/storage-host'
+import { createStorageHost, createOrgId, definePlugin } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { durableChangeFeed } from '@migaia/storage-contract'
 import { deferred } from '@migaia/utils/promise'
 import { redisChangeStreamFeature } from '../src/features/change-stream.js'

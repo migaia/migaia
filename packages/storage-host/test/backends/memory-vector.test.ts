@@ -12,7 +12,8 @@ import {
   type IStorageChange
 } from '@migaia/storage-contract'
 import { lockKey, ConcurrencyPolicy } from '../../src/authoring/concurrency.js'
-import { createStorageHost, createOrgId, memoryBackendPlugin } from '../../src/index.js'
+import { createStorageHost, createOrgId } from '../../src/index.js'
+import { memoryBackendPlugin } from '../../src/plugins/memory.js'
 
 /** Payload declarations remain business schemas while serialize owns the actual field snapshot. */
 type IPayload = { group: string; order: number }

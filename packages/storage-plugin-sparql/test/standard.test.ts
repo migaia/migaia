@@ -1,13 +1,9 @@
 import { describe, expect, it, onTestFinished } from 'vitest'
 import { Store, quad as nativeQuad, namedNode, literal, defaultGraph } from 'oxigraph'
-import {
-  createStorageHost,
-  memoryBackendPlugin,
-  defineFeature,
-  createOrgId
-} from '@migaia/storage-host'
+import { createStorageHost, defineFeature, createOrgId } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { rdf, sparql, type IQuad, type IRdfApi } from '@migaia/storage-contract'
-import { term } from '@migaia/storage-host/authoring/rdf'
+import { term } from '@migaia/storage-host/sdk'
 import { runConformance } from '@migaia/storage-contract/conformance'
 import { sparqlBackendPlugin, sparqlBackendKind } from '../src/index.js'
 import { oxigraphEndpoint } from '../src/oxigraph.js'

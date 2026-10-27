@@ -1,10 +1,10 @@
-import { storageJournalPlugin } from '@migaia/storage-host/journal'
+import { storageJournalPlugin } from '@migaia/storage-host/plugins/journal'
 import { expect, it, onTestFinished } from 'vitest'
 import { Logger, type ILogEntry } from '@migaia/logger'
 import { level } from '@migaia/logger/plugins'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { kv } from '@migaia/storage-contract'
-import { lockKey } from '@migaia/storage-host/authoring/concurrency'
+import { lockKey } from '@migaia/storage-host/sdk'
 import { sqliteBackendPlugin } from '../src/index.js'
 import { nodeSqliteDriver } from '../src/node.js'
 

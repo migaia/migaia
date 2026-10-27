@@ -1,7 +1,10 @@
 import type { IStorageKey } from '@migaia/storage-contract'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
-import { compareStorageKeys } from '@migaia/storage-host/authoring/key'
-import { encodeFlatStorageKey, decodeFlatStorageKey } from '@migaia/storage-host/authoring/backend'
+import {
+  compareStorageKeys,
+  encodeFlatStorageKey,
+  decodeFlatStorageKey
+} from '@migaia/storage-host/sdk'
 
 /** Private deadline rows keep one stable layout across basic cleanup and explicit TTL policy. */
 export const IndexedDbTtlLayout = {

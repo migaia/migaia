@@ -1,5 +1,7 @@
-import type { IBackendLifecycleController } from '@migaia/storage-host/authoring/change-controller'
-import type { createBackendChangeController } from '@migaia/storage-host/authoring/change-controller'
+import type {
+  IBackendLifecycleController,
+  createBackendChangeController
+} from '@migaia/storage-host/sdk'
 import type { captureIndexedDbTtlClock, createIndexedDbTtlAccess } from './indexed-db-ttl.js'
 import type {
   createIndexedDbJournalImages,
@@ -28,7 +30,7 @@ import type { IStorageChange } from '@migaia/storage-contract'
 export type IIndexedDbAssemblyPlan = {
   /** Only this explicit owner imports the full canonical record-query keyset implementation. */
   keyset?: {
-    readonly query: typeof import('@migaia/storage-host/authoring/query').createRecordQuery
+    readonly query: typeof import('@migaia/storage-host/sdk').createRecordQuery
   }
   indexes?: {
     readonly assertHandle: typeof import('./indexed-db-indexes-assembly.js').assertHandle

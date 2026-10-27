@@ -5,7 +5,8 @@ import { STORAGE_BROWSER_SOURCE } from '../src/index.js'
 import { cookieBackendPlugin } from '../src/cookies.js'
 import { indexedDbBackendPlugin } from '../src/indexed-db.js'
 import { localStorageBackendPlugin } from '../src/local-storage.js'
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 
 type IWorkerResult = {
   readonly memory: string | null

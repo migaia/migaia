@@ -21,7 +21,8 @@
 下面用真实内存 records 与 blob 能力演示完整流程；生产数据需要改用持久热冷后端。
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { archivePlugin } from '@migaia/storage-plugin-archive'
 
 await using base = await createStorageHost({
@@ -65,7 +66,8 @@ true
 先上传、再删除看起来简单，但两个存储之间没有一个原子操作。这里只展示，不执行。
 
 ```ts doc-test=check
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { blob } from '@migaia/storage-contract'
 
 await using host = await createStorageHost({

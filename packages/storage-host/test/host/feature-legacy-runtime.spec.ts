@@ -130,10 +130,8 @@ const runRetainedEntryCandidate = async (
       entryPath,
       `const legacyTrace: string[] = []
 globalThis[Symbol.for('${legacyExecutionSymbol}')] = () => { legacyTrace.push('${entryCase}') }
-import {
-  createStorageHost, definePlugin, defineFeature, defineStorageBackendKind,
-  memoryBackendKind, memoryBackendPlugin
-} from './src/index.js'
+import { createStorageHost, definePlugin, defineFeature, defineStorageBackendKind } from './src/index.js'
+import { memoryBackendKind, memoryBackendPlugin } from './src/plugins/memory.js'
 import { defineStorageCapability, implement } from '@migaia/storage-contract'
 const kind = defineStorageBackendKind()('retained')
 /** Each candidate supplies a legal raw resource through the actual installation entry. */

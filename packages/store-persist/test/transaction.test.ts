@@ -3,7 +3,8 @@ import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory
 import { createRuntime } from '@migaia/reactive'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { binaryCodec } from '@migaia/storage-host/entity'
-import { createStorageHost, definePlugin, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost, definePlugin } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { createStore } from '@migaia/store-light'
 import { ObservableMap } from '@migaia/store-indexed'
 import { createAtomStore, familyDef } from '@migaia/store-keyed'
@@ -12,9 +13,9 @@ import {
   createTransactionOwner,
   runTransactionOperation,
   readTransactionOperationContext,
-  useTransactionCapability
-} from '@migaia/storage-host/authoring/transaction'
-import { ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'
+  useTransactionCapability,
+  ConcurrencyPolicy
+} from '@migaia/storage-host/sdk'
 import {
   defineConcurrencyPolicy,
   StorageContractError,

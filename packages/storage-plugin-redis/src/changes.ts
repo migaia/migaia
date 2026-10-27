@@ -1,5 +1,4 @@
-import { snapshotOperationContext } from '@migaia/storage-host/authoring/context'
-import { decodeStorageOrgKey } from '@migaia/storage-host/authoring/key'
+import { snapshotOperationContext, decodeStorageOrgKey } from '@migaia/storage-host/sdk'
 import { type IStorageChange } from '@migaia/storage-contract'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { createRedisLayout, redisUnhex } from './layout.js'

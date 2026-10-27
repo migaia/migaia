@@ -1,5 +1,5 @@
 import type { ISqliteValue } from '../src/types.js'
-import { decodeFlatStorageKey } from '@migaia/storage-host/authoring/backend'
+import { decodeFlatStorageKey, lockKey } from '@migaia/storage-host/sdk'
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
 import { Logger } from '@migaia/logger'
 import {
@@ -10,14 +10,13 @@ import {
   LogRecordState,
   type ILogStore
 } from '@migaia/logger/plugins/durable'
-import { lockKey } from '@migaia/storage-host/authoring/concurrency'
 import { ttl } from '@migaia/storage-contract'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it, onTestFinished } from 'vitest'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
-import { storageJournalPlugin, storageLogStore } from '@migaia/storage-host/journal'
+import { storageJournalPlugin, storageLogStore } from '@migaia/storage-host/plugins/journal'
 import { sqliteBackendPlugin } from '../src/index.js'
 import { nodeSqliteDriver } from '../src/node.js'
 

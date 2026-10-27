@@ -1,5 +1,5 @@
 import { memoryTestFeatures } from '../helpers/memory-features.js'
-import { memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host'
+import { memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { localStorageBackendKind, localStorageBackendPlugin } from '../../src/local-storage.js'
 import { reactiveFeature } from '../../src/features/reactive.js'
 

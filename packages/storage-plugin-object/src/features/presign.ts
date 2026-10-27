@@ -6,7 +6,7 @@ import {
   type IStorageFeatureExpose,
   type IStorageFeatureOutput
 } from '@migaia/storage-host'
-import { snapshotStorageBlobPut, snapshotStorageBlobGet } from '@migaia/storage-host/authoring/blob'
+import { snapshotStorageBlobPut, snapshotStorageBlobGet } from '@migaia/storage-host/sdk'
 import {
   StorageContractError,
   StorageContractErrorCode,

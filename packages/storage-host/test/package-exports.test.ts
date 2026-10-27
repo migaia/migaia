@@ -8,10 +8,13 @@ const baseline = JSON.parse(
   )
 ) as { packages: Record<string, Record<string, string[]>> }
 describe('storage host package exports', () => {
-  it('loads the pure MMR scorer only from its independent vector entry', async () => {
+  it('loads the pure MMR scorer from the SDK entry and not from the root', async () => {
     /** Real dist resolution verifies the neutral entry and the root's protected boundary. */
-    const runtime = await import('@migaia/storage-host/vector/mmr')
-    expect(Object.keys(runtime)).toEqual(baseline.packages['@migaia/storage-host']!['./vector/mmr'])
+    const runtime = await import('@migaia/storage-host/sdk')
+    expect(Object.keys(runtime).sort()).toEqual(
+      [...baseline.packages['@migaia/storage-host']!['./sdk']!].sort()
+    )
+    expect(runtime.mmr).toBeTypeOf('function')
     expect(await import('@migaia/storage-host')).not.toHaveProperty('mmr')
     expect(
       runtime.mmr({ lambda: 1 })(
@@ -24,17 +27,23 @@ describe('storage host package exports', () => {
     ).toEqual([1])
   })
   it('exposes only the private log factory through its dedicated journal entry', async () => {
-    const runtime = await import('@migaia/storage-host/journal')
-    expect(Object.keys(runtime)).toEqual(baseline.packages['@migaia/storage-host']!['./journal'])
+    const runtime = await import('@migaia/storage-host/plugins/journal')
+    expect(Object.keys(runtime)).toEqual(
+      baseline.packages['@migaia/storage-host']!['./plugins/journal']
+    )
     expect(await import('@migaia/storage-host')).not.toHaveProperty('storageLogStore')
   })
-  it('loads only finite backend functions from the dedicated authoring entry', async () => {
+  it('loads only finite backend functions from the SDK entry', async () => {
     /** Real package resolution proves controller authority remains on the original core. */
-    const runtime = await import('@migaia/storage-host/authoring/backend')
+    const runtime = await import('@migaia/storage-host/sdk')
     expect(Object.keys(runtime).sort()).toEqual(
-      baseline.packages['@migaia/storage-host']!['./authoring/backend']
+      [...baseline.packages['@migaia/storage-host']!['./sdk']!].sort()
     )
-    expect(runtime).not.toHaveProperty('createBackendChangeController')
+    /**
+     * The controller factory joined the SDK from its former subpath; lookup and lock ports stay
+     * private.
+     */
+    expect(runtime.createBackendChangeController).toBeTypeOf('function')
     expect(runtime).not.toHaveProperty('getBackendChangeController')
     expect(runtime).not.toHaveProperty('createBackendKeyLockPort')
     expect(runtime.observeStorageBatch).toBeTypeOf('function')
@@ -59,11 +68,11 @@ describe('storage host package exports', () => {
     )
     expect(runtime.asyncDisposeKey).toBe((await import('@migaia/plugin-host')).asyncDisposeKey)
   })
-  it('publishes shared vector snapshots and query synthesis through the vector authoring entry', async () => {
+  it('publishes shared vector snapshots and query synthesis through the SDK entry', async () => {
     /** Actual package resolution excludes private memory scoring, filtering and ranking. */
-    const runtime = await import('@migaia/storage-host/authoring/vector')
-    expect(Object.keys(runtime)).toEqual(
-      baseline.packages['@migaia/storage-host']!['./authoring/vector']
+    const runtime = await import('@migaia/storage-host/sdk')
+    expect(Object.keys(runtime).sort()).toEqual(
+      [...baseline.packages['@migaia/storage-host']!['./sdk']!].sort()
     )
     expect(
       runtime.recommendStorageVector(

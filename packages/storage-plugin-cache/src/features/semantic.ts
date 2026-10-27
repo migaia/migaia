@@ -22,20 +22,18 @@ import {
 } from '@migaia/storage-contract'
 import {
   snapshotStorageVectorCollection,
-  snapshotStorageVector
-} from '@migaia/storage-host/authoring/vector'
-import { snapshotStorageWhere } from '@migaia/storage-host/authoring/query'
-import { defineJsonCodec } from '@migaia/serialize/codecs/json'
-import type { ICodecValue } from '@migaia/serialize/codec'
-import { raceWithAbort, UtilsAbortError } from '@migaia/utils/promise'
-import {
+  snapshotStorageVector,
+  snapshotStorageWhere,
   withAbort,
   throwIfAborted,
   readAbortReason,
   createStorageOperationReporter,
   reportCleanupError,
   type IBackendChangeController
-} from '@migaia/storage-host/authoring/backend'
+} from '@migaia/storage-host/sdk'
+import { defineJsonCodec } from '@migaia/serialize/codecs/json'
+import type { ICodecValue } from '@migaia/serialize/codec'
+import { raceWithAbort, UtilsAbortError } from '@migaia/utils/promise'
 import { cacheBackendKind } from '../kind.js'
 import { cacheKey } from '../key.js'
 import { cacheError, invalidArgument, missingCapability } from '../errors.js'

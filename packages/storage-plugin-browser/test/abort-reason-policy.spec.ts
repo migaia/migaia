@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { readAbortReason } from '@migaia/storage-host/authoring/backend'
+import { readAbortReason } from '@migaia/storage-host/sdk'
 
 describe('storage operation abort reason policy', () => {
   it('returns undefined or the original cancellation reason', () => {

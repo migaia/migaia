@@ -16,7 +16,8 @@
 Put initial plugins in `plugins`. A later `use()` returns a host type that includes the new backends. Both references share one lifetime; close either host reference once.
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 
 const original = await createStorageHost({
   plugins: [memoryBackendPlugin({ id: 'session' })]
@@ -42,7 +43,8 @@ Plugins in one batch cannot borrow each other's unpublished backends. Install ba
 The memory backend can write strings, bytes and records in one transaction. A failed callback does not commit its draft. Obtain queries through the `records` capability; this example reads committed data after the transaction finishes.
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { records } from '@migaia/storage-contract'
 
 type IOrder = { state: string; total: number }
@@ -86,17 +88,18 @@ await users.put({ id: 'u1', name: 'Ada' })
 console.log(await users.get('u1'))
 ```
 
-Select only required units in `features`: `entityQueryFeature()` from `/entity/query` adds query/list/stream; `entityIndexesFeature()` from `/entity/indexes` adds index declaration/planning; `entityUniqueFeature()` from `/entity/unique` adds unique commit checks; `entityMigrationFeature()` from `/entity/migration` adds version plans and persisted migration; `entityKeysetFeature()` from `/entity/keyset` admits page/after. Index-backed queries and fallback uniqueness validation also require query. Migration without indexes or unique constraints scans native records or text keys directly and needs neither query nor unique. Units never enable another unit implicitly.
+Select only required units in `features`: `entityQueryFeature()` from `/entity/features/query` adds query/list/stream; `entityIndexesFeature()` from `/entity/features/indexes` adds index declaration/planning; `entityUniqueFeature()` from `/entity/features/unique` adds unique commit checks; `entityMigrationFeature()` from `/entity/features/migration` adds version plans and persisted migration; `entityKeysetFeature()` from `/entity/features/keyset` admits page/after. Index-backed queries and fallback uniqueness validation also require query. Migration without indexes or unique constraints scans native records or text keys directly and needs neither query nor unique. Units never enable another unit implicitly.
 
 The unique unit captures its own constraint projections without enabling index planning. Unique write checks alone do not require the indexes unit.
 
 `defineEntity<T>()({...})` declares an object's primary key and indexes. `connect(store)` attaches it to a backend. This example writes first, then queries through the same definition.
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { defineEntity } from '@migaia/storage-host/entity'
-import { entityQueryFeature } from '@migaia/storage-host/entity/query'
-import { entityIndexesFeature } from '@migaia/storage-host/entity/indexes'
+import { entityQueryFeature } from '@migaia/storage-host/entity/features/query'
+import { entityIndexesFeature } from '@migaia/storage-host/entity/features/indexes'
 
 type IOrder = { id: string; state: string; total: number }
 const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
@@ -125,9 +128,10 @@ Select `index` or `range` first and only once. `where`, `select`, `skip` and `li
 Select only migration when upgrading records without indexes or unique constraints. Reading an old record upgrades the returned value; call `migrate()` to persist the new envelopes. Each memory-record batch uses the original native transaction.
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { defineEntity } from '@migaia/storage-host/entity'
-import { entityMigrationFeature } from '@migaia/storage-host/entity/migration'
+import { entityMigrationFeature } from '@migaia/storage-host/entity/features/migration'
 
 type IUser = { id: string; name: string }
 const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
@@ -162,7 +166,8 @@ Declaring unique constraints still requires the unique unit. Its fallback check 
 Organization IDs are canonical lowercase UUIDs. Saving an organization view, including extracting one of its methods, keeps that organization fixed.
 
 ```ts doc-test=run
-import { createStorageHost, createOrgId, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost, createOrgId } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 
 const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
 try {
@@ -189,8 +194,9 @@ A non-default organization receives the capabilities its backend actually provid
 Install the optional `@migaia/logger` peer first. `storageLogStore()` is asynchronous and accepts a host or organization view, a backend ID and a nonempty `prefix`. A plain KV object is not accepted. Append one record, then inspect its sequence and pending state:
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
-import { storageLogStore, storageJournalPlugin } from '@migaia/storage-host/journal'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
+import { storageLogStore, storageJournalPlugin } from '@migaia/storage-host/plugins/journal'
 import { LogRecordState } from '@migaia/logger/plugins/durable'
 
 const host = await createStorageHost({ plugins: [storageJournalPlugin(), memoryBackendPlugin()] })
@@ -215,7 +221,7 @@ Opening a log does not enable automatic business logging. Configure `createStora
 
 Choose binlog, WAL, undo and same-transaction log stores as needed. `atomicBinlog` / `atomicUndo` select real log stores by backend ID and require a shared transaction with the business backend. Other combinations depend on backend support and reject before business mutation when unavailable. Failed external binlog appends are reported without rolling back committed business data. Do not recover unknown results by blindly replaying writes. Undo checks stored data and revisions first; conflicts use `UNDO_CONFLICT`, and missing history uses `UNDO_NOT_FOUND`.
 
-`telemetry: true` additionally requires the logger level plugin. Logs can include operation payloads and errors; configure the logger for the application's needs. Even telemetry-only configuration installs an asynchronous stage, so use asynchronous data methods; synchronous reads and writes reject with `ASYNC_STAGE_IN_SYNC_ENTRY`. Without a `/journal` import, the host does not load logger at runtime. See the [logger guide](../logger/USEGUIDE.en.md) for logger configuration.
+`telemetry: true` additionally requires the logger level plugin. Logs can include operation payloads and errors; configure the logger for the application's needs. Even telemetry-only configuration installs an asynchronous stage, so use asynchronous data methods; synchronous reads and writes reject with `ASYNC_STAGE_IN_SYNC_ENTRY`. Without a `/plugins/journal` import, the host does not load logger at runtime. See the [logger guide](../logger/USEGUIDE.en.md) for logger configuration.
 
 ## Handle errors and finish work
 
@@ -237,7 +243,7 @@ For backend implementations, see the [README migration table](./README.en.md#mov
 
 The base host does not import journal runtime, notification controllers or change iterators. Previously the host's journal option loaded logging automatically and memory enabled notifications and watch by default. Applications now select these capabilities so basic reads and writes do not include unused code.
 
-Journal configuration goes into `storageJournalPlugin(options)` from `@migaia/storage-host/journal`, placed in the first `createStorageHost` plugin batch before the backends it records; the host has no separate `journal` option. A configured journal plugin installed later, or passed twice, rejects with `INVALID_CONFIG`. For `storageLogStore()` alone, install `storageJournalPlugin()` without options; missing assembly raises `JOURNAL_NOT_ASSEMBLED`. Journal configuration, stored records and transaction semantics retain their existing contract.
+Journal configuration goes into `storageJournalPlugin(options)` from `@migaia/storage-host/plugins/journal`, placed in the first `createStorageHost` plugin batch before the backends it records; the host has no separate `journal` option. A configured journal plugin installed later, or passed twice, rejects with `INVALID_CONFIG`. For `storageLogStore()` alone, install `storageJournalPlugin()` without options; missing assembly raises `JOURNAL_NOT_ASSEMBLED`. Journal configuration, stored records and transaction semantics retain their existing contract.
 
 `host.unUse(id)` removes one installed plugin: its backend, extension methods and probe listeners are withdrawn first, then its resources are released in reverse order. While another plugin borrows the backend (for example a cache tier) it rejects with `BACKEND_IN_USE`; remove the borrower first. An unknown id rejects with `BACKEND_NOT_INSTALLED`, removal during an install with `STORAGE_HOST_BUSY`, and a configured journal plugin with `INVALID_CONFIG`. The same id can be installed again afterwards; call `detect()` as usual.
 
@@ -246,7 +252,8 @@ Observation events are subscribed only through `storageProbe(handlers)` from `@m
 Memory notifications and feeds use separate Feature roots:
 
 ```ts
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'
 import { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-change-feed'
 
@@ -263,7 +270,7 @@ await host.dispose()
 
 Without the feed Feature, memory reports `capabilities.changeFeed: false` and watch raises `CHANGE_ITERATOR_NOT_ASSEMBLED`. Notifications alone enable `subscribeChanges()`. The feed requires notifications; omitting them raises `CHANGE_CONTROLLER_NOT_ASSEMBLED`. A lightweight lifecycle owner still closes physical resources and drains accepted writes.
 
-Backend authors import the controller factory from `/authoring/change-controller` and pass it explicitly to `core.createChangeController(options, createBackendChangeController)`. Basic physical resources can use `createBackendLifecycleController` from that entry. Import change iterators from `/authoring/change-iterator`; `/authoring/backend` no longer re-exports them.
+Backend authors import the controller factory from `/sdk` and pass it explicitly to `core.createChangeController(options, createBackendChangeController)`. Basic physical resources can use `createBackendLifecycleController` from that entry. Change iterators come from the same `/sdk` entry.
 
 ### Strict index query migration
 

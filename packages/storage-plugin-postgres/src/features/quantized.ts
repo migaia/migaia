@@ -1,5 +1,5 @@
 import { defineFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
-import { refineStorageVectorQuery } from '@migaia/storage-host/authoring/query'
+import { refineStorageVectorQuery } from '@migaia/storage-host/sdk'
 import { type IVectorQuery, type IVectorNativeQuery } from '@migaia/storage-contract'
 import { postgresBackendKind } from '../plugin.js'
 import { PgQuantizedMode } from '../constants.js'

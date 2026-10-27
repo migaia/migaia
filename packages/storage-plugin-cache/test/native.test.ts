@@ -1,4 +1,4 @@
-import { storageJournalPlugin } from '@migaia/storage-host/journal'
+import { storageJournalPlugin } from '@migaia/storage-host/plugins/journal'
 import { Logger } from '@migaia/logger'
 import { binlog, wal, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'
 import { mkdtemp, rm } from 'node:fs/promises'
@@ -9,12 +9,8 @@ import { promisify } from 'node:util'
 import { Pool } from 'pg'
 import { createClientPool } from 'redis'
 import { describe, expect, it } from 'vitest'
-import {
-  createStorageHost,
-  memoryBackendPlugin,
-  definePlugin,
-  createOrgId
-} from '@migaia/storage-host'
+import { createStorageHost, definePlugin, createOrgId } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
 import { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'
 import { redisBackendPlugin, type IRedisDriver } from '@migaia/storage-plugin-redis'
@@ -28,7 +24,7 @@ import { fetchHttp } from '@migaia/storage-plugin-qdrant/http'
 import { pgDriver } from '@migaia/storage-plugin-postgres/pg'
 import { cachePlugin } from '../src/index.js'
 import { vector, type IStorageChange, type IVectorCollection } from '@migaia/storage-contract'
-import { lockKey } from '@migaia/storage-host/authoring/concurrency'
+import { lockKey } from '@migaia/storage-host/sdk'
 
 /** Required service fixtures are injected by the repository's sole native-service launcher. */
 const redisUrl = process.env.MIGAIA_REDIS_URL,

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { intrinsicConstructorName } from '@migaia/storage-host/authoring/backend'
+import { intrinsicConstructorName } from '@migaia/storage-host/sdk'
 import { isUint8Array } from '@migaia/utils/bytes'
 
 describe('cross-realm brand helpers', () => {

@@ -1,6 +1,6 @@
 import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { entityTestFeatures } from './entity-features.js'
-import { storageJournalPlugin } from '@migaia/storage-host/journal'
+import { storageJournalPlugin } from '@migaia/storage-host/plugins/journal'
 import { indexedDbTestFeatures } from './indexed-db-features.js'
 import { createStorageHost, createOrgId, definePlugin } from '@migaia/storage-host'
 import { defineEntity } from '@migaia/storage-host/entity'

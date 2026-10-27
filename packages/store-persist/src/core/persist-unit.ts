@@ -23,9 +23,9 @@ import {
 } from '@migaia/storage-contract'
 import {
   assertTransactionOwner,
-  runTransactionOperation
-} from '@migaia/storage-host/authoring/transaction'
-import { migrateEnvelopeSync } from '@migaia/storage-host/authoring/migration'
+  runTransactionOperation,
+  migrateEnvelopeSync
+} from '@migaia/storage-host/sdk'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { isUint8Array } from '@migaia/utils/bytes'

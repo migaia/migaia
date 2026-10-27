@@ -1,5 +1,5 @@
 import { expectTypeOf } from 'vitest'
-import type { IMemoryBackendStore } from '@migaia/storage-host'
+import type { IMemoryBackendStore } from '@migaia/storage-host/plugins/memory'
 import type { ILocalStorageBackendStore } from '../../src/local-storage.js'
 import type { ISessionStorageBackendStore } from '../../src/session-storage.js'
 import type { ICookieBackendStore } from '../../src/cookies.js'

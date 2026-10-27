@@ -9,10 +9,9 @@ import {
   definePlugin,
   defineFeature,
   defineStorageBackendKind,
-  memoryBackendKind,
-  memoryBackendPlugin,
   StorageErrorCode
 } from '../src/index.js'
+import { memoryBackendKind, memoryBackendPlugin } from '../src/plugins/memory.js'
 import type { IStoragePluginCore } from '../src/index.js'
 import type { IStorageBase } from '@migaia/storage-contract'
 /** The kind describes the real store and native client without granting either one. */

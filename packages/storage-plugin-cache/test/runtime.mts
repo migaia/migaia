@@ -1,4 +1,5 @@
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { cachePlugin } from '@migaia/storage-plugin-cache'
 import { semanticCacheFeature } from '@migaia/storage-plugin-cache/features/semantic'
 

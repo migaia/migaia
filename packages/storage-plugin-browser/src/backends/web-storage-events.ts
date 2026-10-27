@@ -1,7 +1,4 @@
-import {
-  createStorageOperationReporter,
-  reportCleanupError
-} from '@migaia/storage-host/authoring/backend'
+import { createStorageOperationReporter, reportCleanupError } from '@migaia/storage-host/sdk'
 import type { IWebStorageLike } from '../types/storage.js'
 
 /** The native browser event is the sole cross-document source; no polling or injected bus exists. */

@@ -39,25 +39,32 @@ import {
   assertTransactionOwner,
   runTransactionOperation,
   useTransactionCapability,
-  createTransactionBuilder
-} from '@migaia/storage-host/authoring/transaction'
-import {
+  createTransactionBuilder,
   runWithConcurrency,
   snapshotConcurrencyLockRange,
   readConcurrencyLockIdentities,
-  lockKey
-} from '@migaia/storage-host/authoring/concurrency'
-import { createRecordQueryWithoutKeyset } from '@migaia/storage-host/authoring/query'
-import { snapshotStorageKeyPrefix } from '@migaia/storage-host/authoring/key'
-import { isStorageErrorFamily, type IStorageErrorFamily } from './errors.js'
-import {
+  lockKey,
+  createRecordQueryWithoutKeyset,
+  snapshotStorageKeyPrefix,
   type IBackendJournalTransaction,
   createStorageOperationReporter,
   createStorageOperationRuntime,
   reportCleanupError,
   resolveStorageNamespace,
-  type IStorageOperationRuntime
-} from '@migaia/storage-host/authoring/backend'
+  type IStorageOperationRuntime,
+  mergeSignals,
+  readAbortReason,
+  throwIfAborted,
+  withAbort,
+  compareStorageKeys,
+  snapshotStorageKey,
+  encodeFlatStorageKey,
+  snapshotKeyRange,
+  assertKeyRange,
+  createBackendLifecycleController,
+  createStorageToken
+} from '@migaia/storage-host/sdk'
+import { isStorageErrorFamily, type IStorageErrorFamily } from './errors.js'
 import type {
   IStorageJournalBackendBinding,
   IStorageJournalImage,
@@ -79,20 +86,8 @@ import {
   StorageTransactionOperation,
   storageBackendOperation
 } from '../constants.js'
-import {
-  mergeSignals,
-  readAbortReason,
-  throwIfAborted,
-  withAbort
-} from '@migaia/storage-host/authoring/backend'
 import { subscribeToAbort } from './errors.js'
 import { assertStringStorageKey } from '@migaia/storage-contract'
-import { compareStorageKeys, snapshotStorageKey } from '@migaia/storage-host/authoring/key'
-import {
-  encodeFlatStorageKey,
-  snapshotKeyRange,
-  assertKeyRange
-} from '@migaia/storage-host/authoring/backend'
 import { planChannelWrite } from './errors.js'
 /**
  * 's raw-record firewall must distinguish a "canonical entity key" from an unclassifiable/legacy
@@ -133,11 +128,9 @@ import {
 import type { IStorageCapabilities } from '../types/capabilities.js'
 import type { acquireIndexedDbCoordination } from './indexed-db-coordination.js'
 import { acquireIndexedDbLocks } from './indexed-db-locks.js'
-import { createBackendLifecycleController } from '@migaia/storage-host/authoring/change-controller'
-import type { IBackendLifecycleController } from '@migaia/storage-host/authoring/change-controller'
+import type { IBackendLifecycleController } from '@migaia/storage-host/sdk'
 import { IndexedDbBaseAccess, indexedDbFeatureMissing } from './indexed-db-base-access.js'
 import type { IIndexedDbAssemblyPlan } from './indexed-db-assembly.js'
-import { createStorageToken } from '@migaia/storage-host/authoring/backend'
 import {
   provideBackendConstruction,
   browserKeyValueApi,

@@ -4,7 +4,7 @@ import {
   indexedDbDeadlineMetadataKey
 } from './indexed-db-deadline-metadata.js'
 import type { IStorageKey } from '@migaia/storage-contract'
-import { encodeFlatStorageKey } from '@migaia/storage-host/authoring/backend'
+import { encodeFlatStorageKey } from '@migaia/storage-host/sdk'
 import type { IScheduler } from '@migaia/utils/scheduler'
 
 /** Physical IDB channels retain their existing names; the public text lock maps to value. */

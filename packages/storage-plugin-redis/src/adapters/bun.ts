@@ -11,10 +11,7 @@ import {
   subscriptionResource
 } from '../native.js'
 import { normalizeRedisError, invalidArgument, redisError } from '../errors.js'
-import {
-  createStorageOperationReporter,
-  reportCleanupError
-} from '@migaia/storage-host/authoring/backend'
+import { createStorageOperationReporter, reportCleanupError } from '@migaia/storage-host/sdk'
 
 /** The real SDK owns native leases; this driver owns only borrowed root metadata and reporting. */
 class BunRedisDriver implements IRedisDriver<IBunRedisClient> {

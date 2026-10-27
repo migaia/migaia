@@ -6,9 +6,9 @@ import {
   defineFeature,
   definePlugin,
   defineStorageBackendKind,
-  memoryBackendPlugin,
   type IStoragePluginCore
 } from '../../src/index.js'
+import { memoryBackendPlugin } from '../../src/plugins/memory.js'
 import type { ICapabilityInstallPort, IKeyValueStore } from '@migaia/storage-contract'
 
 /** Built-in installation retains memory's record and synchronous native surface. */

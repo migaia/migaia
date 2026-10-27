@@ -1,4 +1,4 @@
-import type { IBackendLifecycleController } from '@migaia/storage-host/authoring/change-controller'
+import type { IBackendLifecycleController, IBackendValueCommit } from '@migaia/storage-host/sdk'
 import {
   kv,
   type ICapabilityImpl,
@@ -8,13 +8,12 @@ import {
   type IStorageBase,
   type IKeyValueStore
 } from '@migaia/storage-contract'
-import { provideCapabilities } from '@migaia/storage-host/authoring/capability'
+import { provideCapabilities } from '@migaia/storage-host/sdk'
 import type {
   IStoragePluginCore,
   IStorageOrgBinding,
   IStorageJournalBackendBinding
 } from '@migaia/storage-host'
-import type { IBackendValueCommit } from '@migaia/storage-host/authoring/backend'
 
 /** Backend factories borrow the original registration's execution and controller ports. */
 export type IBackendRuntime = Pick<

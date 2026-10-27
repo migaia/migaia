@@ -15,7 +15,7 @@ import {
   readAbortReason,
   createStorageOperationReporter,
   reportCleanupError
-} from '@migaia/storage-host/authoring/backend'
+} from '@migaia/storage-host/sdk'
 /** Each query opts into raw text locally; the caller's pool and global parsers remain unchanged. */
 async function query(
   client: Pool | ClientBase,

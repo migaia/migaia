@@ -16,7 +16,7 @@ console.log((key as [string, Date])[1].getTime()) // 0
 Validation opens no store and copies no key. When asynchronous writes retain caller data, the original host authoring helper detaches mutable components:
 
 ```ts
-import { snapshotStorageKey } from '@migaia/storage-host/authoring/key'
+import { snapshotStorageKey } from '@migaia/storage-host/sdk'
 
 const input = ['orders', new Date(0)] as const
 const saved = snapshotStorageKey(input, 'memory') as [string, Date]
@@ -38,7 +38,7 @@ assertSyncWriteOptions({ conflictPolicy: 'replace' })
 These functions execute no cancellation, timers or writes. Invalid fields retain `INVALID_ARGUMENT`; omission supplies no backend default. Structurally valid aborted signals remain valid inputs.
 
 ```ts
-import { snapshotOperationContext } from '@migaia/storage-host/authoring/context'
+import { snapshotOperationContext } from '@migaia/storage-host/sdk'
 
 const controller = new AbortController()
 const options = { signal: controller.signal, timeoutMs: 10 }
@@ -70,7 +70,7 @@ const facts: IStorageCapabilities = {
 console.log(isStorageCapabilities(facts)) // true
 ```
 
-Omitted `batch` means no complete batch-write support; shared conformance marks that group not applicable. Pure shape guards do not normalize copies. Host `/authoring/store` supplies `snapshotStorageCapabilities` when deferred admission must retain those facts.
+Omitted `batch` means no complete batch-write support; shared conformance marks that group not applicable. Pure shape guards do not normalize copies. Host `/sdk` supplies `snapshotStorageCapabilities` when deferred admission must retain those facts.
 
 ## Define a token and implementation
 
@@ -83,11 +83,11 @@ const definition = implement(status, api)
 console.log(isCapabilityToken(status), typeof definition) // true object
 ```
 
-This creates no published store. Host `/authoring/capability` owns publication and has/use. A token's name never substitutes for the original identity. Resource and cleanup examples remain in the [host guide](../storage-host/USEGUIDE.en.md).
+This creates no published store. Host `/sdk` owns publication and has/use. A token's name never substitutes for the original identity. Resource and cleanup examples remain in the [host guide](../storage-host/USEGUIDE.en.md).
 
 ## Codec receiver ownership
 
-`assertCodec(codec)` checks the public shape of an ordinary object or legitimate class. Host `/authoring/codec` owns `snapshotCodec`: it validates and borrows the same original instance. It does not copy `{name, output, encode, decode}`, so methods using `#private` state retain their receiver. Invoke `codec.encode(value)` and `codec.decode(raw)` directly. `fromValueCodec` remains the format adapter on that same entry.
+`assertCodec(codec)` checks the public shape of an ordinary object or legitimate class. Host `/sdk` owns `snapshotCodec`: it validates and borrows the same original instance. It does not copy `{name, output, encode, decode}`, so methods using `#private` state retain their receiver. Invoke `codec.encode(value)` and `codec.decode(raw)` directly. `fromValueCodec` remains the format adapter on that same entry.
 
 ## Original errors and progress
 

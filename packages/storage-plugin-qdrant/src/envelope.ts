@@ -1,6 +1,6 @@
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import type { ICodecValue } from '@migaia/serialize/codec'
-import { encodeOrderedStorageKey } from '@migaia/storage-host/authoring/key'
+import { encodeOrderedStorageKey } from '@migaia/storage-host/sdk'
 import { QdrantText } from './constants.js'
 import { invalidArgument, qdrantError } from './errors.js'
 import { QdrantErrorCode } from './error-code.js'

@@ -1,7 +1,6 @@
 import type { Store } from 'oxigraph'
 import { namedNode, defaultGraph } from 'oxigraph'
-import { sparqlFragment } from '@migaia/storage-host/authoring/sparql'
-import { throwIfAborted } from '@migaia/storage-host/authoring/backend'
+import { sparqlFragment, throwIfAborted } from '@migaia/storage-host/sdk'
 import { invalidArgument, sparqlError } from './errors.js'
 import { SparqlErrorCode } from './error-code.js'
 import { SparqlText } from './text.js'

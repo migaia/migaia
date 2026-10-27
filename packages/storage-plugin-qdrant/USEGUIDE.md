@@ -58,7 +58,7 @@ a
 ```ts doc-test=run
 import { createStorageHost } from '@migaia/storage-host'
 import { vector, ttl, DeleteCountMode } from '@migaia/storage-contract'
-import { lockKey } from '@migaia/storage-host/authoring/concurrency'
+import { lockKey } from '@migaia/storage-host/sdk'
 import { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'
 
 await using host = await createStorageHost({

@@ -1,4 +1,4 @@
-import { createSparqlTag } from '@migaia/storage-host/authoring/sparql'
+import { createSparqlTag } from '@migaia/storage-host/sdk'
 import { type ISparqlFragment } from '@migaia/storage-contract'
 import { invalidArgument } from './errors.js'
 /**

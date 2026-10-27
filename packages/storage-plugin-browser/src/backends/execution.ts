@@ -1,5 +1,5 @@
 import type { IStorageBase, IOperationContext, ILockKey } from '@migaia/storage-contract'
-import { lockKey } from '@migaia/storage-host/authoring/concurrency'
+import { lockKey } from '@migaia/storage-host/sdk'
 import type { IBackendRuntime } from './construction.js'
 import { storageBackendOperation } from '../constants.js'
 

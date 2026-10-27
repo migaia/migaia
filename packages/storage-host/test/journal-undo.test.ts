@@ -5,7 +5,8 @@ import { binlog, undoLog, type ILogStore } from '@migaia/logger/plugins/durable'
 import { lockKey } from '../src/authoring/concurrency.js'
 import { ttl, vector, rdf } from '@migaia/storage-contract'
 import { term } from '../src/authoring/rdf.js'
-import { createOrgId, createStorageHost, memoryBackendPlugin } from '../src/index.js'
+import { createOrgId, createStorageHost } from '../src/index.js'
+import { memoryBackendPlugin } from '../src/plugins/memory.js'
 
 /** Actual durable plugins retain their existing scheduler and committed indexes. */
 const runtimeManager = {

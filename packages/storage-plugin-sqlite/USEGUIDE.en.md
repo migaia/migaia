@@ -20,7 +20,7 @@ The example uses a fixed organization in a file database. Expected output: `read
 ```ts doc-test=run
 import { createStorageHost } from '@migaia/storage-host'
 import { kv, records, ttl, counter } from '@migaia/storage-contract'
-import { lockKey } from '@migaia/storage-host/authoring/concurrency'
+import { lockKey } from '@migaia/storage-host/sdk'
 import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
 import { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'
 await using connection = nodeSqliteDriver('./example-settings.sqlite')
@@ -58,7 +58,7 @@ This creates its own application table in an in-memory database. Expected output
 
 ```ts doc-test=run
 import { createStorageHost } from '@migaia/storage-host'
-import { sqlFragment } from '@migaia/storage-host/authoring/sql'
+import { sqlFragment } from '@migaia/storage-host/sdk'
 import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
 import { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'
 await using connection = nodeSqliteDriver(':memory:')
@@ -111,7 +111,7 @@ Backup uses VACUUM INTO. The destination must not exist and must be writable; it
 
 Files default to wal:true; installation requests and verifies the actual mode. Connections already using journal_mode=OFF reject. In-memory databases default to false and reject explicit true. wal:false still uses real BEGIN/COMMIT/ROLLBACK, but its logical locks coordinate only the current process.
 
-Use tx().lock(lockKey.text(...)).run for explicit logical locks. Select policies from `@migaia/storage-host/authoring/concurrency`. Only matching logical keys conflict; SQLite's physical writer wait is not a business-key conflict. inspectLocks returns actual holders and expiry. maxLockMs defaults to 30000ms, without heartbeat. Cancellation is cooperative.
+Use tx().lock(lockKey.text(...)).run for explicit logical locks. Select policies from `@migaia/storage-host/sdk`. Only matching logical keys conflict; SQLite's physical writer wait is not a business-key conflict. inspectLocks returns actual holders and expiry. maxLockMs defaults to 30000ms, without heartbeat. Cancellation is cooperative.
 
 ## Data and failures
 
@@ -123,8 +123,8 @@ Package failures use source @migaia/storage-plugin-sqlite and SQLITE_FAILED, TRA
 
 ## Optional journals
 
-Enable journals explicitly with `storageJournalPlugin(options)` from `@migaia/storage-host/journal`. SQLite captures complete values, every actual mutation and absolute expiry inside the data transaction, retaining repeated writes and intermediate values. Undo locks and checks every target's final revision/image before restoring. It restores original absolute deadlines, without extending expired data. Recreated organizations and reopened non-WAL coordination groups cannot reuse old undo images. Metadata is excluded from business mutation logs.
+Enable journals explicitly with `storageJournalPlugin(options)` from `@migaia/storage-host/plugins/journal`. SQLite captures complete values, every actual mutation and absolute expiry inside the data transaction, retaining repeated writes and intermediate values. Undo locks and checks every target's final revision/image before restoring. It restores original absolute deadlines, without extending expired data. Recreated organizations and reopened non-WAL coordination groups cannot reuse old undo images. Metadata is excluded from business mutation logs.
 
 External binlog append happens after commit; failure reports but cannot undo committed data. Supported WAL combinations use a marker committed with the data, and recovery does not replay known committed changes. Raw SQL has no complete standard-image target and rejects before execution when commit logging is selected. Global journal configuration uses an asynchronous pipeline, so synchronous entries fail with ASYNC_STAGE_IN_SYNC_ENTRY; installations without journals retain synchronous APIs.
 
-Import storageLogStore separately from `@migaia/storage-host/journal`; an initializer can open a journal in the same database. An in-memory connection exclusively uses a journal namespace until release. File journals read current indexes inside each BEGIN IMMEDIATE transaction and allow multiple connections. Business clear operations leave private journals intact. With commit logging selected, expiry cleanup triggered by reads is logged too; telemetry-only or initializer-only configurations do not enable this mutation logging. Telemetry records each root operation or whole transaction once. The application releases the logger and its storage after releasing the host.
+Import storageLogStore separately from `@migaia/storage-host/plugins/journal`; an initializer can open a journal in the same database. An in-memory connection exclusively uses a journal namespace until release. File journals read current indexes inside each BEGIN IMMEDIATE transaction and allow multiple connections. Business clear operations leave private journals intact. With commit logging selected, expiry cleanup triggered by reads is logged too; telemetry-only or initializer-only configurations do not enable this mutation logging. Telemetry records each root operation or whole transaction once. The application releases the logger and its storage after releasing the host.

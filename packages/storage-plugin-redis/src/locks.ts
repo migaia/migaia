@@ -10,11 +10,11 @@ import {
 import {
   readConcurrencyLockIdentities,
   snapshotConcurrencyLockKeys,
-  snapshotConcurrencyLockHoldings
-} from '@migaia/storage-host/authoring/concurrency'
+  snapshotConcurrencyLockHoldings,
+  throwIfAborted
+} from '@migaia/storage-host/sdk'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { sleep } from '@migaia/utils/promise'
-import { throwIfAborted } from '@migaia/storage-host/authoring/backend'
 import {
   createRedisLayout,
   replyInteger,

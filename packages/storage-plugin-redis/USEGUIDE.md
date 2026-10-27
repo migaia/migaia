@@ -21,7 +21,7 @@
 import { createClientPool } from 'redis'
 import { createStorageHost } from '@migaia/storage-host'
 import { kv, ttl, counter } from '@migaia/storage-contract'
-import { lockKey } from '@migaia/storage-host/authoring/concurrency'
+import { lockKey } from '@migaia/storage-host/sdk'
 import { redisBackendPlugin } from '@migaia/storage-plugin-redis'
 import { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'
 const pool = createClientPool({ url: process.env.REDIS_URL }, { maximum: 8 })
@@ -214,4 +214,4 @@ nodeRedisDriver接受node-redis 6的pool；ioredisDriver接受ioredis 6 client�
 
 host journal可以选择提交后外置binlog和遥测。只有EXEC全部成功才追加成功提交日志；原生部分错误或未知结果不追加、不重放。binlog失败经report报告，不能撤回已提交数据，外置日志与业务数据并非强原子提交。标准值、字节、记录与向量的镜像保留实际wire和绝对期限；历史向量完整before镜像需要二进制端口，缺少时此日志组合在修改前拒绝。
 
-此后端明确nativeAtomic:false。要求同EXEC强原子binlog、WAL intent/marker或undo的组合当前拒绝，不得当作已支持能力。storageLogStore单独从`@migaia/storage-host/journal`导入，每次在原生命名空间读当前索引；多个实例可共用namespace和连续序号，不跨操作缓存索引。原生Feature API不冒充标准业务通道的日志来源。遥测显式启用，根操作和完整事务跨重试各记一次；logger及载体仍由调用方在host之后释放。
+此后端明确nativeAtomic:false。要求同EXEC强原子binlog、WAL intent/marker或undo的组合当前拒绝，不得当作已支持能力。storageLogStore单独从`@migaia/storage-host/plugins/journal`导入，每次在原生命名空间读当前索引；多个实例可共用namespace和连续序号，不跨操作缓存索引。原生Feature API不冒充标准业务通道的日志来源。遥测显式启用，根操作和完整事务跨重试各记一次；logger及载体仍由调用方在host之后释放。

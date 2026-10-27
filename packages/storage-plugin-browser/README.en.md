@@ -93,7 +93,7 @@ Without TTL, the canonical capability owner rejects `store.use(ttl)` with `@miga
 
 Keep the TTL Feature when reopening a database that uses deadlines; basic reads do not interpret expiry metadata. A client without TTL clears inherited deadlines in the same native transaction when overwriting, deleting or clearing targets. Replacement values remain unlimited and another TTL client cannot remove them using the old deadlines.
 
-`indexedDbJournalFeature()` supplies native images, private log namespaces and undo. Global capture additionally requires `storageJournalPlugin()` from `@migaia/storage-host/journal`, explicitly installed before the backend in the same plugin list, plus the original `journal` configuration.
+`indexedDbJournalFeature()` supplies native images, private log namespaces and undo. Global capture additionally requires `storageJournalPlugin()` from `@migaia/storage-host/plugins/journal`, explicitly installed before the backend in the same plugin list, plus the original `journal` configuration.
 
 Journal images read and restore existing physical deadlines without enabling TTL expiry policy. Basic writes retain physical mutation versions and tombstones so another journal-enabled instance can detect update/delete/recreate conflicts; they capture no images and create no log.
 
@@ -242,7 +242,7 @@ try {
 }
 ```
 
-With `indexedDbJournalFeature()` selected, IndexedDB supports `storageLogStore(hostOrOrg, 'indexed-db', { prefix })` from `@migaia/storage-host/journal`. Its private rows use an array-key namespace in the existing META store. Business `clearAll` leaves history intact; organization deletion invalidates old log handles, while the original business view can reopen.
+With `indexedDbJournalFeature()` selected, IndexedDB supports `storageLogStore(hostOrOrg, 'indexed-db', { prefix })` from `@migaia/storage-host/plugins/journal`. Its private rows use an array-key namespace in the existing META store. Business `clearAll` leaves history intact; organization deletion invalidates old log handles, while the original business view can reopen.
 
 In cached mode, dispose a log before opening the same physical organization and prefix again. Native transactions commit head/state/records together and publish the cached index from the actual complete event.
 
@@ -292,7 +292,7 @@ Ordinary localStorage, sessionStorage and Cookie stores declare `capabilities.ba
 
 Import entity codecs from `@migaia/storage-host/entity`. `jsonCodec` has `output: text` and uses strict portable JSON. `structuredCodec` has `output: structured` and delegates storage to a record backend. `binaryCodec` has `output: binary` and accepts `Uint8Array`. `selectCodec` selects a direct channel, a supported fallback, or rejection from the backend's actual capabilities.
 
-Portable JSON rejects unsupported objects and cycles. For `Map` and `Set`, adapt `defineCollectionsJsonCodec` from `@migaia/serialize/codecs/collections-json` with `fromValueCodec` from `@migaia/storage-host/authoring/codec`. A structured backend can instead save supported built-ins and cycles with `structuredCodec`.
+Portable JSON rejects unsupported objects and cycles. For `Map` and `Set`, adapt `defineCollectionsJsonCodec` from `@migaia/serialize/codecs/collections-json` with `fromValueCodec` from `@migaia/storage-host/sdk`. A structured backend can instead save supported built-ins and cycles with `structuredCodec`.
 
 `structuredCodec.encode/decode` returns the original value; the record backend performs copying. IndexedDB uses native structured cloning. The memory backend copies byte views and uses `structuredClone` for records. `binaryCodec` validates and retains the original byte view, while the backend owns its write snapshot. These codecs neither rebuild application class instances nor validate the domain schema.
 

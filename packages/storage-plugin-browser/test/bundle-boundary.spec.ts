@@ -104,7 +104,7 @@ const browserBundleHardCeiling = {
 const browserQueryEntry = [
   "import { createStorageHost } from '@migaia/storage-host'",
   "import { defineEntity } from '@migaia/storage-host/entity'",
-  "import { entityQueryFeature } from '@migaia/storage-host/entity/query'",
+  "import { entityQueryFeature } from '@migaia/storage-host/entity/features/query'",
   "import { indexedDbBackendPlugin } from '@migaia/storage-plugin-browser/indexed-db'",
   '/** Read active user names and release the original owning host.',
   ' * @param {import("@migaia/storage-plugin-browser/indexed-db").IIndexedDbOptions} options Native ports/layout.',
@@ -122,11 +122,11 @@ const browserQueryEntry = [
 /** The diagnostic variant declares every optional unit while keeping the same query workload. */
 const browserFullQueryEntry = [
   "import { createStorageHost } from '@migaia/storage-host'",
-  "import { storageJournalPlugin } from '@migaia/storage-host/journal'",
+  "import { storageJournalPlugin } from '@migaia/storage-host/plugins/journal'",
   "import { defineEntity } from '@migaia/storage-host/entity'",
   ...['query', 'unique', 'migration', 'indexes', 'keyset'].map(
     (name) =>
-      `import { entity${name[0]!.toUpperCase()}${name.slice(1)}Feature } from '@migaia/storage-host/entity/${name}'`
+      `import { entity${name[0]!.toUpperCase()}${name.slice(1)}Feature } from '@migaia/storage-host/entity/features/${name}'`
   ),
   "import { indexedDbBackendPlugin } from '@migaia/storage-plugin-browser/indexed-db'",
   ...['ttl', 'batch', 'journal', 'notifications', 'change-feed', 'indexes', 'keyset'].map(

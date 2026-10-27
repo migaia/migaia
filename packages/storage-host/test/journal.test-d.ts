@@ -1,4 +1,4 @@
-import { storageJournalPlugin } from '@migaia/storage-host/journal'
+import { storageJournalPlugin, storageLogStore } from '@migaia/storage-host/plugins/journal'
 import type {
   IStorageJournalBackendBinding,
   IStorageJournalNamespace,
@@ -12,8 +12,8 @@ import type {
   IStorageJournalRedoBinding
 } from '@migaia/storage-host'
 import type { ITransactionScope } from '@migaia/storage-contract'
-import { createOrgId, createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
-import { storageLogStore } from '@migaia/storage-host/journal'
+import { createOrgId, createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 
 /** Only actual admitted backend ids can select a private resource; org views grant no host close. */
 export async function compileStorageLogStore(): Promise<void> {

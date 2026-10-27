@@ -17,7 +17,7 @@ Write two names and delete only Alice.
 import { Store } from 'oxigraph'
 import { createStorageHost } from '@migaia/storage-host'
 import { rdf } from '@migaia/storage-contract'
-import { term } from '@migaia/storage-host/authoring/rdf'
+import { term } from '@migaia/storage-host/sdk'
 import { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'
 import { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'
 
@@ -65,8 +65,8 @@ Require Alice to remain present before replacing it with Ada. If another transac
 import { Store } from 'oxigraph'
 import { createStorageHost } from '@migaia/storage-host'
 import { rdf } from '@migaia/storage-contract'
-import { ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'
-import { term } from '@migaia/storage-host/authoring/rdf'
+import { ConcurrencyPolicy } from '@migaia/storage-host/sdk'
+import { term } from '@migaia/storage-host/sdk'
 import { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'
 import { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'
 
@@ -113,7 +113,7 @@ Start a real service that supports SPARQL Query and Update. The defaults use the
 ```ts doc-test=run
 import { createStorageHost } from '@migaia/storage-host'
 import { sparql } from '@migaia/storage-contract'
-import { term } from '@migaia/storage-host/authoring/rdf'
+import { term } from '@migaia/storage-host/sdk'
 import { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'
 import { httpEndpoint } from '@migaia/storage-plugin-sparql/http'
 
@@ -156,7 +156,7 @@ Write a graph, export it and import with replace. Every Feature used here is ins
 import { Store } from 'oxigraph'
 import { createStorageHost } from '@migaia/storage-host'
 import { rdf } from '@migaia/storage-contract'
-import { term } from '@migaia/storage-host/authoring/rdf'
+import { term } from '@migaia/storage-host/sdk'
 import { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'
 import { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'
 import { graphStoreFeature } from '@migaia/storage-plugin-sparql/features/graph-store'

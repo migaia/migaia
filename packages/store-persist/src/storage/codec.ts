@@ -1,6 +1,6 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { type ICodecStageObserver, type ICodec } from '@migaia/storage-contract'
-import { fromValueCodec } from '@migaia/storage-host/authoring/codec'
+import { fromValueCodec } from '@migaia/storage-host/sdk'
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { isUint8Array } from '@migaia/utils/bytes'
@@ -70,10 +70,10 @@ function observeCodec(
 /**
  * Provides the default JSON codec with round-trip support for `Map` and `Set`. It delegates to the
  * canonical collections codec through `fromValueCodec`. The package does not depend on concrete
- * `@migaia/storage-plugin-browser` values. Encodes the whole supplied value rather than validating an
- * envelope. Encoding failures reject with ENCODE_FAILED and cause; non-string or invalid decoding
- * rejects with ENVELOPE_INVALID. Old collection markers and tuples remain ordinary data. The
- * canonical portable value-domain rejects non-finite numbers and other invalid values.
+ * `@migaia/storage-plugin-browser` values. Encodes the whole supplied value rather than validating
+ * an envelope. Encoding failures reject with ENCODE_FAILED and cause; non-string or invalid
+ * decoding rejects with ENVELOPE_INVALID. Old collection markers and tuples remain ordinary data.
+ * The canonical portable value-domain rejects non-finite numbers and other invalid values.
  */
 export const defaultJsonCodec: ICodec = Object.freeze({
   name: collectionsCodec.name,

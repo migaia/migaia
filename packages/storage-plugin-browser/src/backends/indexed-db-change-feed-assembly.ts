@@ -1,6 +1,6 @@
 import { IndexedDbFeature } from '../constants.js'
-import type { IBackendChangeController } from '@migaia/storage-host/authoring/change-controller'
-import { createBackendChangeIterator } from '@migaia/storage-host/authoring/change-iterator'
+import type { IBackendChangeController } from '@migaia/storage-host/sdk'
+import { createBackendChangeIterator } from '@migaia/storage-host/sdk'
 import {
   assertStringStorageKey,
   StorageContractError,

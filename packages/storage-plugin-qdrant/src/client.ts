@@ -1,6 +1,6 @@
 import type { QdrantClient } from '@qdrant/js-client-rest'
 import type { IOperationContext } from '@migaia/storage-contract'
-import { throwIfAborted } from '@migaia/storage-host/authoring/backend'
+import { throwIfAborted } from '@migaia/storage-host/sdk'
 import { nativeHttp } from './native.js'
 import { nativeResult } from './protocol.js'
 import { qdrantWireValue } from './wire.js'

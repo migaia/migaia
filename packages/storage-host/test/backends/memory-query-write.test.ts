@@ -2,12 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { records, rdf, vector, type IQuad } from '@migaia/storage-contract'
 import { term } from '../../src/authoring/rdf.js'
 import { ConcurrencyPolicy } from '../../src/authoring/concurrency.js'
-import {
-  createOrgId,
-  createStorageHost,
-  definePlugin,
-  memoryBackendPlugin
-} from '../../src/index.js'
+import { createOrgId, createStorageHost, definePlugin } from '../../src/index.js'
+import { memoryBackendPlugin } from '../../src/plugins/memory.js'
 import { MemoryOperation } from '../../src/backends/memory-constants.js'
 
 /** Native query mutations select and write inside the original transaction attempt. */

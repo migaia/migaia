@@ -10,9 +10,9 @@ import {
   createStorageHost,
   definePlugin,
   defineStorageBackendKind,
-  memoryBackendPlugin,
   type IStoragePluginCore
 } from '../../src/index.js'
+import { memoryBackendPlugin } from '../../src/plugins/memory.js'
 import type { IMigrateOptions, IMigrateResult, IRepository } from '../../src/entity/types.js'
 
 type IUser = {

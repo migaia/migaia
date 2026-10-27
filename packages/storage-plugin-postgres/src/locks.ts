@@ -12,10 +12,10 @@ import {
   readConcurrencyLockIdentities,
   snapshotConcurrencyLockKeys,
   snapshotConcurrencyLockRange,
-  snapshotConcurrencyLockHoldings
-} from '@migaia/storage-host/authoring/concurrency'
+  snapshotConcurrencyLockHoldings,
+  throwIfAborted
+} from '@migaia/storage-host/sdk'
 import { sleep } from '@migaia/utils/promise'
-import { throwIfAborted } from '@migaia/storage-host/authoring/backend'
 import type { IPgConfiguration, IPgTables } from './schema.js'
 import type { IPgConnection } from './types.js'
 import { pgTextKey } from './codec.js'

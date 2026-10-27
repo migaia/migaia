@@ -8,8 +8,11 @@ import {
   StorageContractErrorCode,
   type IStorageKey
 } from '@migaia/storage-contract'
-import { snapshotStorageKey } from '@migaia/storage-host/authoring/key'
-import { encodeFlatStorageKey, decodeFlatStorageKey } from '@migaia/storage-host/authoring/backend'
+import {
+  snapshotStorageKey,
+  encodeFlatStorageKey,
+  decodeFlatStorageKey
+} from '@migaia/storage-host/sdk'
 
 /** Namespace/key codec boundary. Custom codecs own migration and collision safety. */
 export type INamespaceCodec = {

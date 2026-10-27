@@ -10,7 +10,7 @@ import {
   subscribeToAbort,
   readAbortReason,
   type IStorageOperationReporter
-} from '@migaia/storage-host/authoring/backend'
+} from '@migaia/storage-host/sdk'
 import type { IOperationContext } from '@migaia/storage-contract'
 import { Archive } from './constants.js'
 import { invalidSegment, archiveError } from './errors.js'

@@ -2,13 +2,13 @@
 export const StorageErrorText = {
   /** Tell host callers which assembly supplies journal runtime and private log stores. */
   journalNotAssembled:
-    'Install storageJournalPlugin() from @migaia/storage-host/journal before using log stores.',
+    'Install storageJournalPlugin() from @migaia/storage-host/plugins/journal before using log stores.',
   /** A configured journal plugin arrived after the first install batch, or a second one did. */
   journalConfigurationLate:
     'Pass storageJournalPlugin(options) once, in the first plugin batch, before any backend is installed.',
   /** Tell backend authors and memory callers which notification assembly is missing. */
   changeControllerNotAssembled:
-    'Install the backend notification Feature or pass createBackendChangeController from @migaia/storage-host/authoring/change-controller.',
+    'Install the backend notification Feature or pass createBackendChangeController from @migaia/storage-host/sdk.',
   /** Tell memory callers how to select the omitted change-feed iterator owner. */
   changeIteratorNotAssembled:
     'Install memoryChangeFeedFeature() from @migaia/storage-host/features/memory-change-feed before watching changes.',

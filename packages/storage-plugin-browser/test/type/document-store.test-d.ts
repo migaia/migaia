@@ -1,6 +1,6 @@
 import { expectTypeOf } from 'vitest'
 import { asRecordStore } from '../../src/types/storage'
-import type { IMemoryBackendStore } from '@migaia/storage-host'
+import type { IMemoryBackendStore } from '@migaia/storage-host/plugins/memory'
 import type { ILocalStorageBackendStore } from '../../src/local-storage.js'
 import type { IRecordStore, IKeyValueStore } from '../../src/types/storage'
 

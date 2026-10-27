@@ -1,5 +1,37 @@
-import { createBackendChangeIterator } from '@migaia/storage-host/authoring/change-iterator'
-import { createBackendChangeController } from '@migaia/storage-host/authoring/change-controller'
+import {
+  createBackendChangeIterator,
+  createBackendChangeController,
+  ConcurrencyPolicy,
+  runWithConcurrency,
+  snapshotConcurrencyLockKeys,
+  provideCapabilities,
+  createTransactionOwner,
+  runTransactionOperation,
+  assertTransactionOwner,
+  useTransactionCapability,
+  createTransactionBuilder,
+  resolveConcurrencyPolicy,
+  createRecordQuery,
+  createStorageIteratorLifetime,
+  snapshotStorageKey,
+  snapshotStorageBatchKeys,
+  createStorageBatchKeyCapture,
+  snapshotStorageOrgKeyPrefix,
+  snapshotStorageTtlTarget,
+  snapshotStorageCounterIncrement,
+  snapshotOperationContext,
+  asyncDisposeKey,
+  createStorageOperationReporter,
+  reportCleanupError,
+  withAbort,
+  mergeSignals,
+  subscribeToAbort,
+  throwIfAborted,
+  snapshotKeyRange,
+  observeStorageBatch,
+  normalizeError,
+  type IBackendChangeController
+} from '@migaia/storage-host/sdk'
 import { RedisCommand, RedisOperation } from './constants.js'
 import {
   StorageContractErrorCode,
@@ -41,31 +73,6 @@ import {
   type ITtlTarget,
   type ILockHolding
 } from '@migaia/storage-contract'
-import {
-  ConcurrencyPolicy,
-  runWithConcurrency,
-  snapshotConcurrencyLockKeys
-} from '@migaia/storage-host/authoring/concurrency'
-import { provideCapabilities } from '@migaia/storage-host/authoring/capability'
-import {
-  createTransactionOwner,
-  runTransactionOperation,
-  assertTransactionOwner,
-  useTransactionCapability,
-  createTransactionBuilder,
-  resolveConcurrencyPolicy
-} from '@migaia/storage-host/authoring/transaction'
-import { createRecordQuery } from '@migaia/storage-host/authoring/query'
-import { createStorageIteratorLifetime } from '@migaia/storage-host/authoring/resource'
-import {
-  snapshotStorageKey,
-  snapshotStorageBatchKeys,
-  createStorageBatchKeyCapture,
-  snapshotStorageOrgKeyPrefix
-} from '@migaia/storage-host/authoring/key'
-import { snapshotStorageTtlTarget } from '@migaia/storage-host/authoring/ttl'
-import { snapshotStorageCounterIncrement } from '@migaia/storage-host/authoring/counter'
-import { snapshotOperationContext } from '@migaia/storage-host/authoring/context'
 import { isUint8Array } from '@migaia/utils/bytes'
 import { sleep } from '@migaia/utils/promise'
 import {
@@ -75,19 +82,6 @@ import {
   type IStorageOrgBinding,
   type IStorageJournalBackendBinding
 } from '@migaia/storage-host'
-import {
-  asyncDisposeKey,
-  createStorageOperationReporter,
-  reportCleanupError,
-  withAbort,
-  mergeSignals,
-  subscribeToAbort,
-  throwIfAborted,
-  snapshotKeyRange,
-  observeStorageBatch,
-  normalizeError,
-  type IBackendChangeController
-} from '@migaia/storage-host/authoring/backend'
 import { RedisDraft, validateRedisExec } from './transaction.js'
 import { createRedisJournalBinding } from './journal.js'
 import { createRedisLocks, RedisLockConflict } from './locks.js'
