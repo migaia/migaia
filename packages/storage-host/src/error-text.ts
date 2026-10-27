@@ -104,6 +104,10 @@ export const StorageErrorText = {
   backendInstallFailed: 'storage backend installation failed',
   /** Stable text for rejecting host mutation while another batch is installing. */
   storageHostBusy: 'storage host is busy installing plugins',
+  /** Message for BACKEND_IN_USE: another installed plugin still borrows the backend. */
+  backendInUse: 'storage backend is still borrowed by another installed plugin',
+  /** Message when unUse targets a journal plugin whose recording is bound to installed backends. */
+  journalPluginInUse: 'a configured storageJournalPlugin cannot be removed while the host is open',
   /** Stable text for host operations after seal or terminal disposal. */
   storageHostDisposed: 'storage host is disposed',
   /** Stable text for aggregate host cleanup failure. */

@@ -99,6 +99,7 @@ pnpm add --workspace @migaia/logger
 | `createStorageHost({ plugins, ...options })` | 创建宿主，默认在返回前执行环境检查       |
 | `host.backend(id)` / `hasBackend(id)`        | 获取已安装后端，或检查动态 ID            |
 | `host.use(...plugins)`                       | 追加一批插件，成功后返回包含新类型的宿主 |
+| `host.unUse(id)`                             | 卸载一个插件并释放其资源；仍被借用时拒绝 |
 | `host.org(uuid)` / `dropOrg(uuid)`           | 获取组织视图，或删除该组织在各后端的数据 |
 | `host.detect()`                              | 显式执行尚未成功完成的环境检查           |
 | `host.dispose()`                             | 停止接纳新工作，等待并释放资源           |

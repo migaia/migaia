@@ -19,7 +19,12 @@ import {
 import { StorageHookName as Hook } from './hook-names.js'
 import { borrowStorageBackend } from './borrow.js'
 import { createBackendKeyLockPort } from './backends/key-locks.js'
-import { STORAGE_DEFAULT_ORG, STORAGE_JOURNAL_BOOTSTRAP_PREFIX } from './state-constants.js'
+import {
+  STORAGE_DEFAULT_ORG,
+  STORAGE_JOURNAL_BOOTSTRAP_PREFIX,
+  STORAGE_JOURNAL_PLUGIN_ID,
+  STORAGE_PROBE_PLUGIN_ID
+} from './state-constants.js'
 import type { IBackendStageBindings } from '@migaia/storage-contract'
 import {
   defineHost,
@@ -388,6 +393,10 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
    * point; PluginHost itself would wait for it to finish.
    */
   readonly #closing = createAbortController()
+  /** Live borrow count per published store; `unUse` refuses a store whose count is above zero. */
+  readonly #borrowCounts = new Map<IStorageBase, number>()
+  /** Extension keys each installed plugin published, by plugin id, so `unUse` can withdraw them. */
+  readonly #extensionKeys = new Map<string, readonly PropertyKey[]>()
   /** A non-owning reverse index resolves only committed exact stores to their existing context. */
   readonly #storeContexts = new WeakMap<
     object,
@@ -546,11 +555,70 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
   }
 
   /**
+   * Remove one installed plugin by id. Its store, extension methods and probe listeners are
+   * withdrawn first, then PluginHost releases its resources in reverse order. Rejects with
+   * BACKEND_NOT_INSTALLED for an unknown id, BACKEND_IN_USE while another plugin borrows the
+   * backend, STORAGE_HOST_BUSY during an install batch, and INVALID_CONFIG for a configured journal
+   * plugin, whose recording is bound to the backends installed with it.
+   */
+  async unUse(id: string): Promise<void> {
+    this.#assertOpen()
+    if (this.#state === 'installing')
+      throw new StorageError(StorageErrorCode.storageHostBusy, {}, StorageErrorText.storageHostBusy)
+    const context = [...this.#detectContexts].find((candidate) => candidate.id === id)
+    if (context === undefined)
+      throw new StorageError(
+        StorageErrorCode.backendNotInstalled,
+        {},
+        StorageErrorText.backendNotInstalled
+      )
+    const store = this.#registry.get(id)
+    if (store !== undefined && (this.#borrowCounts.get(store) ?? 0) > 0)
+      throw new StorageError(StorageErrorCode.backendInUse, {}, StorageErrorText.backendInUse)
+    if (id === STORAGE_JOURNAL_PLUGIN_ID && this.#journal !== undefined)
+      throw new StorageError(
+        StorageErrorCode.invalidConfig,
+        {},
+        StorageErrorText.journalPluginInUse
+      )
+    this.#withdrawPlugin(id, context)
+    this.#state = 'installing'
+    try {
+      await this.#inner.unUse(pluginNameFromBackendId(id))
+    } finally {
+      if (this.#state === 'installing') this.#state = 'open'
+    }
+  }
+
+  /** Withdraw one plugin's public publication before PluginHost releases its resources. */
+  #withdrawPlugin(id: string, context: IStorageNativeRegistrationContext): void {
+    const nextRegistry = new Map(this.#registry)
+    nextRegistry.delete(id)
+    this.#registry = nextRegistry
+    this.#detectContexts.delete(context)
+    const nextExtensions = Object.create(null) as Record<PropertyKey, unknown>
+    const withdrawn = new Set(this.#extensionKeys.get(id) ?? [])
+    for (const key of Reflect.ownKeys(this.#extensions))
+      if (!withdrawn.has(key))
+        Object.defineProperty(
+          nextExtensions,
+          key,
+          Object.getOwnPropertyDescriptor(this.#extensions, key)!
+        )
+    this.#extensions = nextExtensions
+    this.#extensionKeys.delete(id)
+    if (id === STORAGE_PROBE_PLUGIN_ID) {
+      for (const unsubscribe of this.#probeHandlerSubscriptions) unsubscribe()
+      this.#probeHandlerSubscriptions = []
+    }
+    if (!this.#detectRunning) this.#detectPromise = undefined
+  }
+
+  /**
    * Subscribe the handlers of every `storageProbe(handlers)` in this batch to the host registry.
    * Runs before the batch emits `beforeHostInstall`, so the probe observes the whole batch.
    */
   #subscribeProbeHandlers(plugins: readonly IStorageBackendPluginHandle[]): (() => void)[] {
-    this.#assertOpen()
     const subscriptions: (() => void)[] = []
     for (const plugin of plugins) {
       const handlers = readStorageProbeHandlers(plugin)
@@ -1322,6 +1390,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     for (const [index] of plugins.entries()) {
       /** Retain only this entry original trusted definition metadata. */
       const native = installState.nativeContexts.get(index)
+      this.#extensionKeys.set(native!.id, Reflect.ownKeys(innerHandles[index]!.extensions))
       this.#detectContexts.add(native!)
       if (native!.getKind() !== undefined) {
         nextRegistry.set(native!.id, entries[index]!.storeCell.get())
@@ -1633,12 +1702,19 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     let view: ReturnType<typeof borrowStorageBackend> | undefined
     /** Aliases borrow the source registration's existing facts and release with this borrower. */
     const releases: Array<() => void> = []
+    /** The borrowed store, read after the release is registered so a failed lookup releases nothing. */
+    let store: IStorageBase | undefined
     entryState.registrationCore!.onDispose(() => {
-      if (view !== undefined) entryState.borrowed?.delete(view)
+      if (view !== undefined) {
+        entryState.borrowed?.delete(view)
+        const remaining = (this.#borrowCounts.get(store!) ?? 1) - 1
+        if (remaining === 0) this.#borrowCounts.delete(store!)
+        else this.#borrowCounts.set(store!, remaining)
+      }
       for (const release of releases) release()
     })
     /** Current-batch and future stores never enter this committed registry. */
-    const store = this.#registry.get(id)
+    store = this.#registry.get(id)
     if (store === undefined)
       throw new StorageError(
         StorageErrorCode.backendNotInstalled,
@@ -1663,6 +1739,7 @@ export class StorageHostFacade<P extends readonly IStorageBackendPluginHandle[] 
     const controller = getBackendChangeController(store)
     if (controller !== undefined) releases.push(registerBackendChangeController(view, controller))
     ;(entryState.borrowed ??= new Map()).set(view, store)
+    this.#borrowCounts.set(store, (this.#borrowCounts.get(store) ?? 0) + 1)
     return view as ReturnType<IStoragePluginCore['getPublishedBackend']>
   }
   /** Run original checks in registration order and retain their pending work for disposal. */

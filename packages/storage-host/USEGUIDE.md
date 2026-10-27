@@ -241,6 +241,8 @@ try {
 
 `host.unUse(id)` 卸载一个已安装的插件：先撤下它的后端、扩展方法和 probe 监听，再按逆序释放资源。后端仍被其他插件借用（例如 cache 的某一层）时报 `BACKEND_IN_USE`，应先卸载借用方；未知 id 报 `BACKEND_NOT_INSTALLED`；安装进行中报 `STORAGE_HOST_BUSY`；带配置的日志插件不能卸载，报 `INVALID_CONFIG`。卸载后可用同一个 id 重新安装，之后照常调用 `detect()`。
 
+观察事件只通过 `@migaia/storage-host/plugins/probe` 的 `storageProbe(handlers)` 订阅，宿主没有 `hooks` 选项，也没有 `host.hooks`。probe 放进 `createStorageHost` 的 plugins 时，从这一批的第一个安装事件起就能收到；安装后用 `host.extensions.observe(name, handler)` 追加监听，返回值是退订函数。在非默认组织的视图上调用时只收到该组织的事件。一个宿主只装一个 probe；监听器失败交给 `report`，不改变存储结果。
+
 memory 通知和变更流分别由两个 Feature 装配：
 
 ```ts

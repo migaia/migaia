@@ -32,6 +32,12 @@ export const StorageErrorCode = {
    */
   backendInstallFailed: 'BACKEND_INSTALL_FAILED',
   /**
+   * `host.unUse(id)` targeted a backend that another installed plugin still borrows through
+   * `getPublishedBackend`, such as a cache tier or an archive source. Removing it would leave the
+   * borrower with a closed store; callers must `unUse` the borrower first.
+   */
+  backendInUse: 'BACKEND_IN_USE',
+  /**
    * A host mutation was requested while another install batch is active. Callers must wait for that
    * batch to settle and explicitly retry.
    */

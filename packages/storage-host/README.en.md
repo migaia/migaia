@@ -99,6 +99,7 @@ pnpm add --workspace @migaia/logger
 | `createStorageHost({ plugins, ...options })` | Create a host; environment checks run before it returns by default |
 | `host.backend(id)` / `hasBackend(id)`        | Get an installed backend or check a dynamic ID                     |
 | `host.use(...plugins)`                       | Add a batch and return a host type that includes it                |
+| `host.unUse(id)`                             | Remove one plugin and release it; rejects while it is borrowed     |
 | `host.org(uuid)` / `dropOrg(uuid)`           | Obtain an organization view or remove its data from each backend   |
 | `host.detect()`                              | Run checks that have not completed successfully                    |
 | `host.dispose()`                             | Stop accepting work, wait, and release resources                   |

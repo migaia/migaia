@@ -642,6 +642,11 @@ export type IStorageHost<
   use<const Next extends readonly IStorageBackendPluginHandle[]>(
     ...plugins: IRejectInstalledOrDuplicateIds<{ [N in IStoragePluginId<P[number]>]: true }, Next>
   ): Promise<IStorageHost<readonly [...P, ...Next], J>>
+  /**
+   * Remove one installed plugin by id and release its resources. Rejects while another plugin
+   * borrows the backend (BACKEND_IN_USE). The static host type keeps listing the plugin.
+   */
+  unUse(id: IStoragePluginId<P[number]>): Promise<void>
   backend<N extends keyof IPluginStoreMap<P> & string>(
     id: N
   ): IPluginStoreMap<P>[N] & IStorageJournalUndoSurface<J>
@@ -659,7 +664,14 @@ export type IStorageOrgView<
     import('./journal/types.js').IStorageJournalOf<P>
 > = Omit<
   IStorageHost<P, J>,
-  'use' | 'dropOrg' | 'dispose' | typeof Symbol.asyncDispose | 'backend' | 'backends' | 'org'
+  | 'use'
+  | 'unUse'
+  | 'dropOrg'
+  | 'dispose'
+  | typeof Symbol.asyncDispose
+  | 'backend'
+  | 'backends'
+  | 'org'
 > & {
   readonly orgId: string
   org(orgId: string): IStorageOrgView<P, J>
