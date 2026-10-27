@@ -1,7 +1,8 @@
 /** Preserve public lifecycle and native error behavior before moving RPC implementation owners. */
 import { deferred } from '@migaia/utils/promise'
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { createRpcHost, RpcLifecycleError } from '@migaia/rpc-host'
+import { createRpcHost } from '@migaia/rpc-host'
+import { RpcLifecycleError } from '@migaia/rpc-host/contract'
 import { expect, it, vi } from 'vitest'
 import { coreMemoryServer } from './core-fixture.js'
 

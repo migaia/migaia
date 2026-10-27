@@ -1,6 +1,7 @@
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
-import { createRpcHost, RpcLifecycleError } from '@migaia/rpc-host'
+import { createRpcHost } from '@migaia/rpc-host'
+import { RpcLifecycleError } from '@migaia/rpc-host/contract'
 import { auth } from '@migaia/rpc-host/plugins/auth'
 import { chunk } from '@migaia/rpc-host/plugins/chunk'
 import { batch } from '@migaia/rpc-host/plugins/batch'

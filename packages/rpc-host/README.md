@@ -14,6 +14,8 @@ pnpm add @migaia/rpc-host @migaia/rpc-contract @migaia/rpc-plugin-coroutines
 
 `@migaia/rpc-contract` 是精确 lockstep 的 peer 依赖，必须与 host 和传输插件一起安装相同版本。它们共用应用提供的同一份 contract；开发者显式安装的重复副本不在支持范围内。
 
+错误类、错误判断和可移植值使用 `@migaia/rpc-host/contract`：它按名字转出 `RpcLifecycleError`、`RpcConstructionError`、`RpcAbortError`、`isRpcError`、`isRpcErrorInstance`、`isRpcRemoteError`、`isRpcTimeoutError`、`RPC_CORE_ERROR_SOURCE`、`normalizeRpcPortable`，以及 `RpcError` 等错误类型和 `IRpcPortableValue`。转出与应用提供的 contract 保持同一个对象，跨入口 `instanceof` 一致。原根入口的 contract 值与类型已迁移到此处，不保留旧转出；`createRpcHost` 仍从根入口导入。
+
 下面建立两个同一事件循环内的真实 host。父端的 timeout feature 安装在 coroutine plugin 上；子端接收本代专属 connect 句柄。输出 `42`，finally 关闭原生资源。
 
 ```ts doc-test=run

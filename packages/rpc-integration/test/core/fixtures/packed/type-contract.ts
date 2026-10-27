@@ -43,6 +43,112 @@ import { createProviderEndpoint } from '@migaia/rpc-host/provider'
 // @ts-expect-error Endpoint preset subpaths no longer compete with createRpcHost.
 import { createFullEndpoint as fullPreset } from '@migaia/rpc-host/full'
 
+/** A46 forwarding keeps every moved contract type equal to its canonical declaration. */
+import type * as IHostContract from '@migaia/rpc-host/contract'
+import type * as ICanonicalErrors from '@migaia/rpc-contract/errors'
+import type * as ICanonicalPortable from '@migaia/rpc-contract/portable'
+
+/** Generic identity comparison checks aliases without widening either contract shape. */
+type IEqual<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false
+/** A failed equality is a declaration-check failure, not a runtime approximation. */
+type IAssertSame<T extends true> = T
+/** All fifteen moved error types plus the portable value preserve their original definitions. */
+type IContractTypesMatch = IAssertSame<
+  IEqual<
+    [
+      IHostContract.RpcError,
+      IHostContract.RpcSchemaValidationError,
+      IHostContract.RpcConfigurationError,
+      IHostContract.RpcConstructionError,
+      IHostContract.RpcSerializationError,
+      IHostContract.RpcProtocolError,
+      IHostContract.RpcContractError,
+      IHostContract.RpcTransportError,
+      IHostContract.RpcAuthenticationError,
+      IHostContract.RpcChunkError,
+      IHostContract.RpcRemoteError,
+      IHostContract.RpcAbortError,
+      IHostContract.RpcTimeoutError,
+      IHostContract.IRpcError,
+      IHostContract.IRpcCleanupError,
+      IHostContract.IRpcPortableValue
+    ],
+    [
+      ICanonicalErrors.RpcError,
+      ICanonicalErrors.RpcSchemaValidationError,
+      ICanonicalErrors.RpcConfigurationError,
+      ICanonicalErrors.RpcConstructionError,
+      ICanonicalErrors.RpcSerializationError,
+      ICanonicalErrors.RpcProtocolError,
+      ICanonicalErrors.RpcContractError,
+      ICanonicalErrors.RpcTransportError,
+      ICanonicalErrors.RpcAuthenticationError,
+      ICanonicalErrors.RpcChunkError,
+      ICanonicalErrors.RpcRemoteError,
+      ICanonicalErrors.RpcAbortError,
+      ICanonicalErrors.RpcTimeoutError,
+      ICanonicalErrors.IRpcError,
+      ICanonicalErrors.IRpcCleanupError,
+      ICanonicalPortable.IRpcPortableValue
+    ]
+  >
+>
+/** Type evidence is consumed only during the packed declaration check. */
+declare const contractTypesMatch: IContractTypesMatch
+void contractTypesMatch
+// @ts-expect-error BC30 removes contract types from the Host root.
+import type { RpcError as IRemovedRpcError } from '@migaia/rpc-host'
+// @ts-expect-error BC30 removes contract types from the Host root.
+import type { RpcSchemaValidationError as IRemovedRpcSchemaValidationError } from '@migaia/rpc-host'
+// @ts-expect-error BC30 removes contract types from the Host root.
+import type { RpcConfigurationError as IRemovedRpcConfigurationError } from '@migaia/rpc-host'
+// @ts-expect-error BC30 removes contract types from the Host root.
+import type { RpcConstructionError as IRemovedRpcConstructionError } from '@migaia/rpc-host'
+// @ts-expect-error BC30 removes contract types from the Host root.
+import type { RpcSerializationError as IRemovedRpcSerializationError } from '@migaia/rpc-host'
+// @ts-expect-error BC30 removes contract types from the Host root.
+import type { RpcProtocolError as IRemovedRpcProtocolError } from '@migaia/rpc-host'
+// @ts-expect-error BC30 removes contract types from the Host root.
+import type { RpcContractError as IRemovedRpcContractError } from '@migaia/rpc-host'
+// @ts-expect-error BC30 removes contract types from the Host root.
+import type { RpcTransportError as IRemovedRpcTransportError } from '@migaia/rpc-host'
+// @ts-expect-error BC30 removes contract types from the Host root.
+import type { RpcAuthenticationError as IRemovedRpcAuthenticationError } from '@migaia/rpc-host'
+// @ts-expect-error BC30 removes contract types from the Host root.
+import type { RpcChunkError as IRemovedRpcChunkError } from '@migaia/rpc-host'
+// @ts-expect-error BC30 removes contract types from the Host root.
+import type { RpcRemoteError as IRemovedRpcRemoteError } from '@migaia/rpc-host'
+// @ts-expect-error BC30 removes contract types from the Host root.
+import type { RpcAbortError as IRemovedRpcAbortError } from '@migaia/rpc-host'
+// @ts-expect-error BC30 removes contract types from the Host root.
+import type { RpcTimeoutError as IRemovedRpcTimeoutError } from '@migaia/rpc-host'
+// @ts-expect-error BC30 removes contract types from the Host root.
+import type { IRpcError as IRemovedIRpcError } from '@migaia/rpc-host'
+// @ts-expect-error BC30 removes contract types from the Host root.
+import type { IRpcCleanupError as IRemovedIRpcCleanupError } from '@migaia/rpc-host'
+/** Negative root imports remain used so missing exports supply the actual diagnostic. */
+type IRemovedContractBindings = [
+  IRemovedRpcError,
+  IRemovedRpcSchemaValidationError,
+  IRemovedRpcConfigurationError,
+  IRemovedRpcConstructionError,
+  IRemovedRpcSerializationError,
+  IRemovedRpcProtocolError,
+  IRemovedRpcContractError,
+  IRemovedRpcTransportError,
+  IRemovedRpcAuthenticationError,
+  IRemovedRpcChunkError,
+  IRemovedRpcRemoteError,
+  IRemovedRpcAbortError,
+  IRemovedRpcTimeoutError,
+  IRemovedIRpcError,
+  IRemovedIRpcCleanupError
+]
+/** Compile-only consumption never executes a removed root value. */
+declare const removedContractBindings: IRemovedContractBindings
+void removedContractBindings
+
 /** The packed Host surface correlates a direct target with its actual scalar and stream methods. */
 type IWorkerApi = Readonly<{
   echo(value: number): number

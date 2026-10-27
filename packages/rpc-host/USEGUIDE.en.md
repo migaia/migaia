@@ -373,20 +373,21 @@ A launched child with actual native parent facts (process, thread, coroutine, de
 
 ## Migrate entries
 
-| Retired usage                                         | Replacement                                                             |
-| ----------------------------------------------------- | ----------------------------------------------------------------------- |
-| Root `host.request/send/notify/stream/dispatch/group` | The corresponding `host.<ns>` call                                      |
-| `@migaia/rpc-host/plugin`                             | `@migaia/rpc-host/sdk`                                                  |
-| `/probe` plus `defineFeaturePlugin`                   | `probe` / `defineProbe` from `/plugins/probe`                           |
-| `authFeature/chunkFeature/typegenFeature`             | `auth/chunk/typegen` from `/plugins`                                    |
-| Root `defaultTimeoutMs` or numeric call timeout       | Plugin `features` and complete timeout instances                        |
-| `poolPlugin` or pool assembler                        | Transport `features: [pool({ size })]`                                  |
-| Endpoint, RuntimePeer, v1, JSON-RPC profile           | One Host call owner and one new protocol, without compatibility entries |
-| Root `outcome` or idempotency store                   | Install `/plugins/idempotency`; query its namespace extension           |
+| Retired usage                                               | Replacement                                                             |
+| ----------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Root `host.request/send/notify/stream/dispatch/group`       | The corresponding `host.<ns>` call                                      |
+| `@migaia/rpc-host/plugin`                                   | `@migaia/rpc-host/sdk`                                                  |
+| Contract error classes, predicates, and types from the root | `@migaia/rpc-host/contract`                                             |
+| `/probe` plus `defineFeaturePlugin`                         | `probe` / `defineProbe` from `/plugins/probe`                           |
+| `authFeature/chunkFeature/typegenFeature`                   | `auth/chunk/typegen` from `/plugins`                                    |
+| Root `defaultTimeoutMs` or numeric call timeout             | Plugin `features` and complete timeout instances                        |
+| `poolPlugin` or pool assembler                              | Transport `features: [pool({ size })]`                                  |
+| Endpoint, RuntimePeer, v1, JSON-RPC profile                 | One Host call owner and one new protocol, without compatibility entries |
+| Root `outcome` or idempotency store                         | Install `/plugins/idempotency`; query its namespace extension           |
 
 `remote.host.use`, `remote.host.unUse` and `remote.host.inspect` are removed. RPC no longer provides a protocol for managing a remote host's plugins; local native host installation and disposal keep their own contracts.
 
-Aggregate and individual default subpaths support tree-shaking. Import codes from `@migaia/rpc-contract/error-code` and error classes/contracts from `/errors`. Transport authors supply native carriers and codecs; Host owns handshake, Sessions, pending calls, and provider execution.
+Aggregate and individual default subpaths support tree-shaking. Import codes from `@migaia/rpc-contract/error-code`; import application error classes, predicates, and types from `@migaia/rpc-host/contract`. The root no longer forwards those symbols. `RpcConstructionError` and `RpcAbortError` are runtime classes at this entry, suitable for `instanceof`, and are the same objects as direct contract imports. The entry also supplies `normalizeRpcPortable` and `IRpcPortableValue` for strict own-data normalization with negotiated native values. It neither copies nor installs another contract package. Existing SDK and limits type exports for plugin authors are unchanged. Transport authors supply native carriers and codecs; Host owns handshake, Sessions, pending calls, and provider execution.
 
 ## Close and retain errors
 

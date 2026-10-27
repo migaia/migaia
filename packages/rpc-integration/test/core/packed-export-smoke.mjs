@@ -34,6 +34,8 @@ const rpcOwners = [
   'rpc-plugin-pool',
   'rpc-plugin-devtools'
 ]
+/** Direct consumers are real archives, with Contract supplied by the same application peer. */
+const contractConsumers = ['tray', 'store-worker']
 const smokeDirectory = mkdtempSync(join(tmpdir(), 'migaia-rpc-packed-'))
 const extractDirectory = join(smokeDirectory, 'extract')
 const consumerDirectory = join(smokeDirectory, 'consumer')
@@ -93,16 +95,22 @@ async function main() {
     const consumerDependencyDirectory = join(consumerDirectory, 'node_modules', '@migaia')
     mkdirSync(dependencyDirectory, { recursive: true })
     mkdirSync(consumerDependencyDirectory, { recursive: true })
-    for (const owner of [...packageDependencies, ...rpcOwners]) {
+    for (const owner of [...packageDependencies, ...rpcOwners, ...contractConsumers]) {
       installPackedDependency(dependencyDirectory, owner)
       symlinkSync(join(dependencyDirectory, owner), join(consumerDependencyDirectory, owner), 'dir')
     }
     const packedPackages = Object.fromEntries(
       rpcOwners.map((owner) => [owner, join(dependencyDirectory, owner)])
     )
+    /** Consumer roots resolve only packages extracted from actual packed artifacts. */
+    const packedConsumers = Object.fromEntries(
+      contractConsumers.map((owner) => [owner, join(dependencyDirectory, owner)])
+    )
     const packedPackage = packedPackages['rpc-host']
+    assertPackedContractSurface(packedPackages, packedConsumers)
+    console.log('CHECK A46-contract-entry PASS')
     assertPackedOwnerManifests(packedPackages)
-    assertPackedContractIdentity(packedPackages)
+    assertPackedContractIdentity({ ...packedPackages, ...packedConsumers })
     console.log('CHECK shared-contract-resolution PASS')
     console.log('CHECK five-packed-artifacts PASS')
     assertIdentityObserverDeclarationsHidden(packedPackage)
@@ -213,7 +221,7 @@ async function assertPackedSelectiveBrowserImport(
   writeFileSync(
     browserEntry,
     [
-      "import { isRpcError } from '@migaia/rpc-host'",
+      "import { isRpcError } from '@migaia/rpc-host/contract'",
       "globalThis.__migaiaSelectiveImport = isRpcError({ code: 'SELECTIVE_BROWSER_PROBE' })"
     ].join('\n'),
     'utf8'
@@ -240,7 +248,7 @@ async function assertPackedSelectiveBrowserImport(
   const retainedInputs = Object.entries(output.inputs)
     .filter(([, input]) => input.bytesInOutput > 0)
     .map(([path]) => resolve(consumerDirectory, path))
-  /** Error behavior belongs to Contract; the root re-export must not retain Host execution. */
+  /** The contract forwarding entry must not retain any Host execution in a selective bundle. */
   const hostDist = resolve(packedPackage, 'dist') + '/'
   const errorsDist = resolve(packedContract, 'dist/errors') + '/'
   if (!retainedInputs.some((path) => path.startsWith(errorsDist)))
@@ -434,6 +442,80 @@ function packDependency(packageDirectory, dependency) {
     throw new Error(`Expected exactly one ${dependency} tarball, found ${tarballs.length}`)
   }
   return join(packDirectory, tarballs[0])
+}
+
+/**
+ * A46 compares real packed forwarding identities and the consumer peer boundary.
+ *
+ * @param {Record<string, string>} packedPackages Extracted RPC package roots.
+ * @param {Record<string, string>} packedConsumers Extracted tray and store-worker roots.
+ * @returns {void} Throws when an archive retains a duplicate or old root contract path.
+ */
+function assertPackedContractSurface(packedPackages, packedConsumers) {
+  /** One installed Contract version supplies both direct-consumer peer requirements. */
+  const contractVersion = JSON.parse(
+    readFileSync(join(packedPackages['rpc-contract'], 'package.json'), 'utf8')
+  ).version
+  for (const [owner, directory] of Object.entries(packedConsumers)) {
+    /** Packing rewrites workspace peers to the actual package version. */
+    const manifest = JSON.parse(readFileSync(join(directory, 'package.json'), 'utf8'))
+    if (
+      manifest.dependencies?.['@migaia/rpc-contract'] !== undefined ||
+      manifest.peerDependencies?.['@migaia/rpc-contract'] !== contractVersion
+    )
+      throw new Error(`A46 packed consumer must borrow the exact Contract peer: ${owner}`)
+  }
+  /** The probe executes through Node's actual packed export-map and ESM module cache. */
+  const probe = join(consumerDirectory, 'contract-entry-probe.mjs')
+  writeFileSync(
+    probe,
+    `
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+import { pathToFileURL } from 'node:url';
+import * as root from '@migaia/rpc-host';
+import * as forwarding from '@migaia/rpc-host/contract';
+import * as canonical from '@migaia/rpc-contract/errors';
+import { normalizeRpcPortable } from '@migaia/rpc-contract/portable';
+/** Nine runtime exports are a fixed compile-time contract, not a growing sorted collection. */
+const expected = {
+  RpcLifecycleError: canonical.RpcLifecycleError,
+  RpcConstructionError: canonical.RpcConstructionError,
+  RpcAbortError: canonical.RpcAbortError,
+  isRpcError: canonical.isRpcError,
+  isRpcErrorInstance: canonical.isRpcErrorInstance,
+  isRpcRemoteError: canonical.isRpcRemoteError,
+  isRpcTimeoutError: canonical.isRpcTimeoutError,
+  RPC_CORE_ERROR_SOURCE: canonical.RPC_CORE_ERROR_SOURCE,
+  normalizeRpcPortable
+};
+assert.equal(Object.keys(forwarding).length, Object.keys(expected).length);
+for (const [name, identity] of Object.entries(expected)) {
+  assert.equal(forwarding[name], identity, 'A46 canonical identity: ' + name);
+  assert.equal(name in root, false, 'A46 retired root export: ' + name);
+}
+/** Values constructed through either publication retain the exact native class identity. */
+const construction = new forwarding.RpcConstructionError('packed construction', undefined, []);
+const abort = new forwarding.RpcAbortError();
+assert.ok(construction instanceof canonical.RpcConstructionError);
+assert.ok(new canonical.RpcConstructionError('canonical construction', undefined, []) instanceof forwarding.RpcConstructionError);
+assert.ok(abort instanceof canonical.RpcAbortError);
+assert.ok(new canonical.RpcAbortError() instanceof forwarding.RpcAbortError);
+/** Consumer-relative resolution must retain the same canonical forwarding module and classes. */
+const consumers = ${JSON.stringify(packedConsumers)};
+for (const [owner, directory] of Object.entries(consumers)) {
+  const require = createRequire(directory + '/package.json');
+  const consumerForwarding = await import(pathToFileURL(require.resolve('@migaia/rpc-host/contract')).href);
+  for (const [name, identity] of Object.entries(expected))
+    assert.equal(consumerForwarding[name], identity, 'A46 consumer identity: ' + owner + '/' + name);
+  assert.ok(construction instanceof consumerForwarding.RpcConstructionError);
+  assert.ok(abort instanceof consumerForwarding.RpcAbortError);
+}
+console.log('CHECK A46-packed-identities PASS');
+`,
+    'utf8'
+  )
+  execFileSync(process.execPath, [probe], { cwd: consumerDirectory, stdio: 'inherit' })
 }
 
 /** Prove hosts and transports resolve the same application-owned Contract entry. */

@@ -18,32 +18,6 @@ export type {
   IRpcProvider,
   IRpcProviderMethod
 } from './dispatch/types.js'
-/** Public error diagnostics retain their actual contract-owned class identities. */
-export {
-  RpcLifecycleError,
-  isRpcError,
-  isRpcErrorInstance,
-  isRpcRemoteError,
-  isRpcTimeoutError,
-  RPC_CORE_ERROR_SOURCE
-} from '@migaia/rpc-contract/errors'
-export type {
-  RpcError,
-  RpcSchemaValidationError,
-  RpcConfigurationError,
-  RpcConstructionError,
-  RpcSerializationError,
-  RpcProtocolError,
-  RpcContractError,
-  RpcTransportError,
-  RpcAuthenticationError,
-  RpcChunkError,
-  RpcRemoteError,
-  RpcAbortError,
-  RpcTimeoutError,
-  IRpcError,
-  IRpcCleanupError
-} from '@migaia/rpc-contract/errors'
 export { defaultRpcReporter } from './host/report.js'
 export { RpcWarningCode } from './host/warning.js'
 export type { IRpcWarning } from './host/warning.js'

@@ -15,7 +15,7 @@ import {
   type ISerializePlugin
 } from '@migaia/serialize'
 import { isUint8Array } from '@migaia/utils/bytes'
-import { RpcLifecycleError } from '@migaia/rpc-contract/errors'
+import { RpcLifecycleError } from '@migaia/rpc-host/contract'
 import { createWorkerContractEndpoint, type IWorkerContractEndpoint } from '../worker-contract.js'
 import { toManagedRpcHandler, type IManagedRpcHandler } from '../managed-rpc-handler.js'
 import {

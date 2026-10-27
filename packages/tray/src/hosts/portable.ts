@@ -1,4 +1,4 @@
-import { normalizePortable, type IRpcPortableValue } from '@migaia/rpc-contract'
+import { normalizeRpcPortable, type IRpcPortableValue } from '@migaia/rpc-host/contract'
 import { TrayErrorCode } from '../error-code.js'
 import { createTrayError } from '../errors.js'
 
@@ -10,7 +10,7 @@ import { createTrayError } from '../errors.js'
 export function toWire(value: unknown): IRpcPortableValue | undefined {
   if (value === undefined) return undefined
   try {
-    return normalizePortable(value, 0, new Set<object>(), true)
+    return normalizeRpcPortable(value)
   } catch (error) {
     throw createTrayError(TrayErrorCode.valueNotPortable, error)
   }

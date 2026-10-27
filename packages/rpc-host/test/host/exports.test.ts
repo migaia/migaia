@@ -9,6 +9,7 @@ import * as plugins from '@migaia/rpc-host/plugins'
 /** These are the exact publication paths declared by core3.6, without legacy entry aliases. */
 const expectedEntries = [
   '.',
+  './contract',
   './features',
   './features/retry',
   './features/timeout',
@@ -26,18 +27,8 @@ const expectedEntries = [
   './sdk'
 ]
 
-/** Root owns construction, lifetime and public error diagnostics; code tables belong to Contract. */
-const expectedRoot = [
-  'RPC_CORE_ERROR_SOURCE',
-  'RpcLifecycleError',
-  'RpcWarningCode',
-  'createRpcHost',
-  'defaultRpcReporter',
-  'isRpcError',
-  'isRpcErrorInstance',
-  'isRpcRemoteError',
-  'isRpcTimeoutError'
-]
+/** Root owns Host construction and warnings; contract diagnostics live at the contract entry. */
+const expectedRoot = ['RpcWarningCode', 'createRpcHost', 'defaultRpcReporter']
 
 /** SDK owns native authoring, codecs and shared generations, without business Peer facades. */
 const expectedSdk = [

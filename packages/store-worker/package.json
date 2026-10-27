@@ -41,16 +41,19 @@
   "dependencies": {
     "@migaia/reactive": "workspace:^",
     "@migaia/resource": "workspace:^",
-    "@migaia/rpc-contract": "workspace:*",
     "@migaia/rpc-host": "workspace:*",
     "@migaia/rpc-plugin-browser": "workspace:*",
     "@migaia/serialize": "workspace:^",
     "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
+    "@migaia/rpc-contract": "workspace:*",
     "@playwright/test": "^1.62.1",
     "typescript": "^7.0.2",
     "vite": "8.1.1",
     "vitest": "4.1.10"
+  },
+  "peerDependencies": {
+    "@migaia/rpc-contract": "workspace:*"
   }
 }

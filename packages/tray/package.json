@@ -54,7 +54,6 @@
     "@migaia/event-subscriber": "workspace:^",
     "@migaia/lifecycle": "workspace:^",
     "@migaia/plugin-host": "workspace:^",
-    "@migaia/rpc-contract": "workspace:^",
     "@migaia/rpc-host": "workspace:^",
     "@migaia/rpc-plugin-coroutines": "workspace:*",
     "@migaia/rpc-plugin-process": "workspace:^",
@@ -63,7 +62,11 @@
     "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
+    "@migaia/rpc-contract": "workspace:*",
     "typescript": "^7.0.2",
     "vitest": "4.1.10"
+  },
+  "peerDependencies": {
+    "@migaia/rpc-contract": "workspace:*"
   }
 }

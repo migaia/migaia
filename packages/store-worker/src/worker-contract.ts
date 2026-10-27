@@ -6,10 +6,15 @@
 import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import { deferred } from '@migaia/utils/promise'
 import { attachSecondaryErrors } from '@migaia/utils/error'
-import { normalizeRpcPortable, type IRpcPortableValue } from '@migaia/rpc-contract/portable'
+import {
+  normalizeRpcPortable,
+  RpcAbortError,
+  RpcConstructionError,
+  RpcLifecycleError,
+  type IRpcPortableValue
+} from '@migaia/rpc-host/contract'
 import { createRpcHost, type IRpcHost, type IRpcContext } from '@migaia/rpc-host'
 import { timeout } from '@migaia/rpc-host/features/timeout'
-import { RpcAbortError, RpcConstructionError, RpcLifecycleError } from '@migaia/rpc-contract/errors'
 import { dedicatedWorkerPlugin } from '@migaia/rpc-plugin-browser'
 import type { IWorkerMessagePort } from './worker-message-event.js'
 import { StoreWorkerErrorText } from './error-text.js'

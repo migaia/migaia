@@ -1,4 +1,4 @@
-import type { IRpcPortableValue } from '@migaia/rpc-contract'
+import type { IRpcPortableValue } from '@migaia/rpc-host/contract'
 import { TrayErrorCode } from '../error-code.js'
 import { createTrayError } from '../errors.js'
 

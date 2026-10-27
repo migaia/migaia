@@ -14,6 +14,8 @@ pnpm add @migaia/rpc-host @migaia/rpc-contract @migaia/rpc-plugin-coroutines
 
 `@migaia/rpc-contract` is an exact lockstep peer dependency. Install the same version alongside the host and transport plugins. They share the application's single contract installation; explicitly installed duplicate copies are unsupported.
 
+Import error classes, error predicates, and portable values from `@migaia/rpc-host/contract`. It forwards the named values `RpcLifecycleError`, `RpcConstructionError`, `RpcAbortError`, `isRpcError`, `isRpcErrorInstance`, `isRpcRemoteError`, `isRpcTimeoutError`, `RPC_CORE_ERROR_SOURCE`, and `normalizeRpcPortable`, plus error types such as `RpcError` and the portable-value type `IRpcPortableValue`. These exports retain the application's contract object identities and consistent cross-entry `instanceof` results. All contract values and types formerly exported at the root have moved here without compatibility exports; import `createRpcHost` from the root as before.
+
 This creates two real hosts in one event loop. The parent installs its timeout feature on the coroutine plugin. The child receives the generation-local connect handle. It prints `42` and releases native resources in finally.
 
 ```ts doc-test=run

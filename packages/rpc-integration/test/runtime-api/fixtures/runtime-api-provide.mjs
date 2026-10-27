@@ -1,5 +1,5 @@
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
-import { RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-host'
+import { RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-host/contract'
 import { attachErrorIdentity } from '@migaia/utils/error'
 
 /** Fixture-only historical diagnostics pin existing forwarded wire values, not Core identity. */

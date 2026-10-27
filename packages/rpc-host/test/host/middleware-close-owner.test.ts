@@ -1,7 +1,8 @@
 /** Original middleware disposal assertions now exercise the public Host and its real native IO. */
 import { expect, it, vi } from 'vitest'
 import { defineHost } from '@migaia/plugin-host'
-import { createRpcHost, RpcLifecycleError, type IRpcHostOptions } from '@migaia/rpc-host'
+import { createRpcHost, type IRpcHostOptions } from '@migaia/rpc-host'
+import { RpcLifecycleError } from '@migaia/rpc-host/contract'
 import { auth } from '@migaia/rpc-host/plugins/auth'
 import { defineFlowPlugin, rpcHostPipelines, RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { coreMemoryServer } from './core-fixture.js'

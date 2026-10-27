@@ -377,6 +377,7 @@ export const host = await createRpcHost({
 | ----------------------------------------------------- | ------------------------------------------- |
 | 根级 `host.request/send/notify/stream/dispatch/group` | `host.<ns>` 下的同名调用                    |
 | `@migaia/rpc-host/plugin`                             | `@migaia/rpc-host/sdk`                      |
+| 根入口的 contract 错误类、判断函数和错误类型          | `@migaia/rpc-host/contract`                 |
 | `/probe` + `defineFeaturePlugin`                      | `/plugins/probe` 的 `probe` / `defineProbe` |
 | `authFeature/chunkFeature/typegenFeature`             | `/plugins` 的 `auth/chunk/typegen`          |
 | 根 `defaultTimeoutMs` / 单次数字 timeout              | plugin 的 `features` 与完整 timeout 实例    |
@@ -386,7 +387,7 @@ export const host = await createRpcHost({
 
 `remote.host.use`、`remote.host.unUse` 和 `remote.host.inspect` 已移除，不再提供通过 RPC 管理远端宿主插件的协议；本地原生宿主的安装与释放 API 保持各自契约。
 
-汇总入口和各单项默认子路径均可 tree-shake。错误码从 `@migaia/rpc-contract/error-code` 引入；错误类和契约从 `/errors` 引入。传输作者只提交原生载体与编解码能力，host 负责握手、Session、待决表与 provider 执行。
+汇总入口和各单项默认子路径均可 tree-shake。错误码从 `@migaia/rpc-contract/error-code` 引入；应用使用的错误类、错误判断和类型改从 `@migaia/rpc-host/contract` 引入，根入口不再提供这些转出。`RpcConstructionError` 与 `RpcAbortError` 在此为运行时类，可以用于 `instanceof`；它们与直接 contract 导入保持同一对象。该入口同时提供 `normalizeRpcPortable` 与类型 `IRpcPortableValue`，可用于已协商 native 值的严格 own-data 域规范化；不为调用者复制或安装另一份 contract。SDK 和 limits 面向插件作者的原有类型转出保持不变。传输作者只提交原生载体与编解码能力，host 负责握手、Session、待决表与 provider 执行。
 
 ## 关闭与错误
 
