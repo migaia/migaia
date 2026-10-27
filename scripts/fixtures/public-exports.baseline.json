@@ -1306,18 +1306,6 @@
         "indexedDbBackendKind",
         "indexedDbBackendPlugin"
       ],
-      "./plugins/local-storage": [
-        "localStorageBackendPlugin"
-      ],
-      "./plugins/session-storage": [
-        "sessionStorageBackendPlugin"
-      ],
-      "./plugins/cookies": [
-        "cookieBackendPlugin"
-      ],
-      "./plugins/indexed-db": [
-        "indexedDbBackendPlugin"
-      ],
       "./features/reactive": [
         "reactiveFeature"
       ],

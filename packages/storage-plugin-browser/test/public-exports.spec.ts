@@ -36,14 +36,6 @@ const directConsumerFiles = [
   '../../../fixtures/consumers/electron-renderer.ts'
 ] as const
 
-/** Atomic backend entries and their plugin entries share the original factory object. */
-const canonicalBackendEntries = [
-  ['local-storage', 'localStorageBackendPlugin'],
-  ['session-storage', 'sessionStorageBackendPlugin'],
-  ['cookies', 'cookieBackendPlugin'],
-  ['indexed-db', 'indexedDbBackendPlugin']
-] as const
-
 /** Reads built JavaScript after the package test script has completed its mandatory build step. */
 const readBuiltJavaScript = (): string => {
   /** Distribution directory is owned by the storage-plugin-browser build gate. */
@@ -119,17 +111,6 @@ describe('atomic consumer and artifact correction', () => {
     for (const file of directConsumerFiles) {
       const source = readFileSync(resolve(import.meta.dirname, file), 'utf8')
       expect(source, file).not.toMatch(/from ['"]@migaia\/storage-plugin-browser['"]/)
-    }
-  })
-
-  it('retains canonical backend factory identity across atomic entries', async () => {
-    for (const [entry, exportName] of canonicalBackendEntries) {
-      const atomic = await import(`../dist/${entry}.js`)
-      const plugin = await import(`../dist/plugins/${entry}.js`)
-      const factory = atomic[exportName]
-      expect(factory).toBe(plugin[exportName])
-      expect(factory).toBeTypeOf('function')
-      expect(factory.name).toBe(exportName)
     }
   })
 })

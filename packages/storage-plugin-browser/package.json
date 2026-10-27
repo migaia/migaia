@@ -38,22 +38,6 @@
       "types": "./dist/indexed-db.d.ts",
       "default": "./dist/indexed-db.js"
     },
-    "./plugins/local-storage": {
-      "types": "./dist/plugins/local-storage.d.ts",
-      "default": "./dist/plugins/local-storage.js"
-    },
-    "./plugins/session-storage": {
-      "types": "./dist/plugins/session-storage.d.ts",
-      "default": "./dist/plugins/session-storage.js"
-    },
-    "./plugins/cookies": {
-      "types": "./dist/plugins/cookies.d.ts",
-      "default": "./dist/plugins/cookies.js"
-    },
-    "./plugins/indexed-db": {
-      "types": "./dist/plugins/indexed-db.d.ts",
-      "default": "./dist/plugins/indexed-db.js"
-    },
     "./features/reactive": {
       "types": "./dist/features/reactive.d.ts",
       "default": "./dist/features/reactive.js"
