@@ -1,4 +1,5 @@
 // Reactive query context, leases, external aborts and public state projection for the reactive service (see ./reactive.ts).
+import { hostRethrowReporter } from '@migaia/utils/promise'
 import { createLifecycleScope } from '@migaia/lifecycle'
 import { Resource } from '@migaia/resource'
 import type { IReactiveComputed } from '@migaia/reactive'
@@ -142,13 +143,22 @@ export function createReactiveQuery<T>(
   return publishReactiveQuery(queryState)
 }
 
+/**
+ * Hand a failed report callback's own error to the host unhandled-error channel. The utils
+ * reporter's context names utils operations only and is not read by the host channel.
+ */
+function rethrowReportFailure(failure: unknown): void {
+  ;(hostRethrowReporter as (error: unknown) => void)(failure)
+}
+
 /** Report query diagnostics without replacing the original request or terminal outcome. */
 export function reportQuery<T>(queryState: IReactiveQueryContext<T>, error: unknown): void {
+  /** A failing report callback never replaces the query outcome; its own failure goes to the host. */
   try {
     const result = queryState.input.report?.(error)
-    if (result !== undefined) void Promise.resolve(result).catch(() => undefined)
-  } catch {
-    // Query diagnostics are report-only and must not replace the query outcome.
+    if (result !== undefined) void Promise.resolve(result).catch(rethrowReportFailure)
+  } catch (failure) {
+    rethrowReportFailure(failure)
   }
 }
 

@@ -38,8 +38,22 @@ describe('public reactive query policies', () => {
     await store.putRecord({ id: 'row', value: 'initial' }, 'row')
     /** Equality failures remain diagnostic and must never replace an accepted query value. */
     const equalityFailure = new Error('equality policy failed')
-    /** Both supported report-only failure forms must remain contained. */
+    /** Reporter failures in both forms must reach the host unhandled-error channel. */
     const reporterFailure = new Error('equality reporter failed')
+    /** The host channel rethrows on a microtask; this spy records those rethrows instead. */
+    const unhandled: unknown[] = []
+    const enqueue = globalThis.queueMicrotask
+    const spy = vi.spyOn(globalThis, 'queueMicrotask').mockImplementation((callback) =>
+      enqueue(() => {
+        try {
+          callback()
+        } catch (error) {
+          if (error !== reporterFailure) throw error
+          unhandled.push(error)
+        }
+      })
+    )
+    onTestFinished(() => spy.mockRestore())
     /** Recorded callback inputs prove the original equality failure remains attributable. */
     const reports: unknown[] = []
     /** The caller deliberately changes its equality policy between ordinary refreshes. */
@@ -85,6 +99,7 @@ describe('public reactive query policies', () => {
       expect(query.state.value.value).toEqual([{ id: 'row', value: 'reported-sync' }])
     )
     expect(reports).toEqual([equalityFailure, equalityFailure])
+    await vi.waitFor(() => expect(unhandled).toEqual([reporterFailure, reporterFailure]))
     expect(query.state.runtime).toBe(runtime)
     expect(query.state.debugName).toBe('storage-plugin-browser/live-query-state')
     expect(query.state.peek()).toBe(query.state.value)
