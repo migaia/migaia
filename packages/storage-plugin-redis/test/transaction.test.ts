@@ -7,7 +7,7 @@ import { ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'
 import { redisBackendPlugin, type IRedisDriver } from '../src/index.js'
 import { nodeRedisDriver } from '../src/adapters/node-redis.js'
 import { ioredisDriver } from '../src/adapters/ioredis.js'
-import { createRedisLayout } from '../src/layout.js'
+import { createRedisLayout, encodeRedisValue } from '../src/layout.js'
 
 /** Independent genuine adapters contend only on fresh fixture keys. */
 for (const url of [process.env.MIGAIA_REDIS_URL, process.env.MIGAIA_VALKEY_URL])
@@ -161,6 +161,26 @@ for (const url of [process.env.MIGAIA_REDIS_URL, process.env.MIGAIA_VALKEY_URL])
           )
         ).rejects.toMatchObject({ code: 'WRITE_CONFLICT' })
         expect(await a.getRecord('conflict')).toEqual({ count: 2 })
+        /** Native clients can replace this fixture's value without publishing a host revision. */
+        const layout = createRedisLayout(prefix, org),
+          physical = layout.value('record', 'conflict'),
+          revisionField = layout.revision('record', 'conflict'),
+          revision = await native.command(['HGET', layout.revisions, revisionField])
+        expect(await native.command(['GET', physical])).toBe(
+          encodeRedisValue('record', { count: 2 })
+        )
+        await expect(
+          a.transaction(
+            async (scope) => {
+              expect(await scope.getRecord('conflict')).toEqual({ count: 2 })
+              await native.command(['SET', physical, encodeRedisValue('record', { count: 4 })])
+              expect(await native.command(['HGET', layout.revisions, revisionField])).toBe(revision)
+              await scope.putRecord({ count: 5 }, 'conflict')
+            },
+            { concurrency: ConcurrencyPolicy.fail() }
+          )
+        ).rejects.toMatchObject({ code: 'WRITE_CONFLICT' })
+        expect(await a.getRecord('conflict')).toEqual({ count: 4 })
       } finally {
         await first.backend('redis').clearAll()
         await first.dispose()
