@@ -115,7 +115,16 @@ export function transactionsConformance(
     await expect(store.get('shared-tx')).resolves.toBeNull()
     await expect(store.getRecord('shared-tx')).resolves.toEqual({ v: 2 })
   })
+  transactionsConformanceRest(checkCase, harness)
+}
 
+/** Second half of the transactionsConformance cases; same fixtures and assertions, split for size. */
+function transactionsConformanceRest(
+  checkCase: IConformanceCase,
+  harness: IConformanceHarness
+): void {
+  const check = keyValueCases(checkCase, harness, ['getRecord', 'putRecord', 'transaction'])
+  const expect = harness.expect
   check('transaction 内抛错时整批写入回滚', async (store) => {
     await store.putRecord({ v: 'before' }, 'existing')
     await expect(
@@ -128,7 +137,6 @@ export function transactionsConformance(
     await expect(store.getRecord('tx-key')).resolves.toBeUndefined()
     await expect(store.getRecord('existing')).resolves.toEqual({ v: 'before' })
   })
-
   check('transaction callback abort 后不提交草稿', async (store) => {
     const controller = new AbortController()
     await expect(
@@ -142,7 +150,6 @@ export function transactionsConformance(
     ).rejects.toMatchObject({ code: 'ABORTED' })
     await expect(store.getRecord('abort-transaction')).resolves.toBeUndefined()
   })
-
   check('transaction 对实际并发写采用后端隔离语义', async (store) => {
     await store.putRecord({ value: 0 }, 'revision-conflict')
     // Strong concurrent snapshot/ABA assertions retain their original memory/IndexedDB domain.
@@ -187,7 +194,6 @@ export function transactionsConformance(
     })
     await expect(store.getRecord('revision-conflict')).resolves.toEqual({ value: 2 })
   })
-
   check('transaction 保持 repeatable snapshot，按后端原生或乐观规则提交', async (store) => {
     await store.putRecord({ value: 0 }, 'repeatable-read')
     // Strong concurrent snapshot/ABA assertions retain their original memory/IndexedDB domain.
@@ -229,7 +235,6 @@ export function transactionsConformance(
     release!()
     await expect(first).rejects.toMatchObject({ code: 'WRITE_CONFLICT' })
   })
-
   check(
     '空事务（无读写）与并发 clearRecords 不误报冲突（memory 与 indexed-db 一致）',
     async (store) => {
@@ -267,7 +272,6 @@ export function transactionsConformance(
       await expect(first).resolves.toBeUndefined()
     }
   )
-
   check('transaction 成功 delete 会持久化删除', async (store) => {
     await store.putRecord({ v: 1 }, 'delete-key')
     await store.transaction(async (tx) => {
