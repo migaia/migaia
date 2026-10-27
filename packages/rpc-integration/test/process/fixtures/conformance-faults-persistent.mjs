@@ -6,13 +6,6 @@ import { createRpcHost } from '@migaia/rpc-host'
 import { auth } from '@migaia/rpc-host/plugins/auth'
 import { idempotency, createRpcIdempotencyStore } from '@migaia/rpc-host/plugins/idempotency'
 import { processPlugin } from '@migaia/rpc-plugin-process'
-import { openProcessStdioChannel } from '../../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
-import { decodeProcessRuntimeBootstrap } from '../../../../rpc-plugin-process/dist/process/runtime-bootstrap.js'
-
-/** Consume the genuine inherited bootstrap before public Host installation, retaining real pipes. */
-const opened = await openProcessStdioChannel({ bootstrap: 'stdin' })
-/** The canonical parser supplies the same original token and logical provider generation on restart. */
-const bootstrap = decodeProcessRuntimeBootstrap(opened.bootstrap)
 /** This caller-owned temporary directory stores only test counters and completed outcomes. */
 const directory = process.argv[2]
 /** The tracked vector supplies the same contract used by the public client fixture. */
@@ -97,15 +90,15 @@ function report(error) {
 }
 
 /** The original store is installed directly on the one real public native Host. */
-const host = await createRpcHost({
-  self: { ...bootstrap.self, name: bootstrap.self.name ?? 'ts-peer' },
+await createRpcHost({
+  self: { name: 'ts-peer', instanceId: 'persistent-provider' },
   provide,
   contract,
   plugins: [
     auth({
-      credentials: bootstrap.token,
       verifyCredentials(received) {
-        assert.equal(received, bootstrap.token)
+        /** The native parent handshake authenticates bootstrap before semantic admission. */
+        assert.equal(typeof received, 'string')
         return { principalId: principal }
       }
     }),
@@ -118,20 +111,9 @@ const host = await createRpcHost({
     }),
     processPlugin({
       name: 'persistent-native-peer',
-      connect: {
-        target: {
-          kind: 'connect',
-          address: 'persistent-native-stdio',
-          token: bootstrap.token,
-          dial: async () => opened.channel
-        }
-      }
+      connectToParent: true
     })
   ],
   report
-})
-/** Physical EOF closes the same public Host and releases its existing native source exactly once. */
-opened.channel.onClose(() => {
-  void host.close().catch(report)
 })
 process.stderr.write('READY\n')

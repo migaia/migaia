@@ -22,13 +22,9 @@ const state = {
   executions: 0,
   contexts: [],
   aborts: [],
-  replacements: 0,
-  revision: 0,
   frames: [],
   reports: []
 }
-/** No new fixture fallback is substituted for the unavailable native health receiver. */
-const control = { health: undefined }
 /** Stdio bootstrap remains native launch custody, independent from semantic grammar. */
 const opened = mode === 'stderr' ? await openProcessStdioChannel({ bootstrap: 'stdin' }) : undefined
 /** Structured bootstrap supplies the original physical identity and mandatory token. */
@@ -99,7 +95,6 @@ class IsolationTarget {
   }
   /** Build one actual target definition with the revision captured for that generation. */
   definition() {
-    const revision = state.revision
     return definePlugin({
       name: 'p',
       install: () => ({}),
@@ -108,16 +103,6 @@ class IsolationTarget {
           const output = {
             async request(input, context) {
               if (input === 'stats') return { ...state, pid: process.pid }
-              if (input?.[0] === 'health') {
-                queueMicrotask(() =>
-                  control.health?.({
-                    targetName: 'p',
-                    connectionId: input[1],
-                    reason: new Error('explicit fixture health event')
-                  })
-                )
-                return true
-              }
               if (input === 'stderr') {
                 /** Separate writes deliberately split every potential six-character token window. */
                 for (const part of credentials.alice.match(/.{1,3}/g)) {
@@ -149,7 +134,6 @@ class IsolationTarget {
               return {
                 input,
                 execution: state.executions,
-                revision,
                 session: sessionContext(context)
               }
             },
@@ -203,7 +187,11 @@ class IsolationService {
         }
       },
       plugins: [
-        auth({ verifyCredentials: authenticateCredentials }),
+        auth({
+          verifyCredentials: authenticateCredentials,
+          /** This completed-frame replay case explicitly selects the documented retained-ID mode. */
+          retain: mode === 'replay' ? 310_000 : false
+        }),
         idempotency(),
         limits({ maxConsecutiveTimeouts: 3 }),
         defineFlowFeature({ name: 'isolation-envelope-observer', setup: observeFrames }),

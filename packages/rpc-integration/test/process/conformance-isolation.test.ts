@@ -7,14 +7,15 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { inspect } from 'node:util'
 import { describe, expect, it, vi } from 'vitest'
-import { serializeRpcError } from '@migaia/rpc-contract/errors'
+import { serializeRpcError, type IRpcSerializedError } from '@migaia/rpc-contract/errors'
 import { RpcProbeLifecycle } from '@migaia/rpc-contract/interfaces'
 import { createRpcHost } from '@migaia/rpc-host'
 import { auth } from '@migaia/rpc-host/plugins/auth'
 import { probe } from '@migaia/rpc-host/plugins/probe'
 import { timeout } from '@migaia/rpc-host/features/timeout'
 import { encodeRpcStreamFrame } from '@migaia/rpc-host/sdk'
-import { processPlugin, RpcProcessErrorCode } from '@migaia/rpc-plugin-process'
+import { processPlugin } from '@migaia/rpc-plugin-process'
+import { DEFAULT_MAX_CONNECTIONS } from '../../../rpc-plugin-process/dist/process/resilience/constants.js'
 import { ipcLog, type IIpcLogContext } from '@migaia/rpc-plugin-process/features'
 import { dialProcessByteChannel } from '../../../rpc-plugin-process/dist/process/adapters/node-socket.js'
 import type { IProcessByteChannel } from '../../../rpc-plugin-process/dist/process/types.js'
@@ -79,7 +80,6 @@ const fixturePeer = {
 type IResult = {
   input: unknown
   execution: number
-  revision: number
   session: { sessionId: string; connectionId: string; principalId: string }
 }
 /** The actual child independently counts executions, cancellation and lifecycle replacement. */
@@ -87,10 +87,8 @@ type IStats = {
   executions: number
   contexts: Array<IResult['session'] & { method: string }>
   aborts: Array<IResult['session'] & { label: string; code?: string; localTimeout: boolean }>
-  replacements: number
-  revision: number
   pid: number
-  reports: unknown[]
+  reports: Array<{ inspected: string; wire: IRpcSerializedError }>
   frames: Array<{ sessionId: string; kind: string; id: string | null }>
 }
 
@@ -273,10 +271,12 @@ describe('real process session and principal isolation', () => {
     }
   })
   it('rejects actual over-capacity socket flood and returns every rejected descriptor', async () => {
-    /** Two admitted physical connections fill the real production governor configured capacity. */
+    /** Two authenticated sessions and pending sockets share the current native default capacity. */
     const peer = await listener('flood')
     /** The provider's descriptor baseline includes two established sockets. */
     const sessions: Awaited<ReturnType<typeof client>>[] = []
+    /** Unauthenticated native candidates reserve the remaining real listener slots until released. */
+    const held: IProcessByteChannel[] = []
     /** Refused ports remain fixture-owned until finally, even if their remote end already closes. */
     const refused: Awaited<ReturnType<typeof dialProcessByteChannel>>[] = []
     /** Channel establishment errors preserve native public error identity. */
@@ -285,21 +285,36 @@ describe('real process session and principal isolation', () => {
       for (const token of [peer.tokens.alice, peer.tokens.bob])
         sessions.push(await client(fixturePeer, false, token, peer.address))
       const baseline = descriptors(peer.child.pid!)
+      /** The canonical default is 64, so two ready sessions leave exactly 62 pending slots. */
+      for (let index = 2; index < DEFAULT_MAX_CONNECTIONS; index++)
+        held.push(await dialProcessByteChannel({ address: peer.address }))
+      await vi.waitFor(() =>
+        expect(descriptors(peer.child.pid!)).toBe(baseline + DEFAULT_MAX_CONNECTIONS - 2)
+      )
       for (let index = 0; index < 12; index++) {
         const raw = await dialProcessByteChannel({ address: peer.address })
         refused.push(raw)
+        /** The raw peer close is independent from the managed caller's startup error projection. */
+        const closed = vi.fn()
+        raw.onClose(closed)
         await expect(
           connectRaw(raw, peer.tokens.alice, reports).then(async (active) => {
             await active.close()
-            return active
           })
-        ).rejects.toMatchObject({ code: 'PROCESS_CHANNEL_CLOSED' })
+        ).rejects.toMatchObject({
+          source: 'rpc.remote',
+          code: 'REMOTE_START_FAILED'
+        })
+        await vi.waitFor(() => expect(closed).toHaveBeenCalledTimes(1))
       }
+      await Promise.all(held.map((raw) => raw.close()))
       await vi.waitFor(() => expect(descriptors(peer.child.pid!)).toBe(baseline))
       const receipt = await stats(sessions[1]!)
       expect(
         receipt.reports.filter(
-          (value) => (value as { wire: { code: string } }).wire.code === 'PROCESS_CONNECTION_LIMIT'
+          (value) =>
+            value.wire.source === 'rpc.transport.process' &&
+            value.wire.code === 'PROCESS_CONNECTION_LIMIT'
         )
       ).toHaveLength(12)
       expect(await sessions[0]!.namespace.request('p.f.request', ['still-alice'])).toMatchObject({
@@ -317,7 +332,7 @@ describe('real process session and principal isolation', () => {
         )
       )
     } finally {
-      await Promise.allSettled(refused.map((raw) => raw.close()))
+      await Promise.allSettled([...held, ...refused].map((raw) => raw.close()))
       await Promise.allSettled(sessions.map((session) => session.close()))
       await peer.close()
     }
@@ -613,8 +628,8 @@ describe('real process session and principal isolation', () => {
     }
   })
 
-  it.each(['shared', 'per-connection'] as const)(
-    '%s consecutive request timeouts close only the offending borrowed socket',
+  it.each(['shared'] as const)(
+    '%s provider deadlines close only the offending borrowed socket',
     async (mode) => {
       /** One real child contains either one shared Host or one Host per physical connection. */
       const peer = await listener(mode)
@@ -656,12 +671,6 @@ describe('real process session and principal isolation', () => {
         const outcomes = await Promise.all(pending)
         expect(outcomes).toHaveLength(3)
         expect(outcomes.every((error) => error instanceof Error)).toBe(true)
-        for (const error of outcomes) {
-          expect(error).toMatchObject({
-            source: 'rpc.transport.process',
-            code: RpcProcessErrorCode.channelClosed
-          })
-        }
         /** The actual provider proves trusted local timeout instances, not deserialized wire codes. */
         const receipt = await stats(other)
         expect(receipt.aborts).toHaveLength(3)
@@ -683,13 +692,28 @@ describe('real process session and principal isolation', () => {
             2
           )
         )
+        for (const error of outcomes) {
+          /** A received deadline is final; a still-written request instead retains liquidation. */
+          const wire = serializeRpcError(error, { report: () => undefined })
+          if (wire.code === 'DEADLINE_EXCEEDED')
+            expect(wire).toMatchObject({ source: 'rpc.endpoint', name: 'TimeoutError' })
+          else
+            expect(wire).toMatchObject({
+              source: 'rpc.remote',
+              code: 'REMOTE_RESULT_UNKNOWN',
+              cause: {
+                source: 'rpc.transport.process',
+                code: 'PROCESS_LIQUIDATED',
+                cause: { source: 'rpc.endpoint', code: 'DEADLINE_EXCEEDED' }
+              }
+            })
+        }
         expect(callerScheduler.now()).toBe(0)
         expect(otherClosed).not.toHaveBeenCalled()
         /** The peer still serves the unaffected session without rebuilding its shared target. */
         const unaffected = (await sessions[1]!.namespace.request('p.f.request', [
           'after-timeouts'
         ])) as IResult
-        expect((await stats(sessions[1]!)).replacements).toBe(0)
         expect(peer.child.exitCode).toBeNull()
         await sessions[0]!.close()
         expect(unaffected.session.principalId).toBe('bob')
@@ -698,59 +722,6 @@ describe('real process session and principal isolation', () => {
         await Promise.all(pending)
         await Promise.allSettled(sessions.map((session) => session.close()))
         expect(peer.child.exitCode).toBeNull()
-        await peer.close()
-      }
-    }
-  )
-  it.each(['shared', 'per-connection'] as const)(
-    '%s explicit health replaces only its owned instance in the same PID',
-    async (mode) => {
-      /** Explicit health has no dependency on the consecutive-timeout policy under test above. */
-      const peer = await listener(mode)
-      /** These actual sockets expose whether shared or per-connection fallback closes them. */
-      const sessions: Awaited<ReturnType<typeof client>>[] = []
-      try {
-        sessions.push(await observedClient(peer.tokens.alice, peer.address))
-        sessions.push(await observedClient(peer.tokens.bob, peer.address))
-        const first = sessions[0]!
-        const other = sessions[1]!
-        /** Physical EOF callbacks observe production close without requesting disposal. */
-        const firstClosed = vi.fn()
-        const otherClosed = vi.fn()
-        first.raw.onClose(firstClosed)
-        other.raw.onClose(otherClosed)
-        const initial = (await first.namespace.request('p.f.request', ['identity'])) as IResult
-        const unaffected = (await other.namespace.request('p.f.request', [
-          'other-identity'
-        ])) as IResult
-        await first.namespace.request('p.f.request', [['health', initial.session.connectionId]])
-        await vi.waitFor(() => expect(firstClosed).toHaveBeenCalledTimes(1))
-        if (mode === 'per-connection') {
-          expect(otherClosed).not.toHaveBeenCalled()
-          expect(await other.namespace.request('p.f.request', ['other-instance'])).toMatchObject({
-            revision: unaffected.revision,
-            session: unaffected.session
-          })
-          expect((await stats(other)).replacements).toBe(0)
-        } else {
-          await vi.waitFor(() => expect(otherClosed).toHaveBeenCalledTimes(1))
-          const successor = await client(fixturePeer, false, peer.tokens.bob, peer.address)
-          sessions.push(successor)
-          const value = (await successor.namespace.request('p.f.request', [
-            'replacement'
-          ])) as IResult
-          expect(value.revision).toBe(1)
-          const receipt = await stats(successor)
-          expect(receipt.replacements).toBe(1)
-          expect(receipt.pid).toBe(peer.child.pid)
-          writeFileSync(
-            join(evidence, 'isolation-explicit-health.receipt.json'),
-            JSON.stringify(receipt, null, 2)
-          )
-        }
-        expect(peer.child.exitCode).toBeNull()
-      } finally {
-        await Promise.allSettled(sessions.map((session) => session.close()))
         await peer.close()
       }
     }

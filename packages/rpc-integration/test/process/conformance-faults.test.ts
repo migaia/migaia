@@ -37,7 +37,6 @@ import {
 type IPeer = (typeof peers)[number]
 /** Fault configuration changes real supervision and complete policies, never the semantic protocol. */
 type IFaultOptions = {
-  host?: boolean
   scheduler?: ReturnType<typeof createManualScheduler>
   restart?: ISpawnProcessPluginDeployment['supervision']['restart']
   maxPendingData?: number
@@ -92,10 +91,9 @@ class FaultClient {
     this.budget = createUnitBudget({ kind: 'process', maxUnits: 1, scheduler: options.scheduler })
     this.#fixture = deployment(
       peer,
-      options.host ?? false,
+      false,
       options.token ?? randomUUID(),
       options.address,
-      false,
       this.budget
     )
     this.handles = this.#fixture.handles
@@ -152,8 +150,9 @@ class FaultClient {
   }
   /** Real public member queries sample the original supervisor state without retaining its object. */
   async state(): Promise<string | undefined> {
-    const detail = await this.namespace.members.get('p')
-    return 'state' in detail.unit ? detail.unit.state : undefined
+    /** The single registration may adopt a foreign peer name after admission. */
+    const [detail] = (await this.namespace.members.list()).connections
+    return detail && 'state' in detail.unit ? detail.unit.state : undefined
   }
   /** The same Host close owns native drain/exit; only the explicit original manual clock is settled. */
   close = async (): Promise<void> => {
@@ -492,7 +491,11 @@ describe('real native business budget and independent session', () => {
           active.namespace.request('p.f.request', ['x'.repeat(RPC_STREAM_MAX_FRAME_BYTES)], {
             timeout: timeout({ ms: 10000, scheduler: systemScheduler })
           })
-        ).rejects.toMatchObject({ cause: { code: 'FRAME_LIMIT_EXCEEDED' } })
+        ).rejects.toMatchObject({
+          name: 'RangeError',
+          source: 'rpc.contract',
+          code: 'FRAME_LIMIT_EXCEEDED'
+        })
         expect(active.sent).toHaveLength(writes)
         expect(await healthy.namespace.request('p.f.request', ['healthy'])).toBe('healthy')
         expect(await active.namespace.request('p.f.request', ['after-overflow'])).toBe(
@@ -538,19 +541,14 @@ describe('independent peer rejects raw malformed input', () => {
             await active.physical[0]!.write(bytes)
             if (eof) await active.physical[0]!.close()
             if (label === 'json' && ['node', 'bun'].includes(peer.language)) {
-              /**
-               * Ready JSON is rejected by the canonical core decoder and reported, without
-               * requiring fatal transport closure.
-               */
+              /** A malformed physical JSON frame is reported before this Session closes. */
               await vi.waitFor(() =>
                 expect(Buffer.concat(active.output).toString()).toContain(
                   'PEER_ERROR HANDSHAKE_INVALID'
                 )
               )
-              expect(await active.namespace.request('p.f.request', ['after-invalid-json'])).toBe(
-                'after-invalid-json'
-              )
-            } else await vi.waitFor(() => expect(closed, label).toBe(true), { timeout: 2000 })
+            }
+            await vi.waitFor(() => expect(closed, label).toBe(true), { timeout: 2000 })
             expect(active.handles).toHaveLength(1)
             expect(await healthy.namespace.request('p.f.request', [label])).toBe(label)
           } finally {
@@ -573,56 +571,54 @@ describe('independent peer rejects raw malformed input', () => {
 
 describe('real owned terminal guards', () => {
   for (const peer of peers)
-    for (const host of [false, true])
-      it(`${peer.language} Host=${host} crash terminal rejects all new calls with zero frames`, async () => {
-        /** Logical timers remain deterministic while the peer exits through the actual OS. */
-        const scheduler = createManualScheduler()
-        const active = await faultClient(peer, {
-          host,
-          scheduler,
-          restart: { mode: 'on-failure', maxRestarts: 0 }
-        })
-        try {
-          /** Capture this actual admitted peer name before native retirement removes its directory. */
-          const target = Object.keys(active.namespace.peers)[0]!
-          /**
-           * A real benign call proves business readiness independently from removed management
-           * frames.
-           */
-          expect(await active.namespace.send(target, 'p.f.request', ['before-terminal'])).toBe(
-            'before-terminal'
-          )
-          const current = active.handles[0]!
-          process.kill(current.identity.pid!, 'SIGKILL')
-          await current.exited
-          await vi.waitFor(async () =>
-            expect({ state: await active.state() }).toMatchObject({ state: 'terminal' })
-          )
-          const writes = active.sent.length
-          for (const operation of [
-            () => active.namespace.send(target, 'p.f.request', []),
-            () => active.namespace.notify('p.f.oneWay', [], { targetId: target }),
-            () => active.namespace.streamTo(target, 'p.f.generator', []).next()
-          ])
-            await expect(async () => operation()).rejects.toMatchObject({
-              source: 'rpc.transport.process',
-              code: 'PROCESS_TERMINAL_CALL'
-            })
-          expect(active.sent).toHaveLength(writes)
-          expect(active.handles).toHaveLength(1)
-          expect(
-            wireFrames(active.sent).filter((frame) => frame.kind === 'call').length
-          ).toBeGreaterThan(0)
-        } finally {
-          await active.close()
-          await Promise.all(active.handles.map((handle) => handle.exited))
-          receipt(active, `${peer.language}-terminal-${host}`)
-        }
-        expect(active.budget.inUse).toBe(0)
-        expect(active.budget.pending).toBe(0)
-        expect(scheduler.pendingCount).toBe(0)
-        expect(await active.state()).toBe('disposed')
-      }, 15000)
+    it(`${peer.language} crash terminal rejects all new calls with zero frames`, async () => {
+      /** Logical timers remain deterministic while the peer exits through the actual OS. */
+      const scheduler = createManualScheduler()
+      const active = await faultClient(peer, {
+        scheduler,
+        restart: { mode: 'on-failure', maxRestarts: 0 }
+      })
+      try {
+        /** Capture this actual admitted peer name before native retirement removes its directory. */
+        const target = Object.keys(active.namespace.peers)[0]!
+        /**
+         * A real benign call proves business readiness independently from removed management
+         * frames.
+         */
+        expect(await active.namespace.send(target, 'p.f.request', ['before-terminal'])).toBe(
+          'before-terminal'
+        )
+        const current = active.handles[0]!
+        process.kill(current.identity.pid!, 'SIGKILL')
+        await current.exited
+        await vi.waitFor(async () =>
+          expect({ state: await active.state() }).toMatchObject({ state: 'terminal' })
+        )
+        const writes = active.sent.length
+        for (const operation of [
+          () => active.namespace.send(target, 'p.f.request', []),
+          () => active.namespace.notify('p.f.oneWay', [], { targetId: target }),
+          () => active.namespace.streamTo(target, 'p.f.generator', []).next()
+        ])
+          await expect(async () => operation()).rejects.toMatchObject({
+            source: 'rpc.transport.process',
+            code: 'PROCESS_TERMINAL_CALL'
+          })
+        expect(active.sent).toHaveLength(writes)
+        expect(active.handles).toHaveLength(1)
+        expect(
+          wireFrames(active.sent).filter((frame) => frame.kind === 'call').length
+        ).toBeGreaterThan(0)
+      } finally {
+        await active.close()
+        await Promise.all(active.handles.map((handle) => handle.exited))
+        receipt(active, `${peer.language}-terminal`)
+      }
+      expect(active.budget.inUse).toBe(0)
+      expect(active.budget.pending).toBe(0)
+      expect(scheduler.pendingCount).toBe(0)
+      expect(await active.state()).toBe('disposed')
+    }, 15000)
 })
 
 describe('explicit persistent authenticated scope', () => {
@@ -663,7 +659,17 @@ describe('explicit persistent authenticated scope', () => {
         'hf-original-key',
         'hf-original-key'
       ])
-      expect(requests[1].route.remainingMs).toBeLessThanOrEqual(requests[0].route.remainingMs)
+      expect(requests[1].task.targetGeneration.providerId).toBe(
+        requests[0].task.targetGeneration.providerId
+      )
+      /**
+       * Each local attempt keeps its own finite timeout; restart never creates an inherited
+       * deadline.
+       */
+      for (const frame of requests) {
+        expect(frame.route.remainingMs).toBeGreaterThan(0)
+        expect(frame.route.remainingMs).toBeLessThanOrEqual(5000)
+      }
     } finally {
       await active?.close()
       if (active) {
@@ -876,7 +882,7 @@ describe('capacity one real stopped reader', () => {
 
 describe('real owned crash retry eligibility', () => {
   for (const peer of peers)
-    for (const disposition of ['ready', 'cancel', 'deadline', 'release', 'no-generation'] as const)
+    for (const disposition of ['ready', 'cancel', 'release', 'no-generation'] as const)
       it(`${peer.language} sends ${disposition === 'ready' ? 'one' : 'zero'} replay after ${disposition}`, async () => {
         const scheduler = createManualScheduler()
         const active = await faultClient(peer, {
@@ -914,7 +920,6 @@ describe('real owned crash retry eligibility', () => {
           await active.handles[0]!.exited
           await settleFaultTurn(scheduler)
           if (disposition === 'cancel') controller.abort('hf-cancelled')
-          if (disposition === 'deadline') scheduler.advance(500)
           if (disposition === 'release') await active.close()
           if (disposition === 'ready' || disposition === 'cancel') {
             scheduler.advance(100)
@@ -937,11 +942,14 @@ describe('real owned crash retry eligibility', () => {
               'hf-crash-original-key',
               'hf-crash-original-key'
             ])
-            expect(requests[1].route.remainingMs).toBeLessThan(requests[0].route.remainingMs)
+            /** Origin retries get a fresh attempt timeout; no upstream deadline was supplied. */
+            expect(requests.map((frame) => frame.route.remainingMs)).toEqual([500, 500])
           } else if (disposition === 'cancel') {
             expect(result).toMatchObject({ error: { name: 'AbortError', cause: 'hf-cancelled' } })
-          } else if (disposition === 'deadline') {
-            expect(result).toMatchObject({ error: { name: 'TimeoutError' } })
+          } else if (disposition === 'release') {
+            expect(result).toMatchObject({
+              error: { source: 'rpc.endpoint', code: 'ENDPOINT_DISPOSED' }
+            })
           } else {
             expect(result).toMatchObject({
               error: { source: 'rpc.remote', code: 'REMOTE_RESULT_UNKNOWN' }

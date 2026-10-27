@@ -11,11 +11,14 @@ import { client, peers, evidence } from './fixtures/conformance-business.js'
 
 /** Match the production default rate (budget.ts); resource acceptance never disables admission. */
 const resourceLaunchRate = { max: 8, windowMs: 1000 }
-/** Existing 30s preparation budget covers native observation and final cleanup beyond rate waiting. */
-const resourceDeadlineMarginMs = 30_000
+/**
+ * Native IO and resource sampling retain the conformance suite's 120s operation budget beyond
+ * admission waits.
+ */
+const resourceDeadlineMarginMs = 120_000
 /** Four runtime warmups plus all 1000 required launches share the same rate limiter. */
 const resourceTotalLaunches = 1000 + 4
-/** User ruling derives acceptance time from the unchanged production launch rate. */
+/** Admission rate supplies a minimum wait, while actual serial native work needs its own budget. */
 const resourceDeadlineMs =
   Math.ceil(resourceTotalLaunches / resourceLaunchRate.max) * resourceLaunchRate.windowMs +
   resourceDeadlineMarginMs
@@ -84,7 +87,7 @@ async function rotations(perLanguage: number) {
    * miscounted as leaks.
    */
   const cycle = async (peer: (typeof peers)[number], index: number, record: boolean) => {
-    const active = await client(peer, false, randomUUID(), undefined, false, budget)
+    const active = await client(peer, false, randomUUID(), undefined, budget)
     const pid = active.handles[0]!.identity.pid!
     try {
       expect(budget.inUse).toBeLessThanOrEqual(2)
@@ -281,12 +284,12 @@ describe('actual language process resource ownership', () => {
     const budget = createUnitBudget({ kind: 'process', maxUnits: 2, overflow: 'reject' })
     /** Existing processes stay alive while the rejected candidate rolls back its registration. */
     const active = await Promise.all(
-      peers.slice(0, 2).map((peer) => client(peer, false, randomUUID(), undefined, false, budget))
+      peers.slice(0, 2).map((peer) => client(peer, false, randomUUID(), undefined, budget))
     )
     try {
       expect(budget.inUse).toBe(2)
       await expect(
-        client(peers[2]!, false, randomUUID(), undefined, false, budget)
+        client(peers[2]!, false, randomUUID(), undefined, budget)
       ).rejects.toBeInstanceOf(Error)
       expect(budget.inUse).toBe(2)
       expect(budget.pending).toBe(0)

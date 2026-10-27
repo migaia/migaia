@@ -47,7 +47,7 @@ describe('independent native business peers through public process facades', () 
         /** Freeze sent bytes when native exit is observed, excluding any later teardown writes. */
         const sentBeforeExit = active.handles[0]!.exited.then(() => Buffer.concat(active.sent))
         try {
-          await business(active, peer.id)
+          await business(active)
           if (['python', 'go', 'rust'].includes(peer.language)) {
             /** Original bridge business metadata now uses the sole native task/options grammar. */
             const native = wireFrames(active.sent)
@@ -200,7 +200,7 @@ describe('independent native business peers through public process facades', () 
             const active = await client(peer, host, token, join(directory, 'peer.sock'))
             try {
               if (index === 0) {
-                await business(active, peer.id)
+                await business(active)
                 expect(
                   wireFrames(active.sent)
                     .filter(

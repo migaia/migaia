@@ -43,19 +43,6 @@ const businessVectors = JSON.parse(
 const contract = JSON.parse(
   await readFile(new URL('../../../schema/vectors/remote-contract.json', import.meta.url), 'utf8')
 ).contracts[0].value
-/** Historical bridge schema data remains available only to receiving cases pending retirement. */
-const bridgeContract = {
-  ...contract,
-  features: {
-    f: {
-      methods: {
-        request: contract.features.f.methods.request,
-        oneWay: contract.features.f.methods.oneWay
-      }
-    }
-  }
-}
-
 /** Peer-owned launch scripts prepare only the selected language, never the whole matrix at collect. */
 const peers = [
   {
@@ -127,10 +114,8 @@ function deployment(
   host: boolean,
   token: string,
   address?: string,
-  bridge = false,
   budget?: IUnitBudget<'process'>
 ) {
-  if (bridge) throw new TypeError('JSON-RPC semantic profile retired')
   /** One set of receipts belongs to this actual native deployment. */
   const observed = new BusinessNativeObservations()
   /** The production launcher still owns spawn, bootstrap, signals and the native exit receipt. */
@@ -233,10 +218,9 @@ async function client(
   hostProfile: boolean,
   token: string,
   address?: string,
-  bridge = false,
   budget?: IUnitBudget<'process'>
 ) {
-  const fixture = deployment(peer, hostProfile, token, address, bridge, budget)
+  const fixture = deployment(peer, hostProfile, token, address, budget)
   const installed = await installBusinessClient(fixture, fixture.selected)
   if (peer.language === 'node' || peer.language === 'bun') {
     /** The TS fixture separately publishes its original peer.* methods through host.provide. */
@@ -255,12 +239,7 @@ async function client(
 }
 
 /** Original result/count/order/error/abort/trace assertions use the genuine namespace directly. */
-async function business(
-  active: Awaited<ReturnType<typeof client>>,
-  _peerId: string,
-  bridge = false
-) {
-  if (bridge) throw new TypeError('JSON-RPC semantic profile retired')
+async function business(active: Awaited<ReturnType<typeof client>>) {
   const namespace = active.namespace
   expect(
     await namespace.request('p.f.request', [expected.request.input], {
@@ -307,23 +286,6 @@ async function business(
   ).toEqual(['h-trace-one', 'h-trace-two', null])
 }
 
-/** Decode observed bytes exclusively with the published framing owner. */
-function bridgeFrames(chunks: readonly Uint8Array[]) {
-  /** This observer decodes retained receipts only; production bridge owns all live framing. */
-  let bytes = Buffer.concat(chunks)
-  const messages: any[] = []
-  while (bytes.length) {
-    const end = bytes.indexOf('\r\n\r\n')
-    expect(end).toBeGreaterThan(-1)
-    const length = Number(/Content-Length: (\d+)/i.exec(bytes.subarray(0, end).toString())![1])
-    expect(bytes.length).toBeGreaterThanOrEqual(end + 4 + length)
-    /** Logical assertions keep order while the bridge owns the negotiated physical batch. */
-    const physical = JSON.parse(bytes.subarray(end + 4, end + 4 + length).toString())
-    messages.push(...(Array.isArray(physical) ? physical : [physical]))
-    bytes = bytes.subarray(end + 4 + length)
-  }
-  return messages
-}
 /** Decode retained native receipts with the same sole SDK framing owner used by Process. */
 function wireFrames(chunks: readonly Uint8Array[]) {
   const frames: any[] = []
@@ -368,13 +330,11 @@ export {
   expected,
   businessVectors,
   evidence,
-  bridgeContract,
   contract,
   client,
   business,
   deployment,
   installBusinessClient,
   wireFrames,
-  bridgeFrames,
   assertWireGraph
 }
