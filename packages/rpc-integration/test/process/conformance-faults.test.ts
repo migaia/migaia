@@ -1,4 +1,5 @@
-import { spawn } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
+import { promisify } from 'node:util'
 import { randomUUID } from 'node:crypto'
 import { once } from 'node:events'
 import { closeSync, openSync, readFileSync, writeFileSync } from 'node:fs'
@@ -247,6 +248,13 @@ describe('source domains error source domains', () => {
   it('uses the process domain for a real Go authentication rejection', async () => {
     /** The external owner retains its Go listener even when native credential admission fails. */
     const peer = peers.find((candidate) => candidate.language === 'go')!
+    /** Native compilation completes outside the unchanged listener READY admission window. */
+    const prepareExecutable = promisify(execFile)
+    /** The wrapper recognizes --executable only as its first business argument. */
+    const { stdout: executable } = await prepareExecutable(peer.command, [
+      peer.args[0]!,
+      '--executable'
+    ])
     /** Each attempt owns one real socket path and inherited credential descriptor. */
     const directory = await mkdtemp(join(tmpdir(), 'rpc-hf-go-auth-'))
     /** Listener address is local fixture data, never a handwritten semantic hello producer. */
@@ -259,9 +267,13 @@ describe('source domains error source domains', () => {
     /** Only the fixture owns this inherited credential descriptor. */
     const fd = openSync(auth, 'r')
     /** The same native Go executable used by the business matrix owns authentication. */
-    const child = spawn(peer.command, [...peer.args, '--listen-unix', address, '--auth-fd', '3'], {
-      stdio: ['ignore', 'pipe', 'pipe', fd]
-    })
+    const child = spawn(
+      executable.trim(),
+      [...peer.args.slice(1), '--listen-unix', address, '--auth-fd', '3'],
+      {
+        stdio: ['ignore', 'pipe', 'pipe', fd]
+      }
+    )
     closeSync(fd)
     /** Native exit is observed before any authentication attempt may complete. */
     const exited = once(child, 'close')
