@@ -1,7 +1,7 @@
 // Store names, limits, layout fingerprints, byte helpers and key ranges for the IndexedDB backend (see ./indexed-db.ts).
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import { encodeFlatStorageKey, assertKeyRange, createStorageToken } from '@migaia/storage-host/sdk'
-import { isStorageErrorFamily, type IStorageErrorFamily } from './errors.js'
+import { isStorageErrorFamily, type IStorageErrorFamily } from './backend-errors.js'
 import { StorageError } from '../types/errors.js'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.js'

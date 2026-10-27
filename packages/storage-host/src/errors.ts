@@ -150,11 +150,11 @@ export type IExtensionStage =
  * to the package/code label; nested details are not deep-frozen and original stacks remain on
  * cause.
  */
-export class StorageError extends Error {
+export class StorageError<TCode extends string = IStorageHostErrorCode> extends Error {
   /** Canonical storage-host diagnostic source. */
   readonly source!: string
   /** Semantic failure scenario; branch on this rather than message text. */
-  readonly code!: IStorageHostErrorCode
+  readonly code!: TCode
   /** Backend associated with this operation. */
   readonly backend?: IBackendKind
   /** Logical key associated with this operation. */
@@ -172,15 +172,17 @@ export class StorageError extends Error {
 
   /** Capture diagnostic details once and freeze this error without replacing its original cause. */
   constructor(
-    code: IStorageHostErrorCode,
+    code: TCode,
     details: IStorageErrorDetails = {},
     message?: string,
-    stage?: 'decode' | 'migrate' | 'validate'
+    stage?: 'decode' | 'migrate' | 'validate',
+    /** Owning error domain; backend packages that reuse this class pass their own registered domain. */
+    source: string = STORAGE_HOST_ERROR_SOURCE
   ) {
     super(message ?? StorageErrorText.defaultError(code), { cause: details.cause })
     this.name = 'StorageError'
     Object.defineProperties(this, {
-      source: { value: STORAGE_HOST_ERROR_SOURCE, enumerable: true },
+      source: { value: source, enumerable: true },
       code: { value: code, enumerable: true }
     })
     this.backend = details.backend

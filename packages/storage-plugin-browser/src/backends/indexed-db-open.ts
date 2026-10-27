@@ -1,12 +1,12 @@
 // Layout validation, legacy migration, database open and metadata reads/writes for the IndexedDB backend (see ./indexed-db.ts).
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import type { IStorageOperationRuntime } from '@migaia/storage-host/sdk'
-import { isStorageErrorFamily } from './errors.js'
+import { isStorageErrorFamily } from './backend-errors.js'
 import { StorageError, createStorageError } from '../types/errors.js'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.js'
 import { StorageBackend, StorageMigrationStatus, StorageOperation } from '../constants.js'
-import { normalizeError } from './errors.js'
+import { normalizeError } from './backend-errors.js'
 import {
   fromIdbRequest,
   idbTransactionCommit,
@@ -519,7 +519,7 @@ function openOnce<TValue>(
         },
         () => {
           const cause = readIdbRequestError(request)
-          rejectOpen(cause ?? new Error('[storage-web] IndexedDB open failed'))
+          rejectOpen(cause ?? new Error(StorageErrorText.indexedDbOpenFailed))
         }
       )
     } catch (cause) {

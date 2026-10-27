@@ -24,11 +24,11 @@ import {
   withAbort,
   encodeFlatStorageKey
 } from '@migaia/storage-host/sdk'
-import { isStorageErrorFamily } from './errors.js'
+import { isStorageErrorFamily } from './backend-errors.js'
 import { StorageError } from '../types/errors.js'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageBackend, StorageOperation, storageBackendOperation } from '../constants.js'
-import { normalizeError } from './errors.js'
+import { normalizeError } from './backend-errors.js'
 import {
   fromIdbRequest,
   idbTransactionCommit,

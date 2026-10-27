@@ -1,13 +1,13 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
-import { isStorageErrorFamily, type IStorageErrorFamily } from '../backends/errors.js'
+import { isStorageErrorFamily, type IStorageErrorFamily } from '../backends/backend-errors.js'
 import type { IStorageOperationRuntime } from '@migaia/storage-host/sdk'
 import { StorageError } from '../types/errors.js'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import { normalizeStorageException } from './quota.js'
 import { readAbortReason } from '@migaia/storage-host/sdk'
 import { assertOperationContext } from '@migaia/storage-contract'
-import { subscribeToAbort } from '../backends/errors.js'
+import { subscribeToAbort } from '../backends/backend-errors.js'
 import { StorageBackend } from '../constants.js'
 
 /**

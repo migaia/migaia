@@ -14,10 +14,10 @@ import {
   compareStorageKeys,
   snapshotKeyRange
 } from '@migaia/storage-host/sdk'
-import type { IStorageErrorFamily } from './errors.js'
+import type { IStorageErrorFamily } from './backend-errors.js'
 import type { IStorageJournalAttempt } from '@migaia/storage-host'
 import { StorageBackend, StorageTransactionOperation } from '../constants.js'
-import { planChannelWrite } from './errors.js'
+import { planChannelWrite } from './backend-errors.js'
 import { fromIdbRequest } from '../utils/idb-request.js'
 import type { IKeyRange, IStorageKey } from '../types/context.js'
 import type { IRecordIndexHandle } from '@migaia/storage-contract'

@@ -25,7 +25,7 @@ import {
   type IRecordIndexBackfillRetryReceipt,
   type IRecordIndexBackfillSession
 } from '@migaia/storage-host/entity'
-import { createBackfillContentionFailure } from './errors.js'
+import { createBackfillContentionFailure } from './backend-errors.js'
 import { withStorageIteratorResource } from '../utils/storage-iterator.js'
 import {
   IBackfillLease,

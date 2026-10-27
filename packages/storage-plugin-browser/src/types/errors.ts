@@ -1,3 +1,5 @@
+import { StorageError as HostStorageError } from '@migaia/storage-host'
+import { StorageErrorText } from '../error-text.js'
 import type { IBackendKind } from './capabilities.js'
 import type { IStorageKey } from './context.js'
 import { STORAGE_BROWSER_ERROR_SOURCE } from '@migaia/storage-contract/error-code'
@@ -141,47 +143,23 @@ export type IExtensionStage = NonNullable<
 >
 
 /**
- * Frozen storage diagnostic retaining the original failure on cause. The top-level message defaults
- * to the package/code label; nested details are not deep-frozen and original stacks remain on
- * cause.
+ * The storage-host error class with this package's error domain as source. Branch on `code`; the
+ * original failure stays on `cause`.
  */
-export class StorageError extends Error {
-  /** Canonical storage-plugin-browser diagnostic source. */
-  readonly source: string
-  /** Semantic failure scenario; branch on this rather than message text. */
-  readonly code: IStorageBrowserErrorCode
-  /** Backend associated with this operation. */
-  readonly backend?: IBackendKind
-  /** Logical key associated with this operation. */
-  readonly key?: string | IStorageKey
-  /** Channel already occupying the conflicting key. */
-  readonly existingChannel?: IStorageChannel
-  /** Channel the rejected write attempted to use. */
-  readonly attemptedChannel?: IStorageChannel
-  /** Extension phase responsible for this failure. */
-  readonly extensionStage?: IExtensionStage
-  /** Operation name attached by its owning boundary. */
-  readonly operation?: string
-  /** Internal repository stage used to apply invalid-record policy. */
-  readonly stage?: 'decode' | 'migrate' | 'validate'
-
-  /** Capture diagnostic details once and freeze this error without replacing its original cause. */
+export class StorageError extends HostStorageError<IStorageBrowserErrorCode> {
+  /** Attach the browser domain and this package's default message. */
   constructor(
     code: IStorageBrowserErrorCode,
     details: IStorageErrorDetails = {},
     message?: string,
     stage?: 'decode' | 'migrate' | 'validate'
   ) {
-    super(message ?? `[storage-web] ${code}`, { cause: details.cause })
-    this.name = 'StorageError'
-    this.source = STORAGE_BROWSER_ERROR_SOURCE
-    this.code = code
-    this.backend = details.backend
-    this.key = details.key
-    this.existingChannel = details.existingChannel
-    this.attemptedChannel = details.attemptedChannel
-    this.extensionStage = details.extensionStage
-    this.operation = details.operation
-    this.stage = stage
+    super(
+      code,
+      details,
+      message ?? StorageErrorText.defaultError(code),
+      stage,
+      STORAGE_BROWSER_ERROR_SOURCE
+    )
   }
 }

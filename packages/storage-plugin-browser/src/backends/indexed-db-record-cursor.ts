@@ -15,7 +15,7 @@ import {
 import { StorageError } from '../types/errors.js'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageBackend, StorageOperation } from '../constants.js'
-import { subscribeToAbort } from './errors.js'
+import { subscribeToAbort } from './backend-errors.js'
 import {
   fromIdbRequest,
   installIdbRequestHandlers,

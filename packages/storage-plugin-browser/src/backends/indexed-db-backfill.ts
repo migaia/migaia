@@ -13,7 +13,7 @@ import {
 import { StorageError } from '../types/errors.js'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageBackend, StorageTransactionOperation } from '../constants.js'
-import { collectUniqueIndexOwners } from './errors.js'
+import { collectUniqueIndexOwners } from './backend-errors.js'
 import { fromIdbRequest, idbTransactionCommit } from '../utils/idb-request.js'
 import type { IKeyRange, IOperationContext, IStorageKey } from '../types/context.js'
 import type {

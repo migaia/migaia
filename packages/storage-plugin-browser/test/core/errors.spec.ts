@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { invokeExtension } from '../../src/backends/errors.js'
+import { invokeExtension } from '../../src/backends/backend-errors.js'
 import { createStorageOperationRuntime } from '@migaia/storage-host/sdk'
 import { captureOperationCleanup } from '../helpers/operation-reporter.js'
 

@@ -6,9 +6,9 @@ import {
 } from '@migaia/storage-contract'
 import { ENTITY_UNIQUE_WRITE_LOCK, StorageOperation } from '../constants.js'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
-import { normalizeError } from './errors.js'
+import { normalizeError } from './backend-errors.js'
 import { readAbortReason, throwIfAborted } from '@migaia/storage-host/sdk'
-import { subscribeToAbort } from './errors.js'
+import { subscribeToAbort } from './backend-errors.js'
 import type { IStorageOperationRuntime } from '@migaia/storage-host/sdk'
 
 /** Structural host seam keeps DOM declarations out of the entity/memory public type graph. */

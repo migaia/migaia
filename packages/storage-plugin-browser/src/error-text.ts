@@ -1,6 +1,10 @@
 import { IndexedDbFeature } from './constants.js'
 /** Stable diagnostic text shared by backend, entity, Host and reactive boundaries. */
 export const StorageErrorText = Object.freeze({
+  /** Default message of a browser StorageError, prefixed with this package's name. */
+  defaultError: (code: string) => `[storage-plugin-browser] ${code}`,
+  /** Fallback cause when an IndexedDB open request fails without a native error object. */
+  indexedDbOpenFailed: '[storage-plugin-browser] IndexedDB open failed',
   /** Cause text when work arrives after the owning transaction callback settled. */
   transactionScopeInactive: 'transaction scope is no longer active',
   /** Cause text when a range read needs IDBKeyRange and the realm does not provide it. */

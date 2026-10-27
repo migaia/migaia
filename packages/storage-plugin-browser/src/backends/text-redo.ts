@@ -46,7 +46,7 @@ import { StorageHostErrorCode as JournalErrorCode } from '@migaia/storage-contra
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import type { IBackendRuntime, IBrowserBatchApi } from './construction.js'
 import { snapshotBrowserBatchEntries, observeBrowserBatch, BrowserBatchMethod } from './batch.js'
-import { normalizeError } from './errors.js'
+import { normalizeError } from './backend-errors.js'
 import { withNativeTextOperation } from './native-value-write.js'
 import { storageBackendOperation, TEXT_REDO_LOCK } from '../constants.js'
 

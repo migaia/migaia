@@ -15,7 +15,7 @@ import {
 import { storageBackendOperation } from '../constants.js'
 import { StorageErrorText } from '../error-text.js'
 import type { IBackendKind } from '../types/capabilities.js'
-import { isStorageErrorFamily } from './errors.js'
+import { isStorageErrorFamily } from './backend-errors.js'
 import type { IBrowserBatchApi, IBackendRuntime } from './construction.js'
 
 /** Browser operation labels retain the standard capability's method names on every native path. */
