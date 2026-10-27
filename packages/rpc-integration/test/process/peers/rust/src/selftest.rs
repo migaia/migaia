@@ -647,6 +647,47 @@ fn flat_error_boundaries(counts: &mut Counts) {
         );
     }
 }
+/// Section 33 keeps lexical completion order and rejects a growing completion-time sort.
+fn finish_order(counts: &mut Counts) {
+    let local = crate::identity();
+    let remote = caller();
+    let mut state = crate::business::Business::new(&local, &remote, false);
+    for id in ["z", "a", "m"] {
+        state
+            .native(&call(
+                id,
+                "peer.wait",
+                "request",
+                Value::Null,
+                &local,
+                &remote,
+            ))
+            .unwrap();
+    }
+    let replies = state
+        .native(&call(
+            "finish",
+            "peer.finish",
+            "request",
+            Value::Null,
+            &local,
+            &remote,
+        ))
+        .unwrap();
+    counts.check(
+        "section33/finish-lexical-order",
+        replies
+            .iter()
+            .map(|reply| text(reply, "id"))
+            .collect::<Vec<_>>()
+            == ["a", "m", "z", "finish"],
+    );
+    counts.check(
+        "section33/finish-without-growing-sort",
+        !include_str!("business.rs").contains(".sort("),
+    );
+}
+
 /// A syntactically valid but unsupported version keeps its local and wire refusal labels aligned.
 fn incompatible_reason(counts: &mut Counts) {
     let local = crate::identity();
@@ -688,6 +729,7 @@ pub fn run(root: &Path) -> io::Result<()> {
     canonical_vectors(root, &mut counts);
     stream_vectors(root, &mut counts);
     native_baseline(&mut counts);
+    finish_order(&mut counts);
     incompatible_reason(&mut counts);
     notification_and_cancel(&mut counts);
     closing_group_admission(&mut counts);

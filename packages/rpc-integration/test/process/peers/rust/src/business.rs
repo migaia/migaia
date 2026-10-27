@@ -6,7 +6,7 @@ use crate::{
     write_frame, CONTROL_CLOSE, METHOD_UNAVAILABLE,
 };
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     io::{self, Read, Write},
 };
 
@@ -141,8 +141,8 @@ pub(super) struct Business {
     received: Vec<Value>,
     /// The original flat reason's root node is exposed by the test provider unchanged.
     aborts: Vec<Value>,
-    /// Request ids index compact pending headers in O(1).
-    waiting: HashMap<String, Value>,
+    /// The ordered owner admits one O(log n) insert/remove and drains lexically in O(n).
+    waiting: BTreeMap<String, Value>,
     /// Each generator keeps its header, values, credit and original early-finish permission.
     streams: HashMap<String, (Value, Vec<Value>, usize, bool)>,
     /// A genuine admitted fault executes only after its original ACK is physically written.
@@ -162,7 +162,7 @@ impl Business {
             one_way_receipts: 0,
             received: vec![],
             aborts: vec![],
-            waiting: HashMap::new(),
+            waiting: BTreeMap::new(),
             streams: HashMap::new(),
             pending_fault: None,
         }
@@ -344,23 +344,24 @@ impl Business {
             return Ok(vec![]);
         }
         if text(message, "kind") == "cancel" {
-            if self
-                .waiting
-                .get(id)
-                .is_some_and(|original| Self::matches(original, message))
+            // One entry lookup owns both tuple admission and removal; do not search the tree twice.
+            if let std::collections::btree_map::Entry::Occupied(pending) =
+                self.waiting.entry(id.to_owned())
             {
-                if self.closing {
-                    eprintln!("PEER_EVENT ABORT_DURING_DRAIN");
+                if Self::matches(pending.get(), message) {
+                    if self.closing {
+                        eprintln!("PEER_EVENT ABORT_DURING_DRAIN");
+                    }
+                    pending.remove();
+                    let reason = value(message, "reason");
+                    let root = crate::safe_integer(value(reason, "root")).unwrap_or(0) as usize;
+                    self.aborts.push(
+                        items(value(reason, "nodes"))
+                            .get(root)
+                            .cloned()
+                            .unwrap_or(Value::Null),
+                    );
                 }
-                self.waiting.remove(id);
-                let reason = value(message, "reason");
-                let root = crate::safe_integer(value(reason, "root")).unwrap_or(0) as usize;
-                self.aborts.push(
-                    items(value(reason, "nodes"))
-                        .get(root)
-                        .cloned()
-                        .unwrap_or(Value::Null),
-                );
             }
             return self.stream_control(message);
         }
@@ -424,13 +425,10 @@ impl Business {
             return Ok(vec![stream(message, "open", 0, None)]);
         }
         if method == "peer.finish" {
-            let mut ids: Vec<_> = self.waiting.keys().cloned().collect();
-            ids.sort();
-            let mut replies = Vec::new();
-            for id in ids {
-                if let Some(original) = self.waiting.remove(&id) {
-                    replies.push(response(&original, Value::Null, None));
-                }
+            let waiting = std::mem::take(&mut self.waiting);
+            let mut replies = Vec::with_capacity(waiting.len() + usize::from(mode != "notify"));
+            for (_, original) in waiting {
+                replies.push(response(&original, Value::Null, None));
             }
             if mode != "notify" {
                 replies.push(response(message, Value::Null, None));

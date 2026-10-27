@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"slices"
-	"sort"
 	"syscall"
 	"time"
 )
@@ -44,7 +43,9 @@ type businessState struct {
 	pongs, closes    int
 	received, aborts []any
 	waiting          map[string]*orderedRecord
-	streams          map[string]*businessStream
+	// Pending IDs stay lexical; each insertion/removal uses one binary search and one linear move.
+	waitingOrder []string
+	streams      map[string]*businessStream
 }
 
 // providerModes names actual providers in stable registration order, never map enumeration order.
@@ -191,6 +192,28 @@ func (state *businessState) admitted(message *orderedRecord) bool {
 	return true
 }
 
+// addWaiting keeps replacements at their existing lexical index without copying payloads.
+func (state *businessState) addWaiting(id string, header *orderedRecord) {
+	if _, exists := state.waiting[id]; !exists {
+		index, _ := slices.BinarySearch(state.waitingOrder, id)
+		state.waitingOrder = append(state.waitingOrder, "")
+		copy(state.waitingOrder[index+1:], state.waitingOrder[index:])
+		state.waitingOrder[index] = id
+	}
+	state.waiting[id] = header
+}
+
+// removeWaiting updates the ordered index once after a matching cancellation.
+func (state *businessState) removeWaiting(id string) {
+	delete(state.waiting, id)
+	index, exists := slices.BinarySearch(state.waitingOrder, id)
+	if exists {
+		copy(state.waitingOrder[index:], state.waitingOrder[index+1:])
+		state.waitingOrder[len(state.waitingOrder)-1] = ""
+		state.waitingOrder = state.waitingOrder[:len(state.waitingOrder)-1]
+	}
+}
+
 // native dispatch owns request/notify completion, original cancel reasons, and one credit per item.
 func (state *businessState) native(message *orderedRecord) ([]*orderedRecord, error) {
 	if !state.admitted(message) {
@@ -211,6 +234,7 @@ func (state *businessState) native(message *orderedRecord) ([]*orderedRecord, er
 			state.closeReceived = true
 			state.closeReason, _ = value["reason"].(*orderedRecord)
 			clear(state.waiting)
+			state.waitingOrder = nil
 			clear(state.streams)
 			return nil, nil
 		}
@@ -229,7 +253,7 @@ func (state *businessState) native(message *orderedRecord) ([]*orderedRecord, er
 		return nil, nil
 	case "cancel":
 		if pending := state.waiting[id]; pending != nil && runtimeSchemaEqual(field(pending)["task"], value["task"]) {
-			delete(state.waiting, id)
+			state.removeWaiting(id)
 			reason := field(value["reason"])
 			if reason != nil {
 				state.aborts = append(state.aborts, entries(reason["nodes"])[integerField(reason, "root")])
@@ -288,7 +312,7 @@ func (state *businessState) native(message *orderedRecord) ([]*orderedRecord, er
 			return []*orderedRecord{businessResponse(message, nil, false, failure)}, nil
 		}
 		if method == "peer.wait" {
-			state.waiting[id] = operationHeader(message)
+			state.addWaiting(id, operationHeader(message))
 			return nil, nil
 		}
 		if mode == "stream" {
@@ -304,17 +328,12 @@ func (state *businessState) native(message *orderedRecord) ([]*orderedRecord, er
 			return []*orderedRecord{businessStreamFrame(message, "open", 0, nil)}, nil
 		}
 		if method == "peer.finish" {
-			ids := make([]string, 0, len(state.waiting))
-			for id := range state.waiting {
-				ids = append(ids, id)
-			}
-			// Original independent fixture ordering: sort only pending IDs at explicit peer.finish, never wire keys.
-			sort.Strings(ids)
-			replies := []*orderedRecord{}
-			for _, id := range ids {
+			replies := make([]*orderedRecord, 0, len(state.waitingOrder)+1)
+			for _, id := range state.waitingOrder {
 				replies = append(replies, businessResponse(state.waiting[id], nil, false, nil))
 				delete(state.waiting, id)
 			}
+			state.waitingOrder = nil
 			payload, present := value["payload"]
 			if mode != "notify" {
 				replies = append(replies, businessResponse(message, payload, present, nil))
