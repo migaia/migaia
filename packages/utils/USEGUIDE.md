@@ -603,22 +603,42 @@ scheduler.advance(50) // 触发，打印 'fired'
 
 宿主不支持所选策略时同步抛出 `ENV_UNSUPPORTED`，不会静默降级；传数组即声明自己的回退顺序。没有原生延迟的策略会先用定时器等待 `delay` 再进入对应队列。`signal` 在回调开始前中止会撤销宿主注册并以 `ABORTED` 拒绝。
 
-```ts
+```ts doc-test=check
 import { asyncTask, isAsyncTaskSupported, yieldToHost } from '@migaia/utils/scheduler'
+
+/** Application work scheduled after this turn. */
+declare function flushLogs(): void
+/** Application prefetch work uses the remaining idle budget. */
+declare function prefetch(budgetMs: number): void
+/** Rows and their application handler are supplied by the caller. */
+declare const rows: readonly number[]
+/** Process one row without taking ownership of the source collection. */
+declare function processRow(row: number): void
+/** Count completed rows between explicit host yields. */
+let count = 0
 
 await asyncTask(['postTaskBackground', 'idleCallback', 'timeout'], flushLogs, 100)
 await asyncTask('idleCallback', ({ timeRemaining }) => prefetch(timeRemaining()), {
   idleTimeout: 2000
 })
 for (const row of rows) {
-  process(row)
+  processRow(row)
   if (++count % 500 === 0) await yieldToHost()
 }
 ```
 
 `timeSlice(source, handler, { budget, strategy, signal, onProgress, clock })` 处理大数据时按时间片切分：每片最多工作 `budget` 毫秒（默认 8），然后让出宿主；每片至少处理一项，保证前进。支持同步/异步可迭代对象和生成器。处理函数抛错时会调用迭代器 `return()` 并以原始错误拒绝，`return()` 自身的失败挂在 `errors` 上。`timeSliceMap` / `timeSliceReduce` 是对应的 map/reduce 形式。
 
-```ts
+```ts doc-test=check
+import { timeSliceMap } from '@migaia/utils/scheduler'
+
+/** Application source lines are consumed in their existing order. */
+declare const lines: readonly string[]
+/** Parse one application record. */
+declare function parseLine(line: string): { id: string }
+/** Report completed work to the application's progress view. */
+declare function bar(processed: number): void
+
 const parsed = await timeSliceMap(lines, parseLine, {
   budget: 5,
   onProgress: ({ processed }) => bar(processed)
@@ -1724,8 +1744,19 @@ const diff = {
 
 `ConfigOwner` 持有一份不可变的配置快照，把 `ownConfig` / `readConfigPath` / `patchConfig` / `combineConfig` / `readonlyConfig` 集中到一个可链式调用的类上。每次写入都会先完整构建并校验下一份快照，再提交；失败时旧快照不变。路径类型由 `IObjectPath` 推导，`get('server.port')` 的类型就是 `number | undefined`。
 
-```ts
+```ts doc-test=check
 import { ConfigOwner } from '@migaia/utils/config'
+
+/** Configuration shape owned by the application consuming this example. */
+type IAppConfig = { server: { port: number }; debug: boolean; cache: { ttl: number } }
+/** Application defaults establish the initial complete snapshot. */
+declare const defaults: IAppConfig
+/** Apply a changed or removed server port to the application. */
+declare function restart(port: number | undefined): void
+/** Serialized configuration and its remote endpoint are application inputs. */
+declare const text: string
+/** Remote endpoint returns serialized configuration. */
+declare const url: string
 
 const config = new ConfigOwner(defaults, { validate: (value) => value.server.port > 0 })
 config
@@ -1737,7 +1768,7 @@ const stop = config.watch('server.port', (next, prev) => restart(next))
 
 const fromText = ConfigOwner.from<IAppConfig>(text) // 非法 JSON：CONFIG_PARSE_FAILED
 const remote = await ConfigOwner.fromAsync(
-  ({ signal }) => fetch(url, { signal }).then((r) => r.text()),
+  () => fetch(url).then((r) => r.text()),
   {
     timeoutMs: 5000
   }

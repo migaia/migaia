@@ -589,14 +589,28 @@ dispose(): void;
 
 函数式构建 `Resource`。`setup` 只同步执行一次，拿到 `{ runtime, scheduler, signal, debugName, onDispose }`，返回 fetcher；数据类型从 fetcher 推导。`options` 就是 `IResourceOptions` 加上可选的 `runtime`（默认 `@migaia/reactive` 的 `defaultRuntime`）。
 
-```ts
+```ts doc-test=check
 import { createResource } from '@migaia/resource'
+import type { INativeAbortSignal } from '@migaia/utils/promise'
 
-const user = createResource(({ onDispose }) => {
-  const socket = connect()
-  onDispose(() => socket.close())
-  return ({ signal }) => fetchUser(userId.value, { signal })
-}, { ttl: 30_000 })
+/** Application connection whose lifetime belongs to this resource. */
+declare function connect(): { close(): void }
+/** Application fetcher accepts the resource's cancellation signal. */
+declare function fetchUser(
+  id: string,
+  options: { signal: INativeAbortSignal }
+): Promise<{ id: string }>
+/** Current application user selected before each fetch. */
+declare const userId: { readonly value: string }
+
+const user = createResource(
+  ({ onDispose }) => {
+    const socket = connect()
+    onDispose(() => socket.close())
+    return ({ signal }) => fetchUser(userId.value, { signal })
+  },
+  { ttl: 30_000 }
+)
 ```
 
 - `onDispose` 注册的清理在 `dispose()` 时按注册的逆序执行，`signal` 同时中止。
@@ -605,8 +619,18 @@ const user = createResource(({ onDispose }) => {
 
 配合 `ConfigOwner.fromAsync` 得到配置资源：
 
-```ts
-const config = createResource(() => ({ signal }) => ConfigOwner.fromAsync(fetch(url, { signal }).then((r) => r.text())))
+```ts doc-test=check
+import { createResource } from '@migaia/resource'
+import { ConfigOwner } from '@migaia/utils/config'
+
+/** Application endpoint returning serialized configuration. */
+declare const url: string
+
+const config = createResource(
+  () =>
+    ({ signal }) =>
+      ConfigOwner.fromAsync(fetch(url, { signal }).then((r) => r.text()))
+)
 ```
 
 ### `mutate()` / `subscribe()` / `select()` / `using`

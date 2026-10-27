@@ -76,7 +76,9 @@ memory 的记录过滤在客户端执行。换用数据库后端时，下推能�
 `/entity` 现在只包含定义、连接和基础读写。附加能力需从独立子路径显式装配；缺少装配时抛出 `source: @migaia/storage-host`、`code: ENTITY_FEATURE_REQUIRED`，消息写明所需导入。
 
 ```ts
-import { defineEntity } from '@migaia/storage-host/entity'
+import { defineEntity, type IEntityConnectStore } from '@migaia/storage-host/entity'
+/** 已连接的应用存储，生命周期由调用方管理。 */
+declare const store: IEntityConnectStore
 const users = defineEntity<{ id: string; name: string }>({ name: 'users', key: 'id' }).connect(
   store
 )

@@ -76,7 +76,9 @@ Strings, bytes and records have channel-conflict rules for the same logical key.
 `/entity` provides definition, connection and basic reads/writes. Optional operations require explicit subpath units. Missing units throw `ENTITY_FEATURE_REQUIRED` with `source: @migaia/storage-host` and name the required import.
 
 ```ts
-import { defineEntity } from '@migaia/storage-host/entity'
+import { defineEntity, type IEntityConnectStore } from '@migaia/storage-host/entity'
+/** Connected application storage whose lifetime remains caller-owned. */
+declare const store: IEntityConnectStore
 const users = defineEntity<{ id: string; name: string }>({ name: 'users', key: 'id' }).connect(
   store
 )
