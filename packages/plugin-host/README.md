@@ -22,29 +22,43 @@
 
 ## 从这里开始
 
-安装问候插件并从成功返回的句柄调用它。host 的 execution.mutationTimeoutMs 与 execution.pipelineDrainTimeoutMs 均必填、无默认，本例各为 5000；显式 false 表示不设对应期限。
+问候功能已经在线。这时上线一批新功能：缓存插件先建好了连接，翻译插件却安装失败。宿主撤销这一整批：缓存连接被释放，问候功能照常响应。
 
 ```ts doc-test=run
 import { defineHost, definePlugin } from '@migaia/plugin-host'
 
-const host = defineHost({
-  host: { execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 } }
+const host = defineHost()
+const [greeting] = await host.use(
+  definePlugin({ name: 'greeting', install: () => ({ greet: () => '你好' }) })
+)
+
+const cache = definePlugin({
+  name: 'cache',
+  install: (core) => {
+    core.onDispose(() => console.log('缓存连接已释放'))
+    return {}
+  }
 })
-const greeting = definePlugin({
-  name: 'greeting',
-  install: () => ({ greet: () => '你好' })
+const translator = definePlugin({
+  name: 'translator',
+  install: () => {
+    throw new Error('词典加载失败')
+  }
 })
-const [registration] = await host.use(greeting)
-console.log(registration.extensions.greet())
-await host.unUse('greeting')
+await host.use(cache, translator).catch((error) => console.log(`新功能安装失败：${error.code}`))
+console.log(greeting.extensions.greet())
 await host.dispose()
 ```
 
 输出：
 
 ```text
+缓存连接已释放
+新功能安装失败：PLUGIN_INSTALL_FAILED
 你好
 ```
+
+`use()` 按传入顺序返回句柄，`greeting.extensions` 就是 install 返回的方法。每个安装、更新或卸载 hook 默认最多等 5000 毫秒，超时回滚；卸载时等待在途 pipeline 排空也默认最多 5000 毫秒。需要更长期限或不设期限时，在 `defineHost({ host: { execution } })` 中覆盖，见[全部选项](#创建-host-与全部选项)。
 
 遇到批次失败，看[保留原插件并回滚新资源](./USEGUIDE.md#批次失败时回滚新资源并保留原有插件)；遇到插件顺序问题，看[声明 Feature 依赖](./USEGUIDE.md#不依赖参数顺序先启动提供方)。
 
@@ -129,7 +143,7 @@ pnpm add @migaia/plugin-host
 
 类入口可重写 `createPluginDomainCore()`，每次安装创建一份领域 core。默认返回空对象。领域 core 必须是普通对象、可枚举 data property，不能覆盖 `config`、`onDispose`、`pipeline` 或四个 `use*Pipeline` core 保留成员；无效表面以原生 TypeError / `INVALID_OPTION` 拒绝。
 
-函数入口 `defineHost(options)` 返回冻结的 canonical handle。它提供与类入口相同的功能，并把类上的 protected `useSync`、`runPipeline` 暴露给持有 handle 的 owner。选项 `host` 必填，形状与类构造选项一致；其余字段如下：
+函数入口 `defineHost(options)` 返回冻结的 canonical handle。它提供与类入口相同的功能，并把类上的 protected `useSync`、`runPipeline` 暴露给持有 handle 的 owner。选项 `host` 可选，形状与类构造选项一致；其余字段如下：
 
 | defineHost 字段                 | 默认与含义                                                                                           |
 | ------------------------------- | ---------------------------------------------------------------------------------------------------- |
@@ -141,20 +155,20 @@ pnpm add @migaia/plugin-host
 
 `surface` 支持对象或工厂。对象形式的自有描述符在获取 Runtime 之前读取一次，访问器保持动态，所有 canonical Host 键（包括 identity、use、unUse）仍为保留键。工厂形式 `surface: (native) => ({ ... })` 在创建最终 handle 时执行一次，收到冻结的原生 `use`、`unUse`，可组合并替换这两个方法；其他 canonical Host 键仍不能替换。领域方法、Host 身份、共享出口和 fluent 管线方法属于同一个冻结 handle，组合方应通过 surface 提供方法，不能复制返回的 handle。surface 读取或工厂失败保持原错，经 `CALLBACK_FAILED` 边界分类。旧对象写法和三类型参数调用仍有效。
 
-类构造 `options` 必填，defineHost 的 `host` 同样必填：
+类构造 `options` 可选，defineHost 的 `host` 同样可选；全部省略时使用下表默认值：
 
-| 字段                                                | 默认                                  | 行为                                                                |
-| --------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------- |
-| `identity?: { name?: string }`                      | name 为 `'DEFAULT'`                   | 可读名称可选，宿主另分配唯一 id                                     |
-| `execution.mutationTimeoutMs: number \| false`      | 必填，无默认                          | 本次变更 hook 的执行预算；`false` 无期限                            |
-| `execution.pipelineDrainTimeoutMs: number \| false` | 必填，无默认                          | pipeline 租约排空预算；`false` 等真实排空                           |
-| `pipeline?.mode`                                    | `'sync'`                              | `'sync' \| 'async' \| 'generator' \| 'async-generator'`，构造后固定 |
-| `diagnostic(message, code?, error?)`                | 空操作                                | 接收诊断及被包含的原始失败对象                                      |
-| `onDiagnosticFailure(error)`                        | 宿主的 globalThis.reportError（若有） | 诊断器自身 throw/reject 的终端出口                                  |
-| `scheduler?: IScheduler`                            | 内部 systemScheduler                  | 统一 `now()`、`schedule()` 的时间源                                 |
-| `queueAdmissionTimeoutMs?: number \| false`         | `undefined`                           | 默认只诊断；数值表示排队拒绝阈值；false 关闭相关计时与诊断          |
-| `queueAdmissionDiagnosticMs?: number \| false`      | `1000`                                | 仅未配置排队拒绝阈值时生效；false 关闭诊断计时器                    |
-| `disposeStepTimeoutMs?: number \| false`            | `5000`                                | 单个普通释放步骤的等待预算；false 无期限                            |
+| 字段                                                 | 默认                                  | 行为                                                                |
+| ---------------------------------------------------- | ------------------------------------- | ------------------------------------------------------------------- |
+| `identity?: { name?: string }`                       | name 为 `'DEFAULT'`                   | 可读名称可选，宿主另分配唯一 id                                     |
+| `execution.mutationTimeoutMs?: number \| false`      | `5000`                                | 本次变更 hook 的执行预算；`false` 无期限                            |
+| `execution.pipelineDrainTimeoutMs?: number \| false` | `5000`                                | pipeline 租约排空预算；`false` 等真实排空                           |
+| `pipeline?.mode`                                     | `'sync'`                              | `'sync' \| 'async' \| 'generator' \| 'async-generator'`，构造后固定 |
+| `diagnostic(message, code?, error?)`                 | 空操作                                | 接收诊断及被包含的原始失败对象                                      |
+| `onDiagnosticFailure(error)`                         | 宿主的 globalThis.reportError（若有） | 诊断器自身 throw/reject 的终端出口                                  |
+| `scheduler?: IScheduler`                             | 内部 systemScheduler                  | 统一 `now()`、`schedule()` 的时间源                                 |
+| `queueAdmissionTimeoutMs?: number \| false`          | `undefined`                           | 默认只诊断；数值表示排队拒绝阈值；false 关闭相关计时与诊断          |
+| `queueAdmissionDiagnosticMs?: number \| false`       | `1000`                                | 仅未配置排队拒绝阈值时生效；false 关闭诊断计时器                    |
+| `disposeStepTimeoutMs?: number \| false`             | `5000`                                | 单个普通释放步骤的等待预算；false 无期限                            |
 
 所有时间数值须有限、非负；非法选项、非函数回调或不满足 scheduler 协议的对象以 TypeError / `INVALID_OPTION` 拒绝。直接导入 `@migaia/utils/scheduler` 的消费项目需直接安装 utils。
 
@@ -288,10 +302,7 @@ import { GENERATOR_CONTINUE, MiddlewarePipelineMode } from '@migaia/middleware-p
 
 /** 这个宿主持有两步字符串转换与它们的释放责任。 */
 const textHost = defineHost<Record<never, never>, string>({
-  host: {
-    execution: { mutationTimeoutMs: 5000, pipelineDrainTimeoutMs: 5000 },
-    pipeline: { mode: MiddlewarePipelineMode.generator }
-  }
+  host: { pipeline: { mode: MiddlewarePipelineMode.generator } }
 })
 textHost.useGeneratorPipeline(function* (value) {
   yield value.toUpperCase()
@@ -330,7 +341,7 @@ revision 是 Host 已提交修改的版本号，不是尝试操作的次数。co
 
 createDataOrderSlot 调用即保留顺序；禁用、恢复和 replace 沿用 slot。只有定义永久删除或 session 结束才 retireDataOrderSlot。prepareUnUseBatch 按 owner 的清理顺序接收 exact tokens；commitPreparedUnUseBatch(prepared, { beforeCleanup? }) 先逻辑撤销，再等待 fence 和该代 pipeline lease。beforeCleanup 可选，无默认 Promise，但提供时始终先完成。
 
-托管清理使用必填 execution.pipelineDrainTimeoutMs：数值是本批次 lease 与全部清理步骤共享的预算，耗尽继续后续步骤，即使普通 disposeStepTimeoutMs 为 false；显式 pipelineDrainTimeoutMs false 才逐项等待真实完成并绕过普通步骤预算。预算不撤销进行中的工作；确认物理释放前，应等待全部 physicalCompletion 延续完成，或由拥有 realm 的外层终止其实际执行环境。
+托管清理使用 execution.pipelineDrainTimeoutMs（默认 5000）：数值是本批次 lease 与全部清理步骤共享的预算，耗尽继续后续步骤，即使普通 disposeStepTimeoutMs 为 false；显式 pipelineDrainTimeoutMs false 才逐项等待真实完成并绕过普通步骤预算。预算不撤销进行中的工作；确认物理释放前，应等待全部 physicalCompletion 延续完成，或由拥有 realm 的外层终止其实际执行环境。
 
 `createView(token)` 返回只含该 exact registration 的 extensions 的窄 view，无 Host、config、shared 或 mutation 能力。相同 token 的函数引用稳定，receiver 为 concrete Host。token view 禁用期间仍有效，完整 Host view 此时拒绝；启用恢复原函数引用，卸载两者均撤销。foreign/撤销 token 失败关闭。迁移：旧根 createRegistrationView 与 IPluginRegistrationReceipt 已移除，使用 composition createView/IRegistrationToken。
 
