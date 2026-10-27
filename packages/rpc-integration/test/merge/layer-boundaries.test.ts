@@ -103,19 +103,20 @@ function sourceFiles(directory: string): string[] {
 }
 
 describe('layer dependency direction', () => {
-  it('[CORE-A1-DEPENDENCIES] keeps exactly the six permitted Host runtime dependencies', () => {
-    /** Read the actual package boundary; a dev or peer entry cannot replace a runtime dependency. */
+  it('[CORE-A1-DEPENDENCIES] keeps five Host runtime dependencies and one exact Contract peer', () => {
+    /** BC26 borrows the application's Contract peer while Host retains five runtime dependencies. */
     const manifest = JSON.parse(readFileSync(join(sourceRoot, '../package.json'), 'utf8')) as {
       dependencies: Record<string, string>
+      peerDependencies: Record<string, string>
     }
     expect(Object.keys(manifest.dependencies).sort()).toEqual([
       '@migaia/lifecycle',
       '@migaia/plugin-host',
-      '@migaia/rpc-contract',
       '@migaia/serialize',
       '@migaia/supervision',
       '@migaia/utils'
     ])
+    expect(manifest.peerDependencies['@migaia/rpc-contract']).toBe('workspace:*')
   })
 
   it('keeps the retry feature independent of process and coroutine launchers', () => {
