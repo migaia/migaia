@@ -4,14 +4,13 @@ import {
   lockKey,
   snapshotStorageBatchKeys,
   snapshotOperationContext,
-  snapshotSyncWriteOptions,
   throwIfAborted,
   withAbort,
   reportCleanupError,
   createStorageOperationReporter,
   type IBackendValueCommit
 } from '@migaia/storage-host/sdk'
-import { createTextRedo, type ITextPrepared, type ITextRedoStore } from './text-redo.js'
+import { createTextRedo, type ITextRedoStore } from './text-redo.js'
 import { bindBrowserExecution, textExecutionKeys } from './execution.js'
 import { createBrowserOrgBinding } from './organizations.js'
 import { createTextBatchApi, BrowserBatchMethod } from './batch.js'
@@ -25,17 +24,12 @@ import {
 } from '@migaia/storage-contract'
 import {
   lengthPrefixedNamespaceCodec,
-  namespacedKey,
   namespacedStorageKey,
   admitNamespaceCodec,
   stripStorageNamespace
 } from '../utils/key.js'
 import type { INamespaceCodec } from '../utils/key.js'
-import {
-  parseCookieEntries,
-  serializeCookieAssignment,
-  serializeCookieRemoval
-} from '../utils/cookie-string.js'
+import { parseCookieEntries, serializeCookieRemoval } from '../utils/cookie-string.js'
 import { StorageError, createStorageTypeError } from '../types/errors.js'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.js'
@@ -60,6 +54,7 @@ import {
   type IBackendRuntime,
   type IKeyValueBackendStore
 } from './construction.js'
+import { createCookieSync, prepareCookie } from './cookie-sync.js'
 
 const CAPABILITIES: IStorageCapabilities = {
   batch: false,
@@ -192,7 +187,7 @@ type ICookieConstruction = IBackendConstruction<
   ICookieDocument
 >
 /** A cookie namespace owns its fixed physical scope, native document and redo assembly. */
-type ICookieContext = {
+export type ICookieContext = {
   /** Original options is captured before native construction begins. */
   readonly options: ICookiesOptions
   /** Original runtime is captured before native construction begins. */
@@ -429,7 +424,7 @@ function assembleCookieConstruction(cookieContext: ICookieContext): ICookieConst
 }
 
 /** Publish only after a visible cookie mutation has completed successfully. */
-function publishChange(
+export function publishChange(
   cookieContext: ICookieContext,
   change: Omit<IStorageChange, 'sequence' | 'origin' | 'scope'>
 ): void {
@@ -457,7 +452,7 @@ function readCookie(cookieContext: ICookieContext, operation: string, key?: ISto
 }
 
 /** Write the live cookie jar while preserving host failures in the storage error protocol. */
-function writeCookie(
+export function writeCookie(
   cookieContext: ICookieContext,
   value: string,
   operation: string,
@@ -475,11 +470,11 @@ function writeCookie(
   }
 }
 
-function assertLive(cookieContext: ICookieContext): void {
+export function assertLive(cookieContext: ICookieContext): void {
   cookieContext.controller.assertLive()
 }
 
-function namespacedEntries(
+export function namespacedEntries(
   cookieContext: ICookieContext,
   operation = 'cookie.keys'
 ): Array<{
@@ -511,7 +506,7 @@ function namespacedEntries(
 }
 
 /** Read one physical cookie only when its visible scope is unambiguous. */
-function readVisibleCookie(
+export function readVisibleCookie(
   cookieContext: ICookieContext,
   physicalKey: string,
   operation: string,
@@ -537,7 +532,7 @@ function readVisibleCookie(
 }
 
 /** Delete a stable cookie-name snapshot while exposing the exact partial-failure boundary. */
-function clearNamespacedEntries(
+export function clearNamespacedEntries(
   cookieContext: ICookieContext,
   operation: string,
   signal?: AbortSignal
@@ -562,232 +557,6 @@ function clearNamespacedEntries(
     )
   }
   if (entries.length > 0) publishChange(cookieContext, { channel: 'value', kind: 'clear' })
-}
-
-/** Prepare one visible-cookie assignment before WAL; ordinary sync writes use the same validation. */
-function prepareCookie(
-  cookieContext: ICookieContext,
-  key: IStorageKey,
-  value: string | null,
-  ctx?: ICookieWriteContext,
-  behavior?: {
-    readonly notify?: boolean
-    readonly durable?: true
-    readonly remove?: true
-    readonly encode?: () => string
-  }
-): ITextPrepared {
-  const notify = behavior?.notify !== false
-  const durable = behavior?.durable === true
-  if (value === null && behavior?.remove) {
-    const physicalKey = namespacedStorageKey(
-      cookieContext.namespace,
-      key,
-      cookieContext.namespaceCodec,
-      StorageBackend.cookie
-    )
-    const visible = readVisibleCookie(
-      cookieContext,
-      physicalKey,
-      StorageOperation.cookieRemove,
-      key
-    )
-    const assignment = serializeCookieRemoval(physicalKey, cookieContext.scope)
-    return {
-      value: null,
-      image: undefined,
-      apply: () => {
-        writeCookie(cookieContext, assignment, StorageOperation.cookieRemove, key)
-        if (notify && visible !== undefined)
-          publishChange(cookieContext, { channel: 'value', kind: 'remove', keys: [key] })
-      }
-    }
-  }
-  assertLive(cookieContext)
-  const context = ctx
-  snapshotSyncWriteOptions(context)
-  if (typeof value !== 'string')
-    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
-      backend: StorageBackend.cookie,
-      key,
-      cause: new TypeError(StorageErrorText.cookieValueInvalid)
-    })
-  const physicalKey =
-    behavior?.encode?.() ??
-    namespacedStorageKey(
-      cookieContext.namespace,
-      key,
-      cookieContext.namespaceCodec,
-      StorageBackend.cookie
-    )
-  /** Snapshot mutable/getter-backed context fields before validation and serialization. */
-  const maxAge = context?.maxAge
-  const expires = context?.expires
-  if (maxAge !== undefined && !Number.isSafeInteger(maxAge))
-    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
-      backend: StorageBackend.cookie,
-      key,
-      cause: new RangeError(StorageErrorText.cookieMaxAgeInvalid)
-    })
-  if (expires !== undefined && (typeof expires !== 'object' || expires === null))
-    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
-      backend: StorageBackend.cookie,
-      key,
-      cause: new RangeError(StorageErrorText.cookieExpiresInvalid)
-    })
-  /** Read a Date-like value once so validation and serialization cannot observe different times. */
-  let expiresTime: number | undefined
-  try {
-    expiresTime =
-      expires === undefined ? undefined : ((expires as { getTime(): unknown }).getTime() as number)
-  } catch (cause) {
-    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
-      backend: StorageBackend.cookie,
-      key,
-      cause
-    })
-  }
-  if (expiresTime !== undefined && !Number.isFinite(expiresTime))
-    throw new StorageError(StorageBrowserErrorCode.invalidConfig, {
-      backend: StorageBackend.cookie,
-      key,
-      cause: new RangeError(StorageErrorText.cookieExpiresInvalid)
-    })
-  const expiresNow =
-    maxAge !== undefined ? maxAge <= 0 : expiresTime !== undefined && expiresTime <= Date.now()
-  /** Relative expiry becomes one absolute native date so replay never renews a failed write. */
-  const deadline =
-    !durable || maxAge === undefined ? expiresTime : expiresNow ? 0 : Date.now() + maxAge * 1000
-  if (durable && deadline !== undefined && !Number.isFinite(new Date(deadline).getTime()))
-    throw new StorageContractError(StorageContractErrorCode.unsupported, {
-      backend: StorageBackend.cookie,
-      key
-    })
-  const visibleBefore = readVisibleCookie(
-    cookieContext,
-    physicalKey,
-    StorageOperation.cookieSet,
-    key
-  )
-  const assignment = expiresNow
-    ? serializeCookieRemoval(physicalKey, cookieContext.scope)
-    : serializeCookieAssignment(physicalKey, value, {
-        ...cookieContext.scope,
-        expires: deadline === undefined ? undefined : new Date(deadline),
-        maxAge: durable ? undefined : maxAge
-      })
-  return {
-    value: expiresNow ? null : value,
-    image: { value, ...(deadline === undefined ? {} : { expiresAt: deadline }) },
-    apply: () => {
-      writeCookie(cookieContext, assignment, StorageOperation.cookieSet, key)
-      const visible = readVisibleCookie(cookieContext, physicalKey, StorageOperation.cookieSet, key)
-      if (expiresNow && visible === undefined) {
-        if (notify && visibleBefore !== undefined)
-          publishChange(cookieContext, { channel: 'value', kind: 'remove', keys: [key] })
-        return
-      }
-      if (!expiresNow && visible === value) {
-        if (notify) publishChange(cookieContext, { channel: 'value', kind: 'put', keys: [key] })
-        return
-      }
-      if (visible !== undefined)
-        throw new StorageError(StorageBrowserErrorCode.cookieScopeAmbiguous, {
-          backend: StorageBackend.cookie,
-          key,
-          operation: StorageOperation.cookieSet,
-          cause: new Error(StorageErrorText.cookieRedoScopeMismatch)
-        })
-      throw new StorageError(StorageBrowserErrorCode.writeFailed, {
-        backend: StorageBackend.cookie,
-        key,
-        operation: StorageOperation.cookieSet,
-        cause: new Error(StorageErrorText.cookieRedoWriteInvisible)
-      })
-    }
-  }
-}
-
-/** Build synchronous cookie methods against the admitted native jar and fixed scope. */
-function createCookieSync(cookieContext: ICookieContext): ICookieContext['sync'] {
-  return {
-    get: (key) => {
-      assertLive(cookieContext)
-      return (
-        readVisibleCookie(
-          cookieContext,
-          namespacedKey(
-            cookieContext.namespace,
-            key,
-            cookieContext.namespaceCodec,
-            StorageBackend.cookie
-          ),
-          'cookie.get',
-          key
-        ) ?? null
-      )
-    },
-    set: (key, value, ctx) => {
-      prepareCookie(cookieContext, key, value, ctx, {
-        encode: () =>
-          namespacedKey(
-            cookieContext.namespace,
-            key,
-            cookieContext.namespaceCodec,
-            StorageBackend.cookie
-          )
-      }).apply()
-    },
-    remove: (key) => {
-      assertLive(cookieContext)
-      const physicalKey = namespacedKey(
-        cookieContext.namespace,
-        key,
-        cookieContext.namespaceCodec,
-        StorageBackend.cookie
-      )
-      const visible = readVisibleCookie(
-        cookieContext,
-        physicalKey,
-        StorageOperation.cookieRemove,
-        key
-      )
-      writeCookie(
-        cookieContext,
-        serializeCookieRemoval(physicalKey, cookieContext.scope),
-        StorageOperation.cookieRemove,
-        key
-      )
-      if (visible !== undefined)
-        publishChange(cookieContext, { channel: 'value', kind: 'remove', keys: [key] })
-    },
-    has: (key) => {
-      assertLive(cookieContext)
-      return (
-        readVisibleCookie(
-          cookieContext,
-          namespacedKey(
-            cookieContext.namespace,
-            key,
-            cookieContext.namespaceCodec,
-            StorageBackend.cookie
-          ),
-          'cookie.has',
-          key
-        ) !== undefined
-      )
-    },
-    keys: () => {
-      assertLive(cookieContext)
-      return namespacedEntries(cookieContext).flatMap((entry) =>
-        typeof entry.logicalKey === 'string' ? [entry.logicalKey] : []
-      )
-    },
-    clearValues: () => {
-      assertLive(cookieContext)
-      clearNamespacedEntries(cookieContext, 'cookie.clearValues')
-    }
-  }
 }
 
 /** One native header snapshot supplies ordinary and redo batch reads through the same parser. */
@@ -993,79 +762,113 @@ async function commitValueWrite(
   }
 }
 
+/**
+ * Store shape the CookieStore class implements; named because implements cannot take an
+ * intersection.
+ */
+type ICookieStoreShape = ICookieContext['store']
+
+/** Cookie store of one namespace: text reads, writes and batches over document.cookie. */
+class CookieStore implements ICookieStoreShape {
+  /** Owner state passed in by the constructor caller; read by the members below. */
+  readonly #cookieContext: ICookieContext
+
+  backend: ICookieStoreShape['backend'] = StorageBackend.cookie
+
+  capabilities: ICookieStoreShape['capabilities']
+
+  sync: ICookieStoreShape['sync']
+
+  transaction: ICookieStoreShape['transaction']
+
+  tx: ICookieStoreShape['tx']
+
+  get: ICookieStoreShape['get'] = (key, ctx) =>
+    this.#cookieContext.redoEnabled
+      ? this.#cookieContext.redo.read(ctx, () => this.#cookieContext.sync.get(key))
+      : plain(this.#cookieContext, ctx, () => this.#cookieContext.sync.get(key))
+
+  set: ICookieStoreShape['set'] = async (key, value, ctx?: ICookieWriteContext) => {
+    const context = snapshotCookieWriteContext(ctx)
+    if (this.#cookieContext.redoEnabled) {
+      await this.#cookieContext.redo.write(
+        [lockKey.text(key)],
+        context?.lifecycle,
+        (scope) => scope.set(key, value),
+        (key, value) =>
+          prepareCookie(
+            this.#cookieContext,
+            key,
+            value,
+            { expires: context?.expires, maxAge: context?.maxAge },
+            { notify: false, durable: true, remove: true }
+          )
+      )
+      return
+    }
+    await withAbort(context?.lifecycle, async () => {
+      if (this.#cookieContext.runtime.journal !== undefined)
+        await this.#cookieContext.runtime.journal.prepare()
+      return this.#cookieContext.sync.set(key, value, {
+        expires: context?.expires,
+        maxAge: context?.maxAge
+      })
+    })
+  }
+
+  remove: ICookieStoreShape['remove'] = (key, ctx?: ICookieRemoveContext) =>
+    this.#cookieContext.redoEnabled
+      ? this.#cookieContext.redo.write([lockKey.text(key)], ctx, (scope) => scope.remove(key))
+      : plain(this.#cookieContext, ctx, () => this.#cookieContext.sync.remove(key))
+
+  has: ICookieStoreShape['has'] = (key, ctx) =>
+    this.#cookieContext.redoEnabled
+      ? this.#cookieContext.redo.read(ctx, () => this.#cookieContext.sync.has(key))
+      : plain(this.#cookieContext, ctx, () => this.#cookieContext.sync.has(key))
+
+  keys: ICookieStoreShape['keys'] = (ctx) =>
+    this.#cookieContext.redoEnabled
+      ? this.#cookieContext.redo.read(ctx, () => this.#cookieContext.sync.keys())
+      : plain(this.#cookieContext, ctx, () => this.#cookieContext.sync.keys())
+
+  clearValues: ICookieStoreShape['clearValues'] = (ctx) =>
+    this.#cookieContext.redoEnabled
+      ? this.#cookieContext.redo.clear(ctx)
+      : plain(this.#cookieContext, ctx, (signal) => {
+          assertLive(this.#cookieContext)
+          clearNamespacedEntries(this.#cookieContext, 'cookie.clearValues', signal)
+        })
+
+  clearAll: ICookieStoreShape['clearAll'] = (ctx) =>
+    this.#cookieContext.redoEnabled
+      ? this.#cookieContext.redo.clear(ctx)
+      : plain(this.#cookieContext, ctx, (signal) => {
+          assertLive(this.#cookieContext)
+          clearNamespacedEntries(this.#cookieContext, 'cookie.clearAll', signal)
+        })
+
+  dispose: ICookieStoreShape['dispose'] = () => {
+    return this.#cookieContext.controller.dispose()
+  };
+
+  [asyncDisposeKey]: ICookieStoreShape[typeof asyncDisposeKey] = () =>
+    (this.#cookieContext.symbolicDispose ??= this.#cookieContext.store
+      .dispose()
+      .catch((error) => reportCleanupError(createStorageOperationReporter(), error)))
+
+  /** Capture the owner state; members are own-property arrows so the public shape is unchanged. */
+  constructor(cookieContext: ICookieContext) {
+    this.#cookieContext = cookieContext
+    this.capabilities = this.#cookieContext.redoEnabled
+      ? { ...CAPABILITIES, batch: true, transactions: true }
+      : CAPABILITIES
+    this.sync = this.#cookieContext.sync
+    this.transaction = this.#cookieContext.redo.transaction
+    this.tx = this.#cookieContext.redo.tx
+  }
+}
+
 /** Expose asynchronous cookie methods through the original controller and redo engine. */
 function createCookieStore(cookieContext: ICookieContext): ICookieContext['store'] {
-  return {
-    backend: StorageBackend.cookie,
-    capabilities: cookieContext.redoEnabled
-      ? { ...CAPABILITIES, batch: true, transactions: true }
-      : CAPABILITIES,
-    sync: cookieContext.sync,
-    transaction: cookieContext.redo.transaction,
-    tx: cookieContext.redo.tx,
-    get: (key, ctx) =>
-      cookieContext.redoEnabled
-        ? cookieContext.redo.read(ctx, () => cookieContext.sync.get(key))
-        : plain(cookieContext, ctx, () => cookieContext.sync.get(key)),
-    set: async (key, value, ctx?: ICookieWriteContext) => {
-      const context = snapshotCookieWriteContext(ctx)
-      if (cookieContext.redoEnabled) {
-        await cookieContext.redo.write(
-          [lockKey.text(key)],
-          context?.lifecycle,
-          (scope) => scope.set(key, value),
-          (key, value) =>
-            prepareCookie(
-              cookieContext,
-              key,
-              value,
-              { expires: context?.expires, maxAge: context?.maxAge },
-              { notify: false, durable: true, remove: true }
-            )
-        )
-        return
-      }
-      await withAbort(context?.lifecycle, async () => {
-        if (cookieContext.runtime.journal !== undefined)
-          await cookieContext.runtime.journal.prepare()
-        return cookieContext.sync.set(key, value, {
-          expires: context?.expires,
-          maxAge: context?.maxAge
-        })
-      })
-    },
-    remove: (key, ctx?: ICookieRemoveContext) =>
-      cookieContext.redoEnabled
-        ? cookieContext.redo.write([lockKey.text(key)], ctx, (scope) => scope.remove(key))
-        : plain(cookieContext, ctx, () => cookieContext.sync.remove(key)),
-    has: (key, ctx) =>
-      cookieContext.redoEnabled
-        ? cookieContext.redo.read(ctx, () => cookieContext.sync.has(key))
-        : plain(cookieContext, ctx, () => cookieContext.sync.has(key)),
-    keys: (ctx) =>
-      cookieContext.redoEnabled
-        ? cookieContext.redo.read(ctx, () => cookieContext.sync.keys())
-        : plain(cookieContext, ctx, () => cookieContext.sync.keys()),
-    clearValues: (ctx) =>
-      cookieContext.redoEnabled
-        ? cookieContext.redo.clear(ctx)
-        : plain(cookieContext, ctx, (signal) => {
-            assertLive(cookieContext)
-            clearNamespacedEntries(cookieContext, 'cookie.clearValues', signal)
-          }),
-    clearAll: (ctx) =>
-      cookieContext.redoEnabled
-        ? cookieContext.redo.clear(ctx)
-        : plain(cookieContext, ctx, (signal) => {
-            assertLive(cookieContext)
-            clearNamespacedEntries(cookieContext, 'cookie.clearAll', signal)
-          }),
-    dispose: () => {
-      return cookieContext.controller.dispose()
-    },
-    [asyncDisposeKey]: () =>
-      (cookieContext.symbolicDispose ??= cookieContext.store
-        .dispose()
-        .catch((error) => reportCleanupError(createStorageOperationReporter(), error)))
-  }
+  return new CookieStore(cookieContext)
 }
