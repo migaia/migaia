@@ -181,7 +181,7 @@ export class Session {
   #keepaliveBytes = 0
   /** Work callbacks and pending controls receive the same original terminal reason. */
   #reason: unknown
-  /** Closing-capable Sessions own one lifecycle error whose cause follows the terminal reason. */
+  /** Final abort publishes one shared immutable error after the native terminal reason is selected. */
   #closeError: unknown
   /** Control correlation is independent of business CallTable records. */
   readonly #controls = new Map<string, IControlPending>()
@@ -505,10 +505,18 @@ export class Session {
   #controlled(
     operation: ITimeoutOperation<void>,
     signal?: IAbortSignal,
-    timeoutMs?: number | false
+    timeoutMs?: number | false,
+    connectionAbort = true
   ): Promise<void> {
     const controls = {
-      signals: signal ? [this.#controller.signal, signal] : [this.#controller.signal],
+      /** Controls already settle through their completion table; only writes need this second race. */
+      signals: connectionAbort
+        ? signal
+          ? [this.#controller.signal, signal]
+          : [this.#controller.signal]
+        : signal
+          ? [signal]
+          : [],
       report: this.#options.report
     }
     return (
@@ -531,11 +539,17 @@ export class Session {
     const id = String(++this.#controlSerial)
     /** Timeout precedes signal getter observation even though both share the controlled owner. */
     const timeoutMs = options?.timeoutMs ?? this.#options.controlTimeoutMs
-    return this.#controlled(({ signal }) => this.#ping(id, signal), options?.signal, timeoutMs)
+    return this.#controlled(
+      ({ signal }) => this.#ping(id, signal),
+      options?.signal,
+      timeoutMs,
+      false
+    )
       .catch((error) => {
         const pending = this.#controls.get(id)
         pending?.completion.reject(pending.signal.reason ?? error)
-        throw error
+        /** Already-pending controls retain the selected close reason, not its abort wrapper. */
+        throw this.#controller.signal.aborted ? this.#reason : error
       })
       .finally(() => {
         this.#controls.delete(id)
@@ -612,10 +626,6 @@ export class Session {
     this.#closing = true
     this.#physicalFailure = physicalFailure
     this.#reason = reason ?? createRpcLifecycleError(RpcCoreErrorText.endpointDisposed)
-    this.#closeError =
-      this.#options.carrier.closingWrites && reason !== undefined && reason !== null
-        ? createRpcLifecycleError(RpcCoreErrorText.endpointDisposed, this.#reason)
-        : this.#reason
     this.#observation.lifecycle(RpcProbeLifecycle.closing, this.#reason)
     this.#cancelHandshakeTimer()
     this.#ready.reject(this.#reason)
@@ -634,16 +644,9 @@ export class Session {
     return this.#closed.promise
   }
 
-  /** Refine only the owned closing wrapper; native/user errors keep their original cause and stack. */
+  /** Select the terminal reason without mutating errors already delivered during closing. */
   #refineCloseReason(reason: unknown): void {
     this.#reason = reason
-    if (this.#options.carrier.closingWrites)
-      Object.defineProperty(this.#closeError, 'cause', {
-        value: reason,
-        configurable: true,
-        writable: true
-      })
-    else this.#closeError = reason
   }
 
   /** One budget bounds native reason selection, application hooks, FIFO writes and final close. */
@@ -707,8 +710,10 @@ export class Session {
     } catch (error) {
       this.#options.report(error)
     }
+    /** Terminal selection is complete; this one immutable error becomes the shared abort reason. */
+    this.#closeError = this.#controlError(this.#reason)
     this.#controller.abort(this.#closeError)
-    for (const pending of this.#controls.values()) pending.completion.reject(this.#closeError)
+    for (const pending of this.#controls.values()) pending.completion.reject(this.#reason)
     this.#controls.clear()
     const remove = this.#unsubscribe
     this.#unsubscribe = undefined
@@ -1395,7 +1400,12 @@ export class Session {
 
   /** Translate only utils-owned control wrappers while retaining the original reason/cause. */
   #controlError(error: unknown): unknown {
-    if (this.#closing) return this.#closeError
+    if (this.#closing) {
+      if (this.#controller.signal.aborted) return this.#closeError
+      return this.#options.carrier.closingWrites
+        ? createRpcLifecycleError(RpcCoreErrorText.endpointDisposed, this.#reason)
+        : this.#reason
+    }
     if (error instanceof UtilsAbortError)
       return createRpcAbortError(undefined, undefined, error.cause)
     if (error instanceof UtilsTimeoutError) {
@@ -1410,7 +1420,12 @@ export class Session {
   /** A failing unaccepted candidate emits its coded reject before releasing the physical source. */
   async #fail(error: unknown, reject: boolean): Promise<void> {
     if (this.#closing) {
-      if (error !== this.#reason && error !== this.#closeError) this.#options.report(error)
+      if (
+        error !== this.#reason &&
+        error !== this.#closeError &&
+        safeRead(error, 'cause') !== this.#reason
+      )
+        this.#options.report(error)
       return
     }
     /** Provider cancellation keeps the original typed reason beside its public protocol report. */

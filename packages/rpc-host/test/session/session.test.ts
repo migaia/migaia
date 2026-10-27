@@ -1003,18 +1003,58 @@ it('A40 closing a physically written pending ping reports no cancellation acknow
         pair.a.written.some((frame) => frame.kind === 'control' && frame.operation === 'ping')
       ).toBe(true)
     )
-    /** The same original caller reason must remain reachable through the closing wrapper. */
+    /** Pending controls keep the original close reason rather than a new lifecycle wrapper. */
     const reason = new Error('close with ping outstanding')
     await pair.first.close(reason)
     const failure = await pending
-    expect(failure).toMatchObject({ code: RpcCoreErrorCode.endpointDisposed })
-    assert(failure instanceof Error)
-    expect(failure.cause).toBe(reason)
+    expect(failure).toBe(reason)
     /** The original utility race owns its late rejection handler; no extra timer is needed. */
     await new Promise<void>((resolve) => setImmediate(resolve))
     expect(left.report).not.toHaveBeenCalled()
     expect(left.scheduler.pendingCount).toBe(0)
   } finally {
+    await Promise.all([left.table.close(), right.table.close()])
+  }
+})
+
+it('A45 errors delivered during native close keep their original cause after terminal selection', async () => {
+  /** Real accepted native sources expose the existing SessionTable send boundary. */
+  const left = await Host.create('immutable-close-a')
+  /** Its peer owns the closing Session and lends the same unmodified table send interface. */
+  const right = await Host.create('immutable-close-b')
+  /** Accepted closing-capable resources preserve the same real handshake and native EOF path. */
+  const pair = connect(left, right, 'process', false, '', true)
+  /** Native completion follows the first EOF without replacing either caller-owned Error. */
+  const terminal = deferred<unknown>()
+  /** Native reason selection is observed before issuing the closing-window operation. */
+  const selecting = deferred<void>()
+  /** This initial native Error must remain reachable from the first delivered wrapper. */
+  const eof = new Error('provisional physical EOF')
+  /** Later native completion may replace the Session reason without changing delivered errors. */
+  const final = new Error('selected native terminal reason')
+  Object.assign(pair.b, {
+    terminalReason: () => {
+      selecting.resolve()
+      return terminal.promise
+    }
+  })
+  try {
+    await Promise.all([pair.first.ready, pair.second.ready])
+    await pair.a.close(eof)
+    await selecting.promise
+    /** Sending during the closing window receives its own wrapper with the current cause. */
+    const first = await right.table
+      .send(pair.b.id, call(right, left))
+      .catch((error: unknown) => error)
+    expect(first).toMatchObject({ code: RpcCoreErrorCode.endpointDisposed, cause: eof })
+    terminal.resolve(final)
+    await pair.second.closed
+    expect(first).toMatchObject({ cause: eof })
+    expect(eof).not.toHaveProperty('cause')
+    expect(final).not.toHaveProperty('cause')
+    expect(right.report).not.toHaveBeenCalled()
+  } finally {
+    terminal.resolve(final)
     await Promise.all([left.table.close(), right.table.close()])
   }
 })

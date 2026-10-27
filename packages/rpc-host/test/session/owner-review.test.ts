@@ -2,15 +2,21 @@
 import { deferred } from '@migaia/utils/promise'
 import {
   defineFlowFeature,
+  defineTransportPlugin,
   RpcFlowPoint,
   RpcJsonCarrierCodec,
   type IRpcFlowStage
 } from '@migaia/rpc-host/sdk'
 import { createRpcHost } from '@migaia/rpc-host'
-import type { IRpcFlowContext } from '@migaia/rpc-contract/interfaces'
+import type {
+  IRpcFlowContext,
+  IRpcTransportContext,
+  IRpcSessionHandle
+} from '@migaia/rpc-contract/interfaces'
 import { deserializeRpcWireError, RpcWireHandshakeStep } from '@migaia/rpc-contract/protocol'
 import { assert, expect, it, vi } from 'vitest'
 import { connectedCoreHosts, coreMemoryServer } from '../host/core-fixture.js'
+import { MemoryCarrier } from '../fixtures/core-carrier.js'
 
 /** A real accept hook lends its actual connection signal and can hold only its own continuation. */
 class ClosingAcceptGate {
@@ -151,6 +157,98 @@ it('A36 physical EOF still uses its native terminal reason and publishes peer cl
     expect(reason).not.toHaveProperty('cause')
   } finally {
     await hosts.close()
+  }
+})
+
+it('A45 public transport controls preserve closing-window errors after native reason selection', async () => {
+  /** Both public Hosts acquire native carriers through the existing SDK transport hook. */
+  const gate = new ClosingAcceptGate()
+  gate.hold = false
+  /** Existing listener-style construction owns the server's canonical native installation. */
+  const server = coreMemoryServer('a', 'public-close-a', 'memory', [], [], {
+    create: () => new RpcJsonCarrierCodec(),
+    nativeBinary: false,
+    closingWrites: true
+  })
+  /** Public root construction preserves the same plugin-host and Session ownership as production. */
+  const a = await createRpcHost(server.options)
+  /** The physical server endpoint retains its ordinary JSON codec and close capability. */
+  const left = new MemoryCarrier(
+    'public-close-left',
+    undefined,
+    new RpcJsonCarrierCodec(),
+    false,
+    true
+  )
+  /** The physical client endpoint supplies the delayed terminal reason through its actual port. */
+  const right = new MemoryCarrier(
+    'public-close-right',
+    undefined,
+    new RpcJsonCarrierCodec(),
+    false,
+    true
+  )
+  left.link(right)
+  right.link(left)
+  /** Only native completion chooses the final reason after physical EOF has started closing. */
+  const terminal = deferred<unknown>()
+  /** Signal the point where the actual Session awaits native completion. */
+  const selecting = deferred<void>()
+  /** Provisional native EOF remains the immutable cause of closing-window errors. */
+  const eof = new Error('public provisional EOF')
+  /** The final native Error becomes the connection abort reason's cause. */
+  const final = new Error('public native terminal reason')
+  /** Only client diagnostics are relevant to closing-window acknowledgments. */
+  const reports: unknown[] = []
+  /** The public SDK provides the native transport's existing control port. */
+  let context!: IRpcTransportContext
+  /** The attached resource lends its original stable lifecycle handle to that control port. */
+  let handle!: IRpcSessionHandle
+  Object.assign(right, {
+    terminalReason: () => {
+      selecting.resolve()
+      return terminal.promise
+    }
+  })
+  /** This supported transport attaches the native endpoints without a test-only Session seam. */
+  const transport = defineTransportPlugin({
+    name: 'public-close-native',
+    namespace: 'memory',
+    closingWrites: true,
+    features: [gate.feature],
+    open: async (native) => {
+      context = native
+      /** Server readiness remains owned by its original accepted Session. */
+      const remote = server.accept(left)
+      handle = native.attach(right)
+      await Promise.all([remote.ready, handle.ready])
+      return { dispose: () => undefined }
+    }
+  })
+  /** The independent public client installs the real transport and its observation feature. */
+  const b = await createRpcHost({
+    self: { name: 'b', instanceId: 'public-close-b' },
+    plugins: [transport],
+    report: (error) => reports.push(error)
+  })
+  /** Installed handshake hooks expose the genuine connection signal, never a copied controller. */
+  const signal = (await gate.entered.promise).signal
+  assert(signal)
+  try {
+    await left.close(eof)
+    await selecting.promise
+    /** This native control enters after EOF, before terminal selection completes. */
+    const first = await context.ping(handle).catch((error: unknown) => error)
+    expect(first).toMatchObject({ code: 'ENDPOINT_DISPOSED', cause: eof })
+    terminal.resolve(final)
+    await handle.closed
+    expect(first).toMatchObject({ cause: eof })
+    expect(signal.reason).not.toBe(first)
+    expect(signal.reason).toMatchObject({ cause: final })
+    expect(reports).toEqual([])
+  } finally {
+    terminal.resolve(final)
+    await Promise.all([a.close(), b.close()])
   }
 })
 
