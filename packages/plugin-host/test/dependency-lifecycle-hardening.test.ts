@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
-import { defineFeature, definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.js'
-import { execution, createObservedHost } from './dependency-lifecycle-fixtures.js'
+import { defineFeature, definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.ts'
+import { execution, createObservedHost } from './dependency-lifecycle-fixtures.ts'
 
 describe('hot replacement transaction', () => {
   it('finishes replacement and reports every original error when a dependent restart fails', async () => {

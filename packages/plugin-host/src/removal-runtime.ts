@@ -1,5 +1,5 @@
 /** Owns registration revocation and physical cleanup; lifecycle owns scopes and release waiting. */
-import type { PluginHostState } from './host-state.js'
+import type { PluginHostState } from './host-state.ts'
 import type { INativeAbortSignal } from '@migaia/utils/promise'
 import {
   boundedWait,
@@ -8,17 +8,17 @@ import {
   type IQuiescenceTracker
 } from '@migaia/lifecycle'
 import type { IScheduler } from '@migaia/utils/scheduler'
-import { PluginHostCleanupRuntime, detachRegistrationStages } from './cleanup-runtime.js'
-import ERROR_TEXT, { PluginHostError, PluginHostInternalText } from './error-text.js'
-import { PluginHostErrorCode } from './error-code.js'
-import { invokeCaptured } from './invocation.js'
-import type { IRegistration } from './registry.js'
-import { PluginHostCleanupMode, PluginHostRegistrationLifecycle } from './state-constants.js'
-import { markRegistrationRevoked } from './composition.js'
+import { PluginHostCleanupRuntime, detachRegistrationStages } from './cleanup-runtime.ts'
+import ERROR_TEXT, { PluginHostError, PluginHostInternalText } from './error-text.ts'
+import { PluginHostErrorCode } from './error-code.ts'
+import { invokeCaptured } from './invocation.ts'
+import type { IRegistration } from './registry.ts'
+import { PluginHostCleanupMode, PluginHostRegistrationLifecycle } from './state-constants.ts'
+import { markRegistrationRevoked } from './composition.ts'
 import type {
   IPluginBeforeReleaseContext,
   IPluginDisposalContext
-} from './plugin-lifecycle-types.js'
+} from './plugin-lifecycle-types.ts'
 
 type IPluginHostRemovalRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   /** Host-owned synchronous hook boundary, independent of the asynchronous cleanup wait. */

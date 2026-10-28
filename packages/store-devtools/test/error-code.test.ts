@@ -3,7 +3,7 @@ import {
   createStoreDevtoolsRangeError,
   StoreDevtoolsErrorCode,
   STORE_DEVTOOLS_SOURCE
-} from '../src/errors'
+} from '../src/errors.ts'
 
 describe('store-devtools error-code contract', () => {
   it('declares 5 unique codes under the package source', () => {

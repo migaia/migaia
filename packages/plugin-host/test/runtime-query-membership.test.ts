@@ -4,7 +4,7 @@ import {
   definePlugin,
   getPluginRuntimeIntegration,
   type IPluginRuntimeSharedSlot
-} from '../src/index.js'
+} from '../src/index.ts'
 
 /** Fixture reads remain on the canonical slot, with no test-created registry or index. */
 type IQueryFixture = Readonly<{ values(): readonly object[]; registered(): readonly object[] }>

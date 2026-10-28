@@ -3,14 +3,14 @@
  * lifecycle.
  */
 import { assimilateCapturedThen, probeThenable } from '@migaia/utils/function'
-import { invokeCaptured } from './invocation.js'
-import ERROR_TEXT, { createPluginHostTypeError, PluginHostError } from './error-text.js'
-import { PluginHostErrorCode } from './error-code.js'
-import { isFeatureReference, readDefinedFeature, snapshotFeatureRecord } from './define-feature.js'
-import type { IFeature, IFeatureInspection, IFeatureRecord } from './feature-types.js'
+import { invokeCaptured } from './invocation.ts'
+import ERROR_TEXT, { createPluginHostTypeError, PluginHostError } from './error-text.ts'
+import { PluginHostErrorCode } from './error-code.ts'
+import { isFeatureReference, readDefinedFeature, snapshotFeatureRecord } from './define-feature.ts'
+import type { IFeature, IFeatureInspection, IFeatureRecord } from './feature-types.ts'
 import { buildCapabilityTopology } from '@migaia/capability/graph/topology'
 import { containAsyncRejection } from '@migaia/lifecycle'
-import { reportTerminalFailure } from './diagnostic-report.js'
+import { reportTerminalFailure } from './diagnostic-report.ts'
 
 /** One canonical identity-to-topology compilation shared by preflight and registration execution. */
 type IFeaturePlan = Readonly<{
@@ -206,7 +206,7 @@ export const instantiateFeatures = (
   plan = compileFeatures(roots),
   report?: (error: unknown) => void,
   resolveReference?: (
-    reference: import('./feature-types.js').IFeatureReference<object, boolean>
+    reference: import('./feature-types.ts').IFeatureReference<object, boolean>
   ) => object | undefined,
   /** Receives reporter failures that cannot be re-reported; defaults to the runtime sink. */
   terminal: (failure: unknown) => void = reportTerminalFailure,

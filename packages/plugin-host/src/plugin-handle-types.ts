@@ -2,14 +2,14 @@
  * Defines name-addressed handles, configuration and dependency mutation results. Runtime
  * availability remains owned by the Host.
  */
-import type { IPluginConfig, IReadonlyConfig } from './plugin-lifecycle-types.js'
-import type { IPluginConstraint } from './plugin-definition-types.js'
+import type { IPluginConfig, IReadonlyConfig } from './plugin-lifecycle-types.ts'
+import type { IPluginConstraint } from './plugin-definition-types.ts'
 import type {
   IPluginFeatureName,
   IPluginFeatureOutput,
   IExtractPluginExt,
   IExtractPluginConfig
-} from './plugin-inference-types.js'
+} from './plugin-inference-types.ts'
 
 /** Plugin-scoped config surface exposed by a name-addressed handle. */
 export type IPluginHandleConfig<TPlugin> = Readonly<{

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createStore } from '../src'
+import { createStore } from '../src/index.ts'
 
 describe('store-light', () => {
   it('creates an object facade without collection or keyed dependencies', () => {

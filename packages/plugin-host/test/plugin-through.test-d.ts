@@ -1,5 +1,5 @@
 /** Keeps through payloads exact and preserves use as stage-only registration. */
-import { defineHost, pipelineSpec, type IPluginHostCoreFor } from '../src/index.js'
+import { defineHost, pipelineSpec, type IPluginHostCoreFor } from '../src/index.ts'
 
 /** Genuine declarations provide both the current registration and target-name payload types. */
 const host = defineHost({

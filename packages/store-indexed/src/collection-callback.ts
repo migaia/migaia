@@ -1,7 +1,7 @@
 import { attachErrorIdentity, isNativeErrorValue } from '@migaia/utils/error'
-import { createStoreIndexedError, STORE_INDEXED_SOURCE } from './errors.js'
-import { StoreIndexedErrorCode } from './error-code.js'
-import { StoreIndexedErrorText } from './error-text.js'
+import { createStoreIndexedError, STORE_INDEXED_SOURCE } from './errors.ts'
+import { StoreIndexedErrorCode } from './error-code.ts'
+import { StoreIndexedErrorText } from './error-text.ts'
 
 /**
  * Runs a supported synchronous extension at its collection boundary without changing its return

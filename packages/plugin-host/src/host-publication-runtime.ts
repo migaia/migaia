@@ -3,22 +3,22 @@
  * remain with canonical owners.
  */
 
-import { tagPluginHostError } from './error-text.js'
+import { tagPluginHostError } from './error-text.ts'
 
-import { type IInstallBatchContext } from './install-runtime.js'
-import { PluginHostErrorCode } from './error-code.js'
+import { type IInstallBatchContext } from './install-runtime.ts'
+import { PluginHostErrorCode } from './error-code.ts'
 
-import type { IPipelineDefinitions } from './pipeline-spec.js'
+import type { IPipelineDefinitions } from './pipeline-spec.ts'
 
-import { reportTerminalFailure } from './diagnostic-report.js'
+import { reportTerminalFailure } from './diagnostic-report.ts'
 
-import type { IRegistration } from './registry.js'
-import type { IPluginConstraint } from './plugin-definition-types.js'
-import type { IPluginHostCompositionSnapshot } from './composition-types.js'
+import type { IRegistration } from './registry.ts'
+import type { IPluginConstraint } from './plugin-definition-types.ts'
+import type { IPluginHostCompositionSnapshot } from './composition-types.ts'
 
-import type { IPluginHostRuntimeContext } from './host-runtime-context.js'
-import type { PluginHostRuntimePorts } from './host-runtime-ports.js'
-import type { IPluginConfig } from './plugin-lifecycle-types.js'
+import type { IPluginHostRuntimeContext } from './host-runtime-context.ts'
+import type { PluginHostRuntimePorts } from './host-runtime-ports.ts'
+import type { IPluginConfig } from './plugin-lifecycle-types.ts'
 
 /** Candidate-aware reads preserve the batch until it commits, then resolve current names. */
 export class PluginHostHandlePort<

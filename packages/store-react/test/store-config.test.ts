@@ -7,7 +7,7 @@ import {
   readStoreFeature,
   type IStoreConfigValue,
   type IStoreFeatureExperimental
-} from '../src/store-config'
+} from '../src/store-config.ts'
 
 describe('normalizeStoreConfig', () => {
   it('rejects invalid ready containers and barrier values at the public boundary', () => {

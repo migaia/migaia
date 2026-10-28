@@ -1,6 +1,6 @@
-import { ERROR_SOURCE, StoreReactErrorCode, type IStoreReactErrorCode } from './error-code.js'
+import { ERROR_SOURCE, StoreReactErrorCode, type IStoreReactErrorCode } from './error-code.ts'
 import { attachErrorIdentity, isNativeErrorValue } from '@migaia/utils/error'
-import { StoreReactErrorText } from './error-text.js'
+import { StoreReactErrorText } from './error-text.ts'
 
 export { StoreReactErrorCode, type IStoreReactErrorCode }
 

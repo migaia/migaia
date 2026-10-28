@@ -1,17 +1,17 @@
-import { ReduxDevToolsCommand } from './devtools-constants.js'
-import { identifyMiddlewareFailure } from './error-boundary.js'
+import { ReduxDevToolsCommand } from './devtools-constants.ts'
+import { identifyMiddlewareFailure } from './error-boundary.ts'
 import { getDefaultRuntime } from '@migaia/reactive/extension'
 import { ReactiveErrorPhase } from '@migaia/reactive'
 import type { IDisposer, IRuntime } from '@migaia/reactive'
 import type { IMutationGuard } from '@migaia/store-light'
-import { createStoreMiddlewareError } from './errors.js'
-import { StoreMiddlewareErrorCode } from './error-code.js'
-import { StoreMiddlewareErrorText } from './error-text.js'
+import { createStoreMiddlewareError } from './errors.ts'
+import { StoreMiddlewareErrorCode } from './error-code.ts'
+import { StoreMiddlewareErrorText } from './error-text.ts'
 import {
   MiddlewareCommandType,
   MiddlewareEventPhase,
   MiddlewareEventType
-} from './event-constants.js'
+} from './event-constants.ts'
 
 /** Controls strict mutation policy. Defaults to `off` to preserve existing store behavior. */
 export type IMutationPolicyMode = 'off' | 'actions-only'

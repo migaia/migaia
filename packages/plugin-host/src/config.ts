@@ -3,11 +3,11 @@ import ERROR_TEXT, {
   PluginHostError,
   createPluginHostTypeError,
   PluginHostInternalText
-} from './error-text.js'
-import { PluginHostErrorCode } from './error-code.js'
+} from './error-text.ts'
+import { PluginHostErrorCode } from './error-code.ts'
 import { parseConfigPath as parseUtilsConfigPath } from '@migaia/utils/config'
-import type { IPluginConfig } from './plugin-lifecycle-types.js'
-import type { IPluginHostErrorCode } from './error-code.js'
+import type { IPluginConfig } from './plugin-lifecycle-types.ts'
+import type { IPluginHostErrorCode } from './error-code.ts'
 
 /** Prototype-sensitive record keys are excluded by the existing config value grammar. */
 const dangerousKeys = new Set(['__proto__', 'constructor', 'prototype'])

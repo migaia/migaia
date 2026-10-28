@@ -9,7 +9,7 @@ import {
   type IFeatureCore,
   type IPluginHostCoreFor,
   type IHostDomainCoreRequest
-} from '../../src/index.js'
+} from '../../src/index.ts'
 
 /** Host and plugin declarations carry distinct payloads and remain the only type authority. */
 const hostPipelines = { request: pipelineSpec<{ count: number }>()({ mode: 'async' }) }

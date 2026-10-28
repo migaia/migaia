@@ -8,8 +8,8 @@ import {
   PluginHostError,
   type IPluginHostCoreFor,
   type IPluginInstallFailureDetail
-} from '../../src/index.js'
-import { StageLaneCollection, StageLanes, type IStageSnapshot } from '../../src/stage-lanes.js'
+} from '../../src/index.ts'
+import { StageLaneCollection, StageLanes, type IStageSnapshot } from '../../src/stage-lanes.ts'
 
 /** The sync lane's payload stays distinct from the asynchronous text lane. */
 type INumberValue = Readonly<{ count: number }>

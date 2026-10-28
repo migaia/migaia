@@ -6,16 +6,16 @@ import type {
   ITransactionScope,
   IOperationContext
 } from '@migaia/storage-contract'
-import type { IPersistStorage, IPersistByteStorage } from '../src/core/types.js'
+import type { IPersistStorage, IPersistByteStorage } from '../src/core/types.ts'
 import {
   persistUnit,
   persistTransaction,
   type ITransactionScopeOf,
   type IPersistHandle
-} from '../src/index.js'
-import { persist, type IPersistableStore } from '../src/light-index.js'
-import { persistCollection, type IPersistableCollection } from '../src/indexed-index.js'
-import type { IPersistUnit } from '../src/index.js'
+} from '../src/index.ts'
+import { persist, type IPersistableStore } from '../src/light-index.ts'
+import { persistCollection, type IPersistableCollection } from '../src/indexed-index.ts'
+import type { IPersistUnit } from '../src/index.ts'
 import type { IRuntime } from '@migaia/reactive'
 
 it('IPersistStorage 是最小投影：text-only adapter 无需 backend/has/clearValues/clearAll/dispose', () => {

@@ -2,9 +2,9 @@
  * Owns one-time disposer admission and receiver capture; lifecycle scopes execute the resulting
  * disposer.
  */
-import type { IPluginDisposer, IPluginResource } from './plugin-lifecycle-types.js'
-import { asyncDisposeKeys, disposeKeys } from './symbols.js'
-import { invokeCaptured } from './invocation.js'
+import type { IPluginDisposer, IPluginResource } from './plugin-lifecycle-types.ts'
+import { asyncDisposeKeys, disposeKeys } from './symbols.ts'
+import { invokeCaptured } from './invocation.ts'
 
 /** One disposer property value captured during admission, before user mutation can replace it. */
 type IDisposerCandidate = {

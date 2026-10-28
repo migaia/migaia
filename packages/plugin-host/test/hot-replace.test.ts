@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { defineFeature, definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.js'
+import { defineFeature, definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.ts'
 
 /** Creates a provider with one stable feature name and a versioned output. */
 const createProvider = (version: number, installError?: Error) => {

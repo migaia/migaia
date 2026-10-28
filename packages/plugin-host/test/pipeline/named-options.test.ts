@@ -11,7 +11,7 @@ import {
   PLUGIN_HOST_SOURCE,
   PluginHostErrorCode,
   type IPipelineDefinitions
-} from '../../src/index.js'
+} from '../../src/index.ts'
 
 /** Constructor failures must occur synchronously before an owner handle becomes available. */
 function constructionFailure(pipelines: unknown): Error {

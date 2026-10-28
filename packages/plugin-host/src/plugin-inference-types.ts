@@ -2,20 +2,20 @@
  * Derives precise plugin, Feature and installed-tuple contracts from canonical definition types. It
  * contains no runtime policy.
  */
-import type { IPluginConfig, IPluginLifecycleCore } from './plugin-lifecycle-types.js'
+import type { IPluginConfig, IPluginLifecycleCore } from './plugin-lifecycle-types.ts'
 import type {
   IPluginHostRuntimeExtensions,
   IPlugin,
   IPluginConstraint,
   definedPluginBrand,
   IDefinedPluginConstraint
-} from './plugin-definition-types.js'
+} from './plugin-definition-types.ts'
 import type {
   IFeatureOutput,
   IFeatureOutputs,
   IFeatureRecord,
   IFeatureRecordRequiredExpose
-} from './feature-types.js'
+} from './feature-types.ts'
 
 /** Extracts one candidate's native Feature roots without widening a tuple element. */
 type IPluginConstraintFeatures<TPlugin> =

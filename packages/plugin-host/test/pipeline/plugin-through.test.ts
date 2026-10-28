@@ -1,7 +1,7 @@
 /** Exercises through at the public named-pipeline registration and native lifetime boundaries. */
 import { expect, it, vi } from 'vitest'
-import { defineHost, definePlugin, pipelineSpec, type IPluginHostCoreFor } from '../../src/index.js'
-import { StageLanes } from '../../src/stage-lanes.js'
+import { defineHost, definePlugin, pipelineSpec, type IPluginHostCoreFor } from '../../src/index.ts'
+import { StageLanes } from '../../src/stage-lanes.ts'
 
 /** Every compatible lane carries the same application value without an implicit conversion. */
 type IThroughValue = Readonly<{ count: number }>

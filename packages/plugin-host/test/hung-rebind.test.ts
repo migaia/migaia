@@ -1,6 +1,6 @@
 /** A rebind hook is bounded by the Host mutation budget like every other lifecycle hook. */
 import { describe, expect, it, vi } from 'vitest'
-import { defineFeature, definePlugin, PluginHost } from '../src/index.js'
+import { defineFeature, definePlugin, PluginHost } from '../src/index.ts'
 
 /** Creates the provider `A` whose Feature output changes with each version. */
 const createProvider = (version: number) =>

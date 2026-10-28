@@ -1,7 +1,12 @@
 /* oxlint-disable unicorn/no-thenable -- adversarial fixtures verify thenable admission. */
 import { describe, expect, it } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
-import { atomDef, atomDefFactory, createAtomStore, previewSafeAtomDefFactory } from '../src'
+import {
+  atomDef,
+  atomDefFactory,
+  createAtomStore,
+  previewSafeAtomDefFactory
+} from '../src/index.ts'
 
 /**
  * AtomDef/atomDefFactory must reject thenable return values at runtime instead of silently storing

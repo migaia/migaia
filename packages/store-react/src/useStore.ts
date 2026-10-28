@@ -6,7 +6,7 @@ import {
   type IReactiveSignal
 } from '@migaia/reactive'
 import type { Resource, IResourceState } from '@migaia/resource'
-import { useNodeValue } from './useNode.js'
+import { useNodeValue } from './useNode.ts'
 import {
   storeReady,
   type IReactiveStore,
@@ -14,7 +14,7 @@ import {
   type IStoreResource
 } from '@migaia/store-light'
 import { createObserverBinding, type ICapture } from '@migaia/reactive/extension'
-import { notifyReact } from './notify-react.js'
+import { notifyReact } from './notify-react.ts'
 
 /**
  * Read an IStoreResource render snapshot and subscribe through its external-store protocol.

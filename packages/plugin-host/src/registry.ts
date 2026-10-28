@@ -1,15 +1,15 @@
-import type { IPluginConfig, IPluginDisposer } from './plugin-lifecycle-types.js'
-import type { IPluginConstraint } from './plugin-definition-types.js'
-import type { IPluginHostCore } from './plugin-core-types.js'
+import type { IPluginConfig, IPluginDisposer } from './plugin-lifecycle-types.ts'
+import type { IPluginConstraint } from './plugin-definition-types.ts'
+import type { IPluginHostCore } from './plugin-core-types.ts'
 import type {
   IAbortController,
   IGenerationRequest,
   ILifecycleScope,
   IProvisionalScope
 } from '@migaia/lifecycle'
-import { PluginHostRegistrationLifecycle, type PluginHostCleanupMode } from './state-constants.js'
-import type { IStageEntry, IStageOwnerSegment } from './stage-lanes.js'
-import type { IPluginSetupAttempt } from './setup-runtime.js'
+import { PluginHostRegistrationLifecycle, type PluginHostCleanupMode } from './state-constants.ts'
+import type { IStageEntry, IStageOwnerSegment } from './stage-lanes.ts'
+import type { IPluginSetupAttempt } from './setup-runtime.ts'
 
 export type IPluginDefinition<TCore> = {
   readonly owner: IPluginConstraint<TCore>
@@ -17,7 +17,7 @@ export type IPluginDefinition<TCore> = {
   readonly config: IPluginConfig
   readonly install: IPluginConstraint<TCore>['install']
   /** Captured preparation hook; absent on the one-argument installation path. */
-  readonly setup?: (context: import('./plugin-lifecycle-types.js').IPluginSetupContext) => unknown
+  readonly setup?: (context: import('./plugin-lifecycle-types.ts').IPluginSetupContext) => unknown
   readonly update?: IPluginConstraint<TCore>['update']
   readonly onEnable?: IPluginConstraint<TCore>['onEnable']
   readonly onDisable?: IPluginConstraint<TCore>['onDisable']
@@ -29,7 +29,7 @@ export type IPluginDefinition<TCore> = {
   /** Symbol disposer captured with the plugin admission snapshot; never re-probe owner at cleanup. */
   readonly disposer?: IPluginDisposer
   /** Frozen own-data declarations; actual runners belong to each install generation. */
-  readonly pipelines?: import('./pipeline-spec.js').IPipelineDefinitions
+  readonly pipelines?: import('./pipeline-spec.ts').IPipelineDefinitions
   readonly features: Readonly<Record<string, object>>
   readonly featureExpose?: object | ((core: TCore) => object)
   /** New function-form definitions create this descriptor once for each registration. */

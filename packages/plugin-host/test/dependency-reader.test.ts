@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { defineFeature, definePlugin, PluginHost, readPluginDependencies } from '../src/index.js'
-import { openComposition } from '../src/composition-entry.js'
-import * as admissionRuntime from '../src/admission-runtime.js'
+import { defineFeature, definePlugin, PluginHost, readPluginDependencies } from '../src/index.ts'
+import { openComposition } from '../src/composition-entry.ts'
+import * as admissionRuntime from '../src/admission-runtime.ts'
 
 /** Creates an unbounded Host so admission and ordering need no scheduler timing. */
 const createHost = (): PluginHost<Record<string, never>> =>

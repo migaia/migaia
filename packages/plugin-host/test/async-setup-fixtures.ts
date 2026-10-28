@@ -1,6 +1,6 @@
 /** Owns shared fixture construction; test assertions remain in their focused suites. */
 import { createManualScheduler } from '@migaia/utils/testing'
-import { PluginHost } from '../src/index.js'
+import { PluginHost } from '../src/index.ts'
 
 /** Holds one setup attempt until a test explicitly resolves or rejects its Promise. */
 export const deferred = <T>() => {

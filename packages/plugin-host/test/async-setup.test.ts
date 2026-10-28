@@ -9,8 +9,8 @@ import {
   PluginHostErrorCode,
   type IPluginHostCore,
   type IPluginSetupContext
-} from '../src/index.js'
-import { deferred, createHost } from './async-setup-fixtures.js'
+} from '../src/index.ts'
+import { deferred, createHost } from './async-setup-fixtures.ts'
 
 describe('async setup definition admission', () => {
   it('captures setup as a known function field and rejects invalid definitions', async () => {

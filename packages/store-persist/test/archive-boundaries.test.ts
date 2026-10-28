@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { createMemoryTestStore } from './helpers/memory.js'
+import { createMemoryTestStore } from './helpers/memory.ts'
 import { binaryCodec } from '@migaia/storage-host/entity'
 import { createStore } from '@migaia/store-light'
 import { StorageContractError, type ICodec } from '@migaia/storage-contract'
-import { persist } from '../src/light-index.js'
-import { defaultJsonCodec, readEnvelope, removeEnvelope, writeEnvelope } from '../src/index.js'
+import { persist } from '../src/light-index.ts'
+import { defaultJsonCodec, readEnvelope, removeEnvelope, writeEnvelope } from '../src/index.ts'
 
 /** Real envelope JSON travels through the byte channel without replacing storage semantics. */
 const binaryArchiveCodec: ICodec = {

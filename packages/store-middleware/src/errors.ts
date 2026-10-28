@@ -2,7 +2,7 @@ import {
   ERROR_SOURCE,
   StoreMiddlewareErrorCode,
   type IStoreMiddlewareErrorCode
-} from './error-code.js'
+} from './error-code.ts'
 import { attachErrorIdentity } from '@migaia/utils/error'
 
 export { StoreMiddlewareErrorCode, type IStoreMiddlewareErrorCode }

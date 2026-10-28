@@ -1,4 +1,4 @@
-import { definePlugin, PluginHost } from '../src/index.js'
+import { definePlugin, PluginHost } from '../src/index.ts'
 
 declare const host: PluginHost<Record<string, never>>
 const a = definePlugin({ name: 'a', install: () => ({ a: () => 1 }) })

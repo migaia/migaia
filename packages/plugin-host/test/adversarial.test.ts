@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { PluginHost, PluginHostError } from '../src/index.js'
+import { PluginHost, PluginHostError } from '../src/index.ts'
 import { createManualScheduler } from '@migaia/utils/testing'
 
 class Host extends PluginHost<Record<string, never>, string> {

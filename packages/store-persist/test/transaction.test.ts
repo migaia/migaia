@@ -34,15 +34,15 @@ import {
   persistUnit,
   readEnvelope,
   type IPersistUnit
-} from '../src/index.js'
-import { persist } from '../src/light-index.js'
-import { persistCollection } from '../src/indexed-index.js'
-import { persistKeyed } from '../src/keyed-index.js'
-import { createMemoryTestStore } from './helpers/memory.js'
+} from '../src/index.ts'
+import { persist } from '../src/light-index.ts'
+import { persistCollection } from '../src/indexed-index.ts'
+import { persistKeyed } from '../src/keyed-index.ts'
+import { createMemoryTestStore } from './helpers/memory.ts'
 import {
   runPersistCrossTaskCodecScenario,
   runPersistNativeConsumerScenario
-} from './helpers/native-transaction.js'
+} from './helpers/native-transaction.ts'
 
 /** Local recording failures use one declared family; production backends retain their own errors. */
 type IRecordingFailure = Error & { readonly source: string; readonly code: string }

@@ -2,27 +2,27 @@
  * Captures immutable plugin definitions and batch-name admission; installation and lifecycle work
  * stay with their runtime owners.
  */
-import { PluginActivation } from './state-constants.js'
-import { PluginDefinitionKey, PluginDefinitionText } from './definition-constants.js'
-import { snapshotPipelineDefinitions } from './pipeline-declarations.js'
-import { copyConfig } from './config.js'
-import { snapshotDisposer } from './disposal.js'
-import { snapshotFeatureRecord } from './define-feature.js'
+import { PluginActivation } from './state-constants.ts'
+import { PluginDefinitionKey, PluginDefinitionText } from './definition-constants.ts'
+import { snapshotPipelineDefinitions } from './pipeline-declarations.ts'
+import { copyConfig } from './config.ts'
+import { snapshotDisposer } from './disposal.ts'
+import { snapshotFeatureRecord } from './define-feature.ts'
 import {
   assertDefinitionLifecycle,
   assertDefinitionPolicy,
   readPluginDefinitionData
-} from './define-plugin.js'
+} from './define-plugin.ts'
 import ERROR_TEXT, {
   PluginHostError,
   createPluginHostTypeError,
   PluginHostInternalText
-} from './error-text.js'
-import { PluginHostErrorCode } from './error-code.js'
-import type { IPluginDefinition } from './registry.js'
-import type { IPluginConfig, IPluginResource } from './plugin-lifecycle-types.js'
-import type { IPluginConstraint } from './plugin-definition-types.js'
-import type { IPluginHostCore } from './plugin-core-types.js'
+} from './error-text.ts'
+import { PluginHostErrorCode } from './error-code.ts'
+import type { IPluginDefinition } from './registry.ts'
+import type { IPluginConfig, IPluginResource } from './plugin-lifecycle-types.ts'
+import type { IPluginConstraint } from './plugin-definition-types.ts'
+import type { IPluginHostCore } from './plugin-core-types.ts'
 
 /** Package-local trusted-definition lookup injected by functional entries only. */
 export type ITrustedDefinitionReader = (value: unknown) => IPluginDefinition<any> | undefined

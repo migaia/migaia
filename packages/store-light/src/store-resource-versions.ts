@@ -1,4 +1,4 @@
-import type { IResourceVersion } from './store-resource-state.js'
+import type { IResourceVersion } from './store-resource-state.ts'
 
 /** Owns all non-visible versions until they are adopted or released. */
 export class ResourceVersionRegistry<T> {

@@ -16,10 +16,10 @@ import {
 import { createRpcHost, type IRpcHost, type IRpcContext } from '@migaia/rpc-host'
 import { timeout } from '@migaia/rpc-host/features/timeout'
 import { dedicatedWorkerPlugin } from '@migaia/rpc-plugin-browser'
-import type { IWorkerMessagePort } from './worker-message-event.js'
-import { StoreWorkerErrorText } from './error-text.js'
+import type { IWorkerMessagePort } from './worker-message-event.ts'
+import { StoreWorkerErrorText } from './error-text.ts'
 import { isArrayBuffer, isUint8Array } from '@migaia/utils/bytes'
-import { WorkerRpcIdentity } from './worker-constants.js'
+import { WorkerRpcIdentity } from './worker-constants.ts'
 
 type IWorkerHandler = (
   payload: unknown,

@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
 import { claimOwnership } from '@migaia/reactive/extension'
-import { createStoreRegistry, createStoreToken, StoreRegistry } from '../src/provider-registry'
+import { createStoreRegistry, createStoreToken, StoreRegistry } from '../src/provider-registry.ts'
 
 describe('createStoreToken', () => {
   it('throws when given an empty debug name', () => {

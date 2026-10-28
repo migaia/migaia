@@ -4,17 +4,17 @@
  * publication stay with Host state; this view only reads them and stages this registration's
  * writes.
  */
-import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
-import { PluginHostErrorCode } from './error-code.js'
-import type { IInstallBatchContext } from './install-runtime.js'
+import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.ts'
+import { PluginHostErrorCode } from './error-code.ts'
+import type { IInstallBatchContext } from './install-runtime.ts'
 import type {
   IExtensionOwner,
   IRegistration,
   ISharedExtensionContribution,
   ISharedExtensionReservation,
   ISharedExtensionSlot
-} from './registry.js'
-import type { IPluginRuntimeSharedSlot } from './core.js'
+} from './registry.ts'
+import type { IPluginRuntimeSharedSlot } from './core.ts'
 
 /** Host state reads and writes a slot view needs; it grants no ownership change. */
 export type ISharedSlotViewPort<TDomainCore extends object, TValue> = Readonly<{

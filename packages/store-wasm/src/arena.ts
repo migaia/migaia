@@ -4,8 +4,8 @@ import {
   createStoreWasmError,
   createStoreWasmRangeError,
   StoreWasmErrorCode
-} from './errors.js'
-import { StoreWasmErrorText } from './error-text.js'
+} from './errors.ts'
+import { StoreWasmErrorText } from './error-text.ts'
 import { attachSecondaryErrors } from '@migaia/utils/error'
 
 // 模块作用域缓存，只发起一次加载；重复调用（StrictMode 双渲染、父组件无关重渲染）拿到同一个 promise 引用，

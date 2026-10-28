@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { PluginHostError } from '../src/error-text.js'
+import { PluginHostError } from '../src/error-text.ts'
 import { GENERATOR_CONTINUE as hostContinue } from '@migaia/middleware-pipeline'
-import { type IStageCore, Host, plugin } from './plugin-host-fixtures.js'
+import { type IStageCore, Host, plugin } from './plugin-host-fixtures.ts'
 
 describe('PluginHost', () => {
   it('makes dispose idempotent and rejects terminal mutations', async () => {

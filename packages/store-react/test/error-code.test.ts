@@ -3,7 +3,7 @@ import {
   createStoreReactAggregateError,
   StoreReactErrorCode,
   STORE_REACT_SOURCE
-} from '../src/errors'
+} from '../src/errors.ts'
 
 describe('store-react error-code contract', () => {
   it('declares 9 unique codes under the package source', () => {

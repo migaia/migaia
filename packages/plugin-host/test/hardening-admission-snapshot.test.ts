@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { asyncDisposeKey } from '../src/index.js'
-import { Host } from './hardening-fixtures.js'
+import { asyncDisposeKey } from '../src/index.ts'
+import { Host } from './hardening-fixtures.ts'
 
 describe('resource disposer admission snapshot', () => {
   it('rejects native cleanup methods published as extension capabilities', async () => {

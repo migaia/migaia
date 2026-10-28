@@ -8,10 +8,10 @@ import {
   type IPluginConstraint,
   type IPluginHostCore,
   type IPluginRemoval
-} from '../src/index.js'
-import { readDefinedPluginDefinition } from '../src/define-plugin.js'
-import { snapshotPluginDefinitions } from '../src/admission-runtime.js'
-import ERROR_TEXT from '../src/error-text.js'
+} from '../src/index.ts'
+import { readDefinedPluginDefinition } from '../src/define-plugin.ts'
+import { snapshotPluginDefinitions } from '../src/admission-runtime.ts'
+import ERROR_TEXT from '../src/error-text.ts'
 
 /** Exposes synchronous admission to prove it rejects malformed hooks before mutation. */
 class SyncHost extends PluginHost<Record<string, never>> {

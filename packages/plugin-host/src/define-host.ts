@@ -2,17 +2,17 @@
  * Owns defineHost public types and construction; runtime hooks and bound surface callables have
  * separate explicit owners.
  */
-import { HostSurfaceKey } from './host-constants.js'
-import { DefinedHostRuntime } from './defined-host-runtime.js'
-import { DefinedHostSurface, type IHandleReference } from './host-handle-surface.js'
-import type { IPipelineDefinitions, IPipelineOwner } from './pipeline-spec.js'
-import { identifyPluginHostCallbackFailure } from './error-text.js'
+import { HostSurfaceKey } from './host-constants.ts'
+import { DefinedHostRuntime } from './defined-host-runtime.ts'
+import { DefinedHostSurface, type IHandleReference } from './host-handle-surface.ts'
+import type { IPipelineDefinitions, IPipelineOwner } from './pipeline-spec.ts'
+import { identifyPluginHostCallbackFailure } from './error-text.ts'
 
-import { aliasManagedHost } from './composition.js'
+import { aliasManagedHost } from './composition.ts'
 
-import type { PluginHostError } from './error-text.js'
-import { issueHostIdentity } from './host-identity.js'
-import { type IPluginHostIdentity } from './host-identity-types.js'
+import type { PluginHostError } from './error-text.ts'
+import { issueHostIdentity } from './host-identity.ts'
+import { type IPluginHostIdentity } from './host-identity-types.ts'
 import type {
   IAsyncGeneratorMiddlewareStage,
   IAsyncMiddlewareStage,
@@ -20,9 +20,9 @@ import type {
   IMiddlewarePipelineMode,
   ISyncMiddlewareStage
 } from '@migaia/middleware-pipeline'
-import type { IPluginConstraint, IPluginHostRuntimeExtensions } from './plugin-definition-types.js'
-import type { IPluginConstraintTuple } from './plugin-inference-types.js'
-import type { IPluginHostCore, IPluginHostCoreTypeInfo } from './plugin-core-types.js'
+import type { IPluginConstraint, IPluginHostRuntimeExtensions } from './plugin-definition-types.ts'
+import type { IPluginConstraintTuple } from './plugin-inference-types.ts'
+import type { IPluginHostCore, IPluginHostCoreTypeInfo } from './plugin-core-types.ts'
 import type {
   IPluginHandle,
   IPluginHandleTuple,
@@ -31,15 +31,15 @@ import type {
   IPluginDependencyPlan,
   IPluginHostConfigFor,
   IPluginEnablement
-} from './plugin-handle-types.js'
-import type { IPluginHostDisposalResult } from './plugin-lifecycle-types.js'
-import type { IPluginHostOptions } from './host-options-types.js'
+} from './plugin-handle-types.ts'
+import type { IPluginHostDisposalResult } from './plugin-lifecycle-types.ts'
+import type { IPluginHostOptions } from './host-options-types.ts'
 
 /** Each qualified name retains its own original payload rather than a union of sibling specs. */
 type IQualifiedPipelines<TPlugin> = TPlugin extends { readonly name: infer TName extends string }
   ? {
-      readonly [K in keyof import('./plugin-definition-types.js').IPluginDeclaredPipelines<TPlugin> &
-        string as `${TName}.${K}`]: import('./plugin-definition-types.js').IPluginDeclaredPipelines<TPlugin>[K]
+      readonly [K in keyof import('./plugin-definition-types.ts').IPluginDeclaredPipelines<TPlugin> &
+        string as `${TName}.${K}`]: import('./plugin-definition-types.ts').IPluginDeclaredPipelines<TPlugin>[K]
     }
   : Record<never, never>
 
@@ -180,7 +180,7 @@ export type IHostHandle<
     pipeline(
       name: string,
       request: IHostCoreConstructionRequest
-    ): IPipelineOwner<import('./pipeline-spec.js').IPipelineSpec<unknown>>
+    ): IPipelineOwner<import('./pipeline-spec.ts').IPipelineSpec<unknown>>
     /** Current committed publication revision, not a count of attempted operations. */
     readonly revision: number
     /** Stable name/path config reader and queued transactional updater. */
@@ -193,7 +193,7 @@ export type IHostHandle<
             IPluginHostCore<
               TValue,
               Record<PropertyKey, unknown>,
-              import('./plugin-lifecycle-types.js').IPluginConfig,
+              import('./plugin-lifecycle-types.ts').IPluginConfig,
               TPipelines
             >,
           TPlugins,
@@ -211,7 +211,7 @@ export type IHostHandle<
             IPluginHostCore<
               TValue,
               Record<PropertyKey, unknown>,
-              import('./plugin-lifecycle-types.js').IPluginConfig,
+              import('./plugin-lifecycle-types.ts').IPluginConfig,
               TPipelines
             >,
           TPlugins,

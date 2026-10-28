@@ -1,8 +1,8 @@
-import type { IPipelineDefinitions } from './pipeline-spec.js'
-import { readDefinedPluginDefinition } from './define-plugin.js'
-import { PluginHost as RuntimePluginHost } from './host-runtime.js'
-import type { IPluginHostRuntimeExtensions, IPluginConstraint } from './plugin-definition-types.js'
-import type { IPluginHostOptions } from './host-options-types.js'
+import type { IPipelineDefinitions } from './pipeline-spec.ts'
+import { readDefinedPluginDefinition } from './define-plugin.ts'
+import { PluginHost as RuntimePluginHost } from './host-runtime.ts'
+import type { IPluginHostRuntimeExtensions, IPluginConstraint } from './plugin-definition-types.ts'
+import type { IPluginHostOptions } from './host-options-types.ts'
 
 /** The original constructor's optional slots are published only by its canonical extension owner. */
 type IRuntimeHostConstructor = new <
@@ -27,7 +27,7 @@ const RuntimeHost: IRuntimeHostConstructor = RuntimePluginHost
 export class PluginHost<
   TDomainCore extends object,
   TValue = never,
-  TInstalled extends readonly import('./plugin-definition-types.js').IPluginConstraint<any>[] =
+  TInstalled extends readonly import('./plugin-definition-types.ts').IPluginConstraint<any>[] =
     readonly [],
   TPipelines extends IPipelineDefinitions = Record<never, never>
 > extends RuntimeHost<TDomainCore, TValue, TInstalled, TPipelines> {
@@ -36,7 +36,7 @@ export class PluginHost<
    * Invalid budgets/options fail before plugin hooks run; no plugin is installed by construction.
    * Own the resulting Host until its shared dispose() completion has been observed.
    */
-  constructor(options: import('./host-options-types.js').IPluginHostOptions<TPipelines> = {}) {
+  constructor(options: import('./host-options-types.ts').IPluginHostOptions<TPipelines> = {}) {
     super(options, readDefinedPluginDefinition)
   }
 }
@@ -46,35 +46,35 @@ export {
   readPluginHostDisposalProvenance,
   type IPluginHostDisposalNodeKind,
   type IPluginHostDisposalProvenance
-} from './host-runtime.js'
-export { definePlugin, isDefinedPlugin } from './define-plugin.js'
-export { defineFeature } from './define-feature.js'
-export { readPluginDependencies, type IPluginDependency } from './dependency-reader.js'
-export { getPluginRuntimeIntegration } from './core.js'
+} from './host-runtime.ts'
+export { definePlugin, isDefinedPlugin } from './define-plugin.ts'
+export { defineFeature } from './define-feature.ts'
+export { readPluginDependencies, type IPluginDependency } from './dependency-reader.ts'
+export { getPluginRuntimeIntegration } from './core.ts'
 export type {
   IPluginRuntimeIntegration,
   IPluginRuntimeSharedSlot,
   IPluginRuntimeFeatureSnapshot
-} from './core.js'
-export type { IPluginHostRuntimeExtensions } from './plugin-definition-types.js'
+} from './core.ts'
+export type { IPluginHostRuntimeExtensions } from './plugin-definition-types.ts'
 export {
   defineHost,
   type IDefineHostOptions,
   type IHostCoreConstructionRequest,
   type IHostDomainCoreRequest,
   type IHostHandle
-} from './define-host.js'
-export type { IPluginHostInstalledPlugins } from './host-runtime.js'
-export type { IPluginHostIdentity } from './host-identity-types.js'
+} from './define-host.ts'
+export type { IPluginHostInstalledPlugins } from './host-runtime.ts'
+export type { IPluginHostIdentity } from './host-identity-types.ts'
 export {
   PluginHostStatus,
   PluginHostRegistrationLifecycle,
   type IPluginHostStatus,
   type IPluginHostRegistrationLifecycle
-} from './state-constants.js'
+} from './state-constants.ts'
 
-export { PluginHostErrorCode } from './error-code.js'
-export { default as ERROR_TEXT, PluginHostError } from './error-text.js'
+export { PluginHostErrorCode } from './error-code.ts'
+export { default as ERROR_TEXT, PluginHostError } from './error-text.ts'
 export type {
   IExtractPluginExt,
   IExtractPluginConfig,
@@ -85,12 +85,12 @@ export type {
   IPluginFeatureOutput,
   IPluginFeatureOptions,
   IExcludePluginByName
-} from './plugin-inference-types.js'
+} from './plugin-inference-types.ts'
 export type {
   IPlugin,
   IPluginConstraint,
   IDefinedPluginConstraint
-} from './plugin-definition-types.js'
+} from './plugin-definition-types.ts'
 export type {
   IPluginConfig,
   IPluginDisposer,
@@ -107,7 +107,7 @@ export type {
   IPluginSetupOperation,
   IPluginHostDisposalResult,
   IPluginHostPhysicalCleanupResult
-} from './plugin-lifecycle-types.js'
+} from './plugin-lifecycle-types.ts'
 export type {
   IPluginHandle,
   IPluginHandleConfig,
@@ -118,21 +118,21 @@ export type {
   IPluginHostConfigFor,
   IPluginEnablement,
   IPluginDisableToken
-} from './plugin-handle-types.js'
+} from './plugin-handle-types.ts'
 export type {
   IPluginInstaller,
   IPluginHostCore,
   IPluginHostCoreFor,
   IPluginHostCoreTypeInfo
-} from './plugin-core-types.js'
-export type { IPluginHostErrorCode } from './error-code.js'
-export type { IPluginHostErrorDetail } from './error-types.js'
+} from './plugin-core-types.ts'
+export type { IPluginHostErrorCode } from './error-code.ts'
+export type { IPluginHostErrorDetail } from './error-types.ts'
 export type {
   IPluginInstallFailureDetail,
   IPluginHostOptions,
   IPluginHostDiagnostic,
   IPipelineConfig
-} from './host-options-types.js'
+} from './host-options-types.ts'
 export type {
   IPluginDataOrderSlot,
   IPluginAdmission,
@@ -144,7 +144,7 @@ export type {
   IPluginBatchRemovalOptions,
   IPluginBatchRemovalResult,
   IPluginBatchRemovalLeaf
-} from './composition-types.js'
+} from './composition-types.ts'
 export type {
   IFeature,
   IFeatureCore,
@@ -158,14 +158,14 @@ export type {
   IFeatureDependencyRecord,
   IFeatureRequiredExpose,
   IFeatureRecordRequiredExpose
-} from './feature-types.js'
-export { asyncDisposeKey } from './symbols.js'
-export { isPluginHandleCurrent } from './plugin-handle.js'
+} from './feature-types.ts'
+export { asyncDisposeKey } from './symbols.ts'
+export { isPluginHandleCurrent } from './plugin-handle.ts'
 
 /** Public domain identity for errors emitted by plugin host lifecycle operations. */
-export { PLUGIN_HOST_SOURCE } from './error-code.js'
+export { PLUGIN_HOST_SOURCE } from './error-code.ts'
 
-export { pipelineSpec } from './pipeline-spec.js'
+export { pipelineSpec } from './pipeline-spec.ts'
 export type {
   IPipelineDefinitions,
   IPipelineSpecOptions,
@@ -178,4 +178,4 @@ export type {
   IPipelineStageHandle,
   IPipelineOwner,
   IPipelineRunResult
-} from './pipeline-spec.js'
+} from './pipeline-spec.ts'

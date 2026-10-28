@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defineFeature, definePlugin, PluginHost } from '../src/index.js'
+import { defineFeature, definePlugin, PluginHost } from '../src/index.ts'
 
 /** Creates one optional provider-consumer pair and captures the injected value. */
 const createPair = () => {

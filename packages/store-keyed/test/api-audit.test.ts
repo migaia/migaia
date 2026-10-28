@@ -8,8 +8,8 @@ import {
   splitDef,
   isAtomDefinition,
   derivedDef
-} from '../src/index.js'
-import { readOpticPath, writeOpticPath } from '../src/atom/optics-path.js'
+} from '../src/index.ts'
+import { readOpticPath, writeOpticPath } from '../src/atom/optics-path.ts'
 
 describe('store-keyed audit regressions', () => {
   it.each([-0, +0])('uses the cache key relation when a signed-zero source is replaced', (key) => {

@@ -2,18 +2,18 @@
  * Owns the functional entry's protected Host hooks and one memoized disposal result; public surface
  * descriptors belong to host-handle-surface.
  */
-import type { IPipelineDefinitions } from './pipeline-spec.js'
-import { identifyPluginHostCallbackFailure } from './error-text.js'
+import type { IPipelineDefinitions } from './pipeline-spec.ts'
+import { identifyPluginHostCallbackFailure } from './error-text.ts'
 import { deferred } from '@migaia/utils/promise'
-import { PluginHost } from './host-runtime.js'
+import { PluginHost } from './host-runtime.ts'
 
-import { readDefinedPluginDefinition } from './define-plugin.js'
-import type { PluginHostError } from './error-text.js'
+import { readDefinedPluginDefinition } from './define-plugin.ts'
+import type { PluginHostError } from './error-text.ts'
 
-import type { IPluginConstraint } from './plugin-definition-types.js'
-import type { IPluginHostDisposalResult } from './plugin-lifecycle-types.js'
+import type { IPluginConstraint } from './plugin-definition-types.ts'
+import type { IPluginHostDisposalResult } from './plugin-lifecycle-types.ts'
 
-import type { IDefineHostOptions, IHostCoreConstructionRequest } from './define-host.js'
+import type { IDefineHostOptions, IHostCoreConstructionRequest } from './define-host.ts'
 /**
  * Runtime behind one functional Host. It replaces the four protected class hooks with the options'
  * callbacks and exposes the protected owner entries only to the handle created alongside it.

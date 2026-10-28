@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { initSync } from '@migaia/wasm'
 import { createRuntime, type IDisposable } from '@migaia/reactive'
 import { createStore, type IFieldBuilder, type IFieldContext } from '@migaia/store-light'
-import { array, number, boolean, string, record, ensureWasm } from '../src/index.js'
+import { array, number, boolean, string, record, ensureWasm } from '../src/index.ts'
 
 /** Real Rust/WASM memory used by every field in this regression module. */
 let memory: WebAssembly.Memory

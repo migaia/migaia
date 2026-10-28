@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defineFeature, definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.js'
+import { defineFeature, definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.ts'
 
 /** Creates an unbounded Host for deterministic dependency installation. */
 const createHost = (): PluginHost<Record<string, never>> =>

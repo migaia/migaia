@@ -4,7 +4,7 @@ import {
   STORE_WORKER_SOURCE,
   createStoreWorkerAggregateError,
   createStoreWorkerError
-} from '../src/errors'
+} from '../src/errors.ts'
 
 describe('store-worker error-code contract', () => {
   it('declares 6 unique codes under the package source', () => {

@@ -1,6 +1,6 @@
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import config from '../e2e/vite.config.js'
+import config from '../e2e/vite.config.ts'
 
 describe('store-keyed E2E config', () => {
   it('loads the owning package from current source', () => {

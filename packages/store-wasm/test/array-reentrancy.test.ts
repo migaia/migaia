@@ -17,9 +17,9 @@ vi.mock('@migaia/wasm', () => ({
   ptr_of: (id: number) => allocations.get(id) ?? 0
 }))
 
-import { ensureWasm } from '../src/arena'
-import { array } from '../src/array'
-import { StoreWasmErrorCode, STORE_WASM_SOURCE } from '../src/errors'
+import { ensureWasm } from '../src/arena.ts'
+import { array } from '../src/array.ts'
+import { StoreWasmErrorCode, STORE_WASM_SOURCE } from '../src/errors.ts'
 
 describe('array setRange memory replacement', () => {
   beforeEach(async () => {

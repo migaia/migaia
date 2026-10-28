@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
-import { atomDef, atomDefFactory, createAtomStore } from '../src/index.js'
+import { atomDef, atomDefFactory, createAtomStore } from '../src/index.ts'
 
 /** Static ticks must preserve the dynamic work that occurs only while a definition materializes. */
 describe('known-source store subscriptions', () => {

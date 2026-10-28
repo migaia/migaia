@@ -1,4 +1,4 @@
-import { memoryView } from './memory-view.js'
+import { memoryView } from './memory-view.ts'
 import type { IDisposable } from '@migaia/reactive'
 import type { IFieldSource } from '@migaia/store-light'
 import {
@@ -6,18 +6,18 @@ import {
   disposeAllWasm,
   disposeWasmField,
   throwWasmConstructionFailure
-} from './arena.js'
+} from './arena.ts'
 import {
   assertWasmFieldNotAborted,
   createStoreWasmError,
   createStoreWasmTypeError,
   StoreWasmErrorCode
-} from './errors.js'
-import type { number as numberBuilder } from './number.js'
-import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from './field.js'
+} from './errors.ts'
+import type { number as numberBuilder } from './number.ts'
+import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from './field.ts'
 import { StoreFieldMode } from '@migaia/store-light'
-import { WasmReservedKey } from './field-constants.js'
-import { StoreWasmErrorText } from './error-text.js'
+import { WasmReservedKey } from './field-constants.ts'
+import { StoreWasmErrorText } from './error-text.ts'
 
 // 固定命名字段的结构体（Elm/Haskell record，不是 TS Record<K,V>）
 type IRecordShape = Record<string, ReturnType<typeof numberBuilder>>

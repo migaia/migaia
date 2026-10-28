@@ -2,7 +2,7 @@
  * Construct StoreWorker boundary errors with canonical identities; RPC failures keep their owning
  * chains.
  */
-import { ERROR_SOURCE, StoreWorkerErrorCode, type IStoreWorkerErrorCode } from './error-code.js'
+import { ERROR_SOURCE, StoreWorkerErrorCode, type IStoreWorkerErrorCode } from './error-code.ts'
 
 export { StoreWorkerErrorCode, type IStoreWorkerErrorCode }
 

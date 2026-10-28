@@ -5,7 +5,7 @@ import {
   atomSetter,
   type IReadableAtom,
   type IWritableAtom
-} from '../src/reactive/atom'
+} from '../src/reactive/atom.ts'
 
 function fakeReadableAtom<T>(
   runtime: ReturnType<typeof createRuntime>,

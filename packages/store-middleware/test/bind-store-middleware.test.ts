@@ -6,7 +6,7 @@ import {
   createMutationPolicy,
   type IMiddlewareEvent,
   type IStoreMiddlewarePlugin
-} from '../src/index'
+} from '../src/index.ts'
 
 /** Explicit unbounded policy used by legacy Store behavior tests. */
 const execution = { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } as const

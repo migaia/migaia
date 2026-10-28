@@ -1,16 +1,16 @@
 import type { IAtomStore, IWritableAtomDefinition } from '@migaia/store-keyed'
-import { persistUnit } from '../core/persist-unit.js'
+import { persistUnit } from '../core/persist-unit.ts'
 import type { ICodec } from '@migaia/storage-contract'
 import type {
   IPersistHandle,
   IPersistStorage,
   IPersistUnit,
   IPersistUnitOptions
-} from '../core/types.js'
-import { snapshotPersistOptions, assertPersistString } from '../core/options.js'
-import { createStorePersistTypeError } from '../errors.js'
-import { StorePersistErrorCode } from '../error-code.js'
-import { StorePersistErrorText } from '../error-text.js'
+} from '../core/types.ts'
+import { snapshotPersistOptions, assertPersistString } from '../core/options.ts'
+import { createStorePersistTypeError } from '../errors.ts'
+import { StorePersistErrorCode } from '../error-code.ts'
+import { StorePersistErrorText } from '../error-text.ts'
 
 /** Per-definition archive options; keyed persistence has no migrate callback option. */
 export type IPersistKeyedOptions<T> = Pick<

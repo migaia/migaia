@@ -8,9 +8,9 @@ import {
 import { resolveSchedulerOption } from '@migaia/lifecycle/scheduler'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/utils/function'
-import { ResourceCachePolicy } from './store-resource-cache-policy.js'
-import { ResourceOwnershipRegistry, type IVersionToken } from './store-resource-ownership.js'
-import type { IStoreResourceLoadContext } from './store-resource-request.js'
+import { ResourceCachePolicy } from './store-resource-cache-policy.ts'
+import { ResourceOwnershipRegistry, type IVersionToken } from './store-resource-ownership.ts'
+import type { IStoreResourceLoadContext } from './store-resource-request.ts'
 import {
   createTerminalController,
   createSyncStartedDisposalLedger,
@@ -23,16 +23,16 @@ import {
   type IResourceFetchContext
 } from '@migaia/resource'
 import type { ISyncStartedDisposalLedger } from '@migaia/lifecycle'
-import { StoreResourceKind, StoreResourceErrorPhase } from './resource-state-constants.js'
-import type { IResourceVersion, IResourceCoreState } from './store-resource-state.js'
-import { ResourceVersionRegistry } from './store-resource-versions.js'
-import { ResourceCaptureRegistry, type IResourceCapture } from './store-resource-captures.js'
-import { createStoreLightError, createStoreLightTypeError, StoreLightErrorCode } from './errors.js'
-import { StoreLightErrorText } from './error-text.js'
+import { StoreResourceKind, StoreResourceErrorPhase } from './resource-state-constants.ts'
+import type { IResourceVersion, IResourceCoreState } from './store-resource-state.ts'
+import { ResourceVersionRegistry } from './store-resource-versions.ts'
+import { ResourceCaptureRegistry, type IResourceCapture } from './store-resource-captures.ts'
+import { createStoreLightError, createStoreLightTypeError, StoreLightErrorCode } from './errors.ts'
+import { StoreLightErrorText } from './error-text.ts'
 import { createEventChannel } from '@migaia/event-subscriber'
 
-export type { IStoreResourceLoadContext } from './store-resource-request.js'
-export type { IResourceCapture } from './store-resource-captures.js'
+export type { IStoreResourceLoadContext } from './store-resource-request.ts'
+export type { IResourceCapture } from './store-resource-captures.ts'
 
 /** A readable value with the version number and token that identify it for leases. */
 export type IStoreResourceSnapshot<T> = {

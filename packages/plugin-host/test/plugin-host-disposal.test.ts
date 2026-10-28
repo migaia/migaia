@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { PluginHostError } from '../src/error-text.js'
-import { Host, plugin, TranslatingHost } from './plugin-host-fixtures.js'
+import { PluginHostError } from '../src/error-text.ts'
+import { Host, plugin, TranslatingHost } from './plugin-host-fixtures.ts'
 
 describe('PluginHost', () => {
   it('finishes accepted mutations before dispose closes admission', async () => {

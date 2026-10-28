@@ -1,16 +1,16 @@
-import { StoreWorkerErrorCode } from '../src/index.js'
-import { WorkerAdapter, workerComputed } from '../src/index.js'
-import { workerParser as parser } from '../src/serialize/worker.js'
+import { StoreWorkerErrorCode } from '../src/index.ts'
+import { WorkerAdapter, workerComputed } from '../src/index.ts'
+import { workerParser as parser } from '../src/serialize/worker.ts'
 // @ts-expect-error Worker-C02 uses the existing canonical serialization subpath only.
-import { workerParser } from '../src/index.js'
+import { workerParser } from '../src/index.ts'
 // @ts-expect-error Worker-C02 removes the duplicate root plugin alias.
-import { workerPlugin } from '../src/index.js'
+import { workerPlugin } from '../src/index.ts'
 // @ts-expect-error Worker-C02 removes the duplicate root handler alias.
-import { createSerializeWorkerHandler } from '../src/index.js'
+import { createSerializeWorkerHandler } from '../src/index.ts'
 // @ts-expect-error Worker-C01 removes the internal input wrapper export.
-import { encodeWorkerValue } from '../src/serialize/worker.js'
+import { encodeWorkerValue } from '../src/serialize/worker.ts'
 // @ts-expect-error Worker-C01 removes the identical internal result wrapper export.
-import { decodeWorkerValue } from '../src/serialize/worker.js'
+import { decodeWorkerValue } from '../src/serialize/worker.ts'
 // @ts-expect-error Worker-C01 narrows package exports so transfer-list selection stays private.
 import { transferablesOf } from '@migaia/store-worker/serialize/transferables'
 

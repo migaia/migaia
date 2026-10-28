@@ -1,5 +1,5 @@
 /** Owns shared fixture construction; test assertions remain in their focused suites. */
-import { PluginHost } from '../src/index.js'
+import { PluginHost } from '../src/index.ts'
 
 /** Exposes synchronous installation under the hardening suite's existing deadline policy. */
 export class Host extends PluginHost<Record<string, never>, string> {

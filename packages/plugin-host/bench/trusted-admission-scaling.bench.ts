@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { definePlugin, PluginHost } from '../src/index.js'
-import { openComposition } from '../src/composition-entry.js'
+import { definePlugin, PluginHost } from '../src/index.ts'
+import { openComposition } from '../src/composition-entry.ts'
 
 /** Disables unrelated host deadlines while measuring only trusted admission. */
 const HOST_OPTIONS = {

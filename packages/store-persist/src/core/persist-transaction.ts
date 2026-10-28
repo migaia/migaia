@@ -22,11 +22,11 @@ import {
   type IConcurrencyAttemptContext,
   type IConcurrencyAttempt
 } from '@migaia/storage-contract'
-import type { IPersistHandle, IPersistStorage } from './types.js'
-import { createStorePersistTypeError } from '../errors.js'
-import { StorePersistErrorCode } from '../error-code.js'
-import { StorePersistErrorText } from '../error-text.js'
-import { snapshotPersistOptions } from './options.js'
+import type { IPersistHandle, IPersistStorage } from './types.ts'
+import { createStorePersistTypeError } from '../errors.ts'
+import { StorePersistErrorCode } from '../error-code.ts'
+import { StorePersistErrorText } from '../error-text.ts'
+import { snapshotPersistOptions } from './options.ts'
 
 /** Concrete transaction methods retain their own scope and option types through extraction. */
 type IPersistTransactionStore = Omit<IRecordStore, 'use' | 'transaction' | 'tx'> & {

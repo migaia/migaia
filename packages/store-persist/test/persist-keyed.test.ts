@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { createMemoryTestStore } from './helpers/memory.js'
+import { createMemoryTestStore } from './helpers/memory.ts'
 import { createAtomStore, familyDef } from '@migaia/store-keyed'
 import { createRuntime } from '@migaia/reactive'
-import { persistKeyed, clearFamily } from '../src/keyed-index'
+import { persistKeyed, clearFamily } from '../src/keyed-index.ts'
 
 describe('persistKeyed（store-keyed）', () => {
   it('snapshots accessor-backed options exactly once', async () => {

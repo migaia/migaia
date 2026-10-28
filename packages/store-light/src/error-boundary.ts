@@ -4,7 +4,7 @@ import {
   createStoreLightError,
   STORE_LIGHT_SOURCE,
   type IStoreLightErrorCode
-} from './errors.js'
+} from './errors.ts'
 
 /** Preserve native/foreign identity; classify unowned failures without dropping the original value. */
 export const identifyStoreLightFailure = (

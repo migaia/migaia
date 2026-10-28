@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { openComposition } from '../src/composition-entry.js'
-import { defineFeature, definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.js'
-import { execution, createRequiredPair, SyncHost } from './dependency-lifecycle-fixtures.js'
+import { openComposition } from '../src/composition-entry.ts'
+import { defineFeature, definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.ts'
+import { execution, createRequiredPair, SyncHost } from './dependency-lifecycle-fixtures.ts'
 
 describe('enablement prerequisites', () => {
   it('rejects enabling a dependent while its required provider stays disabled', async () => {

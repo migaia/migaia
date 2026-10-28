@@ -1,13 +1,13 @@
-import { reportDiagnostic } from './diagnostic-report.js'
+import { reportDiagnostic } from './diagnostic-report.ts'
 import ERROR_TEXT, {
   PluginHostError,
   createPluginHostTypeError,
   PluginHostInternalText
-} from './error-text.js'
-import { asyncDisposeKey, disposeKeys } from './symbols.js'
-import { PluginHostErrorCode } from './error-code.js'
-import type { IPluginHostErrorCode } from './error-code.js'
-import type { IExtensionOwner, ISharedExtensionSlot } from './registry.js'
+} from './error-text.ts'
+import { asyncDisposeKey, disposeKeys } from './symbols.ts'
+import { PluginHostErrorCode } from './error-code.ts'
+import type { IPluginHostErrorCode } from './error-code.ts'
+import type { IExtensionOwner, ISharedExtensionSlot } from './registry.ts'
 
 /** Family discrimination belongs to the canonical extension owner, leaving registry types erased. */
 export function isSharedExtensionSlot<TDomainCore extends object, TValue>(

@@ -5,9 +5,9 @@ import {
   PluginHost,
   PluginHostError,
   PluginHostErrorCode
-} from '../src/index.js'
-import { getPluginRuntimeIntegration } from '../src/index.js'
-import { openComposition } from '../src/composition-entry.js'
+} from '../src/index.ts'
+import { getPluginRuntimeIntegration } from '../src/index.ts'
+import { openComposition } from '../src/composition-entry.ts'
 
 /** Explicit unbounded lifecycle policy keeps identity tests independent of wall-clock timing. */
 const execution = { mutationTimeoutMs: false as const, pipelineDrainTimeoutMs: false as const }

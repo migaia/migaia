@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createRuntime, defaultRuntime } from '@migaia/reactive'
-import { ObservableObject } from '../src'
+import { ObservableObject } from '../src/index.ts'
 
 describe('ObservableObject', () => {
   it('reads initial values from the constructor', () => {

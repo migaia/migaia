@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createReduxDevToolsAdapter, type IReduxDevToolsMessage } from '../src/index'
+import { createReduxDevToolsAdapter, type IReduxDevToolsMessage } from '../src/index.ts'
 
 type IState = { readonly count: number }
 

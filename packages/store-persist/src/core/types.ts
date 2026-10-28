@@ -10,7 +10,7 @@ import type {
   ITransactionScope,
   ITransactionStageObserver
 } from '@migaia/storage-contract'
-import { PersistState } from '../state-constants.js'
+import { PersistState } from '../state-constants.ts'
 
 /**
  * Defines the minimal persistence boundary for synchronous snapshots, restoration, and change

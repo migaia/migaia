@@ -4,7 +4,7 @@ import {
   pipelineSpec,
   type IPluginHostCoreFor,
   type IPipelineDefinitions
-} from '../src/index.js'
+} from '../src/index.ts'
 
 /** Host policy is orthogonal to the named payload axes. */
 const execution = { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } as const

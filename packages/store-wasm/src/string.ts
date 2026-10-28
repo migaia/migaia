@@ -1,21 +1,21 @@
-import { memoryView } from './memory-view.js'
+import { memoryView } from './memory-view.ts'
 import type { IDisposable } from '@migaia/reactive'
 import {
   allocateOwnedSync,
   disposeAllWasm,
   disposeWasmField,
   throwWasmConstructionFailure
-} from './arena.js'
+} from './arena.ts'
 import {
   assertWasmFieldNotAborted,
   createStoreWasmError,
   createStoreWasmRangeError,
   createStoreWasmTypeError,
   StoreWasmErrorCode
-} from './errors.js'
-import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from './field.js'
+} from './errors.ts'
+import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from './field.ts'
 import { StoreFieldMode } from '@migaia/store-light'
-import { StoreWasmErrorText } from './error-text.js'
+import { StoreWasmErrorText } from './error-text.ts'
 
 const DEFAULT_MAX_BYTES = 256
 const MAX_STRING_BYTES = 0xffff_ffff - Uint32Array.BYTES_PER_ELEMENT

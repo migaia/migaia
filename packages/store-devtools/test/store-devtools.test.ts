@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
 import { createStore } from '@migaia/store-light'
-import { createStoreDevTools } from '../src/index'
+import { createStoreDevTools } from '../src/index.ts'
 
 function makeStore(runtimeOverrides?: Parameters<typeof createRuntime>[0]) {
   const runtime = createRuntime(runtimeOverrides)

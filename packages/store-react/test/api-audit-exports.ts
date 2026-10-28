@@ -1,6 +1,6 @@
-import type { StoreRegistry } from '../src/index.js'
+import type { StoreRegistry } from '../src/index.ts'
 // @ts-expect-error Cleanup classification is private to the owning adapter.
-import { identifyRegistryDisposalFailure } from '../src/index.js'
+import { identifyRegistryDisposalFailure } from '../src/index.ts'
 
 void identifyRegistryDisposalFailure
 

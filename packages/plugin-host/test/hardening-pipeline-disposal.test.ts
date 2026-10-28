@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { PluginHostError } from '../src/index.js'
-import { Host } from './hardening-fixtures.js'
+import { PluginHostError } from '../src/index.ts'
+import { Host } from './hardening-fixtures.ts'
 
 describe('#7（批次0）registerStage 对同一函数重复注册的不变量', () => {
   it('同一函数的每次注册都是独立条目——同一函数注册两次，卸载后一次都不残留', async () => {

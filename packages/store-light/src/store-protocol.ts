@@ -1,6 +1,6 @@
 import type { INativeAbortSignal } from '@migaia/utils/promise'
 import type { IDisposable, IRuntime } from '@migaia/reactive'
-import { StoreFieldMode } from './field-mode-constants.js'
+import { StoreFieldMode } from './field-mode-constants.ts'
 
 /**
  * Defines extension protocols owned by the store facade.

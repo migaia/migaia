@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
-import { defineFeature, definePlugin, PluginHost, type IPluginHostCore } from '../src/index.js'
-import { openComposition } from '../src/composition-entry.js'
+import { defineFeature, definePlugin, PluginHost, type IPluginHostCore } from '../src/index.ts'
+import { openComposition } from '../src/composition-entry.ts'
 
 /** Sync host exposes the current pipeline result for allocation-order assertions. */
 class StageOrderHost extends PluginHost<Record<string, never>, string> {

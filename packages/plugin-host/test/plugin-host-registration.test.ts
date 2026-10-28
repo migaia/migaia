@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { PluginHostError } from '../src/error-text.js'
-import { type IExt, Host, plugin } from './plugin-host-fixtures.js'
+import { PluginHostError } from '../src/error-text.ts'
+import { type IExt, Host, plugin } from './plugin-host-fixtures.ts'
 
 describe('PluginHost', () => {
   it('keeps plugin stage and resource registration available across async install', async () => {

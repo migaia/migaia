@@ -13,23 +13,23 @@ import {
   type ISyncMiddlewareStage,
   type IAsyncMiddlewareStage
 } from '@migaia/middleware-pipeline'
-import type { StageLanes } from './stage-lanes.js'
-import type { IPipelineSpecOptions, IPipelineStageHandle } from './pipeline-spec.js'
-import type { IPipelinePorts, IPipelineCollectionPort } from './named-pipeline-types.js'
+import type { StageLanes } from './stage-lanes.ts'
+import type { IPipelineSpecOptions, IPipelineStageHandle } from './pipeline-spec.ts'
+import type { IPipelinePorts, IPipelineCollectionPort } from './named-pipeline-types.ts'
 import {
   createPluginHostPipelineViolationHandler,
   executePluginHostPipeline,
   registerPluginHostStage,
   ensurePluginHostStageSlot,
   type IPluginHostPipelineExecutionPort
-} from './pipeline-runtime.js'
-import ERROR_TEXT, { PluginHostError, attachPluginHostIdentity } from './error-text.js'
-import { PluginHostErrorCode } from './error-code.js'
-import { PipelineOrder } from './pipeline-constants.js'
-import { pipelineOptionError } from './pipeline-declarations.js'
-import { PluginPipelineAsyncTerminal, combinePipelineFailures } from './pipeline-execution.js'
-import { pipelinePluginScope, PipelineAccessText } from './pipeline-text.js'
-import type { IRegistration } from './registry.js'
+} from './pipeline-runtime.ts'
+import ERROR_TEXT, { PluginHostError, attachPluginHostIdentity } from './error-text.ts'
+import { PluginHostErrorCode } from './error-code.ts'
+import { PipelineOrder } from './pipeline-constants.ts'
+import { pipelineOptionError } from './pipeline-declarations.ts'
+import { PluginPipelineAsyncTerminal, combinePipelineFailures } from './pipeline-execution.ts'
+import { pipelinePluginScope, PipelineAccessText } from './pipeline-text.ts'
+import type { IRegistration } from './registry.ts'
 
 /** One entry owns its runner forms and delegates all lease/index work to the canonical lane. */
 export class PluginHostPipeline<TDomainCore extends object, TValue> {

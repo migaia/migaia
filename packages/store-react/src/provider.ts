@@ -1,17 +1,17 @@
 import { useContext } from 'react'
 import type { IReactiveStore, IStoreShape } from '@migaia/store-light'
 import type { IRuntime } from '@migaia/reactive'
-import { StoreRegistryContext } from './provider-context.js'
-import type { IStoreToken } from './provider-registry.js'
-import { useStore } from './useStore.js'
-import { createStoreReactError } from './errors.js'
-import { StoreReactErrorCode } from './error-code.js'
-import { StoreReactErrorText } from './error-text.js'
+import { StoreRegistryContext } from './provider-context.ts'
+import type { IStoreToken } from './provider-registry.ts'
+import { useStore } from './useStore.ts'
+import { createStoreReactError } from './errors.ts'
+import { StoreReactErrorCode } from './error-code.ts'
+import { StoreReactErrorText } from './error-text.ts'
 
-export { StoreProvider } from './StoreProvider.js'
-export type { IStoreProviderProps } from './StoreProvider.js'
-export { StoreRegistry, createStoreRegistry, createStoreToken } from './provider-registry.js'
-export type { IStoreRegistrationOptions, IStoreToken } from './provider-registry.js'
+export { StoreProvider } from './StoreProvider.tsx'
+export type { IStoreProviderProps } from './StoreProvider.tsx'
+export { StoreRegistry, createStoreRegistry, createStoreToken } from './provider-registry.ts'
+export type { IStoreRegistrationOptions, IStoreToken } from './provider-registry.ts'
 export {
   assertStoreFeature,
   normalizeStoreConfig,
@@ -19,7 +19,7 @@ export {
   useAssertStoreFeature,
   useStoreConfig,
   useStoreFeature
-} from './store-config.js'
+} from './store-config.ts'
 export type {
   IStoreFeatureExperimental,
   IStoreFeaturePath,
@@ -28,7 +28,7 @@ export type {
   IStoreProviderDefaults,
   IStoreReadyBarrier,
   IStoreConfigValue
-} from './store-config.js'
+} from './store-config.ts'
 
 /** Read the nearest Provider registry synchronously; absence throws PROVIDER_REQUIRED in render. */
 export function useStoreRegistry() {

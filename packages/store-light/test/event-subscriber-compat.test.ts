@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createStoreResource } from '../src/store-resource.js'
+import { createStoreResource } from '../src/store-resource.ts'
 
 describe('event-subscriber compatibility', () => {
   it('preserves exact revision progression and notification call order', async () => {

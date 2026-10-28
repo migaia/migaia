@@ -8,7 +8,7 @@ import {
   PluginHost,
   PluginHostErrorCode,
   type IPluginHostCore
-} from '../src/index.js'
+} from '../src/index.ts'
 
 describe('lazy activation', () => {
   it.each(['notification', 'update'] as const)(

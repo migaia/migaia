@@ -1,4 +1,4 @@
-export * from './devtools.js'
+export * from './devtools.ts'
 export {
   StoreDevtoolsErrorCode,
   type IStoreDevtoolsErrorCode,
@@ -6,4 +6,4 @@ export {
   createStoreDevtoolsError,
   createStoreDevtoolsRangeError,
   createStoreDevtoolsAggregateError
-} from './errors.js'
+} from './errors.ts'

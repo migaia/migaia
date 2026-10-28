@@ -1,11 +1,11 @@
 /** Owns shared fixture construction; test assertions remain in their focused suites. */
 import { vi, type Mock } from 'vitest'
-import { PluginHost } from '../src/host-runtime.js'
-import { PluginHostError } from '../src/error-text.js'
-import { PluginHost as PublicPluginHost } from '../src/index.js'
-import type { IPluginConstraint } from '../src/plugin-definition-types.js'
-import type { IPluginHostCore } from '../src/plugin-core-types.js'
-import type { IPluginHostOptions } from '../src/host-options-types.js'
+import { PluginHost } from '../src/host-runtime.ts'
+import { PluginHostError } from '../src/error-text.ts'
+import { PluginHost as PublicPluginHost } from '../src/index.ts'
+import type { IPluginConstraint } from '../src/plugin-definition-types.ts'
+import type { IPluginHostCore } from '../src/plugin-core-types.ts'
+import type { IPluginHostOptions } from '../src/host-options-types.ts'
 
 /** Minimal domain core supplied by the original numeric host cases. */
 export type IExt = { marker?: string } & Pick<IPluginHostCore<number>, 'onDispose' | 'usePipeline'>

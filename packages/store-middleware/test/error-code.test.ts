@@ -4,7 +4,7 @@ import {
   STORE_MIDDLEWARE_SOURCE,
   createStoreMiddlewareAggregateError,
   createStoreMiddlewareError
-} from '../src/errors'
+} from '../src/errors.ts'
 
 describe('store-middleware error-code contract', () => {
   it('declares 9 unique codes under the package source', () => {

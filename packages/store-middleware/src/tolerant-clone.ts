@@ -1,4 +1,4 @@
-import { isImmutableSnapshotData } from './immutable-data.js'
+import { isImmutableSnapshotData } from './immutable-data.ts'
 /**
  * ClonePolicy — three explicit, differently-guaranteed ways to hand a caller "a copy" of a value,
  * instead of one fuzzy `clone()` that quietly decides how hard to try. Each mode's name is its
@@ -19,9 +19,9 @@ import { isImmutableSnapshotData } from './immutable-data.js'
  */
 export type IClonePolicyMode = 'immutable' | 'opaque' | 'diagnostic'
 
-import { createStoreMiddlewareError } from './errors.js'
-import { StoreMiddlewareErrorCode } from './error-code.js'
-import { StoreMiddlewareErrorText } from './error-text.js'
+import { createStoreMiddlewareError } from './errors.ts'
+import { StoreMiddlewareErrorCode } from './error-code.ts'
+import { StoreMiddlewareErrorText } from './error-text.ts'
 import {
   identitySnapshot,
   immutableSnapshot,

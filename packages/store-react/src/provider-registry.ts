@@ -21,9 +21,9 @@ import {
   createStoreReactAggregateError,
   createStoreReactError,
   identifyRegistryDisposalFailure
-} from './errors.js'
-import { StoreReactErrorCode } from './error-code.js'
-import { StoreReactErrorText } from './error-text.js'
+} from './errors.ts'
+import { StoreReactErrorCode } from './error-code.ts'
+import { StoreReactErrorText } from './error-text.ts'
 import { snapshotOwnDescriptors } from '@migaia/utils/object'
 
 const STORE_TOKEN_VALUE = Symbol('store-token-value')

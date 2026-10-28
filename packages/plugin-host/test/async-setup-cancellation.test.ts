@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { definePlugin, PluginHostErrorCode, type IPluginSetupContext } from '../src/index.js'
-import { deferred, createHost } from './async-setup-fixtures.js'
+import { definePlugin, PluginHostErrorCode, type IPluginSetupContext } from '../src/index.ts'
+import { deferred, createHost } from './async-setup-fixtures.ts'
 
 describe('async setup installation', () => {
   it('aborts a timed-out attempt, drops late success, and reports late rejection', async () => {

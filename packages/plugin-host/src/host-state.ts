@@ -4,12 +4,12 @@
  */
 import { createTopologyIndex, type ITopologyIndex } from '@migaia/capability/graph/topology'
 import type { IDependencyNodeState } from '@migaia/capability/graph/dependency'
-import { StageLaneCollection } from './stage-lanes.js'
-import ERROR_TEXT, { PluginHostError } from './error-text.js'
-import { PluginHostErrorCode } from './error-code.js'
-import { PluginHostRegistrationLifecycle } from './state-constants.js'
-import type { IDataOrderSlotState } from './composition.js'
-import type { IInstallBatchContext } from './install-runtime.js'
+import { StageLaneCollection } from './stage-lanes.ts'
+import ERROR_TEXT, { PluginHostError } from './error-text.ts'
+import { PluginHostErrorCode } from './error-code.ts'
+import { PluginHostRegistrationLifecycle } from './state-constants.ts'
+import type { IDataOrderSlotState } from './composition.ts'
+import type { IInstallBatchContext } from './install-runtime.ts'
 import type {
   IExtensionOwner,
   IRegistration,
@@ -17,13 +17,13 @@ import type {
   ISharedExtensionContribution,
   ISharedExtensionReservation,
   ISharedExtensionBucket
-} from './registry.js'
-import type { IPluginRuntimeSharedSlot } from './core.js'
-import { assertPluginExtensionKey, isSharedExtensionSlot } from './extension.js'
-import { createPluginHostTypeError } from './error-text.js'
-import { toIndexNode } from './dependency-runtime.js'
-import { reverseItems } from './cleanup-runtime.js'
-import { SharedSlotView, type ISharedSlotViewPort } from './shared-slot-view.js'
+} from './registry.ts'
+import type { IPluginRuntimeSharedSlot } from './core.ts'
+import { assertPluginExtensionKey, isSharedExtensionSlot } from './extension.ts'
+import { createPluginHostTypeError } from './error-text.ts'
+import { toIndexNode } from './dependency-runtime.ts'
+import { reverseItems } from './cleanup-runtime.ts'
+import { SharedSlotView, type ISharedSlotViewPort } from './shared-slot-view.ts'
 
 /** Creates the host-owned dependency index and translates structural failures at its boundary. */
 const createDependencyIndex = (): ITopologyIndex =>

@@ -1,6 +1,6 @@
 import { createWorkerHandler } from '@migaia/store-worker'
 import { isArrayBuffer, isUint8Array } from '@migaia/utils/bytes'
-import { StoreWorkerFixtureErrorText } from './fixture-error-text.js'
+import { StoreWorkerFixtureErrorText } from './fixture-error-text.ts'
 
 const handler = createWorkerHandler<unknown, number | number[]>(
   async (payload) => {

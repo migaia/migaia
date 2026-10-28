@@ -8,8 +8,8 @@ import {
   removeEnvelope,
   writeEnvelopeWithStages,
   normalizeTransactionEncodingFailure
-} from '../storage/codec.js'
-import { defaultJsonCodec } from '../storage/codec.js'
+} from '../storage/codec.ts'
+import { defaultJsonCodec } from '../storage/codec.ts'
 import {
   assertVersionedEnvelope,
   StorageStageKind,
@@ -33,8 +33,8 @@ import {
   createStorePersistAbortError,
   createStorePersistAggregateError,
   createStorePersistTypeError
-} from '../errors.js'
-import { StorePersistErrorCode } from '../error-code.js'
+} from '../errors.ts'
+import { StorePersistErrorCode } from '../error-code.ts'
 import type {
   IHydrationStatus,
   IPersistHandle,
@@ -42,19 +42,19 @@ import type {
   IPersistUnit,
   IPersistUnitOptions,
   IWriteStatus
-} from './types.js'
-import { PersistState, PersistCodecOutput } from '../state-constants.js'
-import { StorePersistErrorText } from '../error-text.js'
+} from './types.ts'
+import { PersistState, PersistCodecOutput } from '../state-constants.ts'
+import { StorePersistErrorText } from '../error-text.ts'
 import {
   assertPersistString,
   createPersistMigrationPlan,
   assertPersistStageKind,
   bindPersistStages
-} from './options.js'
+} from './options.ts'
 import {
   registerPersistTransactionParticipant,
   type IPersistParticipationControl
-} from './persist-transaction.js'
+} from './persist-transaction.ts'
 
 /** Maximum single delay accepted by Web/Node timers. */
 const MAX_TIMER_DELAY_MS = 2_147_483_647

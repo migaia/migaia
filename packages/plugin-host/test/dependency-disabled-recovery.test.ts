@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { defineFeature, definePlugin, PluginHost, PluginHostError } from '../src/index.js'
-import { execution } from './dependency-suspend-fixtures.js'
+import { defineFeature, definePlugin, PluginHost, PluginHostError } from '../src/index.ts'
+import { execution } from './dependency-suspend-fixtures.ts'
 
 describe('dependency suspension and recovery', () => {
   it('keeps a disabled rebindable middle node disabled while its provider returns', async () => {

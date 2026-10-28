@@ -9,25 +9,25 @@ import {
   type IProvisionalScope
 } from '@migaia/lifecycle'
 import type { IMiddlewarePipelineMode } from '@migaia/middleware-pipeline'
-import { PluginHostCleanupRuntime } from './cleanup-runtime.js'
+import { PluginHostCleanupRuntime } from './cleanup-runtime.ts'
 import {
   PluginCoreSurface,
   type IPluginRuntimeIntegration,
   type IPluginCoreContext
-} from './core.js'
-import { resolveDisposer } from './disposal.js'
+} from './core.ts'
+import { resolveDisposer } from './disposal.ts'
 import ERROR_TEXT, {
   PluginHostError,
   createPluginHostTypeError,
   PluginHostInternalText
-} from './error-text.js'
-import { PluginHostErrorCode } from './error-code.js'
-import type { IInstallBatchContext } from './install-runtime.js'
-import type { IRegistration } from './registry.js'
-import { PluginHostRegistrationLifecycle } from './state-constants.js'
-import type { IPluginHostCore } from './plugin-core-types.js'
-import type { IPluginResource } from './plugin-lifecycle-types.js'
-import type { IHostCoreConstructionRequest } from './define-host.js'
+} from './error-text.ts'
+import { PluginHostErrorCode } from './error-code.ts'
+import type { IInstallBatchContext } from './install-runtime.ts'
+import type { IRegistration } from './registry.ts'
+import { PluginHostRegistrationLifecycle } from './state-constants.ts'
+import type { IPluginHostCore } from './plugin-core-types.ts'
+import type { IPluginResource } from './plugin-lifecycle-types.ts'
+import type { IHostCoreConstructionRequest } from './define-host.ts'
 
 type IPluginHostCoreRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   /**
@@ -131,7 +131,7 @@ class PluginRegistrationCoreContext<
   }
 
   /** Resolves the current hook operation on every access; cold/outside-install reads still fail. */
-  operation(): import('./plugin-lifecycle-types.js').IPluginOperationContext {
+  operation(): import('./plugin-lifecycle-types.ts').IPluginOperationContext {
     if (!this.registration.operation)
       throw new PluginHostError(
         PluginHostErrorCode.resourceOutsideInstall,
@@ -144,7 +144,7 @@ class PluginRegistrationCoreContext<
   }
 
   /** Uses the registration signal, falling back to the same Host execution signal as before. */
-  lifecycle(): import('./plugin-lifecycle-types.js').IPluginRegistrationContext {
+  lifecycle(): import('./plugin-lifecycle-types.ts').IPluginRegistrationContext {
     return { signal: this.registration.lifecycleController?.signal ?? this.#port.executionSignal }
   }
 

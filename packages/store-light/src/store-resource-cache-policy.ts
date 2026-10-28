@@ -1,6 +1,6 @@
 import { systemScheduler, type IScheduler, type IScheduledTask } from '@migaia/utils/scheduler'
-import { createStoreLightRangeError, StoreLightErrorCode } from './errors.js'
-import { StoreLightErrorText } from './error-text.js'
+import { createStoreLightRangeError, StoreLightErrorCode } from './errors.ts'
+import { StoreLightErrorText } from './error-text.ts'
 
 /** Owns a cache expiry task; the canonical scheduler owns host timers and long-delay segmentation. */
 export class ResourceCachePolicy {

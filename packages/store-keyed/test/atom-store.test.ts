@@ -8,7 +8,7 @@ import {
   derivedDef,
   previewSafeAtomDefFactory,
   writableDef
-} from '../src'
+} from '../src/index.ts'
 
 describe('AtomStore: reads', () => {
   it('preserves cloneable prototypes and fails closed for non-cloneable initial values', () => {

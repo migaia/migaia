@@ -3,24 +3,24 @@
  * runner owner.
  */
 import { MiddlewarePipelineMode, MiddlewarePipelineNext } from '@migaia/middleware-pipeline'
-import type { IPipelineDefinitions, IPipelineStageHandle } from './pipeline-spec.js'
-import { DEFAULT_PIPELINE_KEY } from './stage-lanes.js'
+import type { IPipelineDefinitions, IPipelineStageHandle } from './pipeline-spec.ts'
+import { DEFAULT_PIPELINE_KEY } from './stage-lanes.ts'
 import {
   pipelineDeclarations,
   assertPipelineMode,
   pipelineOptionError
-} from './pipeline-declarations.js'
-import { PluginHostPipeline } from './pipeline-entry.js'
-import type { IPipelinePorts } from './named-pipeline-types.js'
-import type { IPipelineConfig } from './host-options-types.js'
-import ERROR_TEXT, { PluginHostError, attachPluginHostIdentity } from './error-text.js'
-import { PluginHostErrorCode } from './error-code.js'
-import { isRegistrationRevoked } from './composition.js'
-import { readDefinitionDependencies, type IPluginDependency } from './dependency-reader.js'
-import type { IInstallBatchContext } from './install-runtime.js'
-import type { IRegistration } from './registry.js'
-import { PluginHostRegistrationLifecycle } from './state-constants.js'
-import { PluginPipelineThrough, PluginPipelineThroughRemoval } from './pipeline-through.js'
+} from './pipeline-declarations.ts'
+import { PluginHostPipeline } from './pipeline-entry.ts'
+import type { IPipelinePorts } from './named-pipeline-types.ts'
+import type { IPipelineConfig } from './host-options-types.ts'
+import ERROR_TEXT, { PluginHostError, attachPluginHostIdentity } from './error-text.ts'
+import { PluginHostErrorCode } from './error-code.ts'
+import { isRegistrationRevoked } from './composition.ts'
+import { readDefinitionDependencies, type IPluginDependency } from './dependency-reader.ts'
+import type { IInstallBatchContext } from './install-runtime.ts'
+import type { IRegistration } from './registry.ts'
+import { PluginHostRegistrationLifecycle } from './state-constants.ts'
+import { PluginPipelineThrough, PluginPipelineThroughRemoval } from './pipeline-through.ts'
 import {
   pipelinePluginScope,
   pipelineUnknownScope,
@@ -28,7 +28,7 @@ import {
   qualifyPipelineName,
   splitPipelineAddress,
   PipelineAccessText
-} from './pipeline-text.js'
+} from './pipeline-text.ts'
 
 /**
  * One collection enforces cross-pipeline registration and shares the Host's default execution
@@ -257,7 +257,7 @@ export class PluginHostPipelines<TDomainCore extends object, TValue> {
   /** The existing Host lookup can borrow only a genuine construction batch's exact registration. */
   owner(
     name: string,
-    request?: import('./define-host.js').IHostCoreConstructionRequest
+    request?: import('./define-host.ts').IHostCoreConstructionRequest
   ): PluginHostPipeline<TDomainCore, TValue>['owner'] {
     if (!request) return this.named(name).owner
     /** Only the issuing batch can lend its exact native registration to a domain-core request. */

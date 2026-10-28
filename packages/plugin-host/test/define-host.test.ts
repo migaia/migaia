@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { defineHost, definePlugin, type IHostDomainCoreRequest } from '../src/index.js'
-import { isManagedHost, openComposition } from '../src/composition-entry.js'
-import { readHostIdentity } from '../src/host-identity.js'
+import { defineHost, definePlugin, type IHostDomainCoreRequest } from '../src/index.ts'
+import { isManagedHost, openComposition } from '../src/composition-entry.ts'
+import { readHostIdentity } from '../src/host-identity.ts'
 
 const hostOptions = {
   execution: { mutationTimeoutMs: false as const, pipelineDrainTimeoutMs: false as const }

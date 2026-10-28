@@ -10,9 +10,9 @@
  */
 
 import { probeThenable, ThenableProbeKind } from '@migaia/utils/function'
-import { createStoreKeyedTypeError, StoreKeyedErrorCode } from '../errors.js'
-import { AtomKind } from './kind-constants.js'
-import { StoreKeyedErrorText } from '../error-text.js'
+import { createStoreKeyedTypeError, StoreKeyedErrorCode } from '../errors.ts'
+import { AtomKind } from './kind-constants.ts'
+import { StoreKeyedErrorText } from '../error-text.ts'
 
 // Symbol.for keeps definitions recognizable when two copies of the package
 // coexist in one Realm (for example an app bundle plus a same-realm devtools copy).

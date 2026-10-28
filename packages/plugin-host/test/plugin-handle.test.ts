@@ -6,7 +6,7 @@ import {
   isPluginHandleCurrent,
   PluginHost,
   PluginHostErrorCode
-} from '../src/index.js'
+} from '../src/index.ts'
 
 /** Creates an unbounded Host so lifecycle timing does not affect handle assertions. */
 const createHost = (): PluginHost<Record<string, never>> =>

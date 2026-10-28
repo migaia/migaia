@@ -9,13 +9,13 @@ import type {
   IPluginLifecycleConfig,
   IPluginOperationContext,
   IPluginRegistrationContext
-} from './plugin-lifecycle-types.js'
-import type { IFeatureRecord } from './feature-types.js'
+} from './plugin-lifecycle-types.ts'
+import type { IFeatureRecord } from './feature-types.ts'
 import type {
   IPipelineDefinitions,
   IPipelineRegistration,
   IPipelineScope
-} from './pipeline-spec.js'
+} from './pipeline-spec.ts'
 import type {
   IAsyncGeneratorMiddlewareStage,
   IAsyncMiddlewareStage,
@@ -105,4 +105,4 @@ export interface IPluginHostCore<
 export type IPluginPipelineCore<
   TPipelines extends IPipelineDefinitions,
   TFeatures extends IFeatureRecord
-> = IPipelineScope<TPipelines & import('./feature-types.js').IFeatureRecordPipelines<TFeatures>>
+> = IPipelineScope<TPipelines & import('./feature-types.ts').IFeatureRecordPipelines<TFeatures>>

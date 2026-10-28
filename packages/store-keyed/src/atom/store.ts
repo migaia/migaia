@@ -22,8 +22,8 @@ import {
   createStoreKeyedError,
   createStoreKeyedTypeError,
   StoreKeyedErrorCode
-} from '../errors.js'
-import { StoreKeyedErrorText } from '../error-text.js'
+} from '../errors.ts'
+import { StoreKeyedErrorText } from '../error-text.ts'
 import {
   assertNotThenable,
   isAtomDefinition,
@@ -36,8 +36,8 @@ import {
   type IPrimitiveFactoryDefinition,
   type IWritableAtomDefinition,
   type IWritableDerivedDefinition
-} from './definition.js'
-import { AtomKind } from './kind-constants.js'
+} from './definition.ts'
+import { AtomKind } from './kind-constants.ts'
 
 /** Routes atom lifecycle failures to the Runtime reporter, which already contains reporter failures. */
 function reportAtomFailure(

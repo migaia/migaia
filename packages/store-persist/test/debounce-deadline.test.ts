@@ -2,10 +2,10 @@ import { describe, expect, it, vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { createRuntime } from '@migaia/reactive'
 import { createStore } from '@migaia/store-light'
-import { createMemoryTestStore } from './helpers/memory.js'
-import { persist } from '../src/light-index.js'
-import { StorePersistErrorCode } from '../src/error-code.js'
-import { persistUnit } from '../src/index.js'
+import { createMemoryTestStore } from './helpers/memory.ts'
+import { persist } from '../src/light-index.ts'
+import { StorePersistErrorCode } from '../src/error-code.ts'
+import { persistUnit } from '../src/index.ts'
 
 describe('bounded persistence debounce', () => {
   it('enqueues the latest continuous change at maxWait and starts a fresh next window', async () => {

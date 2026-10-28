@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
-import { defineFeature, definePlugin } from '../src/index.js'
-import { FeatureHost } from './plugin-host-fixtures.js'
+import { defineFeature, definePlugin } from '../src/index.ts'
+import { FeatureHost } from './plugin-host-fixtures.ts'
 
 describe('PluginHost', () => {
   it('reports rejected Feature thenables without awaiting or publishing them', async () => {

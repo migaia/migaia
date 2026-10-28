@@ -1,7 +1,7 @@
-import { ERROR_SOURCE, StoreWasmErrorCode, type IStoreWasmErrorCode } from './error-code.js'
+import { ERROR_SOURCE, StoreWasmErrorCode, type IStoreWasmErrorCode } from './error-code.ts'
 import { attachErrorIdentity, isNativeErrorValue, tryReadProperty } from '@migaia/utils/error'
 import type { IAbortSignal } from '@migaia/utils/promise'
-import { StoreWasmErrorText } from './error-text.js'
+import { StoreWasmErrorText } from './error-text.ts'
 
 export { StoreWasmErrorCode, type IStoreWasmErrorCode }
 

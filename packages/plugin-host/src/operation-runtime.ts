@@ -1,8 +1,8 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { boundedWait, createGenerationController, type IGenerationRequest } from '@migaia/lifecycle'
 import type { IScheduler } from '@migaia/utils/scheduler'
-import ERROR_TEXT, { PluginHostError } from './error-text.js'
-import { PluginHostErrorCode } from './error-code.js'
+import ERROR_TEXT, { PluginHostError } from './error-text.ts'
+import { PluginHostErrorCode } from './error-code.ts'
 
 type IPluginHostOperationRegistration = {
   operation?: IGenerationRequest

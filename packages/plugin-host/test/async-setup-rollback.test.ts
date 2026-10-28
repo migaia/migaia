@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { defineFeature, definePlugin, PluginHostErrorCode } from '../src/index.js'
-import { deferred, createHost } from './async-setup-fixtures.js'
+import { defineFeature, definePlugin, PluginHostErrorCode } from '../src/index.ts'
+import { deferred, createHost } from './async-setup-fixtures.ts'
 
 describe('async setup installation', () => {
   it('rolls setup resources back in reverse order and retains the primary cause', async () => {

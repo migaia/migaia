@@ -1,5 +1,5 @@
 /** Owns ordered cleanup collection and lifecycle release policy, without mutation planning. */
-import type { IRegistration } from './registry.js'
+import type { IRegistration } from './registry.ts'
 import {
   createLifecycleScope,
   type ICleanupResult,
@@ -9,9 +9,9 @@ import {
 } from '@migaia/lifecycle'
 import { probeThenable, assimilateCapturedThen } from '@migaia/utils/function'
 import type { IScheduler } from '@migaia/utils/scheduler'
-import ERROR_TEXT, { PluginHostError } from './error-text.js'
-import { PluginHostErrorCode } from './error-code.js'
-import { PluginHostCleanupMode } from './state-constants.js'
+import ERROR_TEXT, { PluginHostError } from './error-text.ts'
+import { PluginHostErrorCode } from './error-code.ts'
+import { PluginHostCleanupMode } from './state-constants.ts'
 
 /** Visits an existing ordered group in reverse without copying its growable storage. */
 export function* reverseItems<T>(items: readonly T[]): IterableIterator<T> {

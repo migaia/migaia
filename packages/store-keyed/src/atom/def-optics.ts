@@ -13,10 +13,10 @@ import {
   type IDerivedDefinition,
   type IWritableAtomDefinition,
   type IWritableDerivedDefinition
-} from './definition.js'
-import { createStoreKeyedError, StoreKeyedErrorCode } from '../errors.js'
-import { StoreKeyedErrorText } from '../error-text.js'
-import type { IAtomStore } from './store.js'
+} from './definition.ts'
+import { createStoreKeyedError, StoreKeyedErrorCode } from '../errors.ts'
+import { StoreKeyedErrorText } from '../error-text.ts'
+import type { IAtomStore } from './store.ts'
 import {
   readOpticPath,
   writeOpticPath,
@@ -27,7 +27,7 @@ import {
   filterOutKey,
   replaceAtIndex,
   KeyedSplitCache
-} from './optics-path.js'
+} from './optics-path.ts'
 
 /** Provides immutable `get` and `set` operations with the same shape as `IAtomOptic`. */
 export type IDefOptic<Source, Focus> = {

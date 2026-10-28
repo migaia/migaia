@@ -16,10 +16,10 @@ export {
   type IWritableDerivedDefinition,
   type IAtomDefinition,
   type IWritableAtomDefinition
-} from './atom/definition.js'
-export { AtomKind, type IAtomKind } from './atom/kind-constants.js'
-export * from './atom/def-optics.js'
-export * from './atom/store.js'
-export * from './family/definition.js'
+} from './atom/definition.ts'
+export { AtomKind, type IAtomKind } from './atom/kind-constants.ts'
+export * from './atom/def-optics.ts'
+export * from './atom/store.ts'
+export * from './family/definition.ts'
 
-export * from './errors.js'
+export * from './errors.ts'

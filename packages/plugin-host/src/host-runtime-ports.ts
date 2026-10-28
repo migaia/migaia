@@ -8,43 +8,43 @@ import ERROR_TEXT, {
   formatPluginHostDiagnostic,
   PluginHostError,
   PluginHostInternalText
-} from './error-text.js'
-import { readHostNodeId } from './host-identity-authority.js'
-import { snapshotPluginDefinitions } from './admission-runtime.js'
-import { type IInstallBatchContext } from './install-runtime.js'
-import { PluginHostErrorCode } from './error-code.js'
-import { matchesManagedHost } from './composition.js'
+} from './error-text.ts'
+import { readHostNodeId } from './host-identity-authority.ts'
+import { snapshotPluginDefinitions } from './admission-runtime.ts'
+import { type IInstallBatchContext } from './install-runtime.ts'
+import { PluginHostErrorCode } from './error-code.ts'
+import { matchesManagedHost } from './composition.ts'
 
-import type { IHostCoreConstructionRequest } from './define-host.js'
-import { reportQueueWait, translateQueueRejection } from './host-queue.js'
-import { drainPipelineLeases } from './pipeline-runtime.js'
+import type { IHostCoreConstructionRequest } from './define-host.ts'
+import { reportQueueWait, translateQueueRejection } from './host-queue.ts'
+import { drainPipelineLeases } from './pipeline-runtime.ts'
 
 import { LifecycleState } from '@migaia/lifecycle'
 
-import { PluginHostDisposalNodeKind } from './cleanup-runtime.js'
+import { PluginHostDisposalNodeKind } from './cleanup-runtime.ts'
 
-import { PluginHostRuntimeIntegration } from './runtime-integration.js'
-import type { IPipelineDefinitions } from './pipeline-spec.js'
+import { PluginHostRuntimeIntegration } from './runtime-integration.ts'
+import type { IPipelineDefinitions } from './pipeline-spec.ts'
 
-import { reportDiagnostic } from './diagnostic-report.js'
+import { reportDiagnostic } from './diagnostic-report.ts'
 
 import { type IMiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 import { planTeardown } from '@migaia/capability/graph/dependency'
 
-import { createPluginHostPublication } from './publication.js'
-import { createPluginHandle } from './plugin-handle.js'
+import { createPluginHostPublication } from './publication.ts'
+import { createPluginHandle } from './plugin-handle.ts'
 
-import { PluginHostRegistrationLifecycle } from './state-constants.js'
-import type { IRegistration } from './registry.js'
-import type { IPluginConstraint } from './plugin-definition-types.js'
-import type { IPluginHostDiagnostic } from './host-options-types.js'
-import type { IPluginHandle } from './plugin-handle-types.js'
-import type { IPluginHostCompositionSnapshot } from './composition-types.js'
+import { PluginHostRegistrationLifecycle } from './state-constants.ts'
+import type { IRegistration } from './registry.ts'
+import type { IPluginConstraint } from './plugin-definition-types.ts'
+import type { IPluginHostDiagnostic } from './host-options-types.ts'
+import type { IPluginHandle } from './plugin-handle-types.ts'
+import type { IPluginHostCompositionSnapshot } from './composition-types.ts'
 
-import { detachRegistrationStages } from './cleanup-runtime.js'
-import type { IPluginHostRuntimeContext } from './host-runtime-context.js'
-import { defaultDiagnostic } from './host-defaults.js'
-import { PluginHostHandlePort, PluginHostPublicationPort } from './host-publication-runtime.js'
+import { detachRegistrationStages } from './cleanup-runtime.ts'
+import type { IPluginHostRuntimeContext } from './host-runtime-context.ts'
+import { defaultDiagnostic } from './host-defaults.ts'
+import { PluginHostHandlePort, PluginHostPublicationPort } from './host-publication-runtime.ts'
 
 /** One Host authority, statically narrowed by each runtime's named port type. */
 export class PluginHostRuntimePorts<

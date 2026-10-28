@@ -6,7 +6,7 @@ import { entityUniqueFeature } from '@migaia/storage-host/entity/features/unique
 import type { IChangeFeedStore, ICodec, IRecordStore } from '@migaia/storage-contract'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { walkErrorCauses } from '@migaia/utils/error'
-import { defaultJsonCodec, persistTransaction, persistUnit, readEnvelope } from '../../src/index.js'
+import { defaultJsonCodec, persistTransaction, persistUnit, readEnvelope } from '../../src/index.ts'
 
 /** Both actual native backends expose their original commit-only notification channel. */
 type INativeStore = IRecordStore & IChangeFeedStore

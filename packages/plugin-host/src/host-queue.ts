@@ -1,8 +1,8 @@
 /** Owns Host queue diagnostics and error translation; lifecycle remains the sole queue authority. */
-import { reportDiagnostic } from './diagnostic-report.js'
+import { reportDiagnostic } from './diagnostic-report.ts'
 import { LifecycleErrorCode } from '@migaia/lifecycle'
-import ERROR_TEXT, { PluginHostError, PluginHostInternalText } from './error-text.js'
-import { PluginHostErrorCode } from './error-code.js'
+import ERROR_TEXT, { PluginHostError, PluginHostInternalText } from './error-text.ts'
+import { PluginHostErrorCode } from './error-code.ts'
 
 /**
  * The queue's two host-facing behaviours: how a wait is reported, and how a rejection is retold.

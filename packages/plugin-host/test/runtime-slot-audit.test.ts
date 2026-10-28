@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
-import { PluginHost, defineHost, definePlugin, getPluginRuntimeIntegration } from '../src/index.js'
+import { PluginHost, defineHost, definePlugin, getPluginRuntimeIntegration } from '../src/index.ts'
 
 /** One real integration contribution exposes a scalar through the original slot lookup. */
 function connection(name: string, key: string, family: object, answer: number) {

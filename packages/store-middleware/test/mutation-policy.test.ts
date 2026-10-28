@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createMutationPolicy, MutationPolicy } from '../src/index'
+import { createMutationPolicy, MutationPolicy } from '../src/index.ts'
 
 describe('MutationPolicy', () => {
   it('defaults to "off": never throws, even with no runInAction wrapping', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
-import { createStoreRegistry, createStoreToken } from '../src/index'
+import { createStoreRegistry, createStoreToken } from '../src/index.ts'
 
 describe('store-react exports', () => {
   it('creates a runtime-bound provider registry', () => {

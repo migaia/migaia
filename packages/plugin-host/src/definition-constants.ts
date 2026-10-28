@@ -2,8 +2,8 @@
  * Owns definition admission vocabulary; core and descriptor capability keys retain their existing
  * owners.
  */
-import { PluginCoreKey } from './core-constants.js'
-import { PluginHostDescriptorHook } from './install-constants.js'
+import { PluginCoreKey } from './core-constants.ts'
+import { PluginHostDescriptorHook } from './install-constants.ts'
 
 /** Stable own-data keys shared by raw admission and trusted functional definitions. */
 export const PluginDefinitionKey = {

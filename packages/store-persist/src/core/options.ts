@@ -1,6 +1,6 @@
-import { StorePersistErrorCode } from '../error-code.js'
-import { createStorePersistTypeError } from '../errors.js'
-import { StorePersistErrorText } from '../error-text.js'
+import { StorePersistErrorCode } from '../error-code.ts'
+import { createStorePersistTypeError } from '../errors.ts'
+import { StorePersistErrorText } from '../error-text.ts'
 import { snapshotOwnDescriptors } from '@migaia/utils/object'
 import { observeThenableRejection } from '@migaia/utils/function'
 import {

@@ -1,8 +1,8 @@
 import { createContext, useContext, type ReactNode } from 'react'
-import { createStoreReactError } from './errors.js'
-import { StoreReactErrorCode } from './error-code.js'
-import { StoreReactErrorText } from './error-text.js'
-import { EMPTY_EXPERIMENTAL_ENCODING, StoreProviderState } from './provider-state-constants.js'
+import { createStoreReactError } from './errors.ts'
+import { StoreReactErrorCode } from './error-code.ts'
+import { StoreReactErrorText } from './error-text.ts'
+import { EMPTY_EXPERIMENTAL_ENCODING, StoreProviderState } from './provider-state-constants.ts'
 import { snapshotOwnDescriptors } from '@migaia/utils/object'
 
 /**

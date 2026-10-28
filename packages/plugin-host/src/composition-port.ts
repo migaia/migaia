@@ -2,7 +2,7 @@
  * Owns the existing managed composition surface through explicit context; provenance stays in
  * composition.
  */
-import type { IPluginHostCompositionIntegration } from './composition-types.js'
+import type { IPluginHostCompositionIntegration } from './composition-types.ts'
 
 /** Composition methods are acquired on demand; revision and snapshot authority remain with the Host. */
 export type IManagedHostRuntime = Omit<

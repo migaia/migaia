@@ -1,4 +1,4 @@
-import { ERROR_SOURCE, StoreSharedErrorCode, type IStoreSharedErrorCode } from './error-code.js'
+import { ERROR_SOURCE, StoreSharedErrorCode, type IStoreSharedErrorCode } from './error-code.ts'
 import { attachErrorIdentity } from '@migaia/utils/error'
 
 export { StoreSharedErrorCode, type IStoreSharedErrorCode }

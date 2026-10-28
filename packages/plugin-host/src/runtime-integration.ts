@@ -4,19 +4,19 @@
  * each request is admitted for this exact registration and batch; slot ownership, registrations and
  * Feature activation stay with Host state and the existing plugin handles.
  */
-import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
-import { PluginHostErrorCode } from './error-code.js'
-import { PluginHostRegistrationLifecycle } from './state-constants.js'
-import type { IPluginHostIdentity } from './host-identity-types.js'
-import type { PluginHostState } from './host-state.js'
-import type { PluginHostOperationRuntime } from './operation-runtime.js'
-import type { IInstallBatchContext } from './install-runtime.js'
-import type { IRegistration } from './registry.js'
+import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.ts'
+import { PluginHostErrorCode } from './error-code.ts'
+import { PluginHostRegistrationLifecycle } from './state-constants.ts'
+import type { IPluginHostIdentity } from './host-identity-types.ts'
+import type { PluginHostState } from './host-state.ts'
+import type { PluginHostOperationRuntime } from './operation-runtime.ts'
+import type { IInstallBatchContext } from './install-runtime.ts'
+import type { IRegistration } from './registry.ts'
 import type {
   IPluginRuntimeFeatureSnapshot,
   IPluginRuntimeIntegration,
   IPluginRuntimeSharedSlot
-} from './core.js'
+} from './core.ts'
 
 /** The two handle reads this port needs from the canonical name-addressed plugin handle. */
 type IIntegrationHandle = Readonly<{

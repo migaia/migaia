@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { IRuntime } from '@migaia/reactive'
-import { notifyReact } from '../src/notify-react'
+import { notifyReact } from '../src/notify-react.ts'
 
 function fakeRuntime(overrides: Partial<IRuntime> = {}): IRuntime {
   return {

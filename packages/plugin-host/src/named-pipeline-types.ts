@@ -4,10 +4,10 @@
  */
 import type { INativeAbortSignal } from '@migaia/utils/promise'
 import type { IPendingTracker } from '@migaia/lifecycle'
-import type { StageLaneCollection } from './stage-lanes.js'
-import type { IPluginHostDiagnostic } from './host-options-types.js'
-import type { IDataOrderSlotState } from './composition.js'
-import type { IRegistration } from './registry.js'
+import type { StageLaneCollection } from './stage-lanes.ts'
+import type { IPluginHostDiagnostic } from './host-options-types.ts'
+import type { IDataOrderSlotState } from './composition.ts'
+import type { IRegistration } from './registry.ts'
 
 /** The Host lends existing lifecycle, pending and ordering owners to every pipeline. */
 export type IPipelinePorts<TValue> = Readonly<{

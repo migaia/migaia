@@ -12,14 +12,14 @@ import {
   readPipelineSpec,
   type IPipelineDefinitions,
   type IPipelineSpecOptions
-} from './pipeline-spec.js'
+} from './pipeline-spec.ts'
 import ERROR_TEXT, {
   PluginHostError,
   attachPluginHostIdentity,
   tagPluginHostError
-} from './error-text.js'
-import { PluginHostErrorCode, type IPluginHostErrorCode } from './error-code.js'
-import { PipelineOrder } from './pipeline-constants.js'
+} from './error-text.ts'
+import { PluginHostErrorCode, type IPluginHostErrorCode } from './error-code.ts'
+import { PipelineOrder } from './pipeline-constants.ts'
 
 /** One admitted declaration contains no running stage or lifetime state. */
 type IPipelineDeclaration = Readonly<{

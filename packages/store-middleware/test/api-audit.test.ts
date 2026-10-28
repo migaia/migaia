@@ -1,4 +1,4 @@
-import { immutableSnapshotClone } from '../src/tolerant-clone.js'
+import { immutableSnapshotClone } from '../src/tolerant-clone.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
 import { createStore } from '@migaia/store-light'
@@ -11,7 +11,7 @@ import {
   type IReduxDevToolsMessage,
   type IDevToolsCommand,
   type IStoreMiddlewareHost
-} from '../src/index.js'
+} from '../src/index.ts'
 
 describe('store-middleware audit regressions', () => {
   it.each(['host', 'binding'] as const)(

@@ -3,8 +3,8 @@
  * reused.
  */
 import { MiddlewarePipelineGeneratorSignals } from '@migaia/middleware-pipeline'
-import type { PluginHostPipeline } from './pipeline-entry.js'
-import type { IPipelineStageHandle } from './pipeline-spec.js'
+import type { PluginHostPipeline } from './pipeline-entry.ts'
+import type { IPipelineStageHandle } from './pipeline-spec.ts'
 
 /** Explicit target owner avoids nested generator/callback construction during through admission. */
 export class PluginPipelineThrough<TDomainCore extends object, TValue> {

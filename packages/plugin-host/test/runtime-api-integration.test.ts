@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
-import * as pluginHost from '../src/index.js'
+import * as pluginHost from '../src/index.ts'
 
 /** The fixture facade reads only receipts supplied by the canonical Host integration owner. */
 type IFixtureFacade = Readonly<{ read(target: string): number | undefined }>

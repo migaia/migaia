@@ -14,7 +14,7 @@ import {
   useStoreRuntime,
   type IStoreProviderConfig,
   type StoreRegistry
-} from '../src/index.js'
+} from '../src/index.ts'
 
 /** A real React error boundary exposes failures through the root's public error callback. */
 class ErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {

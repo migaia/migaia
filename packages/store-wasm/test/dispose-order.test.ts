@@ -22,13 +22,13 @@ vi.mock('@migaia/wasm', () => ({
   ptr_of: (id: number) => allocations.get(id) ?? 0
 }))
 
-import { disposeAllWasm, ensureWasm, throwWasmConstructionFailure } from '../src/arena.js'
-import { array } from '../src/array.js'
-import { boolean } from '../src/boolean.js'
-import { record } from '../src/record.js'
-import { string } from '../src/string.js'
-import { StoreWasmErrorCode } from '../src/error-code.js'
-import { number } from '../src/number.js'
+import { disposeAllWasm, ensureWasm, throwWasmConstructionFailure } from '../src/arena.ts'
+import { array } from '../src/array.ts'
+import { boolean } from '../src/boolean.ts'
+import { record } from '../src/record.ts'
+import { string } from '../src/string.ts'
+import { StoreWasmErrorCode } from '../src/error-code.ts'
+import { number } from '../src/number.ts'
 
 describe('WASM cleanup error contract', () => {
   it('rejects invalid record shapes at the public boundary', () => {
