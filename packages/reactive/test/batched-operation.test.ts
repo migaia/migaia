@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { createRuntime } from '../src/index.js'
-import { createBatchedOperation } from '../src/entry/extension.js'
+import { createRuntime } from '../src/index.ts'
+import { createBatchedOperation } from '../src/entry/extension.ts'
 
 /** Bound internal operations own balanced batching while legacy public callbacks keep their arity. */
 describe('bound batched operations', () => {

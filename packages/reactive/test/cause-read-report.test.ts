@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createRuntime, ReactiveErrorPhase } from '../src/index.js'
-import { ReactiveErrorCode } from '../src/error-code.js'
-import { Scheduler } from '../src/runtime/scheduler.class.js'
+import { createRuntime, ReactiveErrorPhase } from '../src/index.ts'
+import { ReactiveErrorCode } from '../src/error-code.ts'
+import { Scheduler } from '../src/runtime/scheduler.class.ts'
 
 /** Runs a batch whose action, flush, and hostile cause getter fail in that order. */
 function runRuntimeFailure(

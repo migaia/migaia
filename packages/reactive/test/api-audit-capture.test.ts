@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { createRuntime } from '../src/index.js'
-import { createObserverBinding, currentRuntimeVersion } from '../src/entry/extension.js'
+import { createRuntime } from '../src/index.ts'
+import { createObserverBinding, currentRuntimeVersion } from '../src/entry/extension.ts'
 
 describe('audited read-only computed capture', () => {
   it('retains committed upstream edges when the injected idle channel runs synchronously', () => {

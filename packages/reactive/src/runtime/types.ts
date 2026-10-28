@@ -1,12 +1,12 @@
 // 反应式内核的公共类型——只放类型，不放实现。谁需要这些类型就从这里 import，不必经过任何具体类/类实例。
 
-import type { IComputedConfig } from '../reactive/computed.class.js'
+import type { IComputedConfig } from '../reactive/computed.class.ts'
 import {
   ReactiveErrorPhase,
   ReactiveTracePhase,
   ReactiveTraceReason,
   ReactiveTraceType
-} from './trace-constants.js'
+} from './trace-constants.ts'
 
 /**
  * A runtime is a registered object created by this library, not a structurally fabricated SPI.

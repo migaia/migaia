@@ -1,13 +1,13 @@
-import { internalRuntimeOf } from '../src/entry/extension.js'
+import { internalRuntimeOf } from '../src/entry/extension.ts'
 import { describe, expect, it, vi } from 'vitest'
 import {
   createRuntime,
   ReactiveTracePhase,
   ReactiveTraceType,
   type IRuntimeTraceEvent
-} from '../src/index.js'
-import { ReactiveTraceReason } from '../src/runtime/trace-constants.js'
-import { createFieldSource } from '../src/entry/extension.js'
+} from '../src/index.ts'
+import { ReactiveTraceReason } from '../src/runtime/trace-constants.ts'
+import { createFieldSource } from '../src/entry/extension.ts'
 
 type IObserverRunEvent = Extract<
   IRuntimeTraceEvent,

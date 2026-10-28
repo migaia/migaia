@@ -1,6 +1,6 @@
-import { internalsOf } from './internals.js'
-import { runReactiveCallbackWith } from '../errors.js'
-import { DependencyTracker } from './dependency-tracker.class.js'
+import { internalsOf } from './internals.ts'
+import { runReactiveCallbackWith } from '../errors.ts'
+import { DependencyTracker } from './dependency-tracker.class.ts'
 import type {
   IObservable,
   IObserver,
@@ -8,8 +8,8 @@ import type {
   IReactiveNodeOptions,
   IReactiveSignal,
   IRuntime
-} from './types.js'
-import type { IComputedConfig } from '../reactive/computed.class.js'
+} from './types.ts'
+import type { IComputedConfig } from '../reactive/computed.class.ts'
 
 /**
  * Factory view for implementation layers that need the existing graph protocols.

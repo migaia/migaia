@@ -2,22 +2,22 @@ import { describe, expect, it, vi } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createRuntime } from '../src/index.js'
-import { createObserverBinding } from '../src/entry/extension.js'
-import { internalsOf, registerInternals } from '../src/runtime/internals.js'
-import { assertReactiveOwnedBy, claimOwnership } from '../src/entry/extension.js'
+import { createRuntime } from '../src/index.ts'
+import { createObserverBinding } from '../src/entry/extension.ts'
+import { internalsOf, registerInternals } from '../src/runtime/internals.ts'
+import { assertReactiveOwnedBy, claimOwnership } from '../src/entry/extension.ts'
 import {
   assertSingleRuntimeCopy,
   brandOwnedValue,
   noteRuntimeCopy,
   resetRuntimeCopiesForTest,
   runtimeCopyCount
-} from '../src/runtime/copy-check.js'
-import { VersionClock } from '../src/runtime/version-clock.class.js'
-import { Scheduler } from '../src/runtime/scheduler.class.js'
-import type { IFlushable } from '../src/runtime/types.js'
-import { ReactiveErrorCode } from '../src/error-code.js'
-import { createReactiveError, REACTIVE_SOURCE } from '../src/errors.js'
+} from '../src/runtime/copy-check.ts'
+import { VersionClock } from '../src/runtime/version-clock.class.ts'
+import { Scheduler } from '../src/runtime/scheduler.class.ts'
+import type { IFlushable } from '../src/runtime/types.ts'
+import { ReactiveErrorCode } from '../src/error-code.ts'
+import { createReactiveError, REACTIVE_SOURCE } from '../src/errors.ts'
 import { parseSync, Visitor, type Node } from 'oxc-parser'
 
 const srcDir = fileURLToPath(new URL('../src', import.meta.url))

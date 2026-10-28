@@ -1,5 +1,5 @@
-import { getDefaultRuntime } from './default-runtime-provider.js'
-import type { IRuntime } from './types.js'
+import { getDefaultRuntime } from './default-runtime-provider.ts'
+import type { IRuntime } from './types.ts'
 
 /**
  * Default shared runtime for `defaultRuntime.signal/computed/effect` and `createStore()` without an

@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { createRuntime } from '../src/index.js'
+import { createRuntime } from '../src/index.ts'
 import {
   createTrackedObserver,
   type ITrackedObserverBinding
-} from '../src/runtime/observer-binding.js'
-import type { IObserver } from '../src/runtime/types.js'
+} from '../src/runtime/observer-binding.ts'
+import type { IObserver } from '../src/runtime/types.ts'
 
 /** Custom observer callbacks can reconnect graph edges even while scheduler batch depth is positive. */
 describe('notification snapshot reuse', () => {

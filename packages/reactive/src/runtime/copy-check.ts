@@ -16,9 +16,9 @@
  *
  * 这套 `Symbol.for` 登记是发布产物与第二份消费者副本共存时的基础设施防线； 当前单体源码树不会因此自动产生第二份 Runtime。
  */
-import { createReactiveError } from '../errors.js'
-import { ReactiveErrorCode } from '../error-code.js'
-import { ReactiveErrorText } from '../error-text.js'
+import { createReactiveError } from '../errors.ts'
+import { ReactiveErrorCode } from '../error-code.ts'
+import { ReactiveErrorText } from '../error-text.ts'
 
 /** 跨副本共享的键。函数化避免 import 时连全局 Symbol registry 都被触碰。 */
 const registryKey = (): symbol => Symbol.for('@migaia/reactive.runtime-copies')

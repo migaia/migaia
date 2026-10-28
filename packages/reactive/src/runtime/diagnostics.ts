@@ -6,8 +6,8 @@ import type {
   IRuntimeNodeDescriptor,
   IRuntimeNodeKind,
   IRuntimeTraceEvent
-} from './types.js'
-import { ReactiveTracePhase, ReactiveTraceType } from './trace-constants.js'
+} from './types.ts'
+import { ReactiveTracePhase, ReactiveTraceType } from './trace-constants.ts'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 
 type INodeRole = 'observable' | 'observer'

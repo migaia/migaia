@@ -1,5 +1,5 @@
-import { createRuntime } from './runtime.class.js'
-import type { IRuntime } from './types.js'
+import { createRuntime } from './runtime.class.ts'
+import type { IRuntime } from './types.ts'
 
 /** Sole owner of the shared convenience runtime; importing this provider does not construct it. */
 let sharedRuntime: IRuntime | undefined

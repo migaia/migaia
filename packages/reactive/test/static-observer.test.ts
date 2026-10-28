@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { createRuntime, ReactiveErrorCode } from '../src/index.js'
-import { Signal } from '../src/reactive/signal.class.js'
-import { createStaticObserver } from '../src/runtime/static-observer.js'
+import { createRuntime, ReactiveErrorCode } from '../src/index.ts'
+import { Signal } from '../src/reactive/signal.class.ts'
+import { createStaticObserver } from '../src/runtime/static-observer.ts'
 
 /** Known-source observers retain graph lifecycle and post-callback version semantics. */
 describe('static observers', () => {

@@ -1,13 +1,13 @@
-import { internalRuntimeOf } from '../src/entry/extension.js'
-import type { IReactiveEffect } from '../src/index.js'
+import { internalRuntimeOf } from '../src/entry/extension.ts'
+import type { IReactiveEffect } from '../src/index.ts'
 import { describe, expect, it } from 'vitest'
 import {
   createRuntime,
   ReactiveTracePhase,
   ReactiveTraceType,
   type IRuntimeTraceEvent
-} from '../src/index.js'
-import { createObserverBinding } from '../src/entry/extension.js'
+} from '../src/index.ts'
+import { createObserverBinding } from '../src/entry/extension.ts'
 
 type IObserverRunEvent = Extract<
   IRuntimeTraceEvent,

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createRuntime } from '../src/index.js'
+import { createRuntime } from '../src/index.ts'
 import {
   createSourceBinding,
   createTrackedObserver,
@@ -7,7 +7,7 @@ import {
   type IObservable,
   type IRuntimeSourceBinding,
   type ITrackedObserverBinding
-} from '../src/entry/extension.js'
+} from '../src/entry/extension.ts'
 
 describe('audited reactive boundary contracts', () => {
   it.each(['native', 'getter'] as const)(

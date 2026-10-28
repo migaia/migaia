@@ -1,7 +1,7 @@
-import type { Computed } from '../src/reactive/computed.class.js'
-import { currentRuntimeVersion } from '../src/entry/extension.js'
+import type { Computed } from '../src/reactive/computed.class.ts'
+import { currentRuntimeVersion } from '../src/entry/extension.ts'
 import { describe, expect, it } from 'vitest'
-import { createRuntime } from '../src/index.js'
+import { createRuntime } from '../src/index.ts'
 
 describe('Signal', () => {
   it('rebuilds conditional dependencies after an untracked preview', () => {

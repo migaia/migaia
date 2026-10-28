@@ -4,7 +4,9 @@
     "rootDir": "src",
     "outDir": "dist",
     "lib": ["ES2024"],
-    "types": []
+    "types": [],
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true
   },
   "include": ["src", "../utils/types/host-globals.d.ts"]
 }

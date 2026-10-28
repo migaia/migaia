@@ -4,13 +4,13 @@ import type {
   IObserver,
   IReactiveNodeOptions,
   IRuntime
-} from './types.js'
-import { internalsOf, type IRuntimeInternals } from './internals.js'
-import { claimOwnership } from './ownership.js'
-import { registerDeps, registerDepVersions } from './node-internals.js'
-import { createObserverRunTrace, describeObserver } from './diagnostics.js'
-import { ReactiveErrorPhase } from './trace-constants.js'
-import { runReactiveCallbackWith } from '../errors.js'
+} from './types.ts'
+import { internalsOf, type IRuntimeInternals } from './internals.ts'
+import { claimOwnership } from './ownership.ts'
+import { registerDeps, registerDepVersions } from './node-internals.ts'
+import { createObserverRunTrace, describeObserver } from './diagnostics.ts'
+import { ReactiveErrorPhase } from './trace-constants.ts'
+import { runReactiveCallbackWith } from '../errors.ts'
 
 /**
  * An owner's stable source object reads exactly its one graph node. Resolver work may materialize

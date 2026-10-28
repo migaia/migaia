@@ -38,8 +38,8 @@ import {
   isNativeErrorValue,
   tryReadProperty
 } from '@migaia/utils/error'
-import { ERROR_SOURCE, ReactiveErrorCode } from './error-code.js'
-import { ReactiveErrorText } from './error-text.js'
+import { ERROR_SOURCE, ReactiveErrorCode } from './error-code.ts'
+import { ReactiveErrorText } from './error-text.ts'
 
 /**
  * Gives unclassified native callback Errors the owning boundary's identity. Non-Error object throws

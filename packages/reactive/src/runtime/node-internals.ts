@@ -1,8 +1,8 @@
-import type { IObserver } from '../runtime/types.js'
-import { forwardCollectionCallback } from './receiver.js'
-import { createReactiveError } from '../errors.js'
-import { ReactiveErrorCode } from '../error-code.js'
-import { ReactiveErrorText } from '../error-text.js'
+import type { IObserver } from '../runtime/types.ts'
+import { forwardCollectionCallback } from './receiver.ts'
+import { createReactiveError } from '../errors.ts'
+import { ReactiveErrorCode } from '../error-code.ts'
+import { ReactiveErrorText } from '../error-text.ts'
 
 const sets = new WeakMap<object, Set<IObserver>>()
 /** Unobserved notifications share one private empty result without retaining any graph node. */

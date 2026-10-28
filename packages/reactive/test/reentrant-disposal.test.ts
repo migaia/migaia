@@ -1,8 +1,8 @@
-import { internalRuntimeOf } from '../src/entry/extension.js'
-import type { IReactiveEffect } from '../src/index.js'
+import { internalRuntimeOf } from '../src/entry/extension.ts'
+import type { IReactiveEffect } from '../src/index.ts'
 import { describe, expect, it } from 'vitest'
-import { createRuntime } from '../src/index.js'
-import { createObserverBinding } from '../src/entry/extension.js'
+import { createRuntime } from '../src/index.ts'
+import { createObserverBinding } from '../src/entry/extension.ts'
 
 describe('effect terminal reentrancy', () => {
   it('cleanup self-disposal stops rerun, removes edges, and leaves queue empty', () => {

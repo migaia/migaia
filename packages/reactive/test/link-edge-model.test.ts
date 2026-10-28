@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createRuntime, ReactiveErrorCode } from '../src/index.js'
+import { createRuntime, ReactiveErrorCode } from '../src/index.ts'
 import {
   createObserverBinding,
   createTrackedObserver,
@@ -8,7 +8,7 @@ import {
   type IObservable,
   type IObserver,
   type ITrackedObserverBinding
-} from '../src/entry/extension.js'
+} from '../src/entry/extension.ts'
 
 /** Source identities and ordered subscriber sets belong only to the independent reference graph. */
 type IModelSource = {

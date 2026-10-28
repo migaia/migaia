@@ -1,4 +1,4 @@
-import type { IReactiveRuntimeAdapter } from './types.js'
+import type { IReactiveRuntimeAdapter } from './types.ts'
 
 /**
  * Default runtime adapter and the sole host API boundary .

@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createRuntime, ReactiveErrorCode, type IRuntime } from '../src/index.js'
+import { createRuntime, ReactiveErrorCode, type IRuntime } from '../src/index.ts'
 import {
   createSourceBinding,
   type IObservable,
   type IObserver,
   type IRuntimeSourceBinding
-} from '../src/entry/extension.js'
+} from '../src/entry/extension.ts'
 
 /** Uses the same graph identity and construction protocol as a SAB custom source. */
 class CustomSource implements IObservable {

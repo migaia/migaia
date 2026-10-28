@@ -2,13 +2,13 @@ import {
   getDefaultRuntime,
   currentRuntimeVersion,
   deferRuntimeCleanup
-} from '../src/entry/extension.js'
+} from '../src/entry/extension.ts'
 import { describe, expect, it } from 'vitest'
 import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import * as reactivePublicApi from '../src/index.js'
-import { createRuntime } from '../src/index.js'
-import { ReactiveErrorCode } from '../src/error-code.js'
+import * as reactivePublicApi from '../src/index.ts'
+import { createRuntime } from '../src/index.ts'
+import { ReactiveErrorCode } from '../src/error-code.ts'
 
 const srcDir = fileURLToPath(new URL('../src', import.meta.url))
 

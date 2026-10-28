@@ -1,11 +1,11 @@
-import { currentRuntimeVersion } from '../src/entry/extension.js'
+import { currentRuntimeVersion } from '../src/entry/extension.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createRuntime } from '../src/index.js'
-import { noteRuntimeCopy, resetRuntimeCopiesForTest } from '../src/runtime/copy-check.js'
-import { ReactiveErrorCode } from '../src/error-code.js'
+import { createRuntime } from '../src/index.ts'
+import { noteRuntimeCopy, resetRuntimeCopiesForTest } from '../src/runtime/copy-check.ts'
+import { ReactiveErrorCode } from '../src/error-code.ts'
 
 const srcDir = fileURLToPath(new URL('../src', import.meta.url))
 

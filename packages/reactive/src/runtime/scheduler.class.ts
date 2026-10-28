@@ -1,8 +1,8 @@
-import type { IFlushable, IFlushResult, ISchedulerStrategy } from './types.js'
-import { createReactiveError, tagReactiveError } from '../errors.js'
-import { ReactiveErrorCode } from '../error-code.js'
-import { ReactiveErrorText } from '../error-text.js'
-import { defaultRuntimeAdapter } from './default-runtime-adapter.js'
+import type { IFlushable, IFlushResult, ISchedulerStrategy } from './types.ts'
+import { createReactiveError, tagReactiveError } from '../errors.ts'
+import { ReactiveErrorCode } from '../error-code.ts'
+import { ReactiveErrorText } from '../error-text.ts'
+import { defaultRuntimeAdapter } from './default-runtime-adapter.ts'
 import {
   assimilateCapturedThen,
   inspectThenable as inspectCallbackThenable,
@@ -11,7 +11,7 @@ import {
   ThenableProbeKind
 } from '@migaia/utils/function'
 import { tryReadProperty } from '@migaia/utils/error'
-import { ReactiveErrorPhase, type IReactiveErrorPhase } from './trace-constants.js'
+import { ReactiveErrorPhase, type IReactiveErrorPhase } from './trace-constants.ts'
 
 /** 用 `defineProperty` 安全附加 `cause`；失败（frozen / non-extensible）返回 false。 */
 const attachCauseSafely = (error: Error, cause: unknown): boolean => {

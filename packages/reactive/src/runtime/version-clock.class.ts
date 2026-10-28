@@ -1,6 +1,6 @@
-import { createReactiveError, tagReactiveError } from '../errors.js'
-import { ReactiveErrorCode } from '../error-code.js'
-import { ReactiveErrorText } from '../error-text.js'
+import { createReactiveError, tagReactiveError } from '../errors.ts'
+import { ReactiveErrorCode } from '../error-code.ts'
+import { ReactiveErrorText } from '../error-text.ts'
 
 // Monotonic version counter shared by memo invalidation, stale-check shortcuts, and time-travel anchors.
 export class VersionClock {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { createRuntime } from '../src/index.js'
-import { ReactiveErrorCode } from '../src/error-code.js'
-import { ReactiveErrorText } from '../src/error-text.js'
+import { createRuntime } from '../src/index.ts'
+import { ReactiveErrorCode } from '../src/error-code.ts'
+import { ReactiveErrorText } from '../src/error-text.ts'
 
 describe('reactive guarded-read policy', () => {
   it('keeps option and adapter getter failures as INVALID_OPTION causes', () => {

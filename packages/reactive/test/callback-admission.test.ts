@@ -1,9 +1,9 @@
-import { internalRuntimeOf } from '../src/entry/extension.js'
-import type { IReactiveEffect } from '../src/index.js'
+import { internalRuntimeOf } from '../src/entry/extension.ts'
+import type { IReactiveEffect } from '../src/index.ts'
 import { describe, expect, it, vi } from 'vitest'
-import { createRuntime } from '../src/index.js'
-import { ReactiveErrorCode } from '../src/error-code.js'
-import { Scheduler } from '../src/runtime/scheduler.class.js'
+import { createRuntime } from '../src/index.ts'
+import { ReactiveErrorCode } from '../src/error-code.ts'
+import { Scheduler } from '../src/runtime/scheduler.class.ts'
 
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
 

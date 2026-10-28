@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createRuntime } from '../src/index.js'
+import { createRuntime } from '../src/index.ts'
 
 describe('reactive foundation', () => {
   it('propagates signal changes through computed and effect', () => {

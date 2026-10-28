@@ -1,8 +1,8 @@
-import type { IRuntime } from './types.js'
-import { assertNoForeignOwnershipBrand, brandOwnedValue } from './copy-check.js'
-import { createReactiveError } from '../errors.js'
-import { ReactiveErrorCode } from '../error-code.js'
-import { ReactiveErrorText } from '../error-text.js'
+import type { IRuntime } from './types.ts'
+import { assertNoForeignOwnershipBrand, brandOwnedValue } from './copy-check.ts'
+import { createReactiveError } from '../errors.ts'
+import { ReactiveErrorCode } from '../error-code.ts'
+import { ReactiveErrorText } from '../error-text.ts'
 
 /**
  * 唯一所有权登记。

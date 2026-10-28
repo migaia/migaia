@@ -1,9 +1,9 @@
-import type { IRuntime } from './types.js'
-import { internalsOf } from './internals.js'
-import { ReactiveErrorPhase } from './trace-constants.js'
-import { tagReactiveError } from '../errors.js'
-import { ReactiveErrorCode } from '../error-code.js'
-import { ReactiveErrorText } from '../error-text.js'
+import type { IRuntime } from './types.ts'
+import { internalsOf } from './internals.ts'
+import { ReactiveErrorPhase } from './trace-constants.ts'
+import { tagReactiveError } from '../errors.ts'
+import { ReactiveErrorCode } from '../error-code.ts'
+import { ReactiveErrorText } from '../error-text.ts'
 
 /** Schedules synchronous adapter cleanup on its Runtime's existing idle channel, reporting throws. */
 export function deferRuntimeCleanup(runtime: IRuntime, task: () => void): void {

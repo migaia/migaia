@@ -1,15 +1,15 @@
-import { internalsOf } from './internals.js'
-import { claimOwnership } from './ownership.js'
-import type { IObservable, IObserver, IRuntime } from './types.js'
-import { createReactiveError } from '../errors.js'
-import { ReactiveErrorCode } from '../error-code.js'
-import { ReactiveErrorText } from '../error-text.js'
+import { internalsOf } from './internals.ts'
+import { claimOwnership } from './ownership.ts'
+import type { IObservable, IObserver, IRuntime } from './types.ts'
+import { createReactiveError } from '../errors.ts'
+import { ReactiveErrorCode } from '../error-code.ts'
+import { ReactiveErrorText } from '../error-text.ts'
 import {
   assertGraphNodeUnregistered,
   registerSubs,
   registerVersion,
   readVersion
-} from './node-internals.js'
+} from './node-internals.ts'
 
 /** Controlled source lifecycle and notification capabilities without exposing the graph node. */
 export type IRuntimeFieldSource = {

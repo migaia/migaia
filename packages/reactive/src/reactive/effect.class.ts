@@ -5,16 +5,16 @@ import type {
   IObserver,
   IReactiveNodeOptions,
   IRuntime
-} from '../runtime/types.js'
-import { internalsOf, type IRuntimeInternals } from '../runtime/internals.js'
-import { claimOwnership } from '../runtime/ownership.js'
-import { createObserverRunTrace, describeObserver } from '../runtime/diagnostics.js'
+} from '../runtime/types.ts'
+import { internalsOf, type IRuntimeInternals } from '../runtime/internals.ts'
+import { claimOwnership } from '../runtime/ownership.ts'
+import { createObserverRunTrace, describeObserver } from '../runtime/diagnostics.ts'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
-import { registerDeps, registerDepVersions } from '../runtime/node-internals.js'
-import { ReactiveErrorPhase } from '../runtime/trace-constants.js'
-import { createReactiveError, tagReactiveError } from '../errors.js'
-import { ReactiveErrorCode } from '../error-code.js'
-import { ReactiveErrorText } from '../error-text.js'
+import { registerDeps, registerDepVersions } from '../runtime/node-internals.ts'
+import { ReactiveErrorPhase } from '../runtime/trace-constants.ts'
+import { createReactiveError, tagReactiveError } from '../errors.ts'
+import { ReactiveErrorCode } from '../error-code.ts'
+import { ReactiveErrorText } from '../error-text.ts'
 
 // Effects are scheduled observers. A `Computed` propagates dirty state; the scheduler calls an `Effect` through `tick`.
 export class Effect implements IObserver, IDisposable {

@@ -1,22 +1,22 @@
 import { tryReadProperty } from '@migaia/utils/error'
-import { DependencyTracker, markSubscribers } from './dependency-tracker.class.js'
-import { Scheduler } from './scheduler.class.js'
-import { VersionClock } from './version-clock.class.js'
-import { defaultRuntimeAdapter } from './default-runtime-adapter.js'
-import { internalsOf, registerInternals } from './internals.js'
-import { assertReactiveOwnedBy } from './ownership.js'
-import { readVersion, setVersion } from './node-internals.js'
-import { consumePendingCopyWarning, noteRuntimeCopy } from './copy-check.js'
-import { createReactiveError, runReactiveCallback, tagReactiveError } from '../errors.js'
+import { DependencyTracker, markSubscribers } from './dependency-tracker.class.ts'
+import { Scheduler } from './scheduler.class.ts'
+import { VersionClock } from './version-clock.class.ts'
+import { defaultRuntimeAdapter } from './default-runtime-adapter.ts'
+import { internalsOf, registerInternals } from './internals.ts'
+import { assertReactiveOwnedBy } from './ownership.ts'
+import { readVersion, setVersion } from './node-internals.ts'
+import { consumePendingCopyWarning, noteRuntimeCopy } from './copy-check.ts'
+import { createReactiveError, runReactiveCallback, tagReactiveError } from '../errors.ts'
 import { observeThenableRejection } from '@migaia/utils/function'
-import { ReactiveErrorCode } from '../error-code.js'
-import { ReactiveErrorText } from '../error-text.js'
+import { ReactiveErrorCode } from '../error-code.ts'
+import { ReactiveErrorText } from '../error-text.ts'
 import {
   ReactiveErrorPhase,
   ReactiveTracePhase,
   ReactiveTraceReason,
   ReactiveTraceType
-} from './trace-constants.js'
+} from './trace-constants.ts'
 import {
   containDiagnosticRejection,
   describeObservable,
@@ -24,8 +24,8 @@ import {
   readDiagnosticClock,
   sanitizeErrorContext,
   sanitizeTraceEvent
-} from './diagnostics.js'
-import { createReceiverCallback } from './receiver.js'
+} from './diagnostics.ts'
+import { createReceiverCallback } from './receiver.ts'
 import {
   RUNTIME_BRAND,
   type IDisposer,
@@ -38,10 +38,10 @@ import {
   type IRuntimeOptions,
   type IReactiveRuntimeAdapter,
   type IRuntimeTraceEvent
-} from './types.js'
-import { Signal } from '../reactive/signal.class.js'
-import { Computed, type IComputedConfig } from '../reactive/computed.class.js'
-import { Effect } from '../reactive/effect.class.js'
+} from './types.ts'
+import { Signal } from '../reactive/signal.class.ts'
+import { Computed, type IComputedConfig } from '../reactive/computed.class.ts'
+import { Effect } from '../reactive/effect.class.ts'
 
 // Each `Runtime` owns an independent version clock, tracking context, flush scheduler, and node factories.
 // Nodes share a dependency graph and monotonic clock within one runtime. Different runtimes are isolated.

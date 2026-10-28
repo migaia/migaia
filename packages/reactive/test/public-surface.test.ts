@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
-import * as publicApi from '../src/index.js'
-import type { IRuntime } from '../src/index.js'
+import * as publicApi from '../src/index.ts'
+import type { IRuntime } from '../src/index.ts'
 
 describe('public-surface convergence', () => {
   it('exposes only application and controlled extension entries', async () => {
@@ -19,7 +19,7 @@ describe('public-surface convergence', () => {
     }
     expect(publicApi.assertSingleRuntimeCopy).toBeTypeOf('function')
     /** Extension entry exposes controlled graph participation without mutable runtime services. */
-    const extension = await import('../src/entry/extension.js')
+    const extension = await import('../src/entry/extension.ts')
     for (const name of [
       'currentRuntimeVersion',
       'claimOwnership',
@@ -122,7 +122,7 @@ describe('public-surface convergence', () => {
       expect.objectContaining({ code: 'INVALID_OPTION', source: 'reactive' })
     )
     /** Read-only clock query rejects objects without registered runtime ownership. */
-    const { currentRuntimeVersion } = await import('../src/entry/extension.js')
+    const { currentRuntimeVersion } = await import('../src/entry/extension.ts')
     /** Baseline clock value distinguishes a later source write. */
     const previousVersion = currentRuntimeVersion(runtime)
     signal.value = 3

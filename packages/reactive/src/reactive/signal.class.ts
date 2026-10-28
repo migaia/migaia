@@ -4,20 +4,20 @@ import type {
   IObserver,
   IReactiveNodeOptions,
   IRuntime
-} from '../runtime/types.js'
-import { internalsOf, type IRuntimeInternals } from '../runtime/internals.js'
-import { claimOwnership } from '../runtime/ownership.js'
-import { describeObservable, emitTraceSafely } from '../runtime/diagnostics.js'
-import { registerSubs } from '../runtime/node-internals.js'
-import { createReactiveError, tagReactiveError } from '../errors.js'
-import { ReactiveErrorCode } from '../error-code.js'
-import { markSubscribers } from '../runtime/dependency-tracker.class.js'
+} from '../runtime/types.ts'
+import { internalsOf, type IRuntimeInternals } from '../runtime/internals.ts'
+import { claimOwnership } from '../runtime/ownership.ts'
+import { describeObservable, emitTraceSafely } from '../runtime/diagnostics.ts'
+import { registerSubs } from '../runtime/node-internals.ts'
+import { createReactiveError, tagReactiveError } from '../errors.ts'
+import { ReactiveErrorCode } from '../error-code.ts'
+import { markSubscribers } from '../runtime/dependency-tracker.class.ts'
 import {
   ReactiveErrorPhase,
   ReactiveTraceReason,
   ReactiveTraceType
-} from '../runtime/trace-constants.js'
-import { ReactiveErrorText } from '../error-text.js'
+} from '../runtime/trace-constants.ts'
+import { ReactiveErrorText } from '../error-text.ts'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 
 // Writable atom: the source value from which `Computed` and `Effect` derive their results.

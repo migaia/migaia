@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createRuntime, type IReactiveEffect, type IRuntime } from '../src/index.js'
+import { createRuntime, type IReactiveEffect, type IRuntime } from '../src/index.ts'
 import {
   createStaticObserver,
   createSourceBinding,
@@ -10,7 +10,7 @@ import {
   type IObserver,
   type IRuntimeSourceBinding,
   type ITrackedObserverBinding
-} from '../src/entry/extension.js'
+} from '../src/entry/extension.ts'
 
 /** Controlled observers exercise synchronous graph callbacks through the supported extension entry. */
 type IControlledObserver = {

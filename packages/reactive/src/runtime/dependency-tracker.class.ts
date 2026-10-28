@@ -1,24 +1,24 @@
-import type { IObservable, IObserver, IRuntime } from './types.js'
-import { internalsOf } from './internals.js'
-import { assertReactiveOwnedBy } from './ownership.js'
-import { describeObservable, describeObserver, emitTraceSafely } from './diagnostics.js'
-import { createReactiveError, runReactiveCallback } from '../errors.js'
-import { ReactiveErrorCode } from '../error-code.js'
-import { ReactiveErrorText } from '../error-text.js'
+import type { IObservable, IObserver, IRuntime } from './types.ts'
+import { internalsOf } from './internals.ts'
+import { assertReactiveOwnedBy } from './ownership.ts'
+import { describeObservable, describeObserver, emitTraceSafely } from './diagnostics.ts'
+import { createReactiveError, runReactiveCallback } from '../errors.ts'
+import { ReactiveErrorCode } from '../error-code.ts'
+import { ReactiveErrorText } from '../error-text.ts'
 import {
   ReactiveDependencyKind,
   ReactiveErrorPhase,
   ReactiveTracePhase,
   ReactiveTraceReason,
   ReactiveTraceType
-} from './trace-constants.js'
+} from './trace-constants.ts'
 import {
   mutableSubs as mutableNodeSubs,
   mutableDeps as mutableNodeDeps,
   mutableDepVersions as mutableNodeVersions,
   snapshotSubs,
   invalidateSubsSnapshot
-} from './node-internals.js'
+} from './node-internals.ts'
 
 function mutableSubs(observable: IObservable): Set<IObserver> {
   return mutableNodeSubs(observable, observable.subs)

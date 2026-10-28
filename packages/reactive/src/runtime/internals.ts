@@ -1,11 +1,11 @@
-import type { DependencyTracker } from './dependency-tracker.class.js'
-import type { Scheduler } from './scheduler.class.js'
-import type { VersionClock } from './version-clock.class.js'
-import type { IObservable, IRuntime, IRuntimeTraceEvent } from './types.js'
-import { createReactiveError } from '../errors.js'
-import { ReactiveErrorCode } from '../error-code.js'
-import { noteRuntimeCopy } from './copy-check.js'
-import { ReactiveErrorText } from '../error-text.js'
+import type { DependencyTracker } from './dependency-tracker.class.ts'
+import type { Scheduler } from './scheduler.class.ts'
+import type { VersionClock } from './version-clock.class.ts'
+import type { IObservable, IRuntime, IRuntimeTraceEvent } from './types.ts'
+import { createReactiveError } from '../errors.ts'
+import { ReactiveErrorCode } from '../error-code.ts'
+import { noteRuntimeCopy } from './copy-check.ts'
+import { ReactiveErrorText } from '../error-text.ts'
 
 /**
  * Kernel internals boundary.

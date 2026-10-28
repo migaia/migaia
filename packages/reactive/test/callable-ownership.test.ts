@@ -1,6 +1,6 @@
 import { expect, it, vi } from 'vitest'
-import { createRuntime } from '../src/index.js'
-import { assertOwnedBy, claimOwnership, ownerOf } from '../src/entry/extension.js'
+import { createRuntime } from '../src/index.ts'
+import { assertOwnedBy, claimOwnership, ownerOf } from '../src/entry/extension.ts'
 
 it('returns the registered runtime for callable objects', () => {
   /** Callable extension values share the same object ownership contract as ordinary nodes. */
@@ -33,7 +33,7 @@ it('rejects foreign-copy callable ownership through the public extension entry',
   claimOwnership(value, runtime)
   vi.resetModules()
   /** Reloading the public entry models a second module copy with its own ownership WeakMap. */
-  const foreign = await import('../src/entry/extension.js')
+  const foreign = await import('../src/entry/extension.ts')
   expect(() => foreign.ownerOf(value)).toThrow(
     expect.objectContaining({ source: 'reactive', code: 'COPY_CONFLICT' })
   )
