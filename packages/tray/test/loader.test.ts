@@ -165,7 +165,9 @@ describe('@migaia/tray/loader', () => {
     expect(host.plugins).toEqual([])
     await host.dispose()
   })
+})
 
+describe('@migaia/tray/loader', () => {
   it('rolls back the artifact at the loader-host adapter boundary', async () => {
     const host = (await createManagedHost()) as any
     let releaseCount = 0

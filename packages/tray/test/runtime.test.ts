@@ -176,7 +176,9 @@ describe('@migaia/tray/runtime', () => {
     await runtime.dispose()
     await host.dispose()
   })
+})
 
+describe('@migaia/tray/runtime', () => {
   it('cooperatively aborts a caller signal without releasing the lease before callback settlement', async () => {
     const host = (await createManagedHost()) as any
     await installPlugin(host)
@@ -308,7 +310,9 @@ describe('@migaia/tray/runtime', () => {
     })
     await host.dispose()
   })
+})
 
+describe('@migaia/tray/runtime', () => {
   it('commits async-after-await self-unUse through an exact run ticket', async () => {
     const host = (await createManagedHost()) as any
     await installPlugin(host)

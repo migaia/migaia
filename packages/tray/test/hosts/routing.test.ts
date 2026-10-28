@@ -65,6 +65,7 @@ describe('mesh routing and admission accounting', () => {
       await tray.dispose()
     }
   }, 30000)
+
   it('registers custom policies from DSL and options, routes every kind and authenticates child declaration', async () => {
     /** Shared branded policies are imported by genuine native entries. */
     const api = await fixture()
@@ -162,7 +163,9 @@ describe('mesh routing and admission accounting', () => {
       await parent.dispose()
     }
   }, 30000)
+})
 
+describe('mesh routing and admission accounting', () => {
   it('preserves policy error identity, rejects invalid registration and never retries unavailable or unknown targets', async () => {
     const api = await fixture()
     const original = Object.assign(new Error('fixture routing failure'), {
@@ -375,7 +378,9 @@ describe('mesh routing and admission accounting', () => {
       await tray.dispose()
     }
   }, 30000)
+})
 
+describe('mesh routing and admission accounting', () => {
   it('releases admission counts for every completion and never decrements a new same-id admission', async () => {
     /** This existing owner accepts a transport callback, so no public test seam is introduced. */
     const { createRegistry } = await import('../../src/hosts/parent/registry.ts')

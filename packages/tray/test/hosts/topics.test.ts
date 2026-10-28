@@ -214,7 +214,9 @@ describe('Tray business topics', () => {
     await off()
     topics.close()
   })
+})
 
+describe('Tray business topics', () => {
   it('thread last off, active restart, crash restart and process removal isolate memberships', async () => {
     /** Existing thread child entry serves the same host name with this parent supervision policy. */
     const api = await fixture()
