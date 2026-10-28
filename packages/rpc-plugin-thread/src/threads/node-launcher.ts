@@ -5,7 +5,7 @@
 import { deferred, hostRethrowReporter, type IAbortSignal } from '@migaia/utils/promise'
 import type { ILaunchContext } from '@migaia/supervision'
 import { readRpcLaunchFacts, defaultRpcId, IpcReporterContext } from '@migaia/rpc-host/sdk'
-import { threadRuntimeResource } from './runtime-resource.js'
+import { threadRuntimeResource } from './runtime-resource.ts'
 import type { IThreadHandle, IThreadLauncher, IThreadUsage } from '@migaia/supervision/threads'
 import { ThreadLimit } from '@migaia/supervision/threads'
 import { attachErrorIdentity } from '@migaia/utils/error'
@@ -20,13 +20,13 @@ import type {
   IThreadNativeWorker,
   IThreadRuntimeResource,
   IThreadNodePort
-} from './runtime-types.js'
-import { ThreadErrorText } from './error-text.js'
-import { THREAD_FINGERPRINT_PREFIX, THREAD_HEAP_ERROR_CODE, ThreadEvent } from './constants.js'
-import { absoluteThreadEntry, portableThreadSpec } from './error.js'
-import { createNodeThreadCarrier } from './channel.js'
-import { createThreadBootstrap } from './bootstrap.js'
-import type { IThreadChannelFactory, IThreadChannelOptions, IThreadLaunchOptions } from './types.js'
+} from './runtime-types.ts'
+import { ThreadErrorText } from './error-text.ts'
+import { THREAD_FINGERPRINT_PREFIX, THREAD_HEAP_ERROR_CODE, ThreadEvent } from './constants.ts'
+import { absoluteThreadEntry, portableThreadSpec } from './error.ts'
+import { createNodeThreadCarrier } from './channel.ts'
+import { createThreadBootstrap } from './bootstrap.ts'
+import type { IThreadChannelFactory, IThreadChannelOptions, IThreadLaunchOptions } from './types.ts'
 
 /** Native execution and its borrowed message port retain separate cleanup owners. */
 export type INodeThreadHandle = IThreadHandle &

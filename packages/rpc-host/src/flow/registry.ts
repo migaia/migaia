@@ -3,11 +3,11 @@ import type { IPluginHostCore } from '@migaia/plugin-host'
 import { containAsyncRejection } from '@migaia/lifecycle'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IRpcObservation } from '@migaia/rpc-contract/interfaces'
-import { HostErrorText } from '../host/error-text.js'
-import { defaultRpcWarning, type IRpcWarning } from '../host/warning.js'
-import type { IRpcFlowFeature, IRpcFlowInstallation, IRpcFlowSetupContext } from '../sdk/types.js'
-import type { IRpcFlowEntry, IRpcSharedFlows } from '../sdk/metadata.js'
-import type { RpcTransportFlowProgram } from '../sdk/flow-program.js'
+import { HostErrorText } from '../host/error-text.ts'
+import { defaultRpcWarning, type IRpcWarning } from '../host/warning.ts'
+import type { IRpcFlowFeature, IRpcFlowInstallation, IRpcFlowSetupContext } from '../sdk/types.ts'
+import type { IRpcFlowEntry, IRpcSharedFlows } from '../sdk/metadata.ts'
+import type { RpcTransportFlowProgram } from '../sdk/flow-program.ts'
 import {
   RpcFlowPoint,
   invalidFlow,
@@ -15,7 +15,7 @@ import {
   RpcFlowPipelines,
   type IRpcFlowCore,
   type IRpcFlowStage
-} from '../sdk/flow-pipelines.js'
+} from '../sdk/flow-pipelines.ts'
 
 /** Inner-to-outer fixed positions retain canonical dependency order within each native bucket. */
 const flowPositions = {

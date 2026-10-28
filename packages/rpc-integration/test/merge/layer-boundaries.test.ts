@@ -63,12 +63,12 @@ function layerViolations(file: string, source: string): string[] {
           ? statement.source?.value
           : undefined
     if (specifier === undefined) continue
-    /** Source imports retain this branch's emitted-JavaScript specifier convention. */
+    /** Source imports name their actual TypeScript source files. */
     const isRelative = specifier.startsWith('.')
     /** No package may reach a sibling's private files, including through re-exports. */
-    const resolved = isRelative ? resolve(dirname(file), specifier.replace(/\.js$/u, '.ts')) : ''
+    const resolved = isRelative ? resolve(dirname(file), specifier) : ''
     let invalid =
-      isRelative && (!resolved.startsWith(owner.root + sep) || extname(specifier) !== '.js')
+      isRelative && (!resolved.startsWith(owner.root + sep) || extname(specifier) !== '.ts')
     if (!isRelative && specifier.startsWith('@migaia/rpc/')) invalid = true
     if (!isRelative && specifier.startsWith('@migaia/rpc-')) {
       /** Ordinary entries must exist and point inward to the owning package's public surface. */
@@ -173,19 +173,19 @@ describe('layer dependency direction', () => {
       'process to private host',
       'rpc-plugin-process',
       'process/plugin.ts',
-      "import '../../../rpc-host/src/call/table.js'"
+      "import '../../../rpc-host/src/call/table.ts'"
     ],
     [
       'host to private browser',
       'rpc-host',
       'host/rpc-host.ts',
-      "import '../../../rpc-plugin-browser/src/browser/plugin.js'"
+      "import '../../../rpc-plugin-browser/src/browser/plugin.ts'"
     ],
     [
       'browser to private host',
       'rpc-plugin-browser',
       'browser/plugin.ts',
-      "import '../../../rpc-host/src/call/table.js'"
+      "import '../../../rpc-host/src/call/table.ts'"
     ],
     [
       'browser legacy import',
@@ -193,13 +193,13 @@ describe('layer dependency direction', () => {
       'browser/plugin.ts',
       "import '@migaia/rpc/contract'"
     ],
-    ['browser escape', 'rpc-plugin-browser', 'browser/plugin.ts', "import '../../../outside.js'"],
+    ['browser escape', 'rpc-plugin-browser', 'browser/plugin.ts', "import '../../../outside.ts'"],
     ['host self-reference', 'rpc-host', 'host/rpc-host.ts', "import '@migaia/rpc/contract'"],
     [
       'browser private re-export',
       'rpc-plugin-browser',
       'browser/plugin.ts',
-      "export * from '../../../rpc-host/src/call/table.js'"
+      "export * from '../../../rpc-host/src/call/table.ts'"
     ],
     [
       'contract host re-export',
@@ -218,7 +218,7 @@ describe('layer dependency direction', () => {
       'browser sibling',
       'rpc-plugin-browser',
       'browser/adapters/window.ts',
-      "import './broadcast-channel.js'"
+      "import './broadcast-channel.ts'"
     ],
     [
       'browser public SDK',
@@ -244,7 +244,7 @@ describe('layer dependency direction', () => {
       'process/plugin.ts',
       "import '@migaia/rpc-host/sdk'"
     ],
-    ['contract sibling owner', 'rpc-contract', 'contract/error.ts', "import '../wire/limits.js'"]
+    ['contract sibling owner', 'rpc-contract', 'contract/error.ts', "import '../wire/limits.ts'"]
   ])('accepts %s', (_case, owner, file, source) => {
     expect(layerViolations(ownerFile(owner, file), source)).toEqual([])
   })

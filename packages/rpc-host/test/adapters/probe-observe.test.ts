@@ -20,7 +20,7 @@ import { createNodeThreadCarrier } from '../../../rpc-plugin-thread/dist/threads
 import { createSharedWorkerCarrier } from '../../../rpc-plugin-browser/dist/browser/adapters/shared-worker.js'
 import { createDedicatedWorkerCarrier } from '../../../rpc-plugin-browser/dist/browser/adapters/dedicated-worker.js'
 import type { IBrowserEventPort } from '../../../rpc-plugin-browser/dist/browser/native-message.js'
-import { MemoryCarrier } from '../fixtures/core-carrier.js'
+import { MemoryCarrier } from '../fixtures/core-carrier.ts'
 
 /** Only original native callback registrations and native structured-clone delivery live here. */
 class NativeMessages {

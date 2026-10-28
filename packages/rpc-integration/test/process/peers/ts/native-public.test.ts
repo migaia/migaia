@@ -1,5 +1,5 @@
 /** Original TS native business runs through the real public Process namespace. */
-import { PeerMethod, PeerText } from './text.js'
+import { PeerMethod, PeerText } from './text.ts'
 import { spawn, execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { once } from 'node:events'
@@ -13,7 +13,7 @@ import { RpcWireProfile } from '@migaia/rpc-contract/protocol'
 import type { IRpcSessionHandle } from '@migaia/rpc-contract/interfaces'
 import { SessionTable } from '../../../../../rpc-host/dist/session/table.js'
 import type { INodeProcessHandle } from '../../../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
-import { client, wireFrames } from '../../fixtures/conformance-business.js'
+import { client, wireFrames } from '../../fixtures/conformance-business.ts'
 
 /** Supervisor configuration may supply the installed executable; no download occurs. */
 const runtime = process.env.RPC_PEERS_RUNTIME === 'node' ? 'node' : 'bun'

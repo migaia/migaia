@@ -6,7 +6,7 @@ import {
   defineTransportPlugin
 } from '@migaia/rpc-host/sdk'
 import { auth } from '@migaia/rpc-host/plugins/auth'
-import { duplex, reaches } from './audit-byte-fixture.js'
+import { duplex, reaches } from './audit-byte-fixture.ts'
 
 it('refuses a pre-aborted peer signal before opening its byte source', async () => {
   /** Physical acquisition is separate from cold native plugin definition. */

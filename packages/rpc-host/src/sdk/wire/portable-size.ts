@@ -6,7 +6,7 @@
 import { utf8ByteLength, isArrayBuffer, isUint8Array } from '@migaia/utils/bytes'
 import type { IRpcPortableValue } from '@migaia/rpc-contract/protocol'
 import type { IRpcSerializedError } from '@migaia/rpc-contract/errors'
-import { BinaryShape } from './binary-shape.js'
+import { BinaryShape } from './binary-shape.ts'
 
 /**
  * Count portable result data exactly unless the caller's trusted admission budget is exceeded. An

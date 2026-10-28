@@ -7,7 +7,7 @@ import type { IRpcDirectory, IRpcMethodSchema } from '@migaia/rpc-contract/proto
 import { renderPeerDeclaration } from '../../dist/plugins/typegen/render.js'
 import { createRpcHost } from '@migaia/rpc-host'
 import { typegen } from '@migaia/rpc-host/plugins/typegen'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 /** Accepted-directory fixtures use the same closed contract shape as real connected peers. */
 function directory(

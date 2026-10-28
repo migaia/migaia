@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { IRpcContext } from '@migaia/rpc-host'
-import { connectedCoreHosts } from '../host/core-fixture.js'
+import { connectedCoreHosts } from '../host/core-fixture.ts'
 
 describe('streaming provider context', () => {
   it('passes the original stream context through iterator execution and isolates ordinary requests', async () => {

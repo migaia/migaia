@@ -12,7 +12,7 @@ import {
 } from '@migaia/rpc-contract/protocol'
 import { prepareRpcBinary, restoreRpcBinary, RpcBinaryStorage } from '../../dist/sdk/wire/binary.js'
 import vectors from './binary-vectors.json'
-import { header } from '../../../rpc-contract/test/fixtures/core-profile.js'
+import { header } from '../../../rpc-contract/test/fixtures/core-profile.ts'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { BinaryShape, RPC_BINARY_MAX_BYTES } from '../../dist/sdk/wire/binary-shape.js'
 

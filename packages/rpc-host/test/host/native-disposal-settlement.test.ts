@@ -9,8 +9,8 @@ import type { IRpcCarrierReceiver } from '@migaia/rpc-contract/interfaces'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { assert, expect, it, vi, type MockInstance as IMockInstance } from 'vitest'
 import { RpcHost } from '../../dist/host/rpc-host.js'
-import { coreMemoryServer } from './core-fixture.js'
-import { MemoryCarrier } from '../fixtures/core-carrier.js'
+import { coreMemoryServer } from './core-fixture.ts'
+import { MemoryCarrier } from '../fixtures/core-carrier.ts'
 
 /** Only this test temporarily retains the actual ordinary RPC owner for engine observation. */
 const inspectorRoot = '__rpcNativeDisposalOwner'

@@ -12,7 +12,7 @@ import type {
   IRpcTargetSource
 } from '@migaia/rpc-contract/interfaces'
 import type { IAbortSignal } from '@migaia/utils/promise'
-import type { FeatureScope } from '../feature/scope.js'
+import type { FeatureScope } from '../feature/scope.ts'
 import type {
   ICallLocalOptions,
   ICallPreparationCommand,
@@ -20,7 +20,7 @@ import type {
   ICallTargetRef,
   ICallWriteOptions,
   IPreparedCall
-} from '../call/types.js'
+} from '../call/types.ts'
 
 /** An already-failed directory check is consumed only by the original lazy stream owner. */
 export type IStreamAdmissionFailure = Readonly<{ error: unknown }>

@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '../../src/threads/node-launcher.js'
+} from '../../src/threads/node-launcher.ts'
 import { createFixtureAuthentication } from './fixtures/dx-authentication.mjs'
 
 /** The actual Worker provide descriptor publishes these ordinary request result shapes. */

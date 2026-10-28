@@ -36,27 +36,27 @@ import {
   createRpcConfigurationError,
   createRpcError,
   isLocalRpcError
-} from '../../host/error-owner.js'
-import { registerLocalErrorWireSummary } from '../../host/error-wire-metadata.js'
-import { resolveAbortReason } from '../../host/abort-reason.js'
-import { splitRpcPreparedMetadata, joinRpcPreparedMetadata } from '../../sdk/carrier/prepared.js'
-import type { IRpcFlowInstallation, IRpcFlowSetupContext } from '../../sdk/types.js'
-import { RpcFlowPoint, type IRpcFlowStage } from '../../sdk/flow-pipelines.js'
-import { AuthenticationRepresentation } from './representation.js'
-import { RpcAuthenticationEnvelope as Format } from './constants.js'
-import { RpcAuthenticationText as Text } from './text.js'
+} from '../../host/error-owner.ts'
+import { registerLocalErrorWireSummary } from '../../host/error-wire-metadata.ts'
+import { resolveAbortReason } from '../../host/abort-reason.ts'
+import { splitRpcPreparedMetadata, joinRpcPreparedMetadata } from '../../sdk/carrier/prepared.ts'
+import type { IRpcFlowInstallation, IRpcFlowSetupContext } from '../../sdk/types.ts'
+import { RpcFlowPoint, type IRpcFlowStage } from '../../sdk/flow-pipelines.ts'
+import { AuthenticationRepresentation } from './representation.ts'
+import { RpcAuthenticationEnvelope as Format } from './constants.ts'
+import { RpcAuthenticationText as Text } from './text.ts'
 import {
   admitAuthenticationCounter,
   createAuthenticationNonce,
   readAuthenticationEnvelope,
   wrapAuthenticationEnvelope
-} from './envelope.js'
-import { registerAuthenticationCounterSetter } from './counter.js'
-import type { IAuthenticationCounterWindow, IRpcAuthenticationOptions } from './types.js'
-import { RequestReplayLedger, type IRequestReplaySource } from './request-replay.js'
-import { readAuthenticationHandshake, wrapAuthenticationHandshake } from './handshake.js'
-import { readSessionCredentials, readSessionRetention } from '../../session/credentials.js'
-import { readAuthenticationRetain } from './config.js'
+} from './envelope.ts'
+import { registerAuthenticationCounterSetter } from './counter.ts'
+import type { IAuthenticationCounterWindow, IRpcAuthenticationOptions } from './types.ts'
+import { RequestReplayLedger, type IRequestReplaySource } from './request-replay.ts'
+import { readAuthenticationHandshake, wrapAuthenticationHandshake } from './handshake.ts'
+import { readSessionCredentials, readSessionRetention } from '../../session/credentials.ts'
+import { readAuthenticationRetain } from './config.ts'
 
 /** Keep nonce, replay window and retirement subscription with their physical source. */
 type IAuthenticationSource = IRequestReplaySource & {

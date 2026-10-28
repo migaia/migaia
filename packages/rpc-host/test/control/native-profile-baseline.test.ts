@@ -1,6 +1,6 @@
 /** The sole profile exchanges real directories without optional legacy baseline switches. */
 import { assert, expect, it } from 'vitest'
-import { connectedCoreHosts } from '../host/core-fixture.js'
+import { connectedCoreHosts } from '../host/core-fixture.ts'
 
 // Removes v2/batch flags; both original scalar results survive.
 it('exchanges genuine directories and returns both original scalar baseline values', async () => {

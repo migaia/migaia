@@ -7,17 +7,17 @@ import { createContractError } from '@migaia/rpc-contract/errors'
 import { RpcContractErrorCode, RpcProcessErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcWireLimit, type IRpcPeerInfo } from '@migaia/rpc-contract/protocol'
 import type { IRpcConnectionContext } from '@migaia/rpc-contract/interfaces'
-import { receiveAdapterBootstrap } from './bootstrap.js'
-import { createProcessError } from './error.js'
+import { receiveAdapterBootstrap } from './bootstrap.ts'
+import { createProcessError } from './error.ts'
 import {
   PROCESS_CONNECTION_BOOTSTRAP_KIND,
   PROCESS_CONNECTION_BOOTSTRAP_VERSION,
   PROCESS_HANDSHAKE_MAX_FRAME_BYTES,
   PROCESS_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS,
   ProcessConnectionBootstrapStep as Step
-} from './constants.js'
-import type { IProcessByteChannel } from './types.js'
-import type { IProcessServeListenerIngress } from './plugin/types.js'
+} from './constants.ts'
+import type { IProcessByteChannel } from './types.ts'
+import type { IProcessServeListenerIngress } from './plugin/types.ts'
 
 /** Original native collaborators lend cancellation and the sole complete admission deadline. */
 export type IProcessConnectionBootstrapOptions = Readonly<{

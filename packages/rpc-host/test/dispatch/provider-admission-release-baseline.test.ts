@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { expect, it, vi } from 'vitest'
-import { connectedCoreHosts } from '../host/core-fixture.js'
+import { connectedCoreHosts } from '../host/core-fixture.ts'
 
 it('reports the original provider failure once with INTERNAL through its public diagnostic owner', async () => {
   /** Preserve the original r71 failure instance rather than rebuilding a report command DTO. */

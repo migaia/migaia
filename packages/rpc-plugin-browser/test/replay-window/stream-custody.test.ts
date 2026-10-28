@@ -4,7 +4,7 @@ import { auth } from '@migaia/rpc-host/plugins/auth'
 import { limits } from '@migaia/rpc-host/plugins/limits'
 import type { IRpcProviderRejection } from '@migaia/rpc-contract/errors'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
-import { coreMemoryServer } from '../../../rpc-host/test/host/core-fixture.js'
+import { coreMemoryServer } from '../../../rpc-host/test/host/core-fixture.ts'
 
 describe('stream replay custody through public endpoint behavior', () => {
   it.each([false, true])(

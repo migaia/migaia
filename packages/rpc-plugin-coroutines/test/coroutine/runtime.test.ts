@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
 import { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'
-import { ordinaryHost, outlet, runtimeService, values } from './fixture.js'
+import { ordinaryHost, outlet, runtimeService, values } from './fixture.ts'
 
 describe('coroutine runtime plugin modes', () => {
   it('rejects invalid coroutine source and forged parent token with COROUTINE_SOURCE_INVALID', () => {

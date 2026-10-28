@@ -4,14 +4,14 @@
  */
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { RPC_PROCESS_ERROR_SOURCE, RpcProcessErrorCode } from '@migaia/rpc-contract/error-code'
-import { RpcProcessErrorText } from '../error-text.js'
+import { RpcProcessErrorText } from '../error-text.ts'
 import {
   DEFAULT_MAX_CONNECTIONS,
   DEFAULT_DRAIN_MS,
   DEFAULT_REPORT_AT_MS,
   DEFAULT_UNHANDLED_LIMIT
-} from './constants.js'
-import type { IProcessResilienceOptions } from './types.js'
+} from './constants.ts'
+import type { IProcessResilienceOptions } from './types.ts'
 
 /** Validated native options retain the original construction-time error and default behavior. */
 export type IRequiredProcessNativeOptions = IProcessResilienceOptions &

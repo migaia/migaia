@@ -1,5 +1,5 @@
 /** Adapts one borrowed ordered RTC channel to native text message IO for the shared SDK carrier. */
-import { BrowserPeerEvent, BrowserNativeState } from '../peer-text.js'
+import { BrowserPeerEvent, BrowserNativeState } from '../peer-text.ts'
 import { inspectThenable, assimilateCapturedThen } from '@migaia/utils/function'
 import {
   createRpcMessageCarrier,
@@ -24,11 +24,11 @@ import {
   RPC_ENDPOINT_ERROR_SOURCE
 } from '@migaia/rpc-contract/error-code'
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { BrowserRpcErrorText } from '../error-text.js'
-import { createBrowserTransportError, rejectBrowserTransfer } from '../error.js'
-import { createBrowserPeerError } from '../peer-error.js'
-import { BrowserPeerErrorText } from '../../error-text.js'
-import { emitBrowserObservation, type IBrowserObservationMetadata } from '../native-observation.js'
+import { BrowserRpcErrorText } from '../error-text.ts'
+import { createBrowserTransportError, rejectBrowserTransfer } from '../error.ts'
+import { createBrowserPeerError } from '../peer-error.ts'
+import { BrowserPeerErrorText } from '../../error-text.ts'
+import { emitBrowserObservation, type IBrowserObservationMetadata } from '../native-observation.ts'
 
 /** Native RTC transmits one JSON text message; signaling and the channel lifetime remain borrowed. */
 export type IRTCDataChannel = {

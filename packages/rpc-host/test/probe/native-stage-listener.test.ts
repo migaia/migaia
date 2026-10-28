@@ -7,7 +7,7 @@ import {
   subscribeProbeStages
 } from '@migaia/rpc-host/plugins/probe'
 import { expect, it } from 'vitest'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 // Retain the same original handle and early failing subscription.
 it('rebuilds the native installed probe after an earlier stage listener throws', async () => {

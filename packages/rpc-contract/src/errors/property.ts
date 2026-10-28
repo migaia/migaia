@@ -1,8 +1,8 @@
 /** Pure guarded property admission preserves native coded failures and their original causes. */
 import { tryString } from '@migaia/utils/string'
 import { attachErrorIdentity, tryReadProperty } from '@migaia/utils/error'
-import { RPC_ENDPOINT_ERROR_SOURCE as ERROR_SOURCE, RpcCoreErrorCode } from '../error-code.js'
-import { RpcCoreErrorText } from './text.js'
+import { RPC_ENDPOINT_ERROR_SOURCE as ERROR_SOURCE, RpcCoreErrorCode } from '../error-code.ts'
+import { RpcCoreErrorText } from './text.ts'
 
 /** Synchronous sink for a property-read failure; Promise-returning callbacks are rejected. */
 export type IRpcPropertyReadReporter = (

@@ -9,8 +9,8 @@ import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { deserializeRpcWireError } from '@migaia/rpc-contract/protocol'
 import type { IRpcFlowContext, IRpcTransportContext } from '@migaia/rpc-contract/interfaces'
 import { deferred } from '@migaia/utils/promise'
-import { coreMemoryServer } from '../../host/core-fixture.js'
-import { MemoryCarrier } from '../../fixtures/core-carrier.js'
+import { coreMemoryServer } from '../../host/core-fixture.ts'
+import { MemoryCarrier } from '../../fixtures/core-carrier.ts'
 
 it.each([false, true])(
   'maps a public business failure while logger and report retain the original error, logger first %s',

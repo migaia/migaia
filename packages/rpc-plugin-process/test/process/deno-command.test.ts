@@ -11,7 +11,7 @@ import {
 import {
   PROCESS_RUNTIME_API_ENV,
   PROCESS_RUNTIME_API_ENV_VERSION
-} from '../../src/process/constants.js'
+} from '../../src/process/constants.ts'
 import { decodeProcessRuntimeBootstrap } from '../../dist/process/runtime-bootstrap.js'
 
 /** Only the native constructor inputs observed by this adapter fixture are retained. */

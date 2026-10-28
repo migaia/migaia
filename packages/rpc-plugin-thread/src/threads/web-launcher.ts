@@ -11,17 +11,17 @@ import type { IRpcCarrier } from '@migaia/rpc-contract/interfaces'
 import type { ILaunchContext } from '@migaia/supervision'
 import { readRpcLaunchFacts, IpcReporterContext } from '@migaia/rpc-host/sdk'
 import type { IThreadHandle, IThreadLauncher } from '@migaia/supervision/threads'
-import { ThreadEvent, THREAD_FINGERPRINT_PREFIX } from './constants.js'
-import { absoluteThreadEntry, portableThreadSpec } from './error.js'
-import { ThreadErrorText } from './error-text.js'
-import { createThreadBootstrap } from './bootstrap.js'
-import { createWebThreadCarrier, threadTransportError } from './channel.js'
+import { ThreadEvent, THREAD_FINGERPRINT_PREFIX } from './constants.ts'
+import { absoluteThreadEntry, portableThreadSpec } from './error.ts'
+import { ThreadErrorText } from './error-text.ts'
+import { createThreadBootstrap } from './bootstrap.ts'
+import { createWebThreadCarrier, threadTransportError } from './channel.ts'
 import type {
   IThreadWebPort,
   IThreadLaunchOptions,
   IThreadChannelOptions,
   IThreadChannelFactory
-} from './types.js'
+} from './types.ts'
 
 /** Native module Workers expose messaging and a termination request, not a fabricated exit receipt. */
 export type IWebThreadWorker = IThreadWebPort & Readonly<{ terminate(): void }>

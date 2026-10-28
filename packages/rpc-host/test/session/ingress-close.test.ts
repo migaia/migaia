@@ -4,7 +4,7 @@ import auth, { type IRpcAuthenticationTransform } from '@migaia/rpc-host/plugins
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { deferred, type IAbortSignal } from '@migaia/utils/promise'
 import { expect, it, vi } from 'vitest'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 /** One application-owned verifier gate records the signal supplied by its real native Session. */
 class ClosingVerification {

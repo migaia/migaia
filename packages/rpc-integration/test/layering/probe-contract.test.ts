@@ -51,7 +51,7 @@ describe('rpc-devtools layer-1 dependency direction', () => {
   it('contract keeps the devtools scaffold on public core and contract entries', () => {
     for (const path of sourceFiles(devtoolsRoot))
       for (const specifier of imports(path)) {
-        if (specifier.startsWith('.')) expect(specifier, path).toMatch(/\.js$/u)
+        if (specifier.startsWith('.')) expect(specifier, path).toMatch(/\.ts$/u)
         // Shared runtime-neutral owners provide the clock, key order and original failure reporter.
         else
           expect(specifier, path).toMatch(

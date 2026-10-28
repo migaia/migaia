@@ -11,7 +11,7 @@ import type {
   IRpcDispose
 } from '@migaia/rpc-contract/interfaces'
 import type { IRpcErrorWireMetadata } from '@migaia/rpc-contract/errors'
-import type { IRpcBinaryDigest } from '../wire/binary-types.js'
+import type { IRpcBinaryDigest } from '../wire/binary-types.ts'
 
 /** Physical message IO forwards the original native payload and exact caller transfer list. */
 export type IRpcMessageIO = Readonly<{

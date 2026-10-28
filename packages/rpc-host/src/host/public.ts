@@ -6,12 +6,12 @@ import type {
   IRpcTransportPlugin,
   IRpcNamespacePlugin,
   IRpcFlowFeature
-} from '../sdk/types.js'
-import type { IRpcProvide, IRpcProvideOptions } from '../dispatch/types.js'
+} from '../sdk/types.ts'
+import type { IRpcProvide, IRpcProvideOptions } from '../dispatch/types.ts'
 import type { IRpcProviderDeclaration } from '@migaia/rpc-contract/protocol'
-import type { IRpcNamespace, IRpcIntersection } from '../namespace/types.js'
-import type { IRpcSelf } from './identity.js'
-import type { IRpcWarning } from './warning.js'
+import type { IRpcNamespace, IRpcIntersection } from '../namespace/types.ts'
+import type { IRpcSelf } from './identity.ts'
+import type { IRpcWarning } from './warning.ts'
 
 /** Cold host admission contains no concrete timeout, retry, authentication or quota configuration. */
 export type IRpcHostOptions<

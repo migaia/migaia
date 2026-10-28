@@ -13,7 +13,7 @@ import type {
   IRpcTargetSource
 } from '@migaia/rpc-contract/interfaces'
 import { RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
-import { createRemoteLayerError } from '../host/remote-error-owner.js'
+import { createRemoteLayerError } from '../host/remote-error-owner.ts'
 
 /** Readiness subscribers extend the actual namespace index rather than copying accepted entries. */
 export type ISessionAvailabilityIndex = {

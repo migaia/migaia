@@ -1,5 +1,5 @@
 /** Owns bounded name identities and per-source carrier sequence joins used by collector readers. */
-import { CollectorText } from './text.js'
+import { CollectorText } from './text.ts'
 
 /** Shared loss state belongs to the collector, including rejected names at the intern boundary. */
 export type IInternCounters = { internOverflow: number }

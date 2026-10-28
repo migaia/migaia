@@ -1,7 +1,7 @@
 /** Original remote stream business runs through the real namespace and its physical carrier. */
 import { describe, expect, it } from 'vitest'
 import { RpcCallMode, RpcWireKind } from '@migaia/rpc-contract/protocol'
-import { connectedCoreHosts } from '../host/core-fixture.js'
+import { connectedCoreHosts } from '../host/core-fixture.ts'
 
 describe('remote stream dispatch', () => {
   it.each(['generator', 'asyncGenerator'] as const)(

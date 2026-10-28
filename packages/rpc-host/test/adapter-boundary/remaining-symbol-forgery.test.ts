@@ -1,7 +1,7 @@
 /** Settlement provenance reaches the real public provider path; copies stay plain business values. */
 import { assert, expect, it, vi } from 'vitest'
 import type { IRpcProviderResult } from '../../dist/dispatch/types.js'
-import { connectedCoreHosts } from '../host/core-fixture.js'
+import { connectedCoreHosts } from '../host/core-fixture.ts'
 
 /** Reflection copies every public descriptor without obtaining the original context's token. */
 function copyAllDescriptors<T extends object>(source: T): T {

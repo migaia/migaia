@@ -22,20 +22,20 @@ import {
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 import type { IRpcFlowContext, IRpcTargetSource } from '@migaia/rpc-contract/interfaces'
-import { createRpcError } from '../host/error-owner.js'
-import { sameGeneration, sameTask } from '../call/envelope.js'
-import { compileProviderMethods, forwardHint } from './catalog.js'
-import { ProviderInvocation } from './invocation.js'
-import type { ProviderRegistration } from './registration.js'
-import { ProviderCatalog } from './catalog-scope.js'
-import { ProviderOrdering } from './ordering.js'
+import { createRpcError } from '../host/error-owner.ts'
+import { sameGeneration, sameTask } from '../call/envelope.ts'
+import { compileProviderMethods, forwardHint } from './catalog.ts'
+import { ProviderInvocation } from './invocation.ts'
+import type { ProviderRegistration } from './registration.ts'
+import { ProviderCatalog } from './catalog-scope.ts'
+import { ProviderOrdering } from './ordering.ts'
 import type {
   IProviderCommitGate,
   IProviderDispatcherOptions,
   IProviderMethodEntry,
   IRpcProvide,
   IRpcProvideOptions
-} from './types.js'
+} from './types.ts'
 
 /** One entry projection is cold, bounded and never reconstructs a per-call provider facade. */
 function describe(entry: IProviderMethodEntry): IRpcMethodDescription {

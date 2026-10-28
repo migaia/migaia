@@ -1,5 +1,5 @@
 /** Defines reliable WebTransport session and stream ports plus their cold transport options. */
-import type { IBrowserPluginOptions } from './plugin-types.js'
+import type { IBrowserPluginOptions } from './plugin-types.ts'
 
 /** A reliable native stream is owned by this plugin; its enclosing session stays borrowed. */
 export type IWebTransportReliableStream = Readonly<{

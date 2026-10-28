@@ -2,7 +2,7 @@ import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { expect, it, vi } from 'vitest'
-import { connectedCoreHosts, coreMemoryServer } from '../host/core-fixture.js'
+import { connectedCoreHosts, coreMemoryServer } from '../host/core-fixture.ts'
 
 /** One explicit cold context supplies native options and the actual provider declaration. */
 const nativeFixture = {

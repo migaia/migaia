@@ -9,9 +9,9 @@ import {
   isNativeErrorValue,
   tryReadProperty
 } from '@migaia/utils/error'
-import { RpcContractErrorCode, type IRpcContractErrorCode } from '../error-code.js'
-import { RPC_CONTRACT_SOURCE, RpcContractErrorText } from './error-text.js'
-import type { IRpcErrorWireMetadata } from './types.js'
+import { RpcContractErrorCode, type IRpcContractErrorCode } from '../error-code.ts'
+import { RPC_CONTRACT_SOURCE, RpcContractErrorText } from './error-text.ts'
+import type { IRpcErrorWireMetadata } from './types.ts'
 
 /**
  * Canonical text per public code. Keyed by code so every throw site shares one total mapping;

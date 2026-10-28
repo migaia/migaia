@@ -8,7 +8,7 @@ import type {
 import type { IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
-import { createRpcError, createRpcLifecycleError } from '../host/error-owner.js'
+import { createRpcError, createRpcLifecycleError } from '../host/error-owner.ts'
 
 /** The native scheduler supplies all lifetime Promises and real control implementations. */
 export class OriginSession {

@@ -3,15 +3,15 @@
  * lifecycle facts through explicit ports; overflow, callback failures and subscriber cleanup remain
  * separate from native control and business execution.
  */
-import { createRpcError } from '../host/error-owner.js'
+import { createRpcError } from '../host/error-owner.ts'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { RpcCoreErrorCode, RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
-import { createRemoteLayerError } from '../host/remote-error-owner.js'
+import { createRemoteLayerError } from '../host/remote-error-owner.ts'
 import { RuntimeApiErrorText } from '@migaia/rpc-contract/errors'
-import { RpcMemberEventName, RpcMemberQueryLimit } from './native-members-constants.js'
-import { IpcReporterContext } from './reporter-context.js'
-import type { IRpcMemberUnavailable } from './native-members-overview.js'
+import { RpcMemberEventName, RpcMemberQueryLimit } from './native-members-constants.ts'
+import { IpcReporterContext } from './reporter-context.ts'
+import type { IRpcMemberUnavailable } from './native-members-overview.ts'
 /** Lifecycle facts contain only the original identity, time and explicitly safe native fields. */
 export type IRpcMemberEvent = Readonly<{
   /** Original ready/exit/degraded/restart/terminal/liquidated lifecycle fact. */

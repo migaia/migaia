@@ -5,7 +5,7 @@ import {
   RpcWireStreamFinish,
   type IRpcSemanticFrame
 } from '@migaia/rpc-contract/protocol'
-import { connectedCoreHosts } from '../host/core-fixture.js'
+import { connectedCoreHosts } from '../host/core-fixture.ts'
 
 /** Wrong-credit item must fail only its pending caller pull. */
 describe('streaming credit order', () => {

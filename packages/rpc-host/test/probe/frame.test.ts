@@ -16,7 +16,7 @@ import {
 import type { IRpcFlowFeature } from '@migaia/rpc-host/sdk'
 import type { IRpcEnvelope } from '@migaia/rpc-contract/protocol'
 import { carrierSizeBytes } from '../../dist/sdk/wire/probe-content.js'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 /** The existing carrier fixture lends its actual codec, native write and current Host owners. */
 async function observedHosts(options: {

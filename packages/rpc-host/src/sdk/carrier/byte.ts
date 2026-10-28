@@ -16,18 +16,18 @@ import type {
 import {
   createRpcStreamFrameDecoderWithLimit,
   encodeRpcStreamTextFrame
-} from '../wire/physical-stream.js'
-import type { IRpcByteIO } from '../wire/byte-pump.js'
-import { RpcUtf8 } from './utf8.js'
-import { createRpcMessageCarrier } from './message.js'
-import { decodeRpcJsonPhysicalFrame } from './json-codec.js'
-import { RPC_CARRIER_RETAINED_FRAME_BYTES, RPC_CARRIER_HANDSHAKE_FRAME_BYTES } from './constants.js'
+} from '../wire/physical-stream.ts'
+import type { IRpcByteIO } from '../wire/byte-pump.ts'
+import { RpcUtf8 } from './utf8.ts'
+import { createRpcMessageCarrier } from './message.ts'
+import { decodeRpcJsonPhysicalFrame } from './json-codec.ts'
+import { RPC_CARRIER_RETAINED_FRAME_BYTES, RPC_CARRIER_HANDSHAKE_FRAME_BYTES } from './constants.ts'
 import type {
   IRpcMessageIO,
   IRpcMessageCarrierOptions,
   IRpcUtf8Options,
   IRpcJsonTextParser
-} from './types.js'
+} from './types.ts'
 
 /** Native byte IO remains acquired by the platform, including its original reader/write-drain owner. */
 export type IRpcByteCarrierOptions = Omit<IRpcMessageCarrierOptions, 'io' | 'nativeBinary'> &

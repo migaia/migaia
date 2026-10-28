@@ -5,7 +5,7 @@ import { RpcStreamEvent } from '@migaia/rpc-contract'
 import type { IRpcContext } from '@migaia/rpc-host'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
-import { connectedCoreHosts } from '../host/core-fixture.js'
+import { connectedCoreHosts } from '../host/core-fixture.ts'
 
 /** Preserves delivered values and then a sticky restored failure graph. */
 describe('streaming error graph', () => {

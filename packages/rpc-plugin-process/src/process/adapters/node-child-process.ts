@@ -1,6 +1,6 @@
 /** Acquire one native child generation; bootstrap, process streams and exit remain native-owned. */
 import { IpcReporterContext } from '@migaia/rpc-host/sdk'
-import { createProcessError, tagNativeProcessError } from '../error.js'
+import { createProcessError, tagNativeProcessError } from '../error.ts'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
@@ -13,19 +13,19 @@ import {
   type IProcessHandle,
   type IProcessLauncher
 } from '@migaia/supervision/process'
-import { receiveAdapterBootstrap } from '../bootstrap.js'
+import { receiveAdapterBootstrap } from '../bootstrap.ts'
 import { RpcProcessErrorCode } from '@migaia/rpc-contract/error-code'
 
-import { RpcProcessErrorText } from '../error-text.js'
-import type { IProcessByteChannel } from '../types.js'
-import { createAdapterNodeProcessLaunch } from '../node-launch.js'
+import { RpcProcessErrorText } from '../error-text.ts'
+import type { IProcessByteChannel } from '../types.ts'
+import { createAdapterNodeProcessLaunch } from '../node-launch.ts'
 import type {
   IProcessRuntimeBootstrap,
   IProcessRuntimeBootstrapOptions
-} from '../runtime-bootstrap.js'
-import { PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_ENV_VERSION } from '../constants.js'
-import { createAdapterProcessStdio, type IAdapterChildStdio } from '../node-io.js'
-import { sampleNativeProcess } from './native-usage.js'
+} from '../runtime-bootstrap.ts'
+import { PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_ENV_VERSION } from '../constants.ts'
+import { createAdapterProcessStdio, type IAdapterChildStdio } from '../node-io.ts'
+import { sampleNativeProcess } from './native-usage.ts'
 
 /** A Node handle exposes stdout/stdin only when the specification chose byte channels. */
 export type INodeProcessHandle = IProcessHandle &
@@ -294,6 +294,6 @@ export async function openProcessStdioChannel(
 }
 
 /** Moved former Core Node operations remain available through this owning native public entry. */
-export { createAdapterNodeProcessLaunch } from '../node-launch.js'
-export { createAdapterChildStdio, createAdapterProcessStdio } from '../node-io.js'
-export type { IAdapterChildStdio, IAdapterProcessStdio } from '../node-io.js'
+export { createAdapterNodeProcessLaunch } from '../node-launch.ts'
+export { createAdapterChildStdio, createAdapterProcessStdio } from '../node-io.ts'
+export type { IAdapterChildStdio, IAdapterProcessStdio } from '../node-io.ts'

@@ -3,13 +3,13 @@ import { bytesToBase64 } from '@migaia/utils/bytes'
 import { safeRead, RPC_CONTRACT_SOURCE } from '@migaia/rpc-contract/errors'
 import { RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
 import type { IRpcEnvelope, IRpcBinaryManifest } from '@migaia/rpc-contract/protocol'
-import { BinaryShape, RPC_BINARY_MAX_BYTES } from './binary-shape.js'
-import { captureRpcBinary } from './binary-capture.js'
-import { RpcBinaryProfile, RpcBinaryStorage } from './binary-constants.js'
-import type { IRpcBinaryOptions, IRpcPreparedBinary } from './binary-types.js'
-export { restoreRpcBinary } from './binary-restore.js'
-export { RpcBinaryStorage, RpcBinaryProfile } from './binary-constants.js'
-export type * from './binary-types.js'
+import { BinaryShape, RPC_BINARY_MAX_BYTES } from './binary-shape.ts'
+import { captureRpcBinary } from './binary-capture.ts'
+import { RpcBinaryProfile, RpcBinaryStorage } from './binary-constants.ts'
+import type { IRpcBinaryOptions, IRpcPreparedBinary } from './binary-types.ts'
+export { restoreRpcBinary } from './binary-restore.ts'
+export { RpcBinaryStorage, RpcBinaryProfile } from './binary-constants.ts'
+export type * from './binary-types.ts'
 
 /** Canonical unpadded base64url delegates byte conversion to the existing native-neutral utility. */
 export function encodeBytes(bytes: Uint8Array): string {
@@ -61,7 +61,7 @@ export function prepareRpcBinary(
  * suspension.
  */
 export async function finishRpcBinaryCapture(
-  capture: import('./binary-types.js').IRpcBinaryCapture,
+  capture: import('./binary-types.ts').IRpcBinaryCapture,
   options: IRpcBinaryOptions,
   shape: BinaryShape
 ): Promise<IRpcPreparedBinary> {

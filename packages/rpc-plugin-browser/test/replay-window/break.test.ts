@@ -3,7 +3,7 @@ import { describe, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { auth } from '@migaia/rpc-host/plugins/auth'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
-import { coreMemoryServer } from '../../../rpc-host/test/host/core-fixture.js'
+import { coreMemoryServer } from '../../../rpc-host/test/host/core-fixture.ts'
 import { RpcAuthenticationEnvelope } from '../../../rpc-host/dist/features/auth/constants.js'
 
 describe('replay-window r12 authentication break', () => {

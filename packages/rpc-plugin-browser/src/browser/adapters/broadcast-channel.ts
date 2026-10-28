@@ -7,7 +7,7 @@ import {
   RpcProbeDirection,
   type IRpcCarrierWriteOptions
 } from '@migaia/rpc-contract/interfaces'
-import { emitBrowserObservation, type IBrowserObservationMetadata } from '../native-observation.js'
+import { emitBrowserObservation, type IBrowserObservationMetadata } from '../native-observation.ts'
 
 /** A native participant route owns only SDK's exact IO callbacks, not a second peer/session table. */
 export class BroadcastRouteIO implements IRpcMessageIO {

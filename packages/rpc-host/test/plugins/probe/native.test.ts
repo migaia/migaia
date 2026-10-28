@@ -7,7 +7,7 @@ import {
   RpcProbeStage,
   type IRpcProbeEventView
 } from '@migaia/rpc-host/plugins/probe'
-import { coreMemoryServer } from '../../host/core-fixture.js'
+import { coreMemoryServer } from '../../host/core-fixture.ts'
 
 describe('native readonly probe installation', () => {
   it.each(['absent', 'single', 'array'] as const)(

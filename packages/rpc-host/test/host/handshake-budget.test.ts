@@ -5,7 +5,7 @@ import { createManualScheduler } from '@migaia/utils/testing'
 import { createRpcHost } from '@migaia/rpc-host'
 import { defineTransportPlugin } from '@migaia/rpc-host/sdk'
 import type { IRpcSessionView } from '@migaia/rpc-contract/interfaces'
-import { MemoryCarrier } from '../fixtures/core-carrier.js'
+import { MemoryCarrier } from '../fixtures/core-carrier.ts'
 
 it('releases the sole Session handshake deadline after delayed real bilateral admission', async () => {
   /** Both genuine Sessions borrow this original clock through the public scheduler backend. */

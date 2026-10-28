@@ -2,7 +2,7 @@
  * Acquires real Web Streams reader/writer ports and lends them to the SDK byte pump. Process
  * retains native error identity, acquisition rollback and the supplied physical cleanup.
  */
-import { createProcessError, tagNativeProcessError } from './error.js'
+import { createProcessError, tagNativeProcessError } from './error.ts'
 import {
   RPC_PROCESS_ERROR_SOURCE as ERROR_SOURCE,
   RpcProcessErrorCode
@@ -10,9 +10,9 @@ import {
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { RpcBytePump, RpcCarrierObservation, IpcReporterContext } from '@migaia/rpc-host/sdk'
-import { RpcProcessErrorText } from './error-text.js'
-import type { IProcessByteChannel } from './types.js'
-import { ProcessByteCarrierFacts } from './constants.js'
+import { RpcProcessErrorText } from './error-text.ts'
+import type { IProcessByteChannel } from './types.ts'
+import { ProcessByteCarrierFacts } from './constants.ts'
 
 /** Borrow the sole Web Streams pump while keeping every Process error and close identity. */
 export function webByteStream(

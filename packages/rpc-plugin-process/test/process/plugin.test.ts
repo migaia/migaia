@@ -9,7 +9,7 @@ import { createRpcHost } from '@migaia/rpc-host'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import type { IRpcTransportSetupContext } from '@migaia/rpc-host/sdk'
 
-import { socketProcess, command, stopProcess } from './plugin-control.js'
+import { socketProcess, command, stopProcess } from './plugin-control.ts'
 
 describe('native process transport plugin', () => {
   it.skipIf(process.platform === 'win32')(

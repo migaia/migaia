@@ -12,24 +12,24 @@ import {
   RPC_ENDPOINT_ERROR_SOURCE
 } from '@migaia/rpc-contract/error-code'
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { createServiceWorkerCarrier } from './adapters/service-worker.js'
+import { createServiceWorkerCarrier } from './adapters/service-worker.ts'
 import type {
   IServiceWorkerMessageReceiver,
   IServiceWorkerMessageTarget
-} from './adapters/service-worker.js'
-import { attachBrowserCarrier } from './native-message.js'
-import { createBrowserPeerError } from './peer-error.js'
-import { createBrowserTransportError, normalizeBrowserHandshakeFailure } from './error.js'
-import { BrowserRpcErrorText } from './error-text.js'
-import { BrowserPeerErrorText } from '../error-text.js'
-import { BrowserPeerEvent, BrowserNamespace } from './peer-text.js'
-import { ServiceWorkerPluginText } from './service-worker-text.js'
+} from './adapters/service-worker.ts'
+import { attachBrowserCarrier } from './native-message.ts'
+import { createBrowserPeerError } from './peer-error.ts'
+import { createBrowserTransportError, normalizeBrowserHandshakeFailure } from './error.ts'
+import { BrowserRpcErrorText } from './error-text.ts'
+import { BrowserPeerErrorText } from '../error-text.ts'
+import { BrowserPeerEvent, BrowserNamespace } from './peer-text.ts'
+import { ServiceWorkerPluginText } from './service-worker-text.ts'
 import type {
   IServiceWorkerClientEvent,
   IServiceWorkerClientsScope,
   IServiceWorkerPluginOptions
-} from './service-worker-types.js'
-import type { IBrowserFeature } from './plugin-types.js'
+} from './service-worker-types.ts'
+import type { IBrowserFeature } from './plugin-types.ts'
 
 /** Native Client routing retains only its held lookup operation, exact receiver and Host handle. */
 type IServiceWorkerClientSession = {

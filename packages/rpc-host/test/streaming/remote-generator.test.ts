@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { RpcAbortError } from '@migaia/rpc-contract/errors'
-import { connectedCoreHosts } from '../host/core-fixture.js'
+import { connectedCoreHosts } from '../host/core-fixture.ts'
 
 /** Requires one producer next for each caller pull and preserves the generator return value. */
 describe('streaming remote generators', () => {

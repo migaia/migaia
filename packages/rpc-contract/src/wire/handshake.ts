@@ -6,17 +6,17 @@ import {
   validateHandshakeVersion,
   invalidHandshakeField,
   readHandshakeProperty
-} from './handshake-fields.js'
-import type { IRpcErrorWireMetadata } from '../contract/types.js'
-import { createContractError } from '../contract/contract-error.js'
-import { redactRpcHandshakeFailure } from '../errors/handshake-privacy.js'
-import { RpcContractErrorCode } from '../error-code.js'
-import { RpcWireLimit, RpcHandshakeViolation } from './limits.js'
-import { array } from './record.js'
-import { RpcHandshakeReason } from './handshake-text.js'
-import { normalizeRpcPortable } from '../portable/normalize.js'
-import { normalizeRpcDirectory } from './directory.js'
-import { normalizeRpcWireError, restoreRpcWireError } from './errors.js'
+} from './handshake-fields.ts'
+import type { IRpcErrorWireMetadata } from '../contract/types.ts'
+import { createContractError } from '../contract/contract-error.ts'
+import { redactRpcHandshakeFailure } from '../errors/handshake-privacy.ts'
+import { RpcContractErrorCode } from '../error-code.ts'
+import { RpcWireLimit, RpcHandshakeViolation } from './limits.ts'
+import { array } from './record.ts'
+import { RpcHandshakeReason } from './handshake-text.ts'
+import { normalizeRpcPortable } from '../portable/normalize.ts'
+import { normalizeRpcDirectory } from './directory.ts'
+import { normalizeRpcWireError, restoreRpcWireError } from './errors.ts'
 import {
   RpcWireField as F,
   RpcWirePointer as P,
@@ -26,8 +26,8 @@ import {
   RpcWireVersion,
   RpcWireExtensionPattern,
   RpcWireCodecPattern
-} from './constants.js'
-import type { IRpcHandshake, IRpcHello, IRpcAccept } from './types.js'
+} from './constants.ts'
+import type { IRpcHandshake, IRpcHello, IRpcAccept } from './types.ts'
 
 /** Validate required extension labels using the existing suffix grammar and duplicate limit. */
 function extensions(value: unknown, metadata?: IRpcErrorWireMetadata): readonly string[] {

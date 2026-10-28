@@ -4,7 +4,7 @@ import { auth } from '@migaia/rpc-host/plugins/auth'
 import { defineFlowFeature, rpcFlowPlugin, rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { deferred } from '@migaia/utils/promise'
 import { expect, it } from 'vitest'
-import { coreMemoryServer } from './core-fixture.js'
+import { coreMemoryServer } from './core-fixture.ts'
 
 it('F3 refuses a new connection or shared Auth removal while its accepted cleanup is pending', async () => {
   /** Cleanup entry proves native removal was accepted before the new physical connection starts. */

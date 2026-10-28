@@ -1,4 +1,4 @@
-import { nativeFixture, nativeWorkerFor, nativeErrorListenerCount } from './fixture.js'
+import { nativeFixture, nativeWorkerFor, nativeErrorListenerCount } from './fixture.ts'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
 import { LifecycleErrorCode, LifecycleErrorText } from '@migaia/lifecycle'
@@ -8,7 +8,7 @@ import {
   UtilsErrorCode,
   walkErrorCauses
 } from '@migaia/utils/error'
-import { createNodeThreadLauncher } from '../../src/threads/node-launcher.js'
+import { createNodeThreadLauncher } from '../../src/threads/node-launcher.ts'
 
 /** Native exit fixture has no RPC protocol or Vitest runtime in the Worker. */
 const entry = fileURLToPath(new URL('./fixtures/lifecycle-worker.mjs', import.meta.url))

@@ -3,7 +3,7 @@
  * selects instances; timeout, retry, pool, and media features own their own behavior.
  */
 import type { IAbortSignal } from '@migaia/utils/promise'
-import type { IRpcAuthenticationRetain, IRpcDispose, IRpcTransportContext } from './carrier.js'
+import type { IRpcAuthenticationRetain, IRpcDispose, IRpcTransportContext } from './carrier.ts'
 
 /** Canonical executing-policy discriminants are shared by factories and the sole feature selector. */
 export const RpcCallFeatureKind = {

@@ -3,8 +3,8 @@
  * contracts borrow accepted Session resources without exposing a per-peer RPC facade.
  */
 import type { IScheduler } from '@migaia/utils/scheduler'
-import type { IProcessFeature } from '../types.js'
-import type { ProcessConnectionCapacity } from './admission.js'
+import type { IProcessFeature } from '../types.ts'
+import type { ProcessConnectionCapacity } from './admission.ts'
 import type { IRpcNativeMemberControls } from '@migaia/rpc-host/sdk'
 
 /** Actual native fallback keeps recovery and its session registration in its existing owner. */

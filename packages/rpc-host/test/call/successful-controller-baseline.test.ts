@@ -2,7 +2,7 @@
 import { createRpcHost } from '@migaia/rpc-host'
 import assert from 'node:assert/strict'
 import { describe, it, vi } from 'vitest'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 describe('successful request completion', () => {
   it('both real initiators release success without aborting native signals', async () => {

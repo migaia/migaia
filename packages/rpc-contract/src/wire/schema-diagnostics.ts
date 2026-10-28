@@ -3,7 +3,7 @@
  * inspectors. Inspectors retain original causes as data while callers own error construction and
  * reporting; this module retains no registry or resource lifetime.
  */
-import { REMOTE_SHAPE_DETAIL_PATH_CHARS } from './limits.js'
+import { REMOTE_SHAPE_DETAIL_PATH_CHARS } from './limits.ts'
 
 /** Stable diagnostics identify shape failures without copying untrusted input into messages. */
 export const RpcShapeReason = {

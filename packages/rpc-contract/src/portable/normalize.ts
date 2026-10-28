@@ -3,17 +3,17 @@
  * snapshot policies. Each invocation owns only its traversal; binary execution proofs, sessions and
  * physical IO are outside this pure boundary.
  */
-import type { IRpcErrorWireMetadata } from '../contract/types.js'
+import type { IRpcErrorWireMetadata } from '../contract/types.ts'
 import { createPortableWalker } from '@migaia/serialize'
 import {
   rpcWirePortableStrategy,
   rpcNativePortableStrategy,
   raiseRpcPortableViolation
-} from './strategy.js'
-import type { IRpcPortableValue, IRpcWirePortableValue } from '../contract/types.js'
+} from './strategy.ts'
+import type { IRpcPortableValue, IRpcWirePortableValue } from '../contract/types.ts'
 
-export { RPC_PORTABLE_MAX_DEPTH } from './strategy.js'
-export { rpcPortableBackingLength, rpcPortableViewLength } from './intrinsics.js'
+export { RPC_PORTABLE_MAX_DEPTH } from './strategy.ts'
+export { rpcPortableBackingLength, rpcPortableViewLength } from './intrinsics.ts'
 
 /** Preserve negotiated native values using the same canonical graph owner as ordinary wire data. */
 export function normalizeRpcPortable(

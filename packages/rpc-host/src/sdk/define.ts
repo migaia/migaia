@@ -9,10 +9,10 @@ import {
   registerRpcDefinition,
   RpcDefinitionKind,
   type IRpcDefinitionMetadata
-} from './metadata.js'
-import { RpcFlowSetup } from './flow-setup.js'
-import { RpcTransportFlowProgram } from './flow-program.js'
-import { RpcFlowPipelines } from './flow-pipelines.js'
+} from './metadata.ts'
+import { RpcFlowSetup } from './flow-setup.ts'
+import { RpcTransportFlowProgram } from './flow-program.ts'
+import { RpcFlowPipelines } from './flow-pipelines.ts'
 import type {
   IRpcFlowDefinition,
   IRpcFlowPlugin,
@@ -20,12 +20,12 @@ import type {
   IRpcTransportPlugin,
   IRpcTransportFeatureExtensions,
   IRpcTransportSetupContext
-} from './types.js'
-import { closeRpcTransport, installRpcDefinition } from '../host/installation.js'
+} from './types.ts'
+import { closeRpcTransport, installRpcDefinition } from '../host/installation.ts'
 import { tagRpcError } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
-import { HostErrorText } from '../host/error-text.js'
-export { defineFlowFeature } from './flow-feature.js'
+import { HostErrorText } from '../host/error-text.ts'
+export { defineFlowFeature } from './flow-feature.ts'
 
 /** One cold definition owns its install callback; installation state belongs to the receiving host. */
 export class RpcDefinition {

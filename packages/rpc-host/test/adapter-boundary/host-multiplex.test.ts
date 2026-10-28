@@ -8,7 +8,7 @@ import {
   defineTransportPlugin,
   type IRpcMessageIO
 } from '@migaia/rpc-host/sdk'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 /** The original native MessagePort owns delivery; SDK alone owns its subscriptions and close. */
 class FailingMessageIO implements IRpcMessageIO {

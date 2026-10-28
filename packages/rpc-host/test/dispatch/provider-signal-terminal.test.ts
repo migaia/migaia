@@ -4,7 +4,7 @@ import type { IRpcContext } from '@migaia/rpc-host'
 import { RpcWireKind, RpcWireProfile } from '@migaia/rpc-contract/protocol'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { assert, expect, it } from 'vitest'
-import { connectedCoreHosts } from '../host/core-fixture.js'
+import { connectedCoreHosts } from '../host/core-fixture.ts'
 
 /** One real provider owns only its original business entry, abort observation and late result. */
 class SignalTerminalProvider {

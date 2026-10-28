@@ -12,7 +12,7 @@ import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { timeout } from '@migaia/rpc-host/features/timeout'
 import { RpcTimeoutError, RpcAbortError } from '@migaia/rpc-contract/errors'
 import type { IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
-import { coreMemoryServer } from '../../host/core-fixture.js'
+import { coreMemoryServer } from '../../host/core-fixture.ts'
 
 /** Every original observer configuration drives the same real public business matrix. */
 const probeModes = ['absent', 'recording', 'throw', 'reject', 'reentrant'] as const

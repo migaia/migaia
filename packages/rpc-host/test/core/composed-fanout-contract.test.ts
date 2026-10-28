@@ -1,7 +1,7 @@
 import { createRpcHost } from '@migaia/rpc-host'
 import { defineTransportPlugin, type IRpcTransportSetupContext } from '@migaia/rpc-host/sdk'
 import { describe, expect, it, vi } from 'vitest'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 import { readRpcDefinition } from '../../dist/sdk/metadata.js'
 import { RpcLifecycleError, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'

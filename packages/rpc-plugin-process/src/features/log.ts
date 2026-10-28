@@ -3,9 +3,9 @@
  * retirement and reporter-failure isolation stay with this per-installation log owner.
  */
 import { hostRethrowReporter } from '@migaia/utils/promise'
-import { IpcReporterContext, ProcessFeatureName } from './text.js'
-import type { IProcessFeatureContext } from './metadata.js'
-import type { IIpcLogRecord, IpcFlowControl } from './flow-control.js'
+import { IpcReporterContext, ProcessFeatureName } from './text.ts'
+import type { IProcessFeatureContext } from './metadata.ts'
+import type { IIpcLogRecord, IpcFlowControl } from './flow-control.ts'
 
 /** The exact cold sink is captured before native installation and later caller mutation. */
 export type IIpcLogOptions = Readonly<{ report(record: IIpcLogRecord): void | Promise<void> }>

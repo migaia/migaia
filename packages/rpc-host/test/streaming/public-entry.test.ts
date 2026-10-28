@@ -1,6 +1,6 @@
 /** The original public stream delivery uses the sole Host namespace instead of deleted roots. */
 import { expect, it, vi } from 'vitest'
-import { connectedCoreHosts } from '../host/core-fixture.js'
+import { connectedCoreHosts } from '../host/core-fixture.ts'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import {
   RpcCallMode,

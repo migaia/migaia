@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { it } from 'vitest'
-import { connectedCoreHosts } from '../host/core-fixture.js'
+import { connectedCoreHosts } from '../host/core-fixture.ts'
 
 it('the automatic nested doc.save route executes the explicitly provided parent method', async () => {
   /** Count actual execution independently from response settlement. */

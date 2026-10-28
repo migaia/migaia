@@ -12,8 +12,8 @@ import {
   type IRpcHello
 } from '@migaia/rpc-contract/protocol'
 import { redactRpcHandshakeFailure, serializeRpcError } from '@migaia/rpc-contract/errors'
-import { hello } from '../fixtures/core-profile.js'
-import { TOKEN, leaks } from '../fixtures/handshake-privacy.js'
+import { hello } from '../fixtures/core-profile.ts'
+import { TOKEN, leaks } from '../fixtures/handshake-privacy.ts'
 
 /** The actual sole-profile object replaces the removed text-producing offer API. */
 const OFFER = normalizeRpcHandshake({ ...hello('caller'), auth: TOKEN }) as IRpcHello

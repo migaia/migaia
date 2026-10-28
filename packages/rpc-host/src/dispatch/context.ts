@@ -4,9 +4,9 @@ import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 import type { IRpcEnvelope, IRpcPortableValue } from '@migaia/rpc-contract/protocol'
 import type { IRpcFlowContext } from '@migaia/rpc-contract/interfaces'
 import type { INativeAbortSignal } from '@migaia/utils/promise'
-import { createRpcContractError } from '../host/error-owner.js'
-import type { IRpcContext, IRpcProviderResult, IProviderDispatcherOptions } from './types.js'
-import type { ICallTargetRef } from '../call/types.js'
+import { createRpcContractError } from '../host/error-owner.ts'
+import type { IRpcContext, IRpcProviderResult, IProviderDispatcherOptions } from './types.ts'
+import type { ICallTargetRef } from '../call/types.ts'
 
 /** Existing provider transfer snapshots have a fixed public admission boundary. */
 const maxProviderTransferItems = 64

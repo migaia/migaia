@@ -1,8 +1,8 @@
 /** Real native Session attachment preserves one subscription per selected physical carrier. */
 import { createRpcHost } from '@migaia/rpc-host'
 import { expect, it, vi } from 'vitest'
-import { MemoryCarrier } from '../fixtures/core-carrier.js'
-import { coreMemoryServer } from './core-fixture.js'
+import { MemoryCarrier } from '../fixtures/core-carrier.ts'
+import { coreMemoryServer } from './core-fixture.ts'
 
 // Retains subscription counts after the root shadow selector is removed.
 it('subscribes each selected actual carrier exactly once', async () => {

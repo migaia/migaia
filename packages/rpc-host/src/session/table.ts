@@ -36,23 +36,23 @@ import {
   isLocalRpcError,
   createRpcConfigurationError,
   createRpcLifecycleError
-} from '../host/error-owner.js'
-import { HostErrorText } from '../host/error-text.js'
-import { resolveAbortReason } from '../host/abort-reason.js'
-import { Session } from './session.js'
-import { SessionText } from './text.js'
-import type { IRpcPipelineOwner } from '../sdk/flow-pipelines.js'
-import type { IProviderCommitGate } from '../dispatch/types.js'
-import { SessionDrain } from './drain.js'
-import { OriginSession } from './origin.js'
-import { createSessionView, projectDirectory, type IRpcDirectorySnapshot } from './view.js'
-import { isRpcCarrierAdmissionFailure } from '../sdk/carrier/admission.js'
+} from '../host/error-owner.ts'
+import { HostErrorText } from '../host/error-text.ts'
+import { resolveAbortReason } from '../host/abort-reason.ts'
+import { Session } from './session.ts'
+import { SessionText } from './text.ts'
+import type { IRpcPipelineOwner } from '../sdk/flow-pipelines.ts'
+import type { IProviderCommitGate } from '../dispatch/types.ts'
+import { SessionDrain } from './drain.ts'
+import { OriginSession } from './origin.ts'
+import { createSessionView, projectDirectory, type IRpcDirectorySnapshot } from './view.ts'
+import { isRpcCarrierAdmissionFailure } from '../sdk/carrier/admission.ts'
 import {
   SessionAvailability,
   publishSessionReadiness,
   closeSessionReadiness,
   type ISessionAvailabilityIndex
-} from './availability.js'
+} from './availability.ts'
 import type {
   IRpcSessionOptions,
   IRpcSessionFlow,
@@ -61,7 +61,7 @@ import type {
   IRpcSessionWriteOptions,
   IRpcClosingHandler,
   IRpcPeerClosedHandler
-} from './types.js'
+} from './types.ts'
 
 /** Namespace admission protects the Host's lifecycle methods before transport setup begins. */
 const reservedNamespaces = new Set(['self', 'provide', 'close', 'use', 'dispose', 'unUse'])

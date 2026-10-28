@@ -7,8 +7,8 @@ import {
   serializeRpcWireError,
   type IRpcHello
 } from '@migaia/rpc-contract/protocol'
-import { hello } from '../fixtures/core-profile.js'
-import { TOKEN } from '../fixtures/handshake-privacy.js'
+import { hello } from '../fixtures/core-profile.ts'
+import { TOKEN } from '../fixtures/handshake-privacy.ts'
 
 /** The three actually declared handlers retain their original ordered extension identities. */
 const REQUIRED = ['batch@1', 'abort@1', 'wire-error@1']

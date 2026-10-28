@@ -12,8 +12,8 @@ import {
   RpcJsonCarrierCodec,
   type IRpcFlowFeature
 } from '@migaia/rpc-host/sdk'
-import { coreMemoryServer } from './core-fixture.js'
-import { RuntimeApiFixtureText } from '../fixtures/runtime-api-text.js'
+import { coreMemoryServer } from './core-fixture.ts'
+import { RuntimeApiFixtureText } from '../fixtures/runtime-api-text.ts'
 
 /** Keep all three genuine transformations installed on both actual public host owners. */
 async function composition(

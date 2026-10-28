@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
-} from '../../src/process/adapters/node-socket.js'
+} from '../../src/process/adapters/node-socket.ts'
 
 /** Raw endpoint ownership stays independent from retired adapter-level authentication options. */
 describe('Node rendezvous socket ownership', () => {

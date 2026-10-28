@@ -13,8 +13,8 @@ import { RpcError, RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { describe, expect, it, vi } from 'vitest'
 import * as assembly from '../../dist/features/chunk/assembly.js'
-import { coreMemoryServer } from '../host/core-fixture.js'
-import { MemoryCarrier } from '../fixtures/core-carrier.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
+import { MemoryCarrier } from '../fixtures/core-carrier.ts'
 
 /** One exposed alias is the native Feature's complete declared requirement. */
 type IAlias = Readonly<{ alias(): string }>

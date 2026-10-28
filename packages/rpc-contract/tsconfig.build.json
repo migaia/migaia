@@ -4,6 +4,8 @@
   // are a compile input only; tsc never emits `.d.ts` inputs.
   // Run via `pnpm --filter ./packages/rpc run build`.
   "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
     "target": "es2023",
     "lib": ["ES2023", "ESNext.Disposable"],
     "module": "esnext",

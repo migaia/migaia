@@ -4,12 +4,12 @@ import type { IPluginRuntimeFeatureSnapshot } from '@migaia/plugin-host'
 import type { IRpcMethodDescription } from '@migaia/rpc-contract/protocol'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RuntimeApiErrorText } from '@migaia/rpc-contract/errors'
-import { createRpcError } from '../host/error-owner.js'
-import { resolveAbortReason } from '../host/abort-reason.js'
-import { registerLocalErrorWireSummary } from '../host/error-wire-metadata.js'
+import { createRpcError } from '../host/error-owner.ts'
+import { resolveAbortReason } from '../host/abort-reason.ts'
+import { registerLocalErrorWireSummary } from '../host/error-wire-metadata.ts'
 import type { IRpcSessionSelection } from '@migaia/rpc-contract/interfaces'
-import { attachProviderCommitGate, attachProviderPreflight } from './catalog.js'
-import type { IProviderCommitGate, IRpcProvide, IRpcProviderMethod } from './types.js'
+import { attachProviderCommitGate, attachProviderPreflight } from './catalog.ts'
+import type { IProviderCommitGate, IRpcProvide, IRpcProviderMethod } from './types.ts'
 
 /** A cold accepted identity and the existing Forwarder alone can mint held forward callables. */
 export type IProviderExposureForwarding = Readonly<{

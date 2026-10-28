@@ -29,9 +29,9 @@ import {
   type IRpcNativeMemberRecord,
   type IRpcNativePoolEvents
 } from '@migaia/rpc-host/sdk'
-import type { IThreadChannelFactory } from './types.js'
+import type { IThreadChannelFactory } from './types.ts'
 import { timeout } from '@migaia/rpc-host/features/timeout'
-import { portableThreadSpec } from './error.js'
+import { portableThreadSpec } from './error.ts'
 
 /** A full source preserves its actual launcher, budget, scheduler and native supervision policy. */
 export type IThreadSpawn<THandle extends IThreadHandle = IThreadHandle> = Readonly<{

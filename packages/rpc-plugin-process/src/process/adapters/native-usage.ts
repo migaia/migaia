@@ -5,8 +5,8 @@ import { readFile } from 'node:fs/promises'
 import process from 'node:process'
 import type { IProcessUsage } from '@migaia/supervision/process'
 import { RpcProcessErrorCode } from '@migaia/rpc-contract/error-code'
-import { RpcProcessErrorText } from '../error-text.js'
-import { createProcessError } from '../error.js'
+import { RpcProcessErrorText } from '../error-text.ts'
+import { createProcessError } from '../error.ts'
 
 /** OS field names and argument grammar belong only to this local sampler. */
 const ProcessUsageSource = {

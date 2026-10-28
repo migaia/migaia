@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { it } from 'vitest'
-import { connectedCoreHosts } from '../host/core-fixture.js'
+import { connectedCoreHosts } from '../host/core-fixture.ts'
 
 it('borrowed public request preserves getter capture, independent Promises and close identity', async () => {
   /** Caller capture and actual provider execution remain separately observable business facts. */

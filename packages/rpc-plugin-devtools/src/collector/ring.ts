@@ -10,10 +10,10 @@ import {
   type IRpcProbeEventView
 } from '@migaia/rpc-host/plugins/probe'
 import { serializeRpcError, type IRpcSerializeErrorOptions } from '@migaia/rpc-contract/errors'
-import type { IRpcDevtoolsWireEvent } from '../contract/wire.js'
-import type { IRpcDevtoolsRecordEvent } from '../contract/record.js'
-import { CarrierTable, NameTable } from './intern.js'
-import { reportFailure } from './report.js'
+import type { IRpcDevtoolsWireEvent } from '../contract/wire.ts'
+import type { IRpcDevtoolsRecordEvent } from '../contract/record.ts'
+import { CarrierTable, NameTable } from './intern.ts'
+import { reportFailure } from './report.ts'
 
 /**
  * Numeric columns snapshot the view; routes are owned snapshots and other sparse values are

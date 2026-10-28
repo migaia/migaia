@@ -7,7 +7,7 @@ import {
   RpcFlowPoint,
   type IRpcFlowStage
 } from '@migaia/rpc-host/sdk'
-import { coreMemoryServer } from './core-fixture.js'
+import { coreMemoryServer } from './core-fixture.ts'
 
 it('late use returns the same public Host, inherits one shared setup and preserves the cold local override', async () => {
   /** The shared installation must exist even while every cold namespace overrides its placement. */

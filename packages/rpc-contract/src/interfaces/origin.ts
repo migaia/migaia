@@ -1,13 +1,13 @@
 /** Native origin selection borrows real media; logical targets never encode or handshake. */
 import type { IAbortSignal } from '@migaia/utils/promise'
-import type { IRpcSemanticFrame } from '../wire/types.js'
+import type { IRpcSemanticFrame } from '../wire/types.ts'
 import type {
   IRpcCarrierWriteOptions,
   IRpcPingOptions,
   IRpcSessionHandle,
   IRpcSessionView
-} from './carrier.js'
-import type { IRpcNativeGeneration } from './feature.js'
+} from './carrier.ts'
+import type { IRpcNativeGeneration } from './feature.ts'
 
 /** Work owners retain descriptive identity and an explicit native IO collaborator, never a Peer. */
 export type IRpcSessionSelection = Readonly<{

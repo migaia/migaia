@@ -3,7 +3,7 @@ import {
   RpcCoreErrorCode,
   RPC_ENDPOINT_ERROR_SOURCE as RPC_CORE_ERROR_SOURCE
 } from '@migaia/rpc-contract/error-code'
-import { CollectorText } from './text.js'
+import { CollectorText } from './text.ts'
 
 /** Statistics and logging share one classification of the frozen failed observation outcome. */
 export const RpcDevtoolsFailure = {

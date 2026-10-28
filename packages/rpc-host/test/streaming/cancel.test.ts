@@ -11,7 +11,7 @@ import { RpcStreamLimit } from '@migaia/rpc-contract'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { timeout } from '@migaia/rpc-host/features'
-import { connectedCoreHosts } from '../host/core-fixture.js'
+import { connectedCoreHosts } from '../host/core-fixture.ts'
 
 /** Keep deadlines virtual while preserving the endpoint's ordinary zero-delay data handoff. */
 function controlledDeadlineScheduler(): IScheduler & { advance(ms: number): void } {

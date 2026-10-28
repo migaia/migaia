@@ -1,7 +1,7 @@
 import { createUnitBudget } from '@migaia/supervision'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { RpcWireKind, RpcWireControlOperation } from '@migaia/rpc-contract/protocol'
-import { threadFrames } from './frame.js'
+import { threadFrames } from './frame.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import { createRpcHost } from '@migaia/rpc-host'
@@ -12,7 +12,7 @@ import {
   createWebThreadChannelFactory
 } from '../../dist/threads/web-launcher.js'
 
-import { nativeFixture } from './fixture.js'
+import { nativeFixture } from './fixture.ts'
 
 /** Node fixtures cannot establish Web/Bun/Electron actual-exit enforcement. */
 describe('platform capability admission', () => {

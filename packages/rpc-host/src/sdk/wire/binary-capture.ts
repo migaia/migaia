@@ -16,16 +16,16 @@ import {
 import { isCanonicalBase64url } from '@migaia/serialize/core'
 import { createContractError, type IRpcErrorWireMetadata } from '@migaia/rpc-contract/errors'
 import { RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
-import { markRpcCarrierAdmissionFailure } from '../carrier/admission.js'
-import { BinaryShape } from './binary-shape.js'
-import { projectRpcFrameSlots } from './frame-slots.js'
-import { markRpcPortableBinary } from './portable.js'
+import { markRpcCarrierAdmissionFailure } from '../carrier/admission.ts'
+import { BinaryShape } from './binary-shape.ts'
+import { projectRpcFrameSlots } from './frame-slots.ts'
+import { markRpcPortableBinary } from './portable.ts'
 import {
   RpcBinaryStorage,
   RpcBinaryTag as T,
   RPC_BINARY_INTEGRITY_INLINE_BYTES
-} from './binary-constants.js'
-import type { IRpcBinaryDigest, IRpcBinaryEncoding, IRpcBinaryCapture } from './binary-types.js'
+} from './binary-constants.ts'
+import type { IRpcBinaryDigest, IRpcBinaryEncoding, IRpcBinaryCapture } from './binary-types.ts'
 /** One original visit builds both semantic snapshots and tags without rescanning business data. */
 type IBinaryValue = { encoded: IRpcPortableValue; semantic: IRpcPortableValue; native: boolean }
 /** Only the real ordinary JSON codec borrows this existing shallow wire-capture policy. */

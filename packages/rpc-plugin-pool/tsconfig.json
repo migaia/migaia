@@ -1,5 +1,7 @@
 {
   "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
     "target": "es2023",
     "lib": ["ES2024", "ESNext.Disposable"],
     "module": "esnext",

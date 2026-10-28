@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { defineFeature, definePlugin } from '@migaia/plugin-host'
 import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
 import { coroutinePlugin, type ICoroutineConnect } from '@migaia/rpc-plugin-coroutines'
-import { service, ordinaryHost, outlet, values } from './fixture.js'
+import { service, ordinaryHost, outlet, values } from './fixture.ts'
 
 describe('coroutine transport plugin', () => {
   it('uses explicit task handles for bidirectional request notify stream and cancellation', async () => {

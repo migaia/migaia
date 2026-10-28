@@ -1,12 +1,12 @@
 /** Native RPC diagnostics and pure classification; mutable local control provenance belongs to host. */
-import { RpcErrorFamily } from './family.js'
-import { RpcCoreErrorText } from './text.js'
-import { safeRead } from './property.js'
+import { RpcErrorFamily } from './family.ts'
+import { RpcCoreErrorText } from './text.ts'
+import { safeRead } from './property.ts'
 import {
   RPC_ENDPOINT_ERROR_SOURCE as RPC_CORE_ERROR_SOURCE,
   RpcCoreErrorCode,
   type IRpcCoreErrorCode
-} from '../error-code.js'
+} from '../error-code.ts'
 import {
   attachErrorIdentity,
   attachSecondaryErrors,

@@ -3,28 +3,28 @@
  * parser. This boundary captures input and projects portable slots without allocating calls,
  * negotiating sessions, executing providers or performing IO.
  */
-import type { IRpcErrorWireMetadata } from '../contract/types.js'
+import type { IRpcErrorWireMetadata } from '../contract/types.ts'
 /**
  * Admits the sole semantic frame union, delegating each field family to its existing or new grammar
  * owner. It never allocates calls/sessions, executes providers, resolves policy, or performs IO.
  */
-import { normalizeRpcTask, normalizeRpcSteps } from './metadata.js'
+import { normalizeRpcTask, normalizeRpcSteps } from './metadata.ts'
 
-import { identifier, invalid } from './record.js'
+import { identifier, invalid } from './record.ts'
 
-import { normalizeRpcPortable } from '../portable/normalize.js'
-import { isIdempotencyKey } from './metadata.js'
-import { RpcRuntimeOutcomeState } from './outcome-constants.js'
-import { normalizeRpcRoute, normalizeRpcCallOptions } from './metadata.js'
-import { normalizeRpcHandshakeRecord } from './handshake.js'
-import { normalizeRpcDirectory } from './directory.js'
-import { normalizeRpcWireError } from './errors.js'
-import { normalizeRpcStream } from './stream.js'
+import { normalizeRpcPortable } from '../portable/normalize.ts'
+import { isIdempotencyKey } from './metadata.ts'
+import { RpcRuntimeOutcomeState } from './outcome-constants.ts'
+import { normalizeRpcRoute, normalizeRpcCallOptions } from './metadata.ts'
+import { normalizeRpcHandshakeRecord } from './handshake.ts'
+import { normalizeRpcDirectory } from './directory.ts'
+import { normalizeRpcWireError } from './errors.ts'
+import { normalizeRpcStream } from './stream.ts'
 import {
   normalizeRpcGroupResult,
   normalizeRpcOutcome,
   normalizeRpcOutcomeStore
-} from './completion.js'
+} from './completion.ts'
 import {
   RpcWireProfile,
   RpcWireKind as K,
@@ -33,8 +33,8 @@ import {
   RpcWireField as F,
   RpcWirePointer as P,
   RpcWireExtensionPattern
-} from './constants.js'
-import type { IRpcSemanticFrame, IRpcEnvelope, IRpcTask, IRpcPortableProjector } from './types.js'
+} from './constants.ts'
+import type { IRpcSemanticFrame, IRpcEnvelope, IRpcTask, IRpcPortableProjector } from './types.ts'
 
 /** Envelope extension metadata is portable data and cannot mint installed handler authority. */
 function normalizeExtensions(

@@ -5,7 +5,7 @@ import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { createRpcByteCarrier, defineTransportPlugin, RpcEventByteIO } from '@migaia/rpc-host/sdk'
 import { processPlugin } from '@migaia/rpc-plugin-process'
-import { peers, NativeInteropObservations } from './runtime-interop-fixture.js'
+import { peers, NativeInteropObservations } from './runtime-interop-fixture.ts'
 import {
   createNodeProcessLauncher,
   type INodeProcessHandle

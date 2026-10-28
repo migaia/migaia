@@ -10,7 +10,7 @@ import {
   type IRpcProbeEventView
 } from '@migaia/rpc-host/plugins/probe'
 import { describe, expect, it } from 'vitest'
-import { coreMemoryServer, connectedCoreHosts } from '../host/core-fixture.js'
+import { coreMemoryServer, connectedCoreHosts } from '../host/core-fixture.ts'
 
 describe('actual public forwarding lifecycle', () => {
   it('rejects a real forwarding cycle before reentering the original business provider', async () => {

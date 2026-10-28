@@ -4,9 +4,9 @@
  * replay policy belong to Host and installed plugins.
  */
 import { orderStringKeys } from '@migaia/utils/string'
-import { normalizePortable, type IRpcPortableValue } from '../portable/index.js'
-import { readMethodSchema } from './method-schema.js'
-import type { IRpcErrorWireMetadata } from '../contract/types.js'
+import { normalizePortable, type IRpcPortableValue } from '../portable/index.ts'
+import { readMethodSchema } from './method-schema.ts'
+import type { IRpcErrorWireMetadata } from '../contract/types.ts'
 import {
   inspectShape,
   rejectShape,
@@ -14,11 +14,11 @@ import {
   RpcShapeReason,
   type IShapeInspection,
   type IRpcShapeCheck
-} from './schema-diagnostics.js'
-import { RPC_INVALID_DECLARATION_SEGMENT, REMOTE_NAME_PATTERN } from './limits.js'
+} from './schema-diagnostics.ts'
+import { RPC_INVALID_DECLARATION_SEGMENT, REMOTE_NAME_PATTERN } from './limits.ts'
 /** Local advanced provider declarations are inert data, independent from the one wire profile. */
-import type { IRpcMethodSchema } from './method-schema.js'
-import { RPC_DIRECTORY_METHOD_LIMIT, REMOTE_SHAPE_DETAIL_PATH_CHARS } from './limits.js'
+import type { IRpcMethodSchema } from './method-schema.ts'
+import { RPC_DIRECTORY_METHOD_LIMIT, REMOTE_SHAPE_DETAIL_PATH_CHARS } from './limits.ts'
 
 /**
  * Remote description admission bounds anchor existing wire/admission limits: 64

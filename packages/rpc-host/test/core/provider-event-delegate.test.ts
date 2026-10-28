@@ -1,7 +1,7 @@
 import { createRpcHost } from '@migaia/rpc-host'
 import { deferred } from '@migaia/utils/promise'
 import { expect, it } from 'vitest'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 it('delivers dispatch-only frames to the provider-owned listener registry', async () => {
   /** The original frame payload remains business data, independent from the wire protocol. */

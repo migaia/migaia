@@ -19,7 +19,7 @@ import {
   type RpcProbeDirection
 } from '@migaia/rpc-contract/interfaces'
 import { RpcWireKind as K, type IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
-import { carrierSizeBytes } from '../wire/probe-content.js'
+import { carrierSizeBytes } from '../wire/probe-content.ts'
 
 /** One exact native subscription owns its callback without a queue or event retention. */
 type IObservationSubscription = Readonly<{

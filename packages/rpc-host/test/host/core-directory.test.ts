@@ -3,7 +3,7 @@ import { createRpcHost } from '@migaia/rpc-host'
 import { defineFlowPlugin, HostObservationKind } from '@migaia/rpc-host/sdk'
 import type { IRpcSessionView } from '@migaia/rpc-contract/interfaces'
 import { expect, it } from 'vitest'
-import { coreMemoryServer } from './core-fixture.js'
+import { coreMemoryServer } from './core-fixture.ts'
 
 it('advertises current namespace schemas and idempotency only at a fresh accepted handshake', async () => {
   /** The gateway's canonical directory includes current forward targets and held declarations. */

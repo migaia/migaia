@@ -10,16 +10,16 @@ import { RpcCarrierFrameKind as K } from '@migaia/rpc-contract/protocol'
 import { createContractError } from '@migaia/rpc-contract/errors'
 import { RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
 import type { IRpcFlowContext } from '@migaia/rpc-contract/interfaces'
-import type { IRpcFlowInstallation } from '../../sdk/types.js'
-import { RpcFlowPoint, type IRpcFlowStage } from '../../sdk/flow-pipelines.js'
-import { createStringChunkAssembler, createBinaryChunkAssembler } from './assembly.js'
+import type { IRpcFlowInstallation } from '../../sdk/types.ts'
+import { RpcFlowPoint, type IRpcFlowStage } from '../../sdk/flow-pipelines.ts'
+import { createStringChunkAssembler, createBinaryChunkAssembler } from './assembly.ts'
 import {
   RpcChunkExtension,
   RpcChunkEncoding as Encoding,
   RpcChunkMessagePrefix
-} from './constants.js'
-import type { IRpcChunkOptions, IRpcStringChunk, IRpcBinaryChunk } from './types.js'
-import { hostErrorWireMetadata } from '../../host/error-wire-metadata.js'
+} from './constants.ts'
+import type { IRpcChunkOptions, IRpcStringChunk, IRpcBinaryChunk } from './types.ts'
+import { hostErrorWireMetadata } from '../../host/error-wire-metadata.ts'
 
 /** The exact inbound Session signal owns one physical-source retirement listener. */
 type IChunkSource = Readonly<{ signal: IAbortSignal; abort: () => void }>

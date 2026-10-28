@@ -3,10 +3,10 @@
  * selection receives admitted dispatch facts; the store owns claims and retention rather than these
  * declarations or the namespace query itself.
  */
-import type { IRpcCallOptions } from '../../namespace/types.js'
+import type { IRpcCallOptions } from '../../namespace/types.ts'
 import type { IRpcOutcomeLookupResult } from '@migaia/rpc-contract/protocol'
-import type { IRpcFanoutResult } from '../../namespace/types.js'
-import type { IRpcIdempotencyStore, IRpcIdempotencyStoreOptions } from './store.js'
+import type { IRpcFanoutResult } from '../../namespace/types.ts'
+import type { IRpcIdempotencyStore, IRpcIdempotencyStoreOptions } from './store.ts'
 
 /** Existing store capacities and scope callback move from host policy to this actual plugin. */
 export type IRpcIdempotencyOptions = IRpcIdempotencyStoreOptions &

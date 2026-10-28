@@ -4,15 +4,15 @@
  */
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { systemScheduler, type IScheduledTask, type IScheduler } from '@migaia/utils/scheduler'
-import type { ipcLog } from '../features/log.js'
-import { IpcLogEventName } from '../features/flow-control.js'
+import type { ipcLog } from '../features/log.ts'
+import { IpcLogEventName } from '../features/flow-control.ts'
 import { IpcReporterContext } from '@migaia/rpc-host/sdk'
 import {
   CHILD_STDERR_REDACTED,
   PROCESS_STDERR_EVENT_BUDGET,
   PROCESS_STDERR_INTERVAL_MS
-} from './constants.js'
-import type { IProcessCommonOptions } from './types.js'
+} from './constants.ts'
+import type { IProcessCommonOptions } from './types.ts'
 /** The concrete log installation owns its sink and exact observer remover. */
 type IProcessLog = ReturnType<ReturnType<typeof ipcLog>['install']>['value']
 

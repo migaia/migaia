@@ -16,8 +16,8 @@ import {
   PROCESS_RUNTIME_API_FINGERPRINT_PREFIX,
   PROCESS_RUNTIME_API_BOOTSTRAP_KIND,
   PROCESS_RUNTIME_API_BOOTSTRAP_VERSION
-} from './constants.js'
-import { RpcProcessErrorText } from './error-text.js'
+} from './constants.ts'
+import { RpcProcessErrorText } from './error-text.ts'
 
 /** Safe launch selection belongs to the original process launcher, outside the process spec. */
 export type IProcessRuntimeBootstrapOptions = Readonly<{

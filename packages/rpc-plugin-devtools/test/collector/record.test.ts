@@ -4,7 +4,7 @@ import {
   RpcDevtoolsErrorCode,
   RPC_DEVTOOLS_SOURCE
 } from '@migaia/rpc-plugin-devtools'
-import { CollectorFixture, collectorView } from './fixture.js'
+import { CollectorFixture, collectorView } from './fixture.ts'
 
 describe('collector recording', () => {
   it('records three events independently of the main ring and round-trips through the frozen codec', () => {

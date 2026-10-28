@@ -10,7 +10,7 @@ import { idempotency } from '@migaia/rpc-host/plugins/idempotency'
 import { RpcTimeoutError } from '@migaia/rpc-contract/errors'
 import { deferred } from '@migaia/utils/promise'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { connectedCoreHosts, coreMemoryServer } from '../host/core-fixture.js'
+import { connectedCoreHosts, coreMemoryServer } from '../host/core-fixture.ts'
 
 it('injects manual time into a real public RPC attempt deadline', async () => {
   /** The complete feature owns its original monotonic scheduler and timer receipt. */

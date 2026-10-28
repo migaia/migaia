@@ -1,11 +1,11 @@
 /** Acquire native Deno child streams and exit facts; Session and supervision own higher policy. */
 import { RPC_PROCESS_ERROR_SOURCE } from '@migaia/rpc-contract/error-code'
-import { createProcessError } from '../error.js'
+import { createProcessError } from '../error.ts'
 import { IpcReporterContext } from '@migaia/rpc-host/sdk'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { hostRethrowReporter } from '@migaia/utils/promise'
 import { CapabilityLevel, StandardCapability, type TerminationMode } from '@migaia/supervision'
-import { sampleNativeProcess } from './native-usage.js'
+import { sampleNativeProcess } from './native-usage.ts'
 import {
   ProcessCapability,
   type IProcessHandle,
@@ -13,18 +13,18 @@ import {
 } from '@migaia/supervision/process'
 import { encodeRpcStreamFrame } from '@migaia/rpc-host/sdk'
 import { RPC_ENDPOINT_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
-import { receiveAdapterBootstrap } from '../bootstrap.js'
+import { receiveAdapterBootstrap } from '../bootstrap.ts'
 import { RpcProcessErrorCode } from '@migaia/rpc-contract/error-code'
 
-import { RpcProcessErrorText } from '../error-text.js'
-import type { IProcessByteChannel } from '../types.js'
-import { createAdapterProcessLaunch } from '../launch.js'
-import { createAdapterWebByteIO } from '../web-byte-stream.js'
+import { RpcProcessErrorText } from '../error-text.ts'
+import type { IProcessByteChannel } from '../types.ts'
+import { createAdapterProcessLaunch } from '../launch.ts'
+import { createAdapterWebByteIO } from '../web-byte-stream.ts'
 import type {
   IProcessRuntimeBootstrap,
   IProcessRuntimeBootstrapOptions
-} from '../runtime-bootstrap.js'
-import { PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_ENV_VERSION } from '../constants.js'
+} from '../runtime-bootstrap.ts'
+import { PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_ENV_VERSION } from '../constants.ts'
 
 /** Only the Deno APIs used by this deep adapter are typed here. */
 type IDenoChild = Readonly<{

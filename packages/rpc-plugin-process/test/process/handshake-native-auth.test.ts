@@ -4,7 +4,7 @@ import { inspect } from 'node:util'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { createRpcStreamFrameDecoder } from '@migaia/rpc-host/sdk'
 import { RpcWireHandshakeStep } from '@migaia/rpc-contract/protocol'
-import { NativeSocketAuth } from './fixtures/native-socket-auth.js'
+import { NativeSocketAuth } from './fixtures/native-socket-auth.ts'
 import { deferred } from '@migaia/utils/promise'
 
 it('closes an actual pending native verifier without reporting owner cancellation', async () => {

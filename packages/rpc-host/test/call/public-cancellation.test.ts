@@ -3,8 +3,8 @@ import { RpcWireKind, RpcWireProfile } from '@migaia/rpc-contract/protocol'
 import { timeout } from '@migaia/rpc-host/features/timeout'
 import type { IRpcContext } from '@migaia/rpc-host'
 import { describe, expect, it, vi } from 'vitest'
-import { throwingSignal } from '../fixtures/throwing-signal.js'
-import { connectedCoreHosts } from '../host/core-fixture.js'
+import { throwingSignal } from '../fixtures/throwing-signal.ts'
+import { connectedCoreHosts } from '../host/core-fixture.ts'
 
 /** Only real provider entry and finally affect the observable business activity count. */
 class CancellationProvider {

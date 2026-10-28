@@ -5,8 +5,8 @@ import {
   serializeRpcError
 } from '@migaia/rpc-contract/errors'
 import { RpcDevtoolsErrorCode } from '@migaia/rpc-contract/error-code'
-import { RpcDevtoolsErrorText } from '../error-text.js'
-import { identifyDevtoolsError } from '../errors.js'
+import { RpcDevtoolsErrorText } from '../error-text.ts'
+import { identifyDevtoolsError } from '../errors.ts'
 import {
   RpcDevtoolsRecordFormat,
   RpcDevtoolsRecordField,
@@ -14,7 +14,7 @@ import {
   type IRpcDevtoolsRecord,
   type IRpcDevtoolsRecordEvent,
   type IRpcDevtoolsRecordHeader
-} from './record.js'
+} from './record.ts'
 
 /** Convert captured bytes to the record's Base64 text without changing their backing. */
 function encodeBytes(bytes: Uint8Array): string {

@@ -10,7 +10,7 @@ import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory,
   type INodeThreadHandle
-} from '../../src/threads/node-launcher.js'
+} from '../../src/threads/node-launcher.ts'
 
 /** The existing real Worker fixture now uses the sole public Host/transport protocol path. */
 const entry = new URL('./fixtures/short-spawn-worker.mjs', import.meta.url)

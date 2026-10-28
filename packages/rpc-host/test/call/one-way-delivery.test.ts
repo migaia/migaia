@@ -4,7 +4,7 @@ import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
 import { limits } from '@migaia/rpc-host/plugins/limits'
 import { deferred } from '@migaia/utils/promise'
 import { expect, it, vi } from 'vitest'
-import { coreMemoryServer, connectedCoreHosts } from '../host/core-fixture.js'
+import { coreMemoryServer, connectedCoreHosts } from '../host/core-fixture.ts'
 
 /** Own only the original provider's business suspension, not RPC pending or admission state. */
 class HeldNotification {

@@ -2,7 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { beforeAll, describe, expect, it } from 'vitest'
-import { evidence, peers } from './fixtures/conformance-business.js'
+import { evidence, peers } from './fixtures/conformance-business.ts'
 import { normalizeRpcFrame } from '@migaia/rpc-contract/protocol'
 /** Current semantic vectors are independent of the retired v1 TS endpoint runner. */
 const vectors = JSON.parse(

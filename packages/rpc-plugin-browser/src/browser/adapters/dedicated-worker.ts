@@ -6,10 +6,10 @@ import { safeString } from '@migaia/rpc-contract/errors'
 import { RpcCarrierPlatform } from '@migaia/rpc-contract/interfaces'
 import { RpcCoreErrorCode, RPC_ENDPOINT_ERROR_SOURCE } from '@migaia/rpc-contract/error-code'
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { browserMessageCarrier, type IBrowserEventPort } from '../native-message.js'
+import { browserMessageCarrier, type IBrowserEventPort } from '../native-message.ts'
 import type { IRpcTransportSetupContext } from '@migaia/rpc-host/sdk'
-import { BrowserRpcErrorText } from '../error-text.js'
-import { BrowserPeerEvent } from '../peer-text.js'
+import { BrowserRpcErrorText } from '../error-text.ts'
+import { BrowserPeerEvent } from '../peer-text.ts'
 
 /** Preserve native Error/name/stack and the original browser script/deserialization cause. */
 function failure(message: string, cause: unknown): Error {

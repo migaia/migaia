@@ -1,7 +1,7 @@
 /** Admits an actual ServiceWorker or Client source and supplies its native messaging carrier. */
 import type { IRpcTransportSetupContext } from '@migaia/rpc-host/sdk'
 import { RpcCarrierPlatform, RpcCarrierTopology } from '@migaia/rpc-contract/interfaces'
-import { browserMessageCarrier } from '../native-message.js'
+import { browserMessageCarrier } from '../native-message.ts'
 
 /** Outgoing ServiceWorker or actual Client stays distinct from the receiving EventTarget. */
 export type IServiceWorkerMessageTarget = {

@@ -19,7 +19,7 @@ function importClosure(file: string, visited = new Set<string>()): string[] {
           : undefined
     if (specifier === undefined) return []
     if (!specifier.startsWith('.')) return [specifier]
-    const target = resolve(dirname(file), specifier.replace(/\.js$/, '.ts'))
+    const target = resolve(dirname(file), specifier)
     return [target, ...importClosure(target, visited)]
   })
 }

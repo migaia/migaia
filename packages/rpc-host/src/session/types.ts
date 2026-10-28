@@ -9,10 +9,10 @@ import type {
   IRpcTargetSource
 } from '@migaia/rpc-contract/interfaces'
 import type { IRpcDirectory, IRpcEnvelope, IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
-import type { FlowRegistry } from '../flow/registry.js'
-import type { IRpcPipelineOwner } from '../sdk/flow-pipelines.js'
-import type { IProviderCommitGate } from '../dispatch/types.js'
-import type { IRpcDirectorySnapshot } from './view.js'
+import type { FlowRegistry } from '../flow/registry.ts'
+import type { IRpcPipelineOwner } from '../sdk/flow-pipelines.ts'
+import type { IProviderCommitGate } from '../dispatch/types.ts'
+import type { IRpcDirectorySnapshot } from './view.ts'
 
 /** Only these flow operations participate in carrier preparation and session negotiation. */
 export type IRpcSessionFlow = Pick<FlowRegistry, 'facts'> & Partial<Pick<FlowRegistry, 'observe'>>

@@ -11,7 +11,7 @@ import {
 } from '../../dist/features/auth/envelope.js'
 import { AuthenticationRepresentation } from '../../dist/features/auth/representation.js'
 import { RpcAuthenticationEnvelope } from '../../dist/features/auth/constants.js'
-import { codecContext, request } from '../core/fixtures/outbound-proof-candidate.js'
+import { codecContext, request } from '../core/fixtures/outbound-proof-candidate.ts'
 
 /** The standalone public serialize parser receives its actual immutable fixture context. */
 const serializeContext = { signal: new AbortController().signal, context: 'wire-order-fixture' }

@@ -9,7 +9,7 @@ import {
 } from '@migaia/rpc-contract'
 import type { IRpcCodecContext } from '@migaia/rpc-contract/interfaces'
 import { RpcJsonCarrierCodec, RpcUtf8 } from '@migaia/rpc-host/sdk'
-import { hello } from '../../../rpc-contract/test/fixtures/core-profile.js'
+import { hello } from '../../../rpc-contract/test/fixtures/core-profile.ts'
 
 /** Original synthetic credential, including its original case variants, remains unchanged. */
 const T = 'toksecret9f8e'

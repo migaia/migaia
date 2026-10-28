@@ -1,7 +1,7 @@
 /** Public peer projections retain callable prefixes and reject external table mutation. */
 import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { coreMemoryServer } from './core-fixture.js'
+import { coreMemoryServer } from './core-fixture.ts'
 
 it.each([false, true])(
   'keeps callable a and a.b in either directory order (scalar first=%s)',

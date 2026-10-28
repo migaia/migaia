@@ -4,8 +4,8 @@ import { createRpcHost } from '@migaia/rpc-host'
 import { auth } from '@migaia/rpc-host/plugins/auth'
 import { probe } from '@migaia/rpc-host/plugins/probe'
 import { defineFlowFeature, defineTransportPlugin } from '@migaia/rpc-host/sdk'
-import { coreMemoryServer } from '../../host/core-fixture.js'
-import { MemoryCarrier } from '../../fixtures/core-carrier.js'
+import { coreMemoryServer } from '../../host/core-fixture.ts'
+import { MemoryCarrier } from '../../fixtures/core-carrier.ts'
 
 /** Original public constructions and carrier ids retain independent connection credentials. */
 function credentialTransport(server: ReturnType<typeof coreMemoryServer>, label: string) {

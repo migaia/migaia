@@ -13,25 +13,25 @@ import {
   type IRpcProbeEventView
 } from '@migaia/rpc-host/plugins/probe'
 import type { IRpcProvide } from '@migaia/rpc-host'
-import { encodeRpcDevtoolsRecord, decodeRpcDevtoolsRecord } from '../contract/record-codec.js'
-import type { IRpcDevtools, IRpcDevtoolsOptions } from '../collector-types.js'
+import { encodeRpcDevtoolsRecord, decodeRpcDevtoolsRecord } from '../contract/record-codec.ts'
+import type { IRpcDevtools, IRpcDevtoolsOptions } from '../collector-types.ts'
 import type {
   IRpcDevtoolsCounters,
   IRpcDevtoolsPage,
   IRpcDevtoolsQuery
-} from '../contract/service.js'
-import type { IRpcDevtoolsWireEvent } from '../contract/wire.js'
+} from '../contract/service.ts'
+import type { IRpcDevtoolsWireEvent } from '../contract/wire.ts'
 import { RpcDevtoolsErrorCode } from '@migaia/rpc-contract/error-code'
-import { identifyDevtoolsError } from '../errors.js'
-import { NameTable } from './intern.js'
-import { EventRing, readCarrierSequences } from './ring.js'
-import { CollectorStats } from './stats.js'
-import { compileQuery, matchesSlot } from './query.js'
-import { finishRecord } from './record.js'
-import { createCollectorService } from './service.js'
-import { enqueueBatch, reportFailure } from './report.js'
-import { CollectorWatcher } from './watch.js'
-import { CollectorDefaultStages, CollectorLimit, CollectorText } from './text.js'
+import { identifyDevtoolsError } from '../errors.ts'
+import { NameTable } from './intern.ts'
+import { EventRing, readCarrierSequences } from './ring.ts'
+import { CollectorStats } from './stats.ts'
+import { compileQuery, matchesSlot } from './query.ts'
+import { finishRecord } from './record.ts'
+import { createCollectorService } from './service.ts'
+import { enqueueBatch, reportFailure } from './report.ts'
+import { CollectorWatcher } from './watch.ts'
+import { CollectorDefaultStages, CollectorLimit, CollectorText } from './text.ts'
 
 /** Configuration errors preserve the native TypeError and the original failure as cause. */
 function invalid(cause?: unknown): never {

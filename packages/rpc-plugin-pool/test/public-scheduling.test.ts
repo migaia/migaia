@@ -3,7 +3,7 @@ import { createRpcHost } from '@migaia/rpc-host'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { expect, it, vi } from 'vitest'
 import { pool } from '../dist/index.js'
-import { repeatableConnect } from './connect-fixture.js'
+import { repeatableConnect } from './connect-fixture.ts'
 
 /** Only business provider entry and original completion gates are retained by this case. */
 type ISchedulingEvidence = {

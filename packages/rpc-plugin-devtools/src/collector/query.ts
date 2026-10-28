@@ -1,10 +1,10 @@
 /** Compiles collector query filters and applies them to retained numeric event columns. */
 import { RpcProbeStageName, RpcProbeOutcomeName } from '@migaia/rpc-host/plugins/probe'
-import type { IRpcDevtoolsQuery } from '../contract/service.js'
+import type { IRpcDevtoolsQuery } from '../contract/service.ts'
 import { RpcDevtoolsErrorCode } from '@migaia/rpc-contract/error-code'
-import { identifyDevtoolsError } from '../errors.js'
-import { EventRing } from './ring.js'
-import { CollectorLimit, CollectorText } from './text.js'
+import { identifyDevtoolsError } from '../errors.ts'
+import { EventRing } from './ring.ts'
+import { CollectorLimit, CollectorText } from './text.ts'
 
 /** Reader compilation performs string membership setup once before scanning raw columns. */
 export type ICollectorFilter = {

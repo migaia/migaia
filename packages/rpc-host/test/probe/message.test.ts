@@ -11,7 +11,7 @@ import {
 import limits from '@migaia/rpc-host/plugins/limits'
 import timeout from '@migaia/rpc-host/features/timeout'
 import { describe, expect, it, vi } from 'vitest'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 describe('probe logical observations', () => {
   it('records request progress, provider errors, timeout, abort, notify, ping and admission refusal', async () => {

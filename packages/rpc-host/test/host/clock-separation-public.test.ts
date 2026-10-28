@@ -4,7 +4,7 @@ import { timeout } from '@migaia/rpc-host/features/timeout'
 import { deferred } from '@migaia/utils/promise'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { expect, it } from 'vitest'
-import { connectedCoreHosts } from './core-fixture.js'
+import { connectedCoreHosts } from './core-fixture.ts'
 
 it('preserves original provider failure,49/50 deadline and first counter result', async () => {
   /** Only the complete timeout instance borrows manual time; Host receives no clock injection. */

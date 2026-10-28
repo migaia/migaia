@@ -1,11 +1,11 @@
 /** Observe accepted directories and render inert declarations through the caller's output port. */
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import type { IRpcObservation, IRpcSessionView } from '@migaia/rpc-contract/interfaces'
-import { defineFlowPlugin } from '../../sdk/define.js'
-import type { IRpcFlowPlugin } from '../../sdk/types.js'
-import { HostObservationKind } from '../../host/state-constants.js'
-import { RpcTypegenName } from './text.js'
-import { renderPeerDeclaration } from './render.js'
+import { defineFlowPlugin } from '../../sdk/define.ts'
+import type { IRpcFlowPlugin } from '../../sdk/types.ts'
+import { HostObservationKind } from '../../host/state-constants.ts'
+import { RpcTypegenName } from './text.ts'
+import { renderPeerDeclaration } from './render.ts'
 
 /** Actual file I/O belongs to the caller; peer strings never become paths or native handles. */
 export type ITypegenOutput = Readonly<{

@@ -6,10 +6,10 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IRpcCompletion } from '@migaia/rpc-contract/protocol'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
-import { localRpcErrorCode } from '../../host/error-owner.js'
-import { resolveAbortReason } from '../../host/abort-reason.js'
-import type { ProviderAdmissionRegistry } from './provider-admission.js'
-import type { LimitsGovernor } from './governor.js'
+import { localRpcErrorCode } from '../../host/error-owner.ts'
+import { resolveAbortReason } from '../../host/abort-reason.ts'
+import type { ProviderAdmissionRegistry } from './provider-admission.ts'
+import type { LimitsGovernor } from './governor.ts'
 
 /** One original provider operation owns its leases and one optional deadline/activity receipt. */
 export class LimitsLease {

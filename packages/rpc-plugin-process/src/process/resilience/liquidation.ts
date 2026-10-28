@@ -3,14 +3,14 @@
  * dependants retain bounded diagnostic snapshots rather than a second execution lifecycle.
  */
 import { RPC_PROCESS_ERROR_SOURCE } from '@migaia/rpc-contract/error-code'
-import { RpcProcessErrorText } from '../error-text.js'
+import { RpcProcessErrorText } from '../error-text.ts'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import type { IPluginDependencyPlan } from '@migaia/plugin-host'
 import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
 import { RpcProcessErrorCode } from '@migaia/rpc-contract/error-code'
 
-import type { IProcessLiquidationOwner, IProcessResilienceSnapshot } from './types.js'
-import { scheduleProcessDiagnostic } from './terminal.js'
+import type { IProcessLiquidationOwner, IProcessResilienceSnapshot } from './types.ts'
+import { scheduleProcessDiagnostic } from './terminal.ts'
 
 /** A committed mutation can still retain cleanup errors without being retried. */
 export type IProcessLiquidationResult = Readonly<{

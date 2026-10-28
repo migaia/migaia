@@ -3,9 +3,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
 import { createRpcHost, defaultRpcReporter } from '@migaia/rpc-host'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
-import { isThreadChild } from '../../src/threads/child.js'
-import { expandThreadSpawn } from '../../src/threads/short-spawn.js'
-import { threadRuntimeResource } from '../../src/threads/runtime-resource.js'
+import { isThreadChild } from '../../src/threads/child.ts'
+import { expandThreadSpawn } from '../../src/threads/short-spawn.ts'
+import { threadRuntimeResource } from '../../src/threads/runtime-resource.ts'
 
 /** The main module runs outside Vitest so self-entry resolution sees a supported native entry. */
 const fixture = fileURLToPath(new URL('./fixtures/short-spawn-host.mjs', import.meta.url))

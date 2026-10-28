@@ -10,8 +10,8 @@ import { walkErrorCauses } from '@migaia/utils/error'
 import { RpcCarrierFrameKind } from '@migaia/rpc-contract/protocol'
 import type { IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
 import { expect, it, vi } from 'vitest'
-import { coreMemoryServer } from './core-fixture.js'
-import { MemoryCarrier } from '../fixtures/core-carrier.js'
+import { coreMemoryServer } from './core-fixture.ts'
+import { MemoryCarrier } from '../fixtures/core-carrier.ts'
 
 /** The original native-only subjects own genuine pipelines for their actual memory listeners. */
 function receivingHost() {

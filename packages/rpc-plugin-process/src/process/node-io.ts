@@ -3,7 +3,7 @@
  * preserves their distinct destroy or pause/end behavior without terminating the process.
  */
 import type { Readable, Writable, Duplex } from 'node:stream'
-import { nodeByteStream } from './node-byte-stream.js'
+import { nodeByteStream } from './node-byte-stream.ts'
 
 /** The caller holds the actual independent child read/write pipes. */
 export type IAdapterChildStdio = Readonly<{

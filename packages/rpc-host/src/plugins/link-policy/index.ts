@@ -1,7 +1,7 @@
 /** Supply complete strategies through the existing native policy installation owner. */
 import type { IRpcCallFeature } from '@migaia/rpc-contract/interfaces'
-import { defineLinkPolicy } from '../../sdk/define.js'
-import type { IRpcFlowPlugin } from '../../sdk/types.js'
+import { defineLinkPolicy } from '../../sdk/define.ts'
+import type { IRpcFlowPlugin } from '../../sdk/types.ts'
 
 /** Stable native identity lets ordinary installation reject conflicting chain defaults. */
 export const RpcLinkPolicyName = 'rpc-link-policy'

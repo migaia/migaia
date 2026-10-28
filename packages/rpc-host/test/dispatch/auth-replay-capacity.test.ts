@@ -5,7 +5,7 @@ import type { IRpcProviderRejection } from '@migaia/rpc-contract/errors'
 import { deserializeRpcWireError } from '@migaia/rpc-contract/protocol'
 import assert from 'node:assert/strict'
 import { expect, it, vi } from 'vitest'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 /** Only this portable fixture credential is admitted by the actual handshake verifier. */
 const replayCredential = 'auth-capacity-fixture-credential'

@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
-import { coreMemoryServer } from './core-fixture.js'
+import { coreMemoryServer } from './core-fixture.ts'
 
 // Retain original borrowed-session lifetime through actual SDK handles.
 it('lends the actual listener session with disposal confined to that peer', async () => {

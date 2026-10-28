@@ -10,12 +10,12 @@ import {
   type IUrlLike
 } from '@migaia/utils'
 import { resolveRpcEntry, retainRpcRuntimeFlags } from '@migaia/rpc-host/sdk'
-import type { IThreadSpawn } from './source.js'
+import type { IThreadSpawn } from './source.ts'
 import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { invalidThreadConfig } from './error.js'
-import { ThreadErrorText } from './error-text.js'
-import type { IThreadRuntimeResource } from './runtime-types.js'
+import { invalidThreadConfig } from './error.ts'
+import { ThreadErrorText } from './error-text.ts'
+import type { IThreadRuntimeResource } from './runtime-types.ts'
 /** Entry-only recipes fill only missing native launcher, budget and clock fields. */
 export type IThreadShortSpawn = Readonly<{
   entry: true | IUrlLike
@@ -118,12 +118,12 @@ export async function expandThreadSpawn(
   if (!launcher || !channelFactory) {
     if (bun || deno || !node) {
       /** The single Web owner declares each host's own exit capability; only Bun observes close. */
-      const adapter = await import('./web-launcher.js')
+      const adapter = await import('./web-launcher.ts')
       launcher ??= adapter.createWebThreadLauncher({ report })
       channelFactory ??= adapter.createWebThreadChannelFactory({ scheduler, report })
     } else {
       /** Node's public adapter keeps native Worker construction and exit observation canonical. */
-      const adapter = await import('./node-launcher.js')
+      const adapter = await import('./node-launcher.ts')
       launcher ??= adapter.createNodeThreadLauncher({ execArgv: runtimeFlags, report }, runtime)
       channelFactory ??= adapter.createNodeThreadChannelFactory({ scheduler, report })
     }

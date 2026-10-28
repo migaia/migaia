@@ -11,15 +11,15 @@ import {
   type IIpcFlowControlOptions,
   type IRpcFlowControlFeature,
   type IpcFlowControl
-} from './flow-control.js'
-import { ProcessFeatureName } from './text.js'
+} from './flow-control.ts'
+import { ProcessFeatureName } from './text.ts'
 import type {
   IProcessFeatureContext,
   IIpcSendFacts,
   IIpcSendAdmission,
   IIpcWrite,
   IIpcBatchGuard
-} from './metadata.js'
+} from './metadata.ts'
 
 /** Explicit shared flow excludes a second capacity policy on this same native connection. */
 export type ISendQueueOptions = IIpcFlowControlOptions & Readonly<{ flow?: IRpcFlowControlFeature }>

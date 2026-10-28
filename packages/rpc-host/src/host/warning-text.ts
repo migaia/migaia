@@ -1,4 +1,4 @@
-import type { IRpcWarning } from './warning.js'
+import type { IRpcWarning } from './warning.ts'
 
 /** Stable public warning text belongs to Host, independently from error/report contracts. */
 export const HostWarningText = {

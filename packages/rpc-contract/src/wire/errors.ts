@@ -5,24 +5,24 @@
  */
 import { utf8ByteLength } from '@migaia/utils/bytes'
 import { countErrorDataText } from '@migaia/utils/error'
-import { normalizePortable } from '../portable/normalize.js'
+import { normalizePortable } from '../portable/normalize.ts'
 import {
   serializeRpcError,
   sanitizeText,
   deserializeRpcError,
   createInvalidWireError
-} from '../contract/error.js'
+} from '../contract/error.ts'
 
-import { RpcWireLimit } from './limits.js'
-import { RpcWireErrorLimit, RpcWireErrorViolation } from '../contract/wire-error-constants.js'
+import { RpcWireLimit } from './limits.ts'
+import { RpcWireErrorLimit, RpcWireErrorViolation } from '../contract/wire-error-constants.ts'
 import type {
   IRpcSerializedError,
   IRpcWirePortableValue,
   IRpcSerializeErrorOptions,
   IRpcErrorWireMetadata
-} from '../contract/types.js'
-import { RpcWireField as F, RpcWirePointer as P, rpcWirePointer } from './constants.js'
-import type { IRpcWireError, IRpcWireErrorNode } from './types.js'
+} from '../contract/types.ts'
+import { RpcWireField as F, RpcWirePointer as P, rpcWirePointer } from './constants.ts'
+import type { IRpcWireError, IRpcWireErrorNode } from './types.ts'
 
 /** The five fixed scalar fields are charged by the existing RPC text-budget contract. */
 const textFields = [F.source, F.code, F.name, F.message, F.stack] as const

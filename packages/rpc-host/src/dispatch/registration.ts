@@ -1,8 +1,8 @@
 /** One cold provider reservation joins the actual native install commit or rollback. */
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
-import { createRpcError } from '../host/error-owner.js'
-import type { IProviderMethodEntry } from './types.js'
+import { createRpcError } from '../host/error-owner.ts'
+import type { IProviderMethodEntry } from './types.ts'
 
 /** Reservations contain only exact tokens; the sole live catalog retains all executable entries. */
 export class ProviderRegistration {

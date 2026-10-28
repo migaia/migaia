@@ -2,7 +2,7 @@
  * Adapts native browser message events to SDK IO callbacks without duplicating codec or Session
  * state.
  */
-import { BrowserPeerEvent } from './peer-text.js'
+import { BrowserPeerEvent } from './peer-text.ts'
 import { inspectThenable, assimilateCapturedThen } from '@migaia/utils/function'
 import {
   createRpcMessageCarrier,
@@ -19,13 +19,13 @@ import {
   type IRpcCarrierWriteOptions,
   type IRpcCarrierObservationFacts
 } from '@migaia/rpc-contract/interfaces'
-import { BrowserRpcErrorText } from './error-text.js'
-import { createBrowserTransportError, normalizeBrowserHandshakeFailure } from './error.js'
+import { BrowserRpcErrorText } from './error-text.ts'
+import { createBrowserTransportError, normalizeBrowserHandshakeFailure } from './error.ts'
 import {
   emitBrowserObservation,
   rejectBrowserObservation,
   type IBrowserObservationMetadata
-} from './native-observation.js'
+} from './native-observation.ts'
 
 /** Browser acquisition uses native EventTarget operations; SDK owns subscriptions and retirement. */
 export type IBrowserEventPort = Readonly<{

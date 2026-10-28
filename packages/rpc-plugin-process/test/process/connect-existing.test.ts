@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { NativeSocketAuth } from './fixtures/native-socket-auth.js'
+import { NativeSocketAuth } from './fixtures/native-socket-auth.ts'
 import {
   dialProcessByteChannel,
   listenProcessByteChannel

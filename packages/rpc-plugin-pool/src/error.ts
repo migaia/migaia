@@ -7,7 +7,7 @@ import {
   RpcPoolErrorCode,
   type IRpcPoolErrorCode
 } from '@migaia/rpc-contract/error-code'
-import { RpcPoolText } from './text.js'
+import { RpcPoolText } from './text.ts'
 
 /** Attach a registered code without replacing the native error, stack, or original cause. */
 export function tagPoolError<T extends Error>(error: T, code: IRpcPoolErrorCode): T {

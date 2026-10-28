@@ -3,7 +3,7 @@ import { expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { ProviderCatalog } from '../../dist/dispatch/catalog-scope.js'
 import { compileProviderMethods } from '../../dist/dispatch/catalog.js'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 it('rejects a duplicate public provider without replacing the admitted method', async () => {
   /** The original method supplies an independently observable business value. */

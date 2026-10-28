@@ -3,10 +3,10 @@
  * stdio/bootstrap IO. Discovery selects native acquisition without granting RPC authentication.
  */
 import { detectServerRuntime } from '@migaia/utils'
-import type { IAdapterProcessRuntimeIO } from '../runtime-loader.js'
-import { PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS } from '../constants.js'
-import { openProcessStdioChannel } from './node-child-process.js'
-import { isProcessChild } from '../child.js'
+import type { IAdapterProcessRuntimeIO } from '../runtime-loader.ts'
+import { PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS } from '../constants.ts'
+import { openProcessStdioChannel } from './node-child-process.ts'
+import { isProcessChild } from '../child.ts'
 
 /** Consumed discovery stays in this actual native process; a second factory sees the same marker. */
 let automaticMarker: string | undefined

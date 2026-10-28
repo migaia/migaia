@@ -12,10 +12,10 @@ import {
 } from '@migaia/rpc-host/sdk'
 import { RpcCoreErrorCode, RpcProcessErrorCode } from '@migaia/rpc-contract/error-code'
 import { tagRpcError } from '@migaia/rpc-contract/errors'
-import { PROCESS_HANDSHAKE_MAX_FRAME_BYTES } from './constants.js'
-import { createProcessError } from './error.js'
-import { RpcProcessErrorText } from './error-text.js'
-import type { IProcessByteChannel } from './types.js'
+import { PROCESS_HANDSHAKE_MAX_FRAME_BYTES } from './constants.ts'
+import { createProcessError } from './error.ts'
+import { RpcProcessErrorText } from './error-text.ts'
+import type { IProcessByteChannel } from './types.ts'
 
 /** Native first-frame acquisition retains only the unconsumed tail for the one Session reader. */
 class ProcessBootstrap {

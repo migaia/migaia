@@ -24,10 +24,10 @@ import {
   tagRpcError
 } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
-import { ThreadErrorText } from './error-text.js'
-import type { IThreadNodePort } from './runtime-types.js'
-import type { IThreadWebPort } from './types.js'
-import { ThreadEvent } from './constants.js'
+import { ThreadErrorText } from './error-text.ts'
+import type { IThreadNodePort } from './runtime-types.ts'
+import type { IThreadWebPort } from './types.ts'
+import { ThreadEvent } from './constants.ts'
 import { inspectThenable, assimilateCapturedThen } from '@migaia/utils/function'
 
 /** Both original native postMessage surfaces expose one direct, whole-message port. */

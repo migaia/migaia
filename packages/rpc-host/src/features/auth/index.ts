@@ -2,19 +2,19 @@
  * Snapshot cold configuration once; create a separate flow for each native installation and its
  * lifetime.
  */
-import { defineBuiltinFlowFeature } from '../../sdk/flow-feature.js'
-import type { IRpcFlowFeature } from '../../sdk/types.js'
-import { snapshotAuthenticationConfig } from './config.js'
-import { RpcAuthenticationFlow } from './flow.js'
-import { RpcAuthenticationPluginName } from './constants.js'
-import type { IRpcAuthenticationOptions } from './types.js'
+import { defineBuiltinFlowFeature } from '../../sdk/flow-feature.ts'
+import type { IRpcFlowFeature } from '../../sdk/types.ts'
+import { snapshotAuthenticationConfig } from './config.ts'
+import { RpcAuthenticationFlow } from './flow.ts'
+import { RpcAuthenticationPluginName } from './constants.ts'
+import type { IRpcAuthenticationOptions } from './types.ts'
 
 export type {
   IRpcAuthenticationOptions,
   IRpcAuthenticationTransform,
   IRpcAuthenticationCredentialsContext,
   IRpcAuthenticationCredentials
-} from './types.js'
+} from './types.ts'
 
 /** Install credentials and paired transforms through fixed flow hooks. */
 export function auth(options: IRpcAuthenticationOptions): IRpcFlowFeature {

@@ -3,8 +3,8 @@ import {
   RpcDevtoolsRecordFormat,
   type IRpcDevtoolsRecord,
   type IRpcDevtoolsRecordEvent
-} from '../contract/record.js'
-import { EventRing } from './ring.js'
+} from '../contract/record.ts'
+import { EventRing } from './ring.ts'
 
 /** Stop converts numeric columns at the record boundary, preserving native errors/content. */
 export function finishRecord(

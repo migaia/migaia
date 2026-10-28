@@ -1,12 +1,12 @@
 /** Optional application parser execution is separate from the host's inert method declarations. */
 import { RpcCallMode, RpcWireKind } from '@migaia/rpc-contract/protocol'
-import { defineBuiltinFlowFeature } from '../../sdk/flow-feature.js'
-import type { IRpcFlowFeature } from '../../sdk/types.js'
-import { RpcFlowPoint, type IRpcFlowStage } from '../../sdk/flow-pipelines.js'
-import type { IRpcSchemaOptions } from './types.js'
-import { validateContractData } from './validate.js'
-import { RpcSchemaName } from './text.js'
-export type { IRpcSchemaOptions, IRpcSchemaParser, IRpcMethodValidators } from './types.js'
+import { defineBuiltinFlowFeature } from '../../sdk/flow-feature.ts'
+import type { IRpcFlowFeature } from '../../sdk/types.ts'
+import { RpcFlowPoint, type IRpcFlowStage } from '../../sdk/flow-pipelines.ts'
+import type { IRpcSchemaOptions } from './types.ts'
+import { validateContractData } from './validate.ts'
+import { RpcSchemaName } from './text.ts'
+export type { IRpcSchemaOptions, IRpcSchemaParser, IRpcMethodValidators } from './types.ts'
 
 /** One installed validator borrows configured parsers and owns no provider or pending state. */
 class SchemaValidation {

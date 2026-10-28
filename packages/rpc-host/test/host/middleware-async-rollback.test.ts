@@ -2,7 +2,7 @@
 import { defineHost, definePlugin } from '@migaia/plugin-host'
 import { defineTransportPlugin } from '@migaia/rpc-host/sdk'
 import { expect, it, vi } from 'vitest'
-import { MemoryCarrier } from '../fixtures/core-carrier.js'
+import { MemoryCarrier } from '../fixtures/core-carrier.ts'
 
 /** A genuine SDK transport can start only after earlier native installation hooks succeed. */
 function physicalTransport(carrier: MemoryCarrier) {

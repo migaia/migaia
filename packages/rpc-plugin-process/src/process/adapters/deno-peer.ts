@@ -2,10 +2,10 @@
  * Reads and consumes Deno child-discovery markers only with existing environment permission. It
  * opens the original stdio/bootstrap resource and supplies the native final-exit operation.
  */
-import type { IAdapterProcessRuntimeIO } from '../runtime-loader.js'
-import { PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS } from '../constants.js'
-import { openProcessStdioChannel } from './deno-command.js'
-import { isProcessChild } from '../child.js'
+import type { IAdapterProcessRuntimeIO } from '../runtime-loader.ts'
+import { PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_BOOTSTRAP_TIMEOUT_MS } from '../constants.ts'
+import { openProcessStdioChannel } from './deno-command.ts'
+import { isProcessChild } from '../child.ts'
 
 /** Only this native process retains consumed discovery; grandchildren inherit no automatic marker. */
 let automaticMarker: string | undefined

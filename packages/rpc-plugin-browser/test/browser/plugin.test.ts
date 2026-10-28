@@ -5,7 +5,7 @@ import { createRpcHost } from '@migaia/rpc-host'
 /** The existing ordinary thread outlet accepts a registration and its remote method. */
 type IOrdinaryOutlet = Readonly<{ request(method: string, data?: unknown): Promise<unknown> }>
 import * as browser from '@migaia/rpc-plugin-browser'
-import { windowPair, portPair, rtcChannel } from './message-fixture.js'
+import { windowPair, portPair, rtcChannel } from './message-fixture.ts'
 
 it('exports every cold carrier factory through the real browser root', () => {
   expect(

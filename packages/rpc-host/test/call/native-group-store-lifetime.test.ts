@@ -11,8 +11,8 @@ import {
 import { limits } from '@migaia/rpc-host/plugins/limits'
 import { deferred } from '@migaia/utils/promise'
 import { ProviderAdmissionRegistry } from '../../dist/features/limits/provider-admission.js'
-import { coreMemoryServer } from '../host/core-fixture.js'
-import { RuntimeApiFixtureText } from '../fixtures/runtime-api-text.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
+import { RuntimeApiFixtureText } from '../fixtures/runtime-api-text.ts'
 
 /** Acquire two real public Hosts with the same optional policy owners as the original group cases. */
 async function connectGroupStore(

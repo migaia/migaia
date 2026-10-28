@@ -6,16 +6,16 @@ import type {
   IRpcPortableValue,
   IRpcWirePortableValue,
   IRpcErrorWireMetadata
-} from '../contract/types.js'
-import type { IRpcMethodSchema } from './method-schema.js'
-import type { RpcStreamEvent } from './stream-constants.js'
+} from '../contract/types.ts'
+import type { IRpcMethodSchema } from './method-schema.ts'
+import type { RpcStreamEvent } from './stream-constants.ts'
 
 import type {
   RpcCallMode,
   RpcWireProfile,
   RpcWireKind,
   RpcWireControlOperation
-} from './constants.js'
+} from './constants.ts'
 export type { IRpcPortableValue, IRpcWirePortableValue, IRpcMethodSchema }
 /** One caller-supplied pure value projection replaces binary tags without a second payload walk. */
 export type IRpcPortableProjector = (

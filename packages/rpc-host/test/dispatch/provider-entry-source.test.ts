@@ -2,7 +2,7 @@
 import { createRpcHost } from '@migaia/rpc-host'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { assert, expect, it } from 'vitest'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 it('real transaction baseline: provider RPC executes through its public namespace', async () => {
   /** The genuine native listener preserves the original provider target name. */

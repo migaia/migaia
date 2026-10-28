@@ -1,15 +1,15 @@
 /** Builds the SharedWorker transport from one borrowed page port or native connect-event scope. */
 import { defineTransportPlugin } from '@migaia/rpc-host/sdk'
 import type { IRpcTransportPlugin, IRpcTransportFeatureExtensions } from '@migaia/rpc-host/sdk'
-import { BrowserPeerErrorText } from '../error-text.js'
+import { BrowserPeerErrorText } from '../error-text.ts'
 import { RpcBrowserErrorCode } from '@migaia/rpc-contract/error-code'
-import { createBrowserPeerError } from './peer-error.js'
-import { BrowserPluginName, BrowserNamespace } from './peer-text.js'
-import { attachBrowserCarrier } from './native-message.js'
-import { createSharedWorkerCarrier } from './adapters/shared-worker.js'
-import { listenBrowserPorts } from './peer-listener.js'
-import type { ISharedWorkerPluginOptions } from './peer-types.js'
-import type { IBrowserFeature } from './plugin-types.js'
+import { createBrowserPeerError } from './peer-error.ts'
+import { BrowserPluginName, BrowserNamespace } from './peer-text.ts'
+import { attachBrowserCarrier } from './native-message.ts'
+import { createSharedWorkerCarrier } from './adapters/shared-worker.ts'
+import { listenBrowserPorts } from './peer-listener.ts'
+import type { ISharedWorkerPluginOptions } from './peer-types.ts'
+import type { IBrowserFeature } from './plugin-types.ts'
 
 /** Capture one existing page port or native connect scope; no physical effect occurs cold. */
 export function sharedWorkerPlugin<

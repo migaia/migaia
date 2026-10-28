@@ -3,7 +3,7 @@ import { expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { defineTransportPlugin, resolveAbortReason } from '@migaia/rpc-host/sdk'
 import { deferred } from '@migaia/utils/promise'
-import { throwingSignal } from '../fixtures/throwing-signal.js'
+import { throwingSignal } from '../fixtures/throwing-signal.ts'
 
 it('keeps the original failed reason read on CANCELLED before acquiring a carrier', async () => {
   /** A supported structural signal can throw while supplying its terminal reason. */

@@ -1,7 +1,7 @@
 /** Executing binary codec resources carry actual borrowed buffers and explicit error metadata. */
 import type { IRpcEnvelope, IRpcBinaryManifest } from '@migaia/rpc-contract/protocol'
 import type { IRpcErrorWireMetadata } from '@migaia/rpc-contract/errors'
-import type { RpcBinaryStorage } from './binary-constants.js'
+import type { RpcBinaryStorage } from './binary-constants.ts'
 export type { IRpcBinaryManifest }
 /** Digest ownership stays with the installing native crypto resource, never inferred from wire data. */
 export type IRpcBinaryDigest = (backing: ArrayBuffer) => Promise<string>

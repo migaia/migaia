@@ -2,7 +2,7 @@
 import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
 import { normalizeRpcRemainingMs } from '@migaia/rpc-contract/protocol'
 import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
-import { createRpcContractError } from '../host/error-owner.js'
+import { createRpcContractError } from '../host/error-owner.ts'
 
 /** A single physical generation retains only counts and its original drain completion. */
 type IDrainRecord = {

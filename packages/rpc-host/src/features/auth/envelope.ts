@@ -5,10 +5,10 @@
 import {
   createRpcAuthenticationError,
   createRpcConfigurationError
-} from '../../host/error-owner.js'
-import { RpcAuthenticationText as Text } from './text.js'
-import { RpcAuthenticationEnvelope as Format } from './constants.js'
-import type { IAuthenticationEnvelope, IAuthenticationCounterWindow } from './types.js'
+} from '../../host/error-owner.ts'
+import { RpcAuthenticationText as Text } from './text.ts'
+import { RpcAuthenticationEnvelope as Format } from './constants.ts'
+import type { IAuthenticationEnvelope, IAuthenticationCounterWindow } from './types.ts'
 
 /** One canonical lowercase 128-bit spelling is shared by counter nonces and receiver challenges. */
 const authenticationNoncePattern = /^[0-9a-f]{32}$/u

@@ -2,7 +2,7 @@
 import { createRpcHost, type IRpcHostOptions } from '@migaia/rpc-host'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { assert, expect, it } from 'vitest'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 // C008 retains the exact later-invalid-entry error; C075's old private getter input is retired.
 it('rejects the later invalid provider entry and keeps a fresh registration independent', async () => {

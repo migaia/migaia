@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
 import { expect, it } from 'vitest'
-import { client, expected, peers, wireFrames } from '../process/fixtures/conformance-business.js'
+import { client, expected, peers, wireFrames } from '../process/fixtures/conformance-business.ts'
 
 /** The independent baseline providers retain genuine process control and physical exit ownership. */
 for (const peer of peers.filter((value) => ['python', 'go', 'rust'].includes(value.language))) {

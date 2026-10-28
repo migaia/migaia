@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'
 import type { IRpcMemberEvent } from '@migaia/rpc-host/sdk'
-import { ordinaryHost, outlet, runtimeService } from './fixture.js'
+import { ordinaryHost, outlet, runtimeService } from './fixture.ts'
 
 describe('coroutine native lifecycle', () => {
   it('rejects invalid native member commands through their declared Promise boundary', async () => {

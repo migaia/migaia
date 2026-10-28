@@ -1,12 +1,12 @@
 /** Admit cold RPC configuration, then create its one native plugin-host and namespace projections. */
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { tagRpcError } from '@migaia/rpc-contract/errors'
-import { readRpcDefinition } from '../sdk/metadata.js'
-import { RpcFlowProgram } from '../sdk/flow-program.js'
-import { RpcHost } from './rpc-host.js'
-import type { IRpcHostPlugin } from '../sdk/types.js'
-import { HostErrorText } from './error-text.js'
-import type { IRpcHost, IRpcHostOptions } from './public.js'
+import { readRpcDefinition } from '../sdk/metadata.ts'
+import { RpcFlowProgram } from '../sdk/flow-program.ts'
+import { RpcHost } from './rpc-host.ts'
+import type { IRpcHostPlugin } from '../sdk/types.ts'
+import { HostErrorText } from './error-text.ts'
+import type { IRpcHost, IRpcHostOptions } from './public.ts'
 
 /** Validate all transport namespaces before any definition can acquire a physical resource. */
 export function createRpcHost<

@@ -10,28 +10,28 @@ import type {
 import type { IRpcConnectionContext } from '@migaia/rpc-contract/interfaces'
 import type { IRpcTransportSetupContext } from '@migaia/rpc-host/sdk'
 import { defaultRpcId, resolveAbortReason, RpcNativeMembers } from '@migaia/rpc-host/sdk'
-import { createProcessCarrier } from '../carrier.js'
-import { createProcessChannelClosedError, createProcessCleanupError } from '../error.js'
-import { decodeProcessRuntimeBootstrap } from '../runtime-bootstrap.js'
+import { createProcessCarrier } from '../carrier.ts'
+import { createProcessChannelClosedError, createProcessCleanupError } from '../error.ts'
+import { decodeProcessRuntimeBootstrap } from '../runtime-bootstrap.ts'
 import {
   acceptProcessConnectionBootstrap,
   openProcessConnectionBootstrap
-} from '../connection-bootstrap.js'
-import { PROCESS_CONNECTION_RUNTIME } from '../constants.js'
-import { DEFAULT_DRAIN_MS } from '../resilience/constants.js'
+} from '../connection-bootstrap.ts'
+import { PROCESS_CONNECTION_RUNTIME } from '../constants.ts'
+import { DEFAULT_DRAIN_MS } from '../resilience/constants.ts'
 import type {
   IProcessByteChannel,
   IProcessMessageChannel,
   IProcessByteListener,
   IProcessPendingByteConnection,
   IProcessCommonOptions
-} from '../types.js'
-import { reportSafely, invalidOption } from './binding.js'
-import type { IProcessServeChildIngress, IProcessServeListenerIngress } from './types.js'
-import { ProcessConnectionCapacity, type IProcessConnectionLease } from './serve/admission.js'
-import { ProcessServeSession } from './serve/session.js'
-import type { IProcessServeOptions, IProcessSessionsHandle } from './serve/types.js'
-export type { IProcessServeOptions, IProcessSessionsHandle } from './serve/types.js'
+} from '../types.ts'
+import { reportSafely, invalidOption } from './binding.ts'
+import type { IProcessServeChildIngress, IProcessServeListenerIngress } from './types.ts'
+import { ProcessConnectionCapacity, type IProcessConnectionLease } from './serve/admission.ts'
+import { ProcessServeSession } from './serve/session.ts'
+import type { IProcessServeOptions, IProcessSessionsHandle } from './serve/types.ts'
+export type { IProcessServeOptions, IProcessSessionsHandle } from './serve/types.ts'
 
 /** The established child parent-loss default is explicitly lent to the one existing guard. */
 const parentLossGraceMs = 5_000

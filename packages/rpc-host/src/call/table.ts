@@ -33,20 +33,20 @@ import {
   createRpcLifecycleError,
   isLocalRpcError,
   createRpcPhysicalTransportError
-} from '../host/error-owner.js'
-import { callEnvelope } from './envelope.js'
-import { callTarget } from './target.js'
-import { RpcCallIdAllocator } from './id.js'
-import { CallRecord, type ICallRecordOwner } from './record.js'
-import { CallInvocation, type ICallInvocationOwner } from './invocation.js'
-import { reportDiagnostic } from '../host/report.js'
-import { createRemoteLayerError } from '../host/remote-error-owner.js'
-import { resolveAbortReason } from '../host/abort-reason.js'
+} from '../host/error-owner.ts'
+import { callEnvelope } from './envelope.ts'
+import { callTarget } from './target.ts'
+import { RpcCallIdAllocator } from './id.ts'
+import { CallRecord, type ICallRecordOwner } from './record.ts'
+import { CallInvocation, type ICallInvocationOwner } from './invocation.ts'
+import { reportDiagnostic } from '../host/report.ts'
+import { createRemoteLayerError } from '../host/remote-error-owner.ts'
+import { resolveAbortReason } from '../host/abort-reason.ts'
 import {
   deserializeHostWireError,
   serializeHostWireError,
   hostErrorWireMetadata
-} from '../host/error-wire-metadata.js'
+} from '../host/error-wire-metadata.ts'
 import type {
   ICallCommand,
   ICallLocalOptions,
@@ -54,7 +54,7 @@ import type {
   ICallTableOptions,
   ICallTargetRef,
   IPreparedCall
-} from './types.js'
+} from './types.ts'
 export type {
   ICallCommand,
   ICallLocalOptions,
@@ -64,7 +64,7 @@ export type {
   ICallSelf,
   ICallWriteOptions,
   IPreparedCall
-} from './types.js'
+} from './types.ts'
 
 /** Reject invalid method input before directory selection or call preparation can use it. */
 export function assertCallMethod(method: unknown): asserts method is string {
@@ -539,7 +539,7 @@ export class CallTable {
   #write(
     record: CallRecord,
     frame: IRpcEnvelope,
-    options: import('./types.js').ICallWriteOptions
+    options: import('./types.ts').ICallWriteOptions
   ): Promise<void> {
     try {
       return Promise.resolve(

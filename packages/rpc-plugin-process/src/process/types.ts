@@ -4,7 +4,7 @@
  */
 import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IRpcByteIO, IRpcMessageIO } from '@migaia/rpc-host/sdk'
-import type { IIpcLogRecord } from '../features/flow-control.js'
+import type { IIpcLogRecord } from '../features/flow-control.ts'
 
 /** Process bytes use the sole native SDK read/write lifecycle without a protocol facade. */
 export type IProcessByteChannel = IRpcByteIO &

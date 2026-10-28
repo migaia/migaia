@@ -8,7 +8,7 @@ import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcWireKind, type IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
 import { assert, expect, it, vi } from 'vitest'
 import { RpcBatchExtension } from '../../dist/features/batch/constants.js'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 it('reports each native batch replay refusal and its exact physical write failure independently', async () => {
   /** Explicit numeric retention keeps the completed seed in the configured replay capacity. */

@@ -10,7 +10,7 @@ import {
   type IRpcCarrierObservation,
   type IRpcCarrierWriteOptions
 } from '@migaia/rpc-contract/interfaces'
-import type { RpcCarrierObservation } from '../carrier/observation.js'
+import type { RpcCarrierObservation } from '../carrier/observation.ts'
 
 /** Platform acquisition supplies exactly one original native reader; SDK owns subsequent reads. */
 export type IRpcByteReader = Readonly<{

@@ -3,8 +3,8 @@
  * count governs acquired connections rather than provider call concurrency.
  */
 import { RpcProcessErrorCode } from '@migaia/rpc-contract/error-code'
-import { createProcessError, createProcessRangeError } from '../../error.js'
-import { DEFAULT_MAX_CONNECTIONS } from '../../resilience/constants.js'
+import { createProcessError, createProcessRangeError } from '../../error.ts'
+import { DEFAULT_MAX_CONNECTIONS } from '../../resilience/constants.ts'
 
 /** Pending and ready native connections share the same actual installation capacity. */
 type IProcessConnectionState = { active: number; closed: boolean }

@@ -6,7 +6,7 @@ import {
   type IRpcRetryFeature,
   type IRpcAttempt
 } from '@migaia/rpc-contract/interfaces'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 it.each(['before-value', 'after-value'] as const)(
   'does not enter retry policy when a stream fails %s',

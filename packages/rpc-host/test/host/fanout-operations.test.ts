@@ -2,9 +2,9 @@ import { setImmediate as nextTurn } from 'node:timers/promises'
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
-import { coreMemoryServer } from './core-fixture.js'
+import { coreMemoryServer } from './core-fixture.ts'
 import { idempotency } from '@migaia/rpc-host/plugins/idempotency'
-import { key, fanout, items, containsCause, nativeHosts } from './fanout-fixture.js'
+import { key, fanout, items, containsCause, nativeHosts } from './fanout-fixture.ts'
 
 it.each([false, true])(
   'honors an explicit native grant independently of other payload binary (binary=%s)',

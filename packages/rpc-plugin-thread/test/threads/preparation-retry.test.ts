@@ -3,13 +3,13 @@ import { systemScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
 import type { IRpcAvailableAttempt } from '@migaia/rpc-contract/interfaces'
 import { describe, expect, it } from 'vitest'
-import { createWebThreadChannelFactory } from '../../src/threads/web-launcher.js'
-import type { IThreadWebPort } from '../../src/threads/types.js'
+import { createWebThreadChannelFactory } from '../../src/threads/web-launcher.ts'
+import type { IThreadWebPort } from '../../src/threads/types.ts'
 import { retry } from '@migaia/rpc-host/features/retry'
 import { timeout } from '@migaia/rpc-host/features/timeout'
 import { RpcCallMode, RpcWireKind } from '@migaia/rpc-contract/protocol'
-import { threadFrames } from './frame.js'
-import { nativeFixture, workerEntry } from './fixture.js'
+import { threadFrames } from './frame.ts'
+import { nativeFixture, workerEntry } from './fixture.ts'
 /** Ordinary lifecycle regressions from archived audit receipts do not restart the interrupted audit. */
 describe('thread preparation and retry settlement', () => {
   it('invokes the configured stop hook without a receiver on the real native unit', async () => {

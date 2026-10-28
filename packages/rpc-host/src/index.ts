@@ -1,6 +1,6 @@
 /** One native host projects every RPC call under its installed transport namespace. */
-export { createRpcHost } from './host/create-rpc-host.js'
-export type { IRpcHost, IRpcHostOptions } from './host/public.js'
+export { createRpcHost } from './host/create-rpc-host.ts'
+export type { IRpcHost, IRpcHostOptions } from './host/public.ts'
 export type {
   IRpcNamespace,
   IRpcCallOptions,
@@ -11,13 +11,13 @@ export type {
   IRpcPeerClosedEvent,
   IRpcClosingHandler,
   IRpcPeerClosedHandler
-} from './namespace/types.js'
+} from './namespace/types.ts'
 export type {
   IRpcContext,
   IRpcProvide,
   IRpcProvider,
   IRpcProviderMethod
-} from './dispatch/types.js'
-export { defaultRpcReporter } from './host/report.js'
-export { RpcWarningCode } from './host/warning.js'
-export type { IRpcWarning } from './host/warning.js'
+} from './dispatch/types.ts'
+export { defaultRpcReporter } from './host/report.ts'
+export { RpcWarningCode } from './host/warning.ts'
+export type { IRpcWarning } from './host/warning.ts'

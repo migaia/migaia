@@ -4,7 +4,7 @@ import { defineFlowPlugin, defineTransportPlugin } from '@migaia/rpc-host/sdk'
 import type { IRpcAttempt, IRpcTimeoutFeature } from '@migaia/rpc-contract/interfaces'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { expect, it, vi } from 'vitest'
-import { coreMemoryServer } from './core-fixture.js'
+import { coreMemoryServer } from './core-fixture.ts'
 
 /** A supplied complete instance actually executes the originating attempt through its public port. */
 class CountedTimeout implements IRpcTimeoutFeature {

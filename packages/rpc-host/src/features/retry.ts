@@ -11,13 +11,13 @@ import {
 } from '@migaia/rpc-contract/interfaces'
 import { RpcCoreErrorCode, RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
 import { safeRead } from '@migaia/rpc-contract/errors'
-import { createRpcAbortError, createRpcError, createRpcTimeoutError } from '../host/error-owner.js'
-import { createRemoteLayerError } from '../host/remote-error-owner.js'
-import { defaultRpcId } from '../host/identity.js'
-import { defaultRpcReporter, reportDiagnostic } from '../host/report.js'
-import { resolveAbortReason } from '../host/abort-reason.js'
-import { HostErrorText } from '../host/error-text.js'
-import { localErrorWireSummary } from '../host/error-wire-metadata.js'
+import { createRpcAbortError, createRpcError, createRpcTimeoutError } from '../host/error-owner.ts'
+import { createRemoteLayerError } from '../host/remote-error-owner.ts'
+import { defaultRpcId } from '../host/identity.ts'
+import { defaultRpcReporter, reportDiagnostic } from '../host/report.ts'
+import { resolveAbortReason } from '../host/abort-reason.ts'
+import { HostErrorText } from '../host/error-text.ts'
+import { localErrorWireSummary } from '../host/error-wire-metadata.ts'
 
 /** Limits and stable key generation belong to this complete feature, never host call flags. */
 export type IRetryFeatureOptions = Readonly<{

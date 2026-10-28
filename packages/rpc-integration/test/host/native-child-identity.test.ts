@@ -4,7 +4,7 @@ import { defineTransportPlugin, createRpcMessageCarrier } from '@migaia/rpc-host
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'
-import { NativeIdentityChild, type IIdentitySnapshot } from './fixtures/native-identity-child.js'
+import { NativeIdentityChild, type IIdentitySnapshot } from './fixtures/native-identity-child.ts'
 import { deferred } from '@migaia/utils/promise'
 
 /** Observe real native delivery while the SDK retains the original carrier and listener lifetime. */

@@ -13,7 +13,7 @@ import {
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { deferred, type IAbortSignal } from '@migaia/utils/promise'
 import { assert, expect, it, vi } from 'vitest'
-import { coreMemoryServer } from './core-fixture.js'
+import { coreMemoryServer } from './core-fixture.ts'
 
 /** Public construction/restoration preserves diagnostic labels without an owner mint record. */
 function callerDeadline(kind: 'class' | 'constructor' | 'tag' | 'decode' | 'wire-deadline'): Error {

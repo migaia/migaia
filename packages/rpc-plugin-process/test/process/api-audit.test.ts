@@ -1,8 +1,8 @@
 import { expect, it } from 'vitest'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { createAdapterWebByteIO } from '../../dist/process/web-byte-stream.js'
-import { createNodeProcessLauncher } from '../../src/process/adapters/node-child-process.js'
-import { listenProcessByteChannel } from '../../src/process/adapters/node-socket.js'
+import { createNodeProcessLauncher } from '../../src/process/adapters/node-child-process.ts'
+import { listenProcessByteChannel } from '../../src/process/adapters/node-socket.ts'
 
 /** Native stream hooks expose physical cleanup independently of channel bookkeeping. */
 /** Allocate only this case's original observations before installing native-shaped callbacks. */

@@ -7,8 +7,8 @@ import { auth } from '@migaia/rpc-host/plugins/auth'
 import { idempotency, type IRpcOutcomeLookup } from '@migaia/rpc-host/plugins/idempotency'
 import { timeout } from '@migaia/rpc-host/features/timeout'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
-import { coreMemoryServer } from '../host/core-fixture.js'
-import { RuntimeApiFixtureText } from '../fixtures/runtime-api-text.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
+import { RuntimeApiFixtureText } from '../fixtures/runtime-api-text.ts'
 
 /** Sign the original complete authentication input with the same public fixture material. */
 function signature(value: unknown): string {

@@ -8,7 +8,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createNodeThreadCarrier } from '../../dist/threads/channel.js'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import { createRpcHost } from '@migaia/rpc-host'
-import { nativeFixture } from './fixture.js'
+import { nativeFixture } from './fixture.ts'
 
 describe('thread channel ownership and portable boundary', () => {
   it('borrows Node message listeners and sends zero hello before the Host attaches', async () => {

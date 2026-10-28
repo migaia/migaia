@@ -5,8 +5,8 @@
 import type { Readable, Writable } from 'node:stream'
 import { RpcEventByteIO, RpcCarrierObservation, IpcReporterContext } from '@migaia/rpc-host/sdk'
 import { hostRethrowReporter } from '@migaia/utils/promise'
-import { createProcessChannelClosedError } from './error.js'
-import { ProcessByteCarrierFacts } from './constants.js'
+import { createProcessChannelClosedError } from './error.ts'
+import { ProcessByteCarrierFacts } from './constants.ts'
 
 /** Node acquisition borrows the unique SDK byte owner while retaining native stream cleanup. */
 export function nodeByteStream(

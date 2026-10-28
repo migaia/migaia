@@ -4,14 +4,14 @@
  */
 import { defineTransportPlugin } from '@migaia/rpc-host/sdk'
 import type { IRpcTransportPlugin, IRpcTransportFeatureExtensions } from '@migaia/rpc-host/sdk'
-import { BrowserPeerErrorText } from '../error-text.js'
+import { BrowserPeerErrorText } from '../error-text.ts'
 import { RpcBrowserErrorCode } from '@migaia/rpc-contract/error-code'
-import { createBrowserPeerError } from './peer-error.js'
-import { BrowserPluginName, BrowserNamespace } from './peer-text.js'
-import { attachBrowserCarrier } from './native-message.js'
-import type { IWorkerPluginOptions } from './peer-types.js'
-import { createDedicatedWorkerCarrier } from './adapters/dedicated-worker.js'
-import type { IBrowserFeature } from './plugin-types.js'
+import { createBrowserPeerError } from './peer-error.ts'
+import { BrowserPluginName, BrowserNamespace } from './peer-text.ts'
+import { attachBrowserCarrier } from './native-message.ts'
+import type { IWorkerPluginOptions } from './peer-types.ts'
+import { createDedicatedWorkerCarrier } from './adapters/dedicated-worker.ts'
+import type { IBrowserFeature } from './plugin-types.ts'
 
 /** Borrow a real Worker or worker self; installation never launches or terminates its native owner. */
 export function dedicatedWorkerPlugin<

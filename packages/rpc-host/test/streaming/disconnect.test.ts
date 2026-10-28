@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { connectedCoreHosts } from '../host/core-fixture.js'
+import { connectedCoreHosts } from '../host/core-fixture.ts'
 
 /** Delivers no old item twice after the canonical transport reports disconnection. */
 describe('streaming disconnect', () => {

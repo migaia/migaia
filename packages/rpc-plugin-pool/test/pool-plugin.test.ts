@@ -5,7 +5,7 @@ import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { defineTransportPlugin } from '@migaia/rpc-host/sdk'
 import * as pool from '../dist/index.js'
 import { pool as poolFeature } from '../dist/index.js'
-import { repeatableConnect } from './connect-fixture.js'
+import { repeatableConnect } from './connect-fixture.ts'
 
 /** Follow original cause/aggregate links without changing any thrown object. */
 function contains(error: unknown, expected: unknown): boolean {

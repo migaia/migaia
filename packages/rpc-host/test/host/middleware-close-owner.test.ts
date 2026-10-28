@@ -5,7 +5,7 @@ import { createRpcHost, type IRpcHostOptions } from '@migaia/rpc-host'
 import { RpcLifecycleError } from '@migaia/rpc-host/contract'
 import { auth } from '@migaia/rpc-host/plugins/auth'
 import { defineFlowPlugin, rpcHostPipelines, RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
-import { coreMemoryServer } from './core-fixture.js'
+import { coreMemoryServer } from './core-fixture.ts'
 
 /** Install the original identity authentication over the existing physical carrier and JSON codec. */
 async function authenticatedConnection(plugins: IRpcHostOptions['plugins'] = []) {

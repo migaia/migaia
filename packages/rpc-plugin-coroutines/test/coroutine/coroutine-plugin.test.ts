@@ -20,7 +20,7 @@ import {
   createNodeProcessLauncher,
   type INodeProcessHandle
 } from '../../../rpc-plugin-process/dist/process/adapters/node-child-process.js'
-import { runtimeService, values } from './fixture.js'
+import { runtimeService, values } from './fixture.ts'
 
 /** The same original business matrix runs over each actual native execution family. */
 type INativeFamily = 'thread' | 'process'

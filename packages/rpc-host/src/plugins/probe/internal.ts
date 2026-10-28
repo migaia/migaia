@@ -3,7 +3,7 @@
  * Definition and emitter collaborators use this single registration and stage-subscription
  * boundary; public structural fields do not grant probe identity or execution authority.
  */
-import type { IRpcProbe, IRpcProbeDefinition } from './types.js'
+import type { IRpcProbe, IRpcProbeDefinition } from './types.ts'
 
 /**
  * Only package-owned emitters can access compiled fields, callbacks and stage-change subscribers.

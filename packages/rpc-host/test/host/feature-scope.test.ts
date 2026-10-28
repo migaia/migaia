@@ -17,7 +17,7 @@ import {
 import type { IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
 import { StageLanes } from '../../../plugin-host/dist/stage-lanes.js'
 import { RpcAuthenticationEnvelope } from '../../dist/features/auth/constants.js'
-import { coreMemoryServer } from './core-fixture.js'
+import { coreMemoryServer } from './core-fixture.ts'
 
 /** These three fixed permutations exercise callers' arrays without defining another planner. */
 const permutations = [

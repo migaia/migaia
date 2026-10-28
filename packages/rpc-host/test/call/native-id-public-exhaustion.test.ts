@@ -28,11 +28,11 @@ it('reports the actual public allocator exhaustion once without entering the pro
   let providers = 0
   /** Original genuine host owners remain finally-owned even when an assertion rejects. */
   let pair:
-    | Awaited<ReturnType<typeof import('../host/core-fixture.js').connectedCoreHosts>>
+    | Awaited<ReturnType<typeof import('../host/core-fixture.ts').connectedCoreHosts>>
     | undefined
   try {
     /** Dynamic loading follows the original factory-mock pattern before either public Root exists. */
-    const { connectedCoreHosts } = await import('../host/core-fixture.js')
+    const { connectedCoreHosts } = await import('../host/core-fixture.ts')
     pair = await connectedCoreHosts(
       {
         echo: (value) => {

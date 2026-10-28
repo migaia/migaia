@@ -6,7 +6,7 @@ import { createRpcHost } from '@migaia/rpc-host'
 import type { IRpcNativePoolMember } from '@migaia/rpc-host/sdk'
 import { coroutinePlugin, type ICoroutineTaskContext } from '@migaia/rpc-plugin-coroutines'
 import { pool } from '../dist/index.js'
-import { observingPool } from './pool-fixture.js'
+import { observingPool } from './pool-fixture.ts'
 
 /** Application work holds three actual leases without prescribing Pool selection order. */
 class ProviderBarrier {

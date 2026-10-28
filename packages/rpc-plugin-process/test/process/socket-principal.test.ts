@@ -1,6 +1,6 @@
 /** Original verifier principal failures use actual current Process/native authentication owners. */
 import { describe, expect, it } from 'vitest'
-import { NativeSocketAuth } from './fixtures/native-socket-auth.js'
+import { NativeSocketAuth } from './fixtures/native-socket-auth.ts'
 
 describe('process socket principal admission', () => {
   it.each(['', { unexpected: true }] as const)(

@@ -4,7 +4,7 @@
  */
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { RpcError, RpcCoreErrorText, RpcTimeoutError } from '@migaia/rpc-contract/errors'
-import { BrowserPeerErrorText } from '../error-text.js'
+import { BrowserPeerErrorText } from '../error-text.ts'
 import { RPC_ENDPOINT_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 
 /** Existing first-party diagnostic family names remain recognizable by Core's public error guards. */

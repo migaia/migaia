@@ -1,6 +1,6 @@
 import type { IRpcContext } from '@migaia/rpc-host'
 import { describe, expect, it } from 'vitest'
-import { connectedCoreHosts } from '../host/core-fixture.js'
+import { connectedCoreHosts } from '../host/core-fixture.ts'
 
 describe('public provider registration isolation baseline', () => {
   it('retains provider results and the second registration after closing the first namespace', async () => {

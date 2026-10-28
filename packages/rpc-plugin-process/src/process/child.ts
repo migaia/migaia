@@ -3,7 +3,7 @@
  * Consumed nonsecret child classification is retained locally; bootstrap authentication remains
  * independent.
  */
-import { PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_ENV_VERSION } from './constants.js'
+import { PROCESS_RUNTIME_API_ENV, PROCESS_RUNTIME_API_ENV_VERSION } from './constants.ts'
 
 /** Discovery consumes the native environment marker; retain only its nonsecret child classification. */
 let observedChild = false

@@ -2,10 +2,10 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IRpcNativeGeneration, IRpcPrivateSession } from '@migaia/rpc-contract/interfaces'
 import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
-import { createRpcLifecycleError } from '../host/error-owner.js'
-import type { RpcMemberGeneration } from './member-generation.js'
-import type { IRpcNativePoolMember } from './native-feature-types.js'
-import type { IRpcNativeMemberRecord } from './native-members-types.js'
+import { createRpcLifecycleError } from '../host/error-owner.ts'
+import type { RpcMemberGeneration } from './member-generation.ts'
+import type { IRpcNativePoolMember } from './native-feature-types.ts'
+import type { IRpcNativeMemberRecord } from './native-members-types.ts'
 
 /** Concrete transports lend only their actual generation, original registration and cleanup. */
 type IRpcNativePoolMemberOptions = Readonly<{

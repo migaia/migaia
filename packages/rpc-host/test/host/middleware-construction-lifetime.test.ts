@@ -4,7 +4,7 @@ import { timeout } from '@migaia/rpc-host/features/timeout'
 import { RpcTimeoutError } from '@migaia/rpc-contract/errors'
 import { deferred } from '@migaia/utils/promise'
 import { expect, it, vi } from 'vitest'
-import { connectedCoreHosts, coreMemoryServer } from './core-fixture.js'
+import { connectedCoreHosts, coreMemoryServer } from './core-fixture.ts'
 
 /** One original business holds its late value independently from the caller's terminal outcome. */
 class ConstructionLifetimeProvider {

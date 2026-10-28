@@ -17,7 +17,7 @@ import type { IRpcEnvelope } from '@migaia/rpc-contract/protocol'
 import { idempotency } from '@migaia/rpc-host/plugins/idempotency'
 import { createRpcIdempotencyStore } from '@migaia/rpc-host/plugins/idempotency'
 import { retry } from '@migaia/rpc-host/features/retry'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 import { CallInvocation } from '../../dist/call/invocation.js'
 
 /** Native postMessage owns transfer and subscription removal; SDK retains the only carrier. */

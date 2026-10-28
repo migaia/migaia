@@ -15,9 +15,9 @@ import type {
   IRpcTimeoutFeature
 } from '@migaia/rpc-contract/interfaces'
 import type { IAbortSignal } from '@migaia/utils/promise'
-import type { FeatureScope } from '../feature/scope.js'
-import type { SessionTable } from '../session/table.js'
-import type { RpcCallIdAllocator } from './id.js'
+import type { FeatureScope } from '../feature/scope.ts'
+import type { SessionTable } from '../session/table.ts'
+import type { RpcCallIdAllocator } from './id.ts'
 
 /** One attempt captures the exact accepted binding; later replacement cannot settle this task. */
 export type ICallTargetRef = Readonly<{

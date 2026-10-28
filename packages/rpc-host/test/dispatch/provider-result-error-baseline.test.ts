@@ -7,7 +7,7 @@ import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { deserializeRpcWireError } from '@migaia/rpc-contract/protocol'
 import { deferred } from '@migaia/utils/promise'
 import { assert, expect, it } from 'vitest'
-import { connectedCoreHosts, coreMemoryServer } from '../host/core-fixture.js'
+import { connectedCoreHosts, coreMemoryServer } from '../host/core-fixture.ts'
 
 /** Preserve the original two delivery turns before inspecting reports or absent late terminals. */
 async function settleProviderDelivery(): Promise<void> {

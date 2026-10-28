@@ -1,8 +1,8 @@
 /** Scalar failures and ordered array validation serve the single protocol without record copies. */
-import { RpcContractErrorCode } from '../error-code.js'
-import { RpcEnvelopeViolation, RpcWireLimit } from './limits.js'
-import { createContractError } from '../contract/contract-error.js'
-import type { IRpcErrorWireMetadata } from '../contract/types.js'
+import { RpcContractErrorCode } from '../error-code.ts'
+import { RpcEnvelopeViolation, RpcWireLimit } from './limits.ts'
+import { createContractError } from '../contract/contract-error.ts'
+import type { IRpcErrorWireMetadata } from '../contract/types.ts'
 /** Reject closed-profile input with the existing native contract error, preserving its cause. */
 export function invalid(pointer: string, cause?: unknown, metadata?: IRpcErrorWireMetadata): never {
   throw invalidRpcEnvelope(RpcEnvelopeViolation.payload, pointer, cause, metadata)

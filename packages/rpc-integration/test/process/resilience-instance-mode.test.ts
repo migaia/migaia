@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { acceptsSchema, type ISchemaRule } from '../fixtures/schema-accepts.js'
+import { acceptsSchema, type ISchemaRule } from '../fixtures/schema-accepts.ts'
 
 /** The published schema is the independent structure check for instance mode. */
 const schema = JSON.parse(

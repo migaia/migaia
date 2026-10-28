@@ -24,7 +24,7 @@ import { assert, expect, it, vi } from 'vitest'
 import { ProviderAdmissionRegistry } from '../../dist/features/limits/provider-admission.js'
 import { ProviderDispatcher } from '../../dist/dispatch/dispatcher.js'
 import { ProviderInvocation } from '../../dist/dispatch/invocation.js'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 /** In-process engine inspection retains only this case's genuine provider operation owner. */
 const inspectorRoot = '__rpcKeyedGroupProvider'

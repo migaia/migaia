@@ -39,17 +39,17 @@ import {
   RpcAbortError,
   identifyRpcBoundaryFailure
 } from '@migaia/rpc-contract/errors'
-import { RpcStreamErrorText } from './error-text.js'
+import { RpcStreamErrorText } from './error-text.ts'
 import {
   createRpcError,
   createRpcAbortError,
   localRpcErrorCode,
   isLocalRpcError
-} from '../host/error-owner.js'
-import { serializeHostWireError, deserializeHostWireError } from '../host/error-wire-metadata.js'
-import { sameTask } from '../call/envelope.js'
-import { resolveAbortReason } from '../host/abort-reason.js'
-import type { IStreamOwner, IStreamProducerInput } from './types.js'
+} from '../host/error-owner.ts'
+import { serializeHostWireError, deserializeHostWireError } from '../host/error-wire-metadata.ts'
+import { sameTask } from '../call/envelope.ts'
+import { resolveAbortReason } from '../host/abort-reason.ts'
+import type { IStreamOwner, IStreamProducerInput } from './types.ts'
 
 /** Iterator next/return and physical writes remain tracked until their original Promises settle. */
 export class StreamProducer {

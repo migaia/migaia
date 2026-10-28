@@ -13,7 +13,7 @@ import type {
   ICallLocalOptions,
   ICallSelf,
   ICallTargetRef
-} from './types.js'
+} from './types.ts'
 
 /** Compare admitted scalar identity rather than object identity or serialized field ordering. */
 export function sameGeneration(left: IRpcGeneration, right: IRpcGeneration): boolean {

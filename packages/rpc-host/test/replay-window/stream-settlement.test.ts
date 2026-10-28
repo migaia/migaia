@@ -8,8 +8,8 @@ import { RpcStreamEvent, RpcWireKind, type IRpcSemanticFrame } from '@migaia/rpc
 import { deferred } from '@migaia/utils/promise'
 import { expect, it, vi } from 'vitest'
 import { RequestReplayLedger } from '../../dist/features/auth/request-replay.js'
-import { coreMemoryServer } from '../host/core-fixture.js'
-import type { MemoryCarrier } from '../fixtures/core-carrier.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
+import type { MemoryCarrier } from '../fixtures/core-carrier.ts'
 
 it('retains legacy stream admission through next, return and terminal physical completion', async () => {
   /** Original business entry alone changes this count; rejection callbacks cannot increment it. */

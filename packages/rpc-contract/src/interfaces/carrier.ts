@@ -3,15 +3,15 @@
  * implement these resources; contract creates no connection, codec, or listener.
  */
 import type { IAbortSignal } from '@migaia/utils/promise'
-import type { IRpcErrorWireMetadata } from '../contract/types.js'
-import type { IRpcNativeGeneration, IRpcTimeoutFeature } from './feature.js'
+import type { IRpcErrorWireMetadata } from '../contract/types.ts'
+import type { IRpcNativeGeneration, IRpcTimeoutFeature } from './feature.ts'
 import type {
   IRpcOriginBinding,
   IRpcOriginHandle,
   IRpcPrivateSession,
   IRpcTargetSource
-} from './origin.js'
-import type { IRpcProbeDescriptor, RpcProbeDirection } from './observation.js'
+} from './origin.ts'
+import type { IRpcProbeDescriptor, RpcProbeDirection } from './observation.ts'
 import type {
   IRpcBinaryManifest,
   IRpcDirectory,
@@ -19,9 +19,9 @@ import type {
   IRpcMethodDescription,
   IRpcPortableValue,
   IRpcSemanticFrame
-} from '../wire/types.js'
-import { RpcWireKind } from '../wire/constants.js'
-import { RpcStreamEvent } from '../wire/stream-constants.js'
+} from '../wire/types.ts'
+import { RpcWireKind } from '../wire/constants.ts'
+import { RpcStreamEvent } from '../wire/stream-constants.ts'
 
 /** Native write admission reserves the original control lane independently from business data. */
 export const IpcSendClass = { data: 'data', control: 'control' } as const

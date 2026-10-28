@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it, vi } from 'vitest'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
-import { codecContext, request } from '../core/fixtures/outbound-proof-candidate.js'
+import { codecContext, request } from '../core/fixtures/outbound-proof-candidate.ts'
 
 /** Observe the moved canonical codec with a one-off non-string diagnostic fixture. */
 const jsonObjectCodec = new RpcJsonCarrierCodec()

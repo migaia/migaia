@@ -4,21 +4,21 @@
  * stage subscriptions while the emitter owns cleanup and callback isolation.
  */
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { defineFlowPlugin } from '../../sdk/define.js'
-import type { IRpcFlowPlugin, IRpcFlowSetupContext, IRpcFlowInstallation } from '../../sdk/types.js'
-import { defineProbe } from './define.js'
-import { createProbeEmitter } from './emitter.js'
-import { readProbeState } from './internal.js'
-import { RpcProbePluginName } from './text.js'
-import type { IRpcProbe, IRpcProbeDefinition } from './types.js'
+import { defineFlowPlugin } from '../../sdk/define.ts'
+import type { IRpcFlowPlugin, IRpcFlowSetupContext, IRpcFlowInstallation } from '../../sdk/types.ts'
+import { defineProbe } from './define.ts'
+import { createProbeEmitter } from './emitter.ts'
+import { readProbeState } from './internal.ts'
+import { RpcProbePluginName } from './text.ts'
+import type { IRpcProbe, IRpcProbeDefinition } from './types.ts'
 
-export * from './constants.js'
-export type * from './types.js'
-export { defineProbe } from './define.js'
+export * from './constants.ts'
+export type * from './types.ts'
+export { defineProbe } from './define.ts'
 /** Collector plugins consume the same observer owner without copying dispatch or view projection. */
-export { createProbeEmitter } from './emitter.js'
-export { rpcProbeSampleKey } from './sample.js'
-export { readProbeStages, subscribeProbeStages } from './internal.js'
+export { createProbeEmitter } from './emitter.ts'
+export { rpcProbeSampleKey } from './sample.ts'
+export { readProbeStages, subscribeProbeStages } from './internal.ts'
 
 /** Each native installation constructs its emitter without capturing a mutable host facade. */
 function setupProbe(

@@ -39,7 +39,7 @@ import {
   nativeManagedMemoryUnits,
   openManagedMemoryCarrier,
   type IManagedMemoryUnit
-} from '../host/managed-memory-fixture.js'
+} from '../host/managed-memory-fixture.ts'
 
 /** Every observation delegates to the original acquired carrier close and keeps its exact result. */
 type ICarrierReceipt = Readonly<{

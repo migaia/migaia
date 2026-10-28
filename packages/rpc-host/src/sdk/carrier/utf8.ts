@@ -6,9 +6,9 @@
 import { createContractError, type IRpcErrorWireMetadata } from '@migaia/rpc-contract/errors'
 import { RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcHandshakeViolation } from '@migaia/rpc-contract/protocol'
-import { RpcCarrierEncoding } from './constants.js'
-import type { IRpcUtf8Options } from './types.js'
-import { createRpcCarrierTextFailure } from './json.js'
+import { RpcCarrierEncoding } from './constants.ts'
+import type { IRpcUtf8Options } from './types.ts'
+import { createRpcCarrierTextFailure } from './json.ts'
 
 /** Held fatal UTF-8 capability preserves the real native decoder exception on handshake cause. */
 export class RpcUtf8 {

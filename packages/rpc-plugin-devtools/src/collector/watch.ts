@@ -1,14 +1,14 @@
 /** Owns bounded watch batches and releases stream cancellation when the watcher closes. */
 import type { IRpcContext } from '@migaia/rpc-host'
 import { type IRpcProbeEventView } from '@migaia/rpc-host/plugins/probe'
-import type { IRpcDevtoolsQuery, IRpcDevtoolsWatchBatch } from '../contract/service.js'
-import type { IRpcDevtoolsWireEvent } from '../contract/wire.js'
+import type { IRpcDevtoolsQuery, IRpcDevtoolsWatchBatch } from '../contract/service.ts'
+import type { IRpcDevtoolsWireEvent } from '../contract/wire.ts'
 import { RpcDevtoolsErrorCode } from '@migaia/rpc-contract/error-code'
-import { identifyDevtoolsError } from '../errors.js'
-import { EventRing } from './ring.js'
-import { NameTable } from './intern.js'
-import { compileQuery, type ICollectorFilter } from './query.js'
-import { CollectorLimit, CollectorText } from './text.js'
+import { identifyDevtoolsError } from '../errors.ts'
+import { EventRing } from './ring.ts'
+import { NameTable } from './intern.ts'
+import { compileQuery, type ICollectorFilter } from './query.ts'
+import { CollectorLimit, CollectorText } from './text.ts'
 
 /** A watcher retains numeric columns and materializes wire events only when a consumer reads. */
 export class CollectorWatcher {

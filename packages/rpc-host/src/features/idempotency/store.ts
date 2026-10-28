@@ -3,8 +3,8 @@
  * policy. Read-only lookup exposes only this store's facts; callers supply admitted scopes,
  * fingerprints and time, while provider execution and Session lifetimes remain outside the store.
  */
-import { portableBytes } from '../../sdk/wire/portable-size.js'
-import { createRpcConfigurationError, createRpcContractError } from '../../host/error-owner.js'
+import { portableBytes } from '../../sdk/wire/portable-size.ts'
+import { createRpcConfigurationError, createRpcContractError } from '../../host/error-owner.ts'
 import type {
   IRpcPortableValue,
   IRpcWireError,
@@ -16,8 +16,8 @@ import {
   RpcIdempotencyState as State,
   RpcIdempotencyStoreFact as Fact,
   RpcIdempotencyDefaults as Defaults
-} from './constants.js'
-import { defaultRpcId } from '../../host/identity.js'
+} from './constants.ts'
+import { defaultRpcId } from '../../host/identity.ts'
 import { deferred } from '@migaia/utils/promise'
 
 /** A portable provider outcome that can be replayed with a new request identifier. */

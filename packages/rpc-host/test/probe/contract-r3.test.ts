@@ -13,8 +13,8 @@ import {
   RpcProbeStageName,
   type IRpcProbeEventView
 } from '@migaia/rpc-host/plugins/probe'
-import { MemoryCarrier } from '../fixtures/core-carrier.js'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { MemoryCarrier } from '../fixtures/core-carrier.ts'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 /** The original held business payload distinguishes active cancellation from ordinary echo. */
 const held = 'held-variation'

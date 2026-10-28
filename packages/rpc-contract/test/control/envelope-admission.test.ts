@@ -1,7 +1,7 @@
 /** Legacy envelope business guards use the sole public grammar, without restoring v1 records. */
 import { normalizeRpcFrame } from '@migaia/rpc-contract/protocol'
 import { expect, it } from 'vitest'
-import { header } from '../fixtures/core-profile.js'
+import { header } from '../fixtures/core-profile.ts'
 
 // Required routing and a valid ordinary request remain admitted.
 it('requires routing before admitting the original ordinary request', () => {

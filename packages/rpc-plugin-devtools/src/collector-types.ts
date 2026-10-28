@@ -12,8 +12,8 @@ import type {
   IRpcDevtoolsQuery,
   IRpcDevtoolsStats,
   IRpcDevtoolsWatchBatch
-} from './contract/service.js'
-import type { IRpcDevtoolsRecord } from './contract/record.js'
+} from './contract/service.ts'
+import type { IRpcDevtoolsRecord } from './contract/record.ts'
 
 /** Configure bounded observation storage without creating a Peer, transport or persistence owner. */
 export type IRpcDevtoolsOptions = Readonly<{

@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { auth } from '@migaia/rpc-host/plugins/auth'
 import { idempotency } from '@migaia/rpc-host/plugins/idempotency'
-import { coreMemoryServer } from './core-fixture.js'
+import { coreMemoryServer } from './core-fixture.ts'
 
 describe('accepted host session provider policy', () => {
   it('reuses the original authenticated principal scope after reconnect and isolates a different principal', async () => {

@@ -12,7 +12,7 @@ import {
 import { RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcHandshakeViolation } from '@migaia/rpc-contract/protocol'
 import { utf8ByteLength } from '@migaia/utils/bytes'
-import type { IRpcJsonTextParser } from './types.js'
+import type { IRpcJsonTextParser } from './types.ts'
 
 /** A lone UTF-16 half has no exact UTF-8 representation in the original first-message contract. */
 const unpairedSurrogate =

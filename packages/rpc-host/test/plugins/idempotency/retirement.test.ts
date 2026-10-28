@@ -3,7 +3,7 @@ import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { auth } from '@migaia/rpc-host/plugins/auth'
 import { createRpcIdempotencyStore, idempotency } from '@migaia/rpc-host/plugins/idempotency'
-import { coreMemoryServer } from '../../host/core-fixture.js'
+import { coreMemoryServer } from '../../host/core-fixture.ts'
 
 it.each(['carrier', 'principal', 'custom'] as const)(
   'retires only connection-owned outcomes when a %s scope disconnects',

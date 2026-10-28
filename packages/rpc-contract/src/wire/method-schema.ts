@@ -1,15 +1,15 @@
 /** The sole pure method-schema normalizer; traversal and diagnostic identity are operation-local. */
 import { orderStringKeys } from '@migaia/utils/string'
-import { normalizePortable, type IRpcPortableValue } from '../portable/index.js'
-import { createContractError } from '../contract/contract-error.js'
-import type { IRpcErrorWireMetadata } from '../contract/types.js'
-import { RpcContractErrorCode } from '../error-code.js'
+import { normalizePortable, type IRpcPortableValue } from '../portable/index.ts'
+import { createContractError } from '../contract/contract-error.ts'
+import type { IRpcErrorWireMetadata } from '../contract/types.ts'
+import { RpcContractErrorCode } from '../error-code.ts'
 import {
   inspectShape,
   rejectShape,
   RpcShapeReason,
   type IShapeInspection
-} from './schema-diagnostics.js'
+} from './schema-diagnostics.ts'
 
 /** Registered scalar JSON Schema domains; integer is the number refinement. */
 const schemaTypes = ['null', 'boolean', 'object', 'array', 'number', 'integer', 'string'] as const

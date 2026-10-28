@@ -2,15 +2,15 @@
 import { definePlugin, type IDefinedPluginConstraint } from '@migaia/plugin-host'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { tagRpcError } from '@migaia/rpc-contract/errors'
-import { RpcDefinition } from './define.js'
-import { HostErrorText } from '../host/error-text.js'
+import { RpcDefinition } from './define.ts'
+import { HostErrorText } from '../host/error-text.ts'
 import {
   readRpcDefinition,
   registerRpcDefinition,
   RpcDefinitionKind,
   type IRpcDefinitionMetadata
-} from './metadata.js'
-import type { IRpcTransportPlugin } from './types.js'
+} from './metadata.ts'
+import type { IRpcTransportPlugin } from './types.ts'
 
 /**
  * Attach an original native source to one already-declared namespace. Its original namespace key

@@ -3,21 +3,21 @@
  * negotiated extension labels and original native sidecars. Codec execution, digest verification,
  * backing ownership and stream framing belong to SDK or installed transport capabilities.
  */
-import { normalizeRpcPortable } from '../portable/normalize.js'
-import type { IRpcPortableProjector } from './types.js'
-import type { IRpcErrorWireMetadata } from '../contract/types.js'
+import { normalizeRpcPortable } from '../portable/normalize.ts'
+import type { IRpcPortableProjector } from './types.ts'
+import type { IRpcErrorWireMetadata } from '../contract/types.ts'
 /**
  * Validates the carrier-facing frame shell and native binary manifest shapes. Actual codecs,
  * fragment reassembly, sidecar integrity work, transfer, and physical IO belong to their owners.
  */
 import { isArrayBuffer } from '@migaia/utils/bytes'
 import { isCanonicalBase64url } from '@migaia/serialize/core'
-import { array, identifier, invalid } from './record.js'
+import { array, identifier, invalid } from './record.ts'
 
-import { createContractError } from '../contract/contract-error.js'
-import { RpcContractErrorCode } from '../error-code.js'
-import type { IRpcCarrierFrame } from '../interfaces/carrier.js'
-import type { IRpcBinaryManifest } from './types.js'
+import { createContractError } from '../contract/contract-error.ts'
+import { RpcContractErrorCode } from '../error-code.ts'
+import type { IRpcCarrierFrame } from '../interfaces/carrier.ts'
+import type { IRpcBinaryManifest } from './types.ts'
 import {
   RpcCarrierFrameKind as K,
   RpcWireField as F,
@@ -25,8 +25,8 @@ import {
   RpcWireExtensionPattern,
   RpcWireBinaryProfile,
   RpcWireBinaryStorage
-} from './constants.js'
-import { normalizeRpcFrame, isRpcOperationalFrame } from './envelope.js'
+} from './constants.ts'
+import { normalizeRpcFrame, isRpcOperationalFrame } from './envelope.ts'
 
 /** The existing SHA-256 metadata spelling is data, not an executing crypto implementation. */
 const digestPattern = /^[0-9a-f]{64}$/u

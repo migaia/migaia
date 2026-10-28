@@ -33,27 +33,27 @@ import {
   createRpcError,
   createRpcLifecycleError,
   isLocalRpcError
-} from '../host/error-owner.js'
-import { assertCallMethod, type CallTable } from '../call/table.js'
-import type { ICallCommand, ICallTargetRef } from '../call/types.js'
+} from '../host/error-owner.ts'
+import { assertCallMethod, type CallTable } from '../call/table.ts'
+import type { ICallCommand, ICallTargetRef } from '../call/types.ts'
 import type { IAbortSignal } from '@migaia/utils/promise'
-import type { SessionTable } from '../session/table.js'
+import type { SessionTable } from '../session/table.ts'
 import type { IRpcSessionSelection } from '@migaia/rpc-contract/interfaces'
-import { callTarget } from '../call/target.js'
+import { callTarget } from '../call/target.ts'
 import type {
   IRpcCallOptions as IPublicCallOptions,
   IRpcFanoutResult,
   IRpcNotifyOptions as IPublicNotifyOptions,
   IRpcClosingHandler,
   IRpcPeerClosedHandler
-} from './types.js'
-import type { IRpcSessionScope } from '../session/types.js'
-import type { IStreamAdmissionFailure } from '../stream/types.js'
-import type { IProviderCommitGate } from '../dispatch/types.js'
-import { createProviderCommitGate } from '../dispatch/exposure.js'
-import { HostErrorText } from '../host/error-text.js'
-import type { IRpcTransportSetupContext } from '../sdk/types.js'
-import { RpcInstallationSetup } from '../sdk/flow-setup.js'
+} from './types.ts'
+import type { IRpcSessionScope } from '../session/types.ts'
+import type { IStreamAdmissionFailure } from '../stream/types.ts'
+import type { IProviderCommitGate } from '../dispatch/types.ts'
+import { createProviderCommitGate } from '../dispatch/exposure.ts'
+import { HostErrorText } from '../host/error-text.ts'
+import type { IRpcTransportSetupContext } from '../sdk/types.ts'
+import { RpcInstallationSetup } from '../sdk/flow-setup.ts'
 
 /** Per-source native extensions remain distinct from the fixed RPC namespace publication. */
 const sourceFamily = Object.freeze({})

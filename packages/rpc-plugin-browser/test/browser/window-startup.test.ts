@@ -4,7 +4,7 @@ import { defineFlowPlugin, HostObservationKind } from '@migaia/rpc-host/sdk'
 import { deferred } from '@migaia/utils/promise'
 import { expect, it } from 'vitest'
 import { windowPlugin, sharedWorkerPlugin } from '@migaia/rpc-plugin-browser'
-import { windowPair, portPair } from './message-fixture.js'
+import { windowPair, portPair } from './message-fixture.ts'
 
 /** Read only the public semantic handshake discriminator from the original native frame. */
 function hello(value: unknown): boolean {

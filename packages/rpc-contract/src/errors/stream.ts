@@ -1,7 +1,7 @@
 /** Construct the native stream contract failure without retaining protocol or lifecycle state. */
-import { createContractError } from '../contract/contract-error.js'
-import { RpcContractErrorCode } from '../error-code.js'
-import type { RpcStreamViolation as IRpcStreamViolation } from '../wire/stream-constants.js'
+import { createContractError } from '../contract/contract-error.ts'
+import { RpcContractErrorCode } from '../error-code.ts'
+import type { RpcStreamViolation as IRpcStreamViolation } from '../wire/stream-constants.ts'
 
 /** Preserve the first stream violation and its payload-relative pointer on a native TypeError. */
 export function invalidRpcStream(

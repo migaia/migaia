@@ -1,9 +1,9 @@
 /** Defines native ServiceWorker Client events, scope lookup and cold page or worker options. */
-import type { IBrowserPluginOptions } from './plugin-types.js'
+import type { IBrowserPluginOptions } from './plugin-types.ts'
 import type {
   IServiceWorkerMessageReceiver,
   IServiceWorkerMessageTarget
-} from './adapters/service-worker.js'
+} from './adapters/service-worker.ts'
 
 /** Native worker events identify the actual page Client and may extend their preparation lifetime. */
 export type IServiceWorkerClientEvent = MessageEvent<unknown> &

@@ -2,14 +2,14 @@
  * Mint exact local remote-family failures and preserve their private outbound presentation. Native
  * wire shape and error classes remain in contract.
  */
-import { registerLocalErrorWireSummary } from './error-wire-metadata.js'
+import { registerLocalErrorWireSummary } from './error-wire-metadata.ts'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import {
   RPC_REMOTE_ERROR_SOURCE as ERROR_SOURCE,
   RpcRemoteLayerErrorCode,
   type IRpcRemoteLayerErrorCode
 } from '@migaia/rpc-contract/error-code'
-import { RpcRemoteLayerErrorText } from './remote-error-text.js'
+import { RpcRemoteLayerErrorText } from './remote-error-text.ts'
 
 /** Single code-to-text map keeps remote error construction deterministic. */
 const TEXT_BY_CODE: Readonly<Record<IRpcRemoteLayerErrorCode, string>> = {

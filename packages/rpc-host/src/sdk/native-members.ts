@@ -7,13 +7,13 @@ import { SupervisorState, type ISupervisorEvent } from '@migaia/supervision'
 import type { IRpcSessionView } from '@migaia/rpc-contract/interfaces'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RuntimeApiErrorText } from '@migaia/rpc-contract/errors'
-import { createRpcError } from '../host/error-owner.js'
-import { createRpcMemberEventPublisher } from './native-members-events.js'
+import { createRpcError } from '../host/error-owner.ts'
+import { createRpcMemberEventPublisher } from './native-members-events.ts'
 import {
   rpcMemberQueryOutput,
   rpcMemberUnavailable,
   rpcMemberErrorIdentity
-} from './native-members-overview.js'
+} from './native-members-overview.ts'
 import {
   RpcMemberEventName as Event,
   RpcMemberQueryReason as Reason,
@@ -22,8 +22,8 @@ import {
   RpcMemberConnectionDirection,
   RpcNativeMemberKind,
   RpcMemberStopSignal
-} from './native-members-constants.js'
-import type { IRpcMemberCurrent } from './member-types.js'
+} from './native-members-constants.ts'
+import type { IRpcMemberCurrent } from './member-types.ts'
 import type {
   IRpcNativeMembersOptions,
   IRpcNativeMemberRecord,
@@ -32,7 +32,7 @@ import type {
   IRpcMemberListQuery,
   IRpcMemberTargetQuery,
   IRpcMemberTarget
-} from './native-members-types.js'
+} from './native-members-types.ts'
 
 /** Preserve the original query rejection before any sampler or native handle is touched. */
 function validateMemberFilter(filter?: IRpcMemberListFilter): void {

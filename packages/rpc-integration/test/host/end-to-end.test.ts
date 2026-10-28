@@ -13,7 +13,7 @@ import { dedicatedWorkerPlugin } from '@migaia/rpc-plugin-browser'
 import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'
 import { pool } from '@migaia/rpc-plugin-pool'
 import { devtoolsPlugin, type IDevtoolsPlugin } from '@migaia/rpc-plugin-devtools'
-import { childService, type IChildApi, type IParentApi } from './fixtures/service.js'
+import { childService, type IChildApi, type IParentApi } from './fixtures/service.ts'
 
 /** All examples expose the same actual reverse scalar and generator capabilities on their host. */
 const parentService: IParentApi = {

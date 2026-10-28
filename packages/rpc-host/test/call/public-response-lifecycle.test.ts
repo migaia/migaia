@@ -4,8 +4,8 @@ import { deferred } from '@migaia/utils/promise'
 import type { IRpcCarrierFrame, IRpcCarrierWriteOptions } from '@migaia/rpc-contract/interfaces'
 import { RpcWireKind, type IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
 import { it, vi } from 'vitest'
-import type { MemoryCarrier } from '../fixtures/core-carrier.js'
-import { connectedCoreHosts } from '../host/core-fixture.js'
+import type { MemoryCarrier } from '../fixtures/core-carrier.ts'
+import { connectedCoreHosts } from '../host/core-fixture.ts'
 
 /** One actual physical response owns one check-phase fence before native receiver delivery. */
 class ResponseTurn {

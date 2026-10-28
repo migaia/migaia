@@ -17,11 +17,11 @@ import type {
 } from '@migaia/rpc-contract/interfaces'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { RpcPoolErrorCode } from '@migaia/rpc-contract/error-code'
-import { PoolScheduler, validatePoolOptions } from './pool.js'
-import { PoolMedia } from './media.js'
-import { tagPoolError } from './error.js'
-import { RPC_POOL_PEER_ID, RpcPoolState, RpcPoolText } from './text.js'
-import type { IPoolPluginOptions, IRpcPoolControls } from './types.js'
+import { PoolScheduler, validatePoolOptions } from './pool.ts'
+import { PoolMedia } from './media.ts'
+import { tagPoolError } from './error.ts'
+import { RPC_POOL_PEER_ID, RpcPoolState, RpcPoolText } from './text.ts'
+import type { IPoolPluginOptions, IRpcPoolControls } from './types.ts'
 
 /** The sole native publication channel exposes original member and scheduler controls. */
 export type IPoolExtensions = Readonly<{

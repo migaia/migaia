@@ -1,11 +1,11 @@
 /** Pure exceptional-path privacy policy shared by handshake metadata and its actual JSON codec. */
-import { RpcContractErrorCode } from '../error-code.js'
-import { RpcWireErrorViolation } from '../contract/wire-error-constants.js'
+import { RpcContractErrorCode } from '../error-code.ts'
+import { RpcWireErrorViolation } from '../contract/wire-error-constants.ts'
 import {
   RpcHandshakeInputForm,
   RpcHandshakeRedactionPath,
   RpcHandshakeRedactionText
-} from '../wire/handshake-text.js'
+} from '../wire/handshake-text.ts'
 
 /** The original bounded error-chain policy preserves clean native instances through sixteen links. */
 const MAX_ERROR_DEPTH = 16

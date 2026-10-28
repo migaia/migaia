@@ -3,10 +3,10 @@
  * projection. Executing carriers, host state, optional plugins, and feature implementations are not
  * imported.
  */
-export * from './constants.js'
-export type * from './types.js'
-export type { IRpcErrorWireMetadata } from '../contract/types.js'
-export { normalizeRpcFrame, isRpcOperationalFrame } from './envelope.js'
+export * from './constants.ts'
+export type * from './types.ts'
+export type { IRpcErrorWireMetadata } from '../contract/types.ts'
+export { normalizeRpcFrame, isRpcOperationalFrame } from './envelope.ts'
 export {
   normalizeRpcRoute,
   normalizeRpcRemainingMs,
@@ -16,11 +16,11 @@ export {
   normalizeRpcGeneration,
   normalizeRpcSteps,
   normalizeRpcPortable
-} from './metadata.js'
-export { normalizeRpcHandshake, acceptRpcHandshake, completeRpcHandshake } from './handshake.js'
-export { normalizeRpcDirectory } from './directory.js'
-export { normalizeRpcWireError, serializeRpcWireError, deserializeRpcWireError } from './errors.js'
-export { normalizeRpcCarrierFrame, normalizeRpcBinaryManifest } from './frame.js'
+} from './metadata.ts'
+export { normalizeRpcHandshake, acceptRpcHandshake, completeRpcHandshake } from './handshake.ts'
+export { normalizeRpcDirectory } from './directory.ts'
+export { normalizeRpcWireError, serializeRpcWireError, deserializeRpcWireError } from './errors.ts'
+export { normalizeRpcCarrierFrame, normalizeRpcBinaryManifest } from './frame.ts'
 export {
   normalizeRpcStream,
   checkRpcStreamInitialSequence,
@@ -28,16 +28,16 @@ export {
   checkRpcStreamProgress,
   checkRpcStreamConsumerCredit,
   checkRpcStreamProducerCredit
-} from './stream.js'
+} from './stream.ts'
 export {
   normalizeRpcCompletion,
   normalizeRpcGroupResult,
   normalizeRpcOutcome,
   normalizeRpcOutcomeStore
-} from './completion.js'
-export { normalizeMethodSchema } from './method-schema.js'
+} from './completion.ts'
+export { normalizeMethodSchema } from './method-schema.ts'
 
-export { RpcWireLimit, RpcEnvelopeViolation, RpcHandshakeViolation } from './limits.js'
+export { RpcWireLimit, RpcEnvelopeViolation, RpcHandshakeViolation } from './limits.ts'
 
 export {
   RpcProviderDeclarationLimit,
@@ -46,26 +46,26 @@ export {
   RPC_PROVIDER_DECLARATION_VERSION,
   RPC_PROVIDER_MODES,
   checkRpcProviderDeclaration
-} from './provider-declaration.js'
+} from './provider-declaration.ts'
 export type {
   IRpcProviderDeclaration,
   IRpcProviderFeatureDeclaration,
   IRpcProviderMethodDeclaration
-} from './provider-declaration.js'
+} from './provider-declaration.ts'
 export {
   RPC_INVALID_DECLARATION_SEGMENT,
   RPC_PROVIDER_METHOD_MAX_CHARS,
   RPC_PROVIDER_RESERVED_NAMESPACE
-} from './limits.js'
-export { RuntimeApiMode, RuntimeApiModeSource, REMOTE_NAME_PATTERN } from './limits.js'
-export { checkRpcDirectory } from './directory.js'
-export { RpcShapeReason, type IRpcShapeCheck } from './schema-diagnostics.js'
+} from './limits.ts'
+export { RuntimeApiMode, RuntimeApiModeSource, REMOTE_NAME_PATTERN } from './limits.ts'
+export { checkRpcDirectory } from './directory.ts'
+export { RpcShapeReason, type IRpcShapeCheck } from './schema-diagnostics.ts'
 
-export * from './stream-constants.js'
+export * from './stream-constants.ts'
 export {
   checkRpcRuntimeStreamTransition,
   checkRpcRuntimeStreamIntent,
   checkRpcRuntimeStreamFinish
-} from './stream-validation.js'
+} from './stream-validation.ts'
 
-export * from './outcome-constants.js'
+export * from './outcome-constants.ts'

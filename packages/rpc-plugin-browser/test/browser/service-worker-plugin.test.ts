@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { timeout } from '@migaia/rpc-host/features/timeout'
 import { serviceWorkerPlugin } from '@migaia/rpc-plugin-browser'
-import { serviceWorkerRealm } from './fixtures/service-worker.js'
+import { serviceWorkerRealm } from './fixtures/service-worker.ts'
 
 /** Scheduling a wrong source must not complete an independent pending native session. */
 const deliveryTurn = () => new Promise<void>((resolve) => setTimeout(resolve, 20))

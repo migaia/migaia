@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { RpcProbeOutcome } from '@migaia/rpc-host/plugins/probe'
 import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'
-import { CollectorFixture, collectorView } from './fixture.js'
+import { CollectorFixture, collectorView } from './fixture.ts'
 
 /** Exact fixture quantiles provide an independent oracle for bucket interpolation. */
 function quantile(values: readonly number[], percentile: number): number {

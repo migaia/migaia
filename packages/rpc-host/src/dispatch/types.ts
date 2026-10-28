@@ -16,7 +16,7 @@ import type {
   IRpcObservation,
   IRpcTargetSource
 } from '@migaia/rpc-contract/interfaces'
-import type { IRpcPipelineOwner } from '../sdk/flow-pipelines.js'
+import type { IRpcPipelineOwner } from '../sdk/flow-pipelines.ts'
 import type {
   IRpcProviderDeclaration,
   IRpcProviderMethodDeclaration
@@ -70,7 +70,7 @@ export type IProviderCommitGate = Readonly<{
 /** Guard consumers need only the actual origin and already admitted forward path. */
 export type IProviderPreflight = (route: Pick<IRpcRoute, 'senderId' | 'forwardRoute'>) => void
 /** Compact selected address, never a retained mutable Session or per-peer call facade. */
-export type IProviderTarget = import('../call/types.js').ICallTargetRef
+export type IProviderTarget = import('../call/types.ts').ICallTargetRef
 /** Captured forward metadata uses the same compiler as local own-data methods. */
 export type IProviderForwardEntry = Readonly<{
   kind: 'forward'
@@ -152,7 +152,7 @@ export type IProviderStreamPort = Readonly<{
 }>
 /** Root supplies actual IO/flow/namespace ports without optional plugin capabilities. */
 export type IProviderDispatcherOptions = Readonly<{
-  calls: Pick<import('../call/table.js').CallTable, 'invoke'>
+  calls: Pick<import('../call/table.ts').CallTable, 'invoke'>
   self(): IProviderSelf
   send(
     carrierId: string,

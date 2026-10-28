@@ -16,8 +16,8 @@ import type {
   IRpcChunkContext,
   IRpcChunkOptions,
   IRpcChunkAssembler
-} from './types.js'
-import { RpcChunkLimit } from './constants.js'
+} from './types.ts'
+import { RpcChunkLimit } from './constants.ts'
 
 type IEncoded = string | Uint8Array
 type IFrame = IRpcStringChunk | IRpcBinaryChunk

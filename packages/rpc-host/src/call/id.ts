@@ -2,8 +2,8 @@
 import { bytesToBase64 } from '@migaia/utils/bytes'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
-import { createRpcConfigurationError, createRpcError } from '../host/error-owner.js'
-import { NativeDefaultIdText } from './id-text.js'
+import { createRpcConfigurationError, createRpcError } from '../host/error-owner.ts'
+import { NativeDefaultIdText } from './id-text.ts'
 
 /** Only native entropy acquisition is used; media or public diagnostic fields grant no identity. */
 function nonce(): string {

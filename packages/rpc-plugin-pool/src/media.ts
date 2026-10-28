@@ -17,8 +17,8 @@ import type {
   IRpcNativeFeatureContext
 } from '@migaia/rpc-host/sdk'
 import { RpcPoolErrorCode } from '@migaia/rpc-contract/error-code'
-import { tagPoolError } from './error.js'
-import { RpcPoolText } from './text.js'
+import { tagPoolError } from './error.ts'
+import { RpcPoolText } from './text.ts'
 
 /** One source collaborator follows the same native resource across generation replacement. */
 export class PoolMedia implements IRpcTargetSource {

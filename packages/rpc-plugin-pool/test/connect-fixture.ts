@@ -7,7 +7,7 @@ import { createAdapterChildStdio } from '../../rpc-plugin-process/dist/process/n
 import { acceptProcessConnectionBootstrap } from '../../rpc-plugin-process/dist/process/connection-bootstrap.js'
 import { createProcessCarrier } from '../../rpc-plugin-process/dist/process/carrier.js'
 import { pool } from '../dist/index.js'
-import { observingPool } from './pool-fixture.js'
+import { observingPool } from './pool-fixture.ts'
 
 /**
  * In-memory stand-in for a pipe. A real pipe completes a write only after the kernel holds the

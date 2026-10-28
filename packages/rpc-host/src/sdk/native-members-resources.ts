@@ -6,13 +6,13 @@ import {
   rpcMemberUnavailable,
   type IRpcMemberResources,
   type IRpcMemberUnavailable
-} from './native-members-overview.js'
+} from './native-members-overview.ts'
 import {
   RpcMemberMetricScope,
   RpcMemberMetricUnit,
   RpcMemberQueryReason,
   RpcMemberResourceKind
-} from './native-members-constants.js'
+} from './native-members-constants.ts'
 
 /** Native handles retain this original optional cold port; no resource state is copied into remote. */
 export type IRpcMemberNativeUnit = Readonly<{

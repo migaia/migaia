@@ -24,25 +24,25 @@ import {
   type IRpcFlowContext,
   type IRpcSessionSelection
 } from '@migaia/rpc-contract/interfaces'
-import type { ICallCommand, ICallLocalOptions, ICallTargetRef } from '../call/types.js'
-import { sameGeneration } from '../call/envelope.js'
-import { callTarget } from '../call/target.js'
-import { createRpcError } from '../host/error-owner.js'
+import type { ICallCommand, ICallLocalOptions, ICallTargetRef } from '../call/types.ts'
+import { sameGeneration } from '../call/envelope.ts'
+import { callTarget } from '../call/target.ts'
+import { createRpcError } from '../host/error-owner.ts'
 import {
   admitLocalErrorWireRoute,
   registerLocalErrorWireRoute,
   registerLocalErrorWireSummary
-} from '../host/error-wire-metadata.js'
-import { forwardHint, retainProviderForwardMethod } from '../dispatch/catalog.js'
-import type { IProviderForwardEntry, IRpcContext } from '../dispatch/types.js'
-import { ForwardErrorText } from './text.js'
+} from '../host/error-wire-metadata.ts'
+import { forwardHint, retainProviderForwardMethod } from '../dispatch/catalog.ts'
+import type { IProviderForwardEntry, IRpcContext } from '../dispatch/types.ts'
+import { ForwardErrorText } from './text.ts'
 import {
   createDirectoryRow,
   createDirectorySnapshot,
   directoryMethods,
   type IRpcDirectoryRow,
   type IRpcDirectorySnapshot
-} from '../session/view.js'
+} from '../session/view.ts'
 
 /** Accepted facts are borrowed only during selection and never retained in a callable capability. */
 export type IForwardSelection = IRpcSessionSelection

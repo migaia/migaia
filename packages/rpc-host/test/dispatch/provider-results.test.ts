@@ -8,7 +8,7 @@ import { walkErrorCauses } from '@migaia/utils/error'
 import { deferred } from '@migaia/utils/promise'
 import { expect, it, vi } from 'vitest'
 import { createRpcSchemaValidationError } from '../../dist/host/error-owner.js'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 it('releases admission and the original request identity when params validation fails', async () => {
   /** This exact native error is created by the existing canonical application error factory. */

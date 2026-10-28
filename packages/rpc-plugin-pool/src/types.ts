@@ -3,7 +3,7 @@
  * These snapshots describe pool admission rather than provider concurrency.
  */
 import type { IScheduler } from '@migaia/utils/scheduler'
-import type { RpcPoolState } from './text.js'
+import type { RpcPoolState } from './text.ts'
 
 /** This snapshot measures pool client slots and FIFO entries, never provider concurrency. */
 export type IRpcPoolStats = Readonly<{

@@ -4,13 +4,13 @@
  */
 import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IRpcCallFeatures } from '@migaia/rpc-contract/interfaces'
-import type { IRpcClosingHandler, IRpcPeerClosedHandler } from '../session/types.js'
+import type { IRpcClosingHandler, IRpcPeerClosedHandler } from '../session/types.ts'
 export type {
   IRpcClosingEvent,
   IRpcPeerClosedEvent,
   IRpcClosingHandler,
   IRpcPeerClosedHandler
-} from '../session/types.js'
+} from '../session/types.ts'
 import type {
   IRpcPortableValue,
   IRpcStepOutcome,

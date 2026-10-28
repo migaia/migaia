@@ -1,5 +1,5 @@
 /** Owns native BroadcastChannel discovery and participant routes while Host owns RPC sessions. */
-import { BrowserPeerEvent } from './peer-text.js'
+import { BrowserPeerEvent } from './peer-text.ts'
 import { inspectThenable, assimilateCapturedThen } from '@migaia/utils/function'
 import {
   defineTransportPlugin,
@@ -22,18 +22,18 @@ import {
   RPC_ENDPOINT_ERROR_SOURCE
 } from '@migaia/rpc-contract/error-code'
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { BroadcastRouteIO } from './adapters/broadcast-channel.js'
-import { createBrowserPeerError } from './peer-error.js'
+import { BroadcastRouteIO } from './adapters/broadcast-channel.ts'
+import { createBrowserPeerError } from './peer-error.ts'
 import {
   createBrowserTransportError,
   rejectBrowserTransfer,
   normalizeBrowserHandshakeFailure
-} from './error.js'
-import { BrowserPeerErrorText } from '../error-text.js'
-import { BrowserRpcErrorText } from './error-text.js'
-import type { IBrowserPluginOptions, IBrowserFeature } from './plugin-types.js'
-import { BroadcastChannelControl } from './broadcast-channel-text.js'
-import { BrowserNamespace } from './peer-text.js'
+} from './error.ts'
+import { BrowserPeerErrorText } from '../error-text.ts'
+import { BrowserRpcErrorText } from './error-text.ts'
+import type { IBrowserPluginOptions, IBrowserFeature } from './plugin-types.ts'
+import { BroadcastChannelControl } from './broadcast-channel-text.ts'
+import { BrowserNamespace } from './peer-text.ts'
 
 /** The caller retains ownership of this actual same-origin native channel. */
 export type IBroadcastChannelPluginOptions = IBrowserPluginOptions &

@@ -9,7 +9,7 @@ import {
   RPC_COROUTINE_ERROR_SOURCE as ERROR_SOURCE,
   RpcCoroutineErrorCode
 } from '@migaia/rpc-contract/error-code'
-import { CoroutineErrorText } from './error-text.js'
+import { CoroutineErrorText } from './error-text.ts'
 import { defaultRpcId, IpcReporterContext } from '@migaia/rpc-host/sdk'
 
 /** Opaque connection belongs to one task generation and reveals no physical port operation. */

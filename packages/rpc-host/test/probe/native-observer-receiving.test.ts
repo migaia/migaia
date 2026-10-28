@@ -16,10 +16,10 @@ import {
 } from '@migaia/rpc-host/sdk'
 import chunk from '@migaia/rpc-host/plugins/chunk'
 import type { IRpcTransportContext, IRpcSessionHandle } from '@migaia/rpc-contract/interfaces'
-import { devtoolsPlugin } from '../../../rpc-plugin-devtools/src/index.js'
+import { devtoolsPlugin } from '../../../rpc-plugin-devtools/src/index.ts'
 import { assert, expect, it, vi } from 'vitest'
-import { MemoryCarrier } from '../fixtures/core-carrier.js'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { MemoryCarrier } from '../fixtures/core-carrier.ts'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 /** Only the genuine transport installation fills these original native control references. */
 type IObservedSource = {

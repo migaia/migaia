@@ -1,6 +1,6 @@
 /** Resolve native-owner supplied entry facts and loader flags without reading runtime globals. */
 import { readUrlHref, type IUrlLike } from '@migaia/utils'
-import { createRpcError } from '../host/error-owner.js'
+import { createRpcError } from '../host/error-owner.ts'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { tagRpcError } from '@migaia/rpc-contract/errors'
 import {
@@ -10,7 +10,7 @@ import {
   RPC_BUNDLED_ENTRY,
   RPC_ENTRY_SCHEME,
   RPC_TEST_FLAG_PREFIX
-} from './entry-text.js'
+} from './entry-text.ts'
 
 /** Native owners supply entry snapshots; this pure resolver never reads runtime globals. */
 export type IRpcEntryOptions = Readonly<{

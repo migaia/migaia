@@ -7,13 +7,13 @@ import {
 import {
   decodeRpcDevtoolsRecord,
   encodeRpcDevtoolsRecord
-} from '../../src/contract/record-codec.js'
-import { RpcDevtoolsRecordFormat } from '../../src/contract/record.js'
+} from '../../src/contract/record-codec.ts'
+import { RpcDevtoolsRecordFormat } from '../../src/contract/record.ts'
 import type {
   IRpcDevtoolsCounters,
   IRpcDevtoolsServiceApi,
   IRpcDevtoolsStats
-} from '../../src/contract/service.js'
+} from '../../src/contract/service.ts'
 import type { IRpcNamespace } from '@migaia/rpc-host'
 
 /** A typed namespace must preserve the service's concrete stats result across the public API. */
