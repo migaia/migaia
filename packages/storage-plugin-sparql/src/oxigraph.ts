@@ -1,19 +1,19 @@
 import type { Store } from 'oxigraph'
 import { namedNode, defaultGraph } from 'oxigraph'
 import { sparqlFragment, throwIfAborted } from '@migaia/storage-host/sdk'
-import { invalidArgument, sparqlError } from './errors.js'
+import { invalidArgument, sparqlError } from './errors.ts'
 import { SparqlErrorCode } from '@migaia/storage-contract/error-code'
-import { SparqlText } from './text.js'
-import { SparqlErrorText } from './error-text.js'
-import { snapshotGraphTarget, snapshotGraphDocument, snapshotGraphFormat } from './graph-store.js'
-import { parseRdfDocument, writeRdfDocument } from './ntriples.js'
-import { renderFragment } from './render.js'
+import { SparqlText } from './text.ts'
+import { SparqlErrorText } from './error-text.ts'
+import { snapshotGraphTarget, snapshotGraphDocument, snapshotGraphFormat } from './graph-store.ts'
+import { parseRdfDocument, writeRdfDocument } from './ntriples.ts'
+import { renderFragment } from './render.ts'
 import type {
   ISparqlEndpoint,
   ISparqlAbortSignal,
   IRdfGraphTarget,
   IRdfGraphDocument
-} from './endpoint.js'
+} from './endpoint.ts'
 /** Borrow one caller-owned native store; its synchronous operations finish before returning. */
 /** Physical endpoint state is passed explicitly to named native and organization jobs. */
 type IOxigraphEndpointContext = {

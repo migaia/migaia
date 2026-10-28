@@ -1,12 +1,12 @@
 import type { Sql, ReservedSql } from 'postgres'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
-import type { IPgDriver, IPgConnection, IPgNativeParameter, IPgResult } from './types.js'
-import { encodePgParameters } from './parameters.js'
-import { decodePgRows } from './result.js'
-import { pgResource } from './driver-resource.js'
-import { copyCommand } from './copy-command.js'
-import { normalizePostgresError } from './errors.js'
+import type { IPgDriver, IPgConnection, IPgNativeParameter, IPgResult } from './types.ts'
+import { encodePgParameters } from './parameters.ts'
+import { decodePgRows } from './result.ts'
+import { pgResource } from './driver-resource.ts'
+import { copyCommand } from './copy-command.ts'
+import { normalizePostgresError } from './errors.ts'
 import {
   throwIfAborted,
   subscribeToAbort,

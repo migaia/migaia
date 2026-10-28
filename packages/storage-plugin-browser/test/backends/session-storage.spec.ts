@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi, onTestFinished } from 'vitest'
-import { createSessionTestStore } from '../helpers/installed-backends.js'
+import { createSessionTestStore } from '../helpers/installed-backends.ts'
 
 describe('sessionStorageHost 默认注入', () => {
   afterEach(() => {

@@ -1,7 +1,7 @@
 import { it, expect } from 'vitest'
 import { createStorageBlobObject } from '@migaia/storage-host/sdk'
 import { deferred } from '@migaia/utils/promise'
-import { readSegment } from '../src/segment.js'
+import { readSegment } from '../src/segment.ts'
 
 /** The original public blob resource owns a genuinely blocked stream and its held native cancel. */
 it('wakes a blocked decompression read on abort and drains original cancellation/close once', async () => {
@@ -98,7 +98,7 @@ it('measures exact UTF-8 line budgets and keeps embedded newlines inside their c
   const { defineCollectionsJsonCodec } = await import('@migaia/serialize/codecs/collections-json')
   const { createStorageHost } = await import('@migaia/storage-host')
   const { memoryBackendPlugin } = await import('@migaia/storage-host/plugins/memory')
-  const { archivePlugin } = await import('../src/index.js')
+  const { archivePlugin } = await import('../src/index.ts')
   const codec = defineCollectionsJsonCodec({ version: 1 }),
     value = { old: true, text: 'a\nb' }
   const budget = new TextEncoder().encode(

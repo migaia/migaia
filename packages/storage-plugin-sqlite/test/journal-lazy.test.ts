@@ -4,8 +4,8 @@ import { Logger } from '@migaia/logger'
 import { binlog, undoLog, wal, memoryLogStore } from '@migaia/logger/plugins/durable'
 import { kv, ttl } from '@migaia/storage-contract'
 import { createStorageHost } from '@migaia/storage-host'
-import { sqliteBackendPlugin } from '../src/index.js'
-import { nodeSqliteDriver } from '../src/node.js'
+import { sqliteBackendPlugin } from '../src/index.ts'
+import { nodeSqliteDriver } from '../src/node.ts'
 
 /** Each read path must append only its real expiry mutation through the original native journal. */
 it.each([

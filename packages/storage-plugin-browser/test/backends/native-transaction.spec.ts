@@ -1,5 +1,5 @@
 import { storageProbe } from '@migaia/storage-host/plugins/probe'
-import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
+import { indexedDbTestFeatures } from '../helpers/indexed-db-features.ts'
 import {
   IDBDatabase,
   IDBFactory,
@@ -22,7 +22,7 @@ import {
   records,
   type ITransactionScope
 } from '@migaia/storage-contract'
-import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
+import { indexedDbBackendPlugin } from '../../src/indexed-db.ts'
 import { deferred } from '@migaia/utils/promise'
 
 /** Native and shared boundaries may add context while preserving the exact late rejection. */

@@ -1,6 +1,6 @@
 import { defineFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
-import { sqliteBackendKind } from '../plugin.js'
-import type { ISqliteMaintenanceApi } from '../types.js'
+import { sqliteBackendKind } from '../plugin.ts'
+import type { ISqliteMaintenanceApi } from '../types.ts'
 /** Maintenance executes on the original store SQL endpoint and inherits its admission and hooks. */
 export function sqliteMaintenanceFeature() {
   return defineFeature<

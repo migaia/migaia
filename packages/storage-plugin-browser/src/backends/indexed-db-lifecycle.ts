@@ -1,18 +1,18 @@
 // Metadata keys, index generations, the raw mutation firewall, controller and mutation leases for the IndexedDB backend (see ./indexed-db.ts).
-import { isIndexedDbPointRevision } from './indexed-db-revisions.js'
+import { isIndexedDbPointRevision } from './indexed-db-revisions.ts'
 import {
   type IStorageOperationRuntime,
   encodeFlatStorageKey,
   createBackendLifecycleController,
   createStorageToken
 } from '@migaia/storage-host/sdk'
-import { createStorageAggregateError, StorageError } from '../types/errors.js'
+import { createStorageAggregateError, StorageError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
-import { StorageBackend, StorageOperation } from '../constants.js'
+import { StorageErrorText } from '../error-text.ts'
+import { StorageBackend, StorageOperation } from '../constants.ts'
 import { REPOSITORY_KEY_PREFIX, repositoryMigrationKey } from '@migaia/storage-host/entity'
-import { fromIdbRequest } from '../utils/idb-request.js'
-import type { IStorageKey } from '../types/context.js'
+import { fromIdbRequest } from '../utils/idb-request.ts'
+import type { IStorageKey } from '../types/context.ts'
 import type { IRecordIndexHandle } from '@migaia/storage-contract'
 import {
   INTERNAL_META_NAMESPACE,
@@ -20,12 +20,12 @@ import {
   RECORD_EPOCH_KEY,
   createIndexGeneration,
   toIdbKey
-} from './indexed-db-layout.js'
+} from './indexed-db-layout.ts'
 import type {
   IIndexedDbContext,
   IRawMutationAuthority,
   IMutationLeaseContext
-} from './indexed-db.js'
+} from './indexed-db.ts'
 
 export function recordRevisionKey<TValue>(
   indexedDbContext: IIndexedDbContext<TValue>,

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { reportCleanupError, createStorageOperationReporter } from '../../src/authoring/backend.js'
+import { reportCleanupError, createStorageOperationReporter } from '../../src/authoring/backend.ts'
 
 describe('operation reporter（cleanup 观测）', () => {
   it('cleanup 错误传给 primary reporter（原始错误）', () => {

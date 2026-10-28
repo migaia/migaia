@@ -6,10 +6,10 @@ import type {
   ISqliteValue,
   ISqliteRow,
   ISqliteRunResult
-} from './types.js'
-import { normalizeSqliteFailure, sqliteError } from './errors.js'
+} from './types.ts'
+import { normalizeSqliteFailure, sqliteError } from './errors.ts'
 import { SqliteErrorCode } from '@migaia/storage-contract/error-code'
-import { SqliteErrorText } from './error-text.js'
+import { SqliteErrorText } from './error-text.ts'
 /** Native statements are captured by their actual adapter, without a second statement cache. */
 export type INativeStatement = {
   run(...values: readonly ISqliteValue[]): {

@@ -1,1 +1,1 @@
-export { entityMigrationFeature } from './migration-feature.js'
+export { entityMigrationFeature } from './migration-feature.ts'

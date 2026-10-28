@@ -23,8 +23,8 @@ import type {
   IStorageJournalBackendBinding
 } from '@migaia/storage-host'
 import type { IBackendChangeController } from '@migaia/storage-host/sdk'
-import { pgResource } from './driver-resource.js'
-import { pgKey, pgKeyHex, pgRecordKey, pgTextKey, encodePgRecord, decodePgRecord } from './codec.js'
+import { pgResource } from './driver-resource.ts'
+import { pgKey, pgKeyHex, pgRecordKey, pgTextKey, encodePgRecord, decodePgRecord } from './codec.ts'
 import {
   pgIdentity,
   preparePgRevisionRows,
@@ -34,11 +34,11 @@ import {
   markPgChanged,
   type IPgState,
   type IPgMutationChannel
-} from './native.js'
-import type { IPgConfiguration, IPgTables } from './schema.js'
-import { invalidArgument, postgresError } from './errors.js'
+} from './native.ts'
+import type { IPgConfiguration, IPgTables } from './schema.ts'
+import { invalidArgument, postgresError } from './errors.ts'
 import { PostgresErrorCode } from '@migaia/storage-contract/error-code'
-import { PgNames } from './constants.js'
+import { PgNames } from './constants.ts'
 import { deferred } from '@migaia/utils/promise'
 import { base64ToBytes, bytesToBase64 } from '@migaia/utils/bytes'
 /** The image keeps exact original native wire values and absolute PostgreSQL deadlines. */

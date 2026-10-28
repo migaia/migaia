@@ -3,7 +3,7 @@ import {
   composeRepositoryKey,
   decodeRepositoryKey,
   repositoryEntityRange
-} from '../../src/entity/key.js'
+} from '../../src/entity/key.ts'
 
 describe('repository physical key space', () => {
   it('round trips scalar and nested ids without colliding with raw keys', () => {

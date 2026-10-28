@@ -19,10 +19,10 @@ import {
   throwIfAborted
 } from '@migaia/storage-host/sdk'
 import type { IStorageBackendOrgContext } from '@migaia/storage-host'
-import { captureQuads, quadIdentity } from './rdf.js'
-import { invalidArgument, normalizeTransactionFailure } from './errors.js'
-import { SparqlText } from './text.js'
-import type { ISparqlTransactionScope, ISparqlTxRdf, ISparqlTxUpdateApi } from './types.js'
+import { captureQuads, quadIdentity } from './rdf.ts'
+import { invalidArgument, normalizeTransactionFailure } from './errors.ts'
+import { SparqlText } from './text.ts'
+import type { ISparqlTransactionScope, ISparqlTxRdf, ISparqlTxUpdateApi } from './types.ts'
 /** Each canonical quad retains only its final native draft operation. */
 export type ISparqlDraft = Map<string, { readonly quad: IQuad; readonly add: boolean }>
 /** Query writes borrow these existing claim/draft closures without acquiring another scope owner. */

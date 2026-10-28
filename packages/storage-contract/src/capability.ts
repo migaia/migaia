@@ -1,34 +1,34 @@
-import type { IStorageBase, IKeyValueStore } from './store.js'
-import type { ITransactionBuilder, IOptimisticTransactionBuilder } from './concurrency.js'
-import type { IWriteConcurrencyOptions } from './concurrency.js'
+import type { IStorageBase, IKeyValueStore } from './store.ts'
+import type { ITransactionBuilder, IOptimisticTransactionBuilder } from './concurrency.ts'
+import type { IWriteConcurrencyOptions } from './concurrency.ts'
 import type { ICodecValue } from '@migaia/serialize/codec'
-import type { IOperationContext, IStorageKey } from './context.js'
-import type { IRecordQuery, IQueryWatch } from './query-chain.js'
+import type { IOperationContext, IStorageKey } from './context.ts'
+import type { IRecordQuery, IQueryWatch } from './query-chain.ts'
 import type {
   ITransactionScope,
   ITransactionKeyValueApi,
   ITransactionRecordsApi
-} from './transaction.js'
+} from './transaction.ts'
 
 import {
   invalidCapability,
   isCapabilityToken as isToken,
   readCapabilityTokenFacts
-} from './capability-token.js'
-import type { kv } from './capabilities/kv.js'
-import type { records } from './capabilities/records.js'
-import type { ttl, ITransactionTtlApi } from './capabilities/ttl.js'
-import type { counter, ITransactionCounterApi } from './capabilities/counter.js'
-import type { sql } from './capabilities/sql.js'
-import type { rdf, IRdfApi, ITransactionRdfApi } from './capabilities/rdf.js'
-import type { vector, IVectorApi } from './capabilities/vector.js'
-import type { ISqlExecutor } from './sql.js'
-export { defineStorageCapability } from './capability-token.js'
-export { kv } from './capabilities/kv.js'
-export { records } from './capabilities/records.js'
-export { ttl } from './capabilities/ttl.js'
-export { counter } from './capabilities/counter.js'
-export { sql } from './capabilities/sql.js'
+} from './capability-token.ts'
+import type { kv } from './capabilities/kv.ts'
+import type { records } from './capabilities/records.ts'
+import type { ttl, ITransactionTtlApi } from './capabilities/ttl.ts'
+import type { counter, ITransactionCounterApi } from './capabilities/counter.ts'
+import type { sql } from './capabilities/sql.ts'
+import type { rdf, IRdfApi, ITransactionRdfApi } from './capabilities/rdf.ts'
+import type { vector, IVectorApi } from './capabilities/vector.ts'
+import type { ISqlExecutor } from './sql.ts'
+export { defineStorageCapability } from './capability-token.ts'
+export { kv } from './capabilities/kv.ts'
+export { records } from './capabilities/records.ts'
+export { ttl } from './capabilities/ttl.ts'
+export { counter } from './capabilities/counter.ts'
+export { sql } from './capabilities/sql.ts'
 
 /** Type-only API carrier; runtime authority belongs exclusively to the private token set. */
 declare const capabilityApi: unique symbol
@@ -54,7 +54,7 @@ export type IAnyStorageCapability = IStorageCapability<string, unknown>
 export type ICapabilityApi<TCap extends IAnyStorageCapability> =
   TCap extends IStorageCapability<string, infer TApi> ? TApi : never
 
-export type { IStorageBase } from './store.js'
+export type { IStorageBase } from './store.ts'
 
 /** Minimal capability-aware store surface, retaining its exact admitted capability set. */
 export type IStorageStore<TCaps extends IAnyStorageCapability = never> = IStorageBase & {

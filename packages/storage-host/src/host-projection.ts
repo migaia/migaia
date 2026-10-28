@@ -5,16 +5,16 @@ import {
   getBackendChangeController,
   registerBackendEntityAccess,
   type IBackendChangeController
-} from './core/backend-registry.js'
-import { borrowStorageBackend } from './borrow.js'
+} from './core/backend-registry.ts'
+import { borrowStorageBackend } from './borrow.ts'
 import { asyncDisposeKey } from '@migaia/plugin-host'
-import { snapshotStorageBaseDetailed } from './authoring/store.js'
+import { snapshotStorageBaseDetailed } from './authoring/store.ts'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
-import { createStorageTypeError } from './errors.js'
+import { createStorageTypeError } from './errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from './error-text.js'
+import { StorageErrorText } from './error-text.ts'
 import type { IStorageBase } from '@migaia/storage-contract'
-import type { StorageHost } from './storage-host.js'
+import type { StorageHost } from './storage-host.ts'
 
 /** Project a committed store into a borrowed backend view for one organization. */
 export class StorageHostProjection {

@@ -7,22 +7,22 @@ import {
   type IStorageKey,
   type IConflictPolicy
 } from '@migaia/storage-contract'
-import { lockKey } from '../authoring/concurrency.js'
-import { encodeOrderedStorageKey, snapshotStorageKeyPrefix } from '../authoring/key.js'
-import { snapshotStorageVectorUpsert } from '../authoring/vector.js'
-import { memoryJournalDeadlineTarget, snapshotMemoryJournalTarget } from './memory-journal-image.js'
+import { lockKey } from '../authoring/concurrency.ts'
+import { encodeOrderedStorageKey, snapshotStorageKeyPrefix } from '../authoring/key.ts'
+import { snapshotStorageVectorUpsert } from '../authoring/vector.ts'
+import { memoryJournalDeadlineTarget, snapshotMemoryJournalTarget } from './memory-journal-image.ts'
 import type {
   IStorageJournalChange,
   IStorageJournalImage,
   IStorageJournalTarget
-} from '../journal/types.js'
-import { encodeStorageJournalImage, decodeStorageJournalImage } from '../journal/image.js'
-import type { IStorageChannel } from '../errors.js'
-import { STORAGE_MEMORY_BACKEND } from '../state-constants.js'
-import { encodeFlatStorageKey } from '../core/key-domain.js'
-import { identity, entryBytes } from './memory-entries.js'
-import { ttlChannel, ttlKey } from './memory-keyvalue.js'
-import { captureRdfEntries } from './memory-namespace-base.js'
+} from '../journal/types.ts'
+import { encodeStorageJournalImage, decodeStorageJournalImage } from '../journal/image.ts'
+import type { IStorageChannel } from '../errors.ts'
+import { STORAGE_MEMORY_BACKEND } from '../state-constants.ts'
+import { encodeFlatStorageKey } from '../core/key-domain.ts'
+import { identity, entryBytes } from './memory-entries.ts'
+import { ttlChannel, ttlKey } from './memory-keyvalue.ts'
+import { captureRdfEntries } from './memory-namespace-base.ts'
 import {
   txWrite,
   txRemove,
@@ -33,10 +33,10 @@ import {
   txVectorPoints,
   txRdfWrite,
   txRows
-} from './memory-transaction.js'
-import type { IMemoryTransactionContext } from './memory-transaction.js'
-import { vectorKey } from './memory-vector.js'
-import type { IMemoryTtlTarget, IMemoryChannel, IMemoryDraft } from './memory.js'
+} from './memory-transaction.ts'
+import type { IMemoryTransactionContext } from './memory-transaction.ts'
+import { vectorKey } from './memory-vector.ts'
+import type { IMemoryTtlTarget, IMemoryChannel, IMemoryDraft } from './memory.ts'
 
 /** Native text batches stage only into this attempt's existing draft and revision baseline. */
 export function createMemoryTransactionTextDraft<T, R>(

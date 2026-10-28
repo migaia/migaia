@@ -19,7 +19,7 @@ import {
   type IKeyValueApi,
   type IStorageChange
 } from '@migaia/storage-contract'
-import { inspectPgLocks } from './locks.js'
+import { inspectPgLocks } from './locks.ts'
 import {
   readPg,
   writePg,
@@ -31,15 +31,15 @@ import {
   setManyPg,
   removeManyPg,
   removePrefixPg
-} from './native.js'
-import { pgTextKey, encodePgRecord, decodePgRecord } from './codec.js'
-import { PgNames, PgOperation } from './constants.js'
-import { invalidArgument } from './errors.js'
-import type { IPostgresTransactionScope } from './types.js'
+} from './native.ts'
+import { pgTextKey, encodePgRecord, decodePgRecord } from './codec.ts'
+import { PgNames, PgOperation } from './constants.ts'
+import { invalidArgument } from './errors.ts'
+import type { IPostgresTransactionScope } from './types.ts'
 import type { ITransactionBuilder } from '@migaia/storage-contract'
-import { createPgOrgSql, createPgRecordIterator } from './store-records.js'
-import { runPgRootOperation, textKey, textValue, pointLocks, textEntries } from './store-state.js'
-import type { IPgOrganizationContext } from './store-state.js'
+import { createPgOrgSql, createPgRecordIterator } from './store-records.ts'
+import { runPgRootOperation, textKey, textValue, pointLocks, textEntries } from './store-state.ts'
+import type { IPgOrganizationContext } from './store-state.ts'
 
 /**
  * One organization's native PostgreSQL store: text, bytes, record and RDF channels over the shared

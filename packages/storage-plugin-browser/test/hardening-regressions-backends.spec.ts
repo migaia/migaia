@@ -10,8 +10,8 @@ import {
   createCookieTestStore,
   createIndexedDbTestStore,
   createLocalTestStore
-} from './helpers/installed-backends.js'
-import { fakeCookieDocument } from '../src/testing/fake-cookie-document.js'
+} from './helpers/installed-backends.ts'
+import { fakeCookieDocument } from '../src/testing/fake-cookie-document.ts'
 
 /** A failed real installation must expose the browser failure without selecting a memory fallback. */
 const expectUnavailableInstallation = async (

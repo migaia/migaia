@@ -1,13 +1,13 @@
-import { definePlugin } from '../../contracts.js'
-import { createStorageTypeError } from '../../errors.js'
+import { definePlugin } from '../../contracts.ts'
+import { createStorageTypeError } from '../../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../../error-text.js'
-import { STORAGE_PROBE_PLUGIN_ID } from '../../state-constants.js'
-import type { IStorageHookMap, IStorageHooks } from '../../hook-types.js'
-import type { IStorageBackendPluginHandle, IStoragePluginCallContext } from '../../types.js'
-import { attachStorageProbeHandlers, type IStorageProbeHandlers } from './handlers.js'
+import { StorageErrorText } from '../../error-text.ts'
+import { STORAGE_PROBE_PLUGIN_ID } from '../../state-constants.ts'
+import type { IStorageHookMap, IStorageHooks } from '../../hook-types.ts'
+import type { IStorageBackendPluginHandle, IStoragePluginCallContext } from '../../types.ts'
+import { attachStorageProbeHandlers, type IStorageProbeHandlers } from './handlers.ts'
 
-export type { IStorageProbeHandlers } from './handlers.js'
+export type { IStorageProbeHandlers } from './handlers.ts'
 
 /** Extension method published by `storageProbe()` on `host.extensions` and org views. */
 export type IStorageProbeApi = {

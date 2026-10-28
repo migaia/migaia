@@ -6,12 +6,12 @@ import {
   type IStorageFeatureStoreCompatibility,
   type IStoragePluginCore
 } from '@migaia/storage-host'
-import { invalidArgument } from './errors.js'
-import { QdrantText } from './constants.js'
-import { fetchHttp } from './http.js'
-import { createQdrantBackend } from './store.js'
-import type { IQdrantHttp, IQdrantStore, IQdrantOptions } from './types.js'
-import type { IQdrantRescoreConfiguration } from './feature-types.js'
+import { invalidArgument } from './errors.ts'
+import { QdrantText } from './constants.ts'
+import { fetchHttp } from './http.ts'
+import { createQdrantBackend } from './store.ts'
+import type { IQdrantHttp, IQdrantStore, IQdrantOptions } from './types.ts'
+import type { IQdrantRescoreConfiguration } from './feature-types.ts'
 /** Kind identity carries the exact native store and finite caller-owned protocol port. */
 export const qdrantBackendKind = defineStorageBackendKind<
   IQdrantStore,

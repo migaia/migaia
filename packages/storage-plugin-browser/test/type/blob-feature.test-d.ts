@@ -1,11 +1,11 @@
-import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
+import { indexedDbTestFeatures } from '../helpers/indexed-db-features.ts'
 import { createStorageHost } from '@migaia/storage-host'
-import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
+import { indexedDbBackendPlugin } from '../../src/indexed-db.ts'
 import {
   indexedDbBlobFeature,
   type IIndexedDbBlobApi,
   type ITransactionBlobApi
-} from '../../src/features/blobs.js'
+} from '../../src/features/blobs.ts'
 
 /** Compile the exact selected and absent Feature projections without acquiring browser resources. */
 async function blobFeatureTypes() {

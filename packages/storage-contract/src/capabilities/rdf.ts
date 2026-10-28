@@ -1,11 +1,11 @@
-import { type IOperationContext } from '../context.js'
-import { type IWriteConcurrencyOptions } from '../concurrency.js'
-import { type IRdfQuery, type IQueryWatch } from '../query-chain.js'
-import { defineStandardStorageCapability, validateCapabilityMethods } from '../capability-token.js'
-import { STORAGE_RDF_METHODS, STORAGE_RDF_WRITE_METHODS } from '../capability-constants.js'
-import { type IBackendKind } from '../capabilities.js'
-import { StorageContractError, StorageContractErrorCode } from '../errors.js'
-import { StorageContractErrorText } from '../error-text.js'
+import { type IOperationContext } from '../context.ts'
+import { type IWriteConcurrencyOptions } from '../concurrency.ts'
+import { type IRdfQuery, type IQueryWatch } from '../query-chain.ts'
+import { defineStandardStorageCapability, validateCapabilityMethods } from '../capability-token.ts'
+import { STORAGE_RDF_METHODS, STORAGE_RDF_WRITE_METHODS } from '../capability-constants.ts'
+import { type IBackendKind } from '../capabilities.ts'
+import { StorageContractError, StorageContractErrorCode } from '../errors.ts'
+import { StorageContractErrorText } from '../error-text.ts'
 
 /** RDF term tags are shared by canonical snapshots, query bindings and SPARQL serialization. */
 export const RdfTermType = {

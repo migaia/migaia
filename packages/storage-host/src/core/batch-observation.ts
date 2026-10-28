@@ -1,6 +1,6 @@
 import type { IStorageOperationStageObserver } from '@migaia/storage-contract'
 import type { IScheduler } from '@migaia/utils/scheduler'
-import { readStorageHookFailureCode } from '../hooks.js'
+import { readStorageHookFailureCode } from '../hooks.ts'
 
 /**
  * Observe one already-admitted native batch through the original stage binding and clock. The

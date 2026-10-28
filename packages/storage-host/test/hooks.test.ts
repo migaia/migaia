@@ -1,13 +1,13 @@
-import { storageProbe } from '../src/plugins/probe/index.js'
+import { storageProbe } from '../src/plugins/probe/index.ts'
 import { describe, expect, it, vi } from 'vitest'
 import {
   createStorageHost,
   definePlugin,
   defineStorageBackendKind,
   type IStoragePluginCore
-} from '../src/index.js'
+} from '../src/index.ts'
 import type { ICodecStageObserver, IStorageBase } from '@migaia/storage-contract'
-import { catalog } from './helpers/catalog.js'
+import { catalog } from './helpers/catalog.ts'
 
 /** One actual catalog fixture publishes the exact store used by its construction stage port. */
 function observedCatalog() {

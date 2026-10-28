@@ -28,8 +28,8 @@ import {
 } from '@migaia/utils/promise'
 import { IdentifyError } from '@migaia/utils/error'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { snapshotOperationContext } from './context.js'
-import { readTransactionConcurrency, resolveConcurrencyPolicy } from './transaction.js'
+import { snapshotOperationContext } from './context.ts'
+import { readTransactionConcurrency, resolveConcurrencyPolicy } from './transaction.ts'
 import {
   concurrencyAttemptBudgets,
   snapshotLockIdentities,
@@ -46,15 +46,15 @@ import {
   ConcurrencyWaitKind,
   readConcurrencyDecision,
   concurrencyLockFailure
-} from './concurrency-attempt.js'
-import type { IConcurrencyBudget, IAttemptExecution } from './concurrency-attempt.js'
+} from './concurrency-attempt.ts'
+import type { IConcurrencyBudget, IAttemptExecution } from './concurrency-attempt.ts'
 import {
   normalizeLockKeys,
   snapshotConcurrencyExtensions,
   uniqueNormalizedLockKeys,
   snapshotLockKey
-} from './concurrency-lock-keys.js'
-import { ConcurrencyAction } from './concurrency-attempt.js'
+} from './concurrency-lock-keys.ts'
+import { ConcurrencyAction } from './concurrency-attempt.ts'
 
 /** Preset labels describe policy behavior and never authorize a structurally copied policy. */
 const ConcurrencyPreset = { wait: 'wait', fail: 'fail', optimistic: 'optimistic' } as const
@@ -596,8 +596,8 @@ export {
   normalizeLockKeys,
   snapshotConcurrencyLockKeys,
   snapshotConcurrencyLockRange
-} from './concurrency-lock-keys.js'
+} from './concurrency-lock-keys.ts'
 export {
   associateNormalizedLockKeys,
   readConcurrencyLockIdentities
-} from './concurrency-attempt.js'
+} from './concurrency-attempt.ts'

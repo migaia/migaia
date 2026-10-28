@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fromStandardSchema, type IStandardSchemaV1 } from '../../src/entity.js'
+import { fromStandardSchema, type IStandardSchemaV1 } from '../../src/entity.ts'
 
 const numberSchema: IStandardSchemaV1<unknown, number> = {
   '~standard': {

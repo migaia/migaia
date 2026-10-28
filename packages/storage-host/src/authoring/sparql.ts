@@ -15,8 +15,8 @@ import {
   type IRdfBindingTerm,
   type IRawQuad
 } from '@migaia/storage-contract'
-import { captureStorageTemplatePieces } from './template.js'
-import { snapshotStorageRdfTerm } from './rdf.js'
+import { captureStorageTemplatePieces } from './template.ts'
+import { snapshotStorageRdfTerm } from './rdf.ts'
 
 /** Immutable child references defer full-body expansion, never borrowed RDF value capture. */
 type ISparqlNode = { readonly pieces: readonly (string | ISparqlNode)[] }

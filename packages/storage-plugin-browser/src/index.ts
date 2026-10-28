@@ -4,7 +4,7 @@ export {
   type IStorageErrorDetails,
   type IStorageChannel,
   type IExtensionStage
-} from './types/errors.js'
-export { StorageErrorText } from './error-text.js'
-export { lengthPrefixedNamespaceCodec } from './utils/key.js'
-export type { INamespaceCodec } from './utils/key.js'
+} from './types/errors.ts'
+export { StorageErrorText } from './error-text.ts'
+export { lengthPrefixedNamespaceCodec } from './utils/key.ts'
+export type { INamespaceCodec } from './utils/key.ts'

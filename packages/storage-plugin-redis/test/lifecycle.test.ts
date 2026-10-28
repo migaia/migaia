@@ -4,9 +4,9 @@ import { createClientPool } from 'redis'
 import { createOrgId, createStorageHost } from '@migaia/storage-host'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { deferred, sleep } from '@migaia/utils/promise'
-import { redisBackendPlugin, type IRedisDriver } from '../src/index.js'
-import { nodeRedisDriver } from '../src/adapters/node-redis.js'
-import { createRedisLayout } from '../src/layout.js'
+import { redisBackendPlugin, type IRedisDriver } from '../src/index.ts'
+import { nodeRedisDriver } from '../src/adapters/node-redis.ts'
+import { createRedisLayout } from '../src/layout.ts'
 
 /** These finite native lifecycle cases own only fresh namespaces and borrowed genuine clients. */
 for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_VALKEY_URL'] as const) {

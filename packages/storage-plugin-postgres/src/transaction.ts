@@ -23,10 +23,10 @@ import {
 import type { IStorageBackendOrgContext } from '@migaia/storage-host'
 import { sleep } from '@migaia/utils/promise'
 import { walkErrorCauses, attachSecondaryErrors } from '@migaia/utils/error'
-import type { IPgConfiguration, IPgTables } from './schema.js'
-import type { IPgState, IPgRevision } from './native.js'
-import type { IPgJournalCapture } from './journal.js'
-import { commitPgRevisions, recheckPgRevisions } from './native.js'
+import type { IPgConfiguration, IPgTables } from './schema.ts'
+import type { IPgState, IPgRevision } from './native.ts'
+import type { IPgJournalCapture } from './journal.ts'
+import { commitPgRevisions, recheckPgRevisions } from './native.ts'
 import {
   acquirePgLocks,
   verifyPgLocks,
@@ -35,11 +35,11 @@ import {
   guardPgRange,
   PgLockConflict,
   type IPgLockLease
-} from './locks.js'
-import { normalizeTransactionFailure, normalizePostgresError } from './errors.js'
-import { PgNames, PgSqlState, PgOperation } from './constants.js'
-import { PostgresErrorText } from './error-text.js'
-import { pgCodecs } from './codec.js'
+} from './locks.ts'
+import { normalizeTransactionFailure, normalizePostgresError } from './errors.ts'
+import { PgNames, PgSqlState, PgOperation } from './constants.ts'
+import { PostgresErrorText } from './error-text.ts'
+import { pgCodecs } from './codec.ts'
 /** Observation always retains its original receiver and remains report-only. */
 export function observePg<T extends object, K extends keyof T>(
   observer: T,

@@ -2,7 +2,7 @@ import type { IBackendKind } from '@migaia/storage-contract'
 import type { IStorageKey } from '@migaia/storage-contract'
 import { STORAGE_HOST_ERROR_SOURCE } from '@migaia/storage-contract/error-code'
 import type { IStorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from './error-text.js'
+import { StorageErrorText } from './error-text.ts'
 
 /**
  * Optional diagnostic context for a frozen StorageError; nested values and cause retain their

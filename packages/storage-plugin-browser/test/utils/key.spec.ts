@@ -7,7 +7,7 @@ import {
   admitNamespaceCodec,
   stripNamespace,
   stripStorageNamespace
-} from '../../src/utils/key.js'
+} from '../../src/utils/key.ts'
 
 describe('namespacedKey / stripNamespace', () => {
   it('默认 namespace codec runtime descriptor 不可变', () => {

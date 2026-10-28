@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { asyncDisposeKey } from '@migaia/plugin-host'
-import { asRecordStore, isKeyValueStore, isRecordStore } from '../../src/types/storage'
-import { createMemoryTestStore } from '../helpers/installed-backends.js'
-import { createLocalTestStore } from '../helpers/installed-backends.js'
-import type { IStorageCapabilities } from '../../src/types/capabilities'
-import type { IKeyValueStore } from '../../src/types/storage'
+import { asRecordStore, isKeyValueStore, isRecordStore } from '../../src/types/storage.ts'
+import { createMemoryTestStore } from '../helpers/installed-backends.ts'
+import { createLocalTestStore } from '../helpers/installed-backends.ts'
+import type { IStorageCapabilities } from '../../src/types/capabilities.ts'
+import type { IKeyValueStore } from '../../src/types/storage.ts'
 
 const fakeStore = (capabilities: Partial<IStorageCapabilities>) => ({
   backend: 'local' as const,

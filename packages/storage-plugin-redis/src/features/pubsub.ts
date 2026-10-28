@@ -1,13 +1,13 @@
-import { RedisOperation } from '../constants.js'
-import { RedisCommand } from '../constants.js'
+import { RedisOperation } from '../constants.ts'
+import { RedisCommand } from '../constants.ts'
 import { defineFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
 import type { IOperationContext, IStorageResource } from '@migaia/storage-contract'
 import { encodeUtf8 } from '@migaia/utils/bytes'
-import { redisBackendKind } from '../plugin.js'
-import { readNativeFeaturePort } from '../native-feature.js'
-import { featureName, featureInteger, featureBytes, readFeatureBytes } from '../feature-input.js'
-import { RedisSuffix, replyInteger } from '../layout.js'
-import { invalidArgument } from '../errors.js'
+import { redisBackendKind } from '../plugin.ts'
+import { readNativeFeaturePort } from '../native-feature.ts'
+import { featureName, featureInteger, featureBytes, readFeatureBytes } from '../feature-input.ts'
+import { RedisSuffix, replyInteger } from '../layout.ts'
+import { invalidArgument } from '../errors.ts'
 /** Messages are best-effort native Pub/Sub payloads, with no replay or expiry-delivery guarantee. */
 export type IRedisPubSubApi = {
   readonly pubsub: {

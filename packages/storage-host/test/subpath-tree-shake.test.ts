@@ -4,7 +4,7 @@ import { join, resolve } from 'node:path'
 import { afterAll, describe, expect, it } from 'vitest'
 import { build } from 'vite'
 import packageJson from '../package.json' with { type: 'json' }
-import viteConfig from '../vite.config.js'
+import viteConfig from '../vite.config.ts'
 
 /** Published export map: subpath to built file. */
 const exportsMap = packageJson.exports as Record<string, { readonly default: string }>

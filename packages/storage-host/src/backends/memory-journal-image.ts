@@ -4,12 +4,12 @@ import {
   assertLockKey,
   type ILockKey
 } from '@migaia/storage-contract'
-import { decodeFlatStorageKey, encodeFlatStorageKey } from '../core/key-domain.js'
-import { StorageError } from '../errors.js'
+import { decodeFlatStorageKey, encodeFlatStorageKey } from '../core/key-domain.ts'
+import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
-import { STORAGE_MEMORY_BACKEND } from '../state-constants.js'
-import type { IStorageJournalTarget } from '../journal/types.js'
+import { StorageErrorText } from '../error-text.ts'
+import { STORAGE_MEMORY_BACKEND } from '../state-constants.ts'
+import type { IStorageJournalTarget } from '../journal/types.ts'
 
 /** Private deadline identities use the original reversible key codec, without entering business KV. */
 const deadlineTag = 'memory.journal.deadline'

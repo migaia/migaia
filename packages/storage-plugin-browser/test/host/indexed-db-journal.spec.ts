@@ -1,4 +1,4 @@
-import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
+import { indexedDbTestFeatures } from '../helpers/indexed-db-features.ts'
 // @vitest-environment node
 import { IDBFactory, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
@@ -6,7 +6,7 @@ import { createOrgId, createStorageHost } from '@migaia/storage-host'
 import { storageLogStore, storageJournalPlugin } from '@migaia/storage-host/plugins/journal'
 import { LogRecordState } from '@migaia/logger/plugins/durable'
 import { walkErrorCauses } from '@migaia/utils/error'
-import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
+import { indexedDbBackendPlugin } from '../../src/indexed-db.ts'
 
 describe('native IndexedDB private journal namespaces', () => {
   it('uses native readwrite transactions for independent nonexclusive persistent handles', async () => {

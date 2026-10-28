@@ -4,31 +4,31 @@ import {
   StorageContractErrorCode,
   type IBackendKind
 } from '@migaia/storage-contract'
-import { snapshotConcurrencyLockKeys } from '../authoring/concurrency.js'
+import { snapshotConcurrencyLockKeys } from '../authoring/concurrency.ts'
 import {
   snapshotLogRecords,
   type IUndoLogExt,
   type IUndoImage,
   type ILogPayload
-} from './logger-runtime.js'
-import { StorageError } from '../errors.js'
+} from './logger-runtime.ts'
+import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
-import type { IStorageJournalBackendAccess } from './binding.js'
+import { StorageErrorText } from '../error-text.ts'
+import type { IStorageJournalBackendAccess } from './binding.ts'
 import type {
   IStorageJournalImage,
   IStorageJournalChange,
   IStorageJournalNamespace,
   IStorageJournalTarget,
   IStorageJournalUndoRunner
-} from './types.js'
+} from './types.ts'
 import {
   invalidStorageJournalRecord,
   readStorageJournalTarget,
   storageJournalTargetIdentity,
   storageJournalTargetWire
-} from './targets.js'
-import { StorageJournalKind } from './constants.js'
+} from './targets.ts'
+import { StorageJournalKind } from './constants.ts'
 
 /** Persisted target and images are detached before waiting for any business lock. */
 type IStorageUndoRow = {

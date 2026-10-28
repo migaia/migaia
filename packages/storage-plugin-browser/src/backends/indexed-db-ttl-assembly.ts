@@ -1,5 +1,5 @@
-import { IndexedDbTtlLayout } from './indexed-db-deadline-metadata.js'
-import { captureIndexedDbTtlClock, createIndexedDbTtlAccess } from './indexed-db-ttl.js'
+import { IndexedDbTtlLayout } from './indexed-db-deadline-metadata.ts'
+import { captureIndexedDbTtlClock, createIndexedDbTtlAccess } from './indexed-db-ttl.ts'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -13,7 +13,7 @@ import {
   runTransactionOperation,
   snapshotStorageTtlTarget
 } from '@migaia/storage-host/sdk'
-import { StorageBackend, BrowserTtlMethod, StorageTransactionOperation } from '../constants.js'
+import { StorageBackend, BrowserTtlMethod, StorageTransactionOperation } from '../constants.ts'
 import { type ITransactionScope } from '@migaia/storage-contract'
 import {
   IIndexedDbContext,
@@ -21,7 +21,7 @@ import {
   IIndexedDbNativeRegistration,
   executeOperation,
   rootMutation
-} from './indexed-db.js'
+} from './indexed-db.ts'
 /** Public vector TTL is not supported by an IndexedDB backend with no vector collection source. */
 export function captureTtlTarget(
   input: ITtlTarget

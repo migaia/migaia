@@ -2,7 +2,7 @@ import {
   provideCapabilities,
   hasStorageCapability,
   useStorageCapability
-} from '../src/authoring/capability.js'
+} from '../src/authoring/capability.ts'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import {
   defineStorageCapability,
@@ -42,7 +42,7 @@ import {
   type IStorageKey,
   type IWithChainMethods
 } from '@migaia/storage-contract'
-import { snapshotKeyValueStoreDetailed } from '../src/authoring/store.js'
+import { snapshotKeyValueStoreDetailed } from '../src/authoring/store.ts'
 import type { ICodecValue } from '@migaia/serialize/codec'
 import type { IVectorCollectionOptions } from '@migaia/storage-contract'
 

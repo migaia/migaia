@@ -1,8 +1,8 @@
-import { indexedDbTestFeatures } from '../test/helpers/indexed-db-features.js'
+import { indexedDbTestFeatures } from '../test/helpers/indexed-db-features.ts'
 import { createStorageHost } from '@migaia/storage-host'
 import { kv, ttl } from '@migaia/storage-contract'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { indexedDbBackendPlugin } from '../src/indexed-db.js'
+import { indexedDbBackendPlugin } from '../src/indexed-db.ts'
 
 declare global {
   /** Declaration merging attaches one real native TTL scenario to the existing browser runner. */

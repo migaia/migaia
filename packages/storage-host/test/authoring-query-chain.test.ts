@@ -4,7 +4,7 @@ import {
   compileStorageQueryCondition,
   createRecordQuery,
   createRecordQueryWithoutKeyset
-} from '../src/authoring/query.js'
+} from '../src/authoring/query.ts'
 import {
   assertStorageKey,
   KEY_DOMAIN_LIMITS,
@@ -28,12 +28,12 @@ import {
   type IQueryReductionResult,
   type IQueryCondition
 } from '@migaia/storage-contract'
-import { createTransactionOwner } from '../src/authoring/transaction.js'
+import { createTransactionOwner } from '../src/authoring/transaction.ts'
 import {
   provideCapabilities,
   useStorageCapability,
   hasStorageCapability
-} from '../src/authoring/capability.js'
+} from '../src/authoring/capability.ts'
 
 /**
  * Business rows exercise the same conditions used by record queries and archival candidate

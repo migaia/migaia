@@ -1,9 +1,9 @@
-import { storageProbe } from '../src/plugins/probe/index.js'
-import { entityQueryFeature } from '../src/entity/query-feature.js'
-import { entityUniqueFeature } from '../src/entity/unique-feature.js'
-import { entityIndexesFeature } from '../src/entity/indexes-feature.js'
-import { memoryNotificationsFeature } from '../src/features/memory-notifications.js'
-import { memoryChangeFeedFeature } from '../src/features/memory-change-feed.js'
+import { storageProbe } from '../src/plugins/probe/index.ts'
+import { entityQueryFeature } from '../src/entity/query-feature.ts'
+import { entityUniqueFeature } from '../src/entity/unique-feature.ts'
+import { entityIndexesFeature } from '../src/entity/indexes-feature.ts'
+import { memoryNotificationsFeature } from '../src/features/memory-notifications.ts'
+import { memoryChangeFeedFeature } from '../src/features/memory-change-feed.ts'
 import { describe, expect, it } from 'vitest'
 import {
   kv,
@@ -13,7 +13,7 @@ import {
   implement,
   type IStorageChange
 } from '@migaia/storage-contract'
-import { lockKey } from '../src/authoring/concurrency.js'
+import { lockKey } from '../src/authoring/concurrency.ts'
 import {
   createStorageHost,
   createOrgId,
@@ -22,10 +22,10 @@ import {
   defineStorageBackendKind,
   type IStoragePluginCore,
   type IStoragePluginCallContext
-} from '../src/index.js'
-import { memoryBackendPlugin, memoryBackendKind } from '../src/plugins/memory.js'
-import { catalog } from './helpers/catalog.js'
-import { defineEntity } from '../src/entity.js'
+} from '../src/index.ts'
+import { memoryBackendPlugin, memoryBackendKind } from '../src/plugins/memory.ts'
+import { catalog } from './helpers/catalog.ts'
+import { defineEntity } from '../src/entity.ts'
 
 describe('immutable storage organizations', () => {
   it('shares the configured default target and isolates two organizations and plugin namespaces', async () => {
@@ -314,7 +314,7 @@ describe('immutable storage organizations', () => {
       const store = core.getPublishedBackend('memory')
       const repository = users.connect(
         store as typeof store &
-          import('../src/types.js').IStorageBorrowedBackend<
+          import('../src/types.ts').IStorageBorrowedBackend<
             import('@migaia/storage-contract').IKeyValueStore
           >
       )

@@ -15,18 +15,18 @@ import {
   readAbortReason
 } from '@migaia/storage-host/sdk'
 import { raceWithAbort, type IAbortSignal } from '@migaia/utils/promise'
-import { subscribeToAbort } from './backend-errors.js'
-import type { IStorageErrorFamily } from './backend-errors.js'
-import { createStorageAggregateError } from '../types/errors.js'
+import { subscribeToAbort } from './backend-errors.ts'
+import type { IStorageErrorFamily } from './backend-errors.ts'
+import { createStorageAggregateError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
-import { StorageBackend } from '../constants.js'
+import { StorageErrorText } from '../error-text.ts'
+import { StorageBackend } from '../constants.ts'
 import {
   installIdbRequestHandlers,
   installIdbTransactionHandlers,
   readIdbRequestError,
   readIdbTransactionError
-} from '../utils/idb-request.js'
+} from '../utils/idb-request.ts'
 
 /** Observations borrow the host's existing registry and cannot alter native transaction results. */
 export function observeIndexedDbStage(

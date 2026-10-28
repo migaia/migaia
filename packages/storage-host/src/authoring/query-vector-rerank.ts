@@ -10,11 +10,11 @@ import {
   type IOperationContext
 } from '@migaia/storage-contract'
 import type { INativeAbortSignal } from '@migaia/utils/promise'
-import { snapshotStorageVector, snapshotStorageVectorIds } from './vector.js'
-import { encodeOrderedStorageKey, orderStorageKeysByBytes } from './key.js'
-import { invalidQueryCondition } from './query-condition.js'
-import { assertQueryActive } from './query-reader.js'
-import type { IQueryReader, IQueryAdvance } from './query-reader.js'
+import { snapshotStorageVector, snapshotStorageVectorIds } from './vector.ts'
+import { encodeOrderedStorageKey, orderStorageKeysByBytes } from './key.ts'
+import { invalidQueryCondition } from './query-condition.ts'
+import { assertQueryActive } from './query-reader.ts'
+import type { IQueryReader, IQueryAdvance } from './query-reader.ts'
 
 /** Origin capture reuses the vector component/ID owners and never resolves samples or opens I/O. */
 export function snapshotVectorQueryOrigin(

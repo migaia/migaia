@@ -1,6 +1,6 @@
 import * as fs from 'node:fs/promises'
 import { resolve } from 'node:path'
-import type { IObjectFileIo } from './io.js'
+import type { IObjectFileIo } from './io.ts'
 /** Structural declarations describe only the selected runtime's actual native file API. */
 const runtime = (
   globalThis as typeof globalThis & {

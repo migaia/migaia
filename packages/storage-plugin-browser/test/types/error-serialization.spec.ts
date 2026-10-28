@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { serializeRpcError, deserializeRpcError, reachRpcError } from '@migaia/rpc-contract'
-import { StorageError } from '../../src/types/errors.js'
+import { StorageError } from '../../src/types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 

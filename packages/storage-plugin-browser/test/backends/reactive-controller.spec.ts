@@ -1,18 +1,18 @@
-import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
+import { indexedDbTestFeatures } from '../helpers/indexed-db-features.ts'
 import type { IKeyValueStore } from '@migaia/storage-contract'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { describe, expect, it, onTestFinished } from 'vitest'
 import { createStorageHost, defineFeature } from '@migaia/storage-host'
 import type { IBackendChangeController } from '@migaia/storage-host/sdk'
-import { cookieBackendPlugin, cookieBackendKind } from '../../src/cookies.js'
-import { localStorageBackendPlugin, localStorageBackendKind } from '../../src/local-storage.js'
+import { cookieBackendPlugin, cookieBackendKind } from '../../src/cookies.ts'
+import { localStorageBackendPlugin, localStorageBackendKind } from '../../src/local-storage.ts'
 import {
   sessionStorageBackendPlugin,
   sessionStorageBackendKind
-} from '../../src/session-storage.js'
-import { indexedDbBackendPlugin, indexedDbBackendKind } from '../../src/indexed-db.js'
-import { fakeCookieDocument } from '../../src/testing/fake-cookie-document.js'
-import { fakeWebStorage } from '../../src/testing/fake-web-storage.js'
+} from '../../src/session-storage.ts'
+import { indexedDbBackendPlugin, indexedDbBackendKind } from '../../src/indexed-db.ts'
+import { fakeCookieDocument } from '../../src/testing/fake-cookie-document.ts'
+import { fakeWebStorage } from '../../src/testing/fake-web-storage.ts'
 
 type IObservedBackend = {
   readonly name: string

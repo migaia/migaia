@@ -2,11 +2,11 @@ import { type ICodecValue } from '@migaia/serialize/codec'
 import { type IMaybe } from '@migaia/utils'
 import { type INativeAbortSignal } from '@migaia/utils/promise'
 import { type IObjectPath, type IObjectPathValue } from '@migaia/utils/object-path'
-import { type IOperationContext, type IStorageKey } from './context.js'
-import { type IStorageChange } from './change-feed.js'
-import { type IStorageIterator } from './resource.js'
-import { type IConcurrencyPolicy, type IWriteConcurrencyOptions } from './concurrency.js'
-import { type IQuad, type IRdfNamedNode } from './capabilities/rdf.js'
+import { type IOperationContext, type IStorageKey } from './context.ts'
+import { type IStorageChange } from './change-feed.ts'
+import { type IStorageIterator } from './resource.ts'
+import { type IConcurrencyPolicy, type IWriteConcurrencyOptions } from './concurrency.ts'
+import { type IQuad, type IRdfNamedNode } from './capabilities/rdf.ts'
 
 /** Declarative field operators are shared by condition admission, native plans and client execution. */
 export const QueryOperator = Object.freeze({

@@ -7,7 +7,7 @@ import {
   type ILogAppendPort,
   type ILogAppendNotice,
   type ILogStore
-} from './logger-runtime.js'
+} from './logger-runtime.ts'
 import { createEventChannel, EventDispatchPolicy } from '@migaia/event-subscriber'
 import { createConcurrencyLimiter, deferred } from '@migaia/utils/promise'
 import {
@@ -16,12 +16,12 @@ import {
   type ITransactionScope
 } from '@migaia/storage-contract'
 import { PluginHostError } from '@migaia/plugin-host'
-import { StorageError } from '../errors.js'
+import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
-import { isStorageErrorFamily } from '../core/error-family.js'
-import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.js'
-import { resolveStorageJournalBinding, type IStorageJournalBackendAccess } from './binding.js'
+import { StorageErrorText } from '../error-text.ts'
+import { isStorageErrorFamily } from '../core/error-family.ts'
+import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.ts'
+import { resolveStorageJournalBinding, type IStorageJournalBackendAccess } from './binding.ts'
 import {
   appendStorageLog,
   prepareStorageLogAppend,
@@ -33,16 +33,16 @@ import {
   truncateStorageLog,
   type IStorageLogHead,
   type IStorageLogAppend
-} from './protocol.js'
+} from './protocol.ts'
 import type {
   IStorageBackendPluginHandle,
   IPluginStoreMap,
   IStorageHost,
   IStorageOrgView
-} from '../types.js'
-import type { IStorageJournalNamespace, IStorageJournalNamespaceView } from './types.js'
-import { storageLogNativeAccess, type IStorageLogNativeAccess } from './append-port.js'
-import { storageJournalLockKey, StorageJournalLock } from './keys.js'
+} from '../types.ts'
+import type { IStorageJournalNamespace, IStorageJournalNamespaceView } from './types.ts'
+import { storageLogNativeAccess, type IStorageLogNativeAccess } from './append-port.ts'
+import { storageJournalLockKey, StorageJournalLock } from './keys.ts'
 
 /** Keep original coded storage failures and retain unknown native I/O errors on cause. */
 function journalFailure(cause: unknown): Error {

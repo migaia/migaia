@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { createSqlTag, deriveStorageSqlQuery, sqlFragment } from '../src/authoring/sql.js'
-import { createTransactionOwner, runTransactionOperation } from '../src/authoring/transaction.js'
+import { createSqlTag, deriveStorageSqlQuery, sqlFragment } from '../src/authoring/sql.ts'
+import { createTransactionOwner, runTransactionOperation } from '../src/authoring/transaction.ts'
 import {
   type ICompiledStorageSql,
   type ISqlValue,

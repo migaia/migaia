@@ -13,20 +13,20 @@ import {
   type IStorageKey,
   type ITransactionScope
 } from '@migaia/storage-contract'
-import { snapshotStorageBatchKeys, snapshotStorageKeyPrefix } from '../authoring/key.js'
-import { snapshotStorageCounterIncrement } from '../authoring/counter.js'
+import { snapshotStorageBatchKeys, snapshotStorageKeyPrefix } from '../authoring/key.ts'
+import { snapshotStorageCounterIncrement } from '../authoring/counter.ts'
 import {
   assertTransactionOwner,
   runTransactionOperation,
   useTransactionCapability
-} from '../authoring/transaction.js'
-import { createRecordQuery } from '../authoring/query.js'
-import { STORAGE_MEMORY_BACKEND } from '../state-constants.js'
-import { MemoryOperation, MemoryState } from './memory-constants.js'
-import { createStorageToken } from '../core/storage-token.js'
-import { throwIfAborted } from '../core/operation.js'
-import { clone, planCapacity, identity, capacityFact, copyValue } from './memory-entries.js'
-import { captureTtlTarget } from './memory-keyvalue.js'
+} from '../authoring/transaction.ts'
+import { createRecordQuery } from '../authoring/query.ts'
+import { STORAGE_MEMORY_BACKEND } from '../state-constants.ts'
+import { MemoryOperation, MemoryState } from './memory-constants.ts'
+import { createStorageToken } from '../core/storage-token.ts'
+import { throwIfAborted } from '../core/operation.ts'
+import { clone, planCapacity, identity, capacityFact, copyValue } from './memory-entries.ts'
+import { captureTtlTarget } from './memory-keyvalue.ts'
 import {
   batchSize,
   observeBatch,
@@ -35,7 +35,7 @@ import {
   orderedRange,
   captureRdfEntries,
   logicalRdfQuad
-} from './memory-namespace-base.js'
+} from './memory-namespace-base.ts'
 import {
   changes,
   readJournalImage,
@@ -43,7 +43,7 @@ import {
   readJournalRevision,
   txTtl,
   txRemaining
-} from './memory-transaction-journal.js'
+} from './memory-transaction-journal.ts'
 import {
   privateJournal,
   queryIterator,
@@ -57,9 +57,9 @@ import {
   txEntry,
   txRdfRows,
   txSnapshot
-} from './memory-transaction.js'
-import type { IMemoryTransactionContext } from './memory-transaction.js'
-import { vectorKey } from './memory-vector.js'
+} from './memory-transaction.ts'
+import type { IMemoryTransactionContext } from './memory-transaction.ts'
+import { vectorKey } from './memory-vector.ts'
 import {
   journalOperations,
   queryDraft,
@@ -68,13 +68,13 @@ import {
   counterOperations,
   rdfOperations,
   recordPrefix
-} from './memory.js'
+} from './memory.ts'
 import type {
   IMemoryScope,
   IMemoryVectorSelection,
   IMemoryNamespaceContext,
   IMemoryQueryDraft
-} from './memory.js'
+} from './memory.ts'
 
 /** The same physical scope factory serves callbacks, nested operations and final checks. */
 /** One published view borrows the original attempt and authentic native scope. */

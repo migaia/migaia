@@ -1,10 +1,10 @@
-import type { IKeyValueApi } from '../capability.js'
+import type { IKeyValueApi } from '../capability.ts'
 import {
   STORAGE_KEY_VALUE_METHODS,
   SYNC_KEY_VALUE_METHODS,
   TRANSACTION_KEY_VALUE_METHODS
-} from '../capability-constants.js'
-import { defineStandardStorageCapability, invalidCapability } from '../capability-token.js'
+} from '../capability-constants.ts'
+import { defineStandardStorageCapability, invalidCapability } from '../capability-token.ts'
 
 /** Standard KV validates all native methods before either root or Feature publication. */
 function validateKeyValue(value: unknown): void {

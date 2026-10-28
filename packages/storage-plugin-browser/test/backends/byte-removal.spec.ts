@@ -1,8 +1,8 @@
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { describe, expect, it } from 'vitest'
 import type { IStorageChange } from '@migaia/storage-contract'
-import { createMemoryTestStore } from '../helpers/installed-backends.js'
-import { createIndexedDbTestStore } from '../helpers/installed-backends.js'
+import { createMemoryTestStore } from '../helpers/installed-backends.ts'
+import { createIndexedDbTestStore } from '../helpers/installed-backends.ts'
 
 /** Both exact backend factories expose the same public byte-channel deletion contract. */
 const backends = [

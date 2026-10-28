@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { captureOperationCleanup } from '../helpers/operation-reporter.js'
+import { captureOperationCleanup } from '../helpers/operation-reporter.ts'
 import { assertOperationContext } from '@migaia/storage-contract'
 import { mergeSignals, throwIfAborted, withAbort } from '@migaia/storage-host/sdk'
 

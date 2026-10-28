@@ -1,4 +1,4 @@
-import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
+import { indexedDbTestFeatures } from '../helpers/indexed-db-features.ts'
 // @vitest-environment node
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
@@ -6,7 +6,7 @@ import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { lockKey } from '@migaia/storage-host/sdk'
 import { ttl, STORAGE_CONTRACT_SOURCE } from '@migaia/storage-contract'
 import { walkErrorCauses } from '@migaia/utils/error'
-import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
+import { indexedDbBackendPlugin } from '../../src/indexed-db.ts'
 
 describe('physical IndexedDB organizations', () => {
   it('shares the configured default and deletes only the resolved physical targets', async () => {

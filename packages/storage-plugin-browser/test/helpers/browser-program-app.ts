@@ -1,10 +1,10 @@
 import { storageProbe } from '@migaia/storage-host/plugins/probe'
-import { entityTestFeatures } from './entity-features.js'
+import { entityTestFeatures } from './entity-features.ts'
 import { storageJournalPlugin } from '@migaia/storage-host/plugins/journal'
-import { indexedDbTestFeatures } from './indexed-db-features.js'
+import { indexedDbTestFeatures } from './indexed-db-features.ts'
 import { createStorageHost, createOrgId, definePlugin } from '@migaia/storage-host'
 import { defineEntity } from '@migaia/storage-host/entity'
-import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
+import { indexedDbBackendPlugin } from '../../src/indexed-db.ts'
 import {
   runStorageProgramApp,
   runStorageProgramBatch,
@@ -12,7 +12,7 @@ import {
   runStorageProgramOrgs,
   storageProgramBatchObservations,
   type IStorageProgramResult
-} from '../../../storage-plugin-sqlite/test/helpers/program-app.js'
+} from '../../../storage-plugin-sqlite/test/helpers/program-app.ts'
 
 declare global {
   /** Declaration merging exposes the unchanged public application to the existing browser runner. */

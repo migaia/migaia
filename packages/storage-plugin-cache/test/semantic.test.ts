@@ -6,13 +6,13 @@ import { vector, ttl, DeleteCountMode, type IVectorCollection } from '@migaia/st
 import { lockKey } from '@migaia/storage-host/sdk'
 import { deferred } from '@migaia/utils/promise'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { cachePlugin } from '../src/plugin.js'
-import { cacheKey } from '../src/key.js'
+import { cachePlugin } from '../src/plugin.ts'
+import { cacheKey } from '../src/key.ts'
 import {
   semanticCacheFeature,
   type ISemanticCacheOptions,
   type ISemanticPayload
-} from '../src/features/semantic.js'
+} from '../src/features/semantic.ts'
 
 /** Fixed unit vectors make the native engine's score and candidate order observable. */
 const embeddings: Readonly<Record<string, readonly number[]>> = {

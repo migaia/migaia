@@ -1,13 +1,13 @@
-import { entityTestFeatures } from '../helpers/entity-features.js'
-import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
+import { entityTestFeatures } from '../helpers/entity-features.ts'
+import { indexedDbTestFeatures } from '../helpers/indexed-db-features.ts'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { ttl, kv } from '@migaia/storage-contract'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { createStorageHost } from '@migaia/storage-host'
 import { defineEntity } from '@migaia/storage-host/entity'
-import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
-import { indexedDbTtlFeature } from '../../src/features/indexed-db-ttl.js'
+import { indexedDbBackendPlugin } from '../../src/indexed-db.ts'
+import { indexedDbTtlFeature } from '../../src/features/indexed-db-ttl.ts'
 
 /** The real public installation owns native transactions, scopes and cleanup for every TTL case. */
 async function setup() {

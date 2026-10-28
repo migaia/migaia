@@ -3,7 +3,7 @@ import {
   StorageContractErrorCode,
   type IStorageResource
 } from '@migaia/storage-contract'
-import type { IStorageJournalBackendBinding } from './types.js'
+import type { IStorageJournalBackendBinding } from './types.ts'
 
 /** This internal symbol lives only on the original facade and its fixed-org projection shells. */
 export const storageJournalAccess = Symbol()

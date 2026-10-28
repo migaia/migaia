@@ -17,12 +17,12 @@ import {
   throwIfAborted
 } from '@migaia/storage-host/sdk'
 import { isUint8Array } from '@migaia/utils/bytes'
-import { ObjectNames } from '../constants.js'
-import { ObjectErrorText } from '../error-text.js'
+import { ObjectNames } from '../constants.ts'
+import { ObjectErrorText } from '../error-text.ts'
 import { STORAGE_OBJECT_ERROR_SOURCE, ObjectErrorCode } from '@migaia/storage-contract/error-code'
 import type { IObjectErrorCode } from '@migaia/storage-contract/error-code'
-import { invalidArgument, normalizeObjectError, objectError } from '../errors.js'
-import type { createObjectSender } from './send.js'
+import { invalidArgument, normalizeObjectError, objectError } from '../errors.ts'
+import type { createObjectSender } from './send.ts'
 /**
  * Multipart retains at most concurrency outstanding part buffers and one assembling buffer, plus
  * the current input chunk. The first failure stops admission, drains requests, then aborts once.

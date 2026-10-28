@@ -13,14 +13,14 @@ import {
   type ISecondaryIndexRecordStore,
   type ITransactionInfo
 } from '@migaia/storage-contract'
-import { snapshotRecordStore, snapshotKeyValueStoreDetailed } from '../authoring/store.js'
-import { assertTransactionOwner } from '../authoring/transaction.js'
-import { hasStorageCapability, useStorageCapability } from '../authoring/capability.js'
-import { StorageError } from '../errors.js'
+import { snapshotRecordStore, snapshotKeyValueStoreDetailed } from '../authoring/store.ts'
+import { assertTransactionOwner } from '../authoring/transaction.ts'
+import { hasStorageCapability, useStorageCapability } from '../authoring/capability.ts'
+import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import type { IStorageEnvelopeStages } from '../types.js'
+import type { IStorageEnvelopeStages } from '../types.ts'
 
-import type { IBackendChangeController, IBackendLifecycleController } from './change-types.js'
+import type { IBackendChangeController, IBackendLifecycleController } from './change-types.ts'
 
 /** Prepared text mutation checked and committed by the backend's original physical owner. */
 export type IBackendValueCommit = (
@@ -307,4 +307,4 @@ export const getBackendEntityQueryMethods = (store: object): object | undefined 
   return methods
 }
 
-export type * from './change-types.js'
+export type * from './change-types.ts'

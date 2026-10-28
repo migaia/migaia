@@ -15,22 +15,22 @@ import {
   type ITtlApi,
   type ICounterApi
 } from '@migaia/storage-contract'
-import { createPgJournalImages, createPgJournalBinding } from './journal.js'
-import { createPgVectors } from './vector.js'
-import { createPgDurableApi } from './logical-replication.js'
-import { readPg, writePg, pgLockKey, removePrefixPg } from './native.js'
-import { PgNames, PgOperation } from './constants.js'
-import { invalidArgument } from './errors.js'
-import { PostgresErrorText } from './error-text.js'
-import { pgOrgDeadline, createPgRecordSource } from './store-records.js'
+import { createPgJournalImages, createPgJournalBinding } from './journal.ts'
+import { createPgVectors } from './vector.ts'
+import { createPgDurableApi } from './logical-replication.ts'
+import { readPg, writePg, pgLockKey, removePrefixPg } from './native.ts'
+import { PgNames, PgOperation } from './constants.ts'
+import { invalidArgument } from './errors.ts'
+import { PostgresErrorText } from './error-text.ts'
+import { pgOrgDeadline, createPgRecordSource } from './store-records.ts'
 import {
   runPgRootOperation,
   pgOrgTtlTarget,
   textKey,
   pointLocks,
   observePgOrgOperation
-} from './store-state.js'
-import type { IPgOrganizationContext } from './store-state.js'
+} from './store-state.ts'
+import type { IPgOrganizationContext } from './store-state.ts'
 
 /** Organization construction uses the explicit PostgreSQL organization context. */
 export function createPgOrgTtlApi<T>(organization: IPgOrganizationContext<T>): ITtlApi {
@@ -243,7 +243,7 @@ export function createPgOrgJournal<T>(organization: IPgOrganizationContext<T>) {
 /** Report native WAL facts through existing nonfatal diagnostics and capability observation. */
 export function reportPgReplication<T>(
   organization: IPgOrganizationContext<T>,
-  facts: import('./types.js').IPgReplicationHealth
+  facts: import('./types.ts').IPgReplicationHealth
 ): void {
   if (facts.maxSlotWalKeepSize === '-1')
     reportCleanupError(organization.environment.report, PostgresErrorText.unlimitedSlotWal)

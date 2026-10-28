@@ -15,17 +15,17 @@ import {
   type IRdfNamedNode
 } from '@migaia/storage-contract'
 import { attachSecondaryErrors } from '@migaia/utils/error'
-import { runTransactionIteratorOperation } from './transaction.js'
+import { runTransactionIteratorOperation } from './transaction.ts'
 import {
   compareStorageKeys,
   snapshotStorageKey,
   encodeOrderedStorageKey,
   orderStorageKeysByBytes
-} from './key.js'
-import { snapshotStorageRdfPattern } from './rdf.js'
-import { invalidQueryCondition, compileQueryCondition } from './query-condition.js'
-import { queryExecutionFailure, QueryOrderDirection, QueryKeyDirection } from './query-plan.js'
-import type { IQueryNode, IQuerySourceSnapshot } from './query-plan.js'
+} from './key.ts'
+import { snapshotStorageRdfPattern } from './rdf.ts'
+import { invalidQueryCondition, compileQueryCondition } from './query-condition.ts'
+import { queryExecutionFailure, QueryOrderDirection, QueryKeyDirection } from './query-plan.ts'
+import type { IQueryNode, IQuerySourceSnapshot } from './query-plan.ts'
 
 /** External cancellation is observed around accepted work without abandoning a native cursor. */
 export function assertQueryActive(ctx: IOperationContext | undefined): void {

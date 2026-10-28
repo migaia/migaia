@@ -3,9 +3,9 @@ import { describe, it, expect, vi, onTestFinished } from 'vitest'
 import { S3Client } from '@aws-sdk/client-s3'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { blob } from '@migaia/storage-contract'
-import { objectBackendPlugin } from '../src/index.js'
-import { s3ObjectDriver } from '../src/s3.js'
-import { objectPresignFeature } from '../src/features/presign.js'
+import { objectBackendPlugin } from '../src/index.ts'
+import { s3ObjectDriver } from '../src/s3.ts'
+import { objectPresignFeature } from '../src/features/presign.ts'
 
 /** SDK request-handler fixtures verify native SDK serialization, middleware and error identity only. */
 type IRequest = {

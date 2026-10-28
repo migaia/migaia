@@ -1,4 +1,4 @@
-import { assertTransactionOwner } from './authoring/transaction.js'
+import { assertTransactionOwner } from './authoring/transaction.ts'
 import {
   StorageStageKind,
   type IStorageBase,
@@ -10,9 +10,9 @@ import {
   type ISqlStageObserver,
   type IStorageOperationStageObserver
 } from '@migaia/storage-contract'
-import type { IStorageHookIdentity, IStorageHookMap } from './hook-types.js'
-import type { IStorageHookEmitter } from './hooks.js'
-import { StorageHookName as Hook } from './hook-names.js'
+import type { IStorageHookIdentity, IStorageHookMap } from './hook-types.ts'
+import type { IStorageHookEmitter } from './hooks.ts'
+import { StorageHookName as Hook } from './hook-names.ts'
 
 /** Original observer families carry no execution, lifecycle or transaction authority. */
 export type IStorageObserverSet = Readonly<{

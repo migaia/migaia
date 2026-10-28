@@ -4,7 +4,7 @@ import {
   safeJsonPayloadByteLength,
   createStorageToken,
   isStorageKeyInRange
-} from '../src/authoring/backend.js'
+} from '../src/authoring/backend.ts'
 
 /** The canonical zero UUID remains the default physical-target identity. */
 const defaultOrg = '00000000-0000-0000-0000-000000000000'

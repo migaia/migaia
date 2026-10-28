@@ -17,10 +17,10 @@ import {
   type IOperationContext
 } from '@migaia/storage-contract'
 import { ObjectErrorCode } from '@migaia/storage-contract/error-code'
-import { ObjectNames } from '../constants.js'
-import { ObjectErrorText } from '../error-text.js'
-import { normalizeObjectError, objectError } from '../errors.js'
-import { responseStatus } from './response.js'
+import { ObjectNames } from '../constants.ts'
+import { ObjectErrorText } from '../error-text.ts'
+import { normalizeObjectError, objectError } from '../errors.ts'
+import { responseStatus } from './response.ts'
 /** Only SDK commands used by the object backend can enter its finite native send boundary. */
 type ICommand =
   | PutObjectCommand

@@ -24,24 +24,24 @@ import { createAbortController } from '@migaia/lifecycle'
 import { walkErrorCauses } from '@migaia/utils/error'
 import type { IStorageJournalExecutionPort } from '@migaia/storage-host'
 import { sleep, deferred } from '@migaia/utils/promise'
-import { SqliteNames, SqliteControl, SqliteLimits, SqliteOperation } from './constants.js'
+import { SqliteNames, SqliteControl, SqliteLimits, SqliteOperation } from './constants.ts'
 import {
   sqliteError,
   normalizeTransactionFailure,
   normalizeSqliteFailure,
   transactionCleanupFailure
-} from './errors.js'
+} from './errors.ts'
 import { SqliteErrorCode } from '@migaia/storage-contract/error-code'
-import type { ISqliteTransactionScope, ISqliteRow, ISqliteValue } from './types.js'
-import { sqliteObserve } from './store-mutation.js'
+import type { ISqliteTransactionScope, ISqliteRow, ISqliteValue } from './types.ts'
+import { sqliteObserve } from './store-mutation.ts'
 import {
   sqliteDecodeLockIdentity,
   sqliteIdentityRange,
   sqliteCurrentRevision,
   sqliteAdvanceRevisions,
   sqlitePublishChanges
-} from './store-revision.js'
-import { sqliteCreateScope } from './store-scope.js'
+} from './store-revision.ts'
+import { sqliteCreateScope } from './store-scope.ts'
 import {
   SQLITE_CONTROL_ACTIVE,
   sqliteIsBusy,
@@ -52,13 +52,13 @@ import {
   sqliteFinishJournal,
   SqlitePhysicalBusy,
   SqliteLogicalConflict
-} from './store-state.js'
+} from './store-state.ts'
 import type {
   ISqliteOrganizationContext,
   IWriteGuard,
   INativeState,
   ISqliteRevision
-} from './store-state.js'
+} from './store-state.ts'
 
 /** Busy classification is restricted to trusted native transaction control boundaries. */
 async function sqliteControl<TValue>(

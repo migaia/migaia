@@ -44,11 +44,11 @@ import {
 } from '@migaia/storage-host'
 import { StorageHostErrorCode as JournalErrorCode } from '@migaia/storage-contract/error-code'
 import { asyncDisposeKey } from '@migaia/plugin-host'
-import type { IBackendRuntime, IBrowserBatchApi } from './construction.js'
-import { snapshotBrowserBatchEntries, observeBrowserBatch, BrowserBatchMethod } from './batch.js'
-import { normalizeError } from './backend-errors.js'
-import { withNativeTextOperation } from './native-value-write.js'
-import { storageBackendOperation, TEXT_REDO_LOCK } from '../constants.js'
+import type { IBackendRuntime, IBrowserBatchApi } from './construction.ts'
+import { snapshotBrowserBatchEntries, observeBrowserBatch, BrowserBatchMethod } from './batch.ts'
+import { normalizeError } from './backend-errors.ts'
+import { withNativeTextOperation } from './native-value-write.ts'
+import { storageBackendOperation, TEXT_REDO_LOCK } from '../constants.ts'
 
 /** Text scopes expose their actual family only; records and bytes are never fabricated. */
 export type ITextRedoScope = ITransactionKeyValueApi & ITransactionCapabilityView<typeof kv>

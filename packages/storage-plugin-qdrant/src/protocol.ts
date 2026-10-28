@@ -1,7 +1,7 @@
-import { QdrantRoute } from './constants.js'
-import type { IQdrantHttp, IQdrantOperationName } from './types.js'
+import { QdrantRoute } from './constants.ts'
+import type { IQdrantHttp, IQdrantOperationName } from './types.ts'
 import { QdrantErrorCode } from '@migaia/storage-contract/error-code'
-import { qdrantError } from './errors.js'
+import { qdrantError } from './errors.ts'
 /** Result unwrapping retains native optional fields, booleans and snapshot nullability. */
 export function nativeResult<K extends IQdrantOperationName>(
   name: K,

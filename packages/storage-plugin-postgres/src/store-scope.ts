@@ -17,16 +17,16 @@ import {
   removeManyPg,
   removePrefixPg,
   type IPgState
-} from './native.js'
-import { encodePgRecord, decodePgRecord } from './codec.js'
-import { PgNames, PgOperation } from './constants.js'
-import { invalidArgument } from './errors.js'
+} from './native.ts'
+import { encodePgRecord, decodePgRecord } from './codec.ts'
+import { PgNames, PgOperation } from './constants.ts'
+import { invalidArgument } from './errors.ts'
 import {
   createPgRecordIterator,
   pgOrgDeadline,
   createPgRecordSource,
   createPgOrgSql
-} from './store-records.js'
+} from './store-records.ts'
 import {
   runPgScopeOperation,
   textKey,
@@ -36,8 +36,8 @@ import {
   pgOrgTtlTarget,
   counterScope,
   recordsScope
-} from './store-state.js'
-import type { IPgScope, IPgOrganizationContext } from './store-state.js'
+} from './store-state.ts'
+import type { IPgScope, IPgOrganizationContext } from './store-state.ts'
 
 /** One PostgreSQL transaction scope bound to its organization and native transaction. */
 class PgScope<T> implements IPgScope<T> {

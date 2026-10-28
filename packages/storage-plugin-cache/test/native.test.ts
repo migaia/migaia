@@ -22,7 +22,7 @@ import { rediSearchVectorFeature } from '@migaia/storage-plugin-redis/features/s
 import { qdrantBackendPlugin, type IQdrantHttp } from '@migaia/storage-plugin-qdrant'
 import { fetchHttp } from '@migaia/storage-plugin-qdrant/http'
 import { pgDriver } from '@migaia/storage-plugin-postgres/pg'
-import { cachePlugin } from '../src/index.js'
+import { cachePlugin } from '../src/index.ts'
 import { vector, type IStorageChange, type IVectorCollection } from '@migaia/storage-contract'
 import { lockKey } from '@migaia/storage-host/sdk'
 

@@ -8,12 +8,12 @@ import {
   snapshotKeyRange,
   safeJsonPayloadByteLength
 } from '@migaia/storage-host/sdk'
-import { createStorageAggregateError, StorageError } from '../types/errors.js'
+import { createStorageAggregateError, StorageError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
-import { indexBackfillFailureText } from '../error-text.js'
-import { StorageBackend, StorageOperation } from '../constants.js'
-import { fromIdbRequest, idbTransactionCommit } from '../utils/idb-request.js'
-import type { IOperationContext, IStorageKey } from '../types/context.js'
+import { indexBackfillFailureText } from '../error-text.ts'
+import { StorageBackend, StorageOperation } from '../constants.ts'
+import { fromIdbRequest, idbTransactionCommit } from '../utils/idb-request.ts'
+import type { IOperationContext, IStorageKey } from '../types/context.ts'
 import type { IRecordIndexHandle, IRecordIndexReadiness } from '@migaia/storage-contract'
 import {
   RecordIndexBackfillPhase,
@@ -25,8 +25,8 @@ import {
   type IRecordIndexBackfillRetryReceipt,
   type IRecordIndexBackfillSession
 } from '@migaia/storage-host/entity'
-import { createBackfillContentionFailure } from './backend-errors.js'
-import { withStorageIteratorResource } from '../utils/storage-iterator.js'
+import { createBackfillContentionFailure } from './backend-errors.ts'
+import { withStorageIteratorResource } from '../utils/storage-iterator.ts'
 import {
   IBackfillLease,
   IIndexedDbContext,
@@ -58,10 +58,10 @@ import {
   toIdbKey,
   toIdbRange,
   withMutationLease
-} from './indexed-db.js'
-import { assertSession } from './indexed-db-backfill.js'
-import type { IIndexedDbBackfillSession, IIndexedDbBackfillCommit } from './indexed-db-backfill.js'
-import { indexedDbIndexRows } from './indexed-db-indexes-assembly.js'
+} from './indexed-db.ts'
+import { assertSession } from './indexed-db-backfill.ts'
+import type { IIndexedDbBackfillSession, IIndexedDbBackfillCommit } from './indexed-db-backfill.ts'
+import { indexedDbIndexRows } from './indexed-db-indexes-assembly.ts'
 
 export async function commitIndexedDbBackfillNative<TValue>(
   sessionState: IIndexedDbBackfillSession<TValue>,

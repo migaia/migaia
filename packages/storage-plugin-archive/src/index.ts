@@ -1,5 +1,5 @@
-import './hooks.js'
-export { archivePlugin } from './plugin.js'
+import './hooks.ts'
+export { archivePlugin } from './plugin.ts'
 
 export type {
   IArchiveApi,
@@ -9,4 +9,4 @@ export type {
   IArchiveRunResult,
   IArchiveGetOptions,
   IArchiveSweepResult
-} from './types.js'
+} from './types.ts'

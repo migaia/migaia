@@ -1,6 +1,6 @@
-import { RedisOperation } from '../constants.js'
-import { RedisCommand, RedisText } from '../constants.js'
-import type { IRedisConnection } from '../driver.js'
+import { RedisOperation } from '../constants.ts'
+import { RedisCommand, RedisText } from '../constants.ts'
+import type { IRedisConnection } from '../driver.ts'
 import { defineFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
 import {
   asyncDisposeKey,
@@ -17,12 +17,12 @@ import {
   type ICapabilityImpl,
   type IStorageResource
 } from '@migaia/storage-contract'
-import { redisBackendKind } from '../plugin.js'
-import { readNativeFeaturePort, type IRedisNativeFeaturePort } from '../native-feature.js'
-import { featureInteger, readStreamRows } from '../feature-input.js'
-import { decodeRedisChange } from '../changes.js'
-import { replyString, RedisSuffix } from '../layout.js'
-import { redisError, invalidArgument, normalizeRedisTransactionFailure } from '../errors.js'
+import { redisBackendKind } from '../plugin.ts'
+import { readNativeFeaturePort, type IRedisNativeFeaturePort } from '../native-feature.ts'
+import { featureInteger, readStreamRows } from '../feature-input.ts'
+import { decodeRedisChange } from '../changes.ts'
+import { replyString, RedisSuffix } from '../layout.ts'
+import { redisError, invalidArgument, normalizeRedisTransactionFailure } from '../errors.ts'
 import { RedisErrorCode } from '@migaia/storage-contract/error-code'
 /** Reliable change cursors are actual native Stream IDs, with no client-side acknowledgement ledger. */
 export type IRedisChangeStreamOutput = IStorageFeatureOutput<
@@ -138,7 +138,7 @@ export function redisChangeStreamFeature(options: { readonly maxLen: number }) {
       core.featureExpose.registerDetect(async () => {
         readNativeFeaturePort(core.featureExpose.getStore()).enableDurable(maxLen, create)
       })
-      const create = (store: import('../types.js').IRedisStore) =>
+      const create = (store: import('../types.ts').IRedisStore) =>
         createRedisDurableApi(() => readNativeFeaturePort(store))
       const api = createRedisDurableApi(() => readNativeFeaturePort(core.featureExpose.getStore()))
       return {

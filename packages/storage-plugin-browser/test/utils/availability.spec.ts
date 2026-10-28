@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { probeWebStorage } from '../../src/utils/availability'
-import { fakeWebStorage } from '../../src/testing/fake-web-storage'
-import type { IWebStorageLike } from '../../src/types/storage'
+import { probeWebStorage } from '../../src/utils/availability.ts'
+import { fakeWebStorage } from '../../src/testing/fake-web-storage.ts'
+import type { IWebStorageLike } from '../../src/types/storage.ts'
 
 describe('probeWebStorage', () => {
   it('storage 为 undefined 时返回 false', () => {

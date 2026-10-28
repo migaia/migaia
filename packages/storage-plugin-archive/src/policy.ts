@@ -1,8 +1,8 @@
 import type { ICollectionsCodecValue } from '@migaia/serialize/codecs/collections-json'
-import { Archive } from './constants.js'
+import { Archive } from './constants.ts'
 import { ArchiveErrorCode } from '@migaia/storage-contract/error-code'
-import { archiveError } from './errors.js'
-import type { IArchivePluginOptions, IArchiveRule } from './types.js'
+import { archiveError } from './errors.ts'
+import type { IArchivePluginOptions, IArchiveRule } from './types.ts'
 
 /** An installation snapshot never rereads mutable rule fields during a later run. */
 export type IArchiveConfiguration = Readonly<{

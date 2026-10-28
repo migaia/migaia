@@ -2,7 +2,7 @@ import {
   IndexedDbPointRevisions,
   isIndexedDbPointRevision,
   type IIndexedDbPointRevision
-} from './indexed-db-revisions.js'
+} from './indexed-db-revisions.ts'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -24,7 +24,7 @@ import {
   type IStorageJournalTarget
 } from '@migaia/storage-host'
 import { StorageHostErrorCode as JournalErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageBackend } from '../constants.js'
+import { StorageBackend } from '../constants.ts'
 /** Original physical channels retain their native store names and public lock identities. */
 export type IIndexedDbImageChannel = 'value' | 'bytes' | 'record'
 /** One actual native attempt retains only the keys it reads or changes. */

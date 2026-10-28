@@ -22,18 +22,18 @@ import {
 } from '@migaia/storage-contract'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import type { IStorageJournalChange, IStorageJournalTarget } from '@migaia/storage-host'
-import { SqliteNames, SqliteControl, SqliteLimits, SqliteOperation } from './constants.js'
-import { normalizeSqliteFailure } from './errors.js'
-import { decodeKey, decodeHexKey, keyHex } from './key-codec.js'
-import type { ISqliteRow } from './types.js'
+import { SqliteNames, SqliteControl, SqliteLimits, SqliteOperation } from './constants.ts'
+import { normalizeSqliteFailure } from './errors.ts'
+import { decodeKey, decodeHexKey, keyHex } from './key-codec.ts'
+import type { ISqliteRow } from './types.ts'
 import {
   sqliteCleanupExpiredRows,
   sqliteRecordRows,
   sqliteLiveExpiration,
   sqlitePrune,
   sqliteConvert
-} from './store-io.js'
-import { sqliteRootRead } from './store-operation.js'
+} from './store-io.ts'
+import { sqliteRootRead } from './store-operation.ts'
 import {
   sqliteRevision,
   sqliteChanged,
@@ -42,7 +42,7 @@ import {
   sqliteIdentity,
   sqliteCurrentRevision,
   sqliteRevisionIdentity
-} from './store-revision.js'
+} from './store-revision.ts'
 import {
   sqliteStatement,
   SqliteLogicalConflict,
@@ -50,20 +50,20 @@ import {
   sqliteLocalGroup,
   SQLITE_CONTROL_ACTIVE,
   sqliteJournalScope
-} from './store-state.js'
+} from './store-state.ts'
 import type {
   ISqliteOrganizationContext,
   INativeState,
   IChannel,
   IWriteGuard
-} from './store-state.js'
+} from './store-state.ts'
 import {
   sqliteRangeConflict,
   sqliteLockRow,
   sqliteHolderOf,
   sqliteRollback,
   sqliteTransact
-} from './store-transaction.js'
+} from './store-transaction.ts'
 
 /** Distinct physical deletions use bounded IN lists and one existing native transaction. */
 export function sqliteRemoveTextBatch<TValue>(

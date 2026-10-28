@@ -7,8 +7,8 @@ import { createStorageHost } from '@migaia/storage-host'
 import { storageJournalPlugin } from '@migaia/storage-host/plugins/journal'
 import { ConcurrencyPolicy, lockKey } from '@migaia/storage-host/sdk'
 import { deferred } from '@migaia/utils/promise'
-import { postgresBackendPlugin } from '../src/index.js'
-import { pgDriver } from '../src/pg.js'
+import { postgresBackendPlugin } from '../src/index.ts'
+import { pgDriver } from '../src/pg.ts'
 
 /** Real level output observes original PostgreSQL work without becoming its execution owner. */
 const connectionString = process.env.MIGAIA_PG_URL

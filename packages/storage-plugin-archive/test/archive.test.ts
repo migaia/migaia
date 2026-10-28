@@ -4,7 +4,7 @@ import { createStorageHost, definePlugin } from '@migaia/storage-host'
 import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { blob } from '@migaia/storage-contract'
 import type { IStoragePipelineInput } from '@migaia/storage-host'
-import { archivePlugin } from '../src/index.js'
+import { archivePlugin } from '../src/index.ts'
 
 /** Each scenario has genuine isolated hot records, cold objects and an ordinary later extension. */
 async function fixture(

@@ -1,11 +1,11 @@
-import { memoryTestFeatures } from '../helpers/memory-features.js'
+import { memoryTestFeatures } from '../helpers/memory-features.ts'
 import { createRuntime } from '@migaia/reactive'
 import { records, type IStorageIterator, type IStorageChange } from '@migaia/storage-contract'
 import { createStorageHost } from '@migaia/storage-host'
 import { memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { expectTypeOf } from 'vitest'
-import { reactiveFeature } from '../../src/features/reactive.js'
-import { localStorageBackendPlugin } from '../../src/local-storage.js'
+import { reactiveFeature } from '../../src/features/reactive.ts'
+import { localStorageBackendPlugin } from '../../src/local-storage.ts'
 
 /** Selecting the Feature adds live only to the existing chain, preserving its selected result. */
 const host = await createStorageHost({

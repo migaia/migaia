@@ -2,10 +2,10 @@ import { Store } from 'oxigraph'
 import { createStorageHost, defineFeature } from '@migaia/storage-host'
 import { rdf, sparql, kv } from '@migaia/storage-contract'
 import { term, ConcurrencyPolicy } from '@migaia/storage-host/sdk'
-import { sparqlBackendPlugin, sparqlBackendKind } from '../../src/index.js'
-import { oxigraphEndpoint } from '../../src/oxigraph.js'
-import { graphStoreFeature } from '../../src/features/graph-store.js'
-import { ontologyFeature } from '../../src/features/ontology.js'
+import { sparqlBackendPlugin, sparqlBackendKind } from '../../src/index.ts'
+import { oxigraphEndpoint } from '../../src/oxigraph.ts'
+import { graphStoreFeature } from '../../src/features/graph-store.ts'
+import { ontologyFeature } from '../../src/features/ontology.ts'
 /** A real nonempty RDF extension must preserve the complete native scope and unlocked builder. */
 const extension = defineFeature(sparqlBackendKind, () => ({
   capabilities: [],

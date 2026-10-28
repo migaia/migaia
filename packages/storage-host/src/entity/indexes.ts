@@ -1,1 +1,1 @@
-export { entityIndexesFeature } from './indexes-feature.js'
+export { entityIndexesFeature } from './indexes-feature.ts'

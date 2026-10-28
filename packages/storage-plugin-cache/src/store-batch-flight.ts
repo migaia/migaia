@@ -3,14 +3,14 @@ import { lockKey, ConcurrencyPolicy } from '@migaia/storage-host/sdk'
 import { ttl, type ITransactionScope } from '@migaia/storage-contract'
 import type { ICodecValue } from '@migaia/serialize/codec'
 import type { IStorageBorrowedBackend } from '@migaia/storage-host'
-import { CacheText, CacheHook } from './constants.js'
-import { cacheError } from './errors.js'
+import { CacheText, CacheHook } from './constants.ts'
+import { cacheError } from './errors.ts'
 import { CacheErrorCode } from '@migaia/storage-contract/error-code'
-import type { ICachePolicy } from './policy.js'
-import { encodeEntry, type ICacheFound } from './entry.js'
-import type { ICacheStore, ICacheBatchLoader } from './types.js'
-import { writeBatch } from './store-batch.js'
-import type { ICacheFlightContext } from './store-flight.js'
+import type { ICachePolicy } from './policy.ts'
+import { encodeEntry, type ICacheFound } from './entry.ts'
+import type { ICacheStore, ICacheBatchLoader } from './types.ts'
+import { writeBatch } from './store-batch.ts'
+import type { ICacheFlightContext } from './store-flight.ts'
 import {
   route,
   decode,
@@ -20,9 +20,9 @@ import {
   stored,
   bounded,
   remaining
-} from './store-tier.js'
-import { physical } from './store.js'
-import type { ICacheOrganizationContext, IFlight, IWriteItem, ICacheNative } from './store.js'
+} from './store-tier.ts'
+import { physical } from './store.ts'
+import type { ICacheOrganizationContext, IFlight, IWriteItem, ICacheNative } from './store.ts'
 
 /** One original batch loader shares its accepted keys and supersession rows without another queue. */
 type ICacheBatchFlightContext<T extends ICodecValue> = {

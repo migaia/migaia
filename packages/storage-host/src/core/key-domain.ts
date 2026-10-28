@@ -8,12 +8,12 @@ import {
   type IKeyRange,
   type IStorageKey
 } from '@migaia/storage-contract'
-import { compareStorageKeys, snapshotStorageKey } from '../authoring/key.js'
+import { compareStorageKeys, snapshotStorageKey } from '../authoring/key.ts'
 
-import { STORAGE_MEMORY_BACKEND } from '../state-constants.js'
+import { STORAGE_MEMORY_BACKEND } from '../state-constants.ts'
 import { isArrayBuffer } from '@migaia/utils/bytes'
-import { StorageErrorText } from '../error-text.js'
-import { createStorageRangeError, createStorageTypeError } from '../errors.js'
+import { StorageErrorText } from '../error-text.ts'
+import { createStorageRangeError, createStorageTypeError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 
 /** Neutral typing borrows the original structured clone without importing a platform library. */

@@ -25,8 +25,8 @@ import {
 import { isUtilsAbortError, isUtilsTimeoutError } from '@migaia/utils/error'
 import { observeThenableRejection } from '@migaia/utils/function'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { storageKeyBytesIdentity } from './key.js'
-import { snapshotLockKey, encodeLockContent } from './concurrency-lock-keys.js'
+import { storageKeyBytesIdentity } from './key.ts'
+import { snapshotLockKey, encodeLockContent } from './concurrency-lock-keys.ts'
 
 /** Stable concurrency decision values; internal, kept off the SDK star export. */
 export const ConcurrencyAction = { wait: 'wait', reject: 'reject', retry: 'retry' } as const

@@ -1,13 +1,13 @@
-import { createStorageHooks, type IStorageHookEmitter } from './hooks.js'
-import type { IStorageHooks } from './hook-types.js'
-import { createStorageObservers, type IStorageObserverSet } from './stages.js'
-import { StorageHookName as Hook } from './hook-names.js'
-import { borrowStorageBackend } from './borrow.js'
+import { createStorageHooks, type IStorageHookEmitter } from './hooks.ts'
+import type { IStorageHooks } from './hook-types.ts'
+import { createStorageObservers, type IStorageObserverSet } from './stages.ts'
+import { StorageHookName as Hook } from './hook-names.ts'
+import { borrowStorageBackend } from './borrow.ts'
 import {
   STORAGE_DEFAULT_ORG,
   STORAGE_JOURNAL_PLUGIN_ID,
   STORAGE_PROBE_PLUGIN_ID
-} from './state-constants.js'
+} from './state-constants.ts'
 import type { IBackendStageBindings } from '@migaia/storage-contract'
 import {
   asyncDisposeKey,
@@ -21,11 +21,11 @@ import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { assertOperationContext } from '@migaia/storage-contract'
 import type { INativeAbortSignal } from '@migaia/utils/promise'
 import { observeThenableRejection } from '@migaia/utils/function'
-import { createStorageTypeError, createStorageAggregateError, StorageError } from './errors.js'
+import { createStorageTypeError, createStorageAggregateError, StorageError } from './errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from './error-text.js'
-import { readStorageNativePluginDefinition, readStorageNativePluginMetadata } from './contracts.js'
-import type { IStorageStoreCell } from './store-cell.js'
+import { StorageErrorText } from './error-text.ts'
+import { readStorageNativePluginDefinition, readStorageNativePluginMetadata } from './contracts.ts'
+import type { IStorageStoreCell } from './store-cell.ts'
 import type { IStorageBase, IStorageBaseAdmission } from '@migaia/storage-contract'
 import type {
   IStorageBackendPluginHandle,
@@ -41,17 +41,17 @@ import type {
   IStorageOrgView,
   IStorageBackendOrgContext,
   IStorageBorrowedBackend
-} from './types.js'
-import { pluginNameFromBackendId } from './names.js'
-import { readStorageProbeHandlers } from './plugins/probe/handlers.js'
-import type { IStorageHookMap } from './hook-types.js'
-import { storageJournalAccess, type IStorageJournalBackendAccess } from './journal/binding.js'
-import type { IStorageJournalExecutionPort } from './journal/types.js'
-import { StorageHostJournal } from './host-journal.js'
-import { StorageHostInstaller } from './host-install.js'
-import { createStoragePluginHost } from './host-ports.js'
-import { StorageHostBatch } from './host-batch.js'
-import { StorageHostProjection } from './host-projection.js'
+} from './types.ts'
+import { pluginNameFromBackendId } from './names.ts'
+import { readStorageProbeHandlers } from './plugins/probe/handlers.ts'
+import type { IStorageHookMap } from './hook-types.ts'
+import { storageJournalAccess, type IStorageJournalBackendAccess } from './journal/binding.ts'
+import type { IStorageJournalExecutionPort } from './journal/types.ts'
+import { StorageHostJournal } from './host-journal.ts'
+import { StorageHostInstaller } from './host-install.ts'
+import { createStoragePluginHost } from './host-ports.ts'
+import { StorageHostBatch } from './host-batch.ts'
+import { StorageHostProjection } from './host-projection.ts'
 
 /** Deliver final reporter failures through the existing utility host exception boundary. */
 function reportStorageUnhandledFailure(error: unknown): void {

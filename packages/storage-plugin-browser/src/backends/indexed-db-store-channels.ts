@@ -1,5 +1,5 @@
 // Store text, bytes, record, metadata and transaction channels for the IndexedDB backend (see ./indexed-db.ts).
-import { IndexedDbFeature } from '../constants.js'
+import { IndexedDbFeature } from '../constants.ts'
 import {
   createTransactionBuilder,
   lockKey,
@@ -7,22 +7,22 @@ import {
   snapshotStorageKey,
   createStorageToken
 } from '@migaia/storage-host/sdk'
-import { StorageError } from '../types/errors.js'
+import { StorageError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
-import { StorageBackend, StorageOperation } from '../constants.js'
+import { StorageErrorText } from '../error-text.ts'
+import { StorageBackend, StorageOperation } from '../constants.ts'
 import { assertStringStorageKey } from '@migaia/storage-contract'
 import { isUint8Array } from '@migaia/utils/bytes'
-import { indexedDbFeatureMissing } from './indexed-db-base-access.js'
-import { withStorageIteratorResource } from '../utils/storage-iterator.js'
+import { indexedDbFeatureMissing } from './indexed-db-base-access.ts'
+import { withStorageIteratorResource } from '../utils/storage-iterator.ts'
 import {
   META_STORE_NAME,
   readIndexedDbBytes,
   snapshotWriteValue,
   toIdbKey
-} from './indexed-db-layout.js'
-import { assertLive, withMutationLease } from './indexed-db-lifecycle.js'
-import { indexedDbRecordRows } from './indexed-db-record-cursor.js'
+} from './indexed-db-layout.ts'
+import { assertLive, withMutationLease } from './indexed-db-lifecycle.ts'
+import { indexedDbRecordRows } from './indexed-db-record-cursor.ts'
 import {
   rootRead,
   readFrom,
@@ -31,9 +31,9 @@ import {
   rootClear,
   writeTo,
   runTransaction
-} from './indexed-db-root.js'
-import { journalNative } from './indexed-db.js'
-import type { IIndexedDbStore, IIndexedDbContext } from './indexed-db.js'
+} from './indexed-db-root.ts'
+import { journalNative } from './indexed-db.ts'
+import type { IIndexedDbStore, IIndexedDbContext } from './indexed-db.ts'
 
 /**
  * Store shape the IndexedDbStoreText class implements; named because implements cannot take an

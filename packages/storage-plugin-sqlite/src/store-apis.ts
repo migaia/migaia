@@ -18,8 +18,8 @@ import {
   type IRecordsApi
 } from '@migaia/storage-contract'
 import { asyncDisposeKey } from '@migaia/plugin-host'
-import { SqliteNames, SqliteOperation } from './constants.js'
-import type { ISqliteNativeStore } from './types.js'
+import { SqliteNames, SqliteOperation } from './constants.ts'
+import type { ISqliteNativeStore } from './types.ts'
 import {
   sqliteConvert,
   sqliteWriteRaw,
@@ -29,8 +29,8 @@ import {
   sqliteExpiration,
   sqliteRead,
   sqliteWrite
-} from './store-io.js'
-import { sqliteRemoveTextBatch, sqliteRemovePrefix, sqliteIterator } from './store-mutation.js'
+} from './store-io.ts'
+import { sqliteRemoveTextBatch, sqliteRemovePrefix, sqliteIterator } from './store-mutation.ts'
 import {
   sqliteBatchSize,
   sqliteRootRead,
@@ -39,8 +39,8 @@ import {
   sqliteCaptureTextEntries,
   sqliteRootWrite,
   sqliteTextInput
-} from './store-operation.js'
-import type { ISqliteOrganizationContext } from './store-state.js'
+} from './store-operation.ts'
+import type { ISqliteOrganizationContext } from './store-state.ts'
 
 /** Assemble the original keyValue port table from explicit organization state. */
 export function createSqliteKeyValue<TValue>(

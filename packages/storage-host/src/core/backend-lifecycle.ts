@@ -1,14 +1,14 @@
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import { createStringLeaseRegistry, createAbortController } from '@migaia/lifecycle'
 import { IdentifyError, isNativeErrorValue } from '@migaia/utils/error'
-import { StorageError } from '../errors.js'
+import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
+import { StorageErrorText } from '../error-text.ts'
 import type {
   IBackendChangeControllerOptions,
   IBackendLifecycleController
-} from './change-types.js'
-export type { IBackendLifecycleController } from './change-types.js'
+} from './change-types.ts'
+export type { IBackendLifecycleController } from './change-types.ts'
 
 /** Same-realm physical origins are unique independently of optional notification assembly. */
 let backendOriginSequence = 0

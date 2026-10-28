@@ -9,12 +9,12 @@ import {
   encodeStorageOrgStringPrefix,
   encodeOrderedStorageKey,
   decodeOrderedStorageKey
-} from '../authoring/key.js'
+} from '../authoring/key.ts'
 import { bytesToBase64, base64ToBytes } from '@migaia/utils/bytes'
-import { createOrderedRecordIndex } from '../core/ordered-record-index.js'
-import { encodeFlatStorageKey } from '../core/key-domain.js'
-import { STORAGE_MEMORY_BACKEND } from '../state-constants.js'
-import { MemoryState } from './memory-constants.js'
+import { createOrderedRecordIndex } from '../core/ordered-record-index.ts'
+import { encodeFlatStorageKey } from '../core/key-domain.ts'
+import { STORAGE_MEMORY_BACKEND } from '../state-constants.ts'
+import { MemoryState } from './memory-constants.ts'
 
 /** One immutable committed object owns its body, public metadata and original physical identity. */
 export type IMemoryBlobEntry = {

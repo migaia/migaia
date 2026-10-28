@@ -7,8 +7,8 @@ import {
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
 import type { ICollectionsCodecValue } from '@migaia/serialize/codecs/collections-json'
 import { utf8ByteLength } from '@migaia/utils/bytes'
-import { StorageErrorText } from '../error-text.js'
-import { STORAGE_MEMORY_BACKEND } from '../state-constants.js'
+import { StorageErrorText } from '../error-text.ts'
+import { STORAGE_MEMORY_BACKEND } from '../state-constants.ts'
 
 /** Optional namespace-local limits preserve the existing unbounded default. */
 export type IMemoryCapacityOptions = {

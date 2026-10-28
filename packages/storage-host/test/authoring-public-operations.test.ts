@@ -6,9 +6,9 @@ import {
   type ICodec,
   type IStorageKey
 } from '@migaia/storage-contract'
-import { compareStorageKeys, snapshotStorageKey } from '../src/authoring/key.js'
-import { snapshotCodec } from '../src/authoring/codec.js'
-import { snapshotOperationContext, snapshotSyncWriteOptions } from '../src/authoring/context.js'
+import { compareStorageKeys, snapshotStorageKey } from '../src/authoring/key.ts'
+import { snapshotCodec } from '../src/authoring/codec.ts'
+import { snapshotOperationContext, snapshotSyncWriteOptions } from '../src/authoring/context.ts'
 
 describe('public transaction admission', () => {
   it('validates callbacks without invoking them and codes non-callable input', () => {

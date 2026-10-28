@@ -8,11 +8,11 @@ import {
   StorageContractErrorCode
 } from '@migaia/storage-contract'
 import { deferred } from '@migaia/utils/promise'
-import { postgresBackendPlugin } from '../src/index.js'
-import { pgDriver } from '../src/pg.js'
-import { pgLogicalReplicationFeature } from '../src/features/logical-replication.js'
-import { pgKey, encodePgText } from '../src/codec.js'
-import { PgReplicationTestService } from './helpers/replication-service.js'
+import { postgresBackendPlugin } from '../src/index.ts'
+import { pgDriver } from '../src/pg.ts'
+import { pgLogicalReplicationFeature } from '../src/features/logical-replication.ts'
+import { pgKey, encodePgText } from '../src/codec.ts'
+import { PgReplicationTestService } from './helpers/replication-service.ts'
 
 /** Only logical-decoding files share this idle-session scheduler on the separate cluster. */
 const replicationService = new PgReplicationTestService()

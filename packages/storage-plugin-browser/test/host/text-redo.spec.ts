@@ -15,9 +15,9 @@ import {
 } from '@migaia/storage-host/sdk'
 import { kv } from '@migaia/storage-contract'
 import { createStorageHost, createOrgId, definePlugin } from '@migaia/storage-host'
-import { localStorageBackendPlugin } from '../../src/local-storage.js'
-import { sessionStorageBackendPlugin } from '../../src/session-storage.js'
-import { fakeWebStorage } from '../../src/testing/fake-web-storage.js'
+import { localStorageBackendPlugin } from '../../src/local-storage.ts'
+import { sessionStorageBackendPlugin } from '../../src/session-storage.ts'
+import { fakeWebStorage } from '../../src/testing/fake-web-storage.ts'
 
 /** Native LockManager, original durable plugins and the native-shaped Storage port own the work. */
 const createLogger = () =>

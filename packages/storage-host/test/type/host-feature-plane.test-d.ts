@@ -4,7 +4,7 @@ import {
   definePlugin,
   defineStorageBackendKind,
   type IStoragePluginCore
-} from '../../src/index.js'
+} from '../../src/index.ts'
 import {
   records,
   rdf,

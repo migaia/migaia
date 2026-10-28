@@ -28,11 +28,11 @@ import {
   type IDurableChangeFeedApi,
   type IDurableStorageChange
 } from '@migaia/storage-contract'
-import { snapshotStorageCounterIncrement } from '../src/authoring/counter.js'
-import { createVectorQuery, createRdfQuery, compileStorageWhere } from '../src/authoring/query.js'
-import { createTransactionOwner, runTransactionOperation } from '../src/authoring/transaction.js'
-import { provideCapabilities } from '../src/authoring/capability.js'
-import { createStorageIteratorLifetime } from '../src/authoring/resource.js'
+import { snapshotStorageCounterIncrement } from '../src/authoring/counter.ts'
+import { createVectorQuery, createRdfQuery, compileStorageWhere } from '../src/authoring/query.ts'
+import { createTransactionOwner, runTransactionOperation } from '../src/authoring/transaction.ts'
+import { provideCapabilities } from '../src/authoring/capability.ts'
+import { createStorageIteratorLifetime } from '../src/authoring/resource.ts'
 import {
   type IStorageIterator,
   type IStorageKey,

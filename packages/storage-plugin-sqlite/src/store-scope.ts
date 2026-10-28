@@ -23,11 +23,11 @@ import {
   type IStorageIterator,
   type ICompiledStorageSql
 } from '@migaia/storage-contract'
-import { SqliteNames, SqliteControl, SqliteOperation } from './constants.js'
-import { normalizeSqliteFailure } from './errors.js'
-import { decodeKey } from './key-codec.js'
-import { createSqliteExecutor } from './sql.js'
-import type { ISqliteTransactionScope, ISqliteRow } from './types.js'
+import { SqliteNames, SqliteControl, SqliteOperation } from './constants.ts'
+import { normalizeSqliteFailure } from './errors.ts'
+import { decodeKey } from './key-codec.ts'
+import { createSqliteExecutor } from './sql.ts'
+import type { ISqliteTransactionScope, ISqliteRow } from './types.ts'
 import {
   sqliteCaptureTtlTarget,
   sqliteAssertTtlTarget,
@@ -40,8 +40,8 @@ import {
   sqliteLiveExpiration,
   sqlitePrune,
   sqliteConvert
-} from './store-io.js'
-import { sqliteRemoveTextBatch, sqliteRemovePrefix, sqliteObserve } from './store-mutation.js'
+} from './store-io.ts'
+import { sqliteRemoveTextBatch, sqliteRemovePrefix, sqliteObserve } from './store-mutation.ts'
 import {
   sqliteScoped,
   sqliteTextInput,
@@ -49,8 +49,8 @@ import {
   sqliteGetMany,
   sqliteCaptureTextEntries,
   sqliteProjectTextEntries
-} from './store-operation.js'
-import { sqliteRevision } from './store-revision.js'
+} from './store-operation.ts'
+import { sqliteRevision } from './store-revision.ts'
 import {
   ttlOperations,
   counterOperations,
@@ -59,13 +59,13 @@ import {
   sqliteAssertRoot,
   sqliteIsBusy,
   SqlitePhysicalBusy
-} from './store-state.js'
+} from './store-state.ts'
 import type {
   ISqliteInternalScope,
   ISqliteOrganizationContext,
   ITextBatchEntry,
   INativeState
-} from './store-state.js'
+} from './store-state.ts'
 
 /**
  * One SQLite transaction scope: staged reads and writes bound to its organization and native

@@ -18,9 +18,9 @@ import {
   snapshotStorageKeyPrefix,
   storageKeyBytesIdentity,
   sortStorageByteIdentities
-} from './key.js'
-import { snapshotStorageRdfQuad, encodeRdfQuadSnapshot } from './rdf.js'
-import { snapshotLockIdentities } from './concurrency-attempt.js'
+} from './key.ts'
+import { snapshotStorageRdfQuad, encodeRdfQuadSnapshot } from './rdf.ts'
+import { snapshotLockIdentities } from './concurrency-attempt.ts'
 
 /** Disjoint channel markers prevent equal user keys in different channels from colliding. */
 const LockChannelRank = { text: 1, bytes: 2, record: 3, vector: 4, rdf: 5 } as const

@@ -1,9 +1,9 @@
 import { defineFeature, type IStorageFeature } from '@migaia/storage-host'
 import type { IOperationContext } from '@migaia/storage-contract'
-import { qdrantBackendKind } from '../plugin.js'
-import { readNativeFeaturePort } from '../native-feature.js'
-import { nativeRequest } from '../feature-input.js'
-import type { IQdrantRecommendOutput, IQdrantRecommendRequest } from '../feature-types.js'
+import { qdrantBackendKind } from '../plugin.ts'
+import { readNativeFeaturePort } from '../native-feature.ts'
+import { nativeRequest } from '../feature-input.ts'
+import type { IQdrantRecommendOutput, IQdrantRecommendRequest } from '../feature-types.ts'
 /** Preserve native strategy, lookup and sample semantics instead of replacing the standard chain. */
 export function qdrantRecommendFeature(): IStorageFeature<
   typeof qdrantBackendKind,
@@ -41,4 +41,4 @@ export type {
   IQdrantRecommendRequest,
   IQdrantRecommendResult,
   IQdrantRecommendOutput
-} from '../feature-types.js'
+} from '../feature-types.ts'

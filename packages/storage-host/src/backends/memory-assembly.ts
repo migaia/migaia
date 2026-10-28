@@ -1,7 +1,7 @@
 import { inspectFeatures } from '@migaia/plugin-host/composition'
-import type { IStorageFeatureRecord } from '../types.js'
-import type { IBackendChangeControllerFactory } from '../core/change-types.js'
-import type { createBackendChangeIterator } from '../core/change-iterator.js'
+import type { IStorageFeatureRecord } from '../types.ts'
+import type { IBackendChangeControllerFactory } from '../core/change-types.ts'
+import type { createBackendChangeIterator } from '../core/change-iterator.ts'
 
 /** Native memory construction uses only the optional owners explicitly selected as Feature roots. */
 export type IMemoryAssembly = {

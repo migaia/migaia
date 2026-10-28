@@ -31,28 +31,28 @@ import {
   SqliteLimits,
   SqliteOperation,
   quoteSqliteIdentifier
-} from './constants.js'
-import { sqliteError, normalizeTransactionFailure, normalizeSqliteFailure } from './errors.js'
+} from './constants.ts'
+import { sqliteError, normalizeTransactionFailure, normalizeSqliteFailure } from './errors.ts'
 import { SqliteErrorCode } from '@migaia/storage-contract/error-code'
-import { SqliteErrorText } from './error-text.js'
-import { createSqliteStatements } from './sql.js'
+import { SqliteErrorText } from './error-text.ts'
+import { createSqliteStatements } from './sql.ts'
 import type {
   ISqliteOptions,
   ISqliteNativeStore,
   ISqliteDriver,
   ISqliteTransactionScope
-} from './types.js'
+} from './types.ts'
 import {
   createSqliteKeyValue,
   createSqliteRecordApi,
   createSqliteTtlApi,
   createSqliteCounterApi
-} from './store-apis.js'
-import { createSqliteJournal } from './store-journal.js'
-import { sqliteRemovePrefix, sqliteClear } from './store-mutation.js'
-import { sqliteScoped, sqliteRootWrite } from './store-operation.js'
-import { SqliteOrgBase } from './store-org-base.js'
-import { sqliteTransactionIterator } from './store-scope.js'
+} from './store-apis.ts'
+import { createSqliteJournal } from './store-journal.ts'
+import { sqliteRemovePrefix, sqliteClear } from './store-mutation.ts'
+import { sqliteScoped, sqliteRootWrite } from './store-operation.ts'
+import { SqliteOrgBase } from './store-org-base.ts'
+import { sqliteTransactionIterator } from './store-scope.ts'
 import {
   claimedDrivers,
   physicalGroups,
@@ -60,14 +60,14 @@ import {
   counterOperations,
   sqliteStatement,
   sqliteNativeFor
-} from './store-state.js'
+} from './store-state.ts'
 import type {
   ISqliteOrganizationContext,
   ISqliteRuntime,
   ISqlitePhysicalState,
   ISqliteConstruction,
   ISqliteInternalScope
-} from './store-state.js'
+} from './store-state.ts'
 
 /** Assemble the original base port table from explicit organization state. */
 function createSqliteBase<TValue>(
@@ -492,4 +492,4 @@ export function createSqliteStore<TValue>(
     throw normalizeSqliteFailure(error)
   }
 }
-export type { ISqliteRuntime, ISqliteConstruction } from './store-state.js'
+export type { ISqliteRuntime, ISqliteConstruction } from './store-state.ts'

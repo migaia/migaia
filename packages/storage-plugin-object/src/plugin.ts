@@ -13,11 +13,11 @@ import {
   type ICapabilityInstallPort,
   type IOperationContext
 } from '@migaia/storage-contract'
-import { ObjectDriverKind, ObjectNames } from './constants.js'
-import { readObjectDriver } from './driver.js'
-import { createObjectBackend } from './store.js'
-import { invalidArgument } from './errors.js'
-import type { IObjectAddress, IObjectDriver, IObjectStore } from './types.js'
+import { ObjectDriverKind, ObjectNames } from './constants.ts'
+import { readObjectDriver } from './driver.ts'
+import { createObjectBackend } from './store.ts'
+import { invalidArgument } from './errors.ts'
+import type { IObjectAddress, IObjectDriver, IObjectStore } from './types.ts'
 /** Kind identity selects exactly the object backend and its two real native driver families. */
 export const objectBackendKind = defineStorageBackendKind<
   IObjectStore,

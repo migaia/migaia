@@ -9,10 +9,10 @@ import type {
   IStorageIterator,
   IStorageChange
 } from '@migaia/storage-contract'
-import type { RedisDraft } from './transaction.js'
-import type { IRedisConnection, IRedisDriver } from './driver.js'
-import type { createRedisLayout } from './layout.js'
-import type { IRedisStore } from './types.js'
+import type { RedisDraft } from './transaction.ts'
+import type { IRedisConnection, IRedisDriver } from './driver.ts'
+import type { createRedisLayout } from './layout.ts'
+import type { IRedisStore } from './types.ts'
 /** Only the exact installed store lends native Features its original pipeline and resource owner. */
 export const nativeFeaturePort = Symbol('redis-native-feature')
 /** Only the selected vector module supplies these finite original-draft operations. */

@@ -34,12 +34,12 @@ import {
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import type { ICodecValue } from '@migaia/serialize/codec'
 import { raceWithAbort, UtilsAbortError } from '@migaia/utils/promise'
-import { cacheBackendKind } from '../kind.js'
-import { cacheKey } from '../key.js'
-import { cacheError, invalidArgument, missingCapability } from '../errors.js'
+import { cacheBackendKind } from '../kind.ts'
+import { cacheKey } from '../key.ts'
+import { cacheError, invalidArgument, missingCapability } from '../errors.ts'
 import { CacheErrorCode } from '@migaia/storage-contract/error-code'
-import { CacheText, CacheOperation, CacheHook } from '../constants.js'
-import type {} from '../hooks.js'
+import { CacheText, CacheOperation, CacheHook } from '../constants.ts'
+import type {} from '../hooks.ts'
 
 /** User metadata stays scalar and separate from the Feature's reserved flat fields. */
 export type ISemanticPayload = Readonly<Record<string, string | number | boolean>>

@@ -1,7 +1,7 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { createRecordQuery, createVectorQuery, createRdfQuery } from '../src/authoring/query.js'
-import { createStorageIteratorLifetime } from '../src/authoring/resource.js'
-import { term } from '../src/authoring/rdf.js'
+import { createRecordQuery, createVectorQuery, createRdfQuery } from '../src/authoring/query.ts'
+import { createStorageIteratorLifetime } from '../src/authoring/resource.ts'
+import { term } from '../src/authoring/rdf.ts'
 import {
   type IStorageChange,
   type IStorageIterator,

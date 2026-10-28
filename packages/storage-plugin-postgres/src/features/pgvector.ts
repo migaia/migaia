@@ -7,10 +7,10 @@ import {
   type ICapabilityImpl,
   type IVectorApi
 } from '@migaia/storage-contract'
-import { postgresBackendKind } from '../plugin.js'
-import type { IPgNativeVectorApi } from '../types.js'
-import { searchPgNativeVector } from '../vector-native.js'
-import { PgNames } from '../constants.js'
+import { postgresBackendKind } from '../plugin.ts'
+import type { IPgNativeVectorApi } from '../types.ts'
+import { searchPgNativeVector } from '../vector-native.ts'
+import { PgNames } from '../constants.ts'
 /**
  * Selecting pgvector adds its actual native collection provider and keeps caller-table methods
  * separate.

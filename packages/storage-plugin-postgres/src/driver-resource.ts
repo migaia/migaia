@@ -1,4 +1,4 @@
-import { PgNames } from './constants.js'
+import { PgNames } from './constants.ts'
 import { createQuiescenceTracker } from '@migaia/lifecycle'
 import {
   StorageContractError,

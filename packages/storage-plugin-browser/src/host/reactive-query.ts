@@ -3,9 +3,9 @@ import { hostRethrowReporter } from '@migaia/utils/promise'
 import { createLifecycleScope } from '@migaia/lifecycle'
 import { Resource } from '@migaia/resource'
 import type { IReactiveComputed } from '@migaia/reactive'
-import { createStorageAggregateError, StorageError } from '../types/errors.js'
+import { createStorageAggregateError, StorageError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
+import { StorageErrorText } from '../error-text.ts'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -16,20 +16,20 @@ import type {
   ILiveQueryState,
   ILiveQueryStateView,
   IReactiveConsistency
-} from './types.js'
-import { LiveQueryStateStatus } from './state-constants.js'
+} from './types.ts'
+import { LiveQueryStateStatus } from './state-constants.ts'
 import {
   admitReactiveQuery,
   initializeReactiveQuery,
   allocateReactiveResource,
   allocateReactiveProjection,
   publishReactiveQuery
-} from './reactive.js'
+} from './reactive.ts'
 import type {
   IStorageReactiveAdapter,
   IStorageReactiveQueryInput,
   IStorageReactiveQueryLease
-} from './reactive.js'
+} from './reactive.ts'
 
 /** Construct one Resource-backed query under this service's admitted adapter lifetime. */
 

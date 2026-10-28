@@ -1,10 +1,10 @@
-import { lockKey } from '../authoring/concurrency.js'
+import { lockKey } from '../authoring/concurrency.ts'
 import {
   StorageContractError,
   StorageContractErrorCode,
   type ILockKey
 } from '@migaia/storage-contract'
-import { encodeFlatStorageKey } from '../core/key-domain.js'
+import { encodeFlatStorageKey } from '../core/key-domain.ts'
 
 /** Fixed original metadata locks distinguish handle ownership from each native head update. */
 export const StorageJournalLock = {

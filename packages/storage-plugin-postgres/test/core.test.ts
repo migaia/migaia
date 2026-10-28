@@ -5,11 +5,11 @@ import { describe, it, expect, onTestFinished } from 'vitest'
 import { createStorageHost, definePlugin } from '@migaia/storage-host'
 import { kv, records, ttl, counter, sql } from '@migaia/storage-contract'
 import { lockKey, ConcurrencyPolicy } from '@migaia/storage-host/sdk'
-import { postgresBackendPlugin } from '../src/index.js'
-import { pgDriver } from '../src/pg.js'
-import { postgresJsDriver } from '../src/postgres-js.js'
-import { PgNotificationChannel } from '../src/constants.js'
-import type { IPgDriver } from '../src/types.js'
+import { postgresBackendPlugin } from '../src/index.ts'
+import { pgDriver } from '../src/pg.ts'
+import { postgresJsDriver } from '../src/postgres-js.ts'
+import { PgNotificationChannel } from '../src/constants.ts'
+import type { IPgDriver } from '../src/types.ts'
 /** The original service wrapper supplies the real owned PostgreSQL fixture address. */
 const connectionString = process.env.MIGAIA_PG_URL
 /** Missing service setup is an explicit failure rather than an unverified passing skip. */

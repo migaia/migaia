@@ -21,7 +21,7 @@ import {
   type IStorageKey,
   assertStorageOrgId
 } from '@migaia/storage-contract'
-import { encodeOrderedStorageKey } from './key.js'
+import { encodeOrderedStorageKey } from './key.ts'
 
 /** DefaultGraph has one canonical value and no generated blank-node identity. */
 const DEFAULT_GRAPH: IRdfDefaultGraph = { termType: RdfTermType.defaultGraph }

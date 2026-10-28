@@ -3,7 +3,7 @@ import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { indexedDbBackendPlugin } from '@migaia/storage-plugin-browser/indexed-db'
 import { createStorageHost, definePlugin } from '@migaia/storage-host'
 import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
-import { archivePlugin } from '../src/index.js'
+import { archivePlugin } from '../src/index.ts'
 
 /** Genuine IndexedDB installation must be rejected without attempting a cold object operation. */
 it('rejects the actual IndexedDB hot backend before cold I/O while leaving borrowed storage alive', async () => {

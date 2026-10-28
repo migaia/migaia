@@ -1,8 +1,8 @@
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
-import { createStorageRedoJournal } from './redo.js'
-import { createStorageNativeJournal } from './commit.js'
-import type { IStorageJournalBackendAccess } from './binding.js'
-import type { IStorageJournalConfigurationSnapshot } from './configuration-options.js'
+import { createStorageRedoJournal } from './redo.ts'
+import { createStorageNativeJournal } from './commit.ts'
+import type { IStorageJournalBackendAccess } from './binding.ts'
+import type { IStorageJournalConfigurationSnapshot } from './configuration-options.ts'
 
 /** Prepare only the implemented native guarantee; unimplemented selected guarantees fail closed. */
 export function prepareStorageJournalConfiguration(

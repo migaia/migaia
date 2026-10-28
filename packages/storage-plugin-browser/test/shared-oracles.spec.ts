@@ -1,10 +1,10 @@
-import { entityTestFeatures } from './helpers/entity-features.js'
+import { entityTestFeatures } from './helpers/entity-features.ts'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { defineEntity } from '@migaia/storage-host/entity'
-import { createMemoryTestStore } from './helpers/installed-backends.js'
-import { createReactiveServiceFixture } from './helpers/reactive-service.js'
+import { createMemoryTestStore } from './helpers/installed-backends.ts'
+import { createReactiveServiceFixture } from './helpers/reactive-service.ts'
 import { safeJsonPayloadByteLength } from '@migaia/storage-host/sdk'
 import { utf8ByteLength } from '@migaia/utils/bytes'
 

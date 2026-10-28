@@ -1,10 +1,10 @@
 import { expectTypeOf } from 'vitest'
 import type { IMemoryBackendStore } from '@migaia/storage-host/plugins/memory'
-import type { ILocalStorageBackendStore } from '../../src/local-storage.js'
-import type { ISessionStorageBackendStore } from '../../src/session-storage.js'
-import type { ICookieBackendStore } from '../../src/cookies.js'
-import type { IIndexedDbBackendStore } from '../../src/indexed-db.js'
-import type { ISyncKeyValueStore, ISyncCookieStore } from '../../src/types'
+import type { ILocalStorageBackendStore } from '../../src/local-storage.ts'
+import type { ISessionStorageBackendStore } from '../../src/session-storage.ts'
+import type { ICookieBackendStore } from '../../src/cookies.ts'
+import type { IIndexedDbBackendStore } from '../../src/indexed-db.ts'
+import type { ISyncKeyValueStore, ISyncCookieStore } from '../../src/types/index.ts'
 import { kv, records } from '@migaia/storage-contract'
 
 // Public plugin store types retain their native synchronous projection after installation.

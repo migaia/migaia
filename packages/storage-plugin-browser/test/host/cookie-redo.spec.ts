@@ -7,8 +7,8 @@ import { kv } from '@migaia/storage-contract'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { decodeStorageJournalImage } from '@migaia/storage-host/sdk'
 import { storageJournalPlugin } from '@migaia/storage-host/plugins/journal'
-import { cookieBackendPlugin } from '../../src/cookies.js'
-import { fakeCookieDocument } from '../../src/testing/fake-cookie-document.js'
+import { cookieBackendPlugin } from '../../src/cookies.ts'
+import { fakeCookieDocument } from '../../src/testing/fake-cookie-document.ts'
 
 afterEach(() => vi.unstubAllGlobals())
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { planChannelWrite } from '../../src/authoring/backend.js'
+import { planChannelWrite } from '../../src/authoring/backend.ts'
 
 describe('planChannelWrite', () => {
   it('conflict policy rejects cross-channel presence', () => {

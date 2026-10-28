@@ -14,16 +14,16 @@ import {
   type IWhere,
   type IQueryCondition
 } from '@migaia/storage-contract'
-import { QdrantRoute, QdrantText, QdrantManagedVectorName } from './constants.js'
-import { invalidArgument, qdrantError } from './errors.js'
+import { QdrantRoute, QdrantText, QdrantManagedVectorName } from './constants.ts'
+import { invalidArgument, qdrantError } from './errors.ts'
 import { QdrantErrorCode } from '@migaia/storage-contract/error-code'
-import { nativeId } from './id.js'
-import { nativeCondition, orgFilter, type IQdrantFilter } from './filter.js'
-import { snapshotRescoreVector, snapshotRescorePoints } from './feature-input.js'
-import type { IQdrantRescoreVector, IQdrantRescorePoint } from './feature-types.js'
-import type { IQdrantNativeFeaturePort } from './native-feature.js'
-import type { IQdrantHttp, IQdrantOperationName } from './types.js'
-import type { IQdrantQueryRow } from './store-collection.js'
+import { nativeId } from './id.ts'
+import { nativeCondition, orgFilter, type IQdrantFilter } from './filter.ts'
+import { snapshotRescoreVector, snapshotRescorePoints } from './feature-input.ts'
+import type { IQdrantRescoreVector, IQdrantRescorePoint } from './feature-types.ts'
+import type { IQdrantNativeFeaturePort } from './native-feature.ts'
+import type { IQdrantHttp, IQdrantOperationName } from './types.ts'
+import type { IQdrantQueryRow } from './store-collection.ts'
 import {
   report,
   run,
@@ -36,8 +36,8 @@ import {
   decode,
   sample,
   operationResult
-} from './store.js'
-import type { IQdrantOrganizationContext, ICollectionState } from './store.js'
+} from './store.ts'
+import type { IQdrantOrganizationContext, ICollectionState } from './store.ts'
 
 /** One accepted query retains its source selection and immutable query options across native awaits. */
 type IQdrantQueryContext = {

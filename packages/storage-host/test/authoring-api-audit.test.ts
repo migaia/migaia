@@ -1,4 +1,4 @@
-import * as contractAuthoringStore from '../src/authoring/store.js'
+import * as contractAuthoringStore from '../src/authoring/store.ts'
 import { describe, expect, it } from 'vitest'
 import * as contract from '@migaia/storage-contract'
 

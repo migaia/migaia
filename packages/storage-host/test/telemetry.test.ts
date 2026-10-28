@@ -1,11 +1,11 @@
-import { storageJournalPlugin } from '../src/journal.js'
+import { storageJournalPlugin } from '../src/journal.ts'
 import { describe, expect, it } from 'vitest'
 import { Logger, type ILogEntry } from '@migaia/logger'
 import { level } from '@migaia/logger/plugins'
-import { ConcurrencyPolicy, lockKey } from '../src/authoring/concurrency.js'
+import { ConcurrencyPolicy, lockKey } from '../src/authoring/concurrency.ts'
 import { deferred } from '@migaia/utils/promise'
-import { createOrgId, createStorageHost } from '../src/index.js'
-import { memoryBackendPlugin } from '../src/plugins/memory.js'
+import { createOrgId, createStorageHost } from '../src/index.ts'
+import { memoryBackendPlugin } from '../src/plugins/memory.ts'
 
 /** Use the actual borrowed level plugin without a second logger or observation owner. */
 const execution = { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } as const

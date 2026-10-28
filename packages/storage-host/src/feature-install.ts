@@ -1,5 +1,5 @@
 import { PluginHostError, PluginHostErrorCode, ERROR_TEXT } from '@migaia/plugin-host'
-import { assertTransactionOwner, runTransactionOperation } from './authoring/transaction.js'
+import { assertTransactionOwner, runTransactionOperation } from './authoring/transaction.ts'
 import {
   RecordQueryMethod,
   TransactionBuilderMethod,
@@ -10,16 +10,16 @@ import type {
   ICapabilityInstallPort,
   IStorageBase
 } from '@migaia/storage-contract'
-import { createStorageTypeError } from './errors.js'
+import { createStorageTypeError } from './errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from './error-text.js'
+import { StorageErrorText } from './error-text.ts'
 import type {
   IStorageExecutionPort,
   IStorageFeatureOutput,
   IStoragePluginCallContext,
   IStorageFeatureClientResolver
-} from './types.js'
-import { STORAGE_CHAIN_FAMILIES } from './state-constants.js'
+} from './types.ts'
+import { STORAGE_CHAIN_FAMILIES } from './state-constants.ts'
 /** A closed output-shape failure stays at the existing backend definition boundary. */
 function invalid(cause?: unknown): never {
   throw createStorageTypeError(

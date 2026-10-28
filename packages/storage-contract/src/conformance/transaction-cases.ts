@@ -1,8 +1,8 @@
 // Transaction conformance cases, one fresh fixture per registered case.
-import type { IConformanceCase, IConformanceHarness } from './harness.js'
-import { invocation } from './harness.js'
-import type { ITransactionScope } from '../transaction.js'
-import { keyValueCases, conformanceTransactionFailure, ConformanceFailure } from './channels.js'
+import type { IConformanceCase, IConformanceHarness } from './harness.ts'
+import { invocation } from './harness.ts'
+import type { ITransactionScope } from '../transaction.ts'
+import { keyValueCases, conformanceTransactionFailure, ConformanceFailure } from './channels.ts'
 
 /** Original Web transactions assertions, using one fresh fixture per registered case. */
 export function transactionsConformance(

@@ -16,12 +16,12 @@ import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { storageJournalPlugin, storageLogStore } from '@migaia/storage-host/plugins/journal'
 import { encodeFlatStorageKey, ConcurrencyPolicy, lockKey } from '@migaia/storage-host/sdk'
 import { kv, ttl, vector } from '@migaia/storage-contract'
-import { redisBackendPlugin, type IRedisDriver } from '../src/index.js'
-import { nodeRedisDriver } from '../src/adapters/node-redis.js'
-import { rediSearchVectorFeature } from '../src/features/search.js'
-import { redisStreamsFeature } from '../src/features/streams.js'
-import { redisPubSubFeature } from '../src/features/pubsub.js'
-import { createRedisLayout, decodeRedisValue } from '../src/layout.js'
+import { redisBackendPlugin, type IRedisDriver } from '../src/index.ts'
+import { nodeRedisDriver } from '../src/adapters/node-redis.ts'
+import { rediSearchVectorFeature } from '../src/features/search.ts'
+import { redisStreamsFeature } from '../src/features/streams.ts'
+import { redisPubSubFeature } from '../src/features/pubsub.ts'
+import { createRedisLayout, decodeRedisValue } from '../src/layout.ts'
 
 /** Real logger plugins retain their own durable owner and remain borrowed by storage. */
 const loggerOptions = {

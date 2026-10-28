@@ -1,8 +1,8 @@
-import { isKeyValueStore, type IKeyValueStore } from './store.js'
-import type { IStorageKey, IOperationContext } from './context.js'
-import type { IStorageIterator } from './resource.js'
-import type { IWithChangeFeedCapabilities } from './backend.js'
-import { StorageContractError, StorageContractErrorCode } from './errors.js'
+import { isKeyValueStore, type IKeyValueStore } from './store.ts'
+import type { IStorageKey, IOperationContext } from './context.ts'
+import type { IStorageIterator } from './resource.ts'
+import type { IWithChangeFeedCapabilities } from './backend.ts'
+import { StorageContractError, StorageContractErrorCode } from './errors.ts'
 
 /** Post-commit invalidation description, not a stored value or a guaranteed replayable event log. */
 export type IStorageChange = {

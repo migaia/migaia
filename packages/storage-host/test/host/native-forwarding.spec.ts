@@ -5,9 +5,9 @@ import {
   definePlugin,
   defineStorageBackendKind,
   type IStoragePluginCore
-} from '../../src/index.js'
-import { readStorageNativePluginDefinition } from '../../src/contracts.js'
-import { catalog } from '../helpers/catalog.js'
+} from '../../src/index.ts'
+import { readStorageNativePluginDefinition } from '../../src/contracts.ts'
+import { catalog } from '../helpers/catalog.ts'
 
 /** These native forwarding baselines use ordinary composition Features, not backend API publication. */
 const kind = defineStorageBackendKind()('catalog')

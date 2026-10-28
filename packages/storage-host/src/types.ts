@@ -1,8 +1,8 @@
-import type { IBackendValueCommit } from './core/backend-registry.js'
-import type { IBackendRevisionPort } from './backends/revisions.js'
-import type { IBackendKeyLockPort } from './backends/key-locks.js'
-import type { IStorageHooks } from './hook-types.js'
-import type { IStorageHookEmitter } from './hooks.js'
+import type { IBackendValueCommit } from './core/backend-registry.ts'
+import type { IBackendRevisionPort } from './backends/revisions.ts'
+import type { IBackendKeyLockPort } from './backends/key-locks.ts'
+import type { IStorageHooks } from './hook-types.ts'
+import type { IStorageHookEmitter } from './hooks.ts'
 import type {
   IPluginHostCore,
   IPluginRegistrationContext,
@@ -18,7 +18,7 @@ import type { INativeAbortSignal } from '@migaia/utils/promise'
 import type {
   IBackendChangeController,
   IBackendChangeControllerOptions
-} from './core/change-types.js'
+} from './core/change-types.ts'
 import type {
   IOperationContext,
   ILockKey,
@@ -144,7 +144,7 @@ export type IStorageFeatureClientResolver<TClient = unknown, TTransactionClient 
 }
 /** Read-only invocation ports retain one immutable organization without installation authority. */
 export type IStorageBackendOrgContext = {
-  readonly journal?: import('./journal/types.js').IStorageJournalExecutionPort
+  readonly journal?: import('./journal/types.ts').IStorageJournalExecutionPort
   readonly orgId: string
   readonly execution: IStorageExecutionPort
   readonly stageBindings: IBackendStageBindings
@@ -348,8 +348,8 @@ export type IStoragePluginCore<F extends IStorageFeatureRecord = {}> = Pick<
 > &
   IStorageBorrowPort & {
     /** Select journal code only from the explicit journal plugin in its original install scope. */
-    registerJournalRuntime(runtime: import('./journal/loader.js').IStorageJournalRuntime): void
-    readonly journal?: import('./journal/types.js').IStorageJournalExecutionPort
+    registerJournalRuntime(runtime: import('./journal/loader.ts').IStorageJournalRuntime): void
+    readonly journal?: import('./journal/types.ts').IStorageJournalExecutionPort
     readonly defaultOrgId: string
     readonly execution: IStorageExecutionPort
     readonly hooks: IStorageHooks
@@ -370,11 +370,11 @@ export type IStoragePluginCore<F extends IStorageFeatureRecord = {}> = Pick<
     createRevisionPort(): IBackendRevisionPort
     createChangeController(
       options: IBackendChangeControllerOptions,
-      factory: import('./core/change-types.js').IBackendChangeControllerFactory
+      factory: import('./core/change-types.ts').IBackendChangeControllerFactory
     ): IBackendChangeController
     registerChangeController(
       store: IStorageBase,
-      controller: import('./core/change-types.js').IBackendLifecycleController
+      controller: import('./core/change-types.ts').IBackendLifecycleController
     ): void
     registerValueCommit(store: IStorageBase, commit: IBackendValueCommit): void
     /** Register immutable physical-org lookup and deletion only for this exact admitted store. */
@@ -405,7 +405,7 @@ export type IStorageNativePluginDescriptor<
   featureExpose?(): object
   capabilityInstaller?(store: S): ICapabilityInstallPort
   /** Capture original private journal I/O once after this exact store is admitted. */
-  journalBinding?(store: S): import('./journal/types.js').IStorageJournalBackendBinding | undefined
+  journalBinding?(store: S): import('./journal/types.ts').IStorageJournalBackendBinding | undefined
 }
 export declare const storageBackendPluginExtensionsBrand: unique symbol
 /** Extensions are flat functions; the host supplies their organization call context. */
@@ -603,13 +603,13 @@ export type IStorageHostCreateOptions<P extends readonly IStorageBackendPluginHa
 type IStorageJournalUndoSurface<J> = (
   J extends (...args: never[]) => infer R ? Awaited<R> : J
 ) extends { readonly logger: import('@migaia/logger/plugins/durable').IUndoLogExt }
-  ? import('./journal/types.js').IUndoableStore
+  ? import('./journal/types.ts').IUndoableStore
   : Record<never, never>
 /** Neutral host registry and lifetime; backend implementations remain separate from installation. */
 export type IStorageHost<
   P extends readonly IStorageBackendPluginHandle[],
-  J extends import('./journal/types.js').IStorageJournalConfiguration | undefined =
-    import('./journal/types.js').IStorageJournalOf<P>
+  J extends import('./journal/types.ts').IStorageJournalConfiguration | undefined =
+    import('./journal/types.ts').IStorageJournalOf<P>
 > = import('@migaia/storage-contract').IStorageResource & {
   detect(): Promise<void>
   org(orgId: string): IStorageOrgView<P, J>
@@ -660,8 +660,8 @@ export type IStorageHost<
 /** A business view retains inference while lifecycle and installation stay with its root host. */
 export type IStorageOrgView<
   P extends readonly IStorageBackendPluginHandle[],
-  J extends import('./journal/types.js').IStorageJournalConfiguration | undefined =
-    import('./journal/types.js').IStorageJournalOf<P>
+  J extends import('./journal/types.ts').IStorageJournalConfiguration | undefined =
+    import('./journal/types.ts').IStorageJournalOf<P>
 > = Omit<
   IStorageHost<P, J>,
   | 'use'

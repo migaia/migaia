@@ -4,12 +4,12 @@ import postgres from 'postgres'
 import { describe, it, expect, onTestFinished } from 'vitest'
 import { createStorageHost } from '@migaia/storage-host'
 import { deferred } from '@migaia/utils/promise'
-import { postgresBackendPlugin } from '../src/index.js'
-import { pgDriver } from '../src/pg.js'
-import { postgresJsDriver } from '../src/postgres-js.js'
-import { pgCopyFeature } from '../src/features/copy.js'
-import { pgListenFeature } from '../src/features/listen.js'
-import type { IPgCopyTarget, IPgDriver } from '../src/types.js'
+import { postgresBackendPlugin } from '../src/index.ts'
+import { pgDriver } from '../src/pg.ts'
+import { postgresJsDriver } from '../src/postgres-js.ts'
+import { pgCopyFeature } from '../src/features/copy.ts'
+import { pgListenFeature } from '../src/features/listen.ts'
+import type { IPgCopyTarget, IPgDriver } from '../src/types.ts'
 /** These cases execute real native protocols against the original mandatory service fixture. */
 const connectionString = process.env.MIGAIA_PG_URL
 if (!connectionString)

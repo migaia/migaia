@@ -45,21 +45,21 @@ import {
   QdrantText,
   QdrantManagedVectorName,
   QdrantRequiredOperations
-} from './constants.js'
+} from './constants.ts'
 import {
   invalidArgument,
   normalizeQdrantError,
   normalizeOperationError,
   qdrantError,
   responseStatus
-} from './errors.js'
+} from './errors.ts'
 import { QdrantErrorCode } from '@migaia/storage-contract/error-code'
-import { nativeId } from './id.js'
-import { decodePointPayload } from './envelope.js'
-import { nativeCondition, orgFilter } from './filter.js'
-import { collectionVectors, readCollectionConfiguration, readCollectionRescore } from './schema.js'
-import type { IQdrantRescoreConfiguration, IQdrantRescoreVector } from './feature-types.js'
-import { nativeFeaturePort } from './native-feature.js'
+import { nativeId } from './id.ts'
+import { decodePointPayload } from './envelope.ts'
+import { nativeCondition, orgFilter } from './filter.ts'
+import { collectionVectors, readCollectionConfiguration, readCollectionRescore } from './schema.ts'
+import type { IQdrantRescoreConfiguration, IQdrantRescoreVector } from './feature-types.ts'
+import { nativeFeaturePort } from './native-feature.ts'
 import type {
   IQdrantBase,
   IQdrantStore,
@@ -67,9 +67,9 @@ import type {
   IQdrantHttp,
   IQdrantOperationName,
   IQdrantUpdateResult
-} from './types.js'
-import { QdrantVectorCollection } from './store-collection.js'
-import { createQdrantNativeFeaturePort, QdrantRankSource } from './store-rank.js'
+} from './types.ts'
+import { QdrantVectorCollection } from './store-collection.ts'
+import { createQdrantNativeFeaturePort, QdrantRankSource } from './store-rank.ts'
 
 /** A descriptor borrows one resolved physical schema across every organization. */
 export type ICollectionState = {

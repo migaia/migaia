@@ -1,14 +1,14 @@
-import { memoryNotificationsFeature } from '../../src/features/memory-notifications.js'
-import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.js'
+import { memoryNotificationsFeature } from '../../src/features/memory-notifications.ts'
+import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.ts'
 import { describe, expect, it } from 'vitest'
 import { isPlainObject } from '@migaia/utils/object'
 import { utf8ByteLength } from '@migaia/utils/bytes'
-import { createStorageHost, defineFeature } from '../../src/index.js'
-import { memoryBackendKind, memoryBackendPlugin } from '../../src/plugins/memory.js'
+import { createStorageHost, defineFeature } from '../../src/index.ts'
+import { memoryBackendKind, memoryBackendPlugin } from '../../src/plugins/memory.ts'
 import {
   safeJsonPayloadByteLength,
   type IBackendChangeController
-} from '../../src/authoring/backend.js'
+} from '../../src/authoring/backend.ts'
 
 /** Causal probes for the shared lifecycle and JSON-domain owners. */
 describe('owner convergence', () => {

@@ -12,13 +12,13 @@ import {
   throwIfAborted
 } from '@migaia/storage-host/sdk'
 import { attachSecondaryErrors } from '@migaia/utils/error'
-import type { IPgDriver, IPgConnection, IPgResult, IPgNativeParameter } from './types.js'
-import { encodePgParameters } from './parameters.js'
-import { decodePgRows } from './result.js'
-import { copyCommand } from './copy-command.js'
-import { pgResource } from './driver-resource.js'
-import { normalizePostgresError } from './errors.js'
-import { PgNames } from './constants.js'
+import type { IPgDriver, IPgConnection, IPgResult, IPgNativeParameter } from './types.ts'
+import { encodePgParameters } from './parameters.ts'
+import { decodePgRows } from './result.ts'
+import { copyCommand } from './copy-command.ts'
+import { pgResource } from './driver-resource.ts'
+import { normalizePostgresError } from './errors.ts'
+import { PgNames } from './constants.ts'
 /** Unsupported native protocol surfaces fail before a standard operation can modify data. */
 function unsupported(): StorageContractError {
   return new StorageContractError(StorageContractErrorCode.unsupported, {

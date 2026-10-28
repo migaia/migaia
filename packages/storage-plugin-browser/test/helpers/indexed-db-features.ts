@@ -1,10 +1,10 @@
-import { indexedDbKeysetFeature } from '../../src/features/indexed-db-keyset.js'
-import { indexedDbIndexesFeature } from '../../src/features/indexed-db-indexes.js'
-import { indexedDbTtlFeature } from '../../src/features/indexed-db-ttl.js'
-import { indexedDbBatchFeature } from '../../src/features/indexed-db-batch.js'
-import { indexedDbJournalFeature } from '../../src/features/indexed-db-journal.js'
-import { indexedDbNotificationsFeature } from '../../src/features/indexed-db-notifications.js'
-import { indexedDbChangeFeedFeature } from '../../src/features/indexed-db-change-feed.js'
+import { indexedDbKeysetFeature } from '../../src/features/indexed-db-keyset.ts'
+import { indexedDbIndexesFeature } from '../../src/features/indexed-db-indexes.ts'
+import { indexedDbTtlFeature } from '../../src/features/indexed-db-ttl.ts'
+import { indexedDbBatchFeature } from '../../src/features/indexed-db-batch.ts'
+import { indexedDbJournalFeature } from '../../src/features/indexed-db-journal.ts'
+import { indexedDbNotificationsFeature } from '../../src/features/indexed-db-notifications.ts'
+import { indexedDbChangeFeedFeature } from '../../src/features/indexed-db-change-feed.ts'
 
 /**
  * Existing native behavior fixtures explicitly retain the optional capabilities they previously

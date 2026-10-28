@@ -1,4 +1,4 @@
-import { indexUniqueConflictText } from '../error-text.js'
+import { indexUniqueConflictText } from '../error-text.ts'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import {
   assertTransactionOwner,
@@ -13,13 +13,13 @@ import {
   snapshotKeyRange,
   isStorageKeyInRange
 } from '@migaia/storage-host/sdk'
-import { StorageError } from '../types/errors.js'
+import { StorageError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
-import { StorageBackend, StorageOperation, StorageTransactionOperation } from '../constants.js'
+import { StorageErrorText } from '../error-text.ts'
+import { StorageBackend, StorageOperation, StorageTransactionOperation } from '../constants.ts'
 import { raceWithAbort } from '@migaia/utils/promise'
-import { fromIdbRequest, idbTransactionCommit } from '../utils/idb-request.js'
-import type { IKeyRange, IOperationContext, IStorageKey } from '../types/context.js'
+import { fromIdbRequest, idbTransactionCommit } from '../utils/idb-request.ts'
+import type { IKeyRange, IOperationContext, IStorageKey } from '../types/context.ts'
 import type {
   IRecordIndexDefinition,
   IRecordIndexHandle,
@@ -55,13 +55,13 @@ import {
   staleIndexHandleError,
   toIdbKey,
   withMutationLease
-} from './indexed-db.js'
-import { iterateIndexedDbIndex } from './indexed-db-backfill-commit.js'
+} from './indexed-db.ts'
+import { iterateIndexedDbIndex } from './indexed-db-backfill-commit.ts'
 import {
   assertHandle,
   registerIndexedDbBackfill,
   createIndexedDbScopeIndexes
-} from './indexed-db-backfill.js'
+} from './indexed-db-backfill.ts'
 
 export async function ensureRecordIndexes<TValue>(
   indexedDbContext: IIndexedDbContext<TValue>,
@@ -790,8 +790,8 @@ export {
   createIndexedDbScopeIndexes,
   indexedDbBackfillRenew,
   indexedDbBackfillCommitBatch
-} from './indexed-db-backfill.js'
-export type { IIndexedDbBackfillSession, IIndexedDbBackfillCommit } from './indexed-db-backfill.js'
+} from './indexed-db-backfill.ts'
+export type { IIndexedDbBackfillSession, IIndexedDbBackfillCommit } from './indexed-db-backfill.ts'
 export {
   commitIndexedDbBackfillNative,
   indexedDbBackfillFail,
@@ -802,4 +802,4 @@ export {
   applyIndexedDbBackfillProjection,
   finishIndexedDbBackfillCommit,
   iterateIndexedDbIndex
-} from './indexed-db-backfill-commit.js'
+} from './indexed-db-backfill-commit.ts'

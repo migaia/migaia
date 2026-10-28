@@ -1,7 +1,7 @@
-import { isStorageErrorFamily } from '../core/error-family.js'
+import { isStorageErrorFamily } from '../core/error-family.ts'
 import { isPlainObject } from '@migaia/utils/object'
 import { asyncDisposeKey } from '@migaia/plugin-host'
-import { repositoryMigrationKey } from '../core/record-layout.js'
+import { repositoryMigrationKey } from '../core/record-layout.ts'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -15,31 +15,31 @@ import {
   isStorageContractError,
   type ISecondaryIndexRecordStore
 } from '@migaia/storage-contract'
-import { compareStorageKeys, encodeOrderedStorageKey } from '../authoring/key.js'
-import { createRecordQueryWithoutKeyset } from '../authoring/query.js'
+import { compareStorageKeys, encodeOrderedStorageKey } from '../authoring/key.ts'
+import { createRecordQueryWithoutKeyset } from '../authoring/query.ts'
 
-import { StorageError, createStorageTypeError, createStorageAggregateError } from '../errors.js'
+import { StorageError, createStorageTypeError, createStorageAggregateError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { indexBackfillFailureText, StorageErrorText } from '../error-text.js'
+import { indexBackfillFailureText, StorageErrorText } from '../error-text.ts'
 
-import { composeRepositoryKey, decodeRepositoryKey, repositoryEntityRange } from './key.js'
-import { encodeFlatStorageKey, snapshotKeyRange } from '../core/key-domain.js'
+import { composeRepositoryKey, decodeRepositoryKey, repositoryEntityRange } from './key.ts'
+import { encodeFlatStorageKey, snapshotKeyRange } from '../core/key-domain.ts'
 
-import { createStorageOperationRuntime } from '../core/operation-reporter.js'
-import { EntityText } from './text.js'
-import { createEntityQuery } from './query-adapter.js'
-import { snapshotOperationContext } from '../authoring/context.js'
+import { createStorageOperationRuntime } from '../core/operation-reporter.ts'
+import { EntityText } from './text.ts'
+import { createEntityQuery } from './query-adapter.ts'
+import { snapshotOperationContext } from '../authoring/context.ts'
 import type { IOperationContext, IStorageKey } from '@migaia/storage-contract'
 
-import type { IIndexedListOptions, IInvalidRecordIssue, IRepository } from './types.js'
+import type { IIndexedListOptions, IInvalidRecordIssue, IRepository } from './types.ts'
 import {
   projectEntityIndexes,
   chooseEntityQueryIndex,
   supportsEntityIndexCondition,
   ENTITY_QUERY_INDEX_OPERATORS
-} from './index-projection.js'
-import { createOrderedRecordIndex } from '../core/ordered-record-index.js'
-import { safeJsonPayloadByteLength } from '../core/json.js'
+} from './index-projection.ts'
+import { createOrderedRecordIndex } from '../core/ordered-record-index.ts'
+import { safeJsonPayloadByteLength } from '../core/json.ts'
 import {
   asRecordIndexBackfillStore,
   RecordIndexBackfillPhase,
@@ -47,14 +47,14 @@ import {
   type IRecordIndexBackfillPreparation,
   type IRecordIndexBackfillSession,
   type IRecordIndexBackfillCandidate
-} from './backfill.js'
+} from './backfill.ts'
 import {
   EntityState,
   StorageMigrationStatus,
   StorageInvalidRecordAction,
   StorageOperation,
   StorageRecordStage
-} from './constants.js'
+} from './constants.ts'
 import {
   entityIterator,
   IListSnapshot,
@@ -66,9 +66,9 @@ import {
   IIndexedListSnapshot,
   IMatch,
   IEntityQuerySourceContext
-} from './repository-shared.js'
+} from './repository-shared.ts'
 
-import type { EntityRepositoryOwner } from './repository.js'
+import type { EntityRepositoryOwner } from './repository.ts'
 
 /** Own only the explicitly assembled indexes operations; the repository retains storage state. */
 export class EntityIndexesOwner<

@@ -16,12 +16,12 @@ import {
   isRecordStore,
   asRecordStore
 } from '@migaia/storage-contract'
-import { redisBackendPlugin, type IRedisDriver } from '../src/index.js'
-import { redisStreamsFeature } from '../src/features/streams.js'
-import { redisPubSubFeature } from '../src/features/pubsub.js'
-import { redisSortedSetsFeature } from '../src/features/sorted-sets.js'
-import { redisRateLimitFeature } from '../src/features/rate-limit.js'
-import { redisChangeStreamFeature } from '../src/features/change-stream.js'
+import { redisBackendPlugin, type IRedisDriver } from '../src/index.ts'
+import { redisStreamsFeature } from '../src/features/streams.ts'
+import { redisPubSubFeature } from '../src/features/pubsub.ts'
+import { redisSortedSetsFeature } from '../src/features/sorted-sets.ts'
+import { redisRateLimitFeature } from '../src/features/rate-limit.ts'
+import { redisChangeStreamFeature } from '../src/features/change-stream.ts'
 import { rediSearchVectorFeature } from '@migaia/storage-plugin-redis/features/search'
 
 /** Ambient clients make these declaration consumers compile without starting a service. */

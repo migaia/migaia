@@ -4,11 +4,11 @@ import {
   StorageContractErrorCode,
   type IBackendKind
 } from '@migaia/storage-contract'
-import { ENTITY_UNIQUE_WRITE_LOCK, StorageOperation } from '../constants.js'
+import { ENTITY_UNIQUE_WRITE_LOCK, StorageOperation } from '../constants.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
-import { normalizeError } from './backend-errors.js'
+import { normalizeError } from './backend-errors.ts'
 import { readAbortReason, throwIfAborted } from '@migaia/storage-host/sdk'
-import { subscribeToAbort } from './backend-errors.js'
+import { subscribeToAbort } from './backend-errors.ts'
 import type { IStorageOperationRuntime } from '@migaia/storage-host/sdk'
 
 /** Structural host seam keeps DOM declarations out of the entity/memory public type graph. */

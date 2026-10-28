@@ -1,5 +1,5 @@
 import { expectTypeOf } from 'vitest'
-import type { IQueryConditions } from '../src/index.js'
+import type { IQueryConditions } from '../src/index.ts'
 
 /** A finite type projection preserves the adapter state without changing canonical operand domains. */
 function exactConditionState(

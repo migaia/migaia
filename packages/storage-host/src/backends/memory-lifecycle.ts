@@ -1,13 +1,13 @@
 import type { IStorageChange } from '@migaia/storage-contract'
-import { createBackendLifecycleController } from '../core/backend-lifecycle.js'
+import { createBackendLifecycleController } from '../core/backend-lifecycle.ts'
 import type {
   IBackendChangeController,
   IBackendChangeControllerOptions,
   IBackendLifecycleController
-} from '../core/change-types.js'
-import { StorageError } from '../errors.js'
+} from '../core/change-types.ts'
+import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
+import { StorageErrorText } from '../error-text.ts'
 
 /** Memory base retains physical lifecycle while optional notification calls fail explicitly. */
 class MemoryLifecycleController implements IBackendChangeController {

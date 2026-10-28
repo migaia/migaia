@@ -1,6 +1,6 @@
 import type { IOperationContext } from '@migaia/storage-contract'
-import type { ISparqlEndpoint, ISparqlAbortSignal, IRdfGraphTarget } from './endpoint.js'
-import type { ISparqlStore } from './types.js'
+import type { ISparqlEndpoint, ISparqlAbortSignal, IRdfGraphTarget } from './endpoint.ts'
+import type { ISparqlStore } from './types.ts'
 /** The installed native store lends only its existing operation/organization boundary to Features. */
 export const nativeFeaturePort = Symbol('sparql-native-feature')
 export type ISparqlNativeFeaturePort = {

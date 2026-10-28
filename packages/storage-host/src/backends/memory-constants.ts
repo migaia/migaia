@@ -1,4 +1,4 @@
-import type { IStorageChannel } from '../errors.js'
+import type { IStorageChannel } from '../errors.ts'
 
 /** Stable memory endpoint names bind real operations to the original host execution list. */
 export const MemoryOperation = {

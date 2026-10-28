@@ -4,12 +4,12 @@ import { createClientPool } from 'redis'
 import { createStorageHost } from '@migaia/storage-host'
 import { counter, kv, records, ttl, durableChangeFeed } from '@migaia/storage-contract'
 import { runConformance } from '@migaia/storage-contract/conformance'
-import { redisBackendPlugin } from '../src/index.js'
-import { nodeRedisDriver } from '../src/adapters/node-redis.js'
-import { ioredisDriver } from '../src/adapters/ioredis.js'
-import { createRedisLayout } from '../src/layout.js'
-import { redisCapabilities } from '../src/types.js'
-import { redisChangeStreamFeature } from '../src/features/change-stream.js'
+import { redisBackendPlugin } from '../src/index.ts'
+import { nodeRedisDriver } from '../src/adapters/node-redis.ts'
+import { ioredisDriver } from '../src/adapters/ioredis.ts'
+import { createRedisLayout } from '../src/layout.ts'
+import { redisCapabilities } from '../src/types.ts'
+import { redisChangeStreamFeature } from '../src/features/change-stream.ts'
 
 /** Each canonical case receives an empty namespace and only its own native keys are removed. */
 for (const [service, url] of [

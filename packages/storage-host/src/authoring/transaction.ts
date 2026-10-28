@@ -17,7 +17,7 @@ import {
   type ITransactionBuilder,
   type IOptimisticTransactionBuilder
 } from '@migaia/storage-contract'
-import { snapshotLockKey, normalizeLockKeys, associateNormalizedLockKeys } from './concurrency.js'
+import { snapshotLockKey, normalizeLockKeys, associateNormalizedLockKeys } from './concurrency.ts'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   invalidTransaction,
@@ -28,8 +28,8 @@ import {
   rejectedTransactionResult,
   transactionRegistrations,
   RegistrationKind
-} from './transaction-registration.js'
-import type { ITransactionState, IViewRegistration } from './transaction-registration.js'
+} from './transaction-registration.ts'
+import type { ITransactionState, IViewRegistration } from './transaction-registration.ts'
 
 /** One accepted operation owns its public result and fresh view until actual settlement. */
 class TransactionOperation<TScope extends object, TResult> {
@@ -409,8 +409,8 @@ export {
   runTransactionIteratorOperation,
   deriveTransactionIterator,
   assertTransactionOwner
-} from './transaction-registration.js'
+} from './transaction-registration.ts'
 export {
   readTransactionOperationContext,
   useTransactionCapability
-} from './transaction-capability.js'
+} from './transaction-capability.ts'

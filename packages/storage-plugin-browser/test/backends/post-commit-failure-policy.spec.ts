@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
-import { createMemoryTestStore } from '../helpers/installed-backends.js'
-import { createIndexedDbTestStore } from '../helpers/installed-backends.js'
+import { createMemoryTestStore } from '../helpers/installed-backends.ts'
+import { createIndexedDbTestStore } from '../helpers/installed-backends.ts'
 
 /** Creates an isolated fake IndexedDB store for each post-commit failure case. */
 const freshIndexedDb = () =>

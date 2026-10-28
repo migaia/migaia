@@ -5,11 +5,11 @@ import { it, expect, onTestFinished } from 'vitest'
 import { createStorageHost, definePlugin } from '@migaia/storage-host'
 import { ConcurrencyPolicy, lockKey } from '@migaia/storage-host/sdk'
 import { type IConcurrencyPolicy } from '@migaia/storage-contract'
-import { postgresBackendPlugin } from '../src/index.js'
-import { pgDriver } from '../src/pg.js'
+import { postgresBackendPlugin } from '../src/index.ts'
+import { pgDriver } from '../src/pg.ts'
 import { deferred } from '@migaia/utils/promise'
 import { walkErrorCauses } from '@migaia/utils/error'
-import type { IPgResult } from '../src/index.js'
+import type { IPgResult } from '../src/index.ts'
 
 /** Native fixtures change only their own transaction isolation, never caller-wide settings. */
 async function installed(

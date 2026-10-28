@@ -1,4 +1,4 @@
-import { storageJournalPlugin } from '../src/journal.js'
+import { storageJournalPlugin } from '../src/journal.ts'
 import { describe, expect, it } from 'vitest'
 import { Logger } from '@migaia/logger'
 import {
@@ -8,14 +8,14 @@ import {
   memoryLogStore,
   type ILogPayloadInput
 } from '@migaia/logger/plugins/durable'
-import { lockKey } from '../src/authoring/concurrency.js'
+import { lockKey } from '../src/authoring/concurrency.ts'
 import { ttl, type IStorageResource } from '@migaia/storage-contract'
-import { createStorageHost, createOrgId } from '../src/index.js'
-import { memoryBackendPlugin } from '../src/plugins/memory.js'
-import { resolveStorageJournalBinding } from '../src/journal/binding.js'
-import { snapshotStorageJournalConfiguration } from '../src/journal/configuration-options.js'
-import { createStorageNativeJournal } from '../src/journal/commit.js'
-import { StorageJournalKind } from '../src/journal/constants.js'
+import { createStorageHost, createOrgId } from '../src/index.ts'
+import { memoryBackendPlugin } from '../src/plugins/memory.ts'
+import { resolveStorageJournalBinding } from '../src/journal/binding.ts'
+import { snapshotStorageJournalConfiguration } from '../src/journal/configuration-options.ts'
+import { createStorageNativeJournal } from '../src/journal/commit.ts'
+import { StorageJournalKind } from '../src/journal/constants.ts'
 
 /** Real durable plugins use their existing scheduling and explicit execution budget. */
 const runtimeManager = {

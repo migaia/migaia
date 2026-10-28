@@ -1,6 +1,6 @@
-import { memoryNotificationsFeature } from '../src/features/memory-notifications.js'
-import { memoryChangeFeedFeature } from '../src/features/memory-change-feed.js'
-import { catalog } from './helpers/catalog.js'
+import { memoryNotificationsFeature } from '../src/features/memory-notifications.ts'
+import { memoryChangeFeedFeature } from '../src/features/memory-change-feed.ts'
+import { catalog } from './helpers/catalog.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import {
@@ -9,10 +9,10 @@ import {
   definePlugin,
   defineFeature,
   defineStorageBackendKind
-} from '../src/index.js'
+} from '../src/index.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { memoryBackendKind, memoryBackendPlugin } from '../src/plugins/memory.js'
-import type { IStoragePluginCore } from '../src/index.js'
+import { memoryBackendKind, memoryBackendPlugin } from '../src/plugins/memory.ts'
+import type { IStoragePluginCore } from '../src/index.ts'
 import type { IStorageBase } from '@migaia/storage-contract'
 /** The kind describes the real store and native client without granting either one. */
 const kind = defineStorageBackendKind<ReturnType<typeof catalog>['store'], Map<string, string>>()(

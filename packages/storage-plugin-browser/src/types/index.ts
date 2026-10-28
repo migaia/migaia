@@ -1,4 +1,4 @@
-export { ConflictPolicy } from './context.js'
+export { ConflictPolicy } from './context.ts'
 export type {
   IOperationContext,
   IStorageKey,
@@ -6,14 +6,14 @@ export type {
   IWriteOptions,
   ISyncWriteOptions,
   IConflictPolicy
-} from './context.js'
-export type { IBackendKind, IStorageCapabilities } from './capabilities.js'
+} from './context.ts'
+export type { IBackendKind, IStorageCapabilities } from './capabilities.ts'
 export {
   StorageError,
   type IStorageErrorDetails,
   type IStorageChannel,
   type IExtensionStage
-} from './errors.js'
+} from './errors.ts'
 export {
   asRecordStore,
   isRecordStore,
@@ -22,7 +22,7 @@ export {
   type IRecordStore,
   type ISyncCapableStore,
   type IWebStorageLike
-} from './storage.js'
+} from './storage.ts'
 export type { ITransactionScope, ITransactionWriteOptions } from '@migaia/storage-contract'
 export type {
   ICookieStore,
@@ -31,4 +31,4 @@ export type {
   ICookieRemoveContext,
   ICookieScope,
   ISameSite
-} from './cookie.js'
+} from './cookie.ts'

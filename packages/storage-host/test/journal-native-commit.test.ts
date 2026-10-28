@@ -1,14 +1,14 @@
-import { storageJournalPlugin } from '../src/journal.js'
+import { storageJournalPlugin } from '../src/journal.ts'
 import { describe, expect, it } from 'vitest'
 import { Logger } from '@migaia/logger'
 import { binlog, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'
-import { lockKey } from '../src/authoring/concurrency.js'
-import { createStorageHost, createOrgId } from '../src/index.js'
-import { memoryBackendPlugin } from '../src/plugins/memory.js'
-import { storageLogStore } from '../src/journal.js'
-import { resolveStorageJournalBinding } from '../src/journal/binding.js'
-import { createStorageNativeJournal } from '../src/journal/commit.js'
-import { decodeFlatStorageKey } from '../src/core/key-domain.js'
+import { lockKey } from '../src/authoring/concurrency.ts'
+import { createStorageHost, createOrgId } from '../src/index.ts'
+import { memoryBackendPlugin } from '../src/plugins/memory.ts'
+import { storageLogStore } from '../src/journal.ts'
+import { resolveStorageJournalBinding } from '../src/journal/binding.ts'
+import { createStorageNativeJournal } from '../src/journal/commit.ts'
+import { decodeFlatStorageKey } from '../src/core/key-domain.ts'
 
 /** Real logger scheduling stays active while expected diagnostics avoid process output. */
 const runtimeManager = {

@@ -1,4 +1,4 @@
-import { entityTestFeatures } from '../helpers/entity-features.js'
+import { entityTestFeatures } from '../helpers/entity-features.ts'
 import {
   kv,
   records,
@@ -27,15 +27,15 @@ import {
   STORAGE_HOST_ERROR_SOURCE,
   STORAGE_BROWSER_ERROR_SOURCE
 } from '@migaia/storage-contract/error-code'
-import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
+import { indexedDbBackendPlugin } from '../../src/indexed-db.ts'
 import { UTILS_SOURCE, UtilsTimeoutError, walkErrorCauses } from '@migaia/utils/error'
-import { normalizeIndexedDbOperationError } from '../../src/backends/indexed-db.js'
+import { normalizeIndexedDbOperationError } from '../../src/backends/indexed-db.ts'
 import { encodeFlatStorageKey } from '@migaia/storage-host/sdk'
-import { captureOperationCleanup } from '../helpers/operation-reporter.js'
+import { captureOperationCleanup } from '../helpers/operation-reporter.ts'
 import {
   createIndexedDbTestStore,
   createIndexedDbBackfillTestStore
-} from '../helpers/installed-backends.js'
+} from '../helpers/installed-backends.ts'
 
 /** Public installation keeps the original native failure reachable below its host/plugin wrappers. */
 const expectNativeInstallationFailure = async (

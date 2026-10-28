@@ -3,9 +3,9 @@ import {
   type StorageContractError,
   type IStorageKey
 } from '@migaia/storage-contract'
-import { StorageError } from '../types/errors.js'
+import { StorageError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
-import type { IBackendKind } from '../types/capabilities.js'
+import type { IBackendKind } from '../types/capabilities.ts'
 
 /**
  * 各浏览器的配额异常构造方式不同。按 name 与旧版 code 双重识别，覆盖 Firefox `NS_ERROR_DOM_QUOTA_REACHED` 及 WebKit/旧 DOM code

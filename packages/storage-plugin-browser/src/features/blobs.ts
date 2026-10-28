@@ -10,12 +10,12 @@ import {
   type IStorageFeature,
   type IStorageFeatureOutput
 } from '@migaia/storage-host'
-import { indexedDbBackendKind } from '../host/builtin-kinds.js'
-import { INDEXED_DB_BLOB_STORE, StorageBackend } from '../constants.js'
-import { StorageError } from '../types/errors.js'
+import { indexedDbBackendKind } from '../host/builtin-kinds.ts'
+import { INDEXED_DB_BLOB_STORE, StorageBackend } from '../constants.ts'
+import { StorageError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
-import { fromIdbRequest, normalizeIdbRequestFailure } from '../utils/idb-request.js'
+import { StorageErrorText } from '../error-text.ts'
+import { fromIdbRequest, normalizeIdbRequestFailure } from '../utils/idb-request.ts'
 
 /** Blob and File values use the selected native store's structured clone without a codec. */
 export type IIndexedDbBlobApi = {

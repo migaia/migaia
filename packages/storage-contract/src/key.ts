@@ -1,8 +1,8 @@
-import { StorageContractError, StorageContractErrorCode } from './errors.js'
+import { StorageContractError, StorageContractErrorCode } from './errors.ts'
 import { isArrayBuffer } from '@migaia/utils/bytes'
-import { type IBackendKind } from './capabilities.js'
-import { type IStorageKey } from './context.js'
-import { StorageContractErrorText } from './error-text.js'
+import { type IBackendKind } from './capabilities.ts'
+import { type IStorageKey } from './context.ts'
+import { StorageContractErrorText } from './error-text.ts'
 
 /** Hard limits protect flat-key decoding from pathological persisted input. */
 export const KEY_DOMAIN_LIMITS = Object.freeze({

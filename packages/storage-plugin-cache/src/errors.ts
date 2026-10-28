@@ -1,6 +1,6 @@
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { CacheText } from './constants.js'
+import { CacheText } from './constants.ts'
 import { CacheErrorCode, STORAGE_CACHE_ERROR_SOURCE } from '@migaia/storage-contract/error-code'
 import type { ICacheErrorCode } from '@migaia/storage-contract/error-code'
 

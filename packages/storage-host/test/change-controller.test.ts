@@ -1,4 +1,4 @@
-import { createBackendChangeController } from '../src/core/change-controller.js'
+import { createBackendChangeController } from '../src/core/change-controller.ts'
 import { describe, expect, it, vi } from 'vitest'
 import {
   createStorageHost,
@@ -6,11 +6,11 @@ import {
   defineFeature,
   defineStorageBackendKind,
   type IStoragePluginCore
-} from '../src/index.js'
-import type { IBackendChangeController } from '../src/authoring/backend.js'
+} from '../src/index.ts'
+import type { IBackendChangeController } from '../src/authoring/backend.ts'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import { walkErrorCauses } from '@migaia/utils/error'
-import { catalog } from './helpers/catalog.js'
+import { catalog } from './helpers/catalog.ts'
 
 /** One actual map backend is bound to the controller's existing mutation resource owner. */
 const kind = defineStorageBackendKind<ReturnType<typeof catalog>['store'], Map<string, string>>()(

@@ -9,10 +9,10 @@ import {
   type TypeMapping
 } from 'redis'
 import { createStorageOperationReporter, reportCleanupError } from '@migaia/storage-host/sdk'
-import { RedisCommand, RedisReply, RedisText } from '../constants.js'
+import { RedisCommand, RedisReply, RedisText } from '../constants.ts'
 import { RedisErrorCode } from '@migaia/storage-contract/error-code'
-import type { IRedisConnection, IRedisDriver } from '../driver.js'
-import { normalizeRedisError, invalidArgument, redisError } from '../errors.js'
+import type { IRedisConnection, IRedisDriver } from '../driver.ts'
+import { normalizeRedisError, invalidArgument, redisError } from '../errors.ts'
 import {
   runRedisCallback,
   captureCommand,
@@ -21,7 +21,7 @@ import {
   execEntries,
   requireExecArray,
   subscriptionResource
-} from '../native.js'
+} from '../native.ts'
 
 /** The real SDK owns native leases; this driver owns only borrowed root metadata and reporting. */
 class NodeRedisDriver<

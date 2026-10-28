@@ -29,7 +29,7 @@ import {
   type IBlobApi
 } from '@migaia/storage-contract'
 import type { ICollectionsCodecValue } from '@migaia/serialize/codecs/collections-json'
-import { Archive } from './constants.js'
+import { Archive } from './constants.ts'
 import { ArchiveErrorCode } from '@migaia/storage-contract/error-code'
 import {
   archiveError,
@@ -37,8 +37,8 @@ import {
   unsupported,
   transactionArchiveError,
   isArchiveError
-} from './errors.js'
-import { snapshotArchiveOptions, prefixUpper, type IArchiveConfiguration } from './policy.js'
+} from './errors.ts'
+import { snapshotArchiveOptions, prefixUpper, type IArchiveConfiguration } from './policy.ts'
 import {
   archivePrefix,
   finishArchiveResource,
@@ -48,7 +48,7 @@ import {
   readSegment,
   segmentStream,
   type IArchiveRow
-} from './segment.js'
+} from './segment.ts'
 import {
   controlKey,
   manifestKey,
@@ -57,15 +57,15 @@ import {
   readRefs,
   sameManifest,
   changeRefs
-} from './metadata.js'
+} from './metadata.ts'
 import type {
   IArchiveApi,
   IArchivePluginOptions,
   IArchiveRunOptions,
   IArchiveGetOptions,
   IArchiveRunResult
-} from './types.js'
-import './hooks.js'
+} from './types.ts'
+import './hooks.ts'
 
 /** Ordinary extensions borrow only these original installation and runtime ports. */
 type IArchiveCore = Pick<
@@ -586,7 +586,7 @@ class ArchiveOperations {
     hot: IArchiveHot,
     cold: IBlobApi,
     ctx: IOperationContext
-  ): Promise<import('./types.js').IArchiveSweepResult> {
+  ): Promise<import('./types.ts').IArchiveSweepResult> {
     let after: string | undefined,
       scanned = 0,
       removed = 0

@@ -13,8 +13,8 @@ import {
   StorageContractErrorCode,
   StorageContractErrorText
 } from '@migaia/storage-contract'
-import { snapshotOperationContext } from './context.js'
-import { createStorageIteratorLifetime } from './resource.js'
+import { snapshotOperationContext } from './context.ts'
+import { createStorageIteratorLifetime } from './resource.ts'
 import { isUint8Array } from '@migaia/utils/bytes'
 
 /** Return domains derive from the original API so backends do not maintain parallel option types. */

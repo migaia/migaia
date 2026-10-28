@@ -3,9 +3,9 @@ import { QdrantClient } from '@qdrant/js-client-rest'
 import { createStorageHost } from '@migaia/storage-host'
 import { ttl, vector } from '@migaia/storage-contract'
 import { runConformance } from '@migaia/storage-contract/conformance'
-import { qdrantBackendPlugin, type IQdrantHttp } from '../src/index.js'
-import { fetchHttp } from '../src/http.js'
-import { qdrantClientHttp } from '../src/client.js'
+import { qdrantBackendPlugin, type IQdrantHttp } from '../src/index.ts'
+import { fetchHttp } from '../src/http.ts'
+import { qdrantClientHttp } from '../src/client.ts'
 
 /** Both actual adapters consume the same service address from the repository fixture launcher. */
 const url = process.env.MIGAIA_QDRANT_URL

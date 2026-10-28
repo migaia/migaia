@@ -5,7 +5,7 @@ import {
   STORAGE_BROWSER_ERROR_SOURCE
 } from '@migaia/storage-contract/error-code'
 import { walkErrorCauses } from '@migaia/utils/error'
-import { createCookieTestStore } from '../helpers/installed-backends.js'
+import { createCookieTestStore } from '../helpers/installed-backends.ts'
 
 describe('cookiesHost backend（node 环境，无 globalThis.document）', () => {
   it('未注入 document 且 globalThis.document 不存在时抛 BACKEND_UNAVAILABLE', async () => {

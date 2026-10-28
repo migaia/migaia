@@ -4,10 +4,10 @@ import type {
   IRecordIndexProjection,
   IStorageKey
 } from '@migaia/storage-contract'
-import { encodeFlatStorageKey } from './key-domain.js'
-import { StorageError } from '../errors.js'
+import { encodeFlatStorageKey } from './key-domain.ts'
+import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
+import { StorageErrorText } from '../error-text.ts'
 
 /** One unique projected value and its original logical record identity. */
 export type IUniqueIndexOwner = {

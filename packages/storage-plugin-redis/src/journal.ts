@@ -16,10 +16,10 @@ import {
   type IBackendJournalTransaction,
   type IBackendChangeController
 } from '@migaia/storage-host/sdk'
-import { encodeRedisValue, decodeRedisValue, type IRedisChannel } from './layout.js'
-import { invalidArgument } from './errors.js'
-import { RedisText } from './constants.js'
-import type { RedisDraft } from './transaction.js'
+import { encodeRedisValue, decodeRedisValue, type IRedisChannel } from './layout.ts'
+import { invalidArgument } from './errors.ts'
+import { RedisText } from './constants.ts'
+import type { RedisDraft } from './transaction.ts'
 
 /** Original portable wire and native absolute TTL form one opaque diagnostic journal image. */
 function image(

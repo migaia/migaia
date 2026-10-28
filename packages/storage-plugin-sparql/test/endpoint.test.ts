@@ -2,8 +2,8 @@ import { createServer } from 'node:http'
 import { describe, it, expect } from 'vitest'
 import { Store } from 'oxigraph'
 import { term } from '@migaia/storage-host/sdk'
-import { httpEndpoint } from '../src/http.js'
-import { oxigraphEndpoint } from '../src/oxigraph.js'
+import { httpEndpoint } from '../src/http.ts'
+import { oxigraphEndpoint } from '../src/oxigraph.ts'
 describe('native endpoint adapters', () => {
   it('runs actual Oxigraph query/update and atomic graph replacement without owning the store', async () => {
     const native = new Store(),

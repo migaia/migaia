@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { StorageError } from '../../src/types/errors'
+import { StorageError } from '../../src/types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 
 describe('StorageError', () => {

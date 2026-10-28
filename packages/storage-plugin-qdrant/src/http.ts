@@ -1,13 +1,13 @@
 import type { IOperationContext } from '@migaia/storage-contract'
 import { throwIfAborted } from '@migaia/storage-host/sdk'
-import { QdrantRoute, QdrantText } from './constants.js'
+import { QdrantRoute, QdrantText } from './constants.ts'
 import { QdrantErrorCode } from '@migaia/storage-contract/error-code'
-import { QdrantErrorText } from './error-text.js'
-import { invalidArgument, normalizeQdrantError, qdrantError } from './errors.js'
-import { nativeResult } from './protocol.js'
-import { nativeHttp } from './native.js'
-import { qdrantWireValue } from './wire.js'
-import type { IQdrantHttp, IQdrantOperationName } from './types.js'
+import { QdrantErrorText } from './error-text.ts'
+import { invalidArgument, normalizeQdrantError, qdrantError } from './errors.ts'
+import { nativeResult } from './protocol.ts'
+import { nativeHttp } from './native.ts'
+import { qdrantWireValue } from './wire.ts'
+import type { IQdrantHttp, IQdrantOperationName } from './types.ts'
 /** Runtime fetch is the only native transport loaded by this explicit HTTP entry. */
 export function fetchHttp(url: string, apiKey?: string): IQdrantHttp {
   const base = parseQdrantUrl(url)

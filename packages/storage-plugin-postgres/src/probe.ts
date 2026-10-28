@@ -1,7 +1,7 @@
-import type { IPgConfiguration } from './schema.js'
+import type { IPgConfiguration } from './schema.ts'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
-import { PostgresErrorText } from './error-text.js'
-import { PgNames } from './constants.js'
+import { PostgresErrorText } from './error-text.ts'
+import { PgNames } from './constants.ts'
 /** Installation records the actual server limits and transaction isolation without guessing by URL. */
 export type IPgProbe = {
   readonly version: string

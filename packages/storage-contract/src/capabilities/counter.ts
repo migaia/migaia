@@ -1,7 +1,7 @@
-import { type IOperationContext } from '../context.js'
-import { type IWriteConcurrencyOptions } from '../concurrency.js'
-import { STORAGE_COUNTER_METHODS } from '../capability-constants.js'
-import { defineStandardStorageCapability, validateCapabilityMethods } from '../capability-token.js'
+import { type IOperationContext } from '../context.ts'
+import { type IWriteConcurrencyOptions } from '../concurrency.ts'
+import { STORAGE_COUNTER_METHODS } from '../capability-constants.ts'
+import { defineStandardStorageCapability, validateCapabilityMethods } from '../capability-token.ts'
 
 /** Counters atomically update canonical decimal integers in the existing text channel. */
 export type ICounterApi = {

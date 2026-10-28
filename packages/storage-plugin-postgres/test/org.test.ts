@@ -3,10 +3,10 @@ import { Pool } from 'pg'
 import { it, expect, onTestFinished } from 'vitest'
 import { createStorageHost } from '@migaia/storage-host'
 import { vector, records } from '@migaia/storage-contract'
-import { postgresBackendPlugin } from '../src/index.js'
-import { pgDriver } from '../src/pg.js'
-import { pgvectorFeature } from '../src/features/pgvector.js'
-import { pgCopyFeature } from '../src/features/copy.js'
+import { postgresBackendPlugin } from '../src/index.ts'
+import { pgDriver } from '../src/pg.ts'
+import { pgvectorFeature } from '../src/features/pgvector.ts'
+import { pgCopyFeature } from '../src/features/copy.ts'
 /** Actual organization projection must retain the original selected provider authority. */
 it('routes the same text, record and selected vector identities to their immutable organization', async () => {
   const connectionString = process.env.MIGAIA_PG_URL

@@ -1,4 +1,4 @@
-import { entityTestFeatures } from '../helpers/entity-features.js'
+import { entityTestFeatures } from '../helpers/entity-features.ts'
 import { describe, expect, it } from 'vitest'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { defineEntity } from '@migaia/storage-host/entity'
@@ -19,9 +19,9 @@ import {
   createCookieTestStore,
   createIndexedDbBackfillTestStore,
   createMemoryTestStore
-} from '../helpers/installed-backends.js'
-import { fakeWebStorage } from '../../src/testing/fake-web-storage.js'
-import { fakeCookieDocument } from '../../src/testing/fake-cookie-document.js'
+} from '../helpers/installed-backends.ts'
+import { fakeWebStorage } from '../../src/testing/fake-web-storage.ts'
+import { fakeCookieDocument } from '../../src/testing/fake-cookie-document.ts'
 
 /** The same runner supplies assertions; the canonical suite owns every fresh case fixture. */
 const harness: IConformanceHarness = { describe, expect, it, skip: it.skip }

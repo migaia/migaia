@@ -38,19 +38,19 @@ import type {
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
 import { createConcurrencyLimiter } from '@migaia/utils/promise'
-import { SqliteNames } from './constants.js'
-import { sqliteError, normalizeSqliteFailure } from './errors.js'
+import { SqliteNames } from './constants.ts'
+import { sqliteError, normalizeSqliteFailure } from './errors.ts'
 import { SqliteErrorCode } from '@migaia/storage-contract/error-code'
-import { SqliteErrorText } from './error-text.js'
-import { createSqliteStatements } from './sql.js'
-import type { ISqliteJournalTerminal } from './journal.js'
+import { SqliteErrorText } from './error-text.ts'
+import { createSqliteStatements } from './sql.ts'
+import type { ISqliteJournalTerminal } from './journal.ts'
 import type {
   ISqliteOptions,
   ISqliteStore,
   ISqliteDriver,
   ISqliteTransactionScope,
   ISqliteValue
-} from './types.js'
+} from './types.ts'
 
 /** Physical driver ownership is exclusive and released only after its store has drained. */
 export const claimedDrivers = new WeakSet<object>()

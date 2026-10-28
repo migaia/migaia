@@ -1,7 +1,7 @@
 import type { RedisClient as IBunRedisClient } from 'bun'
-import type { IRedisConnection, IRedisDriver } from '../driver.js'
+import type { IRedisConnection, IRedisDriver } from '../driver.ts'
 import { RedisErrorCode } from '@migaia/storage-contract/error-code'
-import { RedisCommand, RedisReply } from '../constants.js'
+import { RedisCommand, RedisReply } from '../constants.ts'
 import {
   runRedisCallback,
   captureCommand,
@@ -10,8 +10,8 @@ import {
   requireExecArray,
   subscriptionResource,
   RedisConnectionPool
-} from '../native.js'
-import { normalizeRedisError, invalidArgument, redisError } from '../errors.js'
+} from '../native.ts'
+import { normalizeRedisError, invalidArgument, redisError } from '../errors.ts'
 import { createStorageOperationReporter, reportCleanupError } from '@migaia/storage-host/sdk'
 
 /** The real SDK owns native leases; this driver owns only borrowed root metadata and reporting. */

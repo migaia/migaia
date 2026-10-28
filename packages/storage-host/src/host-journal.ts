@@ -1,23 +1,23 @@
 // Journal configuration and per-organization journal preparation for one storage host (see ./storage-host.ts).
-import { isStorageErrorFamily } from './core/error-family.js'
-import { readStorageHookFailureCode } from './hooks.js'
-import { StorageHookName as Hook } from './hook-names.js'
+import { isStorageErrorFamily } from './core/error-family.ts'
+import { readStorageHookFailureCode } from './hooks.ts'
+import { StorageHookName as Hook } from './hook-names.ts'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
-import { StorageError } from './errors.js'
+import { StorageError } from './errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from './error-text.js'
-import { type IStorageStoreCell } from './store-cell.js'
-import type { IStorageBackendPluginHandle, IStoragePipelineInput } from './types.js'
-import { readStorageJournalConfiguration } from './journal/plugin-configuration.js'
-import { type IStorageJournalBackendAccess } from './journal/binding.js'
+import { StorageErrorText } from './error-text.ts'
+import { type IStorageStoreCell } from './store-cell.ts'
+import type { IStorageBackendPluginHandle, IStoragePipelineInput } from './types.ts'
+import { readStorageJournalConfiguration } from './journal/plugin-configuration.ts'
+import { type IStorageJournalBackendAccess } from './journal/binding.ts'
 import {
   snapshotStorageJournalConfiguration,
   type IStorageJournalConfigurationSnapshot
-} from './journal/configuration-options.js'
-import type { IStorageJournalConfiguration, IStorageJournalExecutionPort } from './journal/types.js'
-import type { IStorageJournalRuntime } from './journal/loader.js'
-import type { prepareStorageJournalConfiguration } from './journal/configuration.js'
-import type { IStorageNativeRegistrationContext, StorageHost } from './storage-host.js'
+} from './journal/configuration-options.ts'
+import type { IStorageJournalConfiguration, IStorageJournalExecutionPort } from './journal/types.ts'
+import type { IStorageJournalRuntime } from './journal/loader.ts'
+import type { prepareStorageJournalConfiguration } from './journal/configuration.ts'
+import type { IStorageNativeRegistrationContext, StorageHost } from './storage-host.ts'
 
 /** Own the host's journal configuration, runtime and per-organization journal preparation. */
 export class StorageHostJournal {

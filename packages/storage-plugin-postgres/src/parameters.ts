@@ -1,7 +1,7 @@
 import type { ISqlValue } from '@migaia/storage-contract'
-import type { IPgNativeArrayParameter, IPgNativeParameter } from './types.js'
-import { invalidArgument } from './errors.js'
-import { PostgresErrorText } from './error-text.js'
+import type { IPgNativeArrayParameter, IPgNativeParameter } from './types.ts'
+import { invalidArgument } from './errors.ts'
+import { PostgresErrorText } from './error-text.ts'
 /** One array-text encoder is used by all three actual adapters and both root/transaction batches. */
 function arrayText(input: IPgNativeArrayParameter): string {
   const arrayType = input.arrayType

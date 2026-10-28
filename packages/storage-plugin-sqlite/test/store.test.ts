@@ -13,8 +13,8 @@ import {
   compareStorageKeys
 } from '@migaia/storage-host/sdk'
 import { runConformance } from '@migaia/storage-contract/conformance'
-import { sqliteBackendPlugin, type ISqliteValue } from '../src/index.js'
-import { nodeSqliteDriver } from '../src/node.js'
+import { sqliteBackendPlugin, type ISqliteValue } from '../src/index.ts'
+import { nodeSqliteDriver } from '../src/node.ts'
 
 /** Each case owns its actual file and disposes host before the borrowed native connection. */
 async function installed(

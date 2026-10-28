@@ -3,9 +3,9 @@ import {
   StorageContractError,
   StorageContractErrorCode,
   type IStorageIterator
-} from '../src/index.js'
-import { conformanceRows, type IConformanceHarness } from '../src/conformance/harness.js'
-import { conformanceTransactionFailure } from '../src/conformance/channels.js'
+} from '../src/index.ts'
+import { conformanceRows, type IConformanceHarness } from '../src/conformance/harness.ts'
+import { conformanceTransactionFailure } from '../src/conformance/channels.ts'
 describe('consumer conformance helpers', () => {
   it('retains iterator read failure before original iterator cleanup failure', async () => {
     const primary = new Error('iterator read failed')

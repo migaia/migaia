@@ -22,14 +22,14 @@ import {
   snapshotStorageDeleteCountMode,
   asyncDisposeKey
 } from '@migaia/storage-host/sdk'
-import type { IPgState } from './native.js'
-import { observePgRange, observePgBatch, markPgChanged } from './native.js'
-import type { IPgNativeParameter } from './types.js'
-import { pgKey } from './codec.js'
-import { pgVectorCondition, pgVectorFilter, pgVectorProjection } from './vector-filter.js'
-import { invalidArgument } from './errors.js'
-import { PgNames } from './constants.js'
-import { PgVectorBackend, vectorRows, unsupported, pointId } from './vector.js'
+import type { IPgState } from './native.ts'
+import { observePgRange, observePgBatch, markPgChanged } from './native.ts'
+import type { IPgNativeParameter } from './types.ts'
+import { pgKey } from './codec.ts'
+import { pgVectorCondition, pgVectorFilter, pgVectorProjection } from './vector-filter.ts'
+import { invalidArgument } from './errors.ts'
+import { PgNames } from './constants.ts'
+import { PgVectorBackend, vectorRows, unsupported, pointId } from './vector.ts'
 
 /** Each collection retains its own immutable name, schema choice and original backend. */
 export class PgVectorCollection<T> implements IVectorCollection<T, true> {

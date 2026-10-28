@@ -1,9 +1,9 @@
-import { StorageError } from '../errors.js'
+import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { EntityText } from './text.js'
-import type { EntityRepositoryOwner } from './repository.js'
-import type { IRepositoryConfig } from './repository-shared.js'
-import type { IEntityOptions } from './types.js'
+import { EntityText } from './text.ts'
+import type { EntityRepositoryOwner } from './repository.ts'
+import type { IRepositoryConfig } from './repository-shared.ts'
+import type { IEntityOptions } from './types.ts'
 
 /** An explicit entity subpath unit installs only its own operations on the original repository. */
 export type IEntityFeature = Readonly<{

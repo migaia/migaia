@@ -8,7 +8,7 @@ import {
 import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { implement, kv, type IStorageBase, type IStorageChange } from '@migaia/storage-contract'
 import { provideCapabilities } from '@migaia/storage-host/sdk'
-import { cachePlugin } from '../src/index.js'
+import { cachePlugin } from '../src/index.ts'
 
 /**
  * A third-party lower tier whose plain change feed can send an unscoped reset. Text calls go to a

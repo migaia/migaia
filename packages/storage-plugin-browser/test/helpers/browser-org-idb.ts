@@ -1,6 +1,6 @@
-import { indexedDbTestFeatures } from './indexed-db-features.js'
+import { indexedDbTestFeatures } from './indexed-db-features.ts'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
-import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
+import { indexedDbBackendPlugin } from '../../src/indexed-db.ts'
 
 /** Real browser databases prove physical default mapping, isolated deletion, and view reuse. */
 export async function runBrowserIndexedDbOrgScenario() {

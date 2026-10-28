@@ -5,59 +5,59 @@ export type {
   IBackendChangeControllerOptions,
   IBackendChangeSnapshot,
   IBackendValueCommit
-} from '../core/backend-registry.js'
+} from '../core/backend-registry.ts'
 export {
   createStorageOperationReporter,
   createStorageOperationRuntime,
   reportCleanupError
-} from '../core/operation-reporter.js'
+} from '../core/operation-reporter.ts'
 export {
   encodeFlatStorageKey,
   decodeFlatStorageKey,
   snapshotKeyRange,
   assertKeyRange
-} from '../core/key-domain.js'
-export { isStorageKeyInRange } from '../core/query-state.js'
-export { safeJsonPayloadByteLength } from '../core/json.js'
-export { createStorageToken } from '../core/storage-token.js'
-export { resolveStorageNamespace } from '../core/namespace.js'
-export { observeStorageBatch } from '../core/batch-observation.js'
-export { planChannelWrite } from '../core/channel-write.js'
+} from '../core/key-domain.ts'
+export { isStorageKeyInRange } from '../core/query-state.ts'
+export { safeJsonPayloadByteLength } from '../core/json.ts'
+export { createStorageToken } from '../core/storage-token.ts'
+export { resolveStorageNamespace } from '../core/namespace.ts'
+export { observeStorageBatch } from '../core/batch-observation.ts'
+export { planChannelWrite } from '../core/channel-write.ts'
 export type {
   IChannelPresence,
   IChannelMutationPlan,
   IChannelConflictDetails
-} from '../core/channel-write.js'
-export { collectUniqueIndexOwners } from '../core/unique-index.js'
-export type { IUniqueIndexOwner, IUniqueIndexErrorFactory } from '../core/unique-index.js'
-export { isStorageErrorFamily, normalizeError } from '../core/error-family.js'
-export type { IStorageErrorFamily } from '../core/error-family.js'
-export { invokeExtension } from '../core/invoke-extension.js'
+} from '../core/channel-write.ts'
+export { collectUniqueIndexOwners } from '../core/unique-index.ts'
+export type { IUniqueIndexOwner, IUniqueIndexErrorFactory } from '../core/unique-index.ts'
+export { isStorageErrorFamily, normalizeError } from '../core/error-family.ts'
+export type { IStorageErrorFamily } from '../core/error-family.ts'
+export { invokeExtension } from '../core/invoke-extension.ts'
 export {
   readAbortReason,
   subscribeToAbort,
   throwIfAborted,
   mergeSignals,
   withAbort
-} from '../core/operation.js'
+} from '../core/operation.ts'
 export type {
   IStorageOperationReporter,
   IStorageOperationRuntime
-} from '../core/operation-reporter.js'
+} from '../core/operation-reporter.ts'
 
-export type { IBackendKeyLockPort } from '../backends/key-locks.js'
+export type { IBackendKeyLockPort } from '../backends/key-locks.ts'
 
-export type { IBackendRevisionPort } from '../backends/revisions.js'
+export type { IBackendRevisionPort } from '../backends/revisions.ts'
 
-export { createBackendJournalNamespace } from '../journal/namespace-resource.js'
+export { createBackendJournalNamespace } from '../journal/namespace-resource.ts'
 export type {
   IBackendJournalNamespaceOptions,
   IBackendJournalTransaction
-} from '../journal/namespace-resource.js'
+} from '../journal/namespace-resource.ts'
 
-export { storageJournalLockKey, StorageJournalLock } from '../journal/keys.js'
+export { storageJournalLockKey, StorageJournalLock } from '../journal/keys.ts'
 
-export { encodeStorageJournalImage, decodeStorageJournalImage } from '../journal/image.js'
+export { encodeStorageJournalImage, decodeStorageJournalImage } from '../journal/image.ts'
 
 /**
  * Best-effort diagnostics only; this intentionally observes mutable prototype/constructor/name

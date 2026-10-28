@@ -1,15 +1,15 @@
-import { storageJournalPlugin } from '../../src/journal.js'
+import { storageJournalPlugin } from '../../src/journal.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
-import { ConcurrencyPolicy } from '../../src/authoring/concurrency.js'
+import { ConcurrencyPolicy } from '../../src/authoring/concurrency.ts'
 import {
   createStorageHost,
   createOrgId,
   type IStorageJournalNamespaceView,
   type IStorageJournalNamespace
-} from '../../src/index.js'
-import { memoryBackendPlugin } from '../../src/plugins/memory.js'
-import { resolveStorageJournalBinding } from '../../src/journal/binding.js'
+} from '../../src/index.ts'
+import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
+import { resolveStorageJournalBinding } from '../../src/journal/binding.ts'
 
 /** These cases use the actual native owner; the internal resolver is not a public KV escape hatch. */
 describe('memory private journal binding', () => {

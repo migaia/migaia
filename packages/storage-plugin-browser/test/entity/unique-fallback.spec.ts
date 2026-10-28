@@ -1,4 +1,4 @@
-import { entityTestFeatures } from '../helpers/entity-features.js'
+import { entityTestFeatures } from '../helpers/entity-features.ts'
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest'
 import type { IKeyValueStore } from '@migaia/storage-contract'
@@ -7,9 +7,9 @@ import {
   createLocalTestStore,
   createSessionTestStore,
   createCookieTestStore
-} from '../helpers/installed-backends.js'
-import { fakeWebStorage } from '../../src/testing/fake-web-storage.js'
-import { fakeCookieDocument } from '../../src/testing/fake-cookie-document.js'
+} from '../helpers/installed-backends.ts'
+import { fakeWebStorage } from '../../src/testing/fake-web-storage.ts'
+import { fakeCookieDocument } from '../../src/testing/fake-cookie-document.ts'
 
 /** Shared domain keeps each assertion about backend-neutral unique ownership. */
 type IUser = { id: string; email: string }

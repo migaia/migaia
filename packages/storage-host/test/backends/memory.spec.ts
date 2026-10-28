@@ -1,5 +1,5 @@
-import { memoryNotificationsFeature } from '../../src/features/memory-notifications.js'
-import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.js'
+import { memoryNotificationsFeature } from '../../src/features/memory-notifications.ts'
+import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.ts'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import {
   kv,
@@ -9,9 +9,9 @@ import {
   type IStorageResource
 } from '@migaia/storage-contract'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createStorageHost } from '../../src/index.js'
-import { memoryBackendPlugin } from '../../src/plugins/memory.js'
-import { composeRepositoryKey } from '../../src/entity/key.js'
+import { createStorageHost } from '../../src/index.ts'
+import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
+import { composeRepositoryKey } from '../../src/entity/key.ts'
 
 /** Test-owned real host resources are closed after every migrated baseline case. */
 const hosts: IStorageResource[] = []

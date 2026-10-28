@@ -1,8 +1,8 @@
-import { StorageContractError, StorageContractErrorCode } from './errors.js'
-import { type IConflictPolicy, type IOperationContext, type ISyncWriteOptions } from './context.js'
-import { ConflictPolicy } from './context.js'
-import { assertStorageOrgId } from './org.js'
-import { StorageContractErrorText } from './error-text.js'
+import { StorageContractError, StorageContractErrorCode } from './errors.ts'
+import { type IConflictPolicy, type IOperationContext, type ISyncWriteOptions } from './context.ts'
+import { ConflictPolicy } from './context.ts'
+import { assertStorageOrgId } from './org.ts'
+import { StorageContractErrorText } from './error-text.ts'
 
 /** Write callers share the context validator without requiring a supplied conflict choice. */
 export type IOperationValidationContext = IOperationContext & {

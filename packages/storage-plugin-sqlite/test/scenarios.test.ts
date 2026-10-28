@@ -11,9 +11,9 @@ import {
   runTransactionOperation
 } from '@migaia/storage-host/sdk'
 import { sql, type IOperationContext, type IStorageChange } from '@migaia/storage-contract'
-import { sqliteBackendPlugin, sqliteBackendKind, type ISqliteDriver } from '../src/index.js'
-import { nodeSqliteDriver } from '../src/node.js'
-import { sqliteMaintenanceFeature } from '../src/features/maintenance.js'
+import { sqliteBackendPlugin, sqliteBackendKind, type ISqliteDriver } from '../src/index.ts'
+import { nodeSqliteDriver } from '../src/node.ts'
+import { sqliteMaintenanceFeature } from '../src/features/maintenance.ts'
 /** Maintenance runs through the real selected Feature and the original connection's SQL tag. */
 it('backs up and vacuums the actual database while rejecting an occupied connection', async () => {
   const directory = mkdtempSync(join(tmpdir(), 'migaia-sqlite-maintenance-'))

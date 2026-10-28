@@ -1,19 +1,19 @@
-import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
+import { indexedDbTestFeatures } from '../helpers/indexed-db-features.ts'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
 import { createStorageHost, defineFeature } from '@migaia/storage-host'
 import { kv, type ITransactionScope } from '@migaia/storage-contract'
 import { asyncDisposeKey } from '@migaia/plugin-host'
-import { localStorageBackendKind, localStorageBackendPlugin } from '../../src/local-storage.js'
+import { localStorageBackendKind, localStorageBackendPlugin } from '../../src/local-storage.ts'
 import {
   sessionStorageBackendKind,
   sessionStorageBackendPlugin
-} from '../../src/session-storage.js'
-import { cookieBackendKind, cookieBackendPlugin } from '../../src/cookies.js'
-import { indexedDbBackendKind, indexedDbBackendPlugin } from '../../src/indexed-db.js'
-import { fakeWebStorage } from '../../src/testing/fake-web-storage.js'
-import { fakeCookieDocument } from '../../src/testing/fake-cookie-document.js'
+} from '../../src/session-storage.ts'
+import { cookieBackendKind, cookieBackendPlugin } from '../../src/cookies.ts'
+import { indexedDbBackendKind, indexedDbBackendPlugin } from '../../src/indexed-db.ts'
+import { fakeWebStorage } from '../../src/testing/fake-web-storage.ts'
+import { fakeCookieDocument } from '../../src/testing/fake-cookie-document.ts'
 
 describe('browser backend installation through the neutral host', () => {
   it('retains default ids, canonical kinds and the same borrowed native clients with Features', async () => {

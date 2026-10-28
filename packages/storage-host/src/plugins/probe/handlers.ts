@@ -1,4 +1,4 @@
-import type { IStorageHookMap } from '../../hook-types.js'
+import type { IStorageHookMap } from '../../hook-types.ts'
 
 /** Handler map accepted by `storageProbe(handlers)`: one optional listener per event name. */
 export type IStorageProbeHandlers = {

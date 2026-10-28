@@ -1,7 +1,7 @@
-import { StorageError } from '../types/errors.js'
+import { StorageError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageBackend } from '../constants.js'
-import type { ICookieRemoveContext, ICookieScope, ICookieWriteContext } from '../types/cookie.js'
+import { StorageBackend } from '../constants.ts'
+import type { ICookieRemoveContext, ICookieScope, ICookieWriteContext } from '../types/cookie.ts'
 import { utf8ByteLength } from '@migaia/utils/bytes'
 
 /**

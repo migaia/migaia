@@ -1,8 +1,8 @@
-import { createBackendChangeController } from '../src/core/change-controller.js'
+import { createBackendChangeController } from '../src/core/change-controller.ts'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import { describe, expect, it, vi } from 'vitest'
 import { deferred, type IAbortSignal } from '@migaia/utils/promise'
-import { createTransactionOwner } from '../src/authoring/transaction.js'
+import { createTransactionOwner } from '../src/authoring/transaction.ts'
 import {
   defineConcurrencyPolicy,
   StorageStageKind,
@@ -18,17 +18,17 @@ import {
   runWithConcurrency,
   snapshotConcurrencyLockKeys,
   snapshotConcurrencyLockRange
-} from '../src/authoring/concurrency.js'
+} from '../src/authoring/concurrency.ts'
 import {
   createStorageHost,
   definePlugin,
   defineStorageBackendKind,
   StorageError,
   type IStoragePluginCore
-} from '../src/index.js'
+} from '../src/index.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import type { IBackendKeyLockPort, IBackendChangeController } from '../src/authoring/backend.js'
-import { catalog } from './helpers/catalog.js'
+import type { IBackendKeyLockPort, IBackendChangeController } from '../src/authoring/backend.ts'
+import { catalog } from './helpers/catalog.ts'
 
 /** The actual native catalog and original transaction metadata supply one real installation. */
 async function fixture(shared?: IBackendKeyLockPort) {

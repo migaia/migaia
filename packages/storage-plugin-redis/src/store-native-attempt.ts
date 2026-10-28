@@ -4,7 +4,7 @@ import {
   reportCleanupError,
   throwIfAborted
 } from '@migaia/storage-host/sdk'
-import { RedisCommand, RedisOperation } from './constants.js'
+import { RedisCommand, RedisOperation } from './constants.ts'
 import {
   StorageContractErrorCode,
   type IConcurrencyAttemptContext,
@@ -12,23 +12,23 @@ import {
 } from '@migaia/storage-contract'
 import { sleep } from '@migaia/utils/promise'
 import { RedisErrorCode } from '@migaia/storage-contract/error-code'
-import { RedisDraft, validateRedisExec } from './transaction.js'
-import { createRedisLocks, RedisLockConflict } from './locks.js'
-import { replyRevision, RedisSuffix } from './layout.js'
-import { unsupported, normalizeRedisError, redisError } from './errors.js'
-import { RedisText } from './constants.js'
-import { encodeRedisChange } from './changes.js'
-import type { IRedisConnection } from './driver.js'
-import { redisCreateScope } from './store-scope.js'
+import { RedisDraft, validateRedisExec } from './transaction.ts'
+import { createRedisLocks, RedisLockConflict } from './locks.ts'
+import { replyRevision, RedisSuffix } from './layout.ts'
+import { unsupported, normalizeRedisError, redisError } from './errors.ts'
+import { RedisText } from './constants.ts'
+import { encodeRedisChange } from './changes.ts'
+import type { IRedisConnection } from './driver.ts'
+import { redisCreateScope } from './store-scope.ts'
 import {
   redisCommand,
   redisObserve,
   redisConcurrencyStages,
   redisExec,
   redisAssertWrite
-} from './store-state.js'
-import type { IRedisOrganizationContext } from './store-state.js'
-import { redisObservedConnection } from './store-transaction.js'
+} from './store-state.ts'
+import type { IRedisOrganizationContext } from './store-state.ts'
+import { redisObservedConnection } from './store-transaction.ts'
 
 /** Original native execution state is explicit across WATCH, EXEC and connection unwind. */
 type IRedisNativeAttempt<R> = {

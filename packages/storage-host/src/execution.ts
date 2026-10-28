@@ -1,6 +1,6 @@
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import type { IHostHandle } from '@migaia/plugin-host'
-import type { IStorageExecutionPort, IStoragePipelineInput } from './types.js'
+import type { IStorageExecutionPort, IStoragePipelineInput } from './types.ts'
 /** Forward one registration to the original shared runners; no stage or retry state is retained. */
 export function forwardStorageExecution(
   host: Pick<

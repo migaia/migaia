@@ -1,13 +1,13 @@
 import { expect, it } from 'vitest'
-import { createStorageHost } from '../../src/index.js'
+import { createStorageHost } from '../../src/index.ts'
 import {
   STORAGE_HOST_ERROR_SOURCE,
   StorageHostErrorCode
 } from '@migaia/storage-contract/error-code'
-import { memoryBackendPlugin } from '../../src/plugins/memory.js'
-import { storageLogStore, storageJournalPlugin } from '../../src/journal.js'
-import { memoryNotificationsFeature } from '../../src/features/memory-notifications.js'
-import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.js'
+import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
+import { storageLogStore, storageJournalPlugin } from '../../src/journal.ts'
+import { memoryNotificationsFeature } from '../../src/features/memory-notifications.ts'
+import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.ts'
 
 it('keeps base reads and writes usable while rejecting missing optional assemblies', async () => {
   await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })

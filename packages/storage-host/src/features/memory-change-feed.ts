@@ -1,7 +1,7 @@
-import { defineFeature } from '../contracts.js'
-import { memoryBackendKind } from '../backends/memory-plugin.js'
-import { registerMemoryAssembly } from '../backends/memory-assembly.js'
-import { createBackendChangeIterator } from '../core/change-iterator.js'
+import { defineFeature } from '../contracts.ts'
+import { memoryBackendKind } from '../backends/memory-plugin.ts'
+import { registerMemoryAssembly } from '../backends/memory-assembly.ts'
+import { createBackendChangeIterator } from '../core/change-iterator.ts'
 
 /** Explicitly select memory's iterator owner before native backend construction. */
 export function memoryChangeFeedFeature() {

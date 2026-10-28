@@ -6,13 +6,13 @@ import {
   assertTransactionCallback,
   type ITransactionOptions
 } from '@migaia/storage-contract'
-import { lockKey } from '../authoring/concurrency.js'
-import { snapshotStorageKey } from '../authoring/key.js'
-import { snapshotSyncWriteOptions } from '../authoring/context.js'
-import { createTransactionBuilder } from '../authoring/transaction.js'
-import { STORAGE_MEMORY_BACKEND } from '../state-constants.js'
-import { MemoryOperation } from './memory-constants.js'
-import { createStorageToken } from '../core/storage-token.js'
+import { lockKey } from '../authoring/concurrency.ts'
+import { snapshotStorageKey } from '../authoring/key.ts'
+import { snapshotSyncWriteOptions } from '../authoring/context.ts'
+import { createTransactionBuilder } from '../authoring/transaction.ts'
+import { STORAGE_MEMORY_BACKEND } from '../state-constants.ts'
+import { MemoryOperation } from './memory-constants.ts'
+import { createStorageToken } from '../core/storage-token.ts'
 import {
   read,
   prepareWrite,
@@ -25,9 +25,9 @@ import {
   clear,
   mutationEntry,
   clearEntry
-} from './memory-entries.js'
-import { asyncEntry, rootIterator, atomicEntry, watchChanges } from './memory-namespace-base.js'
-import type { IMemoryNamespaceContext, IMemoryScope } from './memory.js'
+} from './memory-entries.ts'
+import { asyncEntry, rootIterator, atomicEntry, watchChanges } from './memory-namespace-base.ts'
+import type { IMemoryNamespaceContext, IMemoryScope } from './memory.ts'
 
 /** Construct synchronous native access without entering asynchronous concurrency. */
 export function createMemoryNamespaceSync<T>(

@@ -1,4 +1,4 @@
-import type { IWebStorageLike } from '../types/storage.js'
+import type { IWebStorageLike } from '../types/storage.ts'
 
 /**
  * Probes whether a storage object is usable by writing and deleting a value. Safari private mode

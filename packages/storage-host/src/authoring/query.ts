@@ -30,21 +30,21 @@ import {
   type IQuad,
   type IRdfNamedNode
 } from '@migaia/storage-contract'
-import { snapshotStorageRdfPattern, snapshotStorageRdfQuad } from './rdf.js'
-import { RecordQueryKeysetOwner } from './query-keyset.js'
+import { snapshotStorageRdfPattern, snapshotStorageRdfQuad } from './rdf.ts'
+import { RecordQueryKeysetOwner } from './query-keyset.ts'
 import {
   invalidQueryCondition,
   snapshotStorageWhere,
   snapshotRecordQueryMethods,
   invalidQueryArgument
-} from './query-condition.js'
+} from './query-condition.ts'
 import {
   assertQueryField,
   mutateRecordQuery,
   queryWriteContext,
   snapshotQueryPatch,
   consumeRecordQuery
-} from './query-execution.js'
+} from './query-execution.ts'
 import {
   queryExecutionFailure,
   QueryOrderMode,
@@ -53,8 +53,8 @@ import {
   QueryKeyDirection,
   QueryOrderDirection,
   QueryOrderField
-} from './query-plan.js'
-import type { IQuerySourceSnapshot, IQueryNode } from './query-plan.js'
+} from './query-plan.ts'
+import type { IQuerySourceSnapshot, IQueryNode } from './query-plan.ts'
 import {
   snapshotQueryOrder,
   queryOrderingBytes,
@@ -62,15 +62,15 @@ import {
   assertQueryActive,
   compileVectorGroupReader,
   compileQueryTraversal
-} from './query-reader.js'
-import { recordQueryReads } from './query-record-reads.js'
-import { compileVectorRerankReader, snapshotVectorQueryOrigin } from './query-vector-rerank.js'
+} from './query-reader.ts'
+import { recordQueryReads } from './query-record-reads.ts'
+import { compileVectorRerankReader, snapshotVectorQueryOrigin } from './query-vector-rerank.ts'
 import {
   familyQueryReads,
   queryWatch,
   snapshotQueryWhere,
   snapshotQueryFields
-} from './query-steps.js'
+} from './query-steps.ts'
 
 /** Creates selected terminals without falsely advertising another select or unsupported terminals. */
 function selectedRecordQuery<
@@ -868,13 +868,13 @@ export {
   snapshotStorageWhere,
   compileStorageWhere,
   compileStorageQueryCondition
-} from './query-condition.js'
+} from './query-condition.ts'
 export type {
   IQueryNode,
   IQuerySourceSnapshot,
   IQueryCursorSnapshot,
   IRecordExecutionPlan
-} from './query-plan.js'
+} from './query-plan.ts'
 export type {
   IQueryAdvance,
   IQueryReader,
@@ -882,4 +882,4 @@ export type {
   IQueryReadResult,
   IQueryReaderInput,
   IQueryCompileContext
-} from './query-reader.js'
+} from './query-reader.ts'

@@ -19,12 +19,12 @@ import {
   assertStorageTtlDuration,
   type IStorageBase
 } from '@migaia/storage-contract'
-import { createSqlTag } from '../src/authoring/sql.js'
-import { provideCapabilities } from '../src/authoring/capability.js'
-import { snapshotStorageTtlTarget } from '../src/authoring/ttl.js'
-import { snapshotStorageCounterIncrement } from '../src/authoring/counter.js'
-import { lockKey } from '../src/authoring/concurrency.js'
-import { term } from '../src/authoring/rdf.js'
+import { createSqlTag } from '../src/authoring/sql.ts'
+import { provideCapabilities } from '../src/authoring/capability.ts'
+import { snapshotStorageTtlTarget } from '../src/authoring/ttl.ts'
+import { snapshotStorageCounterIncrement } from '../src/authoring/counter.ts'
+import { lockKey } from '../src/authoring/concurrency.ts'
+import { term } from '../src/authoring/rdf.ts'
 
 /** Scalar contract fixtures own no data or native resource beyond their original base lifetime. */
 function base(): IStorageBase {

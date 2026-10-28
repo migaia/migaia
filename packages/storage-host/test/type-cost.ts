@@ -1,7 +1,7 @@
 import { createStorageHost, defineFeature } from '@migaia/storage-host'
 import { memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { defineEntity } from '@migaia/storage-host/entity'
-import { lockKey } from '../src/authoring/concurrency.js'
+import { lockKey } from '../src/authoring/concurrency.ts'
 import { records, rdf, vector, type IQuad, type IVectorHit } from '@migaia/storage-contract'
 
 /** A domain row retains exact field names through each public query family. */

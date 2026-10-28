@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { snapshotStorageBaseDetailed, snapshotStorageCapabilities } from '../src/authoring/store.js'
-import { provideCapabilities } from '../src/authoring/capability.js'
+import { snapshotStorageBaseDetailed, snapshotStorageCapabilities } from '../src/authoring/store.ts'
+import { provideCapabilities } from '../src/authoring/capability.ts'
 import {
   StorageStageKind,
   type IStorageBase,

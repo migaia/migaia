@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { ConcurrencyPolicy } from '../src/authoring/concurrency.js'
+import { ConcurrencyPolicy } from '../src/authoring/concurrency.ts'
 import {
   defineConcurrencyPolicy,
   StorageStageKind,
@@ -8,8 +8,8 @@ import {
   type IConcurrencyPolicy,
   type IStorageBase
 } from '@migaia/storage-contract'
-import { createTransactionOwner } from '../src/authoring/transaction.js'
-import { resolveConcurrencyPolicy } from '../src/authoring/transaction.js'
+import { createTransactionOwner } from '../src/authoring/transaction.ts'
+import { resolveConcurrencyPolicy } from '../src/authoring/transaction.ts'
 
 /** This original specialized resource has no database and does not fabricate KV operations. */
 function createBase(): IStorageBase {

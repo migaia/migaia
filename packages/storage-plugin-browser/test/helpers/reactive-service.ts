@@ -1,4 +1,4 @@
-import { memoryTestFeatures } from './memory-features.js'
+import { memoryTestFeatures } from './memory-features.ts'
 import { createStorageHost, defineFeature } from '@migaia/storage-host'
 import {
   memoryBackendKind,
@@ -10,7 +10,7 @@ import { onTestFinished } from 'vitest'
 import {
   createStorageReactiveService,
   type IStorageReactiveService
-} from '../../src/host/reactive.js'
+} from '../../src/host/reactive.ts'
 import type { IBackendChangeController } from '@migaia/storage-host/sdk'
 
 /** The fixture exposes a finite view of the original host rather than another facade. */

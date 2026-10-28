@@ -1,6 +1,6 @@
-export { CacheWriteMode } from './constants.js'
-export { cacheBackendKind } from './kind.js'
-export { cacheKey } from './key.js'
+export { CacheWriteMode } from './constants.ts'
+export { cacheBackendKind } from './kind.ts'
+export { cacheKey } from './key.ts'
 export type {
   ICacheOptions,
   ICacheTierOptions,
@@ -10,8 +10,8 @@ export type {
   ICacheBatchLoader,
   ICacheStats,
   ICacheStore
-} from './types.js'
-import './hooks.js'
-export type { ICacheTierHookPayload } from './hooks.js'
+} from './types.ts'
+import './hooks.ts'
+export type { ICacheTierHookPayload } from './hooks.ts'
 
-export { cachePlugin } from './plugin.js'
+export { cachePlugin } from './plugin.ts'

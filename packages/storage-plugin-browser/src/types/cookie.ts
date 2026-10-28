@@ -1,5 +1,5 @@
-import type { IKeyValueStore } from './storage.js'
-import type { ISyncWriteOptions } from './context.js'
+import type { IKeyValueStore } from './storage.ts'
+import type { ISyncWriteOptions } from './context.ts'
 import type { IOperationContext } from '@migaia/storage-contract'
 
 /** 结构化取消信号（与 contract 的 `IOperationContext.signal` 同源）。 */

@@ -1,4 +1,4 @@
-import type { createRecordQueryWithoutKeyset } from '../authoring/query.js'
+import type { createRecordQueryWithoutKeyset } from '../authoring/query.ts'
 import {
   type IOperationContext,
   type IRecordQuery,
@@ -18,7 +18,7 @@ import type {
   IEntityQueryNeedsLimit,
   IInvalidRecordHandler,
   IInvalidRecordAction
-} from './types.js'
+} from './types.ts'
 
 /** Entity source choices are immutable and contain no native cursor or transaction authority. */
 export type IEntityQuerySourceSelection<T> = Readonly<{

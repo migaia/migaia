@@ -1,13 +1,13 @@
-import { definePlugin } from '../contracts.js'
-import type { IStoragePluginCore } from '../types.js'
-import * as runtime from './runtime.js'
-import { STORAGE_JOURNAL_PLUGIN_ID } from '../state-constants.js'
-import { attachStorageJournalConfiguration } from './plugin-configuration.js'
+import { definePlugin } from '../contracts.ts'
+import type { IStoragePluginCore } from '../types.ts'
+import * as runtime from './runtime.ts'
+import { STORAGE_JOURNAL_PLUGIN_ID } from '../state-constants.ts'
+import { attachStorageJournalConfiguration } from './plugin-configuration.ts'
 import type {
   IStorageJournalConfiguration,
   IStorageJournalInitializerContext,
   IStorageJournalPluginHandle
-} from './types.js'
+} from './types.ts'
 
 /** The selected native plugin owns journal code admission in the existing host lifecycle. */
 class StorageJournalPluginAssembly {

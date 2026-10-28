@@ -1,4 +1,4 @@
-import { StorageError } from '../errors.js'
+import { StorageError } from '../errors.ts'
 import { isStorageContractError, type StorageContractError } from '@migaia/storage-contract'
 
 /** Neutral rules recognize original owners; backend-specific class checks remain with that backend. */

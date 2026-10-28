@@ -1,8 +1,8 @@
 import type { IBackendKind } from '@migaia/storage-contract'
-import { StorageOperation } from '../constants.js'
-import { StorageError } from '../types/errors.js'
+import { StorageOperation } from '../constants.ts'
+import { StorageError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
+import { StorageErrorText } from '../error-text.ts'
 
 // Transaction types and option validation guards belong to `@migaia/storage-contract`. Re-exports preserve existing import paths.
 export type { ITransactionScope, ITransactionWriteOptions } from '@migaia/storage-contract'

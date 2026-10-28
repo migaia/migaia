@@ -9,11 +9,11 @@ import {
   type IOperationContext,
   type IOperationContextSnapshot
 } from '@migaia/storage-contract'
-import { createStorageIteratorLifetime } from '../authoring/resource.js'
+import { createStorageIteratorLifetime } from '../authoring/resource.ts'
 import { deferred, type IDeferred } from '@migaia/utils/promise'
-import type { IBackendChangeController } from './change-controller.js'
-import { mergeSignals, subscribeToAbort, throwIfAborted } from './operation.js'
-import { createStorageOperationReporter } from './operation-reporter.js'
+import type { IBackendChangeController } from './change-controller.ts'
+import { mergeSignals, subscribeToAbort, throwIfAborted } from './operation.ts'
+import { createStorageOperationReporter } from './operation-reporter.ts'
 
 /** The bridge validates the original public channel domain in one local admission table. */
 const changeChannels = ['value', 'bytes', 'record', 'all'] as const

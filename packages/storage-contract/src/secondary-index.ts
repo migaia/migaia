@@ -1,9 +1,9 @@
-import type { ITransactionOptions } from './concurrency.js'
-import type { ITransactionScope } from './transaction.js'
-import type { IStorageIterator } from './resource.js'
-import type { IKeyRange, IOperationContext, IStorageKey, IWriteOptions } from './context.js'
-import { inspectStoreShape, type IRecordStore } from './store.js'
-import { StorageContractError, StorageContractErrorCode } from './errors.js'
+import type { ITransactionOptions } from './concurrency.ts'
+import type { ITransactionScope } from './transaction.ts'
+import type { IStorageIterator } from './resource.ts'
+import type { IKeyRange, IOperationContext, IStorageKey, IWriteOptions } from './context.ts'
+import { inspectStoreShape, type IRecordStore } from './store.ts'
+import { StorageContractError, StorageContractErrorCode } from './errors.ts'
 
 /** Logical index description supplied to an index-capable provider; all fields are required. */
 export type IRecordIndexDefinition = {

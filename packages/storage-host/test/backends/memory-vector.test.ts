@@ -1,5 +1,5 @@
-import { memoryNotificationsFeature } from '../../src/features/memory-notifications.js'
-import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.js'
+import { memoryNotificationsFeature } from '../../src/features/memory-notifications.ts'
+import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.ts'
 import { describe, expect, it } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { deferred } from '@migaia/utils/promise'
@@ -11,9 +11,9 @@ import {
   DeleteCountMode,
   type IStorageChange
 } from '@migaia/storage-contract'
-import { lockKey, ConcurrencyPolicy } from '../../src/authoring/concurrency.js'
-import { createStorageHost, createOrgId } from '../../src/index.js'
-import { memoryBackendPlugin } from '../../src/plugins/memory.js'
+import { lockKey, ConcurrencyPolicy } from '../../src/authoring/concurrency.ts'
+import { createStorageHost, createOrgId } from '../../src/index.ts'
+import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
 
 /** Payload declarations remain business schemas while serialize owns the actual field snapshot. */
 type IPayload = { group: string; order: number }

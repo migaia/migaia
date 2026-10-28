@@ -1,8 +1,8 @@
-import type { IOperationContext } from '../context.js'
-import type { IStorageResource } from '../resource.js'
-import type { IStorageChange } from '../change-feed.js'
-import { STORAGE_DURABLE_CHANGE_METHODS } from '../capability-constants.js'
-import { defineStandardStorageCapability, validateCapabilityMethods } from '../capability-token.js'
+import type { IOperationContext } from '../context.ts'
+import type { IStorageResource } from '../resource.ts'
+import type { IStorageChange } from '../change-feed.ts'
+import { STORAGE_DURABLE_CHANGE_METHODS } from '../capability-constants.ts'
+import { defineStandardStorageCapability, validateCapabilityMethods } from '../capability-token.ts'
 
 /** Opaque cursors identify actual retained commits and remain independent from transient sequence. */
 export type IDurableStorageChange = IStorageChange & { readonly cursor: string }

@@ -1,7 +1,7 @@
 import { DatabaseSync } from 'node:sqlite'
-import { connection } from './driver.js'
-import { normalizeSqliteFailure } from './errors.js'
-import type { ISqliteConnection, ISqliteValue } from './types.js'
+import { connection } from './driver.ts'
+import { normalizeSqliteFailure } from './errors.ts'
+import type { ISqliteConnection, ISqliteValue } from './types.ts'
 /** Node and Deno use their built-in driver; only the returned resource owns native close. */
 export function nodeSqliteDriver(path: string): ISqliteConnection {
   try {

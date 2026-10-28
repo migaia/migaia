@@ -7,7 +7,7 @@ import type {
   IVectorNativeQuery
 } from '@migaia/storage-contract'
 import type { IStorageFeatureOutput } from '@migaia/storage-host'
-import type { IQdrantHttp, IQdrantUpdateResult } from './types.js'
+import type { IQdrantHttp, IQdrantUpdateResult } from './types.ts'
 export type IQdrantHybridBranch = Omit<Schemas['Prefetch'], 'prefetch' | 'query' | 'using'> & {
   query: Schemas['VectorInput']
   using: string

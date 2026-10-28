@@ -1,13 +1,13 @@
 import { storageJournalPlugin, storageLogStore } from '@migaia/storage-host/plugins/journal'
-import { indexedDbTestFeatures } from './indexed-db-features.js'
+import { indexedDbTestFeatures } from './indexed-db-features.ts'
 import { Logger, type ILoggerCore } from '@migaia/logger'
 import { wal, type IWalExt } from '@migaia/logger/plugins/durable'
 import { kv } from '@migaia/storage-contract'
 import { createStorageHost } from '@migaia/storage-host'
-import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
-import { localStorageBackendPlugin } from '../../src/local-storage.js'
-import { sessionStorageBackendPlugin } from '../../src/session-storage.js'
-import { cookieBackendPlugin } from '../../src/cookies.js'
+import { indexedDbBackendPlugin } from '../../src/indexed-db.ts'
+import { localStorageBackendPlugin } from '../../src/local-storage.ts'
+import { sessionStorageBackendPlugin } from '../../src/session-storage.ts'
+import { cookieBackendPlugin } from '../../src/cookies.ts'
 
 /** The opener retains the actual WAL object and its sole persistent native resource. */
 type ITextRedoLogger = Pick<

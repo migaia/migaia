@@ -1,12 +1,12 @@
 import { type ICodecValue } from '@migaia/serialize/codec'
-import { type IBackendKind } from '../capabilities.js'
-import { StorageContractError, StorageContractErrorCode } from '../errors.js'
-import { StorageContractErrorText } from '../error-text.js'
-import { type IOperationContext } from '../context.js'
-import { type IWriteConcurrencyOptions } from '../concurrency.js'
-import { type IVectorQueryBuilder, type IWhere, type IQueryWatch } from '../query-chain.js'
-import { defineStandardStorageCapability, validateCapabilityMethods } from '../capability-token.js'
-import { STORAGE_VECTOR_METHODS } from '../capability-constants.js'
+import { type IBackendKind } from '../capabilities.ts'
+import { StorageContractError, StorageContractErrorCode } from '../errors.ts'
+import { StorageContractErrorText } from '../error-text.ts'
+import { type IOperationContext } from '../context.ts'
+import { type IWriteConcurrencyOptions } from '../concurrency.ts'
+import { type IVectorQueryBuilder, type IWhere, type IQueryWatch } from '../query-chain.ts'
+import { defineStandardStorageCapability, validateCapabilityMethods } from '../capability-token.ts'
+import { STORAGE_VECTOR_METHODS } from '../capability-constants.ts'
 
 /** Shared count strategies keep numeric results without pretending native operation IDs are counts. */
 export const DeleteCountMode = { precount: 'precount', scroll: 'scroll' } as const

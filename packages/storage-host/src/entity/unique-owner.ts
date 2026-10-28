@@ -1,10 +1,10 @@
 import {
   registerTransactionFinalizer,
   readTransactionOperationContext
-} from '../authoring/transaction.js'
+} from '../authoring/transaction.ts'
 import type { ITransactionInfo } from '@migaia/storage-contract'
-import { entityRuntime } from './repository-shared.js'
-import { getBackendValueCommit } from '../core/backend-registry.js'
+import { entityRuntime } from './repository-shared.ts'
+import { getBackendValueCommit } from '../core/backend-registry.ts'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -20,17 +20,17 @@ import {
   composeStructuredKey,
   flatKeyPrefix,
   repositoryUniqueWriteKey
-} from './key.js'
-import { encodeFlatStorageKey } from '../core/key-domain.js'
+} from './key.ts'
+import { encodeFlatStorageKey } from '../core/key-domain.ts'
 
-import { withAbort } from '../core/operation.js'
+import { withAbort } from '../core/operation.ts'
 
 import type { IOperationContext, IStorageKey } from '@migaia/storage-contract'
 
-import { projectEntityIndexes } from './index-projection.js'
-import { collectUniqueIndexOwners } from '../core/unique-index.js'
+import { projectEntityIndexes } from './index-projection.ts'
+import { collectUniqueIndexOwners } from '../core/unique-index.ts'
 
-import { StorageOperation } from './constants.js'
+import { StorageOperation } from './constants.ts'
 import {
   IEntityOperationRuntime,
   IEnvelope,
@@ -38,9 +38,9 @@ import {
   IEntityUniqueMutation,
   normalizeError,
   idOf
-} from './repository-shared.js'
+} from './repository-shared.ts'
 
-import type { EntityRepositoryOwner } from './repository.js'
+import type { EntityRepositoryOwner } from './repository.ts'
 
 /** Own only the explicitly assembled unique operations; the repository retains storage state. */
 export class EntityUniqueOwner<

@@ -1,7 +1,7 @@
-import { encodeStorageRdfTerm } from '../authoring/rdf.js'
+import { encodeStorageRdfTerm } from '../authoring/rdf.ts'
 import { type IQuad } from '@migaia/storage-contract'
-import { STORAGE_MEMORY_BACKEND } from '../state-constants.js'
-import { createOrderedRecordIndex, type IOrderedRecordIndex } from '../core/ordered-record-index.js'
+import { STORAGE_MEMORY_BACKEND } from '../state-constants.ts'
+import { createOrderedRecordIndex, type IOrderedRecordIndex } from '../core/ordered-record-index.ts'
 
 /** The six native permutations share the original compressed radix and canonical term bytes. */
 const rdfOrders = [

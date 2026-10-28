@@ -27,13 +27,13 @@ import {
 } from '@migaia/storage-contract'
 import type { IStorageJournalExecutionPort } from '@migaia/storage-host'
 import { sleep } from '@migaia/utils/promise'
-import { SqliteNames, SqliteControl, SqliteLimits, SqliteOperation } from './constants.js'
-import { normalizeSqliteFailure } from './errors.js'
-import { SqliteErrorText } from './error-text.js'
-import type { ISqliteTransactionScope, ISqliteRow } from './types.js'
-import { sqliteConvert, sqliteWriteRaw, sqliteLiveExpiration, sqlitePrune } from './store-io.js'
-import { sqliteObserve, sqliteSyncMutation } from './store-mutation.js'
-import { sqliteAdvanceRevisions, sqlitePublishChanges, sqliteRevision } from './store-revision.js'
+import { SqliteNames, SqliteControl, SqliteLimits, SqliteOperation } from './constants.ts'
+import { normalizeSqliteFailure } from './errors.ts'
+import { SqliteErrorText } from './error-text.ts'
+import type { ISqliteTransactionScope, ISqliteRow } from './types.ts'
+import { sqliteConvert, sqliteWriteRaw, sqliteLiveExpiration, sqlitePrune } from './store-io.ts'
+import { sqliteObserve, sqliteSyncMutation } from './store-mutation.ts'
+import { sqliteAdvanceRevisions, sqlitePublishChanges, sqliteRevision } from './store-revision.ts'
 import {
   sqliteAssertRoot,
   sqliteNativeFor,
@@ -46,14 +46,14 @@ import {
   sqliteStatement,
   SQLITE_CONTROL_ACTIVE,
   SqlitePhysicalBusy
-} from './store-state.js'
+} from './store-state.ts'
 import type {
   ISqliteOrganizationContext,
   IBatchObservation,
   INativeState,
   IRootMutation,
   ITextBatchEntry
-} from './store-state.js'
+} from './store-state.ts'
 import {
   sqliteLockRanges,
   sqliteConflictingLock,
@@ -63,7 +63,7 @@ import {
   sqlitePhysicalRun,
   sqliteWalAttempt,
   sqliteRollback
-} from './store-transaction.js'
+} from './store-transaction.ts'
 
 /** SqliteOperation uses explicit organization state and the original native execution owner. */
 function sqliteOperation<TValue, I, R>(

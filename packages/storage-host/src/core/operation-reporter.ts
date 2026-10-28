@@ -1,4 +1,4 @@
-import { StorageErrorText } from '../error-text.js'
+import { StorageErrorText } from '../error-text.ts'
 
 /** Native final diagnostic boundary, expressed without importing DOM or Node declarations. */
 const diagnosticHost = globalThis as unknown as {

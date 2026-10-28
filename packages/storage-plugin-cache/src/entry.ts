@@ -1,8 +1,8 @@
 import type { ICodecValue } from '@migaia/serialize/codec'
 import { CacheErrorCode } from '@migaia/storage-contract/error-code'
-import { cacheError, invalidArgument } from './errors.js'
-import { shorten, type ICacheConfiguration, type ICachePolicy } from './policy.js'
-import type { ICacheEntryInfo } from './types.js'
+import { cacheError, invalidArgument } from './errors.ts'
+import { shorten, type ICacheConfiguration, type ICachePolicy } from './policy.ts'
+import type { ICacheEntryInfo } from './types.ts'
 
 /** Fixed envelope is independent of the caller's selected value codec. */
 export type ICacheEntry = Readonly<{

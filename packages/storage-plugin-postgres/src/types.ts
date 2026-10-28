@@ -19,7 +19,7 @@ import type {
   IDurableStorageChange
 } from '@migaia/storage-contract'
 import { kv, records, ttl, counter, sql } from '@migaia/storage-contract'
-import type { PgTruncatePolicy } from './constants.js'
+import type { PgTruncatePolicy } from './constants.ts'
 /** Native results retain only the canonical SQL scalar domain. */
 export type IPgResult = { readonly rows: readonly ISqlRow[]; readonly rowCount: number }
 /** Native COPY uses only structured identifiers and a client-provided byte stream. */

@@ -1,11 +1,11 @@
-import { createLocalTestStore, createSessionTestStore } from '../helpers/installed-backends.js'
+import { createLocalTestStore, createSessionTestStore } from '../helpers/installed-backends.ts'
 import {
   STORAGE_HOST_ERROR_SOURCE,
   STORAGE_BROWSER_ERROR_SOURCE
 } from '@migaia/storage-contract/error-code'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { describe, expect, it, vi } from 'vitest'
-import { fakeWebStorage } from '../../src/testing/fake-web-storage.js'
+import { fakeWebStorage } from '../../src/testing/fake-web-storage.ts'
 
 /** Installation wrappers retain the browser failure and its original native cause. */
 const expectNativeInstallationFailure = async (

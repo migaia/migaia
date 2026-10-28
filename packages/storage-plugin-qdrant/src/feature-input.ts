@@ -6,14 +6,14 @@ import {
   assertStringStorageKey
 } from '@migaia/storage-contract'
 import type { Schemas } from '@qdrant/js-client-rest'
-import { invalidArgument } from './errors.js'
-import { QdrantText } from './constants.js'
+import { invalidArgument } from './errors.ts'
+import { QdrantText } from './constants.ts'
 import type {
   IQdrantRescoreOptions,
   IQdrantRescoreConfiguration,
   IQdrantRescoreVector,
   IQdrantRescorePoint
-} from './feature-types.js'
+} from './feature-types.ts'
 /**
  * Lazy installation retains configured schemas across later native discovery; canonical validation
  * owns dimensions and metric.

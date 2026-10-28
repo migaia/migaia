@@ -1,14 +1,14 @@
 import { defineFeature, type IStorageFeature } from '@migaia/storage-host'
 import type { IOperationContext } from '@migaia/storage-contract'
-import { qdrantBackendKind } from '../plugin.js'
-import { readNativeFeaturePort } from '../native-feature.js'
-import { nativeRequest, validateBranch, validateSparse } from '../feature-input.js'
-import { invalidArgument } from '../errors.js'
+import { qdrantBackendKind } from '../plugin.ts'
+import { readNativeFeaturePort } from '../native-feature.ts'
+import { nativeRequest, validateBranch, validateSparse } from '../feature-input.ts'
+import { invalidArgument } from '../errors.ts'
 import type {
   IQdrantHybridOutput,
   IQdrantHybridRequest,
   IQdrantSparseVectorsRequest
-} from '../feature-types.js'
+} from '../feature-types.ts'
 /** Native fusion is distinct from the standard centroid recommendation and top-k grouping chain. */
 export function qdrantHybridFeature(): IStorageFeature<
   typeof qdrantBackendKind,
@@ -91,4 +91,4 @@ export type {
   IQdrantSparseVectorsResult,
   IQdrantHybridApi,
   IQdrantHybridOutput
-} from '../feature-types.js'
+} from '../feature-types.ts'

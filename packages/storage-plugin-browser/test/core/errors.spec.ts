@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { invokeExtension } from '../../src/backends/backend-errors.js'
+import { invokeExtension } from '../../src/backends/backend-errors.ts'
 import { createStorageOperationRuntime } from '@migaia/storage-host/sdk'
-import { captureOperationCleanup } from '../helpers/operation-reporter.js'
+import { captureOperationCleanup } from '../helpers/operation-reporter.ts'
 
 describe('invokeExtension abort lifecycle', () => {
   it('关闭 check-subscribe race 并阻止扩展结果胜出', async () => {

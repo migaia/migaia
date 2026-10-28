@@ -1,5 +1,5 @@
 import { isUint8Array } from '@migaia/utils/bytes'
-import { RedisCommand } from './constants.js'
+import { RedisCommand } from './constants.ts'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -18,11 +18,11 @@ import {
   type IOrderedRecordRange
 } from '@migaia/storage-host/sdk'
 import type { IStorageJournalAttempt } from '@migaia/storage-host'
-import { captureRedisJournalStage, redisJournalTarget, type IRedisJournalStage } from './journal.js'
-import type { IRedisConnection, IRedisExecEntry } from './driver.js'
-import { redisError, invalidArgument } from './errors.js'
+import { captureRedisJournalStage, redisJournalTarget, type IRedisJournalStage } from './journal.ts'
+import type { IRedisConnection, IRedisExecEntry } from './driver.ts'
+import { redisError, invalidArgument } from './errors.ts'
 import { RedisErrorCode } from '@migaia/storage-contract/error-code'
-import { RedisText, redisExecCause } from './constants.js'
+import { RedisText, redisExecCause } from './constants.ts'
 import {
   createRedisLayout,
   RedisSuffix,
@@ -32,7 +32,7 @@ import {
   replyInteger,
   replyRevision,
   type IRedisChannel
-} from './layout.js'
+} from './layout.ts'
 
 /** One original attempt holds only detached native values and intended writes. */
 export type IRedisDraftEntry = {

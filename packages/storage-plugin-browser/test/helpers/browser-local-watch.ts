@@ -1,5 +1,5 @@
 import { createStorageHost } from '@migaia/storage-host'
-import { localStorageBackendPlugin } from '../../src/local-storage.js'
+import { localStorageBackendPlugin } from '../../src/local-storage.ts'
 
 /** One browser fixture retains only its real iterator and host cleanup closures. */
 let current:

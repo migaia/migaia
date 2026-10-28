@@ -1,7 +1,7 @@
 // Native data access, transaction loops, root operations and store/record API objects for the IndexedDB backend (see ./indexed-db.ts).
-import { IndexedDbFeature } from '../constants.js'
-import type { createIndexedDbJournalImages } from './indexed-db-images.js'
-import type { createIndexedDbTtlAccess } from './indexed-db-ttl.js'
+import { IndexedDbFeature } from '../constants.ts'
+import type { createIndexedDbJournalImages } from './indexed-db-images.ts'
+import type { createIndexedDbTtlAccess } from './indexed-db-ttl.ts'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -24,25 +24,25 @@ import {
   withAbort,
   encodeFlatStorageKey
 } from '@migaia/storage-host/sdk'
-import { isStorageErrorFamily } from './backend-errors.js'
-import { StorageError } from '../types/errors.js'
+import { isStorageErrorFamily } from './backend-errors.ts'
+import { StorageError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageBackend, StorageOperation, storageBackendOperation } from '../constants.js'
-import { normalizeError } from './backend-errors.js'
+import { StorageBackend, StorageOperation, storageBackendOperation } from '../constants.ts'
+import { normalizeError } from './backend-errors.ts'
 import {
   fromIdbRequest,
   idbTransactionCommit,
   installIdbOpenRequestHandlers,
   readIdbRequestError
-} from '../utils/idb-request.js'
-import type { IOperationContext, IStorageKey, IWriteOptions } from '../types/context.js'
+} from '../utils/idb-request.ts'
+import type { IOperationContext, IStorageKey, IWriteOptions } from '../types/context.ts'
 import type { IRecordIndexHandle } from '@migaia/storage-contract'
 import { assertTransactionCallback, type ITransactionScope } from '@migaia/storage-contract'
-import { IndexedDbBaseAccess, indexedDbFeatureMissing } from './indexed-db-base-access.js'
-import type { IBackendRuntime } from './construction.js'
+import { IndexedDbBaseAccess, indexedDbFeatureMissing } from './indexed-db-base-access.ts'
+import type { IBackendRuntime } from './construction.ts'
 import { asyncDisposeKey } from '@migaia/plugin-host'
-import { observeIndexedDbStage } from './indexed-db-transaction.js'
-import { runIndexedDbConcurrencyAttempt } from './indexed-db-construction.js'
+import { observeIndexedDbStage } from './indexed-db-transaction.ts'
+import { runIndexedDbConcurrencyAttempt } from './indexed-db-construction.ts'
 import {
   META_STORE_NAME,
   REVISIONS_STORE_NAME,
@@ -52,7 +52,7 @@ import {
   readIndexedDbBytes,
   RECORD_EPOCH_KEY,
   normalizeIndexedDbOperationError
-} from './indexed-db-layout.js'
+} from './indexed-db-layout.ts'
 import {
   assertLive,
   recordRevisionKey,
@@ -62,8 +62,8 @@ import {
   indexScopeEpochKey,
   withMutationLease,
   closeForTransition
-} from './indexed-db-lifecycle.js'
-import { open, createTransaction } from './indexed-db-open.js'
+} from './indexed-db-lifecycle.ts'
+import { open, createTransaction } from './indexed-db-open.ts'
 import {
   createIndexedDbStoreText,
   createIndexedDbStoreObservation,
@@ -71,15 +71,15 @@ import {
   createIndexedDbStoreBytes,
   createIndexedDbStoreRecords,
   createIndexedDbStoreTransactions
-} from './indexed-db-store-channels.js'
-import { publishChange, indexedDbSignalFailure, recordQueryPushdown } from './indexed-db.js'
+} from './indexed-db-store-channels.ts'
+import { publishChange, indexedDbSignalFailure, recordQueryPushdown } from './indexed-db.ts'
 import type {
   IIndexedDbContext,
   IMutationLeaseContext,
   IIndexedDbTransactionScope,
   IRootMode,
   IRootPrepared
-} from './indexed-db.js'
+} from './indexed-db.ts'
 
 /**
  * Keep the original read lifetime; data projections may lazily expire through its same native

@@ -4,8 +4,8 @@ import {
   definePlugin,
   defineStorageBackendKind,
   type IStoragePluginCore
-} from '../../src/index.js'
-import { ConcurrencyPolicy } from '../../src/authoring/concurrency.js'
+} from '../../src/index.ts'
+import { ConcurrencyPolicy } from '../../src/authoring/concurrency.ts'
 import {
   rdf,
   type IStorageStore,

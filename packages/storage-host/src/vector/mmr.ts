@@ -1,12 +1,12 @@
-import { snapshotStorageVector } from '../authoring/vector.js'
+import { snapshotStorageVector } from '../authoring/vector.ts'
 import {
   StorageContractError,
   StorageContractErrorCode,
   type IVectorReranker
 } from '@migaia/storage-contract'
-import { cosineStorageVectors } from '../backends/vector-core.js'
-import { throwIfAborted } from '../core/operation.js'
-import { StorageErrorText } from '../error-text.js'
+import { cosineStorageVectors } from '../backends/vector-core.ts'
+import { throwIfAborted } from '../core/operation.ts'
+import { StorageErrorText } from '../error-text.ts'
 
 /** The query owns truncation; topN bounds only MMR's greedy prefix and never changes score length. */
 export type IStorageMmrOptions = {

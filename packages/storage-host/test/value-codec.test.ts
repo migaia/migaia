@@ -1,5 +1,5 @@
 import { SERIALIZE_SOURCE } from '@migaia/serialize/core'
-import { fromValueCodec } from '../src/authoring/codec.js'
+import { fromValueCodec } from '../src/authoring/codec.ts'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'

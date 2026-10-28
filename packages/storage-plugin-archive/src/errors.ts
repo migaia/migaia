@@ -12,8 +12,8 @@ import {
 } from '@migaia/storage-contract/error-code'
 import type { IArchiveErrorCode } from '@migaia/storage-contract/error-code'
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { Archive } from './constants.js'
-import { ArchiveText } from './error-text.js'
+import { Archive } from './constants.ts'
+import { ArchiveText } from './error-text.ts'
 
 /** The existing archive source marks declared validation failures without accessor normalization. */
 export function isArchiveError(

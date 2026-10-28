@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { compareStorageKeys, encodeOrderedStorageKey } from '../../src/authoring/key.js'
+import { compareStorageKeys, encodeOrderedStorageKey } from '../../src/authoring/key.ts'
 import { type IStorageKey } from '@migaia/storage-contract'
-import { createOrderedRecordIndex } from '../../src/core/ordered-record-index.js'
+import { createOrderedRecordIndex } from '../../src/core/ordered-record-index.ts'
 
 /** Every fixture uses the actual canonical writer rather than a second test encoding. */
 const encode = (key: IStorageKey): Uint8Array => encodeOrderedStorageKey(key, 'memory')

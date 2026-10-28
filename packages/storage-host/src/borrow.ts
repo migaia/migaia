@@ -1,5 +1,5 @@
 import { asyncDisposeKey } from '@migaia/plugin-host'
-import { hasStorageCapability, useStorageCapability } from './authoring/capability.js'
+import { hasStorageCapability, useStorageCapability } from './authoring/capability.ts'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -9,8 +9,8 @@ import {
   type IStorageChange,
   type IAnyStorageCapability
 } from '@migaia/storage-contract'
-import type { IStorageBorrowedBackend } from './types.js'
-import { STORAGE_ORG_NATIVE_QUERY_METHODS } from './state-constants.js'
+import type { IStorageBorrowedBackend } from './types.ts'
+import { STORAGE_ORG_NATIVE_QUERY_METHODS } from './state-constants.ts'
 
 /** Project business access while keeping both resources with their original registrations. */
 export function borrowStorageBackend(

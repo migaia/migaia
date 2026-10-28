@@ -1,21 +1,21 @@
-import { type ITransactionOptions, type IWriteConcurrencyOptions } from './concurrency.js'
-import { StorageContractError, StorageContractErrorCode } from './errors.js'
+import { type ITransactionOptions, type IWriteConcurrencyOptions } from './concurrency.ts'
+import { StorageContractError, StorageContractErrorCode } from './errors.ts'
 import {
   isStorageCapabilities,
   type IBackendKind,
   type IStorageCapabilities
-} from './capabilities.js'
+} from './capabilities.ts'
 import {
   type IKeyRange,
   type IOperationContext,
   type IStorageKey,
   type ISyncWriteOptions,
   type IWriteOptions
-} from './context.js'
-import { type ITransactionScope } from './transaction.js'
-import { isBackendKind } from './backend.js'
-import { type IStorageResource, type IStorageIterator } from './resource.js'
-import { STORAGE_KEY_VALUE_BASE_METHODS } from './capability-constants.js'
+} from './context.ts'
+import { type ITransactionScope } from './transaction.ts'
+import { isBackendKind } from './backend.ts'
+import { type IStorageResource, type IStorageIterator } from './resource.ts'
+import { STORAGE_KEY_VALUE_BASE_METHODS } from './capability-constants.ts'
 
 /** Runtime-neutral resource identity and facts; specialized stores need no KV methods. */
 export type IStorageBase = IStorageResource & {

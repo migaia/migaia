@@ -1,6 +1,6 @@
 // Transaction drafts, root get/put/remove and native features for the Redis store (see ./store.ts).
 import { runWithConcurrency, throwIfAborted } from '@migaia/storage-host/sdk'
-import { RedisCommand, RedisOperation } from './constants.js'
+import { RedisCommand, RedisOperation } from './constants.ts'
 import {
   StorageContractErrorCode,
   durableChangeFeed,
@@ -16,16 +16,16 @@ import {
   type IConcurrencyAttempt
 } from '@migaia/storage-contract'
 import { RedisErrorCode } from '@migaia/storage-contract/error-code'
-import { RedisDraft } from './transaction.js'
-import { decodeRedisValue, replyOptionalString, type IRedisChannel } from './layout.js'
-import { normalizeRedisTransactionFailure, redisError } from './errors.js'
-import { RedisText } from './constants.js'
-import type { IRedisTransactionScope } from './types.js'
-import type { IRedisConnection, IRedisDriver } from './driver.js'
-import type { IRedisVectorBinding } from './native-feature.js'
-import { redisNativeAttempt } from './store-native-attempt.js'
-import { redisRemovePrefix, redisClearBytes } from './store-records.js'
-import { redisCreateScope } from './store-scope.js'
+import { RedisDraft } from './transaction.ts'
+import { decodeRedisValue, replyOptionalString, type IRedisChannel } from './layout.ts'
+import { normalizeRedisTransactionFailure, redisError } from './errors.ts'
+import { RedisText } from './constants.ts'
+import type { IRedisTransactionScope } from './types.ts'
+import type { IRedisConnection, IRedisDriver } from './driver.ts'
+import type { IRedisVectorBinding } from './native-feature.ts'
+import { redisNativeAttempt } from './store-native-attempt.ts'
+import { redisRemovePrefix, redisClearBytes } from './store-records.ts'
+import { redisCreateScope } from './store-scope.ts'
 import {
   redisTransactions,
   redisObserve,
@@ -35,8 +35,8 @@ import {
   redisCommand,
   redisExec,
   redisObserveNative
-} from './store-state.js'
-import type { IRedisOrganizationContext } from './store-state.js'
+} from './store-state.ts'
+import type { IRedisOrganizationContext } from './store-state.ts'
 import {
   redisDraftKeys,
   redisKey,
@@ -45,7 +45,7 @@ import {
   redisWrite,
   redisPreparePoint,
   redisWriteLocks
-} from './store-write.js'
+} from './store-write.ts'
 
 /** One user transaction owns its original logical callback, budget and completed observation. */
 type IRedisTransactionExecution<R> = {

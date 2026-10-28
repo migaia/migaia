@@ -1,5 +1,5 @@
-import type { ICodec } from './types.js'
-import { StorageCodecOutput, EntityAdapterName } from '../adapter-constants.js'
+import type { ICodec } from './types.ts'
+import { StorageCodecOutput, EntityAdapterName } from '../adapter-constants.ts'
 
 /**
  * Passes serialization to the backend's structured cloning, such as IndexedDB. Supports `Blob`,

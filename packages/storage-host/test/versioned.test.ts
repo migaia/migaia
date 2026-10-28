@@ -10,7 +10,7 @@ import {
   createMigrationPlan,
   migrateEnvelope,
   migrateEnvelopeSync
-} from '../src/authoring/migration.js'
+} from '../src/authoring/migration.ts'
 import type { IAbortSignal } from '@migaia/utils/promise'
 
 describe('migration plans', () => {

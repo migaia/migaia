@@ -20,11 +20,11 @@ import type {
 } from '@migaia/storage-contract'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { markRecordIndexBackfillContentionFailure } from '@migaia/storage-host/entity'
-import { StorageError, type IExtensionStage, type IStorageChannel } from '../types/errors.js'
+import { StorageError, type IExtensionStage, type IStorageChannel } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import type { IStorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageBackend, StorageConflictPolicy, type IStorageConflictPolicy } from '../constants.js'
-import { indexUniqueConflictText } from '../error-text.js'
+import { StorageBackend, StorageConflictPolicy, type IStorageConflictPolicy } from '../constants.ts'
+import { indexUniqueConflictText } from '../error-text.ts'
 
 /** Web errors join the host's canonical family without changing any owner's error identity. */
 export type IStorageErrorFamily = IHostErrorFamily<StorageError>

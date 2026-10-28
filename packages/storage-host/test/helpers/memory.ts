@@ -1,8 +1,8 @@
-import { memoryNotificationsFeature } from '../../src/features/memory-notifications.js'
-import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.js'
+import { memoryNotificationsFeature } from '../../src/features/memory-notifications.ts'
+import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.ts'
 import { afterEach } from 'vitest'
-import { createStorageHost } from '../../src/index.js'
-import { memoryBackendPlugin, type IMemoryBackendStore } from '../../src/plugins/memory.js'
+import { createStorageHost } from '../../src/index.ts'
+import { memoryBackendPlugin, type IMemoryBackendStore } from '../../src/plugins/memory.ts'
 /** Each migrated behavior baseline acquires a genuine installed memory backend and its host. */
 const hosts: Array<{ dispose(): Promise<void> }> = []
 afterEach(async () => {

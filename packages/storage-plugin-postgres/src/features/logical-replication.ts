@@ -9,11 +9,11 @@ import {
   type IOperationContext
 } from '@migaia/storage-contract'
 import { createLifecycleScope } from '@migaia/lifecycle'
-import { postgresBackendKind } from '../plugin.js'
-import { snapshotPgReplication } from '../logical-replication.js'
-import { pgResource } from '../driver-resource.js'
-import { PgNames } from '../constants.js'
-import type { IPgLogicalReplicationOptions } from '../types.js'
+import { postgresBackendKind } from '../plugin.ts'
+import { snapshotPgReplication } from '../logical-replication.ts'
+import { pgResource } from '../driver-resource.ts'
+import { PgNames } from '../constants.ts'
+import type { IPgLogicalReplicationOptions } from '../types.ts'
 /**
  * Selecting this Feature borrows one original persistent slot and never creates or drops it
  * implicitly.

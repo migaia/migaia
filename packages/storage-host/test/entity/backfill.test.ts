@@ -1,17 +1,17 @@
 import { describe, expect, it, vi } from 'vitest'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
-import { createStorageHost } from '../../src/index.js'
-import { memoryBackendPlugin } from '../../src/plugins/memory.js'
+import { createStorageHost } from '../../src/index.ts'
+import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
 import {
   registerRecordIndexBackfillStore,
   markRecordIndexBackfillContentionFailure,
   RecordIndexBackfillPhase,
   type IRecordIndexBackfillStore
-} from '../../src/entity.js'
+} from '../../src/entity.ts'
 import {
   asRecordIndexBackfillStore,
   isBackfillContentionFailure
-} from '../../src/entity/backfill.js'
+} from '../../src/entity/backfill.ts'
 
 describe('the moved neutral backfill registration', () => {
   it('retains the captured provider and original coded contention identity without invoking native work', async () => {

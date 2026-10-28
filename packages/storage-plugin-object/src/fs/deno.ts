@@ -1,6 +1,6 @@
 import { resolve } from 'node:path'
-import type { IObjectFileIo } from './io.js'
-import { ObjectErrorText } from '../error-text.js'
+import type { IObjectFileIo } from './io.ts'
+import { ObjectErrorText } from '../error-text.ts'
 /** The Deno adapter uses native Deno filesystem calls rather than Node compatibility I/O. */
 const runtime = (
   globalThis as typeof globalThis & {

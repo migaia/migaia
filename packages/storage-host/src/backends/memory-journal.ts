@@ -3,17 +3,17 @@ import type { INativeAbortSignal } from '@migaia/utils/promise'
 import {
   createBackendJournalNamespace,
   type IBackendJournalTransaction
-} from '../journal/namespace-resource.js'
+} from '../journal/namespace-resource.ts'
 import {
   StorageContractError,
   StorageContractErrorCode,
   type ITransactionInfo,
   type ITransactionScope
 } from '@migaia/storage-contract'
-import type { IStorageJournalNamespace, IStorageJournalNamespaceView } from '../journal/types.js'
-import { StorageError } from '../errors.js'
+import type { IStorageJournalNamespace, IStorageJournalNamespaceView } from '../journal/types.ts'
+import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
+import { StorageErrorText } from '../error-text.ts'
 
 /** Commit evidence stays in the same private physical data universe as original log namespaces. */
 const markerNamespace = Symbol()

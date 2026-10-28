@@ -1,10 +1,10 @@
-import { type IOperationContext } from '../context.js'
-import { assertLockKey, type ILockKey, type IWriteConcurrencyOptions } from '../concurrency.js'
-import { type IBackendKind } from '../capabilities.js'
-import { StorageContractError, StorageContractErrorCode } from '../errors.js'
-import { StorageContractErrorText } from '../error-text.js'
-import { STORAGE_TTL_METHODS } from '../capability-constants.js'
-import { defineStandardStorageCapability, validateCapabilityMethods } from '../capability-token.js'
+import { type IOperationContext } from '../context.ts'
+import { assertLockKey, type ILockKey, type IWriteConcurrencyOptions } from '../concurrency.ts'
+import { type IBackendKind } from '../capabilities.ts'
+import { StorageContractError, StorageContractErrorCode } from '../errors.ts'
+import { StorageContractErrorText } from '../error-text.ts'
+import { STORAGE_TTL_METHODS } from '../capability-constants.ts'
+import { defineStandardStorageCapability, validateCapabilityMethods } from '../capability-token.ts'
 
 /** TTL targets reuse exactly the physical lock channels that carry expiring values. */
 export type ITtlTarget = Extract<

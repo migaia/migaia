@@ -1,7 +1,7 @@
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import type { IBinlogExt, IUndoLogExt, IWalExt, ILogStore } from '@migaia/logger/plugins/durable'
 import type { ILevelPluginExt } from '@migaia/logger/plugins'
-import type { IStorageJournalConfiguration } from './types.js'
+import type { IStorageJournalConfiguration } from './types.ts'
 
 /** Configuration data stays with the original org cell; these maps grant no backend authority. */
 export type IStorageJournalConfigurationSnapshot = Readonly<{

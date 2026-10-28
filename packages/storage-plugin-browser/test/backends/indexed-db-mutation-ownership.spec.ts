@@ -1,4 +1,4 @@
-import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
+import { indexedDbTestFeatures } from '../helpers/indexed-db-features.ts'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { describe, expect, it, onTestFinished } from 'vitest'
@@ -8,7 +8,7 @@ import {
   indexedDbBackendKind,
   indexedDbBackendPlugin,
   type IIndexedDbOptions
-} from '../../src/indexed-db.js'
+} from '../../src/indexed-db.ts'
 
 /** Failed installation retains the native validation failure below the actual host wrapper. */
 const expectInvalidInstallation = async (pending: Promise<unknown>): Promise<void> => {

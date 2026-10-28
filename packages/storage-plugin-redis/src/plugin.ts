@@ -7,10 +7,10 @@ import {
   type IStoragePluginCore
 } from '@migaia/storage-host'
 import type { ICapabilityInstallPort } from '@migaia/storage-contract'
-import { createRedisStore, type IRedisConstruction } from './store.js'
-import type { IRedisOptions, IRedisStore } from './types.js'
-import type { IRedisDriver } from './driver.js'
-import { RedisText } from './constants.js'
+import { createRedisStore, type IRedisConstruction } from './store.ts'
+import type { IRedisOptions, IRedisStore } from './types.ts'
+import type { IRedisDriver } from './driver.ts'
+import { RedisText } from './constants.ts'
 
 /** Exact kind identity prevents a Feature from borrowing an unrelated backend's native driver. */
 export const redisBackendKind = defineStorageBackendKind<IRedisStore, IRedisDriver>()(

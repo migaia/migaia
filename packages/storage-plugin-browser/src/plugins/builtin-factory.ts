@@ -11,8 +11,8 @@ import {
   type IStorageFeatureStoreCompatibility,
   type IStoragePluginCore
 } from '@migaia/storage-host'
-import type { IBackendConstruction } from '../backends/construction.js'
-import { StorageError } from '../types/errors.js'
+import type { IBackendConstruction } from '../backends/construction.ts'
+import { StorageError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 import type { IBackendKind } from '@migaia/storage-contract'
 

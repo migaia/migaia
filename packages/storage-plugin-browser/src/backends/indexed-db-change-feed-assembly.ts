@@ -1,4 +1,4 @@
-import { IndexedDbFeature } from '../constants.js'
+import { IndexedDbFeature } from '../constants.ts'
 import type { IBackendChangeController } from '@migaia/storage-host/sdk'
 import { createBackendChangeIterator } from '@migaia/storage-host/sdk'
 import {
@@ -6,9 +6,9 @@ import {
   StorageContractError,
   StorageContractErrorCode
 } from '@migaia/storage-contract'
-import { assertLive, type IIndexedDbContext, type IIndexedDbStore } from './indexed-db.js'
-import { indexedDbFeatureMissing } from './indexed-db-base-access.js'
-import { StorageBackend, storageBackendOperation } from '../constants.js'
+import { assertLive, type IIndexedDbContext, type IIndexedDbStore } from './indexed-db.ts'
+import { indexedDbFeatureMissing } from './indexed-db-base-access.ts'
+import { StorageBackend, storageBackendOperation } from '../constants.ts'
 /** Change-feed iteration is imported only by the explicit Feature and borrows post-commit events. */
 export class IndexedDbChangeFeedAssembly {
   /** Watch the original value channel; notification assembly is an explicit prerequisite. */

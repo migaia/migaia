@@ -1,5 +1,5 @@
 // Scoped, observed and mutating entity query sources for the entity query owner (see ./query-owner.ts).
-import { EntityFeatureName } from './constants.js'
+import { EntityFeatureName } from './constants.ts'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import {
@@ -10,28 +10,28 @@ import {
   type ITransactionScope,
   type IStorageIterator
 } from '@migaia/storage-contract'
-import { encodeOrderedStorageKey } from '../authoring/key.js'
-import { compileStorageQueryCondition } from '../authoring/query.js'
+import { encodeOrderedStorageKey } from '../authoring/key.ts'
+import { compileStorageQueryCondition } from '../authoring/query.ts'
 import {
   deriveTransactionIterator,
   nextTransactionIterator,
   runTransactionOperation,
   readTransactionOperationContext
-} from '../authoring/transaction.js'
-import { StorageError } from '../errors.js'
+} from '../authoring/transaction.ts'
+import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { readStorageHookFailureCode } from '../hooks.js'
-import { composeRepositoryKey, composeStructuredKey, decodeRepositoryKey } from './key.js'
-import { encodeFlatStorageKey } from '../core/key-domain.js'
-import { isStorageKeyInRange } from '../core/query-state.js'
-import { createStorageOperationRuntime } from '../core/operation-reporter.js'
-import { EntityText } from './text.js'
-import { type IEntityQueryPlan, type IEntityQuerySourceSelection } from './query-adapter.js'
-import { snapshotOperationContext } from '../authoring/context.js'
+import { readStorageHookFailureCode } from '../hooks.ts'
+import { composeRepositoryKey, composeStructuredKey, decodeRepositoryKey } from './key.ts'
+import { encodeFlatStorageKey } from '../core/key-domain.ts'
+import { isStorageKeyInRange } from '../core/query-state.ts'
+import { createStorageOperationRuntime } from '../core/operation-reporter.ts'
+import { EntityText } from './text.ts'
+import { type IEntityQueryPlan, type IEntityQuerySourceSelection } from './query-adapter.ts'
+import { snapshotOperationContext } from '../authoring/context.ts'
 import type { IStorageKey } from '@migaia/storage-contract'
-import type { IInvalidRecordIssue } from './types.js'
-import { createOrderedRecordIndex } from '../core/ordered-record-index.js'
-import { EntityState, StorageInvalidRecordAction, StorageRecordStage } from './constants.js'
+import type { IInvalidRecordIssue } from './types.ts'
+import { createOrderedRecordIndex } from '../core/ordered-record-index.ts'
+import { EntityState, StorageInvalidRecordAction, StorageRecordStage } from './constants.ts'
 import {
   entityRuntime,
   observeEntity,
@@ -44,9 +44,9 @@ import {
   IEntityScopedSourceContext,
   IEntityQueryObservation,
   IEntityQueryMutationContext
-} from './repository-shared.js'
-import type { EntityRepositoryOwner } from './repository.js'
-import type { EntityQueryOwner } from './query-owner.js'
+} from './repository-shared.ts'
+import type { EntityRepositoryOwner } from './repository.ts'
+import type { EntityQueryOwner } from './query-owner.ts'
 
 /** Own source creation, scoped cursors, observation and mutation for one entity query owner. */
 export class EntityQuerySourceOwner<

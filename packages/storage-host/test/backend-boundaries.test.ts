@@ -7,7 +7,7 @@ import {
   isStorageErrorFamily,
   invokeExtension,
   subscribeToAbort
-} from '../src/authoring/backend.js'
+} from '../src/authoring/backend.ts'
 
 /** A native backend error keeps its real source and original native cause through shared rules. */
 const backendError = (cause?: unknown) =>

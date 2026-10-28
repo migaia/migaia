@@ -12,10 +12,10 @@ import {
   throwIfAborted,
   snapshotKeyRange
 } from '@migaia/storage-host/sdk'
-import { StorageError } from '../types/errors.js'
+import { StorageError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageBackend, StorageOperation } from '../constants.js'
-import { subscribeToAbort } from './backend-errors.js'
+import { StorageBackend, StorageOperation } from '../constants.ts'
+import { subscribeToAbort } from './backend-errors.ts'
 import {
   fromIdbRequest,
   installIdbRequestHandlers,
@@ -23,19 +23,19 @@ import {
   readIdbRequestError,
   readIdbRequestResult,
   readIdbTransactionError
-} from '../utils/idb-request.js'
-import type { IKeyRange, IOperationContext, IStorageKey } from '../types/context.js'
+} from '../utils/idb-request.ts'
+import type { IKeyRange, IOperationContext, IStorageKey } from '../types/context.ts'
 import {
   META_STORE_NAME,
   REVISIONS_STORE_NAME,
   INDEX_RECORDS_STORE_NAME,
   toIdbRange
-} from './indexed-db-layout.js'
-import { assertLive, withMutationLease } from './indexed-db-lifecycle.js'
-import { open, createTransaction } from './indexed-db-open.js'
-import { createNativeDataAccess, runTransaction, assertExpiryRemoval } from './indexed-db-root.js'
-import { publishChange } from './indexed-db.js'
-import type { IIndexedDbContext, IMutationLeaseContext } from './indexed-db.js'
+} from './indexed-db-layout.ts'
+import { assertLive, withMutationLease } from './indexed-db-lifecycle.ts'
+import { open, createTransaction } from './indexed-db-open.ts'
+import { createNativeDataAccess, runTransaction, assertExpiryRemoval } from './indexed-db-root.ts'
+import { publishChange } from './indexed-db.ts'
+import type { IIndexedDbContext, IMutationLeaseContext } from './indexed-db.ts'
 
 /** Advance the original bounded native cursor while retaining its signal and page ownership. */
 /** One bounded index iterator owns continuation, epoch observations and its existing signal. */

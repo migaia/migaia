@@ -1,9 +1,9 @@
 import { snapshotStorageRdfTerm } from '@migaia/storage-host/sdk'
 import { RdfTermType } from '@migaia/storage-contract'
-import { invalidArgument } from './errors.js'
-import { SparqlText } from './text.js'
-import type { IRdfGraphTarget, IRdfGraphFormat, IRdfGraphDocument } from './endpoint.js'
-import type { ISparqlEndpoint, ISparqlGraphStorePort } from './endpoint.js'
+import { invalidArgument } from './errors.ts'
+import { SparqlText } from './text.ts'
+import type { IRdfGraphTarget, IRdfGraphFormat, IRdfGraphDocument } from './endpoint.ts'
+import type { ISparqlEndpoint, ISparqlGraphStorePort } from './endpoint.ts'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 /** Environment detection checks the actual native port without issuing a hidden request. */
 export function requireGraphStore(endpoint: ISparqlEndpoint): ISparqlGraphStorePort {

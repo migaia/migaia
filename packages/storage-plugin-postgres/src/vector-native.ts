@@ -11,12 +11,12 @@ import type {
   IPgNativeVectorHit,
   IPgNativeParameter,
   IPostgresTransactionScope
-} from './types.js'
-import { quotePgIdentifier } from './copy-command.js'
-import { pgVectorCondition, pgVectorFilter } from './vector-filter.js'
-import { invalidArgument, postgresError } from './errors.js'
+} from './types.ts'
+import { quotePgIdentifier } from './copy-command.ts'
+import { pgVectorCondition, pgVectorFilter } from './vector-filter.ts'
+import { invalidArgument, postgresError } from './errors.ts'
 import { PostgresErrorCode } from '@migaia/storage-contract/error-code'
-import { PgNames } from './constants.js'
+import { PgNames } from './constants.ts'
 /** Validate and encode the caller table target before native execution can await. */
 function preparePgNativeVector(
   target: IPgNativeVectorTarget,

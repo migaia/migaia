@@ -3,8 +3,8 @@ export type {
   IQdrantOperation,
   IQdrantOperationName,
   IQdrantUpdateResult
-} from './types.js'
+} from './types.ts'
 
-export { qdrantBackendKind, qdrantBackendPlugin } from './plugin.js'
-export type { IQdrantOptions, IQdrantStore } from './types.js'
-export type { IQdrantHttpHookPayload } from './hooks.js'
+export { qdrantBackendKind, qdrantBackendPlugin } from './plugin.ts'
+export type { IQdrantOptions, IQdrantStore } from './types.ts'
+export type { IQdrantHttpHookPayload } from './hooks.ts'

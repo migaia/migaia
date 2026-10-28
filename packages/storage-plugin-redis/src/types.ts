@@ -15,7 +15,7 @@ import {
   type ITransactionScope,
   type ITransactionOptions
 } from '@migaia/storage-contract'
-import type { IRedisDriver } from './driver.js'
+import type { IRedisDriver } from './driver.ts'
 
 /** Only standard capabilities backed by the original native transaction owner appear on the base. */
 export type IRedisCapabilities = typeof kv | typeof records | typeof ttl | typeof counter

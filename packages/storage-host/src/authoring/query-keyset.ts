@@ -7,7 +7,7 @@ import {
   type IQueryNativeStep
 } from '@migaia/storage-contract'
 import { immutableSnapshot } from '@migaia/utils/object'
-import { compareStorageKeys } from './key.js'
+import { compareStorageKeys } from './key.ts'
 import type {
   IQueryNode,
   IQuerySourceSnapshot,
@@ -18,7 +18,7 @@ import type {
   IQueryReadResult,
   IQueryReaderInput,
   IRecordQueryKeysetContext
-} from './query.js'
+} from './query.ts'
 
 /** Page size, output projection and explicit offsets are not condition or ordering identity. */
 function queryCursorStep(step: IQueryNode['step']): boolean {
