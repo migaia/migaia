@@ -79458,7 +79458,7 @@
             "export declare const IpcSendClass: { readonly data: 'data'; readonly control: 'control'; };",
             "export type IpcSendClass = keyof typeof IpcSendClass;"
           ],
-          "overloadParameterDetails": [[], [], []],
+          "overloadParameterDetails": [[], []],
           "overloadReturns": [],
           "whenToUse": "",
           "notUse": "",
@@ -87986,7 +87986,7 @@
             "export declare const RpcSessionRetirement: { /** A quiet, ready connection reached its configured idle deadline. */ readonly idle: 'idle'; /** The original runtime governor reached its violation or timeout liquidation threshold. */ readonly liquidated: 'liquidated'; };",
             "export type RpcSessionRetirement = keyof typeof RpcSessionRetirement;"
           ],
-          "overloadParameterDetails": [[], [], []],
+          "overloadParameterDetails": [[], []],
           "overloadReturns": [],
           "whenToUse": "Use RpcSessionRetirement when its const contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when RpcSessionRetirement does not match the required inputs or return contract.",
@@ -114556,9 +114556,10 @@
           "examples": [],
           "members": [],
           "composes": [],
+          "aliasOf": "IpcSendClass",
           "exportPath": "./sdk",
           "overloadSignatures": ["export type IpcSendClass = keyof typeof IpcSendClass;"],
-          "overloadParameterDetails": [[], []],
+          "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "",
           "notUse": "",
@@ -134924,11 +134925,12 @@
           "examples": [],
           "members": [],
           "composes": [],
+          "aliasOf": "RpcSessionRetirement",
           "exportPath": "./sdk",
           "overloadSignatures": [
             "export type RpcSessionRetirement = keyof typeof RpcSessionRetirement;"
           ],
-          "overloadParameterDetails": [[], []],
+          "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "Use RpcSessionRetirement when its type contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when RpcSessionRetirement does not match the required inputs or return contract.",
@@ -144004,7 +144006,7 @@
             "export declare const IpcSendClass: { readonly data: 'data'; readonly control: 'control'; };",
             "export type IpcSendClass = keyof typeof IpcSendClass;"
           ],
-          "overloadParameterDetails": [[], [], []],
+          "overloadParameterDetails": [[], []],
           "overloadReturns": [],
           "whenToUse": "",
           "notUse": "",
@@ -148638,16 +148640,6 @@
           "ownerExportPath": "./core",
           "ownerModule": "core",
           "ownerFragment": "serialize-core--ISerializeParser"
-        },
-        {
-          "identity": "packages/serialize/dist/types.d.ts:ISerializePhase:export type ISerializePhase = (typeof SerializePhase)[keyof typeof SerializePhase];",
-          "name": "ISerializePhase",
-          "signature": "export type ISerializePhase = (typeof SerializePhase)[keyof typeof SerializePhase];",
-          "source": "packages/serialize/dist/types.d.ts",
-          "exportPath": ".",
-          "ownerExportPath": "./core",
-          "ownerModule": "core",
-          "ownerFragment": "serialize-core--ISerializePhase"
         },
         {
           "identity": "packages/serialize/dist/types.d.ts:ISerializePlugin:export type ISerializePlugin = { /** * Envelope routing token matching SERIALIZE_TYPE_PATTERN; first registered type is the write * default. */ readonly type: string; /** Parser whose methods and original receiver are captured when registry ownership begins. */ readonly parser: ISerializeParser; };",
@@ -198795,7 +198787,7 @@
           "overloadSignatures": [
             "export type IStorageNativePluginDescriptor<K extends IStorageBackendKind = IStorageBackendKind, S extends IStorageBase = IStorageBase> = { readonly kind?: K; install?(): (object & ThisType<IStoragePluginCallContext>) | PromiseLike<object & ThisType<IStoragePluginCallContext>>; expose?(): Record<string, unknown> & ThisType<IStoragePluginCallContext>; featureExpose?(): object; capabilityInstaller?(store: S): ICapabilityInstallPort; /** Capture original private journal I/O once after this exact store is admitted. */ journalBinding?(store: S): import('./journal/types.ts').IStorageJournalBackendBinding | undefined; };"
           ],
-          "overloadParameterDetails": [[], []],
+          "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "",
           "notUse": "",
@@ -200079,7 +200071,7 @@
           "overloadSignatures": [
             "export type IStoragePluginCore<F extends IStorageFeatureRecord = {}> = Pick<IPluginHostCore<IStoragePipelineInput>, 'operation' | 'lifecycle' | 'onDispose' | 'usePipeline' | 'useAsyncPipeline'> & IStorageBorrowPort & { /** Select journal code only from the explicit journal plugin in its original install scope. */ registerJournalRuntime(runtime: import('./journal/loader.ts').IStorageJournalRuntime): void; readonly journal?: import('./journal/types.ts').IStorageJournalExecutionPort; readonly defaultOrgId: string; readonly execution: IStorageExecutionPort; readonly hooks: IStorageHooks; /** * Subscribe to the host event registry at any time, not only during `install()`. The caller * owns the returned unsubscribe function and must call it when its plugin is disposed. */ readonly subscribeStorageHook: IStorageHooks['on']; readonly stageBindings: IBackendStageBindings; /** Project selected transaction methods onto the original backend-created view before freeze. */ createTransactionApi(scope: object): object | undefined; /** Read installed methods for one actual original fluent creator; omission allocates nothing. */ getChainMethods(family: keyof IChainMethods): object | undefined; createKeyLockPort(): IBackendKeyLockPort; /** Capture the original registration once; lazy org children retain its existing cleanup owner. */ createOrgAuthoringPort(): IStorageOrgAuthoringPort; /** Construct revision facts for one physical data universe during this installation window. */ createRevisionPort(): IBackendRevisionPort; createChangeController(options: IBackendChangeControllerOptions, factory: import('./core/change-types.ts').IBackendChangeControllerFactory): IBackendChangeController; registerChangeController(store: IStorageBase, controller: import('./core/change-types.ts').IBackendLifecycleController): void; registerValueCommit(store: IStorageBase, commit: IBackendValueCommit): void; /** Register immutable physical-org lookup and deletion only for this exact admitted store. */ registerOrgBinding(store: IStorageBase, binding: IStorageOrgBinding): void; /** Register optional native Feature routing only during this exact store's installation. */ registerFeatureClientResolver(store: IStorageBase, resolver: IStorageFeatureClientResolver): void; /** Read original execution and observation ports without registration or lifecycle authority. */ getOrgContext(orgId: string): IStorageBackendOrgContext; registerDetect(check: (signal: INativeAbortSignal) => Promise<void>): void; registerStore<S extends IStorageBase>(store: S): void; getStore(): IStorageBase; getBackendId(): string; readonly features: IFeatureOutputs<F>; readonly featureExpose: IStorageFeatureExpose<IStorageBackendKind>; };"
           ],
-          "overloadParameterDetails": [[], []],
+          "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "",
           "notUse": "",
@@ -293849,7 +293841,7 @@
           "overloadSignatures": [
             "export type IManagedRpcHandler = { (message: unknown): Promise<void>; /** * Closes the handler, waits for endpoint initialization, and calls `endpoint.dispose()`. Cleanup * failures reject the promise instead of being swallowed. Repeated calls return the same promise. * This does not detach the caller's native message listener or dispose a supplied serialization * parser; those resources remain with their owner. */ dispose(): Promise<void>; /** * Synchronously marks the handler unavailable by setting `disposed = true`. It does not release * the endpoint. Repeated calls have no additional effect. */ close(): void; /** Admitted inbound deliveries still awaiting setup/dispatch, not active compute or drain count. */ readonly pendingCount: number; /** Terminal admission marker, set synchronously before asynchronous endpoint cleanup. */ readonly disposed: boolean; };"
           ],
-          "overloadParameterDetails": [[], []],
+          "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "Bridge worker message events to a canonical compute/codec endpoint.",
           "notUse": "",
@@ -314510,7 +314502,7 @@
             "export declare const TrayInstanceEvent: { /** A new id admission was recorded, before generation readiness. */ readonly spawned: 'spawned'; /** A current generation completed initialization. */ readonly ready: 'ready'; /** An admitted unit entered replacement or supervised recovery. */ readonly restarting: 'restarting'; /** The current admission entered failed state. */ readonly failed: 'failed'; /** The record remains admitted but its native unit stopped. */ readonly stopped: 'stopped'; /** The admission was revoked and its removal cleanup was attempted. */ readonly removed: 'removed'; };",
             "export type TrayInstanceEvent = (typeof TrayInstanceEvent)[keyof typeof TrayInstanceEvent];"
           ],
-          "overloadParameterDetails": [[], [], []],
+          "overloadParameterDetails": [[], []],
           "overloadReturns": [],
           "whenToUse": "",
           "notUse": "",
@@ -314622,7 +314614,7 @@
             "export declare const TrayInstanceState: { /** Initial admission is installing its RPC unit and running generation init. */ readonly starting: 'starting'; /** The current generation has completed business plugin initialization. */ readonly ready: 'ready'; /** Native replacement or recovery is waiting for a new generation's initialization. */ readonly restarting: 'restarting'; /** Startup/init or terminal native recovery failed. */ readonly failed: 'failed'; /** The admitted native unit is stopped, while its registry record remains discoverable. */ readonly stopped: 'stopped'; };",
             "export type TrayInstanceState = (typeof TrayInstanceState)[keyof typeof TrayInstanceState];"
           ],
-          "overloadParameterDetails": [[], [], []],
+          "overloadParameterDetails": [[], []],
           "overloadReturns": [],
           "whenToUse": "",
           "notUse": "",

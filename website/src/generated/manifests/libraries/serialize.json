@@ -4560,16 +4560,6 @@
           "ownerFragment": "serialize-core--ISerializeParser"
         },
         {
-          "identity": "packages/serialize/dist/types.d.ts:ISerializePhase:export type ISerializePhase = (typeof SerializePhase)[keyof typeof SerializePhase];",
-          "name": "ISerializePhase",
-          "signature": "export type ISerializePhase = (typeof SerializePhase)[keyof typeof SerializePhase];",
-          "source": "packages/serialize/dist/types.d.ts",
-          "exportPath": ".",
-          "ownerExportPath": "./core",
-          "ownerModule": "core",
-          "ownerFragment": "serialize-core--ISerializePhase"
-        },
-        {
           "identity": "packages/serialize/dist/types.d.ts:ISerializePlugin:export type ISerializePlugin = { /** * Envelope routing token matching SERIALIZE_TYPE_PATTERN; first registered type is the write * default. */ readonly type: string; /** Parser whose methods and original receiver are captured when registry ownership begins. */ readonly parser: ISerializeParser; };",
           "name": "ISerializePlugin",
           "signature": "export type ISerializePlugin = { /** * Envelope routing token matching SERIALIZE_TYPE_PATTERN; first registered type is the write * default. */ readonly type: string; /** Parser whose methods and original receiver are captured when registry ownership begins. */ readonly parser: ISerializeParser; };",

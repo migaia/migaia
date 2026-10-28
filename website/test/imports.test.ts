@@ -29,7 +29,12 @@ const loggingFactories = new Map([
   ['log-plugin-durable:file', ['fileLogStore']]
 ])
 /** Generated module data is inspected without importing unpublished website runtime packages. */
-type IGeneratedApi = { library: string; module: string; symbols: { name: string }[] }
+type IGeneratedApi = {
+  library: string
+  module: string
+  symbols: { name: string; kind: string; source: string }[]
+  aliases: { name: string; source: string }[]
+}
 /** Published runtime migration waits for the first registry release of the new packages. */
 const runtimeAllowances = new Set(['package.json', 'bun.lock', 'app/log.ts', 'app/log-runtime.ts'])
 /** Ignored build products and dependencies are not authored website documentation. */
@@ -231,6 +236,45 @@ test('generates all seven logging packages and removes retired documentation rou
     exported.set(`${api.library}:${api.module}`, new Set(api.symbols.map((symbol) => symbol.name)))
   for (const [entry, factories] of loggingFactories)
     for (const factory of factories) expect(exported.get(entry)?.has(factory), entry).toBe(true)
+  /** An explicit type export shadows the root's star export of a different same-name type. */
+  const serializeRoot = apis.apis.find(
+    (api) => api.library === 'serialize' && api.module === 'index'
+  )!
+  /** Both canonical and alias projections must describe the same single public root binding. */
+  const phases = [...serializeRoot.symbols, ...serializeRoot.aliases].filter(
+    (symbol) => symbol.name === 'ISerializePhase'
+  )
+  expect(phases).toHaveLength(1)
+  expect(phases[0]?.source).toBe('packages/serialize/dist/format-constants.d.ts')
+  /** The separate core entry still owns its original type declaration. */
+  const serializeCore = apis.apis.find(
+    (api) => api.library === 'serialize' && api.module === 'core'
+  )!
+  expect(serializeCore.symbols).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        name: 'ISerializePhase',
+        source: 'packages/serialize/dist/types.d.ts'
+      })
+    ])
+  )
+  /** A real value/type pair shares a name across namespaces and must retain both declarations. */
+  const rpcSdk = apis.apis.find((api) => api.library === 'rpc-host' && api.module === 'sdk')!
+  /** These are distinct public declarations, rather than a duplicate type alias. */
+  const binaryStorage = rpcSdk.symbols.filter((symbol) => symbol.name === 'RpcBinaryStorage')
+  expect(binaryStorage).toHaveLength(2)
+  expect(binaryStorage).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        kind: 'const',
+        source: 'packages/rpc-contract/dist/wire/constants.d.ts'
+      }),
+      expect.objectContaining({
+        kind: 'type',
+        source: 'packages/rpc-host/dist/sdk/wire/binary-constants.d.ts'
+      })
+    ])
+  )
 })
 
 test('keeps legacy package references only in the four deferred published runtime files', () => {

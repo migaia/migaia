@@ -2033,12 +2033,20 @@ function typeOnlyDeclaration(record: Record<string, unknown>, signature: string)
   }
 }
 
+/** TypeScript declarations occupy at most the two fixed type/value binding namespaces. */
+function declarationNamespaces(kind: unknown): readonly string[] {
+  if (kind === 'type' || kind === 'interface') return ['type']
+  return kind === 'class' ? ['type', 'value'] : ['value']
+}
+
 /** Extracts balanced, source-backed declaration records from a declaration file. */
 function declarationSymbols(filePath: string, visited = new Set<string>()) {
   if (visited.has(filePath)) return []
   visited.add(filePath)
   const source = readFileSync(filePath, 'utf8')
   const records: Array<Record<string, unknown>> = []
+  /** Star provenance permits explicit precedence without changing declaration order. */
+  const starRecords = new Set<Record<string, unknown>>()
   /** A default export can name a local declaration without making every private declaration public. */
   const defaultBindings = new Set(
     [...source.matchAll(/^export\s+default\s+([A-Za-z_$][\w$]*)\s*;/gm)].map((match) => match[1])
@@ -2196,13 +2204,17 @@ function declarationSymbols(filePath: string, visited = new Set<string>()) {
           if (record.name === 'default') continue
           if (typeOnly && record.kind !== 'type' && record.kind !== 'interface') {
             if (declaredTypes.has(record.name)) continue
-            records.push(
-              typeOnlyDeclaration(
-                record,
-                `export type { ${String(record.name)} } from '${reexport[3]}';`
-              )
+            /** The converted type keeps its position while retaining star-export provenance. */
+            const exposed = typeOnlyDeclaration(
+              record,
+              `export type { ${String(record.name)} } from '${reexport[3]}';`
             )
-          } else records.push(record)
+            records.push(exposed)
+            starRecords.add(exposed)
+          } else {
+            records.push(record)
+            starRecords.add(record)
+          }
         }
       }
       continue
@@ -2268,7 +2280,28 @@ function declarationSymbols(filePath: string, visited = new Set<string>()) {
       }
     }
   }
-  return records
+  /** Explicit exports shadow star bindings only in the namespace they actually declare. */
+  const explicitBindings = new Set<string>()
+  for (const record of records)
+    if (!starRecords.has(record))
+      // Each declaration contributes at most two namespaces, fixed by TypeScript's binding model.
+      for (const namespace of declarationNamespaces(record.kind))
+        explicitBindings.add(`${namespace}:${String(record.name)}`)
+  /** Keep every surviving declaration in its original order, including unchanged overloads. */
+  const publicRecords: Array<Record<string, unknown>> = []
+  for (const record of records) {
+    if (!starRecords.has(record)) {
+      publicRecords.push(record)
+      continue
+    }
+    /** A value/type declaration remains public while either of its namespaces is unshadowed. */
+    let shadowed = true
+    // The same fixed two-namespace bound keeps the complete collection pass linear.
+    for (const namespace of declarationNamespaces(record.kind))
+      if (!explicitBindings.has(`${namespace}:${String(record.name)}`)) shadowed = false
+    if (!shadowed) publicRecords.push(record)
+  }
+  return publicRecords
 }
 
 /** Builds six ordered, source-backed-or-explicit symbol sections. */

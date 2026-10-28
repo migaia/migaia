@@ -13349,7 +13349,7 @@
             "export declare const IpcSendClass: { readonly data: 'data'; readonly control: 'control'; };",
             "export type IpcSendClass = keyof typeof IpcSendClass;"
           ],
-          "overloadParameterDetails": [[], [], []],
+          "overloadParameterDetails": [[], []],
           "overloadReturns": [],
           "whenToUse": "",
           "notUse": "",
@@ -21877,7 +21877,7 @@
             "export declare const RpcSessionRetirement: { /** A quiet, ready connection reached its configured idle deadline. */ readonly idle: 'idle'; /** The original runtime governor reached its violation or timeout liquidation threshold. */ readonly liquidated: 'liquidated'; };",
             "export type RpcSessionRetirement = keyof typeof RpcSessionRetirement;"
           ],
-          "overloadParameterDetails": [[], [], []],
+          "overloadParameterDetails": [[], []],
           "overloadReturns": [],
           "whenToUse": "Use RpcSessionRetirement when its const contract and declared inputs match the result you need.",
           "notUse": "Choose a different public symbol when RpcSessionRetirement does not match the required inputs or return contract.",

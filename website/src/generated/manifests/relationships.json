@@ -87932,16 +87932,6 @@
       "type": "alias-symbol"
     },
     {
-      "from": "/en/docs/serialize/api#ISerializePhase",
-      "to": "/en/docs/serialize/api/core#serialize-core--ISerializePhase",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/en/docs/serialize/api/core#serialize-core--ISerializePhase",
-      "to": "/en/docs/serialize/api#ISerializePhase",
-      "type": "alias-symbol"
-    },
-    {
       "from": "/en/docs/serialize/api#ISerializePlugin",
       "to": "/en/docs/serialize/api/core#serialize-core--ISerializePlugin",
       "type": "symbol-alias"
@@ -88879,16 +88869,6 @@
     {
       "from": "/zh/docs/serialize/api/core#serialize-core--ISerializeParser",
       "to": "/zh/docs/serialize/api#ISerializeParser",
-      "type": "alias-symbol"
-    },
-    {
-      "from": "/zh/docs/serialize/api#ISerializePhase",
-      "to": "/zh/docs/serialize/api/core#serialize-core--ISerializePhase",
-      "type": "symbol-alias"
-    },
-    {
-      "from": "/zh/docs/serialize/api/core#serialize-core--ISerializePhase",
-      "to": "/zh/docs/serialize/api#ISerializePhase",
       "type": "alias-symbol"
     },
     {

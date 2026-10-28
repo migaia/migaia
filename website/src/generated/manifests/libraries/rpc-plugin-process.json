@@ -3426,7 +3426,7 @@
             "export declare const IpcSendClass: { readonly data: 'data'; readonly control: 'control'; };",
             "export type IpcSendClass = keyof typeof IpcSendClass;"
           ],
-          "overloadParameterDetails": [[], [], []],
+          "overloadParameterDetails": [[], []],
           "overloadReturns": [],
           "whenToUse": "",
           "notUse": "",

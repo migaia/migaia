@@ -2924,7 +2924,7 @@
           "overloadSignatures": [
             "export type IManagedRpcHandler = { (message: unknown): Promise<void>; /** * Closes the handler, waits for endpoint initialization, and calls `endpoint.dispose()`. Cleanup * failures reject the promise instead of being swallowed. Repeated calls return the same promise. * This does not detach the caller's native message listener or dispose a supplied serialization * parser; those resources remain with their owner. */ dispose(): Promise<void>; /** * Synchronously marks the handler unavailable by setting `disposed = true`. It does not release * the endpoint. Repeated calls have no additional effect. */ close(): void; /** Admitted inbound deliveries still awaiting setup/dispatch, not active compute or drain count. */ readonly pendingCount: number; /** Terminal admission marker, set synchronously before asynchronous endpoint cleanup. */ readonly disposed: boolean; };"
           ],
-          "overloadParameterDetails": [[], []],
+          "overloadParameterDetails": [[]],
           "overloadReturns": [],
           "whenToUse": "Bridge worker message events to a canonical compute/codec endpoint.",
           "notUse": "",

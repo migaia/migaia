@@ -8652,7 +8652,7 @@
             "export declare const TrayInstanceEvent: { /** A new id admission was recorded, before generation readiness. */ readonly spawned: 'spawned'; /** A current generation completed initialization. */ readonly ready: 'ready'; /** An admitted unit entered replacement or supervised recovery. */ readonly restarting: 'restarting'; /** The current admission entered failed state. */ readonly failed: 'failed'; /** The record remains admitted but its native unit stopped. */ readonly stopped: 'stopped'; /** The admission was revoked and its removal cleanup was attempted. */ readonly removed: 'removed'; };",
             "export type TrayInstanceEvent = (typeof TrayInstanceEvent)[keyof typeof TrayInstanceEvent];"
           ],
-          "overloadParameterDetails": [[], [], []],
+          "overloadParameterDetails": [[], []],
           "overloadReturns": [],
           "whenToUse": "",
           "notUse": "",
@@ -8764,7 +8764,7 @@
             "export declare const TrayInstanceState: { /** Initial admission is installing its RPC unit and running generation init. */ readonly starting: 'starting'; /** The current generation has completed business plugin initialization. */ readonly ready: 'ready'; /** Native replacement or recovery is waiting for a new generation's initialization. */ readonly restarting: 'restarting'; /** Startup/init or terminal native recovery failed. */ readonly failed: 'failed'; /** The admitted native unit is stopped, while its registry record remains discoverable. */ readonly stopped: 'stopped'; };",
             "export type TrayInstanceState = (typeof TrayInstanceState)[keyof typeof TrayInstanceState];"
           ],
-          "overloadParameterDetails": [[], [], []],
+          "overloadParameterDetails": [[], []],
           "overloadReturns": [],
           "whenToUse": "",
           "notUse": "",
