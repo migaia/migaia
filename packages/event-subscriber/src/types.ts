@@ -1,3 +1,4 @@
+/** Owns public event, channel, Hub and subscription types; no runtime registration state lives here. */
 import type { IObjectPath, IObjectPathValue } from '@migaia/utils/object-path'
 import { EventDelivery, EventSubscriberState } from './state-constants.js'
 import type {
@@ -6,10 +7,8 @@ import type {
   IEventRemovalPolicy
 } from './state-constants.js'
 import type { IEventApiStyle, IEventApiStyleMethodNames, IEventApiStyleOption } from './style.js'
-
 /** Releases an owned subscription synchronously. Repeated calls do not release it again. */
 export type IUnsubscribe = () => void
-
 /** Registration metadata shared by canonical channels, naming aliases, and subscription chains. */
 export type IEventSubscribeOptions = {
   /** Optional nonempty task label, captured when a dispatch selects this registration. */
@@ -17,24 +16,20 @@ export type IEventSubscribeOptions = {
   /** Selects the listener argument; omission preserves context delivery and its controls. */
   readonly delivery?: EventDelivery
 }
-
 /** Selects payload-only delivery explicitly so listener argument inference remains unambiguous. */
 type IEventValueSubscribeOptions = IEventSubscribeOptions & {
   /** Required in this overload: listeners receive the payload instead of a context. */
   readonly delivery: typeof EventDelivery.value
 }
-
 /** Retains context delivery for existing subscriptions and an explicit context selection. */
 type IEventContextSubscribeOptions = IEventSubscribeOptions & {
   readonly delivery?: typeof EventDelivery.context
 }
-
 /** Shares overloads across channel and chain methods without introducing a runtime facade. */
 type IEventSubscribe<T, R, V, H> = {
   (listener: IEventValueListener<T, R>, options: IEventValueSubscribeOptions): H
   (listener: IEventListener<T, R, V>, options?: IEventContextSubscribeOptions): H
 }
-
 /** Adds one selected payload field to listener contexts without replacing their original value. */
 export type IEventValueConfig<T> = {
   /** Static nested path read once per dispatch. An empty or whitespace-only path disables the alias. */
@@ -45,7 +40,6 @@ export type IEventValueConfig<T> = {
    */
   readonly alias: string
 }
-
 /** Removes leading and trailing spaces from a string literal type. */
 type ITrim<S extends string> = S extends ` ${infer R}`
   ? ITrim<R>
@@ -84,7 +78,6 @@ type IEventValueExtension<T, V> = V extends {
 type IProjectedEventContext<T, V> = IEventContext<T> & IEventValueExtension<T, V>
 /** The value configuration for one Hub key, or `undefined` when it does not apply to that payload. */
 type IEventValueForKey<T, V> = V extends IEventValueConfig<T> ? V : undefined
-
 /**
  * Callable owner for one channel subscription chain. Calling it or `unsubscribe` releases the chain
  * once in reverse registration order. Extending a closed chain throws `SUBSCRIPTION_CLOSED`;
@@ -101,7 +94,6 @@ export type IEventChannelSubscription<
   /** Adds a context or value listener to this chain and returns the same handle. */
   readonly subscribe: IEventSubscribe<T, R, V, IEventChannelSubscription<T, R, S, V>>
 } & IEventChannelSubscriptionStyleProjection<T, R, S, V>
-
 /**
  * Callable owner for a Hub subscription chain, released once in reverse registration order. Finite
  * literal event maps exclude keys already used in this chain at the type boundary; widened runtime
@@ -128,7 +120,6 @@ export type IEventHubSubscription<
     options?: Pick<IEventContextSubscribeOptions, 'delivery'>
   ): IEventHubSubscription<C, IEventHubNextUsedKey<C, UsedKeys, K>, S, V>
 } & IEventHubSubscriptionStyleProjection<C, UsedKeys, S, V>
-
 /** True when `T` is a union type. */
 type IIsUnion<T, U = T> = T extends unknown ? ([U] extends [T] ? false : true) : never
 /**
@@ -144,7 +135,6 @@ type IEventHubNextUsedKey<C extends IEventMap, UsedKeys, K> = string extends key
       : IIsUnion<K> extends true
         ? UsedKeys
         : UsedKeys | K
-
 /** Remaining literal keys in a finite Hub chain; broad key maps retain runtime fan-out. */
 export type IEventHubAvailableKey<C extends IEventMap, UsedKeys> = string extends keyof C
   ? keyof C
@@ -153,7 +143,6 @@ export type IEventHubAvailableKey<C extends IEventMap, UsedKeys> = string extend
     : symbol extends keyof C
       ? keyof C
       : Exclude<keyof C, UsedKeys & keyof C>
-
 /** Abort event name accepted by signal-like subscription helpers. */
 export type IEventSubscriberAbortType = typeof EventSubscriberState.abort
 /** Discriminant of one asynchronous listener result: fulfilled or rejected. */
