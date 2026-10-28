@@ -3,8 +3,8 @@ import { createHmac } from 'node:crypto'
 import { setImmediate as nextTurn } from 'node:timers/promises'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
-import { timeout } from '@migaia/rpc-host/features/timeout'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { it, vi } from 'vitest'
 import { coreMemoryServer } from '../host/core-fixture.ts'
@@ -34,7 +34,7 @@ class SigningControl {
   protection(caller: boolean) {
     /** This small callback context names its two inputs rather than sharing fixture closure state. */
     const operation = { owner: this, caller }
-    return auth({
+    return authFeature({
       sign: (value) => operation.owner.#sign(value, operation.caller),
       verify: this.#verify
     })
@@ -120,7 +120,7 @@ for (const control of ['abort', 'deadline', 'late-failure'] as const) {
           null,
           control !== 'deadline'
             ? { signal: controller.signal }
-            : { timeout: timeout({ ms: 10, report: signing.report }) }
+            : { timeout: timeoutFeature({ ms: 10, report: signing.report }) }
         )
         /** Observe before abort so the original expected rejection cannot become detached. */
         const settlement = Promise.allSettled([pending])

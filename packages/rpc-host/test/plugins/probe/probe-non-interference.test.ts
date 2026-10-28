@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost } from '@migaia/rpc-host'
-import { batch } from '@migaia/rpc-host/plugins/batch'
+import { batchFeature } from '@migaia/rpc-host/plugins/batch'
 import {
   probe,
   defineProbe,
@@ -9,7 +9,7 @@ import {
   type IRpcProbeEventView
 } from '@migaia/rpc-host/plugins/probe'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
-import { timeout } from '@migaia/rpc-host/features/timeout'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import { RpcTimeoutError, RpcAbortError } from '@migaia/rpc-contract/errors'
 import type { IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
 import { coreMemoryServer } from '../../host/core-fixture.ts'
@@ -70,7 +70,7 @@ describe('public probe non-interference', () => {
       /** Public providers preserve the same scalar, failure, hold, notification and stream effects. */
       const server = await createRpcHost({
         ...listener.options,
-        plugins: [batch(), ...selected, listener.transport],
+        plugins: [batchFeature(), ...selected, listener.transport],
         report: (error) => business.reports.push(error),
         provide: {
           reenter: () => 9,
@@ -99,7 +99,7 @@ describe('public probe non-interference', () => {
       })
       /** A separate genuine Host owns its native Session and caller completion. */
       const client = await listener.connect('probe-client', {
-        plugins: [batch(), ...selected],
+        plugins: [batchFeature(), ...selected],
         report: (error) => business.reports.push(error)
       })
       observed.client = client.host
@@ -142,7 +142,7 @@ describe('public probe non-interference', () => {
         await vi.waitFor(() => expect(business.reports).toContain(original))
         /** A complete executing timeout instance replaces only the retired numeric configuration. */
         const expired = await client.host.memory
-          .send('probe-server', 'hold', undefined, { timeout: timeout({ ms: 10 }) })
+          .send('probe-server', 'hold', undefined, { timeout: timeoutFeature({ ms: 10 }) })
           .catch((failure: unknown) => failure)
         expect(expired).toBeInstanceOf(RpcTimeoutError)
         expect(expired).toMatchObject({ source: 'rpc.endpoint', code: 'DEADLINE_EXCEEDED' })

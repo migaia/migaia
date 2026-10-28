@@ -1,7 +1,7 @@
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost, type IRpcProvide } from '@migaia/rpc-host'
-import { idempotency } from '@migaia/rpc-host/plugins/idempotency'
+import { idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'
 import { RpcWireProfile, normalizeRpcFrame } from '@migaia/rpc-contract/protocol'
 import { encodeRpcStreamTextFrame } from '@migaia/rpc-host/sdk'
 import { webTransportPlugin } from '@migaia/rpc-plugin-browser'
@@ -49,14 +49,17 @@ async function connected(
   const opening = [
     createRpcHost({
       self: { name: 'wt-client', instanceId: 'wt-client' },
-      plugins: [idempotency(), webTransportPlugin({ session, connect: { timeoutMs: 1000 } })],
+      plugins: [
+        idempotencyFeature(),
+        webTransportPlugin({ session, connect: { timeoutMs: 1000 } })
+      ],
       provide: clientProvide,
       signal: cancellation.signal,
       report: () => undefined
     }),
     createRpcHost({
       self: { name: 'wt-server', instanceId: 'wt-server' },
-      plugins: [idempotency(), serverTransport],
+      plugins: [idempotencyFeature(), serverTransport],
       provide: serverProvide,
       signal: cancellation.signal,
       report: () => undefined

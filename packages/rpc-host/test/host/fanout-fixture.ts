@@ -8,7 +8,7 @@ import {
   defineTransportPlugin,
   type IRpcMessageIO
 } from '@migaia/rpc-host/sdk'
-import { auth } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
 
 /** Target settlement keys are the public endpoint grammar, including names with punctuation. */
 export const key = (target: string) => JSON.stringify(['target', target])
@@ -126,7 +126,7 @@ export async function nativeHosts(provide: IRpcHostOptions['provide']) {
       createRpcHost({
         self: { name: `native-${index}`, instanceId: `native-${index}` },
         plugins: [
-          auth(authentication),
+          authFeature(authentication),
           defineTransportPlugin({
             name: `native-transport-${index}`,
             namespace: 'native',

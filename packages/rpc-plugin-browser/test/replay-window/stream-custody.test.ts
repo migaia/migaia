@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
-import { limits } from '@migaia/rpc-host/plugins/limits'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { limitsFeature } from '@migaia/rpc-host/plugins/limits'
 import type { IRpcProviderRejection } from '@migaia/rpc-contract/errors'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { coreMemoryServer } from '../../../rpc-host/test/host/core-fixture.ts'
@@ -20,7 +20,9 @@ describe('stream replay custody through public endpoint behavior', () => {
       const server = await createRpcHost({
         ...source.options,
         plugins: [
-          ...(authenticated ? [auth({ sign: (value) => value, verify: (value) => value })] : []),
+          ...(authenticated
+            ? [authFeature({ sign: (value) => value, verify: (value) => value })]
+            : []),
           source.transport
         ],
         report: (error) => failures.push(error)
@@ -59,7 +61,9 @@ describe('stream replay custody through public endpoint behavior', () => {
       })
       /** Initial accepted directories include the provider before its first public stream call. */
       const client = await source.connect('client', {
-        plugins: authenticated ? [auth({ sign: (value) => value, verify: (value) => value })] : []
+        plugins: authenticated
+          ? [authFeature({ sign: (value) => value, verify: (value) => value })]
+          : []
       })
       try {
         const iterator = client.host.memory.stream('held', null) as AsyncIterableIterator<never>
@@ -93,7 +97,7 @@ describe('stream replay custody through public endpoint behavior', () => {
     const server = await createRpcHost({
       ...source.options,
       plugins: [
-        auth({
+        authFeature({
           sign: (value) => value,
           verify: (value) => value,
           retain: 310_000,
@@ -102,7 +106,7 @@ describe('stream replay custody through public endpoint behavior', () => {
             notices.push(notice)
           }
         }),
-        limits(),
+        limitsFeature(),
         source.transport
       ]
     })
@@ -134,7 +138,7 @@ describe('stream replay custody through public endpoint behavior', () => {
     })
     /** Establish the original held method in the initial directory before testing replay capacity. */
     const client = await source.connect('client', {
-      plugins: [auth({ sign: (value) => value, verify: (value) => value })]
+      plugins: [authFeature({ sign: (value) => value, verify: (value) => value })]
     })
     /** Cleanup always joins both original consumer promises, including the known failed admission. */
     const pending: Promise<unknown>[] = []

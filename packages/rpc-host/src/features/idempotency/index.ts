@@ -20,7 +20,7 @@ export type {
 export type { IRpcIdempotencyOptions, IRpcOutcomeLookup } from './types.ts'
 
 /** Install the single claim/seal/query owner with body fingerprints in the object's own key order. */
-export function idempotency(
+export function idempotencyFeature(
   options: IRpcIdempotencyOptions = {}
 ): IRpcFlowFeature<Readonly<{ outcome: IRpcOutcomeLookup }>> {
   /** Original store and scope capabilities are retained, rather than copied into host configuration. */
@@ -31,4 +31,4 @@ export function idempotency(
   })
 }
 
-export default idempotency
+export default idempotencyFeature

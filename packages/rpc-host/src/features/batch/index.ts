@@ -12,7 +12,7 @@ import type { IRpcBatchOptions } from './types.ts'
 export type { IRpcBatchOptions } from './types.ts'
 
 /** Install the actual optional physical queue; absent installation allocates no batching state. */
-export function batch(options: IRpcBatchOptions = {}): IRpcFlowFeature {
+export function batchFeature(options: IRpcBatchOptions = {}): IRpcFlowFeature {
   /** Only existing native scope declarations are captured; no host configuration switch is added. */
   const captured = { ...options }
   return defineBuiltinFlowFeature('batch', {
@@ -21,4 +21,4 @@ export function batch(options: IRpcBatchOptions = {}): IRpcFlowFeature {
   })
 }
 
-export default batch
+export default batchFeature

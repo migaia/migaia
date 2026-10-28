@@ -1,5 +1,5 @@
 import { createRpcHost } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
 import { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'
 import { readRpcLaunchFacts, type IRpcLaunchFacts } from '@migaia/rpc-host/sdk'
 import { createUnitBudget, type ILaunchContext } from '@migaia/supervision'
@@ -88,7 +88,7 @@ it('preserves real native transfer backing, offset and borrowed parent cleanup o
   /** Native transfer is enabled only on a signed profile, so both endpoints install auth. */
   const host = await createRpcHost({
     plugins: [
-      auth(createFixtureAuthentication()),
+      authFeature(createFixtureAuthentication()),
       threadPlugin({
         name: 'binary-worker',
         spawn: { entry: signedEntry, name: 'binary-worker', data: { signed: true } }

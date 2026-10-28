@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
-import { errorMap } from '@migaia/rpc-host/plugins/error-map'
+import { errorMapFeature } from '@migaia/rpc-host/plugins/error-map'
 import { RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
 import { deserializeRpcError } from '@migaia/rpc-contract/errors'
 import { serializeRpcError } from '../../dist/host/error-wire-metadata.js'
@@ -105,7 +105,7 @@ it('passes the stream-open context unchanged and invokes its hook once', async (
   /** Actual server identity and declarations belong to this installed native listener. */
   const listener = coreMemoryServer('server', 'server')
   /** The application's explicit outbound policy preserves the controlled code and hides its cause. */
-  const redaction = errorMap((error) =>
+  const redaction = errorMapFeature((error) =>
     deserializeRpcError(
       serializeRpcError(error, {
         report: (failure) => {

@@ -1,7 +1,7 @@
 /** Original provider error atoms use real namespaces, physical replies and the public report port. */
 import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
-import { schema } from '@migaia/rpc-host/plugins/schema'
-import { timeout } from '@migaia/rpc-host/features/timeout'
+import { schemaFeature } from '@migaia/rpc-host/plugins/schema'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import { RpcError } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { deserializeRpcWireError } from '@migaia/rpc-contract/protocol'
@@ -166,7 +166,7 @@ it.each(['params', 'result'] as const)(
     const host = await createRpcHost({
       ...server.options,
       plugins: [
-        schema({
+        schemaFeature({
           schemas: {
             echo: {
               params: side === 'params' ? parser : identity,
@@ -188,7 +188,7 @@ it.each(['params', 'result'] as const)(
     try {
       await expect(
         client.host.memory.send('provider-admission-fixture', 'echo', undefined, {
-          timeout: timeout({ ms: 1000 })
+          timeout: timeoutFeature({ ms: 1000 })
         })
       ).rejects.toMatchObject({
         name: 'RpcSchemaValidationError',

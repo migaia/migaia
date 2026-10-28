@@ -1,7 +1,7 @@
 /** Native calls and authentication remain after retiring v1 stream/empty-capability offers. */
 import { expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import type { IProcessByteListener } from '../../dist/process/types.js'
 import {
@@ -30,7 +30,7 @@ it('retains public native listener calls and the original credential verificatio
       reports.push(error)
     },
     plugins: [
-      auth({ encodedType: 'string', sign: (value) => value, verify: (value) => value }),
+      authFeature({ encodedType: 'string', sign: (value) => value, verify: (value) => value }),
       processPlugin({
         listen: {
           kind: 'listener',
@@ -61,7 +61,7 @@ it('retains public native listener calls and the original credential verificatio
         reports.push(error)
       },
       plugins: [
-        auth({ encodedType: 'string', sign: (value) => value, verify: (value) => value }),
+        authFeature({ encodedType: 'string', sign: (value) => value, verify: (value) => value }),
         processPlugin({
           connect: {
             target: {

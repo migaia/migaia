@@ -344,7 +344,7 @@ class NativeRpcSession {
   #pid
   /**
    * @param {object} namespace Actual public namespace. @param {string} carrier Physical cell.
-   *   @param {string} payload Fixed data. @param {number} pid Native identity. @param {Function[]}
+   * @param {string} payload Fixed data. @param {number} pid Native identity. @param {Function[]}
    *   cleanup Acquired owners.
    */
   constructor(namespace, carrier, payload, pid, cleanup) {
@@ -449,7 +449,7 @@ class BareByteSession {
   #snapshots
   /**
    * @param {object} raw Original native byte I/O. @param {number} pid Actual native identity.
-   *   @param {string} payload Fixed data. @param {Function[]} cleanup Acquired owners.
+   * @param {string} payload Fixed data. @param {Function[]} cleanup Acquired owners.
    */
   constructor(raw, pid, payload, cleanup) {
     this.#raw = raw
@@ -533,7 +533,7 @@ async function openBareProcess(carrier, cleanup) {
 /** Genuine public hosts own negotiation, directory publication, calls and native supervision. */
 async function openRpc(input, cleanup) {
   const { createRpcHost } = await import('@migaia/rpc-host')
-  const { limits } = await import('@migaia/rpc-host/plugins/limits')
+  const { limitsFeature } = await import('@migaia/rpc-host/plugins/limits')
   /** Each selected plugin acquires its own real native resource from the public short recipe. */
   let definition
   if (input.carrier === 'worker') {
@@ -585,7 +585,7 @@ async function openRpc(input, cleanup) {
   const host = await createRpcHost({
     plugins: [
       ...(globalThis.__PROBE_BENCH_PROBE ? [globalThis.__PROBE_BENCH_PROBE] : []),
-      limits(nativeProviderLimits),
+      limitsFeature(nativeProviderLimits),
       definition
     ],
     report
@@ -662,7 +662,7 @@ async function childMain(side, carrier, address) {
     return
   }
   const { createRpcHost } = await import('@migaia/rpc-host')
-  const { limits } = await import('@migaia/rpc-host/plugins/limits')
+  const { limitsFeature } = await import('@migaia/rpc-host/plugins/limits')
   const module = await import(
     carrier === 'worker' ? '@migaia/rpc-plugin-thread' : '@migaia/rpc-plugin-process'
   )
@@ -679,7 +679,7 @@ async function childMain(side, carrier, address) {
             : { connectToParent: true, report }
         )
   await createRpcHost({
-    plugins: [limits(nativeProviderLimits), definition],
+    plugins: [limitsFeature(nativeProviderLimits), definition],
     provide: {
       bench: { echo: (value) => value, pid: () => process.pid, snapshot: captureSnapshot }
     },

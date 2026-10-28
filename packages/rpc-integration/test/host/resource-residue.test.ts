@@ -11,7 +11,7 @@ import { RpcAbortError, RpcTimeoutError } from '@migaia/rpc-contract/errors'
 import type { IRpcContext } from '@migaia/rpc-host'
 import type { IRpcSessionHandle } from '@migaia/rpc-contract/interfaces'
 import type { IRpcProviderRejection } from '@migaia/rpc-contract/errors'
-import { timeout } from '@migaia/rpc-host/features/timeout'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import {
   defineFlowFeature,
   defineTransportPlugin,
@@ -438,7 +438,7 @@ async function operate(
         ordinal,
         kind === 'cancel'
           ? { signal: caller.signal }
-          : { timeout: timeout({ ms: 1000, scheduler }) }
+          : { timeout: timeoutFeature({ ms: 1000, scheduler }) }
       )
       .then(
         () => {

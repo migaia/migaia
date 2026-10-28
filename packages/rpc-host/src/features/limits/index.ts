@@ -12,7 +12,7 @@ import type { IRpcLimitsOptions } from './types.ts'
 export type { IRpcLimitsOptions, IRpcLimitsOverflow, IRpcProviderRejection } from './types.ts'
 
 /** Install one real host-local quota owner; absent installation creates no optional policy state. */
-export function limits(options: IRpcLimitsOptions = {}): IRpcFlowFeature {
+export function limitsFeature(options: IRpcLimitsOptions = {}): IRpcFlowFeature {
   /** Capture cold option values once; each receiving host constructs its own running owner. */
   const captured = { ...options }
   return defineBuiltinFlowFeature('limits', {
@@ -21,4 +21,4 @@ export function limits(options: IRpcLimitsOptions = {}): IRpcFlowFeature {
   })
 }
 
-export default limits
+export default limitsFeature

@@ -3,8 +3,8 @@ import assert from 'node:assert/strict'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { createRpcHost } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
-import { idempotency, createRpcIdempotencyStore } from '@migaia/rpc-host/plugins/idempotency'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { idempotencyFeature, createRpcIdempotencyStore } from '@migaia/rpc-host/plugins/idempotency'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 /** This caller-owned temporary directory stores only test counters and completed outcomes. */
 const directory = process.argv[2]
@@ -95,14 +95,14 @@ await createRpcHost({
   provide,
   contract,
   plugins: [
-    auth({
+    authFeature({
       verifyCredentials(received) {
         /** The native parent handshake authenticates bootstrap before semantic admission. */
         assert.equal(typeof received, 'string')
         return { principalId: principal }
       }
     }),
-    idempotency({
+    idempotencyFeature({
       store,
       scope(identity) {
         assert.equal(identity.principalId, principal)

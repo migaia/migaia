@@ -4,7 +4,7 @@
  */
 import { RpcProbeStage } from '@migaia/rpc-contract/interfaces'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
 import { dedicatedWorkerPlugin, windowPlugin } from '@migaia/rpc-plugin-browser'
 import {
   HopAuthCounter,
@@ -91,7 +91,7 @@ async function openTop(): Promise<IRpcHost> {
       dedicatedWorkerPlugin({
         worker,
         connect: { timeoutMs: 5000 },
-        features: hopAuth ? [auth(authCounter.options(HopSecret.shared))] : []
+        features: hopAuth ? [authFeature(authCounter.options(HopSecret.shared))] : []
       })
     ],
     provide: {

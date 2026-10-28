@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { setImmediate as nextTurn } from 'node:timers/promises'
 import { describe, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
 import { windowPlugin } from '../../dist/index.js'
 import { windowPair } from '../browser/message-fixture.ts'
 
@@ -20,7 +20,7 @@ describe('replay-window r12 physical session authority', () => {
       createRpcHost({
         self: { name: 'client', instanceId: 'client' },
         plugins: [
-          auth({ sign: (value) => value, verify: (value) => value }),
+          authFeature({ sign: (value) => value, verify: (value) => value }),
           windowPlugin({
             window: pair.right.target,
             receiver: pair.left.target,
@@ -32,7 +32,7 @@ describe('replay-window r12 physical session authority', () => {
       createRpcHost({
         self: { name: 'server', instanceId: 'server' },
         plugins: [
-          auth({
+          authFeature({
             sign: (value) => value,
             verify: (value) => {
               verifies++

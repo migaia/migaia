@@ -1,7 +1,7 @@
 /** Credential verification follows the receiver-free contract used by other Auth callbacks. */
 import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins'
+import { authFeature } from '@migaia/rpc-host/plugins'
 import { coreMemoryServer } from '../../host/core-fixture.ts'
 
 it('calls verifyCredentials without a receiver through a public connection', async () => {
@@ -18,14 +18,14 @@ it('calls verifyCredentials without a receiver through a public connection', asy
   /** Host-level Auth verifies the real client hello before business calls are admitted. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [auth({ verifyCredentials }), ...server.options.plugins],
+    plugins: [authFeature({ verifyCredentials }), ...server.options.plugins],
     provide: { echo: (value) => value }
   })
   /** Cleanup owns a client only after its public construction has completed. */
   let client: Awaited<ReturnType<typeof server.connect>> | undefined
   try {
     client = await server.connect('receiver-client', {
-      plugins: [auth({ credentials: 'receiver-token' })]
+      plugins: [authFeature({ credentials: 'receiver-token' })]
     })
     expect(await client.host.memory.send('receiver-server', 'echo', 42)).toBe(42)
     expect(receivers).not.toHaveLength(0)

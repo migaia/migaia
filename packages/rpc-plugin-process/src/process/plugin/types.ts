@@ -10,9 +10,9 @@ import type { IScheduler } from '@migaia/utils/scheduler'
 import type { IRpcCallFeature } from '@migaia/rpc-contract/interfaces'
 import type { IRpcNativeTransportFeature, IRpcFlowFeature } from '@migaia/rpc-host/sdk'
 import type { IRpcPeerInfo, IRpcPortableValue } from '@migaia/rpc-contract/protocol'
-import type { sendQueue } from '../../features/send-queue.ts'
-import type { flowControl } from '../../features/flow-control.ts'
-import type { ipcLog } from '../../features/log.ts'
+import type { sendQueueFeature } from '../../features/send-queue.ts'
+import type { flowControlFeature } from '../../features/flow-control.ts'
+import type { ipcLogFeature } from '../../features/log.ts'
 import type {
   IProcessByteChannel,
   IProcessMessageChannel,
@@ -26,9 +26,9 @@ export type IProcessFeature =
   | IRpcCallFeature
   | IRpcFlowFeature<object>
   | IRpcNativeTransportFeature
-  | ReturnType<typeof sendQueue>
-  | ReturnType<typeof flowControl>
-  | ReturnType<typeof ipcLog>
+  | ReturnType<typeof sendQueueFeature>
+  | ReturnType<typeof flowControlFeature>
+  | ReturnType<typeof ipcLogFeature>
 
 /** Spawn retains its exact native specification, budget, launcher and physical IO acquisition. */
 export type ISpawnProcessPluginDeployment<THandle extends IProcessHandle = IProcessHandle> =

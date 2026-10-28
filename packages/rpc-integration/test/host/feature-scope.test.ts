@@ -3,7 +3,7 @@ import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
-import { schema } from '@migaia/rpc-host/plugins/schema'
+import { schemaFeature } from '@migaia/rpc-host/plugins/schema'
 import { FeatureScopeFixture as Fixture, featureScopeAuth } from './fixtures/feature-scope-child.ts'
 
 it('Process overrides Host auth once and scopes schema independently from Thread', async () => {
@@ -26,7 +26,7 @@ it('Process overrides Host auth once and scopes schema independently from Thread
             if (value.includes(Fixture.marker))
               signed.push({ key: Fixture.processKey, namespace: context.namespace })
           }),
-          schema({
+          schemaFeature({
             schemas: {
               echo: {
                 params: {

@@ -3,8 +3,8 @@ import process from 'node:process'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { createRpcHost } from '@migaia/rpc-host'
 import { isRpcErrorInstance, RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-host/contract'
-import { timeout } from '@migaia/rpc-host/features/timeout'
-import { idempotency } from '@migaia/rpc-host/plugins/idempotency'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
+import { idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 
@@ -30,7 +30,7 @@ try {
         })
   host = await createRpcHost({
     self: { name: 'parent-2', instanceId: 'parent-2' },
-    plugins: [idempotency(), child],
+    plugins: [idempotencyFeature(), child],
     report: (error) =>
       reports.push({
         source: error?.source,
@@ -186,7 +186,7 @@ try {
         orderKey: 'ordinary-held',
         ...(control === 'signal'
           ? { signal: startedController.signal }
-          : { timeout: timeout({ ms: 100 }) })
+          : { timeout: timeoutFeature({ ms: 100 }) })
       })
       .catch((error) => error)
     for (let attempt = 0; !(await ns.request('ordinaryState')).started; attempt++) {

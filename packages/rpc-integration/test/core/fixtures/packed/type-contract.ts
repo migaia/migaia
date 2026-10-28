@@ -5,7 +5,7 @@
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
 import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import type { IRpcCallFeature } from '@migaia/rpc-contract/interfaces'
-import { timeout as namedTimeout, retry } from '@migaia/rpc-host/features'
+import { timeoutFeature as namedTimeout, retryFeature } from '@migaia/rpc-host/features'
 import timeout from '@migaia/rpc-host/features/timeout'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
@@ -191,7 +191,10 @@ async function verifyPackedHostContracts(): Promise<void> {
   // @ts-expect-error The iterable declaration cannot be invoked through a scalar call.
   host.process.send('worker', 'values', 1)
   /** The same timeout definition supports the aggregate and individual feature imports. */
-  const features: readonly IRpcCallFeature[] = [namedTimeout({ ms: 1000 }), retry({ attempts: 2 })]
+  const features: readonly IRpcCallFeature[] = [
+    namedTimeout({ ms: 1000 }),
+    retryFeature({ attempts: 2 })
+  ]
   /**
    * The direct timeout entry keeps the same complete feature contract without a duplicate
    * installation.
@@ -246,7 +249,10 @@ async function verifyPackedHostContracts(): Promise<void> {
   host.process.send('worker', 'echo', 1, { timeout: 100 })
   // @ts-expect-error Per-call retry requires a complete feature or false.
   host.process.send('worker', 'echo', 1, { retry: { attempts: 2 } })
-  void host.process.send('worker', 'echo', 1, { timeout: false, retry: retry({ attempts: 2 }) })
+  void host.process.send('worker', 'echo', 1, {
+    timeout: false,
+    retry: retryFeature({ attempts: 2 })
+  })
 }
 void verifyPackedHostContracts
 

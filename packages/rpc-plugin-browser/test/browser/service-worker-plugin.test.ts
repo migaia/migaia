@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { timeout } from '@migaia/rpc-host/features/timeout'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import { serviceWorkerPlugin } from '@migaia/rpc-plugin-browser'
 import { serviceWorkerRealm } from './fixtures/service-worker.ts'
 
@@ -169,7 +169,7 @@ describe('ServiceWorker raw session plugin', () => {
       expect(await host.serviceWorker.request('echo', 'before')).toBe('before')
       realm.silence()
       await expect(
-        host.serviceWorker.request('echo', 'silent', { timeout: timeout({ ms: 30 }) })
+        host.serviceWorker.request('echo', 'silent', { timeout: timeoutFeature({ ms: 30 }) })
       ).rejects.toMatchObject({
         source: 'rpc.endpoint',
         code: 'DEADLINE_EXCEEDED'

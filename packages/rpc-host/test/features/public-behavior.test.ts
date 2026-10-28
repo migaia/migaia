@@ -1,11 +1,11 @@
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost } from '@migaia/rpc-host'
-import { chunk } from '@migaia/rpc-host/plugins/chunk'
-import { auth } from '@migaia/rpc-host/plugins/auth'
+import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
 import { linkPolicy } from '@migaia/rpc-host/plugins/link-policy'
-import { retry } from '@migaia/rpc-host/features/retry'
-import { timeout } from '@migaia/rpc-host/features/timeout'
+import { retryFeature } from '@migaia/rpc-host/features/retry'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { coreMemoryServer } from '../host/core-fixture.ts'
 
@@ -34,11 +34,11 @@ it('passes a large payload through the canonical chunk root without duplicate fe
   /** Cold flow installation precedes the native transport's sole handshake. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [chunk(), server.transport]
+    plugins: [chunkFeature(), server.transport]
   })
   /** The remote installation negotiates that same extension, without an adapter facade. */
   const client = await server.connect('client', {
-    plugins: [chunk()],
+    plugins: [chunkFeature()],
     provide: { echo: (value: unknown) => value }
   })
   try {
@@ -67,11 +67,11 @@ it('uses canonical authentication transforms on a real connected request and res
   /** Authentication is the actual flow plugin, installed before native startup. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [auth(authentication), server.transport]
+    plugins: [authFeature(authentication), server.transport]
   })
   /** The opposite public Host executes the same original provider and authentication pair. */
   const client = await server.connect('client', {
-    plugins: [auth(authentication)],
+    plugins: [authFeature(authentication)],
     provide: { echo: (value: unknown) => value }
   })
   try {
@@ -89,11 +89,11 @@ it('uses canonical authentication transforms on a real connected request and res
 // Maps host defaults to transport, feature fallback to link policy.
 it('keeps call then transport then link-policy timeout precedence', async () => {
   /** The old host-level 500 ms default is the native transport's complete timeout instance. */
-  const server = coreMemoryServer('server', 'server', 'memory', [timeout({ ms: 500 })])
+  const server = coreMemoryServer('server', 'server', 'memory', [timeoutFeature({ ms: 500 })])
   /** The old 5 ms feature fallback is the actual link policy beneath transport selection. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [linkPolicy({ features: [timeout({ ms: 5 })] }), server.transport]
+    plugins: [linkPolicy({ features: [timeoutFeature({ ms: 5 })] }), server.transport]
   })
   /** Preserve the original 30 ms provider duration rather than changing timing expectations. */
   const client = await server.connect('client', {
@@ -102,7 +102,7 @@ it('keeps call then transport then link-policy timeout precedence', async () => 
   try {
     expect(await host.memory.request('wait')).toBe('done')
     await expect(
-      host.memory.request('wait', undefined, { timeout: timeout({ ms: 5 }) })
+      host.memory.request('wait', undefined, { timeout: timeoutFeature({ ms: 5 }) })
     ).rejects.toMatchObject({ code: 'DEADLINE_EXCEEDED' })
   } finally {
     await client.host.close()
@@ -113,7 +113,7 @@ it('keeps call then transport then link-policy timeout precedence', async () => 
   /** No numeric call option or root policy field stands in for the executing instance. */
   const inherited = await createRpcHost({
     ...fallback.options,
-    plugins: [linkPolicy({ features: [timeout({ ms: 5 })] }), fallback.transport]
+    plugins: [linkPolicy({ features: [timeoutFeature({ ms: 5 })] }), fallback.transport]
   })
   /** The second original provider uses the same 30 ms duration. */
   const peer = await fallback.connect('client', {
@@ -124,7 +124,7 @@ it('keeps call then transport then link-policy timeout precedence', async () => 
       code: 'DEADLINE_EXCEEDED'
     })
     expect(
-      await inherited.memory.request('wait', undefined, { timeout: timeout({ ms: 500 }) })
+      await inherited.memory.request('wait', undefined, { timeout: timeoutFeature({ ms: 500 }) })
     ).toBe('done')
   } finally {
     await peer.host.close()
@@ -135,7 +135,7 @@ it('keeps call then transport then link-policy timeout precedence', async () => 
 // Keep the original unknown-result code even if current source is RED.
 it('reports an unknown non-idempotent result after physical departure instead of replaying it', async () => {
   /** Ordinary listener sessions expose no fabricated generation or readiness authority. */
-  const server = coreMemoryServer('server', 'server', 'memory', [retry()])
+  const server = coreMemoryServer('server', 'server', 'memory', [retryFeature()])
   /** The actual selected retry feature executes through the public namespace. */
   const host = await createRpcHost(server.options)
   /** Original provider entry proves the physical request arrived before departure. */
@@ -154,7 +154,7 @@ it('reports an unknown non-idempotent result after physical departure instead of
   try {
     /** Observe rejection immediately while preserving the original 500 ms logical budget. */
     const result = host.memory
-      .request('effect', undefined, { timeout: timeout({ ms: 500 }) })
+      .request('effect', undefined, { timeout: timeoutFeature({ ms: 500 }) })
       .catch((error: unknown) => error)
     await executing
     client.pair[1].close()
@@ -171,7 +171,7 @@ it.each(['reconnect', 'abort'] as const)(
   'waits for the real same-name session after an idempotent request departs (%s)',
   async (outcome) => {
     /** The original listener accepts both physical generations on one public Host. */
-    const server = coreMemoryServer('server', 'server', 'memory', [retry()])
+    const server = coreMemoryServer('server', 'server', 'memory', [retryFeature()])
     /** Retry borrows the listener's actual ready/exit events rather than a managed launcher. */
     const host = await createRpcHost({
       ...server.options,
@@ -216,7 +216,7 @@ it.each(['reconnect', 'abort'] as const)(
     /** Observe the logical result immediately, including rejection, without an unhandled loser. */
     const result = host.memory
       .send('client', 'api.effect', 'original-input', {
-        timeout: timeout({ ms: 1_000 }),
+        timeout: timeoutFeature({ ms: 1_000 }),
         idempotencyKey: 'listener-retry',
         signal: controller.signal
       })

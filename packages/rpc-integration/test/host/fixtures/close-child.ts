@@ -3,7 +3,7 @@ import { createRpcHost, type IRpcHost, type IRpcClosingEvent } from '@migaia/rpc
 import type { IRpcTransportPlugin } from '@migaia/rpc-host/sdk'
 import { RpcError } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
-import { limits } from '@migaia/rpc-host/plugins/limits'
+import { limitsFeature } from '@migaia/rpc-host/plugins/limits'
 
 /** Each mode chooses an existing public close trigger rather than a fixture-only production seam. */
 export type ICloseFixtureMode = 'namespace' | 'host' | 'limits' | 'idle'
@@ -54,9 +54,9 @@ class CloseChild {
     this.#opening = createRpcHost({
       plugins: [
         ...(mode === 'limits'
-          ? [limits({ maxPayloadBytes: 32, violationLimit: 1 })]
+          ? [limitsFeature({ maxPayloadBytes: 32, violationLimit: 1 })]
           : mode === 'idle'
-            ? [limits({ idleTimeoutMs: 500 })]
+            ? [limitsFeature({ idleTimeoutMs: 500 })]
             : []),
         plugin
       ] as const,

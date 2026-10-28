@@ -5,8 +5,8 @@ import { parseSync, Visitor } from 'oxc-parser'
 import { expect, it, vi } from 'vitest'
 import { defineHost, definePlugin } from '@migaia/plugin-host'
 import { createRpcHost } from '@migaia/rpc-host'
-import { timeout } from '@migaia/rpc-host/features/timeout'
-import { idempotency } from '@migaia/rpc-host/plugins/idempotency'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
+import { idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'
 import { RpcTimeoutError } from '@migaia/rpc-contract/errors'
 import { deferred } from '@migaia/utils/promise'
 import { createManualScheduler } from '@migaia/utils/testing'
@@ -33,7 +33,7 @@ it('injects manual time into a real public RPC attempt deadline', async () => {
   try {
     /** Only this one actual attempt uses the explicitly supplied feature clock. */
     const pending = peers.a.memory.send('b', 'echo', null, {
-      timeout: timeout({ ms: 50, scheduler, report: () => undefined })
+      timeout: timeoutFeature({ ms: 50, scheduler, report: () => undefined })
     })
     /** Observe the original failure before any timer fires. */
     const result = pending.catch((error: unknown) => error)
@@ -135,7 +135,7 @@ it('timestamps failed responses and expires installed replay policy using manual
   /** A real accepted contract grants only this genuine idempotent operation. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [idempotency(), server.transport],
+    plugins: [idempotencyFeature(), server.transport],
     provide: { api: { fail: business } },
     contract: {
       schemaVersion: 1,
@@ -211,7 +211,7 @@ it('retains very long attempt deadlines', async () => {
   /** Completion remains the actual native operation, independent from the feature's timer. */
   const finish = deferred<string>()
   /** Only a real complete timeout feature owns this timer and original call Promise. */
-  const feature = timeout({ ms: 2_147_483_648, scheduler, report: () => undefined })
+  const feature = timeoutFeature({ ms: 2_147_483_648, scheduler, report: () => undefined })
   /** The existing feature boundary directly consumes its genuine attempt execution port. */
   const pending = feature.run({
     signal: new AbortController().signal,

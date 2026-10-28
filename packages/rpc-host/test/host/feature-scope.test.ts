@@ -2,11 +2,11 @@
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
-import { schema } from '@migaia/rpc-host/plugins/schema'
-import { chunk } from '@migaia/rpc-host/plugins/chunk'
-import { batch } from '@migaia/rpc-host/plugins/batch'
-import { limits } from '@migaia/rpc-host/plugins/limits'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { schemaFeature } from '@migaia/rpc-host/plugins/schema'
+import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'
+import { batchFeature } from '@migaia/rpc-host/plugins/batch'
+import { limitsFeature } from '@migaia/rpc-host/plugins/limits'
 import { probe } from '@migaia/rpc-host/plugins/probe'
 import {
   defineFlowFeature,
@@ -160,10 +160,10 @@ function orderedFeatures(order: readonly number[], trace: string[]) {
   })
   /** Only positions vary; no fake algorithm replaces these five real definitions. */
   const features = [
-    auth({ encodedType: 'string', sign: (value) => value, verify: (value) => value }),
-    schema({ schemas: { echo: { params: parser, result: parser } } }),
-    chunk({ chunkBytes: 1024, maxMessageBytes: 64 * 1024 }),
-    batch(),
+    authFeature({ encodedType: 'string', sign: (value) => value, verify: (value) => value }),
+    schemaFeature({ schemas: { echo: { params: parser, result: parser } } }),
+    chunkFeature({ chunkBytes: 1024, maxMessageBytes: 64 * 1024 }),
+    batchFeature(),
     thirdParty
   ]
   return order.map((index) => features[index]!)
@@ -379,8 +379,8 @@ it('uses native dependency order inside plaintext and exposes the explicit outer
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      auth({ sign: (value) => value, verify: (value) => value }),
-      chunk({ chunkBytes: 1024 }),
+      authFeature({ sign: (value) => value, verify: (value) => value }),
+      chunkFeature({ chunkBytes: 1024 }),
       server.transport
     ],
     provide: { echo: (value: unknown) => value }
@@ -390,8 +390,8 @@ it('uses native dependency order inside plaintext and exposes the explicit outer
     plugins: [
       dependent,
       wire,
-      auth({ sign: (value) => value, verify: (value) => value }),
-      chunk({ chunkBytes: 1024 })
+      authFeature({ sign: (value) => value, verify: (value) => value }),
+      chunkFeature({ chunkBytes: 1024 })
     ]
   })
   try {
@@ -435,7 +435,7 @@ it('overrides host authentication once in one Memory namespace and keeps the oth
   /** These actual transform counts distinguish one local override from double signing. */
   const counts = { host: 0, local: 0 }
   /** Matching transforms verify the original value without adding another authentication owner. */
-  const hostAuth = auth({
+  const hostAuth = authFeature({
     sign: (value) => {
       counts.host++
       return value
@@ -443,7 +443,7 @@ it('overrides host authentication once in one Memory namespace and keeps the oth
     verify: (value) => value
   })
   /** The local authentic builtin identity overrides only its transport's namespace. */
-  const localAuth = auth({
+  const localAuth = authFeature({
     sign: (value) => {
       counts.local++
       return value
@@ -462,11 +462,11 @@ it('overrides host authentication once in one Memory namespace and keeps the oth
   })
   /** Both actual clients install paired verification while owning separate physical Sessions. */
   const a = await first.connect('override-a', {
-    plugins: [auth({ sign: (value) => value, verify: (value) => value })]
+    plugins: [authFeature({ sign: (value) => value, verify: (value) => value })]
   })
   /** The second client connects to its original separate listener namespace. */
   const b = await second.connect('override-b', {
-    plugins: [auth({ sign: (value) => value, verify: (value) => value })]
+    plugins: [authFeature({ sign: (value) => value, verify: (value) => value })]
   })
   try {
     counts.host = counts.local = 0
@@ -491,7 +491,7 @@ it('runs a transport-local schema only in its own Memory namespace', async () =>
   }
   /** One genuine local schema Feature joins only the first transport's seven lanes. */
   const first = coreMemoryServer('schema-server', undefined, 'first', [
-    schema({ schemas: { echo: { params: parser, result: parser } } })
+    schemaFeature({ schemas: { echo: { params: parser, result: parser } } })
   ])
   /** No schema is installed for this independent namespace. */
   const second = coreMemoryServer('schema-server', undefined, 'second')
@@ -531,19 +531,23 @@ it.each([false, true])(
       'limits-server',
       undefined,
       'first',
-      local ? [limits({ maxGlobal: 1 })] : []
+      local ? [limitsFeature({ maxGlobal: 1 })] : []
     )
     /** Only local placement gives this namespace its own genuine capacity owner. */
     const second = coreMemoryServer(
       'limits-server',
       undefined,
       'second',
-      local ? [limits({ maxGlobal: 1 })] : []
+      local ? [limitsFeature({ maxGlobal: 1 })] : []
     )
     /** Both namespaces target the same actual original provider set. */
     const host = await createRpcHost({
       ...first.options,
-      plugins: [...(local ? [] : [limits({ maxGlobal: 1 })]), first.transport, second.transport],
+      plugins: [
+        ...(local ? [] : [limitsFeature({ maxGlobal: 1 })]),
+        first.transport,
+        second.transport
+      ],
       provide: {
         held: () => {
           entered.resolve()

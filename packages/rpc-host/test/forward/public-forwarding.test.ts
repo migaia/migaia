@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { createRpcHost } from '@migaia/rpc-host'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
-import { chunk } from '@migaia/rpc-host/plugins/chunk'
+import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'
 import { RpcProbeForwardRejection } from '@migaia/rpc-contract/interfaces'
 import {
   probe,
@@ -198,7 +198,7 @@ it.each(['request', 'group'] as const)(
     /** The leaf owns ordinary provider execution, independent of the relay's held capability. */
     const provider = await createRpcHost({
       ...providerListener.options,
-      plugins: [chunk(chunkOptions), providerListener.transport],
+      plugins: [chunkFeature(chunkOptions), providerListener.transport],
       provide: {
         echo: (value) => {
           executions++
@@ -210,7 +210,7 @@ it.each(['request', 'group'] as const)(
     const relay = await createRpcHost({
       ...relayListener.options,
       plugins: [
-        chunk(chunkOptions),
+        chunkFeature(chunkOptions),
         probe({
           stages: ['forward'],
           emit: (event) => events.push({ ...event, route: event.route?.slice() })
@@ -223,7 +223,9 @@ it.each(['request', 'group'] as const)(
     try {
       await relayListener.link(providerListener)
       relay.provide({ echo: relay.memory.peers['chunk-provider']!.echo! })
-      caller = await relayListener.connect('chunk-caller', { plugins: [chunk(chunkOptions)] })
+      caller = await relayListener.connect('chunk-caller', {
+        plugins: [chunkFeature(chunkOptions)]
+      })
       /** This exact business input requires several actual extension writes on the relay link. */
       const payload = 'forward-chunk-payload'.repeat(32)
       if (mode === 'request')

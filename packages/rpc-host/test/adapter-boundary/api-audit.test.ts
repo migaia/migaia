@@ -5,7 +5,7 @@ import {
   createRpcMessageCarrier,
   defineTransportPlugin
 } from '@migaia/rpc-host/sdk'
-import { auth } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
 import { duplex, reaches } from './audit-byte-fixture.ts'
 
 it('refuses a pre-aborted peer signal before opening its byte source', async () => {
@@ -237,7 +237,7 @@ it('retains the verifier failure locally and keeps it out of the unauthenticated
           plugins: [
             ...(index === 1
               ? [
-                  auth({
+                  authFeature({
                     verifyCredentials() {
                       throw original
                     }

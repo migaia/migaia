@@ -11,9 +11,9 @@ import {
 import { createRpcHost, type IRpcNamespace } from '@migaia/rpc-host'
 import type { IRpcDispatchContext } from '@migaia/rpc-contract/interfaces'
 import { typegen } from '@migaia/rpc-host/plugins/typegen'
-import { limits } from '@migaia/rpc-host/plugins/limits'
-import { auth } from '@migaia/rpc-host/plugins/auth'
-import { chunk } from '@migaia/rpc-host/plugins/chunk'
+import { limitsFeature } from '@migaia/rpc-host/plugins/limits'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'
 import { deferred, type IDeferred } from '@migaia/utils/promise'
 import { describe, expect, it, vi, type MockInstance as IMockInstance } from 'vitest'
 import { readRpcDefinition } from '../../dist/sdk/metadata.js'
@@ -256,8 +256,8 @@ describe('ordinary native Host RPC installation', () => {
     const transport = namedTransport(server)
     /** Removing this generation retires its actual limits instance and original borrowed stages. */
     const flows = rpcFlowPlugin([
-      auth({ sign: (value) => value, verify: (value) => value }),
-      limits(),
+      authFeature({ sign: (value) => value, verify: (value) => value }),
+      limitsFeature(),
       heldDispatch({ entered, resume: resume.promise, admitted: () => additions?.mockClear() }),
       transport
     ])
@@ -265,7 +265,7 @@ describe('ordinary native Host RPC installation', () => {
     await host.use(transport)
     /** This is a genuine connected public client, not a constructed flow context or fake signal. */
     const client = await server.connect('limits-client', {
-      plugins: [auth({ sign: (value) => value, verify: (value) => value })]
+      plugins: [authFeature({ sign: (value) => value, verify: (value) => value })]
     })
     /** Native readiness supplies the exact accepted close receipt needed before cold deletion. */
     const accepted = server.lookup('limits-client')!.handle
@@ -308,13 +308,13 @@ describe('ordinary native Host RPC installation', () => {
   it('protects a selected transport-local Feature while active and permits cold deletion and reconstruction', async () => {
     /** The local information-flow instance belongs to this original transport registration. */
     const server = coreMemoryServer('local-auth-server', 'local-auth-server', 'memory', [
-      auth({ sign: (value) => value, verify: (value) => value })
+      authFeature({ sign: (value) => value, verify: (value) => value })
     ])
     /** Only the genuine public provider supplies observable post-refusal communication. */
     const host = await createRpcHost({ ...server.options, provide: { echo: (value) => value } })
     /** Both peers explicitly install the original wire-changing Feature. */
     const client = await server.connect('local-auth-client', {
-      plugins: [auth({ sign: (value) => value, verify: (value) => value })]
+      plugins: [authFeature({ sign: (value) => value, verify: (value) => value })]
     })
     /** The actual accepted native receipt fences cold deletion after the last Session closes. */
     const accepted = server.lookup('local-auth-client')!.handle
@@ -353,7 +353,7 @@ describe('ordinary native Host RPC installation', () => {
     /** This public root deliberately publishes the wire-changing Feature on just one endpoint. */
     const host = await createRpcHost({
       ...server.options,
-      plugins: [chunk({ chunkBytes: 1_024 }), server.transport],
+      plugins: [chunkFeature({ chunkBytes: 1_024 }), server.transport],
       provide: { echo: (value) => value },
       report: (error) => reports.push(error)
     })

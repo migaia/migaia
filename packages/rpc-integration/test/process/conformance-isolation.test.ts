@@ -11,12 +11,12 @@ import { describe, expect, it, vi } from 'vitest'
 import { serializeRpcError, type IRpcSerializedError } from '@migaia/rpc-contract/errors'
 import { RpcProbeLifecycle } from '@migaia/rpc-contract/interfaces'
 import { createRpcHost } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
 import { probe } from '@migaia/rpc-host/plugins/probe'
-import { timeout } from '@migaia/rpc-host/features/timeout'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import { encodeRpcStreamFrame, RpcEventByteIO, type IRpcByteIO } from '@migaia/rpc-host/sdk'
 import { processPlugin } from '@migaia/rpc-plugin-process'
-import { ipcLog, type IIpcLogContext } from '@migaia/rpc-plugin-process/features'
+import { ipcLogFeature, type IIpcLogContext } from '@migaia/rpc-plugin-process/features'
 import {
   peers,
   evidence,
@@ -230,7 +230,7 @@ describe('real process session and principal isolation', () => {
     const service = await createRpcHost({
       self: { name: 'server', instanceId: 'server' },
       plugins: [
-        auth({
+        authFeature({
           verifyCredentials(value) {
             verify(value)
           }
@@ -535,7 +535,7 @@ describe('real process session and principal isolation', () => {
       identity?: { connectionId: string; sessionId?: string }
     } = { records: [] }
     /** Delegate to the same actual log feature after borrowing its real native context once. */
-    const logging = ipcLog({
+    const logging = ipcLogFeature({
       report: (record) => {
         observed.records.push(record)
       }
@@ -695,7 +695,7 @@ describe('real process session and principal isolation', () => {
           pending.push(
             first.namespace
               .request('p.f.request', [['wait', `timeout-${index}`]], {
-                timeout: timeout({ ms: 30, scheduler: callerScheduler }),
+                timeout: timeoutFeature({ ms: 30, scheduler: callerScheduler }),
                 signal: controller.signal
               })
               .then(

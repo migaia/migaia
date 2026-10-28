@@ -1,6 +1,6 @@
 import { createRpcHost, type IRpcContext, type IRpcProvide } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
-import { timeout } from '@migaia/rpc-host/features/timeout'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import { defineFlowFeature, RpcFlowPoint } from '@migaia/rpc-host/sdk'
 import {
@@ -167,7 +167,7 @@ function peerAuthentication(token: string | undefined) {
   return token === undefined
     ? []
     : [
-        auth({
+        authFeature({
           credentials: token,
           verifyCredentials(received) {
             if (received !== token)
@@ -324,7 +324,7 @@ async function main(): Promise<void> {
     const payload = { echo: 'typescript', number: 1 }
     try {
       const answer = await host.process.request(PeerMethod.echo, payload, {
-        timeout: timeout({ ms: 3000 })
+        timeout: timeoutFeature({ ms: 3000 })
       })
       if (JSON.stringify(answer) !== JSON.stringify(payload))
         throw peerDiagnosticError(RpcCoreErrorCode.internal, PeerText.mismatch)

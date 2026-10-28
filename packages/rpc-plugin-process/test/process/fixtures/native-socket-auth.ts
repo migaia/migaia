@@ -2,7 +2,7 @@
 import { vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost } from '@migaia/rpc-host'
-import { auth, type IRpcAuthenticationOptions } from '@migaia/rpc-host/plugins/auth'
+import { authFeature, type IRpcAuthenticationOptions } from '@migaia/rpc-host/plugins/auth'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import { defaultRpcId, type IRpcTransportSetupContext } from '@migaia/rpc-host/sdk'
 import { RpcProbeDirection } from '@migaia/rpc-contract/interfaces'
@@ -140,7 +140,7 @@ export class NativeSocketAuth {
       plugins: [
         ...(this.#applicationAuth
           ? [
-              auth({
+              authFeature({
                 encodedType: 'string',
                 sign: (value) => value,
                 verify: (value) => value,
@@ -196,7 +196,7 @@ export class NativeSocketAuth {
       plugins: [
         ...(this.#applicationAuth
           ? [
-              auth({
+              authFeature({
                 encodedType: 'string',
                 sign: (value) => value,
                 verify: (value) => value,

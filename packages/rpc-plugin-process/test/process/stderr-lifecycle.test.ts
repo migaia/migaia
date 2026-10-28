@@ -2,7 +2,7 @@ import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { processPlugin } from '@migaia/rpc-plugin-process'
-import { ipcLog, type IIpcLogRecord } from '@migaia/rpc-plugin-process/features'
+import { ipcLogFeature, type IIpcLogRecord } from '@migaia/rpc-plugin-process/features'
 import * as nativeIO from '../../dist/process/node-io.js'
 import * as carrierOwner from '../../dist/process/carrier.js'
 import * as stderrOwner from '../../dist/process/stderr.js'
@@ -115,7 +115,7 @@ class NativeStderrFixture {
         processPlugin({
           spawn: entry,
           features: [
-            ipcLog({
+            ipcLogFeature({
               report: (record) => {
                 this.records.push(record)
               }

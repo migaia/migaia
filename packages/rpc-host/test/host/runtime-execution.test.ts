@@ -1,6 +1,6 @@
 /** Retained execution business uses actual public namespaces and the existing native carrier. */
 import { createRpcHost } from '@migaia/rpc-host'
-import { timeout } from '@migaia/rpc-host/features/timeout'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import limits from '@migaia/rpc-host/plugins/limits'
 import { RpcTimeoutError } from '@migaia/rpc-contract/errors'
 import { RPC_ENDPOINT_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
@@ -108,7 +108,7 @@ it('a queued public group preserves its original deadline code across the physic
       client.host.memory.group([{ method: 'queued' }], {
         orderKey: 'same',
         cancel: 'before-start',
-        timeout: timeout({ ms: 5 })
+        timeout: timeoutFeature({ ms: 5 })
       })
     ])
     /** Only the real correlated remote terminal supplies this original error-code expectation. */

@@ -9,7 +9,7 @@ import type {
   IRpcFramePayload,
   IRpcFrameWriteOptions
 } from '@migaia/rpc-contract/interfaces'
-import { batch } from '../../../dist/features/batch/index.js'
+import { batchFeature } from '../../../dist/features/batch/index.js'
 import { FlowRegistry, type IRpcFlowGroup } from '../../../dist/flow/registry.js'
 import {
   rpcHostPipelines,
@@ -24,7 +24,7 @@ import type { IRpcFlowInstallation } from '../../../dist/sdk/types.js'
 /** The real native factory/setup is used by every owning physical-flow oracle. */
 async function fixture() {
   /** The native graph instantiates this genuine factory handle before its install callback. */
-  const feature = batch({ required: true })
+  const feature = batchFeature({ required: true })
   /** Physical source lifetime remains separate from native installation cleanup. */
   const source = new AbortController()
   /** Installation cleanup owns its original setup signal. */
@@ -421,8 +421,11 @@ it.each(['single', 'batch'] as const)(
       nativeBinary: false
     })
     /** The real optional extension is negotiated by both public hosts. */
-    const host = await createRpcHost({ ...server.options, plugins: [batch(), server.transport] })
-    const client = await server.connect('malformed-source', { plugins: [batch()] })
+    const host = await createRpcHost({
+      ...server.options,
+      plugins: [batchFeature(), server.transport]
+    })
+    const client = await server.connect('malformed-source', { plugins: [batchFeature()] })
     try {
       /** The existing native write port injects one malformed message without a fake Session. */
       const malformed = { kind: 'message', data: '{malformed-batch' } as const

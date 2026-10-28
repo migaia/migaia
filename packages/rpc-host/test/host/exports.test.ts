@@ -101,17 +101,17 @@ const expectedSdk = [
 
 /** Optional flow behavior is published only through its actual owning plugin entry. */
 const expectedPlugins = [
-  'auth',
-  'batch',
-  'chunk',
+  'authFeature',
+  'batchFeature',
+  'chunkFeature',
   'createRpcIdempotencyStore',
   'defineProbe',
-  'errorMap',
-  'idempotency',
-  'limits',
+  'errorMapFeature',
+  'idempotencyFeature',
+  'limitsFeature',
   'linkPolicy',
   'probe',
-  'schema',
+  'schemaFeature',
   'typegen'
 ]
 
@@ -121,7 +121,7 @@ it('publishes exactly the final Host package entries and runtime symbols', () =>
   expect(new Set(Object.keys(manifest.exports))).toEqual(new Set(expectedEntries))
   expect(new Set(Object.keys(root))).toEqual(new Set(expectedRoot))
   expect(new Set(Object.keys(sdk))).toEqual(new Set(expectedSdk))
-  expect(new Set(Object.keys(features))).toEqual(new Set(['retry', 'timeout']))
+  expect(new Set(Object.keys(features))).toEqual(new Set(['retryFeature', 'timeoutFeature']))
   expect(new Set(Object.keys(plugins))).toEqual(new Set(expectedPlugins))
   expect(sdk).not.toHaveProperty('registerJsonObjectPort')
   expect(sdk).not.toHaveProperty('registerBatchAgreement')
@@ -138,26 +138,26 @@ it('publishes the same feature factory through its named and default entry', asy
   for (const name of ['retry', 'timeout'] as const) {
     /** Resolve the actual package subpath rather than a test alias or source module. */
     const entry = await import(`@migaia/rpc-host/features/${name}`)
-    expect(entry.default).toBe(features[name])
+    expect(entry.default).toBe(features[`${name}Feature`])
   }
-  for (const name of [
-    'auth',
-    'batch',
-    'chunk',
-    'idempotency',
-    'limits',
-    'probe',
-    'schema',
-    'typegen'
+  for (const [name, factory] of [
+    ['auth', 'authFeature'],
+    ['batch', 'batchFeature'],
+    ['chunk', 'chunkFeature'],
+    ['idempotency', 'idempotencyFeature'],
+    ['limits', 'limitsFeature'],
+    ['probe', 'probe'],
+    ['schema', 'schemaFeature'],
+    ['typegen', 'typegen']
   ] as const) {
     /** Each complete optional capability has the same factory at both supported entries. */
     const entry = await import(`@migaia/rpc-host/plugins/${name}`)
-    expect(entry.default).toBe(plugins[name])
+    expect(entry.default).toBe(plugins[factory])
   }
   /** Camel-case factory and stable hyphenated subpath belong to the same link policy owner. */
   const entry = await import('@migaia/rpc-host/plugins/link-policy')
   expect(entry.default).toBe(plugins.linkPolicy)
   /** Outbound presentation uses the same camel-case factory at its stable hyphenated subpath. */
   const mapping = await import('@migaia/rpc-host/plugins/error-map')
-  expect(mapping.default).toBe(plugins.errorMap)
+  expect(mapping.default).toBe(plugins.errorMapFeature)
 })

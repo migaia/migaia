@@ -8,8 +8,8 @@ import {
 } from '@migaia/rpc-contract/interfaces'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import {
-  sendQueue as queueFeature,
-  ipcLog as logFeature,
+  sendQueueFeature as queueFeature,
+  ipcLogFeature as logFeature,
   IpcSendClass,
   IpcLogEventName,
   type IIpcLogRecord
@@ -85,7 +85,7 @@ it('shares the same two factories and original flow-control values across public
     'IpcLogEventName',
     'IpcSendClass',
     'default',
-    'flowControl'
+    'flowControlFeature'
   ])
 })
 

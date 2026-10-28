@@ -1,8 +1,8 @@
 /** Carrier-owned idempotency entries retire with their connection; shared scopes retain outcomes. */
 import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
-import { createRpcIdempotencyStore, idempotency } from '@migaia/rpc-host/plugins/idempotency'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { createRpcIdempotencyStore, idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'
 import { coreMemoryServer } from '../../host/core-fixture.ts'
 
 it.each(['carrier', 'principal', 'custom'] as const)(
@@ -18,12 +18,12 @@ it.each(['carrier', 'principal', 'custom'] as const)(
     const host = await createRpcHost({
       ...server.options,
       plugins: [
-        idempotency({
+        idempotencyFeature({
           store,
           ...(mode === 'custom' ? { scope: ({ token }) => (customScope ??= token) } : {})
         }),
         ...(mode === 'principal'
-          ? [auth({ verifyCredentials: () => ({ principalId: 'verified-owner' }) })]
+          ? [authFeature({ verifyCredentials: () => ({ principalId: 'verified-owner' }) })]
           : []),
         server.transport
       ],
@@ -33,7 +33,7 @@ it.each(['carrier', 'principal', 'custom'] as const)(
     const clients: Awaited<ReturnType<typeof server.connect>>[] = []
     try {
       const first = await server.connect('retirement-first', {
-        plugins: mode === 'principal' ? [auth({ credentials: 'fixture-credential' })] : []
+        plugins: mode === 'principal' ? [authFeature({ credentials: 'fixture-credential' })] : []
       })
       clients.push(first)
       expect(
@@ -43,7 +43,7 @@ it.each(['carrier', 'principal', 'custom'] as const)(
       ).toBe(1)
       await first.host.close()
       const second = await server.connect('retirement-second', {
-        plugins: mode === 'principal' ? [auth({ credentials: 'fixture-credential' })] : []
+        plugins: mode === 'principal' ? [authFeature({ credentials: 'fixture-credential' })] : []
       })
       clients.push(second)
       expect(

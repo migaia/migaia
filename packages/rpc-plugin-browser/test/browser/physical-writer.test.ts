@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { batch } from '@migaia/rpc-host/plugins/batch'
+import { batchFeature } from '@migaia/rpc-host/plugins/batch'
 import { dedicatedWorkerPlugin } from '@migaia/rpc-plugin-browser'
 import { RpcCarrierFrameKind } from '@migaia/rpc-contract/protocol'
 import { RpcBatchExtension } from '../../../rpc-host/dist/features/batch/constants.js'
@@ -29,11 +29,11 @@ describe('optimal physical writer', () => {
     /** Both genuine cold batch instances negotiate the extension before any business frame is sent. */
     const hosts = await Promise.all([
       createRpcHost({
-        plugins: [batch(), dedicatedWorkerPlugin({ worker: pair.left.target })],
+        plugins: [batchFeature(), dedicatedWorkerPlugin({ worker: pair.left.target })],
         report: (error) => reports.push(error)
       }),
       createRpcHost({
-        plugins: [batch(), dedicatedWorkerPlugin({ worker: pair.right.target })],
+        plugins: [batchFeature(), dedicatedWorkerPlugin({ worker: pair.right.target })],
         provide: {
           echo: async (payload: string) => {
             if (payload === 'bad-business') throw businessFailure

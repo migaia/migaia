@@ -14,8 +14,8 @@ import {
   type IRpcTransportPlugin,
   type IRpcFlowPlugin
 } from '@migaia/rpc-host/sdk'
-import { idempotency } from '@migaia/rpc-host/plugins/idempotency'
-import { timeout } from '@migaia/rpc-host/features/timeout'
+import { idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import {
   windowPlugin,
   sharedWorkerPlugin,
@@ -28,7 +28,7 @@ import { messageTarget, windowPair, portPair, rtcChannel } from './message-fixtu
 type IBrowserTransportPlugins = readonly [IRpcTransportPlugin<'browser'>]
 /** Actual store extension types join the selected transport rather than a root request facade. */
 type IBrowserReplayPlugins = readonly [
-  ReturnType<typeof idempotency>,
+  ReturnType<typeof idempotencyFeature>,
   IRpcTransportPlugin<'browser'>
 ]
 /** A cold native observation hook precedes the listener transport. */
@@ -90,7 +90,7 @@ describe('browser public namespace runtime', () => {
       const peers = await Promise.all([
         createRpcHost<IFixtureApi, IBrowserReplayPlugins>({
           plugins: [
-            idempotency(),
+            idempotencyFeature(),
             carrier === 'window'
               ? windowPlugin({
                   namespace: 'browser',
@@ -107,7 +107,7 @@ describe('browser public namespace runtime', () => {
         }),
         createRpcHost({
           plugins: [
-            idempotency(),
+            idempotencyFeature(),
             carrier === 'window'
               ? windowPlugin({
                   namespace: 'browser',
@@ -214,7 +214,7 @@ describe('browser public namespace runtime', () => {
       const previous = pair.right.sent.length
       /** The untouched real outbound request is replayed only with hostile native metadata first. */
       const pending = peers[0].browser.request('count', undefined, {
-        timeout: timeout({ ms: 500 })
+        timeout: timeoutFeature({ ms: 500 })
       })
       await expect.poll(() => pair.right.sent.length).toBeGreaterThan(previous)
       /** The last actual outbound frame retains its complete request payload. */
@@ -518,7 +518,7 @@ describe('browser public namespace runtime', () => {
           rtcDataChannelPlugin({
             namespace: 'browser',
             rtcDataChannel: rtcChannel(pair.left),
-            features: [timeout({ ms: 200 })]
+            features: [timeoutFeature({ ms: 200 })]
           })
         ],
         report: (error) => reports.push(error)

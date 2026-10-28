@@ -6,9 +6,9 @@ import { once } from 'node:events'
 import { serializeRpcError, isRpcTimeoutError } from '@migaia/rpc-contract/errors'
 import { PluginHost, definePlugin, defineFeature } from '@migaia/plugin-host'
 import { createRpcHost } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
-import { idempotency } from '@migaia/rpc-host/plugins/idempotency'
-import { limits } from '@migaia/rpc-host/plugins/limits'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'
+import { limitsFeature } from '@migaia/rpc-host/plugins/limits'
 import { defineFlowFeature, RpcFlowPoint, RpcFlowLayer, RpcEventByteIO } from '@migaia/rpc-host/sdk'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 /** The published vector owns every original business method and mode. */
@@ -192,7 +192,7 @@ class IsolationService {
         }
       },
       plugins: [
-        auth({
+        authFeature({
           ...(mode === 'stderr'
             ? {
                 /**
@@ -209,8 +209,8 @@ class IsolationService {
           /** This completed-frame replay case explicitly selects the documented retained-ID mode. */
           retain: mode === 'replay' ? 310_000 : false
         }),
-        idempotency(),
-        limits({ maxConsecutiveTimeouts: 3 }),
+        idempotencyFeature(),
+        limitsFeature({ maxConsecutiveTimeouts: 3 }),
         defineFlowFeature({ name: 'isolation-envelope-observer', setup: observeFrames }),
         processPlugin({
           name: 'p',

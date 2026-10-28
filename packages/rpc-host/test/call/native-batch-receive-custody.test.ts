@@ -1,7 +1,7 @@
 /** Real batch ingress preserves each replay refusal and its original physical write failure. */
 import { createRpcHost } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
-import { batch } from '@migaia/rpc-host/plugins/batch'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { batchFeature } from '@migaia/rpc-host/plugins/batch'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { IpcSendClass, type IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
@@ -16,7 +16,7 @@ it('reports each native batch replay refusal and its exact physical write failur
   /** Only the receiving public Host's original diagnostic outlet contributes to this oracle. */
   const failures: unknown[] = []
   /** Credentials-only Auth retains replay policy without a second signed-payload representation. */
-  const authentication = auth({
+  const authentication = authFeature({
     credentials: 'batch-custody-credential',
     verifyCredentials: (value) => {
       expect(value).toBe('batch-custody-credential')
@@ -39,7 +39,7 @@ it('reports each native batch replay refusal and its exact physical write failur
   /** Native installation owns the sole Auth ledger, Batch owner and actual provider. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [authentication, batch(), server.transport],
+    plugins: [authentication, batchFeature(), server.transport],
     report: (error) => failures.push(error),
     provide: {
       echo: (value: string) => {
@@ -50,7 +50,7 @@ it('reports each native batch replay refusal and its exact physical write failur
   })
   /** The client allocates every real task and retains both original caller operations. */
   const client = await server.connect('batch-custody-client', {
-    plugins: [authentication, batch()]
+    plugins: [authentication, batchFeature()]
   })
   /** Both refused response writes must preserve this identical original native failure. */
   const cause = new Error('fixture refusal write failure')

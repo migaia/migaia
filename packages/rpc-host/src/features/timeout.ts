@@ -158,8 +158,8 @@ class TimeoutFeature implements IRpcTimeoutFeature {
 }
 
 /** Create a complete finite non-negative timeout policy, including a zero pre-send deadline. */
-export function timeout(options: ITimeoutFeatureOptions): IRpcTimeoutFeature {
+export function timeoutFeature(options: ITimeoutFeatureOptions): IRpcTimeoutFeature {
   return Object.freeze(new TimeoutFeature(options))
 }
 
-export default timeout
+export default timeoutFeature

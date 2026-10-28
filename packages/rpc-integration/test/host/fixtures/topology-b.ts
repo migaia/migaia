@@ -4,7 +4,7 @@
  */
 import { RpcProbeStage } from '@migaia/rpc-contract/interfaces'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
 import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'
 import { pool, RPC_POOL_PEER_ID } from '@migaia/rpc-plugin-pool'
 import { processPlugin } from '@migaia/rpc-plugin-process'
@@ -52,7 +52,7 @@ const threadEntry = new URL('./topology-leaf-thread.ts', import.meta.url)
 /** Transform counts of b's side of the b–c auth hop. */
 const hopAuth = new HopAuthCounter()
 /** Hop-scoped auth installed only on the b–c thread transport. */
-const threadFeatures = options.hopAuth ? [auth(hopAuth.options(HopSecret.shared))] : []
+const threadFeatures = options.hopAuth ? [authFeature(hopAuth.options(HopSecret.shared))] : []
 
 /** Cold metadata is reusable; a mismatch is acquired only by the later public use transaction. */
 const childThread = threadPlugin({
@@ -81,7 +81,7 @@ const pythonPlugins = options.python
           ],
           token: pythonToken
         },
-        features: [auth({ credentials: pythonToken })]
+        features: [authFeature({ credentials: pythonToken })]
       })
     ]
   : []

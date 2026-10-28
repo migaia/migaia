@@ -3,7 +3,7 @@ import { expect, it, vi } from 'vitest'
 import { defineHost } from '@migaia/plugin-host'
 import { createRpcHost, type IRpcHostOptions } from '@migaia/rpc-host'
 import { RpcLifecycleError } from '@migaia/rpc-host/contract'
-import { auth } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
 import { defineFlowPlugin, rpcHostPipelines, RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { coreMemoryServer } from './core-fixture.ts'
 
@@ -18,7 +18,7 @@ async function authenticatedConnection(plugins: IRpcHostOptions['plugins'] = [])
   const server = await createRpcHost({
     ...listener.options,
     plugins: [
-      auth({
+      authFeature({
         encrypt: (value) => value,
         decrypt: (value) => value,
         sign: (value) => value,
@@ -31,7 +31,7 @@ async function authenticatedConnection(plugins: IRpcHostOptions['plugins'] = [])
     /** Completion joins the actual handshake before the disposal assertion can run. */
     const client = await listener.connect('close-owner-client', {
       plugins: [
-        auth({
+        authFeature({
           encrypt: (value) => value,
           decrypt: (value) => value,
           sign: (value) => value,

@@ -4,13 +4,13 @@ import type { Runtime } from 'node:inspector'
 import { createRpcHost } from '@migaia/rpc-host'
 import {
   createRpcIdempotencyStore,
-  idempotency,
+  idempotencyFeature,
   type IRpcIdempotencyClaim,
   type IRpcIdempotencyOutcome,
   type IRpcIdempotencyStore
 } from '@migaia/rpc-host/plugins/idempotency'
 import limits from '@migaia/rpc-host/plugins/limits'
-import { timeout } from '@migaia/rpc-host/features/timeout'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import {
   RPC_ENDPOINT_ERROR_SOURCE,
   RpcContractErrorCode,
@@ -113,7 +113,7 @@ it('a send adapter forged FRAME_LIMIT code cannot rewrite the original completed
   /** This real provider alone creates the original completed business value42. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [idempotency({ store, scope: () => 'peer' }), ...server.options.plugins],
+    plugins: [idempotencyFeature({ store, scope: () => 'peer' }), ...server.options.plugins],
     report: (error) => reports.push(error),
     provide: { value: (_payload, context) => context.success(42) }
   })
@@ -199,7 +199,7 @@ it('an original pending keyed claim prevents duplicate execution and seals the c
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      idempotency({ store, scope: () => 'peer' }),
+      idempotencyFeature({ store, scope: () => 'peer' }),
       limits({ maxGlobal: 6, maxPerPeer: 6 }),
       ...server.options.plugins
     ],
@@ -312,7 +312,7 @@ async function clonedStreamReplay(
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      idempotency({ store, scope: () => 'peer' }),
+      idempotencyFeature({ store, scope: () => 'peer' }),
       limits({ maxGlobal: 6, maxPerPeer: 6 }),
       ...server.options.plugins
     ],
@@ -350,7 +350,7 @@ async function clonedStreamReplay(
       idempotencyKey: 'stream-key',
       cancel: 'before-start',
       signal: controller.signal,
-      timeout: code === RpcCoreErrorCode.deadlineExceeded ? timeout({ ms: 5 }) : false
+      timeout: code === RpcCoreErrorCode.deadlineExceeded ? timeoutFeature({ ms: 5 }) : false
     }) as AsyncIterableIterator<unknown>
     /** First next starts the genuine lazy stream and its original selected timeout/cancellation. */
     const initialOutcome = initial.next().catch((error: unknown) => error)

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
-import { idempotency } from '@migaia/rpc-host/plugins/idempotency'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'
 import { coreMemoryServer } from './core-fixture.ts'
 
 describe('accepted host session provider policy', () => {
@@ -16,8 +16,8 @@ describe('accepted host session provider policy', () => {
     const host = await createRpcHost({
       ...server.options,
       plugins: [
-        auth({ verifyCredentials: (value) => ({ principalId: String(value) }) }),
-        idempotency(),
+        authFeature({ verifyCredentials: (value) => ({ principalId: String(value) }) }),
+        idempotencyFeature(),
         server.transport
       ],
       provide: { service: { business } },
@@ -28,7 +28,9 @@ describe('accepted host session provider policy', () => {
       }
     })
     /** Each actual client sends its own credential through the real handshake verification path. */
-    const first = await server.connect('first', { plugins: [auth({ credentials: 'principal-a' })] })
+    const first = await server.connect('first', {
+      plugins: [authFeature({ credentials: 'principal-a' })]
+    })
     try {
       expect(
         await first.host.memory.request('service.business', 42, { idempotencyKey: 'one-effect' })
@@ -39,7 +41,7 @@ describe('accepted host session provider policy', () => {
        * principal.
        */
       const replacement = await server.connect('replacement', {
-        plugins: [auth({ credentials: 'principal-a' })]
+        plugins: [authFeature({ credentials: 'principal-a' })]
       })
       try {
         expect(
@@ -50,7 +52,7 @@ describe('accepted host session provider policy', () => {
         expect(business).toHaveBeenCalledTimes(1)
         /** A separately verified principal cannot borrow the first principal's retained outcome. */
         const other = await server.connect('other', {
-          plugins: [auth({ credentials: 'principal-b' })]
+          plugins: [authFeature({ credentials: 'principal-b' })]
         })
         try {
           expect(

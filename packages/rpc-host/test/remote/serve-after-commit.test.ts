@@ -14,7 +14,7 @@ import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import * as catalog from '../../dist/dispatch/catalog.js'
 import * as exposure from '../../dist/dispatch/exposure.js'
 import type { IProviderCommitGate } from '../../dist/dispatch/types.js'
-import { timeout } from '@migaia/rpc-host/features/timeout'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import { coreMemoryServer } from '../host/core-fixture.ts'
 
 /** The existing connection owns the exact public Host rather than a per-session Peer facade. */
@@ -423,7 +423,9 @@ describe('runtime exposed methods serve after commit', () => {
       const cancellation = createRpcAbortError()
       /** Deadline expiry uses the complete timeout feature, with no fixture timer. */
       const options =
-        interruption === 'abort' ? { signal: controller.signal } : { timeout: timeout({ ms: 20 }) }
+        interruption === 'abort'
+          ? { signal: controller.signal }
+          : { timeout: timeoutFeature({ ms: 20 }) }
       /** Handle caller failure immediately while waiting for actual provider admission. */
       const request = observe(
         fixture.caller.memory.request('business.request', interruption, options)

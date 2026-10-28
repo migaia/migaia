@@ -1,7 +1,7 @@
 /** Original provider failure cleanup is observed through actual public hosts and native flows. */
 import { createRpcHost } from '@migaia/rpc-host'
 import { defineFlowFeature, type IRpcFlowStages } from '@migaia/rpc-host/sdk'
-import { limits } from '@migaia/rpc-host/plugins/limits'
+import { limitsFeature } from '@migaia/rpc-host/plugins/limits'
 import type { IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { walkErrorCauses } from '@migaia/utils/error'
@@ -36,7 +36,11 @@ it('releases admission and the original request identity when params validation 
   /** The genuine native flow prefix fixes validation after quota admission and before business. */
   const host = await createRpcHost({
     ...listener.options,
-    plugins: [limits({ maxGlobal: 1, maxPerPeer: 1 }), validator, ...listener.options.plugins!],
+    plugins: [
+      limitsFeature({ maxGlobal: 1, maxPerPeer: 1 }),
+      validator,
+      ...listener.options.plugins!
+    ],
     provide: { test: provider },
     report: (error) => reports.push(error)
   })
@@ -87,7 +91,11 @@ it('releases same-session capacity when the validation error reply write fails',
   /** Report observes the real Session error boundary, never an invented response to the caller. */
   const host = await createRpcHost({
     ...listener.options,
-    plugins: [limits({ maxGlobal: 1, maxPerPeer: 1 }), validator, ...listener.options.plugins!],
+    plugins: [
+      limitsFeature({ maxGlobal: 1, maxPerPeer: 1 }),
+      validator,
+      ...listener.options.plugins!
+    ],
     provide: { test: provider },
     report: (error) => {
       if (walkErrorCauses(error).includes(feedback.failure)) feedback.reported.resolve(error)

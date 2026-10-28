@@ -356,8 +356,8 @@ class RetryFeature implements IRpcRetryFeature {
 }
 
 /** Create the complete origin strategy using actual carrier-supplied generation authority. */
-export function retry(options: IRetryFeatureOptions = {}): IRpcRetryFeature {
+export function retryFeature(options: IRetryFeatureOptions = {}): IRpcRetryFeature {
   return Object.freeze(new RetryFeature(options))
 }
 
-export default retry
+export default retryFeature

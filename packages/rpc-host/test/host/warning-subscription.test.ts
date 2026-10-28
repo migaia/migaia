@@ -8,7 +8,7 @@ import {
   type IRpcWarning
 } from '@migaia/rpc-host'
 import { defineFlowFeature, defineFlowPlugin, defineTransportPlugin } from '@migaia/rpc-host/sdk'
-import { errorMap } from '@migaia/rpc-host/plugins/error-map'
+import { errorMapFeature } from '@migaia/rpc-host/plugins/error-map'
 import type { IRpcTransportContext } from '@migaia/rpc-contract/interfaces'
 import { MemoryCarrier } from '../fixtures/core-carrier.ts'
 import { coreMemoryServer } from './core-fixture.ts'
@@ -523,7 +523,7 @@ it.each([false, true])(
     const reports: unknown[] = []
     /** Mapping outbound errors must never transform warnings or a local recipient failure. */
     const map = vi.fn(() => null)
-    const mapping = errorMap(map)
+    const mapping = errorMapFeature(map)
     const subscriber = defineFlowPlugin({
       name: 'a32-warning-subscriber',
       setup: () => ({ onWarning: (warning) => warnings.push(warning) })

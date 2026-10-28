@@ -2,9 +2,9 @@ import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createRpcHost } from '@migaia/rpc-host'
 import { RpcLifecycleError } from '@migaia/rpc-host/contract'
-import { auth } from '@migaia/rpc-host/plugins/auth'
-import { chunk } from '@migaia/rpc-host/plugins/chunk'
-import { batch } from '@migaia/rpc-host/plugins/batch'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'
+import { batchFeature } from '@migaia/rpc-host/plugins/batch'
 import {
   defineFlowFeature,
   RpcFlowLayer,
@@ -28,22 +28,22 @@ async function composition(
   })
   /** Every host owns independent nonce, assembler and batch state from the real factories. */
   const plugins = () => [
-    auth({ encodedType: 'string', sign: (value) => value, verify: (value) => value }),
-    chunk({ chunkBytes: 4096, maxMessageBytes: 64 * 1024 })
+    authFeature({ encodedType: 'string', sign: (value) => value, verify: (value) => value }),
+    chunkFeature({ chunkBytes: 4096, maxMessageBytes: 64 * 1024 })
   ]
   /** Provider errors remain on the actual business diagnostic outlet. */
   const reports: unknown[] = []
   /** The real public root owns native installation, Session, dispatch and close. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [...plugins(), batch(), server.transport],
+    plugins: [...plugins(), batchFeature(), server.transport],
     report: (error) => reports.push(error),
     provide
   })
   try {
     /** These extra genuine stages observe real suffix composition without replacing execution. */
     const client = await server.connect('composition-client', {
-      plugins: [...plugins(), ...plaintextFeatures, batch(), ...wireFeatures],
+      plugins: [...plugins(), ...plaintextFeatures, batchFeature(), ...wireFeatures],
       report: (error) => reports.push(error)
     })
     return { host, client, reports }

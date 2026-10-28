@@ -2,7 +2,7 @@ import { expect, it } from 'vitest'
 import { defineHost, definePlugin } from '@migaia/plugin-host'
 import { deferred } from '@migaia/utils/promise'
 import type { IRpcFlowContext, IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
-import { chunk } from '@migaia/rpc-host/plugins/chunk'
+import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'
 import { FlowRegistry, type IRpcFlowGroup } from '../../../dist/flow/registry.js'
 import {
   rpcHostPipelines,
@@ -40,7 +40,7 @@ it('actual native chunk flow preserves negotiated split/reassembly, physical dra
   /** Tokens are fixture observations, independent of physical message ids. */
   let token = 0
   /** The public factory creates a genuine opaque native Feature handle. */
-  const feature = chunk({
+  const feature = chunkFeature({
     required: true,
     chunkBytes: 2,
     maxMessageBytes: 8,
@@ -134,7 +134,7 @@ it('actual native chunk flow preserves negotiated split/reassembly, physical dra
   )
   /** A second public feature uses default source bytes with an explicitly larger legal message. */
   const largeProgram = new RpcTransportFlowProgram([
-    chunk({ chunkBytes: 1024 * 1024, maxMessageBytes: 32 * 1024 * 1024 })
+    chunkFeature({ chunkBytes: 1024 * 1024, maxMessageBytes: 32 * 1024 * 1024 })
   ])
   await flow.use(
     definePlugin({

@@ -5,8 +5,8 @@ import type { IRpcAvailableAttempt } from '@migaia/rpc-contract/interfaces'
 import { describe, expect, it } from 'vitest'
 import { createWebThreadChannelFactory } from '../../src/threads/web-launcher.ts'
 import type { IThreadWebPort } from '../../src/threads/types.ts'
-import { retry } from '@migaia/rpc-host/features/retry'
-import { timeout } from '@migaia/rpc-host/features/timeout'
+import { retryFeature } from '@migaia/rpc-host/features/retry'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import { RpcCallMode, RpcWireKind } from '@migaia/rpc-contract/protocol'
 import { threadFrames } from './frame.ts'
 import { nativeFixture, workerEntry } from './fixture.ts'
@@ -108,7 +108,7 @@ describe('thread preparation and retry settlement', () => {
     /** Only the initial generation may receive the physical send. */
     let sends = 0
     /** Canonical retry owns cancellation and cleanup; this test adds no retry implementation. */
-    const result = retry({ scheduler, report: () => undefined })
+    const result = retryFeature({ scheduler, report: () => undefined })
       .run({
         facts: {
           method: 'p.read',
@@ -150,7 +150,7 @@ describe('thread preparation and retry settlement', () => {
       const feature = await fixture.install()
       /** A held request remains physically pending so only its logical deadline may settle it. */
       const result = feature
-        .hold([], { timeout: timeout({ ms: 200, scheduler }) })
+        .hold([], { timeout: timeoutFeature({ ms: 200, scheduler }) })
         .catch((error: unknown) => {
           outcome = error
         })

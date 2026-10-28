@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { createRpcHost } from '@migaia/rpc-host'
-import { limits, type IRpcProviderRejection } from '@migaia/rpc-host/plugins/limits'
+import { limitsFeature, type IRpcProviderRejection } from '@migaia/rpc-host/plugins/limits'
 import { deserializeRpcWireError } from '@migaia/rpc-contract/protocol'
 import { coreMemoryServer } from '../../host/core-fixture.ts'
 import { LimitsGovernor } from '../../../dist/features/limits/governor.js'
@@ -43,7 +43,7 @@ describe('limits provider concurrency observer', () => {
       const server = await createRpcHost({
         ...listener.options,
         plugins: [
-          limits({
+          limitsFeature({
             maxGlobal: 1,
             maxPerPeer: 1,
             ...(mode === 'none' ? {} : { onRejected: observer })
@@ -137,7 +137,10 @@ describe('limits accepted host policy', () => {
     /** Cold native plugin order installs optional policy before transport startup. */
     const server = await createRpcHost({
       ...listener.options,
-      plugins: [limits({ maxGlobal: 1, maxPerPeer: 1, onRejected }), ...listener.options.plugins!],
+      plugins: [
+        limitsFeature({ maxGlobal: 1, maxPerPeer: 1, onRejected }),
+        ...listener.options.plugins!
+      ],
       provide: { business }
     })
     /** The original two clients have independent native source identity. */
@@ -179,7 +182,7 @@ describe('limits accepted host policy', () => {
     /** Only this installed plugin contributes the original payload policy. */
     const server = await createRpcHost({
       ...listener.options,
-      plugins: [limits({ maxPayloadBytes: 4096 }), ...listener.options.plugins!],
+      plugins: [limitsFeature({ maxPayloadBytes: 4096 }), ...listener.options.plugins!],
       provide: { scalar, stream }
     })
     /** Two genuine client sources retain isolation after one input is refused. */
@@ -217,7 +220,7 @@ describe('limits accepted host policy', () => {
     /** The same three-credit policy exercises the original remaining two-credit group boundary. */
     const server = await createRpcHost({
       ...listener.options,
-      plugins: [limits({ maxCallsPerMinute: 3 }), ...listener.options.plugins!],
+      plugins: [limitsFeature({ maxCallsPerMinute: 3 }), ...listener.options.plugins!],
       provide: { business, warmup: () => null }
     })
     /** This genuine native source uses only the new public namespace. */

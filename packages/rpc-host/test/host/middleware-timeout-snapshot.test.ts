@@ -1,6 +1,6 @@
 /** Original timeout acquisition and immutable policy values use the complete executing feature. */
 import { createRpcHost } from '@migaia/rpc-host'
-import { timeout } from '@migaia/rpc-host/features/timeout'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { expect, it, vi } from 'vitest'
 import { coreMemoryServer } from './core-fixture.ts'
@@ -18,7 +18,7 @@ it.each(
   /** Exactly one acquisition is retained; the obsolete install-time capture boundary is retired. */
   let reads = 0
   /** The new public duration field is acquired by the actual feature, not a private install shim. */
-  const strategy = timeout({
+  const strategy = timeoutFeature({
     get ms() {
       reads += 1
       return ms
@@ -50,7 +50,7 @@ it('timeout snapshots its configuration in receiver-free order', async () => {
     }
   }
   /** The complete factory is the new policy-capture boundary. */
-  const strategy = timeout(config)
+  const strategy = timeoutFeature(config)
   /** Genuine native installation consumes the exact captured feature instance. */
   const server = coreMemoryServer('timeout-fields', 'timeout-fields', 'memory', [strategy])
   /** No deleted plugin.install context or result.ports object is recreated. */
@@ -82,7 +82,7 @@ it('native timeout snapshot survives post-install mutation', async () => {
     scheduler
   }
   /** Policy capture is performed by the complete public factory, with no compatibility port. */
-  const strategy = timeout(config)
+  const strategy = timeoutFeature(config)
   timeoutMs = 101
   /** This real transport owns the feature used by both originating namespace calls. */
   const server = coreMemoryServer('timeout-snapshot', 'timeout-snapshot', 'memory', [strategy])

@@ -31,8 +31,8 @@ import type {
 } from '@migaia/rpc-contract/interfaces'
 import { RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
 import type { IRpcPortableValue } from '@migaia/rpc-contract/protocol'
-import { retry } from '@migaia/rpc-host/features/retry'
-import { timeout } from '@migaia/rpc-host/features/timeout'
+import { retryFeature } from '@migaia/rpc-host/features/retry'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import { SessionTable } from '../../dist/session/table.js'
 import { CallTable } from '../../dist/call/table.js'
 import {
@@ -704,7 +704,7 @@ it('replays a written idempotent public request through the complete retry featu
     await fixture.member.open()
     /** The actual selected origin feature alone may wait and replay after native departure. */
     const result = fixture.namespace.send('remote', 'p.f.request', [], {
-      retry: retry({ scheduler: fixture.scheduler, report: fixture.report })
+      retry: retryFeature({ scheduler: fixture.scheduler, report: fixture.report })
     })
     await entered.promise
     /** The original synchronous exit preceded replacement; join that same real native event here. */
@@ -974,7 +974,7 @@ it('caps public scalar and stream deadlines while one notify creates no scalar r
     ...source,
     localSourceFacts: {
       ...source.localSourceFacts,
-      callTimeoutCap: timeout({ ms: 50, scheduler: fixture.scheduler })
+      callTimeoutCap: timeoutFeature({ ms: 50, scheduler: fixture.scheduler })
     }
   })
   /** Passthrough scheduler observation records actual armed policy budgets, not a parallel limiter. */
@@ -986,18 +986,18 @@ it('caps public scalar and stream deadlines while one notify creates no scalar r
     await fixture.member.open()
     scheduled.mockClear()
     await fixture.namespace.send('remote', 'p.f.request', [], {
-      timeout: timeout({ ms: 90, scheduler: fixture.scheduler })
+      timeout: timeoutFeature({ ms: 90, scheduler: fixture.scheduler })
     })
     expect(scheduled.mock.calls.map(([, ms]) => ms)).toEqual([50, 50])
     scheduled.mockClear()
     await fixture.namespace.send('remote', 'p.f.request', [], {
-      timeout: timeout({ ms: 20, scheduler: fixture.scheduler })
+      timeout: timeoutFeature({ ms: 20, scheduler: fixture.scheduler })
     })
     expect(scheduled.mock.calls.map(([, ms]) => ms)).toEqual([50, 20])
     scheduled.mockClear()
     /** The actual public lazy iterator runs through the original stream owner and timeout policies. */
     const stream = fixture.namespace.streamTo('remote', 'p.f.generator', [], {
-      timeout: timeout({ ms: 90, scheduler: fixture.scheduler })
+      timeout: timeoutFeature({ ms: 90, scheduler: fixture.scheduler })
     })
     try {
       expect(await stream.next()).toEqual({ value: 'item', done: false })

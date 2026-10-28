@@ -2,10 +2,10 @@
 import assert from 'node:assert/strict'
 import { PassThrough } from 'node:stream'
 import { createRpcHost } from '@migaia/rpc-host'
-import { batch } from '@migaia/rpc-host/plugins/batch'
-import { idempotency, type IRpcOutcomeLookup } from '@migaia/rpc-host/plugins/idempotency'
+import { batchFeature } from '@migaia/rpc-host/plugins/batch'
+import { idempotencyFeature, type IRpcOutcomeLookup } from '@migaia/rpc-host/plugins/idempotency'
 import limits from '@migaia/rpc-host/plugins/limits'
-import { timeout } from '@migaia/rpc-host/features/timeout'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import {
   createRpcByteCarrier,
   defineTransportPlugin,
@@ -36,7 +36,7 @@ async function assertOversizedGroupResult(encoding: 'ascii' | 'unicode'): Promis
   /** The genuine provider installs its complete store before the real source can connect. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [idempotency(), server.transport],
+    plugins: [idempotencyFeature(), server.transport],
     provide: {
       large: () => {
         effects++
@@ -82,13 +82,13 @@ async function assertOversizedGroupResult(encoding: 'ascii' | 'unicode'): Promis
   /** The public namespace originates the same keyed atomic group under a complete timeout. */
   const client = await createRpcHost({
     self: { name: 'parent', instanceId: 'parent-1' },
-    plugins: [idempotency(), transport],
+    plugins: [idempotencyFeature(), transport],
     report: physical.report
   })
   try {
     await assert.rejects(
       client.memory.group([{ method: 'large' }], {
-        timeout: timeout({ ms: 500 }),
+        timeout: timeoutFeature({ ms: 500 }),
         idempotencyKey: 'large-result'
       }),
       { code: 'PAYLOAD_INVALID' },
@@ -96,7 +96,9 @@ async function assertOversizedGroupResult(encoding: 'ascii' | 'unicode'): Promis
     )
     assert.equal(effects, 1, 'executed business is never rolled back or retried')
     /** The real namespace extension queries the same originally sealed provider store. */
-    const outcome = await client.memory.outcome('large-result', { timeout: timeout({ ms: 500 }) })
+    const outcome = await client.memory.outcome('large-result', {
+      timeout: timeoutFeature({ ms: 500 })
+    })
     assert('state' in outcome)
     assert.equal(outcome.state, 'done')
     if (outcome.state !== 'done' || outcome.outcome.completion.ok)
@@ -278,7 +280,7 @@ it('notify send completion precedes business completion while its before-start r
   /** Only the complete optional idempotency owner implements claim and outcome behavior. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [idempotency(), server.transport],
+    plugins: [idempotencyFeature(), server.transport],
     provide: {
       hold: async (_payload, context) => {
         signal = context.signal
@@ -291,7 +293,7 @@ it('notify send completion precedes business completion while its before-start r
   /** The caller installs the same native outcome extension, without a Peer compatibility layer. */
   const client = await server.connect(
     'parent',
-    { plugins: [idempotency()], report: (error) => failures.push(error) },
+    { plugins: [idempotencyFeature()], report: (error) => failures.push(error) },
     'parent-1'
   )
   /** Before-start intent is supplied by the original ordinary AbortController. */
@@ -570,7 +572,7 @@ it('real outcome lookup observes the original pending claim and complete sealed 
   /** The genuine default memory store retains its original epoch and continuity facts. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [idempotency(), server.transport],
+    plugins: [idempotencyFeature(), server.transport],
     provide: {
       hold: async () => {
         effects++
@@ -580,7 +582,7 @@ it('real outcome lookup observes the original pending claim and complete sealed 
     }
   })
   /** Outcome is the real installed namespace extension, not a locally generated store facade. */
-  const client = await server.connect('parent', { plugins: [idempotency()] }, 'parent-1')
+  const client = await server.connect('parent', { plugins: [idempotencyFeature()] }, 'parent-1')
   /** Cleanup observes the one genuine operation even after an assertion failure. */
   const pending: Promise<unknown>[] = []
   try {
@@ -646,7 +648,7 @@ it('rejects an ordinary oversized byte frame during capture with its original Ra
   /** Only optional physical Batch is needed; no chunk transformation changes the oversize input. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [batch(), server.transport],
+    plugins: [batchFeature(), server.transport],
     provide: {
       echo: (value: string) => {
         calls.push(value)
@@ -693,7 +695,7 @@ it('rejects an ordinary oversized byte frame during capture with its original Ra
   /** All three logical operations use this same real public namespace and native Batch lane. */
   const client = await createRpcHost({
     self: { name: 'ordinary-oversize-caller', instanceId: 'ordinary-oversize-caller' },
-    plugins: [batch(), transport],
+    plugins: [batchFeature(), transport],
     report: physical.report
   })
   /** The original capture rejection stays observable without executing another encoding path. */

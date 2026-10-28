@@ -6,7 +6,7 @@ import { UtilsAbortError } from '@migaia/utils/error'
 import type { IRpcEnvelopeContext, IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
 import type { IRpcEnvelope, IRpcHello, IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
 import { RpcWireProfile } from '@migaia/rpc-contract/protocol'
-import { auth, type IRpcAuthenticationOptions } from '../../../dist/features/auth/index.js'
+import { authFeature, type IRpcAuthenticationOptions } from '../../../dist/features/auth/index.js'
 import { setAuthenticationReplayCounter } from '../../../dist/features/auth/counter.js'
 import { readAuthenticationEnvelope } from '../../../dist/features/auth/envelope.js'
 import { AuthenticationRepresentation } from '../../../dist/features/auth/representation.js'
@@ -51,7 +51,7 @@ function message(id: string, payload: unknown = id): IRpcEnvelope {
 /** Exercise genuine native setup, named pipelines and the actual executing codec. */
 async function fixture(options: IRpcAuthenticationOptions, nativeBinary = false) {
   /** The genuine native Feature retains original callbacks and paired-transform validation. */
-  const feature = auth(options)
+  const feature = authFeature(options)
   /** Physical source lifetime remains separate from native installation cleanup. */
   const source = new AbortController()
   /** Setup cleanup owns only this actual native installation. */
@@ -757,7 +757,7 @@ it.each([
     /** One factory call preserves the original code and precise existing rejection branch. */
     let failure: unknown
     try {
-      auth(options)
+      authFeature(options)
     } catch (error) {
       failure = error
     }

@@ -2,8 +2,8 @@
 import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { idempotency, type IRpcOutcomeLookup } from '@migaia/rpc-host/plugins/idempotency'
-import { limits } from '@migaia/rpc-host/plugins/limits'
+import { idempotencyFeature, type IRpcOutcomeLookup } from '@migaia/rpc-host/plugins/idempotency'
+import { limitsFeature } from '@migaia/rpc-host/plugins/limits'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { deferred } from '@migaia/utils/promise'
 import { ProviderAdmissionRegistry } from '../../dist/features/limits/provider-admission.js'
@@ -32,7 +32,7 @@ it.each(['request', 'group', 'notify', 'stream'] as const)(
     /** One real native installation owns the original shared limits and keyed claim lifecycle. */
     const host = await createRpcHost({
       ...server.options,
-      plugins: [limits(), idempotency(), server.transport],
+      plugins: [limitsFeature(), idempotencyFeature(), server.transport],
       provide: {
         hold: async () => {
           started = true
@@ -51,7 +51,7 @@ it.each(['request', 'group', 'notify', 'stream'] as const)(
     })
     /** This genuine caller uses the original published namespace outcome extension. */
     const client = await server.connect('store-lifetime-caller', {
-      plugins: [idempotency()]
+      plugins: [idempotencyFeature()]
     })
     /** Only dynamic fixture typing erases the genuine cold namespace extension's callable type. */
     const lookup = Reflect.get(client.host.memory, 'outcome') as IRpcOutcomeLookup

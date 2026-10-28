@@ -14,9 +14,9 @@ import {
 } from '@migaia/rpc-host/sdk'
 import type { IRpcCarrierWriteOptions } from '@migaia/rpc-contract/interfaces'
 import type { IRpcEnvelope } from '@migaia/rpc-contract/protocol'
-import { idempotency } from '@migaia/rpc-host/plugins/idempotency'
+import { idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'
 import { createRpcIdempotencyStore } from '@migaia/rpc-host/plugins/idempotency'
-import { retry } from '@migaia/rpc-host/features/retry'
+import { retryFeature } from '@migaia/rpc-host/features/retry'
 import { coreMemoryServer } from '../host/core-fixture.ts'
 import { CallInvocation } from '../../dist/call/invocation.js'
 
@@ -81,7 +81,7 @@ function keyedPortHost(port: MessagePort, name: string, provide?: IRpcHostOption
   return createRpcHost({
     self: { name, instanceId: name },
     plugins: [
-      idempotency(),
+      idempotencyFeature(),
       defineTransportPlugin({
         name: `${name}-transport`,
         namespace: 'native',
@@ -154,7 +154,7 @@ it('makes the original overlapping keyed requests share the owner result seven e
   /** One genuine feature owns its sole default store and exact completion snapshots. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [idempotency(), server.transport],
+    plugins: [idempotencyFeature(), server.transport],
     provide: {
       count: async () => {
         entered.resolve()
@@ -200,7 +200,7 @@ it('keeps the original key factory failure as a rejected Promise without a busin
   /** Exact identity is the original public callback failure oracle, not a coded replacement. */
   const failure = new Error('factory')
   /** Complete retry construction retains its original public callback and no generated key. */
-  const strategy = retry({
+  const strategy = retryFeature({
     keyFactory() {
       throw failure
     }
@@ -250,7 +250,7 @@ it('rejects a new key while the real bounded store owns an executing request', a
   /** No quota facade or replacement store can reject this second genuine call. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [idempotency({ store }), server.transport],
+    plugins: [idempotencyFeature({ store }), server.transport],
     provide: {
       count: () => {
         count++
@@ -290,7 +290,7 @@ it('rejects the original malformed injected store during native construction', a
   /** The original invalid value must reach the real installed Feature's configuration boundary. */
   const opening = createRpcHost({
     ...server.options,
-    plugins: [idempotency({ store: 1 as never }), server.transport]
+    plugins: [idempotencyFeature({ store: 1 as never }), server.transport]
   })
   try {
     await expect(opening.then(() => undefined)).rejects.toMatchObject({ code: 'INVALID_CONFIG' })
@@ -310,7 +310,7 @@ it('replays original sequential keys and rejects invalid keys before any real bu
   /** Both original repeated and independent keys use the same true provider and real store. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [idempotency(), server.transport],
+    plugins: [idempotencyFeature(), server.transport],
     provide: { count: () => ++count }
   })
   /** Accepted public namespace methods are the sole entry, without a legacy endpoint wrapper. */
@@ -358,7 +358,7 @@ it('retains the original explicit key through genuine retry and the physical req
   /** Original explicit-key admission must never ask the complete retry feature for a new key. */
   const keyFactory = vi.fn(() => 'factory-key')
   /** This real executing feature is installed at the originating native transport scope. */
-  const strategy = retry({ keyFactory })
+  const strategy = retryFeature({ keyFactory })
   /** The existing bridge lends the same genuine Session and physical frame ownership. */
   const server = coreMemoryServer('explicit-key-caller', 'explicit-key-caller', 'memory', [
     strategy
@@ -367,7 +367,7 @@ it('retains the original explicit key through genuine retry and the physical req
   const host = await createRpcHost(server.options)
   /** Real accepted metadata supplies idempotency authority independently from the caller key. */
   const client = await server.connect('explicit-key-provider', {
-    plugins: [idempotency()],
+    plugins: [idempotencyFeature()],
     provide: { api: { request: () => 'result' } },
     contract: {
       schemaVersion: 1,

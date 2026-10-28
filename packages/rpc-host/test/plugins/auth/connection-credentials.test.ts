@@ -1,7 +1,7 @@
 /** Private connection credentials reach only the configured authentication resolver. */
 import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
 import { probe } from '@migaia/rpc-host/plugins/probe'
 import { defineFlowFeature, defineTransportPlugin } from '@migaia/rpc-host/sdk'
 import { coreMemoryServer } from '../../host/core-fixture.ts'
@@ -63,7 +63,7 @@ it.each([false, true])(
       })
     })
     /** The existing auth resolver is the sole recipient of the connection's borrowed credentials. */
-    const authentication = auth({
+    const authentication = authFeature({
       credentials(context) {
         observed.credentials.push({ carrierId: context.carrierId, value: context.credentials })
         return context.credentials

@@ -10,7 +10,7 @@ import {
   defineTransportPlugin,
   type IRpcTransportPlugin
 } from '@migaia/rpc-host/sdk'
-import { timeout } from '@migaia/rpc-host/features'
+import { timeoutFeature } from '@migaia/rpc-host/features'
 import {
   coroutinePlugin,
   type ICoroutineConnect,
@@ -71,7 +71,9 @@ export function rpcCallOptions(options?: ITrayCallOptions): IRpcCallOptions | un
   if (options === undefined) return undefined
   return {
     signal: options.signal,
-    ...(options.timeoutMs === undefined ? {} : { timeout: timeout({ ms: options.timeoutMs }) })
+    ...(options.timeoutMs === undefined
+      ? {}
+      : { timeout: timeoutFeature({ ms: options.timeoutMs }) })
   }
 }
 /** Runtime selects the original native source; parent sources append to its fixed cold namespace. */

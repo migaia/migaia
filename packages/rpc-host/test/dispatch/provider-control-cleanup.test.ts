@@ -1,7 +1,7 @@
 /** Original factory disposal keeps its RPC Root boundary and two native-owned cleanup leaves. */
 import { createRpcHost } from '@migaia/rpc-host'
 import { defineTransportPlugin, RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
-import { chunk } from '@migaia/rpc-host/plugins/chunk'
+import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { expect, it } from 'vitest'
 import { coreMemoryServer } from '../host/core-fixture.ts'
@@ -79,12 +79,12 @@ it('sends the original non-empty Unicode payload through the actual chunk provid
   /** The original provider returns its actual application input through the public boundary. */
   const endpoint = await createRpcHost({
     ...server.options,
-    plugins: [chunk({ chunkBytes: 4 }), server.transport],
+    plugins: [chunkFeature({ chunkBytes: 4 }), server.transport],
     provide: { echo: (value: unknown) => value }
   })
   /** One genuine accepted client owns its independent physical receiver and chunk state. */
   const client = await server.connect('r73-chunk-client', {
-    plugins: [chunk({ chunkBytes: 4 })]
+    plugins: [chunkFeature({ chunkBytes: 4 })]
   })
   try {
     await expect(

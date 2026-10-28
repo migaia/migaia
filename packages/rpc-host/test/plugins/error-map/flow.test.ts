@@ -1,8 +1,8 @@
 /** Maps only outbound errors while public local diagnostics retain their original identities. */
 import { expect, it, vi } from 'vitest'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
-import { errorMap, type IRpcErrorMap } from '@migaia/rpc-host/plugins/error-map'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { errorMapFeature, type IRpcErrorMap } from '@migaia/rpc-host/plugins/error-map'
 import { defineFlowPlugin, defineTransportPlugin } from '@migaia/rpc-host/sdk'
 import { reachRpcError, RpcError } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
@@ -40,14 +40,14 @@ it.each([false, true])(
       expect(context).toMatchObject({ namespace: 'memory', direction: 'outbound' })
       return mapped
     })
-    const mapping = errorMap(map)
+    const mapping = errorMapFeature(map)
     /** Credentials-only authentication keeps real semantic wire errors observable on this medium. */
     const listener = coreMemoryServer('mapped-provider')
     const host = await createRpcHost({
       ...listener.options,
       plugins: [
         ...(loggerFirst ? [logger, mapping] : [mapping, logger]),
-        auth({ verifyCredentials: () => ({ principalId: 'a32-client' }) }),
+        authFeature({ verifyCredentials: () => ({ principalId: 'a32-client' }) }),
         listener.transport
       ],
       provide: {
@@ -59,7 +59,7 @@ it.each([false, true])(
     })
     /** Only this public caller receives the deliberately mapped remote graph. */
     const client = await listener.connect('mapped-client', {
-      plugins: [auth({ credentials: 'a32-public-fixture' })]
+      plugins: [authFeature({ credentials: 'a32-public-fixture' })]
     })
     try {
       const received = await client.host.memory
@@ -109,12 +109,14 @@ it('selects a transport-local mapper only for that namespace and inherits the ho
     return local
   })
   /** The first native transport owns the local override; the second inherits host selection. */
-  const first = coreMemoryServer('mapping-scopes', 'mapping-scopes', 'first', [errorMap(localMap)])
+  const first = coreMemoryServer('mapping-scopes', 'mapping-scopes', 'first', [
+    errorMapFeature(localMap)
+  ])
   const second = coreMemoryServer('mapping-scopes', 'mapping-scopes', 'second')
   /** The public root prepares the one shared mapper through the original native Feature owner. */
   const host = await createRpcHost({
     ...first.options,
-    plugins: [errorMap(sharedMap), first.transport, second.transport],
+    plugins: [errorMapFeature(sharedMap), first.transport, second.transport],
     provide: {
       fail: () => {
         throw primary
@@ -156,8 +158,8 @@ it.each(['none', 'throw'] as const)(
     const host = await createRpcHost({
       ...listener.options,
       plugins: [
-        ...(mode === 'none' ? [] : [errorMap(map)]),
-        auth({ verifyCredentials: () => ({ principalId: 'fallback-client' }) }),
+        ...(mode === 'none' ? [] : [errorMapFeature(map)]),
+        authFeature({ verifyCredentials: () => ({ principalId: 'fallback-client' }) }),
         listener.transport
       ],
       provide: {
@@ -168,7 +170,7 @@ it.each(['none', 'throw'] as const)(
       report: (error) => reports.push(error)
     })
     const client = await listener.connect('fallback-client', {
-      plugins: [auth({ credentials: 'a32-public-fixture' })]
+      plugins: [authFeature({ credentials: 'a32-public-fixture' })]
     })
     try {
       expect(listener.lookup('fallback-client')?.view.authentication?.principalId).toBe(
@@ -211,7 +213,7 @@ it('falls back to the original remote error and reports one mapped serialization
   const listener = coreMemoryServer('serialization-fallback-provider')
   const host = await createRpcHost({
     ...listener.options,
-    plugins: [errorMap(map), listener.transport],
+    plugins: [errorMapFeature(map), listener.transport],
     provide: {
       fail: () => {
         throw primary
@@ -268,7 +270,7 @@ it('rejects a returned Promise as configuration, sends the original error and re
     return delayed.promise
   })
   // @ts-expect-error A JavaScript callback can return a Promise; the public TypeScript mapper cannot.
-  const mapping = errorMap(map)
+  const mapping = errorMapFeature(map)
   /** Only the public provider increments this actual next-message business observation. */
   const echo = vi.fn((value: string) => value)
   const reports: unknown[] = []
@@ -330,7 +332,7 @@ it('delivers the next message on the same Session without waiting for a never-se
   const hanging = new Promise<never>(() => undefined)
   const map = vi.fn(() => hanging)
   // @ts-expect-error The runtime JavaScript misuse is deliberate; Promise returns fail the public mapper type.
-  const mapping = errorMap(map)
+  const mapping = errorMapFeature(map)
   const reports: unknown[] = []
   /**
    * Real business completion, rather than elapsed timing, proves the following message was
@@ -389,7 +391,7 @@ it.each(['verifier', 'resolver'] as const)(
     const host = await createRpcHost({
       ...listener.options,
       plugins: [
-        auth({ credentials: 'a32-server', verifyCredentials: () => undefined }),
+        authFeature({ credentials: 'a32-server', verifyCredentials: () => undefined }),
         listener.transport
       ]
     })
@@ -398,7 +400,7 @@ it.each(['verifier', 'resolver'] as const)(
       const failure = await listener
         .connect('credential-cause-client', {
           plugins: [
-            auth({
+            authFeature({
               credentials:
                 mode === 'resolver'
                   ? () => {
@@ -439,7 +441,7 @@ it('keeps an unauthenticated wire rejection redacted while the local verifier ca
   const host = await createRpcHost({
     ...listener.options,
     plugins: [
-      auth({
+      authFeature({
         verifyCredentials() {
           throw primary
         }
@@ -465,7 +467,7 @@ it('keeps an unauthenticated wire rejection redacted while the local verifier ca
       createRpcHost({
         self: { name: 'redaction-client', instanceId: 'redaction-client' },
         plugins: [
-          auth({ credentials: 'a32-untrusted-token' }),
+          authFeature({ credentials: 'a32-untrusted-token' }),
           defineTransportPlugin({ name: 'redaction-client', namespace: 'memory', open })
         ],
         report: () => undefined

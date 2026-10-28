@@ -2,9 +2,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
-import { auth } from '@migaia/rpc-host/plugins/auth'
-import { chunk } from '@migaia/rpc-host/plugins/chunk'
-import { batch } from '@migaia/rpc-host/plugins/batch'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'
+import { batchFeature } from '@migaia/rpc-host/plugins/batch'
 import {
   probe,
   defineProbe,
@@ -79,7 +79,7 @@ function outbound(events: readonly IRpcProbeEventView[]): IRpcProbeEventView[] {
 
 /** Each real transform preserves the original encrypt-before-sign and verify-before-decrypt order. */
 function security() {
-  return auth({
+  return authFeature({
     encodedType: 'string',
     encrypt: (value) => `encrypted:${JSON.stringify(value)}`,
     decrypt: (value) => JSON.parse(String(value).slice('encrypted:'.length)),
@@ -126,7 +126,7 @@ describe('probe-core outbound frames', () => {
       events: callerEvents,
       incoming: providerEvents,
       capture: ['frame', 'protected'],
-      features: [security(), chunk({ chunkBytes: 1024, maxMessageBytes: 8192 })],
+      features: [security(), chunkFeature({ chunkBytes: 1024, maxMessageBytes: 8192 })],
       json: true,
       echo: (value) => {
         calls += 1
@@ -198,12 +198,12 @@ describe('probe-core outbound frames', () => {
       capture: ['frame', 'protected'],
       json: true,
       features: [
-        auth({
+        authFeature({
           encodedType: 'string',
           sign: protect,
           verify: (value) => String(value).slice('protected:'.length)
         }),
-        chunk({ chunkBytes: 768, maxMessageBytes: 8192 })
+        chunkFeature({ chunkBytes: 768, maxMessageBytes: 8192 })
       ]
     })
     /** Original carrier writes remain genuine and independently countable. */
@@ -370,7 +370,7 @@ describe('probe-core outbound frames', () => {
     const fixture = await observedHosts({
       events,
       capture: ['envelope', 'frame'],
-      features: [batch()],
+      features: [batchFeature()],
       json: true
     })
     const send = vi.spyOn(fixture.pair[0], 'write')

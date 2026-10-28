@@ -1,6 +1,6 @@
 /** A public native removal and a genuine arriving connection share the original Feature lifetime. */
 import { defineHost } from '@migaia/plugin-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
 import { defineFlowFeature, rpcFlowPlugin, rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { deferred } from '@migaia/utils/promise'
 import { expect, it } from 'vitest'
@@ -22,7 +22,10 @@ it('F3 refuses a new connection or shared Auth removal while its accepted cleanu
     })
   })
   /** Both Features use the ordinary SDK wrapper and its actual native registration lifetime. */
-  const flows = rpcFlowPlugin([auth({ sign: (value) => value, verify: (value) => value }), held])
+  const flows = rpcFlowPlugin([
+    authFeature({ sign: (value) => value, verify: (value) => value }),
+    held
+  ])
   /** Only this native Host lends candidate and committed pipeline execution authority. */
   const rpc = rpcHostPipelines(
     () => host,
@@ -53,7 +56,7 @@ it('F3 refuses a new connection or shared Auth removal while its accepted cleanu
     /** The opposite public Host completes real signed handshakes while that disposer stays held. */
     const [connection] = await Promise.allSettled([
       server.connect('f3-arriving-client', {
-        plugins: [auth({ sign: (value) => value, verify: (value) => value })]
+        plugins: [authFeature({ sign: (value) => value, verify: (value) => value })]
       })
     ])
     if (connection!.status === 'fulfilled') client = connection.value

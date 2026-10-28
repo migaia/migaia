@@ -14,7 +14,7 @@ import {
   type IRpcPortableValue
 } from '@migaia/rpc-host/contract'
 import { createRpcHost, type IRpcHost, type IRpcContext } from '@migaia/rpc-host'
-import { timeout } from '@migaia/rpc-host/features/timeout'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import { dedicatedWorkerPlugin } from '@migaia/rpc-plugin-browser'
 import type { IWorkerMessagePort } from './worker-message-event.ts'
 import { StoreWorkerErrorText } from './error-text.ts'
@@ -188,7 +188,7 @@ class WorkerContractEndpoint implements IWorkerContractEndpoint {
           encodeWorkerValue(payload),
           {
             signal: options?.signal,
-            timeout: ms === undefined ? false : timeout({ ms })
+            timeout: ms === undefined ? false : timeoutFeature({ ms })
           }
         )
       })

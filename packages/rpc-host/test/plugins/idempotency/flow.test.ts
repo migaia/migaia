@@ -4,7 +4,10 @@ import type { IRpcDispatchContext } from '@migaia/rpc-contract/interfaces'
 import { RpcDispatchDrop } from '@migaia/rpc-contract/interfaces'
 import type { IRpcEnvelope, IRpcOutcome } from '@migaia/rpc-contract/protocol'
 import { RpcWireProfile } from '@migaia/rpc-contract/protocol'
-import { idempotency, createRpcIdempotencyStore } from '../../../dist/features/idempotency/index.js'
+import {
+  idempotencyFeature,
+  createRpcIdempotencyStore
+} from '../../../dist/features/idempotency/index.js'
 import { FlowRegistry, type IRpcFlowGroup } from '../../../dist/flow/registry.js'
 import {
   rpcHostPipelines,
@@ -27,7 +30,7 @@ it('actual optional idempotency dispatch observes sealed outcome and publishes o
   /** The native graph owns this real Feature and the original custom scope callback. */
   /** Scope is a plain configuration callback and receives no captured option receiver. */
   const scopeReceivers: unknown[] = []
-  const feature = idempotency({
+  const feature = idempotencyFeature({
     store,
     scope(this: unknown) {
       scopeReceivers.push(this)

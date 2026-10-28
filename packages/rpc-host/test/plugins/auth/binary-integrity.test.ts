@@ -2,7 +2,7 @@
 import { createHmac } from 'node:crypto'
 import { expect, it, vi } from 'vitest'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
 import { createRpcBackingDigest, RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import type { IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
 import type { IRpcPortableValue } from '@migaia/rpc-contract/protocol'
@@ -134,7 +134,7 @@ class BinaryIntegrityPair {
   /** Public Auth factories and original transport installs establish real accepted readiness. */
   async open(signed: boolean): Promise<void> {
     /** Each actual Host installs its independent Auth lifetime when integrity is requested. */
-    const plugins = signed ? [auth({ sign: this.#sign, verify: this.#verify })] : []
+    const plugins = signed ? [authFeature({ sign: this.#sign, verify: this.#verify })] : []
     this.#server = await createRpcHost({
       ...this.#listener.options,
       plugins: [...plugins, this.#listener.transport],
@@ -148,7 +148,7 @@ class BinaryIntegrityPair {
     })
     /** A distinct Auth definition keeps replay state owned by the actual connecting Host. */
     const connected = await this.#listener.connect('a33-client', {
-      plugins: signed ? [auth({ sign: this.#sign, verify: this.#verify })] : []
+      plugins: signed ? [authFeature({ sign: this.#sign, verify: this.#verify })] : []
     })
     this.#client = connected.host
     /** This is the client's actual physical write, after codec capture and Auth transformation. */

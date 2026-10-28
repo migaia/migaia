@@ -1,6 +1,6 @@
 /** Process has no native wall cap: an explicit false disables its installed call timeout. */
 import { createRpcHost } from '@migaia/rpc-host'
-import { timeout } from '@migaia/rpc-host/features/timeout'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import { deferred } from '@migaia/utils/promise'
 import { createManualScheduler } from '@migaia/utils/testing'
@@ -25,7 +25,7 @@ it('keeps an actual Process call pending beyond its installed timeout when timeo
     plugins: [
       processPlugin({
         spawn: new URL('./fixtures/core-session-child.ts', import.meta.url),
-        features: [timeout({ ms: 100, scheduler })]
+        features: [timeoutFeature({ ms: 100, scheduler })]
       })
     ],
     report: () => undefined

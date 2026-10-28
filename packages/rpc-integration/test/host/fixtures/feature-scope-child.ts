@@ -1,6 +1,6 @@
 /** Children use the actual native source and the same canonical authentication Feature. */
 import { createRpcHost } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
 import type { IRpcTransportPlugin } from '@migaia/rpc-host/sdk'
 import { RpcError } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
@@ -19,7 +19,7 @@ export function featureScopeAuth(
   key: string,
   signed?: (value: string, context: IRpcFlowContext) => void
 ) {
-  return auth({
+  return authFeature({
     encodedType: 'string',
     sign: (value, context) => {
       /** The configured representation supplies strings before this actual transform runs. */

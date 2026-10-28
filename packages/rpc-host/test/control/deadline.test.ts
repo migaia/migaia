@@ -1,6 +1,6 @@
 /** Original relative-deadline oracles cross genuine namespaces, timeout features and native IO. */
 import { createRpcHost } from '@migaia/rpc-host'
-import { timeout } from '@migaia/rpc-host/features/timeout'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import { linkPolicy } from '@migaia/rpc-host/plugins'
 import { defineFlowFeature, RpcFlowPoint } from '@migaia/rpc-host/sdk'
 import type { IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
@@ -86,7 +86,7 @@ async function subtractReceiverResolutionDelay(): Promise<void> {
   })
   /** Observe rejection immediately so advancing the genuine timer cannot create an unhandled error. */
   const pending = client.host.memory.send('relay', 'provider.check', null, {
-    timeout: timeout({ ms: 100, scheduler: clock.scheduler })
+    timeout: timeoutFeature({ ms: 100, scheduler: clock.scheduler })
   })
   void pending.catch(() => undefined)
   try {
@@ -129,7 +129,7 @@ async function omitDisabledDeadline(): Promise<void> {
   })
   /** Moves the original timeout default into an installed complete link-policy feature. */
   const client = await server.connect('client', {
-    plugins: [linkPolicy({ features: [timeout({ ms: 100, scheduler: clientScheduler })] })]
+    plugins: [linkPolicy({ features: [timeoutFeature({ ms: 100, scheduler: clientScheduler })] })]
   })
   try {
     expect(await client.host.memory.send('provider', 'check', null, { timeout: false })).toBe(false)
@@ -145,7 +145,7 @@ async function omitDisabledDeadline(): Promise<void> {
     const baseline = clock.scheduler.pendingCount
     expect(
       await client.host.memory.send('provider', 'check', null, {
-        timeout: timeout({ ms: 100, scheduler: clientScheduler })
+        timeout: timeoutFeature({ ms: 100, scheduler: clientScheduler })
       })
     ).toBe(false)
     await vi.waitFor(() => expect(clock.scheduler.pendingCount).toBe(baseline))
@@ -232,7 +232,7 @@ async function abortAtMonotonicDeadline(): Promise<void> {
   })
   /** Observe the originating result before any actual deadline callback runs. */
   const result = client.host.memory.send('provider', 'hang', null, {
-    timeout: timeout({ ms: 100, scheduler: clock.scheduler })
+    timeout: timeoutFeature({ ms: 100, scheduler: clock.scheduler })
   })
   void result.catch(() => undefined)
   try {

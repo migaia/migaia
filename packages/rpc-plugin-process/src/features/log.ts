@@ -78,7 +78,7 @@ class IpcLog {
   }
 }
 /** Complete log execution is installed with the physical owner's existing gate and reporter ports. */
-export function ipcLog(options: IIpcLogOptions) {
+export function ipcLogFeature(options: IIpcLogOptions) {
   /** Later mutation cannot replace the actual selected native sink. */
   const captured = Object.freeze({ report: options.report })
   return Object.freeze({
@@ -90,4 +90,4 @@ export function ipcLog(options: IIpcLogOptions) {
     }
   })
 }
-export default ipcLog
+export default ipcLogFeature

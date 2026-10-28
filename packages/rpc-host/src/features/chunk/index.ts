@@ -16,7 +16,7 @@ export type IRpcChunkFeatureOptions = Omit<IRpcChunkOptions, 'errorMetadata'> &
   }>
 
 /** Install actual optional chunk@1 hooks; no chunk resources exist when this factory is absent. */
-export function chunk(options: IRpcChunkFeatureOptions = {}): IRpcFlowFeature {
+export function chunkFeature(options: IRpcChunkFeatureOptions = {}): IRpcFlowFeature {
   /** Limits are captured now and validated by the actual setup owner before any frame is emitted. */
   const captured = { ...options }
   return defineBuiltinFlowFeature('chunk', {
@@ -25,4 +25,4 @@ export function chunk(options: IRpcChunkFeatureOptions = {}): IRpcFlowFeature {
   })
 }
 
-export default chunk
+export default chunkFeature

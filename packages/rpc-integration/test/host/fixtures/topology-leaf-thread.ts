@@ -1,7 +1,7 @@
 /** Thread leaf (b's thread c and its pool members): business providers behind a thread carrier. */
 import { workerData } from 'node:worker_threads'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import { TopologyLeaf } from './topology-leaf.ts'
 import {
@@ -17,7 +17,11 @@ const options = (workerData?.data ?? {}) as ITopologyOptions
 const leaf = new TopologyLeaf()
 /** Hop-scoped auth on this thread's parent connection only. */
 const features = options.hopAuth
-  ? [auth(leaf.auth.options(options.hopAuth === 'match' ? HopSecret.shared : HopSecret.other))]
+  ? [
+      authFeature(
+        leaf.auth.options(options.hopAuth === 'match' ? HopSecret.shared : HopSecret.other)
+      )
+    ]
   : []
 /** The leaf host connected to b. */
 const opening: Promise<IRpcHost> = createRpcHost({

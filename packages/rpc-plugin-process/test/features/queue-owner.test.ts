@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import {
-  sendQueue,
-  flowControl,
-  ipcLog,
+  sendQueueFeature,
+  flowControlFeature,
+  ipcLogFeature,
   IpcSendClass,
   IpcLogEventName,
   type IIpcLogRecord,
@@ -34,7 +34,7 @@ describe('process-owned IPC execution', () => {
     /** The original order oracle counts only actual physical sender entry. */
     const order: string[] = []
     /** One complete native feature installation owns the original utils FIFO. */
-    const installed = sendQueue({ maxPendingData: 3 }).install(context('a1'))
+    const installed = sendQueueFeature({ maxPendingData: 3 }).install(context('a1'))
     /** Each application write enters the exact same installed owner. */
     const run = (id: string) =>
       installed.value.run(data, async () => {
@@ -58,7 +58,7 @@ describe('process-owned IPC execution', () => {
   it('captures data capacity once and keeps the original reserved control capacity', async () => {
     /** Caller mutation must not reconfigure the native connection after cold definition capture. */
     const capacity = { maxPendingData: 1, maxPendingControl: 1 }
-    const feature = sendQueue(capacity)
+    const feature = sendQueueFeature(capacity)
     capacity.maxPendingData = 8
     const installed = feature.install(context('original-process-gate'))
     const records: IIpcLogRecord[] = []
@@ -88,7 +88,7 @@ describe('process-owned IPC execution', () => {
 
   it('waits for actual writability and emits one high/low crossing per capacity cycle', async () => {
     /** Four accepted writes cross high75%; physical completion alone returns them through low50%. */
-    const installed = sendQueue({ maxPendingData: 4 }).install(context('watermark'))
+    const installed = sendQueueFeature({ maxPendingData: 4 }).install(context('watermark'))
     const events: string[] = []
     const remove = installed.value.onEvent((event) => events.push(event.name))
     const first = deferred<void>()
@@ -118,7 +118,7 @@ describe('process-owned IPC execution', () => {
 
   it('reclaims cancelled queued capacity and never enters its original physical write', async () => {
     /** Only the existing utils limiter handles this actual caller cancellation. */
-    const installed = sendQueue({ maxPendingData: 2 }).install(context('queued-cancel'))
+    const installed = sendQueueFeature({ maxPendingData: 2 }).install(context('queued-cancel'))
     const first = deferred<void>()
     const controller = new AbortController()
     const written: string[] = []
@@ -149,11 +149,11 @@ describe('process-owned IPC execution', () => {
   })
 
   it('retains backlog/stderr identity while isolating synchronous and asynchronous sink failure', async () => {
-    const installed = sendQueue({ maxPendingData: 1 }).install(context('a5', 'session'))
+    const installed = sendQueueFeature({ maxPendingData: 1 }).install(context('a5', 'session'))
     const records: IIpcLogRecord[] = []
     const reportErrors: unknown[] = []
     const sinkFailure = new Error('sink failure')
-    const logging = ipcLog({
+    const logging = ipcLogFeature({
       report(record) {
         records.push(record)
         if (record.name === 'ipc.backlog.rejected') throw sinkFailure
@@ -213,16 +213,16 @@ describe('process-owned IPC execution', () => {
 
   it('contains sink reentry and disposes the exact shared-flow log subscription once', async () => {
     /** A shared complete flow is installed exactly once and lent to the queue's real native context. */
-    const feature = flowControl({ maxPendingData: 1 })
+    const feature = flowControlFeature({ maxPendingData: 1 })
     const native = context('fixture-reentry')
     const flow = feature.install(native)
-    const installed = sendQueue({ flow: feature }).install({
+    const installed = sendQueueFeature({ flow: feature }).install({
       ...native,
       flow: { feature, value: flow.value }
     })
     const reentrantErrors: unknown[] = []
     const subscriptions = vi.spyOn(installed.value, 'onEvent')
-    const logging = ipcLog({
+    const logging = ipcLogFeature({
       report(record) {
         if (record.name === 'ipc.backlog.high')
           void installed.value
@@ -262,7 +262,7 @@ describe('process-owned IPC execution', () => {
 
   it('close retains active completion, cancels queued work by identity and shares pending drain', async () => {
     /** A genuine unresolved native write remains active even after logical admission closes. */
-    const installed = sendQueue({ maxPendingData: 2 }).install(context('fixture-close'))
+    const installed = sendQueueFeature({ maxPendingData: 2 }).install(context('fixture-close'))
     const first = deferred<void>()
     /** Limiter admission precedes its task microtask; close starts only after real sender entry. */
     const entered = deferred<void>()
@@ -304,7 +304,7 @@ describe('process-owned IPC execution', () => {
   })
 
   it('closes only the still-queued original batch member and preserves thrown undefined', async () => {
-    const installed = sendQueue().install(context('coalesced-close'))
+    const installed = sendQueueFeature().install(context('coalesced-close'))
     const pending = deferred<void>()
     const reason = new Error('coalesced original close')
     const cancel = vi.fn((failure: unknown) => pending.reject(failure))
@@ -320,7 +320,7 @@ describe('process-owned IPC execution', () => {
     await expect(write).rejects.toBe(reason)
     expect(cancel).toHaveBeenCalledExactlyOnceWith(reason)
     await installed.value.whenIdle()
-    const independent = flowControl().install(context('throw-undefined'))
+    const independent = flowControlFeature().install(context('throw-undefined'))
     const failures: unknown[] = []
     try {
       await independent.value
@@ -341,7 +341,9 @@ describe('process-owned IPC execution', () => {
   })
 
   it('keeps duplicate callback receipts independent across removal and reentrant snapshots', async () => {
-    const installed = flowControl({ maxPendingData: 1 }).install(context('listener-receipts'))
+    const installed = flowControlFeature({ maxPendingData: 1 }).install(
+      context('listener-receipts')
+    )
     const calls: string[] = []
     const duplicate = (event: IIpcLogRecord) => {
       if (event.name === 'ipc.backlog.high') calls.push('same')
@@ -380,15 +382,15 @@ describe('process-owned IPC execution', () => {
   })
 
   it('coldly rejects a second capacity policy without altering the original installed flow', async () => {
-    const first = flowControl({ maxPendingData: 1 })
+    const first = flowControlFeature({ maxPendingData: 1 })
     const native = context('cold-policy-conflict')
     const installed = first.install(native)
-    const other = flowControl()
+    const other = flowControlFeature()
     const write = vi.fn()
     try {
-      expect(() => sendQueue({ flow: first, maxPendingData: 1 })).toThrowError(TypeError)
+      expect(() => sendQueueFeature({ flow: first, maxPendingData: 1 })).toThrowError(TypeError)
       expect(() =>
-        sendQueue({ flow: other }).install({
+        sendQueueFeature({ flow: other }).install({
           ...native,
           flow: { feature: first, value: installed.value }
         })

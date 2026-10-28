@@ -7,7 +7,7 @@ import {
   type IFeatureCore
 } from '@migaia/plugin-host'
 import { createRpcHost } from '@migaia/rpc-host'
-import { chunk } from '@migaia/rpc-host/plugins/chunk'
+import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'
 import { defineTransportPlugin, rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { RpcError, RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
@@ -143,7 +143,7 @@ async function closeFirstPartyFramer(): Promise<void> {
   /** The ordinary public RPC factory installs real chunk resources through genuine native setup. */
   const endpoint = await createRpcHost({
     ...server.options,
-    plugins: [chunk(), server.transport]
+    plugins: [chunkFeature(), server.transport]
   })
   try {
     await endpoint.close()

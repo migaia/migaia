@@ -4,11 +4,11 @@ import { it, vi } from 'vitest'
 import { createRpcHost, type IRpcHostOptions } from '@migaia/rpc-host'
 import {
   createRpcIdempotencyStore,
-  idempotency,
+  idempotencyFeature,
   type IRpcIdempotencyStore,
   type IRpcOutcomeLookup
 } from '@migaia/rpc-host/plugins/idempotency'
-import { limits } from '@migaia/rpc-host/plugins/limits'
+import { limitsFeature } from '@migaia/rpc-host/plugins/limits'
 import { deferred } from '@migaia/utils/promise'
 import { ProviderAdmissionRegistry } from '../../dist/features/limits/provider-admission.js'
 import { coreMemoryServer } from '../host/core-fixture.ts'
@@ -26,14 +26,14 @@ async function connectGroupStore(
   /** Quotas and keyed execution are complete installed Features rather than a test-side registry. */
   const host = await createRpcHost({
     ...server.options,
-    plugins: [limits(), idempotency({ store }), server.transport],
+    plugins: [limitsFeature(), idempotencyFeature({ store }), server.transport],
     provide,
     report: (error) => failures.push(error)
   })
   try {
     /** Only dynamic fixture typing erases the genuine outcome extension's cold declared type. */
     const client = await server.connect('group-store-caller', {
-      plugins: [idempotency()],
+      plugins: [idempotencyFeature()],
       report: (error) => failures.push(error)
     })
     /** This is the original published callable; no lookup or outcome state is fabricated. */

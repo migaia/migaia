@@ -2,7 +2,7 @@
 import { createHmac } from 'node:crypto'
 import { expect, it } from 'vitest'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
-import { auth, type IRpcAuthenticationOptions } from '@migaia/rpc-host/plugins/auth'
+import { authFeature, type IRpcAuthenticationOptions } from '@migaia/rpc-host/plugins/auth'
 import { createRpcBackingDigest, RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import type { IRpcPortableValue } from '@migaia/rpc-contract/protocol'
 import { RpcAuthenticationEnvelope } from '../../../dist/features/auth/constants.js'
@@ -57,7 +57,7 @@ class PublicAuthenticationPair {
   async open(client: IRpcAuthenticationOptions, server: IRpcAuthenticationOptions): Promise<void> {
     this.#server = await createRpcHost({
       ...this.#listener.options,
-      plugins: [auth(server), this.#listener.transport],
+      plugins: [authFeature(server), this.#listener.transport],
       provide: {
         echo: (value: unknown) => {
           this.delivered.push(value)
@@ -66,7 +66,7 @@ class PublicAuthenticationPair {
       }
     })
     /** The existing listener connects both real Session owners and awaits their original handshakes. */
-    const connected = await this.#listener.connect('a29-client', { plugins: [auth(client)] })
+    const connected = await this.#listener.connect('a29-client', { plugins: [authFeature(client)] })
     this.#client = connected.host
   }
 

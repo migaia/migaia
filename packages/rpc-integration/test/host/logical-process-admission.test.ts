@@ -5,8 +5,8 @@ import { deferred } from '@migaia/utils/promise'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { RpcTransportError } from '@migaia/rpc-contract/errors'
 import { createRpcHost } from '@migaia/rpc-host'
-import { batch } from '@migaia/rpc-host/plugins/batch'
-import { chunk } from '@migaia/rpc-host/plugins/chunk'
+import { batchFeature } from '@migaia/rpc-host/plugins/batch'
+import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'
 import {
   defineFlowFeature,
   defineTransportPlugin,
@@ -20,7 +20,7 @@ import type {
   IRpcSessionHandle
 } from '@migaia/rpc-contract/interfaces'
 import {
-  sendQueue,
+  sendQueueFeature,
   IpcSendClass,
   IpcLogEventName,
   type IIpcBacklogEvent,
@@ -36,7 +36,7 @@ class NativeProcessAdmissionPair {
   /** The same original MessagePorts carry every real hello, control, request and response. */
   readonly #ports = new MessageChannel()
   /** Only the original Process feature factory supplies the native FIFO and flow owner. */
-  readonly #definition: ReturnType<typeof sendQueue>
+  readonly #definition: ReturnType<typeof sendQueueFeature>
   /** Published native queue is retained only for its existing event and idle observation APIs. */
   queue!: IpcSendQueue
   /** Actual flow snapshots supply logical counts, never a client in-flight approximation. */
@@ -81,7 +81,7 @@ class NativeProcessAdmissionPair {
   /** Construct the original complete feature before acquiring any native IO. */
   constructor(capacity: number) {
     this.#capacity = capacity
-    this.#definition = sendQueue({ maxPendingData: capacity, maxPendingControl: 4 })
+    this.#definition = sendQueueFeature({ maxPendingData: capacity, maxPendingControl: 4 })
   }
   /** Observe the exact production installation without reconstructing its queue or flow. */
   readonly #install = (context: IProcessFeatureContext) => {
@@ -185,7 +185,10 @@ class NativeProcessAdmissionPair {
   /** Real bilateral Host construction negotiates the original chunk and batch extensions. */
   async open() {
     /** Both directions use their own genuine optional feature installations. */
-    const flow = () => [chunk({ chunkBytes: 4096, maxMessageBytes: 64 * 1024 }), batch()]
+    const flow = () => [
+      chunkFeature({ chunkBytes: 4096, maxMessageBytes: 64 * 1024 }),
+      batchFeature()
+    ]
     /** This observer only supplies a deterministic batch-entry barrier. */
     const witness = defineFlowFeature({
       name: 'logical-native-frame-entry',
@@ -196,9 +199,9 @@ class NativeProcessAdmissionPair {
       createRpcHost({
         self: { name: 'logical-client', instanceId: 'logical-client' },
         plugins: [
-          chunk({ chunkBytes: 4096, maxMessageBytes: 64 * 1024 }),
+          chunkFeature({ chunkBytes: 4096, maxMessageBytes: 64 * 1024 }),
           witness,
-          batch(),
+          batchFeature(),
           this.#transport(true)
         ],
         report: (error) => this.reports.push(error)

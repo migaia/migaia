@@ -329,7 +329,7 @@ export class IpcFlowControl {
  * One complete definition creates one installation-local admission owner; no options registry
  * exists.
  */
-export function flowControl(options: IIpcFlowControlOptions = {}) {
+export function flowControlFeature(options: IIpcFlowControlOptions = {}) {
   /** Capture both fields before a later caller mutation can reconfigure an open connection. */
   const captured = Object.freeze({
     maxPendingData: options.maxPendingData,
@@ -345,5 +345,5 @@ export function flowControl(options: IIpcFlowControlOptions = {}) {
   })
 }
 /** The exact complete flow definition is used by concrete process installation identity checks. */
-export type IRpcFlowControlFeature = ReturnType<typeof flowControl>
-export default flowControl
+export type IRpcFlowControlFeature = ReturnType<typeof flowControlFeature>
+export default flowControlFeature

@@ -3,9 +3,9 @@ import { describe, expect, it, vi } from 'vitest'
 import { MessageChannel, type MessagePort } from 'node:worker_threads'
 import { createHmac } from 'node:crypto'
 import { createRpcHost, type IRpcNamespace } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
-import { chunk } from '@migaia/rpc-host/plugins/chunk'
-import { limits } from '@migaia/rpc-host/plugins/limits'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'
+import { limitsFeature } from '@migaia/rpc-host/plugins/limits'
 import {
   probe as probePlugin,
   defineProbe,
@@ -124,7 +124,7 @@ type IProbeTransforms = { encrypt: number; sign: number; verify: number; decrypt
 
 /** Install the original reversible string transforms with one explicit endpoint counter input. */
 function encryptedAuthentication(counts: IProbeTransforms) {
-  return auth({
+  return authFeature({
     encodedType: 'string',
     encrypt: (value) => {
       counts.encrypt++
@@ -215,8 +215,8 @@ async function encryptedProbeCase(mode: IProbeMode) {
       self: { name: 'encrypted-server', instanceId: 'encrypted-server' },
       plugins: [
         encryptedAuthentication(transforms.right),
-        chunk({ chunkBytes: 96 }),
-        limits({
+        chunkFeature({ chunkBytes: 96 }),
+        limitsFeature({
           maxGlobal: 2,
           maxPerPeer: 2,
           onRejected: (rejection) => {
@@ -251,7 +251,7 @@ async function encryptedProbeCase(mode: IProbeMode) {
       self: { name: 'encrypted-client', instanceId: 'encrypted-client' },
       plugins: [
         encryptedAuthentication(transforms.left),
-        chunk({ chunkBytes: 96 }),
+        chunkFeature({ chunkBytes: 96 }),
         ...observation,
         probeTransport(leftWire, clientNative)
       ],
@@ -439,12 +439,12 @@ async function nativeTransferProbeCase(protection: IProbeProtection, mode: IProb
   const peers = await Promise.all([
     createRpcHost({
       self: { name: 'left', instanceId: 'transfer-left' },
-      plugins: [auth(authenticationConfig), ...observation, probeTransport(leftWire)],
+      plugins: [authFeature(authenticationConfig), ...observation, probeTransport(leftWire)],
       report: (error) => businessReports.push(error)
     }),
     createRpcHost({
       self: { name: 'right', instanceId: 'transfer-right' },
-      plugins: [auth(authenticationConfig), ...observation, probeTransport(rightWire)],
+      plugins: [authFeature(authenticationConfig), ...observation, probeTransport(rightWire)],
       report: (error) => businessReports.push(error),
       provide: {
         reenter: () => 9,

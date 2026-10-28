@@ -12,7 +12,7 @@ import {
   defineTransportPlugin,
   type IRpcFlowInstallation
 } from '@migaia/rpc-host/sdk'
-import { retry } from '@migaia/rpc-host/features/retry'
+import { retryFeature } from '@migaia/rpc-host/features/retry'
 import { linkPolicy } from '@migaia/rpc-host/plugins/link-policy'
 import type { IRpcCarrier } from '@migaia/rpc-contract/interfaces'
 import type { IRpcEnvelope } from '@migaia/rpc-contract/protocol'
@@ -68,7 +68,7 @@ it.each(['deployment', 'managed'] as const)(
     /** The actual provider proves that policy forwarding never duplicates business execution. */
     const business = vi.fn((value: unknown) => value)
     /** This is the complete canonical origin strategy, not a retryPort compatibility object. */
-    const strategy = retry({ keyFactory })
+    const strategy = retryFeature({ keyFactory })
     /** Original configuration slots are deleted; both supported new installation scopes are real. */
     const server = coreMemoryServer(
       'local',

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { coreMemoryServer } from '../../../rpc-host/test/host/core-fixture.ts'
 import { RpcAuthenticationEnvelope } from '../../../rpc-host/dist/features/auth/constants.js'
@@ -24,7 +24,7 @@ describe('replay-window r12 authentication break', () => {
     const server = await createRpcHost({
       ...source.options,
       plugins: [
-        auth({
+        authFeature({
           sign: (value) => value,
           verify: (value) => {
             verified = value
@@ -44,7 +44,10 @@ describe('replay-window r12 authentication break', () => {
     /** The signer deliberately emits the same successfully verified old unbound value. */
     const client = await source.connect('sender', {
       plugins: [
-        auth({ sign: (value) => (legacy ? { legacy: true } : value), verify: (value) => value })
+        authFeature({
+          sign: (value) => (legacy ? { legacy: true } : value),
+          verify: (value) => value
+        })
       ]
     })
     /** The sender cancels work whose malformed protection removed trustworthy reply correlation. */
@@ -84,7 +87,7 @@ describe('replay-window r12 authentication break', () => {
 
   it('rejects encryption without signing during configuration', () => {
     assert.throws(
-      () => auth({ encrypt: (value) => value, decrypt: (value) => value }),
+      () => authFeature({ encrypt: (value) => value, decrypt: (value) => value }),
       { code: 'INVALID_CONFIG' },
       'encryption must be paired with signed replay binding'
     )
@@ -101,12 +104,15 @@ describe('replay-window r12 authentication break', () => {
     })
     const server = await createRpcHost({
       ...source.options,
-      plugins: [auth({ sign: (value) => value, verify: (value) => value }), source.transport],
+      plugins: [
+        authFeature({ sign: (value) => value, verify: (value) => value }),
+        source.transport
+      ],
       provide: { echo: (value: unknown) => value }
     })
     const client = await source.connect('sender', {
       plugins: [
-        auth({
+        authFeature({
           encrypt: (value) => {
             encryptedInput = value
             return value

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { createNodeThreadChannelFactory } from '../../src/threads/node-launcher.ts'
 import { nativeFixture, workerEntry } from './fixture.ts'
 import { RpcCallMode, RpcWireKind } from '@migaia/rpc-contract/protocol'
-import { timeout } from '@migaia/rpc-host/features/timeout'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import type { IRpcNotifyOptions } from '@migaia/rpc-host'
 import { threadFrames } from './frame.ts'
 describe('thread Host facade', () => {
@@ -26,7 +26,7 @@ describe('thread Host facade', () => {
         /** Caller allowance is larger, so the facade's 100 ms cap must win. */
         const result = outlet
           .send('p', 'p.hold', undefined, {
-            timeout: disabled ? false : timeout({ ms: 200, scheduler })
+            timeout: disabled ? false : timeoutFeature({ ms: 200, scheduler })
           })
           .catch((error: unknown) => error)
         await expect

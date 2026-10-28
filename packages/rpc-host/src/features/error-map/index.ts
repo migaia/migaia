@@ -153,7 +153,7 @@ class OutboundErrorMapping {
 }
 
 /** Install one outbound-only mapper at its fixed built-in position before authentication. */
-export function errorMap(map: IRpcErrorMap): IRpcFlowFeature {
+export function errorMapFeature(map: IRpcErrorMap): IRpcFlowFeature {
   if (typeof map !== 'function') invalidFlow(RpcErrorMapText.mapperMustBeFunction)
   return defineBuiltinFlowFeature('errorMap', {
     name: RpcErrorMapName,
@@ -170,4 +170,4 @@ export function errorMap(map: IRpcErrorMap): IRpcFlowFeature {
   })
 }
 
-export default errorMap
+export default errorMapFeature

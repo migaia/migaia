@@ -8,8 +8,8 @@ import {
   readRpcLaunchFacts,
   withRpcLaunchFacts
 } from '@migaia/rpc-host/sdk'
-import { auth } from '@migaia/rpc-host/plugins/auth'
-import { timeout } from '@migaia/rpc-host/features/timeout'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import { createUnitBudget, type IUnitBudget } from '@migaia/supervision'
 import type { IProcessHandle } from '@migaia/supervision/process'
 import {
@@ -199,7 +199,7 @@ async function installBusinessClient(
   const host = await createRpcHost({
     self,
     plugins: [
-      auth({ credentials: source.token }),
+      authFeature({ credentials: source.token }),
       processPlugin({
         name: 'p',
         features,
@@ -243,7 +243,7 @@ async function business(active: Awaited<ReturnType<typeof client>>) {
   const namespace = active.namespace
   expect(
     await namespace.request('p.f.request', [expected.request.input], {
-      timeout: timeout({ ms: 1000 }),
+      timeout: timeoutFeature({ ms: 1000 }),
       idempotencyKey: 'h-bridge-key'
     })
   ).toBe(expected.request.expected)

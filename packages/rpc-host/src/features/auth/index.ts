@@ -17,7 +17,7 @@ export type {
 } from './types.ts'
 
 /** Install credentials and paired transforms through fixed flow hooks. */
-export function auth(options: IRpcAuthenticationOptions): IRpcFlowFeature {
+export function authFeature(options: IRpcAuthenticationOptions): IRpcFlowFeature {
   /** Reuse the configuration snapshot without sharing installed replay state. */
   const captured = snapshotAuthenticationConfig(options)
   return defineBuiltinFlowFeature('auth', {
@@ -26,4 +26,4 @@ export function auth(options: IRpcAuthenticationOptions): IRpcFlowFeature {
   })
 }
 
-export default auth
+export default authFeature

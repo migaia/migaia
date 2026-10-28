@@ -1,12 +1,12 @@
 import { createRpcHost } from '@migaia/rpc-host'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
-import { idempotency } from '@migaia/rpc-host/plugins/idempotency'
+import { idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'
 import { describe, expect, it } from 'vitest'
 
 /** Real Worker entry whose generations can crash on request. */
 const entry = new URL('./fixtures/crash-worker.ts', import.meta.url)
 /** Each genuine transport generation owns its actual outcome feature installation. */
-const transport = threadPlugin({ name: 'thread', spawn: entry, features: [idempotency()] })
+const transport = threadPlugin({ name: 'thread', spawn: entry, features: [idempotencyFeature()] })
 
 type ICrashApi = {
   thread(): number

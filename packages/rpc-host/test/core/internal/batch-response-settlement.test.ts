@@ -3,7 +3,7 @@ import { Session as InspectorSession } from 'node:inspector/promises'
 import type { Runtime } from 'node:inspector'
 import { expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { batch } from '@migaia/rpc-host/plugins/batch'
+import { batchFeature } from '@migaia/rpc-host/plugins/batch'
 import {
   defineFlowFeature,
   defineTransportPlugin,
@@ -199,7 +199,7 @@ for (const customCodec of [false, true]) {
       /** Actual public provider execution supplies both original values through the native group. */
       const provider = await createRpcHost({
         ...server.options,
-        plugins: [batch(), witness.feature, server.transport],
+        plugins: [batchFeature(), witness.feature, server.transport],
         provide: {
           echo: (value: string) => {
             providerCalls += 1
@@ -239,7 +239,7 @@ for (const customCodec of [false, true]) {
       /** The fixed-path inspector is disconnected after this one Root's final resource sample. */
       let inspector: PendingInspector | undefined
       try {
-        const caller = await owner.open(new RpcFlowProgram([batch(), transport]))
+        const caller = await owner.open(new RpcFlowProgram([batchFeature(), transport]))
         inspector = new PendingInspector(owner)
         // Bilateral handshake writes precede the independent busy-call setup boundary below.
         writing.mockClear()

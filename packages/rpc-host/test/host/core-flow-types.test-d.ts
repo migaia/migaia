@@ -5,11 +5,11 @@ import {
   defineTransportPlugin,
   type IRpcTransportPlugin
 } from '@migaia/rpc-host/sdk'
-import { idempotency } from '@migaia/rpc-host/plugins/idempotency'
+import { idempotencyFeature } from '@migaia/rpc-host/plugins/idempotency'
 import type { IRpcOutcomeLookupResult } from '@migaia/rpc-contract/protocol'
 
 /** The real feature factory contributes its public lookup only to its owning transport. */
-const replay = idempotency()
+const replay = idempotencyFeature()
 /** Each actual generic flow contributes its own disjoint namespace method. */
 const extension = defineFlowFeature({
   name: 'typed-extension',

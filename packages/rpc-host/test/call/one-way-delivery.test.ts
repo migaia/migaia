@@ -1,7 +1,7 @@
 /** Receive original one-way delivery and physical failure business through public namespaces. */
 import { setImmediate as nextTurn } from 'node:timers/promises'
 import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
-import { limits } from '@migaia/rpc-host/plugins/limits'
+import { limitsFeature } from '@migaia/rpc-host/plugins/limits'
 import { deferred } from '@migaia/utils/promise'
 import { expect, it, vi } from 'vitest'
 import { coreMemoryServer, connectedCoreHosts } from '../host/core-fixture.ts'
@@ -37,7 +37,7 @@ it('one-way delivery does not wait for business or emit a response and releases 
   /** A single real quota makes admission and release observable without a private snapshot. */
   const provider = await server.connect('one-way-server', {
     provide: { notify: business.notify, ready: () => 'ready' },
-    plugins: [limits({ maxGlobal: 1, maxPerPeer: 1 })]
+    plugins: [limitsFeature({ maxGlobal: 1, maxPerPeer: 1 })]
   })
   try {
     /** Ready traffic precedes the original no-response observation window. */

@@ -1,7 +1,7 @@
 /** Public Auth requests distinguish active duplicate suppression from completed-ID retention. */
 import { expect, it, vi } from 'vitest'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
-import { auth, type IRpcAuthenticationOptions } from '@migaia/rpc-host/plugins/auth'
+import { authFeature, type IRpcAuthenticationOptions } from '@migaia/rpc-host/plugins/auth'
 import { defineFlowFeature, defineTransportPlugin, type IRpcFlowStage } from '@migaia/rpc-host/sdk'
 import { deferred } from '@migaia/utils/promise'
 import type {
@@ -104,13 +104,16 @@ class PublicRetentionPair {
   async open(options: IRpcAuthenticationOptions): Promise<void> {
     this.#server = await createRpcHost({
       ...this.listener.options,
-      plugins: [auth(options), this.listener.transport],
+      plugins: [authFeature(options), this.listener.transport],
       report: (error) => this.reports.push(error),
       provide: { echo: this.#echo }
     })
     this.#client = (
       await this.listener.connect('retain-client', {
-        plugins: [this.replay.feature, auth({ sign: (value) => value, verify: (value) => value })],
+        plugins: [
+          this.replay.feature,
+          authFeature({ sign: (value) => value, verify: (value) => value })
+        ],
         report: (error) => this.reports.push(error)
       })
     ).host
@@ -563,7 +566,7 @@ it('gives the public transport connection retain precedence over its installed A
     ...listener.options,
     plugins: [
       replay.feature,
-      auth({ sign: (value) => value, verify: (value) => value }),
+      authFeature({ sign: (value) => value, verify: (value) => value }),
       listener.transport
     ]
   })
@@ -573,7 +576,7 @@ it('gives the public transport connection retain precedence over its installed A
     client = await createRpcHost({
       self: { name: 'retain-override-client', instanceId: 'retain-override-client' },
       plugins: [
-        auth({ sign: (value) => value, verify: (value) => value, retain: 1_000 }),
+        authFeature({ sign: (value) => value, verify: (value) => value, retain: 1_000 }),
         connection.transport
       ],
       provide: {
@@ -603,12 +606,12 @@ it('rejects unsigned window retention and every illegal numeric retention catego
    */
   const invalid = [0, -1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.MAX_SAFE_INTEGER + 1]
   for (const retain of invalid)
-    expect(() => auth({ sign: (value) => value, verify: (value) => value, retain })).toThrowError(
-      expect.objectContaining({ code: 'INVALID_CONFIG' })
-    )
-  expect(() => auth({ credentials: 'public-retain-fixture', retain: 'window' })).toThrowError(
-    expect.objectContaining({ code: 'INVALID_CONFIG' })
-  )
+    expect(() =>
+      authFeature({ sign: (value) => value, verify: (value) => value, retain })
+    ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }))
+  expect(() =>
+    authFeature({ credentials: 'public-retain-fixture', retain: 'window' })
+  ).toThrowError(expect.objectContaining({ code: 'INVALID_CONFIG' }))
 })
 
 it('rejects invalid public connection numbers, null and unsigned window as configuration', async () => {
@@ -630,7 +633,7 @@ it('rejects invalid public connection numbers, null and unsigned window as confi
   /** No signature callback can disguise the missing-signature window configuration failure. */
   const server = await createRpcHost({
     ...listener.options,
-    plugins: [auth({ verifyCredentials: () => undefined }), listener.transport],
+    plugins: [authFeature({ verifyCredentials: () => undefined }), listener.transport],
     report: (error) => reports.push(error)
   })
   try {
@@ -641,7 +644,7 @@ it('rejects invalid public connection numbers, null and unsigned window as confi
         await expect(
           createRpcHost({
             self: { name: 'invalid-retain-client', instanceId: 'invalid-retain-client' },
-            plugins: [auth({ credentials: 'public-retain-fixture' }), connection.transport],
+            plugins: [authFeature({ credentials: 'public-retain-fixture' }), connection.transport],
             report: (error) => reports.push(error)
           })
         ).rejects.toMatchObject({ source: 'rpc.endpoint', code: 'INVALID_CONFIG' })

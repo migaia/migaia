@@ -2,9 +2,9 @@
 import { defineHost } from '@migaia/plugin-host'
 import { createRpcHost } from '@migaia/rpc-host'
 import { rpcHostPipelines, RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
-import { chunk } from '@migaia/rpc-host/plugins/chunk'
-import { auth } from '@migaia/rpc-host/plugins/auth'
-import { schema } from '@migaia/rpc-host/plugins/schema'
+import { chunkFeature } from '@migaia/rpc-host/plugins/chunk'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { schemaFeature } from '@migaia/rpc-host/plugins/schema'
 import { deferred } from '@migaia/utils/promise'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { RpcCarrierFrameKind } from '@migaia/rpc-contract/protocol'
@@ -61,22 +61,22 @@ it('keeps selected schema parsing and Unicode fragment boundaries on the actual 
     createRpcHost({
       ...server.options,
       plugins: [
-        chunk({ chunkBytes: 4 }),
-        schema({ schemas: { echo: { params: parser, result: parser } } }),
+        chunkFeature({ chunkBytes: 4 }),
+        schemaFeature({ schemas: { echo: { params: parser, result: parser } } }),
         server.transport
       ],
       provide: { echo: (value: unknown) => value }
     }),
     createRpcHost({
       ...rightServer.options,
-      plugins: [chunk({ chunkBytes: 8 }), rightServer.transport],
+      plugins: [chunkFeature({ chunkBytes: 8 }), rightServer.transport],
       provide: { echo: (value: unknown) => value }
     })
   ])
   /** A real peer matches each independent batch's original fragment receiving bound. */
   const [connected, rightConnected] = await Promise.all([
-    server.connect('selected-wire-left-peer', { plugins: [chunk({ chunkBytes: 4 })] }),
-    rightServer.connect('selected-wire-eight-peer', { plugins: [chunk({ chunkBytes: 8 })] })
+    server.connect('selected-wire-left-peer', { plugins: [chunkFeature({ chunkBytes: 4 })] }),
+    rightServer.connect('selected-wire-eight-peer', { plugins: [chunkFeature({ chunkBytes: 8 })] })
   ])
   /** This passthrough spy observes the original post-hook physical write, without another codec. */
   const written = vi.spyOn(connected.pair[0], 'write')
@@ -129,13 +129,13 @@ it('reports transport failure from an actual negotiated chunk fragment write', a
   /** The real provider and caller negotiate the same installed chunk extension before the fault. */
   const server = await createRpcHost({
     ...listener.options,
-    plugins: [chunk({ chunkBytes: 4 }), listener.transport],
+    plugins: [chunkFeature({ chunkBytes: 4 }), listener.transport],
     provide: { echo: (value) => value }
   })
   try {
     /** This is the original connected public Host, not a fabricated sender or selected framer. */
     const client = await listener.connect('chunk-write-caller', {
-      plugins: [chunk({ chunkBytes: 4 })]
+      plugins: [chunkFeature({ chunkBytes: 4 })]
     })
     /** Keep the original raw native failure at the existing carrier's physical write boundary. */
     const failure = new Error('frame send failed')
@@ -214,13 +214,13 @@ it('preserves the original long echo payload through two real eight-unit chunk p
   /** The original provider runs behind the actual public Host and its installed chunk owner. */
   const provider = await createRpcHost({
     ...listener.options,
-    plugins: [chunk({ chunkBytes: 8 }), listener.transport],
+    plugins: [chunkFeature({ chunkBytes: 8 }), listener.transport],
     provide: { echo: (value) => value }
   })
   try {
     /** The independent caller negotiates the same original eight-unit fragment boundary. */
     const client = await listener.connect('chunk-client', {
-      plugins: [chunk({ chunkBytes: 8 })]
+      plugins: [chunkFeature({ chunkBytes: 8 })]
     })
     try {
       await expect(
@@ -278,17 +278,17 @@ it('rejects a forged business signature after real chunk assembly and admits a f
     return candidate.value
   }
   /** The receiving side always signs trusted replies; only the armed business sender forges. */
-  const serverAuthentication = auth({
+  const serverAuthentication = authFeature({
     sign: (value) => ({ value, signature: signatures.trusted }),
     verify
   })
   /** Ready handshakes use trusted signatures before the original business fault is armed. */
-  const clientAuthentication = auth({
+  const clientAuthentication = authFeature({
     sign: (value) => ({ value, signature: state.forge ? signatures.forged : signatures.trusted }),
     verify
   })
   /** Each native installation gets its own actual one-unit assembler and original size bound. */
-  const chunks = chunk({ chunkBytes: 1, maxMessageBytes: 1_024 })
+  const chunks = chunkFeature({ chunkBytes: 1, maxMessageBytes: 1_024 })
   /** Both original pairs use the same canonical codec rather than a synthetic physical grammar. */
   const codec = { create: () => new RpcJsonCarrierCodec(), nativeBinary: false }
   /** A provider call is observable only after actual assembly, verification and metadata admission. */
@@ -377,7 +377,7 @@ it('preserves contract endpoint roundtrips and protection before actual writes',
   /** The original receiving identity owns the real provider and its native transport. */
   const listener = coreMemoryServer('contract-server', 'contract-server', 'memory', [], [], codec)
   /** Server transforms remain real complete Auth hooks, with their original identity transform. */
-  const serverAuthentication = auth({
+  const serverAuthentication = authFeature({
     sign: (frame) => {
       physicalEvents.push('server:protect')
       return frame
@@ -388,7 +388,7 @@ it('preserves contract endpoint roundtrips and protection before actual writes',
     }
   })
   /** The independent caller owns its own complete Auth instance and original callbacks. */
-  const clientAuthentication = auth({
+  const clientAuthentication = authFeature({
     sign: (frame) => {
       physicalEvents.push('client:protect')
       return frame
@@ -401,13 +401,13 @@ it('preserves contract endpoint roundtrips and protection before actual writes',
   /** Actual negotiation installs chunk4 before any business traffic on the provider. */
   const server = await createRpcHost({
     ...listener.options,
-    plugins: [serverAuthentication, chunk({ chunkBytes: 4 }), listener.transport],
+    plugins: [serverAuthentication, chunkFeature({ chunkBytes: 4 }), listener.transport],
     provide: { echo: (value: unknown) => value }
   })
   try {
     /** Both original Hosts have genuinely accepted their peer before the warm call. */
     const client = await listener.connect('contract-client', {
-      plugins: [clientAuthentication, chunk({ chunkBytes: 4 })]
+      plugins: [clientAuthentication, chunkFeature({ chunkBytes: 4 })]
     })
     /** The original held namespace remains the same caller after its public Root closes. */
     const namespace = client.host.memory

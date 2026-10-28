@@ -7,7 +7,7 @@ import type { IRpcWriteAdmission } from '@migaia/rpc-contract/interfaces'
 import { RpcCoreErrorText, RpcLifecycleError, tagRpcError } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import {
-  flowControl,
+  flowControlFeature,
   type IIpcFlowControlOptions,
   type IRpcFlowControlFeature,
   type IpcFlowControl
@@ -110,7 +110,7 @@ export class IpcSendQueue {
 }
 
 /** A complete queue definition executes FIFO policy, rather than supplying a configuration switch. */
-export function sendQueue(options: ISendQueueOptions = {}) {
+export function sendQueueFeature(options: ISendQueueOptions = {}) {
   if (
     options.flow &&
     (options.maxPendingData !== undefined || options.maxPendingControl !== undefined)
@@ -120,7 +120,7 @@ export function sendQueue(options: ISendQueueOptions = {}) {
       RpcCoreErrorCode.invalidConfig
     )
   /** One exact cold definition is installed once by the concrete native process source. */
-  const flow = options.flow ?? flowControl(options)
+  const flow = options.flow ?? flowControlFeature(options)
   return Object.freeze({
     kind: ProcessFeatureName.sendQueue,
     flow,
@@ -131,4 +131,4 @@ export function sendQueue(options: ISendQueueOptions = {}) {
     }
   })
 }
-export default sendQueue
+export default sendQueueFeature

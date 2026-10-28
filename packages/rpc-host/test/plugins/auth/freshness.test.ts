@@ -4,7 +4,7 @@ import { MessageChannel } from 'node:worker_threads'
 import { setImmediate as nextTurn } from 'node:timers/promises'
 import { expect, it, vi } from 'vitest'
 import { createRpcHost, type IRpcNamespace } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
 import { defineTransportPlugin, RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import type {
   IRpcCarrierFrame,
@@ -47,7 +47,7 @@ class CapturedJsonCodec extends RpcJsonCarrierCodec {
 
 /** Real HMAC callbacks protect the existing Auth wrapper without parsing semantic or native frames. */
 function authentication() {
-  return auth({
+  return authFeature({
     sign: (value) => ({
       value,
       signature: createHmac('sha256', signingKey).update(JSON.stringify(value)).digest('hex')
@@ -139,7 +139,7 @@ it('publishes only an explicit authenticated principal on the actual accepted Se
   const host = await createRpcHost({
     ...server.options,
     plugins: [
-      auth({
+      authFeature({
         verifyCredentials: (value) => {
           if (value === identity.credential) return { principalId: identity.principalId }
           if (value === identity.legacyCredential) return 'old-debug-return'
@@ -155,7 +155,7 @@ it('publishes only an explicit authenticated principal on the actual accepted Se
   try {
     /** Native identity and authentication identity deliberately have distinct literal values. */
     const authenticated = await server.connect('wire-name', {
-      plugins: [auth({ credentials: identity.credential })]
+      plugins: [authFeature({ credentials: identity.credential })]
     })
     clients.push(authenticated)
     expect(server.lookup('wire-name')?.view.authentication).toEqual({
@@ -165,7 +165,7 @@ it('publishes only an explicit authenticated principal on the actual accepted Se
     expect(await authenticated.host.memory.send('principal-server', 'echo', 42)).toBe(42)
     /** A string return remains ignored and cannot silently grant a new principal. */
     const legacy = await server.connect('legacy-name', {
-      plugins: [auth({ credentials: identity.legacyCredential })]
+      plugins: [authFeature({ credentials: identity.legacyCredential })]
     })
     clients.push(legacy)
     expect(server.lookup('legacy-name')?.view.authentication).toBeUndefined()
@@ -188,9 +188,9 @@ class PhysicalAuthenticationPair {
   /** Successful HMAC verification counts actual inputs, including captured physical replays. */
   verifies = 0
   /** Each host installs its own original opaque authentication factory result exactly once. */
-  readonly clientFeature: ReturnType<typeof auth>
+  readonly clientFeature: ReturnType<typeof authFeature>
   /** Separate configuration identity constructs the receiver's independent replay owner. */
-  readonly serverFeature: ReturnType<typeof auth>
+  readonly serverFeature: ReturnType<typeof authFeature>
   /** The ordinary SDK listener accepts the actual borrowed MessagePort carrier. */
   readonly server = coreMemoryServer('physical-server')
   /** Real Node carrier observations and native cloning remain below the unchanged JSON codec. */
@@ -233,8 +233,8 @@ class PhysicalAuthenticationPair {
 
   /** Capture original callback methods only after this pair's owning state has initialized. */
   constructor() {
-    this.clientFeature = auth({ sign: this.#sign, verify: this.#verify })
-    this.serverFeature = auth({ sign: this.#sign, verify: this.#verify })
+    this.clientFeature = authFeature({ sign: this.#sign, verify: this.#verify })
+    this.serverFeature = authFeature({ sign: this.#sign, verify: this.#verify })
   }
 
   /** Admit both original endpoints before either native handshake can suspend waiting for its peer. */

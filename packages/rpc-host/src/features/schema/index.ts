@@ -67,7 +67,7 @@ class SchemaValidation {
 }
 
 /** Install actual schema behavior at the fixed envelope and provider dispatch boundaries. */
-export function schema(options: IRpcSchemaOptions = {}): IRpcFlowFeature {
+export function schemaFeature(options: IRpcSchemaOptions = {}): IRpcFlowFeature {
   return defineBuiltinFlowFeature('schema', {
     name: RpcSchemaName,
     setup() {
@@ -84,4 +84,4 @@ export function schema(options: IRpcSchemaOptions = {}): IRpcFlowFeature {
   })
 }
 
-export default schema
+export default schemaFeature

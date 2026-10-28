@@ -1,6 +1,6 @@
 import { createRpcHost } from '@migaia/rpc-host'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
-import { auth } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
 import { workerData } from 'node:worker_threads'
 import { readThreadBootstrap } from '../../../dist/threads/bootstrap.js'
 import { createFixtureAuthentication } from './dx-authentication.mjs'
@@ -23,7 +23,7 @@ await createRpcHost({
   },
   report: (error) => process.stderr.write(`${error?.stack ?? String(error)}\n`),
   plugins: [
-    ...(data.signed ? [auth(createFixtureAuthentication())] : []),
+    ...(data.signed ? [authFeature(createFixtureAuthentication())] : []),
     threadPlugin({ connectToParent: true })
   ]
 })

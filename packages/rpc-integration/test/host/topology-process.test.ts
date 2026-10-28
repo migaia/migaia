@@ -6,11 +6,11 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { RpcProbeDirection, RpcProbeOutcome } from '@migaia/rpc-contract/interfaces'
 import type { IRpcPortableValue } from '@migaia/rpc-contract/protocol'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
 import { coroutinePlugin, type ICoroutineUserTask } from '@migaia/rpc-plugin-coroutines'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import { TopologyLeaf } from './fixtures/topology-leaf.ts'
-import { timeout } from '@migaia/rpc-host/features/timeout'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import { RPC_POOL_PEER_ID } from '@migaia/rpc-plugin-pool'
 import { processPlugin } from '@migaia/rpc-plugin-process'
 import {
@@ -255,7 +255,7 @@ describe('forwarding through process b to its thread, pool and coroutine', () =>
   it('carries the remaining deadline to the leaf without growing it', async () => {
     /** Remaining time the leaf observed for a 5 s caller budget. */
     const seen = (await viaB(host, Topology.c, Topology.remaining, undefined, {
-      timeout: timeout({ ms: 5000 })
+      timeout: timeoutFeature({ ms: 5000 })
     })) as { timeoutMs: number | null }
     expect(seen.timeoutMs).toEqual(expect.any(Number))
     expect(seen.timeoutMs).toBeGreaterThan(0)
@@ -355,7 +355,7 @@ it('host-level auth applies to a late thread while the authenticated coroutine r
   const task: ICoroutineUserTask = async ({ connect, signal, heartbeat }) => {
     const child = await createRpcHost({
       plugins: [
-        auth(leaf.auth.options(HopSecret.shared)),
+        authFeature(leaf.auth.options(HopSecret.shared)),
         coroutinePlugin({ connectToParent: connect })
       ],
       provide: leaf.providers()
@@ -375,7 +375,7 @@ it('host-level auth applies to a late thread while the authenticated coroutine r
   const host = await createRpcHost({
     self: { name: Topology.b, instanceId: 'topology-late-auth-b' },
     plugins: [
-      auth(counter.options(HopSecret.shared)),
+      authFeature(counter.options(HopSecret.shared)),
       coroutinePlugin({ namespace: 'baseline', name: Topology.coroutine, spawn: task })
     ],
     report: () => undefined

@@ -11,10 +11,10 @@ import { createUnitBudget } from '@migaia/supervision'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import type { IRpcRetryFeature, IRpcAttempt } from '@migaia/rpc-contract/interfaces'
-import { retry } from '@migaia/rpc-host/features/retry'
-import { timeout } from '@migaia/rpc-host/features/timeout'
-import { sendQueue } from '@migaia/rpc-plugin-process/features/send-queue'
-import { ipcLog } from '@migaia/rpc-plugin-process/features/log'
+import { retryFeature } from '@migaia/rpc-host/features/retry'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
+import { sendQueueFeature } from '@migaia/rpc-plugin-process/features/send-queue'
+import { ipcLogFeature } from '@migaia/rpc-plugin-process/features/log'
 import type {
   ISpawnProcessPluginDeployment,
   IConnectProcessPluginDeployment
@@ -125,12 +125,13 @@ class FaultClient {
           }
     try {
       this.#installed = await installBusinessClient(this.#fixture, selected, [
-        this.#options.retry ?? retry({ scheduler, report: (error) => this.reports.push(error) }),
+        this.#options.retry ??
+          retryFeature({ scheduler, report: (error) => this.reports.push(error) }),
         ...(this.#options.maxPendingData === undefined
           ? []
           : [
-              sendQueue({ maxPendingData: this.#options.maxPendingData }),
-              ipcLog({
+              sendQueueFeature({ maxPendingData: this.#options.maxPendingData }),
+              ipcLogFeature({
                 report: (record) => {
                   this.backlog.push(record)
                 }
@@ -495,13 +496,13 @@ describe('real native business budget and independent session', () => {
         const payload = 'x'.repeat(RPC_STREAM_MAX_FRAME_BYTES - 4096)
         expect(
           await active.namespace.request('p.f.request', [payload], {
-            timeout: timeout({ ms: 10000, scheduler: systemScheduler })
+            timeout: timeoutFeature({ ms: 10000, scheduler: systemScheduler })
           })
         ).toBe(payload)
         const writes = active.sent.length
         await expect(
           active.namespace.request('p.f.request', ['x'.repeat(RPC_STREAM_MAX_FRAME_BYTES)], {
-            timeout: timeout({ ms: 10000, scheduler: systemScheduler })
+            timeout: timeoutFeature({ ms: 10000, scheduler: systemScheduler })
           })
         ).rejects.toMatchObject({
           name: 'RangeError',
@@ -656,7 +657,7 @@ describe('explicit persistent authenticated scope', () => {
       })
       expect(
         await active.namespace.request('p.f.request', [], {
-          timeout: timeout({ ms: 5000 }),
+          timeout: timeoutFeature({ ms: 5000 }),
           idempotencyKey: 'hf-original-key'
         })
       ).toBe('committed')
@@ -708,7 +709,11 @@ describe('physical departure before sendOnce admission', () => {
         entered = resolve
       })
       /** The original barrier surrounds the complete retry policy's one actual attempt. */
-      const admission = { entered, barrier, policy: retry({ scheduler, report: () => undefined }) }
+      const admission = {
+        entered,
+        barrier,
+        policy: retryFeature({ scheduler, report: () => undefined })
+      }
       const retryPort: IRpcRetryFeature = {
         kind: 'retry',
         async run<T>(attempt: IRpcAttempt<T>): Promise<T> {
@@ -839,7 +844,7 @@ describe('capacity one real stopped reader', () => {
         paused = true
         /** This real pipe write exceeds the OS pipe buffer while remaining below the frame budget. */
         blocked = active.namespace.request('p.f.request', ['x'.repeat(2 * 1024 * 1024)], {
-          timeout: timeout({ ms: 10000, scheduler: systemScheduler }),
+          timeout: timeoutFeature({ ms: 10000, scheduler: systemScheduler }),
           trace: 'h-backlog-trace'
         })
         let settled = false
@@ -912,7 +917,7 @@ describe('real owned crash retry eligibility', () => {
           expect(await active.namespace.request('peer.pause', [])).toBe('ACK')
           pending = active.namespace.request('p.f.request', ['replayed-value'], {
             idempotencyKey: 'hf-crash-original-key',
-            timeout: timeout({ ms: 500, scheduler }),
+            timeout: timeoutFeature({ ms: 500, scheduler }),
             signal: controller.signal
           })
           /**

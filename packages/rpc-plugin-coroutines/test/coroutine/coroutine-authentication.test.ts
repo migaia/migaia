@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createRpcHost, RpcWarningCode, type IRpcWarning } from '@migaia/rpc-host'
-import { auth, type IRpcAuthenticationOptions } from '@migaia/rpc-host/plugins/auth'
+import { authFeature, type IRpcAuthenticationOptions } from '@migaia/rpc-host/plugins/auth'
 import { coroutinePlugin } from '@migaia/rpc-plugin-coroutines'
 
 /** The string signature wraps encrypted frames exactly as a real application boundary does. */
@@ -95,7 +95,7 @@ describe('coroutine authentication cleanup', () => {
           report: (error) => reports.push(error),
           onWarning: (warning) => warnings.push(warning),
           plugins: [
-            auth(authentication),
+            authFeature(authentication),
             coroutinePlugin({ name: 'parent', connectToParent: connect })
           ],
           contract: {
@@ -119,7 +119,7 @@ describe('coroutine authentication cleanup', () => {
     const host = await createRpcHost({
       self: { name: 'math-parent', instanceId: 'authenticated-parent' },
       report: (error) => reports.push(error),
-      plugins: [auth(authentication), service]
+      plugins: [authFeature(authentication), service]
     })
     try {
       expect(await host.coroutine.request('math.calc.double', 21)).toBe(42)

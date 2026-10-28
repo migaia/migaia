@@ -5,7 +5,7 @@ import { createRpcHost } from '@migaia/rpc-host'
 import { defineTransportPlugin, type IRpcTransportSetupContext } from '@migaia/rpc-host/sdk'
 import type { IRpcCarrier, IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
 import { deferred } from '@migaia/utils/promise'
-import { sendQueue, IpcSendClass } from '@migaia/rpc-plugin-process/features'
+import { sendQueueFeature, IpcSendClass } from '@migaia/rpc-plugin-process/features'
 import { createProcessCarrier } from '../../dist/process/carrier.js'
 import { createAdapterChildStdio } from '../../dist/process/node-io.js'
 import type { IProcessByteChannel, IProcessMessageChannel } from '../../dist/process/types.js'
@@ -163,7 +163,7 @@ function openCustodyCarrier(context: IRpcTransportSetupContext, raw: IProcessMes
   /** No feature queue is installed inside this carrier; the standalone queue is the only owner. */
   const carrier = createProcessCarrier(raw, context, { id: 'custody-fast', features: [] })
   /** These are the same actual connection facts normally lent by ProcessCarrierFeatures. */
-  const installed = sendQueue().install({
+  const installed = sendQueueFeature().install({
     owner: context.namespace,
     namespace: context.namespace,
     signal: context.signal,

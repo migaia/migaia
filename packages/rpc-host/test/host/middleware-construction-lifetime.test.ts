@@ -1,6 +1,6 @@
 /** Original caller cancellation and deadline outcomes cross the actual public Host owners. */
 import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
-import { timeout } from '@migaia/rpc-host/features/timeout'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import { RpcTimeoutError } from '@migaia/rpc-contract/errors'
 import { deferred } from '@migaia/utils/promise'
 import { expect, it, vi } from 'vitest'
@@ -61,7 +61,7 @@ it('complete timeout capture retains the original hostile getter cause and one r
   /** Catch only the genuine factory error, without retagging or wrapping it in the fixture. */
   let failure: unknown
   try {
-    timeout(config)
+    timeoutFeature(config)
   } catch (error) {
     failure = error
   }
@@ -84,7 +84,7 @@ it.each(['abort-first', 'timeout-first'] as const)(
     vi.useFakeTimers()
     /** Observe rejection before either real cancellation source can settle the original Promise. */
     const settled = fixture.a.memory
-      .send('b', 'hang', null, { signal: controller.signal, timeout: timeout({ ms: 1 }) })
+      .send('b', 'hang', null, { signal: controller.signal, timeout: timeoutFeature({ ms: 1 }) })
       .catch((error: unknown) => error)
     try {
       await provider.started.promise

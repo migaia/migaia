@@ -1,6 +1,6 @@
 /** Dedicated worker leaf of the iframe topology: business providers behind the page's worker. */
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
 import { RpcProbeStage } from '@migaia/rpc-contract/interfaces'
 import { dedicatedWorkerPlugin, sharedWorkerPlugin } from '@migaia/rpc-plugin-browser'
 import { TopologyLeaf } from '../../../rpc-integration/test/host/fixtures/topology-leaf.ts'
@@ -43,7 +43,7 @@ const opening: Promise<IRpcHost> = createRpcHost({
     leaf.recorder.plugin,
     dedicatedWorkerPlugin({
       worker: self as never,
-      features: configuration.hopAuth ? [auth(leaf.auth.options(HopSecret.shared))] : []
+      features: configuration.hopAuth ? [authFeature(leaf.auth.options(HopSecret.shared))] : []
     }),
     ...(sharedPort ? [sharedWorkerPlugin({ sharedWorker: { port: sharedPort } })] : [])
   ],

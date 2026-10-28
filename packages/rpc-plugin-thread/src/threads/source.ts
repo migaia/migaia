@@ -30,7 +30,7 @@ import {
   type IRpcNativePoolEvents
 } from '@migaia/rpc-host/sdk'
 import type { IThreadChannelFactory } from './types.ts'
-import { timeout } from '@migaia/rpc-host/features/timeout'
+import { timeoutFeature } from '@migaia/rpc-host/features/timeout'
 import { portableThreadSpec } from './error.ts'
 
 /** A full source preserves its actual launcher, budget, scheduler and native supervision policy. */
@@ -111,7 +111,7 @@ export class ThreadSource<THandle extends IThreadHandle = IThreadHandle> {
     this.#callTimeoutCap =
       spec.limits?.callWallTimeMs === undefined
         ? undefined
-        : timeout({ ms: spec.limits.callWallTimeMs, scheduler: source.scheduler })
+        : timeoutFeature({ ms: spec.limits.callWallTimeMs, scheduler: source.scheduler })
     this.generation = new RpcMemberGeneration({
       context,
       binding: {

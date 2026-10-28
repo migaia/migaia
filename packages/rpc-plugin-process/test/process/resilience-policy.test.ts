@@ -5,13 +5,13 @@ import { deferred } from '@migaia/utils/promise'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createRpcHost } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
 import {
-  idempotency,
+  idempotencyFeature,
   createRpcIdempotencyStore,
   type IRpcIdempotencyStore
 } from '@migaia/rpc-host/plugins/idempotency'
-import { limits } from '@migaia/rpc-host/plugins/limits'
+import { limitsFeature } from '@migaia/rpc-host/plugins/limits'
 import { defineTransportPlugin, type IRpcTransportSetupContext } from '@migaia/rpc-host/sdk'
 import type { IRpcSessionHandle } from '@migaia/rpc-contract/interfaces'
 import { createProcessCarrier } from '../../dist/process/carrier.js'
@@ -89,9 +89,9 @@ class NativePolicyServer {
     const host = await createRpcHost({
       self: { name: this.#name, instanceId: this.#name },
       plugins: [
-        idempotency({ store: this.#store }),
-        limits({ maxGlobal: 3, maxPerPeer: 3 }),
-        auth({
+        idempotencyFeature({ store: this.#store }),
+        limitsFeature({ maxGlobal: 3, maxPerPeer: 3 }),
+        authFeature({
           verifyCredentials: (credential) => ({
             principalId: credential === 'bob-token' ? 'bob' : 'alice'
           })
@@ -143,7 +143,7 @@ class NativePolicyServer {
     /** Explicit credentials receive the old unit's explicitly supplied identity input only. */
     const client = await createRpcHost({
       self: { name, instanceId: name },
-      plugins: [auth({ credentials: credential }), source],
+      plugins: [authFeature({ credentials: credential }), source],
       report: (error) => this.reports.push(error)
     })
     this.#hosts.push(client)

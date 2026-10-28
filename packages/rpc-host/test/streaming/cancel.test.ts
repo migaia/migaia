@@ -10,7 +10,7 @@ import {
 import { RpcStreamLimit } from '@migaia/rpc-contract'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { timeout } from '@migaia/rpc-host/features'
+import { timeoutFeature } from '@migaia/rpc-host/features'
 import { connectedCoreHosts } from '../host/core-fixture.ts'
 
 /** Keep deadlines virtual while preserving the endpoint's ordinary zero-delay data handoff. */
@@ -387,7 +387,7 @@ describe('streaming cancellation', () => {
       await expect(waiting.next()).rejects.toBe(abortReason)
       resume()
       const timed = client.memory.stream('deadline', null, {
-        timeout: timeout({ ms: 50, scheduler: clientClock })
+        timeout: timeoutFeature({ ms: 50, scheduler: clientClock })
       }) as AsyncIterableIterator<unknown>
       expect(await timed.next()).toEqual({ done: false, value: 'a' })
       const pendingDeadline = timed.next()

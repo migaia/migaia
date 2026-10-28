@@ -1,7 +1,7 @@
 import { assert, expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
-import { auth } from '@migaia/rpc-host/plugins/auth'
-import { batch } from '@migaia/rpc-host/plugins/batch'
+import { authFeature } from '@migaia/rpc-host/plugins/auth'
+import { batchFeature } from '@migaia/rpc-host/plugins/batch'
 import {
   defineFlowFeature,
   RpcFlowPoint,
@@ -39,14 +39,17 @@ it('hostile outbound authentication preserves native source/code/cause identity'
   /** The actual remote directory advertises the original target method through the public Host. */
   const server = await createRpcHost({
     ...listener.options,
-    plugins: [auth({ sign: (value) => value, verify: (value) => value }), listener.transport],
+    plugins: [
+      authFeature({ sign: (value) => value, verify: (value) => value }),
+      listener.transport
+    ],
     provide: { method: (value) => value }
   })
   try {
     /** The public auth plugin owns the original throwing encrypt callback and its error boundary. */
     const client = await listener.connect('hostile-auth-client', {
       plugins: [
-        auth({
+        authFeature({
           encrypt: (value) => {
             if (state.armed) throw hostile
             return value
@@ -94,7 +97,7 @@ it.each(['throws synchronously', 'rejects asynchronously', 'returns an invalid e
     const server = await createRpcHost({
       ...listener.options,
       plugins: [
-        auth({ encodedType: 'string', sign: (value) => value, verify: (value) => value }),
+        authFeature({ encodedType: 'string', sign: (value) => value, verify: (value) => value }),
         listener.transport
       ],
       provide: { read: () => 42 }
@@ -103,7 +106,7 @@ it.each(['throws synchronously', 'rejects asynchronously', 'returns an invalid e
       /** Only the public authentication plugin executes the original protect failure conditions. */
       const client = await listener.connect('outbound-auth-client', {
         plugins: [
-          auth({
+          authFeature({
             encodedType: 'string',
             sign: (value) => {
               if (!state.armed) return value
@@ -155,14 +158,17 @@ it('keeps the original locally owned authentication failure identity through a p
   /** The peer installs the same real authentication flow and public method directory. */
   const server = await createRpcHost({
     ...listener.options,
-    plugins: [auth({ sign: (value) => value, verify: (value) => value }), listener.transport],
+    plugins: [
+      authFeature({ sign: (value) => value, verify: (value) => value }),
+      listener.transport
+    ],
     provide: { read: () => 42 }
   })
   try {
     /** Original factory-minted Error enters the real public hook rather than a private sender call. */
     const client = await listener.connect('owned-auth-client', {
       plugins: [
-        auth({
+        authFeature({
           sign: (value) => (state.armed ? Promise.reject(authenticationError) : value),
           verify: (value) => value
         })
@@ -201,7 +207,7 @@ it('preserves the original authentication configuration getter cause at the publ
   /** Configuration capture now runs at the public factory rather than inside an old native role. */
   let primary: unknown
   try {
-    auth(config as never)
+    authFeature(config as never)
   } catch (error) {
     primary = error
   }
@@ -227,7 +233,7 @@ it('preserves the original inbound decrypt failure through the public authentica
   const server = await createRpcHost({
     ...listener.options,
     plugins: [
-      auth({
+      authFeature({
         encrypt: (value) => value,
         sign: (value) => value,
         verify: (value) => value,
@@ -246,7 +252,7 @@ it('preserves the original inbound decrypt failure through the public authentica
   try {
     /** A normal authenticated caller supplies genuine protected metadata to the failing decryptor. */
     const client = await listener.connect('inbound-auth-client', {
-      plugins: [auth({ sign: (value) => value, verify: (value) => value })]
+      plugins: [authFeature({ sign: (value) => value, verify: (value) => value })]
     })
     try {
       state.armed = true
@@ -288,8 +294,8 @@ it('isolates a public signing failure while the native batch writer is busy and 
   const server = await createRpcHost({
     ...listener.options,
     plugins: [
-      auth({ encodedType: 'string', sign: (value) => value, verify: (value) => value }),
-      batch(),
+      authFeature({ encodedType: 'string', sign: (value) => value, verify: (value) => value }),
+      batchFeature(),
       listener.transport
     ],
     provide: {
@@ -303,7 +309,7 @@ it('isolates a public signing failure while the native batch writer is busy and 
     /** Real handshakes complete before the selected per-envelope signing rejection is armed. */
     const client = await listener.connect('busy-auth-client', {
       plugins: [
-        auth({
+        authFeature({
           encodedType: 'string',
           sign: (value) => {
             if (!state.failNext) return value
@@ -312,7 +318,7 @@ it('isolates a public signing failure while the native batch writer is busy and 
           },
           verify: (value) => value
         }),
-        batch()
+        batchFeature()
       ]
     })
     /** Existing native write facts exclude directory/control traffic without inspecting ciphertext. */
@@ -408,8 +414,8 @@ it('coalesces two separately authenticated public calls on the same actual sourc
   const server = await createRpcHost({
     ...listener.options,
     plugins: [
-      auth({ encodedType: 'string', sign: (value) => value, verify: (value) => value }),
-      batch(),
+      authFeature({ encodedType: 'string', sign: (value) => value, verify: (value) => value }),
+      batchFeature(),
       listener.transport
     ],
     provide: {
@@ -423,7 +429,7 @@ it('coalesces two separately authenticated public calls on the same actual sourc
     /** The configured canonical signer returns the same actual input without a new group format. */
     const client = await listener.connect('authenticated-batch-client', {
       plugins: [
-        auth({
+        authFeature({
           encodedType: 'string',
           sign: (value, context) => {
             if (observation.enabled) observation.contexts.push(context)
@@ -432,7 +438,7 @@ it('coalesces two separately authenticated public calls on the same actual sourc
           verify: (value) => value
         }),
         witness,
-        batch()
+        batchFeature()
       ]
     })
     /** Existing write facts distinguish actual data frames without decoding the signed payload. */
