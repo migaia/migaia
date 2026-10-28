@@ -60,7 +60,10 @@ describe('guarded property read convergence', () => {
     const targets = [
       'packages/utils/src/function.ts',
       'packages/rpc-contract/src/errors/property.ts',
-      'packages/utils/src/error-chain.ts',
+      'packages/utils/src/internal/error-chain-snapshot.ts',
+      'packages/utils/src/internal/error-chain-serialize.ts',
+      'packages/utils/src/internal/error-chain-normalize.ts',
+      'packages/utils/src/internal/error-chain-data.ts',
       'packages/reactive/src/runtime/runtime.class.ts',
       'packages/reactive/src/runtime/scheduler.class.ts',
       'packages/resource/src/resource.class.ts'
@@ -94,6 +97,8 @@ describe('guarded property read convergence', () => {
         /function tryReadProperty\b/.test(readFileSync(path, 'utf8'))
       )
     })
-    expect(declarations).toEqual([resolve(repositoryRoot, 'packages/utils/src/internal/error-primitives.ts')])
+    expect(declarations).toEqual([
+      resolve(repositoryRoot, 'packages/utils/src/internal/error-primitives.ts')
+    ])
   })
 })
