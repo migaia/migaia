@@ -19,3 +19,17 @@ export const TrayShutdownMode = {
   'strict-drain': 'strict-drain'
 } as const
 export type TrayShutdownMode = keyof typeof TrayShutdownMode
+
+/**
+ * Runtime lifecycle values are shared by admission checks, disposal and the public state
+ * projection.
+ */
+export const RuntimeState = {
+  /** Accepts callbacks while the borrowed managed Host remains available. */
+  active: 'active',
+  /** Rejects new callbacks while existing generation leases settle under the selected policy. */
+  closing: 'closing',
+  /** Runtime disposal observation has ended; bounded callbacks may still hold their original leases. */
+  terminal: 'terminal'
+} as const
+export type RuntimeState = keyof typeof RuntimeState
