@@ -10,7 +10,7 @@ import {
   type ISerializeChunk,
   type ISerializeParser,
   type ISerializePlugin
-} from './src/index';
+} from './src/index.ts';
 import { systemScheduler } from '@migaia/utils/scheduler';
 
 async function readmeExample() {
