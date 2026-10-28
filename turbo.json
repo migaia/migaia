@@ -28,10 +28,6 @@
       "dependsOn": ["build"],
       "outputs": []
     },
-    "typecheck:core": {
-      "dependsOn": ["build"],
-      "outputs": []
-    },
     "typecheck:browser": {
       "dependsOn": ["build"],
       "outputs": []

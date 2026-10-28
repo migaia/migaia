@@ -1,9 +1,7 @@
 {
   // Whole-package dev typecheck (source + tests together) — the equivalent
   // of the app's own `tsconfig.app.json`. Includes DOM lib because the
-  // web-worker adapter needs it; `tsconfig.contract.json`/`tsconfig.core.json`
-  // are the separate, narrower configs that prove parts of this package
-  // don't actually need it. `"types": ["vite/client"]` is here only for
+  // web-worker adapter needs it. `"types": ["vite/client"]` is here only for
   // `architecture.test.ts`'s `import.meta.glob` — a devDependency-time
   // convenience for this package's own tests, not something the shipped
   // library code relies on (`tsconfig.build.json` excludes tests entirely).

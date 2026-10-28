@@ -101,8 +101,7 @@
     "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks",
     "fmt": "oxfmt src test vitest.config.ts README.md README.en.md USEGUIDE.md USEGUIDE.en.md package.json",
     "lint": "oxlint src test vitest.config.ts",
-    "test": "vitest run --coverage",
-    "typecheck:core": "bun check -p tsconfig.core.json"
+    "test": "vitest run --coverage"
   },
   "dependencies": {
     "@migaia/lifecycle": "workspace:^",
