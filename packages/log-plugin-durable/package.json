@@ -1,0 +1,68 @@
+{
+  "name": "@migaia/log-plugin-durable",
+  "version": "0.0.11",
+  "private": true,
+  "description": "Borrowed durable binlog, write-ahead and undo log stores.",
+  "files": [
+    "dist",
+    "README.md",
+    "README.en.md",
+    "USEGUIDE.md",
+    "USEGUIDE.en.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./file": {
+      "browser": {
+        "types": "./dist/file.browser.d.ts",
+        "default": "./dist/file.browser.js"
+      },
+      "node": {
+        "types": "./dist/file.d.ts",
+        "default": "./dist/file.js"
+      },
+      "bun": {
+        "types": "./dist/file.d.ts",
+        "default": "./dist/file.js"
+      },
+      "deno": {
+        "types": "./dist/file.d.ts",
+        "default": "./dist/file.js"
+      },
+      "default": {
+        "types": "./dist/file.browser.d.ts",
+        "default": "./dist/file.browser.js"
+      }
+    }
+  },
+  "scripts": {
+    "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",
+    "fmt": "oxfmt src test package.json tsconfig.json tsconfig.build.json tsconfig.test.json vitest.config.ts README.md README.en.md USEGUIDE.md USEGUIDE.en.md",
+    "lint": "oxlint src test",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
+    "test": "vitest run",
+    "release:patch": "pnpm version patch --no-git-tag-version",
+    "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
+  },
+  "dependencies": {
+    "@migaia/event-subscriber": "workspace:^",
+    "@migaia/plugin-host": "workspace:^",
+    "@migaia/utils": "workspace:^"
+  },
+  "devDependencies": {
+    "@migaia/log-host": "workspace:*",
+    "@types/node": "24.13.2"
+  },
+  "peerDependencies": {
+    "@migaia/log-host": "0.0.11"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
