@@ -1,9 +1,9 @@
 import { MessageChannel } from 'node:worker_threads'
-import type { IServiceWorkerClientsScope } from '../../../src/browser/service-worker-types.js'
+import type { IServiceWorkerClientsScope } from '../../../src/browser/service-worker-types.ts'
 import type {
   IServiceWorkerMessageReceiver,
   IServiceWorkerMessageTarget
-} from '../../../src/browser/adapters/service-worker.js'
+} from '../../../src/browser/adapters/service-worker.ts'
 
 /** Own one page's physical pipe, delivery holds and native container subscriptions. */
 class ServiceWorkerPageFixture {

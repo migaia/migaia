@@ -1,9 +1,9 @@
 /** Starts a borrowed SharedWorker port and supplies its structured-clone carrier to Host. */
 import type { IRpcTransportSetupContext } from '@migaia/rpc-host/sdk'
 import { RpcCarrierPlatform } from '@migaia/rpc-contract/interfaces'
-import { browserMessageCarrier } from '../native-message.js'
-import type { IBrowserEventPort } from '../native-message.js'
-import { BrowserRpcErrorText } from '../error-text.js'
+import { browserMessageCarrier } from '../native-message.ts'
+import type { IBrowserEventPort } from '../native-message.ts'
+import { BrowserRpcErrorText } from '../error-text.ts'
 
 /** A borrowed MessagePort owns native activation and structured-clone transfer only. */
 export type ISharedWorkerPort = IBrowserEventPort

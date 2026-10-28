@@ -16,7 +16,7 @@ import {
 import { createWindowCarrier } from '../../dist/browser/adapters/window.js'
 import { createServiceWorkerCarrier } from '../../dist/browser/adapters/service-worker.js'
 import { createRtcDataChannelCarrier } from '../../dist/browser/adapters/rtc-data-channel.js'
-import { messageTarget, windowPair, portPair, rtcChannel } from './message-fixture.js'
+import { messageTarget, windowPair, portPair, rtcChannel } from './message-fixture.ts'
 
 /** Original native variants still exercise the same actual public factories. */
 const carriers = [

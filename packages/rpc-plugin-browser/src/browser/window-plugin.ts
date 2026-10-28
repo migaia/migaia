@@ -1,16 +1,16 @@
 /** Builds the Window transport definition from a borrowed target and explicit origin policy. */
 import { defineTransportPlugin } from '@migaia/rpc-host/sdk'
 import type { IRpcTransportPlugin, IRpcTransportFeatureExtensions } from '@migaia/rpc-host/sdk'
-import { BrowserPeerErrorText } from '../error-text.js'
+import { BrowserPeerErrorText } from '../error-text.ts'
 import { RpcBrowserErrorCode } from '@migaia/rpc-contract/error-code'
-import { createBrowserPeerError } from './peer-error.js'
-import { createBrowserConfigurationError } from './error.js'
-import { BrowserRpcErrorText } from './error-text.js'
-import { BrowserPluginName, BrowserNamespace } from './peer-text.js'
-import { attachBrowserCarrier } from './native-message.js'
-import { createWindowCarrier } from './adapters/window.js'
-import type { IWindowPluginOptions } from './peer-types.js'
-import type { IBrowserFeature } from './plugin-types.js'
+import { createBrowserPeerError } from './peer-error.ts'
+import { createBrowserConfigurationError } from './error.ts'
+import { BrowserRpcErrorText } from './error-text.ts'
+import { BrowserPluginName, BrowserNamespace } from './peer-text.ts'
+import { attachBrowserCarrier } from './native-message.ts'
+import { createWindowCarrier } from './adapters/window.ts'
+import type { IWindowPluginOptions } from './peer-types.ts'
+import type { IBrowserFeature } from './plugin-types.ts'
 
 /** Capture the exact borrowed Window and required origin before installation can touch native IO. */
 export function windowPlugin<

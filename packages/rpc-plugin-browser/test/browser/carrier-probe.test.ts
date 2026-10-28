@@ -2,7 +2,7 @@ import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { probe } from '@migaia/rpc-host/plugins/probe'
 import { sharedWorkerPlugin } from '../../dist/index.js'
-import { portPair } from './message-fixture.js'
+import { portPair } from './message-fixture.ts'
 
 it('SharedWorker: throwing probes preserve a real Endpoint request and response', async () => {
   /** The original native-only port pair supplies neither a codec nor request/handshake state. */

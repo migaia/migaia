@@ -4,7 +4,7 @@ import { describe, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { auth } from '@migaia/rpc-host/plugins/auth'
 import { windowPlugin } from '../../dist/index.js'
-import { windowPair } from '../browser/message-fixture.js'
+import { windowPair } from '../browser/message-fixture.ts'
 
 describe('replay-window r12 physical session authority', () => {
   it('refuses primitive source before provider admission on the native Window boundary', async () => {

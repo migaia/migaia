@@ -7,12 +7,12 @@ import {
   RpcBrowserErrorCode,
   RPC_ENDPOINT_ERROR_SOURCE
 } from '@migaia/rpc-contract/error-code'
-import { BrowserPeerErrorText } from '../error-text.js'
-import { normalizeBrowserHandshakeFailure } from './error.js'
-import { createBrowserPeerError } from './peer-error.js'
-import { BrowserPeerEvent } from './peer-text.js'
-import { createSharedWorkerCarrier } from './adapters/shared-worker.js'
-import type { IRuntimeBrowserListen, IRuntimeBrowserConnectEvent } from './peer-types.js'
+import { BrowserPeerErrorText } from '../error-text.ts'
+import { normalizeBrowserHandshakeFailure } from './error.ts'
+import { createBrowserPeerError } from './peer-error.ts'
+import { BrowserPeerEvent } from './peer-text.ts'
+import { createSharedWorkerCarrier } from './adapters/shared-worker.ts'
+import type { IRuntimeBrowserListen, IRuntimeBrowserConnectEvent } from './peer-types.ts'
 
 /** The native connect scope can have only one active accept owner, as before this migration. */
 const boundScopes = new WeakSet<object>()

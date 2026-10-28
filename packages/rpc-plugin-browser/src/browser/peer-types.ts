@@ -2,11 +2,11 @@
  * Defines borrowed browser source options and native connect-event shapes used by transport
  * acquisition.
  */
-import type { IWindowMessageTarget, IWindowMessageReceiver } from './adapters/window.js'
-import type { ISharedWorkerPort } from './adapters/shared-worker.js'
-import type { IRTCDataChannel } from './adapters/rtc-data-channel.js'
-import type { IBrowserEventPort } from './native-message.js'
-import type { IBrowserPluginOptions } from './plugin-types.js'
+import type { IWindowMessageTarget, IWindowMessageReceiver } from './adapters/window.ts'
+import type { ISharedWorkerPort } from './adapters/shared-worker.ts'
+import type { IRTCDataChannel } from './adapters/rtc-data-channel.ts'
+import type { IBrowserEventPort } from './native-message.ts'
+import type { IBrowserPluginOptions } from './plugin-types.ts'
 
 /**
  * Connect to one borrowed Window, binding both its native identity and an explicit origin before

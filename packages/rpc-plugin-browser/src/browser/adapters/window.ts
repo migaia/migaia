@@ -2,9 +2,9 @@
 import { detectGlobalScope, GlobalScopeKind } from '@migaia/utils'
 import { RpcCarrierPlatform, RpcCarrierTopology } from '@migaia/rpc-contract/interfaces'
 import type { IRpcTransportSetupContext } from '@migaia/rpc-host/sdk'
-import { BrowserRpcErrorText } from '../error-text.js'
-import { createBrowserConfigurationError } from '../error.js'
-import { browserMessageCarrier } from '../native-message.js'
+import { BrowserRpcErrorText } from '../error-text.ts'
+import { createBrowserConfigurationError } from '../error.ts'
+import { browserMessageCarrier } from '../native-message.ts'
 
 /** The caller owns the remote Window; transfer retains native structured-clone semantics. */
 export type IWindowMessageTarget = {

@@ -1,6 +1,8 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
     "lib": ["ES2023", "DOM", "WebWorker"],
     "noEmit": true,
     "types": ["vite/client", "@playwright/test"]

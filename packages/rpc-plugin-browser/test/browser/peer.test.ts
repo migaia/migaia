@@ -22,7 +22,7 @@ import {
   rtcDataChannelPlugin,
   RPC_BROWSER_ERROR_SOURCE
 } from '@migaia/rpc-plugin-browser'
-import { messageTarget, windowPair, portPair, rtcChannel } from './message-fixture.js'
+import { messageTarget, windowPair, portPair, rtcChannel } from './message-fixture.ts'
 
 /** Concrete native factory identity preserves one explicit namespace independently of root lifetime. */
 type IBrowserTransportPlugins = readonly [IRpcTransportPlugin<'browser'>]

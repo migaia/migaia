@@ -24,17 +24,17 @@ import {
   RpcBrowserErrorCode
 } from '@migaia/rpc-contract/error-code'
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { createBrowserPeerError } from './peer-error.js'
-import { createBrowserTransportError, rejectBrowserTransfer } from './error.js'
-import { BrowserPeerErrorText } from '../error-text.js'
-import { WebTransportPluginText } from './web-transport-text.js'
-import { BrowserNamespace } from './peer-text.js'
-import { attachBrowserCarrier } from './native-message.js'
+import { createBrowserPeerError } from './peer-error.ts'
+import { createBrowserTransportError, rejectBrowserTransfer } from './error.ts'
+import { BrowserPeerErrorText } from '../error-text.ts'
+import { WebTransportPluginText } from './web-transport-text.ts'
+import { BrowserNamespace } from './peer-text.ts'
+import { attachBrowserCarrier } from './native-message.ts'
 import type {
   IWebTransportPluginOptions,
   IWebTransportReliableSession
-} from './web-transport-types.js'
-import type { IBrowserFeature } from './plugin-types.js'
+} from './web-transport-types.ts'
+import type { IBrowserFeature } from './plugin-types.ts'
 
 /** Acquire one actual reliable stream; SDK borrows its successfully acquired native locks. */
 async function openStream(
