@@ -1450,6 +1450,16 @@ console.log(await waiting) // false；没有遗留 timer
 
 `@migaia/lifecycle/scope` 是异步 `createLifecycleScope` 的窄入口；同步与 provisional scope 从 root 导入 `createSyncLifecycleScope` / `createProvisionalScope`。包不提供第二套 scope 实现。generation/quiescence 子路径直接映射各自 canonical owner，未构建的同名 barrel 已删除。
 
+### 方法调用、descriptor 与 options 的读取时机
+
+`createLifecycleScope`、`createSyncLifecycleScope`、`createProvisionalScope` 和 `createMutationQueue` 返回的对象，方法都定义在原型上，必须通过对象调用（`scope.own(...)`、`queue.enqueue(...)`）。把方法解构出来单独调用（`const { own } = scope`）不受支持。
+
+`own()` 校验 descriptor 时会保存一份快照，释放时使用的就是这份快照：注册之后再修改 descriptor 对象，或 getter 之后返回不同的值，都不会影响释放。provisional scope 在 `commitTo(parent)` 时仍把原 descriptor 交给 `parent.own()`，由父 scope 自己校验和快照。
+
+options（`errorPolicy`、`report`、`deadlineAt`、`scheduler`、`onAdmissionDiagnostic` 等）只在创建时读取一次，之后不会再读。
+
+释放回调收到的 `context.signal` 在第一次读取时才创建（已经处于 aborted 状态，reason 为 `SCOPE_CLOSED`）；provisional scope 没有传 `parentSignal` 时，它的 `signal` 也是第一次读取时才创建。不读取 signal 的释放回调不会产生 AbortController。
+
 ### 已收回内部的辅助 API
 
 `createLifecycleUnit` 及其 option/result types 不再从 package 导出；应用使用 `createGenerationController` 管理过期任务，并由领域层持有加载状态。`createStringQuiescenceTracker` 改用有真实消费方的 `createStringLeaseRegistry`。`validateSchedulerTime`、`validateSchedulerDelay`、`tagLifecycleError`、`createLifecycleRangeError` 只供包内部使用，root 与 leaf 均不再暴露。`/scheduler` 公开 snapshot/resolve 准入工具。错误构造器与 scheduler 算术 helper 均已收回内部，不提供兼容 alias；业务错误使用所属包的身份。

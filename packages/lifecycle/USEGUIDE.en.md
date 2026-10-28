@@ -1418,6 +1418,16 @@ Batch debounces, periodic health checks and budget grant timers are not one-shot
 
 `@migaia/lifecycle/scope` is the narrow entry for the async `createLifecycleScope`; import the sync and provisional scopes (`createSyncLifecycleScope`, `createProvisionalScope`) from the root. The package has only one scope implementation. The generation and quiescence subpaths map directly to their single owning modules.
 
+### Method calls and when descriptors and options are read
+
+The objects returned by `createLifecycleScope`, `createSyncLifecycleScope`, `createProvisionalScope` and `createMutationQueue` define their methods on the prototype, so call them on the object (`scope.own(...)`, `queue.enqueue(...)`). Destructuring a method and calling it on its own (`const { own } = scope`) is not supported.
+
+`own()` keeps a snapshot of the descriptor it validates, and release uses that snapshot: changing the descriptor object after registration, or a getter that later returns something else, does not affect release. A provisional scope still hands the original descriptor to `parent.own()` on `commitTo(parent)`, so the parent validates and snapshots it itself.
+
+Options (`errorPolicy`, `report`, `deadlineAt`, `scheduler`, `onAdmissionDiagnostic` and so on) are read once at creation and never again.
+
+`context.signal` in a release callback is created on first read (already aborted, with a `SCOPE_CLOSED` reason). A provisional scope without `parentSignal` also creates its `signal` on first read. Release callbacks that never read the signal cost no AbortController.
+
 ### Helpers that are no longer public
 
 `createLifecycleUnit` and its option/result types are no longer exported; applications use `createGenerationController` for stale work and keep loading state in their own code. `createStringQuiescenceTracker` was replaced by `createStringLeaseRegistry`, which has real consumers. `validateSchedulerTime`, `validateSchedulerDelay`, `tagLifecycleError` and `createLifecycleRangeError` are internal and exposed neither at the root nor from a leaf. `/scheduler` exposes the snapshot/resolve admission helpers. Error constructors and scheduler arithmetic helpers are internal with no compatibility aliases; application errors use their own package's identity.
