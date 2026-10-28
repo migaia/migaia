@@ -1,4 +1,4 @@
-import { ERROR_SOURCE, StoreDevtoolsErrorCode, type IStoreDevtoolsErrorCode } from './error-code.js'
+import { ERROR_SOURCE, StoreDevtoolsErrorCode, type IStoreDevtoolsErrorCode } from './error-code.ts'
 import { attachErrorIdentity, isNativeErrorValue } from '@migaia/utils/error'
 
 export { StoreDevtoolsErrorCode, type IStoreDevtoolsErrorCode }

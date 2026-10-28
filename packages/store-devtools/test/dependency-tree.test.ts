@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
 import type { IObservable, IObserver } from '@migaia/reactive/extension'
-import { getDependencyTree, getObserverTree } from '../src/index'
+import { getDependencyTree, getObserverTree } from '../src/index.ts'
 
 // Structural mocks: getDependencyTree/getObserverTree only read `deps`/`subs`/`debugName`/
 // `version`/`constructor` off the objects they're given — they never touch the real reactive

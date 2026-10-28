@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
 import { createStore } from '@migaia/store-light'
-import { createStoreDevTools, type IStoreDevTools } from '../src/index.js'
+import { createStoreDevTools, type IStoreDevTools } from '../src/index.ts'
 
 describe('store-devtools audit regressions', () => {
   it('classifies a replay clone failure and restores history capture afterwards', async () => {

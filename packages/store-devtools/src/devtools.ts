@@ -15,10 +15,10 @@ import {
   createStoreDevtoolsError,
   createStoreDevtoolsRangeError,
   identifyDevtoolsFailure
-} from './errors.js'
-import { StoreDevtoolsErrorCode } from './error-code.js'
-import { StoreDevtoolsLabel, StoreDevtoolsNodeKind } from './devtools-constants.js'
-import { StoreDevtoolsErrorText } from './error-text.js'
+} from './errors.ts'
+import { StoreDevtoolsErrorCode } from './error-code.ts'
+import { StoreDevtoolsLabel, StoreDevtoolsNodeKind } from './devtools-constants.ts'
+import { StoreDevtoolsErrorText } from './error-text.ts'
 
 /** Rejects depth values that would silently disable the diagnostic traversal bound. */
 function assertDepth(value: number, name: string): void {
