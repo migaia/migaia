@@ -1,9 +1,9 @@
-import { createMemoryTestStore } from './helpers/memory.js'
+import { createMemoryTestStore } from './helpers/memory.ts'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createMicroHub, defineContract, getMicroHub, keyed, resource } from '../src/index.js'
-import { persist, type IPersistOptions } from '../src/persist/index.js'
-import { resources } from '../src/resource/index.js'
-import { state } from '../src/state/index.js'
+import { createMicroHub, defineContract, getMicroHub, keyed, resource } from '../src/index.ts'
+import { persist, type IPersistOptions } from '../src/persist/index.ts'
+import { resources } from '../src/resource/index.ts'
+import { state } from '../src/state/index.ts'
 
 /** Tears down app-owned persistence/resource attachments and resets deterministic timers. */
 afterEach(async () => {

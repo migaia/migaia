@@ -5,7 +5,7 @@ import {
   type ISyncLifecycleScope
 } from '@migaia/lifecycle'
 import { defineHost, definePlugin } from '@migaia/plugin-host'
-import { assertName, type IContract } from './contract.js'
+import { assertName, type IContract } from './contract.ts'
 import type {
   IAppRuntime,
   IContractEntry,
@@ -13,12 +13,12 @@ import type {
   IHubRuntime,
   IMicroDriver,
   IMicroPlugin
-} from './driver.js'
-import { MicroHubErrorCode } from './error-code.js'
-import { MicroHubErrorText } from './error-text.js'
-import { createMicroHubError } from './errors.js'
-import { APP_PLUGIN_PREFIX, MicroCapability, NameKind, capabilityExtensionKey } from './text.js'
-import type { IContractView, IMicroApp, IMicroHub, IOwnOptions, IOwnedContract } from './types.js'
+} from './driver.ts'
+import { MicroHubErrorCode } from './error-code.ts'
+import { MicroHubErrorText } from './error-text.ts'
+import { createMicroHubError } from './errors.ts'
+import { APP_PLUGIN_PREFIX, MicroCapability, NameKind, capabilityExtensionKey } from './text.ts'
+import type { IContractView, IMicroApp, IMicroHub, IOwnOptions, IOwnedContract } from './types.ts'
 
 /** Options of {@link createMicroHub}. */
 export type ICreateMicroHubOptions = {

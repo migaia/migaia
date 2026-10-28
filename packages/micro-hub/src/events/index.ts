@@ -6,7 +6,7 @@ import {
   type ICanonicalEventChannel,
   type IEventChannel
 } from '@migaia/event-subscriber'
-import { isMarker } from '../contract.js'
+import { isMarker } from '../contract.ts'
 import {
   defineMicroPlugin,
   type IAppRuntime,
@@ -15,12 +15,12 @@ import {
   type IHubRuntime,
   type IMicroDriver,
   type IMicroPlugin
-} from '../driver.js'
-import { MicroHubErrorCode } from '../error-code.js'
-import { MicroHubErrorText } from '../error-text.js'
-import { createMicroHubError, createMicroHubTypeError } from '../errors.js'
-import { ContractMarker, MicroCapability } from '../text.js'
-import type { IRequestOptions } from '../types.js'
+} from '../driver.ts'
+import { MicroHubErrorCode } from '../error-code.ts'
+import { MicroHubErrorText } from '../error-text.ts'
+import { createMicroHubError, createMicroHubTypeError } from '../errors.ts'
+import { ContractMarker, MicroCapability } from '../text.ts'
+import type { IRequestOptions } from '../types.ts'
 
 /** Options of the {@link events} capability. */
 export type IEventsOptions = {

@@ -7,7 +7,7 @@ import type {
   IRequestMarker,
   IResourceMarker,
   IStateValues
-} from './contract.js'
+} from './contract.ts'
 
 /**
  * Framework-neutral read contract for every value the hub exposes.

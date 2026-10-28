@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { createMicroHub, getMicroHub, type IMicroApp } from '../src/index.js'
-import { MICRO_APP_CONTEXT, consumeMicroApp, provideMicroApp } from '../src/web-component/index.js'
+import { createMicroHub, getMicroHub, type IMicroApp } from '../src/index.ts'
+import { MICRO_APP_CONTEXT, consumeMicroApp, provideMicroApp } from '../src/web-component/index.ts'
 
 /** Clears each DOM tree after its provider and consumer have released their listeners. */
 afterEach(async () => {

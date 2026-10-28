@@ -2,7 +2,7 @@ import { EventSubscriberErrorCode } from '@migaia/event-subscriber'
 import { PluginHostErrorCode, definePlugin } from '@migaia/plugin-host'
 import { deferred } from '@migaia/utils/promise'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { events } from '../src/events/index.js'
+import { events } from '../src/events/index.ts'
 import {
   MicroCapability,
   MicroHubErrorCode,
@@ -14,9 +14,9 @@ import {
   resource,
   type IMicroHub,
   type IMicroPlugin
-} from '../src/index.js'
-import { state } from '../src/state/index.js'
-import type { IAppRuntime, IDriverMembers } from '../src/driver.js'
+} from '../src/index.ts'
+import { state } from '../src/state/index.ts'
+import type { IAppRuntime, IDriverMembers } from '../src/driver.ts'
 
 /** Hub created by the current case; teardown prevents singleton state leaking between cases. */
 let hub: IMicroHub | undefined

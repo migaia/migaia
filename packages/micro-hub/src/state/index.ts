@@ -10,7 +10,7 @@ import {
   type IAtomStore,
   type IWritableAtomDefinition
 } from '@migaia/store-keyed'
-import { isMarker, type IStatePatch } from '../contract.js'
+import { isMarker, type IStatePatch } from '../contract.ts'
 import {
   defineMicroPlugin,
   type IAppRuntime,
@@ -19,12 +19,12 @@ import {
   type IHubRuntime,
   type IMicroDriver,
   type IMicroPlugin
-} from '../driver.js'
-import { MicroHubErrorCode } from '../error-code.js'
-import { MicroHubErrorText } from '../error-text.js'
-import { createMicroHubError, createMicroHubTypeError } from '../errors.js'
-import { ContractMarker, ContractSection, MicroCapability } from '../text.js'
-import type { ICommitResult, IKeyedReadable, IReadable } from '../types.js'
+} from '../driver.ts'
+import { MicroHubErrorCode } from '../error-code.ts'
+import { MicroHubErrorText } from '../error-text.ts'
+import { createMicroHubError, createMicroHubTypeError } from '../errors.ts'
+import { ContractMarker, ContractSection, MicroCapability } from '../text.ts'
+import type { ICommitResult, IKeyedReadable, IReadable } from '../types.ts'
 
 /** One plain state field: a single atom holding the committed (top-level frozen) value. */
 type IPlainField = {

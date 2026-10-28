@@ -1,7 +1,7 @@
-import { MicroHubErrorCode } from './error-code.js'
-import { MicroHubErrorText } from './error-text.js'
-import { createMicroHubTypeError } from './errors.js'
-import { ContractMarker, ContractSection, NameKind } from './text.js'
+import { MicroHubErrorCode } from './error-code.ts'
+import { MicroHubErrorText } from './error-text.ts'
+import { createMicroHubTypeError } from './errors.ts'
+import { ContractMarker, ContractSection, NameKind } from './text.ts'
 
 /** Marks a contract event; `T` is the payload type and exists only at the type level. */
 export type IEventMarker<T> = {

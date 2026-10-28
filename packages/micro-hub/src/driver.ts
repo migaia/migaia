@@ -1,7 +1,7 @@
 import { definePlugin } from '@migaia/plugin-host'
-import type { IContract } from './contract.js'
-import { CAPABILITY_PLUGIN_PREFIX, MicroCapability, capabilityExtensionKey } from './text.js'
-import type { IOwnOptions } from './types.js'
+import type { IContract } from './contract.ts'
+import { CAPABILITY_PLUGIN_PREFIX, MicroCapability, capabilityExtensionKey } from './text.ts'
+import type { IOwnOptions } from './types.ts'
 
 /**
  * Hub-side record of one registered contract. Capability drivers keep their per-contract state in

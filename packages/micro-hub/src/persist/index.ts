@@ -1,6 +1,6 @@
 import type { IKeyValueStore } from '@migaia/storage-contract'
 import { persistUnit } from '@migaia/store-persist'
-import type { IContract } from '../contract.js'
+import type { IContract } from '../contract.ts'
 import {
   defineMicroPlugin,
   type IAppRuntime,
@@ -9,13 +9,13 @@ import {
   type IHubRuntime,
   type IMicroDriver,
   type IMicroPlugin
-} from '../driver.js'
-import { MicroHubErrorCode } from '../error-code.js'
-import { MicroHubErrorText } from '../error-text.js'
-import { createMicroHubTypeError } from '../errors.js'
-import { stateDriverOf } from '../state/index.js'
-import { MicroCapability } from '../text.js'
-import type { IOwnOptions } from '../types.js'
+} from '../driver.ts'
+import { MicroHubErrorCode } from '../error-code.ts'
+import { MicroHubErrorText } from '../error-text.ts'
+import { createMicroHubTypeError } from '../errors.ts'
+import { stateDriverOf } from '../state/index.ts'
+import { MicroCapability } from '../text.ts'
+import type { IOwnOptions } from '../types.ts'
 
 /** Options of the {@link persist} capability. */
 export type IPersistOptions = {

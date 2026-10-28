@@ -1,4 +1,4 @@
-export { createMicroHub, getMicroHub, type ICreateMicroHubOptions } from './hub.js'
+export { createMicroHub, getMicroHub, type ICreateMicroHubOptions } from './hub.ts'
 export {
   defineContract,
   event,
@@ -16,8 +16,8 @@ export {
   type IResourceMarker,
   type IStatePatch,
   type IStateValues
-} from './contract.js'
-export type { IMicroPlugin } from './driver.js'
+} from './contract.ts'
+export type { IMicroPlugin } from './driver.ts'
 export {
   MicroResourceStatus,
   type ICommitResult,
@@ -36,13 +36,13 @@ export {
   type IReadable,
   type IRequestOptions,
   type IStateView
-} from './types.js'
-export { MicroCapability } from './text.js'
+} from './types.ts'
+export { MicroCapability } from './text.ts'
 export {
   MICRO_HUB_SOURCE,
   MicroHubErrorCode,
   createMicroHubError,
   createMicroHubTypeError,
   type IMicroHubErrorCode
-} from './errors.js'
-export { MicroHubErrorText } from './error-text.js'
+} from './errors.ts'
+export { MicroHubErrorText } from './error-text.ts'
