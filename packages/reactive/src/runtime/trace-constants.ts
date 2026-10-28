@@ -1,3 +1,18 @@
+/** Owns stable graph roles, trace discriminants and diagnostic phases; emission belongs to Runtime. */
+
+/** Stable graph roles are shared by diagnostic descriptors and ownership-error node labels. */
+export const ReactiveNodeKind = {
+  /** A source publishes values and admits downstream subscriptions. */
+  observable: 'observable',
+  /** A consumer records dependencies and receives scheduled invalidation. */
+  observer: 'observer',
+  /** A derived node combines source and observer roles under one diagnostic identity. */
+  computed: 'computed'
+} as const
+
+/** Runtime role keys match their stable descriptor values without introducing a second domain. */
+export type ReactiveNodeKind = keyof typeof ReactiveNodeKind
+
 /** Stable trace event discriminants emitted by the reactive runtime. */
 export const ReactiveTraceType = {
   observableChange: 'observable-change',

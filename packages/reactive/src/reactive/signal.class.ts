@@ -11,7 +11,7 @@ import { describeObservable, emitTraceSafely } from '../runtime/diagnostics.ts'
 import { registerSubs } from '../runtime/node-internals.ts'
 import { createReactiveError, tagReactiveError } from '../errors.ts'
 import { ReactiveErrorCode } from '../error-code.ts'
-import { markSubscribers } from '../runtime/dependency-tracker.class.ts'
+import { markSubscribers } from '../runtime/subscriber-graph.ts'
 import {
   ReactiveErrorPhase,
   ReactiveTraceReason,

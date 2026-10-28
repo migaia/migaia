@@ -1,5 +1,6 @@
 import { tryReadProperty } from '@migaia/utils/error'
-import { DependencyTracker, markSubscribers } from './dependency-tracker.class.ts'
+import { DependencyTracker } from './dependency-tracker.class.ts'
+import { markSubscribers } from './subscriber-graph.ts'
 import { Scheduler } from './scheduler.class.ts'
 import { VersionClock } from './version-clock.class.ts'
 import { defaultRuntimeAdapter } from './default-runtime-adapter.ts'

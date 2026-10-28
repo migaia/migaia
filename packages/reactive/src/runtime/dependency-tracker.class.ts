@@ -1,35 +1,25 @@
+/**
+ * Owns synchronous dependency frames, speculative capture tokens, and transactional forward-edge
+ * commits. Reverse-edge lifecycle and notification snapshots belong to subscriber-graph.ts.
+ */
 import type { IObservable, IObserver, IRuntime } from './types.ts'
 import { internalsOf } from './internals.ts'
 import { assertReactiveOwnedBy } from './ownership.ts'
-import { describeObservable, describeObserver, emitTraceSafely } from './diagnostics.ts'
 import { createReactiveError, runReactiveCallback } from '../errors.ts'
 import { ReactiveErrorCode } from '../error-code.ts'
 import { ReactiveErrorText } from '../error-text.ts'
+import { ReactiveNodeKind, ReactiveDependencyKind, ReactiveTraceReason } from './trace-constants.ts'
 import {
-  ReactiveDependencyKind,
-  ReactiveErrorPhase,
-  ReactiveTracePhase,
-  ReactiveTraceReason,
-  ReactiveTraceType
-} from './trace-constants.ts'
-import {
-  mutableSubs as mutableNodeSubs,
   mutableDeps as mutableNodeDeps,
-  mutableDepVersions as mutableNodeVersions,
-  snapshotSubs,
-  invalidateSubsSnapshot
+  mutableDepVersions as mutableNodeVersions
 } from './node-internals.ts'
+import {
+  disconnectSubscribers,
+  subscribeObservable,
+  unsubscribeObservable
+} from './subscriber-graph.ts'
 
-function mutableSubs(observable: IObservable): Set<IObserver> {
-  return mutableNodeSubs(observable, observable.subs)
-}
-
-/** Preserves the notification-entry snapshot even when extension markDirty callbacks reconnect. */
-export function markSubscribers(observable: IObservable): void {
-  for (const subscriber of snapshotSubs(observable, observable.subs)) subscriber.markDirty()
-}
-
-// 一次追踪的临时帧：fn 执行期间读到的依赖先攒在 nextDeps，不碰正式依赖边。
+/** One evaluation stages first-read dependencies without touching the committed graph. */
 type ITrackingFrame =
   | {
       kind: typeof ReactiveDependencyKind.observer
@@ -42,7 +32,7 @@ type ITrackingFrame =
       derivations: Map<IObservable, ICapturedDerivation>
     }
 
-// Capture 的依赖与 Tracker 身份只存在于私有 WeakMap；调用者只能读取结果并交回整个 token。
+/** The type-only brand keeps captured dependencies and tracker identity out of the public token. */
 declare const CAPTURE_TOKEN: unique symbol
 /**
  * Opaque token returned by `IObserverBinding.capture`: `result` is what the read returned; the
@@ -53,6 +43,7 @@ export type ICapture<R> = {
   readonly [CAPTURE_TOKEN]: true
 }
 
+/** Private version and topology snapshots retained only while an opaque capture token is live. */
 type ICaptureState = {
   /** Lazy derivations already evaluated in render, admitted only with this token's graph. */
   derivations: ReadonlyMap<IObservable, ICapturedDerivation>
@@ -75,22 +66,22 @@ type ICapturedDerivation = {
   readonly afterCommit: () => void
 }
 
-// 全局「当前正在追踪的 tracker」——单线程 JS 里同一时刻只有一个求值在进行，用它跨 tracker 检测跨 runtime 依赖。
-// track() 被派发到「被读节点所属 runtime 的 tracker」上；若那个 tracker 不是当前活跃 tracker，
-// 且当前活跃 tracker 确实在追踪（有 observer），说明是跨 runtime 读取——立即抛错，杜绝静默陈旧数据。
+/** The synchronous active tracker rejects cross-runtime reads while another graph is collecting. */
 let activeTracker: DependencyTracker | null = null
 
-// 集中管理模块级同步追踪上下文，避免各方法直接写全局槽位。
+/** Installs one synchronous tracking context and returns the previous owner for finally restoration. */
 function swapActiveTracker(next: DependencyTracker): DependencyTracker | null {
+  /** Nested evaluation restores exactly the tracker that owned its caller. */
   const previous = activeTracker
   activeTracker = next
   return previous
 }
 
-// Per-runtime dependency tracking owns evaluation context, staged edges, edge commits, disconnection, and stale checks.
-// During `runTracked`, `track()` stages `nextDeps`. Success commits changes; failure discards them and preserves the old graph.
+/** Owns evaluation frames and commits only successful reads, preserving the old graph on failure. */
 export class DependencyTracker {
+  /** Nested frames stage dependencies; a null frame temporarily disables collection. */
   #stack: (ITrackingFrame | null)[] = []
+  /** Opaque tokens retain speculative snapshots without keeping abandoned renders alive. */
   #captures = new WeakMap<object, ICaptureState>()
   /**
    * Terminal invalidation is deliberately independent from VersionClock.
@@ -114,16 +105,20 @@ export class DependencyTracker {
    * or `clearDependencies` deletes the entry.
    */
   #suspendedTopology = new WeakMap<IObserver, Map<IObservable, object | undefined>>()
+  /** Canonical runtime authority used to reject foreign nodes and resolve graph services. */
   #runtime: IRuntime
 
+  /** Binds one independent graph to its owning runtime without installing any edges. */
   constructor(runtime: IRuntime) {
     this.#runtime = runtime
   }
 
+  /** Reads the innermost collection frame without changing nested evaluation state. */
   get #top(): ITrackingFrame | null {
     return this.#stack.length ? this.#stack[this.#stack.length - 1] : null
   }
 
+  /** A capture or observer frame counts as active; an untracked frame suppresses collection. */
   #hasActiveObserver(): boolean {
     return this.#top !== null
   }
@@ -162,7 +157,7 @@ export class DependencyTracker {
   track(observable: IObservable): void {
     if (activeTracker === this) {
       if (this.#top !== null) {
-        this.#assertObservableOwner(observable)
+        assertReactiveOwnedBy(observable, this.#runtime, ReactiveNodeKind.observable)
         this.#top.nextDeps.add(observable)
       }
       return
@@ -182,7 +177,7 @@ export class DependencyTracker {
     this.#suspendedTopology.delete(observer)
     /** Kernel traversal uses the registered Set rather than the public readonly view. */
     const dependencies = mutableNodeDeps(observer, observer.deps)
-    for (const dep of dependencies) this.#unsubscribe(dep, observer)
+    for (const dep of dependencies) unsubscribeObservable(this.#runtime, dep, observer)
     dependencies.clear()
     mutableNodeVersions(observer, observer.depVersions).clear()
   }
@@ -202,7 +197,7 @@ export class DependencyTracker {
     const topology = new Map<IObservable, object | undefined>()
     for (const dep of dependencies) topology.set(dep, this.#topologyTokens.get(dep))
     this.#suspendedTopology.set(observer, topology)
-    for (const dep of topology.keys()) this.#unsubscribe(dep, observer)
+    for (const dep of topology.keys()) unsubscribeObservable(this.#runtime, dep, observer)
     mutableNodeDeps(observer, observer.deps).clear()
   }
 
@@ -225,6 +220,7 @@ export class DependencyTracker {
    * evaluation reads the dependency again and owns its failure (rethrows it or handles it).
    */
   revalidate(observer: IObserver): boolean {
+    /** Only suspended observers need topology validation before reconnecting their recorded graph. */
     const topology = this.#suspendedTopology.get(observer)
     try {
       for (const [dep, recordedVersion] of mutableNodeVersions(observer, observer.depVersions)) {
@@ -260,52 +256,14 @@ export class DependencyTracker {
     observable: IObservable,
     reason: typeof ReactiveTraceReason.invalidate | typeof ReactiveTraceReason.dispose
   ): void {
-    this.#assertObservableOwner(observable)
+    assertReactiveOwnedBy(observable, this.#runtime, ReactiveNodeKind.observable)
+    /** Resolve trace services before invalidating topology, retaining the original mutation order. */
     const runtime = internalsOf(this.#runtime)
     this.#topologyTokens.set(observable, {})
-    if (reason === 'dispose') {
+    if (reason === ReactiveTraceReason.dispose) {
       this.#terminalObservables.add(observable)
     }
-    const observers = [...mutableSubs(observable)]
-    invalidateSubsSnapshot(observable)
-    mutableSubs(observable).clear()
-    for (const observer of observers) {
-      mutableNodeDeps(observer, observer.deps).delete(observable)
-      mutableNodeVersions(observer, observer.depVersions).delete(observable)
-      if (runtime.traceEnabled()) {
-        emitTraceSafely(
-          {
-            timestamp: runtime.timestamp,
-            emitTrace: runtime.emitTrace,
-            reportError: (error) =>
-              observer.runtime.reportError(error, {
-                phase: ReactiveErrorPhase.traceListener,
-                observer,
-                observable
-              })
-          },
-          (timestamp) => ({
-            type: ReactiveTraceType.dependency,
-            timestamp,
-            phase: ReactiveTracePhase.disconnect,
-            observable: describeObservable(observable),
-            observer: describeObserver(observer),
-            reason
-          })
-        )
-      }
-    }
-    for (const observer of observers) {
-      try {
-        observer.onDependencyDisconnected(observable)
-      } catch (error) {
-        observer.runtime.reportError(error, {
-          phase: ReactiveErrorPhase.dependencyDisconnect,
-          observer: describeObserver(observer),
-          observable: describeObservable(observable)
-        })
-      }
-    }
+    disconnectSubscribers(runtime, observable, reason)
   }
 
   /**
@@ -313,14 +271,17 @@ export class DependencyTracker {
    * set.
    */
   runTracked<R>(observer: IObserver, fn: () => R): R {
+    /** A fresh frame isolates this evaluation from reentrant reads and failed staging. */
     const frame: ITrackingFrame = {
       kind: ReactiveDependencyKind.observer,
       observer,
       nextDeps: new Set()
     }
     this.#stack.push(frame)
+    /** The caller may belong to another untracked runtime and must regain its exact context. */
     const prevTracker = swapActiveTracker(this)
     try {
+      /** Callback admission preserves the original synchronous result and error identity. */
       const result = runReactiveCallback(fn)
       if (!observer.disposed) this.#commit(observer, frame.nextDeps)
       return result
@@ -335,15 +296,19 @@ export class DependencyTracker {
    * Concurrent React renders cannot leak subscriptions.
    */
   capture<R>(fn: () => R): ICapture<R> {
+    /** A fresh frame isolates this evaluation from reentrant reads and failed staging. */
     const frame: ITrackingFrame = {
       kind: ReactiveDependencyKind.capture,
       nextDeps: new Set(),
       derivations: new Map()
     }
     this.#stack.push(frame)
+    /** The caller may belong to another untracked runtime and must regain its exact context. */
     const prevTracker = swapActiveTracker(this)
     try {
+      /** Callback admission preserves the original synchronous result and error identity. */
       const result = runReactiveCallback(fn)
+      /** Captured first-read order is retained alongside each value version and topology identity. */
       const dependencies: ICaptureState['dependencies'] = new Map()
       for (const dep of frame.nextDeps) {
         dependencies.set(dep, {
@@ -351,6 +316,7 @@ export class DependencyTracker {
           topologyToken: this.#topologyTokens.get(dep)
         })
       }
+      /** The public token exposes only the read result; graph metadata stays in the WeakMap. */
       const capture = { result } as ICapture<R>
       this.#captures.set(capture, { dependencies, derivations: frame.derivations })
       return capture
@@ -380,6 +346,7 @@ export class DependencyTracker {
         ReactiveErrorText.captureDisposedObserver
       )
     }
+    /** Only this tracker can redeem its still-live single-use token. */
     const state = this.#captures.get(capture)
     if (!state) {
       throw createReactiveError(ReactiveErrorCode.captureInvalid, ReactiveErrorText.captureInvalid)
@@ -436,6 +403,7 @@ export class DependencyTracker {
     this.#commit(observer, new Set(state.dependencies.keys()))
   }
 
+  /** Reconciles changed memberships in O(old + next), preserving stable native iteration order. */
   #commit(observer: IObserver, nextDeps: Set<IObservable>): void {
     /** Capture raw collections once; readonly views remain the external diagnostic boundary. */
     const dependencies = mutableNodeDeps(observer, observer.deps)
@@ -444,6 +412,7 @@ export class DependencyTracker {
     // A suspended observer has no `deps` but keeps its `depVersions` snapshot; the size check
     // sends it through the full path, which subscribes again and replaces the snapshot.
     if (dependencies.size === nextDeps.size && depVersions.size === nextDeps.size) {
+      /** Equal memberships preserve historical insertion order even when read order changes. */
       let sameTopology = true
       for (const dep of nextDeps) {
         if (!dependencies.has(dep)) {
@@ -452,8 +421,7 @@ export class DependencyTracker {
         }
       }
       if (sameTopology) {
-        const versions = depVersions
-        for (const dep of nextDeps) versions.set(dep, dep.version)
+        for (const dep of nextDeps) depVersions.set(dep, dep.version)
         return
       }
     }
@@ -463,7 +431,7 @@ export class DependencyTracker {
     /** Reverse edges added by this commit; terminal rollback removes only these edges. */
     const newSubscriptions: IObservable[] = []
     for (const dep of prevDeps) {
-      if (!nextDeps.has(dep)) this.#unsubscribe(dep, observer)
+      if (!nextDeps.has(dep)) unsubscribeObservable(this.#runtime, dep, observer)
       if (observer.disposed) {
         this.#rollbackTerminalCommit(observer, newSubscriptions)
         return
@@ -474,7 +442,7 @@ export class DependencyTracker {
         this.#rollbackTerminalCommit(observer, newSubscriptions)
         return
       }
-      if (!prevDeps.has(dep)) this.#subscribe(dep, observer)
+      if (!prevDeps.has(dep)) subscribeObservable(this.#runtime, dep, observer)
       if (!prevDeps.has(dep)) newSubscriptions.push(dep)
       if (observer.disposed) {
         this.#rollbackTerminalCommit(observer, newSubscriptions)
@@ -485,14 +453,13 @@ export class DependencyTracker {
       this.#rollbackTerminalCommit(observer, newSubscriptions)
       return
     }
-    const mutableDeps = dependencies
-    mutableDeps.clear()
-    for (const dep of nextDeps) mutableDeps.add(dep)
+    dependencies.clear()
+    for (const dep of nextDeps) dependencies.add(dep)
+    /** Snapshot versions before replacing the live Map, preserving reentrant getter read order. */
     const versions = new Map<IObservable, number>()
     for (const dep of nextDeps) versions.set(dep, dep.version)
-    const mutableVersions = depVersions
-    mutableVersions.clear()
-    for (const [dep, version] of versions) mutableVersions.set(dep, version)
+    depVersions.clear()
+    for (const [dep, version] of versions) depVersions.set(dep, version)
   }
 
   /**
@@ -500,98 +467,10 @@ export class DependencyTracker {
    * observer.
    */
   #rollbackTerminalCommit(observer: IObserver, newSubscriptions: readonly IObservable[]): void {
-    for (const observable of newSubscriptions) this.#unsubscribe(observable, observer)
+    for (const observable of newSubscriptions)
+      unsubscribeObservable(this.#runtime, observable, observer)
     mutableNodeDeps(observer, observer.deps).clear()
     mutableNodeVersions(observer, observer.depVersions).clear()
-  }
-
-  #subscribe(observable: IObservable, observer: IObserver): void {
-    this.#assertObservableOwner(observable)
-    assertReactiveOwnedBy(observer, this.#runtime, 'observer')
-    const runtime = internalsOf(this.#runtime)
-    /** The same raw Set supplies admission and the previous observation state. */
-    const subscribers = mutableSubs(observable)
-    const wasUnobserved = subscribers.size === 0
-    subscribers.add(observer)
-    invalidateSubsSnapshot(observable)
-    if (wasUnobserved) {
-      try {
-        observable.onObserved?.()
-      } catch (error) {
-        observer.runtime.reportError(error, {
-          phase: ReactiveErrorPhase.lifecycleHook,
-          observer: describeObserver(observer),
-          observable: describeObservable(observable)
-        })
-      }
-    }
-    if (runtime.traceEnabled()) {
-      emitTraceSafely(
-        {
-          timestamp: runtime.timestamp,
-          emitTrace: runtime.emitTrace,
-          reportError: (error) =>
-            observer.runtime.reportError(error, {
-              phase: ReactiveErrorPhase.traceListener,
-              observer,
-              observable
-            })
-        },
-        (timestamp) => ({
-          type: ReactiveTraceType.dependency,
-          timestamp,
-          phase: ReactiveTracePhase.connect,
-          observable: describeObservable(observable),
-          observer: describeObserver(observer)
-        })
-      )
-    }
-  }
-
-  #unsubscribe(observable: IObservable, observer: IObserver): void {
-    this.#assertObservableOwner(observable)
-    /** Deletion invalidates the snapshot before any user lifecycle callback runs. */
-    const subscribers = mutableSubs(observable)
-    if (!subscribers.delete(observer)) return
-    invalidateSubsSnapshot(observable)
-    const runtime = internalsOf(this.#runtime)
-    if (runtime.traceEnabled()) {
-      emitTraceSafely(
-        {
-          timestamp: runtime.timestamp,
-          emitTrace: runtime.emitTrace,
-          reportError: (error) =>
-            observer.runtime.reportError(error, {
-              phase: ReactiveErrorPhase.traceListener,
-              observer,
-              observable
-            })
-        },
-        (timestamp) => ({
-          type: ReactiveTraceType.dependency,
-          timestamp,
-          phase: ReactiveTracePhase.disconnect,
-          observable: describeObservable(observable),
-          observer: describeObserver(observer),
-          reason: ReactiveTraceReason.retrack
-        })
-      )
-    }
-    if (subscribers.size === 0) {
-      try {
-        observable.onUnobserved?.()
-      } catch (error) {
-        observer.runtime.reportError(error, {
-          phase: ReactiveErrorPhase.lifecycleHook,
-          observer: describeObserver(observer),
-          observable: describeObservable(observable)
-        })
-      }
-    }
-  }
-
-  #assertObservableOwner(observable: IObservable): void {
-    assertReactiveOwnedBy(observable, this.#runtime, 'observable')
   }
 
   /**
@@ -610,6 +489,7 @@ export class DependencyTracker {
   /** Owns tracking-context restoration for both public callbacks and argument-bound operations. */
   #runUntracked<TArg, R>(fn: (arg: TArg) => R, arg: TArg, withArgument: boolean): R {
     this.#stack.push(null)
+    /** The caller may belong to another untracked runtime and must regain its exact context. */
     const prevTracker = swapActiveTracker(this)
     try {
       return withArgument ? fn(arg) : (fn as () => R)()
