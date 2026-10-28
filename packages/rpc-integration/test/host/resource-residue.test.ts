@@ -1,7 +1,6 @@
 /** Reads actual owner tables after 10,000 real operations, without production diagnostics. */
 import { execFileSync } from 'node:child_process'
 import { getEventListeners } from 'node:events'
-import { mkdirSync, writeFileSync } from 'node:fs'
 import { Session as InspectorSession } from 'node:inspector/promises'
 import type { Runtime } from 'node:inspector'
 import { expect, it, vi } from 'vitest'
@@ -681,19 +680,6 @@ it('drains actual work, flow, session, listener and timer owners after 10000 mix
     throw error
   } finally {
     await Promise.allSettled([client.host.close(), server.host.close()])
-    receipt.reports = reports.map((error) =>
-      classify(error, -1, 'report', 'host', false, rejections.at(-1))
-    )
-    /**
-     * A clean checkout has no ignored documentation tree; this test creates only its receipt
-     * folder.
-     */
-    const receiptFile = new URL(
-      '../../../../docs/rpc-host/scratch/exec/core/phase7-a17-resource-receipt.json',
-      import.meta.url
-    )
-    mkdirSync(new URL('.', receiptFile), { recursive: true })
-    writeFileSync(receiptFile, `${JSON.stringify(receipt, null, 2)}\n`)
     await inspector.close()
     scheduling.mockRestore()
   }
