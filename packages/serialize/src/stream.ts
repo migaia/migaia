@@ -1,68 +1,44 @@
+/**
+ * Owns public stream orchestration: adaptive slices, ordered encoding, sequential decoding and
+ * collection. Admission, scheduler ownership and collection conversion have separate canonical
+ * module owners.
+ */
 import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IScheduler } from '@migaia/utils/scheduler'
+import { attachSecondaryErrors } from '@migaia/utils/error'
 import {
   SerializeCodecError,
-  encodeSerializeTextChunk,
   validateSerializeChunk,
   type ISerializeChunk,
   type ISerializeRegistry,
   type ITextEncoder
 } from './types.ts'
-import {
-  createSerializeError,
-  createSerializeRangeError,
-  createSerializeTypeError,
-  SerializeErrorCode,
-  SerializeErrorText,
-  SERIALIZE_SOURCE,
-  type ISerializeErrorCode
-} from './errors.ts'
+import { createSerializeError, SerializeErrorCode, SerializeErrorText } from './errors.ts'
 import { SerializeChunkKind, SerializePhase } from './format-constants.ts'
+import { SerializeContext } from './operation-constants.ts'
+import { SerializeDiagnosticText } from './diagnostic-text.ts'
 import { createSerializeOperationSignal } from './signal.ts'
-import { snapshotSerializeSignal } from './signal-snapshot.ts'
-import { attachSecondaryErrors, safeErrorReason, tryReadProperty } from '@migaia/utils/error'
+import {
+  isSerializeTaggedError,
+  reasonOf,
+  checkStreamAbort,
+  readSerializeSignalAborted,
+  readSerializeSignalReason
+} from './operation-support.ts'
+import {
+  snapshotFrameBudgetOptions,
+  snapshotEncodeStreamOptions,
+  snapshotDecodeStreamOptions,
+  snapshotCollectOptions
+} from './operation-options.ts'
+import { OwnedStreamYield } from './stream-scheduler.ts'
+import {
+  snapshotCollectEncoder,
+  getCollectIterator,
+  closeCollectIterator,
+  mergeCollectedStream
+} from './stream-collection.ts'
 
-type ISerializeScheduledTask = { cancel(): void }
-
-/** Fully admitted frame-budget options; no field reads remain when slicing begins. */
-type IFrameBudgetSnapshot = {
-  readonly targetMs: number
-  readonly minItems: number
-  readonly maxItems: number
-  readonly initialItems: number
-  readonly yieldTo?: () => Promise<void>
-  readonly signal?: IAbortSignal
-  readonly scheduler: IScheduler
-}
-
-/** Fully admitted encode-stream options captured before the first slice or registry call. */
-type IEncodeStreamSnapshot = IFrameBudgetSnapshot & {
-  readonly type?: string
-  readonly context: string
-  readonly maxInFlight: number
-}
-
-/** Fully admitted decode-stream options captured before the input iterator is touched. */
-type IDecodeStreamSnapshot = {
-  readonly type?: string
-  readonly context: string
-  readonly signal?: IAbortSignal
-}
-
-/** Invoke one captured method with its original protocol receiver. */
-type ISerializeInvokable<TResult> = (...args: never[]) => TResult
-
-/**
- * Captured encoder receiver boundary: invokes the once-captured encoder method with its original
- * receiver.
- */
-const invokeCollectEncoderWithReceiver = <TResult>(
-  method: ISerializeInvokable<TResult>,
-  receiver: object,
-  args: readonly unknown[]
-): TResult => Reflect.apply(method, receiver, args)
-
-/** Add a secondary cleanup failure without changing the earlier primary result. */
 /** Finish public encode-stream cleanup while preserving any earlier primary throw identity. */
 const finalizeEncodeStreamCleanup = (
   cleanupErrors: readonly unknown[],
@@ -75,376 +51,40 @@ const finalizeEncodeStreamCleanup = (
   if (cleanupErrors.length > 0) throw cleanupErrors[0]
 }
 
-/** Attaches one cleanup failure while preserving Serialize's primary error projection. */
-const attachSerializeCleanupError = (primaryError: unknown, cleanupError: unknown): unknown =>
-  attachSecondaryErrors(primaryError, [cleanupError])
-
-/** Preserve an already-owned semantic code while projecting failures at a stream boundary. */
-const hasSerializeCode = (error: unknown, code: ISerializeErrorCode): boolean => {
-  try {
-    return (
-      error instanceof Error &&
-      (error as { readonly source?: unknown }).source === SERIALIZE_SOURCE &&
-      (error as { readonly code?: unknown }).code === code
-    )
-  } catch {
-    return false
-  }
-}
-
-/** Extract hostile protocol-failure text without allowing diagnostics to replace the primary. */
-const streamFailureReason = (error: unknown): string =>
-  safeErrorReason(error, SerializeErrorText.reasonUnavailable)
-
-/** Wrap one encode admission failure with the slice index that owns the invocation. */
-const encodeStreamFailure = (
-  error: unknown,
-  sliceIndex: number,
-  type: string | undefined,
-  context: string,
-  registry: ISerializeRegistry
-): SerializeCodecError =>
-  new SerializeCodecError(
-    `encode stream failed at slice ${sliceIndex}: ${streamFailureReason(error)}`,
-    {
-      type: type ?? registry.primaryType,
-      phase: SerializePhase.encode,
-      context,
-      chunkIndex: sliceIndex,
-      bytesConsumed: 0,
-      code: SerializeErrorCode.encodeFailed,
-      cause: error
-    }
-  )
-
-/** Convert any stream-option getter, shape, or value failure to serialize INVALID_OPTION. */
-const streamOptionFailure = (error: unknown): never => {
-  if (hasSerializeCode(error, SerializeErrorCode.invalidOption)) throw error
-  throw createSerializeTypeError(
-    SerializeErrorCode.invalidOption,
-    SerializeErrorText.operationOptionInvalid,
-    { cause: error }
-  )
-}
-
-/** Translate a task-release failure without replacing its native TypeError semantics. */
-const translateTaskCancelFailure = (error: unknown): unknown =>
-  hasSerializeCode(error, SerializeErrorCode.invalidOption)
-    ? error
-    : createSerializeTypeError(
-        SerializeErrorCode.invalidOption,
-        SerializeErrorText.schedulerTaskCancelFailed,
-        { cause: error }
-      )
-
-/** Read an operation signal's current state while keeping failures at serialize's boundary. */
-const readSerializeSignalAborted = (signal: IAbortSignal): boolean => {
-  try {
-    if (typeof signal.aborted !== 'boolean') throw new TypeError(SerializeErrorText.signalInvalid)
-    return signal.aborted
-  } catch (error) {
-    if (hasSerializeCode(error, SerializeErrorCode.invalidOption)) throw error
-    throw createSerializeTypeError(
-      SerializeErrorCode.invalidOption,
-      SerializeErrorText.signalAccessorFailed,
-      { cause: error }
-    )
-  }
-}
-
-/** Read an operation abort reason only when cancellation wins the owned-yield race. */
-const readSerializeSignalReason = (signal: IAbortSignal): unknown => {
-  /** Stream cancellation wraps every getter failure, including serialize-tagged values. */
-  const read = tryReadProperty(signal, 'reason')
-  if (read.threw)
-    throw createSerializeTypeError(
-      SerializeErrorCode.invalidOption,
-      SerializeErrorText.signalReasonReadFailed,
-      { cause: read.error }
-    )
-  return read.value
+/** Explicit state for the generator's FIFO queue; slots release pending references when drained. */
+type IEncodeStreamRun = {
+  readonly inFlight: Array<Promise<ISerializeChunk> | undefined>
+  head: number
+  sliceIndex: number
+  readonly type: string | undefined
+  readonly context: string
+  readonly registry: ISerializeRegistry
 }
 
 /**
- * Schedule one default frame yield and own its returned task until callback, cancellation, or
- * failure. The state remains pending until `schedule()` returns so synchronous callbacks still
- * release the handle; every cleanup failure is either the first failure or a contained secondary.
+ * Drains the original Promise in FIFO order, preserving its rejection and async settlement
+ * boundary.
  */
-const scheduleOwnedYield = (
-  scheduler: IScheduler,
-  signal: IAbortSignal | undefined
-): Promise<void> => {
-  let resolveYield!: () => void
-  let rejectYield!: (error: unknown) => void
-  const promise = new Promise<void>((resolve, reject) => {
-    resolveYield = resolve
-    rejectYield = reject
-  })
-  /** Task returned by scheduler, retained until exactly-once cleanup. */
-  let task: ISerializeScheduledTask | undefined
-  /** Whether scheduler callback has fired, including synchronous reentrancy. */
-  let callbackFired = false
-  /** Whether schedule invocation has returned or failed. */
-  let scheduleSettled = false
-  /** Whether a primary outcome has been recorded. */
-  let hasPrimary = false
-  /** First failure, which cleanup failures must not replace. */
-  let primaryError: unknown
-  /** Whether task cancellation has been attempted already. */
-  let cancelAttempted = false
-  /** Whether returned promise has been settled. */
-  let settled = false
-  /** Whether abort listener registration was attempted. */
-  let listenerAttempted = false
-  /** Whether abort listener removal was attempted. */
-  let listenerRemoved = false
-  /** Captured signal listener methods preserve receiver and avoid repeated hostile reads. */
-  let addAbortListener: ISerializeInvokable<void> | undefined
-  let removeAbortListener: ISerializeInvokable<void> | undefined
-  const signalReceiver = signal as object | undefined
-  /** Callback removes the owned listener and cancels the owned task before final settlement. */
-  const cleanup = (): void => {
-    if (task !== undefined && !cancelAttempted) {
-      cancelAttempted = true
-      try {
-        task.cancel()
-      } catch (error) {
-        const cleanupError = translateTaskCancelFailure(error)
-        if (!hasPrimary) {
-          primaryError = cleanupError
-          hasPrimary = true
-        } else {
-          primaryError = attachSerializeCleanupError(primaryError, cleanupError)
-        }
-      }
-    }
-    if (
-      signalReceiver !== undefined &&
-      addAbortListener !== undefined &&
-      removeAbortListener !== undefined &&
-      listenerAttempted &&
-      !listenerRemoved
-    ) {
-      listenerRemoved = true
-      try {
-        Reflect.apply(removeAbortListener, signalReceiver, ['abort', onAbort])
-      } catch (error) {
-        const cleanupError = hasSerializeCode(error, SerializeErrorCode.invalidOption)
-          ? error
-          : createSerializeTypeError(
-              SerializeErrorCode.invalidOption,
-              SerializeErrorText.signalAccessorFailed,
-              { cause: error }
-            )
-        if (!hasPrimary) {
-          primaryError = cleanupError
-          hasPrimary = true
-        } else {
-          primaryError = attachSerializeCleanupError(primaryError, cleanupError)
-        }
-      }
-    }
-  }
-  /** Settle only after the scheduler return boundary exposes the task handle. */
-  const finish = (): void => {
-    if (settled || !scheduleSettled || (!callbackFired && !hasPrimary)) return
-    cleanup()
-    settled = true
-    if (hasPrimary) rejectYield(primaryError)
-    else resolveYield()
-  }
-  /** Abort callback makes cancellation the primary outcome and releases any admitted task. */
-  function onAbort(): void {
-    if (settled || hasPrimary) return
-    try {
-      primaryError = createSerializeError(SerializeErrorCode.aborted, SerializeErrorText.aborted, {
-        cause: signal === undefined ? undefined : readSerializeSignalReason(signal)
-      })
-    } catch (error) {
-      primaryError = error
-    }
-    hasPrimary = true
-    finish()
-  }
-  /**
-   * Recheck structural signal state after listener admission, including hosts that do not replay
-   * abort.
-   */
-  const recheckAbortAfterRegistration = (): void => {
-    if (signal === undefined || hasPrimary) return
-    if (readSerializeSignalAborted(signal)) onAbort()
-  }
-
+async function drainEncodedStream(run: IEncodeStreamRun): Promise<ISerializeChunk> {
+  /** A cursor releases each consumed slot without repeatedly shifting the growable queue. */
+  const pending = run.inFlight[run.head]!
+  run.inFlight[run.head] = undefined
+  run.head += 1
   try {
-    if (signal !== undefined) {
-      if (readSerializeSignalAborted(signal)) {
-        onAbort()
-        scheduleSettled = true
-        finish()
-        return promise
-      }
-      const add = signal.addEventListener
-      const remove = signal.removeEventListener
-      if (typeof add !== 'function' || typeof remove !== 'function') {
-        throw new TypeError(SerializeErrorText.signalInvalid)
-      }
-      addAbortListener = add as ISerializeInvokable<void>
-      removeAbortListener = remove as ISerializeInvokable<void>
-      listenerAttempted = true
-      try {
-        Reflect.apply(addAbortListener, signal, ['abort', onAbort, { once: true }])
-      } catch (error) {
-        const registrationError = hasSerializeCode(error, SerializeErrorCode.invalidOption)
-          ? error
-          : createSerializeTypeError(
-              SerializeErrorCode.invalidOption,
-              SerializeErrorText.signalRegistrationFailed,
-              { cause: error }
-            )
-        let recheckFailed = false
-        let recheckError: unknown
-        try {
-          recheckAbortAfterRegistration()
-        } catch (error) {
-          recheckFailed = true
-          recheckError = error
-        }
-        primaryError = registrationError
-        hasPrimary = true
-        if (recheckFailed) primaryError = attachSerializeCleanupError(primaryError, recheckError)
-        scheduleSettled = true
-        finish()
-        return promise
-      }
-      recheckAbortAfterRegistration()
-      if (hasPrimary) {
-        scheduleSettled = true
-        finish()
-        return promise
-      }
-    }
-    task = scheduler.schedule(() => {
-      callbackFired = true
-      finish()
-    }, 0)
-    scheduleSettled = true
+    return await pending
   } catch (error) {
-    if (!hasPrimary) {
-      primaryError = hasSerializeCode(error, SerializeErrorCode.invalidOption)
-        ? error
-        : createSerializeTypeError(
-            SerializeErrorCode.invalidOption,
-            SerializeErrorText.schedulerInvalid,
-            { cause: error }
-          )
-      hasPrimary = true
-    } else {
-      primaryError = attachSerializeCleanupError(primaryError, error)
-    }
-    scheduleSettled = true
-  }
-  finish()
-  return promise
-}
-
-/** Validate a scheduler clock value at the serialize core boundary. */
-const validateSchedulerNow = (value: unknown): number => {
-  if (typeof value !== 'number') {
-    throw createSerializeTypeError(
-      SerializeErrorCode.invalidOption,
-      SerializeErrorText.schedulerNowType
-    )
-  }
-  if (!Number.isFinite(value)) {
-    throw createSerializeRangeError(
-      SerializeErrorCode.invalidOption,
-      SerializeErrorText.schedulerNowRange
-    )
-  }
-  return value
-}
-
-/** Capture one scheduler task and translate hostile task access into serialize ownership. */
-const snapshotScheduledTask = (value: unknown): ISerializeScheduledTask => {
-  if (value === null || (typeof value !== 'object' && typeof value !== 'function')) {
-    throw createSerializeTypeError(
-      SerializeErrorCode.invalidOption,
-      SerializeErrorText.schedulerTaskInvalid
-    )
-  }
-  let cancel: unknown
-  try {
-    cancel = (value as { cancel?: unknown }).cancel
-  } catch (error) {
-    throw createSerializeTypeError(
-      SerializeErrorCode.invalidOption,
-      SerializeErrorText.schedulerTaskCancelGetterFailed,
-      { cause: error }
-    )
-  }
-  if (typeof cancel !== 'function') {
-    throw createSerializeTypeError(
-      SerializeErrorCode.invalidOption,
-      SerializeErrorText.schedulerTaskInvalid
-    )
-  }
-  const receiver = value
-  return { cancel: () => Reflect.apply(cancel as () => void, receiver, []) }
-}
-
-/** Capture scheduler methods once and translate every scheduler failure into serialize errors. */
-const snapshotSerializeScheduler = (value: unknown): IScheduler | undefined => {
-  if ((typeof value !== 'object' && typeof value !== 'function') || value === null) {
-    return undefined
-  }
-  const receiver = value
-  let now: unknown
-  let schedule: unknown
-  try {
-    now = (value as { now?: unknown }).now
-    schedule = (value as { schedule?: unknown }).schedule
-  } catch (error) {
-    throw createSerializeTypeError(
-      SerializeErrorCode.invalidOption,
-      SerializeErrorText.schedulerAccessorFailed,
-      { cause: error }
-    )
-  }
-  if (typeof now !== 'function' || typeof schedule !== 'function') return undefined
-  const isOwnedInvalidOption = (error: unknown): boolean =>
-    error instanceof Error &&
-    (error as { readonly source?: unknown }).source === SERIALIZE_SOURCE &&
-    (error as { readonly code?: unknown }).code === SerializeErrorCode.invalidOption
-  return {
-    now: () => {
-      try {
-        return validateSchedulerNow(Reflect.apply(now as () => unknown, receiver, []))
-      } catch (error) {
-        if (isOwnedInvalidOption(error)) throw error
-        throw createSerializeTypeError(
-          SerializeErrorCode.invalidOption,
-          SerializeErrorText.schedulerNowType,
-          { cause: error }
-        )
+    throw new SerializeCodecError(
+      SerializeDiagnosticText.streamEncodeFailed(run.sliceIndex, reasonOf(error)),
+      {
+        type: run.type ?? run.registry.primaryType,
+        phase: SerializePhase.encode,
+        context: run.context,
+        chunkIndex: run.sliceIndex,
+        bytesConsumed: 0,
+        code: SerializeErrorCode.encodeFailed,
+        cause: error
       }
-    },
-    schedule: (callback, delayMs) => {
-      try {
-        return snapshotScheduledTask(
-          Reflect.apply(schedule as (callback: () => void, delayMs: number) => unknown, receiver, [
-            callback,
-            delayMs
-          ])
-        )
-      } catch (error) {
-        if (isOwnedInvalidOption(error)) throw error
-        throw createSerializeTypeError(
-          SerializeErrorCode.invalidOption,
-          SerializeErrorText.schedulerInvalid,
-          { cause: error }
-        )
-      }
-    }
+    )
   }
 }
 
@@ -483,135 +123,9 @@ export type IFrameBudgetOptions = {
   readonly scheduler: IScheduler
 }
 
+/** Keeps adaptive slice size inside admitted bounds without changing fractional rounding. */
 const clamp = (value: number, low: number, high: number): number =>
   value < low ? low : value > high ? high : value
-
-/** 有限正数；NaN 与 Infinity 都要挡住。 */
-function assertPositiveMs(value: number, name: string): void {
-  if (!Number.isFinite(value) || value <= 0) {
-    throw createSerializeRangeError(
-      SerializeErrorCode.invalidOption,
-      `frame budget ${name} must be a finite positive number, got ${value}`
-    )
-  }
-}
-
-/** 条目数必须是有限正整数——小数会让片边界漂移，NaN 会让循环停不下来。 */
-function assertCount(value: number, name: string): void {
-  if (!Number.isSafeInteger(value) || value < 1) {
-    throw createSerializeRangeError(
-      SerializeErrorCode.invalidOption,
-      `frame budget ${name} must be a positive integer, got ${value}`
-    )
-  }
-}
-
-/** Capture and validate frame-budget fields exactly once before any iterator side effect. */
-const snapshotFrameBudgetOptions = (options: unknown): IFrameBudgetSnapshot => {
-  try {
-    if (options === null || typeof options !== 'object') {
-      throw new TypeError(SerializeErrorText.operationOptionInvalid)
-    }
-    const candidate = options as Record<string, unknown>
-    const targetMsValue = candidate.targetMs
-    const minItemsValue = candidate.minItems
-    const maxItemsValue = candidate.maxItems
-    const initialItemsValue = candidate.initialItems
-    const yieldToValue = candidate.yieldTo
-    const signalValue = candidate.signal
-    const schedulerValue = candidate.scheduler
-    const targetMs = targetMsValue === undefined ? 8 : targetMsValue
-    const minItems = minItemsValue === undefined ? 64 : minItemsValue
-    const maxItems = maxItemsValue === undefined ? 250_000 : maxItemsValue
-    const initialItems = initialItemsValue === undefined ? 2_048 : initialItemsValue
-    const yieldTo = yieldToValue === undefined ? undefined : (yieldToValue as () => Promise<void>)
-    if (typeof targetMs !== 'number') throw new TypeError(SerializeErrorText.operationOptionInvalid)
-    if (typeof minItems !== 'number') throw new TypeError(SerializeErrorText.operationOptionInvalid)
-    if (typeof maxItems !== 'number') throw new TypeError(SerializeErrorText.operationOptionInvalid)
-    if (typeof initialItems !== 'number')
-      throw new TypeError(SerializeErrorText.operationOptionInvalid)
-    if (yieldTo !== undefined && typeof yieldTo !== 'function') {
-      throw new TypeError(SerializeErrorText.operationOptionInvalid)
-    }
-    const scheduler = snapshotSerializeScheduler(schedulerValue)
-    if (scheduler === undefined) {
-      throw createSerializeTypeError(
-        SerializeErrorCode.invalidOption,
-        SerializeErrorText.schedulerInvalid
-      )
-    }
-    const signal = signalValue === undefined ? undefined : snapshotSerializeSignal(signalValue)
-    assertPositiveMs(targetMs, 'targetMs')
-    assertCount(minItems, 'minItems')
-    assertCount(maxItems, 'maxItems')
-    assertCount(initialItems, 'initialItems')
-    if (maxItems < minItems) {
-      throw createSerializeRangeError(
-        SerializeErrorCode.invalidOption,
-        'frame budget maxItems must be at least minItems'
-      )
-    }
-    return { targetMs, minItems, maxItems, initialItems, yieldTo, signal, scheduler }
-  } catch (error) {
-    return streamOptionFailure(error)
-  }
-}
-
-/** Capture encode-stream fields once, including all inherited frame-budget options. */
-const snapshotEncodeStreamOptions = (options: unknown): IEncodeStreamSnapshot => {
-  try {
-    if (options === null || typeof options !== 'object') {
-      throw new TypeError(SerializeErrorText.operationOptionInvalid)
-    }
-    const candidate = options as Record<string, unknown>
-    const typeValue = candidate.type
-    const contextValue = candidate.context
-    const maxInFlightValue = candidate.maxInFlight
-    const frame = snapshotFrameBudgetOptions(options)
-    const type = typeValue === undefined ? undefined : typeValue
-    const context = contextValue === undefined ? 'stream' : contextValue
-    const maxInFlight = maxInFlightValue === undefined ? 1 : maxInFlightValue
-    if (type !== undefined && typeof type !== 'string') {
-      throw new TypeError(SerializeErrorText.operationOptionInvalid)
-    }
-    if (typeof context !== 'string') throw new TypeError(SerializeErrorText.operationOptionInvalid)
-    if (typeof maxInFlight !== 'number') {
-      throw new TypeError(SerializeErrorText.operationOptionInvalid)
-    }
-    if (!Number.isSafeInteger(maxInFlight) || maxInFlight < 1) {
-      throw createSerializeRangeError(
-        SerializeErrorCode.invalidOption,
-        `maxInFlight must be a positive integer, got ${maxInFlight}`
-      )
-    }
-    return { ...frame, type, context, maxInFlight }
-  } catch (error) {
-    return streamOptionFailure(error)
-  }
-}
-
-/** Capture decode-stream fields once before the source iterator is requested. */
-const snapshotDecodeStreamOptions = (options: unknown): IDecodeStreamSnapshot => {
-  try {
-    if (options === null || typeof options !== 'object') {
-      throw new TypeError(SerializeErrorText.operationOptionInvalid)
-    }
-    const candidate = options as Record<string, unknown>
-    const typeValue = candidate.type
-    const contextValue = candidate.context
-    const signalValue = candidate.signal
-    const type = typeValue === undefined ? undefined : typeValue
-    const context = contextValue === undefined ? 'stream' : contextValue
-    if (type !== undefined && typeof type !== 'string') {
-      throw new TypeError(SerializeErrorText.operationOptionInvalid)
-    }
-    if (typeof context !== 'string') throw new TypeError(SerializeErrorText.operationOptionInvalid)
-    const signal = signalValue === undefined ? undefined : snapshotSerializeSignal(signalValue)
-    return { type, context, signal }
-  } catch (error) {
-    return streamOptionFailure(error)
-  }
-}
 
 /**
  * Slices a large array to fit a frame budget and yields the main thread between slices.
@@ -629,30 +143,38 @@ export async function* sliceByFrameBudget<T>(
 ): AsyncGenerator<readonly T[], void, undefined> {
   const { targetMs, minItems, maxItems, initialItems, yieldTo, signal, scheduler } =
     snapshotFrameBudgetOptions(options)
-  const now = (): number => scheduler.now()
-  const resolveYield = yieldTo ?? (() => scheduleOwnedYield(scheduler, signal))
 
+  /** Current adaptive slice size persists only until this generator finishes. */
   let size = clamp(initialItems, minItems, maxItems)
+  /** Current stream position preserves input order and identifies failures at admission. */
   let index = 0
   while (index < items.length) {
     if (signal !== undefined && readSerializeSignalAborted(signal))
       throw createSerializeError(SerializeErrorCode.aborted, SerializeErrorText.aborted, {
         cause: readSerializeSignalReason(signal)
       })
+    /** Fresh shallow slice exposes each input item exactly once without copying payloads. */
     const slice = items.slice(index, index + size)
-    const startedAt = now()
+    /** Clock sample precedes yielding so the resumed interval measures consumer work. */
+    const startedAt = scheduler.now()
     yield slice
     // 恢复点：消费者已经处理完这一片，时差即其真实耗时
-    const elapsed = now() - startedAt
+    /** Consumer processing interval determines the next slice size after resumption. */
+    const elapsed = scheduler.now() - startedAt
     index += slice.length
 
     // 阻尼调整：直接按比例缩放会在噪声下来回振荡，取当前值与目标值的中点。
     // elapsed 极小时用下限兜底，避免除出一个荒谬的放大倍数。
+    /** Budget ratio uses the established minimum elapsed interval to bound adaptation. */
     const ratio = targetMs / Math.max(elapsed, 0.05)
+    /** Bounded target is damped against current size to avoid oscillation. */
     const target = clamp(Math.round(size * ratio), minItems, maxItems)
     size = clamp(Math.round((size + target) / 2), minItems, maxItems)
 
-    if (index < items.length) await resolveYield()
+    if (index < items.length) {
+      if (yieldTo === undefined) await new OwnedStreamYield(scheduler, signal).run()
+      else await yieldTo()
+    }
   }
 }
 
@@ -699,47 +221,39 @@ export async function* encodeStream<T>(
   items: readonly T[],
   options: IEncodeStreamOptions
 ): AsyncGenerator<ISerializeChunk, void, undefined> {
+  /** All caller getters are captured before any signal, scheduler or registry work. */
   const streamOptions = snapshotEncodeStreamOptions(options)
   const { type, context, maxInFlight } = streamOptions
+  /** Admitted caller signal feeds the operation-owned cancellation bridge. */
   const callerSignal = streamOptions.signal
   /** Exact listener and operation cleanup failures retained until generator finalization. */
   const cleanupErrors: unknown[] = []
-  /** Owner-local reporter keeps public cleanup failures observable without adding an API option. */
-  const reportCleanupFailure = (error: unknown): void => {
+  /** Operation cancellation owns queued work and records cleanup failures for finalization. */
+  const operation = createSerializeOperationSignal(callerSignal, (error) => {
     cleanupErrors.push(error)
-  }
-  const operation = createSerializeOperationSignal(callerSignal, reportCleanupFailure)
+  })
+  /** Owned cancellation is shared by slice admission and every registry request. */
   const operationSignal = operation.signal
+  /** Internal frame snapshot changes only the signal to operation-owned cancellation. */
   const operationOptions = { ...streamOptions, signal: operationSignal }
-  const inFlight: Array<Promise<ISerializeChunk> | undefined> = []
-  let inFlightHead = 0
-  let sliceIndex = 0
+  /** Explicit state owns ordered pending work and diagnostic position until finalization. */
+  const run: IEncodeStreamRun = { inFlight: [], head: 0, sliceIndex: 0, type, context, registry }
+  /** Normal exhaustion suppresses early-return cancellation during finalization. */
   let completed = false
   /** Whether the generator body recorded a primary throw before finalization. */
   let hasPrimary = false
   /** First generator-body failure; cleanup failures must remain secondary to it. */
   let primaryError: unknown
 
-  const drainOne = async (): Promise<ISerializeChunk> => {
-    const pending = inFlight[inFlightHead]!
-    inFlight[inFlightHead] = undefined
-    inFlightHead += 1
-    try {
-      return await pending
-    } catch (error) {
-      // 刻意不透传内层 SerializeCodecError：它的 chunkIndex 说的是「本次编码的第几段」，
-      // 恒为 0，会把「流里的第几片」这个真正有用的位置盖掉。原错误挂在 cause 上。
-      throw encodeStreamFailure(error, sliceIndex, type, context, registry)
-    }
-  }
-
   try {
+    /** Each admitted frame stays owned until its original encode Promise enters the FIFO. */
     for await (const slice of sliceByFrameBudget(items, operationOptions)) {
       if (readSerializeSignalAborted(operationSignal)) {
         throw createSerializeError(SerializeErrorCode.aborted, SerializeErrorText.aborted, {
           cause: readSerializeSignalReason(operationSignal)
         })
       }
+      /** Original admitted Promise is observed immediately and drained in FIFO order. */
       let pending: Promise<ISerializeChunk>
       try {
         // Promise.resolve preserves native Promise identity and assimilates thenables while the
@@ -755,16 +269,16 @@ export async function* encodeStream<T>(
       // Observe every queued rejection at admission; draining later must still await the original
       // Promise so ordered output and exact error identity remain unchanged.
       pending.catch(() => undefined)
-      inFlight.push(pending)
+      run.inFlight.push(pending)
       // 背压：在途数达到上限就先把最早那笔排空，避免无限堆积
-      while (inFlight.length - inFlightHead >= maxInFlight) {
-        yield await drainOne()
-        sliceIndex++
+      while (run.inFlight.length - run.head >= maxInFlight) {
+        yield await drainEncodedStream(run)
+        run.sliceIndex++
       }
     }
-    while (inFlight.length - inFlightHead > 0) {
-      yield await drainOne()
-      sliceIndex++
+    while (run.inFlight.length - run.head > 0) {
+      yield await drainEncodedStream(run)
+      run.sliceIndex++
     }
     completed = true
   } catch (error) {
@@ -776,10 +290,11 @@ export async function* encodeStream<T>(
       operation.abort(SerializeErrorText.streamConsumerClosed)
     // Admission-time rejection observers retain ownership of residual noncooperative work.
     // Do not await it here: a parser that ignores abort must not block generator finalization.
-    for (const pending of inFlight.slice(inFlightHead)) pending?.catch(() => undefined)
+    for (let index = run.head; index < run.inFlight.length; index++)
+      run.inFlight[index]?.catch(() => undefined)
     operation.dispose()
-    inFlight.length = 0
-    inFlightHead = 0
+    run.inFlight.length = 0
+    run.head = 0
     finalizeEncodeStreamCleanup(cleanupErrors, hasPrimary, primaryError)
   }
 }
@@ -803,10 +318,13 @@ export async function* decodeStream(
   } = {}
 ): AsyncGenerator<unknown, void, undefined> {
   const { type, context, signal } = snapshotDecodeStreamOptions(options)
+  /** Current stream position preserves input order and identifies failures at admission. */
   let index = 0
+  /** Exact error produced by inner decode wrapping must not be wrapped twice. */
   let ownedError: unknown
   try {
     checkStreamAbort(signal)
+    /** Each source chunk is decoded before another pull, preserving sequential backpressure. */
     for await (const chunk of chunks as AsyncIterable<ISerializeChunk>) {
       checkStreamAbort(signal)
       try {
@@ -814,7 +332,7 @@ export async function* decodeStream(
       } catch (error) {
         // 同上：保留流位置，内层错误挂 cause
         ownedError = new SerializeCodecError(
-          `decode stream failed at chunk ${index}: ${streamFailureReason(error)}`,
+          SerializeDiagnosticText.streamDecodeFailed(index, reasonOf(error)),
           {
             type: type ?? registry.primaryType,
             phase: SerializePhase.decode,
@@ -832,9 +350,10 @@ export async function* decodeStream(
       checkStreamAbort(signal)
     }
   } catch (error) {
-    if (error === ownedError || hasSerializeCode(error, SerializeErrorCode.aborted)) throw error
+    if (error === ownedError || isSerializeTaggedError(error, SerializeErrorCode.aborted))
+      throw error
     throw new SerializeCodecError(
-      `decode stream failed at chunk ${index}: ${streamFailureReason(error)}`,
+      SerializeDiagnosticText.streamDecodeFailed(index, reasonOf(error)),
       {
         type: type ?? registry.primaryType,
         phase: SerializePhase.decode,
@@ -862,27 +381,38 @@ export async function collectStream(
   encoder?: ITextEncoder,
   options?: ICollectStreamOptions
 ): Promise<ISerializeChunk> {
+  /** Collector policy is captured before encoder admission and source acquisition. */
   const collectOptions = snapshotCollectOptions(options)
+  /** Encoder method is captured once before touching even a text-only iterator. */
   const capturedEncoder = snapshotCollectEncoder(encoder)
+  /** Validated chunk snapshots retain input order until one final join. */
   const collected: ISerializeChunk[] = []
+  /** Binary presence selects the established mixed-stream conversion policy. */
   let sawBytes = false
+  /** Validated byte progress excludes text until the final conversion stage. */
   let bytesConsumed = 0
+  /** Current stream position preserves input order and identifies failures at admission. */
   let index = 0
+  /** Each text conversion receives byte progress from its original admission position. */
   const chunkProgress: number[] = []
+  /** Acquired iterator is closed only after failure before normal exhaustion. */
   let iterator: AsyncIterator<ISerializeChunk> | Iterator<ISerializeChunk> | undefined
   /** Undefined is a valid thrown value, so failure presence is separate from its payload. */
   let hasPrimaryError = false
+  /** Exact first failure survives iterator cleanup and final boundary projection. */
   let primaryError: unknown
+  /** Normal exhaustion suppresses early-return cancellation during finalization. */
   let completed = false
   try {
     checkStreamAbort(collectOptions.signal)
     iterator = getCollectIterator(chunks)
     while (true) {
       checkStreamAbort(collectOptions.signal)
+      /** Awaited protocol result is inspected before any chunk-specific access. */
       const step = await iterator.next()
       if (step === null || (typeof step !== 'object' && typeof step !== 'function'))
         throw new SerializeCodecError(SerializeErrorText.collectOptionInvalid, {
-          type: 'stream',
+          type: SerializeContext.stream,
           phase: SerializePhase.encode,
           context: collectOptions.context,
           chunkIndex: index,
@@ -890,14 +420,15 @@ export async function collectStream(
           code: SerializeErrorCode.encodeFailed,
           cause: step
         })
+      /** Completion is read once and short-circuits payload access for truthy values. */
       let done: unknown
       try {
         done = step.done
       } catch (error) {
         throw new SerializeCodecError(
-          `collect stream failed at chunk ${index}: ${streamFailureReason(error)}`,
+          SerializeDiagnosticText.streamCollectFailed(index, reasonOf(error)),
           {
-            type: 'stream',
+            type: SerializeContext.stream,
             phase: SerializePhase.encode,
             context: collectOptions.context,
             chunkIndex: index,
@@ -911,14 +442,15 @@ export async function collectStream(
         completed = true
         break
       }
+      /** Payload is read only for nonterminal results and validated before tag-specific access. */
       let chunk: unknown
       try {
         chunk = step.value
       } catch (error) {
         throw new SerializeCodecError(
-          `collect stream failed at chunk ${index}: ${streamFailureReason(error)}`,
+          SerializeDiagnosticText.streamCollectFailed(index, reasonOf(error)),
           {
-            type: 'stream',
+            type: SerializeContext.stream,
             phase: SerializePhase.encode,
             context: collectOptions.context,
             chunkIndex: index,
@@ -929,8 +461,9 @@ export async function collectStream(
         )
       }
       checkStreamAbort(collectOptions.signal)
+      /** Frozen tuple snapshot prevents hostile raw input from changing after admission. */
       const validatedChunk = validateSerializeChunk(chunk, {
-        type: 'stream',
+        type: SerializeContext.stream,
         phase: SerializePhase.encode,
         context: collectOptions.context,
         chunkIndex: index,
@@ -939,7 +472,7 @@ export async function collectStream(
       chunkProgress.push(bytesConsumed)
       if (validatedChunk[0] === SerializeChunkKind.value) {
         throw new SerializeCodecError(SerializeErrorText.collectValue, {
-          type: 'stream',
+          type: SerializeContext.stream,
           phase: SerializePhase.encode,
           context: collectOptions.context,
           chunkIndex: index,
@@ -958,25 +491,26 @@ export async function collectStream(
     hasPrimaryError = true
     primaryError = error
   } finally {
+    /** Iterator return failure remains secondary to an earlier operation failure. */
     const cleanupError = await closeCollectIterator(iterator, completed)
     if (cleanupError !== undefined) {
       if (!hasPrimaryError) primaryError = cleanupError
-      else primaryError = attachSerializeCleanupError(primaryError, cleanupError)
+      else primaryError = attachSecondaryErrors(primaryError, [cleanupError])
       hasPrimaryError = true
     }
   }
   if (hasPrimaryError) {
     if (
-      hasSerializeCode(primaryError, SerializeErrorCode.invalidChunk) ||
-      hasSerializeCode(primaryError, SerializeErrorCode.invalidOption) ||
-      hasSerializeCode(primaryError, SerializeErrorCode.aborted)
+      isSerializeTaggedError(primaryError, SerializeErrorCode.invalidChunk) ||
+      isSerializeTaggedError(primaryError, SerializeErrorCode.invalidOption) ||
+      isSerializeTaggedError(primaryError, SerializeErrorCode.aborted)
     )
       throw primaryError
     if (primaryError instanceof SerializeCodecError) throw primaryError
     throw new SerializeCodecError(
-      `collect stream failed at chunk ${index}: ${streamFailureReason(primaryError)}`,
+      SerializeDiagnosticText.streamCollectFailed(index, reasonOf(primaryError)),
       {
-        type: 'stream',
+        type: SerializeContext.stream,
         phase: SerializePhase.encode,
         context: collectOptions.context,
         chunkIndex: index,
@@ -986,209 +520,5 @@ export async function collectStream(
       }
     )
   }
-  if (collected.length === 0) {
-    if (collectOptions.empty === 'reject')
-      throw createSerializeError(SerializeErrorCode.encodeFailed, SerializeErrorText.collectEmpty, {
-        context: collectOptions.context
-      })
-    return ['text', '']
-  }
-  if (collected.length === 1) return collected[0]
-  if (!sawBytes) {
-    // Joining once avoids repeatedly copying the accumulated string for a
-    // long stream (which otherwise turns collection into quadratic work).
-    return ['text', collected.map((chunk) => chunk[1] as string).join('')]
-  }
-  // core 无默认 Encoding adapter：出现 bytes 需要合并时必须注入 encoder，不直接使用宿主 TextEncoder。
-  const enc = capturedEncoder
-  if (enc === undefined) {
-    throw createSerializeError(
-      SerializeErrorCode.envUnsupported,
-      SerializeErrorText.encoderInvalid,
-      { context: collectOptions.context }
-    )
-  }
-  const parts = collected.map((chunk, chunkIndex) =>
-    chunk[0] === SerializeChunkKind.bytes
-      ? chunk[1]
-      : encodeSerializeTextChunk(enc, chunk[1] as string, {
-          type: 'stream',
-          phase: SerializePhase.encode,
-          context: collectOptions.context,
-          chunkIndex,
-          bytesConsumed: chunkProgress[chunkIndex] ?? 0
-        })
-  )
-  let total = 0
-  for (const part of parts) total += part.byteLength
-  const merged = new Uint8Array(total)
-  let offset = 0
-  for (const part of parts) {
-    merged.set(part, offset)
-    offset += part.byteLength
-  }
-  return ['bytes', merged]
-}
-
-/** Captures collector options and rejects malformed values before touching the source iterator. */
-function snapshotCollectOptions(options: unknown): {
-  readonly signal?: IAbortSignal
-  readonly empty: 'text' | 'reject'
-  readonly context: string
-} {
-  try {
-    if (options === undefined) return { empty: 'text', context: 'stream' }
-    if (options === null || typeof options !== 'object' || Array.isArray(options))
-      throw new TypeError(SerializeErrorText.collectOptionInvalid)
-    const candidate = options as Record<string, unknown>
-    const signal = candidate.signal
-    const empty = candidate.empty
-    const context = candidate.context
-    if (empty !== undefined && empty !== 'text' && empty !== 'reject')
-      throw new TypeError(SerializeErrorText.collectOptionInvalid)
-    if (context !== undefined && typeof context !== 'string')
-      throw new TypeError(SerializeErrorText.collectOptionInvalid)
-    return {
-      signal: signal === undefined ? undefined : snapshotSerializeSignal(signal),
-      empty: empty ?? 'text',
-      context: context ?? 'stream'
-    }
-  } catch (error) {
-    return streamOptionFailure(error)
-  }
-}
-
-/** Captures an encoder method once and preserves its receiver across mixed collection. */
-function snapshotCollectEncoder(encoder: ITextEncoder | undefined): ITextEncoder | undefined {
-  if (encoder === undefined) return undefined
-  try {
-    if (encoder === null || (typeof encoder !== 'object' && typeof encoder !== 'function'))
-      throw new TypeError(SerializeErrorText.encoderInvalid)
-    const target = encoder as { readonly encode?: unknown }
-    let method: unknown
-    method = target.encode
-    if (typeof method !== 'function') throw new TypeError(SerializeErrorText.encoderInvalid)
-    const receiver = encoder as object
-    return {
-      encode: (input: string): Uint8Array =>
-        invokeCollectEncoderWithReceiver(method as ISerializeInvokable<Uint8Array>, receiver, [
-          input
-        ])
-    }
-  } catch (error) {
-    return streamOptionFailure(error)
-  }
-}
-
-/** Resolves exactly one async or sync iterator after option and cancellation admission. */
-function getCollectIterator(
-  source: AsyncIterable<ISerializeChunk> | Iterable<ISerializeChunk>
-): AsyncIterator<ISerializeChunk> | Iterator<ISerializeChunk> {
-  try {
-    const candidate = source as {
-      readonly [Symbol.asyncIterator]?: () => AsyncIterator<ISerializeChunk>
-      readonly [Symbol.iterator]?: () => Iterator<ISerializeChunk>
-    }
-    const asyncFactory = candidate[Symbol.asyncIterator]
-    if (asyncFactory !== undefined) {
-      if (typeof asyncFactory !== 'function')
-        throw new TypeError(SerializeErrorText.collectOptionInvalid)
-      const sourceIterator = invokeCollectEncoderWithReceiver(
-        asyncFactory as ISerializeInvokable<AsyncIterator<ISerializeChunk>>,
-        candidate as object,
-        []
-      )
-      const next = sourceIterator.next
-      const close = sourceIterator.return
-      return {
-        next: (): Promise<IteratorResult<ISerializeChunk>> =>
-          invokeCollectEncoderWithReceiver(
-            next as ISerializeInvokable<Promise<IteratorResult<ISerializeChunk>>>,
-            sourceIterator as object,
-            []
-          ),
-        return: close
-          ? (): Promise<IteratorResult<ISerializeChunk>> =>
-              invokeCollectEncoderWithReceiver(
-                close as ISerializeInvokable<Promise<IteratorResult<ISerializeChunk>>>,
-                sourceIterator as object,
-                []
-              )
-          : undefined
-      }
-    }
-    const syncFactory = candidate[Symbol.iterator]
-    if (syncFactory !== undefined) {
-      if (typeof syncFactory !== 'function')
-        throw new TypeError(SerializeErrorText.collectOptionInvalid)
-      const sourceIterator = invokeCollectEncoderWithReceiver(
-        syncFactory as ISerializeInvokable<Iterator<ISerializeChunk>>,
-        candidate as object,
-        []
-      )
-      const next = sourceIterator.next
-      const close = sourceIterator.return
-      return {
-        next: (): IteratorResult<ISerializeChunk> =>
-          invokeCollectEncoderWithReceiver(
-            next as ISerializeInvokable<IteratorResult<ISerializeChunk>>,
-            sourceIterator as object,
-            []
-          ),
-        return: close
-          ? (): IteratorResult<ISerializeChunk> =>
-              invokeCollectEncoderWithReceiver(
-                close as ISerializeInvokable<IteratorResult<ISerializeChunk>>,
-                sourceIterator as object,
-                []
-              )
-          : undefined
-      }
-    }
-    throw new TypeError(SerializeErrorText.collectOptionInvalid)
-  } catch (error) {
-    if (hasSerializeCode(error, SerializeErrorCode.invalidOption)) throw error
-    throw new SerializeCodecError(
-      `collect stream failed at chunk 0: ${streamFailureReason(error)}`,
-      {
-        type: 'stream',
-        phase: SerializePhase.encode,
-        context: 'stream',
-        chunkIndex: 0,
-        bytesConsumed: 0,
-        code: SerializeErrorCode.encodeFailed,
-        cause: error
-      }
-    )
-  }
-}
-
-/** Checks cooperative cancellation at each collector admission boundary. */
-function checkStreamAbort(signal: IAbortSignal | undefined): void {
-  if (signal !== undefined && readSerializeSignalAborted(signal))
-    throw createSerializeError(SerializeErrorCode.aborted, SerializeErrorText.aborted, {
-      cause: readSerializeSignalReason(signal)
-    })
-}
-
-/** Calls iterator return at most once and reports cleanup failure without replacing primary. */
-async function closeCollectIterator(
-  iterator: AsyncIterator<ISerializeChunk> | Iterator<ISerializeChunk> | undefined,
-  completed: boolean
-): Promise<unknown> {
-  if (iterator === undefined || completed) return undefined
-  try {
-    const close = iterator.return
-    if (typeof close !== 'function') return undefined
-    await close()
-    return undefined
-  } catch (error) {
-    return createSerializeError(
-      SerializeErrorCode.encodeFailed,
-      SerializeErrorText.collectCleanupFailed,
-      {
-        cause: error
-      }
-    )
-  }
+  return mergeCollectedStream(collected, sawBytes, chunkProgress, capturedEncoder, collectOptions)
 }
