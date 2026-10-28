@@ -1,0 +1,77 @@
+{
+  "name": "@migaia/log-host",
+  "version": "0.0.11",
+  "private": true,
+  "description": "Asynchronous runtime-neutral logging host with composable delivery features.",
+  "files": [
+    "dist",
+    "README.md",
+    "README.en.md",
+    "USEGUIDE.md",
+    "USEGUIDE.en.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./plugin": {
+      "types": "./dist/plugin.d.ts",
+      "default": "./dist/plugin.js"
+    },
+    "./features": {
+      "types": "./dist/features/index.d.ts",
+      "default": "./dist/features/index.js"
+    },
+    "./features/threshold": {
+      "types": "./dist/features/threshold.d.ts",
+      "default": "./dist/features/threshold.js"
+    },
+    "./features/filter": {
+      "types": "./dist/features/filter.d.ts",
+      "default": "./dist/features/filter.js"
+    },
+    "./features/uuid": {
+      "types": "./dist/features/uuid.d.ts",
+      "default": "./dist/features/uuid.js"
+    },
+    "./features/format": {
+      "types": "./dist/features/format.d.ts",
+      "default": "./dist/features/format.js"
+    },
+    "./features/batch": {
+      "types": "./dist/features/batch.d.ts",
+      "default": "./dist/features/batch.js"
+    },
+    "./features/retry": {
+      "types": "./dist/features/retry.d.ts",
+      "default": "./dist/features/retry.js"
+    },
+    "./features/timeout": {
+      "types": "./dist/features/timeout.d.ts",
+      "default": "./dist/features/timeout.js"
+    }
+  },
+  "scripts": {
+    "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",
+    "fmt": "oxfmt src test package.json tsconfig.json tsconfig.build.json tsconfig.test.json vitest.config.ts README.md README.en.md USEGUIDE.md USEGUIDE.en.md",
+    "lint": "oxlint src test",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
+    "test": "pnpm run build && vitest run",
+    "release:patch": "pnpm version patch --no-git-tag-version",
+    "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
+  },
+  "dependencies": {
+    "@migaia/event-subscriber": "workspace:^",
+    "@migaia/lifecycle": "workspace:^",
+    "@migaia/middleware-pipeline": "workspace:^",
+    "@migaia/plugin-host": "workspace:^",
+    "@migaia/utils": "workspace:^"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
