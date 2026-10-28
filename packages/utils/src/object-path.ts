@@ -1,3 +1,7 @@
+/**
+ * Owns typed path grammar, diagnostic traversal, immutable writes and accessor-local root state.
+ * Exposes path operations without config ownership, persistence or snapshot policy.
+ */
 import { ERROR_SOURCE, UtilsErrorCode } from './error-code.ts'
 import { UtilsErrorText } from './error-text.ts'
 import { attachErrorIdentity } from './error.ts'
@@ -245,7 +249,11 @@ export function parseObjectPath(path: string | IObjectPathTuple): IObjectPathTup
   return Object.freeze(segments)
 }
 
-/** Traverses each segment once and preserves missing, blocked, and thrown-getter diagnostics. */
+/**
+ * Traverses the admitted path and preserves even custom tuple slice/getter ordering. Parsed paths
+ * are bounded by maxSegments (256); typed direct tuples by IPathDepth (eight). Prefix snapshots
+ * retain their original eager timing within these compile-time bounds.
+ */
 function probeParsedObjectPath<T, P extends IObjectPathInput<T>>(
   object: T,
   path: P,
@@ -333,32 +341,50 @@ export function set<T, const P extends IObjectPathInput<T>>(
   path: P,
   nextValue: IObjectPathWriteValue<T, P>
 ): T {
+  /** Canonical admission fixes the path before recursive immutable reconstruction begins. */
   const segments = parseObjectPath(path)
-  const update = (current: unknown, index: number): unknown => {
-    if (index === segments.length) return nextValue
-    const key = segments[index]
-    if (
-      current !== undefined &&
-      (current === null || (typeof current !== 'object' && typeof current !== 'function'))
-    )
-      throw invalidPath(String(key), 'path is blocked by a non-object value')
-    const source = current === undefined ? (typeof key === 'number' ? [] : {}) : current
-    const exists = Reflect.has(source as object, key)
-    const child = exists ? Reflect.get(source as object, key, source) : undefined
-    const updated = update(child, index + 1)
-    if (exists && Object.is(child, updated)) return source
-    const target = cloneContainer(source as object, key)
-    const descriptor = Object.getOwnPropertyDescriptor(source as object, key)
-    Object.defineProperty(
-      target,
-      key,
-      descriptor && 'value' in descriptor
-        ? { ...descriptor, value: updated }
-        : { value: updated, enumerable: true, configurable: true, writable: true }
-    )
-    return target
-  }
-  return update(object, 0) as T
+  return updateObjectPath(object, segments, nextValue, 0) as T
+}
+
+/**
+ * Reconstructs the admitted path from leaf to root while preserving descriptor/getter order. Depth
+ * is bounded by the compile-time maxSegments (256); each traversed container is copied once.
+ */
+function updateObjectPath(
+  current: unknown,
+  segments: IObjectPathTuple,
+  nextValue: unknown,
+  index: number
+): unknown {
+  if (index === segments.length) return nextValue
+  /** Current key determines the shape of an absent intermediate container. */
+  const key = segments[index]
+  if (
+    current !== undefined &&
+    (current === null || (typeof current !== 'object' && typeof current !== 'function'))
+  )
+    throw invalidPath(String(key), 'path is blocked by a non-object value')
+  /** Existing containers retain their original receiver and prototype during traversal. */
+  const source = current === undefined ? (typeof key === 'number' ? [] : {}) : current
+  /** Existence is distinct from an own or inherited value of undefined. */
+  const exists = Reflect.has(source as object, key)
+  /** Read exactly once before descending to preserve accessor side effects. */
+  const child = exists ? Reflect.get(source as object, key, source) : undefined
+  /** Child result is known before any ancestor clone or descriptor read. */
+  const updated = updateObjectPath(child, segments, nextValue, index + 1)
+  if (exists && Object.is(child, updated)) return source
+  /** Only changed ancestors are cloned; untouched branches retain their identities. */
+  const target = cloneContainer(source as object, key)
+  /** Existing data properties retain flags; accessors become the established writable data form. */
+  const descriptor = Object.getOwnPropertyDescriptor(source as object, key)
+  Object.defineProperty(
+    target,
+    key,
+    descriptor && 'value' in descriptor
+      ? { ...descriptor, value: updated }
+      : { value: updated, enumerable: true, configurable: true, writable: true }
+  )
+  return target
 }
 
 /** One reusable accessor owns the latest immutable root and its captured observation hooks. */
@@ -404,11 +430,11 @@ class PathAccessor<T> implements IPathAccessor<T> {
     }
   }
   /** A short event-local replacement callback transforms one get result. */
-  #transformGet = <P extends IObjectPathInput<T>>(
+  #transformGet<P extends IObjectPathInput<T>>(
     value: IObjectPathValue<T, P>,
     probe: IPathValueProbe<T, P>,
     hook: IPathAccessorOptions<T>['onGet']
-  ): IObjectPathValue<T, P> => {
+  ): IObjectPathValue<T, P> {
     let transformed = value
     const event: IPathGetEvent<T, P> = {
       originKey: probe.originKey,
@@ -423,11 +449,11 @@ class PathAccessor<T> implements IPathAccessor<T> {
     return transformed
   }
   /** A short event-local replacement callback transforms one proposed write. */
-  #transformSet = <P extends IObjectPathInput<T>>(
+  #transformSet<P extends IObjectPathInput<T>>(
     value: IObjectPathWriteValue<T, P>,
     probe: IPathValueProbe<T, P>,
     hook: IPathAccessorOptions<T>['onSet']
-  ): IObjectPathWriteValue<T, P> => {
+  ): IObjectPathWriteValue<T, P> {
     let transformed = value
     const event: IPathSetEvent<T, P> = {
       originKey: probe.originKey,
