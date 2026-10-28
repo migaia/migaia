@@ -20,12 +20,12 @@ import type {
 import type { IRpcAuthenticationRetain, IRpcCallFeature } from '@migaia/rpc-contract/interfaces'
 import { RpcError, RuntimeApiErrorText } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
-import { isNativeThreadChild } from './child.js'
-import { threadRuntimeResource } from './runtime-resource.js'
-import { expandThreadSpawn, isShortThreadSpawn, type IThreadShortSpawn } from './short-spawn.js'
-import { ThreadSource, type IThreadSpawn } from './source.js'
-import { openThreadParent } from './parent.js'
-import { THREAD_NAMESPACE } from './constants.js'
+import { isNativeThreadChild } from './child.ts'
+import { threadRuntimeResource } from './runtime-resource.ts'
+import { expandThreadSpawn, isShortThreadSpawn, type IThreadShortSpawn } from './short-spawn.ts'
+import { ThreadSource, type IThreadSpawn } from './source.ts'
+import { openThreadParent } from './parent.ts'
+import { THREAD_NAMESPACE } from './constants.ts'
 
 /** Transport installation is cold; self and lifecycle authority belong to the receiving Host. */
 export type IThreadCommonOptions = Readonly<{

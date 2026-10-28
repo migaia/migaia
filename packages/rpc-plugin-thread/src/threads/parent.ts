@@ -17,12 +17,12 @@ import type {
   IRpcTransportContext
 } from '@migaia/rpc-contract/interfaces'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createNodeThreadCarrier } from './channel.js'
-import { nativeThreadInitial, threadChildResource, threadWebParent } from './child.js'
-import { readNodeThreadRuntime } from './runtime-resource.js'
-import type { IThreadBootstrap } from './bootstrap.js'
-import { invalidThreadConfig } from './error.js'
-import { ThreadErrorText } from './error-text.js'
+import { createNodeThreadCarrier } from './channel.ts'
+import { nativeThreadInitial, threadChildResource, threadWebParent } from './child.ts'
+import { readNodeThreadRuntime } from './runtime-resource.ts'
+import type { IThreadBootstrap } from './bootstrap.ts'
+import { invalidThreadConfig } from './error.ts'
+import { ThreadErrorText } from './error-text.ts'
 
 /** A child borrows its actual native parent connection and never gains native mutation authority. */
 class ThreadParent {

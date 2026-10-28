@@ -2,8 +2,8 @@ import { MessageChannel } from 'node:worker_threads'
 import { describe, expect, it, vi } from 'vitest'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
 import { createThreadBootstrap, readThreadInitial } from '../../dist/threads/bootstrap.js'
-import { ThreadBootstrap } from '../../src/threads/constants.js'
-import { borrowedThreadPlugin } from './fixtures/borrowed-source.js'
+import { ThreadBootstrap } from '../../src/threads/constants.ts'
+import { borrowedThreadPlugin } from './fixtures/borrowed-source.ts'
 
 /** The real native initial reader supplies only trusted launch facts to the one Session owner. */
 function nativeChildSource(port: MessageChannel['port2'], bootstrap: unknown) {

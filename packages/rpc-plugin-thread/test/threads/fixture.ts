@@ -16,9 +16,9 @@ import type { IRpcProviderDeclaration } from '@migaia/rpc-contract/protocol'
 import {
   createNodeThreadLauncher,
   createNodeThreadChannelFactory
-} from '../../src/threads/node-launcher.js'
+} from '../../src/threads/node-launcher.ts'
 
-import type { IThreadSpawn } from '../../src/threads/source.js'
+import type { IThreadSpawn } from '../../src/threads/source.ts'
 
 /** The genuine native Host contributes one actual thread namespace after installation. */
 export type INativeFixtureHost = ReturnType<typeof defineHost> &
@@ -41,7 +41,7 @@ export type INativeFixtureHost = ReturnType<typeof defineHost> &
   }>
 
 import { threadRuntimeResource } from '../../dist/threads/runtime-resource.js'
-import { threadRuntimeResource as sourceThreadRuntimeResource } from '../../src/threads/runtime-resource.js'
+import { threadRuntimeResource as sourceThreadRuntimeResource } from '../../src/threads/runtime-resource.ts'
 
 /** Capture native runtime objects only at the fixture construction boundary. */
 const nativeWorkers = vi.hoisted(() => new Map<number, import('node:worker_threads').Worker>())

@@ -8,12 +8,12 @@ import { IpcReporterContext } from '@migaia/rpc-host/sdk'
 import { deferred, hostRethrowReporter, type IAbortSignal } from '@migaia/utils/promise'
 import type { IRpcCarrier } from '@migaia/rpc-contract/interfaces'
 import { RpcTransportError } from '@migaia/rpc-contract/errors'
-import { readNodeThreadRuntime } from './runtime-resource.js'
-import { readThreadInitial, type IThreadBootstrap } from './bootstrap.js'
-import { createWebThreadCarrier } from './channel.js'
-import { ThreadEvent, THREAD_BOOTSTRAP_TIMEOUT_MS } from './constants.js'
-import { ThreadErrorText } from './error-text.js'
-import type { IThreadWebPort } from './types.js'
+import { readNodeThreadRuntime } from './runtime-resource.ts'
+import { readThreadInitial, type IThreadBootstrap } from './bootstrap.ts'
+import { createWebThreadCarrier } from './channel.ts'
+import { ThreadEvent, THREAD_BOOTSTRAP_TIMEOUT_MS } from './constants.ts'
+import { ThreadErrorText } from './error-text.ts'
+import type { IThreadWebPort } from './types.ts'
 
 /** A guard and automatic parent attachment share this exact native initial capture. */
 const webChildren = new WeakMap<IThreadWebPort, ThreadChildCapture>()

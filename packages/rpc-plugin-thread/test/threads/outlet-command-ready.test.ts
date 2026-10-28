@@ -9,7 +9,7 @@ import { createUnitBudget } from '@migaia/supervision'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { defineHost } from '@migaia/plugin-host'
 import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
-import type { INativeFixtureHost } from './fixture.js'
+import type { INativeFixtureHost } from './fixture.ts'
 
 /** A real Worker uses only public factories and exposes its own admitted instance identity. */
 const entry = fileURLToPath(new URL('./fixtures/outlet-command-worker.mjs', import.meta.url))

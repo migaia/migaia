@@ -6,7 +6,7 @@ import { normalizeRpcPortable } from '@migaia/rpc-contract/portable'
 import { tagRpcError } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import type { IThreadSpec } from '@migaia/supervision/threads'
-import { ThreadErrorText } from './error-text.js'
+import { ThreadErrorText } from './error-text.ts'
 
 /** Preserve native TypeError and original cause while naming the rejected field. */
 export function invalidThreadConfig(field: string, message: string, cause?: unknown): never {

@@ -1,7 +1,7 @@
 import { MessageChannel } from 'node:worker_threads'
 import { describe, expect, it } from 'vitest'
 import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'
-import { borrowedThreadPlugin } from './fixtures/borrowed-source.js'
+import { borrowedThreadPlugin } from './fixtures/borrowed-source.ts'
 import { deferred } from '@migaia/utils/promise'
 
 /** The two accepted remote descriptions expose only the opposite peer's application methods. */

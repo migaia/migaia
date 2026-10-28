@@ -3,7 +3,7 @@
  * and parent facts remain borrowed runtime values rather than inferred RPC metadata.
  */
 import { detectServerRuntime, ServerRuntime } from '@migaia/utils'
-import type { IThreadRuntimeResource, IThreadNativeRuntimeModule } from './runtime-types.js'
+import type { IThreadRuntimeResource, IThreadNativeRuntimeModule } from './runtime-types.ts'
 
 /** Synchronous factory admission borrows real Node facts after canonical runtime selection only. */
 const nodeRuntime =

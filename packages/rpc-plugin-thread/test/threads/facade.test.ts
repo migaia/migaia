@@ -1,11 +1,11 @@
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it } from 'vitest'
-import { createNodeThreadChannelFactory } from '../../src/threads/node-launcher.js'
-import { nativeFixture, workerEntry } from './fixture.js'
+import { createNodeThreadChannelFactory } from '../../src/threads/node-launcher.ts'
+import { nativeFixture, workerEntry } from './fixture.ts'
 import { RpcCallMode, RpcWireKind } from '@migaia/rpc-contract/protocol'
 import { timeout } from '@migaia/rpc-host/features/timeout'
 import type { IRpcNotifyOptions } from '@migaia/rpc-host'
-import { threadFrames } from './frame.js'
+import { threadFrames } from './frame.ts'
 describe('thread Host facade', () => {
   it.each([false, true])(
     'Host forwards callWallTimeMs as the total request deadline (timeout disabled: %s)',

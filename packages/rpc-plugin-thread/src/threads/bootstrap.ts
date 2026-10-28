@@ -5,10 +5,10 @@
 import { normalizeRpcGeneration, RpcWireLimit } from '@migaia/rpc-contract/protocol'
 import { normalizeRpcPortable, type IRpcPortableValue } from '@migaia/rpc-contract/portable'
 import type { IRpcLocalSourceFacts } from '@migaia/rpc-contract/interfaces'
-import { ThreadBootstrap } from './constants.js'
-import { invalidThreadConfig } from './error.js'
-import { ThreadErrorText } from './error-text.js'
-import type { IThreadLaunchFacts } from './types.js'
+import { ThreadBootstrap } from './constants.ts'
+import { invalidThreadConfig } from './error.ts'
+import { ThreadErrorText } from './error-text.ts'
+import type { IThreadLaunchFacts } from './types.ts'
 
 /** Business initialization stays separate from trusted native launch relationship facts. */
 export type IThreadBootstrapData = Readonly<{ peerId: string; data?: IRpcPortableValue }>
