@@ -1,7 +1,7 @@
 import { useCallback, useSyncExternalStore } from 'react'
 import type { IDisposer, IRuntime } from '@migaia/reactive'
 import { assertReactiveOwnedBy } from '@migaia/reactive/extension'
-import { notifyReact } from './notify-react.js'
+import { notifyReact } from './notify-react.ts'
 
 /**
  * Stable reactive source already registered to its Runtime. Its tracked value and untracked peek

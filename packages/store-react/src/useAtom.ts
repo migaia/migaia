@@ -2,9 +2,9 @@ import { useCallback, useContext, useSyncExternalStore } from 'react'
 import type { IReadableAtom, IWritableAtom } from '@migaia/store-keyed/reactive/atom'
 import type { Resource } from '@migaia/resource'
 import type { IWritableAtomDefinition } from '@migaia/store-keyed/atom/definition'
-import { useResource } from './useStore.js'
-import { useNodeValue } from './useNode.js'
-import { StoreRegistryContext } from './provider-context.js'
+import { useResource } from './useStore.ts'
+import { useNodeValue } from './useNode.ts'
+import { StoreRegistryContext } from './provider-context.ts'
 
 /** Resource-bearing atom shape accepted by the async value hook; ownership stays with its caller. */
 type IAsyncAtom<T> = {

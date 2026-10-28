@@ -10,7 +10,7 @@ import {
   normalizeStoreConfig,
   StoreProvider,
   useProvidedStore
-} from '../src/index.js'
+} from '../src/index.ts'
 
 describe('store-react audit regressions', () => {
   it('closes admission before owned callbacks and shares reentrant completion', async () => {

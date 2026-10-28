@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { StoreReactErrorCode } from '../src/error-code.js'
-import { normalizeStoreReadyError } from '../src/StoreProvider.js'
+import { StoreReactErrorCode } from '../src/error-code.ts'
+import { normalizeStoreReadyError } from '../src/StoreProvider.tsx'
 
 describe('StoreProvider ready rejection normalization', () => {
   it('preserves an Error rejection identity, including frozen Errors', () => {

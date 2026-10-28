@@ -19,7 +19,7 @@ import {
   useSignal,
   useStore,
   useTracked
-} from '../src/index.js'
+} from '../src/index.ts'
 
 /** React's public act environment switch applies only during these DOM tests. */
 type IActGlobal = typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }

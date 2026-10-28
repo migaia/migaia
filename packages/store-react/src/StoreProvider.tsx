@@ -1,18 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createRuntime, type IRuntime } from '@migaia/reactive'
-import { StoreRegistryContext } from './provider-context.js'
-import { createStoreRegistry, type StoreRegistry } from './provider-registry.js'
-import { createStoreReactError } from './errors.js'
-import { StoreReactErrorCode } from './error-code.js'
-import { StoreReactErrorText } from './error-text.js'
-import { StoreProviderState } from './provider-state-constants.js'
+import { StoreRegistryContext } from './provider-context.ts'
+import { createStoreRegistry, type StoreRegistry } from './provider-registry.ts'
+import { createStoreReactError } from './errors.ts'
+import { StoreReactErrorCode } from './error-code.ts'
+import { StoreReactErrorText } from './error-text.ts'
+import { StoreProviderState } from './provider-state-constants.ts'
 import {
   decodeStoreExperimental,
   encodeStoreExperimental,
   normalizeStoreConfig,
   StoreConfigContext,
   type IStoreProviderConfig
-} from './store-config.js'
+} from './store-config.ts'
 
 const READY_KEYS = new WeakMap<Promise<void>, number>()
 let nextReadyKey = 1
@@ -163,7 +163,7 @@ function ReadyBoundary({
   fallback,
   children
 }: {
-  ready: import('./store-config.js').ITrackedReady
+  ready: import('./store-config.ts').ITrackedReady
   fallback: ReactNode
   children: ReactNode
 }) {
