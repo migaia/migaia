@@ -8,7 +8,7 @@ import {
   MIDDLEWARE_PIPELINE_SOURCE,
   type IAsyncMiddlewareStage,
   type ISyncMiddlewareStage
-} from '../src/index.js'
+} from '../src/index.ts'
 
 describe('multiple downstream submissions', () => {
   it('keeps frozen own runner functions callable after destructuring', () => {

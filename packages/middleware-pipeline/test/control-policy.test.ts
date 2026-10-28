@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { runAsyncForTest } from './pipeline-test-helpers.js'
+import { runAsyncForTest } from './pipeline-test-helpers.ts'
 
 describe('active-control policy', () => {
   it('keeps caught-and-rethrown active control exact and uncombined', async () => {

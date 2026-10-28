@@ -1,6 +1,6 @@
-import { createPipeline, GENERATOR_UNDEFINED, type ICreatePipelineOptions } from '../src/index.js'
+import { createPipeline, GENERATOR_UNDEFINED, type ICreatePipelineOptions } from '../src/index.ts'
 // @ts-expect-error Internal mode predicate is not a public type contract.
-import type { IMiddlewarePipelineSyncMode } from '../src/index.js'
+import type { IMiddlewarePipelineSyncMode } from '../src/index.ts'
 
 /** Keep the forbidden import check live without publishing a compatibility alias. */
 const hidden = undefined as unknown as IMiddlewarePipelineSyncMode

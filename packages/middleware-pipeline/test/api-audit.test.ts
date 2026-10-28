@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createPipeline } from '../src/index.js'
+import { createPipeline } from '../src/index.ts'
 import { walkErrorCauses } from '@migaia/utils/error'
 
 describe('audited middleware contracts', () => {

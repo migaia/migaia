@@ -1,13 +1,13 @@
 /** Owns shared signal admission, cooperative checkpoints, invocation and iterator cleanup. */
 import { admitAbortSignal, type IAbortSignal } from '@migaia/utils/promise'
 import { tryReadProperty } from '@migaia/utils/error'
-import { MiddlewarePipelineErrorText } from './error-text.js'
+import { MiddlewarePipelineErrorText } from './error-text.ts'
 import {
   createMiddlewarePipelineAbortCleanupError,
   createMiddlewarePipelineAbortError,
   createMiddlewarePipelineInvalidOptionError
-} from './errors.js'
-import type { IMiddlewarePipelineContext } from './runtime.js'
+} from './errors.ts'
+import type { IMiddlewarePipelineContext } from './runtime.ts'
 
 /** Invoke a terminal or generator directly, appending context only when a signal was admitted. */
 export function invokeWithContext<TFirst, TResult>(

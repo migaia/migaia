@@ -8,7 +8,7 @@ import {
   type ISyncMiddlewareStage,
   type IGeneratorMiddlewareStage,
   type IAsyncGeneratorMiddlewareStage
-} from './runtime.js'
+} from './runtime.ts'
 import {
   admit,
   check,
@@ -17,18 +17,18 @@ import {
   cleanupSyncIterator,
   cleanupAsyncIterator,
   snapshotStages
-} from './runtime-context.js'
+} from './runtime-context.ts'
 import {
   MiddlewarePipelineNext,
   MiddlewarePipelineViolation,
   type IMiddlewarePipelineViolationHandler,
   type IGeneratorMiddlewareSignals
-} from './state-constants.js'
+} from './state-constants.ts'
 import {
   createMiddlewarePipelineExecutionError,
   createMiddlewarePipelineMultipleDownstreamError,
   throwMiddlewarePipelineDownstreamFailures
-} from './errors.js'
+} from './errors.ts'
 
 /** Records local sync submissions without allocating an array for a single value. */
 export class PipelineSubmissions<TValue> {

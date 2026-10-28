@@ -12,7 +12,7 @@ import {
   type IAsyncMiddlewareStage,
   type IGeneratorMiddlewareStage,
   type ISyncMiddlewareStage
-} from '../src/index.js'
+} from '../src/index.ts'
 
 describe('createPipeline', () => {
   it.each([0, 1, 2])('rejects overlapping sentinel identities (%s)', (pair) => {
