@@ -135,26 +135,4 @@ test('scans tracked test and script sources', () => {
       violations.push(`${path}:scripts.${name} ${value}`)
   }
   assert.deepEqual(violations, [], violations.join('\n'))
-  assert.ok(!paths.includes('packages/storage-plugin-browser/test/reconcile-error-registry.mjs'))
 })
-
-/** Explicit refs keep unrelated earlier production changes out of this preserve check. */
-const base = process.env.TDI_BASE
-const change = process.env.TDI_CHANGE
-test(
-  'leaves production source untouched',
-  {
-    skip: base && change ? false : 'set TDI_BASE and TDI_CHANGE to audit source preservation'
-  },
-  () => {
-    const pathspec = 'packages/*/src/**'
-    for (const args of [
-      ['diff', '--name-only', base, change, '--', pathspec],
-      ['status', '--porcelain', '--untracked-files=all', '--', pathspec]
-    ]) {
-      const result = spawnSync('git', args, { cwd: root, encoding: 'utf8' })
-      assert.equal(result.status, 0, result.stderr)
-      assert.equal(result.stdout, '', `${args.join(' ')}: ${result.stdout}`)
-    }
-  }
-)

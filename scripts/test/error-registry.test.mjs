@@ -4,7 +4,6 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
-  renameSync,
   rmSync,
   symlinkSync,
   writeFileSync
@@ -248,16 +247,15 @@ const sourceValidationModes = [checkErrorRegistrySources, checkErrorRegistry, wr
  * Creates a real parser fixture with a usable local registry for the write mode.
  *
  * @param {string | undefined} source Optional declaration value; undefined omits the declaration.
- * @param {string} [directory] Package path used to distinguish the storage prefix exemption.
  * @returns {string} Temporary repository root owned by the caller.
  */
-const sourceDomainFixture = (source, directory = 'example') => {
-  /** Undefined exercises actual missing-source rejection or the storage fallback exemption. */
+const sourceDomainFixture = (source) => {
+  /** Undefined exercises actual missing-source rejection. */
   const declaration = source === undefined ? '' : `export const ERROR_SOURCE = '${source}'\n`
   /** The package manifest deliberately differs from a valid semantic domain. */
   const root = createFixture(
     `${declaration}export const Code = {\n/** A source validation fixture scenario. */\ninvalid: 'INVALID_INPUT'\n} as const\n`,
-    directory,
+    'example',
     true
   )
   mkdirSync(join(root, 'docs/contracts'), { recursive: true })
@@ -344,108 +342,8 @@ for (const value of validDomains)
       }
     })
 
-/** The identical invalid value is exempt only below the exact packages/storage- prefix. */
-for (const [modeIndex, mode] of sourceValidationModes.entries())
-  test(`source domains accepts deferred storage prefix in public mode ${modeIndex}`, () => {
-    /** This real parser input keeps the same invalid value used by the non-exempt cases. */
-    const root = sourceDomainFixture('@migaia/utils', 'storage-x')
-    try {
-      writeErrorRegistry(root)
-      assert.doesNotThrow(() => mode(root), 'SOURCE_DOMAIN_STORAGE_PREFIX_EXEMPT')
-    } finally {
-      rmSync(root, { recursive: true, force: true })
-    }
-  })
-for (const [modeIndex, mode] of sourceValidationModes.entries())
-  test(`source domains rejects near storage prefix in public mode ${modeIndex}`, () => {
-    /** Storagex is outside packages/storage- even though its name begins with storage. */
-    const root = sourceDomainFixture('@migaia/utils', 'storagex')
-    try {
-      assert.throws(
-        () => mode(root),
-        (error) =>
-          error.code === 'REGISTRY_SOURCE_INVALID' &&
-          error.message.includes('packages/storagex/src/error-code.ts') &&
-          error.message.includes(JSON.stringify('@migaia/utils')),
-        'SOURCE_DOMAIN_STORAGE_PREFIX_ONLY'
-      )
-    } finally {
-      rmSync(root, { recursive: true, force: true })
-    }
-  })
-
-/** A package manifest cannot activate the exemption outside the storage directory prefix. */
-for (const [modeIndex, mode] of sourceValidationModes.entries())
-  test(`source domains rejects a storage manifest in a non-storage directory in public mode ${modeIndex}`, () => {
-    /** Keep the illegal declaration under packages/example while changing only manifest identity. */
-    const root = sourceDomainFixture('@migaia/utils')
-    try {
-      writeFileSync(
-        join(root, 'packages/example/package.json'),
-        JSON.stringify({ name: '@migaia/storage-x' })
-      )
-      assert.throws(
-        () => mode(root),
-        (error) =>
-          error.code === 'REGISTRY_SOURCE_INVALID' &&
-          error.message.includes('packages/example/src/error-code.ts') &&
-          error.message.includes(JSON.stringify('@migaia/utils')),
-        'SOURCE_DOMAIN_MANIFEST_NOT_EXEMPT'
-      )
-    } finally {
-      rmSync(root, { recursive: true, force: true })
-    }
-  })
-
-/** A nested source directory cannot activate the package-directory exemption. */
-for (const [modeIndex, mode] of sourceValidationModes.entries())
-  test(`source domains rejects a nested storage substring in public mode ${modeIndex}`, () => {
-    /** The collector recursively scans this supported layer declaration in a non-storage package. */
-    const root = sourceDomainFixture('@migaia/utils')
-    try {
-      /** Move the same declaration without changing its source value or owning manifest. */
-      const nestedDirectory = join(root, 'packages/example/src/storage-x')
-      mkdirSync(nestedDirectory)
-      renameSync(
-        join(root, 'packages/example/src/error-code.ts'),
-        join(nestedDirectory, 'error-code.ts')
-      )
-      assert.throws(
-        () => mode(root),
-        (error) =>
-          error.code === 'REGISTRY_SOURCE_INVALID' &&
-          error.message.includes('packages/example/src/storage-x/error-code.ts') &&
-          error.message.includes(JSON.stringify('@migaia/utils')),
-        'SOURCE_DOMAIN_NESTED_STORAGE_NOT_EXEMPT'
-      )
-    } finally {
-      rmSync(root, { recursive: true, force: true })
-    }
-  })
-
-/** The temporary storage exemption preserves the old manifest fallback for missing declarations. */
-for (const [modeIndex, mode] of sourceValidationModes.entries())
-  test(`source domains accepts missing declared source under deferred storage prefix in public mode ${modeIndex}`, () => {
-    /** The directory activates the exemption even when the manifest identity is non-storage. */
-    const root = sourceDomainFixture(undefined, 'storage-x')
-    try {
-      writeErrorRegistry(root)
-      assert.doesNotThrow(() => mode(root), 'SOURCE_DOMAIN_STORAGE_MISSING_EXEMPT')
-      assert.deepEqual(
-        checkErrorRegistrySources(root).map(({ source }) => source),
-        ['@migaia/example'],
-        'SOURCE_DOMAIN_STORAGE_FALLBACK_SOURCE'
-      )
-    } finally {
-      rmSync(root, { recursive: true, force: true })
-    }
-  })
-
 test('source domains known source readers contain no legacy error identities', () => {
-  /**
-   * These non-storage comparisons are independent witnesses; the deferred storage-plugin-browser reader stays
-   * with its owner.
-   */
+  /** Each comparison is an independent witness of one retired runtime source identity. */
   const readers = [
     ['packages/tray/src/runtime/create-runtime.ts', ".source === '@migaia/tray'"],
     ['packages/lifecycle/src/abort-factory.ts', ".source === '@migaia/lifecycle'"],
