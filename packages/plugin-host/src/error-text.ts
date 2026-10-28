@@ -1,7 +1,7 @@
 import type { IPluginHostErrorCode } from './error-code.js'
 import type { IPluginHostErrorDetail } from './error-types.js'
 import { PLUGIN_HOST_SOURCE, PluginHostErrorCode } from './error-code.js'
-import { readHostIdentity } from './host-identity.js'
+import { readHostIdentity } from './host-identity-authority.js'
 import {
   attachErrorIdentity,
   attachSecondaryErrors,

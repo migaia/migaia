@@ -1,3 +1,7 @@
+/**
+ * Owns canonical registration, publication and dependency state; adapters borrow explicit ports and
+ * never duplicate these registries.
+ */
 import { createTopologyIndex, type ITopologyIndex } from '@migaia/capability/graph/topology'
 import type { IDependencyNodeState } from '@migaia/capability/graph/dependency'
 import { StageLaneCollection } from './stage-lanes.js'
@@ -11,12 +15,14 @@ import type {
   IRegistration,
   ISharedExtensionSlot,
   ISharedExtensionContribution,
+  ISharedExtensionReservation,
   ISharedExtensionBucket
 } from './registry.js'
 import type { IPluginRuntimeSharedSlot } from './core.js'
 import { assertPluginExtensionKey, isSharedExtensionSlot } from './extension.js'
 import { createPluginHostTypeError } from './error-text.js'
 import { toIndexNode } from './dependency-runtime.js'
+import { reverseItems } from './cleanup-runtime.js'
 import { SharedSlotView, type ISharedSlotViewPort } from './shared-slot-view.js'
 
 /** Creates the host-owned dependency index and translates structural failures at its boundary. */
@@ -75,15 +81,17 @@ export class PluginHostState<TDomainCore extends object, TValue> {
   /** Monotonic view generation; every committed mutation advances it by one. */
   #revision = 0
 
-  /** Host state access shared by every shared-slot view this state issues. */
-  readonly #slotViewPort: ISharedSlotViewPort<TDomainCore, TValue> = {
-    assertActive: () => this.#sharedPublication?.assertActive(),
-    ownerOf: (key) => this.extensionOwners.get(key),
-    registrationNamed: (name) => this.registrations.get(name),
-    isLive: (registration) => this.isLive(registration),
-    updateContribution: (receipt, add) => this.#updateSharedContribution(receipt, add)
-  }
+  /** Weak registration-local reservation index; revocation clears it with the original receipt list. */
+  readonly #slotReservations = new WeakMap<
+    IRegistration<TDomainCore, TValue>,
+    Map<ISharedExtensionSlot<TDomainCore, TValue>, ISharedExtensionReservation<TDomainCore, TValue>>
+  >()
+  /** Shared-slot reads borrow this state through a named, narrowed capability. */
+  readonly #slotViewPort: ISharedSlotViewPort<TDomainCore, TValue> = new PluginHostSharedSlotPort(
+    this
+  )
 
+  /** Monotonic publication receipt read by Host and composition. */
   get revision(): number {
     return this.#revision
   }
@@ -97,6 +105,11 @@ export class PluginHostState<TDomainCore extends object, TValue> {
     }>
   ): void {
     this.#sharedPublication = publication
+  }
+
+  /** Shared-slot views consult only this state's configured Host lifecycle authority. */
+  assertSharedPublicationActive(): void {
+    this.#sharedPublication?.assertActive()
   }
 
   /** Read only the committed shared facade; exclusive extensions retain original snapshot semantics. */
@@ -157,10 +170,9 @@ export class PluginHostState<TDomainCore extends object, TValue> {
             instanceIds: new Map()
           }
     /** Metadata remains on the original candidate reservation, invisible until install commit. */
-    const reservation = registration.sharedSlots?.find((entry) => entry.slot === slot) ?? {
-      slot,
-      value: undefined as object | undefined
-    }
+    const existing = this.#slotReservations.get(registration)?.get(slot)
+    /** Reuse exact receipt identity on repeated acquisition of the same slot. */
+    const reservation = existing ?? { slot, value: undefined as object | undefined }
     /** Writes are exact-registration scoped; facade reads require committed slot identity. */
     const view: IPluginRuntimeSharedSlot<TFacade> = Object.freeze(
       new SharedSlotView<TDomainCore, TValue, TFacade>(
@@ -179,8 +191,13 @@ export class PluginHostState<TDomainCore extends object, TValue> {
         throw createPluginHostTypeError(ERROR_TEXT.INVALID_OPTION)
     }
     batch.extensionOwners.set(key, slot)
-    if (!registration.sharedSlots?.includes(reservation))
-      (registration.sharedSlots ??= []).push(reservation)
+    if (!existing) {
+      /** Re-read after the facade factory: synchronous reentry may have acquired another slot. */
+      const reservations = this.#slotReservations.get(registration) ?? new Map()
+      reservations.set(slot, reservation)
+      this.#slotReservations.set(registration, reservations)
+      ;(registration.sharedSlots ??= []).push(reservation)
+    }
     return view
   }
 
@@ -241,11 +258,17 @@ export class PluginHostState<TDomainCore extends object, TValue> {
         )
     // Concrete Host descriptors must be admissible before any committed table changes. In
     // particular a non-extensible Host must not reserve a family for a publication that failed.
+    /** Batch membership is indexed once; each later key decision is O(1). */
+    const installedSlots = new Set<ISharedExtensionSlot<TDomainCore, TValue>>()
     for (const registration of installed)
-      for (const reservation of registration.sharedSlots ?? [])
+      for (const reservation of registration.sharedSlots ?? []) {
         this.#sharedPublication?.publish(reservation.slot.key)
+        installedSlots.add(reservation.slot)
+      }
     /** Replacement's old and new exact receipts may retain one slot in this same commit. */
-    const retainedSlots = new Set([...batch.extensionOwners.values()].filter(isSharedExtensionSlot))
+    const retainedSlots = new Set<ISharedExtensionSlot<TDomainCore, TValue>>()
+    for (const owner of batch.extensionOwners.values())
+      if (isSharedExtensionSlot(owner)) retainedSlots.add(owner)
     for (const registration of installed) {
       /** Registration currently owning this name before candidate publication, if any. */
       const previous = this.registrations.get(registration.name)
@@ -266,12 +289,7 @@ export class PluginHostState<TDomainCore extends object, TValue> {
       for (const { key } of released.extensions)
         if (this.extensionOwners.get(key) === released) this.extensionOwners.delete(key)
     for (const [key, owner] of batch.extensionOwners)
-      if (
-        !isSharedExtensionSlot(owner) ||
-        installed.some((registration) =>
-          registration.sharedSlots?.some((entry) => entry.slot === owner)
-        )
-      )
+      if (!isSharedExtensionSlot(owner) || installedSlots.has(owner))
         this.extensionOwners.set(key, owner)
     for (const registration of installed)
       for (const reservation of registration.sharedSlots ?? []) {
@@ -280,7 +298,7 @@ export class PluginHostState<TDomainCore extends object, TValue> {
         slot.registrations.set(registration, reservation)
       }
     for (const receipt of batch.sharedContributions) {
-      this.#updateSharedContribution(receipt, true)
+      this.updateSharedContribution(receipt, true)
     }
     for (const registration of installed) this.lanes.bindOwner(registration)
     batch.committed = true
@@ -314,7 +332,7 @@ export class PluginHostState<TDomainCore extends object, TValue> {
   /** Withdraws exact installation receipts while retaining a lazy registration for retry. */
   clearRegistrationPublication(registration: IRegistration<TDomainCore, TValue>): void {
     this.#revokeSharedContributions(registration)
-    for (const { key } of [...registration.extensions].reverse())
+    for (const { key } of reverseItems(registration.extensions))
       if (this.extensionOwners.get(key) === registration) this.extensionOwners.delete(key)
   }
 
@@ -324,7 +342,7 @@ export class PluginHostState<TDomainCore extends object, TValue> {
     retainedSlots?: ReadonlySet<ISharedExtensionSlot<TDomainCore, TValue>>
   ): void {
     for (const receipt of registration.sharedContributions ?? [])
-      this.#updateSharedContribution(receipt, false)
+      this.updateSharedContribution(receipt, false)
     for (const { slot } of registration.sharedSlots ?? []) {
       slot.registrations.delete(registration)
       if (
@@ -337,10 +355,11 @@ export class PluginHostState<TDomainCore extends object, TValue> {
     }
     registration.sharedContributions = undefined
     registration.sharedSlots = []
+    this.#slotReservations.delete(registration)
   }
 
   /** Update exact ready membership and both canonical indexes through one publication owner. */
-  #updateSharedContribution(
+  updateSharedContribution(
     receipt: ISharedExtensionContribution<TDomainCore, TValue>,
     publish: boolean
   ): void {
@@ -350,6 +369,7 @@ export class PluginHostState<TDomainCore extends object, TValue> {
       this.extensionOwners.set(slot.key, slot)
       slot.contributions.add(receipt)
     } else if (!slot.contributions.delete(receipt)) return
+    // Exactly two indexes are defined by ISharedExtensionSlot: names and instanceIds.
     for (const [index, key] of [
       [slot.names, receipt.registration.name],
       [slot.instanceIds, receipt.instanceId]
@@ -368,10 +388,7 @@ export class PluginHostState<TDomainCore extends object, TValue> {
       }
       bucket.single = undefined
       // Membership changes are cold; hot selection reads the cached receipt without an iterator.
-      if (bucket.members.size === 1)
-        bucket.members.forEach((remaining) => {
-          bucket.single = remaining
-        })
+      if (bucket.members.size === 1) bucket.single = bucket.members.values().next().value
     }
     if (publish) this.#sharedPublication?.publish(slot.key)
   }
@@ -406,4 +423,31 @@ export class PluginHostState<TDomainCore extends object, TValue> {
       this.registrations.get(registration.name) === registration
     )
   }
+}
+
+/** Narrows shared views to canonical lookup and exact contribution mutation capabilities. */
+class PluginHostSharedSlotPort<TDomainCore extends object, TValue> implements ISharedSlotViewPort<
+  TDomainCore,
+  TValue
+> {
+  /** The single publication owner; no view-local registration table exists. */
+  readonly #state: PluginHostState<TDomainCore, TValue>
+  /** Captures the canonical owner without transferring lifecycle authority. */
+  constructor(state: PluginHostState<TDomainCore, TValue>) {
+    this.#state = state
+  }
+  /** Shared views preserve the Host lifecycle guard. */
+  readonly assertActive = (): void => this.#state.assertSharedPublicationActive()
+  /** Slot key lookup is O(1). */
+  readonly ownerOf = (key: PropertyKey) => this.#state.extensionOwners.get(key)
+  /** Registration name lookup is O(1). */
+  readonly registrationNamed = (name: string) => this.#state.registrations.get(name)
+  /** Exact-generation visibility stays with the state owner. */
+  readonly isLive = (registration: IRegistration<TDomainCore, TValue>): boolean =>
+    this.#state.isLive(registration)
+  /** Receipt changes update the original canonical slot indexes. */
+  readonly updateContribution = (
+    receipt: ISharedExtensionContribution<TDomainCore, TValue>,
+    add: boolean
+  ): void => this.#state.updateSharedContribution(receipt, add)
 }
