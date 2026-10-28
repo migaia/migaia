@@ -8,7 +8,7 @@ import {
   invokeTaskSettled,
   invokeSerialSettled,
   invokeTask
-} from '../src/index.js'
+} from '../src/index.ts'
 
 describe('event-subscriber invocation hardening', () => {
   it('runs serial listeners after prior settlement and continues after failure', async () => {

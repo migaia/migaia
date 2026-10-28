@@ -5,12 +5,12 @@ import type {
   IEventInvocation,
   IEventInvocationVisitor,
   IFilteredEventChannel
-} from '../types.js'
-import { EventSubscriberErrorCode } from '../error-code.js'
-import { codeExistingError, createEventTypeError, eventErrorText } from '../errors.js'
-import { reportEventProjectionFailure } from '../value-projection.js'
-import { createEventContext, invokeDispatchSnapshot } from './dispatch-context.js'
-import { getCapability, type IChannelCapability } from './channel-capability.js'
+} from '../types.ts'
+import { EventSubscriberErrorCode } from '../error-code.ts'
+import { codeExistingError, createEventTypeError, eventErrorText } from '../errors.ts'
+import { reportEventProjectionFailure } from '../value-projection.ts'
+import { createEventContext, invokeDispatchSnapshot } from './dispatch-context.ts'
+import { getCapability, type IChannelCapability } from './channel-capability.ts'
 
 /** A visit owns the shared close gate and the dispatch arguments used by each entry. */
 export type IInvocationScope<T, R, V> = {

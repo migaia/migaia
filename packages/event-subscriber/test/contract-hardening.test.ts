@@ -1,12 +1,12 @@
 /** Event-subscriber boundary hardening. Cases preserve the existing behavioral assertions. */
-import { subscribeOnce, subscribeSubscriber } from '../src/subscriber.js'
+import { subscribeOnce, subscribeSubscriber } from '../src/subscriber.ts'
 import { describe, expect, it, vi } from 'vitest'
 import {
   EventSubscriberErrorCode,
   createEventChannel,
   createEventHub,
   invokeParallelSettled
-} from '../src/index.js'
+} from '../src/index.ts'
 
 describe('event-subscriber boundary hardening', () => {
   it('rejects malformed public boundaries before registration', () => {

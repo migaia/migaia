@@ -2,17 +2,17 @@
  * Owns one synchronous live visit and its invocation lifetime. It resumes ordered membership
  * admission after callbacks, stopping new admission at the first removal generation change.
  */
-import { EventSubscriberErrorCode } from '../error-code.js'
-import { codeExistingError } from '../errors.js'
-import type { IEventChannelOptions, IEventDispatchSnapshot, IEventInvocation } from '../types.js'
+import { EventSubscriberErrorCode } from '../error-code.ts'
+import { codeExistingError } from '../errors.ts'
+import type { IEventChannelOptions, IEventDispatchSnapshot, IEventInvocation } from '../types.ts'
 import {
   projectEventValue,
   reportEventProjectionFailure,
   type IEventProjectionPlan
-} from '../value-projection.js'
-import { ChannelRegistrations, type IRegistrationOwner } from './channel-registrations.js'
-import { createEventContext, invokeDispatchSnapshot, snapshotOwner } from './dispatch-context.js'
-import { DispatchInvocation, type IInvocationScope } from './invocation.js'
+} from '../value-projection.ts'
+import { ChannelRegistrations, type IRegistrationOwner } from './channel-registrations.ts'
+import { createEventContext, invokeDispatchSnapshot, snapshotOwner } from './dispatch-context.ts'
+import { DispatchInvocation, type IInvocationScope } from './invocation.ts'
 
 /** A visit's shared close gate avoids per-invocation cleanup callbacks. */
 export class LiveVisit<T, R, V> implements IInvocationScope<T, R, V> {

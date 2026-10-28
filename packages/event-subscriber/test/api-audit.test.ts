@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { createEventChannel, invokeEachLive, withSnapshotEntries } from '../src/index.js'
-import { subscribeUntil } from '../src/subscriber.js'
+import { createEventChannel, invokeEachLive, withSnapshotEntries } from '../src/index.ts'
+import { subscribeUntil } from '../src/subscriber.ts'
 
 describe('audited event delivery contracts', () => {
   it('preserves an explicitly thrown undefined visitor value as cause', () => {

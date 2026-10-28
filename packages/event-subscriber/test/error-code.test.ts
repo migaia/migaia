@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { EVENT_SUBSCRIBER_SOURCE, EventSubscriberErrorCode } from '../src/index.js'
+import { EVENT_SUBSCRIBER_SOURCE, EventSubscriberErrorCode } from '../src/index.ts'
 
 describe('error code contract', () => {
   it('exposes one source and nineteen unique public codes', () => {

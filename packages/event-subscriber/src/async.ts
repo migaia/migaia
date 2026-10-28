@@ -2,19 +2,19 @@
  * Owns asynchronous listener settlement; selection and dispatch remain canonical-channel
  * capabilities.
  */
-import { EventSubscriberErrorCode } from './error-code.js'
-import { createEventAggregateError, createEventTypeError, eventErrorText } from './errors.js'
-import { createEventContext, invokeDispatchSnapshot } from './internal/dispatch-context.js'
-import { getCapability } from './internal/channel-capability.js'
-import { validateTaskId } from './internal/channel-options.js'
-import { reportEventProjectionFailure } from './value-projection.js'
-import { EventSubscriberState } from './state-constants.js'
+import { EventSubscriberErrorCode } from './error-code.ts'
+import { createEventAggregateError, createEventTypeError, eventErrorText } from './errors.ts'
+import { createEventContext, invokeDispatchSnapshot } from './internal/dispatch-context.ts'
+import { getCapability } from './internal/channel-capability.ts'
+import { validateTaskId } from './internal/channel-options.ts'
+import { reportEventProjectionFailure } from './value-projection.ts'
+import { EventSubscriberState } from './state-constants.ts'
 import type {
   ICanonicalEventChannel,
   IEventDispatchSnapshot,
   IFilteredEventChannel,
   IListenerResult
-} from './types.js'
+} from './types.ts'
 
 /** Channels the async helpers accept: a canonical channel, or a task-filter view of one. */
 type IAsyncChannel<T, R, V = undefined> =

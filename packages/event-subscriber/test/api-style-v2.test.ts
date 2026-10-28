@@ -5,9 +5,9 @@ import {
   createEventHub,
   EventApiStyle,
   EventSubscriberErrorCode
-} from '../src/index.js'
-import type { IEventApiStyleNames, IEventContext } from '../src/index.js'
-import { normalizeEventApiStyle } from '../src/style.js'
+} from '../src/index.ts'
+import type { IEventApiStyleNames, IEventContext } from '../src/index.ts'
+import { normalizeEventApiStyle } from '../src/style.ts'
 
 describe('event API style surface projection', () => {
   it('normalizes cancellation names for presets and custom styles', () => {

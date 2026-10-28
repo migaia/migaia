@@ -10,7 +10,7 @@ import {
   invokeTaskSettled,
   withSnapshotEntries,
   type IEventChannelLike
-} from '../src/index.js'
+} from '../src/index.ts'
 
 describe('value delivery', () => {
   it('preserves payload identity and mixed listener order across all dispatch entry points', () => {

@@ -3,11 +3,11 @@ export {
   subscribeOnce,
   subscribeSubscriber,
   subscribeUntil
-} from './internal/source-subscription.js'
+} from './internal/source-subscription.ts'
 export type {
   IEventChannelLike,
   IEventContext,
   IEventListener,
   IEventSubscriber,
   IUnsubscribe
-} from './types.js'
+} from './types.ts'

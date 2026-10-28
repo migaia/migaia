@@ -7,10 +7,10 @@ import type {
   IEventChannelOptions,
   IStyledEventChannel,
   IStyledEventChannelOptions
-} from './types.js'
-import type { IEventApiStyle } from './style.js'
-import type { IEventProjectionPlan } from './value-projection.js'
-import { CanonicalChannel } from './internal/channel-owner.js'
+} from './types.ts'
+import type { IEventApiStyle } from './style.ts'
+import type { IEventProjectionPlan } from './value-projection.ts'
+import { CanonicalChannel } from './internal/channel-owner.ts'
 
 /**
  * Creates a transient event channel for synchronous notifications or awaited invoke helpers. Each

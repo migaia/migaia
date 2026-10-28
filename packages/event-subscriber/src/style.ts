@@ -2,8 +2,8 @@
  * Owns naming presets, literal type projections, and immutable alias installation; no dispatch
  * state lives here.
  */
-import { createInvalidOptionsError } from './internal/channel-options.js'
-import { isRecord } from './internal/record.js'
+import { createInvalidOptionsError } from './internal/channel-options.ts'
+import { isRecord } from './internal/record.ts'
 
 /** Canonical method names shared by style projection and callable subscription ownership. */
 export const EventApiMethod = {

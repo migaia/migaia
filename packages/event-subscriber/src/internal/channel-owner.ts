@@ -2,9 +2,9 @@
  * Composes channel configuration, registration membership and dispatch. Owns the public plain
  * object's stable callbacks and subscription-chain admission, without owning scheduler details.
  */
-import { validateEventListener } from './channel-options.js'
-import { EventSubscriberErrorCode } from '../error-code.js'
-import { codeExistingError } from '../errors.js'
+import { validateEventListener } from './channel-options.ts'
+import { EventSubscriberErrorCode } from '../error-code.ts'
+import { codeExistingError } from '../errors.ts'
 import type {
   ICanonicalEventChannel,
   IEventChannelOptions,
@@ -13,20 +13,20 @@ import type {
   IEventValueListener,
   IFilteredEventChannel,
   IUnsubscribe
-} from '../types.js'
-import { projectEventApiStyle, type IEventApiStyle } from '../style.js'
-import { projectEventValue, type IEventProjectionPlan } from '../value-projection.js'
+} from '../types.ts'
+import { projectEventApiStyle, type IEventApiStyle } from '../style.ts'
+import { projectEventValue, type IEventProjectionPlan } from '../value-projection.ts'
 import {
   channelCapabilities,
   filteredCapabilities,
   type IChannelCapability
-} from './channel-capability.js'
-import { readChannelConfiguration, type IChannelConfiguration } from './channel-configuration.js'
-import { readDeliveryOption, readTaskOption, validateTaskId } from './channel-options.js'
-import { ChannelDispatch } from './channel-dispatch.js'
-import { ChannelRegistrations } from './channel-registrations.js'
-import { LiveVisit } from './live-visit.js'
-import { createRawSubscriptionOwner } from './subscription.js'
+} from './channel-capability.ts'
+import { readChannelConfiguration, type IChannelConfiguration } from './channel-configuration.ts'
+import { readDeliveryOption, readTaskOption, validateTaskId } from './channel-options.ts'
+import { ChannelDispatch } from './channel-dispatch.ts'
+import { ChannelRegistrations } from './channel-registrations.ts'
+import { LiveVisit } from './live-visit.ts'
+import { createRawSubscriptionOwner } from './subscription.ts'
 
 /** Admits the listener and its options before any registration or handle state changes. */
 function readRegistrationOptions<T, R, V>(

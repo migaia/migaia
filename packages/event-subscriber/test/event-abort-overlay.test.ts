@@ -1,7 +1,7 @@
 /** Abort overlay. Cases preserve the existing behavioral assertions. */
-import { subscribeUntil } from '../src/subscriber.js'
+import { subscribeUntil } from '../src/subscriber.ts'
 import { describe, expect, it, vi } from 'vitest'
-import { EventSubscriberErrorCode, createEventChannel } from '../src/index.js'
+import { EventSubscriberErrorCode, createEventChannel } from '../src/index.ts'
 
 describe('abort overlay', () => {
   it('rejects callable and array signals before observing members, and codes revoked predicates', () => {

@@ -2,16 +2,16 @@
  * Owns callable subscription chains and structural source installation; it does not dispatch
  * events.
  */
-import { EventSubscriberErrorCode } from '../error-code.js'
+import { EventSubscriberErrorCode } from '../error-code.ts'
 import {
   createEventAggregateError,
   codeExistingError,
   createEventError,
   createEventTypeError,
   eventErrorText
-} from '../errors.js'
-import type { IUnsubscribe } from '../types.js'
-import { EventApiMethod, type IEventApiStylePlan } from '../style.js'
+} from '../errors.ts'
+import type { IUnsubscribe } from '../types.ts'
+import { EventApiMethod, type IEventApiStylePlan } from '../style.ts'
 
 /** Builds one callable, chain-owning subscription handle. */
 type ISubscriptionHandle<T> = IUnsubscribe & {

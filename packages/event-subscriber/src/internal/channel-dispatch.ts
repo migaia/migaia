@@ -3,18 +3,18 @@
  * membership and context projection remain composed services; no style work enters dispatch.
  */
 import { MAX_NATIVE_RECURSION_DEPTH } from '@migaia/utils/function'
-import { EventSubscriberErrorCode } from '../error-code.js'
-import { createEventAggregateError, eventErrorText } from '../errors.js'
-import { EventDispatchPolicy, type IEventDispatchPolicy } from '../state-constants.js'
-import type { IEventChannelOptions } from '../types.js'
+import { EventSubscriberErrorCode } from '../error-code.ts'
+import { createEventAggregateError, eventErrorText } from '../errors.ts'
+import { EventDispatchPolicy, type IEventDispatchPolicy } from '../state-constants.ts'
+import type { IEventChannelOptions } from '../types.ts'
 import {
   projectEventValue,
   reportEventProjectionFailure,
   type IEventProjectionPlan
-} from '../value-projection.js'
-import { createEventContext, invokeDispatchSnapshot } from './dispatch-context.js'
-import { observeDispatchRejection } from './listener-reporting.js'
-import type { ChannelRegistrations } from './channel-registrations.js'
+} from '../value-projection.ts'
+import { createEventContext, invokeDispatchSnapshot } from './dispatch-context.ts'
+import { observeDispatchRejection } from './listener-reporting.ts'
+import type { ChannelRegistrations } from './channel-registrations.ts'
 
 /** A channel's synchronous publish state, shared across nested dispatches in one transaction. */
 export class ChannelDispatch<T, R, V> {

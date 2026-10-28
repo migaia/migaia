@@ -6,8 +6,8 @@ import {
   EVENT_SUBSCRIBER_SOURCE,
   EventSubscriberErrorCode,
   type IEventSubscriberErrorCode
-} from './error-code.js'
-import { EventSubscriberErrorText } from './error-text.js'
+} from './error-code.ts'
+import { EventSubscriberErrorText } from './error-text.ts'
 import { attachErrorIdentity, isNativeErrorValue } from '@migaia/utils/error'
 
 /** Native error with the optional identity fields this package attaches. */

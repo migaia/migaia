@@ -1,7 +1,7 @@
 /** Exposes the admitted runtime-neutral public channel, hub and invocation contracts. */
-export { invokeEachLive, withSnapshotEntries } from './internal/invocation.js'
-export { createCanonicalChannel as createEventChannel } from './channel.js'
-export { createEventHub } from './hub.js'
+export { invokeEachLive, withSnapshotEntries } from './internal/invocation.ts'
+export { createCanonicalChannel as createEventChannel } from './channel.ts'
+export { createEventHub } from './hub.ts'
 export {
   invokeParallel,
   invokeParallelSettled,
@@ -9,25 +9,25 @@ export {
   invokeSerialSettled,
   invokeTask,
   invokeTaskSettled
-} from './async.js'
-export { EVENT_SUBSCRIBER_SOURCE, EventSubscriberErrorCode } from './error-code.js'
+} from './async.ts'
+export { EVENT_SUBSCRIBER_SOURCE, EventSubscriberErrorCode } from './error-code.ts'
 export {
   EventAdmissionPolicy,
   EventDelivery,
   EventDispatchPolicy,
   EventRemovalPolicy,
   EventSubscriberState
-} from './state-constants.js'
-export { EventApiStyle } from './style.js'
-export type { IEventSubscriberErrorCode } from './error-code.js'
+} from './state-constants.ts'
+export { EventApiStyle } from './style.ts'
+export type { IEventSubscriberErrorCode } from './error-code.ts'
 export type {
   IEventAdmissionPolicy,
   IEventDispatchPolicy,
   IEventRemovalPolicy
-} from './state-constants.js'
-export type { IEventChannelSubscription, IEventHubSubscription } from './types.js'
-export type { IEventApiStyle, IEventApiStyleNames } from './style.js'
-export type { IStyledEventChannel, IStyledEventHub } from './types.js'
+} from './state-constants.ts'
+export type { IEventChannelSubscription, IEventHubSubscription } from './types.ts'
+export type { IEventApiStyle, IEventApiStyleNames } from './style.ts'
+export type { IStyledEventChannel, IStyledEventHub } from './types.ts'
 export type {
   ICanonicalEventChannel,
   IEventChannel,
@@ -48,4 +48,4 @@ export type {
   IFilteredEventChannel,
   IListenerResult,
   IUnsubscribe
-} from './types.js'
+} from './types.ts'

@@ -1,9 +1,9 @@
 /** Event-subscriber error and terminal hardening. Cases preserve the existing behavioral assertions. */
 import { describe, expect, it, vi } from 'vitest'
 import vm from 'node:vm'
-import { EventSubscriberErrorCode, createEventChannel } from '../src/index.js'
-import { attachEventErrorCode, codeExistingError } from '../src/errors.js'
-import { createSystemTerminalRuntime } from '../src/internal/terminal-runtime.js'
+import { EventSubscriberErrorCode, createEventChannel } from '../src/index.ts'
+import { attachEventErrorCode, codeExistingError } from '../src/errors.ts'
+import { createSystemTerminalRuntime } from '../src/internal/terminal-runtime.ts'
 
 describe('event-subscriber error and terminal hardening', () => {
   it('uses requested code text when coding frozen or non-error failures', () => {

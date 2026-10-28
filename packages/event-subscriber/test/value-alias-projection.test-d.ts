@@ -1,5 +1,5 @@
 import { expectTypeOf } from 'vitest'
-import { createEventChannel, createEventHub } from '../src/index.js'
+import { createEventChannel, createEventHub } from '../src/index.ts'
 
 type IEvent = {
   readonly data: { readonly count: number }

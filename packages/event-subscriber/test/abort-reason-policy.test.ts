@@ -1,7 +1,7 @@
-import { subscribeUntil } from '../src/subscriber.js'
+import { subscribeUntil } from '../src/subscriber.ts'
 import { describe, expect, it, vi } from 'vitest'
 
-import { EventSubscriberErrorCode } from '../src/error-code.js'
+import { EventSubscriberErrorCode } from '../src/error-code.ts'
 
 describe('event subscriber reason capture', () => {
   it('caches a getter failure by identity and still releases the subscription', () => {

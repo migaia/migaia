@@ -1,7 +1,7 @@
 /** Event-subscriber structural helper hardening. Cases preserve the existing behavioral assertions. */
-import { subscribeOnce, subscribeSubscriber, subscribeUntil } from '../src/subscriber.js'
+import { subscribeOnce, subscribeSubscriber, subscribeUntil } from '../src/subscriber.ts'
 import { describe, expect, it, vi } from 'vitest'
-import { EventSubscriberErrorCode, createEventChannel } from '../src/index.js'
+import { EventSubscriberErrorCode, createEventChannel } from '../src/index.ts'
 
 describe('event-subscriber structural helper hardening', () => {
   it('makes structural subscribeOnce atomic when subscribe invokes synchronously', () => {

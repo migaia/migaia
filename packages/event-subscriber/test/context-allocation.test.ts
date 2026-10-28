@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { createEventChannel, type IEventContext } from '../src/index.js'
-import { channelCapabilities } from '../src/internal/channel-capability.js'
+import { createEventChannel, type IEventContext } from '../src/index.ts'
+import { channelCapabilities } from '../src/internal/channel-capability.ts'
 
 describe('escaping event context', () => {
   it('retains distinct payloads, fixed task labels and detached controls after dispatch', () => {

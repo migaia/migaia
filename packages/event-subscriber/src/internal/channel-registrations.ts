@@ -2,8 +2,8 @@
  * Owns ordered channel membership and listener identity indexes. Exposes atomic admission, release
  * and ordered snapshots; it neither invokes listeners nor owns public handle chains.
  */
-import { createInvalidOptionsError } from './channel-options.js'
-import { EventAdmissionPolicy, EventRemovalPolicy, type EventDelivery } from '../state-constants.js'
+import { createInvalidOptionsError } from './channel-options.ts'
+import { EventAdmissionPolicy, EventRemovalPolicy, type EventDelivery } from '../state-constants.ts'
 import type {
   IEventChannelOptions,
   IEventDispatchControl,
@@ -11,8 +11,8 @@ import type {
   IEventListener,
   IEventValueListener,
   IUnsubscribe
-} from '../types.js'
-import { createOwnerControl, snapshotOwner } from './dispatch-context.js'
+} from '../types.ts'
+import { createOwnerControl, snapshotOwner } from './dispatch-context.ts'
 
 /** Linked registration state shared with escaping dispatch controls. */
 export type IRegistrationOwner<T, R, V> = {
