@@ -8,7 +8,7 @@ import { expect, it } from 'vitest'
 import {
   createNodeProcessLauncher,
   type INodeProcessHandle
-} from '../../src/process/adapters/node-child-process.js'
+} from '../../src/process/adapters/node-child-process.ts'
 
 /** Native Node executes TypeScript directly; the fixture has no source-relative JS import. */
 const entry = new URL('./fixtures/core-session-child.ts', import.meta.url)

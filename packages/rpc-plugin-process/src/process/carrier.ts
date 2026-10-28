@@ -22,19 +22,19 @@ import {
   type IRpcCarrierWriteOptions,
   type IRpcWriteAdmission
 } from '@migaia/rpc-contract/interfaces'
-import { type IpcFlowControl } from '../features/flow-control.js'
-import type { IpcSendQueue } from '../features/send-queue.js'
-import { ProcessFeatureName } from '../features/text.js'
-import type { IProcessFeatureContext } from '../features/metadata.js'
-import type { IProcessFeature } from './plugin/types.js'
-import { attachIpcStderr } from './stderr.js'
+import { type IpcFlowControl } from '../features/flow-control.ts'
+import type { IpcSendQueue } from '../features/send-queue.ts'
+import { ProcessFeatureName } from '../features/text.ts'
+import type { IProcessFeatureContext } from '../features/metadata.ts'
+import type { IProcessFeature } from './plugin/types.ts'
+import { attachIpcStderr } from './stderr.ts'
 import {
   createProcessChannelClosedError,
   createProcessCleanupError,
   createProcessError
-} from './error.js'
+} from './error.ts'
 import { RpcProcessErrorCode } from '@migaia/rpc-contract/error-code'
-import type { IProcessByteChannel, IProcessMessageChannel, IProcessCommonOptions } from './types.js'
+import type { IProcessByteChannel, IProcessMessageChannel, IProcessCommonOptions } from './types.ts'
 
 /** One actual native connection owns its installed feature resources and diagnostic labels. */
 export type IProcessCarrierOptions = Readonly<{

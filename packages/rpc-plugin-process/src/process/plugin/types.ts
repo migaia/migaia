@@ -10,16 +10,16 @@ import type { IScheduler } from '@migaia/utils/scheduler'
 import type { IRpcCallFeature } from '@migaia/rpc-contract/interfaces'
 import type { IRpcNativeTransportFeature, IRpcFlowFeature } from '@migaia/rpc-host/sdk'
 import type { IRpcPeerInfo, IRpcPortableValue } from '@migaia/rpc-contract/protocol'
-import type { sendQueue } from '../../features/send-queue.js'
-import type { flowControl } from '../../features/flow-control.js'
-import type { ipcLog } from '../../features/log.js'
+import type { sendQueue } from '../../features/send-queue.ts'
+import type { flowControl } from '../../features/flow-control.ts'
+import type { ipcLog } from '../../features/log.ts'
 import type {
   IProcessByteChannel,
   IProcessMessageChannel,
   IListenProcessByteChannel,
   IProcessCommonOptions,
   IProcessPendingByteConnection
-} from '../types.js'
+} from '../types.ts'
 
 /** Installed process behavior is complete execution; call features remain selected by Host. */
 export type IProcessFeature =

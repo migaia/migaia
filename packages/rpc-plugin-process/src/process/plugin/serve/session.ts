@@ -12,9 +12,9 @@ import {
   type IRpcNativeMemberRecord,
   type IRpcMemberCurrent
 } from '@migaia/rpc-host/sdk'
-import { createProcessCleanupError } from '../../error.js'
-import type { IProcessConnectionLease } from './admission.js'
-import type { IProcessServeFallback } from './types.js'
+import { createProcessCleanupError } from '../../error.ts'
+import type { IProcessConnectionLease } from './admission.ts'
+import type { IProcessServeFallback } from './types.ts'
 
 /** A committed native session borrows the host's one control and lifetime owner. */
 export class ProcessServeSession implements IRpcNativeMemberRecord {

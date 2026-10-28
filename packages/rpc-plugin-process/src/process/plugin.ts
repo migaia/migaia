@@ -14,24 +14,24 @@ import {
 import { RpcError, RuntimeApiErrorText } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import type { IRpcAuthenticationRetain } from '@migaia/rpc-contract/interfaces'
-import { PROCESS_NAMESPACE } from './constants.js'
-import { isProcessChild } from './child.js'
-import { NativeProcessRuntimeLoader, type IAdapterProcessRuntimeModule } from './runtime-loader.js'
-import { openAutomaticProcessIO } from './automatic-peer.js'
-import { invalidProcessRuntimeBootstrap } from './runtime-bootstrap.js'
+import { PROCESS_NAMESPACE } from './constants.ts'
+import { isProcessChild } from './child.ts'
+import { NativeProcessRuntimeLoader, type IAdapterProcessRuntimeModule } from './runtime-loader.ts'
+import { openAutomaticProcessIO } from './automatic-peer.ts'
+import { invalidProcessRuntimeBootstrap } from './runtime-bootstrap.ts'
 import {
   normalizeProcessSources,
   type IProcessShortSpawn,
   type IProcessShortSourceOptions,
   type IProcessSourceOptions
-} from './adapters/short-source.js'
+} from './adapters/short-source.ts'
 import {
   createSpawnProcessBinding,
   createConnectProcessBinding,
   reportSafely
-} from './plugin/binding.js'
-import { serveProcessSessions } from './plugin/serve.js'
-import type { IProcessFeature, IProcessServeChildIngress } from './plugin/types.js'
+} from './plugin/binding.ts'
+import { serveProcessSessions } from './plugin/serve.ts'
+import type { IProcessFeature, IProcessServeChildIngress } from './plugin/types.ts'
 
 /** Source grammar is native short/full acquisition rather than a callback returning an endpoint. */
 export type IProcessSpawnSource = NonNullable<IProcessSourceOptions['spawn']>
@@ -206,7 +206,7 @@ class ProcessInstallation {
               supervision:
                 sources.connect.supervision ??
                 (this.#options
-                  .supervision as import('./plugin/types.js').IConnectProcessPluginDeployment['supervision'])
+                  .supervision as import('./plugin/types.ts').IConnectProcessPluginDeployment['supervision'])
             },
             context,
             name,

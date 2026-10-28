@@ -11,24 +11,24 @@ import {
   RpcProcessErrorCode
 } from '@migaia/rpc-contract/error-code'
 
-import { RpcProcessErrorText } from '../error-text.js'
-import { createProcessError, createProcessCleanupError } from '../error.js'
-import { MAX_LIQUIDATION_TOMBSTONES } from './constants.js'
+import { RpcProcessErrorText } from '../error-text.ts'
+import { createProcessError, createProcessCleanupError } from '../error.ts'
+import { MAX_LIQUIDATION_TOMBSTONES } from './constants.ts'
 import {
   createProcessDependentDiagnostic,
   liquidateProcessOwner,
   type IProcessDependentDiagnostic
-} from './liquidation.js'
-import { ProcessConnectionCapacity } from '../plugin/serve/admission.js'
-import { normalizeProcessResilienceOptions } from './options.js'
-import { createProcessTerminalRegistration, type IProcessTerminalRegistration } from './terminal.js'
+} from './liquidation.ts'
+import { ProcessConnectionCapacity } from '../plugin/serve/admission.ts'
+import { normalizeProcessResilienceOptions } from './options.ts'
+import { createProcessTerminalRegistration, type IProcessTerminalRegistration } from './terminal.ts'
 import type {
   IProcessLiquidationOwner,
   IProcessResilience,
   IProcessResilienceOptions,
   IProcessResilienceSnapshot,
   IProcessDependencyHostPort
-} from './types.js'
+} from './types.ts'
 
 /** Keep the terminal primary and committed cleanup failures reachable from inspect. */
 function liquidationReason(primary: unknown, cleanupErrors: readonly unknown[]): unknown {

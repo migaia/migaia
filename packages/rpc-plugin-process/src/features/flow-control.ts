@@ -18,13 +18,13 @@ import {
   type IRpcWriteAdmission,
   type IRpcWriteQueueGuard
 } from '@migaia/rpc-contract/interfaces'
-import { IpcCapacity, IpcReporterContext, ProcessFeatureName, ProcessFeatureText } from './text.js'
+import { IpcCapacity, IpcReporterContext, ProcessFeatureName, ProcessFeatureText } from './text.ts'
 import type {
   IProcessFeatureContext,
   IIpcSendFacts,
   IIpcSendAdmission,
   IIpcWrite
-} from './metadata.js'
+} from './metadata.ts'
 
 export { IpcSendClass } from '@migaia/rpc-contract/interfaces'
 /** The existing local event vocabulary is shared by queue and stderr observations. */

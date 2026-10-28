@@ -2,7 +2,7 @@
  * Serializes explicit application-instance recovery against its actual PluginHost and retires
  * matching native sessions. Ingress retains physical reconnection and candidate publication.
  */
-import { createProcessError } from '../error.js'
+import { createProcessError } from '../error.ts'
 import { isDefinedPlugin, type IPluginConstraint } from '@migaia/plugin-host'
 import { RpcProcessErrorCode } from '@migaia/rpc-contract/error-code'
 

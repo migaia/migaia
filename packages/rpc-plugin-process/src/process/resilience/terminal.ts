@@ -3,7 +3,7 @@
  * liquidation. Supervisor state remains authoritative for actual restart and execution
  * availability.
  */
-import { createProcessError } from '../error.js'
+import { createProcessError } from '../error.ts'
 import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
 import { RpcProcessErrorCode } from '@migaia/rpc-contract/error-code'
 
@@ -11,7 +11,7 @@ import type {
   IProcessRegistration,
   IProcessRegistrationBinding,
   IProcessResilienceSnapshot
-} from './types.js'
+} from './types.ts'
 
 /** One registration owns its terminal diagnostics, while supervision owns restart policy. */
 export type IProcessTerminalRegistration = Readonly<{

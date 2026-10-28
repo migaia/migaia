@@ -9,7 +9,7 @@ import { join } from 'node:path'
 import { once } from 'node:events'
 import * as nativeSupervision from '@migaia/supervision/process'
 import type { ChildProcess } from 'node:child_process'
-import { socketProcess, command, stopProcess, collect } from './plugin-control.js'
+import { socketProcess, command, stopProcess, collect } from './plugin-control.ts'
 import { expect, it, vi } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import {

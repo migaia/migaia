@@ -8,7 +8,7 @@ import {
   RpcProcessErrorCode,
   type IRpcProcessErrorCode
 } from '@migaia/rpc-contract/error-code'
-import { RpcProcessErrorText } from './error-text.js'
+import { RpcProcessErrorText } from './error-text.ts'
 
 /** One stable text is assigned to each process code at its single construction site. */
 const TEXT_BY_CODE: Readonly<Record<IRpcProcessErrorCode, string>> = {

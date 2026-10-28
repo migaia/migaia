@@ -52,7 +52,7 @@ describe('Node bootstrap stdin race', () => {
     async (phase) => {
       spawnMock.mockImplementationOnce(() => childWithStdinFailure(phase))
       const { createNodeProcessLauncher } =
-        await import('../../src/process/adapters/node-child-process.js')
+        await import('../../src/process/adapters/node-child-process.ts')
       await expect(
         createNodeProcessLauncher().launch(
           {
@@ -81,7 +81,7 @@ describe('Node bootstrap stdin race', () => {
       try {
         spawnMock.mockImplementationOnce(() => childWithStdinFailure('during-write', code))
         const { createNodeProcessLauncher } =
-          await import('../../src/process/adapters/node-child-process.js')
+          await import('../../src/process/adapters/node-child-process.ts')
         await expect(
           createNodeProcessLauncher().launch(
             {

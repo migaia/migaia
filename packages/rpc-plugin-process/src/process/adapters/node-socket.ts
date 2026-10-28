@@ -7,21 +7,21 @@ import { RPC_ENDPOINT_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-contrac
 import { IpcReporterContext, resolveAbortReason } from '@migaia/rpc-host/sdk'
 import { RpcProcessErrorCode } from '@migaia/rpc-contract/error-code'
 
-import { RpcProcessErrorText } from '../error-text.js'
-import { createProcessError, tagNativeProcessError } from '../error.js'
+import { RpcProcessErrorText } from '../error-text.ts'
+import { createProcessError, tagNativeProcessError } from '../error.ts'
 import type {
   IListenProcessByteChannel,
   IProcessByteChannel,
   IProcessByteListener,
   IProcessPendingByteConnection
-} from '../types.js'
-import { createAdapterSocketByteIO } from '../node-io.js'
+} from '../types.ts'
+import { createAdapterSocketByteIO } from '../node-io.ts'
 import {
   prepareUnixSocketPath,
   recordUnixSocketOwner,
   removeUnixSocketOwner,
   type IUnixSocketRecord
-} from './unix-socket-ownership.js'
+} from './unix-socket-ownership.ts'
 
 /** Node socket addresses are absolute Unix paths, Windows pipe paths, or numeric loopback TCP URLs. */
 type INodeSocketAddress =
@@ -470,4 +470,4 @@ export const listenProcessByteChannel: IListenProcessByteChannel = async (
 }
 
 /** The moved socket resource operation keeps native dependencies in this owning public entry. */
-export { createAdapterSocketByteIO } from '../node-io.js'
+export { createAdapterSocketByteIO } from '../node-io.ts'

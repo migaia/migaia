@@ -3,7 +3,7 @@
  * provide real IO and final exit without constructing a Session or Peer.
  */
 import { detectServerRuntime } from '@migaia/utils'
-import type { IProcessByteChannel } from './types.js'
+import type { IProcessByteChannel } from './types.ts'
 
 /** Native discovery opens the actual runtime I/O, never returns a constructed/trusted Peer DTO. */
 export type IAdapterProcessRuntimeIO = Readonly<{
@@ -27,8 +27,8 @@ export class NativeProcessRuntimeLoader implements IAdapterProcessRuntimeLoader 
   /** Platform discovery performs no channel opening before Core has admitted the peer options. */
   load(): Promise<IAdapterProcessRuntimeModule> | undefined {
     const runtime = detectServerRuntime()
-    if (runtime === 'deno') return import('./adapters/deno-peer.js')
-    if (runtime === 'node' || runtime === 'bun') return import('./adapters/node-peer.js')
+    if (runtime === 'deno') return import('./adapters/deno-peer.ts')
+    if (runtime === 'node' || runtime === 'bun') return import('./adapters/node-peer.ts')
     return undefined
   }
 }

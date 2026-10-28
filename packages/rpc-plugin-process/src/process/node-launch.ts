@@ -3,9 +3,9 @@
  * preparation stays shared, while the receiving Host owns Session admission.
  */
 import type { IProcessSpec } from '@migaia/supervision/process'
-import { AdapterProcessLaunch } from './launch.js'
-import type { IAdapterProcessLaunchContext, IAdapterProcessLaunchOptions } from './launch.js'
-import { createAdapterChildStdio, type IAdapterChildStdio } from './node-io.js'
+import { AdapterProcessLaunch } from './launch.ts'
+import type { IAdapterProcessLaunchContext, IAdapterProcessLaunchOptions } from './launch.ts'
+import { createAdapterChildStdio, type IAdapterChildStdio } from './node-io.ts'
 
 /** Node/Bun physical acquisition stays in Process while Core owns the generic byte carrier. */
 class NodeAdapterProcessLaunch extends AdapterProcessLaunch {

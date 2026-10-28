@@ -40,27 +40,27 @@ import {
 } from '@migaia/rpc-host/sdk'
 import type { IRpcSessionHandle, IRpcSessionView } from '@migaia/rpc-contract/interfaces'
 import { RpcProcessErrorCode } from '@migaia/rpc-contract/error-code'
-import { createProcessCleanupError, createProcessError } from '../error.js'
-import { createProcessCarrier } from '../carrier.js'
+import { createProcessCleanupError, createProcessError } from '../error.ts'
+import { createProcessCarrier } from '../carrier.ts'
 import {
   acceptProcessConnectionBootstrap,
   openProcessConnectionBootstrap
-} from '../connection-bootstrap.js'
-import { PROCESS_CONNECTION_RUNTIME, PROCESS_NAMESPACE } from '../constants.js'
+} from '../connection-bootstrap.ts'
+import { PROCESS_CONNECTION_RUNTIME, PROCESS_NAMESPACE } from '../constants.ts'
 import type { IRpcConnectionContext } from '@migaia/rpc-contract/interfaces'
-import type { IProcessByteChannel, IProcessMessageChannel } from '../types.js'
+import type { IProcessByteChannel, IProcessMessageChannel } from '../types.ts'
 import {
   DEFAULT_HEALTH_FAILURE_THRESHOLD,
   DEFAULT_HEALTH_INTERVAL_MS,
   DEFAULT_HEALTH_TIMEOUT_MS
-} from '../resilience/constants.js'
-import { ProcessConnectionProfile } from './constants.js'
+} from '../resilience/constants.ts'
+import { ProcessConnectionProfile } from './constants.ts'
 import type {
   IProcessFeature,
   IConnectProcessPluginDeployment,
   IProcessConnectionHandle,
   ISpawnProcessPluginDeployment
-} from './types.js'
+} from './types.ts'
 
 /** Secondary diagnostics never replace the native error that triggered rollback. */
 export function reportSafely(report: (error: unknown) => void, error: unknown): void {

@@ -1,7 +1,7 @@
 /** Retain Unix inode ownership evidence and recover only the same abandoned native listener. */
 import { deferred } from '@migaia/utils/promise'
 import { attachSecondaryErrors } from '@migaia/utils/error'
-import { createProcessError } from '../error.js'
+import { createProcessError } from '../error.ts'
 import { randomUUID } from 'node:crypto'
 import { createConnection } from 'node:net'
 import { constants } from 'node:fs'

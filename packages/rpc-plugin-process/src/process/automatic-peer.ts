@@ -3,9 +3,9 @@
  * marker. Native IO acquisition remains separate from Session identity and authentication
  * admission.
  */
-import { PROCESS_RUNTIME_API_ENV_VERSION } from './constants.js'
-import { invalidProcessRuntimeBootstrap } from './runtime-bootstrap.js'
-import type { IProcessByteChannel } from './types.js'
+import { PROCESS_RUNTIME_API_ENV_VERSION } from './constants.ts'
+import { invalidProcessRuntimeBootstrap } from './runtime-bootstrap.ts'
+import type { IProcessByteChannel } from './types.ts'
 
 /** A process owns one automatic stdio pair; failure never permits another physical reader. */
 let claimed = false

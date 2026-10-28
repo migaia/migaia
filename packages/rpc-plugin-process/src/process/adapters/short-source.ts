@@ -17,14 +17,14 @@ import {
   RpcProcessErrorCode,
   RPC_PROCESS_ERROR_SOURCE as ERROR_SOURCE
 } from '@migaia/rpc-contract/error-code'
-import { RpcProcessErrorText } from '../error-text.js'
+import { RpcProcessErrorText } from '../error-text.ts'
 import type {
   IProcessServeListenerIngress,
   ISpawnProcessPluginDeployment
-} from '../plugin/types.js'
-import type { IProcessByteChannel, IListenProcessByteChannel } from '../types.js'
-import type { INodeProcessHandle } from './node-child-process.js'
-import { PROCESS_RUNTIME_API_ENV } from '../constants.js'
+} from '../plugin/types.ts'
+import type { IProcessByteChannel, IListenProcessByteChannel } from '../types.ts'
+import type { INodeProcessHandle } from './node-child-process.ts'
+import { PROCESS_RUNTIME_API_ENV } from '../constants.ts'
 import {
   PROCESS_CONNECT_TIMEOUT_MS,
   PROCESS_CONNECT_RETRY_MS,
@@ -35,7 +35,7 @@ import {
   PROCESS_LOCAL_PIPE_PREFIX,
   PROCESS_SHORT_CHILD_NAME,
   PROCESS_SHORT_WRAP_FIELD
-} from '../short-source-constants.js'
+} from '../short-source-constants.ts'
 import { defaultRpcReporter } from '@migaia/rpc-host'
 
 /** Caller-owned command data excludes the channel, bootstrap and supervision authority. */
@@ -118,7 +118,7 @@ export type IProcessShortSourceOptions = Readonly<{
 export type IProcessSourceOptions = IProcessShortSourceOptions &
   Readonly<{
     spawn?: ISpawnProcessPluginDeployment | true | IUrlLike | IProcessShortSpawn
-    connect?: import('../plugin/types.js').IConnectProcessPluginDeployment | string
+    connect?: import('../plugin/types.ts').IConnectProcessPluginDeployment | string
     listen?: IProcessServeListenerIngress | string
     report?(error: unknown): void
   }>
@@ -126,7 +126,7 @@ export type IProcessSourceOptions = IProcessShortSourceOptions &
 export type IProcessFullSources = Omit<IProcessSourceOptions, 'spawn' | 'connect' | 'listen'> &
   Readonly<{
     spawn?: ISpawnProcessPluginDeployment
-    connect?: import('../plugin/types.js').IConnectProcessPluginDeployment
+    connect?: import('../plugin/types.ts').IConnectProcessPluginDeployment
     listen?: IProcessServeListenerIngress
   }>
 
@@ -438,10 +438,10 @@ async function normalizeShortProcessSpawn(
   /** Lazy deep paths continue to own native launch; connect/listen do not acquire launchers. */
   const native =
     runtime === 'deno'
-      ? await import('./deno-command.js')
+      ? await import('./deno-command.ts')
       : runtime === 'bun'
-        ? await import('./bun-spawn.js')
-        : await import('./node-child-process.js')
+        ? await import('./bun-spawn.ts')
+        : await import('./node-child-process.ts')
   /** All three native runtimes expose the same Node-compatible argument projection when needed. */
   const { default: process } = await import('node:process')
   /** Object short forms contain only ordinary user-selected launch defaults. */
@@ -597,10 +597,10 @@ export async function normalizeProcessSources(
     /** Selected native sockets still use the one original authentication/accept implementation. */
     const socket =
       runtime === 'deno'
-        ? await import('./deno-socket.js')
+        ? await import('./deno-socket.ts')
         : runtime === 'bun'
-          ? await import('./bun-socket.js')
-          : await import('./node-socket.js')
+          ? await import('./bun-socket.ts')
+          : await import('./node-socket.ts')
     if (typeof options.connect === 'string') {
       /**
        * The wait deadline only applies to named local rendezvous, with immediate explicit-address

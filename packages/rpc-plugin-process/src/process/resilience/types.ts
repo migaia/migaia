@@ -5,7 +5,7 @@
 import type { IPluginDependencyPlan, IPluginRemoval } from '@migaia/plugin-host'
 import type { IReadyOutcome, ISupervisorSnapshot } from '@migaia/supervision'
 import type { IScheduler } from '@migaia/utils/scheduler'
-import type { ProcessConnectionCapacity } from '../plugin/serve/admission.js'
+import type { ProcessConnectionCapacity } from '../plugin/serve/admission.ts'
 
 /** The local PluginHost commits its own dependency plan before liquidation reports dependants. */
 export type IProcessDependencyHostPort = Readonly<{

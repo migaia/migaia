@@ -7,7 +7,7 @@ import type {
   IRpcWriteAdmission,
   IRpcWriteQueueGuard
 } from '@migaia/rpc-contract/interfaces'
-import type { IpcFlowControl, IRpcFlowControlFeature } from './flow-control.js'
+import type { IpcFlowControl, IRpcFlowControlFeature } from './flow-control.ts'
 
 /**
  * Concrete process installation supplies only original connection facts and an optional shared

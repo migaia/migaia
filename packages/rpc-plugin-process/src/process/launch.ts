@@ -7,9 +7,9 @@ import { readRpcLaunchFacts, resolveAbortReason } from '@migaia/rpc-host/sdk'
 import {
   prepareProcessRuntimeBootstrap,
   invalidProcessRuntimeBootstrap
-} from './runtime-bootstrap.js'
-import type { IProcessRuntimeBootstrapOptions } from './runtime-bootstrap.js'
-import { createAdapterWebByteIO } from './web-byte-stream.js'
+} from './runtime-bootstrap.ts'
+import type { IProcessRuntimeBootstrapOptions } from './runtime-bootstrap.ts'
+import { createAdapterWebByteIO } from './web-byte-stream.ts'
 
 /** The supervisor's actual launch request carries its signal and private reserved generation. */
 export type IAdapterProcessLaunchContext = Parameters<IProcessLauncher['launch']>[1]

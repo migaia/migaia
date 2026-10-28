@@ -7,7 +7,7 @@ import { deferred } from '@migaia/utils/promise'
 import {
   dialProcessByteChannel,
   listenProcessByteChannel
-} from '../../src/process/adapters/node-socket.js'
+} from '../../src/process/adapters/node-socket.ts'
 import type { IProcessByteChannel, IProcessByteListener } from '../../dist/process/types.js'
 
 /** Real native peers send before the receiver completes its actual semantic acceptance. */

@@ -4,12 +4,12 @@
  */
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { RPC_ENDPOINT_ERROR_SOURCE, RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
-import { RpcProcessErrorText } from '../error-text.js'
-import type { IListenProcessByteChannel, IProcessByteChannel } from '../types.js'
+import { RpcProcessErrorText } from '../error-text.ts'
+import type { IListenProcessByteChannel, IProcessByteChannel } from '../types.ts'
 import {
   dialProcessByteChannel as dialNodeCompatibleChannel,
   listenProcessByteChannel as listenNodeCompatibleChannel
-} from './node-socket.js'
+} from './node-socket.ts'
 
 /** Deno's Windows transport has no named-pipe support in this adapter. */
 function rejectUnsupportedPipe(address: string): void {
