@@ -7,8 +7,8 @@ import {
 } from '@migaia/storage-host/sdk'
 import { assertStorageRdfPattern, type IQuad, type ISparqlFragment } from '@migaia/storage-contract'
 import { bytesToBase64 } from '@migaia/utils/bytes'
-import { invalidArgument } from './errors.js'
-import { SparqlText } from './text.js'
+import { invalidArgument } from './errors.ts'
+import { SparqlText } from './text.ts'
 /** Draft membership reuses the canonical ground quad codec rather than inventing RDF identity. */
 export function quadIdentity(quad: IQuad): string {
   return bytesToBase64(encodeStorageRdfQuad(quad, SparqlText.backend))

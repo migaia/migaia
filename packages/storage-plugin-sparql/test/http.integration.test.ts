@@ -2,11 +2,11 @@ import { describe, it, expect } from 'vitest'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { rdf, sparql } from '@migaia/storage-contract'
 import { term, ConcurrencyPolicy } from '@migaia/storage-host/sdk'
-import { sparqlBackendPlugin } from '../src/index.js'
-import { httpEndpoint } from '../src/http.js'
-import { graphStoreFeature } from '../src/features/graph-store.js'
-import { ontologyFeature } from '../src/features/ontology.js'
-import { parseRdfDocument } from '../src/ntriples.js'
+import { sparqlBackendPlugin } from '../src/index.ts'
+import { httpEndpoint } from '../src/http.ts'
+import { graphStoreFeature } from '../src/features/graph-store.ts'
+import { ontologyFeature } from '../src/features/ontology.ts'
+import { parseRdfDocument } from '../src/ntriples.ts'
 /** The shared service launcher is the only source of real endpoint addresses. */
 const queryUrl = process.env.MIGAIA_SPARQL_QUERY_URL,
   updateUrl = process.env.MIGAIA_SPARQL_UPDATE_URL,

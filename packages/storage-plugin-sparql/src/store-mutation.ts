@@ -22,19 +22,19 @@ import {
   type IRdfQuerySource,
   type IRdfQueryMutation
 } from '@migaia/storage-contract'
-import { invalidArgument, normalizeTransactionFailure, sparqlError } from './errors.js'
+import { invalidArgument, normalizeTransactionFailure, sparqlError } from './errors.ts'
 import { SparqlErrorCode } from '@migaia/storage-contract/error-code'
-import { SparqlText } from './text.js'
-import { parseSparqlResults } from './results.js'
-import { renderFragment } from './render.js'
-import { quadFragment } from './rdf.js'
-import { runSparqlAttempt, type ISparqlDraft, type ISparqlDraftAccess } from './transaction.js'
-import { nativeFeaturePort, type ISparqlNativeFeaturePort } from './native-feature.js'
-import { snapshotGraphTarget } from './graph-store.js'
-import type { ISparqlEndpoint, ISparqlAbortSignal, IRdfGraphTarget } from './endpoint.js'
-import type { ISparqlTransactionScope } from './types.js'
-import { query, sourceFor } from './store-query.js'
-import type { ISparqlQueryContext } from './store-query.js'
+import { SparqlText } from './text.ts'
+import { parseSparqlResults } from './results.ts'
+import { renderFragment } from './render.ts'
+import { quadFragment } from './rdf.ts'
+import { runSparqlAttempt, type ISparqlDraft, type ISparqlDraftAccess } from './transaction.ts'
+import { nativeFeaturePort, type ISparqlNativeFeaturePort } from './native-feature.ts'
+import { snapshotGraphTarget } from './graph-store.ts'
+import type { ISparqlEndpoint, ISparqlAbortSignal, IRdfGraphTarget } from './endpoint.ts'
+import type { ISparqlTransactionScope } from './types.ts'
+import { query, sourceFor } from './store-query.ts'
+import type { ISparqlQueryContext } from './store-query.ts'
 import {
   assertWrite,
   observeNative,
@@ -44,8 +44,8 @@ import {
   report,
   operate,
   reading
-} from './store.js'
-import type { ISparqlOrganizationContext } from './store.js'
+} from './store.ts'
+import type { ISparqlOrganizationContext } from './store.ts'
 
 /** One native conditional Modify publishes user quads and its marker atomically. */
 async function commit(

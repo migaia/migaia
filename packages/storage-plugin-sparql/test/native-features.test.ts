@@ -3,11 +3,11 @@ import { Store } from 'oxigraph'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { rdf, sparql, type IOperationContext } from '@migaia/storage-contract'
 import { term } from '@migaia/storage-host/sdk'
-import { sparqlBackendPlugin } from '../src/index.js'
-import { oxigraphEndpoint } from '../src/oxigraph.js'
-import { graphStoreFeature } from '../src/features/graph-store.js'
-import { ontologyFeature } from '../src/features/ontology.js'
-import { parseRdfDocument } from '../src/ntriples.js'
+import { sparqlBackendPlugin } from '../src/index.ts'
+import { oxigraphEndpoint } from '../src/oxigraph.ts'
+import { graphStoreFeature } from '../src/features/graph-store.ts'
+import { ontologyFeature } from '../src/features/ontology.ts'
+import { parseRdfDocument } from '../src/ntriples.ts'
 
 describe('native Graph Store and ontology Features', () => {
   it('executes all graph operations on physical default/named targets and leaves the borrowed engine open', async () => {

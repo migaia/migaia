@@ -1,5 +1,5 @@
-export { sparqlBackendPlugin, sparqlBackendKind } from './plugin.js'
-export type { ISparqlOptions } from './plugin.js'
+export { sparqlBackendPlugin, sparqlBackendKind } from './plugin.ts'
+export type { ISparqlOptions } from './plugin.ts'
 export type {
   ISparqlStore,
   ISparqlTransactionScope,
@@ -8,8 +8,8 @@ export type {
   ISparqlOptimisticPolicy,
   ISparqlTxRdf,
   ISparqlTxUpdateApi
-} from './types.js'
-export type { ISparqlUpdateHookPayload, ISparqlPreconditionHookPayload } from './hooks.js'
+} from './types.ts'
+export type { ISparqlUpdateHookPayload, ISparqlPreconditionHookPayload } from './hooks.ts'
 
 export type {
   ISparqlEndpoint,
@@ -18,4 +18,4 @@ export type {
   IRdfGraphTarget,
   IRdfGraphFormat,
   IRdfGraphDocument
-} from './endpoint.js'
+} from './endpoint.ts'

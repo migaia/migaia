@@ -1,12 +1,12 @@
 import { bytesToBase64 } from '@migaia/utils/bytes'
 import { throwIfAborted } from '@migaia/storage-host/sdk'
-import { invalidArgument, sparqlError } from './errors.js'
+import { invalidArgument, sparqlError } from './errors.ts'
 import { SparqlErrorCode } from '@migaia/storage-contract/error-code'
-import { SparqlErrorText } from './error-text.js'
-import { SparqlText } from './text.js'
-import { registerHttpRoutes } from './http-route.js'
-import { snapshotGraphTarget, snapshotGraphDocument, snapshotGraphFormat } from './graph-store.js'
-import type { ISparqlEndpoint, ISparqlAbortSignal, IRdfGraphTarget } from './endpoint.js'
+import { SparqlErrorText } from './error-text.ts'
+import { SparqlText } from './text.ts'
+import { registerHttpRoutes } from './http-route.ts'
+import { snapshotGraphTarget, snapshotGraphDocument, snapshotGraphFormat } from './graph-store.ts'
+import type { ISparqlEndpoint, ISparqlAbortSignal, IRdfGraphTarget } from './endpoint.ts'
 /** Credentials enter request headers only and are never copied into native failure data. */
 export type ISparqlHttpOptions = {
   readonly queryUrl: string

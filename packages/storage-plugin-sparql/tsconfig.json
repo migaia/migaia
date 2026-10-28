@@ -1,1 +1,14 @@
-{ "extends": "../../tsconfig.base.json", "compilerOptions": { "module": "ESNext", "moduleResolution": "Bundler", "lib": ["ES2024", "ESNext.Disposable", "DOM", "DOM.Iterable"], "types": ["node"], "rootDir": "src", "outDir": "dist" }, "include": ["src"] }
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2024", "ESNext.Disposable", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src"]
+}

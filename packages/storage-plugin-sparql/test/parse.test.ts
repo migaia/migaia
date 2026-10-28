@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { parseSparqlResults } from '../src/results.js'
-import { parseRdfDocument, writeRdfDocument } from '../src/ntriples.js'
+import { parseSparqlResults } from '../src/results.ts'
+import { parseRdfDocument, writeRdfDocument } from '../src/ntriples.ts'
 describe('native RDF protocol decoding', () => {
   it('decodes complete SELECT terms, unbound columns and ASK without fabricating identities', () => {
     const rows = parseSparqlResults(

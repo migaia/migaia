@@ -13,13 +13,13 @@ import type {
   IRdfQuerySource,
   IRdfQuery
 } from '@migaia/storage-contract'
-import { SparqlText } from './text.js'
-import { quadIdentity } from './rdf.js'
-import type { ISparqlDraft, ISparqlDraftAccess } from './transaction.js'
-import type { ISparqlTransactionScope } from './types.js'
-import { mutateSparqlQuery } from './store-mutation.js'
-import { readQuads, operate, report } from './store.js'
-import type { ISparqlOrganizationContext } from './store.js'
+import { SparqlText } from './text.ts'
+import { quadIdentity } from './rdf.ts'
+import type { ISparqlDraft, ISparqlDraftAccess } from './transaction.ts'
+import type { ISparqlTransactionScope } from './types.ts'
+import { mutateSparqlQuery } from './store-mutation.ts'
+import { readQuads, operate, report } from './store.ts'
+import type { ISparqlOrganizationContext } from './store.ts'
 
 /**
  * Transaction-bound queries register with their actual original operation view, never a copied

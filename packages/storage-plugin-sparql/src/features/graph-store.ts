@@ -1,16 +1,16 @@
 import { defineFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
 import type { IOperationContext } from '@migaia/storage-contract'
-import { sparqlBackendKind } from '../plugin.js'
+import { sparqlBackendKind } from '../plugin.ts'
 import {
   snapshotGraphTarget,
   snapshotGraphFormat,
   snapshotGraphDocument,
   requireGraphStore
-} from '../graph-store.js'
-import { parseRdfDocument, writeRdfDocument } from '../ntriples.js'
-import { readNativeFeaturePort } from '../native-feature.js'
-import { SparqlText } from '../text.js'
-import type { IRdfGraphTarget, IRdfGraphFormat, IRdfGraphDocument } from '../endpoint.js'
+} from '../graph-store.ts'
+import { parseRdfDocument, writeRdfDocument } from '../ntriples.ts'
+import { readNativeFeaturePort } from '../native-feature.ts'
+import { SparqlText } from '../text.ts'
+import type { IRdfGraphTarget, IRdfGraphFormat, IRdfGraphDocument } from '../endpoint.ts'
 /** Root-only Graph Store operations never acquire a transaction projection. */
 export type IGraphStoreApi = {
   getGraph(

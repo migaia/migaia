@@ -1,6 +1,6 @@
 import { createSparqlTag } from '@migaia/storage-host/sdk'
 import { type ISparqlFragment } from '@migaia/storage-contract'
-import { invalidArgument } from './errors.js'
+import { invalidArgument } from './errors.ts'
 /**
  * Generated native graph operations borrow the original fragment compiler without a second
  * renderer.

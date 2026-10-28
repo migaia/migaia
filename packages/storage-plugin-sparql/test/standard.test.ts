@@ -5,8 +5,8 @@ import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { rdf, sparql, type IQuad, type IRdfApi } from '@migaia/storage-contract'
 import { term } from '@migaia/storage-host/sdk'
 import { runConformance } from '@migaia/storage-contract/conformance'
-import { sparqlBackendPlugin, sparqlBackendKind } from '../src/index.js'
-import { oxigraphEndpoint } from '../src/oxigraph.js'
+import { sparqlBackendPlugin, sparqlBackendKind } from '../src/index.ts'
+import { oxigraphEndpoint } from '../src/oxigraph.ts'
 
 runConformance(
   { describe, expect, it },

@@ -33,17 +33,17 @@ import {
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { walkErrorCauses } from '@migaia/utils/error'
 import type { IStoragePluginCore } from '@migaia/storage-host'
-import { invalidArgument, normalizeSparqlError, sparqlError } from './errors.js'
+import { invalidArgument, normalizeSparqlError, sparqlError } from './errors.ts'
 import { STORAGE_SPARQL_ERROR_SOURCE, SparqlErrorCode } from '@migaia/storage-contract/error-code'
-import { SparqlText } from './text.js'
-import { parseSparqlResults } from './results.js'
-import { parseRdfDocument } from './ntriples.js'
-import { renderFragment } from './render.js'
-import { readHttpRoute } from './http-route.js'
-import { captureQuads, matchesQuad, matchFragment, quadIdentity } from './rdf.js'
-import type { ISparqlDraft, ISparqlOwner } from './transaction.js'
-import type { ISparqlEndpoint, ISparqlAbortSignal } from './endpoint.js'
-import type { ISparqlBase, ISparqlStore } from './types.js'
+import { SparqlText } from './text.ts'
+import { parseSparqlResults } from './results.ts'
+import { parseRdfDocument } from './ntriples.ts'
+import { renderFragment } from './render.ts'
+import { readHttpRoute } from './http-route.ts'
+import { captureQuads, matchesQuad, matchFragment, quadIdentity } from './rdf.ts'
+import type { ISparqlDraft, ISparqlOwner } from './transaction.ts'
+import type { ISparqlEndpoint, ISparqlAbortSignal } from './endpoint.ts'
+import type { ISparqlBase, ISparqlStore } from './types.ts'
 import {
   createSparqlBackendBase,
   attempt,
@@ -51,8 +51,8 @@ import {
   installSparqlNativeFeature,
   createOwner,
   drop
-} from './store-mutation.js'
-import { query } from './store-query.js'
+} from './store-mutation.ts'
+import { query } from './store-query.ts'
 
 /** Native input methods are captured without granting the backend ownership of the endpoint. */
 export function captureEndpoint(endpoint: ISparqlEndpoint): ISparqlEndpoint {

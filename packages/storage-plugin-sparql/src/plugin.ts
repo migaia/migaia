@@ -6,11 +6,11 @@ import {
   type IStorageFeatureStoreCompatibility,
   type IStoragePluginCore
 } from '@migaia/storage-host'
-import { invalidArgument } from './errors.js'
-import { SparqlText } from './text.js'
-import { captureEndpoint, createSparqlBackend } from './store.js'
-import type { ISparqlEndpoint } from './endpoint.js'
-import type { ISparqlStore } from './types.js'
+import { invalidArgument } from './errors.ts'
+import { SparqlText } from './text.ts'
+import { captureEndpoint, createSparqlBackend } from './store.ts'
+import type { ISparqlEndpoint } from './endpoint.ts'
+import type { ISparqlStore } from './types.ts'
 /** The kind carries the exact non-KV native store and the unique caller-owned endpoint. */
 /** Backend selection identity remains stable for host installation and matching Features. */
 export const sparqlBackendKind = defineStorageBackendKind<ISparqlStore, ISparqlEndpoint>()(

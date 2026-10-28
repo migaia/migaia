@@ -5,11 +5,11 @@ import { walkErrorCauses } from '@migaia/utils/error'
 import { createStorageHost, createOrgId, definePlugin, defineFeature } from '@migaia/storage-host'
 import { rdf, sparql, type IQuad } from '@migaia/storage-contract'
 import { term, prefixStorageOrgGraph, ConcurrencyPolicy } from '@migaia/storage-host/sdk'
-import { sparqlBackendPlugin, sparqlBackendKind } from '../src/index.js'
-import { oxigraphEndpoint } from '../src/oxigraph.js'
-import { graphStoreFeature } from '../src/features/graph-store.js'
-import { ontologyFeature } from '../src/features/ontology.js'
-import type { ISparqlEndpoint } from '../src/endpoint.js'
+import { sparqlBackendPlugin, sparqlBackendKind } from '../src/index.ts'
+import { oxigraphEndpoint } from '../src/oxigraph.ts'
+import { graphStoreFeature } from '../src/features/graph-store.ts'
+import { ontologyFeature } from '../src/features/ontology.ts'
+import type { ISparqlEndpoint } from '../src/endpoint.ts'
 /** All transaction cases execute the real native RDF engine; counters observe its existing protocol. */
 async function installed(
   options: {

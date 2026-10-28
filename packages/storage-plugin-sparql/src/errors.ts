@@ -3,8 +3,8 @@ import { attachErrorIdentity } from '@migaia/utils/error'
 import { normalizeError } from '@migaia/storage-host/sdk'
 import { STORAGE_SPARQL_ERROR_SOURCE, SparqlErrorCode } from '@migaia/storage-contract/error-code'
 import type { ISparqlErrorCode } from '@migaia/storage-contract/error-code'
-import { SparqlErrorText } from './error-text.js'
-import { SparqlText } from './text.js'
+import { SparqlErrorText } from './error-text.ts'
+import { SparqlText } from './text.ts'
 /** Native errors retain their type and stack, with immutable/conflicting identities on cause. */
 export function sparqlError(code: ISparqlErrorCode, cause?: unknown): Error {
   /** Stable contract text or a complete native request is selected before crossing its boundary. */

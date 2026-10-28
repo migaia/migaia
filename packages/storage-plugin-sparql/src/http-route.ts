@@ -1,4 +1,4 @@
-import type { ISparqlEndpoint } from './endpoint.js'
+import type { ISparqlEndpoint } from './endpoint.ts'
 /** Routing metadata belongs to the original HTTP endpoint; it grants no request or lifecycle handle. */
 const routes = new WeakMap<
   ISparqlEndpoint,

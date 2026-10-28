@@ -1,17 +1,17 @@
 import { defineFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
 import type { IOperationContext } from '@migaia/storage-contract'
-import { sparqlBackendKind } from '../plugin.js'
+import { sparqlBackendKind } from '../plugin.ts'
 import {
   snapshotGraphTarget,
   snapshotGraphFormat,
   snapshotGraphDocument,
   requireGraphStore
-} from '../graph-store.js'
-import { parseRdfDocument, writeRdfDocument } from '../ntriples.js'
-import { readNativeFeaturePort } from '../native-feature.js'
-import { invalidArgument } from '../errors.js'
-import { SparqlText } from '../text.js'
-import type { IRdfGraphTarget, IRdfGraphFormat, IRdfGraphDocument } from '../endpoint.js'
+} from '../graph-store.ts'
+import { parseRdfDocument, writeRdfDocument } from '../ntriples.ts'
+import { readNativeFeaturePort } from '../native-feature.ts'
+import { invalidArgument } from '../errors.ts'
+import { SparqlText } from '../text.ts'
+import type { IRdfGraphTarget, IRdfGraphFormat, IRdfGraphDocument } from '../endpoint.ts'
 /** Import mode selects the existing native per-graph merge or replace operation. */
 export type IOntologyImportOptions = { readonly mode?: 'merge' | 'replace' }
 export type IOntologyApi = {
