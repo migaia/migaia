@@ -127,7 +127,9 @@ export function tagSerializeError<E extends Error>(
   code: ISerializeErrorCode,
   context?: string
 ): ISerializeTaggedError<E> {
+  /** Identity properties are attached to the original native error instance. */
   const tagged = error as ISerializeTaggedError<E>
+  /** Existing error identity is checked before any immutable properties are attached. */
   const already = (error as { readonly source?: string }).source !== undefined
   if (already) {
     if (tagged.source === SERIALIZE_SOURCE && tagged.code === code) {
@@ -189,6 +191,7 @@ export function createSerializeError(
     readonly errors?: readonly unknown[]
   }
 ): ISerializeLifecycleError {
+  /** The newly coded native error retains original cause and optional secondary errors. */
   const error = tagSerializeError(
     new Error(message, options?.cause !== undefined ? { cause: options.cause } : undefined),
     code,
