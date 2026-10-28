@@ -463,6 +463,7 @@ describe('scheduler module stays runtime-neutral', () => {
       'native-timer',
       'shared-scheduler',
       'manual-scheduler',
+      'deadline-heap'
     ]
     /** Combined syntax covers the extracted implementations as well as the original entry. */
     const text = files
@@ -519,6 +520,7 @@ describe('scheduler module stays runtime-neutral', () => {
         './native-timer.ts',
         './shared-scheduler.ts',
         './manual-scheduler.ts',
+        './deadline-heap.ts'
       ])
     )
   })
