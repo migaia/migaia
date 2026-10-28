@@ -247,7 +247,412 @@
       ],
       "guidePath": "/en/docs/log-plugin-reasoning/getting-started",
       "architecturePath": "/en/docs/log-plugin-reasoning",
-      "symbols": [],
+      "symbols": [
+        {
+          "name": "IReasoningPluginConfig",
+          "kind": "type",
+          "signature": "export type IReasoningPluginConfig = { /** Raw token fragments bypass structured output and receive no plugin-owned ANSI. */ write?: (text: string) => void; /** A call-level label overrides the corresponding configured label. */ labels?: { thinking?: string; response?: string; }; /** Defer stream writes and completed-entry dispatch through the real host, default false. */ asyncOutput?: boolean; };",
+          "declarationLine": 2,
+          "source": "packages/log-plugin-reasoning/dist/typing.d.ts",
+          "purpose": "Add six phase methods. Switching finishes the previous nonempty phase; empty or unfinished disposed buffers publish nothing. Streamed text has no plugin-added ANSI.",
+          "core": "write: Receive each original text chunk; synchronous failures enter the host failure channel.\nRecognized stdout.write, then console fallback.\nlabels: Optional thinking/response headings; text and newline boundaries are retained.\nThinking... for thinking, no response heading.\nasyncOutput: Schedule token writes and completed entries through the host's tracked defer work.\nfalse; token writing is synchronous.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "write",
+              "kind": "property",
+              "optional": true,
+              "signature": "write?: (text: string) => void;",
+              "description": "Raw token fragments bypass structured output and receive no plugin-owned ANSI.",
+              "parameterDetails": [],
+              "returns": "(text: string) => void"
+            },
+            {
+              "name": "labels",
+              "kind": "property",
+              "optional": true,
+              "signature": "labels?: { thinking?: string; response?: string; };",
+              "description": "A call-level label overrides the corresponding configured label.",
+              "parameterDetails": [],
+              "returns": "{ thinking?: string; response?: string; }"
+            },
+            {
+              "name": "asyncOutput",
+              "kind": "property",
+              "optional": true,
+              "signature": "asyncOutput?: boolean;",
+              "description": "Defer stream writes and completed-entry dispatch through the real host, default false.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IReasoningPluginConfig",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IReasoningPluginConfig = { /** Raw token fragments bypass structured output and receive no plugin-owned ANSI. */ write?: (text: string) => void; /** A call-level label overrides the corresponding configured label. */ labels?: { thinking?: string; response?: string; }; /** Defer stream writes and completed-entry dispatch through the real host, default false. */ asyncOutput?: boolean; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Add six phase methods. Switching finishes the previous nonempty phase; empty or unfinished disposed buffers publish nothing. Streamed text has no plugin-added ANSI."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IReasoningPluginConfig from @migaia/log-plugin-reasoning, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IReasoningPluginConfig when its type contract and declared inputs match the result you need. Choose a different public symbol when IReasoningPluginConfig does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "write: Receive each original text chunk; synchronous failures enter the host failure channel.\nRecognized stdout.write, then console fallback.\nlabels: Optional thinking/response headings; text and newline boundaries are retained.\nThinking... for thinking, no response heading.\nasyncOutput: Schedule token writes and completed entries through the host's tracked defer work.\nfalse; token writing is synchronous."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/log-plugin-reasoning/dist/typing.d.ts:IReasoningPluginConfig:export type IReasoningPluginConfig = { /** Raw token fragments bypass structured output and receive no plugin-owned ANSI. */ write?: (text: string) => void; /** A call-level label overrides the corresponding configured label. */ labels?: { thinking?: string; response?: string; }; /** Defer stream writes and completed-entry dispatch through the real host, default false. */ asyncOutput?: boolean; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "log-plugin-reasoning-index--IReasoningPluginConfig"
+        },
+        {
+          "name": "LogReasoningErrorCode",
+          "kind": "const",
+          "signature": "export declare const LogReasoningErrorCode: {};",
+          "declarationLine": 2,
+          "source": "packages/log-plugin-reasoning/dist/error-code.d.ts",
+          "purpose": "Semantic codes owned by this package. This empty table declares no package-owned errors.",
+          "core": "Semantic codes owned by this package. This empty table declares no package-owned errors.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "LogReasoningErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": ["export declare const LogReasoningErrorCode: {};"],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Semantic codes owned by this package. This empty table declares no package-owned errors."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import LogReasoningErrorCode from @migaia/log-plugin-reasoning, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use LogReasoningErrorCode when its const contract and declared inputs match the result you need. Choose a different public symbol when LogReasoningErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Semantic codes owned by this package. This empty table declares no package-owned errors."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/log-plugin-reasoning/dist/error-code.d.ts:LogReasoningErrorCode:export declare const LogReasoningErrorCode: {};",
+          "guidance": [],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "log-plugin-reasoning-index--LogReasoningErrorCode"
+        },
+        {
+          "name": "ReasoningPhase",
+          "kind": "const",
+          "signature": "export declare const ReasoningPhase: { /** No unfinished phase exists. */ readonly idle: 'idle'; /** Thinking deltas accumulate for a later thinking entry. */ readonly thinking: 'thinking'; /** Response deltas accumulate for a later response entry. */ readonly responding: 'responding'; };\nexport type ReasoningPhase = keyof typeof ReasoningPhase;",
+          "declarationLine": 2,
+          "source": "packages/log-plugin-reasoning/dist/state-constants.d.ts",
+          "purpose": "Stable phase values used by completed reasoning audit entries.",
+          "core": "idle: No section is active.\nthinking: Accumulate thinking text.\nresponding: Accumulate response text; completed tag remains response.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "idle",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly idle: 'idle';",
+              "description": "No unfinished phase exists.",
+              "parameterDetails": [],
+              "returns": "'idle'"
+            },
+            {
+              "name": "thinking",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly thinking: 'thinking';",
+              "description": "Thinking deltas accumulate for a later thinking entry.",
+              "parameterDetails": [],
+              "returns": "'thinking'"
+            },
+            {
+              "name": "responding",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly responding: 'responding';",
+              "description": "Response deltas accumulate for a later response entry.",
+              "parameterDetails": [],
+              "returns": "'responding'"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "ReasoningPhase",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const ReasoningPhase: { /** No unfinished phase exists. */ readonly idle: 'idle'; /** Thinking deltas accumulate for a later thinking entry. */ readonly thinking: 'thinking'; /** Response deltas accumulate for a later response entry. */ readonly responding: 'responding'; };",
+            "export type ReasoningPhase = keyof typeof ReasoningPhase;"
+          ],
+          "overloadParameterDetails": [[], []],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Stable phase values used by completed reasoning audit entries."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ReasoningPhase from @migaia/log-plugin-reasoning, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ReasoningPhase when its const contract and declared inputs match the result you need. Choose a different public symbol when ReasoningPhase does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "idle: No section is active.\nthinking: Accumulate thinking text.\nresponding: Accumulate response text; completed tag remains response."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/log-plugin-reasoning/dist/state-constants.d.ts:ReasoningPhase:export declare const ReasoningPhase: { /** No unfinished phase exists. */ readonly idle: 'idle'; /** Thinking deltas accumulate for a later thinking entry. */ readonly thinking: 'thinking'; /** Response deltas accumulate for a later response entry. */ readonly responding: 'responding'; };\nexport type ReasoningPhase = keyof typeof ReasoningPhase;",
+          "guidance": [],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "log-plugin-reasoning-index--ReasoningPhase"
+        },
+        {
+          "name": "reasoningPlugin",
+          "kind": "function",
+          "signature": "export declare function reasoningPlugin(options?: IReasoningPluginConfig): ILogPlugin<IReasoningExtension, IReasoningPluginConfig>;",
+          "declarationLine": 4,
+          "source": "packages/log-plugin-reasoning/dist/reasoning.d.ts",
+          "purpose": "Add six phase methods. Switching finishes the previous nonempty phase; empty or unfinished disposed buffers publish nothing. Streamed text has no plugin-added ANSI.",
+          "core": "options: Optional write callback, phase labels and asyncOutput flag; the writer is borrowed.\nAn installable plugin granting six thinking/response stream methods.\nwrite: Receive each original text chunk; synchronous failures enter the host failure channel.\nRecognized stdout.write, then console fallback.\nlabels: Optional thinking/response headings; text and newline boundaries are retained.\nThinking... for thinking, no response heading.\nasyncOutput: Schedule token writes and completed entries through the host's tracked defer work.\nfalse; token writing is synchronous.\nAdd six phase methods. Switching finishes the previous nonempty phase; empty or unfinished disposed buffers publish nothing. Streamed text has no plugin-added ANSI.",
+          "advanced": "Add six phase methods. Switching finishes the previous nonempty phase; empty or unfinished disposed buffers publish nothing. Streamed text has no plugin-added ANSI.",
+          "parameters": ["options: IReasoningPluginConfig (optional)"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IReasoningPluginConfig",
+              "optional": true
+            }
+          ],
+          "returns": "ILogPlugin<IReasoningExtension, IReasoningPluginConfig>",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createLogHost } from '@migaia/log-host'\nimport { reasoningPlugin } from '@migaia/log-plugin-reasoning'\n\n/** 应用接收每次原样流式写入，保留片段边界。 */\nconst fragments: string[] = []\n/** 明确开启 host 跟踪的异步流式调度。 */\nconst log = createLogHost({\n  plugins: [\n    reasoningPlugin({\n      labels: { thinking: 'Plan', response: 'Answer' },\n      asyncOutput: true,\n      write: (text) => {\n        fragments.push(text)\n      }\n    })\n  ]\n})\nlog.thinking('inspect')\nlog.response('ready')\nlog.endResponse()\nawait log.flush()\nawait log.shutdown('manual')",
+            "import { createLogHost } from '@migaia/log-host'\nimport { reasoningPlugin } from '@migaia/log-plugin-reasoning'\n\n/** 应用借用该数组观察每次流式写入的原始文本。 */\nconst fragments: string[] = []\n/** 每次安装独立持有阶段与缓冲区。 */\nconst log = createLogHost({\n  plugins: [\n    reasoningPlugin({\n      write: (text) => {\n        fragments.push(text)\n      }\n    })\n  ]\n})\nlog.startThinking('Thinking')\nlog.thinking('inspect ')\nlog.thinking('the request')\nlog.endThinking()\nlog.startResponse()\nlog.response('Done.')\nlog.endResponse()\nawait log.shutdown('manual')"
+          ],
+          "members": [],
+          "composes": [],
+          "aliasOf": "reasoningPlugin",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function reasoningPlugin(options?: IReasoningPluginConfig): ILogPlugin<IReasoningExtension, IReasoningPluginConfig>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IReasoningPluginConfig",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["ILogPlugin<IReasoningExtension, IReasoningPluginConfig>"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Add six phase methods. Switching finishes the previous nonempty phase; empty or unfinished disposed buffers publish nothing. Streamed text has no plugin-added ANSI."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import reasoningPlugin from @migaia/log-plugin-reasoning, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use reasoningPlugin when its function contract and declared inputs match the result you need. Choose a different public symbol when reasoningPlugin does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "options: Optional write callback, phase labels and asyncOutput flag; the writer is borrowed.\nAn installable plugin granting six thinking/response stream methods.\nwrite: Receive each original text chunk; synchronous failures enter the host failure channel.\nRecognized stdout.write, then console fallback.\nlabels: Optional thinking/response headings; text and newline boundaries are retained.\nThinking... for thinking, no response heading.\nasyncOutput: Schedule token writes and completed entries through the host's tracked defer work.\nfalse; token writing is synchronous.\nAdd six phase methods. Switching finishes the previous nonempty phase; empty or unfinished disposed buffers publish nothing. Streamed text has no plugin-added ANSI."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "Add six phase methods. Switching finishes the previous nonempty phase; empty or unfinished disposed buffers publish nothing. Streamed text has no plugin-added ANSI."
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "write",
+              "type": "(text: string) => void",
+              "optional": true,
+              "description": "Raw token fragments bypass structured output and receive no plugin-owned ANSI."
+            },
+            {
+              "name": "labels",
+              "type": "{ thinking?: string; response?: string; }",
+              "optional": true,
+              "description": "A call-level label overrides the corresponding configured label."
+            },
+            {
+              "name": "labels.thinking",
+              "type": "string",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "labels.response",
+              "type": "string",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "asyncOutput",
+              "type": "boolean",
+              "optional": true,
+              "description": "Defer stream writes and completed-entry dispatch through the real host, default false."
+            }
+          ],
+          "identity": "packages/log-plugin-reasoning/dist/reasoning.d.ts:reasoningPlugin:export declare function reasoningPlugin(options?: IReasoningPluginConfig): ILogPlugin<IReasoningExtension, IReasoningPluginConfig>;",
+          "guidance": [],
+          "usageScore": 28,
+          "configuration": [
+            {
+              "name": "write",
+              "type": "(text: string) => void",
+              "optional": true,
+              "description": "`write(text): void` 是借用的同步能力，卸载不关闭它。未提供时，已识别的服务端宿主借用 `process.stdout.write`；没有 stdout 时使用 `globalThis.console?.log(text)`。`asyncOutput` 默认 false：流式写入立即发生，完成条目仍进入 host 异步日志管线。设为 true 时，流式写入与完成派发都通过 host 跟踪调度，`flush()` 可等待这些已接纳工作。",
+              "descriptionEn": "Raw token fragments bypass structured output and receive no plugin-owned ANSI.",
+              "descriptionZh": "`write(text): void` 是借用的同步能力，卸载不关闭它。未提供时，已识别的服务端宿主借用 `process.stdout.write`；没有 stdout 时使用 `globalThis.console?.log(text)`。`asyncOutput` 默认 false：流式写入立即发生，完成条目仍进入 host 异步日志管线。设为 true 时，流式写入与完成派发都通过 host 跟踪调度，`flush()` 可等待这些已接纳工作。"
+            },
+            {
+              "name": "labels",
+              "type": "{ thinking?: string; response?: string; }",
+              "optional": true,
+              "description": "显式再次开始同一阶段会重置该阶段的缓冲。空缓冲不生成完成条目。标签优先采用调用参数，其次 `labels.thinking` / `labels.response`；thinking 的默认标题是 `Thinking...`，response 默认无标题。标题输出后带两个换行，片段本身不增加换行或 ANSI。",
+              "descriptionEn": "A call-level label overrides the corresponding configured label.",
+              "descriptionZh": "显式再次开始同一阶段会重置该阶段的缓冲。空缓冲不生成完成条目。标签优先采用调用参数，其次 `labels.thinking` / `labels.response`；thinking 的默认标题是 `Thinking...`，response 默认无标题。标题输出后带两个换行，片段本身不增加换行或 ANSI。"
+            },
+            {
+              "name": "labels.thinking",
+              "type": "string",
+              "optional": true,
+              "description": "显式再次开始同一阶段会重置该阶段的缓冲。空缓冲不生成完成条目。标签优先采用调用参数，其次 `labels.thinking` / `labels.response`；thinking 的默认标题是 `Thinking...`，response 默认无标题。标题输出后带两个换行，片段本身不增加换行或 ANSI。",
+              "descriptionEn": "",
+              "descriptionZh": "显式再次开始同一阶段会重置该阶段的缓冲。空缓冲不生成完成条目。标签优先采用调用参数，其次 `labels.thinking` / `labels.response`；thinking 的默认标题是 `Thinking...`，response 默认无标题。标题输出后带两个换行，片段本身不增加换行或 ANSI。"
+            },
+            {
+              "name": "labels.response",
+              "type": "string",
+              "optional": true,
+              "description": "显式再次开始同一阶段会重置该阶段的缓冲。空缓冲不生成完成条目。标签优先采用调用参数，其次 `labels.thinking` / `labels.response`；thinking 的默认标题是 `Thinking...`，response 默认无标题。标题输出后带两个换行，片段本身不增加换行或 ANSI。",
+              "descriptionEn": "",
+              "descriptionZh": "显式再次开始同一阶段会重置该阶段的缓冲。空缓冲不生成完成条目。标签优先采用调用参数，其次 `labels.thinking` / `labels.response`；thinking 的默认标题是 `Thinking...`，response 默认无标题。标题输出后带两个换行，片段本身不增加换行或 ANSI。"
+            },
+            {
+              "name": "asyncOutput",
+              "type": "boolean",
+              "optional": true,
+              "description": "`write(text): void` 是借用的同步能力，卸载不关闭它。未提供时，已识别的服务端宿主借用 `process.stdout.write`；没有 stdout 时使用 `globalThis.console?.log(text)`。`asyncOutput` 默认 false：流式写入立即发生，完成条目仍进入 host 异步日志管线。设为 true 时，流式写入与完成派发都通过 host 跟踪调度，`flush()` 可等待这些已接纳工作。",
+              "descriptionEn": "Defer stream writes and completed-entry dispatch through the real host, default false.",
+              "descriptionZh": "`write(text): void` 是借用的同步能力，卸载不关闭它。未提供时，已识别的服务端宿主借用 `process.stdout.write`；没有 stdout 时使用 `globalThis.console?.log(text)`。`asyncOutput` 默认 false：流式写入立即发生，完成条目仍进入 host 异步日志管线。设为 true 时，流式写入与完成派发都通过 host 跟踪调度，`flush()` 可等待这些已接纳工作。"
+            }
+          ],
+          "fragment": "log-plugin-reasoning-index--reasoningPlugin"
+        }
+      ],
       "aliases": []
     }
   ]

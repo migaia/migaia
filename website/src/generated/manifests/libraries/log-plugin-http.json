@@ -167,7 +167,461 @@
       ],
       "guidePath": "/en/docs/log-plugin-http/getting-started",
       "architecturePath": "/en/docs/log-plugin-http",
-      "symbols": [],
+      "symbols": [
+        {
+          "name": "httpPlugin",
+          "kind": "function",
+          "signature": "export declare function httpPlugin(options: IHttpPluginConfig): ILogPlugin;",
+          "declarationLine": 4,
+          "source": "packages/log-plugin-http/dist/http.d.ts",
+          "purpose": "Serialize projected entries once and POST them. HTTP consumes no text: host formatting is skipped, output formatting is rejected. Host features own batching, retries and timeouts.",
+          "core": "options: Required URL with optional headers, authToken, fetcher, Retry-After bound and delivery features; the wire method is fixed to POST.\nAn entry-only output plugin; install it in createLogHost.plugins and configure delivery policies through features.\nurl: Destination passed unchanged to the injected fetcher.\nfetcher: Return a response with ok/status/headers.get; cooperate with the supplied AbortSignal.\nglobalThis.fetch; creation fails when absent.\nheaders: Copied request headers; caller values override JSON content type.\nContent-Type application/json.\nauthToken: A nonempty value overrides Authorization using the bearer convention.\nNo bearer override.\nmaxRetryAfterMs: Finite nonnegative limit for strictly parsed server Retry-After advice.\n30000 milliseconds.\nfeatures: Use batchFeature, retryFeature and timeoutFeature; format descriptors are rejected.\nNo implicit transport policy.\nSerialize projected entries once and POST them. HTTP consumes no text: host formatting is skipped, output formatting is rejected. Host features own batching, retries and timeouts.",
+          "advanced": "Serialize projected entries once and POST them. HTTP consumes no text: host formatting is skipped, output formatting is rejected. Host features own batching, retries and timeouts.",
+          "parameters": ["options: IHttpPluginConfig"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IHttpPluginConfig",
+              "optional": false
+            }
+          ],
+          "returns": "ILogPlugin",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createLogHost } from '@migaia/log-host'\nimport { batchFeature, retryFeature, timeoutFeature } from '@migaia/log-host/features'\nimport { httpPlugin } from '@migaia/log-plugin-http'\n\nconst log = createLogHost({\n  plugins: [\n    httpPlugin({\n      url: 'https://example.test/logs',\n      fetcher: globalThis.fetch,\n      headers: { 'X-Application': 'example' },\n      authToken: 'example-token',\n      maxRetryAfterMs: 30000,\n      features: [\n        batchFeature({ maxSize: 20 }),\n        retryFeature({ attempts: 3, backoff: 200 }),\n        timeoutFeature({ ms: 10000 })\n      ]\n    })\n  ]\n})\nlog.onFailure(({ error }) => {\n  globalThis.console.error(error)\n})\nlog.log('info', 'request complete')\nawait log.flush()\nawait log.shutdown('manual')",
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { batchFeature, retryFeature, timeoutFeature } from '@migaia/log-host/features'\nimport { httpPlugin } from '@migaia/log-plugin-http'\n\nconst log = createLogHost({\n  plugins: [\n    levelPlugin(),\n    httpPlugin({\n      url: 'https://example.test/logs',\n      features: [\n        batchFeature({ maxSize: 20 }),\n        retryFeature({ attempts: 3, backoff: 200 }),\n        timeoutFeature({ ms: 10000 })\n      ]\n    })\n  ]\n})\nlog.info('request completed', { requestId: 'one' })\nawait log.flush()\nawait log.shutdown('manual')"
+          ],
+          "members": [],
+          "composes": [],
+          "aliasOf": "httpPlugin",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function httpPlugin(options: IHttpPluginConfig): ILogPlugin;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IHttpPluginConfig",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["ILogPlugin"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Serialize projected entries once and POST them. HTTP consumes no text: host formatting is skipped, output formatting is rejected. Host features own batching, retries and timeouts."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import httpPlugin from @migaia/log-plugin-http, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use httpPlugin when its function contract and declared inputs match the result you need. Choose a different public symbol when httpPlugin does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "options: Required URL with optional headers, authToken, fetcher, Retry-After bound and delivery features; the wire method is fixed to POST.\nAn entry-only output plugin; install it in createLogHost.plugins and configure delivery policies through features.\nurl: Destination passed unchanged to the injected fetcher.\nfetcher: Return a response with ok/status/headers.get; cooperate with the supplied AbortSignal.\nglobalThis.fetch; creation fails when absent.\nheaders: Copied request headers; caller values override JSON content type.\nContent-Type application/json.\nauthToken: A nonempty value overrides Authorization using the bearer convention.\nNo bearer override.\nmaxRetryAfterMs: Finite nonnegative limit for strictly parsed server Retry-After advice.\n30000 milliseconds.\nfeatures: Use batchFeature, retryFeature and timeoutFeature; format descriptors are rejected.\nNo implicit transport policy.\nSerialize projected entries once and POST them. HTTP consumes no text: host formatting is skipped, output formatting is rejected. Host features own batching, retries and timeouts."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "Serialize projected entries once and POST them. HTTP consumes no text: host formatting is skipped, output formatting is rejected. Host features own batching, retries and timeouts."
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "url",
+              "type": "string",
+              "optional": false,
+              "description": "Destination passed unchanged to the borrowed fetcher."
+            },
+            {
+              "name": "fetcher",
+              "type": "IHttpFetcher",
+              "optional": true,
+              "description": "Defaults to the current host fetch function when present."
+            },
+            {
+              "name": "headers",
+              "type": "Record<string, string>",
+              "optional": true,
+              "description": "Caller headers override the default JSON content type."
+            },
+            {
+              "name": "authToken",
+              "type": "string",
+              "optional": true,
+              "description": "A truthy token overrides Authorization with the existing bearer convention."
+            },
+            {
+              "name": "maxRetryAfterMs",
+              "type": "number",
+              "optional": true,
+              "description": "Valid server delays are clamped to this finite nonnegative bound, default 30000ms."
+            },
+            {
+              "name": "features",
+              "type": "readonly ILogFeature[]",
+              "optional": true,
+              "description": "Output-scoped host features override defaults without adding a second transport policy."
+            }
+          ],
+          "identity": "packages/log-plugin-http/dist/http.d.ts:httpPlugin:export declare function httpPlugin(options: IHttpPluginConfig): ILogPlugin;",
+          "guidance": [],
+          "usageScore": 24,
+          "configuration": [
+            {
+              "name": "url",
+              "type": "string",
+              "optional": false,
+              "description": "公开配置类型为 `IHttpPluginConfig`。url 原样传给 fetcher；缺省 fetcher 使用全局 fetch。注入函数接受 `(url, { method, headers, body, signal })` 并返回具有 ok/status/headers.get 的 Promise 结果。宿主超时和关闭通过 signal 传递；自定义 fetcher 应配合取消。",
+              "descriptionEn": "Destination passed unchanged to the borrowed fetcher.",
+              "descriptionZh": "公开配置类型为 `IHttpPluginConfig`。url 原样传给 fetcher；缺省 fetcher 使用全局 fetch。注入函数接受 `(url, { method, headers, body, signal })` 并返回具有 ok/status/headers.get 的 Promise 结果。宿主超时和关闭通过 signal 传递；自定义 fetcher 应配合取消。"
+            },
+            {
+              "name": "fetcher",
+              "type": "IHttpFetcher",
+              "optional": true,
+              "description": "公开配置类型为 `IHttpPluginConfig`。url 原样传给 fetcher；缺省 fetcher 使用全局 fetch。注入函数接受 `(url, { method, headers, body, signal })` 并返回具有 ok/status/headers.get 的 Promise 结果。宿主超时和关闭通过 signal 传递；自定义 fetcher 应配合取消。",
+              "descriptionEn": "Defaults to the current host fetch function when present.",
+              "descriptionZh": "公开配置类型为 `IHttpPluginConfig`。url 原样传给 fetcher；缺省 fetcher 使用全局 fetch。注入函数接受 `(url, { method, headers, body, signal })` 并返回具有 ok/status/headers.get 的 Promise 结果。宿主超时和关闭通过 signal 传递；自定义 fetcher 应配合取消。"
+            },
+            {
+              "name": "headers",
+              "type": "Record<string, string>",
+              "optional": true,
+              "description": "公开配置类型为 `IHttpPluginConfig`。url 原样传给 fetcher；缺省 fetcher 使用全局 fetch。注入函数接受 `(url, { method, headers, body, signal })` 并返回具有 ok/status/headers.get 的 Promise 结果。宿主超时和关闭通过 signal 传递；自定义 fetcher 应配合取消。",
+              "descriptionEn": "Caller headers override the default JSON content type.",
+              "descriptionZh": "公开配置类型为 `IHttpPluginConfig`。url 原样传给 fetcher；缺省 fetcher 使用全局 fetch。注入函数接受 `(url, { method, headers, body, signal })` 并返回具有 ok/status/headers.get 的 Promise 结果。宿主超时和关闭通过 signal 传递；自定义 fetcher 应配合取消。"
+            },
+            {
+              "name": "authToken",
+              "type": "string",
+              "optional": true,
+              "description": "A truthy token overrides Authorization with the existing bearer convention.",
+              "descriptionEn": "A truthy token overrides Authorization with the existing bearer convention.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "maxRetryAfterMs",
+              "type": "number",
+              "optional": true,
+              "description": "网络失败、429 和 5xx 可由 `retryFeature` 重试。严格解析的 `Retry-After` 覆盖下一次普通 backoff，并由 `maxRetryAfterMs` 限制。`attempts` 包含首次请求。",
+              "descriptionEn": "Valid server delays are clamped to this finite nonnegative bound, default 30000ms.",
+              "descriptionZh": "网络失败、429 和 5xx 可由 `retryFeature` 重试。严格解析的 `Retry-After` 覆盖下一次普通 backoff，并由 `maxRetryAfterMs` 限制。`attempts` 包含首次请求。"
+            },
+            {
+              "name": "features",
+              "type": "readonly ILogFeature[]",
+              "optional": true,
+              "description": "请求体始终是 `{ \"entries\": [...] }`，每条 entry 的 error 字段由 host 的共享错误链投影处理。HTTP 不消费格式化文本，host 级格式对它跳过；请勿在 HTTP 的 features 中添加 format，创建时会以 host 的 INVALID_OPTION 拒绝。默认 fetcher 是 `globalThis.fetch`；没有任何 fetcher 时工厂同步拒绝创建。",
+              "descriptionEn": "Output-scoped host features override defaults without adding a second transport policy.",
+              "descriptionZh": "请求体始终是 `{ \"entries\": [...] }`，每条 entry 的 error 字段由 host 的共享错误链投影处理。HTTP 不消费格式化文本，host 级格式对它跳过；请勿在 HTTP 的 features 中添加 format，创建时会以 host 的 INVALID_OPTION 拒绝。默认 fetcher 是 `globalThis.fetch`；没有任何 fetcher 时工厂同步拒绝创建。"
+            }
+          ],
+          "fragment": "log-plugin-http-index--httpPlugin"
+        },
+        {
+          "name": "IHttpPluginConfig",
+          "kind": "type",
+          "signature": "export type IHttpPluginConfig = { /** Destination passed unchanged to the borrowed fetcher. */ url: string; /** Defaults to the current host fetch function when present. */ fetcher?: IHttpFetcher; /** Caller headers override the default JSON content type. */ headers?: Record<string, string>; /** A truthy token overrides Authorization with the existing bearer convention. */ authToken?: string; /** Valid server delays are clamped to this finite nonnegative bound, default 30000ms. */ maxRetryAfterMs?: number; /** Output-scoped host features override defaults without adding a second transport policy. */ features?: readonly ILogFeature[]; };",
+          "declarationLine": 18,
+          "source": "packages/log-plugin-http/dist/typing.d.ts",
+          "purpose": "Serialize projected entries once and POST them. HTTP consumes no text: host formatting is skipped, output formatting is rejected. Host features own batching, retries and timeouts.",
+          "core": "url: Destination passed unchanged to the injected fetcher.\nfetcher: Return a response with ok/status/headers.get; cooperate with the supplied AbortSignal.\nglobalThis.fetch; creation fails when absent.\nheaders: Copied request headers; caller values override JSON content type.\nContent-Type application/json.\nauthToken: A nonempty value overrides Authorization using the bearer convention.\nNo bearer override.\nmaxRetryAfterMs: Finite nonnegative limit for strictly parsed server Retry-After advice.\n30000 milliseconds.\nfeatures: Use batchFeature, retryFeature and timeoutFeature; format descriptors are rejected.\nNo implicit transport policy.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "url",
+              "kind": "property",
+              "optional": false,
+              "signature": "url: string;",
+              "description": "Destination passed unchanged to the borrowed fetcher.",
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "fetcher",
+              "kind": "property",
+              "optional": true,
+              "signature": "fetcher?: IHttpFetcher;",
+              "description": "Defaults to the current host fetch function when present.",
+              "parameterDetails": [],
+              "returns": "IHttpFetcher"
+            },
+            {
+              "name": "headers",
+              "kind": "property",
+              "optional": true,
+              "signature": "headers?: Record<string, string>;",
+              "description": "Caller headers override the default JSON content type.",
+              "parameterDetails": [],
+              "returns": "Record<string, string>"
+            },
+            {
+              "name": "authToken",
+              "kind": "property",
+              "optional": true,
+              "signature": "authToken?: string;",
+              "description": "A truthy token overrides Authorization with the existing bearer convention.",
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "maxRetryAfterMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "maxRetryAfterMs?: number;",
+              "description": "Valid server delays are clamped to this finite nonnegative bound, default 30000ms.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "features",
+              "kind": "property",
+              "optional": true,
+              "signature": "features?: readonly ILogFeature[];",
+              "description": "Output-scoped host features override defaults without adding a second transport policy.",
+              "parameterDetails": [],
+              "returns": "readonly ILogFeature[]"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IHttpPluginConfig",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IHttpPluginConfig = { /** Destination passed unchanged to the borrowed fetcher. */ url: string; /** Defaults to the current host fetch function when present. */ fetcher?: IHttpFetcher; /** Caller headers override the default JSON content type. */ headers?: Record<string, string>; /** A truthy token overrides Authorization with the existing bearer convention. */ authToken?: string; /** Valid server delays are clamped to this finite nonnegative bound, default 30000ms. */ maxRetryAfterMs?: number; /** Output-scoped host features override defaults without adding a second transport policy. */ features?: readonly ILogFeature[]; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Serialize projected entries once and POST them. HTTP consumes no text: host formatting is skipped, output formatting is rejected. Host features own batching, retries and timeouts."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IHttpPluginConfig from @migaia/log-plugin-http, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IHttpPluginConfig when its type contract and declared inputs match the result you need. Choose a different public symbol when IHttpPluginConfig does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "url: Destination passed unchanged to the injected fetcher.\nfetcher: Return a response with ok/status/headers.get; cooperate with the supplied AbortSignal.\nglobalThis.fetch; creation fails when absent.\nheaders: Copied request headers; caller values override JSON content type.\nContent-Type application/json.\nauthToken: A nonempty value overrides Authorization using the bearer convention.\nNo bearer override.\nmaxRetryAfterMs: Finite nonnegative limit for strictly parsed server Retry-After advice.\n30000 milliseconds.\nfeatures: Use batchFeature, retryFeature and timeoutFeature; format descriptors are rejected.\nNo implicit transport policy."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/log-plugin-http/dist/typing.d.ts:IHttpPluginConfig:export type IHttpPluginConfig = { /** Destination passed unchanged to the borrowed fetcher. */ url: string; /** Defaults to the current host fetch function when present. */ fetcher?: IHttpFetcher; /** Caller headers override the default JSON content type. */ headers?: Record<string, string>; /** A truthy token overrides Authorization with the existing bearer convention. */ authToken?: string; /** Valid server delays are clamped to this finite nonnegative bound, default 30000ms. */ maxRetryAfterMs?: number; /** Output-scoped host features override defaults without adding a second transport policy. */ features?: readonly ILogFeature[]; };",
+          "guidance": [],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "log-plugin-http-index--IHttpPluginConfig"
+        },
+        {
+          "name": "LOG_HTTP_ERROR_SOURCE",
+          "kind": "const",
+          "signature": "export declare const LOG_HTTP_ERROR_SOURCE = \"logging.http\";",
+          "declarationLine": 2,
+          "source": "packages/log-plugin-http/dist/error-code.d.ts",
+          "purpose": "The stable logging.http domain identifies errors constructed by this package.",
+          "core": "The stable logging.http domain identifies errors constructed by this package.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "ERROR_SOURCE",
+          "exportPath": ".",
+          "overloadSignatures": ["export declare const LOG_HTTP_ERROR_SOURCE = \"logging.http\";"],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The stable logging.http domain identifies errors constructed by this package."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import LOG_HTTP_ERROR_SOURCE from @migaia/log-plugin-http, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use LOG_HTTP_ERROR_SOURCE when its const contract and declared inputs match the result you need. Choose a different public symbol when LOG_HTTP_ERROR_SOURCE does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The stable logging.http domain identifies errors constructed by this package."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/log-plugin-http/dist/error-code.d.ts:LOG_HTTP_ERROR_SOURCE:export declare const LOG_HTTP_ERROR_SOURCE = \"logging.http\";",
+          "guidance": [],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "log-plugin-http-index--LOG_HTTP_ERROR_SOURCE"
+        },
+        {
+          "name": "LogHttpErrorCode",
+          "kind": "const",
+          "signature": "export declare const LogHttpErrorCode: { /** No injected or host fetch capability exists; inject a fetcher before creating this output. */ readonly transportUnavailable: 'TRANSPORT_UNAVAILABLE'; /** JSON projection failed before any POST; inspect the original payload through cause. */ readonly serializeFailed: 'SERIALIZE_FAILED'; /** A POST rejected or returned a failed status; retry only according to the transport hint. */ readonly deliveryFailed: 'DELIVERY_FAILED'; /** Retry-After's admitted bound is negative or nonfinite; correct the factory option. */ readonly invalidOption: 'INVALID_OPTION'; };",
+          "declarationLine": 4,
+          "source": "packages/log-plugin-http/dist/error-code.d.ts",
+          "purpose": "Semantic codes owned by this package. Read together with source logging.http.",
+          "core": "Semantic codes owned by this package. Read together with source logging.http.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "transportUnavailable",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly transportUnavailable: 'TRANSPORT_UNAVAILABLE';",
+              "description": "No injected or host fetch capability exists; inject a fetcher before creating this output.",
+              "parameterDetails": [],
+              "returns": "'TRANSPORT_UNAVAILABLE'"
+            },
+            {
+              "name": "serializeFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly serializeFailed: 'SERIALIZE_FAILED';",
+              "description": "JSON projection failed before any POST; inspect the original payload through cause.",
+              "parameterDetails": [],
+              "returns": "'SERIALIZE_FAILED'"
+            },
+            {
+              "name": "deliveryFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly deliveryFailed: 'DELIVERY_FAILED';",
+              "description": "A POST rejected or returned a failed status; retry only according to the transport hint.",
+              "parameterDetails": [],
+              "returns": "'DELIVERY_FAILED'"
+            },
+            {
+              "name": "invalidOption",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidOption: 'INVALID_OPTION';",
+              "description": "Retry-After's admitted bound is negative or nonfinite; correct the factory option.",
+              "parameterDetails": [],
+              "returns": "'INVALID_OPTION'"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "LogHttpErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const LogHttpErrorCode: { /** No injected or host fetch capability exists; inject a fetcher before creating this output. */ readonly transportUnavailable: 'TRANSPORT_UNAVAILABLE'; /** JSON projection failed before any POST; inspect the original payload through cause. */ readonly serializeFailed: 'SERIALIZE_FAILED'; /** A POST rejected or returned a failed status; retry only according to the transport hint. */ readonly deliveryFailed: 'DELIVERY_FAILED'; /** Retry-After's admitted bound is negative or nonfinite; correct the factory option. */ readonly invalidOption: 'INVALID_OPTION'; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Semantic codes owned by this package. Read together with source logging.http."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import LogHttpErrorCode from @migaia/log-plugin-http, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use LogHttpErrorCode when its const contract and declared inputs match the result you need. Choose a different public symbol when LogHttpErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Semantic codes owned by this package. Read together with source logging.http."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/log-plugin-http/dist/error-code.d.ts:LogHttpErrorCode:export declare const LogHttpErrorCode: { /** No injected or host fetch capability exists; inject a fetcher before creating this output. */ readonly transportUnavailable: 'TRANSPORT_UNAVAILABLE'; /** JSON projection failed before any POST; inspect the original payload through cause. */ readonly serializeFailed: 'SERIALIZE_FAILED'; /** A POST rejected or returned a failed status; retry only according to the transport hint. */ readonly deliveryFailed: 'DELIVERY_FAILED'; /** Retry-After's admitted bound is negative or nonfinite; correct the factory option. */ readonly invalidOption: 'INVALID_OPTION'; };",
+          "guidance": [],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "log-plugin-http-index--LogHttpErrorCode"
+        }
+      ],
       "aliases": []
     }
   ]

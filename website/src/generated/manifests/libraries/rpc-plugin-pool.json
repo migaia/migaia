@@ -478,6 +478,291 @@
       "architecturePath": "/en/docs/rpc-plugin-pool",
       "symbols": [
         {
+          "name": "IPoolExtensions",
+          "kind": "type",
+          "signature": "export type IPoolExtensions = Readonly<{ pool: IRpcPoolControls; members: IRpcNativeMemberControls<RpcNativeMemberKind>; }>;",
+          "declarationLine": 5,
+          "source": "packages/rpc-plugin-pool/dist/plugin.d.ts",
+          "purpose": "Extensions returned through the actual transport namespace.",
+          "core": "pool: Original bounded scheduling controls for this installation.\nmembers: SDK controls borrow these exact native resources and supervisors.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "pool",
+              "kind": "property",
+              "optional": false,
+              "signature": "pool: IRpcPoolControls;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRpcPoolControls"
+            },
+            {
+              "name": "members",
+              "kind": "property",
+              "optional": false,
+              "signature": "members: IRpcNativeMemberControls<RpcNativeMemberKind>;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IRpcNativeMemberControls<RpcNativeMemberKind>"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IPoolExtensions",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPoolExtensions = Readonly<{ pool: IRpcPoolControls; members: IRpcNativeMemberControls<RpcNativeMemberKind>; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Extensions returned through the actual transport namespace."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPoolExtensions from @migaia/rpc-plugin-pool, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPoolExtensions when its type contract and declared inputs match the result you need. Choose a different public symbol when IPoolExtensions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "pool: Original bounded scheduling controls for this installation.\nmembers: SDK controls borrow these exact native resources and supervisors."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-plugin-pool/dist/plugin.d.ts:IPoolExtensions:export type IPoolExtensions = Readonly<{ pool: IRpcPoolControls; members: IRpcNativeMemberControls<RpcNativeMemberKind>; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-plugin-pool-index--IPoolExtensions"
+        },
+        {
+          "name": "IPoolPluginOptions",
+          "kind": "type",
+          "signature": "export type IPoolPluginOptions = Readonly<{ /** Required positive integer target; initial creation waits for this many independent Peers. */ size: number; /** Maximum waiting FIFO length, default 256; nonnegative integer, with 0 allowing no queue. */ maxQueue?: number; /** * Optional idle retirement delay; omitted disables it. Must be finite, positive and at most * 2147483647 ms, including fractional values. Target size remains unchanged after retirement; * later demand refills missing members through the original public factory. */ idleTimeoutMs?: number; /** * Owns idle timers only, default systemScheduler. Admitted once before Peer acquisition; timers * cancel on reserve/retire/close and request optional unref. Peer restart/deadline clocks retain * their source policy, and timer unref is a liveness hint rather than an earlier deadline. */ scheduler?: IScheduler; }>;",
+          "declarationLine": 48,
+          "source": "packages/rpc-plugin-pool/dist/types.d.ts",
+          "purpose": "Original scheduling limits, admitted before any native acquisition.",
+          "core": "size: Required positive integer target; installation waits for that many independent members.\nmaxQueue: Bounded waiting FIFO length; zero rejects when no slot is free.\nOmitted: 256 waiting entries.\nidleTimeoutMs: Finite positive milliseconds at most 2147483647; retirement keeps targetSize for later refill.\nOmitted: disable idle retirement.\nscheduler: Borrowed original idle scheduler only, not native restart or call deadlines.\nOmitted: systemScheduler.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "size",
+              "kind": "property",
+              "optional": false,
+              "signature": "size: number;",
+              "description": "Required positive integer target; initial creation waits for this many independent Peers.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "maxQueue",
+              "kind": "property",
+              "optional": true,
+              "signature": "maxQueue?: number;",
+              "description": "Maximum waiting FIFO length, default 256; nonnegative integer, with 0 allowing no queue.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "idleTimeoutMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "idleTimeoutMs?: number;",
+              "description": "Optional idle retirement delay; omitted disables it. Must be finite, positive and at most 2147483647 ms, including fractional values. Target size remains unchanged after retirement; later demand refills missing members through the original public factory.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "scheduler",
+              "kind": "property",
+              "optional": true,
+              "signature": "scheduler?: IScheduler;",
+              "description": "Owns idle timers only, default systemScheduler. Admitted once before Peer acquisition; timers cancel on reserve/retire/close and request optional unref. Peer restart/deadline clocks retain their source policy, and timer unref is a liveness hint rather than an earlier deadline.",
+              "parameterDetails": [],
+              "returns": "IScheduler"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IPoolPluginOptions",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPoolPluginOptions = Readonly<{ /** Required positive integer target; initial creation waits for this many independent Peers. */ size: number; /** Maximum waiting FIFO length, default 256; nonnegative integer, with 0 allowing no queue. */ maxQueue?: number; /** * Optional idle retirement delay; omitted disables it. Must be finite, positive and at most * 2147483647 ms, including fractional values. Target size remains unchanged after retirement; * later demand refills missing members through the original public factory. */ idleTimeoutMs?: number; /** * Owns idle timers only, default systemScheduler. Admitted once before Peer acquisition; timers * cancel on reserve/retire/close and request optional unref. Peer restart/deadline clocks retain * their source policy, and timer unref is a liveness hint rather than an earlier deadline. */ scheduler?: IScheduler; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Original scheduling limits, admitted before any native acquisition."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPoolPluginOptions from @migaia/rpc-plugin-pool, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPoolPluginOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IPoolPluginOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "size: Required positive integer target; installation waits for that many independent members.\nmaxQueue: Bounded waiting FIFO length; zero rejects when no slot is free.\nOmitted: 256 waiting entries.\nidleTimeoutMs: Finite positive milliseconds at most 2147483647; retirement keeps targetSize for later refill.\nOmitted: disable idle retirement.\nscheduler: Borrowed original idle scheduler only, not native restart or call deadlines.\nOmitted: systemScheduler."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-plugin-pool/dist/types.d.ts:IPoolPluginOptions:export type IPoolPluginOptions = Readonly<{ /** Required positive integer target; initial creation waits for this many independent Peers. */ size: number; /** Maximum waiting FIFO length, default 256; nonnegative integer, with 0 allowing no queue. */ maxQueue?: number; /** * Optional idle retirement delay; omitted disables it. Must be finite, positive and at most * 2147483647 ms, including fractional values. Target size remains unchanged after retirement; * later demand refills missing members through the original public factory. */ idleTimeoutMs?: number; /** * Owns idle timers only, default systemScheduler. Admitted once before Peer acquisition; timers * cancel on reserve/retire/close and request optional unref. Peer restart/deadline clocks retain * their source policy, and timer unref is a liveness hint rather than an earlier deadline. */ scheduler?: IScheduler; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-plugin-pool-index--IPoolPluginOptions"
+        },
+        {
+          "name": "IRpcPoolControls",
+          "kind": "type",
+          "signature": "export type IRpcPoolControls = Readonly<{ /** * Returns a new frozen instantaneous snapshot; reading it neither subscribes nor changes * capacity. */ stats(): IRpcPoolStats; /** * Queues a positive-integer target change in call order. Shrink prefers idle members and waits * for occupied retirees without interrupting their calls; expansion acquires only the missing * members. Factory/cleanup failures reject, and failed expansion restores the old target while * still open. Closing pools reject resize with POOL_CLOSED. */ resize(size: number): Promise<void>; /** * Synchronously enters closing, rejects new admission and drains already accepted operations and * acquisitions before closing owned Peers. Streams must finish/return/throw or settle their * cancellation; no pool drain timeout is added. Repeated calls share one Promise. All member * closes are attempted; failures from this closing phase reject as CLOSE_FAILED AggregateError * with original errors and the first failure on cause, even though state has become closed. * Completed open-phase resize/idle failures have already been delivered and are not replayed. */ close(): Promise<void>; }>;",
+          "declarationLine": 24,
+          "source": "packages/rpc-plugin-pool/dist/types.d.ts",
+          "purpose": "Per-installation original pool controls. close drains accepted work and joins one original Promise; no second shutdown owner.",
+          "core": "stats: Read a new frozen client-slot and queue snapshot, not remote provider/CPU concurrency.\nIRpcPoolStats with current target/member/inFlight/queued/state.\nresize: Serialize target changes, retiring idle members first and waiting for busy retirees without interrupting work. Expansion opens only missing members.\nresize.size: Application-selected positive integer target.\nPromise after adjustment; failed expansion restores the old open target and preserves primary/cleanup errors.\nclose: Stop new admission, drain accepted operations and acquisitions, then attempt all member closes. Active streams must finish or return.\nSame Promise on repeated calls; CLOSE_FAILED retains original errors/cause and the pool stays terminal.",
+          "advanced": "Resize, inspect or explicitly close the pool through its installed transport namespace.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "stats",
+              "kind": "method",
+              "optional": false,
+              "signature": "stats(): IRpcPoolStats;",
+              "description": "Returns a new frozen instantaneous snapshot; reading it neither subscribes nor changes capacity.",
+              "parameterDetails": [],
+              "returns": "IRpcPoolStats"
+            },
+            {
+              "name": "resize",
+              "kind": "method",
+              "optional": false,
+              "signature": "resize(size: number): Promise<void>;",
+              "description": "Queues a positive-integer target change in call order. Shrink prefers idle members and waits for occupied retirees without interrupting their calls; expansion acquires only the missing members. Factory/cleanup failures reject, and failed expansion restores the old target while still open. Closing pools reject resize with POOL_CLOSED.",
+              "parameterDetails": [
+                {
+                  "name": "size",
+                  "type": "number",
+                  "optional": false
+                }
+              ],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "close",
+              "kind": "method",
+              "optional": false,
+              "signature": "close(): Promise<void>;",
+              "description": "Synchronously enters closing, rejects new admission and drains already accepted operations and acquisitions before closing owned Peers. Streams must finish/return/throw or settle their cancellation; no pool drain timeout is added. Repeated calls share one Promise. All member closes are attempted; failures from this closing phase reject as CLOSE_FAILED AggregateError with original errors and the first failure on cause, even though state has become closed. Completed open-phase resize/idle failures have already been delivered and are not replayed.",
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IRpcPoolControls",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRpcPoolControls = Readonly<{ /** * Returns a new frozen instantaneous snapshot; reading it neither subscribes nor changes * capacity. */ stats(): IRpcPoolStats; /** * Queues a positive-integer target change in call order. Shrink prefers idle members and waits * for occupied retirees without interrupting their calls; expansion acquires only the missing * members. Factory/cleanup failures reject, and failed expansion restores the old target while * still open. Closing pools reject resize with POOL_CLOSED. */ resize(size: number): Promise<void>; /** * Synchronously enters closing, rejects new admission and drains already accepted operations and * acquisitions before closing owned Peers. Streams must finish/return/throw or settle their * cancellation; no pool drain timeout is added. Repeated calls share one Promise. All member * closes are attempted; failures from this closing phase reject as CLOSE_FAILED AggregateError * with original errors and the first failure on cause, even though state has become closed. * Completed open-phase resize/idle failures have already been delivered and are not replayed. */ close(): Promise<void>; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Resize, inspect or explicitly close the pool through its installed transport namespace.",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Per-installation original pool controls. close drains accepted work and joins one original Promise; no second shutdown owner."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcPoolControls from @migaia/rpc-plugin-pool, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcPoolControls when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcPoolControls does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "stats: Read a new frozen client-slot and queue snapshot, not remote provider/CPU concurrency.\nIRpcPoolStats with current target/member/inFlight/queued/state.\nresize: Serialize target changes, retiring idle members first and waiting for busy retirees without interrupting work. Expansion opens only missing members.\nresize.size: Application-selected positive integer target.\nPromise after adjustment; failed expansion restores the old open target and preserves primary/cleanup errors.\nclose: Stop new admission, drain accepted operations and acquisitions, then attempt all member closes. Active streams must finish or return.\nSame Promise on repeated calls; CLOSE_FAILED retains original errors/cause and the pool stays terminal."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "Resize, inspect or explicitly close the pool through its installed transport namespace."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-plugin-pool/dist/types.d.ts:IRpcPoolControls:export type IRpcPoolControls = Readonly<{ /** * Returns a new frozen instantaneous snapshot; reading it neither subscribes nor changes * capacity. */ stats(): IRpcPoolStats; /** * Queues a positive-integer target change in call order. Shrink prefers idle members and waits * for occupied retirees without interrupting their calls; expansion acquires only the missing * members. Factory/cleanup failures reject, and failed expansion restores the old target while * still open. Closing pools reject resize with POOL_CLOSED. */ resize(size: number): Promise<void>; /** * Synchronously enters closing, rejects new admission and drains already accepted operations and * acquisitions before closing owned Peers. Streams must finish/return/throw or settle their * cancellation; no pool drain timeout is added. Repeated calls share one Promise. All member * closes are attempted; failures from this closing phase reject as CLOSE_FAILED AggregateError * with original errors and the first failure on cause, even though state has become closed. * Completed open-phase resize/idle failures have already been delivered and are not replayed. */ close(): Promise<void>; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-plugin-pool-index--IRpcPoolControls"
+        },
+        {
           "name": "IRpcPoolErrorCode",
           "kind": "type",
           "signature": "export type IRpcPoolErrorCode = (typeof RpcPoolErrorCode)[keyof typeof RpcPoolErrorCode];",
@@ -543,6 +828,302 @@
           "fragment": "rpc-plugin-pool-index--IRpcPoolErrorCode"
         },
         {
+          "name": "IRpcPoolStats",
+          "kind": "type",
+          "signature": "export type IRpcPoolStats = Readonly<{ /** Requested capacity, retained after idle retirement and changed only by resize. */ targetSize: number; /** Acquired Peers still held, including retiring/closing members until their cleanup settles. */ memberCount: number; /** * Occupied ready-member slots; cold acquisitions not yet ready are not remote/provider * concurrency. */ inFlight: number; /** Accepted FIFO entries without an assigned member; assigned cold acquisitions are excluded. */ queued: number; /** Pool admission/drain phase, independent of native generation or supervision state. */ state: RpcPoolState; }>;",
+          "declarationLine": 8,
+          "source": "packages/rpc-plugin-pool/dist/types.d.ts",
+          "purpose": "Frozen pool scheduling snapshot, independent of provider concurrency and per-Peer native readiness or restart states. Available even after pool closure.",
+          "core": "targetSize: Configured member target from construction or the latest admitted resize; idle retirement does not lower it.\nmemberCount: Currently held hidden member count, including retirement/cleanup still settling. Idle retirement can leave it temporarily below targetSize.\ninFlight: Member slots with an actual acquired Peer assigned to an accepted operation; acquiring slots are excluded until ready.\nqueued: Accepted FIFO waiters without a member assignment; excludes occupied slots and cold acquisition reservations.\nstate: Pool-owned admission and drain lifecycle, separate from member native restart state.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "targetSize",
+              "kind": "property",
+              "optional": false,
+              "signature": "targetSize: number;",
+              "description": "Requested capacity, retained after idle retirement and changed only by resize.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "memberCount",
+              "kind": "property",
+              "optional": false,
+              "signature": "memberCount: number;",
+              "description": "Acquired Peers still held, including retiring/closing members until their cleanup settles.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "inFlight",
+              "kind": "property",
+              "optional": false,
+              "signature": "inFlight: number;",
+              "description": "Occupied ready-member slots; cold acquisitions not yet ready are not remote/provider concurrency.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "queued",
+              "kind": "property",
+              "optional": false,
+              "signature": "queued: number;",
+              "description": "Accepted FIFO entries without an assigned member; assigned cold acquisitions are excluded.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "state",
+              "kind": "property",
+              "optional": false,
+              "signature": "state: RpcPoolState;",
+              "description": "Pool admission/drain phase, independent of native generation or supervision state.",
+              "parameterDetails": [],
+              "returns": "RpcPoolState"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IRpcPoolStats",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IRpcPoolStats = Readonly<{ /** Requested capacity, retained after idle retirement and changed only by resize. */ targetSize: number; /** Acquired Peers still held, including retiring/closing members until their cleanup settles. */ memberCount: number; /** * Occupied ready-member slots; cold acquisitions not yet ready are not remote/provider * concurrency. */ inFlight: number; /** Accepted FIFO entries without an assigned member; assigned cold acquisitions are excluded. */ queued: number; /** Pool admission/drain phase, independent of native generation or supervision state. */ state: RpcPoolState; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Frozen pool scheduling snapshot, independent of provider concurrency and per-Peer native readiness or restart states. Available even after pool closure."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IRpcPoolStats from @migaia/rpc-plugin-pool, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IRpcPoolStats when its type contract and declared inputs match the result you need. Choose a different public symbol when IRpcPoolStats does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "targetSize: Configured member target from construction or the latest admitted resize; idle retirement does not lower it.\nmemberCount: Currently held hidden member count, including retirement/cleanup still settling. Idle retirement can leave it temporarily below targetSize.\ninFlight: Member slots with an actual acquired Peer assigned to an accepted operation; acquiring slots are excluded until ready.\nqueued: Accepted FIFO waiters without a member assignment; excludes occupied slots and cold acquisition reservations.\nstate: Pool-owned admission and drain lifecycle, separate from member native restart state."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-plugin-pool/dist/types.d.ts:IRpcPoolStats:export type IRpcPoolStats = Readonly<{ /** Requested capacity, retained after idle retirement and changed only by resize. */ targetSize: number; /** Acquired Peers still held, including retiring/closing members until their cleanup settles. */ memberCount: number; /** * Occupied ready-member slots; cold acquisitions not yet ready are not remote/provider * concurrency. */ inFlight: number; /** Accepted FIFO entries without an assigned member; assigned cold acquisitions are excluded. */ queued: number; /** Pool admission/drain phase, independent of native generation or supervision state. */ state: RpcPoolState; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-plugin-pool-index--IRpcPoolStats"
+        },
+        {
+          "name": "pool",
+          "kind": "function",
+          "signature": "export declare function pool(options: IPoolPluginOptions): IRpcNativeTransportFeature<IPoolExtensions>;",
+          "declarationLine": 10,
+          "source": "packages/rpc-plugin-pool/dist/plugin.d.ts",
+          "purpose": "Create a complete native pool feature for a repeatable Thread, Process or Coroutine source. Install it in that transport features array; one logical pool is public.",
+          "core": "Cold native feature; the installed transport namespace receives pool and native member controls.\nsize: Required positive integer target; installation waits for that many independent members.\nmaxQueue: Bounded waiting FIFO length; zero rejects when no slot is free.\nOmitted: 256 waiting entries.\nidleTimeoutMs: Finite positive milliseconds at most 2147483647; retirement keeps targetSize for later refill.\nOmitted: disable idle retirement.\nscheduler: Borrowed original idle scheduler only, not native restart or call deadlines.\nOmitted: systemScheduler.\nCreate a complete native pool feature for a repeatable Thread, Process or Coroutine source. Install it in that transport features array; one logical pool is public.",
+          "advanced": "Each operation selects one real member; a stream retains it until actual completion or return.\nExplicit pool.close stops admission, drains accepted work and attempts every owned member close without a new deadline.\nBound native process, thread or cooperative work through original FIFO and leases.",
+          "parameters": ["options: IPoolPluginOptions"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IPoolPluginOptions",
+              "optional": false
+            }
+          ],
+          "returns": "IRpcNativeTransportFeature<IPoolExtensions>",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin } from '@migaia/rpc-plugin-thread'\nimport { pool, RPC_POOL_PEER_ID } from '@migaia/rpc-plugin-pool'\nimport { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\n\ntype IWorkerApi = { work(value: number): number; values(end: number): AsyncIterable<number> }\n\nconst plugins = [\n  threadPlugin({\n    spawn: new URL('./worker.js', import.meta.url),\n    features: [\n      pool({ size: 3, maxQueue: 32 }),\n      timeoutFeature({ ms: 1500 }),\n      retryFeature({ attempts: 2 })\n    ]\n  })\n] as const\n\ntype IPoolHost = IRpcHost<IWorkerApi, typeof plugins>\n\nexport function open() {\n  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n}\n\nexport function work(host: IPoolHost, signal: AbortSignal) {\n  return host.thread.send(RPC_POOL_PEER_ID, 'work', 21, {\n    signal,\n    timeout: timeoutFeature({ ms: 1000 }),\n    retry: false\n  })\n}\n\nexport async function firstValue(host: IPoolHost) {\n  const stream = host.thread.peers.pool.values(10)\n  try {\n    return await stream.next()\n  } finally {\n    await stream.return?.()\n  }\n}\n\nexport async function shrink(host: IPoolHost) {\n  await host.thread.pool.resize(1)\n  return { stats: host.thread.pool.stats(), members: await host.thread.members.list() }\n}\n\nexport async function closeIdlePool(host: IPoolHost) {\n  await host.thread.pool.close()\n  await host.close()\n}",
+            "import { createRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin, isThreadChild } from '@migaia/rpc-plugin-thread'\nimport { pool } from '@migaia/rpc-plugin-pool'\n\ntype IWorkerApi = { double(value: number): number }\n\nif (await isThreadChild()) {\n  await createRpcHost({\n    plugins: [threadPlugin({ connectToParent: true })],\n    provide: { double: (value: number) => value * 2 }\n  })\n} else {\n  const plugins = [\n    threadPlugin({ spawn: true, features: [pool({ size: 3, maxQueue: 32 })] })\n  ] as const\n  const host = await createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n  try {\n    console.log(await host.thread.send('pool', 'double', 21))\n    await host.thread.pool.resize(2)\n    console.log(host.thread.pool.stats().targetSize)\n  } finally {\n    await host.close()\n  }\n}"
+          ],
+          "members": [],
+          "composes": [],
+          "aliasOf": "pool",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function pool(options: IPoolPluginOptions): IRpcNativeTransportFeature<IPoolExtensions>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IPoolPluginOptions",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["IRpcNativeTransportFeature<IPoolExtensions>"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Create a complete native pool feature for a repeatable Thread, Process or Coroutine source. Install it in that transport features array; one logical pool is public."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import pool from @migaia/rpc-plugin-pool, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use pool when its function contract and declared inputs match the result you need. Choose a different public symbol when pool does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Cold native feature; the installed transport namespace receives pool and native member controls.\nsize: Required positive integer target; installation waits for that many independent members.\nmaxQueue: Bounded waiting FIFO length; zero rejects when no slot is free.\nOmitted: 256 waiting entries.\nidleTimeoutMs: Finite positive milliseconds at most 2147483647; retirement keeps targetSize for later refill.\nOmitted: disable idle retirement.\nscheduler: Borrowed original idle scheduler only, not native restart or call deadlines.\nOmitted: systemScheduler.\nCreate a complete native pool feature for a repeatable Thread, Process or Coroutine source. Install it in that transport features array; one logical pool is public."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "Each operation selects one real member; a stream retains it until actual completion or return.\nExplicit pool.close stops admission, drains accepted work and attempts every owned member close without a new deadline.\nBound native process, thread or cooperative work through original FIFO and leases."
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "size",
+              "type": "number",
+              "optional": false,
+              "description": "Required positive integer target; initial creation waits for this many independent Peers."
+            },
+            {
+              "name": "maxQueue",
+              "type": "number",
+              "optional": true,
+              "description": "Maximum waiting FIFO length, default 256; nonnegative integer, with 0 allowing no queue."
+            },
+            {
+              "name": "idleTimeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": "Optional idle retirement delay; omitted disables it. Must be finite, positive and at most 2147483647 ms, including fractional values. Target size remains unchanged after retirement; later demand refills missing members through the original public factory."
+            },
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": true,
+              "description": "Owns idle timers only, default systemScheduler. Admitted once before Peer acquisition; timers cancel on reserve/retire/close and request optional unref. Peer restart/deadline clocks retain their source policy, and timer unref is a liveness hint rather than an earlier deadline."
+            }
+          ],
+          "identity": "packages/rpc-plugin-pool/dist/plugin.d.ts:pool:export declare function pool(options: IPoolPluginOptions): IRpcNativeTransportFeature<IPoolExtensions>;",
+          "guidance": [
+            {
+              "id": "错误与观察",
+              "heading": "错误与观察",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "池 source 为 `rpc.pool`：INVALID_OPTIONS、POOL_TRANSPORT_UNSUPPORTED、POOL_CLOSED、QUEUE_FULL、CALL_ABORTED、CLOSE_FAILED。业务与原生错误保留其原 owner 的 source/code/cause；池不自动重放。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "部分构造失败会清理已获取成员并保留原 primary，次级清理错误继续从错误图或报告到达。最终关闭期间的成员清理失败以 CLOSE_FAILED AggregateError 保留原 errors 和首个 cause，关闭后不重新开放。开放期间已经通过 resize 拒绝或空闲回收报告交付的错误不会保留到最终 close 再次抛出。只读观察使用 `@migaia/rpc-host/plugins/probe`，不在 pool 中另装一套诊断或消息解析器。"
+                }
+              ]
+            },
+            {
+              "id": "选项与控制",
+              "heading": "选项与控制",
+              "blocks": [
+                {
+                  "type": "table",
+                  "headers": ["API / 选项", "行为"],
+                  "rows": [
+                    ["`size`", "必填正整数；初次安装等待目标成员就绪"],
+                    ["`maxQueue`", "默认 256，非负整数；0 表示没有等待槽"],
+                    ["`idleTimeoutMs`", "省略则不回收；正有限毫秒，最大 2147483647"],
+                    ["`scheduler`", "只负责 pool 空闲计时"],
+                    [
+                      "`host.thread.pool.stats()`",
+                      "冻结的 targetSize/memberCount/inFlight/queued/state 快照"
+                    ],
+                    ["`host.thread.pool.resize(size)`", "按顺序调整目标容量，忙成员完成后安全退休"],
+                    ["`host.thread.pool.close()`", "停止新接纳，等待已接纳操作，再关闭成员"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "`inFlight` 是客户端占槽数，不代表 provider 或 CPU 并发。流第一次 `next()` 才占槽，消费完毕或结束迭代后释放。缩容优先退休空闲成员。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "业务与传输失败保留各自错误身份，pool 不自行重放业务。池错误 source 为 `rpc.pool`；按 code/cause 处理，参见使用指南。自定义 transport 使用 `@migaia/rpc-host/sdk`，观察使用 `@migaia/rpc-host/plugins/probe`。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 154,
+          "configuration": [
+            {
+              "name": "size",
+              "type": "number",
+              "optional": false,
+              "description": "`pool({ size })` 放在 `threadPlugin`、`processPlugin` 或 `coroutinePlugin` 的 `features` 中。来源必须能重复获取独立成员：thread/coroutine spawn，或 process spawn/connect。listen、connectToParent 在获取成员前拒绝为 `POOL_TRANSPORT_UNSUPPORTED`。",
+              "descriptionEn": "Required positive integer target; initial creation waits for this many independent Peers.",
+              "descriptionZh": "`pool({ size })` 放在 `threadPlugin`、`processPlugin` 或 `coroutinePlugin` 的 `features` 中。来源必须能重复获取独立成员：thread/coroutine spawn，或 process spawn/connect。listen、connectToParent 在获取成员前拒绝为 `POOL_TRANSPORT_UNSUPPORTED`。"
+            },
+            {
+              "name": "maxQueue",
+              "type": "number",
+              "optional": true,
+              "description": "`maxQueue` — 默认 256，非负整数；0 表示没有等待槽",
+              "descriptionEn": "Maximum waiting FIFO length, default 256; nonnegative integer, with 0 allowing no queue.",
+              "descriptionZh": "`maxQueue` — 默认 256，非负整数；0 表示没有等待槽"
+            },
+            {
+              "name": "idleTimeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": "`idleTimeoutMs` — 省略则不回收；正有限毫秒，最大 2147483647",
+              "descriptionEn": "Optional idle retirement delay; omitted disables it. Must be finite, positive and at most 2147483647 ms, including fractional values. Target size remains unchanged after retirement; later demand refills missing members through the original public factory.",
+              "descriptionZh": "`idleTimeoutMs` — 省略则不回收；正有限毫秒，最大 2147483647"
+            },
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": true,
+              "description": "`scheduler` — 只负责 pool 空闲计时",
+              "descriptionEn": "Owns idle timers only, default systemScheduler. Admitted once before Peer acquisition; timers cancel on reserve/retire/close and request optional unref. Peer restart/deadline clocks retain their source policy, and timer unref is a liveness hint rather than an earlier deadline.",
+              "descriptionZh": "`scheduler` — 只负责 pool 空闲计时"
+            }
+          ],
+          "fragment": "rpc-plugin-pool-index--pool"
+        },
+        {
           "name": "RPC_POOL_ERROR_SOURCE",
           "kind": "const",
           "signature": "export declare const RPC_POOL_ERROR_SOURCE = \"rpc.pool\";",
@@ -604,6 +1185,71 @@
           "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-plugin-pool-index--RPC_POOL_ERROR_SOURCE"
+        },
+        {
+          "name": "RPC_POOL_PEER_ID",
+          "kind": "const",
+          "signature": "export declare const RPC_POOL_PEER_ID = \"pool\";",
+          "declarationLine": 20,
+          "source": "packages/rpc-plugin-pool/dist/text.d.ts",
+          "purpose": "Exact logical target pool for direct send/dispatch. Hidden member IDs never enter the host direct target set.",
+          "core": "Exact logical target pool for direct send/dispatch. Hidden member IDs never enter the host direct target set.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createRpcHost, type IRpcHost } from '@migaia/rpc-host'\nimport { threadPlugin } from '@migaia/rpc-plugin-thread'\nimport { pool, RPC_POOL_PEER_ID } from '@migaia/rpc-plugin-pool'\nimport { timeoutFeature, retryFeature } from '@migaia/rpc-host/features'\n\ntype IWorkerApi = { work(value: number): number; values(end: number): AsyncIterable<number> }\n\nconst plugins = [\n  threadPlugin({\n    spawn: new URL('./worker.js', import.meta.url),\n    features: [\n      pool({ size: 3, maxQueue: 32 }),\n      timeoutFeature({ ms: 1500 }),\n      retryFeature({ attempts: 2 })\n    ]\n  })\n] as const\n\ntype IPoolHost = IRpcHost<IWorkerApi, typeof plugins>\n\nexport function open() {\n  return createRpcHost<IWorkerApi, typeof plugins>({ plugins })\n}\n\nexport function work(host: IPoolHost, signal: AbortSignal) {\n  return host.thread.send(RPC_POOL_PEER_ID, 'work', 21, {\n    signal,\n    timeout: timeoutFeature({ ms: 1000 }),\n    retry: false\n  })\n}\n\nexport async function firstValue(host: IPoolHost) {\n  const stream = host.thread.peers.pool.values(10)\n  try {\n    return await stream.next()\n  } finally {\n    await stream.return?.()\n  }\n}\n\nexport async function shrink(host: IPoolHost) {\n  await host.thread.pool.resize(1)\n  return { stats: host.thread.pool.stats(), members: await host.thread.members.list() }\n}\n\nexport async function closeIdlePool(host: IPoolHost) {\n  await host.thread.pool.close()\n  await host.close()\n}"
+          ],
+          "members": [],
+          "composes": [],
+          "aliasOf": "RPC_POOL_PEER_ID",
+          "exportPath": ".",
+          "overloadSignatures": ["export declare const RPC_POOL_PEER_ID = \"pool\";"],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Exact logical target pool for direct send/dispatch. Hidden member IDs never enter the host direct target set."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import RPC_POOL_PEER_ID from @migaia/rpc-plugin-pool, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use RPC_POOL_PEER_ID when its const contract and declared inputs match the result you need. Choose a different public symbol when RPC_POOL_PEER_ID does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Exact logical target pool for direct send/dispatch. Hidden member IDs never enter the host direct target set."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-plugin-pool/dist/text.d.ts:RPC_POOL_PEER_ID:export declare const RPC_POOL_PEER_ID = \"pool\";",
+          "guidance": [],
+          "usageScore": 18,
+          "configuration": [],
+          "fragment": "rpc-plugin-pool-index--RPC_POOL_PEER_ID"
         },
         {
           "name": "RpcPoolErrorCode",
@@ -724,6 +1370,100 @@
           "usageScore": 0,
           "configuration": [],
           "fragment": "rpc-plugin-pool-index--RpcPoolErrorCode"
+        },
+        {
+          "name": "RpcPoolState",
+          "kind": "const",
+          "signature": "export declare const RpcPoolState: { /** New calls and resizes may be admitted; member availability is tracked separately. */ readonly open: 'open'; /** New admission is fenced while accepted operations and member cleanup drain. */ readonly closing: 'closing'; /** Member cleanup has completed, including completion that rejects with retained failures. */ readonly closed: 'closed'; };\nexport type RpcPoolState = (typeof RpcPoolState)[keyof typeof RpcPoolState];",
+          "declarationLine": 22,
+          "source": "packages/rpc-plugin-pool/dist/text.d.ts",
+          "purpose": "Client scheduling lifecycle reported by stats(): open accepts work, closing drains accepted operations, closed records completed member cleanup attempts. It does not describe individual native supervisor generations.",
+          "core": "open: Accepts new operations, dispatches free slots and queues accepted overflow within maxQueue.\nclosing: Rejects new operations while draining accepted work and closing all owned members.\nclosed: All member closes have been attempted; stats remains readable but no new calls are admitted.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "open",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly open: 'open';",
+              "description": "New calls and resizes may be admitted; member availability is tracked separately.",
+              "parameterDetails": [],
+              "returns": "'open'"
+            },
+            {
+              "name": "closing",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly closing: 'closing';",
+              "description": "New admission is fenced while accepted operations and member cleanup drain.",
+              "parameterDetails": [],
+              "returns": "'closing'"
+            },
+            {
+              "name": "closed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly closed: 'closed';",
+              "description": "Member cleanup has completed, including completion that rejects with retained failures.",
+              "parameterDetails": [],
+              "returns": "'closed'"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "RpcPoolState",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const RpcPoolState: { /** New calls and resizes may be admitted; member availability is tracked separately. */ readonly open: 'open'; /** New admission is fenced while accepted operations and member cleanup drain. */ readonly closing: 'closing'; /** Member cleanup has completed, including completion that rejects with retained failures. */ readonly closed: 'closed'; };",
+            "export type RpcPoolState = (typeof RpcPoolState)[keyof typeof RpcPoolState];"
+          ],
+          "overloadParameterDetails": [[], []],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Client scheduling lifecycle reported by stats(): open accepts work, closing drains accepted operations, closed records completed member cleanup attempts. It does not describe individual native supervisor generations."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import RpcPoolState from @migaia/rpc-plugin-pool, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use RpcPoolState when its const contract and declared inputs match the result you need. Choose a different public symbol when RpcPoolState does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "open: Accepts new operations, dispatches free slots and queues accepted overflow within maxQueue.\nclosing: Rejects new operations while draining accepted work and closing all owned members.\nclosed: All member closes have been attempted; stats remains readable but no new calls are admitted."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/rpc-plugin-pool/dist/text.d.ts:RpcPoolState:export declare const RpcPoolState: { /** New calls and resizes may be admitted; member availability is tracked separately. */ readonly open: 'open'; /** New admission is fenced while accepted operations and member cleanup drain. */ readonly closing: 'closing'; /** Member cleanup has completed, including completion that rejects with retained failures. */ readonly closed: 'closed'; };\nexport type RpcPoolState = (typeof RpcPoolState)[keyof typeof RpcPoolState];",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "rpc-plugin-pool-index--RpcPoolState"
         }
       ],
       "aliases": []

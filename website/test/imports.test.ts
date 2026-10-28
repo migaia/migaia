@@ -16,6 +16,20 @@ const loggingPackages = [
   'log-plugin-reasoning',
   'log-plugin-durable'
 ] as const
+/** Primary public factories must remain visible through real barrels and conditional entries. */
+const loggingFactories = new Map([
+  ['log-host:index', ['createLogHost', 'levelPlugin', 'forwardPlugin']],
+  ['log-host:plugin', ['defineLogFeature', 'defineOutputPlugin', 'projectLogEntry']],
+  ['log-plugin-console:index', ['consolePlugin', 'prettyFeature']],
+  ['log-plugin-http:index', ['httpPlugin']],
+  ['log-plugin-file:index', ['filePlugin']],
+  ['log-plugin-process:index', ['processPlugin']],
+  ['log-plugin-reasoning:index', ['reasoningPlugin']],
+  ['log-plugin-durable:index', ['memoryLogStore', 'binlogPlugin', 'walPlugin', 'undoLogPlugin']],
+  ['log-plugin-durable:file', ['fileLogStore']]
+])
+/** Generated module data is inspected without importing unpublished website runtime packages. */
+type IGeneratedApi = { library: string; module: string; symbols: { name: string }[] }
 /** Published runtime migration waits for the first registry release of the new packages. */
 const runtimeAllowances = new Set(['package.json', 'bun.lock', 'app/log.ts', 'app/log-runtime.ts'])
 /** Ignored build products and dependencies are not authored website documentation. */
@@ -207,6 +221,16 @@ test('generates all seven logging packages and removes retired documentation rou
     existsSync(join(website, 'src/content/zh/packages', 'logger')) &&
       readdirSync(join(website, 'src/content/zh/packages', 'logger')).length > 0
   ).toBe(false)
+  /** Every module and symbol is indexed once; expected entries are the fixed factory table above. */
+  const apis = JSON.parse(
+    readFileSync(join(website, 'src/generated/manifests/apis.json'), 'utf8')
+  ) as { apis: IGeneratedApi[] }
+  /** Package/module identity must not depend on aggregate array position. */
+  const exported = new Map<string, Set<string>>()
+  for (const api of apis.apis)
+    exported.set(`${api.library}:${api.module}`, new Set(api.symbols.map((symbol) => symbol.name)))
+  for (const [entry, factories] of loggingFactories)
+    for (const factory of factories) expect(exported.get(entry)?.has(factory), entry).toBe(true)
 })
 
 test('keeps legacy package references only in the four deferred published runtime files', () => {

@@ -2740,7 +2740,2648 @@
       ],
       "guidePath": "/en/docs/store-indexed/getting-started",
       "architecturePath": "/en/docs/store-indexed",
-      "symbols": [],
+      "symbols": [
+        {
+          "name": "createStoreIndexedError",
+          "kind": "function",
+          "signature": "export declare function createStoreIndexedError(code: IStoreIndexedErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;",
+          "declarationLine": 9,
+          "source": "packages/store-indexed/dist/errors.d.ts",
+          "purpose": "Constructs a native Error with this package source and selected stable code, preserving the original stack without promising that it includes cause messages. The helper returns rather than throws the error.",
+          "core": "code: A value selected from StoreIndexedErrorCode for the actual failure scenario.\nmessage: Caller-authored explanation for this concrete failure.\nA source/code-tagged Error; instanceof and the native stack remain intact.\ncause: Original failure retained by identity on the native error cause property.\nOmitted: no cause property is supplied.",
+          "advanced": "",
+          "parameters": [
+            "code: IStoreIndexedErrorCode",
+            "message: string",
+            "options: { readonly cause?: unknown; } (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "code",
+              "type": "IStoreIndexedErrorCode",
+              "optional": false
+            },
+            {
+              "name": "message",
+              "type": "string",
+              "optional": false
+            },
+            {
+              "name": "options",
+              "type": "{ readonly cause?: unknown; }",
+              "optional": true
+            }
+          ],
+          "returns": "Error",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function createStoreIndexedError(code: IStoreIndexedErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "code",
+                "type": "IStoreIndexedErrorCode",
+                "optional": false
+              },
+              {
+                "name": "message",
+                "type": "string",
+                "optional": false
+              },
+              {
+                "name": "options",
+                "type": "{ readonly cause?: unknown; }",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["Error"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Constructs a native Error with this package source and selected stable code, preserving the original stack without promising that it includes cause messages. The helper returns rather than throws the error."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createStoreIndexedError from @migaia/store-indexed, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createStoreIndexedError when its function contract and declared inputs match the result you need. Choose a different public symbol when createStoreIndexedError does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "code: A value selected from StoreIndexedErrorCode for the actual failure scenario.\nmessage: Caller-authored explanation for this concrete failure.\nA source/code-tagged Error; instanceof and the native stack remain intact.\ncause: Original failure retained by identity on the native error cause property.\nOmitted: no cause property is supplied."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": ""
+            }
+          ],
+          "identity": "packages/store-indexed/dist/errors.d.ts:createStoreIndexedError:export declare function createStoreIndexedError(code: IStoreIndexedErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;",
+          "guidance": [
+            {
+              "id": "操作词表与错误",
+              "heading": "操作词表与错误",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`IndexedOperation` 为消费方诊断/日志提供 `read:'read'`、`write:'write'`、`delete:'delete'`；`IIndexedOperation` 是这些值的联合。本包方法不直接引用该词表。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["StoreIndexedErrorCode 属性", "code", "触发"],
+                  "rows": [
+                    [
+                      "invalidOption",
+                      "INVALID_OPTION",
+                      "options、初值、iterator、Map 条目、debugName、Object key 或 updater 形状无效"
+                    ],
+                    ["collectionDisposed", "COLLECTION_DISPOSED", "关闭后的数据访问/变更"],
+                    ["callbackFailed", "CALLBACK_FAILED", "没有已有包身份的 guard/updater 失败"],
+                    ["indexOutOfRange", "INDEX_OUT_OF_RANGE", "Array.set 越界"],
+                    ["invalidIndex", "INVALID_INDEX", "Array.at/set 非整数"],
+                    ["crossRuntime", "CROSS_RUNTIME", "本包检测到跨 Runtime 追踪读取"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='store.indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
+                },
+                {
+                  "type": "table",
+                  "headers": ["message", "场景"],
+                  "rows": [
+                    [
+                      "`[store] observable collection options must be an object`",
+                      "options 形状或读取失败"
+                    ],
+                    [
+                      "`[store] observable collection debugName must be a string`",
+                      "debugName 类型无效"
+                    ],
+                    [
+                      "`[store] observable collection input must be a non-null object or iterable`",
+                      "初值/替换输入、iterator 或 updater 形状失败"
+                    ],
+                    ["`[store] ObservableObject key must be a string`", "Object 的 key 非字符串"],
+                    [
+                      "`[store] cross-runtime dependency is not allowed: collection read belongs to another Runtime`",
+                      "本包检测到跨 Runtime 追踪"
+                    ],
+                    ["`[store] {debugName} is disposed`", "关闭后使用"],
+                    ["`[store] ObservableArray index out of range`", "set 越界"],
+                    ["`[store] ObservableArray index must be an integer`", "at/set 非整数"],
+                    ["`[store] collection callback failed`", "无法直接附身份时的 callback wrapper"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "三个公开错误工厂的 code 均为必填 `IStoreIndexedErrorCode`、message 为必填 string。`createStoreIndexedError(code,message,options?)` 返回原生 Error，`createStoreIndexedTypeError(...)` 返回 TypeError，options 默认 undefined、只有可选 cause；前者在 options 自有 cause 存在时转发，后者在 cause 非 undefined 时转发。`createStoreIndexedRangeError(code,message)` 返回 RangeError，无第三参数。三者附不可写 source/code，不改 stack；cause 不保证显示进顶层 stack 文本。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 6,
+          "configuration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": "三个公开错误工厂的 code 均为必填 `IStoreIndexedErrorCode`、message 为必填 string。`createStoreIndexedError(code,message,options?)` 返回原生 Error，`createStoreIndexedTypeError(...)` 返回 TypeError，options 默认 undefined、只有可选 cause；前者在 options 自有 cause 存在时转发，后者在 cause 非 undefined 时转发。`createStoreIndexedRangeError(code,message)` 返回 RangeError，无第三参数。三者附不可写 source/code，不改 stack；cause 不保证显示进顶层 stack 文本。",
+              "descriptionEn": "",
+              "descriptionZh": "三个公开错误工厂的 code 均为必填 `IStoreIndexedErrorCode`、message 为必填 string。`createStoreIndexedError(code,message,options?)` 返回原生 Error，`createStoreIndexedTypeError(...)` 返回 TypeError，options 默认 undefined、只有可选 cause；前者在 options 自有 cause 存在时转发，后者在 cause 非 undefined 时转发。`createStoreIndexedRangeError(code,message)` 返回 RangeError，无第三参数。三者附不可写 source/code，不改 stack；cause 不保证显示进顶层 stack 文本。"
+            }
+          ],
+          "fragment": "store-indexed-index--createStoreIndexedError"
+        },
+        {
+          "name": "createStoreIndexedRangeError",
+          "kind": "function",
+          "signature": "export declare function createStoreIndexedRangeError(code: IStoreIndexedErrorCode, message: string): RangeError;",
+          "declarationLine": 16,
+          "source": "packages/store-indexed/dist/errors.d.ts",
+          "purpose": "Constructs a native RangeError with this package source and selected stable code, preserving the original stack without promising that it includes cause messages. The helper returns rather than throws the error.",
+          "core": "code: A value selected from StoreIndexedErrorCode for the actual failure scenario.\nmessage: Caller-authored explanation for this concrete failure.\nA source/code-tagged RangeError; instanceof and the native stack remain intact.",
+          "advanced": "",
+          "parameters": ["code: IStoreIndexedErrorCode", "message: string"],
+          "parameterDetails": [
+            {
+              "name": "code",
+              "type": "IStoreIndexedErrorCode",
+              "optional": false
+            },
+            {
+              "name": "message",
+              "type": "string",
+              "optional": false
+            }
+          ],
+          "returns": "RangeError",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function createStoreIndexedRangeError(code: IStoreIndexedErrorCode, message: string): RangeError;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "code",
+                "type": "IStoreIndexedErrorCode",
+                "optional": false
+              },
+              {
+                "name": "message",
+                "type": "string",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["RangeError"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Constructs a native RangeError with this package source and selected stable code, preserving the original stack without promising that it includes cause messages. The helper returns rather than throws the error."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createStoreIndexedRangeError from @migaia/store-indexed, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createStoreIndexedRangeError when its function contract and declared inputs match the result you need. Choose a different public symbol when createStoreIndexedRangeError does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "code: A value selected from StoreIndexedErrorCode for the actual failure scenario.\nmessage: Caller-authored explanation for this concrete failure.\nA source/code-tagged RangeError; instanceof and the native stack remain intact."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-indexed/dist/errors.d.ts:createStoreIndexedRangeError:export declare function createStoreIndexedRangeError(code: IStoreIndexedErrorCode, message: string): RangeError;",
+          "guidance": [
+            {
+              "id": "操作词表与错误",
+              "heading": "操作词表与错误",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`IndexedOperation` 为消费方诊断/日志提供 `read:'read'`、`write:'write'`、`delete:'delete'`；`IIndexedOperation` 是这些值的联合。本包方法不直接引用该词表。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["StoreIndexedErrorCode 属性", "code", "触发"],
+                  "rows": [
+                    [
+                      "invalidOption",
+                      "INVALID_OPTION",
+                      "options、初值、iterator、Map 条目、debugName、Object key 或 updater 形状无效"
+                    ],
+                    ["collectionDisposed", "COLLECTION_DISPOSED", "关闭后的数据访问/变更"],
+                    ["callbackFailed", "CALLBACK_FAILED", "没有已有包身份的 guard/updater 失败"],
+                    ["indexOutOfRange", "INDEX_OUT_OF_RANGE", "Array.set 越界"],
+                    ["invalidIndex", "INVALID_INDEX", "Array.at/set 非整数"],
+                    ["crossRuntime", "CROSS_RUNTIME", "本包检测到跨 Runtime 追踪读取"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='store.indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
+                },
+                {
+                  "type": "table",
+                  "headers": ["message", "场景"],
+                  "rows": [
+                    [
+                      "`[store] observable collection options must be an object`",
+                      "options 形状或读取失败"
+                    ],
+                    [
+                      "`[store] observable collection debugName must be a string`",
+                      "debugName 类型无效"
+                    ],
+                    [
+                      "`[store] observable collection input must be a non-null object or iterable`",
+                      "初值/替换输入、iterator 或 updater 形状失败"
+                    ],
+                    ["`[store] ObservableObject key must be a string`", "Object 的 key 非字符串"],
+                    [
+                      "`[store] cross-runtime dependency is not allowed: collection read belongs to another Runtime`",
+                      "本包检测到跨 Runtime 追踪"
+                    ],
+                    ["`[store] {debugName} is disposed`", "关闭后使用"],
+                    ["`[store] ObservableArray index out of range`", "set 越界"],
+                    ["`[store] ObservableArray index must be an integer`", "at/set 非整数"],
+                    ["`[store] collection callback failed`", "无法直接附身份时的 callback wrapper"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "三个公开错误工厂的 code 均为必填 `IStoreIndexedErrorCode`、message 为必填 string。`createStoreIndexedError(code,message,options?)` 返回原生 Error，`createStoreIndexedTypeError(...)` 返回 TypeError，options 默认 undefined、只有可选 cause；前者在 options 自有 cause 存在时转发，后者在 cause 非 undefined 时转发。`createStoreIndexedRangeError(code,message)` 返回 RangeError，无第三参数。三者附不可写 source/code，不改 stack；cause 不保证显示进顶层 stack 文本。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "store-indexed-index--createStoreIndexedRangeError"
+        },
+        {
+          "name": "createStoreIndexedTypeError",
+          "kind": "function",
+          "signature": "export declare function createStoreIndexedTypeError(code: IStoreIndexedErrorCode, message: string, options?: { readonly cause?: unknown; }): TypeError;",
+          "declarationLine": 21,
+          "source": "packages/store-indexed/dist/errors.d.ts",
+          "purpose": "Constructs a native TypeError with this package source and selected stable code, preserving the original stack without promising that it includes cause messages. The helper returns rather than throws the error.",
+          "core": "code: A value selected from StoreIndexedErrorCode for the actual failure scenario.\nmessage: Caller-authored explanation for this concrete failure.\nA source/code-tagged TypeError; instanceof and the native stack remain intact.\ncause: Original failure retained by identity on the native error cause property.\nOmitted: no cause property is supplied.",
+          "advanced": "",
+          "parameters": [
+            "code: IStoreIndexedErrorCode",
+            "message: string",
+            "options: { readonly cause?: unknown; } (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "code",
+              "type": "IStoreIndexedErrorCode",
+              "optional": false
+            },
+            {
+              "name": "message",
+              "type": "string",
+              "optional": false
+            },
+            {
+              "name": "options",
+              "type": "{ readonly cause?: unknown; }",
+              "optional": true
+            }
+          ],
+          "returns": "TypeError",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function createStoreIndexedTypeError(code: IStoreIndexedErrorCode, message: string, options?: { readonly cause?: unknown; }): TypeError;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "code",
+                "type": "IStoreIndexedErrorCode",
+                "optional": false
+              },
+              {
+                "name": "message",
+                "type": "string",
+                "optional": false
+              },
+              {
+                "name": "options",
+                "type": "{ readonly cause?: unknown; }",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["TypeError"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Constructs a native TypeError with this package source and selected stable code, preserving the original stack without promising that it includes cause messages. The helper returns rather than throws the error."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createStoreIndexedTypeError from @migaia/store-indexed, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createStoreIndexedTypeError when its function contract and declared inputs match the result you need. Choose a different public symbol when createStoreIndexedTypeError does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "code: A value selected from StoreIndexedErrorCode for the actual failure scenario.\nmessage: Caller-authored explanation for this concrete failure.\nA source/code-tagged TypeError; instanceof and the native stack remain intact.\ncause: Original failure retained by identity on the native error cause property.\nOmitted: no cause property is supplied."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": ""
+            }
+          ],
+          "identity": "packages/store-indexed/dist/errors.d.ts:createStoreIndexedTypeError:export declare function createStoreIndexedTypeError(code: IStoreIndexedErrorCode, message: string, options?: { readonly cause?: unknown; }): TypeError;",
+          "guidance": [
+            {
+              "id": "操作词表与错误",
+              "heading": "操作词表与错误",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`IndexedOperation` 为消费方诊断/日志提供 `read:'read'`、`write:'write'`、`delete:'delete'`；`IIndexedOperation` 是这些值的联合。本包方法不直接引用该词表。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["StoreIndexedErrorCode 属性", "code", "触发"],
+                  "rows": [
+                    [
+                      "invalidOption",
+                      "INVALID_OPTION",
+                      "options、初值、iterator、Map 条目、debugName、Object key 或 updater 形状无效"
+                    ],
+                    ["collectionDisposed", "COLLECTION_DISPOSED", "关闭后的数据访问/变更"],
+                    ["callbackFailed", "CALLBACK_FAILED", "没有已有包身份的 guard/updater 失败"],
+                    ["indexOutOfRange", "INDEX_OUT_OF_RANGE", "Array.set 越界"],
+                    ["invalidIndex", "INVALID_INDEX", "Array.at/set 非整数"],
+                    ["crossRuntime", "CROSS_RUNTIME", "本包检测到跨 Runtime 追踪读取"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='store.indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
+                },
+                {
+                  "type": "table",
+                  "headers": ["message", "场景"],
+                  "rows": [
+                    [
+                      "`[store] observable collection options must be an object`",
+                      "options 形状或读取失败"
+                    ],
+                    [
+                      "`[store] observable collection debugName must be a string`",
+                      "debugName 类型无效"
+                    ],
+                    [
+                      "`[store] observable collection input must be a non-null object or iterable`",
+                      "初值/替换输入、iterator 或 updater 形状失败"
+                    ],
+                    ["`[store] ObservableObject key must be a string`", "Object 的 key 非字符串"],
+                    [
+                      "`[store] cross-runtime dependency is not allowed: collection read belongs to another Runtime`",
+                      "本包检测到跨 Runtime 追踪"
+                    ],
+                    ["`[store] {debugName} is disposed`", "关闭后使用"],
+                    ["`[store] ObservableArray index out of range`", "set 越界"],
+                    ["`[store] ObservableArray index must be an integer`", "at/set 非整数"],
+                    ["`[store] collection callback failed`", "无法直接附身份时的 callback wrapper"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "三个公开错误工厂的 code 均为必填 `IStoreIndexedErrorCode`、message 为必填 string。`createStoreIndexedError(code,message,options?)` 返回原生 Error，`createStoreIndexedTypeError(...)` 返回 TypeError，options 默认 undefined、只有可选 cause；前者在 options 自有 cause 存在时转发，后者在 cause 非 undefined 时转发。`createStoreIndexedRangeError(code,message)` 返回 RangeError，无第三参数。三者附不可写 source/code，不改 stack；cause 不保证显示进顶层 stack 文本。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 6,
+          "configuration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": "三个公开错误工厂的 code 均为必填 `IStoreIndexedErrorCode`、message 为必填 string。`createStoreIndexedError(code,message,options?)` 返回原生 Error，`createStoreIndexedTypeError(...)` 返回 TypeError，options 默认 undefined、只有可选 cause；前者在 options 自有 cause 存在时转发，后者在 cause 非 undefined 时转发。`createStoreIndexedRangeError(code,message)` 返回 RangeError，无第三参数。三者附不可写 source/code，不改 stack；cause 不保证显示进顶层 stack 文本。",
+              "descriptionEn": "",
+              "descriptionZh": "三个公开错误工厂的 code 均为必填 `IStoreIndexedErrorCode`、message 为必填 string。`createStoreIndexedError(code,message,options?)` 返回原生 Error，`createStoreIndexedTypeError(...)` 返回 TypeError，options 默认 undefined、只有可选 cause；前者在 options 自有 cause 存在时转发，后者在 cause 非 undefined 时转发。`createStoreIndexedRangeError(code,message)` 返回 RangeError，无第三参数。三者附不可写 source/code，不改 stack；cause 不保证显示进顶层 stack 文本。"
+            }
+          ],
+          "fragment": "store-indexed-index--createStoreIndexedTypeError"
+        },
+        {
+          "name": "IIndexedOperation",
+          "kind": "type",
+          "signature": "export type IIndexedOperation = (typeof IndexedOperation)[keyof typeof IndexedOperation];",
+          "declarationLine": 11,
+          "source": "packages/store-indexed/dist/indexed-constants.d.ts",
+          "purpose": "Value union of IndexedOperation for consumer-defined read/write/delete diagnostic events.",
+          "core": "Value union of IndexedOperation for consumer-defined read/write/delete diagnostic events.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "IIndexedOperation",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IIndexedOperation = (typeof IndexedOperation)[keyof typeof IndexedOperation];"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Value union of IndexedOperation for consumer-defined read/write/delete diagnostic events."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IIndexedOperation from @migaia/store-indexed, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IIndexedOperation when its type contract and declared inputs match the result you need. Choose a different public symbol when IIndexedOperation does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Value union of IndexedOperation for consumer-defined read/write/delete diagnostic events."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-indexed/dist/indexed-constants.d.ts:IIndexedOperation:export type IIndexedOperation = (typeof IndexedOperation)[keyof typeof IndexedOperation];",
+          "guidance": [
+            {
+              "id": "操作词表与错误",
+              "heading": "操作词表与错误",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`IndexedOperation` 为消费方诊断/日志提供 `read:'read'`、`write:'write'`、`delete:'delete'`；`IIndexedOperation` 是这些值的联合。本包方法不直接引用该词表。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["StoreIndexedErrorCode 属性", "code", "触发"],
+                  "rows": [
+                    [
+                      "invalidOption",
+                      "INVALID_OPTION",
+                      "options、初值、iterator、Map 条目、debugName、Object key 或 updater 形状无效"
+                    ],
+                    ["collectionDisposed", "COLLECTION_DISPOSED", "关闭后的数据访问/变更"],
+                    ["callbackFailed", "CALLBACK_FAILED", "没有已有包身份的 guard/updater 失败"],
+                    ["indexOutOfRange", "INDEX_OUT_OF_RANGE", "Array.set 越界"],
+                    ["invalidIndex", "INVALID_INDEX", "Array.at/set 非整数"],
+                    ["crossRuntime", "CROSS_RUNTIME", "本包检测到跨 Runtime 追踪读取"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='store.indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
+                },
+                {
+                  "type": "table",
+                  "headers": ["message", "场景"],
+                  "rows": [
+                    [
+                      "`[store] observable collection options must be an object`",
+                      "options 形状或读取失败"
+                    ],
+                    [
+                      "`[store] observable collection debugName must be a string`",
+                      "debugName 类型无效"
+                    ],
+                    [
+                      "`[store] observable collection input must be a non-null object or iterable`",
+                      "初值/替换输入、iterator 或 updater 形状失败"
+                    ],
+                    ["`[store] ObservableObject key must be a string`", "Object 的 key 非字符串"],
+                    [
+                      "`[store] cross-runtime dependency is not allowed: collection read belongs to another Runtime`",
+                      "本包检测到跨 Runtime 追踪"
+                    ],
+                    ["`[store] {debugName} is disposed`", "关闭后使用"],
+                    ["`[store] ObservableArray index out of range`", "set 越界"],
+                    ["`[store] ObservableArray index must be an integer`", "at/set 非整数"],
+                    ["`[store] collection callback failed`", "无法直接附身份时的 callback wrapper"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "三个公开错误工厂的 code 均为必填 `IStoreIndexedErrorCode`、message 为必填 string。`createStoreIndexedError(code,message,options?)` 返回原生 Error，`createStoreIndexedTypeError(...)` 返回 TypeError，options 默认 undefined、只有可选 cause；前者在 options 自有 cause 存在时转发，后者在 cause 非 undefined 时转发。`createStoreIndexedRangeError(code,message)` 返回 RangeError，无第三参数。三者附不可写 source/code，不改 stack；cause 不保证显示进顶层 stack 文本。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 12,
+          "configuration": [],
+          "fragment": "store-indexed-index--IIndexedOperation"
+        },
+        {
+          "name": "IndexedOperation",
+          "kind": "const",
+          "signature": "export declare const IndexedOperation: { /** Diagnostic category for reading collection data without changing it. */ readonly read: 'read'; /** Diagnostic category for inserting or updating collection data. */ readonly write: 'write'; /** Diagnostic category for removing collection data. */ readonly delete: 'delete'; };",
+          "declarationLine": 2,
+          "source": "packages/store-indexed/dist/indexed-constants.d.ts",
+          "purpose": "Public read/write/delete vocabulary for consumer diagnostics. Collection mutation guards receive concrete operation labels instead of these constants.",
+          "core": "read: Classify an operation that observes data without changing it.\nwrite: Classify an insertion or value replacement operation.\ndelete: Classify an operation removing a key or member.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "read",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly read: 'read';",
+              "description": "Diagnostic category for reading collection data without changing it.",
+              "parameterDetails": [],
+              "returns": "'read'"
+            },
+            {
+              "name": "write",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly write: 'write';",
+              "description": "Diagnostic category for inserting or updating collection data.",
+              "parameterDetails": [],
+              "returns": "'write'"
+            },
+            {
+              "name": "delete",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly delete: 'delete';",
+              "description": "Diagnostic category for removing collection data.",
+              "parameterDetails": [],
+              "returns": "'delete'"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IndexedOperation",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const IndexedOperation: { /** Diagnostic category for reading collection data without changing it. */ readonly read: 'read'; /** Diagnostic category for inserting or updating collection data. */ readonly write: 'write'; /** Diagnostic category for removing collection data. */ readonly delete: 'delete'; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Public read/write/delete vocabulary for consumer diagnostics. Collection mutation guards receive concrete operation labels instead of these constants."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IndexedOperation from @migaia/store-indexed, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IndexedOperation when its const contract and declared inputs match the result you need. Choose a different public symbol when IndexedOperation does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "read: Classify an operation that observes data without changing it.\nwrite: Classify an insertion or value replacement operation.\ndelete: Classify an operation removing a key or member."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-indexed/dist/indexed-constants.d.ts:IndexedOperation:export declare const IndexedOperation: { /** Diagnostic category for reading collection data without changing it. */ readonly read: 'read'; /** Diagnostic category for inserting or updating collection data. */ readonly write: 'write'; /** Diagnostic category for removing collection data. */ readonly delete: 'delete'; };",
+          "guidance": [
+            {
+              "id": "cell-生命周期-清理与-guard",
+              "heading": "Cell 生命周期、清理与 guard",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "新 cell 在最后一个订阅者离开时尝试回收；从未成功接上观察者的临时 cell 通过所属 Runtime 的 idle 通道清理，默认微任务。删除成员时仍有观察者的 cell 保留并发布缺失值，直到退订。Object/Map/Set 的 prune 只整理已删除且无观察者的 key/member，不释放活观察者；Array 仅走自动路径。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "集合不会感知组件卸载或请求结束，应用必须调用 dispose。dispose 通过集合 owner 同时释放仍拥有的 Signal 与 pool 引用，重复是空操作；随后数据读写及 prune 拒绝，但仍可读 runtime/disposed。借入 Runtime 不由集合销毁。它不承诺清空 backing data、清除已有快照或销毁应用对象。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "guard 是同步写入许可检查，签名 `assertMutationAllowed(operation?:string):void`，每个公开写入入口调用一次，包括最终没有变化的写入；读方法不调用。操作名如 `users.set(u1)`，来自 debugName 与具体方法，不是 IndexedOperation 值。Object.update 的 guard 先于 updater；拒绝时 updater 不执行。可组合 store-middleware 的 MutationPolicy 与 runInAction，策略及 action 范围由那个包负责；使用它应另行安装该包。本包只保证外层提交没有发生，不回滚回调自己的外部副作用。"
+                }
+              ]
+            },
+            {
+              "id": "操作词表与错误",
+              "heading": "操作词表与错误",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`IndexedOperation` 为消费方诊断/日志提供 `read:'read'`、`write:'write'`、`delete:'delete'`；`IIndexedOperation` 是这些值的联合。本包方法不直接引用该词表。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["StoreIndexedErrorCode 属性", "code", "触发"],
+                  "rows": [
+                    [
+                      "invalidOption",
+                      "INVALID_OPTION",
+                      "options、初值、iterator、Map 条目、debugName、Object key 或 updater 形状无效"
+                    ],
+                    ["collectionDisposed", "COLLECTION_DISPOSED", "关闭后的数据访问/变更"],
+                    ["callbackFailed", "CALLBACK_FAILED", "没有已有包身份的 guard/updater 失败"],
+                    ["indexOutOfRange", "INDEX_OUT_OF_RANGE", "Array.set 越界"],
+                    ["invalidIndex", "INVALID_INDEX", "Array.at/set 非整数"],
+                    ["crossRuntime", "CROSS_RUNTIME", "本包检测到跨 Runtime 追踪读取"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='store.indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
+                },
+                {
+                  "type": "table",
+                  "headers": ["message", "场景"],
+                  "rows": [
+                    [
+                      "`[store] observable collection options must be an object`",
+                      "options 形状或读取失败"
+                    ],
+                    [
+                      "`[store] observable collection debugName must be a string`",
+                      "debugName 类型无效"
+                    ],
+                    [
+                      "`[store] observable collection input must be a non-null object or iterable`",
+                      "初值/替换输入、iterator 或 updater 形状失败"
+                    ],
+                    ["`[store] ObservableObject key must be a string`", "Object 的 key 非字符串"],
+                    [
+                      "`[store] cross-runtime dependency is not allowed: collection read belongs to another Runtime`",
+                      "本包检测到跨 Runtime 追踪"
+                    ],
+                    ["`[store] {debugName} is disposed`", "关闭后使用"],
+                    ["`[store] ObservableArray index out of range`", "set 越界"],
+                    ["`[store] ObservableArray index must be an integer`", "at/set 非整数"],
+                    ["`[store] collection callback failed`", "无法直接附身份时的 callback wrapper"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "三个公开错误工厂的 code 均为必填 `IStoreIndexedErrorCode`、message 为必填 string。`createStoreIndexedError(code,message,options?)` 返回原生 Error，`createStoreIndexedTypeError(...)` 返回 TypeError，options 默认 undefined、只有可选 cause；前者在 options 自有 cause 存在时转发，后者在 cause 非 undefined 时转发。`createStoreIndexedRangeError(code,message)` 返回 RangeError，无第三参数。三者附不可写 source/code，不改 stack；cause 不保证显示进顶层 stack 文本。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 18,
+          "configuration": [],
+          "fragment": "store-indexed-index--IndexedOperation"
+        },
+        {
+          "name": "IObservableCollectionOptions",
+          "kind": "type",
+          "signature": "export type IObservableCollectionOptions = { /** * Synchronous guard called before each public mutation, including no-ops; omitted by default. A * failure prevents the outer write or updater from running, but does not undo callback-owned * effects. Existing error identities remain intact; other failures receive CALLBACK_FAILED. */ readonly mutationGuard?: IMutationGuard; /** Diagnostic prefix for nodes and mutation labels; defaults to the collection class name. */ readonly debugName?: string; };",
+          "declarationLine": 5,
+          "source": "packages/store-indexed/dist/collections.d.ts",
+          "purpose": "Construction policy shared by all explicit collection classes; it adds diagnostics and optional mutation admission.",
+          "core": "mutationGuard: Caller-owned IMutationGuard from @migaia/store-light; each mutation invokes assertMutationAllowed(operation) before changing data. Existing foreign source/code stays unchanged. An unclassified extensible native error receives CALLBACK_FAILED without replacement; frozen errors and other values remain reachable through cause/errors. Failure prevents the outer mutation, not callback-owned side effects.\n`undefined`: mutations have no additional policy guard.\ndebugName: Application-selected string prefix for internal signal diagnostics and mutation operation labels.\nThe concrete class name: `ObservableObject`, `ObservableArray`, `ObservableMap` or `ObservableSet`.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "mutationGuard",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly mutationGuard?: IMutationGuard;",
+              "description": "Synchronous guard called before each public mutation, including no-ops; omitted by default. A failure prevents the outer write or updater from running, but does not undo callback-owned effects. Existing error identities remain intact; other failures receive CALLBACK_FAILED.",
+              "parameterDetails": [],
+              "returns": "IMutationGuard"
+            },
+            {
+              "name": "debugName",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly debugName?: string;",
+              "description": "Diagnostic prefix for nodes and mutation labels; defaults to the collection class name.",
+              "parameterDetails": [],
+              "returns": "string"
+            }
+          ],
+          "composes": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IObservableCollectionOptions = { /** * Synchronous guard called before each public mutation, including no-ops; omitted by default. A * failure prevents the outer write or updater from running, but does not undo callback-owned * effects. Existing error identities remain intact; other failures receive CALLBACK_FAILED. */ readonly mutationGuard?: IMutationGuard; /** Diagnostic prefix for nodes and mutation labels; defaults to the collection class name. */ readonly debugName?: string; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Construction policy shared by all explicit collection classes; it adds diagnostics and optional mutation admission."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IObservableCollectionOptions from @migaia/store-indexed, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IObservableCollectionOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IObservableCollectionOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "mutationGuard: Caller-owned IMutationGuard from @migaia/store-light; each mutation invokes assertMutationAllowed(operation) before changing data. Existing foreign source/code stays unchanged. An unclassified extensible native error receives CALLBACK_FAILED without replacement; frozen errors and other values remain reachable through cause/errors. Failure prevents the outer mutation, not callback-owned side effects.\n`undefined`: mutations have no additional policy guard.\ndebugName: Application-selected string prefix for internal signal diagnostics and mutation operation labels.\nThe concrete class name: `ObservableObject`, `ObservableArray`, `ObservableMap` or `ObservableSet`."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-indexed/dist/collections.d.ts:IObservableCollectionOptions:export type IObservableCollectionOptions = { /** * Synchronous guard called before each public mutation, including no-ops; omitted by default. A * failure prevents the outer write or updater from running, but does not undo callback-owned * effects. Existing error identities remain intact; other failures receive CALLBACK_FAILED. */ readonly mutationGuard?: IMutationGuard; /** Diagnostic prefix for nodes and mutation labels; defaults to the collection class name. */ readonly debugName?: string; };",
+          "guidance": [],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "store-indexed-index--IObservableCollectionOptions"
+        },
+        {
+          "name": "IStoreIndexedErrorCode",
+          "kind": "type",
+          "signature": "export type IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode];",
+          "declarationLine": 43,
+          "source": "packages/store-indexed/dist/error-code.d.ts",
+          "purpose": "Value union from StoreIndexedErrorCode, selected when constructing or recognizing this package errors.",
+          "core": "Value union from StoreIndexedErrorCode, selected when constructing or recognizing this package errors.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "IStoreIndexedErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode];"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Value union from StoreIndexedErrorCode, selected when constructing or recognizing this package errors."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IStoreIndexedErrorCode from @migaia/store-indexed, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IStoreIndexedErrorCode when its type contract and declared inputs match the result you need. Choose a different public symbol when IStoreIndexedErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Value union from StoreIndexedErrorCode, selected when constructing or recognizing this package errors."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-indexed/dist/error-code.d.ts:IStoreIndexedErrorCode:export type IStoreIndexedErrorCode = (typeof StoreIndexedErrorCode)[keyof typeof StoreIndexedErrorCode];",
+          "guidance": [
+            {
+              "id": "操作词表与错误",
+              "heading": "操作词表与错误",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`IndexedOperation` 为消费方诊断/日志提供 `read:'read'`、`write:'write'`、`delete:'delete'`；`IIndexedOperation` 是这些值的联合。本包方法不直接引用该词表。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["StoreIndexedErrorCode 属性", "code", "触发"],
+                  "rows": [
+                    [
+                      "invalidOption",
+                      "INVALID_OPTION",
+                      "options、初值、iterator、Map 条目、debugName、Object key 或 updater 形状无效"
+                    ],
+                    ["collectionDisposed", "COLLECTION_DISPOSED", "关闭后的数据访问/变更"],
+                    ["callbackFailed", "CALLBACK_FAILED", "没有已有包身份的 guard/updater 失败"],
+                    ["indexOutOfRange", "INDEX_OUT_OF_RANGE", "Array.set 越界"],
+                    ["invalidIndex", "INVALID_INDEX", "Array.at/set 非整数"],
+                    ["crossRuntime", "CROSS_RUNTIME", "本包检测到跨 Runtime 追踪读取"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='store.indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
+                },
+                {
+                  "type": "table",
+                  "headers": ["message", "场景"],
+                  "rows": [
+                    [
+                      "`[store] observable collection options must be an object`",
+                      "options 形状或读取失败"
+                    ],
+                    [
+                      "`[store] observable collection debugName must be a string`",
+                      "debugName 类型无效"
+                    ],
+                    [
+                      "`[store] observable collection input must be a non-null object or iterable`",
+                      "初值/替换输入、iterator 或 updater 形状失败"
+                    ],
+                    ["`[store] ObservableObject key must be a string`", "Object 的 key 非字符串"],
+                    [
+                      "`[store] cross-runtime dependency is not allowed: collection read belongs to another Runtime`",
+                      "本包检测到跨 Runtime 追踪"
+                    ],
+                    ["`[store] {debugName} is disposed`", "关闭后使用"],
+                    ["`[store] ObservableArray index out of range`", "set 越界"],
+                    ["`[store] ObservableArray index must be an integer`", "at/set 非整数"],
+                    ["`[store] collection callback failed`", "无法直接附身份时的 callback wrapper"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "三个公开错误工厂的 code 均为必填 `IStoreIndexedErrorCode`、message 为必填 string。`createStoreIndexedError(code,message,options?)` 返回原生 Error，`createStoreIndexedTypeError(...)` 返回 TypeError，options 默认 undefined、只有可选 cause；前者在 options 自有 cause 存在时转发，后者在 cause 非 undefined 时转发。`createStoreIndexedRangeError(code,message)` 返回 RangeError，无第三参数。三者附不可写 source/code，不改 stack；cause 不保证显示进顶层 stack 文本。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "store-indexed-index--IStoreIndexedErrorCode"
+        },
+        {
+          "name": "ObservableArray",
+          "kind": "class",
+          "signature": "export declare class ObservableArray<T> extends ObservableCollectionBase { #private; /** * Materialize the iterable before ownership admission; defaults are [], defaultRuntime and {}. * Strings are accepted as iterables. Invalid input/iterator/options throw INVALID_OPTION, * retaining the original iterator failure as cause when present. */ constructor(initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions); /** Read length with a structural dependency; replacing only existing values does not change it. */ get length(): number; /** * Read an integer index, with negative indices counted from the end and out-of-bounds returning * undefined. Observation tracks the resolved index and any necessary length dependency; untracked * reads allocate no cell. Noninteger indices throw INVALID_INDEX. */ at(index: number): T | undefined; /** Return a revision-cached shallow-frozen array, tracking any changed element or length. */ snapshot(): readonly T[]; /** Return a fresh shallow-frozen copy without tracking; element objects remain shared. */ peek(): readonly T[]; /** * Replace an existing element in one batch, skipping Object.is-equal values. Unlike at(), * negative indices are out of range: nonintegers throw INVALID_INDEX and bounds failures * INDEX_OUT_OF_RANGE. */ set(index: number, value: T): void; /** Append values in one batch and return the resulting length; no values leaves content unchanged. */ push(...values: readonly T[]): number; /** Remove and return the last element in one batch, or undefined for an empty array. */ pop(): T | undefined; /** * Apply native splice positioning and return a shallow-frozen removed-elements array. Omitting * deleteCount removes the remainder; explicit undefined removes none. The JavaScript no-argument * call is a no-op. Changed index cells and length are published together. */ splice(start: number, deleteCount?: number, ...items: readonly T[]): readonly T[]; /** * Materialize a complete iterable before replacing the sequence in one batch. Invalid input or * iteration failure throws INVALID_OPTION without replacing prior contents. */ replace(values: Iterable<T>): void; /** Replace the sequence with an empty array through the same single guard/batch boundary. */ clear(): void; }",
+          "declarationLine": 96,
+          "source": "packages/store-indexed/dist/collections.d.ts",
+          "purpose": "Creates an explicit reactive index-based array with lazy per-entry signals and collection-owned disposal. Constructor order is initial, runtime, options; options defaults to `{}`. The supplied Runtime is borrowed, while collection-owned signals are released by dispose.",
+          "core": "initial: Initial iterable, default `[]` for an empty array; strings are accepted as characters.\nruntime: `IRuntime` from `@migaia/reactive`; omitted uses `defaultRuntime`. Use its graph for observing this collection; collection disposal does not dispose the Runtime.\nCaller-owned ObservableArray; dispose it after its observers are released. Invalid input throws a tagged TypeError with INVALID_OPTION.\nruntime: IRuntime selected at construction; tracked reads belong to its graph and mutations use its batching.\ndisposed: Whether terminal disposal has disconnected collection-owned signals; ordinary reads and writes then reject.\ndispose: Idempotently disconnects collection-owned signals and releases cell-pool references without disposing the caller Runtime. Backing data and existing snapshots are not cleared.\nNothing; the collection is terminal and later data access throws COLLECTION_DISPOSED.\nlength: Current array length, tracked through the structure signal rather than individual index cells.\nat: Reads one integer index; negative indexes are relative to the current end and also observe structure.\nat.index: Integer position, accepting negative positions from the end; nonintegers throw INVALID_INDEX.\nElement or undefined outside bounds; owning Runtime tracking observes that index.\nsnapshot: Reads the revision and caches a shallow-frozen array until length or element values change.\nReadonly shallow array snapshot; nested values retain identity.\npeek: Makes a fresh shallow-frozen array copy without any dependency tracking.\nUntracked readonly shallow copy, independent of snapshot caching.\nset: Replaces an existing nonnegative index after guard admission; changed cell and revision commit in one Runtime batch, including synchronous schedulers. Object.is-equal values do not notify.\nset.index: Integer within [0, length); nonintegers throw INVALID_INDEX and other positions INDEX_OUT_OF_RANGE.\nset.value: Application value to store; nested objects retain their original identity.\nNothing; the selected cell and revision update when the value changes.\npush: Appends values in one batch; an empty argument list leaves revisions unchanged.\npush.values: Application values to append in argument order.\nNew array length after the append operation.\npop: Removes the final element, marks any observed index absent and updates structure in one batch.\nRemoved final value, or undefined when already empty.\nsplice: Applies native splice positioning and integer coercion to a copied array, then commits changed indexes in one batch.\nsplice.start: Native splice start position; negative positions count from the end.\nsplice.deleteCount: Omitted removes through the end; explicitly undefined means zero removals.\nsplice.items: Application values inserted at the selected position.\nShallow-frozen array of removed elements; inserted values keep identity.\nreplace: Materializes the entire iterable before replacing data, then updates only materialized index cells in one batch. Equal-length inputs still require a full value comparison; this is not a constant-time replacement.\nreplace.values: Complete replacement iterable; strings are accepted as characters.\nNothing; values and changed length/revision are committed.\nclear: Replaces the array with an empty array through the same guarded replacement path.\nNothing; the array is empty and affected observations are invalidated.\nmutationGuard: Caller-owned IMutationGuard from @migaia/store-light; each mutation invokes assertMutationAllowed(operation) before changing data. Existing foreign source/code stays unchanged. An unclassified extensible native error receives CALLBACK_FAILED without replacement; frozen errors and other values remain reachable through cause/errors. Failure prevents the outer mutation, not callback-owned side effects.\n`undefined`: mutations have no additional policy guard.\ndebugName: Application-selected string prefix for internal signal diagnostics and mutation operation labels.\nThe concrete class name: `ObservableObject`, `ObservableArray`, `ObservableMap` or `ObservableSet`.",
+          "advanced": "Observe a small visible subset of a large positional list.",
+          "parameters": [
+            "initial: Iterable<T> (optional)",
+            "runtime: IRuntime (optional)",
+            "options: IObservableCollectionOptions (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "initial",
+              "type": "Iterable<T>",
+              "optional": true
+            },
+            {
+              "name": "runtime",
+              "type": "IRuntime",
+              "optional": true
+            },
+            {
+              "name": "options",
+              "type": "IObservableCollectionOptions",
+              "optional": true
+            }
+          ],
+          "returns": "No explicit return annotation is declared for this class.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createRuntime } from '@migaia/reactive'\nimport { ObservableArray } from '@migaia/store-indexed'\n\nconst runtime = createRuntime({ schedulerStrategy: (run) => run() })\nconst rows = new ObservableArray([10, 20], runtime)\nlet indexRuns = 0\nlet lengthRuns = 0\nconst indexWatch = runtime.effect(() => {\n  rows.at(0)\n  indexRuns += 1\n})\nconst lengthWatch = runtime.effect(() => {\n  void rows.length\n  lengthRuns += 1\n})\nrows.set(1, 21)\nconsole.log(indexRuns, lengthRuns)\nrows.set(0, 11)\nconsole.log(indexRuns, lengthRuns)\nrows.push(30)\nconsole.log(indexRuns, lengthRuns)\nrows.splice(0, 1)\nconsole.log(indexRuns, lengthRuns, rows.at(0))\nindexWatch.dispose()\nlengthWatch.dispose()\nrows.dispose()",
+            "import { ObservableArray } from '@migaia/store-indexed'\n\nconst rows = new ObservableArray([1, 2])\nconst original = new Error('输入中断')\nfunction* incoming(): Generator<number> {\n  yield 3\n  throw original\n}\ntry {\n  rows.replace(incoming())\n} catch (error) {\n  if (!(error instanceof Error) || !('code' in error)) throw error\n  console.log(error.code, error.cause === original)\n}\nconsole.log(JSON.stringify(rows.snapshot()))\nrows.replace([4, 5])\nconsole.log(JSON.stringify(rows.snapshot()))\nrows.dispose()"
+          ],
+          "members": [
+            {
+              "name": "length",
+              "kind": "get",
+              "optional": false,
+              "signature": "get length(): number;",
+              "description": "Read length with a structural dependency; replacing only existing values does not change it.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "at",
+              "kind": "method",
+              "optional": false,
+              "signature": "at(index: number): T | undefined;",
+              "description": "Read an integer index, with negative indices counted from the end and out-of-bounds returning undefined. Observation tracks the resolved index and any necessary length dependency; untracked reads allocate no cell. Noninteger indices throw INVALID_INDEX.",
+              "parameterDetails": [
+                {
+                  "name": "index",
+                  "type": "number",
+                  "optional": false
+                }
+              ],
+              "returns": "T | undefined"
+            },
+            {
+              "name": "snapshot",
+              "kind": "method",
+              "optional": false,
+              "signature": "snapshot(): readonly T[];",
+              "description": "Return a revision-cached shallow-frozen array, tracking any changed element or length.",
+              "parameterDetails": [],
+              "returns": "readonly T[]"
+            },
+            {
+              "name": "peek",
+              "kind": "method",
+              "optional": false,
+              "signature": "peek(): readonly T[];",
+              "description": "Return a fresh shallow-frozen copy without tracking; element objects remain shared.",
+              "parameterDetails": [],
+              "returns": "readonly T[]"
+            },
+            {
+              "name": "set",
+              "kind": "method",
+              "optional": false,
+              "signature": "set(index: number, value: T): void;",
+              "description": "Replace an existing element in one batch, skipping Object.is-equal values. Unlike at(), negative indices are out of range: nonintegers throw INVALID_INDEX and bounds failures INDEX_OUT_OF_RANGE.",
+              "parameterDetails": [
+                {
+                  "name": "index",
+                  "type": "number",
+                  "optional": false
+                },
+                {
+                  "name": "value",
+                  "type": "T",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "push",
+              "kind": "method",
+              "optional": false,
+              "signature": "push(...values: readonly T[]): number;",
+              "description": "Append values in one batch and return the resulting length; no values leaves content unchanged.",
+              "parameterDetails": [
+                {
+                  "name": "values",
+                  "type": "readonly T[]",
+                  "optional": false
+                }
+              ],
+              "returns": "number"
+            },
+            {
+              "name": "pop",
+              "kind": "method",
+              "optional": false,
+              "signature": "pop(): T | undefined;",
+              "description": "Remove and return the last element in one batch, or undefined for an empty array.",
+              "parameterDetails": [],
+              "returns": "T | undefined"
+            },
+            {
+              "name": "splice",
+              "kind": "method",
+              "optional": false,
+              "signature": "splice(start: number, deleteCount?: number, ...items: readonly T[]): readonly T[];",
+              "description": "Apply native splice positioning and return a shallow-frozen removed-elements array. Omitting deleteCount removes the remainder; explicit undefined removes none. The JavaScript no-argument call is a no-op. Changed index cells and length are published together.",
+              "parameterDetails": [
+                {
+                  "name": "start",
+                  "type": "number",
+                  "optional": false
+                },
+                {
+                  "name": "deleteCount",
+                  "type": "number",
+                  "optional": true
+                },
+                {
+                  "name": "items",
+                  "type": "readonly T[]",
+                  "optional": false
+                }
+              ],
+              "returns": "readonly T[]"
+            },
+            {
+              "name": "replace",
+              "kind": "method",
+              "optional": false,
+              "signature": "replace(values: Iterable<T>): void;",
+              "description": "Materialize a complete iterable before replacing the sequence in one batch. Invalid input or iteration failure throws INVALID_OPTION without replacing prior contents.",
+              "parameterDetails": [
+                {
+                  "name": "values",
+                  "type": "Iterable<T>",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "clear",
+              "kind": "method",
+              "optional": false,
+              "signature": "clear(): void;",
+              "description": "Replace the sequence with an empty array through the same single guard/batch boundary.",
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "runtime",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly runtime: IRuntime;",
+              "description": "Borrowed owner of tracked cells and batches; collection disposal never disposes this Runtime.",
+              "parameterDetails": [],
+              "returns": "IRuntime"
+            },
+            {
+              "name": "disposed",
+              "kind": "get",
+              "optional": false,
+              "signature": "get disposed(): boolean;",
+              "description": "Terminal state readable after disposal; ordinary collection reads and writes then reject.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "optional": false,
+              "signature": "dispose(): void;",
+              "description": "Synchronously retire owned reactive nodes and disconnect their downstream dependencies once. Repeated calls do nothing; subsequent collection operations throw COLLECTION_DISPOSED.",
+              "parameterDetails": [],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare class ObservableArray<T> extends ObservableCollectionBase { #private; /** * Materialize the iterable before ownership admission; defaults are [], defaultRuntime and {}. * Strings are accepted as iterables. Invalid input/iterator/options throw INVALID_OPTION, * retaining the original iterator failure as cause when present. */ constructor(initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions); /** Read length with a structural dependency; replacing only existing values does not change it. */ get length(): number; /** * Read an integer index, with negative indices counted from the end and out-of-bounds returning * undefined. Observation tracks the resolved index and any necessary length dependency; untracked * reads allocate no cell. Noninteger indices throw INVALID_INDEX. */ at(index: number): T | undefined; /** Return a revision-cached shallow-frozen array, tracking any changed element or length. */ snapshot(): readonly T[]; /** Return a fresh shallow-frozen copy without tracking; element objects remain shared. */ peek(): readonly T[]; /** * Replace an existing element in one batch, skipping Object.is-equal values. Unlike at(), * negative indices are out of range: nonintegers throw INVALID_INDEX and bounds failures * INDEX_OUT_OF_RANGE. */ set(index: number, value: T): void; /** Append values in one batch and return the resulting length; no values leaves content unchanged. */ push(...values: readonly T[]): number; /** Remove and return the last element in one batch, or undefined for an empty array. */ pop(): T | undefined; /** * Apply native splice positioning and return a shallow-frozen removed-elements array. Omitting * deleteCount removes the remainder; explicit undefined removes none. The JavaScript no-argument * call is a no-op. Changed index cells and length are published together. */ splice(start: number, deleteCount?: number, ...items: readonly T[]): readonly T[]; /** * Materialize a complete iterable before replacing the sequence in one batch. Invalid input or * iteration failure throws INVALID_OPTION without replacing prior contents. */ replace(values: Iterable<T>): void; /** Replace the sequence with an empty array through the same single guard/batch boundary. */ clear(): void; }"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "initial",
+                "type": "Iterable<T>",
+                "optional": true
+              },
+              {
+                "name": "runtime",
+                "type": "IRuntime",
+                "optional": true
+              },
+              {
+                "name": "options",
+                "type": "IObservableCollectionOptions",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": [],
+          "whenToUse": "Observe a small visible subset of a large positional list.",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Creates an explicit reactive index-based array with lazy per-entry signals and collection-owned disposal. Constructor order is initial, runtime, options; options defaults to `{}`. The supplied Runtime is borrowed, while collection-owned signals are released by dispose."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ObservableArray from @migaia/store-indexed, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ObservableArray when its class contract and declared inputs match the result you need. Choose a different public symbol when ObservableArray does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained class example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "initial: Initial iterable, default `[]` for an empty array; strings are accepted as characters.\nruntime: `IRuntime` from `@migaia/reactive`; omitted uses `defaultRuntime`. Use its graph for observing this collection; collection disposal does not dispose the Runtime.\nCaller-owned ObservableArray; dispose it after its observers are released. Invalid input throws a tagged TypeError with INVALID_OPTION.\nruntime: IRuntime selected at construction; tracked reads belong to its graph and mutations use its batching.\ndisposed: Whether terminal disposal has disconnected collection-owned signals; ordinary reads and writes then reject.\ndispose: Idempotently disconnects collection-owned signals and releases cell-pool references without disposing the caller Runtime. Backing data and existing snapshots are not cleared.\nNothing; the collection is terminal and later data access throws COLLECTION_DISPOSED.\nlength: Current array length, tracked through the structure signal rather than individual index cells.\nat: Reads one integer index; negative indexes are relative to the current end and also observe structure.\nat.index: Integer position, accepting negative positions from the end; nonintegers throw INVALID_INDEX.\nElement or undefined outside bounds; owning Runtime tracking observes that index.\nsnapshot: Reads the revision and caches a shallow-frozen array until length or element values change.\nReadonly shallow array snapshot; nested values retain identity.\npeek: Makes a fresh shallow-frozen array copy without any dependency tracking.\nUntracked readonly shallow copy, independent of snapshot caching.\nset: Replaces an existing nonnegative index after guard admission; changed cell and revision commit in one Runtime batch, including synchronous schedulers. Object.is-equal values do not notify.\nset.index: Integer within [0, length); nonintegers throw INVALID_INDEX and other positions INDEX_OUT_OF_RANGE.\nset.value: Application value to store; nested objects retain their original identity.\nNothing; the selected cell and revision update when the value changes.\npush: Appends values in one batch; an empty argument list leaves revisions unchanged.\npush.values: Application values to append in argument order.\nNew array length after the append operation.\npop: Removes the final element, marks any observed index absent and updates structure in one batch.\nRemoved final value, or undefined when already empty.\nsplice: Applies native splice positioning and integer coercion to a copied array, then commits changed indexes in one batch.\nsplice.start: Native splice start position; negative positions count from the end.\nsplice.deleteCount: Omitted removes through the end; explicitly undefined means zero removals.\nsplice.items: Application values inserted at the selected position.\nShallow-frozen array of removed elements; inserted values keep identity.\nreplace: Materializes the entire iterable before replacing data, then updates only materialized index cells in one batch. Equal-length inputs still require a full value comparison; this is not a constant-time replacement.\nreplace.values: Complete replacement iterable; strings are accepted as characters.\nNothing; values and changed length/revision are committed.\nclear: Replaces the array with an empty array through the same guarded replacement path.\nNothing; the array is empty and affected observations are invalidated.\nmutationGuard: Caller-owned IMutationGuard from @migaia/store-light; each mutation invokes assertMutationAllowed(operation) before changing data. Existing foreign source/code stays unchanged. An unclassified extensible native error receives CALLBACK_FAILED without replacement; frozen errors and other values remain reachable through cause/errors. Failure prevents the outer mutation, not callback-owned side effects.\n`undefined`: mutations have no additional policy guard.\ndebugName: Application-selected string prefix for internal signal diagnostics and mutation operation labels.\nThe concrete class name: `ObservableObject`, `ObservableArray`, `ObservableMap` or `ObservableSet`."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "Observe a small visible subset of a large positional list."
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "mutationGuard",
+              "type": "IMutationGuard",
+              "optional": true,
+              "description": "Synchronous guard called before each public mutation, including no-ops; omitted by default. A failure prevents the outer write or updater from running, but does not undo callback-owned effects. Existing error identities remain intact; other failures receive CALLBACK_FAILED."
+            },
+            {
+              "name": "debugName",
+              "type": "string",
+              "optional": true,
+              "description": "Diagnostic prefix for nodes and mutation labels; defaults to the collection class name."
+            }
+          ],
+          "identity": "packages/store-indexed/dist/collections.d.ts:ObservableArray:export declare class ObservableArray<T> extends ObservableCollectionBase { #private; /** * Materialize the iterable before ownership admission; defaults are [], defaultRuntime and {}. * Strings are accepted as iterables. Invalid input/iterator/options throw INVALID_OPTION, * retaining the original iterator failure as cause when present. */ constructor(initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions); /** Read length with a structural dependency; replacing only existing values does not change it. */ get length(): number; /** * Read an integer index, with negative indices counted from the end and out-of-bounds returning * undefined. Observation tracks the resolved index and any necessary length dependency; untracked * reads allocate no cell. Noninteger indices throw INVALID_INDEX. */ at(index: number): T | undefined; /** Return a revision-cached shallow-frozen array, tracking any changed element or length. */ snapshot(): readonly T[]; /** Return a fresh shallow-frozen copy without tracking; element objects remain shared. */ peek(): readonly T[]; /** * Replace an existing element in one batch, skipping Object.is-equal values. Unlike at(), * negative indices are out of range: nonintegers throw INVALID_INDEX and bounds failures * INDEX_OUT_OF_RANGE. */ set(index: number, value: T): void; /** Append values in one batch and return the resulting length; no values leaves content unchanged. */ push(...values: readonly T[]): number; /** Remove and return the last element in one batch, or undefined for an empty array. */ pop(): T | undefined; /** * Apply native splice positioning and return a shallow-frozen removed-elements array. Omitting * deleteCount removes the remainder; explicit undefined removes none. The JavaScript no-argument * call is a no-op. Changed index cells and length are published together. */ splice(start: number, deleteCount?: number, ...items: readonly T[]): readonly T[]; /** * Materialize a complete iterable before replacing the sequence in one batch. Invalid input or * iteration failure throws INVALID_OPTION without replacing prior contents. */ replace(values: Iterable<T>): void; /** Replace the sequence with an empty array through the same single guard/batch boundary. */ clear(): void; }",
+          "guidance": [
+            {
+              "id": "操作词表与错误",
+              "heading": "操作词表与错误",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`IndexedOperation` 为消费方诊断/日志提供 `read:'read'`、`write:'write'`、`delete:'delete'`；`IIndexedOperation` 是这些值的联合。本包方法不直接引用该词表。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["StoreIndexedErrorCode 属性", "code", "触发"],
+                  "rows": [
+                    [
+                      "invalidOption",
+                      "INVALID_OPTION",
+                      "options、初值、iterator、Map 条目、debugName、Object key 或 updater 形状无效"
+                    ],
+                    ["collectionDisposed", "COLLECTION_DISPOSED", "关闭后的数据访问/变更"],
+                    ["callbackFailed", "CALLBACK_FAILED", "没有已有包身份的 guard/updater 失败"],
+                    ["indexOutOfRange", "INDEX_OUT_OF_RANGE", "Array.set 越界"],
+                    ["invalidIndex", "INVALID_INDEX", "Array.at/set 非整数"],
+                    ["crossRuntime", "CROSS_RUNTIME", "本包检测到跨 Runtime 追踪读取"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='store.indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
+                },
+                {
+                  "type": "table",
+                  "headers": ["message", "场景"],
+                  "rows": [
+                    [
+                      "`[store] observable collection options must be an object`",
+                      "options 形状或读取失败"
+                    ],
+                    [
+                      "`[store] observable collection debugName must be a string`",
+                      "debugName 类型无效"
+                    ],
+                    [
+                      "`[store] observable collection input must be a non-null object or iterable`",
+                      "初值/替换输入、iterator 或 updater 形状失败"
+                    ],
+                    ["`[store] ObservableObject key must be a string`", "Object 的 key 非字符串"],
+                    [
+                      "`[store] cross-runtime dependency is not allowed: collection read belongs to another Runtime`",
+                      "本包检测到跨 Runtime 追踪"
+                    ],
+                    ["`[store] {debugName} is disposed`", "关闭后使用"],
+                    ["`[store] ObservableArray index out of range`", "set 越界"],
+                    ["`[store] ObservableArray index must be an integer`", "at/set 非整数"],
+                    ["`[store] collection callback failed`", "无法直接附身份时的 callback wrapper"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "三个公开错误工厂的 code 均为必填 `IStoreIndexedErrorCode`、message 为必填 string。`createStoreIndexedError(code,message,options?)` 返回原生 Error，`createStoreIndexedTypeError(...)` 返回 TypeError，options 默认 undefined、只有可选 cause；前者在 options 自有 cause 存在时转发，后者在 cause 非 undefined 时转发。`createStoreIndexedRangeError(code,message)` 返回 RangeError，无第三参数。三者附不可写 source/code，不改 stack；cause 不保证显示进顶层 stack 文本。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 102,
+          "configuration": [
+            {
+              "name": "mutationGuard",
+              "type": "IMutationGuard",
+              "optional": true,
+              "description": "`mutationGuard?: IMutationGuard` — `undefined`，无 guard — 每次写入入口调用 `assertMutationAllowed(operation)`",
+              "descriptionEn": "Synchronous guard called before each public mutation, including no-ops; omitted by default. A failure prevents the outer write or updater from running, but does not undo callback-owned effects. Existing error identities remain intact; other failures receive CALLBACK_FAILED.",
+              "descriptionZh": "`mutationGuard?: IMutationGuard` — `undefined`，无 guard — 每次写入入口调用 `assertMutationAllowed(operation)`"
+            },
+            {
+              "name": "debugName",
+              "type": "string",
+              "optional": true,
+              "description": "initial 是可迭代数值序列，省略为 `[]`；runtime 显式传入，options 默认 `{}`、无 guard、debugName 为 `'ObservableArray'`。at 支持整数负下标，set 仅已有非负整数；push 使用 rest 参数，splice 本例 start=0/deleteCount=1。",
+              "descriptionEn": "Diagnostic prefix for nodes and mutation labels; defaults to the collection class name.",
+              "descriptionZh": "initial 是可迭代数值序列，省略为 `[]`；runtime 显式传入，options 默认 `{}`、无 guard、debugName 为 `'ObservableArray'`。at 支持整数负下标，set 仅已有非负整数；push 使用 rest 参数，splice 本例 start=0/deleteCount=1。"
+            }
+          ],
+          "fragment": "store-indexed-index--ObservableArray"
+        },
+        {
+          "name": "ObservableMap",
+          "kind": "class",
+          "signature": "export declare class ObservableMap<K, V> extends ObservableCollectionBase { #private; /** * Materialize native Map entries before ownership; defaults are [], defaultRuntime and {}. * Invalid iterables, entry shapes or options throw INVALID_OPTION, with input failures retained * as cause. Duplicate keys follow native Map semantics. */ constructor(initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>, runtime?: IRuntime, options?: IObservableCollectionOptions); /** Read the member count with the map's structural dependency, which also observes key reorder. */ get size(): number; /** Read one key, tracking its value cell only during observation; absence yields undefined. */ get(key: K): V | undefined; /** Read one key without tracking or allocating a cell, including from another Runtime. */ peek(key: K): V | undefined; /** * Test one key without observing unrelated keys. Tracking shares its value cell, so changing an * existing value can also invalidate this presence read. */ has(key: K): boolean; /** Set a key and return this map; Object.is-equal existing values do not notify. */ set(key: K, value: V): this; /** Remove a key and return whether it existed, notifying its cell and relevant iteration views. */ delete(key: K): boolean; /** Clear all members in one batch; an empty map has no content notifications. */ clear(): void; /** * Materialize all native entries before one batched replacement; invalid input is INVALID_OPTION * and leaves prior contents intact. Key insertion order is observable. Unchanged ordered entries * skip revision notifications; structural/value iteration revisions each advance at most once. */ replace(next: ReadonlyMap<K, V> | Iterable<readonly [K, V]>): void; /** Return a fresh, unfrozen insertion-order key array, tracking structure rather than values. */ keys(): readonly K[]; /** Return a fresh shallow-frozen insertion-order value array, tracking value/order changes. */ valuesArray(): readonly V[]; /** Return a frozen entries array with frozen pairs; referenced keys/values remain shared. */ entries(): readonly (readonly [K, V])[]; /** * Track value/order changes and return a new native Map copy each time. Readonly is a type-level * view: the copy is not frozen, and its keys/values retain their original references. */ snapshot(): ReadonlyMap<K, V>; /** Release remaining cells for absent, unobserved keys and return the number removed. */ prune(): number; }",
+          "declarationLine": 145,
+          "source": "packages/store-indexed/dist/collections.d.ts",
+          "purpose": "Creates an explicit reactive key/value map with lazy per-entry signals and collection-owned disposal. Constructor order is initial, runtime, options; options defaults to `{}`. The supplied Runtime is borrowed, while collection-owned signals are released by dispose.",
+          "core": "initial: Initial map or entry iterable, default `[]` for an empty map. Construction and replace both validate every entry with native Map admission before ownership or data changes; invalid entries throw `INVALID_OPTION` and preserve the old collection.\nruntime: `IRuntime` from `@migaia/reactive`; omitted uses `defaultRuntime`. Use its graph for observing this collection; collection disposal does not dispose the Runtime.\nCaller-owned ObservableMap; dispose it after its observers are released. Invalid input throws a tagged TypeError with INVALID_OPTION.\nruntime: IRuntime selected at construction; tracked reads belong to its graph and mutations use its batching.\ndisposed: Whether terminal disposal has disconnected collection-owned signals; ordinary reads and writes then reject.\ndispose: Idempotently disconnects collection-owned signals and releases cell-pool references without disposing the caller Runtime. Backing data and existing snapshots are not cleared.\nNothing; the collection is terminal and later data access throws COLLECTION_DISPOSED.\nsize: Current entry count; tracks structure and ignores updates that preserve key membership.\nget: Reads a key value and lazily tracks that key only in the owning Runtime context.\nget.key: Application-selected key from the initial data or a key the application has inserted.\nCurrent value or undefined for an absent key.\npeek: Reads the backing Map directly without tracking or creating any key cell.\npeek.key: Application-selected key from the initial data or a key the application has inserted.\nCurrent stored value or undefined without dependency admission.\nhas: Tracks the selected key cell for membership; updates to unrelated keys do not invalidate this observation.\nhas.key: Application-selected key from the initial data or a key the application has inserted.\nTrue when the backing Map contains this key, even if its value is undefined.\nset: Writes a key after admission; an unchanged existing value is a no-op, while insertion updates structure and iteration.\nset.key: Application-selected key from the initial data or a key the application has inserted.\nset.value: Application value to store; nested objects retain their original identity.\nThis same ObservableMap for chaining; values retain original identity.\ndelete: Removes one key in a batch and retains its missing cell while still observed.\ndelete.key: Application-selected key from the initial data or a key the application has inserted.\nTrue if an entry was removed; false when the key was absent.\nclear: Clears stored entries and invalidates materialized cells, with one structure and iteration update.\nNothing; all entries are removed while observed tombstones survive.\nreplace: Materializes all entries before a batched swap; key membership or insertion-order changes update structure and iteration, and value changes update iteration. Only identical entries in identical order avoid notification.\nreplace.next: Complete map or entry iterable to replace existing entries.\nNothing; the replacement is committed atomically after input preparation.\nkeys: Returns insertion-ordered keys while tracking membership structure only.\nFresh key array; readonly typing does not freeze the array.\nvaluesArray: Reads value iteration and returns a shallow-frozen values array.\nFrozen top-level values in current Map iteration order.\nentries: Reads value iteration and returns a frozen array of frozen entry pairs.\nReadonly key/value pairs; nested keys and values keep identity.\nsnapshot: Reads value iteration and creates a new independent native Map copy on each call.\nReadonlyMap-typed shallow copy; the native Map itself is not frozen and changes to it do not mutate the collection.\nprune: Reclaims cells for deleted keys or members only when no observer still holds them; active observations survive.\nNumber of stale cells actually released, not the number of deleted data entries.\nmutationGuard: Caller-owned IMutationGuard from @migaia/store-light; each mutation invokes assertMutationAllowed(operation) before changing data. Existing foreign source/code stays unchanged. An unclassified extensible native error receives CALLBACK_FAILED without replacement; frozen errors and other values remain reachable through cause/errors. Failure prevents the outer mutation, not callback-owned side effects.\n`undefined`: mutations have no additional policy guard.\ndebugName: Application-selected string prefix for internal signal diagnostics and mutation operation labels.\nThe concrete class name: `ObservableObject`, `ObservableArray`, `ObservableMap` or `ObservableSet`.",
+          "advanced": "Track selected lookup keys while independently rendering the whole value list.",
+          "parameters": [
+            "initial: ReadonlyMap<K, V> | Iterable<readonly [K, V]> (optional)",
+            "runtime: IRuntime (optional)",
+            "options: IObservableCollectionOptions (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "initial",
+              "type": "ReadonlyMap<K, V> | Iterable<readonly [K, V]>",
+              "optional": true
+            },
+            {
+              "name": "runtime",
+              "type": "IRuntime",
+              "optional": true
+            },
+            {
+              "name": "options",
+              "type": "IObservableCollectionOptions",
+              "optional": true
+            }
+          ],
+          "returns": "No explicit return annotation is declared for this class.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createRuntime } from '@migaia/reactive'\nimport { ObservableMap } from '@migaia/store-indexed'\n\nconst runtime = createRuntime({ schedulerStrategy: (run) => run() })\nconst values = new ObservableMap<string, number>(\n  [\n    ['a', 1],\n    ['b', 2]\n  ],\n  runtime\n)\nlet keyRuns = 0\nlet valueRuns = 0\nconst keysWatch = runtime.effect(() => {\n  values.keys()\n  keyRuns += 1\n})\nconst valuesWatch = runtime.effect(() => {\n  values.valuesArray()\n  valueRuns += 1\n})\nvalues.set('a', 10)\nconsole.log(keyRuns, valueRuns)\nvalues.replace([\n  ['b', 2],\n  ['a', 10]\n])\nconsole.log(keyRuns, valueRuns, JSON.stringify(values.keys()), JSON.stringify(values.valuesArray()))\nvalues.replace([\n  ['b', 2],\n  ['a', 10]\n])\nconsole.log(keyRuns, valueRuns)\nkeysWatch.dispose()\nvaluesWatch.dispose()\nvalues.dispose()"
+          ],
+          "members": [
+            {
+              "name": "size",
+              "kind": "get",
+              "optional": false,
+              "signature": "get size(): number;",
+              "description": "Read the member count with the map's structural dependency, which also observes key reorder.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "get",
+              "kind": "method",
+              "optional": false,
+              "signature": "get(key: K): V | undefined;",
+              "description": "Read one key, tracking its value cell only during observation; absence yields undefined.",
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "K",
+                  "optional": false
+                }
+              ],
+              "returns": "V | undefined"
+            },
+            {
+              "name": "peek",
+              "kind": "method",
+              "optional": false,
+              "signature": "peek(key: K): V | undefined;",
+              "description": "Read one key without tracking or allocating a cell, including from another Runtime.",
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "K",
+                  "optional": false
+                }
+              ],
+              "returns": "V | undefined"
+            },
+            {
+              "name": "has",
+              "kind": "method",
+              "optional": false,
+              "signature": "has(key: K): boolean;",
+              "description": "Test one key without observing unrelated keys. Tracking shares its value cell, so changing an existing value can also invalidate this presence read.",
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "K",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            },
+            {
+              "name": "set",
+              "kind": "method",
+              "optional": false,
+              "signature": "set(key: K, value: V): this;",
+              "description": "Set a key and return this map; Object.is-equal existing values do not notify.",
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "K",
+                  "optional": false
+                },
+                {
+                  "name": "value",
+                  "type": "V",
+                  "optional": false
+                }
+              ],
+              "returns": "this"
+            },
+            {
+              "name": "delete",
+              "kind": "method",
+              "optional": false,
+              "signature": "delete(key: K): boolean;",
+              "description": "Remove a key and return whether it existed, notifying its cell and relevant iteration views.",
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "K",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            },
+            {
+              "name": "clear",
+              "kind": "method",
+              "optional": false,
+              "signature": "clear(): void;",
+              "description": "Clear all members in one batch; an empty map has no content notifications.",
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "replace",
+              "kind": "method",
+              "optional": false,
+              "signature": "replace(next: ReadonlyMap<K, V> | Iterable<readonly [K, V]>): void;",
+              "description": "Materialize all native entries before one batched replacement; invalid input is INVALID_OPTION and leaves prior contents intact. Key insertion order is observable. Unchanged ordered entries skip revision notifications; structural/value iteration revisions each advance at most once.",
+              "parameterDetails": [
+                {
+                  "name": "next",
+                  "type": "ReadonlyMap<K, V> | Iterable<readonly [K, V]>",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "keys",
+              "kind": "method",
+              "optional": false,
+              "signature": "keys(): readonly K[];",
+              "description": "Return a fresh, unfrozen insertion-order key array, tracking structure rather than values.",
+              "parameterDetails": [],
+              "returns": "readonly K[]"
+            },
+            {
+              "name": "valuesArray",
+              "kind": "method",
+              "optional": false,
+              "signature": "valuesArray(): readonly V[];",
+              "description": "Return a fresh shallow-frozen insertion-order value array, tracking value/order changes.",
+              "parameterDetails": [],
+              "returns": "readonly V[]"
+            },
+            {
+              "name": "entries",
+              "kind": "method",
+              "optional": false,
+              "signature": "entries(): readonly (readonly [K, V])[];",
+              "description": "Return a frozen entries array with frozen pairs; referenced keys/values remain shared.",
+              "parameterDetails": [],
+              "returns": "readonly (readonly [K, V])[]"
+            },
+            {
+              "name": "snapshot",
+              "kind": "method",
+              "optional": false,
+              "signature": "snapshot(): ReadonlyMap<K, V>;",
+              "description": "Track value/order changes and return a new native Map copy each time. Readonly is a type-level view: the copy is not frozen, and its keys/values retain their original references.",
+              "parameterDetails": [],
+              "returns": "ReadonlyMap<K, V>"
+            },
+            {
+              "name": "prune",
+              "kind": "method",
+              "optional": false,
+              "signature": "prune(): number;",
+              "description": "Release remaining cells for absent, unobserved keys and return the number removed.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "runtime",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly runtime: IRuntime;",
+              "description": "Borrowed owner of tracked cells and batches; collection disposal never disposes this Runtime.",
+              "parameterDetails": [],
+              "returns": "IRuntime"
+            },
+            {
+              "name": "disposed",
+              "kind": "get",
+              "optional": false,
+              "signature": "get disposed(): boolean;",
+              "description": "Terminal state readable after disposal; ordinary collection reads and writes then reject.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "optional": false,
+              "signature": "dispose(): void;",
+              "description": "Synchronously retire owned reactive nodes and disconnect their downstream dependencies once. Repeated calls do nothing; subsequent collection operations throw COLLECTION_DISPOSED.",
+              "parameterDetails": [],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare class ObservableMap<K, V> extends ObservableCollectionBase { #private; /** * Materialize native Map entries before ownership; defaults are [], defaultRuntime and {}. * Invalid iterables, entry shapes or options throw INVALID_OPTION, with input failures retained * as cause. Duplicate keys follow native Map semantics. */ constructor(initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>, runtime?: IRuntime, options?: IObservableCollectionOptions); /** Read the member count with the map's structural dependency, which also observes key reorder. */ get size(): number; /** Read one key, tracking its value cell only during observation; absence yields undefined. */ get(key: K): V | undefined; /** Read one key without tracking or allocating a cell, including from another Runtime. */ peek(key: K): V | undefined; /** * Test one key without observing unrelated keys. Tracking shares its value cell, so changing an * existing value can also invalidate this presence read. */ has(key: K): boolean; /** Set a key and return this map; Object.is-equal existing values do not notify. */ set(key: K, value: V): this; /** Remove a key and return whether it existed, notifying its cell and relevant iteration views. */ delete(key: K): boolean; /** Clear all members in one batch; an empty map has no content notifications. */ clear(): void; /** * Materialize all native entries before one batched replacement; invalid input is INVALID_OPTION * and leaves prior contents intact. Key insertion order is observable. Unchanged ordered entries * skip revision notifications; structural/value iteration revisions each advance at most once. */ replace(next: ReadonlyMap<K, V> | Iterable<readonly [K, V]>): void; /** Return a fresh, unfrozen insertion-order key array, tracking structure rather than values. */ keys(): readonly K[]; /** Return a fresh shallow-frozen insertion-order value array, tracking value/order changes. */ valuesArray(): readonly V[]; /** Return a frozen entries array with frozen pairs; referenced keys/values remain shared. */ entries(): readonly (readonly [K, V])[]; /** * Track value/order changes and return a new native Map copy each time. Readonly is a type-level * view: the copy is not frozen, and its keys/values retain their original references. */ snapshot(): ReadonlyMap<K, V>; /** Release remaining cells for absent, unobserved keys and return the number removed. */ prune(): number; }"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "initial",
+                "type": "ReadonlyMap<K, V> | Iterable<readonly [K, V]>",
+                "optional": true
+              },
+              {
+                "name": "runtime",
+                "type": "IRuntime",
+                "optional": true
+              },
+              {
+                "name": "options",
+                "type": "IObservableCollectionOptions",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": [],
+          "whenToUse": "Track selected lookup keys while independently rendering the whole value list.",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Creates an explicit reactive key/value map with lazy per-entry signals and collection-owned disposal. Constructor order is initial, runtime, options; options defaults to `{}`. The supplied Runtime is borrowed, while collection-owned signals are released by dispose."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ObservableMap from @migaia/store-indexed, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ObservableMap when its class contract and declared inputs match the result you need. Choose a different public symbol when ObservableMap does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained class example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "initial: Initial map or entry iterable, default `[]` for an empty map. Construction and replace both validate every entry with native Map admission before ownership or data changes; invalid entries throw `INVALID_OPTION` and preserve the old collection.\nruntime: `IRuntime` from `@migaia/reactive`; omitted uses `defaultRuntime`. Use its graph for observing this collection; collection disposal does not dispose the Runtime.\nCaller-owned ObservableMap; dispose it after its observers are released. Invalid input throws a tagged TypeError with INVALID_OPTION.\nruntime: IRuntime selected at construction; tracked reads belong to its graph and mutations use its batching.\ndisposed: Whether terminal disposal has disconnected collection-owned signals; ordinary reads and writes then reject.\ndispose: Idempotently disconnects collection-owned signals and releases cell-pool references without disposing the caller Runtime. Backing data and existing snapshots are not cleared.\nNothing; the collection is terminal and later data access throws COLLECTION_DISPOSED.\nsize: Current entry count; tracks structure and ignores updates that preserve key membership.\nget: Reads a key value and lazily tracks that key only in the owning Runtime context.\nget.key: Application-selected key from the initial data or a key the application has inserted.\nCurrent value or undefined for an absent key.\npeek: Reads the backing Map directly without tracking or creating any key cell.\npeek.key: Application-selected key from the initial data or a key the application has inserted.\nCurrent stored value or undefined without dependency admission.\nhas: Tracks the selected key cell for membership; updates to unrelated keys do not invalidate this observation.\nhas.key: Application-selected key from the initial data or a key the application has inserted.\nTrue when the backing Map contains this key, even if its value is undefined.\nset: Writes a key after admission; an unchanged existing value is a no-op, while insertion updates structure and iteration.\nset.key: Application-selected key from the initial data or a key the application has inserted.\nset.value: Application value to store; nested objects retain their original identity.\nThis same ObservableMap for chaining; values retain original identity.\ndelete: Removes one key in a batch and retains its missing cell while still observed.\ndelete.key: Application-selected key from the initial data or a key the application has inserted.\nTrue if an entry was removed; false when the key was absent.\nclear: Clears stored entries and invalidates materialized cells, with one structure and iteration update.\nNothing; all entries are removed while observed tombstones survive.\nreplace: Materializes all entries before a batched swap; key membership or insertion-order changes update structure and iteration, and value changes update iteration. Only identical entries in identical order avoid notification.\nreplace.next: Complete map or entry iterable to replace existing entries.\nNothing; the replacement is committed atomically after input preparation.\nkeys: Returns insertion-ordered keys while tracking membership structure only.\nFresh key array; readonly typing does not freeze the array.\nvaluesArray: Reads value iteration and returns a shallow-frozen values array.\nFrozen top-level values in current Map iteration order.\nentries: Reads value iteration and returns a frozen array of frozen entry pairs.\nReadonly key/value pairs; nested keys and values keep identity.\nsnapshot: Reads value iteration and creates a new independent native Map copy on each call.\nReadonlyMap-typed shallow copy; the native Map itself is not frozen and changes to it do not mutate the collection.\nprune: Reclaims cells for deleted keys or members only when no observer still holds them; active observations survive.\nNumber of stale cells actually released, not the number of deleted data entries.\nmutationGuard: Caller-owned IMutationGuard from @migaia/store-light; each mutation invokes assertMutationAllowed(operation) before changing data. Existing foreign source/code stays unchanged. An unclassified extensible native error receives CALLBACK_FAILED without replacement; frozen errors and other values remain reachable through cause/errors. Failure prevents the outer mutation, not callback-owned side effects.\n`undefined`: mutations have no additional policy guard.\ndebugName: Application-selected string prefix for internal signal diagnostics and mutation operation labels.\nThe concrete class name: `ObservableObject`, `ObservableArray`, `ObservableMap` or `ObservableSet`."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "Track selected lookup keys while independently rendering the whole value list."
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "mutationGuard",
+              "type": "IMutationGuard",
+              "optional": true,
+              "description": "Synchronous guard called before each public mutation, including no-ops; omitted by default. A failure prevents the outer write or updater from running, but does not undo callback-owned effects. Existing error identities remain intact; other failures receive CALLBACK_FAILED."
+            },
+            {
+              "name": "debugName",
+              "type": "string",
+              "optional": true,
+              "description": "Diagnostic prefix for nodes and mutation labels; defaults to the collection class name."
+            }
+          ],
+          "identity": "packages/store-indexed/dist/collections.d.ts:ObservableMap:export declare class ObservableMap<K, V> extends ObservableCollectionBase { #private; /** * Materialize native Map entries before ownership; defaults are [], defaultRuntime and {}. * Invalid iterables, entry shapes or options throw INVALID_OPTION, with input failures retained * as cause. Duplicate keys follow native Map semantics. */ constructor(initial?: ReadonlyMap<K, V> | Iterable<readonly [K, V]>, runtime?: IRuntime, options?: IObservableCollectionOptions); /** Read the member count with the map's structural dependency, which also observes key reorder. */ get size(): number; /** Read one key, tracking its value cell only during observation; absence yields undefined. */ get(key: K): V | undefined; /** Read one key without tracking or allocating a cell, including from another Runtime. */ peek(key: K): V | undefined; /** * Test one key without observing unrelated keys. Tracking shares its value cell, so changing an * existing value can also invalidate this presence read. */ has(key: K): boolean; /** Set a key and return this map; Object.is-equal existing values do not notify. */ set(key: K, value: V): this; /** Remove a key and return whether it existed, notifying its cell and relevant iteration views. */ delete(key: K): boolean; /** Clear all members in one batch; an empty map has no content notifications. */ clear(): void; /** * Materialize all native entries before one batched replacement; invalid input is INVALID_OPTION * and leaves prior contents intact. Key insertion order is observable. Unchanged ordered entries * skip revision notifications; structural/value iteration revisions each advance at most once. */ replace(next: ReadonlyMap<K, V> | Iterable<readonly [K, V]>): void; /** Return a fresh, unfrozen insertion-order key array, tracking structure rather than values. */ keys(): readonly K[]; /** Return a fresh shallow-frozen insertion-order value array, tracking value/order changes. */ valuesArray(): readonly V[]; /** Return a frozen entries array with frozen pairs; referenced keys/values remain shared. */ entries(): readonly (readonly [K, V])[]; /** * Track value/order changes and return a new native Map copy each time. Readonly is a type-level * view: the copy is not frozen, and its keys/values retain their original references. */ snapshot(): ReadonlyMap<K, V>; /** Release remaining cells for absent, unobserved keys and return the number removed. */ prune(): number; }",
+          "guidance": [],
+          "usageScore": 58,
+          "configuration": [
+            {
+              "name": "mutationGuard",
+              "type": "IMutationGuard",
+              "optional": true,
+              "description": "`mutationGuard?: IMutationGuard` — `undefined`，无 guard — 每次写入入口调用 `assertMutationAllowed(operation)`",
+              "descriptionEn": "Synchronous guard called before each public mutation, including no-ops; omitted by default. A failure prevents the outer write or updater from running, but does not undo callback-owned effects. Existing error identities remain intact; other failures receive CALLBACK_FAILED.",
+              "descriptionZh": "`mutationGuard?: IMutationGuard` — `undefined`，无 guard — 每次写入入口调用 `assertMutationAllowed(operation)`"
+            },
+            {
+              "name": "debugName",
+              "type": "string",
+              "optional": true,
+              "description": "`debugName?: string` — 对应类名，如 `'ObservableArray'` — Signal 调试名前缀、disposed 信息与 guard 操作名前缀",
+              "descriptionEn": "Diagnostic prefix for nodes and mutation labels; defaults to the collection class name.",
+              "descriptionZh": "`debugName?: string` — 对应类名，如 `'ObservableArray'` — Signal 调试名前缀、disposed 信息与 guard 操作名前缀"
+            }
+          ],
+          "fragment": "store-indexed-index--ObservableMap"
+        },
+        {
+          "name": "ObservableObject",
+          "kind": "class",
+          "signature": "export declare class ObservableObject<T extends Record<string, unknown>> extends ObservableCollectionBase { #private; /** * Copy initial own enumerable string entries, evaluating getters before acquiring ownership. * Runtime defaults to defaultRuntime and options to {}; invalid input/options throw * INVALID_OPTION with the original read failure as cause when present. No deep observation is * installed. */ constructor(initial: T, runtime?: IRuntime, options?: IObservableCollectionOptions); /** Read one string key, tracking its cell only during observation; absent keys yield undefined. */ get<K extends keyof T & string>(key: K): T[K]; /** Read one string key without tracking or allocating a cell, including from another Runtime. */ peek<K extends keyof T & string>(key: K): T[K]; /** * Test presence, tracking the whole key structure; changing another key's membership can rerun * it. */ has(key: keyof T & string): boolean; /** Set a string key in one batch; Object.is-equal existing values do not revise the snapshot. */ set<K extends keyof T & string>(key: K, value: T[K]): void; /** * After guard admission, pass the untracked current value to a synchronous updater and store its * result in one batch. A nonfunction is INVALID_OPTION; callback failure leaves the outer write * uncommitted and preserves the original error identity or cause under CALLBACK_FAILED. */ update<K extends keyof T & string>(key: K, updater: (value: T[K]) => T[K]): void; /** Remove a string key, returning whether it existed; active key observers then read undefined. */ delete(key: keyof T & string): boolean; /** * Return a fresh key array, tracking membership/order rather than existing values; it is not * frozen. */ keys(): readonly (keyof T & string)[]; /** * Track any committed value or shape change and return a cached, shallow-frozen null-prototype * object. Its identity remains stable until the revision changes; nested values remain shared. */ snapshot(): Readonly<T>; /** * Read all own enumerable string entries before one batched replacement, removing omitted keys. * Getter/input failure is INVALID_OPTION and leaves the prior collection intact; nested values * are retained rather than cloned. */ replace(next: T): void; /** Release remaining cells for absent, unobserved keys and return the number removed. */ prune(): number; }",
+          "declarationLine": 44,
+          "source": "packages/store-indexed/dist/collections.d.ts",
+          "purpose": "Creates an explicit reactive string-keyed object with lazy per-entry signals and collection-owned disposal. Constructor order is initial, runtime, options; options defaults to `{}`. The supplied Runtime is borrowed, while collection-owned signals are released by dispose.",
+          "core": "initial: Required initial object; key types are inferred from its declared shape.\nruntime: `IRuntime` from `@migaia/reactive`; omitted uses `defaultRuntime`. Use its graph for observing this collection; collection disposal does not dispose the Runtime.\nCaller-owned ObservableObject; dispose it after its observers are released. Invalid input throws a tagged TypeError with INVALID_OPTION.\nruntime: IRuntime selected at construction; tracked reads belong to its graph and mutations use its batching.\ndisposed: Whether terminal disposal has disconnected collection-owned signals; ordinary reads and writes then reject.\ndispose: Idempotently disconnects collection-owned signals and releases cell-pool references without disposing the caller Runtime. Backing data and existing snapshots are not cleared.\nNothing; the collection is terminal and later data access throws COLLECTION_DISPOSED.\nget: Reads one key and lazily tracks its cell only inside the owning Runtime tracking context.\nget.key: Application-selected key from the initial data or a key the application has inserted.\nStored value, or undefined for an absent key; cross-runtime tracked value reads reject.\npeek: Reads one key without tracking or allocating a reactive cell, even during an active effect.\npeek.key: Application-selected key from the initial data or a key the application has inserted.\nCurrent value, or undefined when absent, without creating a dependency.\nhas: Reads key existence through the shared structure signal; changing only a value does not invalidate it.\nhas.key: Application-selected key from the initial data or a key the application has inserted.\nWhether the object currently contains the string key.\nset: Runs the mutation guard, then assigns one key in a Runtime batch; Object.is-equal existing values do not bump the snapshot revision.\nset.key: Application-selected key from the initial data or a key the application has inserted.\nset.value: Application value to store; nested objects retain their original identity.\nNothing; value observers update and insertion also updates structure.\nupdate: After mutation admission, synchronously calls updater with the untracked current value and commits its result. A thrown updater leaves this outer assignment unapplied.\nupdate.key: Application-selected key from the initial data or a key the application has inserted.\nupdate.updater: Synchronous callback receiving the current T[K] and returning the replacement T[K]; promises are not awaited. Existing error identity is preserved; otherwise CALLBACK_FAILED is attached to the original native error or retains the original through cause/errors.\nNothing; the returned replacement value has been committed in a Runtime batch.\ndelete: Removes one admitted key and updates value, structure and revision signals; observed deleted cells retain an absent tombstone.\ndelete.key: Application-selected key from the initial data or a key the application has inserted.\nTrue only when a stored key was removed; false if already absent.\nkeys: Enumerates current string keys and tracks only the object structure.\nFresh key array in insertion order; its readonly type does not freeze the returned array.\nsnapshot: Returns a shallow-frozen null-prototype object snapshot, cached until actual membership or value changes.\nReadonly top-level copy; nested values retain identity and tracked reads depend on all revisions.\nreplace: Reads all enumerable own entries before mutation and replaces keys in one batch; failed input getters leave existing data unchanged. The guard runs once at replace admission; internal deletion/insertion does not call public delete/set per key.\nreplace.next: Caller-authored complete replacement object; omitted keys are deleted.\nNothing; deleted, inserted and changed keys are committed together.\nprune: Reclaims cells for deleted keys or members only when no observer still holds them; active observations survive.\nNumber of stale cells actually released, not the number of deleted data entries.\nmutationGuard: Caller-owned IMutationGuard from @migaia/store-light; each mutation invokes assertMutationAllowed(operation) before changing data. Existing foreign source/code stays unchanged. An unclassified extensible native error receives CALLBACK_FAILED without replacement; frozen errors and other values remain reachable through cause/errors. Failure prevents the outer mutation, not callback-owned side effects.\n`undefined`: mutations have no additional policy guard.\ndebugName: Application-selected string prefix for internal signal diagnostics and mutation operation labels.\nThe concrete class name: `ObservableObject`, `ObservableArray`, `ObservableMap` or `ObservableSet`.",
+          "advanced": "Edit a large object while subscribing to only selected properties.",
+          "parameters": [
+            "initial: T",
+            "runtime: IRuntime (optional)",
+            "options: IObservableCollectionOptions (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "initial",
+              "type": "T",
+              "optional": false
+            },
+            {
+              "name": "runtime",
+              "type": "IRuntime",
+              "optional": true
+            },
+            {
+              "name": "options",
+              "type": "IObservableCollectionOptions",
+              "optional": true
+            }
+          ],
+          "returns": "No explicit return annotation is declared for this class.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createRuntime } from '@migaia/reactive'\nimport { ObservableObject } from '@migaia/store-indexed'\n\nconst runtime = createRuntime({ schedulerStrategy: (run) => run() })\nconst user = new ObservableObject({ name: '艾达', age: 30 }, runtime)\nconst seen: string[] = []\nconst watch = runtime.effect(() => {\n  seen.push(user.get('name'))\n  user.peek('age')\n})\nuser.set('age', 31)\nuser.set('name', '格蕾丝')\nconsole.log(JSON.stringify(seen))\nwatch.dispose()\nuser.dispose()",
+            "import { ObservableObject } from '@migaia/store-indexed'\n\nconst nested = { visits: 1 }\nconst user = new ObservableObject({ count: 1, nested })\nconst first = user.snapshot()\nconsole.log(\n  Object.isFrozen(first),\n  Object.getPrototypeOf(first) === null,\n  first === user.snapshot()\n)\nuser.set('count', 2)\nconst second = user.snapshot()\nconsole.log(first.count, second.count, first === second)\nnested.visits = 9\nconsole.log(first.nested.visits, second.nested.visits)\nuser.dispose()\nconsole.log(first.count)"
+          ],
+          "members": [
+            {
+              "name": "get",
+              "kind": "method",
+              "optional": false,
+              "signature": "get<K extends keyof T & string>(key: K): T[K];",
+              "description": "Read one string key, tracking its cell only during observation; absent keys yield undefined.",
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "K",
+                  "optional": false
+                }
+              ],
+              "returns": "T[K]"
+            },
+            {
+              "name": "peek",
+              "kind": "method",
+              "optional": false,
+              "signature": "peek<K extends keyof T & string>(key: K): T[K];",
+              "description": "Read one string key without tracking or allocating a cell, including from another Runtime.",
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "K",
+                  "optional": false
+                }
+              ],
+              "returns": "T[K]"
+            },
+            {
+              "name": "has",
+              "kind": "method",
+              "optional": false,
+              "signature": "has(key: keyof T & string): boolean;",
+              "description": "Test presence, tracking the whole key structure; changing another key's membership can rerun it.",
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "keyof T & string",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            },
+            {
+              "name": "set",
+              "kind": "method",
+              "optional": false,
+              "signature": "set<K extends keyof T & string>(key: K, value: T[K]): void;",
+              "description": "Set a string key in one batch; Object.is-equal existing values do not revise the snapshot.",
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "K",
+                  "optional": false
+                },
+                {
+                  "name": "value",
+                  "type": "T[K]",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "update",
+              "kind": "method",
+              "optional": false,
+              "signature": "update<K extends keyof T & string>(key: K, updater: (value: T[K]) => T[K]): void;",
+              "description": "After guard admission, pass the untracked current value to a synchronous updater and store its result in one batch. A nonfunction is INVALID_OPTION; callback failure leaves the outer write uncommitted and preserves the original error identity or cause under CALLBACK_FAILED.",
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "K",
+                  "optional": false
+                },
+                {
+                  "name": "updater",
+                  "type": "(value: T[K]) => T[K]",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "delete",
+              "kind": "method",
+              "optional": false,
+              "signature": "delete(key: keyof T & string): boolean;",
+              "description": "Remove a string key, returning whether it existed; active key observers then read undefined.",
+              "parameterDetails": [
+                {
+                  "name": "key",
+                  "type": "keyof T & string",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            },
+            {
+              "name": "keys",
+              "kind": "method",
+              "optional": false,
+              "signature": "keys(): readonly (keyof T & string)[];",
+              "description": "Return a fresh key array, tracking membership/order rather than existing values; it is not frozen.",
+              "parameterDetails": [],
+              "returns": "readonly (keyof T & string)[]"
+            },
+            {
+              "name": "snapshot",
+              "kind": "method",
+              "optional": false,
+              "signature": "snapshot(): Readonly<T>;",
+              "description": "Track any committed value or shape change and return a cached, shallow-frozen null-prototype object. Its identity remains stable until the revision changes; nested values remain shared.",
+              "parameterDetails": [],
+              "returns": "Readonly<T>"
+            },
+            {
+              "name": "replace",
+              "kind": "method",
+              "optional": false,
+              "signature": "replace(next: T): void;",
+              "description": "Read all own enumerable string entries before one batched replacement, removing omitted keys. Getter/input failure is INVALID_OPTION and leaves the prior collection intact; nested values are retained rather than cloned.",
+              "parameterDetails": [
+                {
+                  "name": "next",
+                  "type": "T",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "prune",
+              "kind": "method",
+              "optional": false,
+              "signature": "prune(): number;",
+              "description": "Release remaining cells for absent, unobserved keys and return the number removed.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "runtime",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly runtime: IRuntime;",
+              "description": "Borrowed owner of tracked cells and batches; collection disposal never disposes this Runtime.",
+              "parameterDetails": [],
+              "returns": "IRuntime"
+            },
+            {
+              "name": "disposed",
+              "kind": "get",
+              "optional": false,
+              "signature": "get disposed(): boolean;",
+              "description": "Terminal state readable after disposal; ordinary collection reads and writes then reject.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "optional": false,
+              "signature": "dispose(): void;",
+              "description": "Synchronously retire owned reactive nodes and disconnect their downstream dependencies once. Repeated calls do nothing; subsequent collection operations throw COLLECTION_DISPOSED.",
+              "parameterDetails": [],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare class ObservableObject<T extends Record<string, unknown>> extends ObservableCollectionBase { #private; /** * Copy initial own enumerable string entries, evaluating getters before acquiring ownership. * Runtime defaults to defaultRuntime and options to {}; invalid input/options throw * INVALID_OPTION with the original read failure as cause when present. No deep observation is * installed. */ constructor(initial: T, runtime?: IRuntime, options?: IObservableCollectionOptions); /** Read one string key, tracking its cell only during observation; absent keys yield undefined. */ get<K extends keyof T & string>(key: K): T[K]; /** Read one string key without tracking or allocating a cell, including from another Runtime. */ peek<K extends keyof T & string>(key: K): T[K]; /** * Test presence, tracking the whole key structure; changing another key's membership can rerun * it. */ has(key: keyof T & string): boolean; /** Set a string key in one batch; Object.is-equal existing values do not revise the snapshot. */ set<K extends keyof T & string>(key: K, value: T[K]): void; /** * After guard admission, pass the untracked current value to a synchronous updater and store its * result in one batch. A nonfunction is INVALID_OPTION; callback failure leaves the outer write * uncommitted and preserves the original error identity or cause under CALLBACK_FAILED. */ update<K extends keyof T & string>(key: K, updater: (value: T[K]) => T[K]): void; /** Remove a string key, returning whether it existed; active key observers then read undefined. */ delete(key: keyof T & string): boolean; /** * Return a fresh key array, tracking membership/order rather than existing values; it is not * frozen. */ keys(): readonly (keyof T & string)[]; /** * Track any committed value or shape change and return a cached, shallow-frozen null-prototype * object. Its identity remains stable until the revision changes; nested values remain shared. */ snapshot(): Readonly<T>; /** * Read all own enumerable string entries before one batched replacement, removing omitted keys. * Getter/input failure is INVALID_OPTION and leaves the prior collection intact; nested values * are retained rather than cloned. */ replace(next: T): void; /** Release remaining cells for absent, unobserved keys and return the number removed. */ prune(): number; }"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "initial",
+                "type": "T",
+                "optional": false
+              },
+              {
+                "name": "runtime",
+                "type": "IRuntime",
+                "optional": true
+              },
+              {
+                "name": "options",
+                "type": "IObservableCollectionOptions",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": [],
+          "whenToUse": "Edit a large object while subscribing to only selected properties.",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Creates an explicit reactive string-keyed object with lazy per-entry signals and collection-owned disposal. Constructor order is initial, runtime, options; options defaults to `{}`. The supplied Runtime is borrowed, while collection-owned signals are released by dispose."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ObservableObject from @migaia/store-indexed, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ObservableObject when its class contract and declared inputs match the result you need. Choose a different public symbol when ObservableObject does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained class example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "initial: Required initial object; key types are inferred from its declared shape.\nruntime: `IRuntime` from `@migaia/reactive`; omitted uses `defaultRuntime`. Use its graph for observing this collection; collection disposal does not dispose the Runtime.\nCaller-owned ObservableObject; dispose it after its observers are released. Invalid input throws a tagged TypeError with INVALID_OPTION.\nruntime: IRuntime selected at construction; tracked reads belong to its graph and mutations use its batching.\ndisposed: Whether terminal disposal has disconnected collection-owned signals; ordinary reads and writes then reject.\ndispose: Idempotently disconnects collection-owned signals and releases cell-pool references without disposing the caller Runtime. Backing data and existing snapshots are not cleared.\nNothing; the collection is terminal and later data access throws COLLECTION_DISPOSED.\nget: Reads one key and lazily tracks its cell only inside the owning Runtime tracking context.\nget.key: Application-selected key from the initial data or a key the application has inserted.\nStored value, or undefined for an absent key; cross-runtime tracked value reads reject.\npeek: Reads one key without tracking or allocating a reactive cell, even during an active effect.\npeek.key: Application-selected key from the initial data or a key the application has inserted.\nCurrent value, or undefined when absent, without creating a dependency.\nhas: Reads key existence through the shared structure signal; changing only a value does not invalidate it.\nhas.key: Application-selected key from the initial data or a key the application has inserted.\nWhether the object currently contains the string key.\nset: Runs the mutation guard, then assigns one key in a Runtime batch; Object.is-equal existing values do not bump the snapshot revision.\nset.key: Application-selected key from the initial data or a key the application has inserted.\nset.value: Application value to store; nested objects retain their original identity.\nNothing; value observers update and insertion also updates structure.\nupdate: After mutation admission, synchronously calls updater with the untracked current value and commits its result. A thrown updater leaves this outer assignment unapplied.\nupdate.key: Application-selected key from the initial data or a key the application has inserted.\nupdate.updater: Synchronous callback receiving the current T[K] and returning the replacement T[K]; promises are not awaited. Existing error identity is preserved; otherwise CALLBACK_FAILED is attached to the original native error or retains the original through cause/errors.\nNothing; the returned replacement value has been committed in a Runtime batch.\ndelete: Removes one admitted key and updates value, structure and revision signals; observed deleted cells retain an absent tombstone.\ndelete.key: Application-selected key from the initial data or a key the application has inserted.\nTrue only when a stored key was removed; false if already absent.\nkeys: Enumerates current string keys and tracks only the object structure.\nFresh key array in insertion order; its readonly type does not freeze the returned array.\nsnapshot: Returns a shallow-frozen null-prototype object snapshot, cached until actual membership or value changes.\nReadonly top-level copy; nested values retain identity and tracked reads depend on all revisions.\nreplace: Reads all enumerable own entries before mutation and replaces keys in one batch; failed input getters leave existing data unchanged. The guard runs once at replace admission; internal deletion/insertion does not call public delete/set per key.\nreplace.next: Caller-authored complete replacement object; omitted keys are deleted.\nNothing; deleted, inserted and changed keys are committed together.\nprune: Reclaims cells for deleted keys or members only when no observer still holds them; active observations survive.\nNumber of stale cells actually released, not the number of deleted data entries.\nmutationGuard: Caller-owned IMutationGuard from @migaia/store-light; each mutation invokes assertMutationAllowed(operation) before changing data. Existing foreign source/code stays unchanged. An unclassified extensible native error receives CALLBACK_FAILED without replacement; frozen errors and other values remain reachable through cause/errors. Failure prevents the outer mutation, not callback-owned side effects.\n`undefined`: mutations have no additional policy guard.\ndebugName: Application-selected string prefix for internal signal diagnostics and mutation operation labels.\nThe concrete class name: `ObservableObject`, `ObservableArray`, `ObservableMap` or `ObservableSet`."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "Edit a large object while subscribing to only selected properties."
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "mutationGuard",
+              "type": "IMutationGuard",
+              "optional": true,
+              "description": "Synchronous guard called before each public mutation, including no-ops; omitted by default. A failure prevents the outer write or updater from running, but does not undo callback-owned effects. Existing error identities remain intact; other failures receive CALLBACK_FAILED."
+            },
+            {
+              "name": "debugName",
+              "type": "string",
+              "optional": true,
+              "description": "Diagnostic prefix for nodes and mutation labels; defaults to the collection class name."
+            }
+          ],
+          "identity": "packages/store-indexed/dist/collections.d.ts:ObservableObject:export declare class ObservableObject<T extends Record<string, unknown>> extends ObservableCollectionBase { #private; /** * Copy initial own enumerable string entries, evaluating getters before acquiring ownership. * Runtime defaults to defaultRuntime and options to {}; invalid input/options throw * INVALID_OPTION with the original read failure as cause when present. No deep observation is * installed. */ constructor(initial: T, runtime?: IRuntime, options?: IObservableCollectionOptions); /** Read one string key, tracking its cell only during observation; absent keys yield undefined. */ get<K extends keyof T & string>(key: K): T[K]; /** Read one string key without tracking or allocating a cell, including from another Runtime. */ peek<K extends keyof T & string>(key: K): T[K]; /** * Test presence, tracking the whole key structure; changing another key's membership can rerun * it. */ has(key: keyof T & string): boolean; /** Set a string key in one batch; Object.is-equal existing values do not revise the snapshot. */ set<K extends keyof T & string>(key: K, value: T[K]): void; /** * After guard admission, pass the untracked current value to a synchronous updater and store its * result in one batch. A nonfunction is INVALID_OPTION; callback failure leaves the outer write * uncommitted and preserves the original error identity or cause under CALLBACK_FAILED. */ update<K extends keyof T & string>(key: K, updater: (value: T[K]) => T[K]): void; /** Remove a string key, returning whether it existed; active key observers then read undefined. */ delete(key: keyof T & string): boolean; /** * Return a fresh key array, tracking membership/order rather than existing values; it is not * frozen. */ keys(): readonly (keyof T & string)[]; /** * Track any committed value or shape change and return a cached, shallow-frozen null-prototype * object. Its identity remains stable until the revision changes; nested values remain shared. */ snapshot(): Readonly<T>; /** * Read all own enumerable string entries before one batched replacement, removing omitted keys. * Getter/input failure is INVALID_OPTION and leaves the prior collection intact; nested values * are retained rather than cloned. */ replace(next: T): void; /** Release remaining cells for absent, unobserved keys and return the number removed. */ prune(): number; }",
+          "guidance": [
+            {
+              "id": "操作词表与错误",
+              "heading": "操作词表与错误",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`IndexedOperation` 为消费方诊断/日志提供 `read:'read'`、`write:'write'`、`delete:'delete'`；`IIndexedOperation` 是这些值的联合。本包方法不直接引用该词表。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["StoreIndexedErrorCode 属性", "code", "触发"],
+                  "rows": [
+                    [
+                      "invalidOption",
+                      "INVALID_OPTION",
+                      "options、初值、iterator、Map 条目、debugName、Object key 或 updater 形状无效"
+                    ],
+                    ["collectionDisposed", "COLLECTION_DISPOSED", "关闭后的数据访问/变更"],
+                    ["callbackFailed", "CALLBACK_FAILED", "没有已有包身份的 guard/updater 失败"],
+                    ["indexOutOfRange", "INDEX_OUT_OF_RANGE", "Array.set 越界"],
+                    ["invalidIndex", "INVALID_INDEX", "Array.at/set 非整数"],
+                    ["crossRuntime", "CROSS_RUNTIME", "本包检测到跨 Runtime 追踪读取"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='store.indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
+                },
+                {
+                  "type": "table",
+                  "headers": ["message", "场景"],
+                  "rows": [
+                    [
+                      "`[store] observable collection options must be an object`",
+                      "options 形状或读取失败"
+                    ],
+                    [
+                      "`[store] observable collection debugName must be a string`",
+                      "debugName 类型无效"
+                    ],
+                    [
+                      "`[store] observable collection input must be a non-null object or iterable`",
+                      "初值/替换输入、iterator 或 updater 形状失败"
+                    ],
+                    ["`[store] ObservableObject key must be a string`", "Object 的 key 非字符串"],
+                    [
+                      "`[store] cross-runtime dependency is not allowed: collection read belongs to another Runtime`",
+                      "本包检测到跨 Runtime 追踪"
+                    ],
+                    ["`[store] {debugName} is disposed`", "关闭后使用"],
+                    ["`[store] ObservableArray index out of range`", "set 越界"],
+                    ["`[store] ObservableArray index must be an integer`", "at/set 非整数"],
+                    ["`[store] collection callback failed`", "无法直接附身份时的 callback wrapper"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "三个公开错误工厂的 code 均为必填 `IStoreIndexedErrorCode`、message 为必填 string。`createStoreIndexedError(code,message,options?)` 返回原生 Error，`createStoreIndexedTypeError(...)` 返回 TypeError，options 默认 undefined、只有可选 cause；前者在 options 自有 cause 存在时转发，后者在 cause 非 undefined 时转发。`createStoreIndexedRangeError(code,message)` 返回 RangeError，无第三参数。三者附不可写 source/code，不改 stack；cause 不保证显示进顶层 stack 文本。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 96,
+          "configuration": [
+            {
+              "name": "mutationGuard",
+              "type": "IMutationGuard",
+              "optional": true,
+              "description": "`initial` 是必填的姓名/年龄对象；`runtime` 使用本例 createRuntime 的实例，省略则 defaultRuntime。options 省略为 `{}`，mutationGuard 为 undefined，debugName 默认为 `'ObservableObject'`。get/set/peek 的 key 均为 initial 推导出的字符串键，set 接受该字段类型。",
+              "descriptionEn": "Synchronous guard called before each public mutation, including no-ops; omitted by default. A failure prevents the outer write or updater from running, but does not undo callback-owned effects. Existing error identities remain intact; other failures receive CALLBACK_FAILED.",
+              "descriptionZh": "`initial` 是必填的姓名/年龄对象；`runtime` 使用本例 createRuntime 的实例，省略则 defaultRuntime。options 省略为 `{}`，mutationGuard 为 undefined，debugName 默认为 `'ObservableObject'`。get/set/peek 的 key 均为 initial 推导出的字符串键，set 接受该字段类型。"
+            },
+            {
+              "name": "debugName",
+              "type": "string",
+              "optional": true,
+              "description": "`initial` 是必填的姓名/年龄对象；`runtime` 使用本例 createRuntime 的实例，省略则 defaultRuntime。options 省略为 `{}`，mutationGuard 为 undefined，debugName 默认为 `'ObservableObject'`。get/set/peek 的 key 均为 initial 推导出的字符串键，set 接受该字段类型。",
+              "descriptionEn": "Diagnostic prefix for nodes and mutation labels; defaults to the collection class name.",
+              "descriptionZh": "`initial` 是必填的姓名/年龄对象；`runtime` 使用本例 createRuntime 的实例，省略则 defaultRuntime。options 省略为 `{}`，mutationGuard 为 undefined，debugName 默认为 `'ObservableObject'`。get/set/peek 的 key 均为 initial 推导出的字符串键，set 接受该字段类型。"
+            }
+          ],
+          "fragment": "store-indexed-index--ObservableObject"
+        },
+        {
+          "name": "ObservableSet",
+          "kind": "class",
+          "signature": "export declare class ObservableSet<T> extends ObservableCollectionBase { #private; /** * Materialize the iterable before ownership; defaults are [], defaultRuntime and {}. Strings are * accepted and duplicates follow native Set semantics. Invalid input/iterator/options throw * INVALID_OPTION, retaining the original input failure as cause when present. */ constructor(initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions); /** Read the member count with a structural dependency, which also observes value reorder. */ get size(): number; /** Test one value's membership, allocating its cell only when the read is tracked. */ has(value: T): boolean; /** Add a value and return this set; an existing native-equal member leaves content unchanged. */ add(value: T): this; /** Remove a value and return whether it existed, notifying its membership and structural views. */ delete(value: T): boolean; /** Clear members in one batch and notify materialized membership cells; empty sets do not notify. */ clear(): void; /** * Materialize the iterable before one batched replacement; invalid input throws INVALID_OPTION * without replacing prior contents. Insertion order is observable, and an identical ordered set * leaves the structural revision unchanged. */ replace(next: Iterable<T>): void; /** Return a fresh shallow-frozen insertion-order array, tracking membership/order changes. */ valuesArray(): readonly T[]; /** * Track membership/order changes and return a new native Set copy. Readonly is type-level rather * than runtime freezing; member objects retain their original references. */ snapshot(): ReadonlySet<T>; /** Release remaining cells for absent, unobserved values and return the number removed. */ prune(): number; }",
+          "declarationLine": 194,
+          "source": "packages/store-indexed/dist/collections.d.ts",
+          "purpose": "Creates an explicit reactive membership set with lazy per-entry signals and collection-owned disposal. Constructor order is initial, runtime, options; options defaults to `{}`. The supplied Runtime is borrowed, while collection-owned signals are released by dispose.",
+          "core": "initial: Initial iterable, default `[]` for an empty membership set; strings are accepted as characters and duplicates collapse under native Set semantics.\nruntime: `IRuntime` from `@migaia/reactive`; omitted uses `defaultRuntime`. Use its graph for observing this collection; collection disposal does not dispose the Runtime.\nCaller-owned ObservableSet; dispose it after its observers are released. Invalid input throws a tagged TypeError with INVALID_OPTION.\nruntime: IRuntime selected at construction; tracked reads belong to its graph and mutations use its batching.\ndisposed: Whether terminal disposal has disconnected collection-owned signals; ordinary reads and writes then reject.\ndispose: Idempotently disconnects collection-owned signals and releases cell-pool references without disposing the caller Runtime. Backing data and existing snapshots are not cleared.\nNothing; the collection is terminal and later data access throws COLLECTION_DISPOSED.\nsize: Current unique member count, read through the structure dependency.\nhas: Reads one membership and lazily creates its boolean cell only while the owning Runtime tracks.\nhas.value: Application value to store; nested objects retain their original identity.\nWhether native Set semantics find the selected member.\nadd: Adds an admitted member and notifies its cell and structure; existing membership is unchanged.\nadd.value: Application value to store; nested objects retain their original identity.\nThis same ObservableSet for chaining.\ndelete: Removes an admitted member, updates structure and retains observed missing-membership cells.\ndelete.value: Application value to store; nested objects retain their original identity.\nTrue only when the member existed before removal.\nclear: Removes all members in one batch and updates materialized membership cells plus structure.\nNothing; membership is empty and affected observations are invalidated.\nreplace: Materializes the iterable before swapping membership in one batch; only identical membership in identical iteration order avoids a structure update.\nreplace.next: Complete replacement iterable; duplicate values collapse using native Set semantics.\nNothing; replacement membership is committed after input preparation.\nvaluesArray: Reads structure and returns a shallow-frozen array in Set iteration order.\nFrozen top-level member list; nested objects retain identity.\nsnapshot: Reads structure and creates a fresh independent native Set copy.\nReadonlySet-typed shallow copy; the native Set is not frozen, and mutating it does not affect the source collection.\nprune: Reclaims cells for deleted keys or members only when no observer still holds them; active observations survive.\nNumber of stale cells actually released, not the number of deleted data entries.\nmutationGuard: Caller-owned IMutationGuard from @migaia/store-light; each mutation invokes assertMutationAllowed(operation) before changing data. Existing foreign source/code stays unchanged. An unclassified extensible native error receives CALLBACK_FAILED without replacement; frozen errors and other values remain reachable through cause/errors. Failure prevents the outer mutation, not callback-owned side effects.\n`undefined`: mutations have no additional policy guard.\ndebugName: Application-selected string prefix for internal signal diagnostics and mutation operation labels.\nThe concrete class name: `ObservableObject`, `ObservableArray`, `ObservableMap` or `ObservableSet`.",
+          "advanced": "Observe independent selection flags without subscribing to every selected item.",
+          "parameters": [
+            "initial: Iterable<T> (optional)",
+            "runtime: IRuntime (optional)",
+            "options: IObservableCollectionOptions (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "initial",
+              "type": "Iterable<T>",
+              "optional": true
+            },
+            {
+              "name": "runtime",
+              "type": "IRuntime",
+              "optional": true
+            },
+            {
+              "name": "options",
+              "type": "IObservableCollectionOptions",
+              "optional": true
+            }
+          ],
+          "returns": "No explicit return annotation is declared for this class.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createRuntime } from '@migaia/reactive'\nimport { ObservableSet } from '@migaia/store-indexed'\n\nconst runtime = createRuntime({ schedulerStrategy: (run) => run() })\nconst selected = new ObservableSet(['a'], runtime)\nlet runs = 0\nlet present = false\nconst watch = runtime.effect(() => {\n  present = selected.has('a')\n  runs += 1\n})\nselected.add('b')\nconsole.log(runs, present)\nselected.delete('a')\nconsole.log(runs, present)\nselected.add('a')\nconsole.log(runs, present)\nwatch.dispose()\nselected.dispose()\nselected.dispose()\nconst count = runtime.signal(1)\ncount.value = 2\nconsole.log(selected.disposed, count.value)\ncount.dispose()"
+          ],
+          "members": [
+            {
+              "name": "size",
+              "kind": "get",
+              "optional": false,
+              "signature": "get size(): number;",
+              "description": "Read the member count with a structural dependency, which also observes value reorder.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "has",
+              "kind": "method",
+              "optional": false,
+              "signature": "has(value: T): boolean;",
+              "description": "Test one value's membership, allocating its cell only when the read is tracked.",
+              "parameterDetails": [
+                {
+                  "name": "value",
+                  "type": "T",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            },
+            {
+              "name": "add",
+              "kind": "method",
+              "optional": false,
+              "signature": "add(value: T): this;",
+              "description": "Add a value and return this set; an existing native-equal member leaves content unchanged.",
+              "parameterDetails": [
+                {
+                  "name": "value",
+                  "type": "T",
+                  "optional": false
+                }
+              ],
+              "returns": "this"
+            },
+            {
+              "name": "delete",
+              "kind": "method",
+              "optional": false,
+              "signature": "delete(value: T): boolean;",
+              "description": "Remove a value and return whether it existed, notifying its membership and structural views.",
+              "parameterDetails": [
+                {
+                  "name": "value",
+                  "type": "T",
+                  "optional": false
+                }
+              ],
+              "returns": "boolean"
+            },
+            {
+              "name": "clear",
+              "kind": "method",
+              "optional": false,
+              "signature": "clear(): void;",
+              "description": "Clear members in one batch and notify materialized membership cells; empty sets do not notify.",
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "replace",
+              "kind": "method",
+              "optional": false,
+              "signature": "replace(next: Iterable<T>): void;",
+              "description": "Materialize the iterable before one batched replacement; invalid input throws INVALID_OPTION without replacing prior contents. Insertion order is observable, and an identical ordered set leaves the structural revision unchanged.",
+              "parameterDetails": [
+                {
+                  "name": "next",
+                  "type": "Iterable<T>",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "valuesArray",
+              "kind": "method",
+              "optional": false,
+              "signature": "valuesArray(): readonly T[];",
+              "description": "Return a fresh shallow-frozen insertion-order array, tracking membership/order changes.",
+              "parameterDetails": [],
+              "returns": "readonly T[]"
+            },
+            {
+              "name": "snapshot",
+              "kind": "method",
+              "optional": false,
+              "signature": "snapshot(): ReadonlySet<T>;",
+              "description": "Track membership/order changes and return a new native Set copy. Readonly is type-level rather than runtime freezing; member objects retain their original references.",
+              "parameterDetails": [],
+              "returns": "ReadonlySet<T>"
+            },
+            {
+              "name": "prune",
+              "kind": "method",
+              "optional": false,
+              "signature": "prune(): number;",
+              "description": "Release remaining cells for absent, unobserved values and return the number removed.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "runtime",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly runtime: IRuntime;",
+              "description": "Borrowed owner of tracked cells and batches; collection disposal never disposes this Runtime.",
+              "parameterDetails": [],
+              "returns": "IRuntime"
+            },
+            {
+              "name": "disposed",
+              "kind": "get",
+              "optional": false,
+              "signature": "get disposed(): boolean;",
+              "description": "Terminal state readable after disposal; ordinary collection reads and writes then reject.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "optional": false,
+              "signature": "dispose(): void;",
+              "description": "Synchronously retire owned reactive nodes and disconnect their downstream dependencies once. Repeated calls do nothing; subsequent collection operations throw COLLECTION_DISPOSED.",
+              "parameterDetails": [],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare class ObservableSet<T> extends ObservableCollectionBase { #private; /** * Materialize the iterable before ownership; defaults are [], defaultRuntime and {}. Strings are * accepted and duplicates follow native Set semantics. Invalid input/iterator/options throw * INVALID_OPTION, retaining the original input failure as cause when present. */ constructor(initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions); /** Read the member count with a structural dependency, which also observes value reorder. */ get size(): number; /** Test one value's membership, allocating its cell only when the read is tracked. */ has(value: T): boolean; /** Add a value and return this set; an existing native-equal member leaves content unchanged. */ add(value: T): this; /** Remove a value and return whether it existed, notifying its membership and structural views. */ delete(value: T): boolean; /** Clear members in one batch and notify materialized membership cells; empty sets do not notify. */ clear(): void; /** * Materialize the iterable before one batched replacement; invalid input throws INVALID_OPTION * without replacing prior contents. Insertion order is observable, and an identical ordered set * leaves the structural revision unchanged. */ replace(next: Iterable<T>): void; /** Return a fresh shallow-frozen insertion-order array, tracking membership/order changes. */ valuesArray(): readonly T[]; /** * Track membership/order changes and return a new native Set copy. Readonly is type-level rather * than runtime freezing; member objects retain their original references. */ snapshot(): ReadonlySet<T>; /** Release remaining cells for absent, unobserved values and return the number removed. */ prune(): number; }"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "initial",
+                "type": "Iterable<T>",
+                "optional": true
+              },
+              {
+                "name": "runtime",
+                "type": "IRuntime",
+                "optional": true
+              },
+              {
+                "name": "options",
+                "type": "IObservableCollectionOptions",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": [],
+          "whenToUse": "Observe independent selection flags without subscribing to every selected item.",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Creates an explicit reactive membership set with lazy per-entry signals and collection-owned disposal. Constructor order is initial, runtime, options; options defaults to `{}`. The supplied Runtime is borrowed, while collection-owned signals are released by dispose."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ObservableSet from @migaia/store-indexed, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ObservableSet when its class contract and declared inputs match the result you need. Choose a different public symbol when ObservableSet does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained class example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "initial: Initial iterable, default `[]` for an empty membership set; strings are accepted as characters and duplicates collapse under native Set semantics.\nruntime: `IRuntime` from `@migaia/reactive`; omitted uses `defaultRuntime`. Use its graph for observing this collection; collection disposal does not dispose the Runtime.\nCaller-owned ObservableSet; dispose it after its observers are released. Invalid input throws a tagged TypeError with INVALID_OPTION.\nruntime: IRuntime selected at construction; tracked reads belong to its graph and mutations use its batching.\ndisposed: Whether terminal disposal has disconnected collection-owned signals; ordinary reads and writes then reject.\ndispose: Idempotently disconnects collection-owned signals and releases cell-pool references without disposing the caller Runtime. Backing data and existing snapshots are not cleared.\nNothing; the collection is terminal and later data access throws COLLECTION_DISPOSED.\nsize: Current unique member count, read through the structure dependency.\nhas: Reads one membership and lazily creates its boolean cell only while the owning Runtime tracks.\nhas.value: Application value to store; nested objects retain their original identity.\nWhether native Set semantics find the selected member.\nadd: Adds an admitted member and notifies its cell and structure; existing membership is unchanged.\nadd.value: Application value to store; nested objects retain their original identity.\nThis same ObservableSet for chaining.\ndelete: Removes an admitted member, updates structure and retains observed missing-membership cells.\ndelete.value: Application value to store; nested objects retain their original identity.\nTrue only when the member existed before removal.\nclear: Removes all members in one batch and updates materialized membership cells plus structure.\nNothing; membership is empty and affected observations are invalidated.\nreplace: Materializes the iterable before swapping membership in one batch; only identical membership in identical iteration order avoids a structure update.\nreplace.next: Complete replacement iterable; duplicate values collapse using native Set semantics.\nNothing; replacement membership is committed after input preparation.\nvaluesArray: Reads structure and returns a shallow-frozen array in Set iteration order.\nFrozen top-level member list; nested objects retain identity.\nsnapshot: Reads structure and creates a fresh independent native Set copy.\nReadonlySet-typed shallow copy; the native Set is not frozen, and mutating it does not affect the source collection.\nprune: Reclaims cells for deleted keys or members only when no observer still holds them; active observations survive.\nNumber of stale cells actually released, not the number of deleted data entries.\nmutationGuard: Caller-owned IMutationGuard from @migaia/store-light; each mutation invokes assertMutationAllowed(operation) before changing data. Existing foreign source/code stays unchanged. An unclassified extensible native error receives CALLBACK_FAILED without replacement; frozen errors and other values remain reachable through cause/errors. Failure prevents the outer mutation, not callback-owned side effects.\n`undefined`: mutations have no additional policy guard.\ndebugName: Application-selected string prefix for internal signal diagnostics and mutation operation labels.\nThe concrete class name: `ObservableObject`, `ObservableArray`, `ObservableMap` or `ObservableSet`."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "Observe independent selection flags without subscribing to every selected item."
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "mutationGuard",
+              "type": "IMutationGuard",
+              "optional": true,
+              "description": "Synchronous guard called before each public mutation, including no-ops; omitted by default. A failure prevents the outer write or updater from running, but does not undo callback-owned effects. Existing error identities remain intact; other failures receive CALLBACK_FAILED."
+            },
+            {
+              "name": "debugName",
+              "type": "string",
+              "optional": true,
+              "description": "Diagnostic prefix for nodes and mutation labels; defaults to the collection class name."
+            }
+          ],
+          "identity": "packages/store-indexed/dist/collections.d.ts:ObservableSet:export declare class ObservableSet<T> extends ObservableCollectionBase { #private; /** * Materialize the iterable before ownership; defaults are [], defaultRuntime and {}. Strings are * accepted and duplicates follow native Set semantics. Invalid input/iterator/options throw * INVALID_OPTION, retaining the original input failure as cause when present. */ constructor(initial?: Iterable<T>, runtime?: IRuntime, options?: IObservableCollectionOptions); /** Read the member count with a structural dependency, which also observes value reorder. */ get size(): number; /** Test one value's membership, allocating its cell only when the read is tracked. */ has(value: T): boolean; /** Add a value and return this set; an existing native-equal member leaves content unchanged. */ add(value: T): this; /** Remove a value and return whether it existed, notifying its membership and structural views. */ delete(value: T): boolean; /** Clear members in one batch and notify materialized membership cells; empty sets do not notify. */ clear(): void; /** * Materialize the iterable before one batched replacement; invalid input throws INVALID_OPTION * without replacing prior contents. Insertion order is observable, and an identical ordered set * leaves the structural revision unchanged. */ replace(next: Iterable<T>): void; /** Return a fresh shallow-frozen insertion-order array, tracking membership/order changes. */ valuesArray(): readonly T[]; /** * Track membership/order changes and return a new native Set copy. Readonly is type-level rather * than runtime freezing; member objects retain their original references. */ snapshot(): ReadonlySet<T>; /** Release remaining cells for absent, unobserved values and return the number removed. */ prune(): number; }",
+          "guidance": [],
+          "usageScore": 58,
+          "configuration": [
+            {
+              "name": "mutationGuard",
+              "type": "IMutationGuard",
+              "optional": true,
+              "description": "`mutationGuard?: IMutationGuard` — `undefined`，无 guard — 每次写入入口调用 `assertMutationAllowed(operation)`",
+              "descriptionEn": "Synchronous guard called before each public mutation, including no-ops; omitted by default. A failure prevents the outer write or updater from running, but does not undo callback-owned effects. Existing error identities remain intact; other failures receive CALLBACK_FAILED.",
+              "descriptionZh": "`mutationGuard?: IMutationGuard` — `undefined`，无 guard — 每次写入入口调用 `assertMutationAllowed(operation)`"
+            },
+            {
+              "name": "debugName",
+              "type": "string",
+              "optional": true,
+              "description": "`debugName?: string` — 对应类名，如 `'ObservableArray'` — Signal 调试名前缀、disposed 信息与 guard 操作名前缀",
+              "descriptionEn": "Diagnostic prefix for nodes and mutation labels; defaults to the collection class name.",
+              "descriptionZh": "`debugName?: string` — 对应类名，如 `'ObservableArray'` — Signal 调试名前缀、disposed 信息与 guard 操作名前缀"
+            }
+          ],
+          "fragment": "store-indexed-index--ObservableSet"
+        },
+        {
+          "name": "STORE_INDEXED_SOURCE",
+          "kind": "const",
+          "signature": "export declare const STORE_INDEXED_SOURCE = \"store.indexed\";",
+          "declarationLine": 4,
+          "source": "packages/store-indexed/dist/errors.d.ts",
+          "purpose": "Stable store.indexed source stamped on errors created by this package; combine it with the error code to identify an owned failure.",
+          "core": "Stable store.indexed source stamped on errors created by this package; combine it with the error code to identify an owned failure.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "exportPath": ".",
+          "overloadSignatures": ["export declare const STORE_INDEXED_SOURCE = \"store.indexed\";"],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Stable store.indexed source stamped on errors created by this package; combine it with the error code to identify an owned failure."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import STORE_INDEXED_SOURCE from @migaia/store-indexed, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use STORE_INDEXED_SOURCE when its const contract and declared inputs match the result you need. Choose a different public symbol when STORE_INDEXED_SOURCE does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Stable store.indexed source stamped on errors created by this package; combine it with the error code to identify an owned failure."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-indexed/dist/errors.d.ts:STORE_INDEXED_SOURCE:export declare const STORE_INDEXED_SOURCE = \"store.indexed\";",
+          "guidance": [
+            {
+              "id": "操作词表与错误",
+              "heading": "操作词表与错误",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`IndexedOperation` 为消费方诊断/日志提供 `read:'read'`、`write:'write'`、`delete:'delete'`；`IIndexedOperation` 是这些值的联合。本包方法不直接引用该词表。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["StoreIndexedErrorCode 属性", "code", "触发"],
+                  "rows": [
+                    [
+                      "invalidOption",
+                      "INVALID_OPTION",
+                      "options、初值、iterator、Map 条目、debugName、Object key 或 updater 形状无效"
+                    ],
+                    ["collectionDisposed", "COLLECTION_DISPOSED", "关闭后的数据访问/变更"],
+                    ["callbackFailed", "CALLBACK_FAILED", "没有已有包身份的 guard/updater 失败"],
+                    ["indexOutOfRange", "INDEX_OUT_OF_RANGE", "Array.set 越界"],
+                    ["invalidIndex", "INVALID_INDEX", "Array.at/set 非整数"],
+                    ["crossRuntime", "CROSS_RUNTIME", "本包检测到跨 Runtime 追踪读取"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='store.indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
+                },
+                {
+                  "type": "table",
+                  "headers": ["message", "场景"],
+                  "rows": [
+                    [
+                      "`[store] observable collection options must be an object`",
+                      "options 形状或读取失败"
+                    ],
+                    [
+                      "`[store] observable collection debugName must be a string`",
+                      "debugName 类型无效"
+                    ],
+                    [
+                      "`[store] observable collection input must be a non-null object or iterable`",
+                      "初值/替换输入、iterator 或 updater 形状失败"
+                    ],
+                    ["`[store] ObservableObject key must be a string`", "Object 的 key 非字符串"],
+                    [
+                      "`[store] cross-runtime dependency is not allowed: collection read belongs to another Runtime`",
+                      "本包检测到跨 Runtime 追踪"
+                    ],
+                    ["`[store] {debugName} is disposed`", "关闭后使用"],
+                    ["`[store] ObservableArray index out of range`", "set 越界"],
+                    ["`[store] ObservableArray index must be an integer`", "at/set 非整数"],
+                    ["`[store] collection callback failed`", "无法直接附身份时的 callback wrapper"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "三个公开错误工厂的 code 均为必填 `IStoreIndexedErrorCode`、message 为必填 string。`createStoreIndexedError(code,message,options?)` 返回原生 Error，`createStoreIndexedTypeError(...)` 返回 TypeError，options 默认 undefined、只有可选 cause；前者在 options 自有 cause 存在时转发，后者在 cause 非 undefined 时转发。`createStoreIndexedRangeError(code,message)` 返回 RangeError，无第三参数。三者附不可写 source/code，不改 stack；cause 不保证显示进顶层 stack 文本。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "store-indexed-index--STORE_INDEXED_SOURCE"
+        },
+        {
+          "name": "StoreIndexedErrorCode",
+          "kind": "const",
+          "signature": "export declare const StoreIndexedErrorCode: { /** * Rejects invalid constructor/options/input/iterator, debugName, object key or updater shape. * Correct the named argument; no partial construction or replacement is committed. */ readonly invalidOption: 'INVALID_OPTION'; /** * Rejects reads or writes after collection disposal. Create a new collection instead of reusing * the disposed instance. */ readonly collectionDisposed: 'COLLECTION_DISPOSED'; /** * A synchronous mutation guard or ObservableObject updater fails without an existing module * identity. Mutable native errors retain their object/type/stack; fallback cause/errors retain * the original. The outer mutation is not committed; callback-owned side effects are not rolled * back. */ readonly callbackFailed: 'CALLBACK_FAILED'; /** * Rejects an out-of-range `ObservableArray.set()` index. Check that the index is within `[0, * length)`. Correct the index instead of retrying the same invalid input. */ readonly indexOutOfRange: 'INDEX_OUT_OF_RANGE'; /** * Rejects a noninteger `ObservableArray` index. Correct the index. Array indices must be * integers. */ readonly invalidIndex: 'INVALID_INDEX'; /** * Rejects a tracked collection read from another runtime. Use the same runtime for the collection * and its observing effect or observer. Untracked `peek` reads are exempt. */ readonly crossRuntime: 'CROSS_RUNTIME'; };",
+          "declarationLine": 8,
+          "source": "packages/store-indexed/dist/error-code.d.ts",
+          "purpose": "Stable semantic codes distinguishing invalid inputs, disposed collections, callback failures, invalid array indexes and reads across runtime graphs.",
+          "core": "invalidOption: Invalid constructor options, input/iterator shape, debugName, object key or updater; fix the supplied value.\ncollectionDisposed: Data access after terminal collection disposal; create a new collection.\ncallbackFailed: An unclassified synchronous mutation guard or updater fails; existing foreign identities stay unchanged, and original values remain reachable. The outer mutation is not committed.\nindexOutOfRange: Array set index falls outside existing nonnegative positions.\ninvalidIndex: Array at or set received a noninteger index.\ncrossRuntime: A tracked value read attempts to connect another Runtime graph.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "invalidOption",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidOption: 'INVALID_OPTION';",
+              "description": "Rejects invalid constructor/options/input/iterator, debugName, object key or updater shape. * Correct the named argument; no partial construction or replacement is committed.",
+              "parameterDetails": [],
+              "returns": "'INVALID_OPTION'"
+            },
+            {
+              "name": "collectionDisposed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly collectionDisposed: 'COLLECTION_DISPOSED';",
+              "description": "Rejects reads or writes after collection disposal. Create a new collection instead of reusing * the disposed instance.",
+              "parameterDetails": [],
+              "returns": "'COLLECTION_DISPOSED'"
+            },
+            {
+              "name": "callbackFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly callbackFailed: 'CALLBACK_FAILED';",
+              "description": "A synchronous mutation guard or ObservableObject updater fails without an existing package * identity. Mutable native errors retain their object/type/stack; fallback cause/errors retain * the original. The outer mutation is not committed; callback-owned side effects are not rolled * back.",
+              "parameterDetails": [],
+              "returns": "'CALLBACK_FAILED'"
+            },
+            {
+              "name": "indexOutOfRange",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly indexOutOfRange: 'INDEX_OUT_OF_RANGE';",
+              "description": "Rejects an out-of-range `ObservableArray.set()` index. Check that the index is within `[0, * length)`. Correct the index instead of retrying the same invalid input.",
+              "parameterDetails": [],
+              "returns": "'INDEX_OUT_OF_RANGE'"
+            },
+            {
+              "name": "invalidIndex",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidIndex: 'INVALID_INDEX';",
+              "description": "Rejects a noninteger `ObservableArray` index. Correct the index. Array indices must be * integers.",
+              "parameterDetails": [],
+              "returns": "'INVALID_INDEX'"
+            },
+            {
+              "name": "crossRuntime",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly crossRuntime: 'CROSS_RUNTIME';",
+              "description": "Rejects a tracked collection read from another runtime. Use the same runtime for the collection * and its observing effect or observer. Untracked `peek` reads are exempt.",
+              "parameterDetails": [],
+              "returns": "'CROSS_RUNTIME'"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "StoreIndexedErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const StoreIndexedErrorCode: { /** * Rejects invalid constructor/options/input/iterator, debugName, object key or updater shape. * Correct the named argument; no partial construction or replacement is committed. */ readonly invalidOption: 'INVALID_OPTION'; /** * Rejects reads or writes after collection disposal. Create a new collection instead of reusing * the disposed instance. */ readonly collectionDisposed: 'COLLECTION_DISPOSED'; /** * A synchronous mutation guard or ObservableObject updater fails without an existing module * identity. Mutable native errors retain their object/type/stack; fallback cause/errors retain * the original. The outer mutation is not committed; callback-owned side effects are not rolled * back. */ readonly callbackFailed: 'CALLBACK_FAILED'; /** * Rejects an out-of-range `ObservableArray.set()` index. Check that the index is within `[0, * length)`. Correct the index instead of retrying the same invalid input. */ readonly indexOutOfRange: 'INDEX_OUT_OF_RANGE'; /** * Rejects a noninteger `ObservableArray` index. Correct the index. Array indices must be * integers. */ readonly invalidIndex: 'INVALID_INDEX'; /** * Rejects a tracked collection read from another runtime. Use the same runtime for the collection * and its observing effect or observer. Untracked `peek` reads are exempt. */ readonly crossRuntime: 'CROSS_RUNTIME'; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Stable semantic codes distinguishing invalid inputs, disposed collections, callback failures, invalid array indexes and reads across runtime graphs."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import StoreIndexedErrorCode from @migaia/store-indexed, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use StoreIndexedErrorCode when its const contract and declared inputs match the result you need. Choose a different public symbol when StoreIndexedErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "invalidOption: Invalid constructor options, input/iterator shape, debugName, object key or updater; fix the supplied value.\ncollectionDisposed: Data access after terminal collection disposal; create a new collection.\ncallbackFailed: An unclassified synchronous mutation guard or updater fails; existing foreign identities stay unchanged, and original values remain reachable. The outer mutation is not committed.\nindexOutOfRange: Array set index falls outside existing nonnegative positions.\ninvalidIndex: Array at or set received a noninteger index.\ncrossRuntime: A tracked value read attempts to connect another Runtime graph."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-indexed/dist/error-code.d.ts:StoreIndexedErrorCode:export declare const StoreIndexedErrorCode: { /** * Rejects invalid constructor/options/input/iterator, debugName, object key or updater shape. * Correct the named argument; no partial construction or replacement is committed. */ readonly invalidOption: 'INVALID_OPTION'; /** * Rejects reads or writes after collection disposal. Create a new collection instead of reusing * the disposed instance. */ readonly collectionDisposed: 'COLLECTION_DISPOSED'; /** * A synchronous mutation guard or ObservableObject updater fails without an existing package * identity. Mutable native errors retain their object/type/stack; fallback cause/errors retain * the original. The outer mutation is not committed; callback-owned side effects are not rolled * back. */ readonly callbackFailed: 'CALLBACK_FAILED'; /** * Rejects an out-of-range `ObservableArray.set()` index. Check that the index is within `[0, * length)`. Correct the index instead of retrying the same invalid input. */ readonly indexOutOfRange: 'INDEX_OUT_OF_RANGE'; /** * Rejects a noninteger `ObservableArray` index. Correct the index. Array indices must be * integers. */ readonly invalidIndex: 'INVALID_INDEX'; /** * Rejects a tracked collection read from another runtime. Use the same runtime for the collection * and its observing effect or observer. Untracked `peek` reads are exempt. */ readonly crossRuntime: 'CROSS_RUNTIME'; };",
+          "guidance": [
+            {
+              "id": "操作词表与错误",
+              "heading": "操作词表与错误",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "`IndexedOperation` 为消费方诊断/日志提供 `read:'read'`、`write:'write'`、`delete:'delete'`；`IIndexedOperation` 是这些值的联合。本包方法不直接引用该词表。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["StoreIndexedErrorCode 属性", "code", "触发"],
+                  "rows": [
+                    [
+                      "invalidOption",
+                      "INVALID_OPTION",
+                      "options、初值、iterator、Map 条目、debugName、Object key 或 updater 形状无效"
+                    ],
+                    ["collectionDisposed", "COLLECTION_DISPOSED", "关闭后的数据访问/变更"],
+                    ["callbackFailed", "CALLBACK_FAILED", "没有已有包身份的 guard/updater 失败"],
+                    ["indexOutOfRange", "INDEX_OUT_OF_RANGE", "Array.set 越界"],
+                    ["invalidIndex", "INVALID_INDEX", "Array.at/set 非整数"],
+                    ["crossRuntime", "CROSS_RUNTIME", "本包检测到跨 Runtime 追踪读取"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "本包错误的 source 为 `STORE_INDEXED_SOURCE='store.indexed'`。已有外包 source/code 保持实际 owner。未编码 guard/updater 原生错误可附码时保留原对象、类型、message、stack；不可附码或非 Error 值经 cause/errors 保留。不要依赖 message 分支，下面列出稳定诊断供定位："
+                },
+                {
+                  "type": "table",
+                  "headers": ["message", "场景"],
+                  "rows": [
+                    [
+                      "`[store] observable collection options must be an object`",
+                      "options 形状或读取失败"
+                    ],
+                    [
+                      "`[store] observable collection debugName must be a string`",
+                      "debugName 类型无效"
+                    ],
+                    [
+                      "`[store] observable collection input must be a non-null object or iterable`",
+                      "初值/替换输入、iterator 或 updater 形状失败"
+                    ],
+                    ["`[store] ObservableObject key must be a string`", "Object 的 key 非字符串"],
+                    [
+                      "`[store] cross-runtime dependency is not allowed: collection read belongs to another Runtime`",
+                      "本包检测到跨 Runtime 追踪"
+                    ],
+                    ["`[store] {debugName} is disposed`", "关闭后使用"],
+                    ["`[store] ObservableArray index out of range`", "set 越界"],
+                    ["`[store] ObservableArray index must be an integer`", "at/set 非整数"],
+                    ["`[store] collection callback failed`", "无法直接附身份时的 callback wrapper"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "三个公开错误工厂的 code 均为必填 `IStoreIndexedErrorCode`、message 为必填 string。`createStoreIndexedError(code,message,options?)` 返回原生 Error，`createStoreIndexedTypeError(...)` 返回 TypeError，options 默认 undefined、只有可选 cause；前者在 options 自有 cause 存在时转发，后者在 cause 非 undefined 时转发。`createStoreIndexedRangeError(code,message)` 返回 RangeError，无第三参数。三者附不可写 source/code，不改 stack；cause 不保证显示进顶层 stack 文本。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "store-indexed-index--StoreIndexedErrorCode"
+        }
+      ],
       "aliases": []
     }
   ]

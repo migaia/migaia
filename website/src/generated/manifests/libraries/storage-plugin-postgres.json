@@ -907,7 +907,2755 @@
       ],
       "guidePath": "/en/docs/storage-plugin-postgres/getting-started",
       "architecturePath": "/en/docs/storage-plugin-postgres",
-      "symbols": [],
+      "symbols": [
+        {
+          "name": "IPgCapabilities",
+          "kind": "type",
+          "signature": "export type IPgCapabilities = typeof kv | typeof records | typeof ttl | typeof counter | typeof sql;",
+          "declarationLine": 86,
+          "source": "packages/storage-plugin-postgres/dist/types.d.ts",
+          "purpose": "The backend native kv/records/ttl/counter/sql token union, before optional Features.",
+          "core": "The backend native kv/records/ttl/counter/sql token union, before optional Features.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "IPgCapabilities",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPgCapabilities = typeof kv | typeof records | typeof ttl | typeof counter | typeof sql;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The backend native kv/records/ttl/counter/sql token union, before optional Features."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPgCapabilities from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPgCapabilities when its type contract and declared inputs match the result you need. Choose a different public symbol when IPgCapabilities does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The backend native kv/records/ttl/counter/sql token union, before optional Features."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/types.d.ts:IPgCapabilities:export type IPgCapabilities = typeof kv | typeof records | typeof ttl | typeof counter | typeof sql;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--IPgCapabilities"
+        },
+        {
+          "name": "IPgCapabilityProbeHookPayload",
+          "kind": "type",
+          "signature": "export type IPgCapabilityProbeHookPayload = IStorageHookIdentity & Readonly<{ version: string; isolationLevel: string; capabilities: IStorageCapabilities; maxSlotWalKeepSize?: string; /** PostgreSQL numeric byte counts remain decimal strings rather than rounded JS numbers. */ confirmedFlushLagBytes?: string; retainedWalBytes?: string; }>;",
+          "declarationLine": 4,
+          "source": "packages/storage-plugin-postgres/dist/hooks.d.ts",
+          "purpose": "Read-only actual version/isolation/capability facts and optional max_slot_wal_keep_size.",
+          "core": "version: Actual native server version observed by capability detection.\nisolationLevel: Actual native transaction isolation level observed by detection.\ncapabilities: Detected supported capability facts without business values.\nmaxSlotWalKeepSize: Optional observed native WAL retention configuration for replication.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "version",
+              "kind": "property",
+              "optional": false,
+              "signature": "version: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "isolationLevel",
+              "kind": "property",
+              "optional": false,
+              "signature": "isolationLevel: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "capabilities",
+              "kind": "property",
+              "optional": false,
+              "signature": "capabilities: IStorageCapabilities;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IStorageCapabilities"
+            },
+            {
+              "name": "maxSlotWalKeepSize",
+              "kind": "property",
+              "optional": true,
+              "signature": "maxSlotWalKeepSize?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "confirmedFlushLagBytes",
+              "kind": "property",
+              "optional": true,
+              "signature": "confirmedFlushLagBytes?: string;",
+              "description": "PostgreSQL numeric byte counts remain decimal strings rather than rounded JS numbers.",
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "retainedWalBytes",
+              "kind": "property",
+              "optional": true,
+              "signature": "retainedWalBytes?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            }
+          ],
+          "composes": ["IStorageHookIdentity"],
+          "aliasOf": "IPgCapabilityProbeHookPayload",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPgCapabilityProbeHookPayload = IStorageHookIdentity & Readonly<{ version: string; isolationLevel: string; capabilities: IStorageCapabilities; maxSlotWalKeepSize?: string; /** PostgreSQL numeric byte counts remain decimal strings rather than rounded JS numbers. */ confirmedFlushLagBytes?: string; retainedWalBytes?: string; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Read-only actual version/isolation/capability facts and optional max_slot_wal_keep_size."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPgCapabilityProbeHookPayload from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPgCapabilityProbeHookPayload when its type contract and declared inputs match the result you need. Choose a different public symbol when IPgCapabilityProbeHookPayload does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "version: Actual native server version observed by capability detection.\nisolationLevel: Actual native transaction isolation level observed by detection.\ncapabilities: Detected supported capability facts without business values.\nmaxSlotWalKeepSize: Optional observed native WAL retention configuration for replication."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/hooks.d.ts:IPgCapabilityProbeHookPayload:export type IPgCapabilityProbeHookPayload = IStorageHookIdentity & Readonly<{ version: string; isolationLevel: string; capabilities: IStorageCapabilities; maxSlotWalKeepSize?: string; /** PostgreSQL numeric byte counts remain decimal strings rather than rounded JS numbers. */ confirmedFlushLagBytes?: string; retainedWalBytes?: string; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--IPgCapabilityProbeHookPayload"
+        },
+        {
+          "name": "IPgConnection",
+          "kind": "type",
+          "signature": "export type IPgConnection = IStorageResource & { query(text: string, params: readonly IPgNativeParameter[], ctx?: IOperationContext): Promise<IPgResult>; copyFrom?(target: IPgCopyTarget, source: AsyncIterable<Uint8Array>, options: IPgCopyOptions, ctx?: IOperationContext): Promise<void>; };",
+          "declarationLine": 34,
+          "source": "packages/storage-plugin-postgres/dist/types.d.ts",
+          "purpose": "Borrowed native query/COPY connection and original two-promise resource release.",
+          "core": "query: Execute native SQL once on the selected original connection.\nquery.text: Complete native SQL statement using positional parameters.\nquery.params: Native scalar values or supported one-dimensional array carriers.\nquery.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nNative scalar rows and command rowCount; native errors retain their cause.\ncopyFrom: Stream client STDIN through the same native connection with backpressure.\ncopyFrom.target: Structured caller-owned table path and column names.\ncopyFrom.source: One byte iterable consumed with native backpressure on this reserved connection.\ncopyFrom.options: Native operation settings for the selected COPY or replication request.\ncopyFrom.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nResolves after all input settles; a failed COPY follows original rollback.",
+          "advanced": "Borrow native SQL operations while keeping all client ownership in the application.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "query",
+              "kind": "method",
+              "optional": false,
+              "signature": "query(text: string, params: readonly IPgNativeParameter[], ctx?: IOperationContext): Promise<IPgResult>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "text",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "params",
+                  "type": "readonly IPgNativeParameter[]",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<IPgResult>"
+            },
+            {
+              "name": "copyFrom",
+              "kind": "method",
+              "optional": true,
+              "signature": "copyFrom?(target: IPgCopyTarget, source: AsyncIterable<Uint8Array>, options: IPgCopyOptions, ctx?: IOperationContext): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "target",
+                  "type": "IPgCopyTarget",
+                  "optional": false
+                },
+                {
+                  "name": "source",
+                  "type": "AsyncIterable<Uint8Array>",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "IPgCopyOptions",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<void>"
+            }
+          ],
+          "composes": ["IStorageResource"],
+          "aliasOf": "IPgConnection",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPgConnection = IStorageResource & { query(text: string, params: readonly IPgNativeParameter[], ctx?: IOperationContext): Promise<IPgResult>; copyFrom?(target: IPgCopyTarget, source: AsyncIterable<Uint8Array>, options: IPgCopyOptions, ctx?: IOperationContext): Promise<void>; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Borrow native SQL operations while keeping all client ownership in the application.",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Borrowed native query/COPY connection and original two-promise resource release."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPgConnection from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPgConnection when its type contract and declared inputs match the result you need. Choose a different public symbol when IPgConnection does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "query: Execute native SQL once on the selected original connection.\nquery.text: Complete native SQL statement using positional parameters.\nquery.params: Native scalar values or supported one-dimensional array carriers.\nquery.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nNative scalar rows and command rowCount; native errors retain their cause.\ncopyFrom: Stream client STDIN through the same native connection with backpressure.\ncopyFrom.target: Structured caller-owned table path and column names.\ncopyFrom.source: One byte iterable consumed with native backpressure on this reserved connection.\ncopyFrom.options: Native operation settings for the selected COPY or replication request.\ncopyFrom.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nResolves after all input settles; a failed COPY follows original rollback."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "Borrow native SQL operations while keeping all client ownership in the application."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/types.d.ts:IPgConnection:export type IPgConnection = IStorageResource & { query(text: string, params: readonly IPgNativeParameter[], ctx?: IOperationContext): Promise<IPgResult>; copyFrom?(target: IPgCopyTarget, source: AsyncIterable<Uint8Array>, options: IPgCopyOptions, ctx?: IOperationContext): Promise<void>; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--IPgConnection"
+        },
+        {
+          "name": "IPgCopyApi",
+          "kind": "type",
+          "signature": "export type IPgCopyApi = { from(target: IPgCopyTarget, source: IPgCopySource, options?: IPgCopyOptions, ctx?: IOperationContext): Promise<void>; };",
+          "declarationLine": 141,
+          "source": "packages/storage-plugin-postgres/dist/types.d.ts",
+          "purpose": "Root/transaction from(target,source,options?,ctx?) streams native COPY and returns void.",
+          "core": "from: Stream client STDIN through the same native connection with backpressure.\nfrom.target: Structured caller-owned table path and column names.\nfrom.source: Factory returning a fresh byte iterable for each actual attempt.\nfrom.options: Native operation settings for the selected COPY or replication request.\nfrom.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nResolves after all input settles; a failed COPY follows original rollback.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "from",
+              "kind": "method",
+              "optional": false,
+              "signature": "from(target: IPgCopyTarget, source: IPgCopySource, options?: IPgCopyOptions, ctx?: IOperationContext): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "target",
+                  "type": "IPgCopyTarget",
+                  "optional": false
+                },
+                {
+                  "name": "source",
+                  "type": "IPgCopySource",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "IPgCopyOptions",
+                  "optional": true
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<void>"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IPgCopyApi",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPgCopyApi = { from(target: IPgCopyTarget, source: IPgCopySource, options?: IPgCopyOptions, ctx?: IOperationContext): Promise<void>; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Root/transaction from(target,source,options?,ctx?) streams native COPY and returns void."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPgCopyApi from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPgCopyApi when its type contract and declared inputs match the result you need. Choose a different public symbol when IPgCopyApi does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "from: Stream client STDIN through the same native connection with backpressure.\nfrom.target: Structured caller-owned table path and column names.\nfrom.source: Factory returning a fresh byte iterable for each actual attempt.\nfrom.options: Native operation settings for the selected COPY or replication request.\nfrom.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nResolves after all input settles; a failed COPY follows original rollback."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/types.d.ts:IPgCopyApi:export type IPgCopyApi = { from(target: IPgCopyTarget, source: IPgCopySource, options?: IPgCopyOptions, ctx?: IOperationContext): Promise<void>; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--IPgCopyApi"
+        },
+        {
+          "name": "IPgCopyOptions",
+          "kind": "type",
+          "signature": "export type IPgCopyOptions = { readonly format?: 'csv' | 'text'; readonly header?: boolean; readonly delimiter?: string; readonly null?: string; };",
+          "declarationLine": 15,
+          "source": "packages/storage-plugin-postgres/dist/types.d.ts",
+          "purpose": "Restricted native client COPY formatting without server files or programs.",
+          "core": "format: Native client COPY format, restricted to CSV or text.\ncsv format.\nCSV quoting and comma separators.\nNative text fields separated by TAB.\nheader: Whether CSV begins with a header row; text rejects true.\nfalse omits the CSV header.\ndelimiter: One native delimiter character, without unsafe control separators.\nComma for CSV and TAB for text.\nnull: Native marker distinguishing a null field from text.\nNative COPY format default marker.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "format",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly format?: 'csv' | 'text';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'csv' | 'text'"
+            },
+            {
+              "name": "header",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly header?: boolean;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "delimiter",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly delimiter?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "null",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly null?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IPgCopyOptions",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPgCopyOptions = { readonly format?: 'csv' | 'text'; readonly header?: boolean; readonly delimiter?: string; readonly null?: string; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Restricted native client COPY formatting without server files or programs."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPgCopyOptions from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPgCopyOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IPgCopyOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "format: Native client COPY format, restricted to CSV or text.\ncsv format.\nCSV quoting and comma separators.\nNative text fields separated by TAB.\nheader: Whether CSV begins with a header row; text rejects true.\nfalse omits the CSV header.\ndelimiter: One native delimiter character, without unsafe control separators.\nComma for CSV and TAB for text.\nnull: Native marker distinguishing a null field from text.\nNative COPY format default marker."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/types.d.ts:IPgCopyOptions:export type IPgCopyOptions = { readonly format?: 'csv' | 'text'; readonly header?: boolean; readonly delimiter?: string; readonly null?: string; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--IPgCopyOptions"
+        },
+        {
+          "name": "IPgCopySource",
+          "kind": "type",
+          "signature": "export type IPgCopySource = () => AsyncIterable<Uint8Array>;",
+          "declarationLine": 22,
+          "source": "packages/storage-plugin-postgres/dist/types.d.ts",
+          "purpose": "A fresh AsyncIterable<Uint8Array> factory invoked once per actual attempt.",
+          "core": "A fresh AsyncIterable<Uint8Array> factory invoked once per actual attempt.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "IPgCopySource",
+          "exportPath": ".",
+          "overloadSignatures": ["export type IPgCopySource = () => AsyncIterable<Uint8Array>;"],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "A fresh AsyncIterable<Uint8Array> factory invoked once per actual attempt."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPgCopySource from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPgCopySource when its type contract and declared inputs match the result you need. Choose a different public symbol when IPgCopySource does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "A fresh AsyncIterable<Uint8Array> factory invoked once per actual attempt."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/types.d.ts:IPgCopySource:export type IPgCopySource = () => AsyncIterable<Uint8Array>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--IPgCopySource"
+        },
+        {
+          "name": "IPgCopyTarget",
+          "kind": "type",
+          "signature": "export type IPgCopyTarget = { readonly table: readonly [string, ...string[]]; readonly columns: readonly [string, ...string[]]; };",
+          "declarationLine": 10,
+          "source": "packages/storage-plugin-postgres/dist/types.d.ts",
+          "purpose": "Structured nonempty table identifier path and nonempty column names for client STDIN.",
+          "core": "table: Nonempty identifier path to the caller-owned destination table.\ncolumns: Nonempty destination column identifiers in incoming field order.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "table",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly table: readonly [string, ...string[]];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly [string, ...string[]]"
+            },
+            {
+              "name": "columns",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly columns: readonly [string, ...string[]];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly [string, ...string[]]"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IPgCopyTarget",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPgCopyTarget = { readonly table: readonly [string, ...string[]]; readonly columns: readonly [string, ...string[]]; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Structured nonempty table identifier path and nonempty column names for client STDIN."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPgCopyTarget from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPgCopyTarget when its type contract and declared inputs match the result you need. Choose a different public symbol when IPgCopyTarget does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "table: Nonempty identifier path to the caller-owned destination table.\ncolumns: Nonempty destination column identifiers in incoming field order."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/types.d.ts:IPgCopyTarget:export type IPgCopyTarget = { readonly table: readonly [string, ...string[]]; readonly columns: readonly [string, ...string[]]; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--IPgCopyTarget"
+        },
+        {
+          "name": "IPgDriver",
+          "kind": "type",
+          "signature": "export type IPgDriver = { readonly logicalReplication?: IPgLogicalReplicationPort; query(text: string, params: readonly IPgNativeParameter[], ctx?: IOperationContext): Promise<IPgResult>; connect(ctx?: IOperationContext): Promise<IPgConnection>; listen?(channel: string, listener: (payload: string) => void, ctx?: IOperationContext): Promise<IStorageResource>; };",
+          "declarationLine": 77,
+          "source": "packages/storage-plugin-postgres/dist/types.d.ts",
+          "purpose": "Caller-owned query/connect and optional listen/replication ports; no close authority.",
+          "core": "query: Execute native SQL once on the selected original connection.\nquery.text: Complete native SQL statement using positional parameters.\nquery.params: Native scalar values or supported one-dimensional array carriers.\nquery.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nNative scalar rows and command rowCount; native errors retain their cause.\nconnect: Reserve one original native connection until its resource settles.\nconnect.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nA borrowed connection with original idempotent disposal.\nlisten: Create one dedicated native channel subscription.\nlisten.channel: Application-assigned native notification channel.\nlisten.listener: Receives the original string payload; thrown or rejected observer errors are reported.\nlisten.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nAn independently disposable listener resource; the root client remains open.\nlogicalReplication: Optional pg-only native slot and pgoutput port; other adapters omit it.",
+          "advanced": "Borrow native SQL operations while keeping all client ownership in the application.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "logicalReplication",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly logicalReplication?: IPgLogicalReplicationPort;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IPgLogicalReplicationPort"
+            },
+            {
+              "name": "query",
+              "kind": "method",
+              "optional": false,
+              "signature": "query(text: string, params: readonly IPgNativeParameter[], ctx?: IOperationContext): Promise<IPgResult>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "text",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "params",
+                  "type": "readonly IPgNativeParameter[]",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<IPgResult>"
+            },
+            {
+              "name": "connect",
+              "kind": "method",
+              "optional": false,
+              "signature": "connect(ctx?: IOperationContext): Promise<IPgConnection>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<IPgConnection>"
+            },
+            {
+              "name": "listen",
+              "kind": "method",
+              "optional": true,
+              "signature": "listen?(channel: string, listener: (payload: string) => void, ctx?: IOperationContext): Promise<IStorageResource>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "channel",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(payload: string) => void",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<IStorageResource>"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IPgDriver",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPgDriver = { readonly logicalReplication?: IPgLogicalReplicationPort; query(text: string, params: readonly IPgNativeParameter[], ctx?: IOperationContext): Promise<IPgResult>; connect(ctx?: IOperationContext): Promise<IPgConnection>; listen?(channel: string, listener: (payload: string) => void, ctx?: IOperationContext): Promise<IStorageResource>; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "Borrow native SQL operations while keeping all client ownership in the application.",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Caller-owned query/connect and optional listen/replication ports; no close authority."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPgDriver from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPgDriver when its type contract and declared inputs match the result you need. Choose a different public symbol when IPgDriver does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "query: Execute native SQL once on the selected original connection.\nquery.text: Complete native SQL statement using positional parameters.\nquery.params: Native scalar values or supported one-dimensional array carriers.\nquery.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nNative scalar rows and command rowCount; native errors retain their cause.\nconnect: Reserve one original native connection until its resource settles.\nconnect.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nA borrowed connection with original idempotent disposal.\nlisten: Create one dedicated native channel subscription.\nlisten.channel: Application-assigned native notification channel.\nlisten.listener: Receives the original string payload; thrown or rejected observer errors are reported.\nlisten.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nAn independently disposable listener resource; the root client remains open.\nlogicalReplication: Optional pg-only native slot and pgoutput port; other adapters omit it."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "Borrow native SQL operations while keeping all client ownership in the application."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/types.d.ts:IPgDriver:export type IPgDriver = { readonly logicalReplication?: IPgLogicalReplicationPort; query(text: string, params: readonly IPgNativeParameter[], ctx?: IOperationContext): Promise<IPgResult>; connect(ctx?: IOperationContext): Promise<IPgConnection>; listen?(channel: string, listener: (payload: string) => void, ctx?: IOperationContext): Promise<IStorageResource>; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--IPgDriver"
+        },
+        {
+          "name": "IPgListenApi",
+          "kind": "type",
+          "signature": "export type IPgListenApi = { listen(channel: string, listener: (payload: string) => void, ctx?: IOperationContext): Promise<IStorageResource>; notify(channel: string, payload: string, ctx?: IOperationContext): Promise<void>; };",
+          "declarationLine": 132,
+          "source": "packages/storage-plugin-postgres/dist/types.d.ts",
+          "purpose": "Root listen(channel,listener,ctx?) returns an owned subscription; notify settles on commit.",
+          "core": "listen: Own a dedicated root notification listener until disposal.\nlisten.channel: Application-assigned native notification channel.\nlisten.listener: Receives the original string payload; thrown or rejected observer errors are reported.\nlisten.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nA native listener resource; disposal leaves the injected pool open.\nnotify: Send native notification on the original root or transaction connection.\nnotify.channel: Application-assigned native notification channel.\nnotify.payload: Application notification string delivered after commit.\nnotify.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nResolves with native execution; transaction delivery occurs only after COMMIT.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "listen",
+              "kind": "method",
+              "optional": false,
+              "signature": "listen(channel: string, listener: (payload: string) => void, ctx?: IOperationContext): Promise<IStorageResource>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "channel",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(payload: string) => void",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<IStorageResource>"
+            },
+            {
+              "name": "notify",
+              "kind": "method",
+              "optional": false,
+              "signature": "notify(channel: string, payload: string, ctx?: IOperationContext): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "channel",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "payload",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<void>"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IPgListenApi",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPgListenApi = { listen(channel: string, listener: (payload: string) => void, ctx?: IOperationContext): Promise<IStorageResource>; notify(channel: string, payload: string, ctx?: IOperationContext): Promise<void>; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Root listen(channel,listener,ctx?) returns an owned subscription; notify settles on commit."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPgListenApi from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPgListenApi when its type contract and declared inputs match the result you need. Choose a different public symbol when IPgListenApi does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "listen: Own a dedicated root notification listener until disposal.\nlisten.channel: Application-assigned native notification channel.\nlisten.listener: Receives the original string payload; thrown or rejected observer errors are reported.\nlisten.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nA native listener resource; disposal leaves the injected pool open.\nnotify: Send native notification on the original root or transaction connection.\nnotify.channel: Application-assigned native notification channel.\nnotify.payload: Application notification string delivered after commit.\nnotify.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nResolves with native execution; transaction delivery occurs only after COMMIT."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/types.d.ts:IPgListenApi:export type IPgListenApi = { listen(channel: string, listener: (payload: string) => void, ctx?: IOperationContext): Promise<IStorageResource>; notify(channel: string, payload: string, ctx?: IOperationContext): Promise<void>; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--IPgListenApi"
+        },
+        {
+          "name": "IPgLogicalReplicationOptions",
+          "kind": "type",
+          "signature": "export type IPgLogicalReplicationOptions = { readonly slot: string; readonly publication: string; /** Reset invalidates the complete route; block leaves a TRUNCATE commit unacknowledged. */ readonly truncate?: PgTruncatePolicy; };",
+          "declarationLine": 64,
+          "source": "packages/storage-plugin-postgres/dist/types.d.ts",
+          "purpose": "Deployment-created persistent slot and publication covering all managed tables.",
+          "core": "slot: Persistent slot name created and assigned by deployment.\npublication: Deployment-created publication covering every managed table.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "slot",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly slot: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "publication",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly publication: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "truncate",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly truncate?: PgTruncatePolicy;",
+              "description": "Reset invalidates the complete route; block leaves a TRUNCATE commit unacknowledged.",
+              "parameterDetails": [],
+              "returns": "PgTruncatePolicy"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IPgLogicalReplicationOptions",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPgLogicalReplicationOptions = { readonly slot: string; readonly publication: string; /** Reset invalidates the complete route; block leaves a TRUNCATE commit unacknowledged. */ readonly truncate?: PgTruncatePolicy; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Deployment-created persistent slot and publication covering all managed tables."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPgLogicalReplicationOptions from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPgLogicalReplicationOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IPgLogicalReplicationOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "slot: Persistent slot name created and assigned by deployment.\npublication: Deployment-created publication covering every managed table."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/types.d.ts:IPgLogicalReplicationOptions:export type IPgLogicalReplicationOptions = { readonly slot: string; readonly publication: string; /** Reset invalidates the complete route; block leaves a TRUNCATE commit unacknowledged. */ readonly truncate?: PgTruncatePolicy; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--IPgLogicalReplicationOptions"
+        },
+        {
+          "name": "IPgLogicalReplicationPort",
+          "kind": "type",
+          "signature": "export type IPgLogicalReplicationPort = { detect(options: IPgLogicalReplicationOptions & IPgLogicalReplicationRoute, ctx?: IOperationContext): Promise<IPgReplicationHealth>; read(options: IPgLogicalReplicationOptions & IPgLogicalReplicationRoute & { readonly after?: string; readonly limit?: number; }, ctx?: IOperationContext): Promise<{ readonly changes: readonly IDurableStorageChange[]; readonly cursor: string; }>; open(options: IPgLogicalReplicationOptions & IPgLogicalReplicationRoute & { readonly from?: string; readonly onChange: (change: IDurableStorageChange) => Promise<void>; readonly onError?: (error: unknown) => void; }, ctx?: IOperationContext): Promise<IStorageResource & { acknowledge(commitEndLsn: string): Promise<void>; }>; dropSlot(slot: string, ctx?: IOperationContext): Promise<void>; };",
+          "declarationLine": 45,
+          "source": "packages/storage-plugin-postgres/dist/types.d.ts",
+          "purpose": "Native pgoutput detection, bounded replay and owned replication resources for the pg adapter.",
+          "core": "detect: Check the original slot and publication prerequisites without creating them.\ndetect.options: Native operation settings for the selected COPY or replication request.\ndetect.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nObserved native WAL retention facts.\nread: Read bounded changes from the original slot and native decoder.\nread.options: Native operation settings for the selected COPY or replication request.\nread.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nA change page and original resume cursor.\nopen: Own one native replication session until its resource is disposed.\nopen.options: Native operation settings for the selected COPY or replication request.\nopen.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nA subscription resource with explicit acknowledgement.\ndropSlot: Explicitly remove a deployment-selected native slot.\ndropSlot.slot: Persistent slot name created and assigned by deployment.\ndropSlot.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nResolves after native slot deletion; disposal alone never deletes it.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "detect",
+              "kind": "method",
+              "optional": false,
+              "signature": "detect(options: IPgLogicalReplicationOptions & IPgLogicalReplicationRoute, ctx?: IOperationContext): Promise<IPgReplicationHealth>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "options",
+                  "type": "IPgLogicalReplicationOptions & IPgLogicalReplicationRoute",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<IPgReplicationHealth>"
+            },
+            {
+              "name": "read",
+              "kind": "method",
+              "optional": false,
+              "signature": "read(options: IPgLogicalReplicationOptions & IPgLogicalReplicationRoute & { readonly after?: string; readonly limit?: number; }, ctx?: IOperationContext): Promise<{ readonly changes: readonly IDurableStorageChange[]; readonly cursor: string; }>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "options",
+                  "type": "IPgLogicalReplicationOptions & IPgLogicalReplicationRoute & { readonly after?: string; readonly limit?: number; }",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<{ readonly changes: readonly IDurableStorageChange[]; readonly cursor: string; }>"
+            },
+            {
+              "name": "open",
+              "kind": "method",
+              "optional": false,
+              "signature": "open(options: IPgLogicalReplicationOptions & IPgLogicalReplicationRoute & { readonly from?: string; readonly onChange: (change: IDurableStorageChange) => Promise<void>; readonly onError?: (error: unknown) => void; }, ctx?: IOperationContext): Promise<IStorageResource & { acknowledge(commitEndLsn: string): Promise<void>; }>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "options",
+                  "type": "IPgLogicalReplicationOptions & IPgLogicalReplicationRoute & { readonly from?: string; readonly onChange: (change: IDurableStorageChange) => Promise<void>; readonly onError?: (error: unknown) => void; }",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<IStorageResource & { acknowledge(commitEndLsn: string): Promise<void>; }>"
+            },
+            {
+              "name": "dropSlot",
+              "kind": "method",
+              "optional": false,
+              "signature": "dropSlot(slot: string, ctx?: IOperationContext): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "slot",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<void>"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IPgLogicalReplicationPort",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPgLogicalReplicationPort = { detect(options: IPgLogicalReplicationOptions & IPgLogicalReplicationRoute, ctx?: IOperationContext): Promise<IPgReplicationHealth>; read(options: IPgLogicalReplicationOptions & IPgLogicalReplicationRoute & { readonly after?: string; readonly limit?: number; }, ctx?: IOperationContext): Promise<{ readonly changes: readonly IDurableStorageChange[]; readonly cursor: string; }>; open(options: IPgLogicalReplicationOptions & IPgLogicalReplicationRoute & { readonly from?: string; readonly onChange: (change: IDurableStorageChange) => Promise<void>; readonly onError?: (error: unknown) => void; }, ctx?: IOperationContext): Promise<IStorageResource & { acknowledge(commitEndLsn: string): Promise<void>; }>; dropSlot(slot: string, ctx?: IOperationContext): Promise<void>; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Native pgoutput detection, bounded replay and owned replication resources for the pg adapter."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPgLogicalReplicationPort from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPgLogicalReplicationPort when its type contract and declared inputs match the result you need. Choose a different public symbol when IPgLogicalReplicationPort does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "detect: Check the original slot and publication prerequisites without creating them.\ndetect.options: Native operation settings for the selected COPY or replication request.\ndetect.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nObserved native WAL retention facts.\nread: Read bounded changes from the original slot and native decoder.\nread.options: Native operation settings for the selected COPY or replication request.\nread.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nA change page and original resume cursor.\nopen: Own one native replication session until its resource is disposed.\nopen.options: Native operation settings for the selected COPY or replication request.\nopen.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nA subscription resource with explicit acknowledgement.\ndropSlot: Explicitly remove a deployment-selected native slot.\ndropSlot.slot: Persistent slot name created and assigned by deployment.\ndropSlot.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nResolves after native slot deletion; disposal alone never deletes it."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/types.d.ts:IPgLogicalReplicationPort:export type IPgLogicalReplicationPort = { detect(options: IPgLogicalReplicationOptions & IPgLogicalReplicationRoute, ctx?: IOperationContext): Promise<IPgReplicationHealth>; read(options: IPgLogicalReplicationOptions & IPgLogicalReplicationRoute & { readonly after?: string; readonly limit?: number; }, ctx?: IOperationContext): Promise<{ readonly changes: readonly IDurableStorageChange[]; readonly cursor: string; }>; open(options: IPgLogicalReplicationOptions & IPgLogicalReplicationRoute & { readonly from?: string; readonly onChange: (change: IDurableStorageChange) => Promise<void>; readonly onError?: (error: unknown) => void; }, ctx?: IOperationContext): Promise<IStorageResource & { acknowledge(commitEndLsn: string): Promise<void>; }>; dropSlot(slot: string, ctx?: IOperationContext): Promise<void>; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--IPgLogicalReplicationPort"
+        },
+        {
+          "name": "IPgLogicalReplicationRoute",
+          "kind": "type",
+          "signature": "export type IPgLogicalReplicationRoute = { readonly schema: string; readonly prefix: string; readonly orgId?: string; };",
+          "declarationLine": 39,
+          "source": "packages/storage-plugin-postgres/dist/types.d.ts",
+          "purpose": "Read-only schema/prefix and optional immutable org route for the original native decoder.",
+          "core": "schema: Read-only configured schema containing the managed tables.\nprefix: Read-only configured table prefix used by the native decoder.\norgId: Immutable organization identifier assigned by the original host view.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "schema",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly schema: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "prefix",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly prefix: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "orgId",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly orgId?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IPgLogicalReplicationRoute",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPgLogicalReplicationRoute = { readonly schema: string; readonly prefix: string; readonly orgId?: string; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Read-only schema/prefix and optional immutable org route for the original native decoder."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPgLogicalReplicationRoute from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPgLogicalReplicationRoute when its type contract and declared inputs match the result you need. Choose a different public symbol when IPgLogicalReplicationRoute does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "schema: Read-only configured schema containing the managed tables.\nprefix: Read-only configured table prefix used by the native decoder.\norgId: Immutable organization identifier assigned by the original host view."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/types.d.ts:IPgLogicalReplicationRoute:export type IPgLogicalReplicationRoute = { readonly schema: string; readonly prefix: string; readonly orgId?: string; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--IPgLogicalReplicationRoute"
+        },
+        {
+          "name": "IPgNativeArrayParameter",
+          "kind": "type",
+          "signature": "export type IPgNativeArrayParameter = { readonly arrayType: 'text'; readonly values: readonly (string | null)[]; } | { readonly arrayType: 'float8'; readonly values: readonly (number | null)[]; };",
+          "declarationLine": 24,
+          "source": "packages/storage-plugin-postgres/dist/types.d.ts",
+          "purpose": "text/float8 arrays are encoded once and bound as one parameter, never SQL text.",
+          "core": "arrayType: Discriminator selecting text or finite float8 array encoding.\nvalues: One-dimensional native scalar elements, including explicit null items.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "arrayType",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly arrayType: 'text';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'text'"
+            },
+            {
+              "name": "values",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly values: readonly (string | null)[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly (string | null)[]"
+            },
+            {
+              "name": "arrayType",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly arrayType: 'float8';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'float8'"
+            },
+            {
+              "name": "values",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly values: readonly (number | null)[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly (number | null)[]"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IPgNativeArrayParameter",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPgNativeArrayParameter = { readonly arrayType: 'text'; readonly values: readonly (string | null)[]; } | { readonly arrayType: 'float8'; readonly values: readonly (number | null)[]; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "text/float8 arrays are encoded once and bound as one parameter, never SQL text."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPgNativeArrayParameter from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPgNativeArrayParameter when its type contract and declared inputs match the result you need. Choose a different public symbol when IPgNativeArrayParameter does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "arrayType: Discriminator selecting text or finite float8 array encoding.\nvalues: One-dimensional native scalar elements, including explicit null items."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/types.d.ts:IPgNativeArrayParameter:export type IPgNativeArrayParameter = { readonly arrayType: 'text'; readonly values: readonly (string | null)[]; } | { readonly arrayType: 'float8'; readonly values: readonly (number | null)[]; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--IPgNativeArrayParameter"
+        },
+        {
+          "name": "IPgNativeOperation",
+          "kind": "type",
+          "signature": "export type IPgNativeOperation = <R>(scope: IPostgresTransactionScope | undefined, operation: string, ctx: IOperationContext | undefined, run: (client: IPgConnection, context: IOperationContext | undefined) => Promise<R>) => Promise<R>;",
+          "declarationLine": 130,
+          "source": "packages/storage-plugin-postgres/dist/types.d.ts",
+          "purpose": "Finite backend author port reusing the original transaction and host pipeline.",
+          "core": "Finite backend author port reusing the original transaction and host pipeline.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "IPgNativeOperation",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPgNativeOperation = <R>(scope: IPostgresTransactionScope | undefined, operation: string, ctx: IOperationContext | undefined, run: (client: IPgConnection, context: IOperationContext | undefined) => Promise<R>) => Promise<R>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Finite backend author port reusing the original transaction and host pipeline."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPgNativeOperation from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPgNativeOperation when its type contract and declared inputs match the result you need. Choose a different public symbol when IPgNativeOperation does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Finite backend author port reusing the original transaction and host pipeline."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/types.d.ts:IPgNativeOperation:export type IPgNativeOperation = <R>(scope: IPostgresTransactionScope | undefined, operation: string, ctx: IOperationContext | undefined, run: (client: IPgConnection, context: IOperationContext | undefined) => Promise<R>) => Promise<R>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--IPgNativeOperation"
+        },
+        {
+          "name": "IPgNativeParameter",
+          "kind": "type",
+          "signature": "export type IPgNativeParameter = ISqlValue | IPgNativeArrayParameter;",
+          "declarationLine": 32,
+          "source": "packages/storage-plugin-postgres/dist/types.d.ts",
+          "purpose": "Shared SQL scalars or this package's finite one-dimensional array carrier.",
+          "core": "arrayType: Array-carrier discriminator; scalar parameters have no such field.\nvalues: Native one-dimensional elements on the explicit array carrier only.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": ["ISqlValue", "IPgNativeArrayParameter"],
+          "aliasOf": "IPgNativeParameter",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPgNativeParameter = ISqlValue | IPgNativeArrayParameter;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Shared SQL scalars or this package's finite one-dimensional array carrier."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPgNativeParameter from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPgNativeParameter when its type contract and declared inputs match the result you need. Choose a different public symbol when IPgNativeParameter does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "arrayType: Array-carrier discriminator; scalar parameters have no such field.\nvalues: Native one-dimensional elements on the explicit array carrier only."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/types.d.ts:IPgNativeParameter:export type IPgNativeParameter = ISqlValue | IPgNativeArrayParameter;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--IPgNativeParameter"
+        },
+        {
+          "name": "IPgNativeVectorApi",
+          "kind": "type",
+          "signature": "export type IPgNativeVectorApi = { search(target: IPgNativeVectorTarget, query: readonly number[], options?: IPgNativeVectorSearchOptions, ctx?: IOperationContext): Promise<readonly IPgNativeVectorHit[]>; };",
+          "declarationLine": 167,
+          "source": "packages/storage-plugin-postgres/dist/types.d.ts",
+          "purpose": "search(target,query,options?,ctx?) uses native operators and caller table semantics.",
+          "core": "search: Rank the caller-owned table using the requested native pgvector operator.\nsearch.target: Structured caller-owned table path and column names.\nsearch.query: Finite vector with the dimension declared by the caller-owned table.\nsearch.options: Native operation settings for the selected COPY or replication request.\nsearch.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nOriginal SQL identifiers, finite scores and selected payload values.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "search",
+              "kind": "method",
+              "optional": false,
+              "signature": "search(target: IPgNativeVectorTarget, query: readonly number[], options?: IPgNativeVectorSearchOptions, ctx?: IOperationContext): Promise<readonly IPgNativeVectorHit[]>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "target",
+                  "type": "IPgNativeVectorTarget",
+                  "optional": false
+                },
+                {
+                  "name": "query",
+                  "type": "readonly number[]",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "IPgNativeVectorSearchOptions",
+                  "optional": true
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<readonly IPgNativeVectorHit[]>"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IPgNativeVectorApi",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPgNativeVectorApi = { search(target: IPgNativeVectorTarget, query: readonly number[], options?: IPgNativeVectorSearchOptions, ctx?: IOperationContext): Promise<readonly IPgNativeVectorHit[]>; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "search(target,query,options?,ctx?) uses native operators and caller table semantics."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPgNativeVectorApi from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPgNativeVectorApi when its type contract and declared inputs match the result you need. Choose a different public symbol when IPgNativeVectorApi does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "search: Rank the caller-owned table using the requested native pgvector operator.\nsearch.target: Structured caller-owned table path and column names.\nsearch.query: Finite vector with the dimension declared by the caller-owned table.\nsearch.options: Native operation settings for the selected COPY or replication request.\nsearch.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nOriginal SQL identifiers, finite scores and selected payload values."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/types.d.ts:IPgNativeVectorApi:export type IPgNativeVectorApi = { search(target: IPgNativeVectorTarget, query: readonly number[], options?: IPgNativeVectorSearchOptions, ctx?: IOperationContext): Promise<readonly IPgNativeVectorHit[]>; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--IPgNativeVectorApi"
+        },
+        {
+          "name": "IPgNativeVectorHit",
+          "kind": "type",
+          "signature": "export type IPgNativeVectorHit = { readonly id: ISqlValue; readonly score: number; readonly payload?: ISqlValue; };",
+          "declarationLine": 161,
+          "source": "packages/storage-plugin-postgres/dist/types.d.ts",
+          "purpose": "Native SQL identifier, finite similarity score and optional original table payload.",
+          "core": "id: Original native SQL identifier read from the caller-selected id column.\nscore: Finite native similarity score in the requested metric.\npayload: Original optional value from the caller-selected payload column.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "id",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly id: ISqlValue;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ISqlValue"
+            },
+            {
+              "name": "score",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly score: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "payload",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly payload?: ISqlValue;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "ISqlValue"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IPgNativeVectorHit",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPgNativeVectorHit = { readonly id: ISqlValue; readonly score: number; readonly payload?: ISqlValue; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Native SQL identifier, finite similarity score and optional original table payload."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPgNativeVectorHit from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPgNativeVectorHit when its type contract and declared inputs match the result you need. Choose a different public symbol when IPgNativeVectorHit does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "id: Original native SQL identifier read from the caller-selected id column.\nscore: Finite native similarity score in the requested metric.\npayload: Original optional value from the caller-selected payload column."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/types.d.ts:IPgNativeVectorHit:export type IPgNativeVectorHit = { readonly id: ISqlValue; readonly score: number; readonly payload?: ISqlValue; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--IPgNativeVectorHit"
+        },
+        {
+          "name": "IPgNativeVectorSearchOptions",
+          "kind": "type",
+          "signature": "export type IPgNativeVectorSearchOptions = { readonly metric?: 'cosine' | 'dot' | 'euclid'; readonly limit?: number; readonly minScore?: number; readonly filter?: import('@migaia/storage-contract').IVectorFilter; readonly efSearch?: number; readonly probes?: number; };",
+          "declarationLine": 152,
+          "source": "packages/storage-plugin-postgres/dist/types.d.ts",
+          "purpose": "Native metric, result bound and transaction-local vector index search settings.",
+          "core": "metric: Native cosine, dot or Euclidean operator selection.\ncosine metric.\nNative cosine similarity.\nNative inner product.\nNative Euclidean distance converted to a score.\nlimit: Maximum native ranked hits returned by this query.\n10 hits.\nminScore: Optional finite score bound applied by the native query.\nfilter: Caller-provided native SQL payload condition for this table.\nefSearch: Optional transaction-local HNSW search effort setting.\nprobes: Optional transaction-local IVFFlat probe count.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "metric",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly metric?: 'cosine' | 'dot' | 'euclid';",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "'cosine' | 'dot' | 'euclid'"
+            },
+            {
+              "name": "limit",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly limit?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "minScore",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly minScore?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "filter",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly filter?: import('@migaia/storage-contract').IVectorFilter;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "import('@migaia/storage-contract').IVectorFilter"
+            },
+            {
+              "name": "efSearch",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly efSearch?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "probes",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly probes?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IPgNativeVectorSearchOptions",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPgNativeVectorSearchOptions = { readonly metric?: 'cosine' | 'dot' | 'euclid'; readonly limit?: number; readonly minScore?: number; readonly filter?: import('@migaia/storage-contract').IVectorFilter; readonly efSearch?: number; readonly probes?: number; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Native metric, result bound and transaction-local vector index search settings."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPgNativeVectorSearchOptions from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPgNativeVectorSearchOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IPgNativeVectorSearchOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "metric: Native cosine, dot or Euclidean operator selection.\ncosine metric.\nNative cosine similarity.\nNative inner product.\nNative Euclidean distance converted to a score.\nlimit: Maximum native ranked hits returned by this query.\n10 hits.\nminScore: Optional finite score bound applied by the native query.\nfilter: Caller-provided native SQL payload condition for this table.\nefSearch: Optional transaction-local HNSW search effort setting.\nprobes: Optional transaction-local IVFFlat probe count."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/types.d.ts:IPgNativeVectorSearchOptions:export type IPgNativeVectorSearchOptions = { readonly metric?: 'cosine' | 'dot' | 'euclid'; readonly limit?: number; readonly minScore?: number; readonly filter?: import('@migaia/storage-contract').IVectorFilter; readonly efSearch?: number; readonly probes?: number; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--IPgNativeVectorSearchOptions"
+        },
+        {
+          "name": "IPgNativeVectorTarget",
+          "kind": "type",
+          "signature": "export type IPgNativeVectorTarget = { readonly table: readonly [string, ...string[]]; readonly idColumn: string; readonly vectorColumn: string; readonly payloadColumn?: string; };",
+          "declarationLine": 145,
+          "source": "packages/storage-plugin-postgres/dist/types.d.ts",
+          "purpose": "Caller-owned table path and id/vector/payload columns, separate from managed collections.",
+          "core": "table: Structured identifier path to the caller-owned vector table.\nidColumn: Column preserving original native SQL point identifiers.\nvectorColumn: Native vector(d) column used by pgvector operators.\npayloadColumn: Optional native payload column retained in each returned hit.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "table",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly table: readonly [string, ...string[]];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly [string, ...string[]]"
+            },
+            {
+              "name": "idColumn",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly idColumn: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "vectorColumn",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly vectorColumn: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "payloadColumn",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly payloadColumn?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IPgNativeVectorTarget",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPgNativeVectorTarget = { readonly table: readonly [string, ...string[]]; readonly idColumn: string; readonly vectorColumn: string; readonly payloadColumn?: string; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Caller-owned table path and id/vector/payload columns, separate from managed collections."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPgNativeVectorTarget from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPgNativeVectorTarget when its type contract and declared inputs match the result you need. Choose a different public symbol when IPgNativeVectorTarget does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "table: Structured identifier path to the caller-owned vector table.\nidColumn: Column preserving original native SQL point identifiers.\nvectorColumn: Native vector(d) column used by pgvector operators.\npayloadColumn: Optional native payload column retained in each returned hit."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/types.d.ts:IPgNativeVectorTarget:export type IPgNativeVectorTarget = { readonly table: readonly [string, ...string[]]; readonly idColumn: string; readonly vectorColumn: string; readonly payloadColumn?: string; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--IPgNativeVectorTarget"
+        },
+        {
+          "name": "IPgNotifyHookPayload",
+          "kind": "type",
+          "signature": "export type IPgNotifyHookPayload = IStorageHookIdentity & Readonly<{ channel: string; }>;",
+          "declarationLine": 14,
+          "source": "packages/storage-plugin-postgres/dist/hooks.d.ts",
+          "purpose": "Native channel identity and original backend/org hook context, without payload values.",
+          "core": "channel: Original native notification channel, excluding message payload.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "channel",
+              "kind": "property",
+              "optional": false,
+              "signature": "channel: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            }
+          ],
+          "composes": ["IStorageHookIdentity"],
+          "aliasOf": "IPgNotifyHookPayload",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPgNotifyHookPayload = IStorageHookIdentity & Readonly<{ channel: string; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Native channel identity and original backend/org hook context, without payload values."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPgNotifyHookPayload from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPgNotifyHookPayload when its type contract and declared inputs match the result you need. Choose a different public symbol when IPgNotifyHookPayload does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "channel: Original native notification channel, excluding message payload."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/hooks.d.ts:IPgNotifyHookPayload:export type IPgNotifyHookPayload = IStorageHookIdentity & Readonly<{ channel: string; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--IPgNotifyHookPayload"
+        },
+        {
+          "name": "IPgResult",
+          "kind": "type",
+          "signature": "export type IPgResult = { readonly rows: readonly ISqlRow[]; readonly rowCount: number; };",
+          "declarationLine": 5,
+          "source": "packages/storage-plugin-postgres/dist/types.d.ts",
+          "purpose": "Validated native scalar rows and actual command rowCount, with null count normalized to zero.",
+          "core": "rows: Original validated rows containing supported SQL scalar values.\nrowCount: Actual command row count; native null counts normalize to zero.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "rows",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly rows: readonly ISqlRow[];",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "readonly ISqlRow[]"
+            },
+            {
+              "name": "rowCount",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly rowCount: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IPgResult",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPgResult = { readonly rows: readonly ISqlRow[]; readonly rowCount: number; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Validated native scalar rows and actual command rowCount, with null count normalized to zero."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPgResult from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPgResult when its type contract and declared inputs match the result you need. Choose a different public symbol when IPgResult does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "rows: Original validated rows containing supported SQL scalar values.\nrowCount: Actual command row count; native null counts normalize to zero."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/types.d.ts:IPgResult:export type IPgResult = { readonly rows: readonly ISqlRow[]; readonly rowCount: number; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--IPgResult"
+        },
+        {
+          "name": "IPgServer",
+          "kind": "type",
+          "signature": "export type IPgServer = 'postgres' | 'cockroach' | 'yugabyte';",
+          "declarationLine": 84,
+          "source": "packages/storage-plugin-postgres/dist/types.d.ts",
+          "purpose": "Actual deployed server preset; only PostgreSQL promises the native change feed.",
+          "core": "Actual deployed server preset; only PostgreSQL promises the native change feed.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "IPgServer",
+          "exportPath": ".",
+          "overloadSignatures": ["export type IPgServer = 'postgres' | 'cockroach' | 'yugabyte';"],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Actual deployed server preset; only PostgreSQL promises the native change feed."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPgServer from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPgServer when its type contract and declared inputs match the result you need. Choose a different public symbol when IPgServer does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Actual deployed server preset; only PostgreSQL promises the native change feed."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/types.d.ts:IPgServer:export type IPgServer = 'postgres' | 'cockroach' | 'yugabyte';",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--IPgServer"
+        },
+        {
+          "name": "IPgTransactionNotifyApi",
+          "kind": "type",
+          "signature": "export type IPgTransactionNotifyApi = { notify(channel: string, payload: string, ctx?: IOperationContext): Promise<void>; };",
+          "declarationLine": 137,
+          "source": "packages/storage-plugin-postgres/dist/types.d.ts",
+          "purpose": "Transaction notify only; no nested listen subscription escapes the original scope.",
+          "core": "notify: Stage native notification on the current transaction connection.\nnotify.channel: Application-assigned native notification channel.\nnotify.payload: Application notification string delivered after commit.\nnotify.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nDelivery follows the real COMMIT; rollback sends nothing.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "notify",
+              "kind": "method",
+              "optional": false,
+              "signature": "notify(channel: string, payload: string, ctx?: IOperationContext): Promise<void>;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "channel",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "payload",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "ctx",
+                  "type": "IOperationContext",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<void>"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IPgTransactionNotifyApi",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPgTransactionNotifyApi = { notify(channel: string, payload: string, ctx?: IOperationContext): Promise<void>; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Transaction notify only; no nested listen subscription escapes the original scope."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPgTransactionNotifyApi from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPgTransactionNotifyApi when its type contract and declared inputs match the result you need. Choose a different public symbol when IPgTransactionNotifyApi does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "notify: Stage native notification on the current transaction connection.\nnotify.channel: Application-assigned native notification channel.\nnotify.payload: Application notification string delivered after commit.\nnotify.ctx: Original optional operation signal and timeout budget, without an additional retry loop.\nDelivery follows the real COMMIT; rollback sends nothing."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/types.d.ts:IPgTransactionNotifyApi:export type IPgTransactionNotifyApi = { notify(channel: string, payload: string, ctx?: IOperationContext): Promise<void>; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--IPgTransactionNotifyApi"
+        },
+        {
+          "name": "IPostgresOptions",
+          "kind": "type",
+          "signature": "export type IPostgresOptions<TServer extends IPgServer = 'postgres'> = { readonly driver: IPgDriver; readonly server?: TServer; readonly schema?: string; readonly prefix?: string; readonly concurrency?: IConcurrencyPolicy; readonly owner?: { readonly label?: string; }; readonly maxLockMs?: number; };",
+          "declarationLine": 118,
+          "source": "packages/storage-plugin-postgres/dist/types.d.ts",
+          "purpose": "Native driver, table layout and original concurrency configuration for one backend.",
+          "core": "id: Application-assigned backend identifier selected by host.backend.\npostgres, the default backend identifier.\ndriver: Borrowed native driver from pgDriver, postgresJsDriver or bunSqlDriver.\nserver: Actual deployed server preset used for native capability admission.\npostgres enables PostgreSQL semantics.\nPostgreSQL with native change notifications.\nCockroachDB without PostgreSQL changeFeed promises.\nYugabyteDB without PostgreSQL changeFeed promises.\nChoose the actual deployed server, since capability admission depends on its native guarantees.\nschema: Existing SQL schema containing managed tables.\npublic schema.\nprefix: Prefix for fixed managed tables, shared by every organization.\nmigaia table prefix.\nconcurrency: Authentic shared policy governing the original native operation.\nOriginal shared owner default policy.\nowner: Optional application diagnostic identity without value payloads.\nNo application owner label.\nowner.label: Application-assigned label for native lock diagnostics.\nNo diagnostic application label.\nmaxLockMs: Positive native logical-key lock lease bound measured against database time.\n60000 milliseconds.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "driver",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly driver: IPgDriver;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IPgDriver"
+            },
+            {
+              "name": "server",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly server?: TServer;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "TServer"
+            },
+            {
+              "name": "schema",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly schema?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "prefix",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly prefix?: string;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "concurrency",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly concurrency?: IConcurrencyPolicy;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "IConcurrencyPolicy"
+            },
+            {
+              "name": "owner",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly owner?: { readonly label?: string; };",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "{ readonly label?: string; }"
+            },
+            {
+              "name": "maxLockMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly maxLockMs?: number;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "number"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IPostgresOptions",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPostgresOptions<TServer extends IPgServer = 'postgres'> = { readonly driver: IPgDriver; readonly server?: TServer; readonly schema?: string; readonly prefix?: string; readonly concurrency?: IConcurrencyPolicy; readonly owner?: { readonly label?: string; }; readonly maxLockMs?: number; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Native driver, table layout and original concurrency configuration for one backend."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPostgresOptions from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPostgresOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IPostgresOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "id: Application-assigned backend identifier selected by host.backend.\npostgres, the default backend identifier.\ndriver: Borrowed native driver from pgDriver, postgresJsDriver or bunSqlDriver.\nserver: Actual deployed server preset used for native capability admission.\npostgres enables PostgreSQL semantics.\nPostgreSQL with native change notifications.\nCockroachDB without PostgreSQL changeFeed promises.\nYugabyteDB without PostgreSQL changeFeed promises.\nChoose the actual deployed server, since capability admission depends on its native guarantees.\nschema: Existing SQL schema containing managed tables.\npublic schema.\nprefix: Prefix for fixed managed tables, shared by every organization.\nmigaia table prefix.\nconcurrency: Authentic shared policy governing the original native operation.\nOriginal shared owner default policy.\nowner: Optional application diagnostic identity without value payloads.\nNo application owner label.\nowner.label: Application-assigned label for native lock diagnostics.\nNo diagnostic application label.\nmaxLockMs: Positive native logical-key lock lease bound measured against database time.\n60000 milliseconds."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/types.d.ts:IPostgresOptions:export type IPostgresOptions<TServer extends IPgServer = 'postgres'> = { readonly driver: IPgDriver; readonly server?: TServer; readonly schema?: string; readonly prefix?: string; readonly concurrency?: IConcurrencyPolicy; readonly owner?: { readonly label?: string; }; readonly maxLockMs?: number; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--IPostgresOptions"
+        },
+        {
+          "name": "IPostgresStore",
+          "kind": "type",
+          "signature": "export type IPostgresStore<TServer extends IPgServer = 'postgres', TValue = unknown> = ICapabilityStore<IPostgresNativeStore<TServer, TValue>, IPgCapabilities, readonly [ ICapabilityImpl<typeof kv>, IPgRecordImplementation<TServer, TValue>, ICapabilityImpl<typeof ttl, ITtlApi>, ICapabilityImpl<typeof counter, ICounterApi>, ICapabilityImpl<typeof sql> ]>;",
+          "declarationLine": 110,
+          "source": "packages/storage-plugin-postgres/dist/types.d.ts",
+          "purpose": "Exact preset store with native SQL, full standard transactions and organization-safe selected providers.",
+          "core": "Exact preset store with native SQL, full standard transactions and organization-safe selected providers.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": ["ICapabilityStore"],
+          "aliasOf": "IPostgresStore",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPostgresStore<TServer extends IPgServer = 'postgres', TValue = unknown> = ICapabilityStore<IPostgresNativeStore<TServer, TValue>, IPgCapabilities, readonly [ ICapabilityImpl<typeof kv>, IPgRecordImplementation<TServer, TValue>, ICapabilityImpl<typeof ttl, ITtlApi>, ICapabilityImpl<typeof counter, ICounterApi>, ICapabilityImpl<typeof sql> ]>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Exact preset store with native SQL, full standard transactions and organization-safe selected providers."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPostgresStore from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPostgresStore when its type contract and declared inputs match the result you need. Choose a different public symbol when IPostgresStore does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Exact preset store with native SQL, full standard transactions and organization-safe selected providers."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/types.d.ts:IPostgresStore:export type IPostgresStore<TServer extends IPgServer = 'postgres', TValue = unknown> = ICapabilityStore<IPostgresNativeStore<TServer, TValue>, IPgCapabilities, readonly [ ICapabilityImpl<typeof kv>, IPgRecordImplementation<TServer, TValue>, ICapabilityImpl<typeof ttl, ITtlApi>, ICapabilityImpl<typeof counter, ICounterApi>, ICapabilityImpl<typeof sql> ]>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--IPostgresStore"
+        },
+        {
+          "name": "IPostgresTransactionScope",
+          "kind": "type",
+          "signature": "export type IPostgresTransactionScope<TValue = unknown> = ITransactionScope<TValue, IPgCapabilities> & ISqlExecutor;",
+          "declarationLine": 88,
+          "source": "packages/storage-plugin-postgres/dist/types.d.ts",
+          "purpose": "The original admitted view sharing KV, records, TTL, counter and SQL on one connection.",
+          "core": "The original admitted view sharing KV, records, TTL, counter and SQL on one connection.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": ["ITransactionScope", "ISqlExecutor"],
+          "aliasOf": "IPostgresTransactionScope",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IPostgresTransactionScope<TValue = unknown> = ITransactionScope<TValue, IPgCapabilities> & ISqlExecutor;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The original admitted view sharing KV, records, TTL, counter and SQL on one connection."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IPostgresTransactionScope from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IPostgresTransactionScope when its type contract and declared inputs match the result you need. Choose a different public symbol when IPostgresTransactionScope does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The original admitted view sharing KV, records, TTL, counter and SQL on one connection."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/types.d.ts:IPostgresTransactionScope:export type IPostgresTransactionScope<TValue = unknown> = ITransactionScope<TValue, IPgCapabilities> & ISqlExecutor;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--IPostgresTransactionScope"
+        },
+        {
+          "name": "postgresBackendKind",
+          "kind": "const",
+          "signature": "export declare const postgresBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", IPostgresStore<IPgServer>, IPgDriver, { getTransactionClient(scope: IPostgresTransactionScope): IPgConnection; readonly runNative: IPgNativeOperation; selectVector(): void; selectQuantized(mode: IPgQuantizedOptions['mode']): void; selectReplication(options: IPgReplicationSelection): void; getReplicationRoute(): import('./types.ts').IPgLogicalReplicationRoute; getServer(): IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import('./types.ts').IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>;",
+          "declarationLine": 6,
+          "source": "packages/storage-plugin-postgres/dist/plugin.d.ts",
+          "purpose": "Authenticate selected native Features against the exact PostgreSQL backend kind.",
+          "core": "Authenticate selected native Features against the exact PostgreSQL backend kind.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "postgresBackendKind",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const postgresBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", IPostgresStore<IPgServer>, IPgDriver, { getTransactionClient(scope: IPostgresTransactionScope): IPgConnection; readonly runNative: IPgNativeOperation; selectVector(): void; selectQuantized(mode: IPgQuantizedOptions['mode']): void; selectReplication(options: IPgReplicationSelection): void; getReplicationRoute(): import('./types.ts').IPgLogicalReplicationRoute; getServer(): IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import('./types.ts').IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>;"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Authenticate selected native Features against the exact PostgreSQL backend kind."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import postgresBackendKind from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use postgresBackendKind when its const contract and declared inputs match the result you need. Choose a different public symbol when postgresBackendKind does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Authenticate selected native Features against the exact PostgreSQL backend kind."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/storage-plugin-postgres/dist/plugin.d.ts:postgresBackendKind:export declare const postgresBackendKind: import(\"@migaia/storage-host\").IStorageBackendKind<\"postgres\", IPostgresStore<IPgServer>, IPgDriver, { getTransactionClient(scope: IPostgresTransactionScope): IPgConnection; readonly runNative: IPgNativeOperation; selectVector(): void; selectQuantized(mode: IPgQuantizedOptions['mode']): void; selectReplication(options: IPgReplicationSelection): void; getReplicationRoute(): import('./types.ts').IPgLogicalReplicationRoute; getServer(): IPgServer; createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi; reportReplication(facts: import('./types.ts').IPgReplicationHealth): void; assertNativeRoot(value: object): void; createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>; }>;",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "storage-plugin-postgres-index--postgresBackendKind"
+        },
+        {
+          "name": "postgresBackendPlugin",
+          "kind": "function",
+          "signature": "export declare function postgresBackendPlugin<TValue = unknown, const TServer extends IPgServer = 'postgres', const TId extends string = 'postgres', const F extends IStorageFeatureRecord = {}>(options: IPostgresOptions<TServer> & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof postgresBackendKind, NoInfer<F>, IPostgresStore<NoInfer<TServer>, TValue>>): IStorageBackendPlugin<typeof postgresBackendKind, NoInfer<TId>, F, IPostgresStore<NoInfer<TServer>, TValue>>;",
+          "declarationLine": 20,
+          "source": "packages/storage-plugin-postgres/dist/plugin.d.ts",
+          "purpose": "Install an injected native driver with standard transactions, SQL and independently selected native Features.",
+          "core": "options: Caller-supplied native driver, physical layout and original concurrency policy.\nfeatures: Exact-kind native Feature selections attached during installation.\nAn exact-id plugin; defaults public/migaia/postgres.\nid: Application-assigned backend identifier selected by host.backend.\npostgres, the default backend identifier.\ndriver: Borrowed native driver from pgDriver, postgresJsDriver or bunSqlDriver.\nserver: Actual deployed server preset used for native capability admission.\npostgres enables PostgreSQL semantics.\nPostgreSQL with native change notifications.\nCockroachDB without PostgreSQL changeFeed promises.\nYugabyteDB without PostgreSQL changeFeed promises.\nChoose the actual deployed server, since capability admission depends on its native guarantees.\nschema: Existing SQL schema containing managed tables.\npublic schema.\nprefix: Prefix for fixed managed tables, shared by every organization.\nmigaia table prefix.\nconcurrency: Authentic shared policy governing the original native operation.\nOriginal shared owner default policy.\nowner: Optional application diagnostic identity without value payloads.\nNo application owner label.\nowner.label: Application-assigned label for native lock diagnostics.\nNo diagnostic application label.\nmaxLockMs: Positive native logical-key lock lease bound measured against database time.\n60000 milliseconds.",
+          "advanced": "",
+          "parameters": [
+            "options: IPostgresOptions<TServer> & { readonly id?: TId; }",
+            "features: F & IStorageFeatureStoreCompatibility<typeof postgresBackendKind, NoInfer<F>, IPostgresStore<NoInfer<TServer>, TValue>> (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IPostgresOptions<TServer> & { readonly id?: TId; }",
+              "optional": false
+            },
+            {
+              "name": "features",
+              "type": "F & IStorageFeatureStoreCompatibility<typeof postgresBackendKind, NoInfer<F>, IPostgresStore<NoInfer<TServer>, TValue>>",
+              "optional": true
+            }
+          ],
+          "returns": "IStorageBackendPlugin<typeof postgresBackendKind, NoInfer<TId>, F, IPostgresStore<NoInfer<TServer>, TValue>>",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { kv, records, ttl } from '@migaia/storage-contract'\nimport { lockKey } from '@migaia/storage-host/sdk'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [postgresBackendPlugin({ driver: pgDriver(pool) })] as const\n  })\n  const store = host.org('10000000-0000-4000-8000-000000000001').backend('postgres')\n  await store\n    .tx()\n    .lock(lockKey.text('example:status'))\n    .run(async (tx) => {\n      await tx.use(kv).setMany([\n        { key: 'example:status', value: 'ready' },\n        { key: ['example', 1], value: 'first', ttlMs: 60000 }\n      ])\n      await tx.putRecord({ name: 'Ada' }, 'example:user')\n      await tx.use(ttl).expire(lockKey.text('example:status'), 60000)\n    })\n  console.log(await store.get('example:status'))\n  console.log((await store.use(records).query().all()).length >= 1)\n} finally {\n  await pool.end()\n}",
+            "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { vector } from '@migaia/storage-contract'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgvectorFeature } from '@migaia/storage-plugin-postgres/features/pgvector'\nimport { pgQuantizedFeature } from '@migaia/storage-plugin-postgres/features/quantized'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      postgresBackendPlugin(\n        { driver: pgDriver(pool) },\n        { vector: pgvectorFeature(), quantized: pgQuantizedFeature({ mode: 'halfvec' }) }\n      )\n    ] as const\n  })\n  const items = host\n    .backend('postgres')\n    .use(vector)\n    .collection<{ category: string }>('example-documents', { dimensions: 3, metric: 'cosine' })\n  await items.upsert([{ id: 'guide', vector: [1, 0, 0], payload: { category: 'guide' } }])\n  const hits = await items\n    .near([1, 0, 0])\n    .where({ category: 'guide' })\n    .topK(20)\n    .rescore({ topN: 5 })\n    .all()\n  console.log(hits.some((hit) => hit.id === 'guide'))\n} finally {\n  await pool.end()\n}",
+            "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgCopyFeature } from '@migaia/storage-plugin-postgres/features/copy'\nimport { pgListenFeature } from '@migaia/storage-plugin-postgres/features/listen'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [\n      postgresBackendPlugin(\n        { driver: pgDriver(pool) },\n        { copy: pgCopyFeature(), listen: pgListenFeature() }\n      )\n    ] as const\n  })\n  const store = host.backend('postgres')\n  await store.sql`CREATE TABLE IF NOT EXISTS app_example_import(name TEXT)`.run()\n  const message = Promise.withResolvers<string>()\n  await using subscription = await store.api.notifications.listen('example_ready', message.resolve)\n  await store.transaction(async (tx) => {\n    await tx.api.copy.from(\n      { table: ['app_example_import'], columns: ['name'] },\n      async function* () {\n        yield new TextEncoder().encode('Ada\\nLin\\n')\n      }\n    )\n    await tx.set('example:import', 'done')\n    await tx.api.notifications.notify('example_ready', 'done')\n  })\n  console.log(await message.promise)\n} finally {\n  await pool.end()\n}",
+            "import { appendFile } from 'node:fs/promises'\nimport { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { storageProbe } from '@migaia/storage-host/plugins/probe'\nimport { durableChangeFeed } from '@migaia/storage-contract'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nimport { pgLogicalReplicationFeature } from '@migaia/storage-plugin-postgres/features/logical-replication'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    report: console.error,\n    plugins: [\n      storageProbe({ onCapabilityProbe: (facts) => console.log(facts.retainedWalBytes) }),\n      postgresBackendPlugin(\n        { driver: pgDriver(pool) },\n        {\n          replication: pgLogicalReplicationFeature({\n            slot: process.env.PG_REPLICATION_SLOT!,\n            publication: process.env.PG_PUBLICATION!\n          })\n        }\n      )\n    ] as const\n  })\n  const store = host.backend('postgres')\n  const caches = new Map<string, Map<string, string>>()\n  const received = Promise.withResolvers<void>()\n  await using tail = await store.use(durableChangeFeed).tailChanges({\n    from: 'now',\n    onChange: async (change) => {\n      if (change.kind === 'reset' && change.orgId === undefined) {\n        for (const cache of caches.values()) cache.clear()\n      } else if (change.orgId !== undefined) caches.get(change.orgId)?.clear()\n      await appendFile('./example-invalidations.ndjson', JSON.stringify(change) + '\\n')\n      received.resolve()\n    },\n    onError: (error) => {\n      received.reject(error)\n    }\n  })\n  await store.set('example:feed', 'ready')\n  await received.promise\n} finally {\n  await pool.end()\n}",
+            "import { Pool } from 'pg'\nimport { createStorageHost } from '@migaia/storage-host'\nimport { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'\nimport { pgDriver } from '@migaia/storage-plugin-postgres/pg'\nconst pool = new Pool({ connectionString: process.env.DATABASE_URL })\ntry {\n  await using host = await createStorageHost({\n    plugins: [postgresBackendPlugin({ driver: pgDriver(pool) })] as const\n  })\n  const store = host.backend('postgres')\n  await store.set('example:status', 'ready')\n  console.log(await store.get('example:status'))\n} finally {\n  await pool.end()\n}"
+          ],
+          "members": [],
+          "composes": [],
+          "aliasOf": "postgresBackendPlugin",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function postgresBackendPlugin<TValue = unknown, const TServer extends IPgServer = 'postgres', const TId extends string = 'postgres', const F extends IStorageFeatureRecord = {}>(options: IPostgresOptions<TServer> & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof postgresBackendKind, NoInfer<F>, IPostgresStore<NoInfer<TServer>, TValue>>): IStorageBackendPlugin<typeof postgresBackendKind, NoInfer<TId>, F, IPostgresStore<NoInfer<TServer>, TValue>>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IPostgresOptions<TServer> & { readonly id?: TId; }",
+                "optional": false
+              },
+              {
+                "name": "features",
+                "type": "F & IStorageFeatureStoreCompatibility<typeof postgresBackendKind, NoInfer<F>, IPostgresStore<NoInfer<TServer>, TValue>>",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": [
+            "IStorageBackendPlugin<typeof postgresBackendKind, NoInfer<TId>, F, IPostgresStore<NoInfer<TServer>, TValue>>"
+          ],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Install an injected native driver with standard transactions, SQL and independently selected native Features."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import postgresBackendPlugin from @migaia/storage-plugin-postgres, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use postgresBackendPlugin when its function contract and declared inputs match the result you need. Choose a different public symbol when postgresBackendPlugin does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "options: Caller-supplied native driver, physical layout and original concurrency policy.\nfeatures: Exact-kind native Feature selections attached during installation.\nAn exact-id plugin; defaults public/migaia/postgres.\nid: Application-assigned backend identifier selected by host.backend.\npostgres, the default backend identifier.\ndriver: Borrowed native driver from pgDriver, postgresJsDriver or bunSqlDriver.\nserver: Actual deployed server preset used for native capability admission.\npostgres enables PostgreSQL semantics.\nPostgreSQL with native change notifications.\nCockroachDB without PostgreSQL changeFeed promises.\nYugabyteDB without PostgreSQL changeFeed promises.\nChoose the actual deployed server, since capability admission depends on its native guarantees.\nschema: Existing SQL schema containing managed tables.\npublic schema.\nprefix: Prefix for fixed managed tables, shared by every organization.\nmigaia table prefix.\nconcurrency: Authentic shared policy governing the original native operation.\nOriginal shared owner default policy.\nowner: Optional application diagnostic identity without value payloads.\nNo application owner label.\nowner.label: Application-assigned label for native lock diagnostics.\nNo diagnostic application label.\nmaxLockMs: Positive native logical-key lock lease bound measured against database time.\n60000 milliseconds."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "id",
+              "type": "TId",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "driver",
+              "type": "IPgDriver",
+              "optional": false,
+              "description": ""
+            },
+            {
+              "name": "server",
+              "type": "TServer",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "schema",
+              "type": "string",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "prefix",
+              "type": "string",
+              "optional": true,
+              "description": "Prefix is immutable for this namespace and all of its transaction views."
+            },
+            {
+              "name": "concurrency",
+              "type": "IConcurrencyPolicy",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "owner",
+              "type": "{ readonly label?: string; }",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "owner.label",
+              "type": "string",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "maxLockMs",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            }
+          ],
+          "identity": "packages/storage-plugin-postgres/dist/plugin.d.ts:postgresBackendPlugin:export declare function postgresBackendPlugin<TValue = unknown, const TServer extends IPgServer = 'postgres', const TId extends string = 'postgres', const F extends IStorageFeatureRecord = {}>(options: IPostgresOptions<TServer> & { readonly id?: TId; }, features?: F & IStorageFeatureStoreCompatibility<typeof postgresBackendKind, NoInfer<F>, IPostgresStore<NoInfer<TServer>, TValue>>): IStorageBackendPlugin<typeof postgresBackendKind, NoInfer<TId>, F, IPostgresStore<NoInfer<TServer>, TValue>>;",
+          "guidance": [],
+          "usageScore": 68,
+          "configuration": [
+            {
+              "name": "id",
+              "type": "TId",
+              "optional": true,
+              "description": "组织 ID 是 UUID 字符串。同名逻辑键、期限、锁和修订分别隔离；默认组织与其它组织共用物理表。`host.dropOrg(id)` 删除该组织的托管行，不删除其它组织或应用表。显式组织视图不允许任意 SQL、COPY 或自有向量表检索。",
+              "descriptionEn": "",
+              "descriptionZh": "组织 ID 是 UUID 字符串。同名逻辑键、期限、锁和修订分别隔离；默认组织与其它组织共用物理表。`host.dropOrg(id)` 删除该组织的托管行，不删除其它组织或应用表。显式组织视图不允许任意 SQL、COPY 或自有向量表检索。"
+            },
+            {
+              "name": "driver",
+              "type": "IPgDriver",
+              "optional": false,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "server",
+              "type": "TServer",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "schema",
+              "type": "string",
+              "optional": true,
+              "description": "部署方先配置 `wal_level=logical`、REPLICATION 角色与持久 pgoutput slot。publication 必须覆盖当前 schema/prefix 的 `kv`、`bytes`、`records` 表，以及 feed 使用的已创建向量表，并启用 `insert,update,delete,truncate`。`truncate: 'block'` 也需要发布 truncate，才能发现并停止该提交。把已有名称放入 `PG_REPLICATION_SLOT`、`PG_PUBLICATION`。该功能仅支持 PostgreSQL preset 的 `/pg` 驱动，检测不创建这些部署资源。",
+              "descriptionEn": "",
+              "descriptionZh": "部署方先配置 `wal_level=logical`、REPLICATION 角色与持久 pgoutput slot。publication 必须覆盖当前 schema/prefix 的 `kv`、`bytes`、`records` 表，以及 feed 使用的已创建向量表，并启用 `insert,update,delete,truncate`。`truncate: 'block'` 也需要发布 truncate，才能发现并停止该提交。把已有名称放入 `PG_REPLICATION_SLOT`、`PG_PUBLICATION`。该功能仅支持 PostgreSQL preset 的 `/pg` 驱动，检测不创建这些部署资源。"
+            },
+            {
+              "name": "prefix",
+              "type": "string",
+              "optional": true,
+              "description": "部署方先配置 `wal_level=logical`、REPLICATION 角色与持久 pgoutput slot。publication 必须覆盖当前 schema/prefix 的 `kv`、`bytes`、`records` 表，以及 feed 使用的已创建向量表，并启用 `insert,update,delete,truncate`。`truncate: 'block'` 也需要发布 truncate，才能发现并停止该提交。把已有名称放入 `PG_REPLICATION_SLOT`、`PG_PUBLICATION`。该功能仅支持 PostgreSQL preset 的 `/pg` 驱动，检测不创建这些部署资源。",
+              "descriptionEn": "Prefix is immutable for this namespace and all of its transaction views.",
+              "descriptionZh": "部署方先配置 `wal_level=logical`、REPLICATION 角色与持久 pgoutput slot。publication 必须覆盖当前 schema/prefix 的 `kv`、`bytes`、`records` 表，以及 feed 使用的已创建向量表，并启用 `insert,update,delete,truncate`。`truncate: 'block'` 也需要发布 truncate，才能发现并停止该提交。把已有名称放入 `PG_REPLICATION_SLOT`、`PG_PUBLICATION`。该功能仅支持 PostgreSQL preset 的 `/pg` 驱动，检测不创建这些部署资源。"
+            },
+            {
+              "name": "concurrency",
+              "type": "IConcurrencyPolicy",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "owner",
+              "type": "{ readonly label?: string; }",
+              "optional": true,
+              "description": "Groups `owner.label`; configure the nested fields below.",
+              "descriptionEn": "Groups `owner.label`; configure the nested fields below.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "owner.label",
+              "type": "string",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            },
+            {
+              "name": "maxLockMs",
+              "type": "number",
+              "optional": true,
+              "description": "",
+              "descriptionEn": "",
+              "descriptionZh": ""
+            }
+          ],
+          "fragment": "storage-plugin-postgres-index--postgresBackendPlugin"
+        }
+      ],
       "aliases": []
     },
     {

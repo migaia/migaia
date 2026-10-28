@@ -1996,8 +1996,11 @@ function declarationEnd(source: string, start: number, kind: string): number {
 /** Resolve declaration artifacts through the same ordinary workspace exports used by consumers. */
 function declarationImportFiles(filePath: string, specifier: string): string[] {
   if (specifier.startsWith('.')) {
-    /** Relative declaration imports retain the existing emitted ESM-to-declaration mapping. */
-    const target = resolve(join(filePath, '..'), specifier.replace(/\.js$/, '') + '.d.ts')
+    /** TypeScript declarations retain source extensions even when JavaScript output rewrites them. */
+    const target = resolve(
+      join(filePath, '..'),
+      specifier.replace(/\.(?:js|ts|tsx)$/, '') + '.d.ts'
+    )
     return existsSync(target) ? [target] : []
   }
   /** Workspace imports resolve only their public types entry, never a guessed private dist path. */
@@ -2014,7 +2017,7 @@ function declarationImportFiles(filePath: string, specifier: string): string[] {
   const key = workspace[2] ? `./${workspace[2]}` : '.'
   /** Existing declaration-file resolution already handles concrete targets and wildcard artifacts. */
   const target = manifest.exports?.[key]
-  return declarationFiles(directory, typeof target === 'string' ? target : target?.types)
+  return declarationFiles(directory, declarationTypeTarget(target))
 }
 
 /** Type-only re-exports expose declaration shape without advertising a callable runtime value. */
@@ -2459,6 +2462,24 @@ function authoredSymbolMetadata(
   }
 }
 
+/** Resolve shared types or the first declared typed runtime branch of a conditional export. */
+function declarationTypeTarget(target: unknown): string | undefined {
+  if (typeof target === 'string') return target
+  /** A cursor visits each manifest condition once without following runtime JavaScript targets. */
+  const pending = [target]
+  for (let cursor = 0; cursor < pending.length; cursor++) {
+    /** Export conditions come from parsed package metadata rather than executable package code. */
+    const candidate = pending[cursor]
+    if (!candidate || typeof candidate !== 'object') continue
+    /** Shared declarations take precedence over runtime-specific nested declaration branches. */
+    const conditions = candidate as Record<string, unknown>
+    if (typeof conditions.types === 'string') return conditions.types
+    for (const condition of Object.values(conditions))
+      if (condition && typeof condition === 'object') pending.push(condition)
+  }
+  return undefined
+}
+
 /** Resolves an exports.types target, including declaration wildcard entries. */
 function declarationFiles(directory: string, typeTarget: unknown): string[] {
   if (typeof typeTarget !== 'string') return []
@@ -2484,7 +2505,7 @@ function buildPublicSymbols(directory: string, manifest: Record<string, any>, ex
     typeof manifest.name === 'string' ? manifest.name : `@migaia/${directory.split('/').at(-1)}`
   for (const exportPath of exports) {
     const target = manifest.exports?.[exportPath]
-    const types = typeof target === 'string' ? target : target?.types
+    const types = declarationTypeTarget(target)
     /** JSON exports are public data values, even when they have no declaration artifact. */
     const dataTarget = typeof target === 'string' ? target : target?.default
     if (typeof dataTarget === 'string' && dataTarget.endsWith('.json')) {

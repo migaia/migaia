@@ -2428,7 +2428,1698 @@
       ],
       "guidePath": "/en/docs/store-worker/getting-started",
       "architecturePath": "/en/docs/store-worker",
-      "symbols": [],
+      "symbols": [
+        {
+          "name": "createStoreWorkerAggregateError",
+          "kind": "function",
+          "signature": "export declare function createStoreWorkerAggregateError(code: IStoreWorkerErrorCode, errors: readonly unknown[], message: string): AggregateError;",
+          "declarationLine": 22,
+          "source": "packages/store-worker/dist/errors.d.ts",
+          "purpose": "Creates native AggregateError with source store.worker and selected code, preserving native type, stack and original failure reachability.",
+          "core": "code: Actual failure value from StoreWorkerErrorCode.\nerrors: Original failures retained in AggregateError.errors in caller order.\nmessage: Caller-provided readable diagnostic message.\nTagged error object returned without throwing it; inspect source and code together.",
+          "advanced": "",
+          "parameters": [
+            "code: IStoreWorkerErrorCode",
+            "errors: readonly unknown[]",
+            "message: string"
+          ],
+          "parameterDetails": [
+            {
+              "name": "code",
+              "type": "IStoreWorkerErrorCode",
+              "optional": false
+            },
+            {
+              "name": "errors",
+              "type": "readonly unknown[]",
+              "optional": false
+            },
+            {
+              "name": "message",
+              "type": "string",
+              "optional": false
+            }
+          ],
+          "returns": "AggregateError",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function createStoreWorkerAggregateError(code: IStoreWorkerErrorCode, errors: readonly unknown[], message: string): AggregateError;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "code",
+                "type": "IStoreWorkerErrorCode",
+                "optional": false
+              },
+              {
+                "name": "errors",
+                "type": "readonly unknown[]",
+                "optional": false
+              },
+              {
+                "name": "message",
+                "type": "string",
+                "optional": false
+              }
+            ]
+          ],
+          "overloadReturns": ["AggregateError"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Creates native AggregateError with source store.worker and selected code, preserving native type, stack and original failure reachability."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createStoreWorkerAggregateError from @migaia/store-worker, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createStoreWorkerAggregateError when its function contract and declared inputs match the result you need. Choose a different public symbol when createStoreWorkerAggregateError does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "code: Actual failure value from StoreWorkerErrorCode.\nerrors: Original failures retained in AggregateError.errors in caller order.\nmessage: Caller-provided readable diagnostic message.\nTagged error object returned without throwing it; inspect source and code together."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-worker/dist/errors.d.ts:createStoreWorkerAggregateError:export declare function createStoreWorkerAggregateError(code: IStoreWorkerErrorCode, errors: readonly unknown[], message: string): AggregateError;",
+          "guidance": [
+            {
+              "id": "取消-错误与清理归属",
+              "heading": "取消、错误与清理归属",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "通用 Adapter request 保留 canonical Host 取消、超时与 transport 错误。未分类 provider 失败在顶层保留原生 Error/TypeError，并附加 rpc.endpoint / INTERNAL；message、stack 与嵌套 cause 链保持，其中未分类原生原因节点仍为 unknown / UNKNOWN。不再增加 RpcRemoteError 外壳。跨 realm 会重建对象，不保留发送方引用 identity。未配置期限且 provider 一直不结算时，请求仍可能等待。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "序列化 decode / request 与预取消 encode 使用 SerializeCodecError / REQUEST_ABORTED，包含 type（默认 worker）、phase（encode / decode）、context、chunkIndex 0 和 bytesConsumed（输入 bytes 长度，否则 0），原 signal.reason 保留在 cause。活动 encode 流可以由原始 RPC / 取消失败终结，不保证每个失败都有全部 codec 字段。credit 等待和显式流停止创建原生 DOMException / AbortError，message 为 serialize stream cancelled，附 REQUEST_ABORTED；其原生类型、message 和 stack 由错误链保留。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["StoreWorkerErrorCode 属性 / 值", "触发"],
+                  "rows": [
+                    [
+                      "invalidOption / INVALID_OPTION",
+                      "非法或不可读取的 Worker / parser / Resource 配置。"
+                    ],
+                    [
+                      "adapterDisposed / ADAPTER_DISPOSED",
+                      "已 close / dispose 的通用 Adapter 继续 request。"
+                    ],
+                    [
+                      "requestAborted / REQUEST_ABORTED",
+                      "序列化请求或流协作取消，检查 reason 与真实 buffer 状态。"
+                    ],
+                    [
+                      "invalidRequestChunk / INVALID_REQUEST_CHUNK",
+                      "Worker 请求的 chunk 形状非法。"
+                    ],
+                    [
+                      "invalidResponseChunk / INVALID_RESPONSE_CHUNK",
+                      "返回 chunk 或帧序列不合法。"
+                    ],
+                    ["cleanupFailed / CLEANUP_FAILED", "parser 端点与可选 terminate 同时清理失败。"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "STORE_WORKER_SOURCE 为 store.worker。createStoreWorkerError(code, message, options?) 接收必填码和消息，可选 options.cause，返回带身份的 Error；createStoreWorkerAggregateError(code, errors, message) 返回 AggregateError，保留 errors 顺序和原值。code 类型为 IStoreWorkerErrorCode，工厂不覆盖 stack。外包完整身份继续由原 owner 负责。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "store-worker-index--createStoreWorkerAggregateError"
+        },
+        {
+          "name": "createStoreWorkerError",
+          "kind": "function",
+          "signature": "export declare function createStoreWorkerError(code: IStoreWorkerErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;",
+          "declarationLine": 15,
+          "source": "packages/store-worker/dist/errors.d.ts",
+          "purpose": "Creates native Error with source store.worker and selected code, preserving native type, stack and original failure reachability.",
+          "core": "code: Actual failure value from StoreWorkerErrorCode.\nmessage: Caller-provided readable diagnostic message.\nTagged error object returned without throwing it; inspect source and code together.\ncause: Non-undefined original failure attached unchanged as cause.\nOmitted: no cause attached.",
+          "advanced": "",
+          "parameters": [
+            "code: IStoreWorkerErrorCode",
+            "message: string",
+            "options: { readonly cause?: unknown; } (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "code",
+              "type": "IStoreWorkerErrorCode",
+              "optional": false
+            },
+            {
+              "name": "message",
+              "type": "string",
+              "optional": false
+            },
+            {
+              "name": "options",
+              "type": "{ readonly cause?: unknown; }",
+              "optional": true
+            }
+          ],
+          "returns": "Error",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function createStoreWorkerError(code: IStoreWorkerErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "code",
+                "type": "IStoreWorkerErrorCode",
+                "optional": false
+              },
+              {
+                "name": "message",
+                "type": "string",
+                "optional": false
+              },
+              {
+                "name": "options",
+                "type": "{ readonly cause?: unknown; }",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["Error"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Creates native Error with source store.worker and selected code, preserving native type, stack and original failure reachability."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createStoreWorkerError from @migaia/store-worker, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createStoreWorkerError when its function contract and declared inputs match the result you need. Choose a different public symbol when createStoreWorkerError does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "code: Actual failure value from StoreWorkerErrorCode.\nmessage: Caller-provided readable diagnostic message.\nTagged error object returned without throwing it; inspect source and code together.\ncause: Non-undefined original failure attached unchanged as cause.\nOmitted: no cause attached."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": ""
+            }
+          ],
+          "identity": "packages/store-worker/dist/errors.d.ts:createStoreWorkerError:export declare function createStoreWorkerError(code: IStoreWorkerErrorCode, message: string, options?: { readonly cause?: unknown; }): Error;",
+          "guidance": [
+            {
+              "id": "取消-错误与清理归属",
+              "heading": "取消、错误与清理归属",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "通用 Adapter request 保留 canonical Host 取消、超时与 transport 错误。未分类 provider 失败在顶层保留原生 Error/TypeError，并附加 rpc.endpoint / INTERNAL；message、stack 与嵌套 cause 链保持，其中未分类原生原因节点仍为 unknown / UNKNOWN。不再增加 RpcRemoteError 外壳。跨 realm 会重建对象，不保留发送方引用 identity。未配置期限且 provider 一直不结算时，请求仍可能等待。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "序列化 decode / request 与预取消 encode 使用 SerializeCodecError / REQUEST_ABORTED，包含 type（默认 worker）、phase（encode / decode）、context、chunkIndex 0 和 bytesConsumed（输入 bytes 长度，否则 0），原 signal.reason 保留在 cause。活动 encode 流可以由原始 RPC / 取消失败终结，不保证每个失败都有全部 codec 字段。credit 等待和显式流停止创建原生 DOMException / AbortError，message 为 serialize stream cancelled，附 REQUEST_ABORTED；其原生类型、message 和 stack 由错误链保留。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["StoreWorkerErrorCode 属性 / 值", "触发"],
+                  "rows": [
+                    [
+                      "invalidOption / INVALID_OPTION",
+                      "非法或不可读取的 Worker / parser / Resource 配置。"
+                    ],
+                    [
+                      "adapterDisposed / ADAPTER_DISPOSED",
+                      "已 close / dispose 的通用 Adapter 继续 request。"
+                    ],
+                    [
+                      "requestAborted / REQUEST_ABORTED",
+                      "序列化请求或流协作取消，检查 reason 与真实 buffer 状态。"
+                    ],
+                    [
+                      "invalidRequestChunk / INVALID_REQUEST_CHUNK",
+                      "Worker 请求的 chunk 形状非法。"
+                    ],
+                    [
+                      "invalidResponseChunk / INVALID_RESPONSE_CHUNK",
+                      "返回 chunk 或帧序列不合法。"
+                    ],
+                    ["cleanupFailed / CLEANUP_FAILED", "parser 端点与可选 terminate 同时清理失败。"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "STORE_WORKER_SOURCE 为 store.worker。createStoreWorkerError(code, message, options?) 接收必填码和消息，可选 options.cause，返回带身份的 Error；createStoreWorkerAggregateError(code, errors, message) 返回 AggregateError，保留 errors 顺序和原值。code 类型为 IStoreWorkerErrorCode，工厂不覆盖 stack。外包完整身份继续由原 owner 负责。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 6,
+          "configuration": [
+            {
+              "name": "cause",
+              "type": "unknown",
+              "optional": true,
+              "description": "STORE_WORKER_SOURCE 为 store.worker。createStoreWorkerError(code, message, options?) 接收必填码和消息，可选 options.cause，返回带身份的 Error；createStoreWorkerAggregateError(code, errors, message) 返回 AggregateError，保留 errors 顺序和原值。code 类型为 IStoreWorkerErrorCode，工厂不覆盖 stack。外包完整身份继续由原 owner 负责。",
+              "descriptionEn": "",
+              "descriptionZh": "STORE_WORKER_SOURCE 为 store.worker。createStoreWorkerError(code, message, options?) 接收必填码和消息，可选 options.cause，返回带身份的 Error；createStoreWorkerAggregateError(code, errors, message) 返回 AggregateError，保留 errors 顺序和原值。code 类型为 IStoreWorkerErrorCode，工厂不覆盖 stack。外包完整身份继续由原 owner 负责。"
+            }
+          ],
+          "fragment": "store-worker-index--createStoreWorkerError"
+        },
+        {
+          "name": "createWorkerHandler",
+          "kind": "function",
+          "signature": "export declare function createWorkerHandler<Input, Output>(compute: (payload: Input, context: { signal: INativeAbortSignal; }) => Output | Promise<Output>, postMessage: (message: unknown) => void, options?: { readonly timeoutMs?: number; }): IManagedRpcHandler;",
+          "declarationLine": 71,
+          "source": "packages/store-worker/dist/worker.d.ts",
+          "purpose": "Registers one worker-side computation with the canonical RPC provider. Pair it with WorkerAdapter; connect returned callback to host message delivery explicitly.",
+          "core": "compute: Synchronous or async callback (payload: Input, {signal: INativeAbortSignal}) returning Output or Promise<Output>. Reads/throws/rejections follow RPC provider handling; check signal cooperatively for long work.\npostMessage: Synchronous callback receiving raw reply/control envelopes, normally message => workerGlobal.postMessage(message); return void, host send errors follow transport failure handling.\nCallable IManagedRpcHandler: await handler(rawMessage) for delivery, then close/dispose for endpoint cleanup. Compute failures are replies, while initialization/delivery failures can reject the callback.\ntimeoutMs: Forwarded endpoint option; this provider helper does not apply it as a compute execution deadline. Set request deadline on the main-side adapter.\nundefined: no endpoint request deadline is supplied.",
+          "advanced": "",
+          "parameters": [
+            "compute: (payload: Input, context: { signal: INativeAbortSignal; }) => Output | Promise<Output>",
+            "postMessage: (message: unknown) => void",
+            "options: { readonly timeoutMs?: number; } (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "compute",
+              "type": "(payload: Input, context: { signal: INativeAbortSignal; }) => Output | Promise<Output>",
+              "optional": false
+            },
+            {
+              "name": "postMessage",
+              "type": "(message: unknown) => void",
+              "optional": false
+            },
+            {
+              "name": "options",
+              "type": "{ readonly timeoutMs?: number; }",
+              "optional": true
+            }
+          ],
+          "returns": "IManagedRpcHandler",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import {\n  Worker,\n  MessageChannel,\n  workerData,\n  isMainThread,\n  threadId,\n  type MessagePort\n} from 'node:worker_threads'\nimport { WorkerAdapter, createWorkerHandler } from '@migaia/store-worker'\n\nif (!isMainThread) {\n  const port = workerData as MessagePort\n  const handler = createWorkerHandler(\n    (values: number[]) => ({\n      total: values.reduce((sum, value) => sum + value, 0),\n      pid: process.pid,\n      threadId\n    }),\n    (message) => port.postMessage(message)\n  )\n  port.on('message', (message) => void handler(message).catch(console.error))\n} else {\n  const { port1, port2 } = new MessageChannel()\n  const worker = new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })\n  port1.start()\n  const adapter = new WorkerAdapter(port1)\n  try {\n    const result = await adapter.request<\n      number[],\n      {\n        total: number\n        pid: number\n        threadId: number\n      }\n    >([20, 22])\n    console.log('结果：', result.total, result.pid === process.pid, result.threadId !== threadId)\n  } finally {\n    await adapter.dispose()\n    port1.close()\n    await worker.terminate()\n  }\n}",
+            "import {\n  Worker,\n  MessageChannel,\n  workerData,\n  isMainThread,\n  threadId,\n  type MessagePort\n} from 'node:worker_threads'\nimport { WorkerAdapter, createWorkerHandler } from '@migaia/store-worker'\n\nif (!isMainThread) {\n  const port = workerData as MessagePort\n  const handler = createWorkerHandler(\n    (value: number) => value * 2,\n    (message) => port.postMessage(message)\n  )\n  port.on('message', (message) => {\n    if (message === 'ping') {\n      port.postMessage('pong')\n      return\n    }\n    void handler(message).catch(console.error)\n  })\n} else {\n  const { port1, port2 } = new MessageChannel()\n  const worker = new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })\n  port1.start()\n  const adapter = new WorkerAdapter(port1)\n  try {\n    console.log('关闭前：', await adapter.request(21))\n    adapter.close()\n    const failure = await adapter.request(21).catch((error: unknown) => error)\n    console.log('已关闭：', adapter.disposed, (failure as { code?: string }).code)\n    const first = adapter.dispose()\n    console.log('同一清理：', first === adapter.dispose())\n    await first\n    const pong = new Promise<unknown>((resolve) => port1.once('message', resolve))\n    port1.postMessage('ping')\n    console.log('借用端口：', await pong)\n  } finally {\n    await adapter.dispose()\n    port1.close()\n    await worker.terminate()\n  }\n}",
+            "import {\n  Worker,\n  MessageChannel,\n  workerData,\n  isMainThread,\n  threadId,\n  type MessagePort\n} from 'node:worker_threads'\nimport { WorkerAdapter, createWorkerHandler } from '@migaia/store-worker'\n\nif (!isMainThread) {\n  const port = workerData as MessagePort\n  const root = new RangeError('行数据无效')\n  const failure = new TypeError('无法计算总数', { cause: root })\n  const handler = createWorkerHandler(\n    () => {\n      throw failure\n    },\n    (message) => port.postMessage(message)\n  )\n  port.on('message', (message) => void handler(message).catch(console.error))\n} else {\n  const { port1, port2 } = new MessageChannel()\n  const worker = new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })\n  port1.start()\n  const adapter = new WorkerAdapter(port1)\n  try {\n    const failure = (await adapter.request([1, 2]).catch((error: unknown) => error)) as Error\n    const primary = failure\n    const root = primary.cause as Error\n    console.log('远端错误：', failure.name, (failure as Error & { code?: string }).code)\n    console.log('原始错误：', primary instanceof TypeError, primary.message)\n    console.log('原因：', root instanceof RangeError, root.message)\n    console.log('堆栈：', Boolean(primary.stack), Boolean(root.stack))\n  } finally {\n    await adapter.dispose()\n    port1.close()\n    await worker.terminate()\n  }\n}",
+            "import {\n  Worker,\n  MessageChannel,\n  workerData,\n  isMainThread,\n  threadId,\n  type MessagePort\n} from 'node:worker_threads'\nimport { createRuntime } from '@migaia/reactive'\nimport { WorkerAdapter, createWorkerHandler, workerComputed } from '@migaia/store-worker'\n\nif (!isMainThread) {\n  const port = workerData as MessagePort\n  const handler = createWorkerHandler(\n    (values: number[]) => values.reduce((total, value) => total + value, 0),\n    (message) => port.postMessage(message)\n  )\n  port.on('message', (message) => void handler(message).catch(console.error))\n} else {\n  const { port1, port2 } = new MessageChannel()\n  const worker = new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })\n  port1.start()\n  const adapter = new WorkerAdapter(port1)\n  const runtime = createRuntime()\n  const values = runtime.signal([1, 2, 3])\n  const sum = workerComputed<number[], number>(adapter, () => values.value, {\n    runtime,\n    autoStart: false\n  })\n  try {\n    console.log('取值前：', sum.state.status)\n    console.log('首次：', await sum.refetch(), sum.state.status)\n    const cached = sum.promise\n    console.log('缓存：', cached === sum.promise, await cached)\n    values.value = [4, 5]\n    console.log('更新：', await sum.refetch(), sum.state.status)\n  } finally {\n    sum.dispose()\n    await adapter.dispose()\n    port1.close()\n    await worker.terminate()\n  }\n}",
+            "import { Worker, MessageChannel, workerData, isMainThread } from 'node:worker_threads'\nimport { WorkerAdapter, createWorkerHandler } from '@migaia/store-worker'\nif (!isMainThread) {\n  const handler = createWorkerHandler(Number, (m) => workerData.postMessage(m))\n  workerData.on('message', (m: unknown) => void handler(m).catch(console.error))\n} else {\n  const { port1, port2 } = new MessageChannel()\n  const worker = new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })\n  port1.start()\n  const adapter = new WorkerAdapter(port1)\n  console.log(await adapter.request('42'))\n  await adapter.dispose()\n  port1.close()\n  await worker.terminate()\n}"
+          ],
+          "members": [],
+          "composes": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function createWorkerHandler<Input, Output>(compute: (payload: Input, context: { signal: INativeAbortSignal; }) => Output | Promise<Output>, postMessage: (message: unknown) => void, options?: { readonly timeoutMs?: number; }): IManagedRpcHandler;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "compute",
+                "type": "(payload: Input, context: { signal: INativeAbortSignal; }) => Output | Promise<Output>",
+                "optional": false
+              },
+              {
+                "name": "postMessage",
+                "type": "(message: unknown) => void",
+                "optional": false
+              },
+              {
+                "name": "options",
+                "type": "{ readonly timeoutMs?: number; }",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["IManagedRpcHandler"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Registers one worker-side computation with the canonical RPC provider. Pair it with WorkerAdapter; connect returned callback to host message delivery explicitly."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import createWorkerHandler from @migaia/store-worker, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use createWorkerHandler when its function contract and declared inputs match the result you need. Choose a different public symbol when createWorkerHandler does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "compute: Synchronous or async callback (payload: Input, {signal: INativeAbortSignal}) returning Output or Promise<Output>. Reads/throws/rejections follow RPC provider handling; check signal cooperatively for long work.\npostMessage: Synchronous callback receiving raw reply/control envelopes, normally message => workerGlobal.postMessage(message); return void, host send errors follow transport failure handling.\nCallable IManagedRpcHandler: await handler(rawMessage) for delivery, then close/dispose for endpoint cleanup. Compute failures are replies, while initialization/delivery failures can reject the callback.\ntimeoutMs: Forwarded endpoint option; this provider helper does not apply it as a compute execution deadline. Set request deadline on the main-side adapter.\nundefined: no endpoint request deadline is supplied."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "timeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            }
+          ],
+          "identity": "packages/store-worker/dist/worker.d.ts:createWorkerHandler:export declare function createWorkerHandler<Input, Output>(compute: (payload: Input, context: { signal: INativeAbortSignal; }) => Output | Promise<Output>, postMessage: (message: unknown) => void, options?: { readonly timeoutMs?: number; }): IManagedRpcHandler;",
+          "guidance": [],
+          "usageScore": 110,
+          "configuration": [
+            {
+              "name": "timeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": "`new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })` 在另一个线程执行当前文件；`isMainThread` 区分两条分支，`workerData` 是交给子线程的端口，`transferList` 转移的是端口而非业务输入。`port1.start()` 启用原生端口的事件分发。`request` 的两个泛型只声明输入与返回值类型；本例载荷为 `[20, 22]`，未设置 `signal`。适配器的 `clientId` 默认 `'main'`，`timeoutMs` 默认 `undefined`，不设期限。",
+              "descriptionEn": "",
+              "descriptionZh": "`new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })` 在另一个线程执行当前文件；`isMainThread` 区分两条分支，`workerData` 是交给子线程的端口，`transferList` 转移的是端口而非业务输入。`port1.start()` 启用原生端口的事件分发。`request` 的两个泛型只声明输入与返回值类型；本例载荷为 `[20, 22]`，未设置 `signal`。适配器的 `clientId` 默认 `'main'`，`timeoutMs` 默认 `undefined`，不设期限。"
+            }
+          ],
+          "fragment": "store-worker-index--createWorkerHandler"
+        },
+        {
+          "name": "IManagedRpcHandler",
+          "kind": "type",
+          "signature": "export type IManagedRpcHandler = { (message: unknown): Promise<void>; /** * Closes the handler, waits for endpoint initialization, and calls `endpoint.dispose()`. Cleanup * failures reject the promise instead of being swallowed. Repeated calls return the same promise. * This does not detach the caller's native message listener or dispose a supplied serialization * parser; those resources remain with their owner. */ dispose(): Promise<void>; /** * Synchronously marks the handler unavailable by setting `disposed = true`. It does not release * the endpoint. Repeated calls have no additional effect. */ close(): void; /** Admitted inbound deliveries still awaiting setup/dispatch, not active compute or drain count. */ readonly pendingCount: number; /** Terminal admission marker, set synchronously before asynchronous endpoint cleanup. */ readonly disposed: boolean; };",
+          "declarationLine": 10,
+          "source": "packages/store-worker/dist/managed-rpc-handler.d.ts",
+          "purpose": "Callable (message: unknown) => Promise<void> from either handler factory. Message is raw event.data; it awaits readiness and delivery, not compute completion. Terminal calls resolve without delivery; init/delivery failures reject. Attach host listener yourself and remove it yourself at teardown.",
+          "core": "pendingCount: Count of managed message callback invocations awaiting endpoint readiness/delivery and one microtask; this is not provider computation concurrency or unfinished RPC requests.\ndisposed: True after close/dispose starts; later message invocations resolve without delivery.\nclose: Idempotently stops new managed message delivery synchronously; does not unregister host onmessage or release endpoint/resources.\nVoid once unavailable; endpoint cleanup still requires dispose.\ndispose: Closes, awaits readiness, then unsubscribes provider routes and disposes the endpoint. Repeated/concurrent calls share one Promise. It does not terminate the Worker or dispose the supplied parser.\nStable Promise<void>; endpoint initialization and cleanup failures reject.",
+          "advanced": "Bridge worker message events to a canonical compute/codec endpoint.",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "dispose",
+              "kind": "method",
+              "optional": false,
+              "signature": "dispose(): Promise<void>;",
+              "description": "Closes the handler, waits for endpoint initialization, and calls `endpoint.dispose()`. Cleanup failures reject the promise instead of being swallowed. Repeated calls return the same promise. This does not detach the caller's native message listener or dispose a supplied serialization parser; those resources remain with their owner.",
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            },
+            {
+              "name": "close",
+              "kind": "method",
+              "optional": false,
+              "signature": "close(): void;",
+              "description": "Synchronously marks the handler unavailable by setting `disposed = true`. It does not release the endpoint. Repeated calls have no additional effect.",
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "pendingCount",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly pendingCount: number;",
+              "description": "Admitted inbound deliveries still awaiting setup/dispatch, not active compute or drain count.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "disposed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly disposed: boolean;",
+              "description": "Terminal admission marker, set synchronously before asynchronous endpoint cleanup.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IManagedRpcHandler",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IManagedRpcHandler = { (message: unknown): Promise<void>; /** * Closes the handler, waits for endpoint initialization, and calls `endpoint.dispose()`. Cleanup * failures reject the promise instead of being swallowed. Repeated calls return the same promise. * This does not detach the caller's native message listener or dispose a supplied serialization * parser; those resources remain with their owner. */ dispose(): Promise<void>; /** * Synchronously marks the handler unavailable by setting `disposed = true`. It does not release * the endpoint. Repeated calls have no additional effect. */ close(): void; /** Admitted inbound deliveries still awaiting setup/dispatch, not active compute or drain count. */ readonly pendingCount: number; /** Terminal admission marker, set synchronously before asynchronous endpoint cleanup. */ readonly disposed: boolean; };"
+          ],
+          "overloadParameterDetails": [[], []],
+          "overloadReturns": [],
+          "whenToUse": "Bridge worker message events to a canonical compute/codec endpoint.",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Callable (message: unknown) => Promise<void> from either handler factory. Message is raw event.data; it awaits readiness and delivery, not compute completion. Terminal calls resolve without delivery; init/delivery failures reject. Attach host listener yourself and remove it yourself at teardown."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IManagedRpcHandler from @migaia/store-worker, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IManagedRpcHandler when its type contract and declared inputs match the result you need. Choose a different public symbol when IManagedRpcHandler does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "pendingCount: Count of managed message callback invocations awaiting endpoint readiness/delivery and one microtask; this is not provider computation concurrency or unfinished RPC requests.\ndisposed: True after close/dispose starts; later message invocations resolve without delivery.\nclose: Idempotently stops new managed message delivery synchronously; does not unregister host onmessage or release endpoint/resources.\nVoid once unavailable; endpoint cleanup still requires dispose.\ndispose: Closes, awaits readiness, then unsubscribes provider routes and disposes the endpoint. Repeated/concurrent calls share one Promise. It does not terminate the Worker or dispose the supplied parser.\nStable Promise<void>; endpoint initialization and cleanup failures reject."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "Bridge worker message events to a canonical compute/codec endpoint."
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-worker/dist/managed-rpc-handler.d.ts:IManagedRpcHandler:export type IManagedRpcHandler = { (message: unknown): Promise<void>; /** * Closes the handler, waits for endpoint initialization, and calls `endpoint.dispose()`. Cleanup * failures reject the promise instead of being swallowed. Repeated calls return the same promise. * This does not detach the caller's native message listener or dispose a supplied serialization * parser; those resources remain with their owner. */ dispose(): Promise<void>; /** * Synchronously marks the handler unavailable by setting `disposed = true`. It does not release * the endpoint. Repeated calls have no additional effect. */ close(): void; /** Admitted inbound deliveries still awaiting setup/dispatch, not active compute or drain count. */ readonly pendingCount: number; /** Terminal admission marker, set synchronously before asynchronous endpoint cleanup. */ readonly disposed: boolean; };",
+          "guidance": [],
+          "usageScore": 34,
+          "configuration": [],
+          "fragment": "store-worker-index--IManagedRpcHandler"
+        },
+        {
+          "name": "IStoreWorkerErrorCode",
+          "kind": "type",
+          "signature": "export type IStoreWorkerErrorCode = (typeof StoreWorkerErrorCode)[keyof typeof StoreWorkerErrorCode];",
+          "declarationLine": 52,
+          "source": "packages/store-worker/dist/error-code.d.ts",
+          "purpose": "Value union of StoreWorkerErrorCode; external RPC/Resource failures have their own code unions.",
+          "core": "Value union of StoreWorkerErrorCode; external RPC/Resource failures have their own code unions.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "IStoreWorkerErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IStoreWorkerErrorCode = (typeof StoreWorkerErrorCode)[keyof typeof StoreWorkerErrorCode];"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Value union of StoreWorkerErrorCode; external RPC/Resource failures have their own code unions."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IStoreWorkerErrorCode from @migaia/store-worker, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IStoreWorkerErrorCode when its type contract and declared inputs match the result you need. Choose a different public symbol when IStoreWorkerErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Value union of StoreWorkerErrorCode; external RPC/Resource failures have their own code unions."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-worker/dist/error-code.d.ts:IStoreWorkerErrorCode:export type IStoreWorkerErrorCode = (typeof StoreWorkerErrorCode)[keyof typeof StoreWorkerErrorCode];",
+          "guidance": [
+            {
+              "id": "取消-错误与清理归属",
+              "heading": "取消、错误与清理归属",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "通用 Adapter request 保留 canonical Host 取消、超时与 transport 错误。未分类 provider 失败在顶层保留原生 Error/TypeError，并附加 rpc.endpoint / INTERNAL；message、stack 与嵌套 cause 链保持，其中未分类原生原因节点仍为 unknown / UNKNOWN。不再增加 RpcRemoteError 外壳。跨 realm 会重建对象，不保留发送方引用 identity。未配置期限且 provider 一直不结算时，请求仍可能等待。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "序列化 decode / request 与预取消 encode 使用 SerializeCodecError / REQUEST_ABORTED，包含 type（默认 worker）、phase（encode / decode）、context、chunkIndex 0 和 bytesConsumed（输入 bytes 长度，否则 0），原 signal.reason 保留在 cause。活动 encode 流可以由原始 RPC / 取消失败终结，不保证每个失败都有全部 codec 字段。credit 等待和显式流停止创建原生 DOMException / AbortError，message 为 serialize stream cancelled，附 REQUEST_ABORTED；其原生类型、message 和 stack 由错误链保留。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["StoreWorkerErrorCode 属性 / 值", "触发"],
+                  "rows": [
+                    [
+                      "invalidOption / INVALID_OPTION",
+                      "非法或不可读取的 Worker / parser / Resource 配置。"
+                    ],
+                    [
+                      "adapterDisposed / ADAPTER_DISPOSED",
+                      "已 close / dispose 的通用 Adapter 继续 request。"
+                    ],
+                    [
+                      "requestAborted / REQUEST_ABORTED",
+                      "序列化请求或流协作取消，检查 reason 与真实 buffer 状态。"
+                    ],
+                    [
+                      "invalidRequestChunk / INVALID_REQUEST_CHUNK",
+                      "Worker 请求的 chunk 形状非法。"
+                    ],
+                    [
+                      "invalidResponseChunk / INVALID_RESPONSE_CHUNK",
+                      "返回 chunk 或帧序列不合法。"
+                    ],
+                    ["cleanupFailed / CLEANUP_FAILED", "parser 端点与可选 terminate 同时清理失败。"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "STORE_WORKER_SOURCE 为 store.worker。createStoreWorkerError(code, message, options?) 接收必填码和消息，可选 options.cause，返回带身份的 Error；createStoreWorkerAggregateError(code, errors, message) 返回 AggregateError，保留 errors 顺序和原值。code 类型为 IStoreWorkerErrorCode，工厂不覆盖 stack。外包完整身份继续由原 owner 负责。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "store-worker-index--IStoreWorkerErrorCode"
+        },
+        {
+          "name": "IWorkerComputedOptions",
+          "kind": "type",
+          "signature": "export type IWorkerComputedOptions<Output> = IResourceOptions<Output> & { /** Borrowed reactive Runtime, default defaultRuntime, used for the returned Resource. */ readonly runtime?: IRuntime; };",
+          "declarationLine": 80,
+          "source": "packages/store-worker/dist/worker.d.ts",
+          "purpose": "Resource IResourceOptions plus Runtime selection; known fields are read once before Resource ownership and auto-start.",
+          "core": "debugName: Label shown in reactive diagnostics and in request error context.\nNot set: diagnostics show no label.\nttl: Success lifetime in milliseconds; positive finite lifetimes revalidate on an expired read. `0` and `Infinity` disable time expiration, but changed dependencies, including after suspension, still trigger refetching. Must be ≥ 0 or `Infinity`.\n`Infinity`: fresh until a dependency changes or `refetch()` is called.\nautoStart: Start the first request in the constructor.\n`true`: starts immediately unless the initial snapshot is fresh.\nstaleWhileRevalidate: Keep showing expired success data while the refresh runs (`refreshing` is `true`) instead of switching to `pending`.\n`false`: an expired value is replaced by `pending`.\nretry: Resource retry policy: a non-negative integer extra-attempt count, or synchronous (failureCount,error) => boolean. failureCount starts at one and error is the original fetch failure. Return true to retry; callback throws or non-boolean/thenable results become Resource failure, without awaiting a Promise.\nZero extra attempts; no automatic retry.\nretryDelay: Finite non-negative milliseconds, or synchronous (failureCount,error) => milliseconds for each accepted retry. Receives the one-based count and original failure; callback throws or invalid/non-number/thenable results become Resource failure. A delayed retry remains cancellable through Resource.\nZero milliseconds; retries without a configured delay.\nUse a fixed millisecond delay for short failures, or a synchronous callback for increasing waits. failureCount starts at one. Omission retries immediately; retry must also allow another attempt.\nkeepAlive: Keep upstream dependencies connected while nothing reads `state`, so changes are still tracked.\n`false`: unobserved resources disconnect upstream.\ninitialSnapshot: Success snapshot from `dehydrate()` (server rendering or persistence) used as the initial state; it is revalidated when expired.\nNot set: start from `idle`.\nscheduler: IScheduler from @migaia/utils/scheduler controls Resource TTL and retry clocks; forwarded unchanged to Resource.\nsystemScheduler from @migaia/utils/scheduler.\nruntime: IRuntime returned by reactive createRuntime; selectInput reads belong to this Resource Runtime. Other-Runtime reads are governed by reactive ownership checks.\nReactive defaultRuntime; pass a request/instance Runtime for isolation.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "runtime",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly runtime?: IRuntime;",
+              "description": "Borrowed reactive Runtime, default defaultRuntime, used for the returned Resource.",
+              "parameterDetails": [],
+              "returns": "IRuntime"
+            }
+          ],
+          "composes": ["IResourceOptions"],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IWorkerComputedOptions<Output> = IResourceOptions<Output> & { /** Borrowed reactive Runtime, default defaultRuntime, used for the returned Resource. */ readonly runtime?: IRuntime; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Resource IResourceOptions plus Runtime selection; known fields are read once before Resource ownership and auto-start."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IWorkerComputedOptions from @migaia/store-worker, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IWorkerComputedOptions when its type contract and declared inputs match the result you need. Choose a different public symbol when IWorkerComputedOptions does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "debugName: Label shown in reactive diagnostics and in request error context.\nNot set: diagnostics show no label.\nttl: Success lifetime in milliseconds; positive finite lifetimes revalidate on an expired read. `0` and `Infinity` disable time expiration, but changed dependencies, including after suspension, still trigger refetching. Must be ≥ 0 or `Infinity`.\n`Infinity`: fresh until a dependency changes or `refetch()` is called.\nautoStart: Start the first request in the constructor.\n`true`: starts immediately unless the initial snapshot is fresh.\nstaleWhileRevalidate: Keep showing expired success data while the refresh runs (`refreshing` is `true`) instead of switching to `pending`.\n`false`: an expired value is replaced by `pending`.\nretry: Resource retry policy: a non-negative integer extra-attempt count, or synchronous (failureCount,error) => boolean. failureCount starts at one and error is the original fetch failure. Return true to retry; callback throws or non-boolean/thenable results become Resource failure, without awaiting a Promise.\nZero extra attempts; no automatic retry.\nretryDelay: Finite non-negative milliseconds, or synchronous (failureCount,error) => milliseconds for each accepted retry. Receives the one-based count and original failure; callback throws or invalid/non-number/thenable results become Resource failure. A delayed retry remains cancellable through Resource.\nZero milliseconds; retries without a configured delay.\nUse a fixed millisecond delay for short failures, or a synchronous callback for increasing waits. failureCount starts at one. Omission retries immediately; retry must also allow another attempt.\nkeepAlive: Keep upstream dependencies connected while nothing reads `state`, so changes are still tracked.\n`false`: unobserved resources disconnect upstream.\ninitialSnapshot: Success snapshot from `dehydrate()` (server rendering or persistence) used as the initial state; it is revalidated when expired.\nNot set: start from `idle`.\nscheduler: IScheduler from @migaia/utils/scheduler controls Resource TTL and retry clocks; forwarded unchanged to Resource.\nsystemScheduler from @migaia/utils/scheduler.\nruntime: IRuntime returned by reactive createRuntime; selectInput reads belong to this Resource Runtime. Other-Runtime reads are governed by reactive ownership checks.\nReactive defaultRuntime; pass a request/instance Runtime for isolation."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-worker/dist/worker.d.ts:IWorkerComputedOptions:export type IWorkerComputedOptions<Output> = IResourceOptions<Output> & { /** Borrowed reactive Runtime, default defaultRuntime, used for the returned Resource. */ readonly runtime?: IRuntime; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "store-worker-index--IWorkerComputedOptions"
+        },
+        {
+          "name": "IWorkerDiagnosticType",
+          "kind": "type",
+          "signature": "export type IWorkerDiagnosticType = (typeof WorkerDiagnosticType)[keyof typeof WorkerDiagnosticType];",
+          "declarationLine": 31,
+          "source": "packages/store-worker/dist/worker-constants.d.ts",
+          "purpose": "The single literal worker, used as default codec diagnostic and plugin format label.",
+          "core": "The single literal worker, used as default codec diagnostic and plugin format label.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "IWorkerDiagnosticType",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IWorkerDiagnosticType = (typeof WorkerDiagnosticType)[keyof typeof WorkerDiagnosticType];"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The single literal worker, used as default codec diagnostic and plugin format label."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IWorkerDiagnosticType from @migaia/store-worker, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IWorkerDiagnosticType when its type contract and declared inputs match the result you need. Choose a different public symbol when IWorkerDiagnosticType does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The single literal worker, used as default codec diagnostic and plugin format label."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-worker/dist/worker-constants.d.ts:IWorkerDiagnosticType:export type IWorkerDiagnosticType = (typeof WorkerDiagnosticType)[keyof typeof WorkerDiagnosticType];",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "store-worker-index--IWorkerDiagnosticType"
+        },
+        {
+          "name": "IWorkerPort",
+          "kind": "type",
+          "signature": "export type IWorkerPort = IWorkerMessagePort;",
+          "declarationLine": 12,
+          "source": "packages/store-worker/dist/worker.d.ts",
+          "purpose": "Alias of the native port accepted by rpc-plugin-browser dedicatedWorkerPlugin options.worker, through IWorkerMessagePort. It borrows synchronous postMessage, listener registration and removal, and optional start; the application retains the physical Worker or MessagePort lifetime.",
+          "core": "postMessage: Synchronous host callback sending a raw RPC envelope; do not reinterpret it as an application payload. Transfer is the optional native list and return value is unused; host errors propagate into transport handling.\npostMessage.value: Original frame value supplied by the canonical worker transport; forward it unchanged to native postMessage rather than wrapping it as another application request.\npostMessage.transfer: Optional native transfer list received from send options; omit for ordinary cloning.\nVoid after the host accepted the send; it does not mean peer computation completed.\nstart: Optional synchronous native MessagePort start operation borrowed from the supplied port. The canonical worker transport invokes it before installing its message listener; Worker-like ports without this method need no substitute.\nVoid after native startup; this operation does not acquire ownership of the port or terminate it during cleanup.\nOmitted for ports that do not require explicit message delivery startup.\naddEventListener: Host installs a listener for message, error or messageerror; RPC owns subscriptions and dispatch. Do not steal a mutable onmessage slot for the main-side adapter.\naddEventListener.type: Event name supplied by the RPC adapter: message, error or messageerror.\naddEventListener.listener: Synchronous callback receiving an event-like object with data, origin, source and type as applicable; return void, and transport isolates listener failures.\nVoid after listener registration.\nremoveEventListener: Host removes the exact type/listener pair installed by the transport during endpoint cleanup.\nremoveEventListener.type: Previously registered event name from the transport.\nremoveEventListener.listener: Exact callback identity received during registration.\nVoid after listener removal; native cleanup failures reject endpoint disposal.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "postMessage",
+              "kind": "method",
+              "optional": false,
+              "signature": "postMessage(value: unknown, transfer?: readonly Transferable[]): void;",
+              "description": "Native Transferable overloads stay assignable; RPC forwards its original ArrayBuffer list.",
+              "parameterDetails": [
+                {
+                  "name": "value",
+                  "type": "unknown",
+                  "optional": false
+                },
+                {
+                  "name": "transfer",
+                  "type": "readonly Transferable[]",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "start",
+              "kind": "method",
+              "optional": true,
+              "signature": "start?(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "addEventListener",
+              "kind": "method",
+              "optional": false,
+              "signature": "addEventListener(type: string, listener: (event: any) => void): void;",
+              "description": "Native EventTarget overloads deliver distinct message and error event types.",
+              "parameterDetails": [
+                {
+                  "name": "type",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(event: any) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "removeEventListener",
+              "kind": "method",
+              "optional": false,
+              "signature": "removeEventListener(type: string, listener: (event: any) => void): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "type",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(event: any) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            }
+          ],
+          "composes": [],
+          "exportPath": ".",
+          "overloadSignatures": ["export type IWorkerPort = IWorkerMessagePort;"],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Alias of the native port accepted by rpc-plugin-browser dedicatedWorkerPlugin options.worker, through IWorkerMessagePort. It borrows synchronous postMessage, listener registration and removal, and optional start; the application retains the physical Worker or MessagePort lifetime."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IWorkerPort from @migaia/store-worker, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IWorkerPort when its type contract and declared inputs match the result you need. Choose a different public symbol when IWorkerPort does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "postMessage: Synchronous host callback sending a raw RPC envelope; do not reinterpret it as an application payload. Transfer is the optional native list and return value is unused; host errors propagate into transport handling.\npostMessage.value: Original frame value supplied by the canonical worker transport; forward it unchanged to native postMessage rather than wrapping it as another application request.\npostMessage.transfer: Optional native transfer list received from send options; omit for ordinary cloning.\nVoid after the host accepted the send; it does not mean peer computation completed.\nstart: Optional synchronous native MessagePort start operation borrowed from the supplied port. The canonical worker transport invokes it before installing its message listener; Worker-like ports without this method need no substitute.\nVoid after native startup; this operation does not acquire ownership of the port or terminate it during cleanup.\nOmitted for ports that do not require explicit message delivery startup.\naddEventListener: Host installs a listener for message, error or messageerror; RPC owns subscriptions and dispatch. Do not steal a mutable onmessage slot for the main-side adapter.\naddEventListener.type: Event name supplied by the RPC adapter: message, error or messageerror.\naddEventListener.listener: Synchronous callback receiving an event-like object with data, origin, source and type as applicable; return void, and transport isolates listener failures.\nVoid after listener registration.\nremoveEventListener: Host removes the exact type/listener pair installed by the transport during endpoint cleanup.\nremoveEventListener.type: Previously registered event name from the transport.\nremoveEventListener.listener: Exact callback identity received during registration.\nVoid after listener removal; native cleanup failures reject endpoint disposal."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-worker/dist/worker.d.ts:IWorkerPort:export type IWorkerPort = IWorkerMessagePort;",
+          "guidance": [],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "store-worker-index--IWorkerPort"
+        },
+        {
+          "name": "STORE_WORKER_SOURCE",
+          "kind": "const",
+          "signature": "export declare const STORE_WORKER_SOURCE = \"store.worker\";",
+          "declarationLine": 8,
+          "source": "packages/store-worker/dist/errors.d.ts",
+          "purpose": "Exact store.worker source identity attached to package errors; inspect together with code.",
+          "core": "Exact store.worker source identity attached to package errors; inspect together with code.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "exportPath": ".",
+          "overloadSignatures": ["export declare const STORE_WORKER_SOURCE = \"store.worker\";"],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Exact store.worker source identity attached to package errors; inspect together with code."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import STORE_WORKER_SOURCE from @migaia/store-worker, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use STORE_WORKER_SOURCE when its const contract and declared inputs match the result you need. Choose a different public symbol when STORE_WORKER_SOURCE does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Exact store.worker source identity attached to package errors; inspect together with code."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-worker/dist/errors.d.ts:STORE_WORKER_SOURCE:export declare const STORE_WORKER_SOURCE = \"store.worker\";",
+          "guidance": [
+            {
+              "id": "取消-错误与清理归属",
+              "heading": "取消、错误与清理归属",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "通用 Adapter request 保留 canonical Host 取消、超时与 transport 错误。未分类 provider 失败在顶层保留原生 Error/TypeError，并附加 rpc.endpoint / INTERNAL；message、stack 与嵌套 cause 链保持，其中未分类原生原因节点仍为 unknown / UNKNOWN。不再增加 RpcRemoteError 外壳。跨 realm 会重建对象，不保留发送方引用 identity。未配置期限且 provider 一直不结算时，请求仍可能等待。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "序列化 decode / request 与预取消 encode 使用 SerializeCodecError / REQUEST_ABORTED，包含 type（默认 worker）、phase（encode / decode）、context、chunkIndex 0 和 bytesConsumed（输入 bytes 长度，否则 0），原 signal.reason 保留在 cause。活动 encode 流可以由原始 RPC / 取消失败终结，不保证每个失败都有全部 codec 字段。credit 等待和显式流停止创建原生 DOMException / AbortError，message 为 serialize stream cancelled，附 REQUEST_ABORTED；其原生类型、message 和 stack 由错误链保留。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["StoreWorkerErrorCode 属性 / 值", "触发"],
+                  "rows": [
+                    [
+                      "invalidOption / INVALID_OPTION",
+                      "非法或不可读取的 Worker / parser / Resource 配置。"
+                    ],
+                    [
+                      "adapterDisposed / ADAPTER_DISPOSED",
+                      "已 close / dispose 的通用 Adapter 继续 request。"
+                    ],
+                    [
+                      "requestAborted / REQUEST_ABORTED",
+                      "序列化请求或流协作取消，检查 reason 与真实 buffer 状态。"
+                    ],
+                    [
+                      "invalidRequestChunk / INVALID_REQUEST_CHUNK",
+                      "Worker 请求的 chunk 形状非法。"
+                    ],
+                    [
+                      "invalidResponseChunk / INVALID_RESPONSE_CHUNK",
+                      "返回 chunk 或帧序列不合法。"
+                    ],
+                    ["cleanupFailed / CLEANUP_FAILED", "parser 端点与可选 terminate 同时清理失败。"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "STORE_WORKER_SOURCE 为 store.worker。createStoreWorkerError(code, message, options?) 接收必填码和消息，可选 options.cause，返回带身份的 Error；createStoreWorkerAggregateError(code, errors, message) 返回 AggregateError，保留 errors 顺序和原值。code 类型为 IStoreWorkerErrorCode，工厂不覆盖 stack。外包完整身份继续由原 owner 负责。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "store-worker-index--STORE_WORKER_SOURCE"
+        },
+        {
+          "name": "StoreWorkerErrorCode",
+          "kind": "const",
+          "signature": "export declare const StoreWorkerErrorCode: { /** * Worker options, parser encode/decode members or the post callback are invalid or inaccessible. * Correct the factory input; native getter failures retain identity or an original cause. */ readonly invalidOption: 'INVALID_OPTION'; /** * A worker adapter is called after disposal. * * Create a new adapter instead of reusing the disposed instance. */ readonly adapterDisposed: 'ADAPTER_DISPOSED'; /** * Worker serialization is cooperatively cancelled through an `AbortSignal` or explicit stream * stop. * * Treat this as cancellation. Transfer can detach input after a send, but pre-cancelled requests * have not sent it; inspect the actual backing buffer before deciding whether retry is safe. */ readonly requestAborted: 'REQUEST_ABORTED'; /** * A request chunk sent to the worker has an invalid shape. * * Check that the payload satisfies `ISerializeChunk`. This is a protocol error. */ readonly invalidRequestChunk: 'INVALID_REQUEST_CHUNK'; /** * A chunk returned by the worker has an invalid shape. * * Check the worker parser output. This is a worker implementation error. */ readonly invalidResponseChunk: 'INVALID_RESPONSE_CHUNK'; /** * Both endpoint and owned Worker cleanup failed during parser disposal. A single failure keeps * its existing identity rather than receiving this aggregate code. The caller must inspect * `cause`/`errors[]` and treat the parser as terminal. */ readonly cleanupFailed: 'CLEANUP_FAILED'; };",
+          "declarationLine": 12,
+          "source": "packages/store-worker/dist/error-code.d.ts",
+          "purpose": "Stable Worker bridge and serializer failure codes; canonical RPC/Resource failures may retain their own package identity.",
+          "core": "invalidOption: Malformed options, callbacks, worker shape or serializer phase; correct caller input.\nadapterDisposed: WorkerAdapter request after close/dispose; create another adapter.\nrequestAborted: Worker serialization was cancelled through its context signal or an explicit stream stop; copied input remains readable.\ninvalidRequestChunk: Worker handler received a malformed serialization chunk.\ninvalidResponseChunk: Main-side serializer received invalid response chunk or frame sequence.\ncleanupFailed: Both endpoint cleanup and requested Worker termination failed; ordered CLEANUP_FAILED AggregateError retains both. A single cleanup failure keeps its existing identity and does not receive this aggregate code.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "invalidOption",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidOption: 'INVALID_OPTION';",
+              "description": "Worker options, parser encode/decode members or the post callback are invalid or inaccessible. * Correct the factory input; native getter failures retain identity or an original cause.",
+              "parameterDetails": [],
+              "returns": "'INVALID_OPTION'"
+            },
+            {
+              "name": "adapterDisposed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly adapterDisposed: 'ADAPTER_DISPOSED';",
+              "description": "A worker adapter is called after disposal. * * Create a new adapter instead of reusing the disposed instance.",
+              "parameterDetails": [],
+              "returns": "'ADAPTER_DISPOSED'"
+            },
+            {
+              "name": "requestAborted",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly requestAborted: 'REQUEST_ABORTED';",
+              "description": "Worker serialization is cooperatively cancelled through an `AbortSignal` or explicit stream * stop. * * Treat this as cancellation. Transfer can detach input after a send, but pre-cancelled requests * have not sent it; inspect the actual backing buffer before deciding whether retry is safe.",
+              "parameterDetails": [],
+              "returns": "'REQUEST_ABORTED'"
+            },
+            {
+              "name": "invalidRequestChunk",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidRequestChunk: 'INVALID_REQUEST_CHUNK';",
+              "description": "A request chunk sent to the worker has an invalid shape. * * Check that the payload satisfies `ISerializeChunk`. This is a protocol error.",
+              "parameterDetails": [],
+              "returns": "'INVALID_REQUEST_CHUNK'"
+            },
+            {
+              "name": "invalidResponseChunk",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidResponseChunk: 'INVALID_RESPONSE_CHUNK';",
+              "description": "A chunk returned by the worker has an invalid shape. * * Check the worker parser output. This is a worker implementation error.",
+              "parameterDetails": [],
+              "returns": "'INVALID_RESPONSE_CHUNK'"
+            },
+            {
+              "name": "cleanupFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly cleanupFailed: 'CLEANUP_FAILED';",
+              "description": "Both endpoint and owned Worker cleanup failed during parser disposal. A single failure keeps * its existing identity rather than receiving this aggregate code. The caller must inspect * `cause`/`errors[]` and treat the parser as terminal.",
+              "parameterDetails": [],
+              "returns": "'CLEANUP_FAILED'"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "StoreWorkerErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const StoreWorkerErrorCode: { /** * Worker options, parser encode/decode members or the post callback are invalid or inaccessible. * Correct the factory input; native getter failures retain identity or an original cause. */ readonly invalidOption: 'INVALID_OPTION'; /** * A worker adapter is called after disposal. * * Create a new adapter instead of reusing the disposed instance. */ readonly adapterDisposed: 'ADAPTER_DISPOSED'; /** * Worker serialization is cooperatively cancelled through an `AbortSignal` or explicit stream * stop. * * Treat this as cancellation. Transfer can detach input after a send, but pre-cancelled requests * have not sent it; inspect the actual backing buffer before deciding whether retry is safe. */ readonly requestAborted: 'REQUEST_ABORTED'; /** * A request chunk sent to the worker has an invalid shape. * * Check that the payload satisfies `ISerializeChunk`. This is a protocol error. */ readonly invalidRequestChunk: 'INVALID_REQUEST_CHUNK'; /** * A chunk returned by the worker has an invalid shape. * * Check the worker parser output. This is a worker implementation error. */ readonly invalidResponseChunk: 'INVALID_RESPONSE_CHUNK'; /** * Both endpoint and owned Worker cleanup failed during parser disposal. A single failure keeps * its existing identity rather than receiving this aggregate code. The caller must inspect * `cause`/`errors[]` and treat the parser as terminal. */ readonly cleanupFailed: 'CLEANUP_FAILED'; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Stable Worker bridge and serializer failure codes; canonical RPC/Resource failures may retain their own package identity."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import StoreWorkerErrorCode from @migaia/store-worker, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use StoreWorkerErrorCode when its const contract and declared inputs match the result you need. Choose a different public symbol when StoreWorkerErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "invalidOption: Malformed options, callbacks, worker shape or serializer phase; correct caller input.\nadapterDisposed: WorkerAdapter request after close/dispose; create another adapter.\nrequestAborted: Worker serialization was cancelled through its context signal or an explicit stream stop; copied input remains readable.\ninvalidRequestChunk: Worker handler received a malformed serialization chunk.\ninvalidResponseChunk: Main-side serializer received invalid response chunk or frame sequence.\ncleanupFailed: Both endpoint cleanup and requested Worker termination failed; ordered CLEANUP_FAILED AggregateError retains both. A single cleanup failure keeps its existing identity and does not receive this aggregate code."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-worker/dist/error-code.d.ts:StoreWorkerErrorCode:export declare const StoreWorkerErrorCode: { /** * Worker options, parser encode/decode members or the post callback are invalid or inaccessible. * Correct the factory input; native getter failures retain identity or an original cause. */ readonly invalidOption: 'INVALID_OPTION'; /** * A worker adapter is called after disposal. * * Create a new adapter instead of reusing the disposed instance. */ readonly adapterDisposed: 'ADAPTER_DISPOSED'; /** * Worker serialization is cooperatively cancelled through an `AbortSignal` or explicit stream * stop. * * Treat this as cancellation. Transfer can detach input after a send, but pre-cancelled requests * have not sent it; inspect the actual backing buffer before deciding whether retry is safe. */ readonly requestAborted: 'REQUEST_ABORTED'; /** * A request chunk sent to the worker has an invalid shape. * * Check that the payload satisfies `ISerializeChunk`. This is a protocol error. */ readonly invalidRequestChunk: 'INVALID_REQUEST_CHUNK'; /** * A chunk returned by the worker has an invalid shape. * * Check the worker parser output. This is a worker implementation error. */ readonly invalidResponseChunk: 'INVALID_RESPONSE_CHUNK'; /** * Both endpoint and owned Worker cleanup failed during parser disposal. A single failure keeps * its existing identity rather than receiving this aggregate code. The caller must inspect * `cause`/`errors[]` and treat the parser as terminal. */ readonly cleanupFailed: 'CLEANUP_FAILED'; };",
+          "guidance": [
+            {
+              "id": "取消-错误与清理归属",
+              "heading": "取消、错误与清理归属",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "通用 Adapter request 保留 canonical Host 取消、超时与 transport 错误。未分类 provider 失败在顶层保留原生 Error/TypeError，并附加 rpc.endpoint / INTERNAL；message、stack 与嵌套 cause 链保持，其中未分类原生原因节点仍为 unknown / UNKNOWN。不再增加 RpcRemoteError 外壳。跨 realm 会重建对象，不保留发送方引用 identity。未配置期限且 provider 一直不结算时，请求仍可能等待。"
+                },
+                {
+                  "type": "paragraph",
+                  "text": "序列化 decode / request 与预取消 encode 使用 SerializeCodecError / REQUEST_ABORTED，包含 type（默认 worker）、phase（encode / decode）、context、chunkIndex 0 和 bytesConsumed（输入 bytes 长度，否则 0），原 signal.reason 保留在 cause。活动 encode 流可以由原始 RPC / 取消失败终结，不保证每个失败都有全部 codec 字段。credit 等待和显式流停止创建原生 DOMException / AbortError，message 为 serialize stream cancelled，附 REQUEST_ABORTED；其原生类型、message 和 stack 由错误链保留。"
+                },
+                {
+                  "type": "table",
+                  "headers": ["StoreWorkerErrorCode 属性 / 值", "触发"],
+                  "rows": [
+                    [
+                      "invalidOption / INVALID_OPTION",
+                      "非法或不可读取的 Worker / parser / Resource 配置。"
+                    ],
+                    [
+                      "adapterDisposed / ADAPTER_DISPOSED",
+                      "已 close / dispose 的通用 Adapter 继续 request。"
+                    ],
+                    [
+                      "requestAborted / REQUEST_ABORTED",
+                      "序列化请求或流协作取消，检查 reason 与真实 buffer 状态。"
+                    ],
+                    [
+                      "invalidRequestChunk / INVALID_REQUEST_CHUNK",
+                      "Worker 请求的 chunk 形状非法。"
+                    ],
+                    [
+                      "invalidResponseChunk / INVALID_RESPONSE_CHUNK",
+                      "返回 chunk 或帧序列不合法。"
+                    ],
+                    ["cleanupFailed / CLEANUP_FAILED", "parser 端点与可选 terminate 同时清理失败。"]
+                  ]
+                },
+                {
+                  "type": "paragraph",
+                  "text": "STORE_WORKER_SOURCE 为 store.worker。createStoreWorkerError(code, message, options?) 接收必填码和消息，可选 options.cause，返回带身份的 Error；createStoreWorkerAggregateError(code, errors, message) 返回 AggregateError，保留 errors 顺序和原值。code 类型为 IStoreWorkerErrorCode，工厂不覆盖 stack。外包完整身份继续由原 owner 负责。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "store-worker-index--StoreWorkerErrorCode"
+        },
+        {
+          "name": "WorkerAdapter",
+          "kind": "class",
+          "signature": "export declare class WorkerAdapter { #private; /** * Borrows port and captures client options once; options default to an empty object. clientId * defaults to main, with worker as the remote endpoint id. timeoutMs is omitted by default, * leaving requests without an application deadline. Invalid options throw locally; endpoint setup * failures surface through request/dispose rather than making the constructor async. */ constructor(port: IWorkerPort, options?: { readonly clientId?: string; readonly timeoutMs?: number; }); /** Whether close/dispose has fenced new requests, independently of cleanup completion. */ get disposed(): boolean; /** * Waits for endpoint setup and the remote computation, returning its decoded result; Output is a * static expectation rather than runtime schema validation. Captures optional signal once before * asynchronous admission; it defaults to undefined. Inputs are copied without detaching the * caller's buffers. Invalid options or terminal admission reject, as do RPC/remote failures. * Cancellation asks a cooperative provider to stop and does not undo completed effects or * forcibly terminate it. */ request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; }): Promise<Output>; /** * Synchronously marks the adapter unavailable by setting `disposed = true`. It does not release * the endpoint. Repeated calls have no additional effect. */ close(): void; /** * Closes the adapter, waits for endpoint initialization, and calls `endpoint.close()`. This is * the only asynchronous disposal entry point. Cleanup failures reject the promise. Repeated calls * return the same promise. The borrowed physical port/Worker remains caller-owned. */ dispose(): Promise<void>; }",
+          "declarationLine": 23,
+          "source": "packages/store-worker/dist/worker.d.ts",
+          "purpose": "Creates a main-side client that asynchronously initializes a canonical worker endpoint; requests await readiness automatically. Pair it with createWorkerHandler on the worker. It borrows the supplied Worker and never terminates it.",
+          "core": "port: IWorkerPort, normally a Worker created by the application; preserve its event-listener methods.\nNew WorkerAdapter with asynchronous endpoint initialization already started; request awaits it and dispose shares one cleanup Promise. Invalid option-object access throws INVALID_OPTION synchronously, while endpoint initialization failure is observed through request/dispose.\ndisposed: True after close/dispose starts, before asynchronous endpoint cleanup completes.\nrequest: Waits readiness then sends one canonical call. Generics only type the result; no runtime schema check is added. Payload passes recursive portable conversion, with bytes encoded to base64url and class prototypes not preserved; use supported plain data.\nrequest.payload: Caller Input consumed by worker compute; avoid cycles and reserved $worker envelope keys.\nrequest.options: Options default to {}; signal defaults to undefined and controls cooperative request cancellation. Inputs are copied without detaching caller buffers.\nPromise<Output>; closed adapter rejects ADAPTER_DISPOSED, endpoint/RPC/compute failures keep their canonical identity. Classify ordinary request cancellation with RPC_CORE_ERROR_SOURCE and RpcCoreErrorCode.cancelled, not the serializer REQUEST_ABORTED code. close alone does not cancel admitted requests.\nclose: Idempotently marks unavailable synchronously; does not release endpoint or terminate Worker.\nVoid; later request calls reject immediately.\ndispose: Closes adapter, awaits readiness and closes endpoint; never terminates the borrowed Worker. Repeated calls return the same Promise.\nStable Promise<void>; initialization/cleanup failures reject.\nclientId: String assigned by the caller for this RPC endpoint identity; the worker-side helper targets main, so the usual supported pair uses that default. Distinct topology requires a matching peer configuration.\nmain, a fixed identity rather than a generated unique ID.\ntimeoutMs: Optional per-request millisecond timeout forwarded to the canonical RPC send operation by WorkerAdapter; RPC owns validation, cancellation and timeout errors.\nundefined: no default request deadline is supplied.",
+          "advanced": "Offload computation then connect its result to a Resource.",
+          "parameters": [
+            "port: IWorkerPort",
+            "options: { readonly clientId?: string; readonly timeoutMs?: number; } (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "port",
+              "type": "IWorkerPort",
+              "optional": false
+            },
+            {
+              "name": "options",
+              "type": "{ readonly clientId?: string; readonly timeoutMs?: number; }",
+              "optional": true
+            }
+          ],
+          "returns": "No explicit return annotation is declared for this class.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import {\n  Worker,\n  MessageChannel,\n  workerData,\n  isMainThread,\n  threadId,\n  type MessagePort\n} from 'node:worker_threads'\nimport { WorkerAdapter, createWorkerHandler } from '@migaia/store-worker'\n\nif (!isMainThread) {\n  const port = workerData as MessagePort\n  const handler = createWorkerHandler(\n    (values: number[]) => ({\n      total: values.reduce((sum, value) => sum + value, 0),\n      pid: process.pid,\n      threadId\n    }),\n    (message) => port.postMessage(message)\n  )\n  port.on('message', (message) => void handler(message).catch(console.error))\n} else {\n  const { port1, port2 } = new MessageChannel()\n  const worker = new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })\n  port1.start()\n  const adapter = new WorkerAdapter(port1)\n  try {\n    const result = await adapter.request<\n      number[],\n      {\n        total: number\n        pid: number\n        threadId: number\n      }\n    >([20, 22])\n    console.log('结果：', result.total, result.pid === process.pid, result.threadId !== threadId)\n  } finally {\n    await adapter.dispose()\n    port1.close()\n    await worker.terminate()\n  }\n}",
+            "import {\n  Worker,\n  MessageChannel,\n  workerData,\n  isMainThread,\n  threadId,\n  type MessagePort\n} from 'node:worker_threads'\nimport { WorkerAdapter, createWorkerHandler } from '@migaia/store-worker'\n\nif (!isMainThread) {\n  const port = workerData as MessagePort\n  const handler = createWorkerHandler(\n    (value: number) => value * 2,\n    (message) => port.postMessage(message)\n  )\n  port.on('message', (message) => {\n    if (message === 'ping') {\n      port.postMessage('pong')\n      return\n    }\n    void handler(message).catch(console.error)\n  })\n} else {\n  const { port1, port2 } = new MessageChannel()\n  const worker = new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })\n  port1.start()\n  const adapter = new WorkerAdapter(port1)\n  try {\n    console.log('关闭前：', await adapter.request(21))\n    adapter.close()\n    const failure = await adapter.request(21).catch((error: unknown) => error)\n    console.log('已关闭：', adapter.disposed, (failure as { code?: string }).code)\n    const first = adapter.dispose()\n    console.log('同一清理：', first === adapter.dispose())\n    await first\n    const pong = new Promise<unknown>((resolve) => port1.once('message', resolve))\n    port1.postMessage('ping')\n    console.log('借用端口：', await pong)\n  } finally {\n    await adapter.dispose()\n    port1.close()\n    await worker.terminate()\n  }\n}",
+            "import {\n  Worker,\n  MessageChannel,\n  workerData,\n  isMainThread,\n  threadId,\n  type MessagePort\n} from 'node:worker_threads'\nimport { WorkerAdapter, createWorkerHandler } from '@migaia/store-worker'\n\nif (!isMainThread) {\n  const port = workerData as MessagePort\n  const root = new RangeError('行数据无效')\n  const failure = new TypeError('无法计算总数', { cause: root })\n  const handler = createWorkerHandler(\n    () => {\n      throw failure\n    },\n    (message) => port.postMessage(message)\n  )\n  port.on('message', (message) => void handler(message).catch(console.error))\n} else {\n  const { port1, port2 } = new MessageChannel()\n  const worker = new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })\n  port1.start()\n  const adapter = new WorkerAdapter(port1)\n  try {\n    const failure = (await adapter.request([1, 2]).catch((error: unknown) => error)) as Error\n    const primary = failure\n    const root = primary.cause as Error\n    console.log('远端错误：', failure.name, (failure as Error & { code?: string }).code)\n    console.log('原始错误：', primary instanceof TypeError, primary.message)\n    console.log('原因：', root instanceof RangeError, root.message)\n    console.log('堆栈：', Boolean(primary.stack), Boolean(root.stack))\n  } finally {\n    await adapter.dispose()\n    port1.close()\n    await worker.terminate()\n  }\n}",
+            "import {\n  Worker,\n  MessageChannel,\n  workerData,\n  isMainThread,\n  threadId,\n  type MessagePort\n} from 'node:worker_threads'\nimport { createRuntime } from '@migaia/reactive'\nimport { WorkerAdapter, createWorkerHandler, workerComputed } from '@migaia/store-worker'\n\nif (!isMainThread) {\n  const port = workerData as MessagePort\n  const handler = createWorkerHandler(\n    (values: number[]) => values.reduce((total, value) => total + value, 0),\n    (message) => port.postMessage(message)\n  )\n  port.on('message', (message) => void handler(message).catch(console.error))\n} else {\n  const { port1, port2 } = new MessageChannel()\n  const worker = new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })\n  port1.start()\n  const adapter = new WorkerAdapter(port1)\n  const runtime = createRuntime()\n  const values = runtime.signal([1, 2, 3])\n  const sum = workerComputed<number[], number>(adapter, () => values.value, {\n    runtime,\n    autoStart: false\n  })\n  try {\n    console.log('取值前：', sum.state.status)\n    console.log('首次：', await sum.refetch(), sum.state.status)\n    const cached = sum.promise\n    console.log('缓存：', cached === sum.promise, await cached)\n    values.value = [4, 5]\n    console.log('更新：', await sum.refetch(), sum.state.status)\n  } finally {\n    sum.dispose()\n    await adapter.dispose()\n    port1.close()\n    await worker.terminate()\n  }\n}",
+            "import { Worker, MessageChannel, workerData, isMainThread } from 'node:worker_threads'\nimport { WorkerAdapter, createWorkerHandler } from '@migaia/store-worker'\nif (!isMainThread) {\n  const handler = createWorkerHandler(Number, (m) => workerData.postMessage(m))\n  workerData.on('message', (m: unknown) => void handler(m).catch(console.error))\n} else {\n  const { port1, port2 } = new MessageChannel()\n  const worker = new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })\n  port1.start()\n  const adapter = new WorkerAdapter(port1)\n  console.log(await adapter.request('42'))\n  await adapter.dispose()\n  port1.close()\n  await worker.terminate()\n}"
+          ],
+          "members": [
+            {
+              "name": "disposed",
+              "kind": "get",
+              "optional": false,
+              "signature": "get disposed(): boolean;",
+              "description": "Whether close/dispose has fenced new requests, independently of cleanup completion.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "request",
+              "kind": "method",
+              "optional": false,
+              "signature": "request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; }): Promise<Output>;",
+              "description": "Waits for endpoint setup and the remote computation, returning its decoded result; Output is a static expectation rather than runtime schema validation. Captures optional signal once before asynchronous admission; it defaults to undefined. Inputs are copied without detaching the caller's buffers. Invalid options or terminal admission reject, as do RPC/remote failures. Cancellation asks a cooperative provider to stop and does not undo completed effects or forcibly terminate it.",
+              "parameterDetails": [
+                {
+                  "name": "payload",
+                  "type": "Input",
+                  "optional": false
+                },
+                {
+                  "name": "options",
+                  "type": "{ signal?: IAbortSignal; }",
+                  "optional": true
+                }
+              ],
+              "returns": "Promise<Output>"
+            },
+            {
+              "name": "close",
+              "kind": "method",
+              "optional": false,
+              "signature": "close(): void;",
+              "description": "Synchronously marks the adapter unavailable by setting `disposed = true`. It does not release the endpoint. Repeated calls have no additional effect.",
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "dispose",
+              "kind": "method",
+              "optional": false,
+              "signature": "dispose(): Promise<void>;",
+              "description": "Closes the adapter, waits for endpoint initialization, and calls `endpoint.close()`. This is the only asynchronous disposal entry point. Cleanup failures reject the promise. Repeated calls return the same promise. The borrowed physical port/Worker remains caller-owned.",
+              "parameterDetails": [],
+              "returns": "Promise<void>"
+            }
+          ],
+          "composes": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare class WorkerAdapter { #private; /** * Borrows port and captures client options once; options default to an empty object. clientId * defaults to main, with worker as the remote endpoint id. timeoutMs is omitted by default, * leaving requests without an application deadline. Invalid options throw locally; endpoint setup * failures surface through request/dispose rather than making the constructor async. */ constructor(port: IWorkerPort, options?: { readonly clientId?: string; readonly timeoutMs?: number; }); /** Whether close/dispose has fenced new requests, independently of cleanup completion. */ get disposed(): boolean; /** * Waits for endpoint setup and the remote computation, returning its decoded result; Output is a * static expectation rather than runtime schema validation. Captures optional signal once before * asynchronous admission; it defaults to undefined. Inputs are copied without detaching the * caller's buffers. Invalid options or terminal admission reject, as do RPC/remote failures. * Cancellation asks a cooperative provider to stop and does not undo completed effects or * forcibly terminate it. */ request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; }): Promise<Output>; /** * Synchronously marks the adapter unavailable by setting `disposed = true`. It does not release * the endpoint. Repeated calls have no additional effect. */ close(): void; /** * Closes the adapter, waits for endpoint initialization, and calls `endpoint.close()`. This is * the only asynchronous disposal entry point. Cleanup failures reject the promise. Repeated calls * return the same promise. The borrowed physical port/Worker remains caller-owned. */ dispose(): Promise<void>; }"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "port",
+                "type": "IWorkerPort",
+                "optional": false
+              },
+              {
+                "name": "options",
+                "type": "{ readonly clientId?: string; readonly timeoutMs?: number; }",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": [],
+          "whenToUse": "Offload computation then connect its result to a Resource.",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Creates a main-side client that asynchronously initializes a canonical worker endpoint; requests await readiness automatically. Pair it with createWorkerHandler on the worker. It borrows the supplied Worker and never terminates it."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import WorkerAdapter from @migaia/store-worker, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use WorkerAdapter when its class contract and declared inputs match the result you need. Choose a different public symbol when WorkerAdapter does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained class example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "port: IWorkerPort, normally a Worker created by the application; preserve its event-listener methods.\nNew WorkerAdapter with asynchronous endpoint initialization already started; request awaits it and dispose shares one cleanup Promise. Invalid option-object access throws INVALID_OPTION synchronously, while endpoint initialization failure is observed through request/dispose.\ndisposed: True after close/dispose starts, before asynchronous endpoint cleanup completes.\nrequest: Waits readiness then sends one canonical call. Generics only type the result; no runtime schema check is added. Payload passes recursive portable conversion, with bytes encoded to base64url and class prototypes not preserved; use supported plain data.\nrequest.payload: Caller Input consumed by worker compute; avoid cycles and reserved $worker envelope keys.\nrequest.options: Options default to {}; signal defaults to undefined and controls cooperative request cancellation. Inputs are copied without detaching caller buffers.\nPromise<Output>; closed adapter rejects ADAPTER_DISPOSED, endpoint/RPC/compute failures keep their canonical identity. Classify ordinary request cancellation with RPC_CORE_ERROR_SOURCE and RpcCoreErrorCode.cancelled, not the serializer REQUEST_ABORTED code. close alone does not cancel admitted requests.\nclose: Idempotently marks unavailable synchronously; does not release endpoint or terminate Worker.\nVoid; later request calls reject immediately.\ndispose: Closes adapter, awaits readiness and closes endpoint; never terminates the borrowed Worker. Repeated calls return the same Promise.\nStable Promise<void>; initialization/cleanup failures reject.\nclientId: String assigned by the caller for this RPC endpoint identity; the worker-side helper targets main, so the usual supported pair uses that default. Distinct topology requires a matching peer configuration.\nmain, a fixed identity rather than a generated unique ID.\ntimeoutMs: Optional per-request millisecond timeout forwarded to the canonical RPC send operation by WorkerAdapter; RPC owns validation, cancellation and timeout errors.\nundefined: no default request deadline is supplied."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "Offload computation then connect its result to a Resource."
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "clientId",
+              "type": "string",
+              "optional": true,
+              "description": "Local RPC endpoint id, default main; it is a captured string rather than an id factory."
+            },
+            {
+              "name": "timeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": ""
+            }
+          ],
+          "identity": "packages/store-worker/dist/worker.d.ts:WorkerAdapter:export declare class WorkerAdapter { #private; /** * Borrows port and captures client options once; options default to an empty object. clientId * defaults to main, with worker as the remote endpoint id. timeoutMs is omitted by default, * leaving requests without an application deadline. Invalid options throw locally; endpoint setup * failures surface through request/dispose rather than making the constructor async. */ constructor(port: IWorkerPort, options?: { readonly clientId?: string; readonly timeoutMs?: number; }); /** Whether close/dispose has fenced new requests, independently of cleanup completion. */ get disposed(): boolean; /** * Waits for endpoint setup and the remote computation, returning its decoded result; Output is a * static expectation rather than runtime schema validation. Captures optional signal once before * asynchronous admission; it defaults to undefined. Inputs are copied without detaching the * caller's buffers. Invalid options or terminal admission reject, as do RPC/remote failures. * Cancellation asks a cooperative provider to stop and does not undo completed effects or * forcibly terminate it. */ request<Input, Output>(payload: Input, options?: { signal?: IAbortSignal; }): Promise<Output>; /** * Synchronously marks the adapter unavailable by setting `disposed = true`. It does not release * the endpoint. Repeated calls have no additional effect. */ close(): void; /** * Closes the adapter, waits for endpoint initialization, and calls `endpoint.close()`. This is * the only asynchronous disposal entry point. Cleanup failures reject the promise. Repeated calls * return the same promise. The borrowed physical port/Worker remains caller-owned. */ dispose(): Promise<void>; }",
+          "guidance": [],
+          "usageScore": 138,
+          "configuration": [
+            {
+              "name": "clientId",
+              "type": "string",
+              "optional": true,
+              "description": "`new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })` 在另一个线程执行当前文件；`isMainThread` 区分两条分支，`workerData` 是交给子线程的端口，`transferList` 转移的是端口而非业务输入。`port1.start()` 启用原生端口的事件分发。`request` 的两个泛型只声明输入与返回值类型；本例载荷为 `[20, 22]`，未设置 `signal`。适配器的 `clientId` 默认 `'main'`，`timeoutMs` 默认 `undefined`，不设期限。",
+              "descriptionEn": "Local RPC endpoint id, default main; it is a captured string rather than an id factory.",
+              "descriptionZh": "`new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })` 在另一个线程执行当前文件；`isMainThread` 区分两条分支，`workerData` 是交给子线程的端口，`transferList` 转移的是端口而非业务输入。`port1.start()` 启用原生端口的事件分发。`request` 的两个泛型只声明输入与返回值类型；本例载荷为 `[20, 22]`，未设置 `signal`。适配器的 `clientId` 默认 `'main'`，`timeoutMs` 默认 `undefined`，不设期限。"
+            },
+            {
+              "name": "timeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": "`new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })` 在另一个线程执行当前文件；`isMainThread` 区分两条分支，`workerData` 是交给子线程的端口，`transferList` 转移的是端口而非业务输入。`port1.start()` 启用原生端口的事件分发。`request` 的两个泛型只声明输入与返回值类型；本例载荷为 `[20, 22]`，未设置 `signal`。适配器的 `clientId` 默认 `'main'`，`timeoutMs` 默认 `undefined`，不设期限。",
+              "descriptionEn": "",
+              "descriptionZh": "`new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })` 在另一个线程执行当前文件；`isMainThread` 区分两条分支，`workerData` 是交给子线程的端口，`transferList` 转移的是端口而非业务输入。`port1.start()` 启用原生端口的事件分发。`request` 的两个泛型只声明输入与返回值类型；本例载荷为 `[20, 22]`，未设置 `signal`。适配器的 `clientId` 默认 `'main'`，`timeoutMs` 默认 `undefined`，不设期限。"
+            }
+          ],
+          "fragment": "store-worker-index--WorkerAdapter"
+        },
+        {
+          "name": "workerComputed",
+          "kind": "function",
+          "signature": "export declare function workerComputed<Input, Output>(adapter: WorkerAdapter, selectInput: () => Input, options?: IWorkerComputedOptions<Output>): Resource<Output>;",
+          "declarationLine": 95,
+          "source": "packages/store-worker/dist/worker.d.ts",
+          "purpose": "Constructs a standard Resource whose fetcher selects input synchronously and sends through the adapter. Input reads before returning establish reactive dependencies. It never disposes the adapter or Worker.",
+          "core": "adapter: WorkerAdapter instance returned by its constructor; the caller retains disposal ownership.\nselectInput: Synchronous no-argument callback returning Input for each Resource fetch attempt; may run again on dependency change, refetch or retry. Throws become Resource failure; do not return a Promise.\nResource<Output> from @migaia/resource, including state, refetch(), promise, cancel(), dehydrate/hydrate and dispose(). Canonical resource documentation defines generation cancellation and retry. Dispose it separately, then await adapter.dispose and terminate caller Worker.\ndebugName: Label shown in reactive diagnostics and in request error context.\nNot set: diagnostics show no label.\nttl: Success lifetime in milliseconds; positive finite lifetimes revalidate on an expired read. `0` and `Infinity` disable time expiration, but changed dependencies, including after suspension, still trigger refetching. Must be ≥ 0 or `Infinity`.\n`Infinity`: fresh until a dependency changes or `refetch()` is called.\nautoStart: Start the first request in the constructor.\n`true`: starts immediately unless the initial snapshot is fresh.\nstaleWhileRevalidate: Keep showing expired success data while the refresh runs (`refreshing` is `true`) instead of switching to `pending`.\n`false`: an expired value is replaced by `pending`.\nretry: Resource retry policy: a non-negative integer extra-attempt count, or synchronous (failureCount,error) => boolean. failureCount starts at one and error is the original fetch failure. Return true to retry; callback throws or non-boolean/thenable results become Resource failure, without awaiting a Promise.\nZero extra attempts; no automatic retry.\nretryDelay: Finite non-negative milliseconds, or synchronous (failureCount,error) => milliseconds for each accepted retry. Receives the one-based count and original failure; callback throws or invalid/non-number/thenable results become Resource failure. A delayed retry remains cancellable through Resource.\nZero milliseconds; retries without a configured delay.\nUse a fixed millisecond delay for short failures, or a synchronous callback for increasing waits. failureCount starts at one. Omission retries immediately; retry must also allow another attempt.\nkeepAlive: Keep upstream dependencies connected while nothing reads `state`, so changes are still tracked.\n`false`: unobserved resources disconnect upstream.\ninitialSnapshot: Success snapshot from `dehydrate()` (server rendering or persistence) used as the initial state; it is revalidated when expired.\nNot set: start from `idle`.\nscheduler: IScheduler from @migaia/utils/scheduler controls Resource TTL and retry clocks; forwarded unchanged to Resource.\nsystemScheduler from @migaia/utils/scheduler.\nruntime: IRuntime returned by reactive createRuntime; selectInput reads belong to this Resource Runtime. Other-Runtime reads are governed by reactive ownership checks.\nReactive defaultRuntime; pass a request/instance Runtime for isolation.",
+          "advanced": "",
+          "parameters": [
+            "adapter: WorkerAdapter",
+            "selectInput: () => Input",
+            "options: IWorkerComputedOptions<Output> (optional)"
+          ],
+          "parameterDetails": [
+            {
+              "name": "adapter",
+              "type": "WorkerAdapter",
+              "optional": false
+            },
+            {
+              "name": "selectInput",
+              "type": "() => Input",
+              "optional": false
+            },
+            {
+              "name": "options",
+              "type": "IWorkerComputedOptions<Output>",
+              "optional": true
+            }
+          ],
+          "returns": "Resource<Output>",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import {\n  Worker,\n  MessageChannel,\n  workerData,\n  isMainThread,\n  threadId,\n  type MessagePort\n} from 'node:worker_threads'\nimport { createRuntime } from '@migaia/reactive'\nimport { WorkerAdapter, createWorkerHandler, workerComputed } from '@migaia/store-worker'\n\nif (!isMainThread) {\n  const port = workerData as MessagePort\n  const handler = createWorkerHandler(\n    (values: number[]) => values.reduce((total, value) => total + value, 0),\n    (message) => port.postMessage(message)\n  )\n  port.on('message', (message) => void handler(message).catch(console.error))\n} else {\n  const { port1, port2 } = new MessageChannel()\n  const worker = new Worker(new URL(import.meta.url), { workerData: port2, transferList: [port2] })\n  port1.start()\n  const adapter = new WorkerAdapter(port1)\n  const runtime = createRuntime()\n  const values = runtime.signal([1, 2, 3])\n  const sum = workerComputed<number[], number>(adapter, () => values.value, {\n    runtime,\n    autoStart: false\n  })\n  try {\n    console.log('取值前：', sum.state.status)\n    console.log('首次：', await sum.refetch(), sum.state.status)\n    const cached = sum.promise\n    console.log('缓存：', cached === sum.promise, await cached)\n    values.value = [4, 5]\n    console.log('更新：', await sum.refetch(), sum.state.status)\n  } finally {\n    sum.dispose()\n    await adapter.dispose()\n    port1.close()\n    await worker.terminate()\n  }\n}"
+          ],
+          "members": [],
+          "composes": [],
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function workerComputed<Input, Output>(adapter: WorkerAdapter, selectInput: () => Input, options?: IWorkerComputedOptions<Output>): Resource<Output>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "adapter",
+                "type": "WorkerAdapter",
+                "optional": false
+              },
+              {
+                "name": "selectInput",
+                "type": "() => Input",
+                "optional": false
+              },
+              {
+                "name": "options",
+                "type": "IWorkerComputedOptions<Output>",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["Resource<Output>"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Constructs a standard Resource whose fetcher selects input synchronously and sends through the adapter. Input reads before returning establish reactive dependencies. It never disposes the adapter or Worker."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import workerComputed from @migaia/store-worker, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use workerComputed when its function contract and declared inputs match the result you need. Choose a different public symbol when workerComputed does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "adapter: WorkerAdapter instance returned by its constructor; the caller retains disposal ownership.\nselectInput: Synchronous no-argument callback returning Input for each Resource fetch attempt; may run again on dependency change, refetch or retry. Throws become Resource failure; do not return a Promise.\nResource<Output> from @migaia/resource, including state, refetch(), promise, cancel(), dehydrate/hydrate and dispose(). Canonical resource documentation defines generation cancellation and retry. Dispose it separately, then await adapter.dispose and terminate caller Worker.\ndebugName: Label shown in reactive diagnostics and in request error context.\nNot set: diagnostics show no label.\nttl: Success lifetime in milliseconds; positive finite lifetimes revalidate on an expired read. `0` and `Infinity` disable time expiration, but changed dependencies, including after suspension, still trigger refetching. Must be ≥ 0 or `Infinity`.\n`Infinity`: fresh until a dependency changes or `refetch()` is called.\nautoStart: Start the first request in the constructor.\n`true`: starts immediately unless the initial snapshot is fresh.\nstaleWhileRevalidate: Keep showing expired success data while the refresh runs (`refreshing` is `true`) instead of switching to `pending`.\n`false`: an expired value is replaced by `pending`.\nretry: Resource retry policy: a non-negative integer extra-attempt count, or synchronous (failureCount,error) => boolean. failureCount starts at one and error is the original fetch failure. Return true to retry; callback throws or non-boolean/thenable results become Resource failure, without awaiting a Promise.\nZero extra attempts; no automatic retry.\nretryDelay: Finite non-negative milliseconds, or synchronous (failureCount,error) => milliseconds for each accepted retry. Receives the one-based count and original failure; callback throws or invalid/non-number/thenable results become Resource failure. A delayed retry remains cancellable through Resource.\nZero milliseconds; retries without a configured delay.\nUse a fixed millisecond delay for short failures, or a synchronous callback for increasing waits. failureCount starts at one. Omission retries immediately; retry must also allow another attempt.\nkeepAlive: Keep upstream dependencies connected while nothing reads `state`, so changes are still tracked.\n`false`: unobserved resources disconnect upstream.\ninitialSnapshot: Success snapshot from `dehydrate()` (server rendering or persistence) used as the initial state; it is revalidated when expired.\nNot set: start from `idle`.\nscheduler: IScheduler from @migaia/utils/scheduler controls Resource TTL and retry clocks; forwarded unchanged to Resource.\nsystemScheduler from @migaia/utils/scheduler.\nruntime: IRuntime returned by reactive createRuntime; selectInput reads belong to this Resource Runtime. Other-Runtime reads are governed by reactive ownership checks.\nReactive defaultRuntime; pass a request/instance Runtime for isolation."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "runtime",
+              "type": "IRuntime",
+              "optional": true,
+              "description": "Borrowed reactive Runtime, default defaultRuntime, used for the returned Resource."
+            },
+            {
+              "name": "debugName",
+              "type": "string",
+              "optional": true,
+              "description": "Human-readable owner label used in reactive diagnostics and request error context."
+            },
+            {
+              "name": "ttl",
+              "type": "number",
+              "optional": true,
+              "description": "Successful values remain fresh for this many milliseconds. `0` and `Infinity` keep them fresh * until a dependency changes or `refetch()` is called."
+            },
+            {
+              "name": "autoStart",
+              "type": "boolean",
+              "optional": true,
+              "description": "Start the first request in the constructor. Defaults to true."
+            },
+            {
+              "name": "staleWhileRevalidate",
+              "type": "boolean",
+              "optional": true,
+              "description": "Keep stale success data visible while a background refresh runs."
+            },
+            {
+              "name": "retry",
+              "type": "IResourceRetryPolicy",
+              "optional": true,
+              "description": "Retry count or predicate. Suspense Promise throws do not count."
+            },
+            {
+              "name": "retryDelay",
+              "type": "number | ((failureCount: number, error: unknown) => number)",
+              "optional": true,
+              "description": "Milliseconds to wait before the next retry, fixed or computed from the failure number and * error. Defaults to 0."
+            },
+            {
+              "name": "keepAlive",
+              "type": "boolean",
+              "optional": true,
+              "description": "Keep upstream reactive edges while no state consumer exists."
+            },
+            {
+              "name": "initialSnapshot",
+              "type": "IResourceCacheSnapshot<T>",
+              "optional": true,
+              "description": "SSR/persisted success cache used before optional revalidation."
+            },
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": true,
+              "description": "Supplies one scheduler for TTL, `updatedAt`, `expiresAt`, and retry delays. Defaults to * utils/scheduler `systemScheduler`. Missing host capabilities fail immediately instead of * silently falling back to microtasks."
+            }
+          ],
+          "identity": "packages/store-worker/dist/worker.d.ts:workerComputed:export declare function workerComputed<Input, Output>(adapter: WorkerAdapter, selectInput: () => Input, options?: IWorkerComputedOptions<Output>): Resource<Output>;",
+          "guidance": [],
+          "usageScore": 70,
+          "configuration": [
+            {
+              "name": "runtime",
+              "type": "IRuntime",
+              "optional": true,
+              "description": "`runtime` 显式使用输入信号所属的运行时；省略时为 `defaultRuntime`。`selectInput` 同步返回 `values.value`；`autoStart: false` 覆盖默认 `true`，只跳过构造时主动启动，首个 `state` 读取仍会触发请求。`ttl` 默认 `Infinity`，本例不覆盖；`refetch()` 强制取值，`promise` 被动读取可复用新鲜缓存。`Resource` 借用适配器，须先释放资源，再清理端点与原生 Worker。",
+              "descriptionEn": "Borrowed reactive Runtime, default defaultRuntime, used for the returned Resource.",
+              "descriptionZh": "`runtime` 显式使用输入信号所属的运行时；省略时为 `defaultRuntime`。`selectInput` 同步返回 `values.value`；`autoStart: false` 覆盖默认 `true`，只跳过构造时主动启动，首个 `state` 读取仍会触发请求。`ttl` 默认 `Infinity`，本例不覆盖；`refetch()` 强制取值，`promise` 被动读取可复用新鲜缓存。`Resource` 借用适配器，须先释放资源，再清理端点与原生 Worker。"
+            },
+            {
+              "name": "debugName",
+              "type": "string",
+              "optional": true,
+              "description": "debugName — undefined。",
+              "descriptionEn": "debugName — undefined。",
+              "descriptionZh": ""
+            },
+            {
+              "name": "ttl",
+              "type": "number",
+              "optional": true,
+              "description": "`runtime` 显式使用输入信号所属的运行时；省略时为 `defaultRuntime`。`selectInput` 同步返回 `values.value`；`autoStart: false` 覆盖默认 `true`，只跳过构造时主动启动，首个 `state` 读取仍会触发请求。`ttl` 默认 `Infinity`，本例不覆盖；`refetch()` 强制取值，`promise` 被动读取可复用新鲜缓存。`Resource` 借用适配器，须先释放资源，再清理端点与原生 Worker。",
+              "descriptionEn": "Successful values remain fresh for this many milliseconds. `0` and `Infinity` keep them fresh * until a dependency changes or `refetch()` is called.",
+              "descriptionZh": "`runtime` 显式使用输入信号所属的运行时；省略时为 `defaultRuntime`。`selectInput` 同步返回 `values.value`；`autoStart: false` 覆盖默认 `true`，只跳过构造时主动启动，首个 `state` 读取仍会触发请求。`ttl` 默认 `Infinity`，本例不覆盖；`refetch()` 强制取值，`promise` 被动读取可复用新鲜缓存。`Resource` 借用适配器，须先释放资源，再清理端点与原生 Worker。"
+            },
+            {
+              "name": "autoStart",
+              "type": "boolean",
+              "optional": true,
+              "description": "用 `workerComputed` 同步选择输入，并传入信号所属的运行时；`autoStart: false` 跳过构造时主动启动，读取 `state` 仍可按需取值，再等待 `refetch`、读取缓存并在输入改变后刷新。",
+              "descriptionEn": "Start the first request in the constructor. Defaults to true.",
+              "descriptionZh": "用 `workerComputed` 同步选择输入，并传入信号所属的运行时；`autoStart: false` 跳过构造时主动启动，读取 `state` 仍可按需取值，再等待 `refetch`、读取缓存并在输入改变后刷新。"
+            },
+            {
+              "name": "staleWhileRevalidate",
+              "type": "boolean",
+              "optional": true,
+              "description": "staleWhileRevalidate — false。",
+              "descriptionEn": "staleWhileRevalidate — false。",
+              "descriptionZh": ""
+            },
+            {
+              "name": "retry",
+              "type": "IResourceRetryPolicy",
+              "optional": true,
+              "description": "retry — 0；也可按 (failureCount, error) 返回是否重试。",
+              "descriptionEn": "Retry count or predicate. Suspense Promise throws do not count.",
+              "descriptionZh": "retry — 0；也可按 (failureCount, error) 返回是否重试。"
+            },
+            {
+              "name": "retryDelay",
+              "type": "number | ((failureCount: number, error: unknown) => number)",
+              "optional": true,
+              "description": "retryDelay — 0；也可按 (failureCount, error) 返回等待毫秒数。",
+              "descriptionEn": "Milliseconds to wait before the next retry, fixed or computed from the failure number and * error. Defaults to 0.",
+              "descriptionZh": "retryDelay — 0；也可按 (failureCount, error) 返回等待毫秒数。"
+            },
+            {
+              "name": "keepAlive",
+              "type": "boolean",
+              "optional": true,
+              "description": "keepAlive — false。",
+              "descriptionEn": "keepAlive — false。",
+              "descriptionZh": ""
+            },
+            {
+              "name": "initialSnapshot",
+              "type": "IResourceCacheSnapshot<T>",
+              "optional": true,
+              "description": "initialSnapshot — undefined。",
+              "descriptionEn": "initialSnapshot — undefined。",
+              "descriptionZh": ""
+            },
+            {
+              "name": "scheduler",
+              "type": "IScheduler",
+              "optional": true,
+              "description": "scheduler — systemScheduler。",
+              "descriptionEn": "scheduler — systemScheduler。",
+              "descriptionZh": ""
+            }
+          ],
+          "fragment": "store-worker-index--workerComputed"
+        },
+        {
+          "name": "WorkerDiagnosticType",
+          "kind": "const",
+          "signature": "export declare const WorkerDiagnosticType: { /** Default parser name and serializer diagnostic type when no format label is supplied. */ readonly worker: 'worker'; };",
+          "declarationLine": 3,
+          "source": "packages/store-worker/dist/worker-constants.d.ts",
+          "purpose": "Default worker parser name, registry format and codec diagnostic type when no explicit type is provided.",
+          "core": "worker: Used when options.type is omitted; not an automatic format detector.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "worker",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly worker: 'worker';",
+              "description": "Default parser name and serializer diagnostic type when no format label is supplied.",
+              "parameterDetails": [],
+              "returns": "'worker'"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "WorkerDiagnosticType",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const WorkerDiagnosticType: { /** Default parser name and serializer diagnostic type when no format label is supplied. */ readonly worker: 'worker'; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Default worker parser name, registry format and codec diagnostic type when no explicit type is provided."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import WorkerDiagnosticType from @migaia/store-worker, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use WorkerDiagnosticType when its const contract and declared inputs match the result you need. Choose a different public symbol when WorkerDiagnosticType does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "worker: Used when options.type is omitted; not an automatic format detector."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/store-worker/dist/worker-constants.d.ts:WorkerDiagnosticType:export declare const WorkerDiagnosticType: { /** Default parser name and serializer diagnostic type when no format label is supplied. */ readonly worker: 'worker'; };",
+          "guidance": [],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "store-worker-index--WorkerDiagnosticType"
+        }
+      ],
       "aliases": []
     },
     {
@@ -2626,6 +4317,75 @@
               "signature": "terminate?(): void;",
               "description": "Called once on parser disposal only when terminateOnDispose is true; otherwise not invoked.",
               "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "postMessage",
+              "kind": "method",
+              "optional": false,
+              "signature": "postMessage(value: unknown, transfer?: readonly Transferable[]): void;",
+              "description": "Native Transferable overloads stay assignable; RPC forwards its original ArrayBuffer list.",
+              "parameterDetails": [
+                {
+                  "name": "value",
+                  "type": "unknown",
+                  "optional": false
+                },
+                {
+                  "name": "transfer",
+                  "type": "readonly Transferable[]",
+                  "optional": true
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "start",
+              "kind": "method",
+              "optional": true,
+              "signature": "start?(): void;",
+              "description": null,
+              "parameterDetails": [],
+              "returns": "void"
+            },
+            {
+              "name": "addEventListener",
+              "kind": "method",
+              "optional": false,
+              "signature": "addEventListener(type: string, listener: (event: any) => void): void;",
+              "description": "Native EventTarget overloads deliver distinct message and error event types.",
+              "parameterDetails": [
+                {
+                  "name": "type",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(event: any) => void",
+                  "optional": false
+                }
+              ],
+              "returns": "void"
+            },
+            {
+              "name": "removeEventListener",
+              "kind": "method",
+              "optional": false,
+              "signature": "removeEventListener(type: string, listener: (event: any) => void): void;",
+              "description": null,
+              "parameterDetails": [
+                {
+                  "name": "type",
+                  "type": "string",
+                  "optional": false
+                },
+                {
+                  "name": "listener",
+                  "type": "(event: any) => void",
+                  "optional": false
+                }
+              ],
               "returns": "void"
             }
           ],

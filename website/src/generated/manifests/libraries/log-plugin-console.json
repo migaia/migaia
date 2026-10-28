@@ -199,7 +199,403 @@
       ],
       "guidePath": "/en/docs/log-plugin-console/getting-started",
       "architecturePath": "/en/docs/log-plugin-console",
-      "symbols": [],
+      "symbols": [
+        {
+          "name": "ConsoleColorMode",
+          "kind": "const",
+          "signature": "export declare const ConsoleColorMode: { /** Follow environment and TTY capabilities when no explicit policy wins. */ readonly auto: 'auto'; /** Emit ANSI even when the borrowed output is not a terminal. */ readonly always: 'always'; /** Suppress ANSI regardless of host environment. */ readonly never: 'never'; };\nexport type ConsoleColorMode = keyof typeof ConsoleColorMode;",
+          "declarationLine": 2,
+          "source": "packages/log-plugin-console/dist/state-constants.d.ts",
+          "purpose": "Select automatic, forced or disabled ANSI coloring for prettyFeature.",
+          "core": "auto: Resolve environment and terminal policy.\nalways: Force the declared ANSI palette.\nnever: Write the same prefix without ANSI.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "auto",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly auto: 'auto';",
+              "description": "Follow environment and TTY capabilities when no explicit policy wins.",
+              "parameterDetails": [],
+              "returns": "'auto'"
+            },
+            {
+              "name": "always",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly always: 'always';",
+              "description": "Emit ANSI even when the borrowed output is not a terminal.",
+              "parameterDetails": [],
+              "returns": "'always'"
+            },
+            {
+              "name": "never",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly never: 'never';",
+              "description": "Suppress ANSI regardless of host environment.",
+              "parameterDetails": [],
+              "returns": "'never'"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "ConsoleColorMode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const ConsoleColorMode: { /** Follow environment and TTY capabilities when no explicit policy wins. */ readonly auto: 'auto'; /** Emit ANSI even when the borrowed output is not a terminal. */ readonly always: 'always'; /** Suppress ANSI regardless of host environment. */ readonly never: 'never'; };",
+            "export type ConsoleColorMode = keyof typeof ConsoleColorMode;"
+          ],
+          "overloadParameterDetails": [[], []],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Select automatic, forced or disabled ANSI coloring for prettyFeature."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import ConsoleColorMode from @migaia/log-plugin-console, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use ConsoleColorMode when its const contract and declared inputs match the result you need. Choose a different public symbol when ConsoleColorMode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "auto: Resolve environment and terminal policy.\nalways: Force the declared ANSI palette.\nnever: Write the same prefix without ANSI."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/log-plugin-console/dist/state-constants.d.ts:ConsoleColorMode:export declare const ConsoleColorMode: { /** Follow environment and TTY capabilities when no explicit policy wins. */ readonly auto: 'auto'; /** Emit ANSI even when the borrowed output is not a terminal. */ readonly always: 'always'; /** Suppress ANSI regardless of host environment. */ readonly never: 'never'; };\nexport type ConsoleColorMode = keyof typeof ConsoleColorMode;",
+          "guidance": [],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "log-plugin-console-index--ConsoleColorMode"
+        },
+        {
+          "name": "consolePlugin",
+          "kind": "function",
+          "signature": "export declare function consolePlugin(options?: IConsoleOptions): ILogPlugin<IConsoleExtension>;",
+          "declarationLine": 4,
+          "source": "packages/log-plugin-console/dist/console.d.ts",
+          "purpose": "Route asynchronous entries by tag, skip silent entries, and add synchronous raw output without owning borrowed capabilities.",
+          "core": "options: Optional borrowed console/stdout capabilities and output-scoped features.\nAn installable console output plugin granting synchronous raw(text).\nconsole: Borrow log/warn/error methods and preserve their receiver.\nglobalThis.console.\nstdout: Borrow write(text) and optional isTTY; removing the plugin never closes it.\nRecognized process.stdout, or console.log fallback.\nfeatures: Output-scoped host policies override host defaults of the same kind.\nNo output overrides.\nRoute asynchronous entries by tag, skip silent entries, and add synchronous raw output without owning borrowed capabilities.",
+          "advanced": "Route asynchronous entries by tag, skip silent entries, and add synchronous raw output without owning borrowed capabilities.",
+          "parameters": ["options: IConsoleOptions (optional)"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IConsoleOptions",
+              "optional": true
+            }
+          ],
+          "returns": "ILogPlugin<IConsoleExtension>",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { formatFeature } from '@migaia/log-host/features'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [levelPlugin(), consolePlugin({ console: globalThis.console })],\n  features: [prettyFeature({ color: 'never', timestamp: false })]\n})\nlog.info('user=%s', 'alice', { tenant: 'acme' })\nlog.raw('progress\\r')\nawait log.flush()\nawait log.shutdown('manual')\n\nconst json = createLogHost({\n  plugins: [consolePlugin({ features: [formatFeature({ format: 'json' })] })]\n})\njson.log('info', 'structured')\nawait json.shutdown('manual')",
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [levelPlugin(), consolePlugin()],\n  features: [prettyFeature({ color: 'auto' })]\n})\nlog.info('server ready', { port: 3000 })\nawait log.flush()\nawait log.shutdown('manual')"
+          ],
+          "members": [],
+          "composes": [],
+          "aliasOf": "consolePlugin",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function consolePlugin(options?: IConsoleOptions): ILogPlugin<IConsoleExtension>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IConsoleOptions",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["ILogPlugin<IConsoleExtension>"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Route asynchronous entries by tag, skip silent entries, and add synchronous raw output without owning borrowed capabilities."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import consolePlugin from @migaia/log-plugin-console, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use consolePlugin when its function contract and declared inputs match the result you need. Choose a different public symbol when consolePlugin does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "options: Optional borrowed console/stdout capabilities and output-scoped features.\nAn installable console output plugin granting synchronous raw(text).\nconsole: Borrow log/warn/error methods and preserve their receiver.\nglobalThis.console.\nstdout: Borrow write(text) and optional isTTY; removing the plugin never closes it.\nRecognized process.stdout, or console.log fallback.\nfeatures: Output-scoped host policies override host defaults of the same kind.\nNo output overrides.\nRoute asynchronous entries by tag, skip silent entries, and add synchronous raw output without owning borrowed capabilities."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "Route asynchronous entries by tag, skip silent entries, and add synchronous raw output without owning borrowed capabilities."
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "console",
+              "type": "IConsoleTarget",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "stdout",
+              "type": "IConsoleStdout",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "features",
+              "type": "readonly ILogFeature[]",
+              "optional": true,
+              "description": ""
+            }
+          ],
+          "identity": "packages/log-plugin-console/dist/console.d.ts:consolePlugin:export declare function consolePlugin(options?: IConsoleOptions): ILogPlugin<IConsoleExtension>;",
+          "guidance": [],
+          "usageScore": 34,
+          "configuration": [
+            {
+              "name": "console",
+              "type": "IConsoleTarget",
+              "optional": true,
+              "description": "安装 `@migaia/log-plugin-console` 与相同版本的 `@migaia/log-host`。输出插件只依赖 host、utils 与 ansis，不要求安装其它输出插件。",
+              "descriptionEn": "",
+              "descriptionZh": "安装 `@migaia/log-plugin-console` 与相同版本的 `@migaia/log-host`。输出插件只依赖 host、utils 与 ansis，不要求安装其它输出插件。"
+            },
+            {
+              "name": "stdout",
+              "type": "IConsoleStdout",
+              "optional": true,
+              "description": "`consolePlugin` 接受 `console`、`stdout`、`features`。console 是拥有 `log`、`warn`、`error` 方法的借用对象；调用保留该对象的 receiver。stdout 拥有 `write(text)`，可提供 `isTTY`。默认分别取全局 console 与识别到的宿主 process.stdout；卸载不关闭这些能力。",
+              "descriptionEn": "",
+              "descriptionZh": "`consolePlugin` 接受 `console`、`stdout`、`features`。console 是拥有 `log`、`warn`、`error` 方法的借用对象；调用保留该对象的 receiver。stdout 拥有 `write(text)`，可提供 `isTTY`。默认分别取全局 console 与识别到的宿主 process.stdout；卸载不关闭这些能力。"
+            },
+            {
+              "name": "features",
+              "type": "readonly ILogFeature[]",
+              "optional": true,
+              "description": "`consolePlugin` 接受 `console`、`stdout`、`features`。console 是拥有 `log`、`warn`、`error` 方法的借用对象；调用保留该对象的 receiver。stdout 拥有 `write(text)`，可提供 `isTTY`。默认分别取全局 console 与识别到的宿主 process.stdout；卸载不关闭这些能力。",
+              "descriptionEn": "",
+              "descriptionZh": "`consolePlugin` 接受 `console`、`stdout`、`features`。console 是拥有 `log`、`warn`、`error` 方法的借用对象；调用保留该对象的 receiver。stdout 拥有 `write(text)`，可提供 `isTTY`。默认分别取全局 console 与识别到的宿主 process.stdout；卸载不关闭这些能力。"
+            }
+          ],
+          "fragment": "log-plugin-console-index--consolePlugin"
+        },
+        {
+          "name": "LogConsoleErrorCode",
+          "kind": "const",
+          "signature": "export declare const LogConsoleErrorCode: {};",
+          "declarationLine": 2,
+          "source": "packages/log-plugin-console/dist/error-code.d.ts",
+          "purpose": "Semantic codes owned by this package. This empty table declares no package-owned errors.",
+          "core": "Semantic codes owned by this package. This empty table declares no package-owned errors.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "LogConsoleErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": ["export declare const LogConsoleErrorCode: {};"],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Semantic codes owned by this package. This empty table declares no package-owned errors."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import LogConsoleErrorCode from @migaia/log-plugin-console, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use LogConsoleErrorCode when its const contract and declared inputs match the result you need. Choose a different public symbol when LogConsoleErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Semantic codes owned by this package. This empty table declares no package-owned errors."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/log-plugin-console/dist/error-code.d.ts:LogConsoleErrorCode:export declare const LogConsoleErrorCode: {};",
+          "guidance": [],
+          "usageScore": 6,
+          "configuration": [],
+          "fragment": "log-plugin-console-index--LogConsoleErrorCode"
+        },
+        {
+          "name": "prettyFeature",
+          "kind": "function",
+          "signature": "export declare function prettyFeature(options?: IPrettyOptions): Extract<ILogFeature, { phase: 'format'; }>;",
+          "declarationLine": 23,
+          "source": "packages/log-plugin-console/dist/pretty.d.ts",
+          "purpose": "Issue a format descriptor recognized by the console by opaque identity. Preserve native args/Error and the host's separate shallow metadata copy.",
+          "core": "options: Optional color mode (auto) and timestamp flag (true).\nA host-recognized format descriptor whose native argument handling is recognized by the console output.\ncolor: Explicit always/never wins; auto checks NO_COLOR, FORCE_COLOR, TTY, then CI.\nauto.\ntimestamp: Include the entry's original ISO timestamp in the pretty prefix.\ntrue.\nIssue a format descriptor recognized by the console by opaque identity. Preserve native args/Error and the host's separate shallow metadata copy.",
+          "advanced": "Issue a format descriptor recognized by the console by opaque identity. Preserve native args/Error and the host's separate shallow metadata copy.",
+          "parameters": ["options: IPrettyOptions (optional)"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IPrettyOptions",
+              "optional": true
+            }
+          ],
+          "returns": "Extract<ILogFeature, { phase: 'format'; }>",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { formatFeature } from '@migaia/log-host/features'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [levelPlugin(), consolePlugin({ console: globalThis.console })],\n  features: [prettyFeature({ color: 'never', timestamp: false })]\n})\nlog.info('user=%s', 'alice', { tenant: 'acme' })\nlog.raw('progress\\r')\nawait log.flush()\nawait log.shutdown('manual')\n\nconst json = createLogHost({\n  plugins: [consolePlugin({ features: [formatFeature({ format: 'json' })] })]\n})\njson.log('info', 'structured')\nawait json.shutdown('manual')",
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin, prettyFeature } from '@migaia/log-plugin-console'\n\nconst log = createLogHost({\n  plugins: [levelPlugin(), consolePlugin()],\n  features: [prettyFeature({ color: 'auto' })]\n})\nlog.info('server ready', { port: 3000 })\nawait log.flush()\nawait log.shutdown('manual')"
+          ],
+          "members": [],
+          "composes": [],
+          "aliasOf": "prettyFeature",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function prettyFeature(options?: IPrettyOptions): Extract<ILogFeature, { phase: 'format'; }>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IPrettyOptions",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["Extract<ILogFeature, { phase: 'format'; }>"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Issue a format descriptor recognized by the console by opaque identity. Preserve native args/Error and the host's separate shallow metadata copy."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import prettyFeature from @migaia/log-plugin-console, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use prettyFeature when its function contract and declared inputs match the result you need. Choose a different public symbol when prettyFeature does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "options: Optional color mode (auto) and timestamp flag (true).\nA host-recognized format descriptor whose native argument handling is recognized by the console output.\ncolor: Explicit always/never wins; auto checks NO_COLOR, FORCE_COLOR, TTY, then CI.\nauto.\ntimestamp: Include the entry's original ISO timestamp in the pretty prefix.\ntrue.\nIssue a format descriptor recognized by the console by opaque identity. Preserve native args/Error and the host's separate shallow metadata copy."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "Issue a format descriptor recognized by the console by opaque identity. Preserve native args/Error and the host's separate shallow metadata copy."
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "color",
+              "type": "ConsoleColorMode",
+              "optional": true,
+              "description": ""
+            },
+            {
+              "name": "timestamp",
+              "type": "boolean",
+              "optional": true,
+              "description": ""
+            }
+          ],
+          "identity": "packages/log-plugin-console/dist/pretty.d.ts:prettyFeature:export declare function prettyFeature(options?: IPrettyOptions): Extract<ILogFeature, { phase: 'format'; }>;",
+          "guidance": [],
+          "usageScore": 32,
+          "configuration": [
+            {
+              "name": "color",
+              "type": "ConsoleColorMode",
+              "optional": true,
+              "description": "`prettyFeature({ color, timestamp })` 的 color 默认为 auto，可用 `ConsoleColorMode.auto`、`always`、`never`。always/never 优先；auto 依次考虑 NO_COLOR、非零 FORCE_COLOR、TTY、CI。timestamp 默认为 true。",
+              "descriptionEn": "",
+              "descriptionZh": "`prettyFeature({ color, timestamp })` 的 color 默认为 auto，可用 `ConsoleColorMode.auto`、`always`、`never`。always/never 优先；auto 依次考虑 NO_COLOR、非零 FORCE_COLOR、TTY、CI。timestamp 默认为 true。"
+            },
+            {
+              "name": "timestamp",
+              "type": "boolean",
+              "optional": true,
+              "description": "`prettyFeature({ color, timestamp })` 的 color 默认为 auto，可用 `ConsoleColorMode.auto`、`always`、`never`。always/never 优先；auto 依次考虑 NO_COLOR、非零 FORCE_COLOR、TTY、CI。timestamp 默认为 true。",
+              "descriptionEn": "",
+              "descriptionZh": "`prettyFeature({ color, timestamp })` 的 color 默认为 auto，可用 `ConsoleColorMode.auto`、`always`、`never`。always/never 优先；auto 依次考虑 NO_COLOR、非零 FORCE_COLOR、TTY、CI。timestamp 默认为 true。"
+            }
+          ],
+          "fragment": "log-plugin-console-index--prettyFeature"
+        }
+      ],
       "aliases": []
     }
   ]

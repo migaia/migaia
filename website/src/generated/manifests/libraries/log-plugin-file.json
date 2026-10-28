@@ -409,6 +409,275 @@
             }
           ],
           "fragment": "log-plugin-file-index--filePlugin"
+        },
+        {
+          "name": "IFilePluginConfig",
+          "kind": "type",
+          "signature": "export type IFilePluginConfig = { /** Required nonempty destination passed unchanged to the borrowed append capability. */ readonly path: string; /** Defaults to a supported runtime's native append writer in server conditions only. */ readonly writer?: IFileWriter; /** Optional per-delivered-batch thresholds require an explicit rotate capability. */ readonly rotate?: { /** Rotate after a batch reaches the specified UTF-8 byte count. */ readonly maxBytes?: number; /** Rotate after a batch reaches the specified entry count. */ readonly maxEntries?: number; }; /** Host-owned output policies override host defaults without creating a private queue. */ readonly features?: readonly ILogFeature[]; };",
+          "declarationLine": 8,
+          "source": "packages/log-plugin-file/dist/typing.d.ts",
+          "purpose": "Append one batch with one writer call and rotate after configured thresholds. Native Node/Bun append uses node:fs; Deno uses writeTextFile with append:true. Browser entry requires a writer.",
+          "core": "path: Nonempty file path passed unchanged to append and rotate.\nwriter: Borrow append(path,text) and optional rotate(path); the plugin never closes it.\nRuntime-native append; unavailable in browser.\nrotate: Positive entry/byte thresholds; writer.rotate must exist at creation.\nNo rotation.\nfeatures: Select host batching and formatting for this output.\nJSON formatting without implicit batching.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "path",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly path: string;",
+              "description": "Required nonempty destination passed unchanged to the borrowed append capability.",
+              "parameterDetails": [],
+              "returns": "string"
+            },
+            {
+              "name": "writer",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly writer?: IFileWriter;",
+              "description": "Defaults to a supported runtime's native append writer in server conditions only.",
+              "parameterDetails": [],
+              "returns": "IFileWriter"
+            },
+            {
+              "name": "rotate",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly rotate?: { /** Rotate after a batch reaches the specified UTF-8 byte count. */ readonly maxBytes?: number; /** Rotate after a batch reaches the specified entry count. */ readonly maxEntries?: number; };",
+              "description": "Optional per-delivered-batch thresholds require an explicit rotate capability.",
+              "parameterDetails": [],
+              "returns": "{ /** Rotate after a batch reaches the specified UTF-8 byte count. */ readonly maxBytes?: number; /** Rotate after a batch reaches the specified entry count. */ readonly maxEntries?: number; }"
+            },
+            {
+              "name": "features",
+              "kind": "property",
+              "optional": true,
+              "signature": "readonly features?: readonly ILogFeature[];",
+              "description": "Host-owned output policies override host defaults without creating a private queue.",
+              "parameterDetails": [],
+              "returns": "readonly ILogFeature[]"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IFilePluginConfig",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IFilePluginConfig = { /** Required nonempty destination passed unchanged to the borrowed append capability. */ readonly path: string; /** Defaults to a supported runtime's native append writer in server conditions only. */ readonly writer?: IFileWriter; /** Optional per-delivered-batch thresholds require an explicit rotate capability. */ readonly rotate?: { /** Rotate after a batch reaches the specified UTF-8 byte count. */ readonly maxBytes?: number; /** Rotate after a batch reaches the specified entry count. */ readonly maxEntries?: number; }; /** Host-owned output policies override host defaults without creating a private queue. */ readonly features?: readonly ILogFeature[]; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Append one batch with one writer call and rotate after configured thresholds. Native Node/Bun append uses node:fs; Deno uses writeTextFile with append:true. Browser entry requires a writer."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IFilePluginConfig from @migaia/log-plugin-file, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IFilePluginConfig when its type contract and declared inputs match the result you need. Choose a different public symbol when IFilePluginConfig does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "path: Nonempty file path passed unchanged to append and rotate.\nwriter: Borrow append(path,text) and optional rotate(path); the plugin never closes it.\nRuntime-native append; unavailable in browser.\nrotate: Positive entry/byte thresholds; writer.rotate must exist at creation.\nNo rotation.\nfeatures: Select host batching and formatting for this output.\nJSON formatting without implicit batching."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/log-plugin-file/dist/typing.d.ts:IFilePluginConfig:export type IFilePluginConfig = { /** Required nonempty destination passed unchanged to the borrowed append capability. */ readonly path: string; /** Defaults to a supported runtime's native append writer in server conditions only. */ readonly writer?: IFileWriter; /** Optional per-delivered-batch thresholds require an explicit rotate capability. */ readonly rotate?: { /** Rotate after a batch reaches the specified UTF-8 byte count. */ readonly maxBytes?: number; /** Rotate after a batch reaches the specified entry count. */ readonly maxEntries?: number; }; /** Host-owned output policies override host defaults without creating a private queue. */ readonly features?: readonly ILogFeature[]; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "log-plugin-file-index--IFilePluginConfig"
+        },
+        {
+          "name": "LOG_FILE_ERROR_SOURCE",
+          "kind": "const",
+          "signature": "export declare const LOG_FILE_ERROR_SOURCE = \"logging.file\";",
+          "declarationLine": 2,
+          "source": "packages/log-plugin-file/dist/error-code.d.ts",
+          "purpose": "The stable logging.file domain identifies errors constructed by this package.",
+          "core": "The stable logging.file domain identifies errors constructed by this package.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "ERROR_SOURCE",
+          "exportPath": ".",
+          "overloadSignatures": ["export declare const LOG_FILE_ERROR_SOURCE = \"logging.file\";"],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The stable logging.file domain identifies errors constructed by this package."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import LOG_FILE_ERROR_SOURCE from @migaia/log-plugin-file, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use LOG_FILE_ERROR_SOURCE when its const contract and declared inputs match the result you need. Choose a different public symbol when LOG_FILE_ERROR_SOURCE does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The stable logging.file domain identifies errors constructed by this package."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/log-plugin-file/dist/error-code.d.ts:LOG_FILE_ERROR_SOURCE:export declare const LOG_FILE_ERROR_SOURCE = \"logging.file\";",
+          "guidance": [
+            {
+              "id": "错误与关闭",
+              "heading": "错误与关闭",
+              "blocks": [
+                {
+                  "type": "paragraph",
+                  "text": "错误 source 为 `LOG_FILE_ERROR_SOURCE`（`logging.file`）。`INVALID_OPTION` 表示 path/轮转配置不合法；`FILE_SINK_UNAVAILABLE` 表示当前入口没有 writer；两者在创建时同步抛出。`DELIVERY_FAILED` 表示 append 或 rotate 失败，`cause` 保留原异常，失败经 host 的 `onFailure` 观察，日志方法不因此抛出。卸载不会关闭应用的 writer。"
+                }
+              ]
+            }
+          ],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "log-plugin-file-index--LOG_FILE_ERROR_SOURCE"
+        },
+        {
+          "name": "LogFileErrorCode",
+          "kind": "const",
+          "signature": "export declare const LogFileErrorCode: { /** No injected or supported native writer exists; provide an explicit append capability. */ readonly fileSinkUnavailable: 'FILE_SINK_UNAVAILABLE'; /** Append or rotation failed; cause retains the exact writer failure. */ readonly deliveryFailed: 'DELIVERY_FAILED'; /** Path or rotation configuration is invalid; fix options before installing the output. */ readonly invalidOption: 'INVALID_OPTION'; };",
+          "declarationLine": 4,
+          "source": "packages/log-plugin-file/dist/error-code.d.ts",
+          "purpose": "Semantic codes owned by this package. Read together with source logging.file.",
+          "core": "Semantic codes owned by this package. Read together with source logging.file.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "fileSinkUnavailable",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly fileSinkUnavailable: 'FILE_SINK_UNAVAILABLE';",
+              "description": "No injected or supported native writer exists; provide an explicit append capability.",
+              "parameterDetails": [],
+              "returns": "'FILE_SINK_UNAVAILABLE'"
+            },
+            {
+              "name": "deliveryFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly deliveryFailed: 'DELIVERY_FAILED';",
+              "description": "Append or rotation failed; cause retains the exact writer failure.",
+              "parameterDetails": [],
+              "returns": "'DELIVERY_FAILED'"
+            },
+            {
+              "name": "invalidOption",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly invalidOption: 'INVALID_OPTION';",
+              "description": "Path or rotation configuration is invalid; fix options before installing the output.",
+              "parameterDetails": [],
+              "returns": "'INVALID_OPTION'"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "LogFileErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const LogFileErrorCode: { /** No injected or supported native writer exists; provide an explicit append capability. */ readonly fileSinkUnavailable: 'FILE_SINK_UNAVAILABLE'; /** Append or rotation failed; cause retains the exact writer failure. */ readonly deliveryFailed: 'DELIVERY_FAILED'; /** Path or rotation configuration is invalid; fix options before installing the output. */ readonly invalidOption: 'INVALID_OPTION'; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Semantic codes owned by this package. Read together with source logging.file."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import LogFileErrorCode from @migaia/log-plugin-file, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use LogFileErrorCode when its const contract and declared inputs match the result you need. Choose a different public symbol when LogFileErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Semantic codes owned by this package. Read together with source logging.file."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/log-plugin-file/dist/error-code.d.ts:LogFileErrorCode:export declare const LogFileErrorCode: { /** No injected or supported native writer exists; provide an explicit append capability. */ readonly fileSinkUnavailable: 'FILE_SINK_UNAVAILABLE'; /** Append or rotation failed; cause retains the exact writer failure. */ readonly deliveryFailed: 'DELIVERY_FAILED'; /** Path or rotation configuration is invalid; fix options before installing the output. */ readonly invalidOption: 'INVALID_OPTION'; };",
+          "guidance": [],
+          "usageScore": 0,
+          "configuration": [],
+          "fragment": "log-plugin-file-index--LogFileErrorCode"
         }
       ],
       "aliases": []

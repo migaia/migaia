@@ -167,7 +167,426 @@
       ],
       "guidePath": "/en/docs/log-plugin-process/getting-started",
       "architecturePath": "/en/docs/log-plugin-process",
-      "symbols": [],
+      "symbols": [
+        {
+          "name": "IProcessPluginConfig",
+          "kind": "type",
+          "signature": "export type IProcessPluginConfig = { /** Defaults to the recognized server runtime's process; absent processes install no listeners. */ process?: IProcessCapability; /** Defaults true; crash events are logged as fatal before shutdown. */ captureCrashes?: boolean; /** Defaults 3000ms; expiration exits after the available graceful wait. */ shutdownTimeoutMs?: number; /** Defaults false; explicit interception changes exit to wait for a bounded flush. */ interceptProcessExit?: boolean; };",
+          "declarationLine": 9,
+          "source": "packages/log-plugin-process/dist/typing.d.ts",
+          "purpose": "Group compatible hosts by process object. Signals and crashes share shutdown work; beforeExit only flushes. Final removal restores listeners and any intercepted exit function.",
+          "core": "process: Borrow env/on/removeListener/exit with original receiver identity.\nRecognized server process; absent capability is inert.\ncaptureCrashes: Record crash events before their existing shutdown path.\ntrue.\nshutdownTimeoutMs: Bound graceful flush/shutdown waits in milliseconds.\n3000 milliseconds.\ninterceptProcessExit: Capture the original exit function, wait for bounded flush, then restore exact identity on removal.\nfalse.",
+          "advanced": "",
+          "parameters": ["This type declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this type.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "process",
+              "kind": "property",
+              "optional": true,
+              "signature": "process?: IProcessCapability;",
+              "description": "Defaults to the recognized server runtime's process; absent processes install no listeners.",
+              "parameterDetails": [],
+              "returns": "IProcessCapability"
+            },
+            {
+              "name": "captureCrashes",
+              "kind": "property",
+              "optional": true,
+              "signature": "captureCrashes?: boolean;",
+              "description": "Defaults true; crash events are logged as fatal before shutdown.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            },
+            {
+              "name": "shutdownTimeoutMs",
+              "kind": "property",
+              "optional": true,
+              "signature": "shutdownTimeoutMs?: number;",
+              "description": "Defaults 3000ms; expiration exits after the available graceful wait.",
+              "parameterDetails": [],
+              "returns": "number"
+            },
+            {
+              "name": "interceptProcessExit",
+              "kind": "property",
+              "optional": true,
+              "signature": "interceptProcessExit?: boolean;",
+              "description": "Defaults false; explicit interception changes exit to wait for a bounded flush.",
+              "parameterDetails": [],
+              "returns": "boolean"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "IProcessPluginConfig",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export type IProcessPluginConfig = { /** Defaults to the recognized server runtime's process; absent processes install no listeners. */ process?: IProcessCapability; /** Defaults true; crash events are logged as fatal before shutdown. */ captureCrashes?: boolean; /** Defaults 3000ms; expiration exits after the available graceful wait. */ shutdownTimeoutMs?: number; /** Defaults false; explicit interception changes exit to wait for a bounded flush. */ interceptProcessExit?: boolean; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Group compatible hosts by process object. Signals and crashes share shutdown work; beforeExit only flushes. Final removal restores listeners and any intercepted exit function."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import IProcessPluginConfig from @migaia/log-plugin-process, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use IProcessPluginConfig when its type contract and declared inputs match the result you need. Choose a different public symbol when IProcessPluginConfig does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained type example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "process: Borrow env/on/removeListener/exit with original receiver identity.\nRecognized server process; absent capability is inert.\ncaptureCrashes: Record crash events before their existing shutdown path.\ntrue.\nshutdownTimeoutMs: Bound graceful flush/shutdown waits in milliseconds.\n3000 milliseconds.\ninterceptProcessExit: Capture the original exit function, wait for bounded flush, then restore exact identity on removal.\nfalse."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/log-plugin-process/dist/typing.d.ts:IProcessPluginConfig:export type IProcessPluginConfig = { /** Defaults to the recognized server runtime's process; absent processes install no listeners. */ process?: IProcessCapability; /** Defaults true; crash events are logged as fatal before shutdown. */ captureCrashes?: boolean; /** Defaults 3000ms; expiration exits after the available graceful wait. */ shutdownTimeoutMs?: number; /** Defaults false; explicit interception changes exit to wait for a bounded flush. */ interceptProcessExit?: boolean; };",
+          "guidance": [],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "log-plugin-process-index--IProcessPluginConfig"
+        },
+        {
+          "name": "LOG_PROCESS_ERROR_SOURCE",
+          "kind": "const",
+          "signature": "export declare const LOG_PROCESS_ERROR_SOURCE = \"logging.process\";",
+          "declarationLine": 2,
+          "source": "packages/log-plugin-process/dist/error-code.d.ts",
+          "purpose": "The stable logging.process domain identifies errors constructed by this package.",
+          "core": "The stable logging.process domain identifies errors constructed by this package.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [],
+          "composes": [],
+          "aliasOf": "ERROR_SOURCE",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const LOG_PROCESS_ERROR_SOURCE = \"logging.process\";"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "The stable logging.process domain identifies errors constructed by this package."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import LOG_PROCESS_ERROR_SOURCE from @migaia/log-plugin-process, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use LOG_PROCESS_ERROR_SOURCE when its const contract and declared inputs match the result you need. Choose a different public symbol when LOG_PROCESS_ERROR_SOURCE does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "The stable logging.process domain identifies errors constructed by this package."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/log-plugin-process/dist/error-code.d.ts:LOG_PROCESS_ERROR_SOURCE:export declare const LOG_PROCESS_ERROR_SOURCE = \"logging.process\";",
+          "guidance": [],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "log-plugin-process-index--LOG_PROCESS_ERROR_SOURCE"
+        },
+        {
+          "name": "LogProcessErrorCode",
+          "kind": "const",
+          "signature": "export declare const LogProcessErrorCode: { /** The same process group has begun shutdown; do not install more hosts into that group. */ readonly runtimeShuttingDown: 'RUNTIME_SHUTTING_DOWN'; /** Same-process policy or scheduler domain differs from its existing group; use matching options. */ readonly pluginConfigConflict: 'PLUGIN_CONFIG_CONFLICT'; /** Installation and rollback both failed; the original install error remains first in errors. */ readonly processInstallRollbackFailed: 'PROCESS_INSTALL_ROLLBACK_FAILED'; /** Final uninstall attempted every restoration/removal but cleanup failed; inspect its causes. */ readonly pluginUninstallCleanupFailed: 'PLUGIN_UNINSTALL_CLEANUP_FAILED'; /** Shutdown timer cancellation or the captured exit failed; inspect ordered cleanup causes. */ readonly pluginShutdownCleanupFailed: 'PLUGIN_SHUTDOWN_CLEANUP_FAILED'; };",
+          "declarationLine": 4,
+          "source": "packages/log-plugin-process/dist/error-code.d.ts",
+          "purpose": "Semantic codes owned by this package. Read together with source logging.process.",
+          "core": "Semantic codes owned by this package. Read together with source logging.process.",
+          "advanced": "",
+          "parameters": ["This const declaration has no parameters."],
+          "parameterDetails": [],
+          "returns": "No explicit return annotation is declared for this const.",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [],
+          "members": [
+            {
+              "name": "runtimeShuttingDown",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly runtimeShuttingDown: 'RUNTIME_SHUTTING_DOWN';",
+              "description": "The same process group has begun shutdown; do not install more hosts into that group.",
+              "parameterDetails": [],
+              "returns": "'RUNTIME_SHUTTING_DOWN'"
+            },
+            {
+              "name": "pluginConfigConflict",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly pluginConfigConflict: 'PLUGIN_CONFIG_CONFLICT';",
+              "description": "Same-process policy or scheduler domain differs from its existing group; use matching options.",
+              "parameterDetails": [],
+              "returns": "'PLUGIN_CONFIG_CONFLICT'"
+            },
+            {
+              "name": "processInstallRollbackFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly processInstallRollbackFailed: 'PROCESS_INSTALL_ROLLBACK_FAILED';",
+              "description": "Installation and rollback both failed; the original install error remains first in errors.",
+              "parameterDetails": [],
+              "returns": "'PROCESS_INSTALL_ROLLBACK_FAILED'"
+            },
+            {
+              "name": "pluginUninstallCleanupFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly pluginUninstallCleanupFailed: 'PLUGIN_UNINSTALL_CLEANUP_FAILED';",
+              "description": "Final uninstall attempted every restoration/removal but cleanup failed; inspect its causes.",
+              "parameterDetails": [],
+              "returns": "'PLUGIN_UNINSTALL_CLEANUP_FAILED'"
+            },
+            {
+              "name": "pluginShutdownCleanupFailed",
+              "kind": "property",
+              "optional": false,
+              "signature": "readonly pluginShutdownCleanupFailed: 'PLUGIN_SHUTDOWN_CLEANUP_FAILED';",
+              "description": "Shutdown timer cancellation or the captured exit failed; inspect ordered cleanup causes.",
+              "parameterDetails": [],
+              "returns": "'PLUGIN_SHUTDOWN_CLEANUP_FAILED'"
+            }
+          ],
+          "composes": [],
+          "aliasOf": "LogProcessErrorCode",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare const LogProcessErrorCode: { /** The same process group has begun shutdown; do not install more hosts into that group. */ readonly runtimeShuttingDown: 'RUNTIME_SHUTTING_DOWN'; /** Same-process policy or scheduler domain differs from its existing group; use matching options. */ readonly pluginConfigConflict: 'PLUGIN_CONFIG_CONFLICT'; /** Installation and rollback both failed; the original install error remains first in errors. */ readonly processInstallRollbackFailed: 'PROCESS_INSTALL_ROLLBACK_FAILED'; /** Final uninstall attempted every restoration/removal but cleanup failed; inspect its causes. */ readonly pluginUninstallCleanupFailed: 'PLUGIN_UNINSTALL_CLEANUP_FAILED'; /** Shutdown timer cancellation or the captured exit failed; inspect ordered cleanup causes. */ readonly pluginShutdownCleanupFailed: 'PLUGIN_SHUTDOWN_CLEANUP_FAILED'; };"
+          ],
+          "overloadParameterDetails": [[]],
+          "overloadReturns": [],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Semantic codes owned by this package. Read together with source logging.process."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import LogProcessErrorCode from @migaia/log-plugin-process, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use LogProcessErrorCode when its const contract and declared inputs match the result you need. Choose a different public symbol when LogProcessErrorCode does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained const example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "Semantic codes owned by this package. Read together with source logging.process."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": ""
+            }
+          ],
+          "declaredConfiguration": [],
+          "identity": "packages/log-plugin-process/dist/error-code.d.ts:LogProcessErrorCode:export declare const LogProcessErrorCode: { /** The same process group has begun shutdown; do not install more hosts into that group. */ readonly runtimeShuttingDown: 'RUNTIME_SHUTTING_DOWN'; /** Same-process policy or scheduler domain differs from its existing group; use matching options. */ readonly pluginConfigConflict: 'PLUGIN_CONFIG_CONFLICT'; /** Installation and rollback both failed; the original install error remains first in errors. */ readonly processInstallRollbackFailed: 'PROCESS_INSTALL_ROLLBACK_FAILED'; /** Final uninstall attempted every restoration/removal but cleanup failed; inspect its causes. */ readonly pluginUninstallCleanupFailed: 'PLUGIN_UNINSTALL_CLEANUP_FAILED'; /** Shutdown timer cancellation or the captured exit failed; inspect ordered cleanup causes. */ readonly pluginShutdownCleanupFailed: 'PLUGIN_SHUTDOWN_CLEANUP_FAILED'; };",
+          "guidance": [],
+          "usageScore": 4,
+          "configuration": [],
+          "fragment": "log-plugin-process-index--LogProcessErrorCode"
+        },
+        {
+          "name": "processPlugin",
+          "kind": "function",
+          "signature": "export declare function processPlugin(options?: IProcessPluginConfig): ILogPlugin<Record<string, never>, IProcessPluginConfig>;",
+          "declarationLine": 4,
+          "source": "packages/log-plugin-process/dist/process.d.ts",
+          "purpose": "Group compatible hosts by process object. Signals and crashes share shutdown work; beforeExit only flushes. Final removal restores listeners and any intercepted exit function.",
+          "core": "options: Optional borrowed process, crash capture, shutdown timeout and exit interception policy.\nAn installable process-lifecycle plugin; compatible hosts share one listener group without owning the borrowed process.\nprocess: Borrow env/on/removeListener/exit with original receiver identity.\nRecognized server process; absent capability is inert.\ncaptureCrashes: Record crash events before their existing shutdown path.\ntrue.\nshutdownTimeoutMs: Bound graceful flush/shutdown waits in milliseconds.\n3000 milliseconds.\ninterceptProcessExit: Capture the original exit function, wait for bounded flush, then restore exact identity on removal.\nfalse.\nGroup compatible hosts by process object. Signals and crashes share shutdown work; beforeExit only flushes. Final removal restores listeners and any intercepted exit function.",
+          "advanced": "Group compatible hosts by process object. Signals and crashes share shutdown work; beforeExit only flushes. Final removal restores listeners and any intercepted exit function.",
+          "parameters": ["options: IProcessPluginConfig (optional)"],
+          "parameterDetails": [
+            {
+              "name": "options",
+              "type": "IProcessPluginConfig",
+              "optional": true
+            }
+          ],
+          "returns": "ILogPlugin<Record<string, never>, IProcessPluginConfig>",
+          "errors": [],
+          "lifecycleConcurrency": "",
+          "examples": [
+            "import { createLogHost } from '@migaia/log-host'\nimport { processPlugin } from '@migaia/log-plugin-process'\n\nconst log = createLogHost({\n  plugins: [\n    processPlugin({ captureCrashes: true, shutdownTimeoutMs: 3000, interceptProcessExit: false })\n  ]\n})\nlog.onShutdown(() => {\n  log.log('info', 'closing')\n})",
+            "import { createLogHost, levelPlugin } from '@migaia/log-host'\nimport { consolePlugin } from '@migaia/log-plugin-console'\nimport { processPlugin } from '@migaia/log-plugin-process'\n\nconst log = createLogHost({\n  plugins: [levelPlugin(), consolePlugin(), processPlugin()]\n})\nlog.onShutdown(() => {\n  log.info('shutdown started')\n})\nlog.info('ready')"
+          ],
+          "members": [],
+          "composes": [],
+          "aliasOf": "processPlugin",
+          "exportPath": ".",
+          "overloadSignatures": [
+            "export declare function processPlugin(options?: IProcessPluginConfig): ILogPlugin<Record<string, never>, IProcessPluginConfig>;"
+          ],
+          "overloadParameterDetails": [
+            [
+              {
+                "name": "options",
+                "type": "IProcessPluginConfig",
+                "optional": true
+              }
+            ]
+          ],
+          "overloadReturns": ["ILogPlugin<Record<string, never>, IProcessPluginConfig>"],
+          "whenToUse": "",
+          "notUse": "",
+          "sections": [
+            {
+              "id": "introduction",
+              "title": "介绍",
+              "content": "Group compatible hosts by process object. Signals and crashes share shutdown work; beforeExit only flushes. Final removal restores listeners and any intercepted exit function."
+            },
+            {
+              "id": "getting-started",
+              "title": "上手",
+              "content": "Import processPlugin from @migaia/log-plugin-process, then follow a maintained task example for your use case."
+            },
+            {
+              "id": "when-to-use",
+              "title": "适用场景",
+              "content": "Use processPlugin when its function contract and declared inputs match the result you need. Choose a different public symbol when processPlugin does not match the required inputs or return contract."
+            },
+            {
+              "id": "quick-implementation",
+              "title": "快速实现",
+              "content": "Use a maintained function example that demonstrates real inputs and observable behavior."
+            },
+            {
+              "id": "core-usage",
+              "title": "核心用法",
+              "content": "options: Optional borrowed process, crash capture, shutdown timeout and exit interception policy.\nAn installable process-lifecycle plugin; compatible hosts share one listener group without owning the borrowed process.\nprocess: Borrow env/on/removeListener/exit with original receiver identity.\nRecognized server process; absent capability is inert.\ncaptureCrashes: Record crash events before their existing shutdown path.\ntrue.\nshutdownTimeoutMs: Bound graceful flush/shutdown waits in milliseconds.\n3000 milliseconds.\ninterceptProcessExit: Capture the original exit function, wait for bounded flush, then restore exact identity on removal.\nfalse.\nGroup compatible hosts by process object. Signals and crashes share shutdown work; beforeExit only flushes. Final removal restores listeners and any intercepted exit function."
+            },
+            {
+              "id": "advanced-usage",
+              "title": "高阶用法",
+              "content": "Group compatible hosts by process object. Signals and crashes share shutdown work; beforeExit only flushes. Final removal restores listeners and any intercepted exit function."
+            }
+          ],
+          "declaredConfiguration": [
+            {
+              "name": "process",
+              "type": "IProcessCapability",
+              "optional": true,
+              "description": "Defaults to the recognized server runtime's process; absent processes install no listeners."
+            },
+            {
+              "name": "captureCrashes",
+              "type": "boolean",
+              "optional": true,
+              "description": "Defaults true; crash events are logged as fatal before shutdown."
+            },
+            {
+              "name": "shutdownTimeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": "Defaults 3000ms; expiration exits after the available graceful wait."
+            },
+            {
+              "name": "interceptProcessExit",
+              "type": "boolean",
+              "optional": true,
+              "description": "Defaults false; explicit interception changes exit to wait for a bounded flush."
+            }
+          ],
+          "identity": "packages/log-plugin-process/dist/process.d.ts:processPlugin:export declare function processPlugin(options?: IProcessPluginConfig): ILogPlugin<Record<string, never>, IProcessPluginConfig>;",
+          "guidance": [],
+          "usageScore": 24,
+          "configuration": [
+            {
+              "name": "process",
+              "type": "IProcessCapability",
+              "optional": true,
+              "description": "`LOG_PROCESS_ERROR_SOURCE` 为 logging.process；`LogProcessErrorCode` 包含 RUNTIME_SHUTTING_DOWN、PLUGIN_CONFIG_CONFLICT、PROCESS_INSTALL_ROLLBACK_FAILED、PLUGIN_UNINSTALL_CLEANUP_FAILED、PLUGIN_SHUTDOWN_CLEANUP_FAILED。安装冲突/失败同步抛出；运行期失败进入 host 的 onFailure，终端报告由 host 统一处理。并发同类关闭或 flush 共用进行中的工作。",
+              "descriptionEn": "Defaults to the recognized server runtime's process; absent processes install no listeners.",
+              "descriptionZh": "`LOG_PROCESS_ERROR_SOURCE` 为 logging.process；`LogProcessErrorCode` 包含 RUNTIME_SHUTTING_DOWN、PLUGIN_CONFIG_CONFLICT、PROCESS_INSTALL_ROLLBACK_FAILED、PLUGIN_UNINSTALL_CLEANUP_FAILED、PLUGIN_SHUTDOWN_CLEANUP_FAILED。安装冲突/失败同步抛出；运行期失败进入 host 的 onFailure，终端报告由 host 统一处理。并发同类关闭或 flush 共用进行中的工作。"
+            },
+            {
+              "name": "captureCrashes",
+              "type": "boolean",
+              "optional": true,
+              "description": "Defaults true; crash events are logged as fatal before shutdown.",
+              "descriptionEn": "Defaults true; crash events are logged as fatal before shutdown.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "shutdownTimeoutMs",
+              "type": "number",
+              "optional": true,
+              "description": "Defaults 3000ms; expiration exits after the available graceful wait.",
+              "descriptionEn": "Defaults 3000ms; expiration exits after the available graceful wait.",
+              "descriptionZh": ""
+            },
+            {
+              "name": "interceptProcessExit",
+              "type": "boolean",
+              "optional": true,
+              "description": "Defaults false; explicit interception changes exit to wait for a bounded flush.",
+              "descriptionEn": "Defaults false; explicit interception changes exit to wait for a bounded flush.",
+              "descriptionZh": ""
+            }
+          ],
+          "fragment": "log-plugin-process-index--processPlugin"
+        }
+      ],
       "aliases": []
     }
   ]
