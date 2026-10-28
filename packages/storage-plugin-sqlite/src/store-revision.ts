@@ -10,19 +10,19 @@ import type { IStorageKey, ILockKey } from '@migaia/storage-contract'
 import { bytesToBase64 } from '@migaia/utils/bytes'
 import type { IStorageJournalImage, IStorageJournalTarget } from '@migaia/storage-host'
 import type { ICollectionsCodecValue } from '@migaia/serialize/codecs/collections-json'
-import { SqliteNames } from './constants.js'
-import { sqliteError } from './errors.js'
+import { SqliteNames } from './constants.ts'
+import { sqliteError } from './errors.ts'
 import { SqliteErrorCode } from '@migaia/storage-contract/error-code'
-import { SqliteErrorText } from './error-text.js'
-import { decodeHexKey, keyHex } from './key-codec.js'
-import type { ISqliteRow } from './types.js'
-import { sqliteLocalGroup, sqliteStatement } from './store-state.js'
+import { SqliteErrorText } from './error-text.ts'
+import { decodeHexKey, keyHex } from './key-codec.ts'
+import type { ISqliteRow } from './types.ts'
+import { sqliteLocalGroup, sqliteStatement } from './store-state.ts'
 import type {
   ISqliteOrganizationContext,
   IChannel,
   INativeState,
   ISqliteRevision
-} from './store-state.js'
+} from './store-state.ts'
 
 /** Bind one logical key to the existing physical table representation. */
 export function sqliteEncoded<TValue>(

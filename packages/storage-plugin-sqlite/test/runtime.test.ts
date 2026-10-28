@@ -8,8 +8,8 @@ import { it, expect, onTestFinished } from 'vitest'
 import { createStorageHost } from '@migaia/storage-host'
 import { ConcurrencyPolicy, lockKey } from '@migaia/storage-host/sdk'
 import { sleep } from '@migaia/utils/promise'
-import { sqliteBackendPlugin } from '../src/index.js'
-import { nodeSqliteDriver } from '../src/node.js'
+import { sqliteBackendPlugin } from '../src/index.ts'
+import { nodeSqliteDriver } from '../src/node.ts'
 /** The same plain-JavaScript consumer proves the actual built entries in separate runtime processes. */
 const fixture = fileURLToPath(new URL('./runtime-matrix.mjs', import.meta.url))
 it.each(['Node', 'Bun', 'Deno'] as const)(

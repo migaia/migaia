@@ -1,14 +1,14 @@
 import { createSqlTag } from '@migaia/storage-host/sdk'
 import { type ICompiledStorageSql, type IOperationContext } from '@migaia/storage-contract'
-import { SqliteLimits } from './constants.js'
-import { normalizeSqliteFailure } from './errors.js'
+import { SqliteLimits } from './constants.ts'
+import { normalizeSqliteFailure } from './errors.ts'
 import type {
   ISqliteDriver,
   ISqliteStatement,
   ISqliteValue,
   ISqliteRunResult,
   ISqliteExecutor
-} from './types.js'
+} from './types.ts'
 /** One bounded LRU owns native statement references for an installed store. */
 class SqliteStatements {
   /** The caller keeps native connection ownership; this cache only prepares and borrows statements. */

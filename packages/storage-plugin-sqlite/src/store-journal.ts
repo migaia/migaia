@@ -20,13 +20,13 @@ import type {
   IStorageJournalBackendBinding,
   IStorageJournalNamespaceView
 } from '@migaia/storage-host'
-import { SqliteNames } from './constants.js'
-import { sqliteError } from './errors.js'
+import { SqliteNames } from './constants.ts'
+import { sqliteError } from './errors.ts'
 import { SqliteErrorCode } from '@migaia/storage-contract/error-code'
-import { decodeHexKey, keyHex } from './key-codec.js'
-import type { ISqliteRow, ISqliteValue } from './types.js'
-import { sqliteRemove } from './store-io.js'
-import { sqliteTargetKey, sqliteJournalChanges, sqliteMarker } from './store-mutation.js'
+import { decodeHexKey, keyHex } from './key-codec.ts'
+import type { ISqliteRow, ISqliteValue } from './types.ts'
+import { sqliteRemove } from './store-io.ts'
+import { sqliteTargetKey, sqliteJournalChanges, sqliteMarker } from './store-mutation.ts'
 import {
   sqliteRevisionKey,
   sqliteJournalImage,
@@ -35,10 +35,10 @@ import {
   sqliteRevisionIdentity,
   sqliteEncoded,
   sqliteChanged
-} from './store-revision.js'
-import { sqliteJournalScope, sqliteStatement, sqliteLocalGroup } from './store-state.js'
-import type { ISqliteOrganizationContext, INativeState } from './store-state.js'
-import { sqliteTransact } from './store-transaction.js'
+} from './store-revision.ts'
+import { sqliteJournalScope, sqliteStatement, sqliteLocalGroup } from './store-state.ts'
+import type { ISqliteOrganizationContext, INativeState } from './store-state.ts'
+import { sqliteTransact } from './store-transaction.ts'
 
 /** One fixed namespace holds its native interval and the original memory-index generation. */
 type ISqliteNamespaceContext<TValue> = {

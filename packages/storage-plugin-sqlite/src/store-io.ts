@@ -15,26 +15,26 @@ import {
   type ILockKey
 } from '@migaia/storage-contract'
 import type { ICollectionsCodecValue } from '@migaia/serialize/codecs/collections-json'
-import { SqliteNames } from './constants.js'
-import { sqliteError } from './errors.js'
+import { SqliteNames } from './constants.ts'
+import { sqliteError } from './errors.ts'
 import { SqliteErrorCode } from '@migaia/storage-contract/error-code'
-import { decodeKey, decodeHexKey } from './key-codec.js'
-import type { ISqliteRow, ISqliteValue } from './types.js'
-import { sqliteObserve, sqliteSyncMutation } from './store-mutation.js'
+import { decodeKey, decodeHexKey } from './key-codec.ts'
+import type { ISqliteRow, ISqliteValue } from './types.ts'
+import { sqliteObserve, sqliteSyncMutation } from './store-mutation.ts'
 import {
   sqliteRevisionKey,
   sqliteRevision,
   sqliteEncoded,
   sqliteChanged,
   sqliteIdentity
-} from './store-revision.js'
-import { sqliteStatement } from './store-state.js'
+} from './store-revision.ts'
+import { sqliteStatement } from './store-state.ts'
 import type {
   ISqliteOrganizationContext,
   IChannel,
   INativeState,
   ISqliteTtlTarget
-} from './store-state.js'
+} from './store-state.ts'
 
 /** Actual codec calls share one failure policy for roots, scopes and iterator advances. */
 export function sqliteConvert<TValue>(

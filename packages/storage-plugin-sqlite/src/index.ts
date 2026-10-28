@@ -1,4 +1,4 @@
-export { sqliteBackendPlugin, sqliteBackendKind } from './plugin.js'
+export { sqliteBackendPlugin, sqliteBackendKind } from './plugin.ts'
 
 export type {
   ISqliteValue,
@@ -13,4 +13,4 @@ export type {
   ISqliteStore,
   ISqliteOptions,
   ISqliteMaintenanceApi
-} from './types.js'
+} from './types.ts'

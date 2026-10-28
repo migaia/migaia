@@ -12,14 +12,14 @@ import {
   StorageContractErrorCode,
   type ICapabilityInstallPort
 } from '@migaia/storage-contract'
-import { createSqliteStore, type ISqliteConstruction } from './store.js'
-import { SqliteNames } from './constants.js'
+import { createSqliteStore, type ISqliteConstruction } from './store.ts'
+import { SqliteNames } from './constants.ts'
 import type {
   ISqliteStore,
   ISqliteDriver,
   ISqliteTransactionScope,
   ISqliteOptions
-} from './types.js'
+} from './types.ts'
 /** Exact kind identity gates Features before native client access or construction. */
 export const sqliteBackendKind = defineStorageBackendKind<
   ISqliteStore,

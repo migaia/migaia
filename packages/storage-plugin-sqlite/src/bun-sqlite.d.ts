@@ -3,7 +3,7 @@ declare module 'bun:sqlite' {
   export class Database {
     constructor(path: string, options: { safeIntegers: true })
     exec(text: string): unknown
-    prepare(text: string): import('./driver.js').INativeStatement
+    prepare(text: string): import('./driver.ts').INativeStatement
     close(throwOnError: true): void
   }
 }

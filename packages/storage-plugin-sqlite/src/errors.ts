@@ -6,7 +6,7 @@ import {
 } from '@migaia/storage-contract'
 import { STORAGE_SQLITE_ERROR_SOURCE, SqliteErrorCode } from '@migaia/storage-contract/error-code'
 import type { ISqliteErrorCode } from '@migaia/storage-contract/error-code'
-import { SqliteErrorText } from './error-text.js'
+import { SqliteErrorText } from './error-text.ts'
 /** Attach the public package identity without replacing the native error type or stack. */
 export function sqliteError(
   code: ISqliteErrorCode,

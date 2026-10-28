@@ -16,17 +16,17 @@ import {
 } from '@migaia/storage-contract'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import type { IStorageJournalExecutionPort } from '@migaia/storage-host'
-import { SqliteNames, SqliteControl, SqliteOperation } from './constants.js'
-import { createSqliteExecutor } from './sql.js'
-import type { ISqliteNativeStore, ISqliteRow } from './types.js'
-import { sqliteRead, sqliteRemove, sqliteConvert, sqliteWriteRaw, sqliteWrite } from './store-io.js'
+import { SqliteNames, SqliteControl, SqliteOperation } from './constants.ts'
+import { createSqliteExecutor } from './sql.ts'
+import type { ISqliteNativeStore, ISqliteRow } from './types.ts'
+import { sqliteRead, sqliteRemove, sqliteConvert, sqliteWriteRaw, sqliteWrite } from './store-io.ts'
 import {
   sqliteTextKeys,
   sqliteClear,
   sqliteIterator,
   sqliteSyncMutation,
   sqliteObserve
-} from './store-mutation.js'
+} from './store-mutation.ts'
 import {
   sqliteTextInput,
   sqliteRootRead,
@@ -34,17 +34,17 @@ import {
   sqlitePrepareWrite,
   sqliteBytesInput,
   sqliteSynchronous
-} from './store-operation.js'
-import { sqliteRevisionKey, sqliteDecodeLockIdentity } from './store-revision.js'
-import { sqliteExecuteSql } from './store-scope.js'
+} from './store-operation.ts'
+import { sqliteRevisionKey, sqliteDecodeLockIdentity } from './store-revision.ts'
+import { sqliteExecuteSql } from './store-scope.ts'
 import {
   sqliteStatement,
   sqliteOperationOrg,
   sqliteLocalGroup,
   sqliteJournalFor
-} from './store-state.js'
-import type { ISqliteOrganizationContext } from './store-state.js'
-import { sqliteTransact, sqliteHolderOf } from './store-transaction.js'
+} from './store-state.ts'
+import type { ISqliteOrganizationContext } from './store-state.ts'
+import { sqliteTransact, sqliteHolderOf } from './store-transaction.ts'
 
 /**
  * One organization's native SQLite store: text, bytes, record, TTL and RDF channels over the shared

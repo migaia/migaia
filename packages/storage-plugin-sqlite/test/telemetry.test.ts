@@ -5,8 +5,8 @@ import { level } from '@migaia/logger/plugins'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { kv } from '@migaia/storage-contract'
 import { lockKey } from '@migaia/storage-host/sdk'
-import { sqliteBackendPlugin } from '../src/index.js'
-import { nodeSqliteDriver } from '../src/node.js'
+import { sqliteBackendPlugin } from '../src/index.ts'
+import { nodeSqliteDriver } from '../src/node.ts'
 
 /** The borrowed logger sink observes completed work; it owns no backend execution or cleanup. */
 const execution = { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } as const

@@ -18,8 +18,8 @@ import {
   type ISqliteValue,
   type ISqliteRunResult,
   type ISqliteDriver
-} from '../src/index.js'
-import { nodeSqliteDriver } from '../src/node.js'
+} from '../src/index.ts'
+import { nodeSqliteDriver } from '../src/node.ts'
 /** Existing SQL consumers depend only on the shared executor and retain external row interfaces. */
 interface ICountRow {
   readonly count: number

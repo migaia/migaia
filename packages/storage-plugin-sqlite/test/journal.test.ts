@@ -1,4 +1,4 @@
-import type { ISqliteValue } from '../src/types.js'
+import type { ISqliteValue } from '../src/types.ts'
 import { decodeFlatStorageKey, lockKey } from '@migaia/storage-host/sdk'
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
 import { Logger } from '@migaia/logger'
@@ -17,8 +17,8 @@ import { join } from 'node:path'
 import { expect, it, onTestFinished } from 'vitest'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { storageJournalPlugin, storageLogStore } from '@migaia/storage-host/plugins/journal'
-import { sqliteBackendPlugin } from '../src/index.js'
-import { nodeSqliteDriver } from '../src/node.js'
+import { sqliteBackendPlugin } from '../src/index.ts'
+import { nodeSqliteDriver } from '../src/node.ts'
 
 /** Every case owns only its temporary native file; the connection outlives the installed host. */
 async function installed(options: { memory?: boolean; wal?: boolean } = { memory: true }) {

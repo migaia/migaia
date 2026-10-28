@@ -1,7 +1,7 @@
 import { Database } from 'bun:sqlite'
-import { connection } from './driver.js'
-import { normalizeSqliteFailure } from './errors.js'
-import type { ISqliteConnection } from './types.js'
+import { connection } from './driver.ts'
+import { normalizeSqliteFailure } from './errors.ts'
+import type { ISqliteConnection } from './types.ts'
 /** Bun's explicit driver entry enables exact integers before any statement is prepared. */
 export function bunSqliteDriver(path: string): ISqliteConnection {
   try {
