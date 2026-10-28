@@ -9,7 +9,7 @@ import type {
   IStorageResource
 } from '@migaia/storage-contract'
 import type { blob } from '@migaia/storage-contract'
-import type { ObjectDriverKind } from './constants.js'
+import type { ObjectDriverKind } from './constants.ts'
 /** Descriptor branding is implemented by the package's one private weak identity map. */
 declare const objectDriverBrand: unique symbol
 /** Lazy driver descriptor never opens directories, clients or upload readers. */

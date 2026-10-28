@@ -19,16 +19,16 @@ import {
   type IOperationContext
 } from '@migaia/storage-contract'
 import { isUint8Array } from '@migaia/utils/bytes'
-import { defineObjectDriver } from './driver.js'
-import { ObjectDriverKind, ObjectNames } from './constants.js'
+import { defineObjectDriver } from './driver.ts'
+import { ObjectDriverKind, ObjectNames } from './constants.ts'
 import { ObjectErrorCode } from '@migaia/storage-contract/error-code'
-import { ObjectErrorText } from './error-text.js'
-import { invalidArgument, normalizeObjectError, objectError } from './errors.js'
-import { createObjectSender } from './s3/send.js'
-import { responseInfo, responseStatus } from './s3/response.js'
-import { uploadMultipart } from './s3/multipart.js'
-import { assertS3ObjectHeaders } from './s3/options.js'
-import type { IObjectDriver, IObjectNative } from './types.js'
+import { ObjectErrorText } from './error-text.ts'
+import { invalidArgument, normalizeObjectError, objectError } from './errors.ts'
+import { createObjectSender } from './s3/send.ts'
+import { responseInfo, responseStatus } from './s3/response.ts'
+import { uploadMultipart } from './s3/multipart.ts'
+import { assertS3ObjectHeaders } from './s3/options.ts'
+import type { IObjectDriver, IObjectNative } from './types.ts'
 /** Injected clients are borrowed; a configured client belongs exclusively to this installation. */
 export type IS3ObjectDriverOptions = (
   | { readonly client: S3Client; readonly config?: never }

@@ -12,12 +12,12 @@ import {
   StorageContractErrorCode,
   type IOperationContext
 } from '@migaia/storage-contract'
-import type { IObjectStore } from '../types.js'
-import { ObjectDriverKind, ObjectNames } from '../constants.js'
-import { objectBackendKind } from '../plugin.js'
-import { invalidArgument, normalizeObjectError } from '../errors.js'
-import { observeObjectFeature } from '../store.js'
-import { assertS3ObjectHeaders } from '../s3/options.js'
+import type { IObjectStore } from '../types.ts'
+import { ObjectDriverKind, ObjectNames } from '../constants.ts'
+import { objectBackendKind } from '../plugin.ts'
+import { invalidArgument, normalizeObjectError } from '../errors.ts'
+import { observeObjectFeature } from '../store.ts'
+import { assertS3ObjectHeaders } from '../s3/options.ts'
 /** Signed requests expose only URL/method and the exact headers the caller must carry. */
 export type IObjectSignedRequest<TMethod extends 'GET' | 'PUT'> = Readonly<{
   url: string

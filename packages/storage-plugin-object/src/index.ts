@@ -1,8 +1,8 @@
-export { objectBackendPlugin, objectBackendKind } from './plugin.js'
-export { ObjectDriverKind } from './constants.js'
+export { objectBackendPlugin, objectBackendKind } from './plugin.ts'
+export { ObjectDriverKind } from './constants.ts'
 export type {
   IObjectDriver,
   IObjectStore,
   IObjectAddress,
   IObjectPostCommitError
-} from './types.js'
+} from './types.ts'

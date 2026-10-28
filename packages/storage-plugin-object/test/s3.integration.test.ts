@@ -2,8 +2,8 @@ import { describe, it, expect, onTestFinished, vi } from 'vitest'
 import { S3Client } from '@aws-sdk/client-s3'
 import { createStorageHost } from '@migaia/storage-host'
 import { blob } from '@migaia/storage-contract'
-import { objectBackendPlugin } from '../src/index.js'
-import { s3ObjectDriver } from '../src/s3.js'
+import { objectBackendPlugin } from '../src/index.ts'
+import { s3ObjectDriver } from '../src/s3.ts'
 
 /**
  * The shared launcher owns service addresses and credentials; no backend-local defaults duplicate

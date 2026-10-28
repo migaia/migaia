@@ -1,9 +1,9 @@
 import { detectServerRuntime } from '@migaia/utils'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
-import { defineObjectDriver } from './driver.js'
-import { ObjectDriverKind } from './constants.js'
-import { invalidArgument } from './errors.js'
-import type { IObjectDriver } from './types.js'
+import { defineObjectDriver } from './driver.ts'
+import { ObjectDriverKind } from './constants.ts'
+import { invalidArgument } from './errors.ts'
+import type { IObjectDriver } from './types.ts'
 /** A trusted plugin-managed directory must not contain unrelated application files. */
 export type IFsObjectDriverOptions = { readonly root: string }
 /** Capture one path without importing native adapters or opening a directory until installation. */
@@ -14,15 +14,15 @@ export function fsObjectDriver(options: IFsObjectDriverOptions): IObjectDriver {
     const runtime = detectServerRuntime()
     const io =
       runtime === 'deno'
-        ? (await import('./fs/deno.js')).fileIo
+        ? (await import('./fs/deno.ts')).fileIo
         : runtime === 'bun'
-          ? (await import('./fs/bun.js')).fileIo
+          ? (await import('./fs/bun.ts')).fileIo
           : runtime === 'node'
-            ? (await import('./fs/node.js')).fileIo
+            ? (await import('./fs/node.ts')).fileIo
             : undefined
     if (!io)
       throw new StorageContractError(StorageContractErrorCode.unsupported, { backend: 'object' })
-    const { openFileObjects } = await import('./fs/layout.js')
+    const { openFileObjects } = await import('./fs/layout.ts')
     return openFileObjects(root, io, context)
   })
 }

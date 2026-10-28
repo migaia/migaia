@@ -1,4 +1,4 @@
-import { invalidArgument } from './errors.js'
+import { invalidArgument } from './errors.ts'
 /** The original ordered key bytes travel as fixed-width lowercase ASCII hex on native S3 keys. */
 export const encodeObjectWireBytes = (bytes: Uint8Array): string =>
   Array.from(bytes, (byte) => byte.toString(16).padStart(2, '0')).join('')

@@ -1,6 +1,6 @@
-import type { IObjectDriver, IObjectNative, IObjectOpenContext } from './types.js'
-import type { ObjectDriverKind } from './constants.js'
-import { invalidArgument } from './errors.js'
+import type { IObjectDriver, IObjectNative, IObjectOpenContext } from './types.ts'
+import type { ObjectDriverKind } from './constants.ts'
+import { invalidArgument } from './errors.ts'
 /** One descriptor map owns brand identity and the captured native opener. */
 const drivers = new WeakMap<
   IObjectDriver,

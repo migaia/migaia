@@ -35,14 +35,14 @@ import {
 import type { IStoragePluginCore } from '@migaia/storage-host'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { bytesToBase64, base64ToBytes } from '@migaia/utils/bytes'
-import { readObjectDriver } from './driver.js'
-import { ObjectNames } from './constants.js'
-import { invalidArgument, normalizeObjectError } from './errors.js'
-import { ObjectErrorText } from './error-text.js'
+import { readObjectDriver } from './driver.ts'
+import { ObjectNames } from './constants.ts'
+import { invalidArgument, normalizeObjectError } from './errors.ts'
+import { ObjectErrorText } from './error-text.ts'
 import { ObjectErrorCode } from '@migaia/storage-contract/error-code'
-import { objectError } from './errors.js'
-import { encodeObjectWireBytes as hex, decodeObjectWireBytes as unhex } from './wire.js'
-import type { IObjectDriver, IObjectNative, IObjectStore } from './types.js'
+import { objectError } from './errors.ts'
+import { encodeObjectWireBytes as hex, decodeObjectWireBytes as unhex } from './wire.ts'
+import type { IObjectDriver, IObjectNative, IObjectStore } from './types.ts'
 
 /** Native Features reuse the exact original store observer without adding public store methods. */
 const featureObservation = Symbol('object-feature-observation')

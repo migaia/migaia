@@ -1,5 +1,5 @@
 import type { IBlobApi } from '@migaia/storage-contract'
-import { invalidArgument } from '../errors.js'
+import { invalidArgument } from '../errors.ts'
 /** S3 HTTP metadata keys are lowercase HTTP tokens; values must fit ordinary HTTP header bytes. */
 export function assertS3ObjectHeaders(options: NonNullable<Parameters<IBlobApi['put']>[2]>): void {
   if (

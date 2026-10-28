@@ -13,13 +13,13 @@ import {
   throwIfAborted,
   readAbortReason
 } from '@migaia/storage-host/sdk'
-import { ObjectDriverKind, ObjectNames } from '../constants.js'
+import { ObjectDriverKind, ObjectNames } from '../constants.ts'
 import { ObjectErrorCode } from '@migaia/storage-contract/error-code'
-import { ObjectErrorText } from '../error-text.js'
-import { invalidArgument, isMissing, normalizeObjectError, objectError } from '../errors.js'
-import type { IObjectNative, IObjectOpenContext, IObjectRead } from '../types.js'
-import type { IObjectFileIo } from './io.js'
-import { decodeObjectWireBytes } from '../wire.js'
+import { ObjectErrorText } from '../error-text.ts'
+import { invalidArgument, isMissing, normalizeObjectError, objectError } from '../errors.ts'
+import type { IObjectNative, IObjectOpenContext, IObjectRead } from '../types.ts'
+import type { IObjectFileIo } from './io.ts'
+import { decodeObjectWireBytes } from '../wire.ts'
 
 /** One process cannot install two independent writers for the same real directory. */
 const occupiedRoots = new Set<string>()

@@ -6,11 +6,11 @@ import { describe, it, expect, onTestFinished, vi } from 'vitest'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { blob } from '@migaia/storage-contract'
 import { runConformance } from '@migaia/storage-contract/conformance'
-import { objectBackendPlugin } from '../src/index.js'
-import { fsObjectDriver } from '../src/fs.js'
-import { objectPresignFeature } from '../src/features/presign.js'
-import { fileIo } from '../src/fs/node.js'
-import { ObjectNames } from '../src/constants.js'
+import { objectBackendPlugin } from '../src/index.ts'
+import { fsObjectDriver } from '../src/fs.ts'
+import { objectPresignFeature } from '../src/features/presign.ts'
+import { fileIo } from '../src/fs/node.ts'
+import { ObjectNames } from '../src/constants.ts'
 
 /** Each business case owns a real native directory and closes the host before fixture cleanup. */
 async function installed() {

@@ -2,8 +2,8 @@ import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { STORAGE_OBJECT_ERROR_SOURCE, ObjectErrorCode } from '@migaia/storage-contract/error-code'
 import type { IObjectErrorCode } from '@migaia/storage-contract/error-code'
-import { ObjectErrorText } from './error-text.js'
-import { ObjectNames } from './constants.js'
+import { ObjectErrorText } from './error-text.ts'
+import { ObjectNames } from './constants.ts'
 /** Attach domain and code to a new native Error while preserving the exact original cause. */
 export function objectError(
   code: IObjectErrorCode,

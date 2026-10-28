@@ -1,7 +1,7 @@
 import * as fs from 'node:fs/promises'
 import { resolve } from 'node:path'
 import { Readable } from 'node:stream'
-import type { IObjectFileIo } from './io.js'
+import type { IObjectFileIo } from './io.ts'
 /** Node reads hold an independent native file handle until EOF or explicit close. */
 export const fileIo: IObjectFileIo = {
   async root(path) {
