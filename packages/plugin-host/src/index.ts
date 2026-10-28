@@ -27,7 +27,8 @@ const RuntimeHost: IRuntimeHostConstructor = RuntimePluginHost
 export class PluginHost<
   TDomainCore extends object,
   TValue = never,
-  TInstalled extends readonly import('./plugin-definition-types.js').IPluginConstraint<any>[] = readonly [],
+  TInstalled extends readonly import('./plugin-definition-types.js').IPluginConstraint<any>[] =
+    readonly [],
   TPipelines extends IPipelineDefinitions = Record<never, never>
 > extends RuntimeHost<TDomainCore, TValue, TInstalled, TPipelines> {
   /**

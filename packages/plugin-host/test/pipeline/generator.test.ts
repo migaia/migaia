@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 import {
-  createPipeline,
-  MiddlewarePipelineMode,
   GENERATOR_CONTINUE,
   GENERATOR_HALT,
   GENERATOR_UNDEFINED
