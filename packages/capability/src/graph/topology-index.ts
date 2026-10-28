@@ -1,3 +1,4 @@
+import { TopologyInvalidReason } from './topology-reasons.js'
 /**
  * Owns incremental topology facts, edge admission and isolated transaction publication. Exposes the
  * public index contract; resource lifecycle and dependency policy stay outside L0.
@@ -13,7 +14,6 @@ import {
   snapshotTopologyIndexNode
 } from './topology-admission.js'
 import {
-  TopologyInvalidReason,
   type ICapabilityTopology,
   type ITopologyDependency,
   type ITopologyInvalidReason,

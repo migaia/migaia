@@ -1,3 +1,8 @@
+/**
+ * Owns static topology projection and public contracts; structural reason values live in the
+ * dependency leaf.
+ */
+import { TopologyInvalidReason as topologyInvalidReason } from './topology-reasons.js'
 import {
   admitTopologyId,
   createTopologyReadonlyMap,
@@ -8,22 +13,7 @@ import {
 } from './topology-admission.js'
 
 /** Stable structural reasons passed to the caller-owned topology error adapter. */
-export const TopologyInvalidReason = {
-  /** A node descriptor is structurally invalid. */
-  invalidNode: 'invalid-node',
-  /** Two node descriptors use the same ID. */
-  duplicateNode: 'duplicate-node',
-  /** A node repeats one required provider edge. */
-  duplicateEdge: 'duplicate-edge',
-  /** Two node descriptors use the same registration ordinal. */
-  duplicateOrdinal: 'duplicate-ordinal',
-  /** A topology operation references a node that is not currently present. */
-  unknownNode: 'unknown-node',
-  /** A nested transaction or base-index mutation is attempted while a transaction is open. */
-  transactionOpen: 'transaction-open',
-  /** A settled transaction is used after commit or rollback. */
-  transactionClosed: 'transaction-closed'
-} as const
+export const TopologyInvalidReason = topologyInvalidReason
 
 /** Structural admission and transaction-state failures interpreted by the caller's error adapter. */
 export type ITopologyInvalidReason =

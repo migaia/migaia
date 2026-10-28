@@ -1,13 +1,10 @@
+import { TopologyInvalidReason } from './topology-reasons.js'
 /**
  * Owns hostile topology admission and immutable collection projections. Exposes captured facts and
  * read-only maps; graph lifecycle and error policy remain caller-owned.
  */
 import { attachSecondaryErrors } from '@migaia/utils/error'
-import {
-  TopologyInvalidReason,
-  type ITopologyDependency,
-  type ITopologyInvalidReason
-} from './topology.js'
+import { type ITopologyDependency, type ITopologyInvalidReason } from './topology.js'
 
 /** Getter metadata reaches caller-owned policy while the pure boundary retains the original cause. */
 export type ITopologySnapshotFailure = (
