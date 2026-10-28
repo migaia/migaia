@@ -27,10 +27,6 @@ export function createRoutedRemote<H extends IAnyTrayHost>(
 }
 /** Only the envelope's absent payload is omitted; no application field is silently removed. */
 function createCalls(send: ITraySender) {
-  const invocation = (path: string, payload: unknown): ITrayInvocation => {
-    if (typeof path !== 'string') throw createTrayError(TrayErrorCode.pathNotExposed)
-    return { path, ...(payload === undefined ? {} : { payload: toWire(payload) }) }
-  }
   return {
     request: (path: string, payload?: unknown, options?: ITrayCallOptions) =>
       send.request(invocation(path, payload), options),
@@ -39,4 +35,10 @@ function createCalls(send: ITraySender) {
     stream: (path: string, payload?: unknown, options?: ITrayCallOptions) =>
       send.stream(invocation(path, payload), options)
   }
+}
+
+/** Validate one public path and omit only absent envelope payload; application data stays portable. */
+function invocation(path: string, payload: unknown): ITrayInvocation {
+  if (typeof path !== 'string') throw createTrayError(TrayErrorCode.pathNotExposed)
+  return { path, ...(payload === undefined ? {} : { payload: toWire(payload) }) }
 }

@@ -55,8 +55,16 @@ export function parentRuntimeTransport(): IRpcTransportPlugin<
     namespace: TrayInternal.connection,
     closingWrites: true,
     expose: [TrayInternal.relayPlugin],
-    open: () => ({ dispose: () => undefined })
+    open: openParentTransport
   })
+}
+
+/**
+ * Admit the parent's cold transport without acquiring a native unit; each open keeps its own
+ * handle.
+ */
+function openParentTransport(): { dispose(): void } {
+  return { dispose: () => undefined }
 }
 /** Translate Tray's unchanged delay option into the sole supported complete RPC feature form. */
 export function rpcCallOptions(options?: ITrayCallOptions): IRpcCallOptions | undefined {

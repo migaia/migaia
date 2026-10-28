@@ -22,6 +22,40 @@ function exitNodeRealm(code: number): void {
   realm?.exit(code)
 }
 
+/** Own the first exit decision for one child generation, independently of native parent loss. */
+class ChildExit {
+  /** Utils retains the exact deferred outcome raced by the original task or realm runner. */
+  readonly #outcome = deferred<void>()
+  /** Live options preserve the original reporter lookup timing when an exit Promise rejects. */
+  readonly #options: ITrayRuntimeOptions
+  /** Only the first explicit child exit can decide clean settlement or a crash. */
+  #ended = false
+
+  /** Attach the original rejection observer before a business plugin can exit during init. */
+  constructor(options: ITrayRuntimeOptions) {
+    this.#options = options
+    void this.#outcome.promise.catch((error) => this.#options.report(error))
+  }
+
+  /** Exit never throws into business code; the original runner cleans up before ending its unit. */
+  readonly exit = (error?: unknown): void => {
+    if (this.#ended) return
+    this.#ended = true
+    if (error === undefined) this.#outcome.resolve()
+    else this.#outcome.reject(error)
+  }
+
+  /** Explicit first exit keeps its outcome while native cleanup closes parent stdio. */
+  parentLossExit(code: number): void {
+    if (!this.#ended) exitNodeRealm(code)
+  }
+
+  /** Parent task and realm runner observe the original exit Promise without another continuation. */
+  get promise(): Promise<void> {
+    return this.#outcome.promise
+  }
+}
+
 /** Finish business cleanup before retiring transport while native pipelines remain admitted. */
 export async function disposeChildHost(
   host: ITrayRuntimeHost,
@@ -79,25 +113,14 @@ export async function serveChild(
     }
   }) as ITrayRuntimeHost
   /** The first exit request alone determines clean or crash task settlement. */
-  const outcome = deferred<void>()
-  /** A plugin may exit during init before the realm runner starts observing it. */
-  void outcome.promise.catch((error) => options.report(error))
-  /** Exit idempotency belongs to this child generation, not the parent registry. */
-  let ended = false
-  /** Never throw into business code; the runner disposes and settles the native unit later. */
-  const exit = (error?: unknown): void => {
-    if (ended) return
-    ended = true
-    if (error === undefined) outcome.resolve()
-    else outcome.reject(error)
-  }
+  const outcome = new ChildExit(options)
   try {
     /** The dispatcher retains its original shutdown Promise while its Feature serves RPC. */
     const dispatcher = createChildDispatcher(
       admitted,
       host,
       () => outletOf(host, admitted),
-      exit,
+      outcome.exit,
       options.report
     )
     await host.use(
@@ -110,10 +133,7 @@ export async function serveChild(
     const transport = runtimePlugin(admitted, TrayRuntimeMode.child, {
       ...options,
       connect,
-      parentLossExit: (code) => {
-        // An explicit first exit keeps its outcome while the same cleanup closes parent stdio.
-        if (!ended) exitNodeRealm(code)
-      }
+      parentLossExit: (code) => outcome.parentLossExit(code)
     })
     await host.use(transport)
     return {

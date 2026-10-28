@@ -97,7 +97,10 @@ export function defineTrayHost<
       TrayHostField.routing
     ].map((key) => [key, readData(source, key)])
   )
-  /** Runtime omission is the only default; every other family must be explicit. */
+  /**
+   * Runtime omission defaults to coroutine; membership scans exactly TrayRuntime’s three fixed
+   * keys.
+   */
   const runtime = fields.runtime === undefined ? TrayRuntime.coroutine : fields.runtime
   if (
     typeof fields.name !== 'string' ||
@@ -179,7 +182,7 @@ export function defineTrayHost<
     if (restart !== undefined) {
       /** Restart options are copied once; maxRestarts is never renamed. */
       const options = readRecord(restart)
-      /** Native restart modes have no Tray-specific extension. */
+      /** Membership scans exactly the three compile-time modes declared by TrayRestartMode. */
       const mode = readData(options, TrayHostField.mode)
       if (mode !== undefined && !Object.values(TrayRestartMode).includes(mode as never))
         throw createTrayError(TrayErrorCode.hostInvalid)
