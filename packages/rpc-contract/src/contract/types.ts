@@ -1,5 +1,5 @@
 /** Pure portable-value, error-projection and shape-diagnostic types; no legacy protocol or framer. */
-import type { ERROR_SOURCE, IRpcContractErrorCode } from '../error-code.js'
+import type { ERROR_SOURCE, IRpcContractErrorCode } from '../error-code.ts'
 
 /** Portable binary value represented without runtime-specific typed arrays. */
 export type IRpcPortableBytes = Readonly<{

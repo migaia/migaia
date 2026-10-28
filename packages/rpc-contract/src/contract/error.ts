@@ -7,24 +7,24 @@ import {
   sanitizeErrorText,
   type IErrorChainStrategy
 } from '@migaia/utils/error'
-import { createContractError } from './contract-error.js'
-import { RpcContractErrorCode } from '../error-code.js'
-import { RpcWireLimit } from '../wire/limits.js'
-import { normalizePortable } from '../portable/normalize.js'
+import { createContractError } from './contract-error.ts'
+import { RpcContractErrorCode } from '../error-code.ts'
+import { RpcWireLimit } from '../wire/limits.ts'
+import { normalizePortable } from '../portable/normalize.ts'
 import type {
   IRpcSerializedError,
   IRpcSerializeErrorOptions,
   IRpcWireErrorOptions,
   IRpcErrorWireMetadata,
   IRpcErrorWireSummary
-} from './types.js'
+} from './types.ts'
 import {
   RpcErrorReachLimit,
   RpcWireErrorFallback,
   RpcWireErrorField,
   RpcWireErrorLimit,
   RpcWireErrorViolation
-} from './wire-error-constants.js'
+} from './wire-error-constants.ts'
 
 /** Read exact-reference presentation before ordinary error getters, preserving reentrant order. */
 function readWireSummary(

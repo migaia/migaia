@@ -8,7 +8,7 @@ import {
   RpcProbeForwardRejection,
   rpcProbeEnvelopeFacts
 } from '@migaia/rpc-contract/interfaces'
-import { header, hello } from './fixtures/core-profile.js'
+import { header, hello } from './fixtures/core-profile.ts'
 import {
   RpcWireProfile,
   RpcWireBinaryProfile,

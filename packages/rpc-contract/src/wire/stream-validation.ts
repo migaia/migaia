@@ -1,8 +1,8 @@
 /** Check caller-supplied stream credit and sequence facts without retaining live state. */
-import { invalidRpcStream } from '../errors/stream.js'
-import { RpcStreamViolation } from './stream-constants.js'
-import { RpcWireCancel, RpcWireStreamFinish } from './constants.js'
-import type { IRpcCallOptions, IRpcStreamEvent } from './types.js'
+import { invalidRpcStream } from '../errors/stream.ts'
+import { RpcStreamViolation } from './stream-constants.ts'
+import { RpcWireCancel, RpcWireStreamFinish } from './constants.ts'
+import type { IRpcCallOptions, IRpcStreamEvent } from './types.ts'
 
 /** Stable locations distinguish legacy payload and runtime-envelope stream diagnostics. */
 export const RpcStreamPointer = {

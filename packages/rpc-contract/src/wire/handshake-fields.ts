@@ -1,11 +1,11 @@
 /** Pure handshake field validators borrow original records and ignore non-owned metadata fields. */
-import type { IRpcHandshakeVersion } from './types.js'
-import type { IRpcErrorWireMetadata } from '../contract/types.js'
+import type { IRpcHandshakeVersion } from './types.ts'
+import type { IRpcErrorWireMetadata } from '../contract/types.ts'
 import { tryReadProperty } from '@migaia/utils/error'
-import { createContractError } from '../contract/contract-error.js'
-import { RpcContractErrorCode } from '../error-code.js'
-import { RpcWireJsonCodec, RpcWireField as F } from './constants.js'
-import { RpcWireLimit, RpcHandshakeViolation } from './limits.js'
+import { createContractError } from '../contract/contract-error.ts'
+import { RpcContractErrorCode } from '../error-code.ts'
+import { RpcWireJsonCodec, RpcWireField as F } from './constants.ts'
+import { RpcWireLimit, RpcHandshakeViolation } from './limits.ts'
 
 /** Runtime labels describe the peer implementation rather than granting execution authority. */
 const runtimePattern = /^[a-z][a-z0-9-]{0,31}$/u

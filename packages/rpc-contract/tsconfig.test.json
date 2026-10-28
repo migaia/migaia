@@ -1,6 +1,8 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
     "lib": ["ES2023", "DOM", "ESNext.Disposable"],
     "noEmit": true,
     "types": ["vite/client", "vitest/globals", "node"]

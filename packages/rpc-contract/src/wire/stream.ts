@@ -3,24 +3,24 @@
  * sequence and credit checks. Stream execution, queued pulls, cancellation and resource cleanup
  * remain with the Host stream owner.
  */
-import type { IRpcPortableProjector } from './types.js'
-import type { IRpcErrorWireMetadata } from '../contract/types.js'
+import type { IRpcPortableProjector } from './types.ts'
+import type { IRpcErrorWireMetadata } from '../contract/types.ts'
 /**
  * Admits stream event data for the single profile and flat wire errors. The existing sequence and
  * credit checks remain shared; no stream queue, pending pull, timer, or listener is held here.
  */
-import { invalid, invalidRpcEnvelope } from './record.js'
+import { invalid, invalidRpcEnvelope } from './record.ts'
 
-import { normalizeRpcPortable } from '../portable/normalize.js'
+import { normalizeRpcPortable } from '../portable/normalize.ts'
 import {
   RpcStreamEvent,
   RpcStreamLimit,
   RpcStreamViolation,
   measurePortableStreamValue
-} from './stream-constants.js'
-import { normalizeRpcWireError } from './errors.js'
-import { RpcWireField as F, RpcWirePointer as P, RpcWireStreamFinish } from './constants.js'
-import type { IRpcStreamEvent } from './types.js'
+} from './stream-constants.ts'
+import { normalizeRpcWireError } from './errors.ts'
+import { RpcWireField as F, RpcWirePointer as P, RpcWireStreamFinish } from './constants.ts'
+import type { IRpcStreamEvent } from './types.ts'
 
 /** Reuse established producer/consumer credit checks with caller-supplied held state. */
 export {
@@ -29,7 +29,7 @@ export {
   checkRpcStreamProgress,
   checkRpcStreamConsumerCredit,
   checkRpcStreamProducerCredit
-} from './stream-validation.js'
+} from './stream-validation.ts'
 
 /** Normalize one stream event in linear value size, preserving existing item/end/fail spelling. */
 export function normalizeRpcStream(

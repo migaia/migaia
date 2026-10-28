@@ -4,12 +4,12 @@
  * with the invoking walker rather than this policy module.
  */
 import { isArrayBuffer } from '@migaia/utils/bytes'
-import type { IRpcErrorWireMetadata } from '../contract/types.js'
+import type { IRpcErrorWireMetadata } from '../contract/types.ts'
 import type { IPortableWalkerStrategy } from '@migaia/serialize'
-import { createContractError } from '../contract/contract-error.js'
-import { RpcContractErrorCode } from '../error-code.js'
-import { RPC_CONTRACT_SOURCE } from '../contract/error-text.js'
-import { rpcPortableBackingLength, rpcPortableViewLength } from './intrinsics.js'
+import { createContractError } from '../contract/contract-error.ts'
+import { RpcContractErrorCode } from '../error-code.ts'
+import { RPC_CONTRACT_SOURCE } from '../contract/error-text.ts'
+import { rpcPortableBackingLength, rpcPortableViewLength } from './intrinsics.ts'
 
 /** Preserve the wire strategy's inline-only binary branch in portable package declarations. */
 type IRpcWirePortableStrategy = Extract<

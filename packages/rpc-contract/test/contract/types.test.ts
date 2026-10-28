@@ -5,7 +5,7 @@ import {
   normalizeRpcFrame,
   type IRpcSemanticFrame
 } from '@migaia/rpc-contract/protocol'
-import { header } from '../fixtures/core-profile.js'
+import { header } from '../fixtures/core-profile.ts'
 
 describe('rpc-contract declarations', () => {
   it('preserves sole-profile literals and exhaustive semantic frame narrowing', () => {

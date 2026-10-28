@@ -3,37 +3,37 @@
  * profile. These pure snapshots preserve execution order and flat errors without running providers
  * or owning an idempotency store.
  */
-import type { IRpcPortableProjector } from './types.js'
-import type { IRpcErrorWireMetadata } from '../contract/types.js'
+import type { IRpcPortableProjector } from './types.ts'
+import type { IRpcErrorWireMetadata } from '../contract/types.ts'
 /**
  * Validates fail-stop group reports and retained outcome facts under the existing runtime rules. It
  * never executes providers, reserves work, or owns an idempotency result store.
  */
-import { normalizeRpcGeneration, isRpcMode } from './metadata.js'
+import { normalizeRpcGeneration, isRpcMode } from './metadata.ts'
 
-import { invalid } from './record.js'
+import { invalid } from './record.ts'
 
-import { normalizeRpcPortable } from '../portable/normalize.js'
+import { normalizeRpcPortable } from '../portable/normalize.ts'
 import {
   RpcRuntimeStoreKind,
   RpcRuntimeStoreContinuity,
   RpcRuntimeOutcomeState
-} from './outcome-constants.js'
-import { normalizeRpcWireError } from './errors.js'
-import { RpcStreamEvent } from './stream-constants.js'
+} from './outcome-constants.ts'
+import { normalizeRpcWireError } from './errors.ts'
+import { RpcStreamEvent } from './stream-constants.ts'
 import {
   RpcCallMode,
   RpcWireField as F,
   RpcWirePointer as P,
   RpcWireStepState as S
-} from './constants.js'
+} from './constants.ts'
 import type {
   IRpcStepOutcome,
   IRpcTask,
   IRpcCompletion,
   IRpcOutcomeStore,
   IRpcOutcome
-} from './types.js'
+} from './types.ts'
 
 /** Validate one original group outcome under its preceding fail-stop state. */
 function validateStepOutcome(

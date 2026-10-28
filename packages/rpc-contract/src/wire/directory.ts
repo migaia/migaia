@@ -1,14 +1,14 @@
 /** Pure schema3 directory validators read original records and their known fields only. */
-import { normalizeRpcGeneration } from './metadata.js'
-import { RpcWireDirectoryVersion } from './constants.js'
+import { normalizeRpcGeneration } from './metadata.ts'
+import { RpcWireDirectoryVersion } from './constants.ts'
 import {
   RpcWireLimit,
   REMOTE_NAME_PATTERN,
   RPC_DIRECTORY_METHOD_LIMIT,
   RuntimeApiMode,
   RuntimeApiModeSource
-} from './limits.js'
-import { readMethodSchema, normalizeMethodSchema } from './method-schema.js'
+} from './limits.ts'
+import { readMethodSchema, normalizeMethodSchema } from './method-schema.ts'
 import {
   inspectShape,
   rejectShape,
@@ -16,10 +16,10 @@ import {
   RpcShapeReason,
   type IShapeInspection,
   type IRpcShapeCheck
-} from './schema-diagnostics.js'
-import { invalid as invalidEnvelope } from './record.js'
-import type { IRpcDirectory } from './types.js'
-import type { IRpcErrorWireMetadata } from '../contract/types.js'
+} from './schema-diagnostics.ts'
+import { invalid as invalidEnvelope } from './record.ts'
+import type { IRpcDirectory } from './types.ts'
+import type { IRpcErrorWireMetadata } from '../contract/types.ts'
 
 /** Method path segments use the same stable grammar as local provider declarations. */
 const segment = new RegExp(REMOTE_NAME_PATTERN, 'u')

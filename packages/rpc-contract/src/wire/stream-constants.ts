@@ -1,7 +1,7 @@
 /** Pure stream value budgets and event vocabulary; execution and held credit stay in Host. */
-import type { IRpcPortableValue } from './types.js'
+import type { IRpcPortableValue } from './types.ts'
 import { isArrayBuffer, isUint8Array } from '@migaia/utils/bytes'
-import { rpcPortableBackingLength, rpcPortableViewLength } from '../portable/normalize.js'
+import { rpcPortableBackingLength, rpcPortableViewLength } from '../portable/normalize.ts'
 
 /** The seven shared stream events; direction and sequence are checked by the stream owner. */
 export const RpcStreamEvent = {

@@ -9,13 +9,13 @@ import type {
   IRpcHandshake,
   IRpcPortableValue,
   IRpcSemanticFrame
-} from '../wire/types.js'
+} from '../wire/types.ts'
 import type {
   IRpcCarrierFrame,
   IRpcPreparedMessage,
   IRpcSessionView,
   IRpcCarrierWriteOptions
-} from './carrier.js'
+} from './carrier.ts'
 
 /** A flow context exposes accepted facts, never mutable pending/provider/session tables. */
 export type IRpcFlowContext = Readonly<{

@@ -3,12 +3,12 @@
  * variants. Snapshotting validates declared facts and relative budgets without authorizing peers,
  * selecting feature instances or deciding whether a generation is current.
  */
-import type { IRpcErrorWireMetadata } from '../contract/types.js'
+import type { IRpcErrorWireMetadata } from '../contract/types.ts'
 /** Shared generation, task, group and call-option grammar for the single profile. */
-import { normalizeRpcPortable } from '../portable/normalize.js'
-import { RpcCallMode, RpcWireField as F } from './constants.js'
-import { RpcWireLimit } from './limits.js'
-import { identifier, invalid } from './record.js'
+import { normalizeRpcPortable } from '../portable/normalize.ts'
+import { RpcCallMode, RpcWireField as F } from './constants.ts'
+import { RpcWireLimit } from './limits.ts'
+import { identifier, invalid } from './record.ts'
 import type {
   IRpcCallOptions,
   IRpcRoute,
@@ -16,7 +16,7 @@ import type {
   IRpcGeneration,
   IRpcStep,
   IRpcPortableProjector
-} from './types.js'
+} from './types.ts'
 
 /** The retained scalar-failure order checks target identity before physical receiver identity. */
 const routeIdentityFields = [F.applicationVersion, F.senderId, F.targetId, F.receiverId] as const

@@ -3,10 +3,10 @@
  * Pure envelope projections expose admitted header facts; subscriptions, capture and physical IO
  * belong to Host, SDK and concrete transport owners.
  */
-import { RpcWireKind, RpcCallMode } from '../wire/constants.js'
-import { RpcStreamEvent } from '../wire/stream-constants.js'
-import type { IRpcEnvelope, IRpcControlFrame } from '../wire/types.js'
-import type { IRpcCarrierFrame } from './carrier.js'
+import { RpcWireKind, RpcCallMode } from '../wire/constants.ts'
+import { RpcStreamEvent } from '../wire/stream-constants.ts'
+import type { IRpcEnvelope, IRpcControlFrame } from '../wire/types.ts'
+import type { IRpcCarrierFrame } from './carrier.ts'
 /** Physical platform labels move from the retired transport owner without changing their values. */
 export const RpcCarrierPlatform = {
   /** Same-origin broadcast channel. */ broadcastChannel: 'BroadcastChannel',

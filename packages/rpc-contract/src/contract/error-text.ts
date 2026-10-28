@@ -2,7 +2,7 @@
  * Owns stable Contract diagnostic text shared by pure validators and native error construction.
  * Protocol admission and error provenance remain with their respective owners.
  */
-import { ERROR_SOURCE } from '../error-code.js'
+import { ERROR_SOURCE } from '../error-code.ts'
 
 /** Contract-layer identity attached to every RPC contract boundary error. */
 export const RPC_CONTRACT_SOURCE = ERROR_SOURCE
