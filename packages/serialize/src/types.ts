@@ -1,3 +1,5 @@
+/** Public chunk, parser and registry contracts own shared tuple and encoding admission. */
+import { SerializeDiagnosticText } from './diagnostic-text.ts'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IScheduler } from '@migaia/utils/scheduler'
 
@@ -13,15 +15,15 @@ import {
   createSerializeTypeError,
   SerializeErrorCode,
   SerializeErrorText
-} from './errors.js'
+} from './errors.ts'
 import { isUint8Array } from '@migaia/utils/bytes'
-import type { ISerializeErrorCode } from './error-code.js'
+import type { ISerializeErrorCode } from './error-code.ts'
 import {
   SerializeChunkKind,
   SerializeCleanupKind,
   SerializeCleanupPolicy,
   SerializePhase
-} from './format-constants.js'
+} from './format-constants.ts'
 
 /**
  * Serialization chunk protocol.
@@ -114,7 +116,7 @@ export function assertSerializeType(type: string): void {
   if (!SERIALIZE_TYPE_PATTERN.test(type)) {
     throw createSerializeRangeError(
       SerializeErrorCode.invalidOption,
-      `invalid serialize plugin type: ${JSON.stringify(type)}; expected ${String(SERIALIZE_TYPE_PATTERN)}`
+      SerializeDiagnosticText.invalidType(type, SERIALIZE_TYPE_PATTERN)
     )
   }
 }
@@ -128,6 +130,14 @@ export function assertSerializeType(type: string): void {
  */
 export const isChunkShape = (value: unknown): value is readonly [string, unknown] =>
   Array.isArray(value) && value.length === 2 && typeof value[0] === 'string'
+
+/** Rejects a malformed tuple with its exact collection location and no additional wrapper. */
+function rejectSerializeChunk(
+  message: string,
+  details: Parameters<typeof validateSerializeChunk>[1]
+): never {
+  throw new SerializeCodecError(message, { ...details, code: SerializeErrorCode.invalidChunk })
+}
 
 /**
  * Validate one chunk at a package boundary and retain its stream position in any failure. Registry
@@ -144,37 +154,34 @@ export function validateSerializeChunk(
     readonly bytesConsumed: number
   }
 ): ISerializeChunk {
-  const fail = (message: string): never => {
-    throw new SerializeCodecError(message, {
-      ...details,
-      code: SerializeErrorCode.invalidChunk
-    })
-  }
-
   try {
     if (!Array.isArray(candidate) || candidate.length !== 2) {
-      fail('serialize chunk must be a [type, data] pair')
+      rejectSerializeChunk(SerializeDiagnosticText.chunkPair, details)
     }
-    const tuple = candidate as readonly [unknown, unknown]
+    /** Only the admitted pair container is read before producing a frozen snapshot. */
+    const tuple = candidate as unknown as readonly [unknown, unknown]
+    /** Chunk discriminant is captured once so caller getters cannot change the branch. */
     const kind = tuple[0]
+    /** Payload identity is preserved while tuple properties are snapshotted. */
     const data = tuple[1]
     if (kind === SerializeChunkKind.text) {
-      if (typeof data !== 'string') fail('text chunk data must be a string')
+      if (typeof data !== 'string') rejectSerializeChunk(SerializeDiagnosticText.chunkText, details)
       // Copy only the tuple container. Payload identity, including Uint8Array/value references,
       // remains unchanged while later consumers cannot reread a hostile tuple.
       return Object.freeze([kind, data]) as ISerializeChunk
     }
     if (kind === SerializeChunkKind.bytes) {
       if (!isUint8Array(data)) {
-        fail('bytes chunk data must be a Uint8Array')
+        rejectSerializeChunk(SerializeDiagnosticText.chunkBytes, details)
       }
       return Object.freeze([kind, data]) as ISerializeChunk
     }
-    if (kind !== SerializeChunkKind.value) fail('unknown serialize chunk type')
+    if (kind !== SerializeChunkKind.value)
+      rejectSerializeChunk(SerializeDiagnosticText.chunkUnknown, details)
     return Object.freeze([kind, data]) as ISerializeChunk
   } catch (error) {
     if (error instanceof SerializeCodecError) throw error
-    throw new SerializeCodecError('serialize chunk validation failed', {
+    throw new SerializeCodecError(SerializeDiagnosticText.chunkValidation, {
       ...details,
       code: SerializeErrorCode.invalidChunk,
       cause: error
@@ -236,7 +243,7 @@ export class SerializeCodecError<TCode extends string = ISerializeErrorCode> ext
     }
   ) {
     super(message, details.cause !== undefined ? { cause: details.cause } : undefined)
-    this.name = 'SerializeCodecError'
+    this.name = SerializeDiagnosticText.codecErrorName
     this.source = details.source ?? SERIALIZE_SOURCE
     this.code = details.code
     if (details.context !== undefined) this.context = details.context
@@ -262,16 +269,19 @@ export function encodeSerializeTextChunk(
     readonly bytesConsumed: number
   }
 ): Uint8Array {
+  /** Encoder output is observed once before native byte-array admission. */
   let encoded: unknown
   try {
     encoded = encoder.encode(text)
   } catch (error) {
-    throw new SerializeCodecError(
-      `${SerializeErrorText.textEncodeFailed} at chunk ${details.chunkIndex}`,
-      { ...details, code: SerializeErrorCode.encodeFailed, cause: error }
-    )
+    throw new SerializeCodecError(SerializeDiagnosticText.textEncodeAt(details.chunkIndex), {
+      ...details,
+      code: SerializeErrorCode.encodeFailed,
+      cause: error
+    })
   }
   if (isUint8Array(encoded)) return encoded
+  /** An undefined return needs an explicit cause instead of losing its classification. */
   const invalidReturn =
     encoded === undefined
       ? createSerializeTypeError(
@@ -279,10 +289,11 @@ export function encodeSerializeTextChunk(
           SerializeErrorText.textEncoderOutputInvalid
         )
       : encoded
-  throw new SerializeCodecError(
-    `${SerializeErrorText.textEncoderOutputInvalid} at chunk ${details.chunkIndex}`,
-    { ...details, code: SerializeErrorCode.invalidChunk, cause: invalidReturn }
-  )
+  throw new SerializeCodecError(SerializeDiagnosticText.textEncoderOutputAt(details.chunkIndex), {
+    ...details,
+    code: SerializeErrorCode.invalidChunk,
+    cause: invalidReturn
+  })
 }
 
 /**

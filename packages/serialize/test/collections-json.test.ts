@@ -1,10 +1,10 @@
 import { runInNewContext } from 'node:vm'
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { defineCollectionsJsonCodec } from '../src/codecs/collections-json.js'
-import { defineJsonCodec } from '../src/codecs/json.js'
-import { defineCBORCodec } from '../src/codecs/cbor.js'
-import { defineMessagePackCodec } from '../src/codecs/message-pack.js'
-import { toPortableValue } from '../src/codec.js'
+import { defineCollectionsJsonCodec } from '../src/codecs/collections-json.ts'
+import { defineJsonCodec } from '../src/codecs/json.ts'
+import { defineCBORCodec } from '../src/codecs/cbor.ts'
+import { defineMessagePackCodec } from '../src/codecs/message-pack.ts'
+import { toPortableValue } from '../src/codec.ts'
 
 describe('collection-preserving JSON codec', () => {
   it('restores nested collections in insertion order and leaves byte tags as records', () => {
@@ -134,7 +134,7 @@ describe('collection-preserving JSON codec', () => {
     } finally {
       sort.mockRestore()
     }
-    expect(Object.keys(toPortableValue({ b: 1, a: 2 }) as object)).toEqual(['a', 'b'])
+    expect(Object.keys(toPortableValue({ b: 1, a: 2 }) as object)).toEqual(['b', 'a'])
   })
 
   it('visits format getters once in property order and emits format-specific ordered bytes', () => {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { sliceByFrameBudget } from '../src/index.js'
-import { readReason } from '../src/signal-snapshot.js'
-import { createSerializeTypeError, SerializeErrorCode, SerializeErrorText } from '../src/errors.js'
+import { sliceByFrameBudget } from '../src/index.ts'
+import { readReason } from '../src/signal-snapshot.ts'
+import { createSerializeTypeError, SerializeErrorCode, SerializeErrorText } from '../src/errors.ts'
 
 /** Structural signal with a reason accessor whose failure identity is observable. */
 function throwingReason(cause: unknown, initialAborted = false) {

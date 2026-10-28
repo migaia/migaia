@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { encodeStream, type ISerializeChunk } from '../src/index.js'
+import { encodeStream, type ISerializeChunk } from '../src/index.ts'
 
 describe('serialize bounded finalization', () => {
   it('returns without awaiting noncooperative residual work', async () => {

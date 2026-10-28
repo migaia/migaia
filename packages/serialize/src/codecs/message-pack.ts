@@ -1,14 +1,14 @@
-import { toCodecPortableValue } from '../portable.js'
+import { toCodecPortableValue } from '../portable.ts'
 import { decode, encode } from '@msgpack/msgpack'
-import { SerializeErrorCode } from '../error-code.js'
+import { SerializeErrorCode } from '../error-code.ts'
 import {
   asCodecValue,
   CodecErrorText,
   normalizeCodecFailure,
   type ICodec,
   type ICodecValue
-} from '../codec.js'
-import { assertCodecVersion } from '../internal/codec.js'
+} from '../codec.ts'
+import { assertCodecVersion } from '../internal/codec.ts'
 
 /** Options for the MessagePack codec factory. */
 export type IMessagePackCodecOptions<TVersion extends number> = Readonly<{
@@ -28,6 +28,7 @@ export function defineMessagePackCodec<const TVersion extends number>(
 ): ICodec<ICodecValue, Uint8Array, 'message-pack', TVersion> & {
   readonly encodedType: 'uint8array'
 } {
+  /** Retain the admitted literal codec revision without rereading the caller option. */
   const version = assertCodecVersion(options.version)
   return Object.freeze({
     id: 'message-pack' as const,
@@ -35,6 +36,7 @@ export function defineMessagePackCodec<const TVersion extends number>(
     encodedType: 'uint8array' as const,
     encode: (value: ICodecValue): Uint8Array => {
       try {
+        /** One shared projection owns value-domain validation before format encoding. */
         const portable = toCodecPortableValue(value)
         return encode(portable, { ignoreUndefined: true, sortKeys: false })
       } catch (error) {
@@ -47,6 +49,7 @@ export function defineMessagePackCodec<const TVersion extends number>(
     },
     decode: (value: Uint8Array): ICodecValue => {
       try {
+        /** Validate the format decoder result through the shared portable value boundary. */
         const decoded = decode(value) as unknown
         return asCodecValue(decoded)
       } catch (error) {

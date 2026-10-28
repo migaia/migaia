@@ -1,4 +1,4 @@
-import { createPortableWalker, type IPortableWalkerStrategy } from '../../src/codec.js'
+import { createPortableWalker, type IPortableWalkerStrategy } from '../../src/codec.ts'
 
 /** Copied RPC contract identity is fixture policy; serialize production code owns no RPC rule. */
 const RpcPortableOracle = {

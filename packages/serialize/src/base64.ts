@@ -3,7 +3,7 @@
  * `btoa`/`atob`.
  */
 
-import { createSerializeTypeError, SerializeErrorCode, SerializeErrorText } from './errors.js'
+import { createSerializeTypeError, SerializeErrorCode, SerializeErrorText } from './errors.ts'
 import {
   base64ToBytes as decodeCanonicalBase64,
   bytesToBase64 as encodeCanonicalBase64,
@@ -55,6 +55,7 @@ export function base64ToBytes(text: string): Uint8Array {
 export function bytesToBase64url(bytes: Uint8Array): string {
   /** The canonical encoder adds at most two padding characters; never scan the whole wire text. */
   const text = bytesToBase64(bytes).replaceAll('+', '-').replaceAll('/', '_')
+  /** Canonical Base64 adds at most two trailing padding characters; strip only that suffix. */
   const padding = text.endsWith('==') ? 2 : text.endsWith('=') ? 1 : 0
   return padding === 0 ? text : text.slice(0, -padding)
 }
@@ -63,7 +64,7 @@ export function bytesToBase64url(bytes: Uint8Array): string {
 export function isCanonicalBase64url(text: string): boolean {
   if (!/^[A-Za-z0-9_-]*$/u.test(text) || text.length % 4 === 1) return false
   if (text.length === 0) return true
-  /** Final sextet determines whether the omitted padding has a unique spelling. */
+  /** Final sextet lookup is bounded by BASE64URL_ALPHABET's fixed 64 RFC 4648 characters. */
   const bits = BASE64URL_ALPHABET.indexOf(text[text.length - 1]!)
   return text.length % 4 === 2 ? (bits & 15) === 0 : text.length % 4 === 3 ? (bits & 3) === 0 : true
 }

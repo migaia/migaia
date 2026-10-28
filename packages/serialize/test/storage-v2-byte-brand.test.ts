@@ -1,7 +1,7 @@
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
-import { encodeSerializeTextChunk, validateSerializeChunk } from '../src/types.js'
-import { SerializePhase } from '../src/format-constants.js'
+import { encodeSerializeTextChunk, validateSerializeChunk } from '../src/types.ts'
+import { SerializePhase } from '../src/format-constants.ts'
 
 /** Stable diagnostics used by both boundary probes. */
 const details = {

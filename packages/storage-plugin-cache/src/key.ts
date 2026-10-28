@@ -8,6 +8,7 @@ import {
 import { SerializeErrorCode } from '@migaia/serialize/core'
 import { encodeUtf8 } from '@migaia/utils/bytes'
 import { invalidArgument } from './errors.ts'
+import { CacheKeyNormalizer } from './key-canonical.ts'
 
 /** Digest original bytes once; cache request identities and offloaded content share this primitive. */
 export async function hashCacheBytes(bytes: Uint8Array): Promise<string> {
@@ -24,11 +25,12 @@ export async function cacheKey(
 ): Promise<string> {
   if (parts.length === 0) throw invalidArgument()
   try {
-    /**
-     * Validate the detached projection; the legacy sorting projector alone permits nonportable
-     * leaves.
-     */
-    const text = JSON.stringify(parts.map((part) => asCodecValue(toPortableValue(part))))
+    /** Preserve the existing projection and value admission before cache-specific key ordering. */
+    const projected = parts.map((part) => asCodecValue(toPortableValue(part)))
+    /** The cache owner normalizes detached records without reading application getters again. */
+    const normalizer = new CacheKeyNormalizer()
+    /** Stable JSON bytes retain existing cache identities independently of serialize key order. */
+    const text = JSON.stringify(normalizer.normalize(projected))
     return hashCacheBytes(encodeUtf8(text))
   } catch (error) {
     throw normalizeCodecFailure(

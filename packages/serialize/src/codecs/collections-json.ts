@@ -1,9 +1,9 @@
-import type { ICodec, ICodecValue } from '../codec.js'
-import type { IJsonCodecOptions } from './json.js'
-import { CodecErrorText } from '../codec-text.js'
-import { SerializeErrorCode } from '../error-code.js'
-import { assertCodecVersion, createCodecError } from '../internal/codec.js'
-import { fromCollectionsPortableValue, toCollectionsPortableValue } from '../portable.js'
+import type { ICodec, ICodecValue } from '../codec.ts'
+import type { IJsonCodecOptions } from './json.ts'
+import { CodecErrorText } from '../codec-text.ts'
+import { SerializeErrorCode } from '../error-code.ts'
+import { assertCodecVersion, createCodecError } from '../internal/codec.ts'
+import { fromCollectionsPortableValue, toCollectionsPortableValue } from '../portable.ts'
 
 /** Portable format values extended with recursively nested collections and intrinsic bytes. */
 export type ICollectionsCodecValue =

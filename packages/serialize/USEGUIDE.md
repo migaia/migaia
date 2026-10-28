@@ -395,7 +395,7 @@ ICodecValue 的静态域为 null、boolean、number、string、嵌套只读数�
 
 ### Portable 默认规则与可复用 walker
 
-toPortableValue(value, active?) 返回旧中间投影，不等于最终断言：普通对象按排序字符串键逐项读取并递归，得到可变 ordinary 对象，不冻结；Uint8Array 变成 { $rpc: 'bytes', base64url }。继承/非枚举/symbol 字段不进入记录投影，getter 可能执行，重复兄弟引用各复制一次；环只按当前祖先路径判断。投影阶段可暂存 undefined/NaN 等中间值，格式 codec 最终校验才拒绝。
+toPortableValue(value, active?) 返回旧中间投影，不等于最终断言：普通对象按 Object.keys 属性枚举顺序逐项读取并递归，得到可变 ordinary 对象，不冻结；Uint8Array 变成 { $rpc: 'bytes', base64url }。继承/非枚举/symbol 字段不进入记录投影，getter 可能执行，重复兄弟引用各复制一次；环只按当前祖先路径判断。投影阶段可暂存 undefined/NaN 等中间值，格式 codec 最终校验才拒绝。
 
 assertPortableValue(value, active?) 返回 void，asCodecValue(value) 验证后返回同一 ICodecValue 视图；不复制或冻结。默认 decoded profile 拒绝非有限数、undefined、函数、symbol、bigint、Date/Map/Set、非法数组和 native bytes；认可的 bytes tag 保留既有字符集规则，不冒称额外协议的 canonical 位校验。默认深度不限。ArrayBuffer/class 等旧投影行为不应被误称为通用安全快照。
 
@@ -471,7 +471,7 @@ console.log(text) // {"$rpc":"map","entries":[["roles",{"$rpc":"set","values":["
 console.log(codec.decode(text)) // Map { 'roles' => Set { 'read', 'write' } }
 ```
 
-格式 codec 先枚举整数索引，再按字符串插入顺序输出，getter 遍历顺序相同。公开 toPortableValue 仍提供按键排序的中间投影。RPC owned 快照与普通对象、字节 JSON 路径均保持对象自身的 key 顺序；RPC 私有快照仍由原单遍遍历同时完成复制与字节上限计算，并跳过已经编码的二进制子树。
+格式 codec 与公开 toPortableValue 都先枚举整数索引，再按字符串插入顺序输出，getter 遍历顺序相同。serialize 不负责键排序；需要规范顺序时，由消费者负责规范化。RPC owned 快照与普通对象、字节 JSON 路径均保持对象自身的 key 顺序；RPC 私有快照仍由原单遍遍历同时完成复制与字节上限计算，并跳过已经编码的二进制子树。
 
 ### 编码结果自带格式标签
 

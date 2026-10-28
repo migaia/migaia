@@ -1,8 +1,8 @@
-import { createSerializeTypeError, SerializeErrorCode, SerializeErrorText } from './errors.js'
-import { SerializeTextFormat, type ISerializeTextFormat } from './format-constants.js'
-import { jsonParser } from './plugins/json.js'
+import { createSerializeTypeError, SerializeErrorCode, SerializeErrorText } from './errors.ts'
+import { SerializeTextFormat, type ISerializeTextFormat } from './format-constants.ts'
+import { jsonParser } from './plugins/json.ts'
 import { createAbortController } from '@migaia/lifecycle/abort'
-import type { ISerializeChunk, ISerializeContext } from './types.js'
+import type { ISerializeChunk, ISerializeContext } from './types.ts'
 
 /** Text formats share one admitted data graph; unsupported values cannot be silently omitted. */
 type IOutputValue =
@@ -33,6 +33,7 @@ function invalid(cause?: unknown): never {
 
 /** TOML basic strings require Unicode scalars; JSON and YAML retain their original string domain. */
 function scalarString(value: string): void {
+  /** Unicode iteration combines valid surrogate pairs before scalar admission. */
   for (const character of value) {
     /** Iteration combines valid surrogate pairs, so a remaining surrogate is not a scalar. */
     const point = character.codePointAt(0)!
@@ -78,7 +79,9 @@ function admit(value: unknown, format: ISerializeTextFormat, active: Set<object>
       const length = descriptors.length!.value as number
       /** New arrays preserve ordering and contain only admitted data values. */
       const result: IOutputValue[] = []
+      /** Process each captured own key once while preserving the existing enumeration order. */
       for (const key of Reflect.ownKeys(descriptors)) {
+        /** Inspect only the captured own-data descriptor; caller getters remain unevaluated. */
         const descriptor = descriptors[key as string]!
         if (!descriptor.enumerable) continue
         if (
@@ -90,6 +93,7 @@ function admit(value: unknown, format: ISerializeTextFormat, active: Set<object>
           invalid()
       }
       for (let index = 0; index < length; index++) {
+        /** Inspect only the captured own-data descriptor; caller getters remain unevaluated. */
         const descriptor = descriptors[index]
         if (!descriptor?.enumerable || !Object.hasOwn(descriptor, 'value')) invalid()
         result.push(admit(descriptor.value, format, active))
@@ -98,7 +102,9 @@ function admit(value: unknown, format: ISerializeTextFormat, active: Set<object>
     }
     /** A null prototype also prevents a user key from changing projection object ownership. */
     const result: { [key: string]: IOutputValue } = Object.create(null)
+    /** Process each captured own key once while preserving the existing enumeration order. */
     for (const key of Reflect.ownKeys(descriptors)) {
+      /** Inspect only the captured own-data descriptor; caller getters remain unevaluated. */
       const descriptor = descriptors[key as string]!
       if (!descriptor.enumerable) continue
       if (typeof key !== 'string' || !Object.hasOwn(descriptor, 'value')) invalid()
@@ -153,6 +159,7 @@ export function emitOutput(
   value: unknown,
   format: ISerializeTextFormat = SerializeTextFormat.json
 ): string {
+  // SerializeTextFormat has exactly three compile-time values: json, yaml, and toml.
   if (!Object.values(SerializeTextFormat).includes(format)) invalid()
   if (
     format === SerializeTextFormat.toml &&

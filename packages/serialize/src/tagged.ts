@@ -1,11 +1,12 @@
+/** Tagged codec contracts, descriptor admission, and synchronous framing share one owner. */
 import { isUint8Array } from '@migaia/utils/bytes'
 import { isPlainObject } from '@migaia/utils/object'
-import { type ICodec, type ICodecEncodedType, normalizeCodecFailure } from './codec.js'
-import { CodecErrorText } from './codec-text.js'
-import { SerializeErrorCode } from './error-code.js'
-import { TaggedCodecFormat } from './format-constants.js'
-import { createCodecError } from './internal/codec.js'
-import { SERIALIZE_TYPE_PATTERN } from './types.js'
+import { type ICodec, type ICodecEncodedType, normalizeCodecFailure } from './codec.ts'
+import { CodecErrorText } from './codec-text.ts'
+import { SerializeErrorCode } from './error-code.ts'
+import { TaggedCodecFormat } from './format-constants.ts'
+import { createCodecError } from './internal/codec.ts'
+import { SERIALIZE_TYPE_PATTERN } from './types.ts'
 
 /** Source carrier stays explicit even when unknown-carrier codecs happen to encode strings. */
 type ITaggedSourceCodec<TValue, TEncoded, TFormat extends ICodecEncodedType> = ICodec<
@@ -104,7 +105,7 @@ function captureCodec<TValue, TEncoded>(
 function assertTag(tag: unknown): asserts tag is string {
   if (typeof tag === 'string') {
     /** The separator cannot occur in a valid id, so one split is sufficient. */
-    const separator = tag.indexOf(TaggedCodecFormat.tagSeparator)
+    const separator = taggedSeparatorOffset(tag, TaggedCodecFormat.tagSeparator)
     /** Numeric conversion is bounded by the header length and checked against canonical spelling. */
     const version = Number(tag.slice(separator + 1))
     if (
@@ -119,6 +120,210 @@ function assertTag(tag: unknown): asserts tag is string {
   throw createCodecError(SerializeErrorCode.tagInvalid, CodecErrorText.tagInvalid)
 }
 
+/** Locate one fixed framing character in a single linear pass over the input text. */
+function taggedSeparatorOffset(value: string, separator: string, start = 0): number {
+  for (let index = start; index < value.length; index++)
+    if (value[index] === separator) return index
+  return -1
+}
+
+/** One immutable router owns admitted revisions and cached headers; it never grows per request. */
+class TaggedCodecOwner<TValue, TEncoded, TFormat extends ICodecEncodedType> {
+  /** Registered revision index provides constant-time exact tag routing. */
+  readonly #readers = new Map<string, ICapturedCodec<TValue, TEncoded>>()
+  /** First admitted descriptor owns writes and fixes the public carrier. */
+  readonly #writer: ICapturedCodec<TValue, TEncoded>
+  /** Optional legacy reader is independent from registered tagged revisions. */
+  readonly #untagged: ICapturedCodec<TValue, TEncoded> | undefined
+  /** Binary framing is cached once and copied into each owned encoded frame. */
+  readonly #binaryHeader: Uint8Array
+  /** Text framing stays stable without per-write identity reconstruction. */
+  readonly #textHeader: string
+  /** Frozen plain descriptor retains own keys and independently callable functions. */
+  readonly codec: ITaggedCodec<TValue, TEncoded, TFormat>
+
+  /** Admit each descriptor in list order and cache framing before publishing the router. */
+  constructor(options: ITaggedCodecOptions<TValue, TEncoded, TFormat>) {
+    /** One map owns registered format revisions; no per-request cache grows over time. */
+    const readers = this.#readers
+    /** Fixed first writer; assigned only after a nonempty admitted source list. */
+    let writer: ICapturedCodec<TValue, TEncoded>
+    /** Optional fallback is captured independently and never participates in writes. */
+    let untagged: ICapturedCodec<TValue, TEncoded> | undefined
+    try {
+      /** Snapshot option fields once before descriptor admission. */
+      const { codecs, untagged: fallback } = options
+      if (!Array.isArray(codecs) || codecs.length === 0)
+        throw createCodecError(
+          SerializeErrorCode.invalidOption,
+          CodecErrorText.taggedOptionsInvalid
+        )
+      /** Admit each source descriptor once in caller-supplied revision order. */
+      for (const source of codecs) {
+        /** Each admitted revision gets one immutable identity and method snapshot. */
+        const captured = captureCodec<TValue, TEncoded>(source)
+        if (
+          readers.has(captured.tag) ||
+          (readers.size > 0 && captured.encodedType !== writer!.encodedType)
+        )
+          throw createCodecError(
+            SerializeErrorCode.invalidOption,
+            CodecErrorText.taggedOptionsInvalid
+          )
+        if (readers.size === 0) writer = captured
+        readers.set(captured.tag, captured)
+      }
+      if (fallback !== undefined) {
+        untagged = captureCodec(fallback)
+        if (untagged.encodedType !== writer!.encodedType)
+          throw createCodecError(
+            SerializeErrorCode.invalidOption,
+            CodecErrorText.taggedOptionsInvalid
+          )
+      }
+    } catch (cause) {
+      throw normalizeCodecFailure(
+        cause,
+        SerializeErrorCode.invalidOption,
+        CodecErrorText.taggedOptionsInvalid
+      )
+    }
+    /** Fixed identity is ASCII by admission, so its character codes are exactly UTF-8 bytes. */
+    const tagBytes = Uint8Array.from(writer!.tag, (char) => char.charCodeAt(0))
+    /** Cached binary header is copied with the untouched payload into one fresh output allocation. */
+    const binaryHeader = new Uint8Array(TaggedCodecFormat.binaryHeaderLength + tagBytes.length)
+    binaryHeader.set(TaggedCodecFormat.binaryMagic)
+    binaryHeader[4] = TaggedCodecFormat.version
+    binaryHeader[5] = tagBytes.length >>> 8
+    binaryHeader[6] = tagBytes.length & 255
+    binaryHeader.set(tagBytes, TaggedCodecFormat.binaryHeaderLength)
+    /** Cached string header avoids reconstructing fixed identity on every write. */
+    const textHeader = `${TaggedCodecFormat.textPrefix}${writer!.tag}${TaggedCodecFormat.textSeparator}`
+
+    this.#writer = writer!
+    this.#untagged = untagged
+    this.#binaryHeader = binaryHeader
+    this.#textHeader = textHeader
+    this.codec = Object.freeze({
+      id: TaggedCodecFormat.id,
+      version: TaggedCodecFormat.version,
+      encodedType: writer!.encodedType as TFormat,
+      encode: (value: TValue) => this.#encode(value),
+      decode: (value: ITaggedEncoded<TEncoded, TFormat> | TEncoded) => this.#decode(value)
+    })
+  }
+
+  /** Untagged input requires its explicitly admitted legacy reader. */
+  #decodeUntagged(value: TEncoded): TValue {
+    if (this.#untagged === undefined)
+      throw createCodecError(SerializeErrorCode.tagMissing, CodecErrorText.tagMissing)
+    return this.#untagged.decode(value)
+  }
+
+  /** Canonical tags use one exact revision lookup and never fall back. */
+  #decodeTagged(tag: unknown, value: TEncoded): TValue {
+    assertTag(tag)
+    /** One exact lookup selects only the registered revision. */
+    const reader = this.#readers.get(tag)
+    if (reader === undefined)
+      throw createCodecError(SerializeErrorCode.tagUnknown, CodecErrorText.tagUnknown)
+    return reader.decode(value)
+  }
+
+  /** Delegate exactly once and add framing without changing the inner failure identity. */
+  #encode(value: TValue): ITaggedEncoded<TEncoded, TFormat> {
+    try {
+      /** Delegate once before framing; failures keep their original boundary identity. */
+      const encoded = this.#writer.encode(value)
+      if (this.#writer.encodedType === 'string') {
+        if (typeof encoded !== 'string')
+          throw createCodecError(SerializeErrorCode.encodeFailed, CodecErrorText.encodeFailed)
+        return (this.#textHeader + encoded) as ITaggedEncoded<TEncoded, TFormat>
+      }
+      if (this.#writer.encodedType === 'uint8array') {
+        if (!isUint8Array(encoded))
+          throw createCodecError(SerializeErrorCode.encodeFailed, CodecErrorText.encodeFailed)
+        /** One owned allocation copies the cached header and the borrowed inner payload. */
+        const result = new Uint8Array(this.#binaryHeader.length + encoded.length)
+        result.set(this.#binaryHeader)
+        result.set(encoded, this.#binaryHeader.length)
+        return result as ITaggedEncoded<TEncoded, TFormat>
+      }
+      return Object.freeze({
+        [TaggedCodecFormat.marker]: this.#writer.tag,
+        [TaggedCodecFormat.value]: encoded
+      }) as ITaggedEncoded<TEncoded, TFormat>
+    } catch (cause) {
+      throw normalizeCodecFailure(
+        cause,
+        SerializeErrorCode.encodeFailed,
+        CodecErrorText.encodeFailed
+      )
+    }
+  }
+
+  /** Parse the declared carrier and route the untouched payload to one captured reader. */
+  #decode(value: ITaggedEncoded<TEncoded, TFormat> | TEncoded): TValue {
+    try {
+      if (this.#writer.encodedType === 'string' && typeof value === 'string') {
+        if (!value.startsWith(TaggedCodecFormat.textPrefix))
+          return this.#decodeUntagged(value as TEncoded)
+        /** The first delimiter terminates the header; payload text stays untouched. */
+        const end = taggedSeparatorOffset(
+          value,
+          TaggedCodecFormat.textSeparator,
+          TaggedCodecFormat.textPrefix.length
+        )
+        if (end === -1)
+          throw createCodecError(SerializeErrorCode.tagInvalid, CodecErrorText.tagInvalid)
+        return this.#decodeTagged(
+          value.slice(TaggedCodecFormat.textPrefix.length, end),
+          value.slice(end + 1) as TEncoded
+        )
+      }
+      if (this.#writer.encodedType === 'uint8array' && isUint8Array(value)) {
+        // TaggedCodecFormat.binaryMagic has exactly four compile-time byte values.
+        if (!TaggedCodecFormat.binaryMagic.every((byte, index) => value[index] === byte))
+          return this.#decodeUntagged(value as TEncoded)
+        if (
+          value.length < TaggedCodecFormat.binaryHeaderLength ||
+          value[4] !== TaggedCodecFormat.version
+        )
+          throw createCodecError(SerializeErrorCode.tagInvalid, CodecErrorText.tagInvalid)
+        /** Claimed header length is checked before creating the borrowed payload view. */
+        const end = TaggedCodecFormat.binaryHeaderLength + ((value[5]! << 8) | value[6]!)
+        if (end > value.length)
+          throw createCodecError(SerializeErrorCode.tagInvalid, CodecErrorText.tagInvalid)
+        /** Admitted identities are ASCII, whose one-byte UTF-8 spelling decodes directly. */
+        const tag = Array.from(value.subarray(TaggedCodecFormat.binaryHeaderLength, end), (byte) =>
+          String.fromCharCode(byte)
+        ).join('')
+        return this.#decodeTagged(tag, value.subarray(end) as TEncoded)
+      }
+      if (
+        this.#writer.encodedType === 'unknown' &&
+        isPlainObject(value) &&
+        Object.hasOwn(value, TaggedCodecFormat.marker)
+      ) {
+        /** Capture the own discriminator once before selecting its reader. */
+        const tag = value[TaggedCodecFormat.marker]
+        if (typeof tag === 'string') {
+          if (!Object.hasOwn(value, TaggedCodecFormat.value))
+            throw createCodecError(SerializeErrorCode.tagInvalid, CodecErrorText.tagInvalid)
+          return this.#decodeTagged(tag, value[TaggedCodecFormat.value] as TEncoded)
+        }
+      }
+      return this.#decodeUntagged(value as TEncoded)
+    } catch (cause) {
+      throw normalizeCodecFailure(
+        cause,
+        SerializeErrorCode.decodeFailed,
+        CodecErrorText.decodeFailed
+      )
+    }
+  }
+}
+
 /**
  * Creates a frozen format router without storage or lifecycle ownership. Identity, methods, and the
  * fixed write header are captured once. Text prefix collisions are treated as tagged input;
@@ -127,163 +332,5 @@ function assertTag(tag: unknown): asserts tag is string {
 export function createTaggedCodec<TValue, TEncoded, const TFormat extends ICodecEncodedType>(
   options: ITaggedCodecOptions<TValue, TEncoded, TFormat>
 ): ITaggedCodec<TValue, TEncoded, TFormat> {
-  /** One map owns registered format revisions; no per-request cache grows over time. */
-  const readers = new Map<string, ICapturedCodec<TValue, TEncoded>>()
-  /** Fixed first writer; assigned only after a nonempty admitted source list. */
-  let writer: ICapturedCodec<TValue, TEncoded>
-  /** Optional fallback is captured independently and never participates in writes. */
-  let untagged: ICapturedCodec<TValue, TEncoded> | undefined
-  try {
-    /** Snapshot option fields once before descriptor admission. */
-    const { codecs, untagged: fallback } = options
-    if (!Array.isArray(codecs) || codecs.length === 0)
-      throw createCodecError(SerializeErrorCode.invalidOption, CodecErrorText.taggedOptionsInvalid)
-    for (const source of codecs) {
-      /** Each admitted revision gets one immutable identity and method snapshot. */
-      const captured = captureCodec<TValue, TEncoded>(source)
-      if (
-        readers.has(captured.tag) ||
-        (readers.size > 0 && captured.encodedType !== writer!.encodedType)
-      )
-        throw createCodecError(
-          SerializeErrorCode.invalidOption,
-          CodecErrorText.taggedOptionsInvalid
-        )
-      if (readers.size === 0) writer = captured
-      readers.set(captured.tag, captured)
-    }
-    if (fallback !== undefined) {
-      untagged = captureCodec(fallback)
-      if (untagged.encodedType !== writer!.encodedType)
-        throw createCodecError(
-          SerializeErrorCode.invalidOption,
-          CodecErrorText.taggedOptionsInvalid
-        )
-    }
-  } catch (cause) {
-    throw normalizeCodecFailure(
-      cause,
-      SerializeErrorCode.invalidOption,
-      CodecErrorText.taggedOptionsInvalid
-    )
-  }
-  /** Fixed identity is ASCII by admission, so its character codes are exactly UTF-8 bytes. */
-  const tagBytes = Uint8Array.from(writer!.tag, (char) => char.charCodeAt(0))
-  /** Cached binary header is copied with the untouched payload into one fresh output allocation. */
-  const binaryHeader = new Uint8Array(TaggedCodecFormat.binaryHeaderLength + tagBytes.length)
-  binaryHeader.set(TaggedCodecFormat.binaryMagic)
-  binaryHeader[4] = TaggedCodecFormat.version
-  binaryHeader[5] = tagBytes.length >>> 8
-  binaryHeader[6] = tagBytes.length & 255
-  binaryHeader.set(tagBytes, TaggedCodecFormat.binaryHeaderLength)
-  /** Cached string header avoids reconstructing fixed identity on every write. */
-  const textHeader = `${TaggedCodecFormat.textPrefix}${writer!.tag}${TaggedCodecFormat.textSeparator}`
-  /** Untagged routing is explicit and cannot guess a registered codec. */
-  const decodeUntagged = (value: TEncoded): TValue => {
-    if (untagged === undefined)
-      throw createCodecError(SerializeErrorCode.tagMissing, CodecErrorText.tagMissing)
-    return untagged.decode(value)
-  }
-  /** Syntactically valid tags must name an admitted reader; no fallback is attempted. */
-  const decodeTagged = (tag: unknown, value: TEncoded): TValue => {
-    assertTag(tag)
-    /** One exact lookup selects only the registered revision. */
-    const reader = readers.get(tag)
-    if (reader === undefined)
-      throw createCodecError(SerializeErrorCode.tagUnknown, CodecErrorText.tagUnknown)
-    return reader.decode(value)
-  }
-  return Object.freeze({
-    id: TaggedCodecFormat.id,
-    version: TaggedCodecFormat.version,
-    encodedType: writer!.encodedType as TFormat,
-    encode: (value: TValue): ITaggedEncoded<TEncoded, TFormat> => {
-      try {
-        /** Delegate once before framing; failures keep their original boundary identity. */
-        const encoded = writer!.encode(value)
-        if (writer!.encodedType === 'string') {
-          if (typeof encoded !== 'string')
-            throw createCodecError(SerializeErrorCode.encodeFailed, CodecErrorText.encodeFailed)
-          return (textHeader + encoded) as ITaggedEncoded<TEncoded, TFormat>
-        }
-        if (writer!.encodedType === 'uint8array') {
-          if (!isUint8Array(encoded))
-            throw createCodecError(SerializeErrorCode.encodeFailed, CodecErrorText.encodeFailed)
-          /** One owned allocation copies the cached header and the borrowed inner payload. */
-          const result = new Uint8Array(binaryHeader.length + encoded.length)
-          result.set(binaryHeader)
-          result.set(encoded, binaryHeader.length)
-          return result as ITaggedEncoded<TEncoded, TFormat>
-        }
-        return Object.freeze({
-          [TaggedCodecFormat.marker]: writer!.tag,
-          [TaggedCodecFormat.value]: encoded
-        }) as ITaggedEncoded<TEncoded, TFormat>
-      } catch (cause) {
-        throw normalizeCodecFailure(
-          cause,
-          SerializeErrorCode.encodeFailed,
-          CodecErrorText.encodeFailed
-        )
-      }
-    },
-    decode: (value: ITaggedEncoded<TEncoded, TFormat> | TEncoded): TValue => {
-      try {
-        if (writer!.encodedType === 'string' && typeof value === 'string') {
-          if (!value.startsWith(TaggedCodecFormat.textPrefix))
-            return decodeUntagged(value as TEncoded)
-          /** The first delimiter terminates the header; payload text stays untouched. */
-          const end = value.indexOf(
-            TaggedCodecFormat.textSeparator,
-            TaggedCodecFormat.textPrefix.length
-          )
-          if (end === -1)
-            throw createCodecError(SerializeErrorCode.tagInvalid, CodecErrorText.tagInvalid)
-          return decodeTagged(
-            value.slice(TaggedCodecFormat.textPrefix.length, end),
-            value.slice(end + 1) as TEncoded
-          )
-        }
-        if (writer!.encodedType === 'uint8array' && isUint8Array(value)) {
-          if (!TaggedCodecFormat.binaryMagic.every((byte, index) => value[index] === byte))
-            return decodeUntagged(value as TEncoded)
-          if (
-            value.length < TaggedCodecFormat.binaryHeaderLength ||
-            value[4] !== TaggedCodecFormat.version
-          )
-            throw createCodecError(SerializeErrorCode.tagInvalid, CodecErrorText.tagInvalid)
-          /** Claimed header length is checked before creating the borrowed payload view. */
-          const end = TaggedCodecFormat.binaryHeaderLength + ((value[5]! << 8) | value[6]!)
-          if (end > value.length)
-            throw createCodecError(SerializeErrorCode.tagInvalid, CodecErrorText.tagInvalid)
-          /** Admitted identities are ASCII, whose one-byte UTF-8 spelling decodes directly. */
-          const tag = Array.from(
-            value.subarray(TaggedCodecFormat.binaryHeaderLength, end),
-            (byte) => String.fromCharCode(byte)
-          ).join('')
-          return decodeTagged(tag, value.subarray(end) as TEncoded)
-        }
-        if (
-          writer!.encodedType === 'unknown' &&
-          isPlainObject(value) &&
-          Object.hasOwn(value, TaggedCodecFormat.marker)
-        ) {
-          /** Capture the own discriminator once before selecting its reader. */
-          const tag = value[TaggedCodecFormat.marker]
-          if (typeof tag === 'string') {
-            if (!Object.hasOwn(value, TaggedCodecFormat.value))
-              throw createCodecError(SerializeErrorCode.tagInvalid, CodecErrorText.tagInvalid)
-            return decodeTagged(tag, value[TaggedCodecFormat.value] as TEncoded)
-          }
-        }
-        return decodeUntagged(value as TEncoded)
-      } catch (cause) {
-        throw normalizeCodecFailure(
-          cause,
-          SerializeErrorCode.decodeFailed,
-          CodecErrorText.decodeFailed
-        )
-      }
-    }
-  })
+  return new TaggedCodecOwner(options).codec
 }

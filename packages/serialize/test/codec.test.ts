@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 
-import { identityCodec } from '../src/codecs/identity/v1.js'
-import { defineJsonCodec } from '../src/codecs/json.js'
-import { defineMessagePackCodec } from '../src/codecs/message-pack.js'
-import { defineCBORCodec } from '../src/codecs/cbor.js'
-import { defineProtobufCodec } from '../src/codecs/protobuf.js'
-import { RpcEnvelopeSchema } from './fixtures/rpc-envelope-schema.js'
-import type { ICodecValue } from '../src/codec.js'
+import { identityCodec } from '../src/codecs/identity/v1.ts'
+import { defineJsonCodec } from '../src/codecs/json.ts'
+import { defineMessagePackCodec } from '../src/codecs/message-pack.ts'
+import { defineCBORCodec } from '../src/codecs/cbor.ts'
+import { defineProtobufCodec } from '../src/codecs/protobuf.ts'
+import { RpcEnvelopeSchema } from './fixtures/rpc-envelope-schema.ts'
+import type { ICodecValue } from '../src/codec.ts'
 
 const value = { text: 'portable', bytes: { $rpc: 'bytes', base64url: 'AAE' }, nested: [null, 1] }
 

@@ -4,23 +4,23 @@
  * Core does not import this entry, preventing a dependency cycle. The registry depends on core and
  * lifecycle.
  */
-export * from './core.js'
-export * from './plugins.js'
+export * from './core.ts'
+export * from './plugins.ts'
 export type {
   ICodec,
   ICodecEncodedType,
   ICodecValue,
   IPortableWalkerStrategy,
   IPortableBinaryResult
-} from './codec.js'
-export { createPortableWalker } from './codec.js'
-export { emitOutput } from './output.js'
-export { chunkToBytes, chunkToText, createSerializeRegistry } from './registry.js'
+} from './codec.ts'
+export { createPortableWalker } from './codec.ts'
+export { emitOutput } from './output.ts'
+export { chunkToBytes, chunkToText, createSerializeRegistry } from './registry.ts'
 export type {
   ISerializeCleanupError,
   ISerializeRegistryOptions,
   ISerializeTimeoutDiagnostic
-} from './registry.js'
+} from './registry.ts'
 export {
   SerializeChunkKind,
   SerializeOutput,
@@ -36,4 +36,4 @@ export {
   type ISerializeCleanupPolicy,
   type ISerializeCleanupKind,
   type ISerializePluginType
-} from './format-constants.js'
+} from './format-constants.ts'

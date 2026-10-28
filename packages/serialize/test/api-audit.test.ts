@@ -1,10 +1,10 @@
 import { Buffer } from 'node:buffer'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { walkErrorCauses } from '@migaia/utils/error'
-import * as codecBoundary from '../src/codec.js'
-import { identityCodec } from '../src/codecs/identity/v1.js'
+import * as codecBoundary from '../src/codec.ts'
+import { identityCodec } from '../src/codecs/identity/v1.ts'
 // @ts-expect-error removes this synonym; ISerializeChunkKind is the canonical public name.
-import type { ISerializeChunkType as IRetiredChunkType } from '../src/core.js'
+import type { ISerializeChunkType as IRetiredChunkType } from '../src/core.ts'
 import {
   base64ToBytes,
   chunkToBytes,
@@ -17,7 +17,7 @@ import {
   SerializeErrorCode,
   tagSerializeError,
   type ISerializeChunk
-} from '../src/index.js'
+} from '../src/index.ts'
 
 describe('serialize audited ownership and failure contracts', () => {
   it('expose canonical entries without helper or compatibility exports', () => {

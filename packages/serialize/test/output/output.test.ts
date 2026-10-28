@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
 import { parse as parseYaml } from 'yaml'
 import { it } from 'vitest'
-import * as serialize from '../../src/index.js'
+import * as serialize from '../../src/index.ts'
 
 /** The pre-implementation namespace assertion fails as business RED, never as a missing import. */
 function emit(value: unknown, format: 'json' | 'yaml' | 'toml'): string {

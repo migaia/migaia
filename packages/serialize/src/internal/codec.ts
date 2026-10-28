@@ -1,6 +1,6 @@
-import { SerializeErrorCode } from '../error-code.js'
-import { SERIALIZE_SOURCE } from '../errors.js'
-import { CodecErrorText } from '../codec-text.js'
+import { SerializeErrorCode } from '../error-code.ts'
+import { SERIALIZE_SOURCE } from '../errors.ts'
+import { CodecErrorText } from '../codec-text.ts'
 
 /** Construct a native error with package identity while retaining the original cause. */
 export function createCodecError(
@@ -8,6 +8,7 @@ export function createCodecError(
   message: string,
   cause?: unknown
 ): Error {
+  /** The original native TypeError receives serialize identity without replacing its stack. */
   const error = new TypeError(message, cause === undefined ? undefined : { cause })
   Object.defineProperty(error, 'source', { value: SERIALIZE_SOURCE, enumerable: true })
   Object.defineProperty(error, 'code', { value: code, enumerable: true })

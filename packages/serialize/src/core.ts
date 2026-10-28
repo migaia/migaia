@@ -22,7 +22,7 @@ export {
   type ISerializeRegistry,
   type ITextDecoder,
   type ITextEncoder
-} from './types.js'
+} from './types.ts'
 
 export {
   SERIALIZE_SOURCE,
@@ -36,11 +36,11 @@ export {
   createSerializeError,
   createSerializeTypeError,
   createSerializeRangeError
-} from './errors.js'
+} from './errors.ts'
 
-export { base64ToBytes, bytesToBase64, streamBase64Chunks } from './base64.js'
+export { base64ToBytes, bytesToBase64, streamBase64Chunks } from './base64.ts'
 /** Portable policy consumers share the existing canonical alphabet and unused-bit checker. */
-export { isCanonicalBase64url } from './base64.js'
+export { isCanonicalBase64url } from './base64.ts'
 
 export {
   collectStream,
@@ -50,6 +50,6 @@ export {
   type ICollectStreamOptions,
   type IEncodeStreamOptions,
   type IFrameBudgetOptions
-} from './stream.js'
+} from './stream.ts'
 
-export type { ISerializeChunkKind } from './format-constants.js'
+export type { ISerializeChunkKind } from './format-constants.ts'

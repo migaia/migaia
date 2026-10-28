@@ -6,7 +6,7 @@ import {
   createSerializeRangeError,
   createSerializeTypeError,
   tagSerializeError
-} from '../src/errors.js'
+} from '../src/errors.ts'
 
 describe('serialize error-code contract', () => {
   it('declares 11 unique codes under the package source', () => {

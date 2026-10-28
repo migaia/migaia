@@ -1,7 +1,7 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { describe, expect, it, vi } from 'vitest'
-import { createSerializeRegistry } from '../src/index.js'
-import { composeSerializeSignal } from '../src/signal.js'
+import { createSerializeRegistry } from '../src/index.ts'
+import { composeSerializeSignal } from '../src/signal.ts'
 
 describe('composeSerializeSignal registration races', () => {
   it('disposes caller and closing registrations in strict reverse install order exactly once', () => {

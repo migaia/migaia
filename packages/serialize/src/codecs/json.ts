@@ -1,13 +1,13 @@
-import { toCodecPortableValue } from '../portable.js'
-import { SerializeErrorCode } from '../error-code.js'
+import { toCodecPortableValue } from '../portable.ts'
+import { SerializeErrorCode } from '../error-code.ts'
 import {
   asCodecValue,
   CodecErrorText,
   normalizeCodecFailure,
   type ICodec,
   type ICodecValue
-} from '../codec.js'
-import { assertCodecVersion, createCodecError } from '../internal/codec.js'
+} from '../codec.ts'
+import { assertCodecVersion, createCodecError } from '../internal/codec.ts'
 
 /** Options for the native JSON codec factory. */
 export type IJsonCodecOptions<TVersion extends number> = Readonly<{
@@ -25,6 +25,7 @@ export type IJsonCodecOptions<TVersion extends number> = Readonly<{
 export function defineJsonCodec<const TVersion extends number>(
   options: IJsonCodecOptions<TVersion>
 ): ICodec<ICodecValue, string, 'json', TVersion> & { readonly encodedType: 'string' } {
+  /** Retain the admitted literal codec revision without rereading the caller option. */
   const version = assertCodecVersion(options.version)
   return Object.freeze({
     id: 'json' as const,
@@ -32,7 +33,9 @@ export function defineJsonCodec<const TVersion extends number>(
     encodedType: 'string' as const,
     encode: (value: ICodecValue): string => {
       try {
+        /** One shared projection owns value-domain validation before format encoding. */
         const portable = toCodecPortableValue(value)
+        /** Retain the complete format result before validating or publishing its carrier. */
         const encoded = JSON.stringify(portable)
         if (encoded === undefined)
           throw createCodecError(SerializeErrorCode.encodeFailed, CodecErrorText.encodeFailed)
@@ -47,6 +50,7 @@ export function defineJsonCodec<const TVersion extends number>(
     },
     decode: (value: string): ICodecValue => {
       try {
+        /** Validate the format decoder result through the shared portable value boundary. */
         const decoded = JSON.parse(value) as unknown
         return asCodecValue(decoded)
       } catch (error) {

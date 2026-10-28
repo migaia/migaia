@@ -4,7 +4,7 @@ import {
   createSerializeRegistry,
   type ISerializeChunk,
   type ISerializePlugin
-} from '../src/index.js'
+} from '../src/index.ts'
 
 const plugin = (encode: ISerializePlugin['parser']['encode']): ISerializePlugin => ({
   type: 'a',
