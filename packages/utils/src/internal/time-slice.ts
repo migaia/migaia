@@ -11,7 +11,7 @@ import {
   tryReadProperty,
   UtilsAbortError
 } from '../error.ts'
-import type { IAbortSignal } from '../promise.ts'
+import type { IAbortSignal } from './promise-contract.ts'
 import { resolveAsyncTaskStrategy, yieldToHost, type AsyncTaskStrategy } from './async-task.ts'
 import { systemScheduler } from './scheduler.ts'
 
@@ -132,20 +132,52 @@ export function timeSlice<T>(
   const yieldStrategy = resolveAsyncTaskStrategy(strategy)
   /** Opened source; opening errors are argument errors. */
   const { iterator, async } = openSource(source)
-  return run(iterator, async, handler, budget, yieldStrategy, signal, onProgress, clock)
+  return run({
+    iterator,
+    async,
+    handler,
+    budget,
+    strategy: yieldStrategy,
+    signal,
+    onProgress,
+    clock
+  })
 }
 
-/** The asynchronous slicing loop behind `timeSlice()`. */
-async function run<T>(
-  iterator: ISliceIterator<T>,
-  async: boolean,
-  handler: (item: T, index: number) => unknown,
-  budget: number,
-  strategy: AsyncTaskStrategy,
-  signal: IAbortSignal | undefined,
-  onProgress: ((report: ITimeSliceReport) => void) | undefined,
+/** Snapshot values are passed explicitly; progress creation never captures one run's changing state. */
+function sliceReport(
+  processed: number,
+  slices: number,
+  startedAt: number,
   clock: { now(): number }
-): Promise<ITimeSliceReport> {
+): ITimeSliceReport {
+  return Object.freeze({ processed, slices, elapsedMs: clock.now() - startedAt })
+}
+
+/** Observe cancellation at the same item boundary and keep hostile reason failures as reasons. */
+function checkSliceAbort(signal: IAbortSignal | undefined): void {
+  if (!signal?.aborted) return
+  /** Cancellation reasons use the package's canonical protected property read. */
+  const reason = tryReadProperty(signal as { reason?: unknown }, 'reason')
+  throw new UtilsAbortError(reason.threw ? reason.error : reason.value)
+}
+
+/** One admitted slicing run owns exactly these source, callback and scheduling capabilities. */
+type ISliceRunContext<T> = {
+  readonly iterator: ISliceIterator<T>
+  readonly async: boolean
+  readonly handler: (item: T, index: number) => unknown
+  readonly budget: number
+  readonly strategy: AsyncTaskStrategy
+  readonly signal: IAbortSignal | undefined
+  readonly onProgress: ((report: ITimeSliceReport) => void) | undefined
+  readonly clock: { now(): number }
+}
+
+/** The asynchronous slicing loop owns all run counters; borrowed capabilities arrive explicitly. */
+async function run<T>(context: ISliceRunContext<T>): Promise<ITimeSliceReport> {
+  /** These admitted references stay stable until this run returns or rejects. */
+  const { iterator, async, handler, budget, strategy, signal, onProgress, clock } = context
   /** Run start on the monotonic clock. */
   const startedAt = clock.now()
   /** Start of the current slice. */
@@ -156,19 +188,9 @@ async function run<T>(
   let slices = 1
   /** Whether the iterator reported completion, so `return()` must not be called. */
   let done = false
-  /** Builds a frozen progress snapshot. */
-  const report = (): ITimeSliceReport =>
-    Object.freeze({ processed, slices, elapsedMs: clock.now() - startedAt })
-  /** Throws the abort error when the signal fired. */
-  const checkAbort = (): void => {
-    if (!signal?.aborted) return
-    /** Abort reason read once through a guarded getter. */
-    const reason = tryReadProperty(signal as { reason?: unknown }, 'reason')
-    throw new UtilsAbortError(reason.threw ? reason.error : reason.value)
-  }
   try {
     for (;;) {
-      checkAbort()
+      checkSliceAbort(signal)
       /** Next iterator step; awaited only for async sources. */
       const step = async ? await iterator.next() : (iterator.next() as IteratorResult<T>)
       if (step.done) {
@@ -180,7 +202,7 @@ async function run<T>(
       if (isThenable(result)) await result
       processed += 1
       if (clock.now() - sliceStart >= budget) {
-        onProgress?.(report())
+        onProgress?.(sliceReport(processed, slices, startedAt, clock))
         await yieldToHost(strategy, signal ? { signal } : undefined)
         slices += 1
         sliceStart = clock.now()
@@ -199,7 +221,7 @@ async function run<T>(
     throw error
   }
   /** Final report, also delivered to `onProgress`. */
-  const final = report()
+  const final = sliceReport(processed, slices, startedAt, clock)
   onProgress?.(final)
   return final
 }
@@ -219,22 +241,7 @@ export function timeSliceMap<T, R>(
 ): Promise<Awaited<R>[]> {
   if (typeof mapper !== 'function')
     throw argumentError(TypeError, 'mapper', UtilsErrorText.functionExpectation)
-  /** Results in source order. */
-  const results: Awaited<R>[] = []
-  return timeSlice(
-    source,
-    (item, index) => {
-      /** Mapper result, awaited when asynchronous. */
-      const value = mapper(item, index)
-      if (isThenable(value))
-        return Promise.resolve(value).then((resolved) => {
-          results.push(resolved as Awaited<R>)
-        })
-      results.push(value as Awaited<R>)
-      return undefined
-    },
-    options
-  ).then(() => results)
+  return new SliceMapOperation(mapper).run(source, options)
 }
 
 /**
@@ -253,13 +260,65 @@ export function timeSliceReduce<T, A>(
 ): Promise<A> {
   if (typeof reducer !== 'function')
     throw argumentError(TypeError, 'reducer', UtilsErrorText.functionExpectation)
-  /** Running accumulator. */
-  let accumulator = initial
-  return timeSlice(
-    source,
-    (item, index) => {
-      accumulator = reducer(accumulator, item, index)
-    },
-    options
-  ).then(() => accumulator)
+  return new SliceReduceOperation(reducer, initial).run(source, options)
+}
+
+/** A mapped run owns its output array and one mapper, including asynchronous append ordering. */
+class SliceMapOperation<T, R> {
+  /** Callback remains a plain invocation and is never replaced after admission. */
+  readonly #mapper: (item: T, index: number) => R | PromiseLike<R>
+  /** Only completed mapper values enter the result, in source order. */
+  readonly #results: Awaited<R>[] = []
+
+  /** Capture the caller callback without running source iteration early. */
+  constructor(mapper: (item: T, index: number) => R | PromiseLike<R>) {
+    this.#mapper = mapper
+  }
+
+  /** Reuse the canonical slicing loop; the result becomes visible after final progress delivery. */
+  run(source: Iterable<T> | AsyncIterable<T>, options?: ITimeSliceOptions): Promise<Awaited<R>[]> {
+    return timeSlice(source, this.#handle, options).then(() => this.#results)
+  }
+
+  /** Preserve synchronous fast-path appends and the one Promise job for asynchronous values. */
+  readonly #handle = (item: T, index: number): unknown => {
+    /** Reading the mapper out retains the original receiver-free callback invocation. */
+    const mapper = this.#mapper
+    /** A mapper thenable is assimilated exactly as before. */
+    const value = mapper(item, index)
+    if (isThenable(value)) return Promise.resolve(value).then(this.#append)
+    this.#results.push(value as Awaited<R>)
+    return undefined
+  }
+
+  /** One asynchronous mapper continuation commits its value without adding a second job. */
+  readonly #append = (value: Awaited<R>): void => {
+    this.#results.push(value)
+  }
+}
+
+/** A reduction owns one accumulator and callback while the canonical loop owns iteration timing. */
+class SliceReduceOperation<T, A> {
+  /** The reducer uses the original plain-call receiver. */
+  readonly #reducer: (accumulator: A, item: T, index: number) => A
+  /** The latest returned accumulator remains private until slicing completes. */
+  #accumulator: A
+
+  /** Store the initial accumulator without reading the source or invoking the reducer. */
+  constructor(reducer: (accumulator: A, item: T, index: number) => A, initial: A) {
+    this.#reducer = reducer
+    this.#accumulator = initial
+  }
+
+  /** Return the final accumulator after the same final progress callback. */
+  run(source: Iterable<T> | AsyncIterable<T>, options?: ITimeSliceOptions): Promise<A> {
+    return timeSlice(source, this.#handle, options).then(() => this.#accumulator)
+  }
+
+  /** One source item advances the accumulator synchronously, preserving reducer failure identity. */
+  readonly #handle = (item: T, index: number): void => {
+    /** A local callback keeps the original unbound invocation semantics. */
+    const reducer = this.#reducer
+    this.#accumulator = reducer(this.#accumulator, item, index)
+  }
 }
