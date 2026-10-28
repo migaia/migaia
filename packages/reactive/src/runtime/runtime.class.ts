@@ -1,10 +1,14 @@
-import { tryReadProperty } from '@migaia/utils/error'
+/**
+ * Owns Runtime assembly, public node factories and private graph publication and diagnostic
+ * channels.
+ */
 import { DependencyTracker } from './dependency-tracker.class.ts'
 import { markSubscribers } from './subscriber-graph.ts'
+import { readRuntimeConfiguration } from './runtime-options.ts'
+import { TracedAction } from './traced-action.ts'
 import { Scheduler } from './scheduler.class.ts'
 import { VersionClock } from './version-clock.class.ts'
-import { defaultRuntimeAdapter } from './default-runtime-adapter.ts'
-import { internalsOf, registerInternals } from './internals.ts'
+import { internalsOf, registerInternals, type IRuntimeInternals } from './internals.ts'
 import { assertReactiveOwnedBy } from './ownership.ts'
 import { readVersion, setVersion } from './node-internals.ts'
 import { consumePendingCopyWarning, noteRuntimeCopy } from './copy-check.ts'
@@ -13,8 +17,8 @@ import { observeThenableRejection } from '@migaia/utils/function'
 import { ReactiveErrorCode } from '../error-code.ts'
 import { ReactiveErrorText } from '../error-text.ts'
 import {
+  ReactiveNodeKind,
   ReactiveErrorPhase,
-  ReactiveTracePhase,
   ReactiveTraceReason,
   ReactiveTraceType
 } from './trace-constants.ts'
@@ -22,11 +26,9 @@ import {
   containDiagnosticRejection,
   describeObservable,
   emitTraceSafely,
-  readDiagnosticClock,
   sanitizeErrorContext,
   sanitizeTraceEvent
 } from './diagnostics.ts'
-import { createReceiverCallback } from './receiver.ts'
 import {
   RUNTIME_BRAND,
   type IDisposer,
@@ -37,230 +39,64 @@ import {
   type IRuntimeErrorContext,
   type IRuntimeErrorReportContext,
   type IRuntimeOptions,
-  type IReactiveRuntimeAdapter,
   type IRuntimeTraceEvent
 } from './types.ts'
 import { Signal } from '../reactive/signal.class.ts'
 import { Computed, type IComputedConfig } from '../reactive/computed.class.ts'
 import { Effect } from '../reactive/effect.class.ts'
 
-// Each `Runtime` owns an independent version clock, tracking context, flush scheduler, and node factories.
-// Nodes share a dependency graph and monotonic clock within one runtime. Different runtimes are isolated.
-// Isolation prevents state leaking across SSR requests, tests, and React roots.
-// It also supports independent schedulers, worker runtimes, and distinct stores in DevTools.
-//
-// Runtime factories (`runtime.signal`, `computed`, and `effect`) assign nodes to their creator's graph.
-// Shared convenience calls use the same factories through `defaultRuntime`.
+/**
+ * Owns one isolated graph, scheduler and diagnostic channel. Assembly uses admitted capabilities;
+ * graph mutation stays behind the internals WeakMap rather than public Runtime properties.
+ */
 export class Runtime implements IRuntime {
   readonly [RUNTIME_BRAND] = true as const
+  /** Captured error reporter retains its admission-time receiver. */
   #onError: (error: unknown, context: IRuntimeErrorContext) => unknown
+  /** Trace listener membership is owned until its returned removal token is called. */
   #traceListeners = new Set<(event: IRuntimeTraceEvent) => void>()
+  /** Canonical graph services remain private even when an extension holds this Runtime. */
+  readonly #services: IRuntimeInternals
+  /** Idle admission is independent of flush strategy and keeps the original receiver. */
+  readonly #scheduleIdle: (task: () => void) => void
+  /** Default idle recovery keeps the same captured adapter port identity. */
+  readonly #scheduleMicrotask: (task: () => void) => void
 
+  /** Validates all options before allocating graph state, then registers one capability bundle. */
   constructor(options: IRuntimeOptions = {}) {
-    /** Reads one option exactly once and converts getter failures into a package error. */
-    const readOption = <K extends keyof IRuntimeOptions>(key: K): IRuntimeOptions[K] => {
-      /** The read primitive leaves the option failure policy with this runtime. */
-      const read = tryReadProperty(options, key)
-      if (read.threw) {
-        throw tagReactiveError(
-          new TypeError(ReactiveErrorText.runtimeOptionGetterFailed(String(key)), {
-            cause: read.error
-          }),
-          ReactiveErrorCode.invalidOption
-        )
-      }
-      return read.value
-    }
-
-    /** Reads one adapter method once, retaining the source object as its receiver. */
-    const snapshotAdapterMethod = <K extends keyof IReactiveRuntimeAdapter>(
-      source: Partial<IReactiveRuntimeAdapter> | undefined,
-      key: K
-    ): { readonly fn: IReactiveRuntimeAdapter[K]; readonly receiver: unknown } => {
-      if (source === undefined) {
-        return { fn: defaultRuntimeAdapter[key], receiver: defaultRuntimeAdapter }
-      }
-      /** Preserve the source object as the method receiver after this single read. */
-      const read = tryReadProperty(source, key)
-      if (read.threw) {
-        throw tagReactiveError(
-          new TypeError(ReactiveErrorText.runtimeAdapterGetterFailed(String(key)), {
-            cause: read.error
-          }),
-          ReactiveErrorCode.invalidOption
-        )
-      }
-      const value = read.value
-      if (value === undefined) {
-        return { fn: defaultRuntimeAdapter[key], receiver: defaultRuntimeAdapter }
-      }
-      if (typeof value !== 'function') {
-        throw tagReactiveError(
-          new TypeError(ReactiveErrorText.runtimeAdapterMustBeFunction(String(key))),
-          ReactiveErrorCode.invalidOption
-        )
-      }
-      return { fn: value as IReactiveRuntimeAdapter[K], receiver: source }
-    }
-
-    /** Reads and validates the flush-loop bound before any Runtime graph state is allocated. */
-    const maxFlushPassesOption = readOption('maxFlushPasses')
-    if (
-      maxFlushPassesOption !== undefined &&
-      (!Number.isSafeInteger(maxFlushPassesOption) || maxFlushPassesOption < 1)
-    ) {
-      throw tagReactiveError(
-        new RangeError(ReactiveErrorText.maxFlushPassesInvalid),
-        ReactiveErrorCode.invalidOption
-      )
-    }
-
-    // All injected functions are admitted before graph state is allocated. Each method is read once,
-    // explicit undefined falls back to the default, and the wrapper keeps the original receiver.
-    const adapterSource = readOption('adapter')
-    const scheduleMicrotask = snapshotAdapterMethod(adapterSource, 'scheduleMicrotask')
-    const now = snapshotAdapterMethod(adapterSource, 'now')
-    const timestamp = snapshotAdapterMethod(adapterSource, 'timestamp')
-    const reportError = snapshotAdapterMethod(adapterSource, 'reportError')
-    const adapter: IReactiveRuntimeAdapter = {
-      scheduleMicrotask: createReceiverCallback(scheduleMicrotask.fn, scheduleMicrotask.receiver),
-      now: createReceiverCallback(now.fn, now.receiver),
-      timestamp: createReceiverCallback(timestamp.fn, timestamp.receiver),
-      reportError: createReceiverCallback(reportError.fn, reportError.receiver)
-    }
-    const onErrorOption = readOption('onError')
-    if (onErrorOption !== undefined && typeof onErrorOption !== 'function') {
-      throw tagReactiveError(
-        new TypeError(ReactiveErrorText.runtimeOptionMustBeFunction('onError')),
-        ReactiveErrorCode.invalidOption
-      )
-    }
-    const onTraceOption = readOption('onTrace')
-    if (onTraceOption !== undefined && typeof onTraceOption !== 'function') {
-      throw tagReactiveError(
-        new TypeError(ReactiveErrorText.runtimeOptionMustBeFunction('onTrace')),
-        ReactiveErrorCode.invalidOption
-      )
-    }
-    const scheduleIdleOption = readOption('scheduleIdle')
-    if (scheduleIdleOption !== undefined && typeof scheduleIdleOption !== 'function') {
-      throw tagReactiveError(
-        new TypeError(ReactiveErrorText.runtimeOptionMustBeFunction('scheduleIdle')),
-        ReactiveErrorCode.invalidOption
-      )
-    }
-    /** Constructor-selected flush timing is admitted before allocating any graph state. */
-    const schedulerStrategyOption = readOption('schedulerStrategy')
-    if (schedulerStrategyOption !== undefined && typeof schedulerStrategyOption !== 'function') {
-      throw tagReactiveError(
-        new TypeError(ReactiveErrorText.schedulerStrategyInvalid),
-        ReactiveErrorCode.invalidOption
-      )
-    }
+    /** Ordered snapshots replace constructor-local option and adapter closures. */
+    const configuration = readRuntimeConfiguration(options)
+    /** One monotonic clock is shared by all nodes in this isolated graph. */
     const clock = new VersionClock()
+    /** Tracking context belongs to this exact Runtime. */
     const tracker = new DependencyTracker(this)
-    this.#onError =
-      onErrorOption === undefined
-        ? adapter.reportError
-        : createReceiverCallback(onErrorOption, options)
-    if (onTraceOption !== undefined) {
-      this.#traceListeners.add(createReceiverCallback(onTraceOption, options))
-    }
-    const traceEnabled = (): boolean => this.#traceListeners.size > 0
-    const emitTrace = (event: IRuntimeTraceEvent): void => {
-      const snapshot = sanitizeTraceEvent(event)
-      for (const listener of Array.from(this.#traceListeners)) {
-        try {
-          // Dependency-edge traces fire while commit still owns an active
-          // tracking frame. Diagnostic reads must never join that graph.
-          const result: unknown = tracker.untracked(() => listener(snapshot))
-          containDiagnosticRejection(result, (error) =>
-            this.reportError(error, { phase: ReactiveErrorPhase.traceListener })
-          )
-        } catch (error) {
-          this.reportError(error, { phase: ReactiveErrorPhase.traceListener })
-        }
-      }
-    }
+    this.#onError = configuration.onError
+    if (configuration.onTrace !== undefined) this.#traceListeners.add(configuration.onTrace)
+    this.#scheduleIdle = configuration.scheduleIdle
+    this.#scheduleMicrotask = configuration.adapter.scheduleMicrotask
+    /** Scheduler callbacks retain the existing asynchronous error phase and timing. */
     const scheduler = new Scheduler(
       (error, phase) => this.reportError(error, { phase: phase ?? ReactiveErrorPhase.asyncFlush }),
-      maxFlushPassesOption,
-      adapter.scheduleMicrotask
+      configuration.maxFlushPasses,
+      configuration.adapter.scheduleMicrotask
     )
-    if (schedulerStrategyOption !== undefined) scheduler.setStrategy(schedulerStrategyOption)
-    // 通知闭包只保存在 WeakMap 内部面。Runtime 实例本身没有 notify 方法，
-    // 因而第三方不能拿一个伪造节点绕过受控节点 API。
-    const publish = (source: IObservable, version: number): void => {
-      assertReactiveOwnedBy(source, this, 'observable')
-      setVersion(source, version)
-      if (traceEnabled()) {
-        emitTraceSafely(
-          {
-            timestamp: adapter.timestamp,
-            emitTrace,
-            reportError: (error) =>
-              this.reportError(error, {
-                phase: ReactiveErrorPhase.traceListener,
-                observable: source
-              })
-          },
-          (timestamp) => ({
-            type: ReactiveTraceType.observableChange,
-            timestamp,
-            observable: describeObservable(source),
-            reason: ReactiveTraceReason.notify
-          })
-        )
-      }
-      scheduler.runDeferred(markSubscribers, source)
+    if (configuration.schedulerStrategy !== undefined) {
+      scheduler.setStrategy(configuration.schedulerStrategy)
     }
-    const notify = (source: IObservable): void => {
-      publish(source, clock.next())
-    }
-    const commitSource = <T>(source: IObservable, write: () => T): T => {
-      assertReactiveOwnedBy(source, this, 'observable')
-      // Reserve the version before user code runs. A failed write consumes a
-      // clock slot but never publishes a partial source update.
-      const version = clock.next()
-      const result = write()
-      publish(source, Math.max(version, readVersion(source)))
-      return result
-    }
-    // 内部面只经 WeakMap 暴露；拿到 Runtime 的第三方无法沿引用链摸到图。
-    /** Captures the admitted idle callback and its original receiver once for this Runtime. */
-    const scheduleIdle =
-      scheduleIdleOption === undefined
-        ? adapter.scheduleMicrotask
-        : createReceiverCallback(scheduleIdleOption, options)
-    /** Admits idle cleanup through the configured hook and recovers through the safe microtask port. */
-    const deferIdle = (task: () => void): void => {
-      try {
-        scheduleIdle(task)
-      } catch (error) {
-        this.reportError(error, { phase: ReactiveErrorPhase.asyncFlush })
-        if (scheduleIdle !== adapter.scheduleMicrotask) {
-          try {
-            adapter.scheduleMicrotask(task)
-          } catch (fallbackError) {
-            this.reportError(fallbackError, { phase: ReactiveErrorPhase.asyncFlush })
-          }
-        }
-      }
-    }
-    registerInternals(this, {
+    this.#services = {
       clock,
       tracker,
       scheduler,
-      now: adapter.now,
-      timestamp: adapter.timestamp,
-      traceEnabled,
-      emitTrace,
-      notify,
-      commitSource,
-      deferIdle
-    })
-    // 多副本警告发生在 Runtime 建立前（createRuntime 先 noteRuntimeCopy 再 new）——经 `reportError` 的
-    // containment 上报：reporter 同步抛/异步拒绝都不会破坏构造、不会产生 unhandled rejection。
+      now: configuration.adapter.now,
+      timestamp: configuration.adapter.timestamp,
+      traceEnabled: () => this.#traceListeners.size > 0,
+      emitTrace: (event) => this.#emitTrace(event),
+      notify: (source) => this.#notify(source),
+      commitSource: (source, write) => this.#commitSource(source, write),
+      deferIdle: (task) => this.#deferIdle(task)
+    }
+    registerInternals(this, this.#services)
+    /** Copy warnings cross the registered error-containment boundary only after assembly. */
     const copyWarning = consumePendingCopyWarning()
     if (copyWarning !== undefined) {
       this.reportError(createReactiveError(ReactiveErrorCode.copyConflict, copyWarning), {
@@ -269,9 +105,86 @@ export class Runtime implements IRuntime {
     }
   }
 
+  /** Snapshots listener membership and keeps diagnostic reads outside active tracking frames. */
+  #emitTrace(event: IRuntimeTraceEvent): void {
+    /** All listeners see the same immutable event snapshot. */
+    const snapshot = sanitizeTraceEvent(event)
+    for (const listener of Array.from(this.#traceListeners)) {
+      try {
+        /** A listener cannot join the graph that emitted its diagnostic event. */
+        const result: unknown = this.#services.tracker.untracked(() => listener(snapshot))
+        containDiagnosticRejection(result, (error) =>
+          this.reportError(error, { phase: ReactiveErrorPhase.traceListener })
+        )
+      } catch (error) {
+        this.reportError(error, { phase: ReactiveErrorPhase.traceListener })
+      }
+    }
+  }
+
+  /** Commits a version before tracing and propagating the source's entry subscriber snapshot. */
+  #publish(source: IObservable, version: number): void {
+    assertReactiveOwnedBy(source, this, ReactiveNodeKind.observable)
+    setVersion(source, version)
+    if (this.#traceListeners.size > 0) {
+      emitTraceSafely(
+        {
+          timestamp: this.#services.timestamp,
+          emitTrace: this.#services.emitTrace,
+          reportError: (error) =>
+            this.reportError(error, {
+              phase: ReactiveErrorPhase.traceListener,
+              observable: source
+            })
+        },
+        (timestamp) => ({
+          type: ReactiveTraceType.observableChange,
+          timestamp,
+          observable: describeObservable(source),
+          reason: ReactiveTraceReason.notify
+        })
+      )
+    }
+    this.#services.scheduler.runDeferred(markSubscribers, source)
+  }
+
+  /** Notification reserves a new graph version even when it has no subscribers. */
+  #notify(source: IObservable): void {
+    this.#publish(source, this.#services.clock.next())
+  }
+
+  /** Reserves before user code and never republishes an older version after a reentrant write. */
+  #commitSource<T>(source: IObservable, write: () => T): T {
+    assertReactiveOwnedBy(source, this, ReactiveNodeKind.observable)
+    /** A failed write consumes its slot but never publishes partial source state. */
+    const version = this.#services.clock.next()
+    /** User writes remain synchronous and execute exactly once. */
+    const result = write()
+    this.#publish(source, Math.max(version, readVersion(source)))
+    return result
+  }
+
+  /** Reports idle admission failure and tries the distinct admitted microtask port once. */
+  #deferIdle(task: () => void): void {
+    try {
+      this.#scheduleIdle(task)
+    } catch (error) {
+      this.reportError(error, { phase: ReactiveErrorPhase.asyncFlush })
+      if (this.#scheduleIdle !== this.#scheduleMicrotask) {
+        try {
+          this.#scheduleMicrotask(task)
+        } catch (fallbackError) {
+          this.reportError(fallbackError, { phase: ReactiveErrorPhase.asyncFlush })
+        }
+      }
+    }
+  }
+
+  /** Creates a source that shares this Runtime's graph, clock and admitted diagnostic capabilities. */
   signal<T>(value: T, options?: IReactiveNodeOptions): Signal<T> {
     return new Signal(value, this, options)
   }
+  /** Creates a lazy derived node whose dependencies and cache remain owned by this graph. */
   computed<T>(fn: () => T, config?: IComputedConfig<T>): Computed<T> {
     return new Computed(fn, this, config)
   }
@@ -279,15 +192,28 @@ export class Runtime implements IRuntime {
   effect(fn: () => void | IDisposer, options?: IReactiveNodeOptions): Effect {
     return new Effect(fn, this, options)
   }
+  /** Runs a synchronous public callback and preserves the scheduler's outermost flush/error policy. */
   batch<T>(fn: () => T): T {
     return runReactiveCallback(() => internalsOf(this).scheduler.runBatched(fn))
   }
+  /**
+   * Temporarily suppresses dependency collection while retaining the public callback error
+   * boundary.
+   */
   untracked<T>(fn: () => T): T {
     return runReactiveCallback(() => internalsOf(this).tracker.untracked(fn))
   }
+  /**
+   * Drains pending observers synchronously or reports reentrant deferral through the existing
+   * result.
+   */
   flush(): IFlushResult {
     return internalsOf(this).scheduler.flush()
   }
+  /**
+   * Validates an action label, then owns one synchronous trace span only when diagnostics are
+   * active.
+   */
   runTracedAction<T>(name: string, fn: () => T): T {
     if (typeof name !== 'string' || name.length === 0) {
       throw tagReactiveError(
@@ -295,67 +221,21 @@ export class Runtime implements IRuntime {
         ReactiveErrorCode.invalidOption
       )
     }
+    /** The admitted internals retain the same clock and trace callback identities for the action. */
     const diagnostics = internalsOf(this)
     if (!diagnostics.traceEnabled()) return runReactiveCallback(fn)
-    const reportTraceFailure = (error: unknown): void => {
-      this.reportError(error, { phase: ReactiveErrorPhase.traceListener })
-    }
-    const startedAt = readDiagnosticClock(diagnostics.now, 0, reportTraceFailure)
-    emitTraceSafely(
-      {
-        timestamp: diagnostics.timestamp,
-        emitTrace: diagnostics.emitTrace,
-        reportError: reportTraceFailure
-      },
-      (timestamp) => ({
-        type: ReactiveTraceType.action,
-        timestamp,
-        phase: ReactiveTracePhase.start,
-        name
-      })
-    )
-    try {
-      const result = runReactiveCallback(fn)
-      emitTraceSafely(
-        {
-          timestamp: diagnostics.timestamp,
-          emitTrace: diagnostics.emitTrace,
-          reportError: reportTraceFailure
-        },
-        (timestamp) => ({
-          type: ReactiveTraceType.action,
-          timestamp,
-          phase: ReactiveTracePhase.end,
-          name,
-          durationMs:
-            readDiagnosticClock(diagnostics.now, startedAt, reportTraceFailure) - startedAt
-        })
-      )
-      return result
-    } catch (error) {
-      emitTraceSafely(
-        {
-          timestamp: diagnostics.timestamp,
-          emitTrace: diagnostics.emitTrace,
-          reportError: reportTraceFailure
-        },
-        (timestamp) => ({
-          type: ReactiveTraceType.action,
-          timestamp,
-          phase: ReactiveTracePhase.error,
-          name,
-          durationMs:
-            readDiagnosticClock(diagnostics.now, startedAt, reportTraceFailure) - startedAt,
-          error
-        })
-      )
-      throw error
-    }
+    return new TracedAction(this, diagnostics, name).run(fn)
   }
+
+  /**
+   * Reports outside dependency tracking and contains secondary reporter failures on the terminal
+   * sink.
+   */
   reportError(error: unknown, context: IRuntimeErrorReportContext): void {
     try {
       // Lifecycle failures can be reported from inside dependency commit.
       // Reporter reads are diagnostics, not observer dependencies.
+      /** Sanitized context prevents reporter reads from exposing mutable graph objects. */
       const result: unknown = internalsOf(this).tracker.untracked(() =>
         this.#onError(error, sanitizeErrorContext(context))
       )
@@ -368,6 +248,7 @@ export class Runtime implements IRuntime {
       })
     }
   }
+  /** Adds one diagnostic listener and returns a detached token that removes only that membership. */
   subscribeTrace(listener: (event: IRuntimeTraceEvent) => void): IDisposer {
     this.#traceListeners.add(listener)
     return () => this.#traceListeners.delete(listener)
