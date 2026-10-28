@@ -118,8 +118,10 @@ export type LogLevel = keyof typeof LogLevel;
   - **Control flow without nested functions.** Retry and fallback logic is an explicit loop or a named state machine.
   - **No self-held closures on short-lived objects.** A type that is created and disposed often (per request, call, stream, frame, lease or Resource) must not create a closure that captures the instance and store it in the instance's own state: a private field, a `#context`/state object, or a callback table. Example: `this.#context.startRequest = () => this.#startRequest()`.
     - Call a method on the owner, or a module-level function that receives the context, instead.
-    - This pattern was measured once: each disposed `Resource` kept 258 bytes after a forced GC, against 67 bytes without the closure. Instances survived young-generation GC, minor GCs fell from 24 to 12, and create-dispose became 12% slower.
-    - A suspected case is settled by measurement: create and dispose N instances, force GC, and compare the heap kept per instance with and without the closure.
+    - The cost is one extra allocation per closure per instance. The closure alone does not keep a disposed instance alive: on the rpc call path and the storage op path, removing it left the heap kept after a forced GC unchanged (21 and 3 bytes per op) and cut minor GCs by at most 6%.
+    - One type did retain memory: each disposed `Resource` kept 258 bytes after a forced GC, against 67 bytes without the closure, and create-dispose became 12% slower. That retention had a type-specific cause. Do not read it as "every self-held closure leaks".
+    - A suspected case is settled by measurement, A/B against an A/A baseline: create and dispose N instances, force GC, and compare the heap kept per instance and the minor-GC count with and without the closure. For per-message and per-frame types, change existing code only when the allocation A/B shows a gain beyond A/A noise.
+    - Exclude fixture artifacts before measuring. A test carrier that records every frame makes each call look like it keeps memory.
     - Long-lived objects (hosts, registries, runtimes) are not affected.
 
 - **Shared behaviour abstracted once.** When several packages or backends need the same logic, move it to its correct owner, such as an authoring subpath or a shared base type, instead of repeating it.
