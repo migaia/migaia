@@ -1,3 +1,7 @@
+/**
+ * Owns opaque composition provenance and managed Host records; transaction execution stays in
+ * composition-runtime.
+ */
 import { assimilateCapturedThen } from '@migaia/utils/function'
 import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
 import type {
@@ -10,8 +14,10 @@ import type {
 } from './composition-types.js'
 import type { IPluginHostPhysicalCleanupResult } from './plugin-lifecycle-types.js'
 import { createPluginHostExtensionPublication } from './publication.js'
+import { PluginHostRegistrationLifecycle } from './state-constants.js'
 import { PluginHostErrorCode } from './error-code.js'
 import type { IPluginHostCompositionRuntimePort } from './composition-runtime.js'
+import { buildManagedPort, type IManagedHostRuntime } from './composition-port.js'
 
 /** Validates a publication-ordered request list and resolves its Host-owned definition snapshots. */
 export const resolveAdmissionDefinitions = <TDefinition>(
@@ -19,9 +25,12 @@ export const resolveAdmissionDefinitions = <TDefinition>(
   host: object
 ): readonly TDefinition[] => {
   if (!Array.isArray(requests)) throw createPluginHostTypeError(ERROR_TEXT.ADMISSION_REQUESTS_ARRAY)
+  /** A request may consume each exact Host-owned ordering slot only once. */
   const seenSlots = new Set<object>()
   return requests.map((request) => {
+    /** Property access is captured inside the invalid-option boundary before provenance lookup. */
     let admission: unknown
+    /** The captured slot must belong to the receiving Host and the admitted definition name. */
     let slot: unknown
     try {
       admission = request?.admission
@@ -31,9 +40,12 @@ export const resolveAdmissionDefinitions = <TDefinition>(
     }
     if (!admission || typeof admission !== 'object')
       throw createPluginHostTypeError(ERROR_TEXT.ADMISSION_REQUIRED)
+    /** Only this package instance can resolve an opaque admission to its immutable definition. */
     const definition = readAdmissionDefinition<TDefinition>(admission)
     if (!definition) throw createPluginHostTypeError(ERROR_TEXT.ADMISSION_FOREIGN)
+    /** Slot matching uses captured definition data rather than a live user property. */
     const definitionName = (definition as { readonly name?: unknown }).name
+    /** Private slot provenance checks Host ownership, exact name and permanent retirement. */
     const slotState = slot && typeof slot === 'object' ? readDataOrderSlotState(slot) : undefined
     if (!slotState || slotState.host !== host || slotState.name !== definitionName)
       throw createPluginHostTypeError(ERROR_TEXT.ADMISSION_SLOT_FOREIGN)
@@ -187,7 +199,9 @@ export const isRegistrationRevoked = (registration: object): boolean =>
 export const createRegistrationView = (
   receipt: IRegistrationToken
 ): Readonly<{ readonly extensions: Readonly<Record<PropertyKey, unknown>> }> => {
+  /** The original receipt provenance supplies both exact registration identity and its issuing Host. */
   const resolved = readRegistrationForReceipt(receipt)
+  /** The view retains one exact generation; it never follows a same-name successor. */
   const registration = resolved?.registration as
     | {
         readonly extensions: readonly {
@@ -205,7 +219,7 @@ export const createRegistrationView = (
     !registration ||
     revokedRegistrations.has(resolved.registration) ||
     !registration.installed ||
-    registration.lifecycle === 'dispose'
+    registration.lifecycle === PluginHostRegistrationLifecycle.dispose
   )
     throw new PluginHostError(
       PluginHostErrorCode.registrationRevoked,
@@ -219,7 +233,7 @@ export const createRegistrationView = (
         !captured[0] ||
         revokedRegistrations.has(captured[0]) ||
         !captured[0].installed ||
-        captured[0].lifecycle === 'dispose'
+        captured[0].lifecycle === PluginHostRegistrationLifecycle.dispose
       )
         throw new PluginHostError(
           PluginHostErrorCode.registrationRevoked,
@@ -270,44 +284,6 @@ type IManagedHostRecord = {
   readonly readCurrentSnapshot: () => unknown
   port?: IPluginHostCompositionIntegration<object>
 }
-
-/** Runtime methods supplied by composition; revision and snapshot reads stay with the Host. */
-type IManagedHostRuntime = Omit<
-  IPluginHostCompositionIntegration<object>,
-  'revision' | 'getCurrentSnapshot'
->
-
-/**
- * Builds the managed-protocol port over a host's composition runtime.
- *
- * It lives here rather than in the host constructor because this module owns what the protocol is:
- * the host only owns the runtime the port delegates to, and a literal spelled out in the
- * constructor put the shape of a composition-only surface in the middle of ordinary host wiring.
- */
-export const buildManagedPort = <TRuntime extends IManagedHostRuntime>(
-  runtime: TRuntime,
-  readRevision: () => number,
-  readCurrentSnapshot: () => unknown
-): IPluginHostCompositionIntegration<object> =>
-  Object.freeze({
-    createPluginAdmission: (plugin) => runtime.createPluginAdmission(plugin),
-    createDataOrderSlot: (name) => runtime.createDataOrderSlot(name),
-    retireDataOrderSlot: (slot) => runtime.retireDataOrderSlot(slot),
-    prepareAdmissions: (requests) => runtime.prepareAdmissions(requests),
-    commitPreparedAdmissions: (prepared) => runtime.commitPreparedAdmissions(prepared),
-    discardPreparedAdmissions: (prepared) => runtime.discardPreparedAdmissions(prepared),
-    prepareUnUseBatch: (receipts) => runtime.prepareUnUseBatch(receipts),
-    commitPreparedUnUseBatch: (prepared, options) =>
-      runtime.commitPreparedUnUseBatch(prepared, options),
-    // getter，不是快照：`revision` 每次读都必须反映当前提交代次。
-    get revision(): number {
-      return readRevision()
-    },
-    getCurrentSnapshot: () =>
-      readCurrentSnapshot() as ReturnType<
-        IPluginHostCompositionIntegration<object>['getCurrentSnapshot']
-      >
-  })
 
 /** Records the original runtime authority without constructing the optional composition facade. */
 export const registerManagedHost = (
@@ -368,10 +344,10 @@ export const openComposition = (
   /** Optional implementation enters only through the dedicated public composition entry. */
   const record = readManagedHost(target)
   if (record.port === undefined)
-    record.port = buildManagedPort(
-      createRuntime(record.runtimePort),
-      record.readRevision,
-      record.readCurrentSnapshot
-    )
+    record.port = buildManagedPort({
+      runtime: createRuntime(record.runtimePort),
+      readRevision: record.readRevision,
+      readCurrentSnapshot: record.readCurrentSnapshot
+    })
   return record.port
 }
