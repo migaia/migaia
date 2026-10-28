@@ -1,7 +1,6 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": true, "rootDir": "src", "outDir": "dist", "lib": ["ES2024", "ESNext.Disposable"], "types": [] },
   "include": ["src", "../utils/types/host-globals.d.ts"]
 }

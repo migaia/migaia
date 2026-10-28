@@ -1,7 +1,6 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "allowImportingTsExtensions": true,
     "noEmit": true,
     "paths": {
       "@migaia/plugin-host": ["../../packages/plugin-host/dist/index.d.ts"],

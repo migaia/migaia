@@ -3,8 +3,6 @@
   "compilerOptions": {
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "allowImportingTsExtensions": true,
-    "rewriteRelativeImportExtensions": true,
     "lib": ["ES2024", "ESNext.Disposable"],
     "rootDir": "src",
     "outDir": "dist",

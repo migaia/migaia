@@ -1,8 +1,6 @@
 {
   "extends": "../../../tsconfig.base.json",
   "compilerOptions": {
-    "allowImportingTsExtensions": true,
-    "rewriteRelativeImportExtensions": true,
     "noEmit": true,
     "types": [],
     "lib": ["ES2024", "DOM", "DOM.Iterable", "ESNext.Disposable"]

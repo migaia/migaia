@@ -1,8 +1,6 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "allowImportingTsExtensions": true,
-    "rewriteRelativeImportExtensions": true,
     "rootDir": "src",
     "outDir": "dist",
     "lib": ["ES2024"],

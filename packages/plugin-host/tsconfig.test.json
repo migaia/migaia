@@ -1,8 +1,6 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "allowImportingTsExtensions": true,
-    "rewriteRelativeImportExtensions": true,
     "noEmit": true,
     "rootDir": ".",
     "types": ["node", "vitest/globals"]

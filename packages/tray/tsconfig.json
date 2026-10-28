@@ -2,8 +2,6 @@
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "rootDir": "src",
-    "allowImportingTsExtensions": true,
-    "rewriteRelativeImportExtensions": true,
     "noEmit": true,
     "lib": ["ES2024", "ESNext.Disposable"],
     "types": []

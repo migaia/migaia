@@ -1,8 +1,6 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "allowImportingTsExtensions": true,
-    "rewriteRelativeImportExtensions": true,
     "noEmit": true,
     "rootDir": ".",
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
