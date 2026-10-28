@@ -1,20 +1,13 @@
 /** Own immutable configuration snapshots, validation, asynchronous loading and scoped watchers. */
-import { ERROR_SOURCE, UtilsErrorCode, type IUtilsErrorCode } from './error-code.ts'
+import { ConfigReason } from './internal/config-text.ts'
+import { UtilsErrorCode } from './error-code.ts'
 import { UtilsErrorText } from './error-text.ts'
-import { attachErrorIdentity, safeErrorReason } from './error.ts'
 import { isPlainObject } from './object.ts'
 import type { IObjectPath, IObjectPathValue, IObjectPathWriteValue } from './object-path.ts'
 import { reportUnhandledError } from './host-report.ts'
 import { raceWithAbort, withTimeout, type IAbortSignal } from './promise.ts'
-import { orderStringKeys } from './internal/string-order.ts'
 import {
   CONFIG_DELETE,
-  combineConfig,
-  ownConfig,
-  parseConfigPath,
-  patchConfig,
-  readConfigPath,
-  readonlyConfig,
   type IConfigCombineOptions,
   type IConfigPatch,
   type IConfigPatchOptions,
@@ -22,7 +15,20 @@ import {
   type IConfigRecord,
   type IOwnConfigOptions,
   type IOwnedConfig
-} from './config.ts'
+} from './internal/config-contract.ts'
+import { combineConfig, ownConfig, patchConfig } from './internal/config-owned.ts'
+import { readConfigPath } from './internal/config-path.ts'
+import { readonlyConfig } from './internal/config-readonly.ts'
+import { ownerError } from './internal/config-owner-error.ts'
+import { UNCHANGED, ownValue, rawAt, rebuild, toSegments } from './internal/config-owner-path.ts'
+import { collectDiff } from './internal/config-owner-diff.ts'
+import { toPlain } from './internal/config-owner-json.ts'
+import {
+  ConfigSourceLoader,
+  parseConfigText,
+  readConfigEnvironment
+} from './internal/config-owner-source.ts'
+import { ConfigWatchers } from './internal/config-owner-watchers.ts'
 
 /** Deep readonly view type returned by `view()`, `get()` and watch listeners. */
 export type IConfigView<T> = T extends (...args: never[]) => unknown
@@ -124,366 +130,12 @@ export type IMergedConfig<S extends readonly IConfigSource[]> = IUnionToIntersec
 > &
   IConfigRecord
 
-/** One registered watch listener; `path` is absent for root listeners. */
-type IConfigWatcher = {
-  readonly path: readonly string[] | undefined
-  readonly listener: (next: unknown, prev: unknown) => void
-}
-
-/** Marker returned by the path rebuild when a delete targets a missing path (no change). */
-const UNCHANGED: unique symbol = Symbol('UNCHANGED')
-
-/** Only records created for the current unpublished environment draft may be updated in place. */
-type IEnvConstructionContext = {
-  /** Borrowed coerce values remain outside this set and retain the original per-edge copy policy. */
-  readonly owned: WeakSet<object>
-}
-
-/** Creates a coded native error without replacing its native type. */
-function ownerError(
-  Constructor: TypeErrorConstructor | ErrorConstructor,
-  code: IUtilsErrorCode,
-  message: string,
-  cause?: unknown
-): Error {
-  return attachErrorIdentity(
-    new Constructor(message, cause === undefined ? undefined : { cause }),
-    { source: ERROR_SOURCE, code }
-  )
-}
-
-/** Source throws and rejections share one coded boundary while retaining the original cause. */
-function configSourceFailure(cause: unknown): Error {
-  return ownerError(
-    Error,
-    UtilsErrorCode.configSourceFailed,
-    UtilsErrorText.configSourceFailed,
-    cause
-  )
-}
-
-/** Resolve only the supplied source; parsing, owner construction and cancellation stay outside. */
-function loadConfigSource<T extends IConfigRecord>(
-  source: IConfigAsyncSource<T>,
-  context: { readonly signal: IAbortSignal }
-): Promise<unknown> {
-  /** Preserve the original factory and thenable observation before source error normalization. */
-  let produced: unknown
-  try {
-    produced = typeof source === 'function' ? source(context) : source
-  } catch (cause) {
-    return Promise.reject(configSourceFailure(cause))
-  }
-  return Promise.resolve(produced).then(
-    (value) => value,
-    (cause: unknown) => {
-      throw configSourceFailure(cause)
-    }
-  )
-}
-
-/** Turns an owner path into validated segments through the canonical config path parser. */
-function toSegments(path: unknown): readonly string[] {
-  if (typeof path === 'string') return parseConfigPath(path)
-  if (!Array.isArray(path) || path.length === 0)
-    throw ownerError(
-      TypeError,
-      UtilsErrorCode.configPathInvalid,
-      UtilsErrorText.configPathInvalid(String(path), 'non-empty string or segment list required')
-    )
-  for (const segment of path)
-    if (typeof segment !== 'string' || segment.length === 0 || segment.includes('.'))
-      throw ownerError(
-        TypeError,
-        UtilsErrorCode.configPathInvalid,
-        UtilsErrorText.configPathInvalid(String(segment), 'invalid segment')
-      )
-  // Re-parse the joined form so dangerous keys and limits use the one canonical policy.
-  parseConfigPath(path.join('.'))
-  return Object.freeze([...path])
-}
-
-/** Reads one own data property without invoking accessors. */
-function ownValue(
-  node: unknown,
-  key: string
-): { readonly found: boolean; readonly value: unknown } {
-  if (node === null || typeof node !== 'object') return { found: false, value: undefined }
-  /** Descriptor read avoids running getters on owned graphs. */
-  const descriptor = Object.getOwnPropertyDescriptor(node, key)
-  return descriptor && 'value' in descriptor
-    ? { found: true, value: descriptor.value }
-    : { found: false, value: undefined }
-}
-
-/** Walks raw owned data along segments; never wraps or copies. */
-function rawAt(root: unknown, segments: readonly string[]): { found: boolean; value: unknown } {
-  /** Current node during the walk. */
-  let node = root
-  for (const segment of segments) {
-    /** Own data value of the current segment. */
-    const next = ownValue(node, segment)
-    if (!next.found) return { found: false, value: undefined }
-    node = next.value
-  }
-  return { found: true, value: node }
-}
-
-/** Array index segment check; config paths spell indexes as plain digit strings. */
-function isIndex(segment: string): boolean {
-  return /^(0|[1-9]\d*)$/.test(segment)
-}
-
-/** Shallow copy of a record that keeps its prototype and own data descriptors. */
-function copyRecord(node: object): Record<string, unknown> {
-  /** Copy with the same prototype (plain or null-prototype). */
-  const copy = Object.create(Object.getPrototypeOf(node)) as Record<string, unknown>
-  for (const key of Reflect.ownKeys(node)) {
-    /** Source descriptor, copied as is so enumerability stays unchanged. */
-    const descriptor = Object.getOwnPropertyDescriptor(node, key)
-    if (descriptor) Object.defineProperty(copy, key, descriptor)
-  }
-  return copy
-}
-
-/**
- * Rebuilds one container along `segments` with copy-on-write. Missing intermediates become plain
- * records. A delete of a missing path returns `UNCHANGED`. Environment construction may reuse only
- * records already owned by its unpublished draft; ordinary writes retain copy-on-write.
- */
-function rebuild(
-  node: unknown,
-  segments: readonly string[],
-  value: unknown,
-  at: string,
-  construction?: IEnvConstructionContext
-): unknown {
-  if (segments.length === 0) return value
-  // All callers use toSegments and parseConfigPath's fixed default maxPathLength of 4096
-  // (config.ts). Suffix and diagnostic-prefix copies have that fixed bound, independent of env width.
-  /** Current segment and its remaining path. */
-  const [segment, ...rest] = segments
-  /** Owned child at this segment, if any. */
-  const child = ownValue(node, segment)
-  if (node === undefined) {
-    if (value === CONFIG_DELETE) return UNCHANGED
-    /** Missing records belong only to this construction, never to a supplied coerce value. */
-    const record = {
-      [segment]: rebuild(undefined, rest, value, `${at}.${segment}`, construction)
-    }
-    construction?.owned.add(record)
-    return record
-  }
-  if (Array.isArray(node)) {
-    if (!isIndex(segment))
-      throw ownerError(
-        TypeError,
-        UtilsErrorCode.configPathInvalid,
-        UtilsErrorText.configPathInvalid(`${at}.${segment}`, 'array index required')
-      )
-    /** Numeric index into the copied array. */
-    const index = Number(segment)
-    if (value === CONFIG_DELETE && rest.length === 0) {
-      if (index >= node.length) return UNCHANGED
-      return [...node.slice(0, index), ...node.slice(index + 1)]
-    }
-    /** Rebuilt child; unchanged children keep the original array. */
-    const next = rebuild(
-      child.found ? child.value : undefined,
-      rest,
-      value,
-      `${at}.${segment}`,
-      construction
-    )
-    if (next === UNCHANGED) return UNCHANGED
-    /** Copy-on-write array; the original stays untouched. */
-    const copy = [...node]
-    copy[index] = next
-    return copy
-  }
-  if (!isPlainObject(node))
-    throw ownerError(
-      TypeError,
-      UtilsErrorCode.configPathInvalid,
-      UtilsErrorText.configPathInvalid(at, 'record or array required')
-    )
-  if (value === CONFIG_DELETE && rest.length === 0) {
-    if (!child.found) return UNCHANGED
-    /** Copy without the deleted key. */
-    const copy = copyRecord(node)
-    delete copy[segment]
-    return copy
-  }
-  /** Rebuilt child. */
-  const next = rebuild(
-    child.found ? child.value : undefined,
-    rest,
-    value,
-    `${at}.${segment}`,
-    construction
-  )
-  if (next === UNCHANGED) return UNCHANGED
-  /** Only an unexposed private draft avoids copying its growing record; borrowed records detach. */
-  const copy = construction?.owned.has(node) ? node : copyRecord(node)
-  Object.defineProperty(copy, segment, {
-    configurable: true,
-    enumerable: true,
-    value: next,
-    writable: true
-  })
-  construction?.owned.add(copy)
-  return copy
-}
-
-/** Leaf equality used by `diff()` and path-scoped watchers. */
-function sameLeaf(left: unknown, right: unknown): boolean {
-  if (Object.is(left, right)) return true
-  return left instanceof Date && right instanceof Date && left.getTime() === right.getTime()
-}
-
-/** A first-visit path stays linked until a difference needs its public segment list. */
-type IConfigDiffPath = Readonly<{ parent: IConfigDiffPath | undefined; key: string }>
-
-/** One pair waiting for the original depth-first comparison. */
-type IConfigDiffPair = Readonly<{
-  left: unknown
-  right: unknown
-  path: IConfigDiffPath | undefined
-}>
-
-/** One admitted pair retains its own-key order while a child pair is compared. */
-type IConfigDiffFrame = IConfigDiffPair & {
-  readonly keys: readonly string[]
-  index: number
-}
-
-/** Materialize only reported paths; equal cycles never copy a growing path prefix. */
-function diffPath(root: readonly string[], path: IConfigDiffPath | undefined): readonly string[] {
-  if (!path) return root
-  /** Reverse linked segments once before appending the caller's original root path. */
-  const segments: string[] = []
-  for (let node: IConfigDiffPath | undefined = path; node; node = node.parent)
-    segments.push(node.key)
-  segments.reverse()
-  return Object.freeze([...root, ...segments])
-}
-
-/** Compare each container pair once, reporting differences at its first depth-first path. */
-function collectDiff(
-  left: unknown,
-  right: unknown,
-  path: readonly string[],
-  out: IConfigDiffEntry[]
-): void {
-  /** Pair identity belongs only to this comparison, never to a later diff or notification. */
-  const compared = new WeakMap<object, WeakSet<object>>()
-  /** Explicit frames preserve recursive key/read order without growing the JavaScript call stack. */
-  const frames: IConfigDiffFrame[] = []
-  /** The next child is visited before its parent's following key. */
-  let pair: IConfigDiffPair | undefined = { left, right, path: undefined }
-  while (pair || frames.length > 0) {
-    if (pair) {
-      /** The pending pair is consumed before its frame can descend again. */
-      const current = pair
-      pair = undefined
-      if (sameLeaf(current.left, current.right)) continue
-      if (
-        !(
-          (Array.isArray(current.left) && Array.isArray(current.right)) ||
-          (isPlainObject(current.left) && isPlainObject(current.right))
-        )
-      ) {
-        out.push(Object.freeze({ path: diffPath(path, current.path), kind: 'changed' }))
-        continue
-      }
-      /** Both sides passed the same-kind container check. */
-      const before = current.left as object
-      /** Right identities are distinct per left node, preserving comparisons against other aliases. */
-      const after = current.right as object
-      /** Mark before descending so an equal back edge ends without reporting a false difference. */
-      const matches = compared.get(before) ?? new WeakSet<object>()
-      if (matches.has(after)) continue
-      matches.add(after)
-      compared.set(before, matches)
-      frames.push({
-        ...current,
-        keys: [...new Set([...Object.keys(before), ...Object.keys(after)])],
-        index: 0
-      })
-    }
-    /** The top frame alone selects the next descriptor read, retaining left-key-first order. */
-    const frame = frames[frames.length - 1]!
-    /** An exhausted frame releases its own keys before its parent advances. */
-    const key = frame.keys[frame.index]
-    if (key === undefined) {
-      frames.pop()
-      continue
-    }
-    frame.index += 1
-    /** Linking costs one edge; public arrays are allocated only for actual output entries. */
-    const childPath: IConfigDiffPath = { parent: frame.path, key }
-    /** Own data values retain their original before-then-after observation order. */
-    const before = ownValue(frame.left, key)
-    const after = ownValue(frame.right, key)
-    if (!before.found) out.push(Object.freeze({ path: diffPath(path, childPath), kind: 'added' }))
-    else if (!after.found)
-      out.push(Object.freeze({ path: diffPath(path, childPath), kind: 'removed' }))
-    else pair = { left: before.value, right: after.value, path: childPath }
-  }
-}
-
-/**
- * Converts an owned graph into JSON data. Dates use `toISOString()`; values JSON cannot represent
- * (Map, Set, functions, bigint, symbols) throw `CONFIG_UNSUPPORTED`.
- */
-function toPlain(value: unknown, path: string, depth: number): unknown {
-  if (value === null || typeof value === 'string' || typeof value === 'boolean') return value
-  if (typeof value === 'number') return Number.isFinite(value) ? value : null
-  if (value === undefined) return undefined
-  if (value instanceof Date) return value.toISOString()
-  if (depth > 256)
-    throw ownerError(
-      TypeError,
-      UtilsErrorCode.configUnsupported,
-      UtilsErrorText.configUnsupported(path, 'graph is too deep for JSON')
-    )
-  if (Array.isArray(value))
-    return value.map((item, index) => {
-      /** JSON writes `undefined` array items as `null`. */
-      const plain = toPlain(item, `${path}.${index}`, depth + 1)
-      return plain === undefined ? null : plain
-    })
-  if (isPlainObject(value)) {
-    /** Plain output record. */
-    const out: Record<string, unknown> = {}
-    for (const key of Object.keys(value)) {
-      /** Converted child; `undefined` keys are omitted as `JSON.stringify` does. */
-      const plain = toPlain(value[key], `${path}.${key}`, depth + 1)
-      if (plain !== undefined) out[key] = plain
-    }
-    return out
-  }
-  throw ownerError(
-    TypeError,
-    UtilsErrorCode.configUnsupported,
-    UtilsErrorText.configUnsupported(path, 'value is not JSON serializable')
-  )
-}
-
 /**
  * Stateful owner of one immutable config snapshot.
  *
- * Every write builds a complete next snapshot through the existing `ownConfig` / `patchConfig` /
- * `combineConfig` primitives, validates it, and only then commits it, so a failed write leaves the
- * previous snapshot untouched. Writes return `this`, so calls chain. Reads return deep readonly
- * views. All state is private and the prototype is frozen.
- *
- * @example
- *   ;```ts
- *   const config = new ConfigOwner({ server: { port: 80 }, debug: false })
- *   config.set('server.port', 8080).patch({ debug: true })
- *   config.get('server.port') // 8080, typed as number
- *   ```
+ * Writes build a complete owned candidate, validate it, then commit; failures keep the old
+ * snapshot. Writes chain through `this`; reads are readonly. State is private; the prototype is
+ * frozen.
  */
 export class ConfigOwner<T extends IConfigRecord = IConfigRecord> {
   /** Current committed owned snapshot. Never mutated in place; replaced on every commit. */
@@ -497,11 +149,9 @@ export class ConfigOwner<T extends IConfigRecord = IConfigRecord> {
   /** Receives watch-listener failures, which must never be swallowed. */
   readonly #report: (error: unknown) => void
   /** Registered watchers in registration order. */
-  readonly #watchers = new Set<IConfigWatcher>()
+  readonly #watchers: ConfigWatchers
   /** Whether writes are permanently rejected with `CONFIG_READONLY`. */
   #locked = false
-  /** Whether listeners are running; writes during notification are reentrant and rejected. */
-  #notifying = false
   /** Nesting depth of `batch()`; commits are deferred while it is positive. */
   #batchDepth = 0
 
@@ -530,6 +180,7 @@ export class ConfigOwner<T extends IConfigRecord = IConfigRecord> {
     })
     this.#validate = validate
     this.#report = report ?? reportUnhandledError
+    this.#watchers = new ConfigWatchers(this.#report, this)
     /** Owned initial snapshot. */
     const owned = ownConfig(value, this.#ownOptions)
     this.#check(owned)
@@ -538,62 +189,26 @@ export class ConfigOwner<T extends IConfigRecord = IConfigRecord> {
   }
 
   /**
-   * Parses JSON text into an owner. Non-string input or invalid JSON throws `CONFIG_PARSE_FAILED`
-   * with the parser error on `cause`; a non-record root throws `CONFIG_UNSUPPORTED`.
-   *
-   * @example
-   *   ;```ts
-   *   const config = ConfigOwner.from<{ port: number }>('{"port":80}')
-   *   ```
+   * Parses JSON text; malformed text retains `CONFIG_PARSE_FAILED` and its original cause. The
+   * constructor rejects non-record roots with `CONFIG_UNSUPPORTED`.
    */
   static from<T extends IConfigRecord = IConfigRecord>(
     text: string,
     options?: IConfigOwnerParseOptions<T>
   ): ConfigOwner<T> {
-    if (typeof text !== 'string')
-      throw ownerError(
-        TypeError,
-        UtilsErrorCode.configParseFailed,
-        UtilsErrorText.configParseFailed('text must be a string')
-      )
-    /** Parsed root; validated by the constructor. */
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(text, options?.reviver)
-    } catch (cause) {
-      throw ownerError(
-        TypeError,
-        UtilsErrorCode.configParseFailed,
-        UtilsErrorText.configParseFailed(safeErrorReason(cause, 'invalid JSON')),
-        cause
-      )
-    }
-    return new ConfigOwner(parsed as T, options)
+    return new ConfigOwner(parseConfigText(text, options) as T, options)
   }
 
   /**
-   * Builds an owner from an asynchronous source: a Promise, a value, or a factory that receives an
-   * abort signal (pass it to `fetch`). Strings are parsed as JSON.
-   *
-   * Rejections and factory throws become `CONFIG_SOURCE_FAILED` (original on `cause`); `signal` and
-   * `timeoutMs` reject with the standard abort/timeout errors. Pair with `createResource` to get a
-   * reactive config resource.
-   *
-   * @example
-   *   ;```ts
-   *   const config = await ConfigOwner.fromAsync(
-   *     ({ signal }) => fetch('/config.json', { signal }).then((r) => r.text()),
-   *     { timeoutMs: 5000 }
-   *   )
-   *   ```
+   * Loads a value, Promise or signal-aware factory; strings are parsed as JSON. Factory failures
+   * retain their cause under `CONFIG_SOURCE_FAILED`; abort and timeout use the standard errors.
    */
   static async fromAsync<T extends IConfigRecord = IConfigRecord>(
     source: IConfigAsyncSource<T>,
     options?: IConfigOwnerAsyncOptions<T>
   ): Promise<ConfigOwner<T>> {
-    /** The operation borrows explicit source input; its normalization belongs to the loader. */
-    const load = (context: { readonly signal: IAbortSignal }): Promise<unknown> =>
-      loadConfigSource(source, context)
+    /** Detached source callback retains one explicit source owner for this asynchronous wait. */
+    const load = new ConfigSourceLoader(source).load
     /** Loaded root, raced against the optional deadline and signal. */
     const loaded =
       options?.timeoutMs !== undefined
@@ -607,83 +222,17 @@ export class ConfigOwner<T extends IConfigRecord = IConfigRecord> {
   }
 
   /**
-   * Builds a nested config from flat environment variables. Pass `process.env`,
-   * `Deno.env.toObject()` or any record; values stay strings unless `coerce` converts them.
-   * Conflicting keys (`APP__DB=1` and `APP__DB__PORT=2`) throw `CONFIG_CONFLICT`.
-   *
-   * @example
-   *   ;```ts
-   *   ConfigOwner.fromEnv(process.env, {
-   *     prefix: 'APP__',
-   *     key: (s) => s.toLowerCase(),
-   *     coerce: Number
-   *   })
-   *   ```
+   * Builds nested data from flat environment variables, applying optional key/coerce policies.
+   * Conflicting leaf/prefix keys throw `CONFIG_CONFLICT` before owner publication.
    */
   static fromEnv<T extends IConfigRecord = IConfigRecord>(
     env: Readonly<Record<string, string | undefined>>,
     options?: IConfigOwnerEnvOptions<T>
   ): ConfigOwner<T> {
-    if (env === null || typeof env !== 'object')
-      throw ownerError(
-        TypeError,
-        UtilsErrorCode.invalidArgument,
-        UtilsErrorText.invalidArgument('env', 'a record of strings')
-      )
-    /** Options with defaults. */
-    const {
-      prefix = '',
-      separator = '__',
-      key = (segment: string) => segment,
-      coerce
-    } = options ?? {}
-    if (typeof separator !== 'string' || separator.length === 0)
-      throw ownerError(
-        TypeError,
-        UtilsErrorCode.invalidArgument,
-        UtilsErrorText.invalidArgument('separator', 'a non-empty string')
-      )
-    /** Nested root built from every matching key. */
-    let root: unknown = {}
-    /** Construction owns only this root and later path records, never callback-provided objects. */
-    const construction: IEnvConstructionContext = { owned: new WeakSet([root as object]) }
-    for (const name of orderStringKeys(Object.keys(env))) {
-      /** Raw string value; non-strings are skipped like unset variables. */
-      const raw = env[name]
-      if (typeof raw !== 'string' || !name.startsWith(prefix)) continue
-      /** Segments after the prefix, mapped by the caller's key policy. */
-      const segments = name
-        .slice(prefix.length)
-        .split(separator)
-        .map((segment) => key(segment))
-      /** Validated segments; invalid names throw `CONFIG_PATH_INVALID`. */
-      const path = toSegments(segments)
-      /** One cursor visits each prefix once; no repeated slicing or retraversal. */
-      let prefixNode = root
-      for (let index = 1; index <= path.length; index += 1) {
-        /** Descriptor probing preserves the original own-data conflict policy. */
-        const existing = ownValue(prefixNode, path[index - 1]!)
-        if (existing.found && (index === path.length || !isPlainObject(existing.value)))
-          throw ownerError(
-            TypeError,
-            UtilsErrorCode.configConflict,
-            UtilsErrorText.configConflict(path.slice(0, index).join('.'), `environment key ${name}`)
-          )
-        prefixNode = existing.value
-      }
-      root = rebuild(root, path, coerce ? coerce(raw, path) : raw, 'env', construction)
-    }
-    return new ConfigOwner(root as T, options)
+    return new ConfigOwner(readConfigEnvironment(env, options) as T, options)
   }
 
-  /**
-   * Merges sources left to right into a new owner (later sources win, records merge deeply).
-   *
-   * @example
-   *   ;```ts
-   *   const config = ConfigOwner.merge(defaults, fileConfig, envConfig)
-   *   ```
-   */
+  /** Merges sources left to right into a new owner (later sources win, records merge deeply). */
   static merge<S extends readonly [IConfigSource, ...IConfigSource[]]>(
     ...sources: S
   ): ConfigOwner<IMergedConfig<S>> {
@@ -691,7 +240,7 @@ export class ConfigOwner<T extends IConfigRecord = IConfigRecord> {
       throw ownerError(
         TypeError,
         UtilsErrorCode.invalidArgument,
-        UtilsErrorText.invalidArgument('sources', 'at least one source')
+        UtilsErrorText.invalidArgument('sources', ConfigReason.atLeastOneSource)
       )
     /** First source becomes the owner; the rest are combined into it. */
     const [first, ...rest] = sources
@@ -711,14 +260,7 @@ export class ConfigOwner<T extends IConfigRecord = IConfigRecord> {
     return this.#locked
   }
 
-  /**
-   * Value at a typed path as a deep readonly view, or `undefined` when missing.
-   *
-   * @example
-   *   ;```ts
-   *   config.get('server.port') // number | undefined
-   *   ```
-   */
+  /** Value at a typed path as a deep readonly view, or `undefined` when missing. */
   get<const P extends IConfigOwnerPath<T>>(
     path: P
   ): IConfigView<IConfigOwnerPathValue<T, P>> | undefined {
@@ -771,14 +313,7 @@ export class ConfigOwner<T extends IConfigRecord = IConfigRecord> {
     return readonlyConfig(this.#config) as IConfigView<T>
   }
 
-  /**
-   * New owner for a record subtree, sharing options but not listeners or the validator.
-   *
-   * @example
-   *   ;```ts
-   *   const db = config.select('db')
-   *   ```
-   */
+  /** New owner for a record subtree, sharing options but not listeners or the validator. */
   select<const P extends IConfigOwnerPath<T>>(
     path: P
   ): ConfigOwner<IConfigOwnerPathValue<T, P> & IConfigRecord> {
@@ -796,7 +331,7 @@ export class ConfigOwner<T extends IConfigRecord = IConfigRecord> {
       throw ownerError(
         TypeError,
         UtilsErrorCode.configUnsupported,
-        UtilsErrorText.configUnsupported(segments.join('.'), 'record required')
+        UtilsErrorText.configUnsupported(segments.join('.'), ConfigReason.recordRequired)
       )
     return new ConfigOwner(
       subtree.value as IConfigOwnerPathValue<T, P> & IConfigRecord,
@@ -820,11 +355,6 @@ export class ConfigOwner<T extends IConfigRecord = IConfigRecord> {
   /**
    * Sets one path with copy-on-write; missing intermediate records are created. Throws
    * `CONFIG_PATH_INVALID` when an intermediate is not a record or array.
-   *
-   * @example
-   *   ;```ts
-   *   config.set('server.port', 8080).set('server.host', 'localhost')
-   *   ```
    */
   set<const P extends IConfigOwnerPath<T>>(path: P, value: IConfigOwnerWriteValue<T, P>): this {
     return this.#writePath(toSegments(path), value)
@@ -842,14 +372,8 @@ export class ConfigOwner<T extends IConfigRecord = IConfigRecord> {
   }
 
   /**
-   * Merges sources into this owner through `combineConfig` (later sources win). Pass a source list
-   * plus options to control merge strategies. Returns `this`, retyped with the merged shape.
-   *
-   * @example
-   *   ;```ts
-   *   config.combine({ cache: { ttl: 60 } }).get('cache.ttl')
-   *   config.combine([override], { strategies: { array: 'concat' } })
-   *   ```
+   * Merges source values through `combineConfig`; list form accepts explicit strategies. Returns
+   * this same owner, typed with the merged shape.
    */
   combine<S extends readonly IConfigSource[]>(...sources: S): ConfigOwner<T & IMergedConfig<S>>
   combine<S extends readonly IConfigSource[]>(
@@ -875,14 +399,8 @@ export class ConfigOwner<T extends IConfigRecord = IConfigRecord> {
   }
 
   /**
-   * Runs several writes as one commit: the validator and watchers run once at the end. If `fn`
-   * throws or validation fails, every write in the batch is rolled back. Nested batches join the
-   * outer one.
-   *
-   * @example
-   *   ;```ts
-   *   config.batch((c) => c.set('a', 1).set('b', 2))
-   *   ```
+   * Runs writes as one validated commit and watcher notification. Nested batches join the outer
+   * batch; a throw or validation failure restores the previous snapshot.
    */
   batch(fn: (owner: this) => void): this {
     if (typeof fn !== 'function')
@@ -927,14 +445,8 @@ export class ConfigOwner<T extends IConfigRecord = IConfigRecord> {
   }
 
   /**
-   * Watches the whole snapshot, or only one path (fires only when that path's data changed).
-   * Returns an idempotent unsubscribe. Listener throws go to `report`; writes from a listener throw
-   * `REENTRANT_CALL`.
-   *
-   * @example
-   *   ;```ts
-   *   const stop = config.watch('server.port', (next, prev) => restart(next))
-   *   ```
+   * Watches the root or one changed path; returns an idempotent unsubscribe. Listener failures go
+   * to `report`, and writes during notification throw `REENTRANT_CALL`.
    */
   watch(listener: (next: IConfigView<T>, prev: IConfigView<T>) => void): () => void
   watch<const P extends IConfigOwnerPath<T>>(
@@ -957,15 +469,7 @@ export class ConfigOwner<T extends IConfigRecord = IConfigRecord> {
         UtilsErrorCode.invalidArgument,
         UtilsErrorText.invalidArgument('listener', UtilsErrorText.functionExpectation)
       )
-    /** Registered entry; its identity is the unsubscribe key. */
-    const watcher: IConfigWatcher = {
-      path: rootForm ? undefined : toSegments(pathOrListener),
-      listener
-    }
-    this.#watchers.add(watcher)
-    return () => {
-      this.#watchers.delete(watcher)
-    }
+    return this.#watchers.add(rootForm ? undefined : toSegments(pathOrListener), listener)
   }
 
   /** New owner with the same snapshot and options; listeners and lock state are not copied. */
@@ -989,7 +493,7 @@ export class ConfigOwner<T extends IConfigRecord = IConfigRecord> {
 
   /** Rejects writes while locked or while watchers run. */
   #assertWritable(): void {
-    if (this.#notifying)
+    if (this.#watchers.notifying)
       throw ownerError(Error, UtilsErrorCode.reentrantCall, UtilsErrorText.reentrantCall)
     if (this.#locked)
       throw ownerError(
@@ -1053,69 +557,8 @@ export class ConfigOwner<T extends IConfigRecord = IConfigRecord> {
     /** Previous snapshot handed to watchers. */
     const previous = this.#config
     this.#config = candidate
-    this.#notify(previous, candidate)
+    this.#watchers.notify(previous, candidate)
     return this
-  }
-
-  /** Runs watchers once per commit; failures are reported and never stop the other watchers. */
-  #notify(previous: IOwnedConfig<T>, next: IOwnedConfig<T>): void {
-    if (this.#watchers.size === 0) return
-    /** Completed branch comparisons are shared only within this commit, never across notifications. */
-    const comparisons = new WeakMap<object, WeakMap<object, boolean>>()
-    this.#notifying = true
-    try {
-      // Snapshot so watchers added during notification wait for the next commit.
-      for (const watcher of Array.from(this.#watchers)) {
-        if (!this.#watchers.has(watcher)) continue
-        try {
-          if (watcher.path === undefined) {
-            watcher.listener(readonlyConfig(next), readonlyConfig(previous))
-            continue
-          }
-          /** Raw values on each side of the commit. */
-          const before = rawAt(previous, watcher.path)
-          const after = rawAt(next, watcher.path)
-          /** Object-only identity keys leave primitive Object.is semantics, including signed zero. */
-          const objects =
-            before.value !== null &&
-            typeof before.value === 'object' &&
-            after.value !== null &&
-            typeof after.value === 'object'
-          /** A prior listener may already have compared this exact immutable branch pair. */
-          const previousComparisons = objects ? comparisons.get(before.value as object) : undefined
-          /** Undefined is a cache miss; both changed and unchanged comparisons are reusable. */
-          let changed = previousComparisons?.get(after.value as object)
-          if (changed === undefined) {
-            /** Only a completed comparison is cached; thrown failures retain per-listener reporting. */
-            const changes: IConfigDiffEntry[] = []
-            if (before.found !== after.found) changes.push({ path: watcher.path, kind: 'changed' })
-            else collectDiff(before.value, after.value, watcher.path, changes)
-            changed = changes.length > 0
-            if (objects) {
-              /**
-               * The same left branch can be paired with several independently selected right
-               * branches.
-               */
-              const results = previousComparisons ?? new WeakMap<object, boolean>()
-              results.set(after.value as object, changed)
-              comparisons.set(before.value as object, results)
-            }
-          }
-          if (!changed) continue
-          /** Readonly views of both values. */
-          const read = (snapshot: IOwnedConfig<T>): unknown => {
-            /** Discriminated read through the canonical readonly path reader. */
-            const result = readConfigPath(snapshot, watcher.path!)
-            return result.kind === 'value' ? result.value : undefined
-          }
-          watcher.listener(read(next), read(previous))
-        } catch (error) {
-          this.#report(error)
-        }
-      }
-    } finally {
-      this.#notifying = false
-    }
   }
 }
 
