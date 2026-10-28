@@ -1,7 +1,7 @@
 import { UtilsAbortError } from '@migaia/utils/error'
 import { describe, expect, it } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
-import { ObservableMap, ObservableSet, ObservableArray, ObservableObject } from '../src/index.js'
+import { ObservableMap, ObservableSet, ObservableArray, ObservableObject } from '../src/index.ts'
 
 describe('store-indexed audit regressions', () => {
   it('invalidates all Map iteration views when insertion order changes', () => {

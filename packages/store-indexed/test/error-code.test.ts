@@ -3,7 +3,7 @@ import {
   createStoreIndexedRangeError,
   StoreIndexedErrorCode,
   STORE_INDEXED_SOURCE
-} from '../src/errors'
+} from '../src/errors.ts'
 
 describe('store-indexed error-code contract', () => {
   it('declares 6 unique codes under the package source', () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { defaultRuntime } from '@migaia/reactive'
-import { ObservableArray, ObservableMap, ObservableObject, ObservableSet } from '../src'
+import { ObservableArray, ObservableMap, ObservableObject, ObservableSet } from '../src/index.ts'
 
 describe('store-indexed', () => {
   it('contains revoked collection options and invalid debug names', () => {

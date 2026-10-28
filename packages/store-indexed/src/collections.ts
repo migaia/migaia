@@ -8,15 +8,15 @@ import {
   isAnyRuntimeTracking,
   type IObservable
 } from '@migaia/reactive/extension'
-import { ReactiveCellPool } from './reactive-cell-pool.js'
+import { ReactiveCellPool } from './reactive-cell-pool.ts'
 import {
   createStoreIndexedError,
   createStoreIndexedRangeError,
   createStoreIndexedTypeError
-} from './errors.js'
-import { StoreIndexedErrorCode } from './error-code.js'
-import { StoreIndexedErrorText } from './error-text.js'
-import { runCollectionCallback } from './collection-callback.js'
+} from './errors.ts'
+import { StoreIndexedErrorCode } from './error-code.ts'
+import { StoreIndexedErrorText } from './error-text.ts'
+import { runCollectionCallback } from './collection-callback.ts'
 import { snapshotOwnDescriptors } from '@migaia/utils/object'
 
 const ABSENT = Symbol('observable-collection-absent')

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
-import { ObservableArray, ObservableMap, ObservableSet } from '../src/index.js'
+import { ObservableArray, ObservableMap, ObservableSet } from '../src/index.ts'
 
 describe('public collection subscriptions', () => {
   it('tracks an array tail and a growing fixed index through structural edits', () => {

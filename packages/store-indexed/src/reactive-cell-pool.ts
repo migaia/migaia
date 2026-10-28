@@ -1,6 +1,6 @@
 import type { IReactiveSignal } from '@migaia/reactive'
 import type { IObservable } from '@migaia/reactive/extension'
-import { KeyedCellRegistry, scheduleLazyCellRelease } from './keyed-cell-registry.js'
+import { KeyedCellRegistry, scheduleLazyCellRelease } from './keyed-cell-registry.ts'
 
 /**
  * Shared getOrCreate / speculative-lease / tombstone lifecycle for a keyed map of lazily
