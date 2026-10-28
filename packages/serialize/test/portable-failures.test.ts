@@ -102,10 +102,10 @@ describe('serialize portable convergence oracle', () => {
     expect(input.a).toBe(child)
     expect(Object.keys(input)).toEqual(['z', 'a'])
     expect(Object.isFrozen(input)).toBe(false)
-    /** Old intermediate projection remains independent and lexically ordered. */
+    /** Intermediate projection remains independent and preserves property enumeration order. */
     const projected = toPortableValue(input) as Record<string, unknown>
     expect(projected).not.toBe(input)
-    expect(Object.keys(projected)).toEqual(['a', 'z'])
+    expect(Object.keys(projected)).toEqual(['z', 'a'])
     expect(projected.a).not.toBe(child)
   })
 
@@ -193,7 +193,7 @@ describe('serialize portable convergence oracle', () => {
   it('keeps codec projection errors ahead of later portable assertion failures', () => {
     /** Old projection copies NaN unchanged, then a later getter supplies the primary error. */
     const original = new Error('codec projection getter failure')
-    /** Sorted a precedes b; rejecting a too early would hide the observable b getter failure. */
+    /** Enumerated a precedes b; rejecting a too early would hide the observable b getter failure. */
     const input = {
       a: Number.NaN,
       get b(): never {

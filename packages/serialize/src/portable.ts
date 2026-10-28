@@ -208,10 +208,11 @@ export function asCodecValue(value: unknown): ICodecValue {
 }
 
 /**
- * Builds the legacy mutable projection: record keys are visited in sorted order and Uint8Array
+ * Builds the mutable projection: record keys follow Object.keys enumeration order and Uint8Array
  * becomes a bytes-tag record. Getters run, repeated sibling references are copied separately, and
  * cycles or unsupported binary containers reject. This intermediate projection may still contain
  * values outside ICodecValue; use asCodecValue or a format codec for final portable validation.
+ * Consumers own any canonical key ordering; serialize does not sort record keys.
  */
 export function toPortableValue(value: unknown, active = new Set<object>()): unknown {
   return projectPortable.value(value, active)

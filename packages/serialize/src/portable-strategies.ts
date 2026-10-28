@@ -15,7 +15,7 @@ function hasPortableMarker(keys: readonly string[]): boolean {
   return false
 }
 
-/** Legacy record keys read lazily so nested getters retain sorted or decoded traversal order. */
+/** Record keys read lazily so nested getters retain the captured property enumeration order. */
 function* portableEntries(
   value: Record<string, unknown>,
   keys: readonly string[]
@@ -82,8 +82,8 @@ export const projectionStrategy: IPortableWalkerStrategy = {
   },
   record: (value) => {
     if (!Object.hasOwn(value, PortableBytesField.marker) && Array.isArray(value)) return undefined
-    /** Sorted keys are captured once and also identify an enumerable wire tag. */
-    const keys = Object.keys(value).sort()
+    /** Enumerable keys retain caller property order and identify an enumerable wire tag. */
+    const keys = Object.keys(value)
     return {
       entries: portableEntries(value as Record<string, unknown>, keys),
       output: {},
@@ -187,7 +187,7 @@ export const codecStrategy: IPortableWalkerStrategy = {
   }),
   record: (value) => {
     if (!Object.hasOwn(value, PortableBytesField.marker) && Array.isArray(value)) return undefined
-    /** Codec formats preserve enumeration order; public portable snapshots retain their sorting. */
+    /** Codec formats and public portable projections share property enumeration order. */
     const keys = Object.keys(value)
     return new CodecPortableRecord(value as Record<string, unknown>, keys)
   },

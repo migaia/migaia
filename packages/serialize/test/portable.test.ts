@@ -131,8 +131,8 @@ describe('serialize portable convergence oracle', () => {
     expect(Object.isFrozen((outputs[1]!.second as Record<string, unknown>).child)).toBe(true)
   })
 
-  it('preserves sorted public projection and property-order codec getters', () => {
-    /** Codec projection recurses before reading the next sorted parent field. */
+  it('preserves property enumeration order for public projection and codec getters', () => {
+    /** Public and codec projections recurse before reading the next enumerated parent field. */
     const reads: string[] = []
     /** Repeated child references remain independent copies in the legacy codec path. */
     const shared = {
@@ -141,7 +141,7 @@ describe('serialize portable convergence oracle', () => {
         return 7
       }
     }
-    /** Reverse insertion order distinguishes codec sorting from snapshot enumeration. */
+    /** Reverse alphabetical insertion order distinguishes enumeration from comparison sorting. */
     const input = {
       get z() {
         reads.push('z')
@@ -154,8 +154,8 @@ describe('serialize portable convergence oracle', () => {
     }
     /** Inspect the existing public projection without introducing an exported codec strategy. */
     const output = toPortableValue(input) as Record<string, unknown>
-    expect(reads).toEqual(['a', 'shared.value', 'z', 'shared.value'])
-    expect(Object.keys(output)).toEqual(['a', 'z'])
+    expect(reads).toEqual(['z', 'shared.value', 'a', 'shared.value'])
+    expect(Object.keys(output)).toEqual(['z', 'a'])
     expect(Object.getPrototypeOf(output)).toBe(Object.prototype)
     expect(Object.isFrozen(output)).toBe(false)
     expect(output.a).not.toBe(output.z)

@@ -134,7 +134,7 @@ describe('collection-preserving JSON codec', () => {
     } finally {
       sort.mockRestore()
     }
-    expect(Object.keys(toPortableValue({ b: 1, a: 2 }) as object)).toEqual(['a', 'b'])
+    expect(Object.keys(toPortableValue({ b: 1, a: 2 }) as object)).toEqual(['b', 'a'])
   })
 
   it('visits format getters once in property order and emits format-specific ordered bytes', () => {

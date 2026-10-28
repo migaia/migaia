@@ -395,7 +395,7 @@ ICodecValue’s static domain contains null, boolean, number, string, nested rea
 
 ### Portable defaults and the reusable walker
 
-toPortableValue(value, active?) is the legacy intermediate projection rather than a final assertion. It reads sorted string keys and recursively produces mutable ordinary objects without freezing. Uint8Array becomes { $rpc: 'bytes', base64url }. Inherited, nonenumerable and symbol record fields are omitted. Getters may run. Repeated sibling references are copied independently, while cycles are checked on the active ancestor path. Projection can temporarily retain undefined/NaN; codecs reject them during final portable validation.
+toPortableValue(value, active?) is the legacy intermediate projection rather than a final assertion. It follows Object.keys property enumeration order and recursively produces mutable ordinary objects without freezing. Uint8Array becomes { $rpc: 'bytes', base64url }. Inherited, nonenumerable and symbol record fields are omitted. Getters may run. Repeated sibling references are copied independently, while cycles are checked on the active ancestor path. Projection can temporarily retain undefined/NaN; codecs reject them during final portable validation.
 
 assertPortableValue(value, active?) returns void. asCodecValue(value) validates and returns the same object narrowed to ICodecValue. Neither copies nor freezes. The default decoded profile rejects nonfinite numbers, undefined, functions, symbols, bigint, Date/Map/Set, invalid arrays and native bytes. Recognized byte tags retain the existing character-set checks rather than a different protocol’s stricter canonical-bit policy. Default depth is unlimited. Legacy projections of ArrayBuffer/class objects are not general-purpose safe snapshots.
 
@@ -471,7 +471,7 @@ console.log(text) // {"$rpc":"map","entries":[["roles",{"$rpc":"set","values":["
 console.log(codec.decode(text)) // Map { 'roles' => Set { 'read', 'write' } }
 ```
 
-Format codecs keep integer-index enumeration followed by string insertion order, including getter traversal. Public toPortableValue still supplies a sorted intermediate projection. RPC owned snapshots and ordinary object and byte JSON paths preserve each object's own key order. The existing private RPC snapshot owner still copies and computes the byte upper bound in one traversal, skipping already encoded binary subtrees.
+Format codecs and public toPortableValue both follow integer-index enumeration followed by string insertion order, including getter traversal. serialize does not sort keys; consumers own any required canonical ordering. RPC owned snapshots and ordinary object and byte JSON paths preserve each object's own key order. The existing private RPC snapshot owner still copies and computes the byte upper bound in one traversal, skipping already encoded binary subtrees.
 
 ### Carry a format tag in the encoded value
 
