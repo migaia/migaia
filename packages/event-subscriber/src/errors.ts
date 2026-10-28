@@ -1,3 +1,7 @@
+/**
+ * Owns native error identity attachment and canonical code-to-text lookup; no dispatch state lives
+ * here.
+ */
 import {
   EVENT_SUBSCRIBER_SOURCE,
   EventSubscriberErrorCode,

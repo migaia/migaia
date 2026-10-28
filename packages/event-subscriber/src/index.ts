@@ -1,4 +1,5 @@
-export { invokeEachLive, withSnapshotEntries } from './channel.js'
+/** Exposes the admitted runtime-neutral public channel, hub and invocation contracts. */
+export { invokeEachLive, withSnapshotEntries } from './internal/invocation.js'
 export { createCanonicalChannel as createEventChannel } from './channel.js'
 export { createEventHub } from './hub.js'
 export {

@@ -1,3 +1,7 @@
+/**
+ * Owns host diagnostic adaptation and the terminal failure ladder; it does not schedule event
+ * dispatch.
+ */
 import { EventSubscriberErrorCode } from '../error-code.js'
 import { createEventAggregateError, eventErrorText } from '../errors.js'
 
@@ -24,31 +28,41 @@ export type IEventTerminalHost = {
 /** Feature-detects host diagnostics lazily without importing DOM, Node, or lifecycle types. */
 export const createSystemTerminalRuntime = (
   host: IEventTerminalHost = globalThis as IEventTerminalHost
-): IEventTerminalRuntime => ({
-  /** Calls the host `reportError` when it exists. */
+): IEventTerminalRuntime => new SystemTerminalRuntime(host)
+
+/** Owns one host adapter while preserving native host method receivers and lazy getter reads. */
+class SystemTerminalRuntime implements IEventTerminalRuntime {
+  /** Original host object is retained for native receiver-sensitive diagnostics. */
+  readonly #host: IEventTerminalHost
+
+  /** Retains the host without reading any of its diagnostic members eagerly. */
+  constructor(host: IEventTerminalHost) {
+    this.#host = host
+  }
+
+  /** Calls the host reportError only when the member exists; failures remain observable upstream. */
   reportError(error: unknown): boolean {
-    if (!('reportError' in host)) return false
-    host.reportError!(error)
+    if (!('reportError' in this.#host)) return false
+    this.#host.reportError!(error)
     return true
-  },
-  /** Calls `console.error` when it exists. */
+  }
+
+  /** Calls the original console object's error method when that member exists. */
   consoleError(error: unknown): boolean {
-    /** Host console, read once. */
-    const consoleObject = host.console
+    /** Read once to preserve getter effects and the original console receiver. */
+    const consoleObject = this.#host.console
     if (consoleObject === undefined) return false
     if (!('error' in consoleObject)) return false
     consoleObject.error!(error)
     return true
-  },
-  /**
-   * Throws the error from a microtask. When the host cannot queue it, throws the error
-   * synchronously; when queueing itself fails, throws an aggregate holding both errors.
-   */
+  }
+
+  /** Queues an uncaught throw, retaining both errors if host feature detection or queueing fails. */
   enqueueThrow(error: unknown): void {
-    /** Whether the host offers `queueMicrotask`. */
+    /** Presence is checked separately because a hostile host may throw from its has trap. */
     let hasQueueMicrotask = false
     try {
-      hasQueueMicrotask = 'queueMicrotask' in host
+      hasQueueMicrotask = 'queueMicrotask' in this.#host
     } catch (failure) {
       throw createEventAggregateError(
         EventSubscriberErrorCode.unhandledListenerFailure,
@@ -57,19 +71,10 @@ export const createSystemTerminalRuntime = (
       )
     }
     if (hasQueueMicrotask) {
-      /** Set when the host had a callable `queueMicrotask` and the callback was built. */
-      let callbackArgumentEvaluated = false
+      /** Optional call argument evaluation distinguishes missing callbacks from successful queueing. */
+      const callbackState = { evaluated: false }
       try {
-        // Optional method call reads the getter once, evaluates its argument only when
-        // a callable target exists, and preserves the original host as the receiver.
-        host.queueMicrotask?.(
-          (() => {
-            callbackArgumentEvaluated = true
-            return () => {
-              throw error
-            }
-          })()
-        )
+        this.#host.queueMicrotask?.(createThrowCallback(error, callbackState))
       } catch (failure) {
         throw createEventAggregateError(
           EventSubscriberErrorCode.unhandledListenerFailure,
@@ -77,12 +82,20 @@ export const createSystemTerminalRuntime = (
           eventErrorText(EventSubscriberErrorCode.unhandledListenerFailure)
         )
       }
-      if (!callbackArgumentEvaluated) throw error
+      if (!callbackState.evaluated) throw error
       return
     }
     throw error
   }
-})
+}
+
+/** Builds the final microtask only when optional-call argument evaluation actually occurs. */
+function createThrowCallback(error: unknown, state: { evaluated: boolean }): () => never {
+  state.evaluated = true
+  return () => {
+    throw error
+  }
+}
 
 /** Runs the single terminal-report ladder while preserving every failure in occurrence order. */
 export const reportTerminalDiagnostic = (
@@ -91,40 +104,41 @@ export const reportTerminalDiagnostic = (
   terminalReport: ((error: AggregateError) => void | PromiseLike<void>) | undefined,
   runtime: IEventTerminalRuntime
 ): void => {
-  /**
-   * Sends errors to the host: `reportError` first, then `console.error`, and finally a thrown error
-   * on a microtask.
-   */
-  const reportSystem = (currentErrors: readonly unknown[]): void => {
-    /** Errors to report, including later reporter failures. */
-    const accumulated = [...currentErrors]
-    /** Builds the aggregate error from the current list. */
-    const diagnostic = (): AggregateError =>
-      createEventAggregateError(code, accumulated, eventErrorText(code))
-    try {
-      if (runtime.reportError(diagnostic())) return
-    } catch (error) {
-      accumulated.push(error)
-    }
-    try {
-      if (runtime.consoleError(diagnostic())) return
-    } catch (error) {
-      accumulated.push(error)
-    }
-    runtime.enqueueThrow(diagnostic())
-  }
-  /** Aggregate error handed to `terminalReport`. */
+  /** Terminal sink observes this aggregate before any host fallback starts. */
   const diagnostic = createEventAggregateError(code, errors, eventErrorText(code))
   if (!terminalReport) {
-    reportSystem(errors)
+    reportSystemDiagnostic(code, errors, runtime)
     return
   }
   try {
     Promise.resolve(terminalReport(diagnostic)).then(
       () => undefined,
-      (error) => reportSystem([...errors, error])
+      (error) => reportSystemDiagnostic(code, [...errors, error], runtime)
     )
   } catch (error) {
-    reportSystem([...errors, error])
+    reportSystemDiagnostic(code, [...errors, error], runtime)
   }
+}
+
+/** Attempts host sinks in order, retaining each failed sink before proceeding to the next. */
+function reportSystemDiagnostic(
+  code: (typeof EventSubscriberErrorCode)[keyof typeof EventSubscriberErrorCode],
+  errors: readonly unknown[],
+  runtime: IEventTerminalRuntime
+): void {
+  /** Each failed host appends once; the maximum two host failures are bounded by the sink ladder. */
+  const accumulated = [...errors]
+  try {
+    if (runtime.reportError(createEventAggregateError(code, accumulated, eventErrorText(code))))
+      return
+  } catch (error) {
+    accumulated.push(error)
+  }
+  try {
+    if (runtime.consoleError(createEventAggregateError(code, accumulated, eventErrorText(code))))
+      return
+  } catch (error) {
+    accumulated.push(error)
+  }
+  runtime.enqueueThrow(createEventAggregateError(code, accumulated, eventErrorText(code)))
 }

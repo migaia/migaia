@@ -1,6 +1,19 @@
-import { EventSubscriberErrorCode } from './error-code.js'
-import { createEventTypeError, eventErrorText } from './errors.js'
+/**
+ * Owns naming presets, literal type projections, and immutable alias installation; no dispatch
+ * state lives here.
+ */
+import { createInvalidOptionsError } from './internal/channel-options.js'
 import { isRecord } from './internal/record.js'
+
+/** Canonical method names shared by style projection and callable subscription ownership. */
+export const EventApiMethod = {
+  /** Registration method preserved on every channel, Hub, and chain handle. */
+  subscribe: 'subscribe',
+  /** Publication method preserved on every source surface. */
+  publish: 'publish',
+  /** Callable handle self-alias preserved for every chain. */
+  unsubscribe: 'unsubscribe'
+} as const
 
 /**
  * Naming presets for Channel and Hub. Aliases reference canonical methods without adding another
@@ -37,9 +50,9 @@ type IEventApiReservedName =
 /** Maps each preset to its semantic method names without introducing a second runtime owner. */
 const eventApiStyleNames = {
   [EventApiStyle.subscribePublish]: {
-    subscribe: 'subscribe',
-    publish: 'publish',
-    unsubscribe: 'unsubscribe'
+    subscribe: EventApiMethod.subscribe,
+    publish: EventApiMethod.publish,
+    unsubscribe: EventApiMethod.unsubscribe
   },
   [EventApiStyle.onEmit]: { subscribe: 'on', publish: 'emit', unsubscribe: 'off' },
   [EventApiStyle.onTrigger]: { subscribe: 'on', publish: 'trigger', unsubscribe: 'off' },
@@ -52,11 +65,11 @@ const hasEventApiStylePreset = (value: string): value is EventApiStyle =>
 
 /** Names reserved by either canonical surface or by JavaScript prototype hazards. */
 const eventApiReservedNames = new Set<IEventApiReservedName>([
-  'subscribe',
+  EventApiMethod.subscribe,
   'subscribeOnce',
   'subscribeUntil',
-  'publish',
-  'unsubscribe',
+  EventApiMethod.publish,
+  EventApiMethod.unsubscribe,
   'filterTaskId',
   'clear',
   'size',
@@ -188,49 +201,55 @@ export const normalizeEventApiStyle = (value: unknown): IEventApiStylePlan => {
     const validatedPublish = validateStyleName(publish)
     /** Unsubscribe alias after validation; defaults to `unsubscribe`. */
     const validatedUnsubscribe = validateStyleName(
-      unsubscribe === undefined ? 'unsubscribe' : unsubscribe
+      unsubscribe === undefined ? EventApiMethod.unsubscribe : unsubscribe
     )
     if (
       validatedSubscribe === validatedPublish ||
       validatedSubscribe === validatedUnsubscribe ||
       validatedPublish === validatedUnsubscribe
     )
-      throw invalidStyle()
-    if (isReservedForOtherMethod(validatedSubscribe, 'subscribe')) throw invalidStyle()
-    if (isReservedForOtherMethod(validatedPublish, 'publish')) throw invalidStyle()
-    if (isReservedForOtherMethod(validatedUnsubscribe, 'unsubscribe')) throw invalidStyle()
+      throw createInvalidOptionsError()
+    if (isReservedForOtherMethod(validatedSubscribe, EventApiMethod.subscribe))
+      throw createInvalidOptionsError()
+    if (isReservedForOtherMethod(validatedPublish, EventApiMethod.publish))
+      throw createInvalidOptionsError()
+    if (isReservedForOtherMethod(validatedUnsubscribe, EventApiMethod.unsubscribe))
+      throw createInvalidOptionsError()
     return Object.freeze({
       subscribe: validatedSubscribe,
       publish: validatedPublish,
       unsubscribe: validatedUnsubscribe
     })
   }
-  throw invalidStyle()
+  throw createInvalidOptionsError()
+}
+
+/** Reads a source's style once and preserves the construction boundary's original cause wrapping. */
+export function readEventApiStyle(options: { readonly style?: unknown }): IEventApiStylePlan {
+  try {
+    return normalizeEventApiStyle(options.style)
+  } catch (error) {
+    throw createInvalidOptionsError(error)
+  }
 }
 
 /** Builds only non-canonical alias descriptors; canonical members remain the original methods. */
 export const projectEventApiStyle = <T extends object>(surface: T, plan: IEventApiStylePlan): T => {
   /** Alias descriptors to define on the surface. */
   const descriptors: PropertyDescriptorMap = {}
-  /** Alias names that differ from the canonical names, without duplicates. */
-  const aliasNames = [plan.subscribe, plan.publish].filter(
-    (name, index, names) =>
-      name !== (index === 0 ? 'subscribe' : 'publish') && names.indexOf(name) === index
-  )
-  if (!Object.isExtensible(surface)) throw invalidStyle()
-  for (const name of aliasNames) {
-    /** Existing property under the alias name; a non-configurable one blocks the style. */
-    const existing = Object.getOwnPropertyDescriptor(surface, name)
-    if (existing && !existing.configurable) throw invalidStyle()
-  }
-  if (plan.subscribe !== 'subscribe')
+  if (!Object.isExtensible(surface)) throw createInvalidOptionsError()
+  // Exactly two source operations exist: subscribe and publish in EventApiMethod.
+  if (plan.subscribe !== EventApiMethod.subscribe) validateAliasProperty(surface, plan.subscribe)
+  if (plan.publish !== EventApiMethod.publish && plan.publish !== plan.subscribe)
+    validateAliasProperty(surface, plan.publish)
+  if (plan.subscribe !== EventApiMethod.subscribe)
     descriptors[plan.subscribe] = {
       configurable: false,
       enumerable: false,
       value: (surface as Record<string, unknown>).subscribe,
       writable: false
     }
-  if (plan.publish !== 'publish')
+  if (plan.publish !== EventApiMethod.publish)
     descriptors[plan.publish] = {
       configurable: false,
       enumerable: false,
@@ -243,7 +262,7 @@ export const projectEventApiStyle = <T extends object>(surface: T, plan: IEventA
 
 /** Validates one semantic method name before it enters a descriptor plan. */
 const validateStyleName = (value: unknown): string => {
-  if (typeof value !== 'string' || value.length === 0) throw invalidStyle()
+  if (typeof value !== 'string' || value.length === 0) throw createInvalidOptionsError()
   return value
 }
 
@@ -256,9 +275,9 @@ const isReservedForOtherMethod = (
   return eventApiReservedNames.has(value as IEventApiReservedName)
 }
 
-/** Creates the package-owned native error used for every invalid style boundary. */
-const invalidStyle = (): TypeError =>
-  createEventTypeError(
-    EventSubscriberErrorCode.invalidOptions,
-    eventErrorText(EventSubscriberErrorCode.invalidOptions)
-  )
+/** Rejects an immutable existing alias before descriptor installation mutates the source. */
+function validateAliasProperty(surface: object, name: string): void {
+  /** Existing descriptor is inspected once; configurable aliases may be replaced atomically. */
+  const existing = Object.getOwnPropertyDescriptor(surface, name)
+  if (existing && !existing.configurable) throw createInvalidOptionsError()
+}
