@@ -204,7 +204,7 @@ export class StageLanes<TValue> {
   /** Cached version, invalidated only when visible execution can change. */
   #snapshot: IStageSnapshot<TValue> | undefined
   /** Retires the cached version's owner pins after its last execution releases. */
-  #retireSnapshot: (() => void) | undefined
+  #snapshotRetirement: StageSnapshotRetirement<TValue> | undefined
 
   /** Share the Host tracker while retaining this pipeline's independent registration view. */
   constructor(
@@ -261,8 +261,8 @@ export class StageLanes<TValue> {
 
   /** Invalidates the cached execution version after a visible mutation. */
   invalidate(): void {
-    this.#retireSnapshot?.()
-    this.#retireSnapshot = undefined
+    this.#snapshotRetirement?.retire()
+    this.#snapshotRetirement = undefined
     this.#snapshot = undefined
   }
 
@@ -428,8 +428,7 @@ export class StageLanes<TValue> {
     /** Owner pins belong to the immutable version, rather than every execution. */
     const releases = ownerKeys.map((key) => this.leases.retain(key))
     /** Retirement borrows lifecycle rather than building another lease or drain implementation. */
-    const retirement = new StageSnapshotRetirement(this.leases, snapshot, releases)
-    this.#retireSnapshot = () => retirement.retire()
+    this.#snapshotRetirement = new StageSnapshotRetirement(this.leases, snapshot, releases)
     this.#snapshot = snapshot
     return snapshot
   }
