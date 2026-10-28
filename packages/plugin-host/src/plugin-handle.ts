@@ -2,7 +2,7 @@ import { invokeCaptured } from './invocation.js'
 import { PluginHostErrorCode } from './error-code.js'
 import ERROR_TEXT, { PluginHostError } from './error-text.js'
 import type { IRegistration } from './registry.js'
-import type { IPluginConfig } from './typing.js'
+import type { IPluginConfig } from './plugin-lifecycle-types.js'
 
 /** Host-owned access used to keep handles live across replacement generations. */
 type IPluginHandlePort<TDomainCore extends object, TValue> = Readonly<{

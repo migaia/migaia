@@ -5,7 +5,8 @@ import { PluginHost } from './host-runtime.js'
 import { aliasManagedHost } from './composition.js'
 import { readDefinedPluginDefinition } from './define-plugin.js'
 import type { PluginHostError } from './error-text.js'
-import { issueHostIdentity, type IPluginHostIdentity } from './host-identity.js'
+import { issueHostIdentity } from './host-identity.js'
+import { type IPluginHostIdentity } from './host-identity-types.js'
 import type {
   IAsyncGeneratorMiddlewareStage,
   IAsyncMiddlewareStage,
@@ -13,28 +14,26 @@ import type {
   IMiddlewarePipelineMode,
   ISyncMiddlewareStage
 } from '@migaia/middleware-pipeline'
+import type { IPluginConstraint, IPluginHostRuntimeExtensions } from './plugin-definition-types.js'
+import type { IPluginConstraintTuple } from './plugin-inference-types.js'
+import type { IPluginHostCore, IPluginHostCoreTypeInfo } from './plugin-core-types.js'
 import type {
-  IPluginConstraint,
-  IPluginConstraintTuple,
-  IPluginHostCore,
-  IPluginHostCoreTypeInfo,
   IPluginHandle,
   IPluginHandleTuple,
   IPluginRemoval,
   IPluginDependencyMutationOptions,
   IPluginDependencyPlan,
-  IPluginHostDisposalResult,
   IPluginHostConfigFor,
-  IPluginEnablement,
-  IPluginHostOptions,
-  IPluginHostRuntimeExtensions
-} from './typing.js'
+  IPluginEnablement
+} from './plugin-handle-types.js'
+import type { IPluginHostDisposalResult } from './plugin-lifecycle-types.js'
+import type { IPluginHostOptions } from './host-options-types.js'
 
 /** Each qualified name retains its own original payload rather than a union of sibling specs. */
 type IQualifiedPipelines<TPlugin> = TPlugin extends { readonly name: infer TName extends string }
   ? {
-      readonly [K in keyof import('./typing.js').IPluginDeclaredPipelines<TPlugin> &
-        string as `${TName}.${K}`]: import('./typing.js').IPluginDeclaredPipelines<TPlugin>[K]
+      readonly [K in keyof import('./plugin-definition-types.js').IPluginDeclaredPipelines<TPlugin> &
+        string as `${TName}.${K}`]: import('./plugin-definition-types.js').IPluginDeclaredPipelines<TPlugin>[K]
     }
   : Record<never, never>
 
@@ -188,7 +187,7 @@ export type IHostHandle<
             IPluginHostCore<
               TValue,
               Record<PropertyKey, unknown>,
-              import('./typing.js').IPluginConfig,
+              import('./plugin-lifecycle-types.js').IPluginConfig,
               TPipelines
             >,
           TPlugins,
@@ -206,7 +205,7 @@ export type IHostHandle<
             IPluginHostCore<
               TValue,
               Record<PropertyKey, unknown>,
-              import('./typing.js').IPluginConfig,
+              import('./plugin-lifecycle-types.js').IPluginConfig,
               TPipelines
             >,
           TPlugins,

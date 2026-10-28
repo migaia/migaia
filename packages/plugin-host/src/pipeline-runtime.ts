@@ -20,7 +20,7 @@ import type { IDataOrderSlotState } from './composition.js'
 import type { IRegistration } from './registry.js'
 import type { IStageSnapshot, IStageForms, StageLanes } from './stage-lanes.js'
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
-import type { IPluginHostErrorCode } from './typing.js'
+import type { IPluginHostErrorCode } from './error-code.js'
 
 /** Maps canonical runner violations onto the Host diagnostic and coded-error policy. */
 export const createPluginHostPipelineViolationHandler =

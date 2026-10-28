@@ -38,15 +38,15 @@ import type {
   IPluginAdmissionRequest,
   IPluginBatchRemovalOptions,
   IPluginBatchRemovalResult,
-  IPluginConstraint,
   IPluginDataOrderSlot,
-  IPluginHostCore,
-  IPluginHostPhysicalCleanupResult,
   IPluginPreparedAdmissions,
   IPluginPreparedRemovalBatch,
-  IRegistrationToken,
-  IPluginHostDiagnostic
-} from './typing.js'
+  IRegistrationToken
+} from './composition-types.js'
+import type { IPluginConstraint } from './plugin-definition-types.js'
+import type { IPluginHostCore } from './plugin-core-types.js'
+import type { IPluginHostPhysicalCleanupResult } from './plugin-lifecycle-types.js'
+import type { IPluginHostDiagnostic } from './host-options-types.js'
 
 type ICompositionStrictCleanupResult<TRegistration> = ICleanupResult &
   Readonly<{

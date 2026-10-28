@@ -1,4 +1,4 @@
-import type { IPluginDisposer, IPluginResource } from './typing.js'
+import type { IPluginDisposer, IPluginResource } from './plugin-lifecycle-types.js'
 import { asyncDisposeKeys, disposeKeys } from './symbols.js'
 import { invokeCaptured } from './invocation.js'
 

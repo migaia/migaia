@@ -14,12 +14,9 @@ import ERROR_TEXT, {
 } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import type { IPluginDefinition } from './registry.js'
-import type {
-  IPluginConfig,
-  IPluginConstraint,
-  IPluginHostCore,
-  IPluginResource
-} from './typing.js'
+import type { IPluginConfig, IPluginResource } from './plugin-lifecycle-types.js'
+import type { IPluginConstraint } from './plugin-definition-types.js'
+import type { IPluginHostCore } from './plugin-core-types.js'
 
 /** Package-local trusted-definition lookup injected by functional entries only. */
 export type ITrustedDefinitionReader = (value: unknown) => IPluginDefinition<any> | undefined

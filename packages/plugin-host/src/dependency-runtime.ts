@@ -14,7 +14,7 @@ import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-
 import type { IFeatureReference } from './feature-types.js'
 import type { PluginHostState } from './host-state.js'
 import type { IInstallEntry, IPluginDefinition, IRegistration } from './registry.js'
-import type { IPluginDependencyPlan } from './typing.js'
+import type { IPluginDependencyPlan } from './plugin-handle-types.js'
 
 /** Graph ownership stays in capability; this module only adapts plugin definitions and errors. */
 

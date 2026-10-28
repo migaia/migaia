@@ -4,11 +4,11 @@ import type {
   IPluginDataOrderSlot,
   IPluginHostCompositionIntegration,
   IPluginAdmissionRequest,
-  IPluginHostPhysicalCleanupResult,
   IPluginPreparedAdmissions,
   IPluginPreparedRemovalBatch,
   IRegistrationToken
-} from './typing.js'
+} from './composition-types.js'
+import type { IPluginHostPhysicalCleanupResult } from './plugin-lifecycle-types.js'
 import { createPluginHostExtensionPublication } from './publication.js'
 import { PluginHostErrorCode } from './error-code.js'
 import type { IPluginHostCompositionRuntimePort } from './composition-runtime.js'

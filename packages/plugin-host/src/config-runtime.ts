@@ -11,7 +11,9 @@ import ERROR_TEXT, {
 import { PluginHostErrorCode } from './error-code.js'
 import { invokeCaptured } from './invocation.js'
 import type { IRegistration } from './registry.js'
-import type { IPluginConfig, IPluginConstraint, IPluginHostConfigFor } from './typing.js'
+import type { IPluginConfig } from './plugin-lifecycle-types.js'
+import type { IPluginConstraint } from './plugin-definition-types.js'
+import type { IPluginHostConfigFor } from './plugin-handle-types.js'
 
 type IPluginHostConfigRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   /** Host-owned synchronous hook boundary, without changing the update result identity. */

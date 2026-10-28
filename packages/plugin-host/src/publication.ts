@@ -1,11 +1,9 @@
 import { invokeCaptured } from './invocation.js'
 import type { IRegistration } from './registry.js'
-import type {
-  IPluginConfig,
-  IPluginConstraint,
-  IPluginHostConfigFor,
-  IPluginHostCompositionSnapshot
-} from './typing.js'
+import type { IPluginConfig } from './plugin-lifecycle-types.js'
+import type { IPluginConstraint } from './plugin-definition-types.js'
+import type { IPluginHostConfigFor } from './plugin-handle-types.js'
+import type { IPluginHostCompositionSnapshot } from './composition-types.js'
 
 /** Host callbacks needed to materialize a view without transferring lifecycle ownership. */
 type IPluginHostPublicationPort<THost, TDomainCore extends object, TValue> = Readonly<{

@@ -1,9 +1,6 @@
-import type {
-  IPluginConfig,
-  IPluginConstraint,
-  IPluginDisposer,
-  IPluginHostCore
-} from './typing.js'
+import type { IPluginConfig, IPluginDisposer } from './plugin-lifecycle-types.js'
+import type { IPluginConstraint } from './plugin-definition-types.js'
+import type { IPluginHostCore } from './plugin-core-types.js'
 import type {
   IAbortController,
   IGenerationRequest,
@@ -20,7 +17,7 @@ export type IPluginDefinition<TCore> = {
   readonly config: IPluginConfig
   readonly install: IPluginConstraint<TCore>['install']
   /** Captured preparation hook; absent on the one-argument installation path. */
-  readonly setup?: (context: import('./typing.js').IPluginSetupContext) => unknown
+  readonly setup?: (context: import('./plugin-lifecycle-types.js').IPluginSetupContext) => unknown
   readonly update?: IPluginConstraint<TCore>['update']
   readonly onEnable?: IPluginConstraint<TCore>['onEnable']
   readonly onDisable?: IPluginConstraint<TCore>['onDisable']

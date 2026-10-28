@@ -17,7 +17,8 @@ import { PluginHostErrorCode } from './error-code.js'
 import type { IInstallBatchContext } from './install-runtime.js'
 import type { IRegistration } from './registry.js'
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
-import type { IPluginHostCore, IPluginResource } from './typing.js'
+import type { IPluginHostCore } from './plugin-core-types.js'
+import type { IPluginResource } from './plugin-lifecycle-types.js'
 import type { IHostCoreConstructionRequest } from './define-host.js'
 
 type IPluginHostCoreRuntimePort<TDomainCore extends object, TValue> = Readonly<{

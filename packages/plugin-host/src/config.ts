@@ -5,7 +5,8 @@ import ERROR_TEXT, {
 } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import { parseConfigPath as parseUtilsConfigPath } from '@migaia/utils/config'
-import type { IPluginConfig, IPluginHostErrorCode } from './typing.js'
+import type { IPluginConfig } from './plugin-lifecycle-types.js'
+import type { IPluginHostErrorCode } from './error-code.js'
 
 const dangerousKeys = new Set(['__proto__', 'constructor', 'prototype'])
 export const readPlainDataRecord = (

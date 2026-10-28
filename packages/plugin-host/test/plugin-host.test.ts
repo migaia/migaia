@@ -13,7 +13,9 @@ import {
   readPluginHostDisposalProvenance
 } from '../src/index.js'
 import * as pluginHostPublic from '../src/index.js'
-import type { IPluginConstraint, IPluginHostCore, IPluginHostOptions } from '../src/typing'
+import type { IPluginConstraint } from '../src/plugin-definition-types.js'
+import type { IPluginHostCore } from '../src/plugin-core-types.js'
+import type { IPluginHostOptions } from '../src/host-options-types.js'
 import {
   createPipeline,
   GENERATOR_CONTINUE as middlewareContinue,
@@ -25,7 +27,7 @@ import {
   GENERATOR_CONTINUE as hostContinue,
   GENERATOR_HALT as hostHalt,
   GENERATOR_UNDEFINED as hostUndefined
-} from '../src/typing'
+} from '@migaia/middleware-pipeline'
 import { PluginHostRemovalRuntime } from '../src/removal-runtime.js'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { openComposition } from '../src/composition-entry.js'

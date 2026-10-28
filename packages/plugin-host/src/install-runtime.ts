@@ -37,13 +37,9 @@ import type {
   IPluginDescriptor,
   IRegistration
 } from './registry.js'
-import type {
-  IPluginHostCore,
-  IPluginInstallFailureDetail,
-  IPluginHostDiagnostic,
-  IPluginResource,
-  IPluginSetupContext
-} from './typing.js'
+import type { IPluginHostCore } from './plugin-core-types.js'
+import type { IPluginInstallFailureDetail, IPluginHostDiagnostic } from './host-options-types.js'
+import type { IPluginResource, IPluginSetupContext } from './plugin-lifecycle-types.js'
 
 /** Candidate registries held privately until one install batch reaches its commit point. */
 export type IInstallBatchContext<TDomainCore extends object, TValue> = {

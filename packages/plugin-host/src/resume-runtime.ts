@@ -12,7 +12,7 @@ import ERROR_TEXT, { PluginHostError } from './error-text.js'
 import type { PluginHostState } from './host-state.js'
 import type { PluginHostInstallRuntime } from './install-runtime.js'
 import type { IRegistration } from './registry.js'
-import type { IPluginHostDiagnostic } from './typing.js'
+import type { IPluginHostDiagnostic } from './host-options-types.js'
 import type { PluginHostOperationRuntime } from './operation-runtime.js'
 
 /** Host authority used to resume suspended registrations after a provider becomes available. */

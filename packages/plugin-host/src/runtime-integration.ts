@@ -7,7 +7,7 @@
 import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
-import type { IPluginHostIdentity } from './host-identity.js'
+import type { IPluginHostIdentity } from './host-identity-types.js'
 import type { PluginHostState } from './host-state.js'
 import type { PluginHostOperationRuntime } from './operation-runtime.js'
 import type { IInstallBatchContext } from './install-runtime.js'

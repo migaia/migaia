@@ -12,13 +12,10 @@ import ERROR_TEXT, { PluginHostError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import type { PluginHostState } from './host-state.js'
 import type { IRegistration } from './registry.js'
-import type {
-  IPluginConstraint,
-  IPluginEnablement,
-  IPluginDependencyMutationOptions,
-  IPluginRegistrationContext,
-  IPluginHostDiagnostic
-} from './typing.js'
+import type { IPluginConstraint } from './plugin-definition-types.js'
+import type { IPluginEnablement, IPluginDependencyMutationOptions } from './plugin-handle-types.js'
+import type { IPluginRegistrationContext } from './plugin-lifecycle-types.js'
+import type { IPluginHostDiagnostic } from './host-options-types.js'
 import {
   admitDependencyMutationOptions,
   findUnavailableProvider,

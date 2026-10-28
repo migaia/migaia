@@ -14,7 +14,10 @@ import { invokeCaptured } from './invocation.js'
 import type { IRegistration } from './registry.js'
 import { PluginHostCleanupMode, PluginHostRegistrationLifecycle } from './state-constants.js'
 import { markRegistrationRevoked } from './composition.js'
-import type { IPluginBeforeReleaseContext, IPluginDisposalContext } from './typing.js'
+import type {
+  IPluginBeforeReleaseContext,
+  IPluginDisposalContext
+} from './plugin-lifecycle-types.js'
 
 type IPluginHostRemovalRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   /** Host-owned synchronous hook boundary, independent of the asynchronous cleanup wait. */

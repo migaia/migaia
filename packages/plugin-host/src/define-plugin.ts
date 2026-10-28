@@ -21,10 +21,10 @@ import type {
   IDefinedPluginConstraint,
   IPlugin,
   IPluginCommon,
-  IPluginConfig,
   IPluginConstraint,
   IPluginSetupHooks
-} from './typing.js'
+} from './plugin-definition-types.js'
+import type { IPluginConfig } from './plugin-lifecycle-types.js'
 
 type IStoredDefinition = IPluginDefinition<any>
 
@@ -290,7 +290,7 @@ const createDefinition = <TPlugin extends IPluginConstraint<any>>(
       : copyConfig(fields.rawConfig as IPluginConfig, 'plugin config')
   const plugin = createFrozenPlugin(source, fields, featureRecord, ownedConfig, metadata)
   const disposer = snapshotDisposer(
-    plugin as unknown as import('./typing.js').IPluginResource
+    plugin as unknown as import('./plugin-lifecycle-types.js').IPluginResource
   ).disposer
   const definition: IStoredDefinition = {
     owner: plugin as unknown as IPluginConstraint<any>,
@@ -339,7 +339,7 @@ export function definePlugin<
   name: TName,
   descriptorFactory: (
     core: TCore &
-      import('./typing.js').IPluginHostCore<TValue> &
+      import('./plugin-core-types.js').IPluginHostCore<TValue> &
       Readonly<{ readonly features: IFeatureOutputs<TFeatures>; readonly featureExpose: TExpose }>
   ) => IPluginDescriptor<TExtension, TPublic, TExpose, TShared> &
     (keyof IFeatureRecordRequiredExpose<TFeatures> extends never
@@ -381,16 +381,16 @@ export function definePlugin<
 >(
   definition: IPluginCommon<
     TCore &
-      import('./typing.js').IPluginHostCore<TValue> &
-      import('./typing.js').IPluginPipelineCore<TPipelines, TFeatures>,
+      import('./plugin-core-types.js').IPluginHostCore<TValue> &
+      import('./plugin-core-types.js').IPluginPipelineCore<TPipelines, TFeatures>,
     TConfig,
     TFeatures,
     TExpose
   > &
     IPluginSetupHooks<
       TCore &
-        import('./typing.js').IPluginHostCore<TValue> &
-        import('./typing.js').IPluginPipelineCore<TPipelines, TFeatures>,
+        import('./plugin-core-types.js').IPluginHostCore<TValue> &
+        import('./plugin-core-types.js').IPluginPipelineCore<TPipelines, TFeatures>,
       TExtension,
       TConfig,
       TFeatures,
@@ -433,8 +433,8 @@ export function definePlugin<
 >(
   definition: IPlugin<
     TCore &
-      import('./typing.js').IPluginHostCore<TValue> &
-      import('./typing.js').IPluginPipelineCore<TPipelines, TFeatures>,
+      import('./plugin-core-types.js').IPluginHostCore<TValue> &
+      import('./plugin-core-types.js').IPluginPipelineCore<TPipelines, TFeatures>,
     TExtension,
     TConfig,
     TShared,

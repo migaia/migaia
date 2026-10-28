@@ -15,11 +15,11 @@ import {
 import type {
   IPluginConfig,
   IPluginResource,
-  IPluginHostCore,
   IPluginOperationContext,
   IPluginRegistrationContext,
   IReadonlyConfig
-} from './typing.js'
+} from './plugin-lifecycle-types.js'
+import type { IPluginHostCore } from './plugin-core-types.js'
 import type { IRegistration } from './registry.js'
 
 /** Registration-scoped publication stages exact receipts in the original install batch. */

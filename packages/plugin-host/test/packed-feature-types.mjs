@@ -351,7 +351,7 @@ runDeclarationMutation(
 runDeclarationMutation(
   'native',
   fixtures.native,
-  join(packageDirectory, 'dist/typing.d.ts'),
+  join(packageDirectory, 'dist/plugin-inference-types.d.ts'),
   'TRequired extends Record<string, never> ? unknown : TCore extends TRequired ? unknown : never',
   'unknown',
   [

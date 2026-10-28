@@ -4,9 +4,9 @@ export { inspectFeatures } from './feature-runtime.js'
 import type {
   IRegistrationToken,
   IRegistrationView,
-  IPluginConstraint,
   IPluginHostCompositionIntegration
-} from './typing.js'
+} from './composition-types.js'
+import type { IPluginConstraint } from './plugin-definition-types.js'
 
 /**
  * Creates a narrow extension view for an exact committed registration token, rather than a
@@ -24,6 +24,6 @@ export { isManagedHost } from './composition.js'
 export const openComposition = (target: object): IPluginHostCompositionIntegration<object> =>
   openManagedComposition(target, (port) => new PluginHostCompositionRuntime(port))
 
-export type { IRegistrationToken, IRegistrationView } from './typing.js'
-export type { IPluginHostCompositionIntegration } from './typing.js'
-export type { IPluginHostCompositionSnapshot } from './typing.js'
+export type { IRegistrationToken, IRegistrationView } from './composition-types.js'
+export type { IPluginHostCompositionIntegration } from './composition-types.js'
+export type { IPluginHostCompositionSnapshot } from './composition-types.js'

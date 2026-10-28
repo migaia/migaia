@@ -13,7 +13,8 @@ import {
 import type { IScheduler } from '@migaia/utils/scheduler'
 import ERROR_TEXT, { PluginHostError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
-import type { IPluginHostDiagnostic, IPluginHostDisposalResult } from './typing.js'
+import type { IPluginHostDiagnostic } from './host-options-types.js'
+import type { IPluginHostDisposalResult } from './plugin-lifecycle-types.js'
 
 type IPluginHostDisposalRuntimePort<TRegistration> = Readonly<{
   readonly terminal: ITerminalController

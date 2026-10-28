@@ -1,12 +1,7 @@
 import ERROR_TEXT, { createPluginHostTypeError } from './error-text.js'
 
-/** Public, immutable identity assigned by this module to one Host surface. */
-export type IPluginHostIdentity = Readonly<{
-  /** Human-readable label supplied by the caller, or `DEFAULT` when omitted. */
-  readonly name: string
-  /** Process-local identifier issued from this module's monotonic sequence. */
-  readonly id: string
-}>
+import type { IPluginHostIdentity } from './host-identity-types.js'
+export type { IPluginHostIdentity } from './host-identity-types.js'
 
 /** Module-private identity authority; entries disappear with their Host targets. */
 const identities = new WeakMap<

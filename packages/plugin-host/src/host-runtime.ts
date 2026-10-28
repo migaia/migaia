@@ -7,7 +7,8 @@ import ERROR_TEXT, {
   tagPluginHostError,
   PluginHostInternalText
 } from './error-text.js'
-import { issueHostIdentity, readHostNodeId, type IPluginHostIdentity } from './host-identity.js'
+import { issueHostIdentity, readHostNodeId } from './host-identity.js'
+import { type IPluginHostIdentity } from './host-identity-types.js'
 import {
   preflightPluginDefinitions,
   snapshotPluginDefinitions,
@@ -88,23 +89,20 @@ import {
 } from './dependency-runtime.js'
 import { PluginHostRegistrationLifecycle } from './state-constants.js'
 import type { IRegistration } from './registry.js'
+import type { pluginHostCoreTypes, IPluginHostCore } from './plugin-core-types.js'
+import type { IPluginConstraint } from './plugin-definition-types.js'
+import type { IPluginConstraintTuple, IUniquePluginNames } from './plugin-inference-types.js'
 import type {
-  pluginHostCoreTypes,
-  IPluginConstraint,
-  IPluginConstraintTuple,
-  IPluginHostCore,
   IPluginHostConfigFor,
-  IPluginHostDiagnostic,
   IPluginHandle,
   IPluginHandleTuple,
-  IUniquePluginNames,
   IPluginDependencyMutationOptions,
   IPluginDependencyPlan,
   IPluginRemoval,
-  IPluginHostCompositionSnapshot,
-  IPluginHostOptions,
   IPluginEnablement
-} from './typing.js'
+} from './plugin-handle-types.js'
+import type { IPluginHostDiagnostic, IPluginHostOptions } from './host-options-types.js'
+import type { IPluginHostCompositionSnapshot } from './composition-types.js'
 
 /** Type-only invariant marker that preserves constructor-installed tuples through subclasses. */
 declare const installedPluginsBrand: unique symbol
@@ -1221,7 +1219,7 @@ class PluginHostConstructor<
    * is exposed through physicalCompletion rather than treated as forcibly stopped. Cleanup failure
    * does not reopen the Host. Functional defineHost middleware can separately reject its chain.
    */
-  dispose(): Promise<import('./typing.js').IPluginHostDisposalResult> {
+  dispose(): Promise<import('./plugin-lifecycle-types.js').IPluginHostDisposalResult> {
     return this.#hostDisposalRuntime.dispose()
   }
 }

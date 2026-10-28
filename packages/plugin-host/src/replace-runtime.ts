@@ -8,7 +8,7 @@ import ERROR_TEXT, { PluginHostError } from './error-text.js'
 import type { PluginHostState } from './host-state.js'
 import type { IInstallBatchContext, PluginHostInstallRuntime } from './install-runtime.js'
 import type { IInstallEntry, IRegistration } from './registry.js'
-import type { IPluginHostDiagnostic } from './typing.js'
+import type { IPluginHostDiagnostic } from './host-options-types.js'
 import type { PluginHostOperationRuntime } from './operation-runtime.js'
 
 /** Narrow Host authority used by one replacement transaction; every call runs inside the queue. */

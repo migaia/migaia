@@ -3,7 +3,8 @@ import type { INativeAbortSignal } from '@migaia/utils/promise'
 import type { IAbortController } from '@migaia/lifecycle/abort'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import type { IRegistration } from './registry.js'
-import type { IPluginHostCore, IPluginHostDiagnostic } from './typing.js'
+import type { IPluginHostCore } from './plugin-core-types.js'
+import type { IPluginHostDiagnostic } from './host-options-types.js'
 
 /** Host authority needed by setup; the registration remains owned by its install transaction. */
 export type IPluginSetupPort = Readonly<{

@@ -6,7 +6,7 @@ import ERROR_TEXT, {
 } from './error-text.js'
 import { asyncDisposeKey, disposeKeys } from './symbols.js'
 import { PluginHostErrorCode } from './error-code.js'
-import type { IPluginHostErrorCode } from './typing.js'
+import type { IPluginHostErrorCode } from './error-code.js'
 import type { IExtensionOwner, ISharedExtensionSlot } from './registry.js'
 
 /** Family discrimination belongs to the canonical extension owner, leaving registry types erased. */
