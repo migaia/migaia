@@ -1,3 +1,7 @@
+/**
+ * Owns failure-contained trace emission and immutable diagnostic node snapshots. It never changes
+ * graph admission, lifecycle outcomes, or primary errors when a diagnostic clock or sink fails.
+ */
 import type {
   IObservable,
   IObserver,
@@ -7,10 +11,14 @@ import type {
   IRuntimeNodeKind,
   IRuntimeTraceEvent
 } from './types.ts'
-import { ReactiveTracePhase, ReactiveTraceType } from './trace-constants.ts'
+import { ReactiveNodeKind, ReactiveTracePhase, ReactiveTraceType } from './trace-constants.ts'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 
-type INodeRole = 'observable' | 'observer'
+/** Describing one graph role can discover a computed's other role through native membership. */
+type INodeRole = Exclude<ReactiveNodeKind, typeof ReactiveNodeKind.computed>
+
+/** Stable namespace used by every generated diagnostic node identity. */
+const NODE_ID_PREFIX = 'reactive:'
 
 /** Host callbacks used to contain every trace clock and sink failure at the diagnostic boundary. */
 export type ITraceDiagnosticHost = {
@@ -31,14 +39,18 @@ export type IObserverRunTrace = {
   error(error: unknown): void
 }
 
+/** Cached node identities are weak so diagnostics never retain a disposed graph. */
 const nodeDescriptors = new WeakMap<object, IRuntimeNodeDescriptor>()
+/** Frozen public copies preserve identity without publishing mutable or hostile inputs. */
 const copiedDescriptors = new WeakMap<object, IRuntimeNodeDescriptor>()
+/** Monotonic diagnostic identities correlate nodes without consuming the runtime value clock. */
 let nextNodeId = 1
 
+/** The allowed descriptor kinds are fixed by the three runtime node roles. */
 const NODE_KINDS: ReadonlySet<string> = new Set<IRuntimeNodeKind>([
-  'observable',
-  'observer',
-  'computed'
+  ReactiveNodeKind.observable,
+  ReactiveNodeKind.observer,
+  ReactiveNodeKind.computed
 ])
 
 /**
@@ -86,6 +98,7 @@ export function emitTraceSafely(
   createEvent: (timestamp: number) => IRuntimeTraceEvent,
   fallbackTimestamp = 0
 ): void {
+  /** Clock failures are reported before the sink receives its fallback timestamp. */
   const timestamp = readDiagnosticClock(host.timestamp, fallbackTimestamp, (error) =>
     reportDiagnosticFailure(host, error)
   )
@@ -96,85 +109,105 @@ export function emitTraceSafely(
   }
 }
 
-/**
- * Creates a failure-contained observer-run trace span. Clock and sink failures are reported through
- * the existing diagnostic boundary, while fallback samples preserve a terminal event and never
- * replace the observer's primary error or lifecycle result.
- */
+/** Owns one observer-run span while its public handle retains the original plain-object shape. */
+class ObserverRunTrace {
+  /** Descriptor identity is shared by every event in this observer's span. */
+  readonly #observer: IRuntimeNodeDescriptor
+  /** The original host retains dynamic clock and sink property reads at their existing points. */
+  readonly #host: IObserverRunTraceHost
+  /** Records the single start admission before clocks or listeners can reenter. */
+  #started = false
+  /** Commits terminal admission before clocks or listeners can attempt another terminal event. */
+  #terminal = false
+  /** Last monotonic start sample supplies duration and the terminal-clock fallback. */
+  #startedAt = 0
+  /** Last timestamp sample supplies the terminal event's fallback timestamp. */
+  #startedTimestamp = 0
+  /** One stable reporter avoids allocating another closure for each diagnostic clock sample. */
+  readonly #reportFailure = (error: unknown): void => reportDiagnosticFailure(this.#host, error)
+
+  /** Retains the observer and host without reading any diagnostic clock or sink during creation. */
+  constructor(observer: IRuntimeNodeDescriptor, host: IObserverRunTraceHost) {
+    this.#observer = observer
+    this.#host = host
+  }
+
+  /** Preserves own method keys, descriptors, prototype, and detached-call behavior of the handle. */
+  createHandle(): IObserverRunTrace {
+    return {
+      start: () => this.#start(),
+      end: () => this.#end(),
+      error: (error) => this.#error(error)
+    }
+  }
+
+  /** Contains sink failures without replacing the observer's primary result or exception. */
+  #emit(event: IRuntimeTraceEvent): void {
+    try {
+      this.#host.emitTrace(event)
+    } catch (error) {
+      this.#reportFailure(error)
+    }
+  }
+
+  /** Attempts one start event, sampling monotonic time before its event timestamp. */
+  #start(): void {
+    if (this.#started) return
+    this.#started = true
+    this.#startedAt = readDiagnosticClock(this.#host.now, 0, this.#reportFailure)
+    this.#startedTimestamp = readDiagnosticClock(this.#host.timestamp, 0, this.#reportFailure)
+    this.#emit({
+      type: ReactiveTraceType.observerRun,
+      timestamp: this.#startedTimestamp,
+      phase: ReactiveTracePhase.start,
+      observer: this.#observer
+    })
+  }
+
+  /** Attempts one successful terminal event and preserves timestamp-before-duration sampling. */
+  #end(): void {
+    if (!this.#started || this.#terminal) return
+    this.#terminal = true
+    this.#emit({
+      type: ReactiveTraceType.observerRun,
+      timestamp: readDiagnosticClock(
+        this.#host.timestamp,
+        this.#startedTimestamp,
+        this.#reportFailure
+      ),
+      phase: ReactiveTracePhase.end,
+      observer: this.#observer,
+      durationMs:
+        readDiagnosticClock(this.#host.now, this.#startedAt, this.#reportFailure) - this.#startedAt
+    })
+  }
+
+  /** Attempts one failed terminal event while retaining the caller's original error identity. */
+  #error(primaryError: unknown): void {
+    if (!this.#started || this.#terminal) return
+    this.#terminal = true
+    this.#emit({
+      type: ReactiveTraceType.observerRun,
+      timestamp: readDiagnosticClock(
+        this.#host.timestamp,
+        this.#startedTimestamp,
+        this.#reportFailure
+      ),
+      phase: ReactiveTracePhase.error,
+      observer: this.#observer,
+      durationMs:
+        readDiagnosticClock(this.#host.now, this.#startedAt, this.#reportFailure) - this.#startedAt,
+      error: primaryError
+    })
+  }
+}
+
+/** Constructs a failure-contained observer span without changing its public handle's shape. */
 export function createObserverRunTrace(
   observer: IRuntimeNodeDescriptor,
   host: IObserverRunTraceHost
 ): IObserverRunTrace {
-  /** Reports a diagnostic failure without allowing a failing reporter to escape this boundary. */
-  const reportFailure = (error: unknown): void => {
-    reportDiagnosticFailure(host, error)
-  }
-
-  /** Reads one diagnostic clock and reports failures before returning its fallback sample. */
-  const readClock = (read: () => number, fallback: number): number => {
-    return readDiagnosticClock(read, fallback, reportFailure)
-  }
-
-  /** Attempts one trace emission and reports failures without changing observer control flow. */
-  const emit = (event: IRuntimeTraceEvent): void => {
-    try {
-      host.emitTrace(event)
-    } catch (error) {
-      reportFailure(error)
-    }
-  }
-
-  /** Tracks whether this controller attempted its single start emission. */
-  let started = false
-  /** Prevents catch/finally or reentrant callers from emitting two terminal events. */
-  let terminal = false
-  /** Last valid monotonic sample used to calculate or recover terminal duration. */
-  let startedAt = 0
-  /** Last valid event timestamp used to recover terminal event timestamps. */
-  let startedTimestamp = 0
-
-  /** Emits exactly one start event, using zero when either start clock is unavailable. */
-  const start = (): void => {
-    if (started) return
-    started = true
-    startedAt = readClock(host.now, 0)
-    startedTimestamp = readClock(host.timestamp, 0)
-    emit({
-      type: ReactiveTraceType.observerRun,
-      timestamp: startedTimestamp,
-      phase: ReactiveTracePhase.start,
-      observer
-    })
-  }
-
-  /** Emits one successful terminal event and ignores later terminal attempts. */
-  const end = (): void => {
-    if (!started || terminal) return
-    terminal = true
-    emit({
-      type: ReactiveTraceType.observerRun,
-      timestamp: readClock(host.timestamp, startedTimestamp),
-      phase: ReactiveTracePhase.end,
-      observer,
-      durationMs: readClock(host.now, startedAt) - startedAt
-    })
-  }
-
-  /** Emits one error terminal event while preserving the caller's original error identity. */
-  const error = (primaryError: unknown): void => {
-    if (!started || terminal) return
-    terminal = true
-    emit({
-      type: ReactiveTraceType.observerRun,
-      timestamp: readClock(host.timestamp, startedTimestamp),
-      phase: ReactiveTracePhase.error,
-      observer,
-      durationMs: readClock(host.now, startedAt) - startedAt,
-      error: primaryError
-    })
-  }
-
-  return { start, end, error }
+  return new ObserverRunTrace(observer, host).createHandle()
 }
 
 /**
@@ -184,8 +217,10 @@ export function createObserverRunTrace(
  * `id`, while diagnostics never expose the mutable node.
  */
 function describeNode(node: object, role: INodeRole): IRuntimeNodeDescriptor {
+  /** A graph node keeps the same frozen diagnostic identity across every publication. */
   const existing = nodeDescriptors.get(node)
   if (existing) return existing
+  /** Capture metadata without invoking a user-defined debugName getter. */
   let descriptors: PropertyDescriptorMap
   try {
     descriptors = Object.getOwnPropertyDescriptors(node)
@@ -195,15 +230,25 @@ function describeNode(node: object, role: INodeRole): IRuntimeNodeDescriptor {
   // `subs`/`deps` are intentionally accessors on built-in nodes so callers
   // cannot mutate the graph through a public Set. Use membership rather than
   // own-property descriptors; prototype accessors still identify the role.
-  const observable = role === 'observable' || 'subs' in node
-  const observer = role === 'observer' || 'deps' in node
+  /** Explicit role or graph membership identifies the observable half of a computed. */
+  const observable = role === ReactiveNodeKind.observable || 'subs' in node
+  /** Explicit role or graph membership identifies the observer half of a computed. */
+  const observer = role === ReactiveNodeKind.observer || 'deps' in node
+  /** Dual-role nodes publish one computed identity rather than separate graph descriptors. */
   const kind: IRuntimeNodeKind =
-    observable && observer ? 'computed' : observable ? 'observable' : 'observer'
+    observable && observer
+      ? ReactiveNodeKind.computed
+      : observable
+        ? ReactiveNodeKind.observable
+        : ReactiveNodeKind.observer
+  /** Only an own data label can cross the diagnostic boundary without running user code. */
   const debugNameDescriptor = descriptors.debugName
+  /** Non-string metadata is omitted rather than coerced through user callbacks. */
   const debugName =
     debugNameDescriptor && 'value' in debugNameDescriptor ? debugNameDescriptor.value : undefined
+  /** Immutable public metadata exposes identity and label, never mutable graph authority. */
   const descriptor = Object.freeze({
-    id: `reactive:${nextNodeId++}`,
+    id: `${NODE_ID_PREFIX}${nextNodeId++}`,
     kind,
     ...(typeof debugName === 'string' ? { debugName } : {})
   })
@@ -211,34 +256,45 @@ function describeNode(node: object, role: INodeRole): IRuntimeNodeDescriptor {
   return descriptor
 }
 
+/** Describes the observable graph role without exposing its mutable subscriber collection. */
 export const describeObservable = (observable: IObservable): IRuntimeNodeDescriptor =>
-  describeNode(observable, 'observable')
+  describeNode(observable, ReactiveNodeKind.observable)
 
+/** Describes the observer graph role without exposing its mutable dependency collection. */
 export const describeObserver = (observer: IObserver): IRuntimeNodeDescriptor =>
-  describeNode(observer, 'observer')
+  describeNode(observer, ReactiveNodeKind.observer)
+
+/** Reads a captured own data property without evaluating accessors on untrusted descriptors. */
+function descriptorDataValue(properties: PropertyDescriptorMap, name: string): unknown {
+  /** Reflection already captured this descriptor; inspecting it cannot invoke the original getter. */
+  const descriptor = properties[name]
+  return descriptor && 'value' in descriptor ? descriptor.value : undefined
+}
 
 /** Copy untrusted descriptors before publishing them to diagnostic callbacks. */
 function sanitizeDescriptor(value: unknown, role: INodeRole): IRuntimeNodeDescriptor {
   if (typeof value !== 'object' || value === null) {
     return anonymousDescriptor(role)
   }
+  /** Previously described raw nodes must reuse their canonical identity before copying. */
   const internal = nodeDescriptors.get(value)
   if (internal) return sanitizeDescriptor(internal, role)
+  /** Repeated sanitization preserves the same frozen snapshot for the same input object. */
   const copied = copiedDescriptors.get(value)
   if (copied) return copied
+  /** Reflection captures descriptor data while leaving accessor properties unevaluated. */
   let properties: PropertyDescriptorMap
   try {
     properties = Object.getOwnPropertyDescriptors(value)
   } catch {
     return anonymousDescriptor(role)
   }
-  const dataValue = (name: string): unknown => {
-    const descriptor = properties[name]
-    return descriptor && 'value' in descriptor ? descriptor.value : undefined
-  }
-  const id = dataValue('id')
-  const kind = dataValue('kind')
-  const debugName = dataValue('debugName')
+  /** Stable own data values are copied without evaluating hostile descriptor getters. */
+  const id = descriptorDataValue(properties, 'id')
+  /** The discriminant is checked against the finite diagnostic node-kind contract below. */
+  const kind = descriptorDataValue(properties, 'kind')
+  /** Only string labels survive the public diagnostic snapshot. */
+  const debugName = descriptorDataValue(properties, 'debugName')
   // A raw reactive node has no public id. Describe it instead of copying any
   // internal fields, which also hardens direct JS calls to emitTrace/reportError.
   if (typeof id !== 'string' || typeof kind !== 'string' || !NODE_KINDS.has(kind)) {
@@ -248,6 +304,7 @@ function sanitizeDescriptor(value: unknown, role: INodeRole): IRuntimeNodeDescri
       return anonymousDescriptor(role)
     }
   }
+  /** Immutable public metadata exposes identity and label, never mutable graph authority. */
   const descriptor = Object.freeze({
     id,
     kind: kind as IRuntimeNodeKind,
@@ -260,7 +317,7 @@ function sanitizeDescriptor(value: unknown, role: INodeRole): IRuntimeNodeDescri
 /** Metadata poisoning must degrade diagnostics, never suppress the error. */
 function anonymousDescriptor(role: INodeRole): IRuntimeNodeDescriptor {
   return Object.freeze({
-    id: `reactive:${nextNodeId++}`,
+    id: `${NODE_ID_PREFIX}${nextNodeId++}`,
     kind: role
   })
 }
@@ -268,32 +325,32 @@ function anonymousDescriptor(role: INodeRole): IRuntimeNodeDescriptor {
 /** Normalize a public trace event into an immutable, graph-safe snapshot. */
 export function sanitizeTraceEvent(event: IRuntimeTraceEvent): IRuntimeTraceEvent {
   switch (event.type) {
-    case 'observable-change':
+    case ReactiveTraceType.observableChange:
       return Object.freeze({
         type: event.type,
         timestamp: event.timestamp,
-        observable: sanitizeDescriptor(event.observable, 'observable'),
+        observable: sanitizeDescriptor(event.observable, ReactiveNodeKind.observable),
         reason: event.reason
       })
-    case 'dependency':
+    case ReactiveTraceType.dependency:
       return Object.freeze({
         type: event.type,
         timestamp: event.timestamp,
         phase: event.phase,
-        observable: sanitizeDescriptor(event.observable, 'observable'),
-        observer: sanitizeDescriptor(event.observer, 'observer'),
+        observable: sanitizeDescriptor(event.observable, ReactiveNodeKind.observable),
+        observer: sanitizeDescriptor(event.observer, ReactiveNodeKind.observer),
         ...(event.reason === undefined ? {} : { reason: event.reason })
       })
-    case 'observer-run':
+    case ReactiveTraceType.observerRun:
       return Object.freeze({
         type: event.type,
         timestamp: event.timestamp,
         phase: event.phase,
-        observer: sanitizeDescriptor(event.observer, 'observer'),
+        observer: sanitizeDescriptor(event.observer, ReactiveNodeKind.observer),
         ...(event.durationMs === undefined ? {} : { durationMs: event.durationMs }),
         ...(event.error === undefined ? {} : { error: event.error })
       })
-    case 'action':
+    case ReactiveTraceType.action:
       return Object.freeze({
         type: event.type,
         timestamp: event.timestamp,
@@ -312,12 +369,12 @@ export function sanitizeErrorContext(context: IRuntimeErrorReportContext): IRunt
     ...(context.observer === undefined
       ? {}
       : {
-          observer: sanitizeDescriptor(context.observer, 'observer')
+          observer: sanitizeDescriptor(context.observer, ReactiveNodeKind.observer)
         }),
     ...(context.observable === undefined
       ? {}
       : {
-          observable: sanitizeDescriptor(context.observable, 'observable')
+          observable: sanitizeDescriptor(context.observable, ReactiveNodeKind.observable)
         })
   })
 }
