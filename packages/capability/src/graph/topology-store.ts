@@ -20,7 +20,6 @@ export type IKeyedStore<K, V> = {
   delete(key: K): boolean
   keys(): IterableIterator<K>
   values(): IterableIterator<V>
-  [Symbol.iterator](): IterableIterator<[K, V]>
 }
 
 /** Marks a key an overlay removed from its base store. */
@@ -95,21 +94,10 @@ export class OverlayStore<K, V> implements IKeyedStore<K, V> {
     for (const key of this.keys()) yield this.get(key)!
   }
 
-  /** Iterates visible pairs without copying the base or overlay collection. */
-  *[Symbol.iterator](): IterableIterator<[K, V]> {
-    for (const key of this.keys()) yield [key, this.get(key)!]
-  }
-
-  /** Applies only written keys; the optional adopter settles nested value overlays at commit. */
-  applyTo(target: IKeyedStore<K, V>, adoptValue?: (value: V) => V): void {
+  /** Applies each written key once in O(K); ordered bucket copies are published as complete values. */
+  applyTo(target: IKeyedStore<K, V>): void {
     for (const [key, value] of this.#own)
       if (value === REMOVED) target.delete(key)
-      else target.set(key, adoptValue ? adoptValue(value) : value)
-  }
-
-  /** Settles a nested bucket into its base so later transactions never build overlay chains. */
-  commitToBase(): IKeyedStore<K, V> {
-    this.applyTo(this.#base)
-    return this.#base
+      else target.set(key, value)
   }
 }
