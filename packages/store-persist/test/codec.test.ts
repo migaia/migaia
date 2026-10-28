@@ -1,6 +1,6 @@
 import vm from 'node:vm'
 import { describe, expect, it } from 'vitest'
-import { defaultJsonCodec } from '../src/storage/codec.js'
+import { defaultJsonCodec } from '../src/storage/codec.ts'
 
 describe('defaultJsonCodec Map/Set 往返', () => {
   it('同 realm 嵌套 Map/Set 还原为真实实例', async () => {

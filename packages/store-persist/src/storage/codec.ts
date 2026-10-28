@@ -4,11 +4,11 @@ import { fromValueCodec } from '@migaia/storage-host/sdk'
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { isUint8Array } from '@migaia/utils/bytes'
-import type { IPersistStorage } from '../core/types.js'
-import { createStorePersistTypeError } from '../errors.js'
-import { StorePersistErrorCode } from '../error-code.js'
-import { PersistCodecOutput, PersistCodecOperation } from '../state-constants.js'
-import { StorePersistErrorText } from '../error-text.js'
+import type { IPersistStorage } from '../core/types.ts'
+import { createStorePersistTypeError } from '../errors.ts'
+import { StorePersistErrorCode } from '../error-code.ts'
+import { PersistCodecOutput, PersistCodecOperation } from '../state-constants.ts'
+import { StorePersistErrorText } from '../error-text.ts'
 
 /**
  * Keeps declared coded failures intact; raw snapshot/codec errors enter the existing encode

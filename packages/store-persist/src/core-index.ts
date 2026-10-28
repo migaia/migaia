@@ -1,5 +1,5 @@
-export { persistTransaction, type ITransactionScopeOf } from './core/persist-transaction.js'
-export { persistUnit } from './core/persist-unit.js'
+export { persistTransaction, type ITransactionScopeOf } from './core/persist-transaction.ts'
+export { persistUnit } from './core/persist-unit.ts'
 export type {
   IPersistUnit,
   IPersistUnitOptions,
@@ -8,7 +8,7 @@ export type {
   IHydrationStatus,
   IWriteStatus,
   IReadonlyPersistValue
-} from './core/types.js'
-export { defaultJsonCodec, writeEnvelope, readEnvelope, removeEnvelope } from './storage/codec.js'
-export * from './errors.js'
-export { PersistState, PersistCodecOutput, type IPersistState } from './state-constants.js'
+} from './core/types.ts'
+export { defaultJsonCodec, writeEnvelope, readEnvelope, removeEnvelope } from './storage/codec.ts'
+export * from './errors.ts'
+export { PersistState, PersistCodecOutput, type IPersistState } from './state-constants.ts'

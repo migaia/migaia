@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
-import { createMemoryTestStore } from './helpers/memory.js'
+import { createMemoryTestStore } from './helpers/memory.ts'
 import { createStore } from '@migaia/store-light'
-import { persist } from '../src/light-index'
+import { persist } from '../src/light-index.ts'
 
 describe('persist（store-light）', () => {
   it('snapshots accessor-backed options exactly once', async () => {

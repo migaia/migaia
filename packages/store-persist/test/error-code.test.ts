@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { createMemoryTestStore } from './helpers/memory.js'
+import { createMemoryTestStore } from './helpers/memory.ts'
 import { createStore } from '@migaia/store-light'
-import { persist } from '../src/light-index'
+import { persist } from '../src/light-index.ts'
 import {
   createStorePersistAbortError,
   StorePersistErrorCode,
   STORE_PERSIST_SOURCE
-} from '../src/errors'
+} from '../src/errors.ts'
 
 describe('store-persist error-code contract', () => {
   it('declares 8 unique codes under the package source', () => {

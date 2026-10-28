@@ -1,5 +1,5 @@
 import type { IDisposer, IRuntime } from '@migaia/reactive'
-import { persistUnit } from '../core/persist-unit.js'
+import { persistUnit } from '../core/persist-unit.ts'
 import type {
   ICodec,
   IMigrationStep,
@@ -11,8 +11,8 @@ import type {
   IPersistStorage,
   IPersistUnit,
   IPersistUnitOptions
-} from '../core/types.js'
-import { snapshotPersistOptions } from '../core/options.js'
+} from '../core/types.ts'
+import { snapshotPersistOptions } from '../core/options.ts'
 
 /**
  * Defines the four store capabilities used by `persist()`.

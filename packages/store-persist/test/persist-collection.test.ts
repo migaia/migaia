@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { createMemoryTestStore } from './helpers/memory.js'
+import { createMemoryTestStore } from './helpers/memory.ts'
 import {
   ObservableMap,
   ObservableSet,
   ObservableObject,
   ObservableArray
 } from '@migaia/store-indexed'
-import { persistCollection } from '../src/indexed-index'
+import { persistCollection } from '../src/indexed-index.ts'
 
 describe('persistCollection（store-indexed）', () => {
   it('snapshots accessor-backed options exactly once', async () => {

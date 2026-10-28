@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
 import { createStore } from '@migaia/store-light'
-import { createMemoryTestStore } from './helpers/memory.js'
-import { persist } from '../src/light-index.js'
+import { createMemoryTestStore } from './helpers/memory.ts'
+import { persist } from '../src/light-index.ts'
 import { createAtomStore, atomDef } from '@migaia/store-keyed'
-import { persistKeyed } from '../src/keyed-index.js'
-import { persistUnit, type IPersistHandle } from '../src/index.js'
-import { defaultJsonCodec, PersistState } from '../src/index.js'
+import { persistKeyed } from '../src/keyed-index.ts'
+import { persistUnit, type IPersistHandle } from '../src/index.ts'
+import { defaultJsonCodec, PersistState } from '../src/index.ts'
 
 describe('store-persist audit regressions', () => {
   it('hydrates with the admitted merge callback without rereading its getter', async () => {

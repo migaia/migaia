@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
 import { createStore } from '@migaia/store-light'
-import { createMemoryTestStore } from './helpers/memory.js'
+import { createMemoryTestStore } from './helpers/memory.ts'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import { StorageStageKind, type ICodecStageObserver } from '@migaia/storage-contract'
-import { persistUnit } from '../src/index.js'
-import { persist } from '../src/light-index.js'
+import { persistUnit } from '../src/index.ts'
+import { persist } from '../src/light-index.ts'
 
 describe('versioned persistence', () => {
   it('snapshots contiguous steps and upgrades without automatically writing the archive', async () => {

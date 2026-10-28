@@ -1,7 +1,7 @@
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
-import { writeEnvelope } from '../src/storage/codec.js'
-import { PersistCodecOutput } from '../src/state-constants.js'
+import { writeEnvelope } from '../src/storage/codec.ts'
+import { PersistCodecOutput } from '../src/state-constants.ts'
 
 describe('store-persist byte boundary', () => {
   it('passes a foreign intrinsic byte payload to binary storage unchanged', async () => {
