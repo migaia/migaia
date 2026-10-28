@@ -1,2 +1,2 @@
-export { storageLogStore } from './journal/log-store.js'
-export { storageJournalPlugin } from './journal/plugin.js'
+export { storageLogStore } from './journal/log-store.ts'
+export { storageJournalPlugin } from './journal/plugin.ts'

@@ -5,7 +5,7 @@ import {
   type ILockKey,
   type ITransactionScope
 } from '@migaia/storage-contract'
-import type { IStorageJournalBackendAccess } from './binding.js'
+import type { IStorageJournalBackendAccess } from './binding.ts'
 
 /**
  * Only the original log object carries this internal fixed-target closure; no authority table

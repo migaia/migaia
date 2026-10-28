@@ -22,7 +22,7 @@ import {
   type IStorageImplementationRecord,
   type ITransactionScope
 } from '@migaia/storage-contract'
-import { snapshotStorageBaseDetailed } from './store.js'
+import { snapshotStorageBaseDetailed } from './store.ts'
 
 /** A token is reserved before publication and remains absent from ordinary capability reads. */
 type IInstalledCapability = { readonly implementation: ICapabilityImpl; published: boolean }

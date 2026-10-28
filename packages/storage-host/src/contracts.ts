@@ -1,6 +1,6 @@
 import type { IBackendStageBindings } from '@migaia/storage-contract'
-import type { IStorageHooks } from './hook-types.js'
-import type { IStorageHookEmitter } from './hooks.js'
+import type { IStorageHooks } from './hook-types.ts'
+import type { IStorageHookEmitter } from './hooks.ts'
 import {
   defineFeature as defineNativeFeature,
   definePlugin as defineNativePlugin,
@@ -10,16 +10,16 @@ import {
 import { inspectFeatures } from '@migaia/plugin-host/composition'
 import type { IStorageBase } from '@migaia/storage-contract'
 import type { IScheduler } from '@migaia/utils/scheduler'
-import { createStorageTypeError } from './errors.js'
+import { createStorageTypeError } from './errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { installStorageFeatures, type IStorageFeatureProjection } from './feature-install.js'
-import { pluginNameFromBackendId } from './names.js'
+import { installStorageFeatures, type IStorageFeatureProjection } from './feature-install.ts'
+import { pluginNameFromBackendId } from './names.ts'
 import {
   STORAGE_DESCRIPTOR_METADATA,
   STORAGE_DESCRIPTOR_HOOKS,
   STORAGE_RESERVED_EXPOSE
-} from './state-constants.js'
-import { StorageErrorText } from './error-text.js'
+} from './state-constants.ts'
+import { StorageErrorText } from './error-text.ts'
 import type {
   IStorageBackendKind,
   IStorageDefinePlugin,
@@ -29,7 +29,7 @@ import type {
   IStorageExecutionPort,
   IStoragePipelineInput,
   IStorageNativePluginDescriptor
-} from './types.js'
+} from './types.ts'
 /** Authentic kind objects are local identities, never diagnostic names or public type brands. */
 const kinds = new WeakSet<object>()
 /** Defined storage Features retain their required kind identities without a second Feature system. */
@@ -175,10 +175,10 @@ type IStorageNativeCore = IPluginHostCore<IStoragePipelineInput> & {
   readonly getChainMethods: IStoragePluginCore['getChainMethods']
   setStorageFeatureProjection(projection: IStorageFeatureProjection | undefined): void
   getStorageFeatureClientResolver(): ReturnType<
-    import('./store-cell.js').IStorageStoreCell['getFeatureClientResolver']
+    import('./store-cell.ts').IStorageStoreCell['getFeatureClientResolver']
   >
   setStorageJournalBinding(
-    binding: import('./journal/types.js').IStorageJournalBackendBinding
+    binding: import('./journal/types.ts').IStorageJournalBackendBinding
   ): void
   readonly defaultOrgId: string
   readonly createRevisionPort: IStoragePluginCore['createRevisionPort']

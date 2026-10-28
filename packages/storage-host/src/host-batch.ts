@@ -1,16 +1,16 @@
 // One install batch of a storage host: PluginHost transaction, journal bootstrap and publication (see ./storage-host.ts).
-import { STORAGE_JOURNAL_BOOTSTRAP_PREFIX } from './state-constants.js'
+import { STORAGE_JOURNAL_BOOTSTRAP_PREFIX } from './state-constants.ts'
 import {
   definePlugin as defineNativePlugin,
   type IPluginConstraint,
   type IPluginHostCore
 } from '@migaia/plugin-host'
-import { StorageError } from './errors.js'
+import { StorageError } from './errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from './error-text.js'
-import { readStorageNativePluginMetadata } from './contracts.js'
-import type { IStorageBackendPluginHandle } from './types.js'
-import { pluginNameFromBackendId } from './names.js'
+import { StorageErrorText } from './error-text.ts'
+import { readStorageNativePluginMetadata } from './contracts.ts'
+import type { IStorageBackendPluginHandle } from './types.ts'
+import { pluginNameFromBackendId } from './names.ts'
 import type {
   IStorageHostCore,
   IStorageInstallBatchContext,
@@ -18,7 +18,7 @@ import type {
   IStorageBatchToken,
   IStorageNativeRegistrationContext,
   StorageHost
-} from './storage-host.js'
+} from './storage-host.ts'
 
 /** Run install batches through PluginHost and publish what each batch committed. */
 export class StorageHostBatch {

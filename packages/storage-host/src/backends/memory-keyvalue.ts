@@ -5,13 +5,13 @@ import {
   type ITtlTarget,
   type IStorageKey
 } from '@migaia/storage-contract'
-import { snapshotConcurrencyLockRange, lockKey } from '../authoring/concurrency.js'
-import { snapshotStorageBatchKeys, snapshotStorageKeyPrefix } from '../authoring/key.js'
-import { snapshotStorageTtlTarget } from '../authoring/ttl.js'
-import { snapshotStorageCounterIncrement } from '../authoring/counter.js'
-import { STORAGE_MEMORY_BACKEND } from '../state-constants.js'
-import { MemoryOperation } from './memory-constants.js'
-import { encodeFlatStorageKey } from '../core/key-domain.js'
+import { snapshotConcurrencyLockRange, lockKey } from '../authoring/concurrency.ts'
+import { snapshotStorageBatchKeys, snapshotStorageKeyPrefix } from '../authoring/key.ts'
+import { snapshotStorageTtlTarget } from '../authoring/ttl.ts'
+import { snapshotStorageCounterIncrement } from '../authoring/counter.ts'
+import { STORAGE_MEMORY_BACKEND } from '../state-constants.ts'
+import { MemoryOperation } from './memory-constants.ts'
+import { encodeFlatStorageKey } from '../core/key-domain.ts'
 import {
   read,
   liveEntry,
@@ -23,7 +23,7 @@ import {
   capacityFact,
   entryBytes,
   write
-} from './memory-entries.js'
+} from './memory-entries.ts'
 import {
   batchSize,
   observeBatch,
@@ -31,8 +31,8 @@ import {
   readTextBatch,
   atomicEntry,
   captureTextEntries
-} from './memory-namespace-base.js'
-import type { IMemoryNamespaceContext, IMemoryTtlTarget, IMemoryChannel } from './memory.js'
+} from './memory-namespace-base.ts'
+import type { IMemoryNamespaceContext, IMemoryTtlTarget, IMemoryChannel } from './memory.ts'
 
 /** Retain the original native KV members before provider publication replaces the root has overload. */
 export function createMemoryNamespaceKeyValue<T>(

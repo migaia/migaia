@@ -1,7 +1,7 @@
-import { storageProbe } from '../src/plugins/probe/index.js'
-import { storageJournalPlugin } from '../src/journal.js'
-import { memoryNotificationsFeature } from '../src/features/memory-notifications.js'
-import { memoryChangeFeedFeature } from '../src/features/memory-change-feed.js'
+import { storageProbe } from '../src/plugins/probe/index.ts'
+import { storageJournalPlugin } from '../src/journal.ts'
+import { memoryNotificationsFeature } from '../src/features/memory-notifications.ts'
+import { memoryChangeFeedFeature } from '../src/features/memory-change-feed.ts'
 import { describe, expect, it } from 'vitest'
 import { Logger } from '@migaia/logger'
 import { deferred } from '@migaia/utils/promise'
@@ -13,10 +13,10 @@ import {
   type ILogStore
 } from '@migaia/logger/plugins/durable'
 import { blob, counter, kv, rdf, ttl, vector } from '@migaia/storage-contract'
-import { lockKey } from '../src/authoring/concurrency.js'
-import { term } from '../src/authoring/rdf.js'
-import { createOrgId, createStorageHost } from '../src/index.js'
-import { memoryBackendPlugin } from '../src/plugins/memory.js'
+import { lockKey } from '../src/authoring/concurrency.ts'
+import { term } from '../src/authoring/rdf.ts'
+import { createOrgId, createStorageHost } from '../src/index.ts'
+import { memoryBackendPlugin } from '../src/plugins/memory.ts'
 
 /** Real durable scheduling keeps failures observable without writing test diagnostics to stdout. */
 const runtimeManager = {

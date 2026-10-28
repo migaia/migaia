@@ -1,13 +1,13 @@
-import { memoryNotificationsFeature } from '../src/features/memory-notifications.js'
-import { memoryChangeFeedFeature } from '../src/features/memory-change-feed.js'
+import { memoryNotificationsFeature } from '../src/features/memory-notifications.ts'
+import { memoryChangeFeedFeature } from '../src/features/memory-change-feed.ts'
 import { describe, expect, expectTypeOf, it } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
-import { assertTransactionOwner } from '../src/authoring/transaction.js'
+import { assertTransactionOwner } from '../src/authoring/transaction.ts'
 import { records, type ITransactionScope } from '@migaia/storage-contract'
-import { createMemoryBackend } from '../src/backends/memory.js'
-import type { IStoragePluginCore } from '../src/index.js'
-import { createStorageHost, defineFeature, definePlugin } from '../src/index.js'
-import { memoryBackendKind, memoryBackendPlugin } from '../src/plugins/memory.js'
+import { createMemoryBackend } from '../src/backends/memory.ts'
+import type { IStoragePluginCore } from '../src/index.ts'
+import { createStorageHost, defineFeature, definePlugin } from '../src/index.ts'
+import { memoryBackendKind, memoryBackendPlugin } from '../src/plugins/memory.ts'
 
 /** Real memory transactions retain their undefined native client while supporting scoped methods. */
 const scopedFeature = () =>

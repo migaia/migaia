@@ -1,12 +1,12 @@
-import { storageProbe } from '../../src/plugins/probe/index.js'
-import { memoryNotificationsFeature } from '../../src/features/memory-notifications.js'
-import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.js'
+import { storageProbe } from '../../src/plugins/probe/index.ts'
+import { memoryNotificationsFeature } from '../../src/features/memory-notifications.ts'
+import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { blob, type IBlobApi, type IStorageChange } from '@migaia/storage-contract'
-import { createOrgId, createStorageHost, definePlugin } from '../../src/index.js'
-import { memoryBackendPlugin } from '../../src/plugins/memory.js'
-import { MemoryOperation } from '../../src/backends/memory-constants.js'
+import { createOrgId, createStorageHost, definePlugin } from '../../src/index.ts'
+import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
+import { MemoryOperation } from '../../src/backends/memory-constants.ts'
 
 /** Installed stores exercise the reference object backend through the authentic capability token. */
 describe('memory native objects', () => {

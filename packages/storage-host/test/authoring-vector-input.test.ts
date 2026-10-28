@@ -1,4 +1,4 @@
-import * as contractAuthoringVector from '../src/authoring/vector.js'
+import * as contractAuthoringVector from '../src/authoring/vector.ts'
 import { describe, expect, it } from 'vitest'
 import * as contract from '@migaia/storage-contract'
 

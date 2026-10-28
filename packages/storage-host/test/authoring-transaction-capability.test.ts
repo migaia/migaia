@@ -4,8 +4,8 @@ import {
   runTransactionOperation,
   assertTransactionOwner,
   useTransactionCapability
-} from '../src/authoring/transaction.js'
-import { provideCapabilities } from '../src/authoring/capability.js'
+} from '../src/authoring/transaction.ts'
+import { provideCapabilities } from '../src/authoring/capability.ts'
 import {
   implement,
   kv,
@@ -33,9 +33,9 @@ import {
   type ITransactionTtlApi,
   type ITransactionCounterApi
 } from '@migaia/storage-contract'
-import { createRdfQuery, createRecordQuery } from '../src/authoring/query.js'
-import { term } from '../src/authoring/rdf.js'
-import { createSqlTag, sqlFragment } from '../src/authoring/sql.js'
+import { createRdfQuery, createRecordQuery } from '../src/authoring/query.ts'
+import { term } from '../src/authoring/rdf.ts'
+import { createSqlTag, sqlFragment } from '../src/authoring/sql.ts'
 
 /** Concrete rows and full externally constructible scopes require no private symbol or cast. */
 type IRow = { readonly state: string; readonly value: number }

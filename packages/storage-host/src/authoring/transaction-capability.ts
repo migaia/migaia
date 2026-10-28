@@ -19,12 +19,12 @@ import {
   type IStorageKey,
   type IOperationContext
 } from '@migaia/storage-contract'
-import { readTransactionImplementation } from './capability.js'
-import { deriveStorageSqlQuery } from './sql.js'
+import { readTransactionImplementation } from './capability.ts'
+import { deriveStorageSqlQuery } from './sql.ts'
 import type { ICodecValue } from '@migaia/serialize/codec'
-import { transactionView, invalidTransaction, failTransaction } from './transaction-registration.js'
-import type { ITransactionState } from './transaction-registration.js'
-import { runTransactionOperation } from './transaction.js'
+import { transactionView, invalidTransaction, failTransaction } from './transaction-registration.ts'
+import type { ITransactionState } from './transaction-registration.ts'
+import { runTransactionOperation } from './transaction.ts'
 
 /**
  * Reads the original backend attempt's context from an authentic live view. Every user, operation

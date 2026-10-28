@@ -1,9 +1,9 @@
-import { memoryNotificationsFeature } from '../../src/features/memory-notifications.js'
-import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.js'
+import { memoryNotificationsFeature } from '../../src/features/memory-notifications.ts'
+import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.ts'
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
-import { createStorageHost, defineFeature, definePlugin } from '../../src/index.js'
-import { memoryBackendKind, memoryBackendPlugin } from '../../src/plugins/memory.js'
+import { createStorageHost, defineFeature, definePlugin } from '../../src/index.ts'
+import { memoryBackendKind, memoryBackendPlugin } from '../../src/plugins/memory.ts'
 
 /** The actual Feature borrows the same controlled backend object through its declared lazy port. */
 const controllerFeature = defineFeature(memoryBackendKind, ({ featureExpose }) => ({

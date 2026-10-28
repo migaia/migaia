@@ -18,7 +18,7 @@ import {
 import { asCodecValue, toPortableValue } from '@migaia/serialize/codec'
 import { parseObjectPath } from '@migaia/utils/object'
 /** The native engine remains responsible for retrieval; only query synthesis is shared. */
-export { recommendStorageVector } from '../backends/vector-core.js'
+export { recommendStorageVector } from '../backends/vector-core.ts'
 
 /** Preserve coded contract failures and retain the exact cause of getters and codec failures. */
 /** Only payload projection normalizes a real serialization failure to the vector contract. */

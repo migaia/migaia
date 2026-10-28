@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { snapshotStorageWhere, compileStorageQueryCondition } from '../src/authoring/query.js'
+import { snapshotStorageWhere, compileStorageQueryCondition } from '../src/authoring/query.ts'
 
 describe('native canonical where authoring', () => {
   it('shares the canonical AST and original membership predicate semantics', () => {

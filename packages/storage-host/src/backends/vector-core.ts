@@ -1,14 +1,14 @@
-import { snapshotStorageVector } from '../authoring/vector.js'
+import { snapshotStorageVector } from '../authoring/vector.ts'
 import {
   StorageContractError,
   StorageContractErrorCode,
   type IStorageVectorConfiguration,
   type IStorageVectorPoint
 } from '@migaia/storage-contract'
-import { encodeOrderedStorageKey } from '../authoring/key.js'
-import { createOrderedRecordIndex } from '../core/ordered-record-index.js'
-import { STORAGE_MEMORY_BACKEND } from '../state-constants.js'
-import { StorageErrorText } from '../error-text.js'
+import { encodeOrderedStorageKey } from '../authoring/key.ts'
+import { createOrderedRecordIndex } from '../core/ordered-record-index.ts'
+import { STORAGE_MEMORY_BACKEND } from '../state-constants.ts'
+import { StorageErrorText } from '../error-text.ts'
 
 /** Reject invalid synthesis input without creating an operation, collection or native resource. */
 function invalidRecommendation(): never {

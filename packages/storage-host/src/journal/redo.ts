@@ -10,19 +10,19 @@ import {
   type IBinlogExt,
   type IWalExt,
   type ILogPayload
-} from './logger-runtime.js'
-import type { IStorageJournalBackendAccess } from './binding.js'
-import { StorageJournalKind } from './constants.js'
-import { storageJournalTargetWire } from './targets.js'
+} from './logger-runtime.ts'
+import type { IStorageJournalBackendAccess } from './binding.ts'
+import { StorageJournalKind } from './constants.ts'
+import { storageJournalTargetWire } from './targets.ts'
 import {
   readStorageJournalIntent,
   readStorageJournalIntentTarget,
   storageJournalTargetsMatch
-} from './wal.js'
-import { StorageError } from '../errors.js'
+} from './wal.ts'
+import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
-import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.js'
+import { StorageErrorText } from '../error-text.ts'
+import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.ts'
 
 /** Redo borrows the original WAL index and text draft; it owns no queue or native terminal. */
 type IStorageRedoOptions = {

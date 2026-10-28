@@ -4,7 +4,7 @@ import {
   decodeFlatStorageKey,
   encodeFlatStorageKey,
   snapshotKeyRange
-} from '../../src/authoring/backend.js'
+} from '../../src/authoring/backend.ts'
 import { KEY_DOMAIN_LIMITS, assertStorageKey } from '@migaia/storage-contract'
 
 describe('core key-domain', () => {

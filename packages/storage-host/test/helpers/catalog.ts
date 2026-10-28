@@ -1,7 +1,7 @@
 import { vi } from 'vitest'
-import { provideCapabilities } from '../../src/authoring/capability.js'
+import { provideCapabilities } from '../../src/authoring/capability.ts'
 import { type ICapabilityInstallPort, type IStorageBase } from '@migaia/storage-contract'
-import type { IStoragePluginCore } from '../../src/index.js'
+import type { IStoragePluginCore } from '../../src/index.ts'
 /** Each fixture owns one native map and one real pair of cleanup promises. */
 export function catalog(core: IStoragePluginCore, backend = 'catalog') {
   const client = new Map<string, string>()

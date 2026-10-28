@@ -1,4 +1,4 @@
-import { createBackendChangeController } from '../src/core/change-controller.js'
+import { createBackendChangeController } from '../src/core/change-controller.ts'
 import { describe, expect, it } from 'vitest'
 import {
   createStorageHost,
@@ -7,9 +7,9 @@ import {
   defineStorageBackendKind,
   type IStorageOrgAuthoringPort,
   type IStoragePluginCore
-} from '../src/index.js'
-import { getBackendChangeController } from '../src/core/change-controller.js'
-import { catalog } from './helpers/catalog.js'
+} from '../src/index.ts'
+import { getBackendChangeController } from '../src/core/change-controller.ts'
+import { catalog } from './helpers/catalog.ts'
 
 /** A lazy physical backend uses the original controller and exact-store registry after installation. */
 function lazyBackend() {

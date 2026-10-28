@@ -1,5 +1,5 @@
-import { memoryNotificationsFeature } from '../../src/features/memory-notifications.js'
-import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.js'
+import { memoryNotificationsFeature } from '../../src/features/memory-notifications.ts'
+import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.ts'
 import { describe, expect, it } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import {
@@ -9,10 +9,10 @@ import {
   type IStorageChange,
   type IQuad
 } from '@migaia/storage-contract'
-import { term } from '../../src/authoring/rdf.js'
-import { lockKey, ConcurrencyPolicy } from '../../src/authoring/concurrency.js'
-import { createStorageHost, createOrgId } from '../../src/index.js'
-import { memoryBackendPlugin } from '../../src/plugins/memory.js'
+import { term } from '../../src/authoring/rdf.ts'
+import { lockKey, ConcurrencyPolicy } from '../../src/authoring/concurrency.ts'
+import { createStorageHost, createOrgId } from '../../src/index.ts'
+import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
 
 /** Ground fixtures use the same public term factories as applications and server authors. */
 function quad(subject: string, object: string, graph = term.defaultGraph): IQuad {

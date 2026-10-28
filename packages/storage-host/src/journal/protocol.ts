@@ -7,11 +7,11 @@ import {
   type ILogRecordSnapshot,
   type ILogStoreRecoveryRow,
   type ILogStoreSnapshot
-} from './logger-runtime.js'
-import { StorageError } from '../errors.js'
+} from './logger-runtime.ts'
+import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
-import type { IStorageJournalNamespaceView } from './types.js'
+import { StorageErrorText } from '../error-text.ts'
+import type { IStorageJournalNamespaceView } from './types.ts'
 
 /** The private wire is versioned independently of business codecs and never enters their keys. */
 export const StorageLogWire = {

@@ -17,30 +17,30 @@ import {
   snapshotStorageKey,
   encodeOrderedStorageKey,
   snapshotStorageKeyPrefix
-} from '../authoring/key.js'
-import { assertTransactionOwner, runTransactionOperation } from '../authoring/transaction.js'
-import { createRdfQuery } from '../authoring/query.js'
-import { snapshotStorageRdfPattern } from '../authoring/rdf.js'
-import { createMemoryRdfIndex } from './rdf-core.js'
-import type { IStorageJournalChange } from '../journal/types.js'
-import type { IStorageChannel } from '../errors.js'
-import type { IStoragePluginCore } from '../types.js'
-import { STORAGE_MEMORY_BACKEND } from '../state-constants.js'
-import { MemoryOperation, MemoryState } from './memory-constants.js'
-import { encodeFlatStorageKey } from '../core/key-domain.js'
+} from '../authoring/key.ts'
+import { assertTransactionOwner, runTransactionOperation } from '../authoring/transaction.ts'
+import { createRdfQuery } from '../authoring/query.ts'
+import { snapshotStorageRdfPattern } from '../authoring/rdf.ts'
+import { createMemoryRdfIndex } from './rdf-core.ts'
+import type { IStorageJournalChange } from '../journal/types.ts'
+import type { IStorageChannel } from '../errors.ts'
+import type { IStoragePluginCore } from '../types.ts'
+import { STORAGE_MEMORY_BACKEND } from '../state-constants.ts'
+import { MemoryOperation, MemoryState } from './memory-constants.ts'
+import { encodeFlatStorageKey } from '../core/key-domain.ts'
 import {
   createOrderedRecordIndex,
   compareRecordIndexKeys,
   type IOrderedRecordRange
-} from '../core/ordered-record-index.js'
-import { planChannelWrite } from '../core/channel-write.js'
-import { throwIfAborted } from '../core/operation.js'
+} from '../core/ordered-record-index.ts'
+import { planChannelWrite } from '../core/channel-write.ts'
+import { throwIfAborted } from '../core/operation.ts'
 import {
   createMemoryTransactionContext,
   memoryTransactionConflict,
   memoryTransactionCapacityConflict,
   commitMemoryTransaction
-} from './memory-commit.js'
+} from './memory-commit.ts'
 import {
   planCapacity,
   normalize,
@@ -52,10 +52,10 @@ import {
   copyValue,
   prepare,
   entryBytes
-} from './memory-entries.js'
-import { captureRdfEntries, physicalRdfPattern, logicalRdfQuad } from './memory-namespace-base.js'
-import { draftCapacityPlan } from './memory-scope.js'
-import { captureJournalStage } from './memory-transaction-journal.js'
+} from './memory-entries.ts'
+import { captureRdfEntries, physicalRdfPattern, logicalRdfQuad } from './memory-namespace-base.ts'
+import { draftCapacityPlan } from './memory-scope.ts'
+import { captureJournalStage } from './memory-transaction-journal.ts'
 import type {
   IMemoryNamespaceContext,
   IMemoryScope,
@@ -65,7 +65,7 @@ import type {
   IMemoryChannel,
   IMemorySnapshot,
   IMemoryEntry
-} from './memory.js'
+} from './memory.ts'
 
 /** One accepted native attempt owns its draft, repeatable reads and original scope controls. */
 export type IMemoryTransactionContext<T, R> = {

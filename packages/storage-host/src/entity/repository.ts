@@ -1,10 +1,10 @@
-import { EntityFeatureName } from './constants.js'
+import { EntityFeatureName } from './constants.ts'
 import {
   getBackendValueCommit,
   type IBackendEntityAccess,
   type IEntityKeyValueMethods,
   type IEntityRecordMethods
-} from '../core/backend-registry.js'
+} from '../core/backend-registry.ts'
 import {
   StorageContractError,
   type IMigrationPlan,
@@ -15,24 +15,24 @@ import {
   type ITransactionScope,
   type IRecordIndexHandle
 } from '@migaia/storage-contract'
-import { compareStorageKeys } from '../authoring/key.js'
+import { compareStorageKeys } from '../authoring/key.ts'
 import {
   runTransactionOperation,
   readTransactionOperationContext
-} from '../authoring/transaction.js'
-import { lockKey } from '../authoring/concurrency.js'
-import { isStorageErrorFamily } from '../core/error-family.js'
-import { StorageError } from '../errors.js'
+} from '../authoring/transaction.ts'
+import { lockKey } from '../authoring/concurrency.ts'
+import { isStorageErrorFamily } from '../core/error-family.ts'
+import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
-import { selectCodec } from '../serialize/index.js'
-import { jsonCodec } from '../serialize/json.js'
-import { structuredCodec } from '../serialize/structured.js'
-import { composeFlatKey, composeRepositoryKey, composeStructuredKey } from './key.js'
-import { encodeFlatStorageKey } from '../core/key-domain.js'
-import { createStorageOperationRuntime, reportCleanupError } from '../core/operation-reporter.js'
-import { EntityText } from './text.js'
-import { snapshotOperationContext } from '../authoring/context.js'
+import { StorageErrorText } from '../error-text.ts'
+import { selectCodec } from '../serialize/index.ts'
+import { jsonCodec } from '../serialize/json.ts'
+import { structuredCodec } from '../serialize/structured.ts'
+import { composeFlatKey, composeRepositoryKey, composeStructuredKey } from './key.ts'
+import { encodeFlatStorageKey } from '../core/key-domain.ts'
+import { createStorageOperationRuntime, reportCleanupError } from '../core/operation-reporter.ts'
+import { EntityText } from './text.ts'
+import { snapshotOperationContext } from '../authoring/context.ts'
 import type { IOperationContext, IStorageKey } from '@migaia/storage-contract'
 import type {
   IEntityTransactionScope,
@@ -42,9 +42,9 @@ import type {
   IInvalidRecordAction,
   IInvalidRecordHandler,
   IInvalidRecordIssue
-} from './types.js'
-import type { ISnapshotEntityIndexes } from './index-projection.js'
-import { StorageRecordStage } from './constants.js'
+} from './types.ts'
+import type { ISnapshotEntityIndexes } from './index-projection.ts'
+import { StorageRecordStage } from './constants.ts'
 import {
   IEntityOperationRuntime,
   entityRuntime,
@@ -54,14 +54,14 @@ import {
   IRepositoryConfig,
   idOf,
   IEntityRepositoryBinding
-} from './repository-shared.js'
-import type { EntityMigrationOwner } from './migration-owner.js'
-import type { EntityUniqueOwner } from './unique-owner.js'
-import type { EntityIndexesOwner } from './indexes-owner.js'
-import type { EntityQueryOwner } from './query-owner.js'
-import type { IEntityKeysetOwner } from './keyset.js'
-import { missingEntityFeature } from './assembly.js'
-import { EntityRecordCodec } from './record-codec.js'
+} from './repository-shared.ts'
+import type { EntityMigrationOwner } from './migration-owner.ts'
+import type { EntityUniqueOwner } from './unique-owner.ts'
+import type { EntityIndexesOwner } from './indexes-owner.ts'
+import type { EntityQueryOwner } from './query-owner.ts'
+import type { IEntityKeysetOwner } from './keyset.ts'
+import { missingEntityFeature } from './assembly.ts'
+import { EntityRecordCodec } from './record-codec.ts'
 
 export class EntityRepositoryOwner<
   TDomain,

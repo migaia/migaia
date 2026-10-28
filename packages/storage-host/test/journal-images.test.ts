@@ -1,12 +1,12 @@
-import { storageJournalPlugin } from '../src/journal.js'
+import { storageJournalPlugin } from '../src/journal.ts'
 import { describe, expect, it } from 'vitest'
-import { lockKey } from '../src/authoring/concurrency.js'
+import { lockKey } from '../src/authoring/concurrency.ts'
 import { rdf, vector, ttl, type IQuad } from '@migaia/storage-contract'
-import { term } from '../src/authoring/rdf.js'
-import { createStorageHost, createOrgId } from '../src/index.js'
-import { memoryBackendPlugin } from '../src/plugins/memory.js'
-import { resolveStorageJournalBinding } from '../src/journal/binding.js'
-import { memoryJournalDeadlineTarget } from '../src/backends/memory-journal-image.js'
+import { term } from '../src/authoring/rdf.ts'
+import { createStorageHost, createOrgId } from '../src/index.ts'
+import { memoryBackendPlugin } from '../src/plugins/memory.ts'
+import { resolveStorageJournalBinding } from '../src/journal/binding.ts'
+import { memoryJournalDeadlineTarget } from '../src/backends/memory-journal-image.ts'
 
 describe('original memory journal images', () => {
   it('restores exact text, byte, record and deadline images through the same native draft', async () => {

@@ -1,6 +1,6 @@
-import { memoryNotificationsFeature } from '../src/features/memory-notifications.js'
-import { memoryChangeFeedFeature } from '../src/features/memory-change-feed.js'
-import { storageJournalPlugin } from '../src/journal.js'
+import { memoryNotificationsFeature } from '../src/features/memory-notifications.ts'
+import { memoryChangeFeedFeature } from '../src/features/memory-change-feed.ts'
+import { storageJournalPlugin } from '../src/journal.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { LogRecordState } from '@migaia/logger/plugins/durable'
 import { deferred } from '@migaia/utils/promise'
@@ -12,11 +12,11 @@ import {
   type IStorageJournalBackendBinding,
   type IStorageJournalNamespace,
   type IStorageJournalNamespaceView
-} from '../src/index.js'
-import { memoryBackendKind, memoryBackendPlugin } from '../src/plugins/memory.js'
-import { storageLogStore } from '../src/journal.js'
-import { createMemoryBackend } from '../src/backends/memory.js'
-import { resolveStorageJournalBinding } from '../src/journal/binding.js'
+} from '../src/index.ts'
+import { memoryBackendKind, memoryBackendPlugin } from '../src/plugins/memory.ts'
+import { storageLogStore } from '../src/journal.ts'
+import { createMemoryBackend } from '../src/backends/memory.ts'
+import { resolveStorageJournalBinding } from '../src/journal/binding.ts'
 
 /** Faults surround real private memory I/O admitted through the original descriptor boundary. */
 function nonAtomicPrivatePlugin(fault: {

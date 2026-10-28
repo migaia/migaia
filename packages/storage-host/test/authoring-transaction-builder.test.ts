@@ -1,10 +1,10 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { ConcurrencyPolicy, lockKey, runWithConcurrency } from '../src/authoring/concurrency.js'
+import { ConcurrencyPolicy, lockKey, runWithConcurrency } from '../src/authoring/concurrency.ts'
 import {
   createTransactionBuilder,
   createTransactionOwner,
   resolveConcurrencyPolicy
-} from '../src/authoring/transaction.js'
+} from '../src/authoring/transaction.ts'
 import {
   type IStorageBase,
   type ITransactionOptions,

@@ -1,15 +1,15 @@
-export { passthrough } from './schema/passthrough.js'
-export { fromStandardSchema, type IStandardSchemaV1 } from './schema/standard-schema.js'
-export type { ISchemaAdapter } from './schema/types.js'
-export { jsonCodec, structuredCodec, binaryCodec, selectCodec } from './serialize/index.js'
-export type { ICodec, ICodecOutput, ISelectedCodec } from './serialize/index.js'
-export { REPOSITORY_KEY_PREFIX, repositoryMigrationKey } from './core/record-layout.js'
+export { passthrough } from './schema/passthrough.ts'
+export { fromStandardSchema, type IStandardSchemaV1 } from './schema/standard-schema.ts'
+export type { ISchemaAdapter } from './schema/types.ts'
+export { jsonCodec, structuredCodec, binaryCodec, selectCodec } from './serialize/index.ts'
+export type { ICodec, ICodecOutput, ISelectedCodec } from './serialize/index.ts'
+export { REPOSITORY_KEY_PREFIX, repositoryMigrationKey } from './core/record-layout.ts'
 
 export {
   RecordIndexBackfillPhase,
   registerRecordIndexBackfillStore,
   markRecordIndexBackfillContentionFailure
-} from './entity/backfill.js'
+} from './entity/backfill.ts'
 export type {
   IRecordIndexBackfillPhase,
   IRecordIndexBackfillCandidate,
@@ -20,9 +20,9 @@ export type {
   IRecordIndexBackfillRetryReceipt,
   IRecordIndexBackfillSession,
   IRecordIndexBackfillStore
-} from './entity/backfill.js'
+} from './entity/backfill.ts'
 
-export { defineEntity } from './entity/define.js'
+export { defineEntity } from './entity/define.ts'
 export type {
   IEntityDefinition,
   IEntityQuery,
@@ -53,6 +53,6 @@ export type {
   IInvalidRecordHandler,
   IRecordComparator,
   IRepository
-} from './entity/types.js'
+} from './entity/types.ts'
 
-export type { IEntityFeature } from './entity/assembly.js'
+export type { IEntityFeature } from './entity/assembly.ts'

@@ -1,4 +1,4 @@
-import { storageProbe } from '../src/plugins/probe/index.js'
+import { storageProbe } from '../src/plugins/probe/index.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import {
@@ -13,8 +13,8 @@ import {
   defineFeature,
   defineStorageBackendKind,
   type IStoragePluginCore
-} from '../src/index.js'
-import { catalog } from './helpers/catalog.js'
+} from '../src/index.ts'
+import { catalog } from './helpers/catalog.ts'
 
 /** A native map remains the actual client, store and lifecycle owner throughout detection. */
 const kind = defineStorageBackendKind<ReturnType<typeof catalog>['store'], Map<string, string>>()(

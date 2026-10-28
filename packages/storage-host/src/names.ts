@@ -1,4 +1,4 @@
-import { STORAGE_PLUGIN_NAME_PREFIX } from './state-constants.js'
+import { STORAGE_PLUGIN_NAME_PREFIX } from './state-constants.ts'
 /** Encode one already validated ASCII id without changing the public backend lookup identity. */
 export function pluginNameFromBackendId(id: string): string {
   return (

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createRecordQuery, compileStorageQueryCondition } from '../src/authoring/query.js'
-import { createStorageIteratorLifetime } from '../src/authoring/resource.js'
+import { createRecordQuery, compileStorageQueryCondition } from '../src/authoring/query.ts'
+import { createStorageIteratorLifetime } from '../src/authoring/resource.ts'
 import {
   type IQueryCondition,
   type IRecordQueryInput,

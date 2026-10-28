@@ -1,14 +1,14 @@
-import { memoryNotificationsFeature } from '../../src/features/memory-notifications.js'
-import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.js'
-import { createBackendChangeController } from '../../src/core/change-controller.js'
+import { memoryNotificationsFeature } from '../../src/features/memory-notifications.ts'
+import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.ts'
+import { createBackendChangeController } from '../../src/core/change-controller.ts'
 import {
   createStorageHost,
   defineFeature,
   definePlugin,
   defineStorageBackendKind,
   type IStoragePluginCore
-} from '../../src/index.js'
-import { memoryBackendPlugin } from '../../src/plugins/memory.js'
+} from '../../src/index.ts'
+import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
 import type { ICapabilityInstallPort, IKeyValueStore } from '@migaia/storage-contract'
 
 /** Built-in installation retains memory's record and synchronous native surface. */

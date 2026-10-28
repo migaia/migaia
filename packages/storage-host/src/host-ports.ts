@@ -1,29 +1,29 @@
 // Registration cores, the PluginHost assembly and the native authoring and execution ports of one storage host (see ./storage-host.ts).
-import type { IStorageHookEmitter } from './hooks.js'
-import type { IStorageHooks } from './hook-types.js'
-import { createBackendRevisionPort } from './backends/revisions.js'
+import type { IStorageHookEmitter } from './hooks.ts'
+import type { IStorageHooks } from './hook-types.ts'
+import { createBackendRevisionPort } from './backends/revisions.ts'
 import {
   registerBackendChangeController,
   registerBackendValueCommit,
   getBackendChangeController,
   type IBackendChangeController
-} from './core/backend-registry.js'
-import { createBackendKeyLockPort } from './backends/key-locks.js'
+} from './core/backend-registry.ts'
+import { createBackendKeyLockPort } from './backends/key-locks.ts'
 import { defineHost, type IHostHandle, type IPluginHostOptions } from '@migaia/plugin-host'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
-import { createStorageTypeError, StorageError } from './errors.js'
+import { createStorageTypeError, StorageError } from './errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from './error-text.js'
-import { forwardStorageExecution } from './execution.js'
+import { StorageErrorText } from './error-text.ts'
+import { forwardStorageExecution } from './execution.ts'
 import type { IStorageBase } from '@migaia/storage-contract'
-import type { IStoragePipelineInput, IStoragePluginCore } from './types.js'
+import type { IStoragePipelineInput, IStoragePluginCore } from './types.ts'
 import type {
   IStorageRegistrationAssembly,
   IStorageInstallCore,
   IStorageNativeRegistrationContext,
   IStorageHostCore,
   IStoragePluginHost
-} from './storage-host.js'
+} from './storage-host.ts'
 
 /** Assemble native ports without creating another install or resource owner. */
 function createStorageRegistrationCore(registration: IStorageRegistrationAssembly): object {
@@ -40,7 +40,7 @@ function createStorageRegistrationCore(registration: IStorageRegistrationAssembl
     setStorageFeatureProjection: context.storeCell.setFeatureProjection,
     getStorageFeatureClientResolver: context.storeCell.getFeatureClientResolver,
     setStorageJournalBinding: (
-      binding: import('./journal/types.js').IStorageJournalBackendBinding
+      binding: import('./journal/types.ts').IStorageJournalBackendBinding
     ) => {
       /** Admission remains inside the original registration's installation window. */
       registration.registrationCore!.onDispose(context.storeCell.releaseJournalResources)
@@ -253,8 +253,8 @@ function createStorageExecutionPorts(registration: IStorageRegistrationAssembly)
 
 /** Missing notification assembly is rejected before acquiring a channel or lifecycle resource. */
 function requireChangeControllerFactory(
-  factory: import('./core/change-types.js').IBackendChangeControllerFactory | undefined
-): import('./core/change-types.js').IBackendChangeControllerFactory {
+  factory: import('./core/change-types.ts').IBackendChangeControllerFactory | undefined
+): import('./core/change-types.ts').IBackendChangeControllerFactory {
   if (factory === undefined)
     throw new StorageError(
       StorageHostErrorCode.changeControllerNotAssembled,

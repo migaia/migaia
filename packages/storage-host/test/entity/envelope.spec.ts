@@ -1,9 +1,9 @@
-import { storageProbe } from '../../src/plugins/probe/index.js'
-import { entityQueryFeature } from '../../src/entity/query-feature.js'
-import { entityUniqueFeature } from '../../src/entity/unique-feature.js'
-import { entityMigrationFeature } from '../../src/entity/migration-feature.js'
-import { entityIndexesFeature } from '../../src/entity/indexes-feature.js'
-import { entityKeysetFeature } from '../../src/entity/keyset.js'
+import { storageProbe } from '../../src/plugins/probe/index.ts'
+import { entityQueryFeature } from '../../src/entity/query-feature.ts'
+import { entityUniqueFeature } from '../../src/entity/unique-feature.ts'
+import { entityMigrationFeature } from '../../src/entity/migration-feature.ts'
+import { entityIndexesFeature } from '../../src/entity/indexes-feature.ts'
+import { entityKeysetFeature } from '../../src/entity/keyset.ts'
 import { describe, expect, it } from 'vitest'
 import type { IKeyValueStore } from '@migaia/storage-contract'
 import {
@@ -12,9 +12,9 @@ import {
   defineFeature,
   defineStorageBackendKind,
   type IStoragePluginCore
-} from '../../src/index.js'
-import { defineEntity } from '../../src/entity.js'
-import { composeFlatKey } from '../../src/entity/key.js'
+} from '../../src/index.ts'
+import { defineEntity } from '../../src/entity.ts'
+import { composeFlatKey } from '../../src/entity/key.ts'
 
 /**
  * A frozen raw provider proves envelope hooks do not depend on a change controller or provider

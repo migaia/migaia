@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assertTransactionOwner } from '../src/authoring/transaction.js'
+import { assertTransactionOwner } from '../src/authoring/transaction.ts'
 import { deferred } from '@migaia/utils/promise'
 import {
   createOrgId,
@@ -8,8 +8,8 @@ import {
   definePlugin,
   defineStorageBackendKind,
   type IStoragePluginCore
-} from '../src/index.js'
-import { createMemoryBackend } from '../src/backends/memory.js'
+} from '../src/index.ts'
+import { createMemoryBackend } from '../src/backends/memory.ts'
 
 /** Clients are borrowed fixture identities; actual data and transaction ownership stay in memory. */
 type IClient = { readonly orgId: string; readonly marker: string }

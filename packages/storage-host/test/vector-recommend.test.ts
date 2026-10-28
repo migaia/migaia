@@ -1,7 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { recommendStorageVector } from '../src/authoring/vector.js'
-import { snapshotStorageVector } from '../src/authoring/vector.js'
-import { mmr } from '../src/vector/mmr.js'
+import { recommendStorageVector } from '../src/authoring/vector.ts'
+import { snapshotStorageVector } from '../src/authoring/vector.ts'
+import { mmr } from '../src/vector/mmr.ts'
 
 describe('pure vector MMR reranker', () => {
   it('encodes deterministic greedy selection order for lambda zero, one and one half', () => {

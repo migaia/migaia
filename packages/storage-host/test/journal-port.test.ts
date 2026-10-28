@@ -1,10 +1,10 @@
-import { memoryNotificationsFeature } from '../src/features/memory-notifications.js'
-import { memoryChangeFeedFeature } from '../src/features/memory-change-feed.js'
-import { storageJournalPlugin } from '../src/journal.js'
+import { memoryNotificationsFeature } from '../src/features/memory-notifications.ts'
+import { memoryChangeFeedFeature } from '../src/features/memory-change-feed.ts'
+import { storageJournalPlugin } from '../src/journal.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
-import { lockKey } from '../src/authoring/concurrency.js'
-import { runTransactionOperation } from '../src/authoring/transaction.js'
+import { lockKey } from '../src/authoring/concurrency.ts'
+import { runTransactionOperation } from '../src/authoring/transaction.ts'
 import {
   LogRecordState,
   binlog,
@@ -19,19 +19,19 @@ import {
   type IStoragePluginCore,
   type IStorageJournalNamespaceView,
   type IStorageJournalBackendBinding
-} from '../src/index.js'
-import { memoryBackendPlugin, memoryBackendKind } from '../src/plugins/memory.js'
-import { storageLogStore } from '../src/journal.js'
-import { resolveStorageLogNativeAccess } from '../src/journal/append-port.js'
-import { createMemoryBackend } from '../src/backends/memory.js'
+} from '../src/index.ts'
+import { memoryBackendPlugin, memoryBackendKind } from '../src/plugins/memory.ts'
+import { storageLogStore } from '../src/journal.ts'
+import { resolveStorageLogNativeAccess } from '../src/journal/append-port.ts'
+import { createMemoryBackend } from '../src/backends/memory.ts'
 import { Logger } from '@migaia/logger'
 import {
   resolveStorageJournalBinding,
   snapshotStorageJournalBinding
-} from '../src/journal/binding.js'
-import { prepareStorageJournalConfiguration } from '../src/journal/configuration.js'
-import { snapshotStorageJournalConfiguration } from '../src/journal/configuration-options.js'
-import { createStorageNativeJournal } from '../src/journal/commit.js'
+} from '../src/journal/binding.ts'
+import { prepareStorageJournalConfiguration } from '../src/journal/configuration.ts'
+import { snapshotStorageJournalConfiguration } from '../src/journal/configuration-options.ts'
+import { createStorageNativeJournal } from '../src/journal/commit.ts'
 
 /** Delay only an ordinary result after the original owner has actually committed and freed locks. */
 function delayedCommittedPlugin(delay: {

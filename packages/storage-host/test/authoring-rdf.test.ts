@@ -6,7 +6,7 @@ import {
   snapshotStorageRdfQuad,
   encodeStorageRdfQuad,
   encodeStorageRdfTerm
-} from '../src/authoring/rdf.js'
+} from '../src/authoring/rdf.ts'
 import {
   assertStorageRdfTerm,
   assertStorageRdfPattern,

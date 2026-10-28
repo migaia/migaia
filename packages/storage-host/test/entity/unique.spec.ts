@@ -1,12 +1,12 @@
-import { entityQueryFeature } from '../../src/entity/query-feature.js'
-import { entityUniqueFeature } from '../../src/entity/unique-feature.js'
-import { entityMigrationFeature } from '../../src/entity/migration-feature.js'
-import { entityIndexesFeature } from '../../src/entity/indexes-feature.js'
-import { entityKeysetFeature } from '../../src/entity/keyset.js'
+import { entityQueryFeature } from '../../src/entity/query-feature.ts'
+import { entityUniqueFeature } from '../../src/entity/unique-feature.ts'
+import { entityMigrationFeature } from '../../src/entity/migration-feature.ts'
+import { entityIndexesFeature } from '../../src/entity/indexes-feature.ts'
+import { entityKeysetFeature } from '../../src/entity/keyset.ts'
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import { defineEntity } from '../../src/entity.js'
-import { memoryBackend } from '../helpers/memory.js'
+import { defineEntity } from '../../src/entity.ts'
+import { memoryBackend } from '../helpers/memory.ts'
 
 /** Shared domain keeps each assertion about backend-neutral unique ownership. */
 type IUser = { id: string; email: string }

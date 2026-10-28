@@ -1,5 +1,5 @@
 import { createManualScheduler } from '@migaia/utils/testing'
-import { snapshotStorageBaseDetailed } from '../../src/authoring/store.js'
+import { snapshotStorageBaseDetailed } from '../../src/authoring/store.ts'
 import { type IKeyValueStore } from '@migaia/storage-contract'
 import { describe, expect, it } from 'vitest'
 import {
@@ -8,9 +8,9 @@ import {
   definePlugin,
   defineStorageBackendKind,
   type IStoragePluginCore
-} from '../../src/index.js'
+} from '../../src/index.ts'
 import { STORAGE_HOST_ERROR_SOURCE } from '@migaia/storage-contract/error-code'
-import { memoryBackend } from '../helpers/memory.js'
+import { memoryBackend } from '../helpers/memory.ts'
 
 /** Admission baselines supply the same resource label without requiring memory-native ports. */
 const kind = defineStorageBackendKind()('memory')

@@ -13,7 +13,7 @@ import {
   StorageContractErrorCode,
   StorageContractErrorText
 } from '@migaia/storage-contract'
-import { captureStorageTemplatePieces } from './template.js'
+import { captureStorageTemplatePieces } from './template.ts'
 import { isUint8Array } from '@migaia/utils/bytes'
 
 /** Private node tags distinguish immutable composition references from copied bound values. */

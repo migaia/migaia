@@ -12,7 +12,7 @@ import {
   snapshotStorageBatchKeys,
   createStorageBatchKeyCapture,
   projectStorageBatchKeys
-} from '../src/authoring/key.js'
+} from '../src/authoring/key.ts'
 import { type IStorageKey } from '@migaia/storage-contract'
 
 /** Compares public byte output lexicographically without decoding or depending on key tags. */

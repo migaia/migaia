@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { createSparqlTag, sparqlFragment } from '../src/authoring/sparql.js'
+import { createSparqlTag, sparqlFragment } from '../src/authoring/sparql.ts'
 import {
   sparql,
   implement,
@@ -11,8 +11,8 @@ import {
   type IRdfLiteral,
   type IOperationContext
 } from '@migaia/storage-contract'
-import { term } from '../src/authoring/rdf.js'
-import { provideCapabilities } from '../src/authoring/capability.js'
+import { term } from '../src/authoring/rdf.ts'
+import { provideCapabilities } from '../src/authoring/capability.ts'
 
 /** Native callback fixture retains only actual prepared text; no endpoint or parser is fabricated. */
 function setup() {

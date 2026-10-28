@@ -1,10 +1,10 @@
 import { tryReadProperty } from '@migaia/utils/error'
 import { createEventHub, EventDelivery } from '@migaia/event-subscriber'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
-import { createStorageTypeError } from './errors.js'
+import { createStorageTypeError } from './errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from './error-text.js'
-import type { IStorageHookMap, IStorageHooks } from './hook-types.js'
+import { StorageErrorText } from './error-text.ts'
+import type { IStorageHookMap, IStorageHooks } from './hook-types.ts'
 
 /** A lazy payload producer is evaluated once only when the original event channel has listeners. */
 export type IStorageHookEmitter = <K extends keyof IStorageHookMap>(

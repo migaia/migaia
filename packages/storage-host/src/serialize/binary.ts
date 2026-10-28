@@ -1,9 +1,9 @@
-import { StorageError } from '../errors.js'
+import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { isUint8Array } from '@migaia/utils/bytes'
-import { StorageErrorText } from '../error-text.js'
-import type { ICodec } from './types.js'
-import { StorageCodecOutput, EntityAdapterName } from '../adapter-constants.js'
+import { StorageErrorText } from '../error-text.ts'
+import type { ICodec } from './types.ts'
+import { StorageCodecOutput, EntityAdapterName } from '../adapter-constants.ts'
 
 /**
  * Frozen Uint8Array codec retaining the original valid view on encode/decode; invalid values reject

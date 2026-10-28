@@ -1,4 +1,4 @@
-import { StorageError } from '../errors.js'
+import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import {
   StorageContractError,
@@ -6,13 +6,13 @@ import {
   type ICodec,
   type IOperationContext
 } from '@migaia/storage-contract'
-import { snapshotCodec } from '../authoring/codec.js'
+import { snapshotCodec } from '../authoring/codec.ts'
 import { bytesToBase64, base64ToBytes } from '@migaia/utils/bytes'
-import { snapshotStorageCapabilities } from '../authoring/store.js'
+import { snapshotStorageCapabilities } from '../authoring/store.ts'
 import { type IStorageCapabilities } from '@migaia/storage-contract'
 import { isUint8Array } from '@migaia/utils/bytes'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
-import { StorageErrorText } from '../error-text.js'
+import { StorageErrorText } from '../error-text.ts'
 
 /** Snapshot a binary codec result before wrapping it as text. */
 const toBinaryBytes = (value: unknown): Uint8Array => {

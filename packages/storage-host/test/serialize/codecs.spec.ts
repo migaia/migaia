@@ -1,7 +1,7 @@
 import { SERIALIZE_SOURCE } from '@migaia/serialize/core'
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
-import { jsonCodec, structuredCodec, binaryCodec } from '../../src/entity.js'
+import { jsonCodec, structuredCodec, binaryCodec } from '../../src/entity.ts'
 
 describe('jsonCodec', () => {
   it('对象往返', async () => {

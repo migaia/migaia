@@ -1,10 +1,10 @@
 import { asCodecValue } from '@migaia/serialize/codec'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { base64ToBytes, bytesToBase64 } from '@migaia/utils/bytes'
-import { StorageError } from '../errors.js'
+import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
-import type { IStorageJournalImage } from './types.js'
+import { StorageErrorText } from '../error-text.ts'
+import type { IStorageJournalImage } from './types.ts'
 
 /** A persisted image declares the exact existing synchronous codec revision used for replay. */
 const codec = defineJsonCodec({ version: 1 })

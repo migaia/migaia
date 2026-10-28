@@ -1,5 +1,5 @@
-import { REPOSITORY_KEY_PREFIX } from '../core/record-layout.js'
-import { decodeFlatStorageKey, encodeFlatStorageKey } from '../core/key-domain.js'
+import { REPOSITORY_KEY_PREFIX } from '../core/record-layout.ts'
+import { decodeFlatStorageKey, encodeFlatStorageKey } from '../core/key-domain.ts'
 import type { IKeyRange, IStorageKey } from '@migaia/storage-contract'
 
 /**

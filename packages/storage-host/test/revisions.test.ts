@@ -4,9 +4,9 @@ import {
   definePlugin,
   defineStorageBackendKind,
   type IStoragePluginCore
-} from '../src/index.js'
-import type { IBackendRevisionPort } from '../src/authoring/backend.js'
-import { catalog } from './helpers/catalog.js'
+} from '../src/index.ts'
+import type { IBackendRevisionPort } from '../src/authoring/backend.ts'
+import { catalog } from './helpers/catalog.ts'
 
 /** Real installations issue revision facts without transferring resource ownership to a member. */
 async function fixture(shared?: IBackendRevisionPort, org?: string) {

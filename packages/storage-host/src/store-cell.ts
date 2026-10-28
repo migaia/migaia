@@ -1,22 +1,22 @@
 import type { IChainMethods, IStorageBase, IStorageResource } from '@migaia/storage-contract'
 import { createErrorCollector } from '@migaia/lifecycle'
-import { StorageError } from './errors.js'
+import { StorageError } from './errors.ts'
 import {
   StorageHostErrorCode,
   STORAGE_HOST_ERROR_SOURCE
 } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from './error-text.js'
-import type { IStorageFeatureProjection } from './feature-install.js'
+import { StorageErrorText } from './error-text.ts'
+import type { IStorageFeatureProjection } from './feature-install.ts'
 import type {
   IStorageOrgBinding,
   IStorageBorrowedBackend,
   IStoragePluginCallContext,
   IStorageExecutionPort,
   IStorageFeatureClientResolver
-} from './types.js'
+} from './types.ts'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
-import type { IStorageJournalBackendBinding } from './journal/types.js'
-import { snapshotStorageJournalBinding } from './journal/binding.js'
+import type { IStorageJournalBackendBinding } from './journal/types.ts'
+import { snapshotStorageJournalBinding } from './journal/binding.ts'
 /** One registration binds one construction identity and publishes it only after admission. */
 export type IStorageStoreCell = {
   /** A read-only original registration identity grants no methods or resource authority. */

@@ -5,10 +5,10 @@ import type {
   IRecordIndexProjection,
   IRecordIndexReadiness
 } from '@migaia/storage-contract'
-import { StorageError } from '../errors.js'
+import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
-import { resolveBackendCapabilityOwner } from '../core/backend-registry.js'
+import { StorageErrorText } from '../error-text.ts'
+import { resolveBackendCapabilityOwner } from '../core/backend-registry.ts'
 
 /** The original neutral registry keeps backend-private provider state out of public objects. */
 const backfillStores = new WeakMap<object, IRecordIndexBackfillStore<unknown>>()

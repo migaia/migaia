@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { projectEntityIndexes, snapshotEntityIndexes } from '../../src/entity/index-projection.js'
+import { projectEntityIndexes, snapshotEntityIndexes } from '../../src/entity/index-projection.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageContractErrorCode } from '@migaia/storage-contract'
 

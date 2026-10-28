@@ -4,10 +4,10 @@ import {
   createRdfQuery,
   createVectorQuery,
   compileStorageQueryCondition
-} from '../src/authoring/query.js'
-import { createStorageIteratorLifetime } from '../src/authoring/resource.js'
-import { ConcurrencyPolicy } from '../src/authoring/concurrency.js'
-import { term } from '../src/authoring/rdf.js'
+} from '../src/authoring/query.ts'
+import { createStorageIteratorLifetime } from '../src/authoring/resource.ts'
+import { ConcurrencyPolicy } from '../src/authoring/concurrency.ts'
+import { term } from '../src/authoring/rdf.ts'
 import {
   type IStorageIterator,
   type IStorageKey,

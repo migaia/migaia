@@ -1,1 +1,1 @@
-export { entityQueryFeature } from './query-feature.js'
+export { entityQueryFeature } from './query-feature.ts'

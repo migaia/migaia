@@ -1,34 +1,34 @@
 // Codec, schema and envelope conversion for one entity repository (see ./repository.ts).
-import { EntityFeatureName } from './constants.js'
+import { EntityFeatureName } from './constants.ts'
 import {
   getBackendEnvelopeStages,
   type IEntityKeyValueMethods,
   type IEntityRecordMethods
-} from '../core/backend-registry.js'
+} from '../core/backend-registry.ts'
 import {
   assertVersionedEnvelope,
   StorageContractErrorCode,
   type ICodecStageObserver
 } from '@migaia/storage-contract'
-import { isStorageErrorFamily } from '../core/error-family.js'
-import { StorageError } from '../errors.js'
+import { isStorageErrorFamily } from '../core/error-family.ts'
+import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { readStorageHookFailureCode } from '../hooks.js'
-import { composeFlatKey, composeRepositoryKey, composeStructuredKey } from './key.js'
-import { invokeExtension } from '../core/invoke-extension.js'
+import { readStorageHookFailureCode } from '../hooks.ts'
+import { composeFlatKey, composeRepositoryKey, composeStructuredKey } from './key.ts'
+import { invokeExtension } from '../core/invoke-extension.ts'
 import type { IOperationContext, IStorageKey } from '@migaia/storage-contract'
-import type { ISchemaAdapter } from '../entity.js'
-import type { ISelectedCodec } from '../entity.js'
-import { StorageOperation, StorageRecordStage } from './constants.js'
+import type { ISchemaAdapter } from '../entity.ts'
+import type { ISelectedCodec } from '../entity.ts'
+import { StorageOperation, StorageRecordStage } from './constants.ts'
 import {
   IEntityOperationRuntime,
   observeEntity,
   IEnvelope,
   IStageFailure,
   stageFailure
-} from './repository-shared.js'
-import type { EntityMigrationOwner } from './migration-owner.js'
-import type { EntityRepositoryOwner } from './repository.js'
+} from './repository-shared.ts'
+import type { EntityMigrationOwner } from './migration-owner.ts'
+import type { EntityRepositoryOwner } from './repository.ts'
 
 /** Immutable codec, schema and storage facts the repository selects before publication. */
 export type IEntityRecordCodecState<TDomain, TStored> = {

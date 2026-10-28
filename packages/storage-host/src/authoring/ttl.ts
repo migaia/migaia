@@ -3,7 +3,7 @@ import {
   assertStorageTtlTarget,
   type IBackendKind
 } from '@migaia/storage-contract'
-import { snapshotLockKey } from './concurrency.js'
+import { snapshotLockKey } from './concurrency.ts'
 
 /** Capture the original lock target only when middleware or native admission can await. */
 export function snapshotStorageTtlTarget(

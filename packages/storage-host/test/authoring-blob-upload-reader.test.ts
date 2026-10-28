@@ -1,4 +1,4 @@
-import * as contractAuthoringBlob from '../src/authoring/blob.js'
+import * as contractAuthoringBlob from '../src/authoring/blob.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 

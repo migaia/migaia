@@ -1,19 +1,15 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "lib": [
-      "ES2024",
-      "ESNext.Disposable",
-      "DOM"
-    ],
+    "lib": ["ES2024", "ESNext.Disposable", "DOM"],
     "rootDir": "src",
     "outDir": "dist",
     "types": []
   },
-  "include": [
-    "src"
-  ],
+  "include": ["src"],
   "exclude": []
 }

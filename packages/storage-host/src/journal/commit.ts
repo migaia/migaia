@@ -5,24 +5,24 @@ import {
   type ILockKey,
   type ITransactionScope
 } from '@migaia/storage-contract'
-import { snapshotConcurrencyLockKeys } from '../authoring/concurrency.js'
+import { snapshotConcurrencyLockKeys } from '../authoring/concurrency.ts'
 import {
   snapshotLogRecords,
   type IBinlogExt,
   type IWalExt,
   type IUndoLogExt,
   type ILogStore
-} from './logger-runtime.js'
-import { encodeFlatStorageKey } from '../core/key-domain.js'
-import type { IStorageJournalBackendAccess } from './binding.js'
-import { resolveStorageLogNativeAccess } from './append-port.js'
-import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.js'
-import { isStorageErrorFamily } from '../core/error-family.js'
+} from './logger-runtime.ts'
+import { encodeFlatStorageKey } from '../core/key-domain.ts'
+import type { IStorageJournalBackendAccess } from './binding.ts'
+import { resolveStorageLogNativeAccess } from './append-port.ts'
+import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.ts'
+import { isStorageErrorFamily } from '../core/error-family.ts'
 
-import { StorageJournalKind } from './constants.js'
-import { createStorageExternalWal } from './wal.js'
-import { storageJournalTargetWire } from './targets.js'
-import { createStorageJournalUndo, storageJournalUndoImages } from './undo.js'
+import { StorageJournalKind } from './constants.ts'
+import { createStorageExternalWal } from './wal.ts'
+import { storageJournalTargetWire } from './targets.ts'
+import { createStorageJournalUndo, storageJournalUndoImages } from './undo.ts'
 /** Private terminal access shares the original namespace resource and never enters business KV. */
 const terminalNamespace = 'storage.journal.terminal'
 /**

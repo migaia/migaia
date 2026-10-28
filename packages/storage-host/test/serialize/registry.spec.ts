@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { selectCodec, jsonCodec, structuredCodec, binaryCodec } from '../../src/entity.js'
+import { selectCodec, jsonCodec, structuredCodec, binaryCodec } from '../../src/entity.ts'
 import { assertCodec } from '@migaia/storage-contract'
 import type { IStorageCapabilities } from '@migaia/storage-contract'
 

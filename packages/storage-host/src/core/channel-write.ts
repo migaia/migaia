@@ -1,7 +1,7 @@
 import type { IBackendKind, IStorageKey } from '@migaia/storage-contract'
-import { StorageError, type IStorageChannel } from '../errors.js'
+import { StorageError, type IStorageChannel } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { STORAGE_MEMORY_BACKEND } from '../state-constants.js'
+import { STORAGE_MEMORY_BACKEND } from '../state-constants.ts'
 
 /** Existing physical channel presence is supplied by the real backend. */
 export type IChannelPresence = ReadonlySet<IStorageChannel>

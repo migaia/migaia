@@ -5,8 +5,8 @@ import {
   lockKey,
   runWithConcurrency,
   readConcurrencyLockIdentities
-} from '../src/authoring/concurrency.js'
-import { createTransactionOwner, resolveConcurrencyPolicy } from '../src/authoring/transaction.js'
+} from '../src/authoring/concurrency.ts'
+import { createTransactionOwner, resolveConcurrencyPolicy } from '../src/authoring/transaction.ts'
 import {
   defineConcurrencyPolicy,
   StorageStageKind,

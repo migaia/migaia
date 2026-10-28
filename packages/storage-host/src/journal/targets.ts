@@ -1,12 +1,12 @@
-import { snapshotConcurrencyLockKeys } from '../authoring/concurrency.js'
+import { snapshotConcurrencyLockKeys } from '../authoring/concurrency.ts'
 import { type IBackendKind } from '@migaia/storage-contract'
-import { snapshotLogRecords, type ILogPayload } from './logger-runtime.js'
-import { decodeFlatStorageKey, encodeFlatStorageKey } from '../core/key-domain.js'
-import { StorageError } from '../errors.js'
+import { snapshotLogRecords, type ILogPayload } from './logger-runtime.ts'
+import { decodeFlatStorageKey, encodeFlatStorageKey } from '../core/key-domain.ts'
+import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
-import { StorageJournalKind } from './constants.js'
-import type { IStorageJournalTarget } from './types.js'
+import { StorageErrorText } from '../error-text.ts'
+import { StorageJournalKind } from './constants.ts'
+import type { IStorageJournalTarget } from './types.ts'
 
 /** Persisted target failures retain the original canonical codec or lock-validator cause. */
 export function invalidStorageJournalRecord(cause?: unknown): never {

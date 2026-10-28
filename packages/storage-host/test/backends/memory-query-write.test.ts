@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { records, rdf, vector, type IQuad } from '@migaia/storage-contract'
-import { term } from '../../src/authoring/rdf.js'
-import { ConcurrencyPolicy } from '../../src/authoring/concurrency.js'
-import { createOrgId, createStorageHost, definePlugin } from '../../src/index.js'
-import { memoryBackendPlugin } from '../../src/plugins/memory.js'
-import { MemoryOperation } from '../../src/backends/memory-constants.js'
+import { term } from '../../src/authoring/rdf.ts'
+import { ConcurrencyPolicy } from '../../src/authoring/concurrency.ts'
+import { createOrgId, createStorageHost, definePlugin } from '../../src/index.ts'
+import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
+import { MemoryOperation } from '../../src/backends/memory-constants.ts'
 
 /** Native query mutations select and write inside the original transaction attempt. */
 describe('memory native query writes', () => {

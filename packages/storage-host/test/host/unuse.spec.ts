@@ -1,11 +1,11 @@
 import { expect, it } from 'vitest'
 import { Logger } from '@migaia/logger'
 import { level } from '@migaia/logger/plugins'
-import { createStorageHost, definePlugin } from '../../src/index.js'
+import { createStorageHost, definePlugin } from '../../src/index.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { memoryBackendPlugin } from '../../src/plugins/memory.js'
-import { storageJournalPlugin } from '../../src/journal.js'
-import { storageProbe } from '../../src/plugins/probe/index.js'
+import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
+import { storageJournalPlugin } from '../../src/journal.ts'
+import { storageProbe } from '../../src/plugins/probe/index.ts'
 
 /** A plugin that borrows the memory backend the way a cache tier or archive source does. */
 const borrower = (target: string) =>

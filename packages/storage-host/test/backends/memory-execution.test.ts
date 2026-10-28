@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
-import { ConcurrencyPolicy } from '../../src/authoring/concurrency.js'
-import { createStorageHost, definePlugin } from '../../src/index.js'
-import { memoryBackendPlugin } from '../../src/plugins/memory.js'
-import { MemoryOperation } from '../../src/backends/memory-constants.js'
+import { ConcurrencyPolicy } from '../../src/authoring/concurrency.ts'
+import { createStorageHost, definePlugin } from '../../src/index.ts'
+import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
+import { MemoryOperation } from '../../src/backends/memory-constants.ts'
 
 describe('memory execution and the original concurrency budget', () => {
   it('keeps after-next and native failure handling around the actual root operation', async () => {

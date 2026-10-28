@@ -8,8 +8,8 @@ import {
   type ITransactionInfo,
   type ITransactionScope
 } from '@migaia/storage-contract'
-import { subscribeToAbort } from '../core/operation.js'
-import type { IStorageJournalNamespace, IStorageJournalNamespaceView } from './types.js'
+import { subscribeToAbort } from '../core/operation.ts'
+import type { IStorageJournalNamespace, IStorageJournalNamespaceView } from './types.ts'
 
 /**
  * A transaction borrows private I/O and terminal observation without commit or native-handle

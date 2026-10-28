@@ -9,14 +9,14 @@ import {
   StorageContractErrorCode,
   type IOperationContextSnapshot
 } from '@migaia/storage-contract'
-import { snapshotOperationContext } from '../authoring/context.js'
-import { isStorageErrorFamily } from './error-family.js'
+import { snapshotOperationContext } from '../authoring/context.ts'
+import { isStorageErrorFamily } from './error-family.ts'
 import {
   createStorageOperationRuntime,
   reportCleanupError,
   type IStorageOperationReporter,
   type IStorageOperationRuntime
-} from './operation-reporter.js'
+} from './operation-reporter.ts'
 
 type IOperationValidationContext = IOperationContext & {
   readonly conflictPolicy?: unknown

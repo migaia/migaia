@@ -1,6 +1,6 @@
-import type { IStoragePipelineInput } from '../types.js'
-import type { IStorageJournalConfigurationSnapshot } from './configuration-options.js'
-import { STORAGE_TELEMETRY_TAG } from './constants.js'
+import type { IStoragePipelineInput } from '../types.ts'
+import type { IStorageJournalConfigurationSnapshot } from './configuration-options.ts'
+import { STORAGE_TELEMETRY_TAG } from './constants.ts'
 
 /** Resolve the optional logger only when the selected journal runtime is evaluated. */
 const { LoggerLevel } = await import('@migaia/logger')

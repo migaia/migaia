@@ -14,9 +14,9 @@ import {
   type IStorageIterator
 } from '@migaia/storage-contract'
 import type { IMaybe } from '@migaia/utils'
-import { createStorageIteratorLifetime } from './resource.js'
-import { runTransactionIteratorOperation, deriveTransactionIterator } from './transaction.js'
-import { invalidQueryCondition } from './query-condition.js'
+import { createStorageIteratorLifetime } from './resource.ts'
+import { runTransactionIteratorOperation, deriveTransactionIterator } from './transaction.ts'
+import { invalidQueryCondition } from './query-condition.ts'
 import {
   consumeRecordQuery,
   prepareQueryExecution,
@@ -25,12 +25,12 @@ import {
   beginVectorQueryOperation,
   failedRecordQuery,
   releaseVectorQueryOperation
-} from './query-execution.js'
-import type { IPreparedQueryExecution } from './query-execution.js'
-import { planRecordQuery } from './query-plan.js'
-import type { IQuerySourceSnapshot, IQueryNode, IRecordExecutionPlan } from './query-plan.js'
-import { assertQueryActive, completeQueryCleanup } from './query-reader.js'
-import type { IQueryReader, ICompiledQueryReader, IQueryAdvance } from './query-reader.js'
+} from './query-execution.ts'
+import type { IPreparedQueryExecution } from './query-execution.ts'
+import { planRecordQuery } from './query-plan.ts'
+import type { IQuerySourceSnapshot, IQueryNode, IRecordExecutionPlan } from './query-plan.ts'
+import { assertQueryActive, completeQueryCleanup } from './query-reader.ts'
+import type { IQueryReader, ICompiledQueryReader, IQueryAdvance } from './query-reader.ts'
 
 /** Common read and numeric terminals borrow only the existing planner, reader and resource owner. */
 /** Read terminals share one explicit query definition while original source resources own execution. */

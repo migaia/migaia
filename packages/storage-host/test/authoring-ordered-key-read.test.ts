@@ -4,7 +4,7 @@ import {
   decodeOrderedStorageKey,
   prefixStorageOrgKey,
   unprefixStorageOrgKey
-} from '../src/authoring/key.js'
+} from '../src/authoring/key.ts'
 
 describe('ordered physical key reader', () => {
   it('reads the original complete scalar and nested tuple domains without changing UTF-16 units', () => {

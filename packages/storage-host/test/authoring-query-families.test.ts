@@ -3,8 +3,8 @@ import {
   createRdfQuery,
   createVectorQuery,
   refineStorageVectorQuery
-} from '../src/authoring/query.js'
-import { createStorageIteratorLifetime } from '../src/authoring/resource.js'
+} from '../src/authoring/query.ts'
+import { createStorageIteratorLifetime } from '../src/authoring/resource.ts'
 import {
   QueryOperation,
   QueryOperator,
@@ -20,7 +20,7 @@ import {
   type IVectorNativeQuery,
   type IVectorReranker
 } from '@migaia/storage-contract'
-import { term } from '../src/authoring/rdf.js'
+import { term } from '../src/authoring/rdf.ts'
 
 /** Original cursor ownership is shared by every family test, including early-exit cleanup. */
 function rows<T>(

@@ -15,12 +15,12 @@ import {
   StorageContractError,
   StorageContractErrorCode
 } from '@migaia/storage-contract'
-import { ConcurrencyPolicy } from './concurrency.js'
-import { snapshotOperationContext } from './context.js'
-import { snapshotStorageBaseDetailed } from './store.js'
-import { createStorageIteratorLifetime } from './resource.js'
+import { ConcurrencyPolicy } from './concurrency.ts'
+import { snapshotOperationContext } from './context.ts'
+import { snapshotStorageBaseDetailed } from './store.ts'
+import { createStorageIteratorLifetime } from './resource.ts'
 import { observeThenableRejection } from '@migaia/utils/function'
-import { runTransactionOperation, nextTransactionIterator } from './transaction.js'
+import { runTransactionOperation, nextTransactionIterator } from './transaction.ts'
 
 /** Backend normalization is the only owner of transaction failure source, code and topology. */
 type ITransactionFailure = Error & { readonly source: string; readonly code: string }

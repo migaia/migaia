@@ -20,32 +20,32 @@ import {
   snapshotConcurrencyLockKeys,
   lockKey,
   runWithConcurrency
-} from '../authoring/concurrency.js'
+} from '../authoring/concurrency.ts'
 import {
   snapshotStorageBatchKeys,
   createStorageBatchKeyCapture,
   encodeOrderedStorageKey
-} from '../authoring/key.js'
-import { createTransactionBuilder } from '../authoring/transaction.js'
-import { createRdfQuery } from '../authoring/query.js'
+} from '../authoring/key.ts'
+import { createTransactionBuilder } from '../authoring/transaction.ts'
+import { createRdfQuery } from '../authoring/query.ts'
 import {
   snapshotStorageRdfQuad,
   snapshotStorageRdfPattern,
   prefixStorageOrgGraph,
   unprefixStorageOrgGraph
-} from '../authoring/rdf.js'
-import { memoryRdfKeys } from './rdf-core.js'
-import { StorageError } from '../errors.js'
+} from '../authoring/rdf.ts'
+import { memoryRdfKeys } from './rdf-core.ts'
+import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
-import { STORAGE_MEMORY_BACKEND } from '../state-constants.js'
-import { MemoryOperation, MemoryState } from './memory-constants.js'
-import { encodeFlatStorageKey, snapshotKeyRange } from '../core/key-domain.js'
-import type { IOrderedRecordRange } from '../core/ordered-record-index.js'
-import { throwIfAborted, mergeSignals, withAbort } from '../core/operation.js'
-import { reportCleanupError } from '../core/operation-reporter.js'
-import { observeStorageBatch } from '../core/batch-observation.js'
-import { prepare, holding, entryBytes, identity, liveEntry, clone } from './memory-entries.js'
+import { StorageErrorText } from '../error-text.ts'
+import { STORAGE_MEMORY_BACKEND } from '../state-constants.ts'
+import { MemoryOperation, MemoryState } from './memory-constants.ts'
+import { encodeFlatStorageKey, snapshotKeyRange } from '../core/key-domain.ts'
+import type { IOrderedRecordRange } from '../core/ordered-record-index.ts'
+import { throwIfAborted, mergeSignals, withAbort } from '../core/operation.ts'
+import { reportCleanupError } from '../core/operation-reporter.ts'
+import { observeStorageBatch } from '../core/batch-observation.ts'
+import { prepare, holding, entryBytes, identity, liveEntry, clone } from './memory-entries.ts'
 import {
   createMemoryNamespaceSync,
   createMemoryNamespaceBaseText,
@@ -53,9 +53,9 @@ import {
   createMemoryNamespaceBaseRecords,
   createMemoryNamespaceBaseTransactions,
   createMemoryNamespaceBaseObservation
-} from './memory-namespace-sync.js'
-import { transact } from './memory-transaction.js'
-import { queryDraft } from './memory.js'
+} from './memory-namespace-sync.ts'
+import { transact } from './memory-transaction.ts'
+import { queryDraft } from './memory.ts'
 import type {
   IMemoryNamespaceContext,
   IMemoryScope,
@@ -63,7 +63,7 @@ import type {
   IMemoryAtomicWork,
   IMemoryEntry,
   IMemoryRdfEntry
-} from './memory.js'
+} from './memory.ts'
 
 /** One existing runner owns every asynchronous public endpoint. */
 export function asyncEntry<T, I, R>(

@@ -1,6 +1,6 @@
-import { createRecordQuery } from '../authoring/query.js'
-import { EntityFeatureName } from './constants.js'
-import type { IEntityFeature } from './assembly.js'
+import { createRecordQuery } from '../authoring/query.ts'
+import { EntityFeatureName } from './constants.ts'
+import type { IEntityFeature } from './assembly.ts'
 
 /** Keyset assembly delegates page and cursor work to the original canonical query owner. */
 class EntityKeysetOwner {

@@ -1,4 +1,4 @@
-import { storageProbe } from '../../src/plugins/probe/index.js'
+import { storageProbe } from '../../src/plugins/probe/index.ts'
 import { describe, expect, it } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import {
@@ -7,11 +7,11 @@ import {
   type ITransactionKeyValueApi,
   type ITransactionScope
 } from '@migaia/storage-contract'
-import { lockKey, ConcurrencyPolicy } from '../../src/authoring/concurrency.js'
-import { registerTransactionFinalizer } from '../../src/authoring/transaction.js'
-import { createStorageHost, definePlugin, StorageError } from '../../src/index.js'
-import { memoryBackendPlugin } from '../../src/plugins/memory.js'
-import type { IStorageHookMap } from '../../src/index.js'
+import { lockKey, ConcurrencyPolicy } from '../../src/authoring/concurrency.ts'
+import { registerTransactionFinalizer } from '../../src/authoring/transaction.ts'
+import { createStorageHost, definePlugin, StorageError } from '../../src/index.ts'
+import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
+import type { IStorageHookMap } from '../../src/index.ts'
 
 /** The selected row domain belongs to the actual native memory record channel. */
 type IOrder = { state: string; total: number }

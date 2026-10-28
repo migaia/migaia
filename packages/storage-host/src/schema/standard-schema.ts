@@ -1,8 +1,8 @@
-import { StorageError, createStorageTypeError } from '../errors.js'
+import { StorageError, createStorageTypeError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
-import { EntityAdapterName } from '../adapter-constants.js'
-import type { ISchemaAdapter } from './types.js'
+import { StorageErrorText } from '../error-text.ts'
+import { EntityAdapterName } from '../adapter-constants.ts'
+import type { ISchemaAdapter } from './types.ts'
 
 /**
  * Minimal Standard Schema version-one protocol. Any validator implementing this structure can

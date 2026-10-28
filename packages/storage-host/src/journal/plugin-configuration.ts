@@ -1,4 +1,4 @@
-import type { IStorageJournalConfiguration } from './types.js'
+import type { IStorageJournalConfiguration } from './types.ts'
 
 /**
  * Journal configuration carried by each `storageJournalPlugin()` handle. The host reads it before

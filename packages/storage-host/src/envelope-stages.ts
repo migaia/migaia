@@ -1,8 +1,8 @@
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
-import type { IStorageEnvelopeStages } from './types.js'
-import type { IStorageObserverBinding } from './stages.js'
-import type { IStorageHookMap } from './hook-types.js'
-import { StorageHookName as Hook } from './hook-names.js'
+import type { IStorageEnvelopeStages } from './types.ts'
+import type { IStorageObserverBinding } from './stages.ts'
+import type { IStorageHookMap } from './hook-types.ts'
+import { StorageHookName as Hook } from './hook-names.ts'
 
 /** Bind immutable operation metadata to the original migration observer, without executing a plan. */
 export function createStorageEnvelopeStages(

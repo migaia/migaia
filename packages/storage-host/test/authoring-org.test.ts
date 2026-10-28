@@ -6,19 +6,19 @@ import {
   type IOperationContext,
   type IStorageKey
 } from '@migaia/storage-contract'
-import { snapshotOperationContext } from '../src/authoring/context.js'
+import { snapshotOperationContext } from '../src/authoring/context.ts'
 import {
   prefixStorageOrgKey,
   encodeStorageOrgStringPrefix,
   encodeOrderedStorageKey,
   unprefixStorageOrgKey
-} from '../src/authoring/key.js'
+} from '../src/authoring/key.ts'
 import {
   getStorageOrgGraphPrefix,
   prefixStorageOrgGraph,
   unprefixStorageOrgGraph,
   term
-} from '../src/authoring/rdf.js'
+} from '../src/authoring/rdf.ts'
 
 /** The reserved default remains a valid canonical identity without forcing it into omitted contexts. */
 const zeroOrg = '00000000-0000-0000-0000-000000000000'

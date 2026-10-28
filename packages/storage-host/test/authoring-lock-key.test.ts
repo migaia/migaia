@@ -4,16 +4,16 @@ import {
   snapshotConcurrencyLockHoldings,
   snapshotConcurrencyLockKeys,
   snapshotConcurrencyLockRange
-} from '../src/authoring/concurrency.js'
+} from '../src/authoring/concurrency.ts'
 import {
   assertLockKey,
   type ILockHolding,
   type ILockKey,
   type IStorageKey
 } from '@migaia/storage-contract'
-import { compareStorageKeys } from '../src/authoring/key.js'
-import { term, encodeStorageRdfQuad } from '../src/authoring/rdf.js'
-import { normalizeLockKeys, snapshotLockKey } from '../src/authoring/concurrency.js'
+import { compareStorageKeys } from '../src/authoring/key.ts'
+import { term, encodeStorageRdfQuad } from '../src/authoring/rdf.ts'
+import { normalizeLockKeys, snapshotLockKey } from '../src/authoring/concurrency.ts'
 
 /** Oracle compares established key meanings and fixed channel order, independent of new encoding. */
 function compareLockKeys(left: ILockKey, right: ILockKey): number {

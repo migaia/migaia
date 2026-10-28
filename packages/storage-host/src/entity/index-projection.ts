@@ -1,4 +1,4 @@
-import { EntityText } from './text.js'
+import { EntityText } from './text.ts'
 import { get, parseObjectPath, type IObjectPathTuple } from '@migaia/utils/object'
 import type {
   IRecordIndexDefinition,
@@ -9,8 +9,8 @@ import type {
   IKeyRange
 } from '@migaia/storage-contract'
 import { assertStorageKey, QueryOperator } from '@migaia/storage-contract'
-import { snapshotStorageKey, compareStorageKeys } from '../authoring/key.js'
-import { StorageError } from '../errors.js'
+import { snapshotStorageKey, compareStorageKeys } from '../authoring/key.ts'
+import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import type { IKeyValueStore } from '@migaia/storage-contract'
 

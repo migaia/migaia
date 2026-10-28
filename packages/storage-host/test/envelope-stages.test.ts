@@ -1,20 +1,20 @@
-import { storageProbe } from '../src/plugins/probe/index.js'
+import { storageProbe } from '../src/plugins/probe/index.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { assertVersionedEnvelope } from '@migaia/storage-contract'
 import {
   createMigrationPlan,
   migrateEnvelope,
   migrateEnvelopeSync
-} from '../src/authoring/migration.js'
+} from '../src/authoring/migration.ts'
 import {
   createStorageHost,
   definePlugin,
   defineStorageBackendKind,
   type IStoragePluginCore,
   type IStorageHookMap
-} from '../src/index.js'
-import { catalog } from './helpers/catalog.js'
-import { getBackendEnvelopeStages } from '../src/core/change-controller.js'
+} from '../src/index.ts'
+import { catalog } from './helpers/catalog.ts'
+import { getBackendEnvelopeStages } from '../src/core/change-controller.ts'
 
 /** Actual backend identity binds observations without replacing the migration or store owner. */
 const kind = defineStorageBackendKind<ReturnType<typeof catalog>['store'], Map<string, string>>()(

@@ -1,7 +1,7 @@
 import { asyncDisposeKey } from '@migaia/plugin-host'
-import { createBackendRevisionPort } from './revisions.js'
-import { createBackendKeyLockPort } from './key-locks.js'
-import type { IBackendChangeController } from '../core/change-types.js'
+import { createBackendRevisionPort } from './revisions.ts'
+import { createBackendKeyLockPort } from './key-locks.ts'
+import type { IBackendChangeController } from '../core/change-types.ts'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -50,41 +50,41 @@ import {
   type IOperationContext,
   type IConflictPolicy
 } from '@migaia/storage-contract'
-import { ConcurrencyPolicy, runWithConcurrency } from '../authoring/concurrency.js'
-import { snapshotStorageCounterIncrement } from '../authoring/counter.js'
-import { createTransactionOwner, assertTransactionOwner } from '../authoring/transaction.js'
-import { createMemoryRdfIndex, type IMemoryRdfKeys } from './rdf-core.js'
-import { createMemoryBlobData } from './memory-blob.js'
-import { createMemoryJournalData, type IMemoryJournalTransaction } from './memory-journal.js'
-import { snapshotMemoryJournalTarget } from './memory-journal-image.js'
+import { ConcurrencyPolicy, runWithConcurrency } from '../authoring/concurrency.ts'
+import { snapshotStorageCounterIncrement } from '../authoring/counter.ts'
+import { createTransactionOwner, assertTransactionOwner } from '../authoring/transaction.ts'
+import { createMemoryRdfIndex, type IMemoryRdfKeys } from './rdf-core.ts'
+import { createMemoryBlobData } from './memory-blob.ts'
+import { createMemoryJournalData, type IMemoryJournalTransaction } from './memory-journal.ts'
+import { snapshotMemoryJournalTarget } from './memory-journal-image.ts'
 import type {
   IStorageJournalBackendBinding,
   IStorageJournalChange,
   IStorageJournalImage,
   IStorageJournalTarget
-} from '../journal/types.js'
+} from '../journal/types.ts'
 import type { ILogPayload } from '@migaia/logger/plugins/durable'
-import { storageJournalLockKey, StorageJournalLock } from '../journal/keys.js'
+import { storageJournalLockKey, StorageJournalLock } from '../journal/keys.ts'
 import { detectServerRuntime } from '@migaia/utils'
-import { StorageError, type IStorageChannel } from '../errors.js'
+import { StorageError, type IStorageChannel } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
-import type { IStoragePluginCore } from '../types.js'
-import { STORAGE_MEMORY_BACKEND } from '../state-constants.js'
-import { MemoryOperation, MemoryState } from './memory-constants.js'
-import { createStorageToken } from '../core/storage-token.js'
-import { createOrderedRecordIndex } from '../core/ordered-record-index.js'
-import { resolveStorageNamespace } from '../core/namespace.js'
-import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.js'
-import type { IMemoryAssembly } from './memory-assembly.js'
-import { createMemoryLifecycleController } from './memory-lifecycle.js'
+import { StorageErrorText } from '../error-text.ts'
+import type { IStoragePluginCore } from '../types.ts'
+import { STORAGE_MEMORY_BACKEND } from '../state-constants.ts'
+import { MemoryOperation, MemoryState } from './memory-constants.ts'
+import { createStorageToken } from '../core/storage-token.ts'
+import { createOrderedRecordIndex } from '../core/ordered-record-index.ts'
+import { resolveStorageNamespace } from '../core/namespace.ts'
+import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.ts'
+import type { IMemoryAssembly } from './memory-assembly.ts'
+import { createMemoryLifecycleController } from './memory-lifecycle.ts'
 import {
   snapshotMemoryCapacity,
   createMemoryCapacityIndex,
   type IMemoryCapacity,
   type IMemoryCapacityOptions,
   type IMemoryCapacityChange
-} from './memory-capacity.js'
+} from './memory-capacity.ts'
 import {
   normalize,
   finalize,
@@ -92,20 +92,20 @@ import {
   mutationRanges,
   clearAll,
   holding
-} from './memory-entries.js'
+} from './memory-entries.ts'
 import {
   createMemoryNamespaceKeyValue,
   createMemoryNamespaceTimeToLive,
   createMemoryNamespaceCounters
-} from './memory-keyvalue.js'
-import { createMemoryNamespaceBase, atomicEntry } from './memory-namespace-base.js'
+} from './memory-keyvalue.ts'
+import { createMemoryNamespaceBase, atomicEntry } from './memory-namespace-base.ts'
 import {
   createMemoryNamespaceRdfApi,
   createMemoryNamespaceStore,
   createMemoryNamespaceJournalImages
-} from './memory-namespace-store.js'
-import { createMemoryNamespaceObjects } from './memory-objects.js'
-import { createMemoryNamespaceVectors } from './memory-vector.js'
+} from './memory-namespace-store.ts'
+import { createMemoryNamespaceObjects } from './memory-objects.ts'
+import { createMemoryNamespaceVectors } from './memory-vector.ts'
 
 /** Memory options retain one private data universe for this concrete plugin instance. */
 export type IMemoryOptions = {

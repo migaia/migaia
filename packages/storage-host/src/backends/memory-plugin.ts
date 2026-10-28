@@ -1,18 +1,18 @@
 import { type ITransactionScope, type records } from '@migaia/storage-contract'
-import { StorageError } from '../errors.js'
+import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
-import { isStorageErrorFamily } from '../core/error-family.js'
-import { definePlugin, defineStorageBackendKind } from '../contracts.js'
+import { StorageErrorText } from '../error-text.ts'
+import { isStorageErrorFamily } from '../core/error-family.ts'
+import { definePlugin, defineStorageBackendKind } from '../contracts.ts'
 import type {
   IStoragePluginCore,
   IStorageFeatureRecord,
   IStorageBackendPlugin,
   IStorageFeatureStoreCompatibility
-} from '../types.js'
-import { createMemoryBackend, type IMemoryBackendStore, type IMemoryOptions } from './memory.js'
-import { readMemoryAssembly } from './memory-assembly.js'
-import { snapshotMemoryCapacity } from './memory-capacity.js'
+} from '../types.ts'
+import { createMemoryBackend, type IMemoryBackendStore, type IMemoryOptions } from './memory.ts'
+import { readMemoryAssembly } from './memory-assembly.ts'
+import { snapshotMemoryCapacity } from './memory-capacity.ts'
 
 /** Exact memory token keeps native data and the original transaction owner in the neutral host. */
 export const memoryBackendKind = defineStorageBackendKind<

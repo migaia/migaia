@@ -16,8 +16,8 @@ import {
   type IStorageBorrowedBackend,
   type IStorageFeatureExpose,
   type IStorageBackendKind
-} from '../src/index.js'
-import { catalog } from './helpers/catalog.js'
+} from '../src/index.ts'
+import { catalog } from './helpers/catalog.ts'
 
 /** One real map-backed catalog is admitted without requiring a capability provider. */
 const kind = defineStorageBackendKind<IStorageBase, Map<string, string>>()('catalog')

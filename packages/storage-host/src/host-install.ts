@@ -1,36 +1,36 @@
 // Install entries and backend registration contexts for one storage host (see ./storage-host.ts).
-import { readStorageHookFailureCode } from './hooks.js'
-import { createStorageObservers, type IStorageObserverSet } from './stages.js'
-import { createStorageEnvelopeStages } from './envelope-stages.js'
+import { readStorageHookFailureCode } from './hooks.ts'
+import { createStorageObservers, type IStorageObserverSet } from './stages.ts'
+import { createStorageEnvelopeStages } from './envelope-stages.ts'
 import {
   registerBackendChangeController,
   registerBackendEnvelopeStages,
   getBackendChangeController,
   registerBackendEntityAccess
-} from './core/backend-registry.js'
-import { StorageHookName as Hook } from './hook-names.js'
-import { borrowStorageBackend } from './borrow.js'
+} from './core/backend-registry.ts'
+import { StorageHookName as Hook } from './hook-names.ts'
+import { borrowStorageBackend } from './borrow.ts'
 import { asyncDisposeKey, getPluginRuntimeIntegration, type IPlugin } from '@migaia/plugin-host'
-import { snapshotStorageBaseDetailed } from './authoring/store.js'
+import { snapshotStorageBaseDetailed } from './authoring/store.ts'
 import {
   assertOperationContext,
   StorageContractError,
   StorageContractErrorCode
 } from '@migaia/storage-contract'
 import { raceWithAbort } from '@migaia/utils/promise'
-import { createStorageTypeError, StorageError } from './errors.js'
+import { createStorageTypeError, StorageError } from './errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from './error-text.js'
-import { readStorageNativePluginDefinition, readStorageNativePluginMetadata } from './contracts.js'
-import { forwardStorageExecution } from './execution.js'
-import { createStorageStoreCell } from './store-cell.js'
+import { StorageErrorText } from './error-text.ts'
+import { readStorageNativePluginDefinition, readStorageNativePluginMetadata } from './contracts.ts'
+import { forwardStorageExecution } from './execution.ts'
+import { createStorageStoreCell } from './store-cell.ts'
 import type { IStorageBase } from '@migaia/storage-contract'
 import type {
   IStorageBackendPluginHandle,
   IStoragePipelineInput,
   IStoragePluginCore,
   IStoragePluginCallContext
-} from './types.js'
+} from './types.ts'
 import type {
   IStorageNativeRegistrationContext,
   IStorageDetectCheck,
@@ -39,7 +39,7 @@ import type {
   IStorageInstallEntryContext,
   IStorageInstallEntryResult,
   StorageHost
-} from './storage-host.js'
+} from './storage-host.ts'
 
 /** Own install entries and the registration context through which each backend plugin installs. */
 export class StorageHostInstaller {

@@ -8,29 +8,29 @@ import {
   type IStorageKey,
   type IOperationContext
 } from '@migaia/storage-contract'
-import { runWithConcurrency } from '../authoring/concurrency.js'
-import { prefixStorageOrgKey } from '../authoring/key.js'
+import { runWithConcurrency } from '../authoring/concurrency.ts'
+import { prefixStorageOrgKey } from '../authoring/key.ts'
 import {
   snapshotStorageBlobPut,
   snapshotStorageBlobGet,
   snapshotStorageBlobList,
   createStorageBlobObject,
   createStorageBlobBodyReader
-} from '../authoring/blob.js'
+} from '../authoring/blob.ts'
 import { isUint8Array } from '@migaia/utils/bytes'
-import { StorageError } from '../errors.js'
+import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { STORAGE_MEMORY_BACKEND } from '../state-constants.js'
-import { MemoryOperation } from './memory-constants.js'
-import { createStorageToken } from '../core/storage-token.js'
-import { isStorageErrorFamily } from '../core/error-family.js'
+import { STORAGE_MEMORY_BACKEND } from '../state-constants.ts'
+import { MemoryOperation } from './memory-constants.ts'
+import { createStorageToken } from '../core/storage-token.ts'
+import { isStorageErrorFamily } from '../core/error-family.ts'
 import {
   throwIfAborted,
   mergeSignals,
   subscribeToAbort,
   readAbortReason
-} from '../core/operation.js'
-import { reportCleanupError } from '../core/operation-reporter.js'
+} from '../core/operation.ts'
+import { reportCleanupError } from '../core/operation-reporter.ts'
 import {
   identity,
   mutationEntry,
@@ -40,9 +40,9 @@ import {
   holding,
   commitCapacity,
   capacityFact
-} from './memory-entries.js'
-import { asyncEntry } from './memory-namespace-base.js'
-import type { IMemoryNamespaceContext } from './memory.js'
+} from './memory-entries.ts'
+import { asyncEntry } from './memory-namespace-base.ts'
+import type { IMemoryNamespaceContext } from './memory.ts'
 
 /** Native object failures reuse the existing memory serialization boundary and original cause. */
 function blobFailure<T>(

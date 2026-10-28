@@ -16,14 +16,14 @@ import type {
   IQueryStageObserver
 } from '@migaia/storage-contract'
 import type { IKeyValueStore } from '@migaia/storage-contract'
-import type { IStorageBorrowedBackend } from '../types.js'
+import type { IStorageBorrowedBackend } from '../types.ts'
 /** Raw backends retain resource admission; only certified host views may omit ownership members. */
 export type IEntityConnectStore = IKeyValueStore | IStorageBorrowedBackend<IKeyValueStore>
-import type { IEntityFeature } from './assembly.js'
-import type { ISchemaAdapter } from '../entity.js'
+import type { IEntityFeature } from './assembly.ts'
+import type { ISchemaAdapter } from '../entity.ts'
 import type { IMigrationStep } from '@migaia/storage-contract'
-import type { ICodec } from '../entity.js'
-import type { IStorageInvalidRecordAction, IStorageRecordStage } from './constants.js'
+import type { ICodec } from '../entity.ts'
+import type { IStorageInvalidRecordAction, IStorageRecordStage } from './constants.ts'
 import type { IObjectPathInput, IObjectPathValue } from '@migaia/utils/object'
 
 /**

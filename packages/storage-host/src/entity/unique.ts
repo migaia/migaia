@@ -1,1 +1,1 @@
-export { entityUniqueFeature } from './unique-feature.js'
+export { entityUniqueFeature } from './unique-feature.ts'

@@ -1,5 +1,5 @@
-import { memoryNotificationsFeature } from '../../src/features/memory-notifications.js'
-import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.js'
+import { memoryNotificationsFeature } from '../../src/features/memory-notifications.ts'
+import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import {
@@ -9,11 +9,11 @@ import {
   rdf,
   type IStorageChange
 } from '@migaia/storage-contract'
-import { term } from '../../src/authoring/rdf.js'
-import { createOrgId, createStorageHost } from '../../src/index.js'
-import { memoryBackendPlugin } from '../../src/plugins/memory.js'
-import { createBackendChangeController } from '../../src/core/change-controller.js'
-import { createBackendChangeIterator } from '../../src/authoring/change-iterator.js'
+import { term } from '../../src/authoring/rdf.ts'
+import { createOrgId, createStorageHost } from '../../src/index.ts'
+import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
+import { createBackendChangeController } from '../../src/core/change-controller.ts'
+import { createBackendChangeIterator } from '../../src/authoring/change-iterator.ts'
 
 /** Native watch streams are invalidation hints from the same original commit controller. */
 describe('memory native text watch', () => {

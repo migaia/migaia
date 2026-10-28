@@ -18,30 +18,30 @@ import {
   type IQueryCondition,
   type IStorageKey
 } from '@migaia/storage-contract'
-import { snapshotConcurrencyLockRange, lockKey } from '../authoring/concurrency.js'
+import { snapshotConcurrencyLockRange, lockKey } from '../authoring/concurrency.ts'
 import {
   snapshotStorageBatchKeys,
   encodeOrderedStorageKey,
   snapshotStorageKeyPrefix
-} from '../authoring/key.js'
+} from '../authoring/key.ts'
 import {
   createVectorQuery,
   compileStorageWhere,
   compileStorageQueryCondition
-} from '../authoring/query.js'
+} from '../authoring/query.ts'
 import {
   snapshotStorageVectorCollection,
   snapshotStorageVector,
   snapshotStorageVectorUpsert,
   snapshotStorageVectorSearch
-} from '../authoring/vector.js'
+} from '../authoring/vector.ts'
 import { parseObjectPath } from '@migaia/utils/object-path'
-import { rankMemoryVectors, recommendStorageVector } from './vector-core.js'
-import { StorageErrorText } from '../error-text.js'
-import { STORAGE_MEMORY_BACKEND } from '../state-constants.js'
-import { MemoryOperation, MemoryState } from './memory-constants.js'
-import { encodeFlatStorageKey } from '../core/key-domain.js'
-import { compareRecordIndexKeys } from '../core/ordered-record-index.js'
+import { rankMemoryVectors, recommendStorageVector } from './vector-core.ts'
+import { StorageErrorText } from '../error-text.ts'
+import { STORAGE_MEMORY_BACKEND } from '../state-constants.ts'
+import { MemoryOperation, MemoryState } from './memory-constants.ts'
+import { encodeFlatStorageKey } from '../core/key-domain.ts'
+import { compareRecordIndexKeys } from '../core/ordered-record-index.ts'
 import {
   deletePhysical,
   liveEntry,
@@ -53,10 +53,10 @@ import {
   setDeadline,
   bump,
   publish
-} from './memory-entries.js'
-import { watchChanges, atomicEntry, nativeIterator, asyncEntry } from './memory-namespace-base.js'
-import { queryDraft } from './memory.js'
-import type { IMemoryNamespaceContext, IMemoryVectorSelection } from './memory.js'
+} from './memory-entries.ts'
+import { watchChanges, atomicEntry, nativeIterator, asyncEntry } from './memory-namespace-base.ts'
+import { queryDraft } from './memory.ts'
+import type { IMemoryNamespaceContext, IMemoryVectorSelection } from './memory.ts'
 
 /** New native capability calls check the same controller before the original registration runner. */
 function vectorOperation<T, R>(

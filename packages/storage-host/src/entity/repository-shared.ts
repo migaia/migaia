@@ -3,7 +3,7 @@ import {
   getBackendEntityAccess,
   snapshotBackendEntityRecordWatcher,
   type IBackendEntityAccess
-} from '../core/backend-registry.js'
+} from '../core/backend-registry.ts'
 import {
   type IVersionedEnvelope,
   type IMigrationPlan,
@@ -19,36 +19,36 @@ import {
   type IKeyRange,
   type ISecondaryIndexRecordStore
 } from '@migaia/storage-contract'
-import { snapshotKeyValueStoreDetailed, snapshotRecordStore } from '../authoring/store.js'
-import { compareStorageKeys } from '../authoring/key.js'
-import { assertTransactionOwner } from '../authoring/transaction.js'
+import { snapshotKeyValueStoreDetailed, snapshotRecordStore } from '../authoring/store.ts'
+import { compareStorageKeys } from '../authoring/key.ts'
+import { assertTransactionOwner } from '../authoring/transaction.ts'
 
-import { StorageError } from '../errors.js'
+import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 
-import { isStorageKeyInRange } from '../core/query-state.js'
-import { normalizeError as normalizeStorageError } from '../core/error-family.js'
+import { isStorageKeyInRange } from '../core/query-state.ts'
+import { normalizeError as normalizeStorageError } from '../core/error-family.ts'
 import {
   createStorageOperationRuntime,
   type IStorageOperationRuntime,
   reportCleanupError
-} from '../core/operation-reporter.js'
-import { EntityText } from './text.js'
-import { type IEntityQueryPlan, type IEntityQuerySourceSelection } from './query-adapter.js'
+} from '../core/operation-reporter.ts'
+import { EntityText } from './text.ts'
+import { type IEntityQueryPlan, type IEntityQuerySourceSelection } from './query-adapter.ts'
 import type { IOperationContext, IStorageKey } from '@migaia/storage-contract'
 import type { IRecordStore, IKeyValueStore } from '@migaia/storage-contract'
-import type { ISchemaAdapter } from '../entity.js'
-import type { ICodec } from '../entity.js'
-import type { IListOptions, IMigrateOptions, IEntityConnectStore } from './types.js'
-import type { ISnapshotEntityIndexes } from './index-projection.js'
+import type { ISchemaAdapter } from '../entity.ts'
+import type { ICodec } from '../entity.ts'
+import type { IListOptions, IMigrateOptions, IEntityConnectStore } from './types.ts'
+import type { ISnapshotEntityIndexes } from './index-projection.ts'
 
-import { createOrderedRecordIndex } from '../core/ordered-record-index.js'
+import { createOrderedRecordIndex } from '../core/ordered-record-index.ts'
 
 import {
   StorageMigrationPhase,
   StorageMigrationStatus,
   type IStorageRecordStage
-} from './constants.js'
+} from './constants.ts'
 
 /** Entity extension observations borrow only the currently accepted canonical operation view. */
 export type IEntityOperationRuntime = IStorageOperationRuntime & {
@@ -251,7 +251,7 @@ export type IRepositoryConfig<TDomain, TStored> = {
   /** Selects a default from the backend kind when omitted. See `createRepository`. */
   readonly codec: ICodec<unknown, unknown> | undefined
   readonly migrationPlan: IMigrationPlan | undefined
-  readonly features: readonly import('./assembly.js').IEntityFeature[]
+  readonly features: readonly import('./assembly.ts').IEntityFeature[]
   readonly validateOnRead: boolean
   readonly onDiagnostic: (message: string) => void
   readonly defaultOrderBy: ((left: TDomain, right: TDomain) => number) | undefined

@@ -4,8 +4,8 @@ import {
   getBackendValueCommit,
   type IEntitySecondaryMethods,
   type IEntityRecordMethods
-} from '../core/backend-registry.js'
-import { repositoryMigrationKey } from '../core/record-layout.js'
+} from '../core/backend-registry.ts'
+import { repositoryMigrationKey } from '../core/record-layout.ts'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -13,10 +13,10 @@ import {
   isStorageContractError,
   type IRecordIndexHandle
 } from '@migaia/storage-contract'
-import { encodeOrderedStorageKey } from '../authoring/key.js'
-import { readTransactionOperationContext } from '../authoring/transaction.js'
-import { migrateEnvelope } from '../authoring/migration.js'
-import { StorageError } from '../errors.js'
+import { encodeOrderedStorageKey } from '../authoring/key.ts'
+import { readTransactionOperationContext } from '../authoring/transaction.ts'
+import { migrateEnvelope } from '../authoring/migration.ts'
+import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 
 import {
@@ -25,17 +25,17 @@ import {
   decodeRepositoryKey,
   flatKeyPrefix,
   repositoryEntityRange
-} from './key.js'
-import { decodeFlatStorageKey, encodeFlatStorageKey } from '../core/key-domain.js'
+} from './key.ts'
+import { decodeFlatStorageKey, encodeFlatStorageKey } from '../core/key-domain.ts'
 
-import { createStorageOperationRuntime, reportCleanupError } from '../core/operation-reporter.js'
-import { EntityText } from './text.js'
-import { snapshotOperationContext } from '../authoring/context.js'
+import { createStorageOperationRuntime, reportCleanupError } from '../core/operation-reporter.ts'
+import { EntityText } from './text.ts'
+import { snapshotOperationContext } from '../authoring/context.ts'
 import type { IOperationContext, IStorageKey } from '@migaia/storage-contract'
 
-import type { IInvalidRecordIssue, IMigrateOptions, IRepository } from './types.js'
-import { projectEntityIndexes } from './index-projection.js'
-import { createOrderedRecordIndex } from '../core/ordered-record-index.js'
+import type { IInvalidRecordIssue, IMigrateOptions, IRepository } from './types.ts'
+import { projectEntityIndexes } from './index-projection.ts'
+import { createOrderedRecordIndex } from '../core/ordered-record-index.ts'
 
 import {
   StorageMigrationPhase,
@@ -43,7 +43,7 @@ import {
   StorageInvalidRecordAction,
   StorageOperation,
   StorageRecordStage
-} from './constants.js'
+} from './constants.ts'
 import {
   IEntityOperationRuntime,
   IEnvelope,
@@ -52,9 +52,9 @@ import {
   normalizeError,
   IEntityMigrationContext,
   IEntityMigrationCheckpoint
-} from './repository-shared.js'
+} from './repository-shared.ts'
 
-import type { EntityRepositoryOwner } from './repository.js'
+import type { EntityRepositoryOwner } from './repository.ts'
 
 /** Own only the explicitly assembled migration operations; the repository retains storage state. */
 export class EntityMigrationOwner<

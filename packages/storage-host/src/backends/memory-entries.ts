@@ -17,32 +17,32 @@ import {
   snapshotConcurrencyLockRange,
   lockKey,
   runWithConcurrency
-} from '../authoring/concurrency.js'
+} from '../authoring/concurrency.ts'
 import {
   snapshotStorageKey,
   encodeOrderedStorageKey,
   snapshotStorageKeyPrefix
-} from '../authoring/key.js'
-import { encodeStorageRdfQuad } from '../authoring/rdf.js'
+} from '../authoring/key.ts'
+import { encodeStorageRdfQuad } from '../authoring/rdf.ts'
 import { isUint8Array, utf8ByteLength } from '@migaia/utils/bytes'
-import { StorageError, type IStorageChannel } from '../errors.js'
+import { StorageError, type IStorageChannel } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
-import { STORAGE_MEMORY_BACKEND } from '../state-constants.js'
-import { MemoryOperation, MemoryState } from './memory-constants.js'
-import { encodeFlatStorageKey } from '../core/key-domain.js'
-import { planChannelWrite } from '../core/channel-write.js'
-import { isStorageErrorFamily } from '../core/error-family.js'
-import { StorageHookName } from '../hook-names.js'
-import { memoryCapacityValueBytes, type IMemoryCapacityChange } from './memory-capacity.js'
-import { transact } from './memory-transaction.js'
+import { StorageErrorText } from '../error-text.ts'
+import { STORAGE_MEMORY_BACKEND } from '../state-constants.ts'
+import { MemoryOperation, MemoryState } from './memory-constants.ts'
+import { encodeFlatStorageKey } from '../core/key-domain.ts'
+import { planChannelWrite } from '../core/channel-write.ts'
+import { isStorageErrorFamily } from '../core/error-family.ts'
+import { StorageHookName } from '../hook-names.ts'
+import { memoryCapacityValueBytes, type IMemoryCapacityChange } from './memory-capacity.ts'
+import { transact } from './memory-transaction.ts'
 import type {
   IMemoryNamespaceContext,
   IMemoryPhysicalChannel,
   IMemoryChannel,
   IMemoryEntry,
   IMemoryRootMutation
-} from './memory.js'
+} from './memory.ts'
 
 /** Root lifecycle finalization releases each namespace's physical facts exactly once. */
 export async function finalize<T>(namespaceContext: IMemoryNamespaceContext<T>) {

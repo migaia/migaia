@@ -26,24 +26,24 @@ import {
 } from '@migaia/storage-contract'
 import { immutableSnapshot } from '@migaia/utils/object'
 import { attachSecondaryErrors } from '@migaia/utils/error'
-import { snapshotOperationContext } from './context.js'
-import { runTransactionIteratorOperation } from './transaction.js'
-import { storageKeyBytesIdentity } from './key.js'
-import { snapshotStorageRdfQuad, encodeRdfQuadSnapshot } from './rdf.js'
-import { invalidQueryCondition } from './query-condition.js'
-import { queryExecutionFailure, planRecordQuery } from './query-plan.js'
+import { snapshotOperationContext } from './context.ts'
+import { runTransactionIteratorOperation } from './transaction.ts'
+import { storageKeyBytesIdentity } from './key.ts'
+import { snapshotStorageRdfQuad, encodeRdfQuadSnapshot } from './rdf.ts'
+import { invalidQueryCondition } from './query-condition.ts'
+import { queryExecutionFailure, planRecordQuery } from './query-plan.ts'
 import type {
   IQuerySourceSnapshot,
   IRecordExecutionPlan,
   IQueryNode,
   IQuerySourcePort
-} from './query-plan.js'
+} from './query-plan.ts'
 import {
   assertQueryActive,
   compileRecordQueryReader,
   completeQueryCleanup
-} from './query-reader.js'
-import type { IQueryReader, ICompiledQueryReader } from './query-reader.js'
+} from './query-reader.ts'
+import type { IQueryReader, ICompiledQueryReader } from './query-reader.ts'
 
 /** Checks the captured intent before any native source is invoked. */
 function assertQueryExecution(

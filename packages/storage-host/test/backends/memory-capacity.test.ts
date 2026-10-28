@@ -1,14 +1,14 @@
-import { storageProbe } from '../../src/plugins/probe/index.js'
+import { storageProbe } from '../../src/plugins/probe/index.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { deferred } from '@migaia/utils/promise'
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
 import { utf8ByteLength } from '@migaia/utils/bytes'
-import { ConcurrencyPolicy, lockKey } from '../../src/authoring/concurrency.js'
+import { ConcurrencyPolicy, lockKey } from '../../src/authoring/concurrency.ts'
 import { counter, kv, ttl, vector } from '@migaia/storage-contract'
-import { createStorageHost, createOrgId } from '../../src/index.js'
-import { memoryBackendPlugin } from '../../src/plugins/memory.js'
-import { createMemoryCapacityIndex } from '../../src/backends/memory-capacity.js'
+import { createStorageHost, createOrgId } from '../../src/index.ts'
+import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
+import { createMemoryCapacityIndex } from '../../src/backends/memory-capacity.ts'
 
 /**
  * Capacity is exercised through actual installed stores, namespaces and original transaction

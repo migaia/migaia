@@ -29,19 +29,19 @@ import {
   type IQuad
 } from '@migaia/storage-contract'
 import { attachErrorIdentity, IdentifyError, toError } from '@migaia/utils/error'
-import { RecordQueryKeysetOwner } from './query-keyset.js'
+import { RecordQueryKeysetOwner } from './query-keyset.ts'
 import {
   invalidQueryArgument,
   invalidQueryCondition,
   QueryConditionKind,
   queryEqual
-} from './query-condition.js'
+} from './query-condition.ts'
 import type {
   IQueryCompileContext,
   IQueryReader,
   IFamilyReaderCompiler,
   IVectorReaderCompiler
-} from './query-reader.js'
+} from './query-reader.ts'
 
 /** Nodes retain only their immediate predecessor, so deriving a branch never copies its history. */
 export type IQueryNode = {

@@ -15,11 +15,11 @@ import {
   invalidQueryCondition,
   snapshotStorageWhere,
   snapshotQueryField
-} from './query-condition.js'
-import { prepareQueryExecution, querySourceInput } from './query-execution.js'
-import { planRecordQuery, queryExecutionFailure } from './query-plan.js'
-import type { IQuerySourceSnapshot, IQueryNode } from './query-plan.js'
-import { recordQueryReads } from './query-record-reads.js'
+} from './query-condition.ts'
+import { prepareQueryExecution, querySourceInput } from './query-execution.ts'
+import { planRecordQuery, queryExecutionFailure } from './query-plan.ts'
+import type { IQuerySourceSnapshot, IQueryNode } from './query-plan.ts'
+import { recordQueryReads } from './query-record-reads.ts'
 
 /** Captures an immutable string projection before creating another chain node. */
 export function snapshotQueryFields(fields: readonly unknown[]): readonly string[] {

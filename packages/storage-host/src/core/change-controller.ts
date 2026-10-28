@@ -1,19 +1,19 @@
 import { type IStorageChange, type IStorageKey } from '@migaia/storage-contract'
 import { createEventChannel, EventDispatchPolicy } from '@migaia/event-subscriber'
 import type { INativeAbortSignal } from '@migaia/utils/promise'
-import { createStorageOperationReporter, reportCleanupError } from './operation-reporter.js'
-import { REPOSITORY_KEY_PREFIX } from './record-layout.js'
+import { createStorageOperationReporter, reportCleanupError } from './operation-reporter.ts'
+import { REPOSITORY_KEY_PREFIX } from './record-layout.ts'
 import type {
   IBackendChangeController,
   IBackendChangeControllerOptions,
   IBackendChangeSnapshot
-} from './change-types.js'
+} from './change-types.ts'
 import {
   createBackendLifecycleController,
   type IBackendLifecycleController
-} from './backend-lifecycle.js'
-export type * from './change-types.js'
-export * from './backend-registry.js'
+} from './backend-lifecycle.ts'
+export type * from './change-types.ts'
+export * from './backend-registry.ts'
 /** Large commits preserve the original coarse-invalidation bound. */
 const maxEventKeys = 128
 

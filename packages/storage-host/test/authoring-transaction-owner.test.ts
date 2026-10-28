@@ -7,7 +7,7 @@ import {
   nextTransactionIterator,
   registerTransactionFinalizer,
   runTransactionOperation
-} from '../src/authoring/transaction.js'
+} from '../src/authoring/transaction.ts'
 import {
   TransactionActivityMode,
   type IStorageBase,

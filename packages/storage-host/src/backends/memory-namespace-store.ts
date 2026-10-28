@@ -14,15 +14,15 @@ import {
   type IWriteConcurrencyOptions,
   type IOperationContext
 } from '@migaia/storage-contract'
-import { snapshotConcurrencyLockRange } from '../authoring/concurrency.js'
-import { snapshotStorageKeyPrefix } from '../authoring/key.js'
-import { assertTransactionOwner } from '../authoring/transaction.js'
-import { createRecordQuery } from '../authoring/query.js'
-import { provideCapabilities } from '../authoring/capability.js'
-import type { IStorageJournalImage, IStorageJournalTarget } from '../journal/types.js'
-import { STORAGE_MEMORY_BACKEND } from '../state-constants.js'
-import { MemoryOperation, MemoryState } from './memory-constants.js'
-import { encodeFlatStorageKey } from '../core/key-domain.js'
+import { snapshotConcurrencyLockRange } from '../authoring/concurrency.ts'
+import { snapshotStorageKeyPrefix } from '../authoring/key.ts'
+import { assertTransactionOwner } from '../authoring/transaction.ts'
+import { createRecordQuery } from '../authoring/query.ts'
+import { provideCapabilities } from '../authoring/capability.ts'
+import type { IStorageJournalImage, IStorageJournalTarget } from '../journal/types.ts'
+import { STORAGE_MEMORY_BACKEND } from '../state-constants.ts'
+import { MemoryOperation, MemoryState } from './memory-constants.ts'
+import { encodeFlatStorageKey } from '../core/key-domain.ts'
 import {
   mutationEntry,
   capacityFact,
@@ -31,23 +31,23 @@ import {
   publish,
   deletePhysical,
   liveEntry
-} from './memory-entries.js'
+} from './memory-entries.ts'
 import {
   captureRdfEntries,
   logicalRdfQuad,
   rootRdfQuery,
   watchChanges,
   atomicEntry
-} from './memory-namespace-base.js'
-import { bindRecords } from './memory-scope.js'
+} from './memory-namespace-base.ts'
+import { bindRecords } from './memory-scope.ts'
 import {
   ttlOperations,
   rdfOperations,
   counterOperations,
   queryDraft,
   journalOperations
-} from './memory.js'
-import type { IMemoryNamespaceContext, IMemoryEntry, IMemoryScope } from './memory.js'
+} from './memory.ts'
+import type { IMemoryNamespaceContext, IMemoryEntry, IMemoryScope } from './memory.ts'
 
 /** Native RDF writes use the original mutation runner, canonical locks and final synchronous turn. */
 export function createMemoryNamespaceRdfApi<T>(

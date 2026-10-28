@@ -11,20 +11,20 @@ import {
   type IWalExt,
   type IUndoLogExt,
   type ILogPayload
-} from './logger-runtime.js'
-import { readStorageJournalTarget, storageJournalTargetIdentity } from './targets.js'
-import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.js'
-import { StorageError } from '../errors.js'
+} from './logger-runtime.ts'
+import { readStorageJournalTarget, storageJournalTargetIdentity } from './targets.ts'
+import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.ts'
+import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
-import type { IStorageJournalBackendAccess } from './binding.js'
-import { StorageJournalKind } from './constants.js'
+import { StorageErrorText } from '../error-text.ts'
+import type { IStorageJournalBackendAccess } from './binding.ts'
+import { StorageJournalKind } from './constants.ts'
 import {
   equalStorageJournalPayload,
   readStorageUndoRows,
   storageJournalUndoImages
-} from './undo.js'
-import type { IStorageJournalChange, IStorageJournalImage } from './types.js'
+} from './undo.ts'
+import type { IStorageJournalChange, IStorageJournalImage } from './types.ts'
 
 /** Complete immutable recovery target; matching names never authenticate a native transaction. */
 export type IStorageJournalTargetIdentity = Readonly<{

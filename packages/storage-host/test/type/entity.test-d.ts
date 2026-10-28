@@ -1,19 +1,19 @@
-import type { IMemoryBackendWithChangeFeed } from '../helpers/memory.js'
-import type { IStorageBorrowedBackend } from '../../src/types.js'
-import { memoryNotificationsFeature } from '../../src/features/memory-notifications.js'
-import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.js'
+import type { IMemoryBackendWithChangeFeed } from '../helpers/memory.ts'
+import type { IStorageBorrowedBackend } from '../../src/types.ts'
+import { memoryNotificationsFeature } from '../../src/features/memory-notifications.ts'
+import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.ts'
 import { expectTypeOf } from 'vitest'
-import { defineEntity } from '../../src/entity.js'
-import { memoryBackend } from '../helpers/memory.js'
+import { defineEntity } from '../../src/entity.ts'
+import { memoryBackend } from '../helpers/memory.ts'
 import type { ICapabilityInstallPort, IStorageBase, IStorageKey } from '@migaia/storage-contract'
 import {
   createStorageHost,
   definePlugin,
   defineStorageBackendKind,
   type IStoragePluginCore
-} from '../../src/index.js'
-import { memoryBackendPlugin } from '../../src/plugins/memory.js'
-import type { IMigrateOptions, IMigrateResult, IRepository } from '../../src/entity/types.js'
+} from '../../src/index.ts'
+import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
+import type { IMigrateOptions, IMigrateResult, IRepository } from '../../src/entity/types.ts'
 
 type IUser = {
   id: string

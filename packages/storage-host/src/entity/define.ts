@@ -1,9 +1,9 @@
-import { EntityFeatureName } from './constants.js'
-import { EntityText } from './text.js'
-import { passthrough } from '../schema/passthrough.js'
-import { createRepository } from './repository.js'
-import type { IEntityConnectStore } from './types.js'
-import type { ISchemaAdapter } from '../entity.js'
+import { EntityFeatureName } from './constants.ts'
+import { EntityText } from './text.ts'
+import { passthrough } from '../schema/passthrough.ts'
+import { createRepository } from './repository.ts'
+import type { IEntityConnectStore } from './types.ts'
+import type { ISchemaAdapter } from '../entity.ts'
 import type {
   IEntityDefinition,
   IEntityIndex,
@@ -12,12 +12,12 @@ import type {
   IRepository,
   IEntityConnectOptions,
   IEntityStoreQueryMethods
-} from './types.js'
-import { StorageError } from '../errors.js'
+} from './types.ts'
+import { StorageError } from '../errors.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { assertCodec } from '@migaia/storage-contract'
-import type { IRepositoryConfig } from './repository-shared.js'
-import { missingEntityFeature } from './assembly.js'
+import type { IRepositoryConfig } from './repository-shared.ts'
+import { missingEntityFeature } from './assembly.ts'
 
 type IEntityOptionsWithoutIndexes<TDomain, TStored> = Omit<
   IEntityOptions<TDomain, TStored, undefined>,

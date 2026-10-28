@@ -15,13 +15,13 @@ import {
 import {
   readConcurrencyLockIdentities,
   snapshotConcurrencyLockHoldings
-} from '../authoring/concurrency.js'
-import { snapshotStorageKey } from '../authoring/key.js'
+} from '../authoring/concurrency.ts'
+import { snapshotStorageKey } from '../authoring/key.ts'
 import { walkErrorCauses } from '@migaia/utils/error'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { createConcurrencyLimiter, deferred, raceWithAbort } from '@migaia/utils/promise'
-import { readAbortReason, subscribeToAbort, throwIfAborted } from '../core/operation.js'
-import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.js'
+import { readAbortReason, subscribeToAbort, throwIfAborted } from '../core/operation.ts'
+import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.ts'
 
 /** The physical backend owns this port; creating it grants no transaction or retry authority. */
 export type IBackendKeyLockPort = IStorageResource & {

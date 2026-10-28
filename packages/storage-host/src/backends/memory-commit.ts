@@ -7,12 +7,12 @@ import {
   type IConcurrencyAttempt,
   type IConcurrencyAttemptContext
 } from '@migaia/storage-contract'
-import { readConcurrencyLockIdentities, lockKey } from '../authoring/concurrency.js'
-import { createMemoryRdfIndex } from './rdf-core.js'
-import type { IStorageChannel } from '../errors.js'
-import { StorageErrorText } from '../error-text.js'
-import { createOrderedRecordIndex } from '../core/ordered-record-index.js'
-import { throwIfAborted } from '../core/operation.js'
+import { readConcurrencyLockIdentities, lockKey } from '../authoring/concurrency.ts'
+import { createMemoryRdfIndex } from './rdf-core.ts'
+import type { IStorageChannel } from '../errors.ts'
+import { StorageErrorText } from '../error-text.ts'
+import { createOrderedRecordIndex } from '../core/ordered-record-index.ts'
+import { throwIfAborted } from '../core/operation.ts'
 import {
   liveEntry,
   revision,
@@ -24,11 +24,11 @@ import {
   bump,
   publish,
   commitCapacity
-} from './memory-entries.js'
-import { createScope, draftCapacityPlan } from './memory-scope.js'
-import { createMemoryTransactionTextDraft } from './memory-transaction-journal.js'
-import { txSnapshot, stageDraft } from './memory-transaction.js'
-import type { IMemoryTransactionContext } from './memory-transaction.js'
+} from './memory-entries.ts'
+import { createScope, draftCapacityPlan } from './memory-scope.ts'
+import { createMemoryTransactionTextDraft } from './memory-transaction-journal.ts'
+import { txSnapshot, stageDraft } from './memory-transaction.ts'
+import type { IMemoryTransactionContext } from './memory-transaction.ts'
 import type {
   IMemoryNamespaceContext,
   IMemoryScope,
@@ -37,7 +37,7 @@ import type {
   IMemoryDraft,
   IMemorySnapshot,
   IMemoryChannel
-} from './memory.js'
+} from './memory.ts'
 
 /** Initialize one native attempt before any business or journal work is admitted. */
 export function createMemoryTransactionContext<T, R>(

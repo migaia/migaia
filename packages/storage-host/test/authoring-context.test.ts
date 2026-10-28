@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { StorageContractError } from '@migaia/storage-contract'
-import { snapshotOperationContext } from '../src/authoring/context.js'
+import { snapshotOperationContext } from '../src/authoring/context.ts'
 
 describe('信号结构等价（真实 AbortSignal 满足 IAbortSignal）', () => {
   it('真实 AbortController().signal 被 snapshotOperationContext 接受', () => {

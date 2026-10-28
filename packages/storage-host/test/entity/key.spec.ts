@@ -5,7 +5,7 @@ import {
   composeStructuredKey,
   flatKeyPrefix,
   structuredEntityRange
-} from '../../src/entity/key.js'
+} from '../../src/entity/key.ts'
 
 describe('composeStructuredKey / composeFlatKey', () => {
   it('composeStructuredKey 产出 [entityName, id]', () => {
