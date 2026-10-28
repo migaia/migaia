@@ -5,4 +5,4 @@ export {
   containAsyncRejection,
   type ILifecycleError,
   type IErrorCollector
-} from './errors.js'
+} from './errors.ts'

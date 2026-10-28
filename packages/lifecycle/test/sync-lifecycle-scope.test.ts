@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createSyncLifecycleScope } from '../src/sync-lifecycle-scope'
-import { createLifecycleScope } from '../src/lifecycle-scope'
-import { createProvisionalScope } from '../src/provisional-scope'
-import { LifecycleErrorCode } from '../src/error-code'
+import { createSyncLifecycleScope } from '../src/sync-lifecycle-scope.ts'
+import { createLifecycleScope } from '../src/lifecycle-scope.ts'
+import { createProvisionalScope } from '../src/provisional-scope.ts'
+import { LifecycleErrorCode } from '../src/error-code.ts'
 
 describe('SyncLifecycleScope: rejects async descriptors and async-owner instances at registration time', () => {
   it('rejects a descriptor missing syncSafe: true', () => {

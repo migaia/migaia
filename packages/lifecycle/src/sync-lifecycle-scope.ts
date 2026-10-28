@@ -1,22 +1,22 @@
-import { assertErrorPolicyReporter } from './error-boundary.js'
+import { assertErrorPolicyReporter } from './error-boundary.ts'
 import type {
   ICollectedError,
   IErrorPolicy,
   IReleaseContext,
   IReleaseDescriptor,
   ILifecycleState
-} from './types.js'
-import { ASYNC_OWNER_BRAND } from './types.js'
-import { createLifecycleError } from './errors.js'
-import { LifecycleErrorCode } from './error-code.js'
-import { LifecycleErrorText } from './error-text.js'
-import { OwnedEntryList } from './owned-entries.js'
-import { ClosingSignalSource, captureAbortControllerFactory } from './abort-factory.js'
-import type { IAbortController } from './abort.js'
-import { LifecycleState } from './state-constants.js'
-import { admitDescriptor } from './dispose-transaction.js'
-import { orderDisposeItems } from './disposal-order.js'
-import { executeSyncDisposeTransaction } from './sync-dispose-transaction.js'
+} from './types.ts'
+import { ASYNC_OWNER_BRAND } from './types.ts'
+import { createLifecycleError } from './errors.ts'
+import { LifecycleErrorCode } from './error-code.ts'
+import { LifecycleErrorText } from './error-text.ts'
+import { OwnedEntryList } from './owned-entries.ts'
+import { ClosingSignalSource, captureAbortControllerFactory } from './abort-factory.ts'
+import type { IAbortController } from './abort.ts'
+import { LifecycleState } from './state-constants.ts'
+import { admitDescriptor } from './dispose-transaction.ts'
+import { orderDisposeItems } from './disposal-order.ts'
+import { executeSyncDisposeTransaction } from './sync-dispose-transaction.ts'
 
 const disposeKey = (Symbol as typeof Symbol & { dispose?: symbol }).dispose
 

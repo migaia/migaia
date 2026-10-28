@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { createQuiescenceTracker, createStringLeaseRegistry } from '../src/quiescence-tracker'
-import { LifecycleErrorCode } from '../src/error-code'
+import { createQuiescenceTracker, createStringLeaseRegistry } from '../src/quiescence-tracker.ts'
+import { LifecycleErrorCode } from '../src/error-code.ts'
 
 describe('QuiescenceTracker: unsealed whenZero()', () => {
   it('throws synchronously, not a rejected Promise, when the key is not sealed', () => {

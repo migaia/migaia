@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { boundedWait } from '../src/bounded-wait.js'
+import { boundedWait } from '../src/bounded-wait.ts'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
 
 const deferred = <T>(): {

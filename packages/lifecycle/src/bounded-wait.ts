@@ -1,17 +1,17 @@
-import { defaultLifecycleScheduler } from './scheduler.js'
-import { captureCleanupReporter } from './abortable-delay.js'
-import { safeReport } from './errors.js'
+import { defaultLifecycleScheduler } from './scheduler.ts'
+import { captureCleanupReporter } from './abortable-delay.ts'
+import { safeReport } from './errors.ts'
 import { tryReadProperty } from '@migaia/utils/error'
-import { createLifecycleTypeError } from './errors.js'
-import { LifecycleErrorCode } from './error-code.js'
-import { LifecycleErrorText } from './error-text.js'
-import { attachLifecycleSecondaryErrors } from './error-boundary.js'
+import { createLifecycleTypeError } from './errors.ts'
+import { LifecycleErrorCode } from './error-code.ts'
+import { LifecycleErrorText } from './error-text.ts'
+import { attachLifecycleSecondaryErrors } from './error-boundary.ts'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import {
   resolveSchedulerOption,
   validateSchedulerDelay,
   validateSchedulerTime
-} from './scheduler.js'
+} from './scheduler.ts'
 
 /**
  * Waits for one awaitable until an absolute deadline, without cancelling it; typically used so a

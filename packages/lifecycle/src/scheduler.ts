@@ -14,9 +14,9 @@ import {
   createLifecycleFailure,
   createLifecycleRangeError,
   createLifecycleTypeError
-} from './errors.js'
-import { LifecycleErrorCode } from './error-code.js'
-import { LifecycleErrorText } from './error-text.js'
+} from './errors.ts'
+import { LifecycleErrorCode } from './error-code.ts'
+import { LifecycleErrorText } from './error-text.ts'
 
 /** Invokes one captured host method, retaining native failures with lifecycle scheduler identity. */
 function invokeSchedulerMethod<T>(

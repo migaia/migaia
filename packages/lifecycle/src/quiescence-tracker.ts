@@ -1,7 +1,7 @@
-import { createLifecycleError } from './errors.js'
-import { LifecycleErrorCode } from './error-code.js'
-import { LifecycleErrorText } from './error-text.js'
-import type { IDisposer } from './types.js'
+import { createLifecycleError } from './errors.ts'
+import { LifecycleErrorCode } from './error-code.ts'
+import { LifecycleErrorText } from './error-text.ts'
+import type { IDisposer } from './types.ts'
 
 export type IQuiescenceTracker<TKey> = {
   retain(key: TKey): IDisposer

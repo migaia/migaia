@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { IAbortSignal } from '@migaia/utils/promise'
-import { createAbortController, observeAbortSubscription } from '../src/abort.js'
+import { createAbortController, observeAbortSubscription } from '../src/abort.ts'
 
 describe('reason 行为', () => {
   it('abort(reason) 后 reason 经 signal.reason 保持 === 身份可达', () => {

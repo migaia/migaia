@@ -1,15 +1,15 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
-import { attachLifecycleSecondaryErrors } from './error-boundary.js'
-import { LifecycleErrorCode } from './error-code.js'
-import { LifecycleErrorText } from './error-text.js'
-import { createLifecycleFailure, createLifecycleTypeError } from './errors.js'
+import { attachLifecycleSecondaryErrors } from './error-boundary.ts'
+import { LifecycleErrorCode } from './error-code.ts'
+import { LifecycleErrorText } from './error-text.ts'
+import { createLifecycleFailure, createLifecycleTypeError } from './errors.ts'
 import {
   observeAbortSubscription,
   type IObservedAbortSubscription
-} from './observed-subscription.js'
-import { safeReport } from './errors.js'
-import { validateSchedulerDelay } from './scheduler.js'
+} from './observed-subscription.ts'
+import { safeReport } from './errors.ts'
+import { validateSchedulerDelay } from './scheduler.ts'
 
 /** Package-private callback admission shared by duration and deadline waits. */
 export function captureCleanupReporter(value: unknown): ((error: unknown) => void) | undefined {

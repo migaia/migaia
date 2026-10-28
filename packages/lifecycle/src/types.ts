@@ -1,7 +1,7 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
-import type { IDisposerContext } from './disposer-context.js'
+import type { IDisposerContext } from './disposer-context.ts'
 import type { IScheduler } from '@migaia/utils/scheduler'
-import { LifecycleErrorPolicy, LifecycleState, LifecycleUnitState } from './state-constants.js'
+import { LifecycleErrorPolicy, LifecycleState, LifecycleUnitState } from './state-constants.ts'
 
 /**
  * Synchronous, idempotent teardown/unregister function.

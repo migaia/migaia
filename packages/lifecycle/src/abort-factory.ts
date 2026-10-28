@@ -1,7 +1,7 @@
-import type { IAbortController } from './abort.js'
-import { LifecycleErrorCode } from './error-code.js'
-import { LifecycleErrorText } from './error-text.js'
-import { LIFECYCLE_SOURCE, createLifecycleError } from './errors.js'
+import type { IAbortController } from './abort.ts'
+import { LifecycleErrorCode } from './error-code.ts'
+import { LifecycleErrorText } from './error-text.ts'
+import { LIFECYCLE_SOURCE, createLifecycleError } from './errors.ts'
 
 type IHostAbortControllerConstructor = new () => IAbortController
 

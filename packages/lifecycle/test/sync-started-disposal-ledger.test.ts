@@ -6,8 +6,8 @@ import {
   type ICleanupResult,
   LifecycleState,
   type IAbortController
-} from '../src/index.js'
-import { createAbortController } from '../src/abort.js'
+} from '../src/index.ts'
+import { createAbortController } from '../src/abort.ts'
 
 describe('sync-started disposal ledger', () => {
   it('starts every callback synchronously and reaches terminal after seal and settlement', async () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createTerminalController } from '../src/terminal-controller'
+import { createTerminalController } from '../src/terminal-controller.ts'
 
 describe('TerminalController: open -> close -> terminal', () => {
   it('starts open, moves to closing on close(), and to terminal on forceTerminal()', () => {

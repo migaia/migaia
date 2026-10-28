@@ -1,29 +1,29 @@
 import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/utils/function'
-import { defaultLifecycleScheduler } from './scheduler.js'
-import { assertErrorPolicyReporter, attachLifecycleSecondaryErrors } from './error-boundary.js'
-import { containAsyncRejection, safeReport } from './errors.js'
-import type { ICollectedError, IErrorPolicy, IReleaseContext, IReleaseDescriptor } from './types.js'
-import { DisposerContext, type IDisposerContext } from './disposer-context.js'
-import { createErrorCollector, createLifecycleError, createLifecycleTypeError } from './errors.js'
-import { LifecycleErrorCode } from './error-code.js'
-import { LifecycleErrorText } from './error-text.js'
-import { boundedWait } from './bounded-wait.js'
+import { defaultLifecycleScheduler } from './scheduler.ts'
+import { assertErrorPolicyReporter, attachLifecycleSecondaryErrors } from './error-boundary.ts'
+import { containAsyncRejection, safeReport } from './errors.ts'
+import type { ICollectedError, IErrorPolicy, IReleaseContext, IReleaseDescriptor } from './types.ts'
+import { DisposerContext, type IDisposerContext } from './disposer-context.ts'
+import { createErrorCollector, createLifecycleError, createLifecycleTypeError } from './errors.ts'
+import { LifecycleErrorCode } from './error-code.ts'
+import { LifecycleErrorText } from './error-text.ts'
+import { boundedWait } from './bounded-wait.ts'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import {
   resolveSchedulerOption,
   addSchedulerTime,
   validateSchedulerDelay,
   validateSchedulerTime
-} from './scheduler.js'
+} from './scheduler.ts'
 import type { IAbortSignal } from '@migaia/utils/promise'
-import { captureAbortControllerFactory } from './abort-factory.js'
+import { captureAbortControllerFactory } from './abort-factory.ts'
 import {
   observeAbortSubscription,
   type IObservedAbortSubscription
-} from './observed-subscription.js'
-import { DisposeTransactionKind, LifecycleState } from './state-constants.js'
-import { orderDisposeItems } from './disposal-order.js'
-import type { ILifecycleState } from './types.js'
+} from './observed-subscription.ts'
+import { DisposeTransactionKind, LifecycleState } from './state-constants.ts'
+import { orderDisposeItems } from './disposal-order.ts'
+import type { ILifecycleState } from './types.ts'
 
 type ICallbackOutcome = { readonly ok: true } | { readonly ok: false; readonly error: unknown }
 

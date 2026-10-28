@@ -1,10 +1,10 @@
-import { defaultLifecycleScheduler } from './scheduler.js'
-import { attachLifecycleSecondaryErrors } from './error-boundary.js'
-import { containAsyncRejection, createLifecycleError } from './errors.js'
-import { LifecycleErrorCode } from './error-code.js'
-import { LifecycleErrorText, LifecycleErrorTextFactory } from './error-text.js'
+import { defaultLifecycleScheduler } from './scheduler.ts'
+import { attachLifecycleSecondaryErrors } from './error-boundary.ts'
+import { containAsyncRejection, createLifecycleError } from './errors.ts'
+import { LifecycleErrorCode } from './error-code.ts'
+import { LifecycleErrorText, LifecycleErrorTextFactory } from './error-text.ts'
 import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
-import { resolveSchedulerOption } from './scheduler.js'
+import { resolveSchedulerOption } from './scheduler.ts'
 
 export type IMutationQueueOptions = {
   /**

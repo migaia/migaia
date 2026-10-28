@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { observeAbortSubscription } from '../src/observed-subscription.js'
+import { observeAbortSubscription } from '../src/observed-subscription.ts'
 
 describe('lifecycle abort listener reason policy', () => {
   it.each([false, true])(

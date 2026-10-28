@@ -1,13 +1,13 @@
 /* oxlint-disable unicorn/no-thenable -- 对抗夹具刻意构造 hostile then getter 以验证单次探测语义 */
 import { describe, expect, it, vi } from 'vitest'
-import { createProvisionalScope } from '../src/provisional-scope'
-import { createLifecycleUnit } from '../src/lifecycle-unit'
-import { createSyncLifecycleScope } from '../src/sync-lifecycle-scope'
-import { createGenerationController } from '../src/generation-controller'
+import { createProvisionalScope } from '../src/provisional-scope.ts'
+import { createLifecycleUnit } from '../src/lifecycle-unit.ts'
+import { createSyncLifecycleScope } from '../src/sync-lifecycle-scope.ts'
+import { createGenerationController } from '../src/generation-controller.ts'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { assimilateCapturedThen, probeThenable } from '@migaia/utils/function'
-import type { ILifecycleOwner } from '../src/types'
+import type { ILifecycleOwner } from '../src/types.ts'
 
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
 
@@ -252,7 +252,7 @@ describe('manual scheduler recursive due flush', () => {
 
 describe('lifecycle canonical probe + rollback identity', () => {
   it('isThenable is no longer a public export', async () => {
-    const publicApi = (await import('../src/index.js')) as Record<string, unknown>
+    const publicApi = (await import('../src/index.ts')) as Record<string, unknown>
     expect(publicApi.isThenable).toBeUndefined()
   })
 

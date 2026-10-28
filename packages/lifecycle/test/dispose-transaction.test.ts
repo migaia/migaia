@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createDisposeTransaction, executeReleaseDescriptor } from '../src/dispose-transaction'
-import { LifecycleErrorCode } from '../src/error-code.js'
-import { LIFECYCLE_SOURCE } from '../src/errors.js'
+import { createDisposeTransaction, executeReleaseDescriptor } from '../src/dispose-transaction.ts'
+import { LifecycleErrorCode } from '../src/error-code.ts'
+import { LIFECYCLE_SOURCE } from '../src/errors.ts'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import type { IReleaseContext, IReleaseDescriptor } from '../src/types'
+import type { IReleaseContext, IReleaseDescriptor } from '../src/types.ts'
 
 const baseContext = (overrides: Partial<IReleaseContext> = {}): IReleaseContext => ({
   signal: new AbortController().signal,

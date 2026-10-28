@@ -3,8 +3,8 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   createGenerationController,
   type IGenerationControllerOptions
-} from '../src/generation-controller.js'
-import { LifecycleErrorCode } from '../src/error-code.js'
+} from '../src/generation-controller.ts'
+import { LifecycleErrorCode } from '../src/error-code.ts'
 
 /** Optional pre-implementation seam makes missing complete an assertion, never a TypeError. */
 type ICompletionController = ReturnType<typeof createGenerationController> & {

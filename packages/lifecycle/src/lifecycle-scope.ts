@@ -1,4 +1,4 @@
-import { assertErrorPolicyReporter } from './error-boundary.js'
+import { assertErrorPolicyReporter } from './error-boundary.ts'
 import type {
   ICollectedError,
   IErrorPolicy,
@@ -6,25 +6,25 @@ import type {
   IReleaseContext,
   IReleaseDescriptor,
   ILifecycleState
-} from './types.js'
-import { ASYNC_OWNER_BRAND } from './types.js'
-import { DisposerContext } from './disposer-context.js'
+} from './types.ts'
+import { ASYNC_OWNER_BRAND } from './types.ts'
+import { DisposerContext } from './disposer-context.ts'
 import {
   containAsyncRejection,
   createErrorCollector,
   createLifecycleError,
   safeReport
-} from './errors.js'
-import { LifecycleErrorCode } from './error-code.js'
-import { LifecycleErrorText } from './error-text.js'
-import { OwnedEntryList } from './owned-entries.js'
-import { LifecycleState } from './state-constants.js'
-import { admitDescriptor, isValidDeadline, releaseAdmittedItems } from './dispose-transaction.js'
-import { orderDisposeItems } from './disposal-order.js'
-import { ClosingSignalSource, captureAbortControllerFactory } from './abort-factory.js'
-import type { IAbortController } from './abort.js'
+} from './errors.ts'
+import { LifecycleErrorCode } from './error-code.ts'
+import { LifecycleErrorText } from './error-text.ts'
+import { OwnedEntryList } from './owned-entries.ts'
+import { LifecycleState } from './state-constants.ts'
+import { admitDescriptor, isValidDeadline, releaseAdmittedItems } from './dispose-transaction.ts'
+import { orderDisposeItems } from './disposal-order.ts'
+import { ClosingSignalSource, captureAbortControllerFactory } from './abort-factory.ts'
+import type { IAbortController } from './abort.ts'
 import type { IScheduler } from '@migaia/utils/scheduler'
-import { resolveSchedulerOption } from './scheduler.js'
+import { resolveSchedulerOption } from './scheduler.ts'
 
 const asyncDisposeKey = (Symbol as typeof Symbol & { asyncDispose?: symbol }).asyncDispose
 

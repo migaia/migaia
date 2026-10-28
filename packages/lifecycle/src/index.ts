@@ -6,18 +6,18 @@ export type {
   IReleaseDescriptor,
   ICollectedError,
   IErrorPolicy
-} from './types.js'
+} from './types.ts'
 
-export type { IDisposerContext } from './disposer-context.js'
+export type { IDisposerContext } from './disposer-context.ts'
 
 export {
   LifecycleState,
   LifecycleErrorPolicy,
   DisposeTransactionKind,
   type IDisposeTransactionKind
-} from './state-constants.js'
+} from './state-constants.ts'
 
-export { createAbortController, type IAbortController } from './abort.js'
+export { createAbortController, type IAbortController } from './abort.ts'
 
 export {
   createSyncStartedDisposalLedger,
@@ -25,12 +25,12 @@ export {
   type ICleanupResult,
   type ISyncStartedDisposalLedger,
   type ISyncStartedDisposalOutcome
-} from './dispose-transaction.js'
+} from './dispose-transaction.ts'
 
-export { LifecycleErrorCode, type ILifecycleErrorCode } from './error-code.js'
-export { LifecycleErrorText, type ILifecycleErrorText } from './error-text.js'
+export { LifecycleErrorCode, type ILifecycleErrorCode } from './error-code.ts'
+export { LifecycleErrorText, type ILifecycleErrorText } from './error-text.ts'
 
-export { snapshotScheduler } from './scheduler-entry.js'
+export { snapshotScheduler } from './scheduler-entry.ts'
 
 export {
   LIFECYCLE_SOURCE,
@@ -38,25 +38,25 @@ export {
   createErrorCollector,
   type ILifecycleError,
   type IErrorCollector
-} from './errors-entry.js'
+} from './errors-entry.ts'
 
-export { boundedWait } from './bounded-wait.js'
-export { abortableDelay } from './abortable-delay.js'
+export { boundedWait } from './bounded-wait.ts'
+export { abortableDelay } from './abortable-delay.ts'
 
-export { createTerminalController, type ITerminalController } from './terminal-controller.js'
+export { createTerminalController, type ITerminalController } from './terminal-controller.ts'
 
 export {
   createLifecycleScope,
   type ILifecycleScope,
   type ILifecycleScopeOptions
-} from './lifecycle-scope.js'
+} from './lifecycle-scope.ts'
 
 export {
   createSyncLifecycleScope,
   type ISyncLifecycleScope,
   type ISyncLifecycleScopeOptions,
   type ISyncReleaseDescriptor
-} from './sync-lifecycle-scope.js'
+} from './sync-lifecycle-scope.ts'
 
 export {
   createGenerationController,
@@ -64,7 +64,7 @@ export {
   type IGenerationControllerOptions,
   type IGenerationRequest,
   type IGenerationToken
-} from './generation-controller.js'
+} from './generation-controller.ts'
 
 export {
   createQuiescenceTracker,
@@ -74,20 +74,20 @@ export {
   type IQuiescenceTracker,
   type ILeaseRegistry,
   type IPendingTracker
-} from './quiescence-tracker.js'
+} from './quiescence-tracker.ts'
 
 export {
   createProvisionalScope,
   type IProvisionalScope,
   type IProvisionalScopeOptions
-} from './provisional-scope.js'
+} from './provisional-scope.ts'
 
 export {
   createMutationQueue,
   type IMutationQueue,
   type IMutationQueueOptions,
   type IEnqueueOptions
-} from './mutation-queue.js'
+} from './mutation-queue.ts'
 
 export {
   executeReleaseDescriptor,
@@ -96,4 +96,4 @@ export {
   type IDisposeTransaction,
   type IDisposeTransactionMode,
   type IDisposeTransactionOptions
-} from './dispose-transaction.js'
+} from './dispose-transaction.ts'

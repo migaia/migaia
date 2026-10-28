@@ -1,7 +1,7 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
-import { LifecycleErrorCode } from './error-code.js'
-import { LifecycleErrorText } from './error-text.js'
-import { createLifecycleTypeError } from './errors.js'
+import { LifecycleErrorCode } from './error-code.ts'
+import { LifecycleErrorText } from './error-text.ts'
+import { createLifecycleTypeError } from './errors.ts'
 import { attachSecondaryErrors, tryReadProperty } from '@migaia/utils/error'
 
 /** Idempotent handle for one lifecycle-owned abort registration. */
