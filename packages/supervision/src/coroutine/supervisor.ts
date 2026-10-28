@@ -7,6 +7,7 @@ import { SupervisionErrorText } from '../error-text.js'
 import { createSupervisionError } from '../errors.js'
 import type { IUnitProfile } from '../types.js'
 import { CoroutineOutcome } from './constants.js'
+import { COROUTINE_KIND, CoroutineField } from './contract.js'
 import { createCoroutineLauncher, terminateCoroutineHandle } from './launcher.js'
 import type {
   ICoroutineExitStatus,
@@ -34,30 +35,33 @@ export function createCoroutineSupervisor<TPort = undefined>(
       TypeError,
       SupervisionErrorCode.invalidOption,
       SupervisionErrorText.invalidOption,
-      { detail: { field: 'spec.task' } }
+      { detail: { field: CoroutineField.task } }
     )
   if (options.heartbeat && options.health)
     throw createSupervisionError(
       TypeError,
       SupervisionErrorCode.invalidOption,
       SupervisionErrorText.invalidOption,
-      { detail: { field: 'heartbeat' } }
+      { detail: { field: CoroutineField.heartbeat } }
     )
+  /** Core and heartbeat observations share the admitted scheduler. */
   const scheduler = resolveSchedulerOption(options) ?? resolveScheduler(systemScheduler)
+  /** Optional heartbeat configuration replaces generic health only when present. */
   const heartbeat = options.heartbeat
   if (heartbeat && (!(heartbeat.timeoutMs > 0) || !Number.isFinite(heartbeat.timeoutMs)))
     throw createSupervisionError(
       RangeError,
       SupervisionErrorCode.invalidOption,
       SupervisionErrorText.invalidOption,
-      { detail: { field: 'heartbeat.timeoutMs' } }
+      { detail: { field: CoroutineField.heartbeatTimeout } }
     )
+  /** Coroutine policy delegates lifecycle state and teardown to the shared core. */
   const profile: IUnitProfile<
     ICoroutineSpec<TPort>,
     ICoroutineHandle<TPort>,
     ICoroutineExitStatus
   > = {
-    kind: 'coroutine',
+    kind: COROUTINE_KIND,
     gracefulTermination: false,
     requirements: () => [],
     validateSpec(spec) {
@@ -66,7 +70,7 @@ export function createCoroutineSupervisor<TPort = undefined>(
           TypeError,
           SupervisionErrorCode.invalidOption,
           SupervisionErrorText.invalidOption,
-          { detail: { field: 'spec.task' } }
+          { detail: { field: CoroutineField.task } }
         )
     },
     terminate(handle) {
@@ -78,6 +82,7 @@ export function createCoroutineSupervisor<TPort = undefined>(
         : { reason: ExitReason.crashed, cause: status.error }
     }
   }
+  /** Heartbeat checks observe task progress without creating another monitor. */
   const health = heartbeat
     ? {
         intervalMs: heartbeat.intervalMs ?? heartbeat.timeoutMs,
@@ -93,7 +98,7 @@ export function createCoroutineSupervisor<TPort = undefined>(
                 detail: {
                   lastHeartbeatAt: handle.lastHeartbeatAt,
                   timeoutMs: heartbeat.timeoutMs,
-                  kind: 'coroutine'
+                  kind: COROUTINE_KIND
                 }
               }
             )
