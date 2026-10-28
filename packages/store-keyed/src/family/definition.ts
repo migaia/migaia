@@ -197,8 +197,10 @@ export function familyDef<K extends IFamilyKey, T>(
 
   const family = ((key: K) => cache.lookup(key)) as IFamilyDef<K, T, IWritableAtomDefinition<T>>
   Object.defineProperty(family, 'size', { get: () => cache.size })
-  ;(family as { forget: (key: K) => boolean }).forget = (key) => cache.forget(key)
-  ;(family as { clear: () => void }).clear = () => cache.clear()
+  Object.assign(family, {
+    forget: (key: K) => cache.forget(key),
+    clear: () => cache.clear()
+  })
   return family
 }
 
@@ -252,7 +254,9 @@ export function derivedFamilyDef<K extends IFamilyKey, T>(
 
   const family = ((key: K) => cache.lookup(key)) as IFamilyDef<K, T>
   Object.defineProperty(family, 'size', { get: () => cache.size })
-  ;(family as { forget: (key: K) => boolean }).forget = (key) => cache.forget(key)
-  ;(family as { clear: () => void }).clear = () => cache.clear()
+  Object.assign(family, {
+    forget: (key: K) => cache.forget(key),
+    clear: () => cache.clear()
+  })
   return family
 }
