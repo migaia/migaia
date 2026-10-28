@@ -1,0 +1,47 @@
+{
+  "name": "@migaia/log-plugin-file",
+  "version": "0.0.11",
+  "private": true,
+  "description": "Composable file logging plugin.",
+  "files": [
+    "dist",
+    "README.md",
+    "README.en.md",
+    "USEGUIDE.md",
+    "USEGUIDE.en.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "node": "./dist/index.js",
+      "bun": "./dist/index.js",
+      "deno": "./dist/index.js",
+      "browser": "./dist/index.browser.js",
+      "default": "./dist/index.browser.js"
+    }
+  },
+  "scripts": {
+    "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",
+    "fmt": "oxfmt src test package.json tsconfig.json tsconfig.build.json tsconfig.test.json vitest.config.ts README.md README.en.md USEGUIDE.md USEGUIDE.en.md",
+    "lint": "oxlint src test",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
+    "test": "pnpm run build && vitest run",
+    "release:patch": "pnpm version patch --no-git-tag-version",
+    "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
+  },
+  "dependencies": {
+    "@migaia/utils": "workspace:^"
+  },
+  "devDependencies": {
+    "@migaia/log-host": "workspace:0.0.11"
+  },
+  "peerDependencies": {
+    "@migaia/log-host": "0.0.11"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
