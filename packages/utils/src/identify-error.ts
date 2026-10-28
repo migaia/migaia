@@ -1,4 +1,16 @@
-import { ERROR_SOURCE, UtilsErrorCode } from './error-code.ts'
+/**
+ * Own identified-error construction and immutable public methods; admission and call wrappers are
+ * separate owners.
+ */
+import {
+  admitIdentity,
+  identityError,
+  isPlainRecord,
+  readString,
+  matchesIdentity,
+  sameDetail
+} from './internal/identify-error-admission.ts'
+import { IdentifyErrorFactoryOwner, IdentifyErrorWrapper } from './internal/identify-error-call.ts'
 import { UtilsErrorText } from './error-text.ts'
 import {
   attachErrorIdentity,
@@ -7,10 +19,9 @@ import {
   isNativeErrorValue,
   safeErrorReason,
   toError,
-  tryReadProperty,
   walkErrorCauses,
   type IErrorIdentity
-} from './error.ts'
+} from './internal/error-primitives.ts'
 import { deserializeErrorChain, serializeErrorChain } from './error-chain.ts'
 import type { IErrorChainStrategy, ISerializedErrorChain } from './error-chain-types.ts'
 
@@ -89,82 +100,6 @@ export type IIdentifyErrorFactory<S extends string, M extends Readonly<Record<st
 export type IIdentifyErrorCases<R> = {
   readonly [code: string]: ((error: IIdentifiedError) => R) | undefined
 } & { readonly _?: (error: unknown) => R }
-
-/** Factory names that would shadow factory helpers. */
-const reservedFactoryKeys = new Set<string>(['source', 'codes', 'is', 'find'])
-
-/** Creates the coded native `TypeError` used for every rejected identity or argument. */
-function identityError(field: string): TypeError {
-  return attachErrorIdentity(new TypeError(UtilsErrorText.identityInvalid(field)), {
-    source: ERROR_SOURCE,
-    code: UtilsErrorCode.invalidArgument
-  })
-}
-
-/** Checks a plain record without invoking accessors or proxies beyond a prototype read. */
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
-  /** Plain records are created by literals or `Object.create(null)`. */
-  const prototype: unknown = Object.getPrototypeOf(value)
-  return prototype === Object.prototype || prototype === null
-}
-
-/**
- * Validates and freezes one identity. The result is a fresh object, so later caller mutation of the
- * input cannot change an existing error.
- */
-function admitIdentity<S extends string, C extends string>(
-  identity: IIdentifyErrorIdentity<S, C>
-): IIdentifyErrorIdentity<S, C> {
-  if (identity === null || typeof identity !== 'object') throw identityError('identity')
-  /** Snapshot of each field, read once so getters cannot change between validation and use. */
-  const { source, code, phase, detail } = identity
-  if (typeof source !== 'string' || source.length === 0) throw identityError('source')
-  if (typeof code !== 'string' || code.length === 0) throw identityError('code')
-  if (phase !== undefined && typeof phase !== 'string') throw identityError('phase')
-  if (detail !== undefined && !isPlainRecord(detail)) throw identityError('detail')
-  return Object.freeze({
-    source,
-    code,
-    ...(phase === undefined ? {} : { phase }),
-    ...(detail === undefined ? {} : { detail: Object.freeze({ ...detail }) })
-  }) as IIdentifyErrorIdentity<S, C>
-}
-
-/** Reads one optional string property without letting hostile getters escape. */
-function readString(value: object, key: string): string | undefined {
-  /** Guarded read; a throwing getter counts as absent identity. */
-  const read = tryReadProperty(value as Record<string, unknown>, key)
-  return !read.threw && typeof read.value === 'string' ? read.value : undefined
-}
-
-/** Tests one identity against a partial match; omitted match fields always pass. */
-function matchesIdentity(
-  identity: IErrorIdentity | undefined,
-  match: IErrorIdentityMatch
-): boolean {
-  if (!identity) return false
-  return (
-    (match.source === undefined || match.source === identity.source) &&
-    (match.code === undefined || match.code === identity.code) &&
-    (match.phase === undefined || match.phase === identity.phase)
-  )
-}
-
-/** Shallow own-key equality for identity details; both absent counts as equal. */
-function sameDetail(
-  left: Readonly<Record<string, unknown>> | undefined,
-  right: Readonly<Record<string, unknown>> | undefined
-): boolean {
-  if (left === right) return true
-  if (!left || !right) return false
-  /** Own keys of the left detail, compared in both directions by count and value. */
-  const keys = Object.keys(left)
-  return (
-    keys.length === Object.keys(right).length &&
-    keys.every((key) => Object.hasOwn(right, key) && Object.is(left[key], right[key]))
-  )
-}
 
 /**
  * Error with a stable semantic identity (`source`, `code`, optional `phase`/`detail`) and an
@@ -282,34 +217,7 @@ class IdentifyErrorConstructor<S extends string = string, C extends string = str
     source: S,
     codes: M
   ): IIdentifyErrorFactory<S, M> {
-    if (typeof source !== 'string' || source.length === 0) throw identityError('source')
-    if (!isPlainRecord(codes)) throw identityError('codes')
-    /** Frozen copy of the code table, so later edits to the input never change the factory. */
-    const table = Object.freeze({ ...codes }) as Readonly<M>
-    /** Factory under construction; frozen before it is returned. */
-    const factory: Record<string, unknown> = {
-      source,
-      codes: table,
-      is: (value: unknown, key?: string) =>
-        (key === undefined || Object.hasOwn(table, key)) &&
-        IdentifyError.is(value, { source, code: key === undefined ? undefined : table[key] }),
-      find: (error: unknown, key?: string) =>
-        key === undefined || Object.hasOwn(table, key)
-          ? IdentifyError.find(error, { source, code: key === undefined ? undefined : table[key] })
-          : undefined
-    }
-    for (const [key, code] of Object.entries(table)) {
-      if (reservedFactoryKeys.has(key)) throw identityError(`codes.${key}`)
-      if (typeof code !== 'string' || code.length === 0) throw identityError(`codes.${key}`)
-      factory[key] = (options?: IIdentifyErrorFactoryOptions) =>
-        new IdentifyError(
-          { source, code, phase: options?.phase, detail: options?.detail },
-          options && 'cause' in options
-            ? { message: options.message, cause: options.cause }
-            : { message: options?.message }
-        )
-    }
-    return Object.freeze(factory) as IIdentifyErrorFactory<S, M>
+    return new IdentifyErrorFactoryOwner(source, codes, IdentifyError).create()
   }
 
   /**
@@ -340,28 +248,7 @@ class IdentifyErrorConstructor<S extends string = string, C extends string = str
    */
   static wrap<F extends (...args: never[]) => unknown>(fn: F, identity: IIdentifyErrorIdentity): F {
     if (typeof fn !== 'function') throw identityError('fn')
-    /** Validated identity reused by every call of the wrapper. */
-    const admitted = admitIdentity(identity)
-    /** Converts one failure; shared by the synchronous and asynchronous paths. */
-    const convert = (error: unknown): IdentifyError => IdentifyError.from(error, admitted)
-    return ((...args: Parameters<F>) => {
-      /** Result of the wrapped call; thenables are observed for rejection. */
-      let result: unknown
-      try {
-        result = fn(...args)
-      } catch (error) {
-        throw convert(error)
-      }
-      if (
-        result !== null &&
-        (typeof result === 'object' || typeof result === 'function') &&
-        typeof (result as { then?: unknown }).then === 'function'
-      )
-        return Promise.resolve(result as PromiseLike<unknown>).then(undefined, (error: unknown) => {
-          throw convert(error)
-        })
-      return result
-    }) as F
+    return new IdentifyErrorWrapper(fn, admitIdentity(identity), IdentifyError).wrap()
   }
 
   /**
@@ -385,7 +272,9 @@ class IdentifyErrorConstructor<S extends string = string, C extends string = str
 
   /**
    * Finds the first link of the cause / `AggregateError.errors` chain whose identity matches. Works
-   * with any coded error, not only `IdentifyError` instances.
+   * with any coded error, not only `IdentifyError` instances. The shared walk limits each path to
+   * 32 edges by default and deduplicates visited identities; aggregate width is caller-sized, so
+   * this search is O(reached identities + edges), never a constant-size-chain assumption.
    *
    * @example
    *   ;```ts
@@ -442,6 +331,7 @@ class IdentifyErrorConstructor<S extends string = string, C extends string = str
     if (IdentifyError.is(value)) return value.#identity
     /** Required identity fields, read through guarded property access. */
     const source = readString(value, 'source')
+    /** Code follows the source read once, retaining the original hostile-getter order. */
     const code = readString(value, 'code')
     if (!source || !code) return undefined
     /** Optional phase, only kept when it is a string. */
@@ -492,11 +382,14 @@ class IdentifyErrorConstructor<S extends string = string, C extends string = str
     return walkErrorCauses(this)
   }
 
-  /** Whether any chain link (including `this`) matches the partial identity. */
+  /**
+   * Whether any link matches, after the shared 32-edge-depth walk has snapshotted every reached
+   * identity. Aggregate width is not bounded by depth; the scan remains O(reached identities).
+   */
   has(match: IErrorIdentityMatch): boolean {
-    return walkErrorCauses(this).some((link) =>
-      matchesIdentity(IdentifyError.identityOf(link), match)
-    )
+    for (const link of walkErrorCauses(this))
+      if (matchesIdentity(IdentifyError.identityOf(link), match)) return true
+    return false
   }
 
   /** Whether `other` carries the same `source`, `code` and `phase`. Never throws. */

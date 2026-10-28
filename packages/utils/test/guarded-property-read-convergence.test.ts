@@ -94,6 +94,6 @@ describe('guarded property read convergence', () => {
         /function tryReadProperty\b/.test(readFileSync(path, 'utf8'))
       )
     })
-    expect(declarations).toEqual([resolve(repositoryRoot, 'packages/utils/src/error.ts')])
+    expect(declarations).toEqual([resolve(repositoryRoot, 'packages/utils/src/internal/error-primitives.ts')])
   })
 })
