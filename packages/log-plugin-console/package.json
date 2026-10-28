@@ -1,0 +1,45 @@
+{
+  "name": "@migaia/log-plugin-console",
+  "version": "0.0.11",
+  "private": true,
+  "description": "Composable console logging plugin.",
+  "files": [
+    "dist",
+    "README.md",
+    "README.en.md",
+    "USEGUIDE.md",
+    "USEGUIDE.en.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "node ../../scripts/dist-stamp.mjs clean && tsc -p tsconfig.build.json && node ../../scripts/dist-stamp.mjs write",
+    "fmt": "oxfmt src test package.json tsconfig.json tsconfig.build.json tsconfig.test.json vitest.config.ts README.md README.en.md USEGUIDE.md USEGUIDE.en.md",
+    "lint": "oxlint src test",
+    "typecheck": "bun check -p tsconfig.json",
+    "typecheck:test": "bun check -p tsconfig.test.json",
+    "test": "pnpm run build && vitest run",
+    "test:browser": "playwright test --config test/browser/playwright.config.ts",
+    "release:patch": "pnpm version patch --no-git-tag-version",
+    "release:publish": "pnpm publish --access restricted --ignore-scripts --no-git-checks"
+  },
+  "dependencies": {
+    "@migaia/utils": "workspace:^",
+    "ansis": "4.3.1"
+  },
+  "devDependencies": {
+    "@migaia/log-host": "workspace:0.0.11"
+  },
+  "peerDependencies": {
+    "@migaia/log-host": "0.0.11"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
