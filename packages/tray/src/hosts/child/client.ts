@@ -1,13 +1,13 @@
 /** Child business calls use its one actual parent namespace and the original relay admission. */
 import { defineFeature, definePlugin } from '@migaia/plugin-host'
-import { createRemote, createRoutedRemote, type ITrayInvocation } from '../remote.js'
-import { readHost } from '../define-host.js'
-import { TrayInternal, TrayCallKind } from '../constants.js'
-import { createRoutingNamespace, builtInRouting } from '../routing.js'
-import { rpcCallOptions, type ITrayRuntimeOutlet } from '../runtime.js'
-import { toWire } from '../portable.js'
-import type { IAnyTrayHost, ITrayInstanceInfo, ITrayClientPlugin } from '../typing.js'
-import type { IChildTopics } from './topics.js'
+import { createRemote, createRoutedRemote, type ITrayInvocation } from '../remote.ts'
+import { readHost } from '../define-host.ts'
+import { TrayInternal, TrayCallKind } from '../constants.ts'
+import { createRoutingNamespace, builtInRouting } from '../routing.ts'
+import { rpcCallOptions, type ITrayRuntimeOutlet } from '../runtime.ts'
+import { toWire } from '../portable.ts'
+import type { IAnyTrayHost, ITrayInstanceInfo, ITrayClientPlugin } from '../typing.ts'
+import type { IChildTopics } from './topics.ts'
 
 /** One generation owns only its immutable client configuration; RPC owns physical work. */
 class ChildTrayClient {

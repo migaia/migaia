@@ -1,8 +1,8 @@
-export { createTrayGraph } from './tray.js'
-export * from './hosts/index.js'
-export { TrayErrorCode } from './error-code.js'
-export type { ITrayErrorCode } from './error-code.js'
-export { TRAY_SOURCE } from './errors.js'
+export { createTrayGraph } from './tray.ts'
+export * from './hosts/index.ts'
+export { TrayErrorCode } from './error-code.ts'
+export type { ITrayErrorCode } from './error-code.ts'
+export { TRAY_SOURCE } from './errors.ts'
 export type {
   ITrayGraph,
   ITrayEntryContext,
@@ -11,5 +11,5 @@ export type {
   ITrayEntryKind,
   ITrayKey,
   ITrayState
-} from './contract.js'
-export type { IGraphReadinessSnapshot } from './types.js'
+} from './contract.ts'
+export type { IGraphReadinessSnapshot } from './types.ts'

@@ -10,7 +10,7 @@ import {
   type IPluginRemoval
 } from '@migaia/plugin-host'
 import { openComposition } from '@migaia/plugin-host/composition'
-import { createHost } from '../src/host/index.js'
+import { createHost } from '../src/host/index.ts'
 
 class RuntimeHost extends PluginHost<Record<string, never>, string> {}
 

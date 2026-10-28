@@ -1,5 +1,5 @@
-export { createHost } from './create-host.js'
-export { TrayHostState } from './typing.js'
+export { createHost } from './create-host.ts'
+export { TrayHostState } from './typing.ts'
 export type {
   ICreateHostOptions,
   ITrayHost,
@@ -19,4 +19,4 @@ export type {
   ITrayPluginRemovalResult,
   ITrayResolvedHost,
   IUnsubscribe
-} from './typing.js'
+} from './typing.ts'

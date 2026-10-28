@@ -3,11 +3,11 @@
  * ownership.
  */
 import { createConcurrencyLimiter, type IConcurrencyLimiter } from '@migaia/utils/promise'
-import { createTrayError } from '../../errors.js'
-import { TrayErrorCode } from '../../error-code.js'
-import { TrayInstanceState, TrayCallKind, type TrayManagementMode } from '../constants.js'
-import type { IAnyTrayHost, ITrayInstance } from '../typing.js'
-import type { ITrayInvocation, ITraySender } from '../remote.js'
+import { createTrayError } from '../../errors.ts'
+import { TrayErrorCode } from '../../error-code.ts'
+import { TrayInstanceState, TrayCallKind, type TrayManagementMode } from '../constants.ts'
+import type { IAnyTrayHost, ITrayInstance } from '../typing.ts'
+import type { ITrayInvocation, ITraySender } from '../remote.ts'
 /** Metadata belongs to one id admission; RPC remains the connection and generation owner. */
 export type ITrayRecord = {
   definition: IAnyTrayHost

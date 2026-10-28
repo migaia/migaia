@@ -10,8 +10,8 @@ import {
   type IRpcMemberEvent,
   type IRpcMemberConnectionDetail
 } from '@migaia/rpc-host/sdk'
-import { createTrayError, TRAY_SOURCE } from '../../errors.js'
-import { TrayErrorCode } from '../../error-code.js'
+import { createTrayError, TRAY_SOURCE } from '../../errors.ts'
+import { TrayErrorCode } from '../../error-code.ts'
 import {
   TrayInternal,
   TrayInstanceState,
@@ -19,18 +19,18 @@ import {
   TrayRuntimeMode,
   TrayManagementMode,
   TrayCallKind
-} from '../constants.js'
-import { readHost } from '../define-host.js'
-import { readRoutingPolicy, type ITrayRoutingPolicy } from '../routing-policy.js'
-import { toWire } from '../portable.js'
+} from '../constants.ts'
+import { readHost } from '../define-host.ts'
+import { readRoutingPolicy, type ITrayRoutingPolicy } from '../routing-policy.ts'
+import { toWire } from '../portable.ts'
 import {
   createRemote,
   createRoutedRemote,
   type ITraySender,
   type ITrayInvocation
-} from '../remote.js'
-import { createRoutingRegistry, createRoutingNamespace } from '../routing.js'
-import { createParentTopics } from './topics.js'
+} from '../remote.ts'
+import { createRoutingRegistry, createRoutingNamespace } from '../routing.ts'
+import { createParentTopics } from './topics.ts'
 import {
   runtimePlugin,
   parentRuntimeTransport,
@@ -40,12 +40,12 @@ import {
   type ITrayRuntimeHost,
   type ITrayRuntimeOutlet,
   type ITrayRuntimeMembers
-} from '../runtime.js'
-import { disposeChildHost, serveChild } from '../child/serve.js'
-import { createRegistry, type ITrayRecord } from './registry.js'
-import { createTrayEvents } from './events.js'
-import { createRelay } from './relay.js'
-import type { IAnyTrayHost, ITray, ITrayInstance } from '../typing.js'
+} from '../runtime.ts'
+import { disposeChildHost, serveChild } from '../child/serve.ts'
+import { createRegistry, type ITrayRecord } from './registry.ts'
+import { createTrayEvents } from './events.ts'
+import { createRelay } from './relay.ts'
+import type { IAnyTrayHost, ITray, ITrayInstance } from '../typing.ts'
 /** Parent construction options retain the host and routing tuples for public inference. */
 export type ICreateTrayOptions<
   THosts extends readonly IAnyTrayHost[],
@@ -708,7 +708,7 @@ class TrayRuntime<
   /** Original subscribe admission and result behavior stays with this parent owner. */
   #subscribeEntry = (
     topic: string,
-    listener: import('../topics.js').ITrayTopicListener
+    listener: import('../topics.ts').ITrayTopicListener
   ): (() => void) => {
     this.#assertActive()
     return this.#topics.subscribe(topic, listener)

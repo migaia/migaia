@@ -1,9 +1,9 @@
 import { getEventListeners } from 'node:events'
-import { defineLoader, loadIntoHost } from '../src/loader/index.js'
-import { defineAdapter } from '../src/adapter/index.js'
+import { defineLoader, loadIntoHost } from '../src/loader/index.ts'
+import { defineAdapter } from '../src/adapter/index.ts'
 import { describe, expect, it } from 'vitest'
 import { defineHost, definePlugin } from '@migaia/plugin-host'
-import { createHost } from '../src/host/index.js'
+import { createHost } from '../src/host/index.ts'
 
 /** Real PluginHost configuration used by the managed ownership regressions. */
 const execution = { mutationTimeoutMs: 500, pipelineDrainTimeoutMs: 500 }

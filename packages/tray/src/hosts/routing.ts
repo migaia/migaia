@@ -2,17 +2,17 @@
  * Admit routing policies and select from one current candidate snapshot; registry owns instance
  * lifetime.
  */
-import { createTrayError } from '../errors.js'
-import { TrayErrorCode } from '../error-code.js'
-import { TrayInstanceState } from './constants.js'
+import { createTrayError } from '../errors.ts'
+import { TrayErrorCode } from '../error-code.ts'
+import { TrayInstanceState } from './constants.ts'
 import {
   roundRobin,
   leastInFlight,
   readRoutingPolicy,
   type ITrayRoutingPolicy
-} from './routing-policy.js'
-import type { ITrayRegistry, ITrayRecord } from './parent/registry.js'
-import type { IAnyTrayHost, ITrayRouting, ITrayRoutedRemote } from './typing.js'
+} from './routing-policy.ts'
+import type { ITrayRegistry, ITrayRecord } from './parent/registry.ts'
+import type { IAnyTrayHost, ITrayRouting, ITrayRoutedRemote } from './typing.ts'
 
 /** Shared built-ins are authored by the same policy WeakMap as custom identities. */
 export const builtInRouting: readonly [

@@ -1,8 +1,8 @@
 /** Project validated Tray calls through an admitted sender; registry and RPC own lifecycle state. */
-import { createTrayError } from '../errors.js'
-import { TrayErrorCode } from '../error-code.js'
-import { toWire } from './portable.js'
-import type { IAnyTrayHost, ITrayRemote, ITrayRoutedRemote, ITrayCallOptions } from './typing.js'
+import { createTrayError } from '../errors.ts'
+import { TrayErrorCode } from '../error-code.ts'
+import { toWire } from './portable.ts'
+import type { IAnyTrayHost, ITrayRemote, ITrayRoutedRemote, ITrayCallOptions } from './typing.ts'
 /** Dispatcher payload omits absent data; application objects are validated unchanged. */
 export type ITrayInvocation = Readonly<{ path: string; payload?: unknown }>
 /** One callable remote forwards each operation through its admission-bound sender. */

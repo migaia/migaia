@@ -13,8 +13,8 @@ import {
 } from '@migaia/plugin-host'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { DependencyPolicy } from '@migaia/capability/graph/dependency'
-import { createHost } from '../src/host/index.js'
-import { TrayErrorCode } from '../src/error-code.js'
+import { createHost } from '../src/host/index.ts'
+import { TrayErrorCode } from '../src/error-code.ts'
 
 /** Real provenance remains owned by PluginHost; this test only observes the public protocol read. */
 const actualOpenComposition = composition.openComposition

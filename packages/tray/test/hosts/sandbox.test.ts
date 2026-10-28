@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { fixture, marker } from './helper.js'
+import { fixture, marker } from './helper.ts'
 
 describe('Tray external process sandbox', () => {
   it('applies an env command wrapper before init and every restart', async () => {

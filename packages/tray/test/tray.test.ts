@@ -8,8 +8,8 @@ import {
   TrayErrorCode,
   type ITrayEntryDefinition,
   type ITrayKey
-} from '../src/index.js'
-import { attachTrayError, createTrayError, TRAY_SOURCE } from '../src/errors.js'
+} from '../src/index.ts'
+import { attachTrayError, createTrayError, TRAY_SOURCE } from '../src/errors.ts'
 
 const key = (value: string) => value as ITrayKey
 const deferred = <T>() => {

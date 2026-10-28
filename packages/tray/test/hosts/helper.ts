@@ -6,7 +6,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { expect, vi } from 'vitest'
 
 /** Main-process fixture declarations share source brands; native Node entry fixtures keep dist. */
-vi.mock('@migaia/tray', () => import('../../src/index.js'))
+vi.mock('@migaia/tray', () => import('../../src/index.ts'))
 
 /** Main-process calls exercise source while child entry fixtures retain their built boundary. */
 export async function fixture() {

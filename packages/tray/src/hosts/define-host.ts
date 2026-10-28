@@ -3,17 +3,17 @@
  * deferred.
  */
 import { isUrlObject, readUrlHref, type IUrlLike } from '@migaia/utils'
-import { TrayErrorCode } from '../error-code.js'
-import { createTrayError } from '../errors.js'
-import { TrayHostField, TrayInternal, TrayRestartMode, TrayRuntime } from './constants.js'
-import { readRoutingPolicy, type ITrayRoutingPolicy } from './routing-policy.js'
+import { TrayErrorCode } from '../error-code.ts'
+import { createTrayError } from '../errors.ts'
+import { TrayHostField, TrayInternal, TrayRestartMode, TrayRuntime } from './constants.ts'
+import { readRoutingPolicy, type ITrayRoutingPolicy } from './routing-policy.ts'
 import type {
   IAnyTrayHost,
   ITrayExposePath,
   ITrayHost,
   ITrayHostDefinition,
   ITrayPlugins
-} from './typing.js'
+} from './typing.ts'
 
 /** Runtime authority belongs to the exact frozen object returned by defineTrayHost. */
 const hosts = new WeakSet<object>()

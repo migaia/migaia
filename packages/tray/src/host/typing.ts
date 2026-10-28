@@ -1,5 +1,5 @@
 /** Preserve managed native Host capability types without widening named pipeline authoring. */
-import type { TrayShutdownMode } from '../state-constants.js'
+import type { TrayShutdownMode } from '../state-constants.ts'
 import type {
   IExtractPluginConfig,
   IExtractPluginExt,

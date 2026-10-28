@@ -2,7 +2,7 @@
  * Owns one managed Host claim and its canonical composition/graph bridge. Creation rollback,
  * publication and disposal share those owners; bounded waits retain the original physical cleanup.
  */
-import { TrayShutdownMode } from '../state-constants.js'
+import { TrayShutdownMode } from '../state-constants.ts'
 import { mergeCleanupResults } from '@migaia/lifecycle'
 import {
   createDynamicCapabilityGraph,
@@ -22,8 +22,8 @@ import {
   type IPluginHostDisposalResult,
   type IPluginDependency
 } from '@migaia/plugin-host'
-import { TrayErrorCode } from '../error-code.js'
-import { attachTrayError, createTrayError } from '../errors.js'
+import { TrayErrorCode } from '../error-code.ts'
+import { attachTrayError, createTrayError } from '../errors.ts'
 import {
   TrayHostState,
   type ICreateHostOptions,
@@ -37,13 +37,13 @@ import {
   type ITrayPluginPhysicalCleanupResult,
   type ITrayResolvedHost,
   type IUnsubscribe
-} from './typing.js'
+} from './typing.ts'
 import {
   claimArtifactCustody,
   readRuntimeBridge,
   registerRuntimeBridge,
   type ITrayArtifactCustody
-} from './internal-capability.js'
+} from './internal-capability.ts'
 import {
   createView as createRegistrationView,
   isManagedHost,

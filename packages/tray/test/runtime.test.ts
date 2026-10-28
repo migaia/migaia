@@ -3,10 +3,10 @@ import { describe, expect, it, vi } from 'vitest'
 import { PluginHost, defineFeature, definePlugin } from '@migaia/plugin-host'
 import { createAbortController } from '@migaia/lifecycle'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createHost } from '../src/host/index.js'
-import { defineAdapter } from '../src/adapter/index.js'
-import { defineLoader, loadIntoHost } from '../src/loader/index.js'
-import { createRuntime } from '../src/runtime/index.js'
+import { createHost } from '../src/host/index.ts'
+import { defineAdapter } from '../src/adapter/index.ts'
+import { defineLoader, loadIntoHost } from '../src/loader/index.ts'
+import { createRuntime } from '../src/runtime/index.ts'
 
 class TestHost extends PluginHost<Record<string, never>, string> {}
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fixture } from './helper.js'
+import { fixture } from './helper.ts'
 
 describe('Tray public boundary and lifecycle events', () => {
   it('exports routing capabilities and registered mesh diagnostics', async () => {

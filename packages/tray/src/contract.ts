@@ -1,10 +1,10 @@
-import type { TrayEntryKind } from './state-constants.js'
+import type { TrayEntryKind } from './state-constants.ts'
 import type {
   IGraphNodeState,
   IGraphReleaseContext,
   IGraphReadinessSnapshot,
   IReleaseDescriptor
-} from './types.js'
+} from './types.ts'
 import type { ICapabilityGraphState } from '@migaia/capability/graph'
 import type { INativeAbortSignal } from '@migaia/utils/promise'
 

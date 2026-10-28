@@ -1,11 +1,11 @@
-import type { TrayShutdownMode } from '../state-constants.js'
+import type { TrayShutdownMode } from '../state-constants.ts'
 import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import type { IExtractPluginExt, IPluginConstraint } from '@migaia/plugin-host'
 import type {
   ITrayHostSource,
   ITrayPluginAdmission,
   ITrayPluginConstraint
-} from '../host/typing.js'
+} from '../host/typing.ts'
 
 /** Resolves exact extension types for literal ready plugin names and stays unknown when widened. */
 export type IRuntimeExtensionsFor<

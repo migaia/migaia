@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { TrayErrorCode } from '../../src/error-code.js'
-import { defineTrayHost, readHost } from '../../src/hosts/define-host.js'
-import { defineRoutingPolicy } from '../../src/hosts/routing-policy.js'
-import { toWire } from '../../src/hosts/portable.js'
+import { TrayErrorCode } from '../../src/error-code.ts'
+import { defineTrayHost, readHost } from '../../src/hosts/define-host.ts'
+import { defineRoutingPolicy } from '../../src/hosts/routing-policy.ts'
+import { toWire } from '../../src/hosts/portable.ts'
 
 /** Empty business installation keeps definition tests independent of runtime startup. */
 const plugins = () => [] as const

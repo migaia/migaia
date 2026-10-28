@@ -1,16 +1,16 @@
-import { TrayShutdownMode } from '../state-constants.js'
+import { TrayShutdownMode } from '../state-constants.ts'
 import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/utils/function'
 import { createAbortController } from '@migaia/lifecycle'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { TrayErrorCode } from '../error-code.js'
-import { TRAY_SOURCE, attachTrayError, createTrayError } from '../errors.js'
-import { readRuntimeBridge } from '../host/internal-capability.js'
+import { TrayErrorCode } from '../error-code.ts'
+import { TRAY_SOURCE, attachTrayError, createTrayError } from '../errors.ts'
+import { readRuntimeBridge } from '../host/internal-capability.ts'
 import type {
   ITrayHost,
   ITrayHostTypeInfo,
   ITrayHostReadyPlugins,
   ITrayHostSourceOf
-} from '../host/typing.js'
+} from '../host/typing.ts'
 import type {
   IRuntime,
   IRuntimeDisposalResult,
@@ -19,7 +19,7 @@ import type {
   IRuntimeSelfMutation,
   IRuntimeSelfMutationTicket,
   IRuntimeShutdownOptions
-} from './typing.js'
+} from './typing.ts'
 
 /** Non-exported brand distinguishing Runtime tickets from caller-shaped lookalikes. */
 const runtimeSelfMutationTicketBrand = Symbol('migaia.tray.runtime.self-mutation-ticket')

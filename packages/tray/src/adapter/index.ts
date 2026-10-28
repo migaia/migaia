@@ -1,2 +1,2 @@
-export { defineAdapter } from './define-adapter.js'
-export type { IAdapter, IAdapterContext } from './typing.js'
+export { defineAdapter } from './define-adapter.ts'
+export type { IAdapter, IAdapterContext } from './typing.ts'

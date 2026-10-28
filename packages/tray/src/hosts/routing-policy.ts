@@ -1,6 +1,6 @@
-import { TrayErrorCode } from '../error-code.js'
-import { createTrayError } from '../errors.js'
-import type { ITrayInstance } from './typing.js'
+import { TrayErrorCode } from '../error-code.ts'
+import { createTrayError } from '../errors.ts'
+import type { ITrayInstance } from './typing.ts'
 
 /** Compile-time identity cannot replace the runtime WeakMap authority. */
 declare const trayRoutingPolicyBrand: unique symbol

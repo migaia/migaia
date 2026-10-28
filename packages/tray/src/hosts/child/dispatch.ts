@@ -8,14 +8,14 @@ import {
 import type { IRpcContext } from '@migaia/rpc-host'
 import { DependencyAction, DependencyPolicy } from '@migaia/capability/graph/dependency'
 import { withTimeout } from '@migaia/utils/promise'
-import { createTrayError } from '../../errors.js'
-import { TrayErrorCode } from '../../error-code.js'
-import { TrayInternal } from '../constants.js'
-import { createTrayPlugin } from './client.js'
-import { createChildTopics } from './topics.js'
-import type { ITrayRuntimeHost, ITrayRuntimeOutlet } from '../runtime.js'
-import type { IAnyTrayHost, ITrayInstanceInfo } from '../typing.js'
-import type { ITrayInvocation } from '../remote.js'
+import { createTrayError } from '../../errors.ts'
+import { TrayErrorCode } from '../../error-code.ts'
+import { TrayInternal } from '../constants.ts'
+import { createTrayPlugin } from './client.ts'
+import { createChildTopics } from './topics.ts'
+import type { ITrayRuntimeHost, ITrayRuntimeOutlet } from '../runtime.ts'
+import type { IAnyTrayHost, ITrayInstanceInfo } from '../typing.ts'
+import type { ITrayInvocation } from '../remote.ts'
 /** One child generation initializes once; PluginHost's dependency plan owns business cleanup order. */
 export function createChildDispatcher(
   definition: IAnyTrayHost,

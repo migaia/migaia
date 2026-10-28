@@ -1,6 +1,6 @@
 import type { IRpcPortableValue } from '@migaia/rpc-host/contract'
-import { TrayErrorCode } from '../error-code.js'
-import { createTrayError } from '../errors.js'
+import { TrayErrorCode } from '../error-code.ts'
+import { createTrayError } from '../errors.ts'
 
 /** Authenticated publisher identity is separate from arbitrary business payloads. */
 export type ITrayTopicMeta = Readonly<{

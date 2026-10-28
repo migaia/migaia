@@ -1,8 +1,8 @@
-import { TrayInternal } from '../../src/hosts/constants.js'
+import { TrayInternal } from '../../src/hosts/constants.ts'
 import { describe, expect, it } from 'vitest'
 import { defineHost } from '@migaia/plugin-host'
 import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
-import { assembled, fixture, liveThreads, processAlive, until } from './helper.js'
+import { assembled, fixture, liveThreads, processAlive, until } from './helper.ts'
 
 describe('Tray child topology', () => {
   it.each([0, 1, 2])(

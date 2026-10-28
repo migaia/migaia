@@ -1,23 +1,23 @@
 import { createAbortController, createProvisionalScope } from '@migaia/lifecycle'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { TrayErrorCode } from '../error-code.js'
-import { attachTrayError, createTrayError } from '../errors.js'
-import { registerArtifactCustody } from '../host/internal-capability.js'
-import { defineAdapter } from '../adapter/define-adapter.js'
-import { defineLoader } from './define-loader.js'
+import { TrayErrorCode } from '../error-code.ts'
+import { attachTrayError, createTrayError } from '../errors.ts'
+import { registerArtifactCustody } from '../host/internal-capability.ts'
+import { defineAdapter } from '../adapter/define-adapter.ts'
+import { defineLoader } from './define-loader.ts'
 import type {
   ILoadIntoHostOptions,
   ILoadIntoHostResult,
   ILoadedArtifact,
   ILoaderContext
-} from './typing.js'
+} from './typing.ts'
 import type {
   ITrayHostTypeInfo,
   ITrayHostSourceOf,
   ITrayHostReadyPlugins,
   ITrayPluginAdmission,
   ITrayPluginConstraint
-} from '../host/typing.js'
+} from '../host/typing.ts'
 
 /**
  * Loads and adapts an artifact into an existing managed Host. Before commit the provisional scope

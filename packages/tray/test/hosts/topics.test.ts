@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { setTimeout as delay } from 'node:timers/promises'
-import { fixture, until, marker, lines, chainHas, assembled } from './helper.js'
+import { fixture, until, marker, lines, chainHas, assembled } from './helper.ts'
 
 describe('Tray business topics', () => {
   it('validates topic and portable payload before delivery', async () => {

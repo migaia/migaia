@@ -2,7 +2,7 @@ import type {
   IHostBaselinePlugins,
   ICanResolveReadyDefinitions,
   IResolveReadyTrayPlugins
-} from '../src/host/typing.js'
+} from '../src/host/typing.ts'
 import { describe, expect, it } from 'vitest'
 import {
   defineFeature,
@@ -19,8 +19,8 @@ import {
   type ITrayPluginCore,
   type ITrayPluginMutationResult,
   type ITrayPluginRemovalResult
-} from '../src/host/index.js'
-import type { IRuntime } from '../src/runtime/typing.js'
+} from '../src/host/index.ts'
+import type { IRuntime } from '../src/runtime/typing.ts'
 
 type ITestCore = Record<string, never>
 type IReadyConfig = Readonly<{ readonly enabled: boolean }>

@@ -1,4 +1,4 @@
-import { TrayEntryKind } from './state-constants.js'
+import { TrayEntryKind } from './state-constants.ts'
 import { GraphReadinessState } from '@migaia/capability'
 import {
   createCapabilityGraph,
@@ -6,16 +6,16 @@ import {
   type IGraphNodeDefinition,
   type IGraphNodeId
 } from '@migaia/capability/graph'
-import { TrayErrorCode } from './error-code.js'
-import { attachTrayError, createTrayError } from './errors.js'
+import { TrayErrorCode } from './error-code.ts'
+import { attachTrayError, createTrayError } from './errors.ts'
 import type {
   ITrayGraph,
   ITrayEntryDefinition,
   ITrayEntryContext,
   ITrayKey,
   ITrayState
-} from './contract.js'
-import type { IGraphNodeState, IReleaseDescriptor } from './types.js'
+} from './contract.ts'
+import type { IGraphNodeState, IReleaseDescriptor } from './types.ts'
 
 const keyOf = (key: ITrayKey): IGraphNodeId => key as unknown as IGraphNodeId
 

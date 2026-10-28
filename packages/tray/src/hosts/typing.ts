@@ -12,8 +12,8 @@ import type {
 } from '@migaia/plugin-host'
 import type { IAbortSignal, IUrlLike } from '@migaia/utils'
 import type { IRpcMemberConnectionDetail } from '@migaia/rpc-host/sdk'
-import type { TrayInstanceEvent, TrayInstanceState, TrayRuntime } from './constants.js'
-import type { ITrayRoutingPolicy } from './routing-policy.js'
+import type { TrayInstanceEvent, TrayInstanceState, TrayRuntime } from './constants.ts'
+import type { ITrayRoutingPolicy } from './routing-policy.ts'
 
 /** Caller cancellation and deadline occupy only the third public call position. */
 export type ITrayCallOptions = Readonly<{
@@ -25,7 +25,7 @@ export type ITrayCallOptions = Readonly<{
 /** Accepted host runtime families; transport and supervision remain rpc-owned. */
 export type ITrayRuntime = (typeof TrayRuntime)[keyof typeof TrayRuntime]
 /** Registry domains are declared once by their canonical value/type owner. */
-export type { TrayInstanceState, TrayInstanceEvent } from './constants.js'
+export type { TrayInstanceState, TrayInstanceEvent } from './constants.ts'
 /** Native plugin tuple, retaining each definition's Feature metadata. */
 export type ITrayPlugins = readonly IPluginConstraint<any, any, any>[]
 /** Selects a literal plugin identity without recursively walking its tuple. */
@@ -299,7 +299,7 @@ export type ITrayClient<TRouting extends readonly ITrayRoutingPolicy[] = readonl
   /** Registers generation-bound membership; the asynchronous unsubscribe receipt is idempotent. */
   subscribe(
     topic: string,
-    listener: import('./topics.js').ITrayTopicListener
+    listener: import('./topics.ts').ITrayTopicListener
   ): Promise<() => Promise<void>>
 }>
 /** Per-init PluginHost definition exposes one precise native `tray` Feature. */
@@ -338,7 +338,7 @@ export type ITray<
    */
   publish(topic: string, payload?: unknown): void
   /** Adds a parent-side business listener and returns a synchronous unsubscribe receipt. */
-  subscribe(topic: string, listener: import('./topics.js').ITrayTopicListener): () => void
+  subscribe(topic: string, listener: import('./topics.ts').ITrayTopicListener): () => void
   /**
    * Admits an id, starts its RPC unit and initializes plugins before returning a fixed-admission
    * remote.

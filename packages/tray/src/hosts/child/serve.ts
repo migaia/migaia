@@ -4,16 +4,16 @@ import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { probe } from '@migaia/rpc-host/plugins/probe'
 import { deferred } from '@migaia/utils/promise'
 import type { ICoroutineConnect } from '@migaia/rpc-plugin-coroutines'
-import { createChildDispatcher } from './dispatch.js'
-import { readHost } from '../define-host.js'
+import { createChildDispatcher } from './dispatch.ts'
+import { readHost } from '../define-host.ts'
 import {
   outletOf,
   runtimePlugin,
   type ITrayRuntimeHost,
   type ITrayRuntimeOptions
-} from '../runtime.js'
-import { TrayRuntime, TrayRuntimeMode } from '../constants.js'
-import type { IAnyTrayHost } from '../typing.js'
+} from '../runtime.ts'
+import { TrayRuntime, TrayRuntimeMode } from '../constants.ts'
+import type { IAnyTrayHost } from '../typing.ts'
 
 /** The original Node child realm exit stays shared by parent loss and the chosen Tray outcome. */
 function exitNodeRealm(code: number): void {
@@ -141,8 +141,8 @@ export async function serveTrayHost(
   /** The coroutine task owns its runner; only a Node realm calls this public entry. */
   const admitted = readHost(definition)
   if (admitted.runtime === TrayRuntime.coroutine) {
-    const { createTrayError } = await import('../../errors.js')
-    const { TrayErrorCode } = await import('../../error-code.js')
+    const { createTrayError } = await import('../../errors.ts')
+    const { TrayErrorCode } = await import('../../error-code.ts')
     throw createTrayError(TrayErrorCode.hostInvalid)
   }
   /** Default diagnostics use the same boundary reporter in either Node realm. */

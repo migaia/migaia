@@ -1,6 +1,6 @@
 import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import type { IReleaseDescriptor } from '@migaia/lifecycle'
-import type { IAdapter } from '../adapter/typing.js'
+import type { IAdapter } from '../adapter/typing.ts'
 import type {
   ITrayHost,
   ITrayHostSource,
@@ -11,7 +11,7 @@ import type {
   ITrayPluginAdmission,
   ITrayPluginConstraint,
   ITrayHostMutationResult
-} from '../host/typing.js'
+} from '../host/typing.ts'
 
 /** Artifact plus its explicit lifecycle release contract. */
 export type ILoadedArtifact<TArtifact> = Readonly<{

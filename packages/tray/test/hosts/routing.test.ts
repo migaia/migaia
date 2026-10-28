@@ -3,7 +3,7 @@ import { defineProbe } from '@migaia/rpc-host/plugins/probe'
 import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { RpcWireKind, type IRpcEnvelope } from '@migaia/rpc-contract/protocol'
 import { setTimeout as delay } from 'node:timers/promises'
-import { fixture, until } from './helper.js'
+import { fixture, until } from './helper.ts'
 
 describe('mesh routing and admission accounting', () => {
   it('interleaves both built-in forms with one cursor and counts pending requests', async () => {
@@ -236,10 +236,10 @@ describe('mesh routing and admission accounting', () => {
     }
     /** The existing relay owner also rejects a forged name after authenticated sender lookup. */
     const { defineHost } = await import('@migaia/plugin-host')
-    const { createRelay } = await import('../../src/hosts/parent/relay.js')
-    const { createRegistry } = await import('../../src/hosts/parent/registry.js')
-    const { createRoutingRegistry } = await import('../../src/hosts/routing.js')
-    const { createParentTopics } = await import('../../src/hosts/parent/topics.js')
+    const { createRelay } = await import('../../src/hosts/parent/relay.ts')
+    const { createRegistry } = await import('../../src/hosts/parent/registry.ts')
+    const { createRoutingRegistry } = await import('../../src/hosts/routing.ts')
+    const { createParentTopics } = await import('../../src/hosts/parent/topics.ts')
     let targetSends = 0
     const registry = createRegistry(
       () => {},
@@ -378,8 +378,8 @@ describe('mesh routing and admission accounting', () => {
 
   it('releases admission counts for every completion and never decrements a new same-id admission', async () => {
     /** This existing owner accepts a transport callback, so no public test seam is introduced. */
-    const { createRegistry } = await import('../../src/hosts/parent/registry.js')
-    const { TrayCallKind } = await import('../../src/hosts/constants.js')
+    const { createRegistry } = await import('../../src/hosts/parent/registry.ts')
+    const { TrayCallKind } = await import('../../src/hosts/constants.ts')
     const api = await fixture()
     let settle: (value?: unknown) => void = () => {}
     let fail: (error: unknown) => void = () => {}

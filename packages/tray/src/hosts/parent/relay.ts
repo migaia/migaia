@@ -1,13 +1,13 @@
 import { defineFeature, definePlugin, type IPluginConstraint } from '@migaia/plugin-host'
 import type { IRpcContext } from '@migaia/rpc-host'
-import { TrayInternal, TrayCallKind } from '../constants.js'
-import { createTrayError } from '../../errors.js'
-import { TrayErrorCode } from '../../error-code.js'
-import type { ITrayRegistry, ITrayRecord } from './registry.js'
-import type { ITraySender } from '../remote.js'
-import type { createRoutingRegistry } from '../routing.js'
-import type { IAnyTrayHost } from '../typing.js'
-import type { createParentTopics } from './topics.js'
+import { TrayInternal, TrayCallKind } from '../constants.ts'
+import { createTrayError } from '../../errors.ts'
+import { TrayErrorCode } from '../../error-code.ts'
+import type { ITrayRegistry, ITrayRecord } from './registry.ts'
+import type { ITraySender } from '../remote.ts'
+import type { createRoutingRegistry } from '../routing.ts'
+import type { IAnyTrayHost } from '../typing.ts'
+import type { createParentTopics } from './topics.ts'
 /** Relay envelope carries an admission receipt and omits an absent application payload. */
 type IRelayCall = Readonly<{
   host: string

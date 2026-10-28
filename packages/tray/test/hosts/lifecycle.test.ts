@@ -1,10 +1,10 @@
-import { TrayInternal } from '../../src/hosts/constants.js'
-import type { ITrayRecord } from '../../src/hosts/parent/registry.js'
+import { TrayInternal } from '../../src/hosts/constants.ts'
+import type { ITrayRecord } from '../../src/hosts/parent/registry.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { setTimeout as delay } from 'node:timers/promises'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { fileURLToPath } from 'node:url'
-import { assembled, chainHas, fixture, lines, marker, until } from './helper.js'
+import { assembled, chainHas, fixture, lines, marker, until } from './helper.ts'
 
 describe('Tray lifecycle management', () => {
   /** This direct consumer must prove cleanup against Deno's actual unsupported exit capability. */

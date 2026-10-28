@@ -1,7 +1,7 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { createEventHub } from '@migaia/event-subscriber'
-import { TrayInstanceEvent } from '../constants.js'
-import type { ITrayInstanceEventRecord, ITrayInstanceEventRecord as IRecord } from '../typing.js'
+import { TrayInstanceEvent } from '../constants.ts'
+import type { ITrayInstanceEventRecord, ITrayInstanceEventRecord as IRecord } from '../typing.ts'
 
 /** Lifecycle publisher stays private; facade users borrow only observation operations. */
 export function createTrayEvents(report: (error: unknown) => void) {
