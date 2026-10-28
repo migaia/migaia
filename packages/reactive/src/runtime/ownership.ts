@@ -1,3 +1,7 @@
+/**
+ * Owns the canonical object-to-Runtime table and cross-copy checks used at graph admission
+ * boundaries.
+ */
 import type { IRuntime } from './types.ts'
 import { assertNoForeignOwnershipBrand, brandOwnedValue } from './copy-check.ts'
 import { createReactiveError } from '../errors.ts'
@@ -22,6 +26,7 @@ const OWNERS = new WeakMap<object, IRuntime>()
  * different runtimes is a programming error because it would belong to two graphs.
  */
 export function claimOwnership(value: object, runtime: IRuntime): void {
+  /** Existing local ownership takes precedence over any diagnostic brand on the same value. */
   const existing = OWNERS.get(value)
   if (existing && existing !== runtime) {
     throw createReactiveError(
@@ -39,6 +44,7 @@ export function claimOwnership(value: object, runtime: IRuntime): void {
  */
 export function ownerOf(value: unknown): IRuntime | undefined {
   if ((typeof value !== 'object' && typeof value !== 'function') || value === null) return undefined
+  /** A local WeakMap hit is authoritative; only a miss requires the cross-copy diagnostic check. */
   const owner = OWNERS.get(value)
   if (owner) return owner
   assertNoForeignOwnershipBrand(value)
@@ -53,6 +59,7 @@ export function ownerOf(value: unknown): IRuntime | undefined {
  * joined.
  */
 export function assertOwnedBy(value: unknown, runtime: IRuntime, what: string): void {
+  /** Ordinary unregistered values remain admissible while managed foreign values reject on lookup. */
   const owner = ownerOf(value)
   if (owner && owner !== runtime) {
     throw createReactiveError(
@@ -70,6 +77,7 @@ export function assertOwnedBy(value: unknown, runtime: IRuntime, what: string): 
  * graph.
  */
 export function assertReactiveOwnedBy(value: object, runtime: IRuntime, what: string): void {
+  /** Strict graph admission requires this copy's actual registration rather than a structural field. */
   const owner = OWNERS.get(value)
   if (!owner) {
     throw createReactiveError(

@@ -1,3 +1,7 @@
+/**
+ * Admits extension cleanup onto the owning Runtime's existing idle channel without owning a new
+ * queue.
+ */
 import type { IRuntime } from './types.ts'
 import { internalsOf } from './internals.ts'
 import { ReactiveErrorPhase } from './trace-constants.ts'

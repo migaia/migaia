@@ -26,18 +26,24 @@ const registryKey = (): symbol => Symbol.for('@migaia/reactive.runtime-copies')
 /** 本副本的身份。每份模块各自新建一个，因此可用来数副本。 */
 const THIS_COPY = Symbol('@migaia/reactive.runtime-copy')
 
+/** Versioned process-wide diagnostic record shared by independently loaded library copies. */
 type IRegistry = {
   readonly version: 1
   readonly copies: Set<symbol>
   warned: boolean
 }
 
+/** Validates data descriptors without invoking hostile registry getters or assuming graph authority. */
 function isRegistry(value: unknown): value is IRegistry {
   if (typeof value !== 'object' || value === null) return false
   try {
+    /** Reflection inspects registry structure without calling accessor properties. */
     const descriptors = Object.getOwnPropertyDescriptors(value)
+    /** Protocol version must be a data property matching the existing registry format. */
     const version = descriptors.version
+    /** Copy identities must remain in a native Set shared by this process registry. */
     const copies = descriptors.copies
+    /** Warning state must be writable so the second-copy warning is recorded only once. */
     const warned = descriptors.warned
     return (
       version !== undefined &&
@@ -63,10 +69,14 @@ let thisCopyNoted = false
 function registryOf(create: false): IRegistry | undefined
 function registryOf(create: true): IRegistry
 function registryOf(create: boolean): IRegistry | undefined {
+  /** The host owns only this diagnostic record; per-copy graph services remain module-private. */
   const host = globalThis as unknown as object
+  /** The global symbol is resolved lazily when a correctness boundary is actually entered. */
   const key = registryKey()
+  /** An accessor registry cannot impersonate the expected shared data record. */
   const descriptor = Object.getOwnPropertyDescriptor(host, key)
   if (descriptor) {
+    /** Retain the reflected value for validation without a second property read. */
     const existing = 'value' in descriptor ? descriptor.value : undefined
     if (!isRegistry(existing)) {
       throw createReactiveError(
@@ -77,6 +87,7 @@ function registryOf(create: boolean): IRegistry | undefined {
     return existing as IRegistry
   }
   if (!create) return undefined
+  /** First registration publishes one versioned record without creating any Runtime or graph. */
   const created: IRegistry = {
     version: 1,
     copies: new Set(),
@@ -94,7 +105,9 @@ const ownershipCopyKey = (): symbol => Symbol.for('@migaia/reactive.ownership-co
 
 /** Brands objects managed by this library copy immutably so another copy rejects foreign ownership. */
 export function brandOwnedValue(value: object): void {
+  /** All library copies recognize this brand key while keeping distinct identity values. */
   const key = ownershipCopyKey()
+  /** Inspect existing brand descriptors without evaluating consumer-defined accessors. */
   const descriptor = Object.getOwnPropertyDescriptor(value, key)
   if (descriptor) {
     if ('value' in descriptor && descriptor.value === THIS_COPY) return
@@ -121,6 +134,7 @@ export function brandOwnedValue(value: object): void {
  * ordinary values.
  */
 export function assertNoForeignOwnershipBrand(value: object): void {
+  /** Descriptor-only reads separate plain values from foreign or corrupted managed values. */
   const descriptor = Object.getOwnPropertyDescriptor(value, ownershipCopyKey())
   if (!descriptor) return
   if ('value' in descriptor && descriptor.value === THIS_COPY) return
@@ -146,6 +160,7 @@ let pendingCopyWarning: string | undefined
 
 /** Returns and clears the pending multiple-copy diagnostic. Runtime construction consumes it. */
 export const consumePendingCopyWarning = (): string | undefined => {
+  /** Clearing before return transfers ownership of this warning to the newly registered Runtime. */
   const warning = pendingCopyWarning
   pendingCopyWarning = undefined
   return warning
@@ -160,6 +175,7 @@ export const consumePendingCopyWarning = (): string | undefined => {
  */
 export function noteRuntimeCopy(copy: symbol = THIS_COPY): void {
   if (copy === THIS_COPY && thisCopyNoted) return
+  /** The shared record tracks diagnostics only; copy-local WeakMaps remain graph authorities. */
   const registry = registryOf(true)
   registry.copies.add(copy)
   if (copy === THIS_COPY) thisCopyNoted = true
@@ -184,6 +200,7 @@ export const runtimeCopyCount = (): number => registryOf(false)?.copies.size ?? 
 export function assertSingleRuntimeCopy(): void {
   // 调用断言的只读副本也算一份；否则「另一份已登记 + 本副本未建 Runtime」会误判。
   noteRuntimeCopy()
+  /** Include this copy before deciding whether the deployment satisfies explicit single-copy policy. */
   const registry = registryOf(true)
   if (registry.copies.size > 1) {
     throw createReactiveError(

@@ -1,3 +1,7 @@
+/**
+ * Owns native error identity attachment and callback failure admission without changing original
+ * stacks.
+ */
 /** `source` value stamped onto every error this package throws. */
 export const REACTIVE_SOURCE = ERROR_SOURCE
 
@@ -17,6 +21,7 @@ export function createReactiveError(
   message: string,
   options?: { readonly cause?: unknown }
 ): IReactiveError {
+  /** Construct once before identity attachment so the original native stack and cause stay intact. */
   const error = new Error(
     message,
     options !== undefined && 'cause' in options ? { cause: options.cause } : undefined

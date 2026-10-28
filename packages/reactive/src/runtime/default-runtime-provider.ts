@@ -1,3 +1,7 @@
+/**
+ * Owns lazy default Runtime identity shared by explicit extension use and the eager convenience
+ * entry.
+ */
 import { createRuntime } from './runtime.class.ts'
 import type { IRuntime } from './types.ts'
 

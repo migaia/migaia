@@ -1,3 +1,7 @@
+/**
+ * Owns Runtime capability registration and trusted lookup; public graph views expose no service
+ * bundle.
+ */
 import type { DependencyTracker } from './dependency-tracker.class.ts'
 import type { Scheduler } from './scheduler.class.ts'
 import type { VersionClock } from './version-clock.class.ts'
@@ -52,6 +56,7 @@ export type IRuntimeInternals = {
   deferIdle(task: () => void): void
 }
 
+/** Runtime identity keeps canonical services alive without publishing them on observable properties. */
 const INTERNALS = new WeakMap<object, IRuntimeInternals>()
 
 /**
@@ -75,6 +80,7 @@ export function registerInternals(runtime: IRuntime, internals: IRuntimeInternal
  * impersonates a runtime at this boundary prevents later failures with unclear origins.
  */
 export function internalsOf(runtime: IRuntime): IRuntimeInternals {
+  /** Only an entry registered by this library copy grants authority over this Runtime's graph. */
   const internals = INTERNALS.get(runtime)
   if (internals) return internals
   // 双实例自检（copy-check.ts）：读取内部面也是正确性边界，登记本副本。

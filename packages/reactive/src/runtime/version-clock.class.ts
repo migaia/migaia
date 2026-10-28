@@ -1,10 +1,13 @@
+/** Owns one Runtime's monotonic version allocation and terminal exhaustion policy. */
 import { createReactiveError, tagReactiveError } from '../errors.ts'
 import { ReactiveErrorCode } from '../error-code.ts'
 import { ReactiveErrorText } from '../error-text.ts'
 
-// Monotonic version counter shared by memo invalidation, stale-check shortcuts, and time-travel anchors.
+/** Shared monotonic versions identify committed graph changes without colliding with live snapshots. */
 export class VersionClock {
+  /** Zero precedes every committed publication; successful allocation increments this value once. */
   #version = 0
+  /** Fixed safe-integer ceiling stops writes before versions lose identity through numeric rounding. */
   #maxVersion: number
 
   /**

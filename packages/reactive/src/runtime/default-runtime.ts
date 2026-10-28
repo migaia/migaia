@@ -1,3 +1,7 @@
+/**
+ * Owns eager convenience access to the provider's shared Runtime; pure kernel imports exclude this
+ * module.
+ */
 import { getDefaultRuntime } from './default-runtime-provider.ts'
 import type { IRuntime } from './types.ts'
 

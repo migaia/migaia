@@ -1,3 +1,7 @@
+/**
+ * Owns known-source subscriptions and their dynamic admission fallback; graph services stay
+ * canonical.
+ */
 import type {
   IDisposable,
   IObservable,
@@ -27,9 +31,13 @@ class StaticObserver implements IObserver, IDisposable {
   #deps = new Set<IObservable>()
   /** Successful reads update the same canonical versions exposed through the readonly view. */
   #depVersions = new Map<IObservable, number>()
+  /** Read-only membership exposes admitted dependencies without writable graph authority. */
   readonly deps: ReadonlySet<IObservable>
+  /** The live version view describes the same committed snapshot used by stale checks. */
   readonly depVersions: ReadonlyMap<IObservable, number>
+  /** Stable graph owner supplies this subscription's scheduler and error boundaries. */
   readonly runtime: IRuntime
+  /** Optional diagnostic label does not change source resolution or membership. */
   debugName?: string
   /** Runtime services remain private and immutable for the lifetime of this observer. */
   readonly #internals: IRuntimeInternals
@@ -67,6 +75,7 @@ class StaticObserver implements IObserver, IDisposable {
     this.#run(true)
   }
 
+  /** Reports terminal state without resolving a replacement source or reconnecting dependencies. */
   get disposed(): boolean {
     return this.#disposed
   }
@@ -135,6 +144,7 @@ class StaticObserver implements IObserver, IDisposable {
     if (this.#disposed) return
     /** Trace allocation remains optional, as for the existing Effect implementation. */
     const runtime = this.#internals
+    /** One optional span covers this subscription attempt's admission, notification and failure. */
     const trace = runtime.traceEnabled()
       ? createObserverRunTrace(describeObserver(this), {
           now: runtime.now,

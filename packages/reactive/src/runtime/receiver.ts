@@ -2,11 +2,12 @@
  * Reflective receiver-binding boundary for `@migaia/reactive`.
  *
  * The repository forbids `Function.prototype.call`/`apply`/`bind`, and an arrow function captures
- * lexical context rather than supplying an arbitrary receiver — yet two legitimate cases need an
- * explicit `this`:
+ * lexical context rather than supplying an arbitrary receiver — these callbacks need an explicit
+ * `this`:
  *
  * - The read-only collection views must forward the caller-supplied `thisArg` while substituting the
  *   read-only view (never the mutable backing collection) as the third argument.
+ * - Runtime option and adapter snapshots retain the receiver that owned each captured method.
  *
  * `Reflect.apply` for collection callbacks is kept in this module; thenable mechanics are owned by
  * the runtime-neutral Utils function boundary.
