@@ -7,11 +7,11 @@ import {
   RpcProbeStage,
   type IRpcProbeEventView
 } from '@migaia/rpc-host/plugins/probe'
-import type { IRpcDevtoolsStats } from '../contract/service.js'
-import { NameTable } from './intern.js'
-import { CollectorLimit } from './text.js'
-import { reportFailure } from './report.js'
-import { classifyRpcFailure, RpcDevtoolsFailure } from './failure.js'
+import type { IRpcDevtoolsStats } from '../contract/service.ts'
+import { NameTable } from './intern.ts'
+import { CollectorLimit } from './text.ts'
+import { reportFailure } from './report.ts'
+import { classifyRpcFailure, RpcDevtoolsFailure } from './failure.ts'
 
 /** Five counters and the terminal-bin maximum precede the 24 histogram bins without padding. */
 const StatsWidth = 6 + CollectorLimit.histogram

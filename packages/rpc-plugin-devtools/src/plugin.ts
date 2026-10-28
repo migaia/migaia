@@ -7,9 +7,9 @@ import {
 } from '@migaia/rpc-host/sdk'
 import { createProbeEmitter } from '@migaia/rpc-host/plugins/probe'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createRpcDevtools } from './collector/devtools.js'
-import { CollectorText } from './collector/text.js'
-import type { IRpcDevtools, IRpcDevtoolsOptions } from './collector-types.js'
+import { createRpcDevtools } from './collector/devtools.ts'
+import { CollectorText } from './collector/text.ts'
+import type { IRpcDevtools, IRpcDevtoolsOptions } from './collector-types.ts'
 
 /** Native metadata retains the caller's collector; each installed emitter has its own lifetime. */
 export type IDevtoolsPlugin = IRpcFlowPlugin &

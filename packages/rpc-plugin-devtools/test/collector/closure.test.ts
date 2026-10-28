@@ -6,11 +6,11 @@ import {
   RpcProbeKind,
   RpcProbeStage
 } from '@migaia/rpc-host/plugins/probe'
-import { devtoolsPlugin } from '../../src/index.js'
-import type { IRpcDevtoolsWatchBatch, IRpcDevtoolsServiceApi } from '../../src/contract/service.js'
-import { NameTable, CarrierTable } from '../../src/collector/intern.js'
-import { CollectorStats } from '../../src/collector/stats.js'
-import { collectorView } from './fixture.js'
+import { devtoolsPlugin } from '../../src/index.ts'
+import type { IRpcDevtoolsWatchBatch, IRpcDevtoolsServiceApi } from '../../src/contract/service.ts'
+import { NameTable, CarrierTable } from '../../src/collector/intern.ts'
+import { CollectorStats } from '../../src/collector/stats.ts'
+import { collectorView } from './fixture.ts'
 
 it('translates independent source ordinals and preserves a recording-owned carrier link', () => {
   /** One-slot main retention must not retire an alias still held by the explicit recording. */

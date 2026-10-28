@@ -5,7 +5,7 @@ import {
   RpcDevtoolsErrorCode,
   RPC_DEVTOOLS_SOURCE
 } from '@migaia/rpc-plugin-devtools'
-import { CollectorFixture, collectorView } from './fixture.js'
+import { CollectorFixture, collectorView } from './fixture.ts'
 
 describe('collector ingestion and ring', () => {
   it('retains the newest four of six views, converts every field and never retains the mutable view', () => {

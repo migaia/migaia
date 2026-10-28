@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'
-import { collectorView } from './fixture.js'
+import { collectorView } from './fixture.ts'
 
 describe('collector bounded interning', () => {
   it('records twenty methods with overflow id 0 while retaining earlier interned names', () => {

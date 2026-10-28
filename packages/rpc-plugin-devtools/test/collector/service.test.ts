@@ -1,14 +1,14 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createRpcHost, type IRpcContext, type IRpcNamespace } from '@migaia/rpc-host'
-import { coreMemoryServer } from '../../../rpc-host/test/host/core-fixture.js'
+import { coreMemoryServer } from '../../../rpc-host/test/host/core-fixture.ts'
 import { RpcProbeStage } from '@migaia/rpc-host/plugins/probe'
 import {
   devtoolsPlugin,
   RpcDevtoolsErrorCode,
   RPC_DEVTOOLS_SOURCE
 } from '@migaia/rpc-plugin-devtools'
-import type { IRpcDevtoolsQuery, IRpcDevtoolsServiceApi } from '../../src/contract/service.js'
-import { CollectorFixture, collectorView } from './fixture.js'
+import type { IRpcDevtoolsQuery, IRpcDevtoolsServiceApi } from '../../src/contract/service.ts'
+import { CollectorFixture, collectorView } from './fixture.ts'
 
 describe('collector query, watch and service', () => {
   it('serves query, stats, watch, lifecycle and recording through actual connected Hosts', async () => {

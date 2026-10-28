@@ -5,9 +5,9 @@ import type { IRpcContext } from '@migaia/rpc-host'
 import { devtoolsPlugin } from '@migaia/rpc-plugin-devtools'
 import { subscribeProbeStages } from '@migaia/rpc-host/plugins/probe'
 import { RpcDevtoolsErrorCode } from '@migaia/rpc-contract/error-code'
-import { connectedCoreHosts } from '../../../rpc-host/test/host/core-fixture.js'
-import type { IRpcDevtoolsServiceApi } from '../../src/contract/service.js'
-import { collectorView } from './fixture.js'
+import { connectedCoreHosts } from '../../../rpc-host/test/host/core-fixture.ts'
+import type { IRpcDevtoolsServiceApi } from '../../src/contract/service.ts'
+import { collectorView } from './fixture.ts'
 
 /** Observe the original first pull after registration, retaining the same native generator. */
 function observedWatch(
