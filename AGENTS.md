@@ -104,20 +104,28 @@ export type LogLevel = keyof typeof LogLevel;
   - Do not build a component as one factory function whose inner functions share captured variables.
 - **One named function per job.** Encoding, mapping, validation, retry, conflict detection and error normalization are separate functions. A function that does several jobs in sequence is split along those jobs.
 - **Explicit state.** A function receives what it needs as parameters or through its owning object. It does not reach into an enclosing scope for state that belongs to a component.
+- **Why closures are limited.** The goal is readable, maintainable code, not a closure count. A short arrow that captures only `this` and forwards to a method or field, for example `send: (frame) => this.send(frame)` in a handle or port object, is readable and allowed.
 - **Closures only where natural.** Use them for:
-  - small callbacks;
+  - small inline callbacks, including forwarding arrows passed as an argument or object property;
   - event listeners;
-  - short local helpers;
   - deliberately private module-level state.
 
-  A closure never forms the backbone of a component, and closures are not nested to build control flow. Retry and fallback logic is an explicit loop or a named state machine, not functions nested inside functions.
+  A closure never forms the backbone of a component.
+- **Closure shape limits.**
+  - **One callback level.** A callback's body must not contain another callback or function expression.
+  - **No local function declarations.** A function or method body must not declare a named function, with `function` or as a `const`/`let` arrow. Move the helper to module level or make it a method, and pass the state it needs as parameters.
+  - **Recursion goes to module level.** A recursive helper is a standalone module-level function, or a method, that receives its state as parameters. It is never an inner function that recurses over captured variables.
+  - **Control flow without nested functions.** Retry and fallback logic is an explicit loop or a named state machine.
 
 - **Shared behaviour abstracted once.** When several packages or backends need the same logic, move it to its correct owner, such as an authoring subpath or a shared base type, instead of repeating it.
+- **No pass-through layers.** Do not add a function, class, module or adapter that only forwards to another one. Fixing a closure or a length problem must not create such a layer. Forwarding arrows inside one object literal, as allowed above, are not a layer.
 - **Hard limit on function length.** No function may exceed 400 lines, counting its nested functions. A longer function must be split along its jobs.
 - **Review signals.** In review, each of these must be fixed or justified:
   - a function over about 150 lines;
-  - function definitions nested more than two levels deep;
-  - a function that reads many variables (three or more) from an enclosing scope.
+  - a function that reads many variables (three or more) from an enclosing scope;
+  - an object literal with many forwarding arrows, which may mean the object should be a named type implemented by a class.
+
+  Nested callbacks and local function declarations are not review signals; they are forbidden by the closure shape limits above.
 
   A justification states why the code is one indivisible job. Splitting code into arbitrary chunks to satisfy a number is not a fix.
 
