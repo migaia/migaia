@@ -1,4 +1,4 @@
-import { snapshotPipelineDefinitions } from './named-pipelines.js'
+import { snapshotPipelineDefinitions } from './pipeline-declarations.js'
 import { copyConfig } from './config.js'
 import { snapshotDisposer } from './disposal.js'
 import { snapshotFeatureRecord } from './define-feature.js'

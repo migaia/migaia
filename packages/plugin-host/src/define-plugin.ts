@@ -1,5 +1,5 @@
 import type { IPipelineDefinitions } from './pipeline-spec.js'
-import { snapshotPipelineDefinitions } from './named-pipelines.js'
+import { snapshotPipelineDefinitions } from './pipeline-declarations.js'
 import { copyConfig } from './config.js'
 import { snapshotDisposer } from './disposal.js'
 import { invokeCaptured } from './invocation.js'
