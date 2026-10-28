@@ -1,6 +1,6 @@
-import { type StorageStageKind } from './stage-kind.js'
-import { type ITransactionScope } from './transaction.js'
-import { type IOperationContext } from './context.js'
+import { type StorageStageKind } from './stage-kind.ts'
+import { type ITransactionScope } from './transaction.ts'
+import { type IOperationContext } from './context.ts'
 
 /** SQL observations bind to the original transaction owner and never execute statements. */
 export type ISqlStageObserver = Readonly<{

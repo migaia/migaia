@@ -1,6 +1,6 @@
-import type { IAnyStorageCapability, IStorageCapability } from './capability.js'
-import { StorageContractError, StorageContractErrorCode } from './errors.js'
-import { StorageContractErrorText } from './error-text.js'
+import type { IAnyStorageCapability, IStorageCapability } from './capability.ts'
+import { StorageContractError, StorageContractErrorCode } from './errors.ts'
+import { StorageContractErrorText } from './error-text.ts'
 
 /** Standard transaction projections name only their finite original methods and pure query fact. */
 export type ICapabilityTransactionFacts = {

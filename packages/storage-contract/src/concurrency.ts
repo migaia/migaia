@@ -1,12 +1,12 @@
-import { type IStorageBase } from './store.js'
-import { assertStorageKey, assertStringStorageKey } from './key.js'
-import { assertStorageRdfQuad, type IQuad } from './capabilities/rdf.js'
-import { type IBackendKind } from './capabilities.js'
-import { StorageContractError, StorageContractErrorCode } from './errors.js'
-import { StorageContractErrorText } from './error-text.js'
-import { type StorageStageKind } from './stage-kind.js'
+import { type IStorageBase } from './store.ts'
+import { assertStorageKey, assertStringStorageKey } from './key.ts'
+import { assertStorageRdfQuad, type IQuad } from './capabilities/rdf.ts'
+import { type IBackendKind } from './capabilities.ts'
+import { StorageContractError, StorageContractErrorCode } from './errors.ts'
+import { StorageContractErrorText } from './error-text.ts'
+import { type StorageStageKind } from './stage-kind.ts'
 import { type IAbortSignal } from '@migaia/utils/promise'
-import { type IConflictPolicy, type IOperationContext, type IStorageKey } from './context.js'
+import { type IConflictPolicy, type IOperationContext, type IStorageKey } from './context.ts'
 
 /** Physical channel identities used by the original transaction and concurrency owners. */
 export type ILockKey =

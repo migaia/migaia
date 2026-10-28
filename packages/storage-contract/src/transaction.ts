@@ -1,18 +1,18 @@
-import { type IAnyStorageCapability, type ITransactionCapabilityView } from './capability.js'
-import { type kv } from './capabilities/kv.js'
+import { type IAnyStorageCapability, type ITransactionCapabilityView } from './capability.ts'
+import { type kv } from './capabilities/kv.ts'
 import { type ICodecValue } from '@migaia/serialize/codec'
-import { type IRecordQuery } from './query-chain.js'
-import { StorageStageKind } from './stage-kind.js'
-import { type IConflictPolicy, type IStorageKey, type IKeyRange } from './context.js'
-import { type IStorageIterator } from './resource.js'
+import { type IRecordQuery } from './query-chain.ts'
+import { StorageStageKind } from './stage-kind.ts'
+import { type IConflictPolicy, type IStorageKey, type IKeyRange } from './context.ts'
+import { type IStorageIterator } from './resource.ts'
 import {
   type IRecordIndexHandle,
   type IRecordIndexProjection,
   type IRecordIndexQuery
-} from './secondary-index.js'
-import { StorageContractErrorText } from './error-text.js'
-import { type IBackendKind } from './capabilities.js'
-import { StorageContractError, StorageContractErrorCode } from './errors.js'
+} from './secondary-index.ts'
+import { StorageContractErrorText } from './error-text.ts'
+import { type IBackendKind } from './capabilities.ts'
+import { StorageContractError, StorageContractErrorCode } from './errors.ts'
 
 /** Reduced write options used inside a backend-owned transaction scope. */
 export type ITransactionWriteOptions = {

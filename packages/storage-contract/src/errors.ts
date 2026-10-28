@@ -1,11 +1,11 @@
-import type { IBackendKind } from './capabilities.js'
-import type { IStorageKey } from './context.js'
-import type { ILockKey, IConcurrencyHolder } from './concurrency.js'
+import type { IBackendKind } from './capabilities.ts'
+import type { IStorageKey } from './context.ts'
+import type { ILockKey, IConcurrencyHolder } from './concurrency.ts'
 import {
   ERROR_SOURCE,
   StorageContractErrorCode,
   type IStorageContractErrorCode
-} from './error-code.js'
+} from './error-code.ts'
 
 export { StorageContractErrorCode, type IStorageContractErrorCode }
 

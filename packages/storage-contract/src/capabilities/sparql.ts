@@ -1,6 +1,6 @@
-import { type IOperationContext } from '../context.js'
-import { defineStandardStorageCapability, invalidCapability } from '../capability-token.js'
-import { type IRdfNamedNode, type IRdfLiteral, type IRdfBindingTerm, type IRawQuad } from './rdf.js'
+import { type IOperationContext } from '../context.ts'
+import { defineStandardStorageCapability, invalidCapability } from '../capability-token.ts'
+import { type IRdfNamedNode, type IRdfLiteral, type IRdfBindingTerm, type IRawQuad } from './rdf.ts'
 
 /** Only the private fragment table establishes a portable composition identity. */
 declare const sparqlFragmentBrand: unique symbol

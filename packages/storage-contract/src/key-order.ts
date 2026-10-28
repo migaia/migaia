@@ -1,4 +1,4 @@
-import { type IStorageKey } from './context.js'
+import { type IStorageKey } from './context.ts'
 
 /** One native batch position retains canonical identity and its first equivalent input position. */
 export type IStorageBatchKey = {

@@ -1,6 +1,6 @@
-import type { IStorageStore } from '../capability.js'
-import { kv } from '../capabilities/kv.js'
-import { conformanceCases, type IConformanceHarness, type IConformanceSubject } from './harness.js'
+import type { IStorageStore } from '../capability.ts'
+import { kv } from '../capabilities/kv.ts'
+import { conformanceCases, type IConformanceHarness, type IConformanceSubject } from './harness.ts'
 import {
   kvConformance,
   binaryConformance,
@@ -8,17 +8,17 @@ import {
   iterationConformance,
   crossChannelConformance,
   syncBinaryConformance
-} from './channels.js'
-import { transactionsConformance } from './transaction-cases.js'
-import { syncConformance, indexConformance, feedConformance } from './features.js'
-import { standardConformance } from './standards.js'
-import { nativeTransactionsConformance } from './transactions.js'
+} from './channels.ts'
+import { transactionsConformance } from './transaction-cases.ts'
+import { syncConformance, indexConformance, feedConformance } from './features.ts'
+import { standardConformance } from './standards.ts'
+import { nativeTransactionsConformance } from './transactions.ts'
 
 export type {
   IConformanceMatchers,
   IConformanceAsyncMatchers,
   IConformanceHarness
-} from './harness.js'
+} from './harness.ts'
 
 /** Register the declared contract cases with the consumer's runner; never create a runner or host. */
 export function runConformance<TStore extends IStorageStore<never>>(

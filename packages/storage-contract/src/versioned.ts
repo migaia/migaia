@@ -1,6 +1,6 @@
 import type { IAbortSignal, IUtilsReporter } from '@migaia/utils/promise'
-import { StorageContractError, StorageContractErrorCode } from './errors.js'
-import { StorageContractErrorText } from './error-text.js'
+import { StorageContractError, StorageContractErrorCode } from './errors.ts'
+import { StorageContractErrorText } from './error-text.ts'
 
 /** Archive shape shared by persistence consumers; state remains caller-owned. */
 export type IVersionedEnvelope<TState = unknown> = {

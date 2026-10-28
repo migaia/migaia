@@ -1,8 +1,8 @@
 // Channel conformance cases: key-value, binary, records, iteration, cross-channel and sync binary.
-import type { IConformanceCase, IConformanceHarness } from './harness.js'
-import { conformanceCleanup, invocation } from './harness.js'
-import type { IRecordStore } from '../store.js'
-import { isKeyValueStore } from '../store.js'
+import type { IConformanceCase, IConformanceHarness } from './harness.ts'
+import { conformanceCleanup, invocation } from './harness.ts'
+import type { IRecordStore } from '../store.ts'
+import { isKeyValueStore } from '../store.ts'
 import { walkErrorCauses } from '@migaia/utils/error'
 
 /** Deliberate callback failures prove rollback without depending on a runner error type. */

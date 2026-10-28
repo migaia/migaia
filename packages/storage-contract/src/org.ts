@@ -1,5 +1,5 @@
-import { StorageContractError, StorageContractErrorCode } from './errors.js'
-import { StorageContractErrorText } from './error-text.js'
+import { StorageContractError, StorageContractErrorCode } from './errors.ts'
+import { StorageContractErrorText } from './error-text.ts'
 
 /** Canonical UUID syntax preserves exact organization identity, including the reserved zero UUID. */
 const storageOrgIdPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/

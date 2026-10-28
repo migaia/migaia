@@ -1,5 +1,5 @@
-import type { IOperationContext } from './context.js'
-import type { StorageStageKind } from './stage-kind.js'
+import type { IOperationContext } from './context.ts'
+import type { StorageStageKind } from './stage-kind.ts'
 
 /** Declared encoded form: text strings, binary bytes, or backend-supported structured values. */
 export type ICodecOutput = 'text' | 'binary' | 'structured'

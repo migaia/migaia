@@ -1,10 +1,10 @@
-import type { IAnyStorageCapability, IStorageStore } from '../capability.js'
-import { kv } from '../capabilities/kv.js'
-import type { ITransactionKeyValueApi } from '../transaction.js'
-import { rdf, RdfTermType, RdfDatatype, type ITransactionRdfApi } from '../capabilities/rdf.js'
-import type { IOperationContext } from '../context.js'
-import type { IConformanceCase, IConformanceHarness } from './harness.js'
-import { conformanceApi } from './harness.js'
+import type { IAnyStorageCapability, IStorageStore } from '../capability.ts'
+import { kv } from '../capabilities/kv.ts'
+import type { ITransactionKeyValueApi } from '../transaction.ts'
+import { rdf, RdfTermType, RdfDatatype, type ITransactionRdfApi } from '../capabilities/rdf.ts'
+import type { IOperationContext } from '../context.ts'
+import type { IConformanceCase, IConformanceHarness } from './harness.ts'
+import { conformanceApi } from './harness.ts'
 
 /** Deliberate user failure tests atomic rollback without prescribing a backend's error family. */
 const ROLLBACK_FAILURE = 'conformance native transaction rollback'

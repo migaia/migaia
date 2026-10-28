@@ -1,4 +1,4 @@
-import type { StorageStageKind } from './stage-kind.js'
+import type { StorageStageKind } from './stage-kind.ts'
 import type {
   IStorageStore,
   IStorageCapabilitySet,
@@ -9,24 +9,24 @@ import type {
   ICapabilityStore,
   IAnyStorageCapability,
   records
-} from './capability.js'
-import type { rdf, IRdfApi } from './capabilities/rdf.js'
+} from './capability.ts'
+import type { rdf, IRdfApi } from './capabilities/rdf.ts'
 import type {
   vector,
   IVectorApi,
   IVectorCollection,
   IVectorCollectionOptions
-} from './capabilities/vector.js'
-import type { IKeyValueStore } from './store.js'
-import type { IRecordQuery, IRdfQuery, IVectorQueryBuilder, IQueryWatch } from './query-chain.js'
-import type { IStorageKey, IOperationContext } from './context.js'
+} from './capabilities/vector.ts'
+import type { IKeyValueStore } from './store.ts'
+import type { IRecordQuery, IRdfQuery, IVectorQueryBuilder, IQueryWatch } from './query-chain.ts'
+import type { IStorageKey, IOperationContext } from './context.ts'
 import type { ICodecValue } from '@migaia/serialize/codec'
-import type { ICodecStageObserver } from './codec.js'
-import type { ITransactionStageObserver } from './transaction.js'
-import type { IConcurrencyStageObserver } from './concurrency.js'
-import type { ISqlStageObserver } from './sql.js'
-import type { IQueryStageObserver } from './query.js'
-import type { ITransactionBuilder, IOptimisticTransactionBuilder } from './concurrency.js'
+import type { ICodecStageObserver } from './codec.ts'
+import type { ITransactionStageObserver } from './transaction.ts'
+import type { IConcurrencyStageObserver } from './concurrency.ts'
+import type { ISqlStageObserver } from './sql.ts'
+import type { IQueryStageObserver } from './query.ts'
+import type { ITransactionBuilder, IOptimisticTransactionBuilder } from './concurrency.ts'
 
 /** Canonical provider label syntax shared by base and KV admission. */
 export const BACKEND_KIND_PATTERN = /^[a-z][a-z0-9-]{0,63}$/

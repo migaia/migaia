@@ -1,6 +1,6 @@
-import { StorageContractError, StorageContractErrorCode } from './errors.js'
-import { type ICodec } from './codec.js'
-import { StorageContractErrorText } from './error-text.js'
+import { StorageContractError, StorageContractErrorCode } from './errors.ts'
+import { type ICodec } from './codec.ts'
+import { StorageContractErrorText } from './error-text.ts'
 
 /** Validates codec metadata and callable conversion ports without copying or running the codec. */
 export function assertCodec(codec: unknown): asserts codec is ICodec {

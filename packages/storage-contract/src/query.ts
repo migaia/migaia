@@ -1,4 +1,4 @@
-import type { StorageStageKind } from './stage-kind.js'
+import type { StorageStageKind } from './stage-kind.ts'
 /** Query observations carry plans and counts while the original owner retains execution. */
 export type IQueryStageObserver = Readonly<{
   readonly kind: typeof StorageStageKind.query

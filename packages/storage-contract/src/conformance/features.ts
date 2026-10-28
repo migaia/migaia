@@ -1,9 +1,9 @@
-import type { IConformanceCase, IConformanceHarness, IConformanceSubject } from './harness.js'
-import { conformanceRows, conformanceCleanup } from './harness.js'
-import { isKeyValueStore, type IKeyValueStore, type IRecordStore } from '../store.js'
-import type { IStorageStore } from '../capability.js'
-import { asSecondaryIndexRecordStore } from '../secondary-index.js'
-import { asChangeFeedStore } from '../change-feed.js'
+import type { IConformanceCase, IConformanceHarness, IConformanceSubject } from './harness.ts'
+import { conformanceRows, conformanceCleanup } from './harness.ts'
+import { isKeyValueStore, type IKeyValueStore, type IRecordStore } from '../store.ts'
+import type { IStorageStore } from '../capability.ts'
+import { asSecondaryIndexRecordStore } from '../secondary-index.ts'
+import { asChangeFeedStore } from '../change-feed.ts'
 
 /** Exercise the actual synchronous channel and both directions of shared text visibility. */
 export function syncConformance(check: IConformanceCase, harness: IConformanceHarness): void {

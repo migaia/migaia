@@ -1,5 +1,5 @@
 import type { IAbortSignal } from '@migaia/utils/promise'
-import type { IWriteConcurrencyOptions } from './concurrency.js'
+import type { IWriteConcurrencyOptions } from './concurrency.ts'
 
 /**
  * Optional final argument for asynchronous storage operations. The contract validates its shape;

@@ -1,5 +1,5 @@
-import type { IRecordsApi } from '../capability.js'
-import { defineStandardStorageCapability, invalidCapability } from '../capability-token.js'
+import type { IRecordsApi } from '../capability.ts'
+import { defineStandardStorageCapability, invalidCapability } from '../capability-token.ts'
 
 /** Native and Feature records retain their exact original callable admission without querying. */
 function validateRecords(value: unknown): void {

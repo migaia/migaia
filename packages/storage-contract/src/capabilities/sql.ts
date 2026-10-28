@@ -1,5 +1,5 @@
-import type { ISqlExecutor } from '../sql.js'
-import { defineStandardStorageCapability, invalidCapability } from '../capability-token.js'
+import type { ISqlExecutor } from '../sql.ts'
+import { defineStandardStorageCapability, invalidCapability } from '../capability-token.ts'
 
 /** SQL publication validates the nested tag shape without compiling or executing native input. */
 function validateSqlApi(api: unknown): void {
