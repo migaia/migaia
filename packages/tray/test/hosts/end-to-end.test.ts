@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fixture, livePorts, liveThreads, processAlive, until } from './helper.js'
+import { fixture, livePorts, liveThreads, processAlive, until } from './helper.ts'
 
 describe('Tray Hosts root integration', () => {
   it('[A-total] manages shared agent, Worker and process hosts with relayed request and ordered stream', async () => {

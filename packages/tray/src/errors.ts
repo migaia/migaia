@@ -2,8 +2,8 @@
  * Classify Tray boundary failures with stable codes while retaining foreign identities and original
  * chains.
  */
-import { ERROR_SOURCE, TrayErrorCode, type ITrayErrorCode } from './error-code.js'
-import { TrayErrorText } from './error-text.js'
+import { ERROR_SOURCE, TrayErrorCode, type ITrayErrorCode } from './error-code.ts'
+import { TrayErrorText } from './error-text.ts'
 import { attachErrorIdentity, attachSecondaryErrors, isNativeErrorValue } from '@migaia/utils/error'
 
 /** Stable package source attached to every Tray-owned boundary error. */

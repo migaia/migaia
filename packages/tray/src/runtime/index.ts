@@ -1,4 +1,4 @@
-export { createRuntime } from './create-runtime.js'
+export { createRuntime } from './create-runtime.ts'
 export type {
   IRuntime,
   IRuntimeDisposalResult,
@@ -8,4 +8,4 @@ export type {
   IRuntimeExtensionsFor,
   IRuntimeRunOptions,
   IRuntimeShutdownOptions
-} from './typing.js'
+} from './typing.ts'

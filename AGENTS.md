@@ -116,6 +116,11 @@ export type LogLevel = keyof typeof LogLevel;
   - **No local function declarations.** A function or method body must not declare a named function, with `function` or as a `const`/`let` arrow. Move the helper to module level or make it a method, and pass the state it needs as parameters.
   - **Recursion goes to module level.** A recursive helper is a standalone module-level function, or a method, that receives its state as parameters. It is never an inner function that recurses over captured variables.
   - **Control flow without nested functions.** Retry and fallback logic is an explicit loop or a named state machine.
+  - **No self-held closures on short-lived objects.** A type that is created and disposed often (per request, call, stream, frame, lease or Resource) must not create a closure that captures the instance and store it in the instance's own state: a private field, a `#context`/state object, or a callback table. Example: `this.#context.startRequest = () => this.#startRequest()`.
+    - Call a method on the owner, or a module-level function that receives the context, instead.
+    - This pattern was measured once: each disposed `Resource` kept 258 bytes after a forced GC, against 67 bytes without the closure. Instances survived young-generation GC, minor GCs fell from 24 to 12, and create-dispose became 12% slower.
+    - A suspected case is settled by measurement: create and dispose N instances, force GC, and compare the heap kept per instance with and without the closure.
+    - Long-lived objects (hosts, registries, runtimes) are not affected.
 
 - **Shared behaviour abstracted once.** When several packages or backends need the same logic, move it to its correct owner, such as an authoring subpath or a shared base type, instead of repeating it.
 - **No pass-through layers.** Do not add a function, class, module or adapter that only forwards to another one. Fixing a closure or a length problem must not create such a layer. Forwarding arrows inside one object literal, as allowed above, are not a layer.

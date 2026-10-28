@@ -20,8 +20,8 @@ import { processPlugin } from '@migaia/rpc-plugin-process'
 import { threadPlugin } from '@migaia/rpc-plugin-thread'
 import type { IPluginConstraint, IHostHandle } from '@migaia/plugin-host'
 import type { IRpcProbe } from '@migaia/rpc-host/plugins/probe'
-import { TrayInternal, TrayRuntime, TrayRuntimeMode } from './constants.js'
-import type { IAnyTrayHost, ITrayCallOptions } from './typing.js'
+import { TrayInternal, TrayRuntime, TrayRuntimeMode } from './constants.ts'
+import type { IAnyTrayHost, ITrayCallOptions } from './typing.ts'
 
 /** This is the actual published RPC namespace, without a separate callable facade. */
 export type ITrayRuntimeOutlet = IRpcNamespace
@@ -55,8 +55,16 @@ export function parentRuntimeTransport(): IRpcTransportPlugin<
     namespace: TrayInternal.connection,
     closingWrites: true,
     expose: [TrayInternal.relayPlugin],
-    open: () => ({ dispose: () => undefined })
+    open: openParentTransport
   })
+}
+
+/**
+ * Admit the parent's cold transport without acquiring a native unit; each open keeps its own
+ * handle.
+ */
+function openParentTransport(): { dispose(): void } {
+  return { dispose: () => undefined }
 }
 /** Translate Tray's unchanged delay option into the sole supported complete RPC feature form. */
 export function rpcCallOptions(options?: ITrayCallOptions): IRpcCallOptions | undefined {

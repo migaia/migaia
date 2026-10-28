@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { setTimeout as delay } from 'node:timers/promises'
-import { fixture, until, marker, lines, chainHas, assembled } from './helper.js'
+import { fixture, until, marker, lines, chainHas, assembled } from './helper.ts'
 
 describe('Tray business topics', () => {
   it('validates topic and portable payload before delivery', async () => {
@@ -214,7 +214,9 @@ describe('Tray business topics', () => {
     await off()
     topics.close()
   })
+})
 
+describe('Tray business topics', () => {
   it('thread last off, active restart, crash restart and process removal isolate memberships', async () => {
     /** Existing thread child entry serves the same host name with this parent supervision policy. */
     const api = await fixture()

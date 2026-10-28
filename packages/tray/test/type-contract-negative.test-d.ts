@@ -1,4 +1,4 @@
-import type { ITrayHost } from '../src/host/typing.js'
+import type { ITrayHost } from '../src/host/typing.ts'
 import type { PluginHost } from '@migaia/plugin-host'
 
 declare const host: ITrayHost<PluginHost<Record<string, never>, string>, readonly []>

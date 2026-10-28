@@ -3,11 +3,11 @@
  * ownership.
  */
 import { createConcurrencyLimiter, type IConcurrencyLimiter } from '@migaia/utils/promise'
-import { createTrayError } from '../../errors.js'
-import { TrayErrorCode } from '../../error-code.js'
-import { TrayInstanceState, TrayCallKind, type TrayManagementMode } from '../constants.js'
-import type { IAnyTrayHost, ITrayInstance } from '../typing.js'
-import type { ITrayInvocation, ITraySender } from '../remote.js'
+import { createTrayError } from '../../errors.ts'
+import { TrayErrorCode } from '../../error-code.ts'
+import { TrayInstanceState, TrayCallKind, type TrayManagementMode } from '../constants.ts'
+import type { IAnyTrayHost, ITrayInstance } from '../typing.ts'
+import type { ITrayInvocation, ITraySender } from '../remote.ts'
 /** Metadata belongs to one id admission; RPC remains the connection and generation owner. */
 export type ITrayRecord = {
   definition: IAnyTrayHost
@@ -38,6 +38,8 @@ export function createRegistry(
 class TrayRegistry {
   /** Business metadata is indexed by one admission id. */
   readonly #records = new Map<string, ITrayRecord>()
+  /** Host-local admissions retain spawn order; admit/revoke alone maintain membership, never state. */
+  readonly #byHost = new Map<string, Map<string, ITrayRecord>>()
   /** Authenticated sender projection is revoked before physical resource cleanup. */
   readonly #instanceIds = new Map<string, { record: ITrayRecord; generation: number }>()
   /** Opaque receipts refer to exact admissions, never current same-id replacements. */
@@ -54,6 +56,11 @@ class TrayRegistry {
   /** Expose the original metadata inventory to the parent admission owner. */
   get records() {
     return this.#records
+  }
+  /** Borrow one host's insertion-ordered records without exposing the mutable membership Map. */
+  recordsForHost(host: string): IterableIterator<ITrayRecord> {
+    // An absent host uses a fixed zero-element iterator; successful picks allocate no collection.
+    return this.#byHost.get(host)?.values() ?? [].values()
   }
   /** Expose the exact authenticated identity projection to relay admission. */
   get instanceIds() {
@@ -94,6 +101,10 @@ class TrayRegistry {
   revoke = (record: ITrayRecord): void => {
     record.removed = true
     this.#records.delete(record.id)
+    /** Logical revocation removes this admission from its original host before resource cleanup. */
+    const records = this.#byHost.get(record.definition.name)
+    records?.delete(record.id)
+    if (records?.size === 0) this.#byHost.delete(record.definition.name)
     if (record.instanceId) this.#instanceIds.delete(record.instanceId)
     for (const receipt of record.receipts) this.#receipts.delete(receipt)
     record.receipts.clear()
@@ -172,6 +183,13 @@ class TrayRegistry {
       inFlight: 0
     }
     this.#records.set(id, record)
+    /** One host-local insertion preserves the same spawn order as the original global record Map. */
+    let records = this.#byHost.get(definition.name)
+    if (!records) {
+      records = new Map()
+      this.#byHost.set(definition.name, records)
+    }
+    records.set(id, record)
     return record
   }
   /** Original admission operation; mutable registry state stays with this owner. */

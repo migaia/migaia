@@ -1,5 +1,5 @@
 import type { INativeAbortSignal } from '@migaia/utils/promise'
-import type { ITrayHostSource, ITrayPluginConstraint } from '../host/typing.js'
+import type { ITrayHostSource, ITrayPluginConstraint } from '../host/typing.ts'
 
 /** Runtime-neutral context supplied during one pure artifact conversion. */
 export type IAdapterContext = Readonly<{

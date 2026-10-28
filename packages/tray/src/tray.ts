@@ -1,24 +1,28 @@
-import { TrayEntryKind } from './state-constants.js'
+/** Admits static entries and projects readiness; Capability Graph owns values, startup and cleanup. */
+import { TrayEntryKind } from './state-constants.ts'
 import { GraphReadinessState } from '@migaia/capability'
 import {
   createCapabilityGraph,
   CapabilityGraphState,
   type IGraphNodeDefinition,
-  type IGraphNodeId
+  type IGraphNodeId,
+  type IGraphStartContext
 } from '@migaia/capability/graph'
-import { TrayErrorCode } from './error-code.js'
-import { attachTrayError, createTrayError } from './errors.js'
+import { TrayErrorCode } from './error-code.ts'
+import { attachTrayError, createTrayError } from './errors.ts'
 import type {
   ITrayGraph,
   ITrayEntryDefinition,
   ITrayEntryContext,
   ITrayKey,
   ITrayState
-} from './contract.js'
-import type { IGraphNodeState, IReleaseDescriptor } from './types.js'
+} from './contract.ts'
+import type { IGraphNodeState, IReleaseDescriptor } from './types.ts'
 
+/** Preserve caller-owned string identity when projecting Tray keys into Graph node identifiers. */
 const keyOf = (key: ITrayKey): IGraphNodeId => key as unknown as IGraphNodeId
 
+/** Captured admission facts keep metadata stable while blocked readiness may retain its source. */
 type IAdmittedEntry = {
   /** Original definitions are needed only while blocked can retry; final gates/dispose release them. */
   source: ITrayEntryDefinition<unknown> | undefined
@@ -27,6 +31,37 @@ type IAdmittedEntry = {
   readonly requires: readonly ITrayKey[]
   readonly readiness: ITrayEntryDefinition<unknown>['readiness']
   readonly start: ITrayEntryDefinition<unknown>['start']
+}
+
+/** Project one admitted definition into a Graph node without introducing another lifecycle owner. */
+function createGraphNode(entry: IAdmittedEntry): IGraphNodeDefinition<unknown> {
+  /** Preserve the captured key used by both Graph registration and diagnostics. */
+  const key = entry.key
+  /** Required provider order stays identical to the admitted snapshot. */
+  const dependencies = (entry.requires ?? []).map((provider) => ({
+    provider: keyOf(provider),
+    required: true as const
+  }))
+  return {
+    id: keyOf(key),
+    kind: entry.kind,
+    dependencies,
+    start: (context) => startGraphEntry(entry, context)
+  }
+}
+
+/** Translate the exact Graph context; return foreign thenables unchanged for Graph assimilation. */
+function startGraphEntry(
+  entry: IAdmittedEntry,
+  context: IGraphStartContext
+): ReturnType<IAdmittedEntry['start']> {
+  /** Only key translation differs from Graph; resource ownership passes through unchanged. */
+  const entryContext: ITrayEntryContext = {
+    signal: context.signal,
+    get: <T>(provider: ITrayKey): T => context.get<T>(keyOf(provider)),
+    own: <T>(resource: T, descriptor: IReleaseDescriptor): T => context.own(resource, descriptor)
+  }
+  return entry.start(entryContext)
 }
 
 /**
@@ -70,6 +105,7 @@ class TrayGraphOwner {
     this.#graphProjection = false
     this.#disposed = false
     for (const entry of entries) {
+      /** Snapshot every supported metadata getter exactly once before validation or registration. */
       let key: unknown, kind: unknown, requires: unknown, readiness: unknown, start: unknown
       try {
         key = entry?.key
@@ -92,6 +128,10 @@ class TrayGraphOwner {
         (readiness !== undefined && (typeof readiness !== 'object' || readiness === null))
       )
         throw createTrayError(TrayErrorCode.invalidEntry)
+      /**
+       * The sole captured record retains source only while explicit blocked retries remain
+       * possible.
+       */
       let admittedEntry: IAdmittedEntry
       try {
         admittedEntry = {
@@ -121,28 +161,8 @@ class TrayGraphOwner {
           throw createTrayError(TrayErrorCode.invalidEntry)
       }
     this.#graph = createCapabilityGraph()
-    const nodes: IGraphNodeDefinition<unknown>[] = this.#admitted.map((entry) => {
-      const key = entry.key
-      const dependencies = (entry.requires ?? []).map((provider) => ({
-        provider: keyOf(provider),
-        required: true as const
-      }))
-      return {
-        id: keyOf(key),
-        kind: entry.kind,
-        dependencies,
-        start: (context) => {
-          const entryContext: ITrayEntryContext = {
-            signal: context.signal,
-            get: <T>(provider: ITrayKey): T => context.get<T>(keyOf(provider)),
-            own: <T>(resource: T, descriptor: IReleaseDescriptor): T =>
-              context.own(resource, descriptor)
-          }
-          // Return foreign thenables unchanged; Graph owns assimilation and primary release admission.
-          return entry.start(entryContext)
-        }
-      }
-    })
+    /** Materialize every node before registration, preserving original constructor failure order. */
+    const nodes = this.#admitted.map(createGraphNode)
     for (const node of nodes) this.#graph.register(node)
     this.surface = this.#surface()
   }
@@ -174,6 +194,10 @@ class TrayGraphOwner {
           this.#gateError = createTrayError(TrayErrorCode.invalidEntry)
           break
         }
+        /**
+         * Validate the state before reading error so an invalid fact never invokes its error
+         * getter.
+         */
         let state: unknown
         try {
           state = snapshot.state
@@ -191,6 +215,10 @@ class TrayGraphOwner {
           this.#gateError = createTrayError(TrayErrorCode.invalidEntry)
           break
         }
+        /**
+         * Retain even falsey provider errors without changing their identity or fallback
+         * precedence.
+         */
         let error: unknown
         try {
           error = snapshot.error
@@ -256,7 +284,9 @@ class TrayGraphOwner {
   }
   /** Assemble original public getters and callable identities around this explicit owner. */
   #surface(): ITrayGraph {
+    /** Preserve the original bound reader identity inside the own state getter. */
     const readState = this.#readState
+    /** Preserve the original bound reader identity inside the own error getter. */
     const readError = this.#readError
     return {
       keys: Object.freeze(this.#admitted.map((entry) => entry.key)),

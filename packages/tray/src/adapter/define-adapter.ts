@@ -1,7 +1,7 @@
 import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/utils/function'
-import { TrayErrorCode } from '../error-code.js'
-import { createTrayError } from '../errors.js'
-import type { IAdapter, IAdapterContext } from './typing.js'
+import { TrayErrorCode } from '../error-code.ts'
+import { createTrayError } from '../errors.ts'
+import type { IAdapter, IAdapterContext } from './typing.ts'
 
 /**
  * Captures the adapt method once and returns a frozen reusable contract. Each invocation converts
@@ -11,8 +11,8 @@ import type { IAdapter, IAdapterContext } from './typing.js'
  */
 export function defineAdapter<
   TArtifact,
-  THost extends import('../host/typing.js').ITrayHostSource,
-  const TPlugin extends import('../host/typing.js').ITrayPluginConstraint<THost>
+  THost extends import('../host/typing.ts').ITrayHostSource,
+  const TPlugin extends import('../host/typing.ts').ITrayPluginConstraint<THost>
 >(adapter: IAdapter<TArtifact, THost, TPlugin>): IAdapter<TArtifact, THost, TPlugin> {
   if (!adapter || typeof adapter !== 'object')
     throw createTrayError(TrayErrorCode.adapterContractInvalid)

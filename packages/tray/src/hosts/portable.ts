@@ -1,6 +1,6 @@
 import { normalizeRpcPortable, type IRpcPortableValue } from '@migaia/rpc-host/contract'
-import { TrayErrorCode } from '../error-code.js'
-import { createTrayError } from '../errors.js'
+import { TrayErrorCode } from '../error-code.ts'
+import { createTrayError } from '../errors.ts'
 
 /**
  * Snapshots config or payload with the rpc portable owner and preserves native binary. The absent

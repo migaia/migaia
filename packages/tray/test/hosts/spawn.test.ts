@@ -1,4 +1,4 @@
-import { TrayInternal } from '../../src/hosts/constants.js'
+import { TrayInternal } from '../../src/hosts/constants.ts'
 import { describe, expect, it } from 'vitest'
 import {
   assembled,
@@ -9,7 +9,7 @@ import {
   marker,
   processAlive,
   until
-} from './helper.js'
+} from './helper.ts'
 
 describe('Tray instance admission and discovery', () => {
   it('admits two genuine units per runtime, filters discovery and physically removes them', async () => {

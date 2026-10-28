@@ -1,11 +1,11 @@
 import { createEventHub } from '@migaia/event-subscriber'
 import type { IRpcContext } from '@migaia/rpc-host'
-import { TrayErrorCode } from '../../error-code.js'
-import { createTrayError } from '../../errors.js'
-import { TrayInstanceState } from '../constants.js'
-import { toWire } from '../portable.js'
-import { assertTopic, type ITrayTopicDelivery, type ITrayTopicListener } from '../topics.js'
-import type { ITrayRecord, ITrayRegistry } from './registry.js'
+import { TrayErrorCode } from '../../error-code.ts'
+import { createTrayError } from '../../errors.ts'
+import { TrayInstanceState } from '../constants.ts'
+import { toWire } from '../portable.ts'
+import { assertTopic, type ITrayTopicDelivery, type ITrayTopicListener } from '../topics.ts'
+import type { ITrayRecord, ITrayRegistry } from './registry.ts'
 
 /** One parent hub fans out to local users and each authenticated generation membership. */
 export function createParentTopics(

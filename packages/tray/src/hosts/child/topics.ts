@@ -1,9 +1,9 @@
 /** Own generation-local topic membership; EventSubscriber owns delivery and RPC owns parent IO. */
 import { createEventHub } from '@migaia/event-subscriber'
-import { TrayInternal } from '../constants.js'
-import { toWire } from '../portable.js'
-import { assertTopic, type ITrayTopicDelivery, type ITrayTopicListener } from '../topics.js'
-import type { ITrayRuntimeOutlet } from '../runtime.js'
+import { TrayInternal } from '../constants.ts'
+import { toWire } from '../portable.ts'
+import { assertTopic, type ITrayTopicDelivery, type ITrayTopicListener } from '../topics.ts'
+import type { ITrayRuntimeOutlet } from '../runtime.ts'
 
 /** One listener owns only its original local remover and idempotent last-listener cleanup. */
 type ITopicSubscription = {

@@ -1,7 +1,7 @@
 import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/utils/function'
-import { TrayErrorCode } from '../error-code.js'
-import { createTrayError } from '../errors.js'
-import type { ILoadedArtifact, ILoader, ILoaderContext } from './typing.js'
+import { TrayErrorCode } from '../error-code.ts'
+import { createTrayError } from '../errors.ts'
+import type { ILoadedArtifact, ILoader, ILoaderContext } from './typing.ts'
 
 /**
  * Captures the load method once and returns a frozen reusable contract. Each call executes that

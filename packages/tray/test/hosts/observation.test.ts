@@ -3,7 +3,7 @@ import { defineProbe, RpcProbeStage } from '@migaia/rpc-host/plugins/probe'
 import * as CoroutineSupervision from '@migaia/supervision/coroutine'
 import * as ThreadSupervision from '@migaia/supervision/threads'
 import * as ProcessSupervision from '@migaia/supervision/process'
-import { chainHas, classify, fixture, lines, marker, until } from './helper.js'
+import { chainHas, classify, fixture, lines, marker, until } from './helper.ts'
 
 describe('Tray runtime observation', () => {
   it('observes parent messages for two units per runtime and child serve messages in native realms', async () => {

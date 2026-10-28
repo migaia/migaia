@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fixture } from './helper.js'
+import { fixture } from './helper.ts'
 
 describe('Tray discovery', () => {
   it('filters all six ready native instances by runtime, host and state and merges unit detail', async () => {

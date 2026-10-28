@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { setTimeout as delay } from 'node:timers/promises'
-import { chainHas, fixture, lines, marker, until } from './helper.js'
+import { chainHas, fixture, lines, marker, until } from './helper.ts'
 
 /** Cartesian product proves every runtime can be both a relay caller and target. */
 const pairs = [0, 1, 2].flatMap((caller) => [0, 1, 2].map((target) => [caller, target] as const))

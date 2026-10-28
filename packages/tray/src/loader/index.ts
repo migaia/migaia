@@ -1,9 +1,9 @@
-export { defineLoader } from './define-loader.js'
-export { loadIntoHost } from './load-into-host.js'
+export { defineLoader } from './define-loader.ts'
+export { loadIntoHost } from './load-into-host.ts'
 export type {
   ILoadedArtifact,
   ILoader,
   ILoaderContext,
   ILoadIntoHostOptions,
   ILoadIntoHostResult
-} from './typing.js'
+} from './typing.ts'

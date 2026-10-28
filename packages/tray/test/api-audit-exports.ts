@@ -1,12 +1,12 @@
 // @ts-expect-error Tray-C01 keeps inference helpers private to their declaration owner.
-import type { IHostBaselinePlugins } from '../src/host/index.js'
+import type { IHostBaselinePlugins } from '../src/host/index.ts'
 // @ts-expect-error Tray-C01 keeps inference helpers private to their declaration owner.
-import type { IPluginWithSynchronousShared } from '../src/host/index.js'
+import type { IPluginWithSynchronousShared } from '../src/host/index.ts'
 // @ts-expect-error Tray-C01 keeps inference helpers private to their declaration owner.
-import type { ICanResolveReadyDefinitions } from '../src/host/index.js'
+import type { ICanResolveReadyDefinitions } from '../src/host/index.ts'
 // @ts-expect-error Tray-C01 keeps inference helpers private to their declaration owner.
-import type { IResolveReadyTrayPlugins } from '../src/host/index.js'
-import type { IRuntimeShutdownOptions } from '../src/runtime/index.js'
+import type { IResolveReadyTrayPlugins } from '../src/host/index.ts'
+import type { IRuntimeShutdownOptions } from '../src/runtime/index.ts'
 /** Runtime bounded shutdown has no independent wait budget; managed Host owns quiescence. */
 const shutdown: IRuntimeShutdownOptions = {
   mode: 'bounded',

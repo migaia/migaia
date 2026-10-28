@@ -1,8 +1,8 @@
 /** Project validated Tray calls through an admitted sender; registry and RPC own lifecycle state. */
-import { createTrayError } from '../errors.js'
-import { TrayErrorCode } from '../error-code.js'
-import { toWire } from './portable.js'
-import type { IAnyTrayHost, ITrayRemote, ITrayRoutedRemote, ITrayCallOptions } from './typing.js'
+import { createTrayError } from '../errors.ts'
+import { TrayErrorCode } from '../error-code.ts'
+import { toWire } from './portable.ts'
+import type { IAnyTrayHost, ITrayRemote, ITrayRoutedRemote, ITrayCallOptions } from './typing.ts'
 /** Dispatcher payload omits absent data; application objects are validated unchanged. */
 export type ITrayInvocation = Readonly<{ path: string; payload?: unknown }>
 /** One callable remote forwards each operation through its admission-bound sender. */
@@ -27,10 +27,6 @@ export function createRoutedRemote<H extends IAnyTrayHost>(
 }
 /** Only the envelope's absent payload is omitted; no application field is silently removed. */
 function createCalls(send: ITraySender) {
-  const invocation = (path: string, payload: unknown): ITrayInvocation => {
-    if (typeof path !== 'string') throw createTrayError(TrayErrorCode.pathNotExposed)
-    return { path, ...(payload === undefined ? {} : { payload: toWire(payload) }) }
-  }
   return {
     request: (path: string, payload?: unknown, options?: ITrayCallOptions) =>
       send.request(invocation(path, payload), options),
@@ -39,4 +35,10 @@ function createCalls(send: ITraySender) {
     stream: (path: string, payload?: unknown, options?: ITrayCallOptions) =>
       send.stream(invocation(path, payload), options)
   }
+}
+
+/** Validate one public path and omit only absent envelope payload; application data stays portable. */
+function invocation(path: string, payload: unknown): ITrayInvocation {
+  if (typeof path !== 'string') throw createTrayError(TrayErrorCode.pathNotExposed)
+  return { path, ...(payload === undefined ? {} : { payload: toWire(payload) }) }
 }

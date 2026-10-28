@@ -8,6 +8,9 @@ export const TrayManagementMode = { manual: 'manual', background: 'background' }
 /** Queue ownership is private metadata, never a native supervision state. */
 export type TrayManagementMode = keyof typeof TrayManagementMode
 
+/** Native replacement results and member departures use this discriminant in parent management. */
+export const TrayNativeReplacement = 'replaced'
+
 /** Runtime families accepted by the host DSL and selected by the runtime adapter. */
 export const TrayRuntime = {
   /** Same-realm cooperative task managed by the canonical coroutine RPC plugin. */

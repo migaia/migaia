@@ -2,17 +2,17 @@
  * Admit routing policies and select from one current candidate snapshot; registry owns instance
  * lifetime.
  */
-import { createTrayError } from '../errors.js'
-import { TrayErrorCode } from '../error-code.js'
-import { TrayInstanceState } from './constants.js'
+import { createTrayError } from '../errors.ts'
+import { TrayErrorCode } from '../error-code.ts'
+import { TrayInstanceState } from './constants.ts'
 import {
   roundRobin,
   leastInFlight,
   readRoutingPolicy,
   type ITrayRoutingPolicy
-} from './routing-policy.js'
-import type { ITrayRegistry, ITrayRecord } from './parent/registry.js'
-import type { IAnyTrayHost, ITrayRouting, ITrayRoutedRemote } from './typing.js'
+} from './routing-policy.ts'
+import type { ITrayRegistry, ITrayRecord } from './parent/registry.ts'
+import type { IAnyTrayHost, ITrayRouting, ITrayRoutedRemote } from './typing.ts'
 
 /** Shared built-ins are authored by the same policy WeakMap as custom identities. */
 export const builtInRouting: readonly [
@@ -61,7 +61,8 @@ class RoutingRegistry {
   }
   /**
    * Pick one current ready admission; business calls never retry or migrate. The policy contract
-   * receives every ready candidate, requiring one O(n) snapshot pass; returned id lookup is O(1).
+   * receives every ready candidate in the target host, requiring one O(h) snapshot pass over that
+   * host's admissions rather than all registry records; returned id lookup remains O(1).
    */
   pick = (host: string, name: string): ITrayRecord => {
     const policy = this.#policies.get(name)
@@ -70,12 +71,8 @@ class RoutingRegistry {
     const candidates: ITrayRecord[] = []
     /** Index only this snapshot so policy reentrancy cannot admit a later same-id replacement. */
     const candidateIds = new Map<string, ITrayRecord>()
-    for (const record of this.#registry.records.values())
-      if (
-        record.definition.name === host &&
-        record.state === TrayInstanceState.ready &&
-        !record.removed
-      ) {
+    for (const record of this.#registry.recordsForHost(host))
+      if (record.state === TrayInstanceState.ready && !record.removed) {
         candidates.push(record)
         candidateIds.set(record.id, record)
       }
@@ -113,17 +110,33 @@ export function createRoutingNamespace<
   names: readonly TNames[],
   route: (name: string, host: IAnyTrayHost) => ITrayRoutedRemote<IAnyTrayHost>
 ): ITrayRouting<TNames, THosts> {
-  /** The closed registration set is checked for both member and callable forms. */
-  const allowed = new Set<string>(names)
-  /** Arrow shape has callable arity two and no mutable receiver dependency. */
-  const routing = (name: string, host: IAnyTrayHost) => {
-    if (!allowed.has(name)) throw createTrayError(TrayErrorCode.routingUnknown)
-    return route(name, host)
+  return new RoutingNamespace(names, route).routing as ITrayRouting<TNames, THosts>
+}
+
+/** Own callable routing authority while preserving its frozen arrow shape and exact own members. */
+class RoutingNamespace {
+  /** Both member and callable forms validate the same closed name registration set. */
+  readonly #allowed: ReadonlySet<string>
+  /** Parent or child owner performs the original routing work after name admission. */
+  readonly #route: (name: string, host: IAnyTrayHost) => ITrayRoutedRemote<IAnyTrayHost>
+  /** Arrow keeps arity two, no prototype, and its original receiver-independent behavior. */
+  readonly routing = (name: string, host: IAnyTrayHost) => {
+    if (!this.#allowed.has(name)) throw createTrayError(TrayErrorCode.routingUnknown)
+    return this.#route(name, host)
   }
-  for (const name of allowed)
-    Object.defineProperty(routing, name, {
-      value: (host: IAnyTrayHost) => routing(name, host),
-      enumerable: true
-    })
-  return Object.freeze(routing) as ITrayRouting<TNames, THosts>
+
+  /** Install one own arity-one member per admitted name before freezing the original callable. */
+  constructor(
+    names: readonly string[],
+    route: (name: string, host: IAnyTrayHost) => ITrayRoutedRemote<IAnyTrayHost>
+  ) {
+    this.#allowed = new Set(names)
+    this.#route = route
+    for (const name of this.#allowed)
+      Object.defineProperty(this.routing, name, {
+        value: (host: IAnyTrayHost) => this.routing(name, host),
+        enumerable: true
+      })
+    Object.freeze(this.routing)
+  }
 }

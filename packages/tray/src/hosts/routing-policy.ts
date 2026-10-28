@@ -1,6 +1,7 @@
-import { TrayErrorCode } from '../error-code.js'
-import { createTrayError } from '../errors.js'
-import type { ITrayInstance } from './typing.js'
+/** Own routing-policy identity and pure built-in picks; parent registries retain selection state. */
+import { TrayErrorCode } from '../error-code.ts'
+import { createTrayError } from '../errors.ts'
+import type { ITrayInstance } from './typing.ts'
 
 /** Compile-time identity cannot replace the runtime WeakMap authority. */
 declare const trayRoutingPolicyBrand: unique symbol
@@ -94,12 +95,19 @@ export const roundRobin = authorPolicy(
  * Built-in policy selecting the least pending business sends; ties retain spawn order, not CPU
  * load.
  */
-export const leastInFlight = authorPolicy(
-  TrayRoutingBuiltinName.leastInFlight,
-  (candidates) =>
-    candidates.reduce((best, candidate) => (candidate.inFlight < best.inFlight ? candidate : best))
-      .id
-)
+export const leastInFlight = authorPolicy(TrayRoutingBuiltinName.leastInFlight, pickLeastInFlight)
+
+/** Select the earliest minimum in one pass over the parent's guaranteed non-empty dense snapshot. */
+function pickLeastInFlight(candidates: readonly ITrayInstance[]): string {
+  /** Ties retain the first spawn; update only when the next candidate has strictly less work. */
+  let best = candidates[0]!
+  for (let index = 1; index < candidates.length; index++) {
+    /** Candidate snapshots are immutable facts from this single policy invocation. */
+    const candidate = candidates[index]!
+    if (candidate.inFlight < best.inFlight) best = candidate
+  }
+  return best.id
+}
 
 /** Internal trust lookup rejects structural copies without reading their properties. */
 export function readRoutingPolicy(value: unknown): ITrayRoutingPick | undefined {

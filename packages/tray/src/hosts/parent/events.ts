@@ -1,7 +1,11 @@
+/** Own lifecycle observation subscriptions and bounded watches; EventSubscriber owns fan-out. */
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { createEventHub } from '@migaia/event-subscriber'
-import { TrayInstanceEvent } from '../constants.js'
-import type { ITrayInstanceEventRecord, ITrayInstanceEventRecord as IRecord } from '../typing.js'
+import { TrayInstanceEvent } from '../constants.ts'
+import type { ITrayInstanceEventRecord, ITrayInstanceEventRecord as IRecord } from '../typing.ts'
+
+/** Public watch contract retains exactly the latest 100 unread lifecycle records. */
+const eventWatchCapacity = 100
 
 /** Lifecycle publisher stays private; facade users borrow only observation operations. */
 export function createTrayEvents(report: (error: unknown) => void) {
@@ -53,8 +57,12 @@ class TrayEvents {
 
 /** One watch owns iterator-local state, never native lifecycle or durable event history. */
 class TrayEventWatch implements AsyncIterableIterator<IRecord> {
-  /** Exactly the latest 100 unread observations are retained; shifts have constant bounded cost. */
-  readonly #queue: IRecord[] = []
+  /** Fixed ring retains the latest 100 unread observations without copying or shifting records. */
+  readonly #queue: (IRecord | undefined)[] = []
+  /** Oldest unread ring slot is advanced only after read or oldest-record eviction. */
+  #head = 0
+  /** Number of retained observations never exceeds eventWatchCapacity from the public contract. */
+  #size = 0
   /** Concurrent next callers are correlated without shifting a growing pending array. */
   readonly #pending = new Map<number, (value: IteratorResult<IRecord>) => void>()
   /** Monotonic issuance identifies each pending read until it settles. */
@@ -81,6 +89,7 @@ class TrayEventWatch implements AsyncIterableIterator<IRecord> {
     this.#signal = signal
     this.#finished = closed
     if (!closed && !signal?.aborted) {
+      // TrayInstanceEvent declares exactly six lifecycle names; subscription setup has that fixed bound.
       for (const name of Object.values(TrayInstanceEvent))
         this.#releases.push(hub.subscribe(name, (context) => this.#accept(context.value)))
       watches.add(this.#finish)
@@ -89,13 +98,19 @@ class TrayEventWatch implements AsyncIterableIterator<IRecord> {
   }
   /** Deliver one observation to the first waiter, or retain it within the fixed 100-record budget. */
   #accept(value: IRecord): void {
+    /** The next issued waiter always receives its record before any bounded history is retained. */
     const read = this.#pending.get(this.#received)
     if (read) {
       this.#pending.delete(this.#received++)
       read({ done: false, value })
     } else {
-      if (this.#queue.length === 100) this.#queue.shift()
-      this.#queue.push(value)
+      if (this.#size === eventWatchCapacity) {
+        this.#queue[this.#head] = value
+        this.#head = (this.#head + 1) % eventWatchCapacity
+      } else {
+        this.#queue[(this.#head + this.#size) % eventWatchCapacity] = value
+        this.#size += 1
+      }
     }
   }
   /** Release this watch once and settle every pending read as complete. */
@@ -106,6 +121,8 @@ class TrayEventWatch implements AsyncIterableIterator<IRecord> {
     this.#signal?.removeEventListener('abort', this.#finish)
     this.#watches.delete(this.#finish)
     this.#queue.length = 0
+    this.#head = 0
+    this.#size = 0
     for (const resolve of this.#pending.values()) resolve({ done: true, value: undefined })
     this.#pending.clear()
   };
@@ -116,7 +133,13 @@ class TrayEventWatch implements AsyncIterableIterator<IRecord> {
   /** Return the oldest unread observation or await one original lifecycle event. */
   next(): Promise<IteratorResult<IRecord>> {
     if (this.#finished) return Promise.resolve({ done: true, value: undefined })
-    const value = this.#queue.shift()
+    /** Read and clear one original ring slot so consumed records are not retained by the watch. */
+    const value = this.#queue[this.#head]
+    if (this.#size !== 0) {
+      this.#queue[this.#head] = undefined
+      this.#head = (this.#head + 1) % eventWatchCapacity
+      this.#size -= 1
+    }
     return value
       ? Promise.resolve({ done: false, value })
       : new Promise((resolve) => this.#pending.set(this.#issued++, resolve))
