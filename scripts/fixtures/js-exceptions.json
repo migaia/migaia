@@ -514,10 +514,6 @@
       "reason": "Repository tooling test run directly with node --test."
     },
     {
-      "path": "scripts/test/public-exports.test.mjs",
-      "reason": "Repository tooling test run directly with node --test."
-    },
-    {
       "path": "scripts/test/registry-generation.test.mjs",
       "reason": "Repository tooling test run directly with node --test."
     },
@@ -527,14 +523,6 @@
     },
     {
       "path": "scripts/test/release-progress.test.mjs",
-      "reason": "Repository tooling test run directly with node --test."
-    },
-    {
-      "path": "scripts/test/rpc-merge-legacy-readers.test.mjs",
-      "reason": "Repository tooling test run directly with node --test."
-    },
-    {
-      "path": "scripts/test/rpc-merge-packed.test.mjs",
       "reason": "Repository tooling test run directly with node --test."
     },
     {
