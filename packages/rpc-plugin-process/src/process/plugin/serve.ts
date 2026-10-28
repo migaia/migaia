@@ -47,7 +47,8 @@ class ProcessSessionOwner {
   /** The original native scheduler also measures remaining parent-loss grace. */
   readonly #scheduler: IScheduler
   /** Reporter failures cannot overwrite a preparation or native cleanup failure. */
-  readonly #report: (error: unknown) => void
+  readonly #report = (error: unknown): void =>
+    reportSafely(this.#options.report ?? this.#context.report, error)
   /** Only this native service's pending and accepted resources count against its capacity. */
   readonly #connections: ProcessConnectionCapacity
   /** Borrowed shared capacity remains owned by its original manager. */
@@ -96,7 +97,6 @@ class ProcessSessionOwner {
       options.scheduler ??
       (ingress.kind === 'listener' ? ingress.scheduler : undefined) ??
       systemScheduler
-    this.#report = (error) => reportSafely(options.report ?? context.report, error)
     this.#connections = options.connections ?? new ProcessConnectionCapacity(options.maxConnections)
     this.#ownsConnections = options.connections === undefined
   }
