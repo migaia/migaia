@@ -417,6 +417,44 @@ function verifyOpensAndRollsBackATransactionWithoutCopyingTheIndex() {
   expect(large).toBeLessThan(Math.max(small, 0.05) * 25)
 }
 
+/** Verifies mixed consumer reconnect order and isolated publication with four fixed consumers. */
+function verifyMixedConsumerReconnectOrderAcrossTransactionSettlement(): void {
+  /** Four consumers precede their provider so admission also exercises existing dangling buckets. */
+  const index = createTestIndex()
+  index.add({ id: 'older-required', dependencies: [{ provider: 'p', required: true }] })
+  index.add({ id: 'older-optional', dependencies: [{ provider: 'p', required: false }] })
+  index.add({ id: 'newer-required', dependencies: [{ provider: 'p', required: true }] })
+  index.add({ id: 'newer-optional', dependencies: [{ provider: 'p', required: false }] })
+  index.add({ id: 'p', dependencies: [] })
+  /** Expected registration order is independent of physical bucket insertion and returned arrays. */
+  const before = {
+    required: ['older-required', 'newer-required'],
+    optional: ['older-optional', 'newer-optional']
+  }
+  expect(index.dependents('p')).toEqual(before)
+  index.setDependencies('older-optional', [])
+  index.setDependencies('older-optional', [{ provider: 'p', required: false }])
+  expect(index.dependents('p')).toEqual(before)
+  /** Switching old edge kinds must still place both old consumers before newer registrations. */
+  const rewired = {
+    required: ['older-optional', 'newer-required'],
+    optional: ['older-required', 'newer-optional']
+  }
+  /** Two literal modes give O(1) fixture work; each rewires the same four fixed consumers. */
+  for (const settlement of ['rollback', 'commit'] as const) {
+    /** Working buckets must own their edits until this transaction explicitly settles. */
+    const transaction = index.begin()
+    transaction.setDependencies('older-required', [])
+    transaction.setDependencies('older-optional', [])
+    transaction.setDependencies('older-required', [{ provider: 'p', required: false }])
+    transaction.setDependencies('older-optional', [{ provider: 'p', required: true }])
+    expect(transaction.dependents('p')).toEqual(rewired)
+    expect(index.dependents('p')).toEqual(before)
+    transaction[settlement]()
+    expect(index.dependents('p')).toEqual(settlement === 'rollback' ? before : rewired)
+  }
+}
+
 describe('incremental topology index', () => {
   it(
     'maintains dependents, missing edges, and required closure',
@@ -426,6 +464,11 @@ describe('incremental topology index', () => {
   it(
     'retains ordinal edge order and kind across rewiring and transactions',
     verifyRetainsOrdinalEdgeOrderAndKindAcrossRewiringAndTransactions
+  )
+
+  it(
+    'retains both consumer partitions through reconnect, rollback, and commit',
+    verifyMixedConsumerReconnectOrderAcrossTransactionSettlement
   )
 
   it(

@@ -5,6 +5,7 @@ import { TopologyInvalidReason } from './topology-reasons.js'
  */
 import { OverlayStore, type IKeyedStore, type IStoredTopologyNode } from './topology-store.js'
 import { TopologyTransaction } from './topology-transaction.js'
+import { TopologyConsumerBucket } from './topology-consumers.js'
 import { TopologyLevelQueue } from './topology-level-queue.js'
 import { orderTopologyNodes, registrationTopologyNodes } from './topology-order.js'
 import {
@@ -110,7 +111,7 @@ class TopologyIndex implements ITopologyIndex {
   readonly #nodes: IKeyedStore<string, IStoredTopologyNode>
 
   /** Requiredness keyed by provider and consumer, retaining dangling provider references. */
-  readonly #consumers: IKeyedStore<string, IKeyedStore<string, boolean>>
+  readonly #consumers: IKeyedStore<string, TopologyConsumerBucket>
 
   /** Next monotonic registration ordinal; removals never reclaim it. */
   #nextOrdinal: number
@@ -159,20 +160,21 @@ class TopologyIndex implements ITopologyIndex {
     return node.dependencies
   }
 
-  /** Returns direct present dependents split by required and optional edge kind. */
+  /** Returns direct dependents in O(deg), allocating only the two result arrays and frozen result. */
   dependents(id: string): IGraphDependents {
     this.#requireNode(id)
     /** Required consumers in registration order. */
     const required: string[] = []
     /** Optional consumers in registration order. */
     const optional: string[] = []
-    /** Reverse membership stays keyed; projection alone restores registration order. */
-    const edges = this.#consumers.get(id)
-    /** Captured consumers are restricted to this provider's direct neighbourhood. */
-    const consumers: IStoredTopologyNode[] = []
-    for (const consumer of edges?.keys() ?? []) consumers.push(this.#nodes.get(consumer)!)
-    for (const consumer of registrationTopologyNodes(consumers)) {
-      ;(edges!.get(consumer.id) ? required : optional).push(consumer.id)
+    /** Writes already maintain registration order, so the read visits each direct edge once. */
+    const consumers = this.#consumers.get(id)?.entries
+    if (consumers) {
+      for (let index = 0; index < consumers.length; index += 1) {
+        /** Stored edge kind partitions IDs without node lookups, pairs or a temporary projection. */
+        const consumer = consumers[index]!
+        ;(consumer.required ? required : optional).push(consumer.id)
+      }
     }
     return Object.freeze({
       required: Object.freeze(required),
@@ -208,10 +210,13 @@ class TopologyIndex implements ITopologyIndex {
     for (let index = 0; index < queue.length; index += 1) {
       /** Each reached provider expands its reverse memberships once. */
       const provider = queue[index]!
-      for (const [consumerId, required] of this.#consumers.get(provider) ?? []) {
-        if (!required || reached.has(consumerId)) continue
-        reached.add(consumerId)
-        queue.push(consumerId)
+      /** Ordered stored edges are visited once per reached provider, O(V + E) for the closure. */
+      const consumers = this.#consumers.get(provider)?.entries
+      if (!consumers) continue
+      for (const consumer of consumers) {
+        if (!consumer.required || reached.has(consumer.id)) continue
+        reached.add(consumer.id)
+        queue.push(consumer.id)
       }
     }
     return Object.freeze(this.#orderCanonical(reached))
@@ -389,10 +394,7 @@ class TopologyIndex implements ITopologyIndex {
   /** Applies a transaction view's overlay writes, then releases ownership. */
   #adopt(working: TopologyIndex): void {
     ;(working.#nodes as OverlayStore<string, IStoredTopologyNode>).applyTo(this.#nodes)
-    ;(working.#consumers as OverlayStore<string, IKeyedStore<string, boolean>>).applyTo(
-      this.#consumers,
-      (bucket) => (bucket instanceof OverlayStore ? bucket.commitToBase() : bucket)
-    )
+    ;(working.#consumers as OverlayStore<string, TopologyConsumerBucket>).applyTo(this.#consumers)
     this.#nextOrdinal = working.#nextOrdinal
     this.#transactionOpen = false
   }
@@ -416,29 +418,32 @@ class TopologyIndex implements ITopologyIndex {
   }
 
   /**
-   * Returns a writable consumer bucket without copying its existing memberships. A transaction adds
-   * an O(1) nested overlay, preserving stable base readers until commit.
+   * Returns the current writable bucket in O(1). A transaction's first write copies that provider's
+   * bucket in O(deg); later writes reuse it.
    */
-  #writableConsumers(provider: string): IKeyedStore<string, boolean> | undefined {
+  #writableConsumers(provider: string): TopologyConsumerBucket | undefined {
     /** Existing provider bucket may still belong to the stable parent view. */
     const consumers = this.#consumers.get(provider)
     if (!consumers || !(this.#consumers instanceof OverlayStore) || this.#consumers.owns(provider))
       return consumers
-    /** Nested overlay charges only actual consumer edits when the transaction commits. */
-    const overlay = new OverlayStore(consumers)
-    this.#consumers.set(provider, overlay)
-    return overlay
+    /** One independent ordered copy is published only if this transaction commits. */
+    const copy = new TopologyConsumerBucket(consumers)
+    this.#consumers.set(provider, copy)
+    return copy
   }
 
-  /** Stores one reverse membership in O(1); readers own registration-order projection. */
+  /** Appends a newest consumer in O(1), or reconnects an older ordinal in O(deg) without sorting. */
   #addReverseEdge(provider: string, consumer: string, required: boolean): void {
-    /** Writable bucket is owned either by this base or its transaction overlay. */
-    const consumers = this.#writableConsumers(provider)
-    if (consumers) consumers.set(consumer, required)
-    else this.#consumers.set(provider, new Map([[consumer, required]]))
+    /** Existing or newly created bucket belongs to this base or transaction working view. */
+    let consumers = this.#writableConsumers(provider)
+    if (!consumers) {
+      consumers = new TopologyConsumerBucket()
+      this.#consumers.set(provider, consumers)
+    }
+    consumers.set(consumer, required, this.#nodes.get(consumer)!.ordinal)
   }
 
-  /** Removes one reverse edge and prunes empty provider buckets. */
+  /** Removes one reverse edge in O(deg), then prunes an empty provider bucket in O(1). */
   #removeReverseEdge(provider: string, consumer: string): void {
     /** Writable bucket is owned either by this base or its transaction overlay. */
     const consumers = this.#writableConsumers(provider)
