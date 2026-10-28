@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
-import * as pluginHostPublic from '../src/index.js'
+import * as pluginHostPublic from '../src/index.ts'
 
 const forbiddenProvenanceExports = [
   'markPluginHostDisposalNode',

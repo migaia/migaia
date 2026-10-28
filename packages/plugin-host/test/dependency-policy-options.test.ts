@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defineFeature, definePlugin, PluginHost } from '../src/index.js'
+import { defineFeature, definePlugin, PluginHost } from '../src/index.ts'
 
 /** Creates the required two-level chain plus one optional direct consumer. */
 const createFixture = async () => {

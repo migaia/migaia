@@ -10,21 +10,21 @@ import {
   type DependencyPolicy,
   type IDependencyPlan
 } from '@migaia/capability/graph/dependency'
-import { reportDiagnostic } from './diagnostic-report.js'
-import { invokeCaptured } from './invocation.js'
-import ERROR_TEXT, { PluginHostError } from './error-text.js'
-import { PluginHostErrorCode } from './error-code.js'
-import type { PluginHostState } from './host-state.js'
-import type { IRegistration } from './registry.js'
-import type { IPluginConstraint } from './plugin-definition-types.js'
-import type { IPluginEnablement, IPluginDependencyMutationOptions } from './plugin-handle-types.js'
-import type { IPluginRegistrationContext } from './plugin-lifecycle-types.js'
-import type { IPluginHostDiagnostic } from './host-options-types.js'
+import { reportDiagnostic } from './diagnostic-report.ts'
+import { invokeCaptured } from './invocation.ts'
+import ERROR_TEXT, { PluginHostError } from './error-text.ts'
+import { PluginHostErrorCode } from './error-code.ts'
+import type { PluginHostState } from './host-state.ts'
+import type { IRegistration } from './registry.ts'
+import type { IPluginConstraint } from './plugin-definition-types.ts'
+import type { IPluginEnablement, IPluginDependencyMutationOptions } from './plugin-handle-types.ts'
+import type { IPluginRegistrationContext } from './plugin-lifecycle-types.ts'
+import type { IPluginHostDiagnostic } from './host-options-types.ts'
 import {
   admitDependencyMutationOptions,
   findUnavailableProvider,
   toPluginPlan
-} from './dependency-runtime.js'
+} from './dependency-runtime.ts'
 
 /** Committed state and reporting authority used by reversible availability transitions. */
 type IPluginHostEnablementRuntimePort<TDomainCore extends object, TValue> = Readonly<{

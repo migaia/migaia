@@ -2,7 +2,7 @@
  * Owns Host stage admission and execution settlement; middleware and lifecycle retain runner and
  * lease authority.
  */
-import { reportDiagnostic } from './diagnostic-report.js'
+import { reportDiagnostic } from './diagnostic-report.ts'
 import { boundedWait, type IPendingTracker } from '@migaia/lifecycle'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import {
@@ -18,13 +18,13 @@ import ERROR_TEXT, {
   attachPluginHostIdentity,
   createPluginHostTypeError,
   PluginHostInternalText
-} from './error-text.js'
-import { PluginHostErrorCode } from './error-code.js'
-import type { IDataOrderSlotState } from './composition.js'
-import type { IRegistration } from './registry.js'
-import type { IStageSnapshot, IStageForms, StageLanes } from './stage-lanes.js'
-import { PluginHostRegistrationLifecycle } from './state-constants.js'
-import type { IPluginHostErrorCode } from './error-code.js'
+} from './error-text.ts'
+import { PluginHostErrorCode } from './error-code.ts'
+import type { IDataOrderSlotState } from './composition.ts'
+import type { IRegistration } from './registry.ts'
+import type { IStageSnapshot, IStageForms, StageLanes } from './stage-lanes.ts'
+import { PluginHostRegistrationLifecycle } from './state-constants.ts'
+import type { IPluginHostErrorCode } from './error-code.ts'
 
 /** Maps canonical runner violations onto the Host diagnostic and coded-error policy. */
 export const createPluginHostPipelineViolationHandler =

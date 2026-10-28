@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { defineFeature, definePlugin, PluginHostError } from '../src/index.js'
-import { Host } from './hardening-fixtures.js'
+import { defineFeature, definePlugin, PluginHostError } from '../src/index.ts'
+import { Host } from './hardening-fixtures.ts'
 
 describe('#1 config.get 丢弃第一段，插件名含点号时路径解析错位', () => {
   it('插件名含路径分隔符时在安装入口拒绝', async () => {

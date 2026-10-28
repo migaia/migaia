@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defineFeature, definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.js'
+import { defineFeature, definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.ts'
 
 /** Creates the required provider-consumer fixture used by removal and disable policy checks. */
 const createFixture = async () => {

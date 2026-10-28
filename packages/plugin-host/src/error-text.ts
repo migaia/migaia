@@ -1,8 +1,8 @@
 /** Owns package error construction, identity attachment and canonical error/diagnostic text. */
-import type { IPluginHostErrorCode } from './error-code.js'
-import type { IPluginHostErrorDetail } from './error-types.js'
-import { PLUGIN_HOST_SOURCE, PluginHostErrorCode } from './error-code.js'
-import { readHostIdentity } from './host-identity-authority.js'
+import type { IPluginHostErrorCode } from './error-code.ts'
+import type { IPluginHostErrorDetail } from './error-types.ts'
+import { PLUGIN_HOST_SOURCE, PluginHostErrorCode } from './error-code.ts'
+import { readHostIdentity } from './host-identity-authority.ts'
 import {
   attachErrorIdentity,
   attachSecondaryErrors,

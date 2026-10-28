@@ -1,6 +1,6 @@
 /** Owns shared fixture construction; test assertions remain in their focused suites. */
 import { MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
-import { PluginHost } from '../src/index.js'
+import { PluginHost } from '../src/index.ts'
 
 /** Retains exact recovery failures without depending on diagnostic prose. */
 export type IRecoveryDiagnostic = { code?: string; error?: unknown }

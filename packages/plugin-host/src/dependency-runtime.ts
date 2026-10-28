@@ -12,14 +12,14 @@ import type { ITopologyIndexNode, ITopologyTransaction } from '@migaia/capabilit
 import {
   collectPluginFeatureDependencies,
   readDefinitionDependencies
-} from './dependency-reader.js'
-import { PluginActivation } from './state-constants.js'
-import { PluginHostErrorCode } from './error-code.js'
-import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
-import type { IFeatureReference } from './feature-types.js'
-import type { PluginHostState } from './host-state.js'
-import type { IInstallEntry, IPluginDefinition, IRegistration } from './registry.js'
-import type { IPluginDependencyPlan } from './plugin-handle-types.js'
+} from './dependency-reader.ts'
+import { PluginActivation } from './state-constants.ts'
+import { PluginHostErrorCode } from './error-code.ts'
+import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.ts'
+import type { IFeatureReference } from './feature-types.ts'
+import type { PluginHostState } from './host-state.ts'
+import type { IInstallEntry, IPluginDefinition, IRegistration } from './registry.ts'
+import type { IPluginDependencyPlan } from './plugin-handle-types.ts'
 
 /** Graph ownership stays in capability; this module only adapts plugin definitions and errors. */
 

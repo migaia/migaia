@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { definePlugin, PluginHost } from '../src/index.js'
-import { openComposition } from '../src/composition-entry.js'
-import { PluginHostErrorCode, type IPluginHostErrorCode } from '../src/error-code.js'
-import type { IPluginConfig } from '../src/plugin-lifecycle-types.js'
+import { definePlugin, PluginHost } from '../src/index.ts'
+import { openComposition } from '../src/composition-entry.ts'
+import { PluginHostErrorCode, type IPluginHostErrorCode } from '../src/error-code.ts'
+import type { IPluginConfig } from '../src/plugin-lifecycle-types.ts'
 
 const options = { execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } } as const
 class ConfigHost extends PluginHost<Record<string, never>, unknown> {

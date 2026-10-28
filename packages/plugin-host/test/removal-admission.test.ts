@@ -7,8 +7,8 @@ import {
   PluginHost,
   PluginHostError,
   PluginHostErrorCode
-} from '../src/index.js'
-import { createView, openComposition } from '../src/composition-entry.js'
+} from '../src/index.ts'
+import { createView, openComposition } from '../src/composition-entry.ts'
 
 it('rejects ordinary removal atomically, permits cold retry, and never vetoes full Host disposal', async () => {
   /** Only domain state changes the original synchronous removal decision. */

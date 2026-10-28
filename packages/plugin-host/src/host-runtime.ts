@@ -3,17 +3,17 @@
  * mutate and publish through explicit ports.
  */
 
-import { PluginHostError } from './error-text.js'
-import { type IPluginHostIdentity } from './host-identity-types.js'
-import { type ITrustedDefinitionReader } from './admission-runtime.js'
+import { PluginHostError } from './error-text.ts'
+import { type IPluginHostIdentity } from './host-identity-types.ts'
+import { type ITrustedDefinitionReader } from './admission-runtime.ts'
 
-import type { IHostCoreConstructionRequest } from './define-host.js'
+import type { IHostCoreConstructionRequest } from './define-host.ts'
 
-import type { IPluginHostDisposalProvenance } from './cleanup-runtime.js'
-import { HostReflection } from './host-constants.js'
-import { asyncDisposeKey } from './symbols.js'
+import type { IPluginHostDisposalProvenance } from './cleanup-runtime.ts'
+import { HostReflection } from './host-constants.ts'
+import { asyncDisposeKey } from './symbols.ts'
 
-import type { IPipelineDefinitions, IPipelineOwner } from './pipeline-spec.js'
+import type { IPipelineDefinitions, IPipelineOwner } from './pipeline-spec.ts'
 
 import {
   MiddlewarePipelineMode,
@@ -24,9 +24,9 @@ import {
   type ISyncMiddlewareStage
 } from '@migaia/middleware-pipeline'
 
-import type { pluginHostCoreTypes, IPluginHostCore } from './plugin-core-types.js'
-import type { IPluginConstraint } from './plugin-definition-types.js'
-import type { IPluginConstraintTuple, IUniquePluginNames } from './plugin-inference-types.js'
+import type { pluginHostCoreTypes, IPluginHostCore } from './plugin-core-types.ts'
+import type { IPluginConstraint } from './plugin-definition-types.ts'
+import type { IPluginConstraintTuple, IUniquePluginNames } from './plugin-inference-types.ts'
 import type {
   IPluginHostConfigFor,
   IPluginHandle,
@@ -35,12 +35,12 @@ import type {
   IPluginDependencyPlan,
   IPluginRemoval,
   IPluginEnablement
-} from './plugin-handle-types.js'
-import type { IPluginHostOptions } from './host-options-types.js'
+} from './plugin-handle-types.ts'
+import type { IPluginHostOptions } from './host-options-types.ts'
 
-import { createHostRuntimeContext, type IPluginHostRuntimeContext } from './host-runtime-context.js'
-import { PluginHostMutationRuntime } from './host-mutation-runtime.js'
-import type { PluginHostRuntimePorts } from './host-runtime-ports.js'
+import { createHostRuntimeContext, type IPluginHostRuntimeContext } from './host-runtime-context.ts'
+import { PluginHostMutationRuntime } from './host-mutation-runtime.ts'
+import type { PluginHostRuntimePorts } from './host-runtime-ports.ts'
 /** Type-only invariant marker that preserves constructor-installed tuples through subclasses. */
 declare const installedPluginsBrand: unique symbol
 
@@ -48,7 +48,7 @@ export {
   PluginHostDisposalNodeKind,
   type IPluginHostDisposalNodeKind,
   type IPluginHostDisposalProvenance
-} from './cleanup-runtime.js'
+} from './cleanup-runtime.ts'
 /** Module-instance authority for Host-generated disposal nodes; duplicate instances fail closed. */
 const pluginHostDisposalProvenance = new WeakMap<object, IPluginHostDisposalProvenance>()
 
@@ -174,11 +174,11 @@ class PluginHostConstructor<
   ): IPipelineOwner<TPipelines[TName]>
   protected pipeline(
     name: string,
-    request: import('./define-host.js').IHostCoreConstructionRequest
-  ): IPipelineOwner<import('./pipeline-spec.js').IPipelineSpec<unknown>>
+    request: import('./define-host.ts').IHostCoreConstructionRequest
+  ): IPipelineOwner<import('./pipeline-spec.ts').IPipelineSpec<unknown>>
   protected pipeline(
     name: string,
-    request?: import('./define-host.js').IHostCoreConstructionRequest
+    request?: import('./define-host.ts').IHostCoreConstructionRequest
   ): any {
     return this.#context.pipelines.owner(name, request)
   }
@@ -322,7 +322,7 @@ class PluginHostConstructor<
    * is exposed through physicalCompletion rather than treated as forcibly stopped. Cleanup failure
    * does not reopen the Host. Functional defineHost middleware can separately reject its chain.
    */
-  dispose(): Promise<import('./plugin-lifecycle-types.js').IPluginHostDisposalResult> {
+  dispose(): Promise<import('./plugin-lifecycle-types.ts').IPluginHostDisposalResult> {
     return this.#context.hostDisposalRuntime.dispose()
   }
 }

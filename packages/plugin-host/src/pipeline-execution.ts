@@ -1,6 +1,6 @@
 /** Owns fixed pipeline execution ports and terminal-result capture, not runner or lease algorithms. */
-import ERROR_TEXT, { tagPluginHostError } from './error-text.js'
-import { PluginHostErrorCode } from './error-code.js'
+import ERROR_TEXT, { tagPluginHostError } from './error-text.ts'
+import { PluginHostErrorCode } from './error-code.ts'
 
 /** Keeps stage/downstream failure identity and ordering under the existing pipeline code. */
 export function combinePipelineFailures(

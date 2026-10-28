@@ -6,8 +6,8 @@ import ERROR_TEXT, {
   PluginHostError,
   createPluginHostTypeError,
   PluginHostInternalText
-} from './error-text.js'
-import { PluginHostErrorCode } from './error-code.js'
+} from './error-text.ts'
+import { PluginHostErrorCode } from './error-code.ts'
 import {
   MiddlewarePipelineMode,
   type IAsyncGeneratorMiddlewareStage,
@@ -22,10 +22,10 @@ import type {
   IPluginOperationContext,
   IPluginRegistrationContext,
   IReadonlyConfig
-} from './plugin-lifecycle-types.js'
-import type { IPluginHostCore } from './plugin-core-types.js'
-import { PluginCoreKey } from './core-constants.js'
-import type { IRegistration } from './registry.js'
+} from './plugin-lifecycle-types.ts'
+import type { IPluginHostCore } from './plugin-core-types.ts'
+import { PluginCoreKey } from './core-constants.ts'
+import type { IRegistration } from './registry.ts'
 
 /** Registration-scoped publication stages exact receipts in the original install batch. */
 export type IPluginRuntimeSharedSlot<TFacade extends object = object> = Readonly<{

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { defineFeature, definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.js'
-import { openComposition } from '../src/composition-entry.js'
+import { defineFeature, definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.ts'
+import { openComposition } from '../src/composition-entry.ts'
 
 /** Creates one unbounded host so path tests control setup settlement directly. */
 const createHost = (diagnostic?: (...args: any[]) => void) =>

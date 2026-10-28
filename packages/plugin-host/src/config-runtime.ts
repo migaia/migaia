@@ -2,22 +2,22 @@
  * Owns the stable config surface and queued update transaction; Host retains admission and
  * generation authority.
  */
-import type { PluginHostCoreRuntime } from './core-runtime.js'
-import type { PluginHostOperationRuntime } from './operation-runtime.js'
-import type { PluginHostState } from './host-state.js'
-import { copyConfigWithPatch, parseConfigPath, readConfigPath } from './config.js'
+import type { PluginHostCoreRuntime } from './core-runtime.ts'
+import type { PluginHostOperationRuntime } from './operation-runtime.ts'
+import type { PluginHostState } from './host-state.ts'
+import { copyConfigWithPatch, parseConfigPath, readConfigPath } from './config.ts'
 import ERROR_TEXT, {
   identifyPluginHostCallbackFailure,
   PluginHostError,
   createPluginHostTypeError,
   PluginHostInternalText
-} from './error-text.js'
-import { PluginHostErrorCode } from './error-code.js'
-import { invokeCaptured } from './invocation.js'
-import type { IRegistration } from './registry.js'
-import type { IPluginConfig } from './plugin-lifecycle-types.js'
-import type { IPluginConstraint } from './plugin-definition-types.js'
-import type { IPluginHostConfigFor } from './plugin-handle-types.js'
+} from './error-text.ts'
+import { PluginHostErrorCode } from './error-code.ts'
+import { invokeCaptured } from './invocation.ts'
+import type { IRegistration } from './registry.ts'
+import type { IPluginConfig } from './plugin-lifecycle-types.ts'
+import type { IPluginConstraint } from './plugin-definition-types.ts'
+import type { IPluginHostConfigFor } from './plugin-handle-types.ts'
 
 /** Narrow authority for config admission, queued hooks and committed config publication. */
 type IPluginHostConfigRuntimePort<TDomainCore extends object, TValue> = Readonly<{

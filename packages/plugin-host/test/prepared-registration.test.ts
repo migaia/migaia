@@ -6,7 +6,7 @@ import {
   PluginHost,
   type IPluginHostCore,
   type IPluginRuntimeIntegration
-} from '../src/index.js'
+} from '../src/index.ts'
 
 for (const mode of ['class', 'frozen'] as const) {
   it(`${mode} original batch admits exact prepared reads without granting late installation rights`, async () => {

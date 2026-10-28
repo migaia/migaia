@@ -1,5 +1,5 @@
 /** Function-form mutation composition does not relax canonical keys for ordinary object surfaces. */
-import { defineHost } from '../src/index.js'
+import { defineHost } from '../src/index.ts'
 
 /** These declarations are typechecked without creating additional runtime Hosts. */
 function surfaceTypes(): void {

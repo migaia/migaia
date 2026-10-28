@@ -1,8 +1,8 @@
-import { openComposition } from '../src/composition-entry.js'
+import { openComposition } from '../src/composition-entry.ts'
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { defineFeature, definePlugin, PluginHost } from '../src/index.js'
-import { PluginHostErrorCode } from '../src/error-code.js'
+import { defineFeature, definePlugin, PluginHost } from '../src/index.ts'
+import { PluginHostErrorCode } from '../src/error-code.ts'
 
 const hostOptions = {
   execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }

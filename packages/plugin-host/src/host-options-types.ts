@@ -2,9 +2,9 @@
  * Defines Host construction budgets and diagnostic/error detail contracts. It performs no admission
  * or error construction.
  */
-import type { IPluginHostErrorCode } from './error-code.js'
+import type { IPluginHostErrorCode } from './error-code.ts'
 import type { IScheduler } from '@migaia/utils/scheduler'
-import type { IPipelineDefinitions } from './pipeline-spec.js'
+import type { IPipelineDefinitions } from './pipeline-spec.ts'
 import type { IMiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 
 /**

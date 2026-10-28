@@ -1,9 +1,9 @@
 /** Owns name-addressed handles and generation-bound extensions; lifecycle authority stays in ports. */
-import { invokeCaptured } from './invocation.js'
-import { PluginHostErrorCode } from './error-code.js'
-import ERROR_TEXT, { PluginHostError } from './error-text.js'
-import type { IRegistration } from './registry.js'
-import type { IPluginConfig } from './plugin-lifecycle-types.js'
+import { invokeCaptured } from './invocation.ts'
+import { PluginHostErrorCode } from './error-code.ts'
+import ERROR_TEXT, { PluginHostError } from './error-text.ts'
+import type { IRegistration } from './registry.ts'
+import type { IPluginConfig } from './plugin-lifecycle-types.ts'
 
 /** Host-owned access used to keep handles live across replacement generations. */
 type IPluginHandlePort<TDomainCore extends object, TValue> = Readonly<{

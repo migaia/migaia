@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { PluginHost, PluginHostError } from '../src/index.js'
-import type { IPluginInstallFailureDetail } from '../src/index.js'
+import { PluginHost, PluginHostError } from '../src/index.ts'
+import type { IPluginInstallFailureDetail } from '../src/index.ts'
 
 type IInstallCore = {
   onDispose(resource: () => void): void

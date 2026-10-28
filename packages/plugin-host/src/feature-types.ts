@@ -1,4 +1,4 @@
-import type { IPipelineDefinitions, IPipelineScope } from './pipeline-spec.js'
+import type { IPipelineDefinitions, IPipelineScope } from './pipeline-spec.ts'
 /** A named root/dependency map of trusted Feature definitions. */
 export type IFeatureRecord = Readonly<Record<string, IFeature<any, any, any>>>
 

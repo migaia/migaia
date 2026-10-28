@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defineFeature, definePlugin, PluginHost } from '../src/index.js'
+import { defineFeature, definePlugin, PluginHost } from '../src/index.ts'
 
 /** Keeps a microtask clock running while one installation path executes. */
 const startClock = () => {

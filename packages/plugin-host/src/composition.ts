@@ -3,7 +3,7 @@
  * composition-runtime.
  */
 import { assimilateCapturedThen } from '@migaia/utils/function'
-import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
+import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.ts'
 import type {
   IPluginDataOrderSlot,
   IPluginHostCompositionIntegration,
@@ -11,13 +11,13 @@ import type {
   IPluginPreparedAdmissions,
   IPluginPreparedRemovalBatch,
   IRegistrationToken
-} from './composition-types.js'
-import type { IPluginHostPhysicalCleanupResult } from './plugin-lifecycle-types.js'
-import { createPluginHostExtensionPublication } from './publication.js'
-import { PluginHostRegistrationLifecycle } from './state-constants.js'
-import { PluginHostErrorCode } from './error-code.js'
-import type { IPluginHostCompositionRuntimePort } from './composition-runtime.js'
-import { buildManagedPort, type IManagedHostRuntime } from './composition-port.js'
+} from './composition-types.ts'
+import type { IPluginHostPhysicalCleanupResult } from './plugin-lifecycle-types.ts'
+import { createPluginHostExtensionPublication } from './publication.ts'
+import { PluginHostRegistrationLifecycle } from './state-constants.ts'
+import { PluginHostErrorCode } from './error-code.ts'
+import type { IPluginHostCompositionRuntimePort } from './composition-runtime.ts'
+import { buildManagedPort, type IManagedHostRuntime } from './composition-port.ts'
 
 /** Validates a publication-ordered request list and resolves its Host-owned definition snapshots. */
 export const resolveAdmissionDefinitions = <TDefinition>(
@@ -80,7 +80,7 @@ export type IDataOrderSlotState = {
   readonly name: string
   readonly ordinal: bigint
   /** Stable lane segment allocated with the slot, before a plugin binds to it. */
-  segments?: Map<PropertyKey, import('./stage-lanes.js').IStageOwnerSegment>
+  segments?: Map<PropertyKey, import('./stage-lanes.ts').IStageOwnerSegment>
   retired: boolean
 }
 

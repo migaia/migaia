@@ -1,16 +1,16 @@
 /** Proves the public type removals and canonical middleware re-exports. */
 // @ts-expect-error removes the duplicated mode constant.
-import { PluginHostPipelineMode } from '../src/index.js'
+import { PluginHostPipelineMode } from '../src/index.ts'
 // @ts-expect-error removes the duplicated sync stage declaration.
-import type { ISyncPipelineStage } from '../src/index.js'
+import type { ISyncPipelineStage } from '../src/index.ts'
 // @ts-expect-error removes public compatibility adapters.
-import { adaptSyncStageToAsync } from '../src/index.js'
+import { adaptSyncStageToAsync } from '../src/index.ts'
 import {
   MiddlewarePipelineMode,
   type IMiddlewarePipelineMode,
   type ISyncMiddlewareStage
 } from '@migaia/middleware-pipeline'
-import { PluginHostErrorCode } from '../src/index.js'
+import { PluginHostErrorCode } from '../src/index.ts'
 
 const mode: IMiddlewarePipelineMode = MiddlewarePipelineMode.sync
 const stage: ISyncMiddlewareStage<number> = (value, next) => next(value + 1)

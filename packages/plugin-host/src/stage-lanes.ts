@@ -6,8 +6,8 @@ import type {
   IMiddlewarePipelineMode,
   IMiddlewarePipelineStage
 } from '@migaia/middleware-pipeline'
-import type { IDataOrderSlotState } from './composition.js'
-import type { IRegistration } from './registry.js'
+import type { IDataOrderSlotState } from './composition.ts'
+import type { IRegistration } from './registry.ts'
 
 /** Runner forms derived once from one canonical stage registration. */
 export type IStageForms<TValue> = Readonly<{

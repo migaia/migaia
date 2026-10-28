@@ -2,11 +2,11 @@
  * Owns Host identity admission, monotonic issuance and entropy; the authority leaf owns
  * exact-target records.
  */
-import ERROR_TEXT, { createPluginHostTypeError } from './error-text.js'
-import type { IPluginHostIdentity } from './host-identity-types.js'
-import { readHostIdentityRecord, recordHostIdentity } from './host-identity-authority.js'
-export type { IPluginHostIdentity } from './host-identity-types.js'
-export { readHostIdentity, readHostNodeId } from './host-identity-authority.js'
+import ERROR_TEXT, { createPluginHostTypeError } from './error-text.ts'
+import type { IPluginHostIdentity } from './host-identity-types.ts'
+import { readHostIdentityRecord, recordHostIdentity } from './host-identity-authority.ts'
+export type { IPluginHostIdentity } from './host-identity-types.ts'
+export { readHostIdentity, readHostNodeId } from './host-identity-authority.ts'
 
 /** Monotonic process-local sequence used only after an identity name passes validation. */
 let issued = 0

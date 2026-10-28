@@ -2,35 +2,35 @@
  * Owns trusted definition identity and immutable hook/metadata admission; per-registration
  * factories run only under the install owner.
  */
-import { PluginActivation } from './state-constants.js'
-import { PluginDefinitionKey, PluginDefinitionText } from './definition-constants.js'
-import type { IPipelineDefinitions } from './pipeline-spec.js'
-import { snapshotPipelineDefinitions } from './pipeline-declarations.js'
-import { copyConfig } from './config.js'
-import { snapshotDisposer } from './disposal.js'
-import { invokeCaptured } from './invocation.js'
+import { PluginActivation } from './state-constants.ts'
+import { PluginDefinitionKey, PluginDefinitionText } from './definition-constants.ts'
+import type { IPipelineDefinitions } from './pipeline-spec.ts'
+import { snapshotPipelineDefinitions } from './pipeline-declarations.ts'
+import { copyConfig } from './config.ts'
+import { snapshotDisposer } from './disposal.ts'
+import { invokeCaptured } from './invocation.ts'
 import ERROR_TEXT, {
   createPluginDefinitionTypeError,
   createPluginHostTypeError,
   PluginHostError,
   PluginHostInternalText
-} from './error-text.js'
-import { PluginHostErrorCode } from './error-code.js'
-import { createFeatureReference, snapshotFeatureRecord } from './define-feature.js'
-import type { IPluginDefinition, IPluginDescriptor } from './registry.js'
+} from './error-text.ts'
+import { PluginHostErrorCode } from './error-code.ts'
+import { createFeatureReference, snapshotFeatureRecord } from './define-feature.ts'
+import type { IPluginDefinition, IPluginDescriptor } from './registry.ts'
 import type {
   IFeatureOutputs,
   IFeatureRecord,
   IFeatureRecordRequiredExpose
-} from './feature-types.js'
+} from './feature-types.ts'
 import type {
   IDefinedPluginConstraint,
   IPlugin,
   IPluginCommon,
   IPluginConstraint,
   IPluginSetupHooks
-} from './plugin-definition-types.js'
-import type { IPluginConfig } from './plugin-lifecycle-types.js'
+} from './plugin-definition-types.ts'
+import type { IPluginConfig } from './plugin-lifecycle-types.ts'
 
 /** Trusted identity stores one captured definition and never a live Host registration. */
 type IStoredDefinition = IPluginDefinition<any>
@@ -336,7 +336,7 @@ const createDefinition = <TPlugin extends IPluginConstraint<any>>(
   const plugin = createFrozenPlugin(source, fields, featureRecord, ownedConfig, metadata)
   /** Resolve symbol cleanup from the finished frozen plugin, keeping captured hook wrappers. */
   const disposer = snapshotDisposer(
-    plugin as unknown as import('./plugin-lifecycle-types.js').IPluginResource
+    plugin as unknown as import('./plugin-lifecycle-types.ts').IPluginResource
   ).disposer
   /** The private WeakMap stores one immutable definition identity without Host state. */
   const definition: IStoredDefinition = {
@@ -386,7 +386,7 @@ export function definePlugin<
   name: TName,
   descriptorFactory: (
     core: TCore &
-      import('./plugin-core-types.js').IPluginHostCore<TValue> &
+      import('./plugin-core-types.ts').IPluginHostCore<TValue> &
       Readonly<{ readonly features: IFeatureOutputs<TFeatures>; readonly featureExpose: TExpose }>
   ) => IPluginDescriptor<TExtension, TPublic, TExpose, TShared> &
     (keyof IFeatureRecordRequiredExpose<TFeatures> extends never
@@ -428,16 +428,16 @@ export function definePlugin<
 >(
   definition: IPluginCommon<
     TCore &
-      import('./plugin-core-types.js').IPluginHostCore<TValue> &
-      import('./plugin-core-types.js').IPluginPipelineCore<TPipelines, TFeatures>,
+      import('./plugin-core-types.ts').IPluginHostCore<TValue> &
+      import('./plugin-core-types.ts').IPluginPipelineCore<TPipelines, TFeatures>,
     TConfig,
     TFeatures,
     TExpose
   > &
     IPluginSetupHooks<
       TCore &
-        import('./plugin-core-types.js').IPluginHostCore<TValue> &
-        import('./plugin-core-types.js').IPluginPipelineCore<TPipelines, TFeatures>,
+        import('./plugin-core-types.ts').IPluginHostCore<TValue> &
+        import('./plugin-core-types.ts').IPluginPipelineCore<TPipelines, TFeatures>,
       TExtension,
       TConfig,
       TFeatures,
@@ -480,8 +480,8 @@ export function definePlugin<
 >(
   definition: IPlugin<
     TCore &
-      import('./plugin-core-types.js').IPluginHostCore<TValue> &
-      import('./plugin-core-types.js').IPluginPipelineCore<TPipelines, TFeatures>,
+      import('./plugin-core-types.ts').IPluginHostCore<TValue> &
+      import('./plugin-core-types.ts').IPluginPipelineCore<TPipelines, TFeatures>,
     TExtension,
     TConfig,
     TShared,

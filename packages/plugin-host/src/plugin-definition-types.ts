@@ -12,15 +12,15 @@ import type {
   IPluginLifecycleCore,
   IPluginSetupContext,
   IPluginSetup
-} from './plugin-lifecycle-types.js'
-import type { asyncDisposeKey } from './symbols.js'
+} from './plugin-lifecycle-types.ts'
+import type { asyncDisposeKey } from './symbols.ts'
 import type {
   IFeatureOutput,
   IFeatureReference,
   IFeatureOutputs,
   IFeatureRecord
-} from './feature-types.js'
-import type { IPipelineDefinitions } from './pipeline-spec.js'
+} from './feature-types.ts'
+import type { IPipelineDefinitions } from './pipeline-spec.ts'
 
 /** Interface semantics are required only for adapter-owned module augmentation of Host outlets. */
 export interface IPluginHostRuntimeExtensions<

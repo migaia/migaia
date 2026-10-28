@@ -4,7 +4,7 @@ import {
   MiddlewarePipelineMode,
   type IMiddlewarePipelineMode
 } from '@migaia/middleware-pipeline'
-import { PluginHost, PluginHostError } from '../../src/index.js'
+import { PluginHost, PluginHostError } from '../../src/index.ts'
 
 /** Exercises Host dispatch, canonical lifting, mismatch causality and lane atomicity. */
 /** Host exposing pipeline execution for each canonical runner mode. */

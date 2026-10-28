@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { defineHost, definePlugin, type IPluginHostCore } from '../../src/index.js'
+import { defineHost, definePlugin, type IPluginHostCore } from '../../src/index.ts'
 import { MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
-import { StageLanes } from '../../src/stage-lanes.js'
+import { StageLanes } from '../../src/stage-lanes.ts'
 import { deferred } from '@migaia/utils/promise'
 
 /** Creates one async host whose owner can choose either execution entry. */

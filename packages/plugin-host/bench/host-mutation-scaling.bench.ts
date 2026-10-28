@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { defineFeature, definePlugin, PluginHost } from '../src/index.js'
-import { openComposition } from '../src/composition-entry.js'
+import { defineFeature, definePlugin, PluginHost } from '../src/index.ts'
+import { openComposition } from '../src/composition-entry.ts'
 
 /** Builds a real host with the requested number of unrelated committed registrations. */
 const createHost = async (size: number): Promise<PluginHost<Record<string, never>>> => {

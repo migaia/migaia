@@ -3,17 +3,17 @@
  * lifecycle implementation.
  */
 
-import ERROR_TEXT, { createPluginHostTypeError, PluginHostInternalText } from './error-text.js'
-import { issueHostIdentity } from './host-identity.js'
-import { type IPluginHostIdentity } from './host-identity-types.js'
-import { type ITrustedDefinitionReader } from './admission-runtime.js'
-import { PluginHostInstallRuntime } from './install-runtime.js'
+import ERROR_TEXT, { createPluginHostTypeError, PluginHostInternalText } from './error-text.ts'
+import { issueHostIdentity } from './host-identity.ts'
+import { type IPluginHostIdentity } from './host-identity-types.ts'
+import { type ITrustedDefinitionReader } from './admission-runtime.ts'
+import { PluginHostInstallRuntime } from './install-runtime.ts'
 
-import { registerManagedHost } from './composition.js'
-import { PluginHostState } from './host-state.js'
-import type { IHostCoreConstructionRequest } from './define-host.js'
+import { registerManagedHost } from './composition.ts'
+import { PluginHostState } from './host-state.ts'
+import type { IHostCoreConstructionRequest } from './define-host.ts'
 
-import { admitHostScheduler, assertTimeoutOption } from './host-options.js'
+import { admitHostScheduler, assertTimeoutOption } from './host-options.ts'
 
 import {
   createMutationQueue,
@@ -26,30 +26,30 @@ import {
   type ITerminalController
 } from '@migaia/lifecycle'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
-import type { IPluginHostDisposalProvenance } from './cleanup-runtime.js'
-import { PluginHostCleanupRuntime } from './cleanup-runtime.js'
-import { PluginHostPipelines } from './named-pipelines.js'
+import type { IPluginHostDisposalProvenance } from './cleanup-runtime.ts'
+import { PluginHostCleanupRuntime } from './cleanup-runtime.ts'
+import { PluginHostPipelines } from './named-pipelines.ts'
 
-import type { IPipelineDefinitions } from './pipeline-spec.js'
-import { PluginHostRemovalRuntime } from './removal-runtime.js'
-import { PluginHostReplaceRuntime } from './replace-runtime.js'
-import { PluginHostResumeRuntime } from './resume-runtime.js'
-import { bindTerminalSink } from './diagnostic-report.js'
-import { PluginHostOperationRuntime } from './operation-runtime.js'
+import type { IPipelineDefinitions } from './pipeline-spec.ts'
+import { PluginHostRemovalRuntime } from './removal-runtime.ts'
+import { PluginHostReplaceRuntime } from './replace-runtime.ts'
+import { PluginHostResumeRuntime } from './resume-runtime.ts'
+import { bindTerminalSink } from './diagnostic-report.ts'
+import { PluginHostOperationRuntime } from './operation-runtime.ts'
 
-import { PluginHostCoreRuntime } from './core-runtime.js'
-import { PluginHostConfigRuntime } from './config-runtime.js'
-import { PluginHostDisposalRuntime } from './host-disposal-runtime.js'
+import { PluginHostCoreRuntime } from './core-runtime.ts'
+import { PluginHostConfigRuntime } from './config-runtime.ts'
+import { PluginHostDisposalRuntime } from './host-disposal-runtime.ts'
 
 import {
   PluginHostEnablementRuntime,
   createPluginHostEnablementFacade
-} from './enablement-runtime.js'
+} from './enablement-runtime.ts'
 
-import type { IRegistration } from './registry.js'
-import type { IPluginConstraint } from './plugin-definition-types.js'
-import type { IPluginHostDiagnostic, IPluginHostOptions } from './host-options-types.js'
-import type { IPluginHandle, IPluginEnablement } from './plugin-handle-types.js'
+import type { IRegistration } from './registry.ts'
+import type { IPluginConstraint } from './plugin-definition-types.ts'
+import type { IPluginHostDiagnostic, IPluginHostOptions } from './host-options-types.ts'
+import type { IPluginHandle, IPluginEnablement } from './plugin-handle-types.ts'
 
 import {
   defaultDiagnostic,
@@ -57,10 +57,10 @@ import {
   DEFAULT_PIPELINE_DRAIN_TIMEOUT_MS,
   DEFAULT_DISPOSE_STEP_TIMEOUT_MS,
   DEFAULT_QUEUE_ADMISSION_DIAGNOSTIC_MS
-} from './host-defaults.js'
-import { HostTimeoutOptionKey } from './host-constants.js'
-import { PluginHostRuntimePorts } from './host-runtime-ports.js'
-import { PluginHostPublicationRuntime } from './host-publication-runtime.js'
+} from './host-defaults.ts'
+import { HostTimeoutOptionKey } from './host-constants.ts'
+import { PluginHostRuntimePorts } from './host-runtime-ports.ts'
+import { PluginHostPublicationRuntime } from './host-publication-runtime.ts'
 /**
  * Runtime state shared only through named, statically narrowed ports; lifecycle owners retain their
  * own resources.

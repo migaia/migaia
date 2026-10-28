@@ -1,4 +1,4 @@
-import { definePlugin, PluginHost, type IPluginConstraint } from '../src/index.js'
+import { definePlugin, PluginHost, type IPluginConstraint } from '../src/index.ts'
 import type { IPluginSetup, IPluginSetupContext, IPluginSetupOperation } from '@migaia/plugin-host'
 
 /** Requires structural equality in both directions, including the setup output axis. */

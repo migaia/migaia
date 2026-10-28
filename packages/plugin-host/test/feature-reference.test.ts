@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defineFeature, definePlugin, PluginHostErrorCode } from '../src/index.js'
+import { defineFeature, definePlugin, PluginHostErrorCode } from '../src/index.ts'
 
 describe('feature references', () => {
   it('creates a reference only for declared features', () => {

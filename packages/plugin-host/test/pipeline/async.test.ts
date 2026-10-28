@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
-import { PluginHost } from '../../src/host-runtime.js'
+import { PluginHost } from '../../src/host-runtime.ts'
 
 /** Test host exposing the protected pipeline entry. */
 class AsyncHost extends PluginHost<Record<string, never>, number> {

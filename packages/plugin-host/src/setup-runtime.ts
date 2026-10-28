@@ -3,20 +3,20 @@
  * install.
  */
 import { observeAbortSubscription } from '@migaia/lifecycle/abort'
-import { resolveDisposer } from './disposal.js'
-import { reportDiagnostic } from './diagnostic-report.js'
-import { PluginHostErrorCode } from './error-code.js'
-import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
-import { invokeCaptured } from './invocation.js'
-import type { IInstallBatchContext } from './install-runtime.js'
-import type { PluginHostOperationRuntime } from './operation-runtime.js'
+import { resolveDisposer } from './disposal.ts'
+import { reportDiagnostic } from './diagnostic-report.ts'
+import { PluginHostErrorCode } from './error-code.ts'
+import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.ts'
+import { invokeCaptured } from './invocation.ts'
+import type { IInstallBatchContext } from './install-runtime.ts'
+import type { PluginHostOperationRuntime } from './operation-runtime.ts'
 import type { INativeAbortSignal } from '@migaia/utils/promise'
 import { createAbortController, type IAbortController } from '@migaia/lifecycle/abort'
 import type { IScheduler } from '@migaia/utils/scheduler'
-import type { IRegistration } from './registry.js'
-import type { IPluginHostCore } from './plugin-core-types.js'
-import type { IPluginHostDiagnostic } from './host-options-types.js'
-import type { IPluginResource, IPluginSetupContext } from './plugin-lifecycle-types.js'
+import type { IRegistration } from './registry.ts'
+import type { IPluginHostCore } from './plugin-core-types.ts'
+import type { IPluginHostDiagnostic } from './host-options-types.ts'
+import type { IPluginResource, IPluginSetupContext } from './plugin-lifecycle-types.ts'
 
 /** Host authority needed by setup; the registration remains owned by its install transaction. */
 export type IPluginSetupPort<TDomainCore extends object, TValue> = Readonly<{

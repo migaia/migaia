@@ -1,11 +1,11 @@
-import type { IPipelineDefinitions } from './pipeline-spec.js'
-import ERROR_TEXT, { createPluginHostTypeError } from './error-text.js'
+import type { IPipelineDefinitions } from './pipeline-spec.ts'
+import ERROR_TEXT, { createPluginHostTypeError } from './error-text.ts'
 import type {
   IFeature,
   IFeatureDependencyRecord,
   IFeatureFactory,
   IFeatureReference
-} from './feature-types.js'
+} from './feature-types.ts'
 
 /** Module-private immutable definition data; runtime consumers never trust public object shape. */
 type IFeatureDefinition = Readonly<{

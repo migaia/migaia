@@ -1,7 +1,7 @@
 /** Owns the unique Host disposal result and composes existing lifecycle drains and cleanup owners. */
 import { deferred } from '@migaia/utils/promise'
-import type { PluginHostState } from './host-state.js'
-import { reportDiagnostic } from './diagnostic-report.js'
+import type { PluginHostState } from './host-state.ts'
+import { reportDiagnostic } from './diagnostic-report.ts'
 import {
   boundedWait,
   mergeCleanupResults,
@@ -12,10 +12,10 @@ import {
   type ITerminalController
 } from '@migaia/lifecycle'
 import type { IScheduler } from '@migaia/utils/scheduler'
-import ERROR_TEXT, { PluginHostError } from './error-text.js'
-import { PluginHostErrorCode } from './error-code.js'
-import type { IPluginHostDiagnostic } from './host-options-types.js'
-import type { IPluginHostDisposalResult } from './plugin-lifecycle-types.js'
+import ERROR_TEXT, { PluginHostError } from './error-text.ts'
+import { PluginHostErrorCode } from './error-code.ts'
+import type { IPluginHostDiagnostic } from './host-options-types.ts'
+import type { IPluginHostDisposalResult } from './plugin-lifecycle-types.ts'
 
 /** Existing terminal, queue, registration and reporting authority required by Host disposal. */
 type IPluginHostDisposalRuntimePort<TRegistration> = Readonly<{

@@ -2,7 +2,7 @@
  * Owns functional Host callables and descriptor materialization; keeps the public handle a plain
  * frozen surface behind its original proxy.
  */
-import type { IPipelineDefinitions } from './pipeline-spec.js'
+import type { IPipelineDefinitions } from './pipeline-spec.ts'
 
 import type {
   IAsyncGeneratorMiddlewareStage,
@@ -10,16 +10,16 @@ import type {
   IGeneratorMiddlewareStage,
   ISyncMiddlewareStage
 } from '@migaia/middleware-pipeline'
-import type { IPluginConstraint } from './plugin-definition-types.js'
+import type { IPluginConstraint } from './plugin-definition-types.ts'
 import type {
   IPluginRemoval,
   IPluginDependencyMutationOptions,
   IPluginDependencyPlan
-} from './plugin-handle-types.js'
+} from './plugin-handle-types.ts'
 
-import type { IDefineHostOptions, IHostCoreConstructionRequest } from './define-host.js'
-import { HostSurfaceKey, HostReflection, hostAccessorName } from './host-constants.js'
-import { DefinedHostRuntime, DefinedHostDisposal } from './defined-host-runtime.js'
+import type { IDefineHostOptions, IHostCoreConstructionRequest } from './define-host.ts'
+import { HostSurfaceKey, HostReflection, hostAccessorName } from './host-constants.ts'
+import { DefinedHostRuntime, DefinedHostDisposal } from './defined-host-runtime.ts'
 
 /** The original proxy identity becomes available only after its plain surface exists. */
 export type IHandleReference = { handle: object | undefined }

@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
-import { defineFeature, definePlugin, PluginHost } from '../src/index.js'
+import { defineFeature, definePlugin, PluginHost } from '../src/index.ts'
 import {
   type IRecoveryDiagnostic,
   SuspendHost,
   RecoveryHost,
   execution
-} from './dependency-suspend-fixtures.js'
+} from './dependency-suspend-fixtures.ts'
 
 describe('dependency suspension and recovery', () => {
   it('suspends active required dependents without disposing them', async () => {

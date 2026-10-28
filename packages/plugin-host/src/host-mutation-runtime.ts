@@ -3,15 +3,15 @@
  * dependency algorithms stay in their canonical packages.
  */
 
-import ERROR_TEXT, { PluginHostError } from './error-text.js'
+import ERROR_TEXT, { PluginHostError } from './error-text.ts'
 
-import { preflightPluginDefinitions, snapshotPluginDefinitions } from './admission-runtime.js'
+import { preflightPluginDefinitions, snapshotPluginDefinitions } from './admission-runtime.ts'
 
-import { PluginHostErrorCode } from './error-code.js'
+import { PluginHostErrorCode } from './error-code.ts'
 
-import type { IPipelineDefinitions } from './pipeline-spec.js'
+import type { IPipelineDefinitions } from './pipeline-spec.ts'
 
-import { reportDiagnostic } from './diagnostic-report.js'
+import { reportDiagnostic } from './diagnostic-report.ts'
 
 import {
   DependencyAction,
@@ -25,10 +25,10 @@ import {
   toPluginPlan,
   projectAffected,
   validateInstallBatch
-} from './dependency-runtime.js'
+} from './dependency-runtime.ts'
 
-import type { IRegistration } from './registry.js'
-import type { IPluginConstraint } from './plugin-definition-types.js'
+import type { IRegistration } from './registry.ts'
+import type { IPluginConstraint } from './plugin-definition-types.ts'
 
 import type {
   IPluginHandle,
@@ -36,10 +36,10 @@ import type {
   IPluginDependencyMutationOptions,
   IPluginDependencyPlan,
   IPluginRemoval
-} from './plugin-handle-types.js'
+} from './plugin-handle-types.ts'
 
-import type { IPluginHostRuntimeContext } from './host-runtime-context.js'
-import type { PluginHostRuntimePorts } from './host-runtime-ports.js'
+import type { IPluginHostRuntimeContext } from './host-runtime-context.ts'
+import type { PluginHostRuntimePorts } from './host-runtime-ports.ts'
 
 /** Coordinates public structural mutations over explicit canonical owners. */
 export class PluginHostMutationRuntime<
@@ -266,7 +266,7 @@ export class PluginHostMutationRuntime<
    * replacement validation.
    */
   #validateBatch(
-    entries: readonly import('./registry.js').IInstallEntry<TDomainCore, TValue>[],
+    entries: readonly import('./registry.ts').IInstallEntry<TDomainCore, TValue>[],
     inactive: PluginInactiveProviderPolicy,
     activationRoots?: readonly string[]
   ): ReturnType<typeof validateInstallBatch<TDomainCore, TValue>> {

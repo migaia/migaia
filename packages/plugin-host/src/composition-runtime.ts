@@ -2,9 +2,9 @@
  * Owns staged composition admission and removal transactions; opaque provenance and native cleanup
  * stay with their existing owners.
  */
-import { reverseItems, appendCleanupErrors } from './cleanup-runtime.js'
-import { preflightPluginDefinitions } from './admission-runtime.js'
-import type { PluginHostRemovalRuntime } from './removal-runtime.js'
+import { reverseItems, appendCleanupErrors } from './cleanup-runtime.ts'
+import { preflightPluginDefinitions } from './admission-runtime.ts'
+import type { PluginHostRemovalRuntime } from './removal-runtime.ts'
 import { boundedWait, mergeCleanupResults, type ICleanupResult } from '@migaia/lifecycle'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import {
@@ -26,18 +26,18 @@ import {
   registerPreparedAdmissions,
   registerPreparedRemoval,
   resolveAdmissionDefinitions
-} from './composition.js'
+} from './composition.ts'
 import ERROR_TEXT, {
   PluginHostError,
   createPluginHostTypeError,
   PluginHostInternalText
-} from './error-text.js'
-import { PluginHostErrorCode } from './error-code.js'
-import { reportDiagnostic } from './diagnostic-report.js'
-import { PluginHostCleanupMode } from './state-constants.js'
-import type { PluginHostState } from './host-state.js'
-import type { IInstallBatchContext, PluginHostInstallRuntime } from './install-runtime.js'
-import type { IPluginDefinition, IRegistration } from './registry.js'
+} from './error-text.ts'
+import { PluginHostErrorCode } from './error-code.ts'
+import { reportDiagnostic } from './diagnostic-report.ts'
+import { PluginHostCleanupMode } from './state-constants.ts'
+import type { PluginHostState } from './host-state.ts'
+import type { IInstallBatchContext, PluginHostInstallRuntime } from './install-runtime.ts'
+import type { IPluginDefinition, IRegistration } from './registry.ts'
 import type {
   IPluginAdmission,
   IPluginAdmissionRequest,
@@ -47,11 +47,11 @@ import type {
   IPluginPreparedAdmissions,
   IPluginPreparedRemovalBatch,
   IRegistrationToken
-} from './composition-types.js'
-import type { IPluginConstraint } from './plugin-definition-types.js'
-import type { IPluginHostCore } from './plugin-core-types.js'
-import type { IPluginHostPhysicalCleanupResult } from './plugin-lifecycle-types.js'
-import type { IPluginHostDiagnostic } from './host-options-types.js'
+} from './composition-types.ts'
+import type { IPluginConstraint } from './plugin-definition-types.ts'
+import type { IPluginHostCore } from './plugin-core-types.ts'
+import type { IPluginHostPhysicalCleanupResult } from './plugin-lifecycle-types.ts'
+import type { IPluginHostDiagnostic } from './host-options-types.ts'
 
 type ICompositionStrictCleanupResult<TRegistration> = ICleanupResult &
   Readonly<{

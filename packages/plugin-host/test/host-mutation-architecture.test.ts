@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { readFile, readdir } from 'node:fs/promises'
-import { definePlugin, PluginHost, type IPluginHostCore } from '../src/index.js'
-import { PluginHostState } from '../src/host-state.js'
+import { definePlugin, PluginHost, type IPluginHostCore } from '../src/index.ts'
+import { PluginHostState } from '../src/host-state.ts'
 
 /** Sync host exposes stage identity while an install candidate remains unpublished. */
 class ArchitectureHost extends PluginHost<Record<string, never>, string> {

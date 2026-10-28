@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { defineFeature, definePlugin, PluginHost } from '../src/index.js'
-import { type IRecoveryDiagnostic, execution } from './dependency-suspend-fixtures.js'
+import { defineFeature, definePlugin, PluginHost } from '../src/index.ts'
+import { type IRecoveryDiagnostic, execution } from './dependency-suspend-fixtures.ts'
 
 describe('dependency suspension and recovery', () => {
   it('reports restart failure without rejecting the restored provider', async () => {

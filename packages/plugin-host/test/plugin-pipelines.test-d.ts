@@ -5,7 +5,7 @@ import {
   definePlugin,
   pipelineSpec,
   type IFeatureCore
-} from '../src/index.js'
+} from '../src/index.ts'
 /** Genuine declarations provide the same runtime and compile-time payload. */
 const pipelines = { outgoing: pipelineSpec<{ text: string }>()({ mode: 'async' }) }
 /** The Feature core derives its names from that actual definition map. */

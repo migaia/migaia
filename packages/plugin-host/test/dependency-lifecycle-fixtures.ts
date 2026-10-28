@@ -8,7 +8,7 @@ import {
   type IFeature,
   type IFeatureReference,
   type IPluginConfig
-} from '../src/index.js'
+} from '../src/index.ts'
 
 /** Keeps dependency scenarios independent from wall-clock lifecycle deadlines. */
 export const execution = {

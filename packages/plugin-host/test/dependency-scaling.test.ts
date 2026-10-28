@@ -16,7 +16,7 @@ vi.mock('@migaia/capability/graph/topology', async (importOriginal) => {
   }
 })
 
-import { defineFeature, definePlugin, PluginHost } from '../src/index.js'
+import { defineFeature, definePlugin, PluginHost } from '../src/index.ts'
 
 /** Builds a host with a long required chain and exercises one leaf-only mutation sequence. */
 const measure = async (size: number) => {

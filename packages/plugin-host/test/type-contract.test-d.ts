@@ -4,8 +4,8 @@ import {
   type IPluginHostCompositionIntegration,
   type IRegistrationToken,
   type IRegistrationView
-} from '../src/composition-entry.js'
-import { defineFeature, definePlugin, type IPlugin, PluginHost } from '../src/index.js'
+} from '../src/composition-entry.ts'
+import { defineFeature, definePlugin, type IPlugin, PluginHost } from '../src/index.ts'
 
 const dependency = defineFeature(() => ({ read: () => 1 }))
 // @ts-expect-error Feature factories are synchronous; returned methods may be async instead.

@@ -1,6 +1,6 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
-import { parseConfigPath, readConfigPath } from '../src/config'
+import { parseConfigPath, readConfigPath } from '../src/config.ts'
 
 describe('PluginHost configuration properties', () => {
   it('reads arbitrary non-negative array indexes through the public path grammar', () => {

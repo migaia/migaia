@@ -2,10 +2,10 @@
  * Defines opaque composition capabilities and batch publication/cleanup results. Private runtime
  * provenance remains owned by composition.
  */
-import type { IPluginHostPhysicalCleanupResult } from './plugin-lifecycle-types.js'
-import type { IPluginConstraint } from './plugin-definition-types.js'
-import type { IExtractPluginExt } from './plugin-inference-types.js'
-import type { IPluginHostConfigFor } from './plugin-handle-types.js'
+import type { IPluginHostPhysicalCleanupResult } from './plugin-lifecycle-types.ts'
+import type { IPluginConstraint } from './plugin-definition-types.ts'
+import type { IExtractPluginExt } from './plugin-inference-types.ts'
+import type { IPluginHostConfigFor } from './plugin-handle-types.ts'
 import type { ICleanupResult } from '@migaia/lifecycle'
 
 /** Opaque Host-owned ordering slot; callers may retain it but cannot inspect its ordinal. */

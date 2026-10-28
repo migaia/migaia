@@ -2,7 +2,7 @@
  * Owns the one module-instance Host identity table; it performs no admission, entropy or error
  * construction.
  */
-import type { IPluginHostIdentity } from './host-identity-types.js'
+import type { IPluginHostIdentity } from './host-identity-types.ts'
 
 /** A facade and its runtime retain this exact frozen provenance record rather than copying it. */
 export type IHostIdentityRecord = Readonly<{ identity: IPluginHostIdentity; nodeId: string }>

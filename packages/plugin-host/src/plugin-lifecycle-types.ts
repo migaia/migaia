@@ -2,7 +2,7 @@
  * Defines registration resources, immutable configuration and hook contexts. Runtime lifecycle
  * ownership remains with the existing lifecycle package.
  */
-import type { asyncDisposeKey } from './symbols.js'
+import type { asyncDisposeKey } from './symbols.ts'
 import type { INativeAbortSignal } from '@migaia/utils/promise'
 import type { ICleanupResult } from '@migaia/lifecycle'
 

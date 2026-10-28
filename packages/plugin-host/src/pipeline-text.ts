@@ -1,5 +1,5 @@
 /** Owns stable named-pipeline addressing and diagnostic scope text, not lookup or execution policy. */
-import type { IPluginDependency } from './dependency-reader.js'
+import type { IPluginDependency } from './dependency-reader.ts'
 
 /** Diagnostic scope labels and the separator shared by declaration qualification and lookup. */
 export const PipelineAccessText = {

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
-import { defineFeature, definePlugin, PluginHost } from '../src/index.js'
-import { openComposition } from '../src/composition-entry.js'
+import { defineFeature, definePlugin, PluginHost } from '../src/index.ts'
+import { openComposition } from '../src/composition-entry.ts'
 
 describe('release paths', () => {
   it('runs the old dependent and provider hooks before replacement cleanup, once per generation', async () => {

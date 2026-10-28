@@ -2,10 +2,10 @@
  * Owns sequential late rollback and immutable completion detail for synchronous installation
  * failure.
  */
-import { reverseItems, appendCleanupErrors } from './cleanup-runtime.js'
-import type { PluginHostRemovalRuntime } from './removal-runtime.js'
-import type { IRegistration } from './registry.js'
-import type { IPluginInstallFailureDetail } from './host-options-types.js'
+import { reverseItems, appendCleanupErrors } from './cleanup-runtime.ts'
+import type { PluginHostRemovalRuntime } from './removal-runtime.ts'
+import type { IRegistration } from './registry.ts'
+import type { IPluginInstallFailureDetail } from './host-options-types.ts'
 
 /** The install owner retains its established diagnostic text and failure policy. */
 type IInstallRollbackReporter = Readonly<{

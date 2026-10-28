@@ -5,8 +5,8 @@ import {
   MiddlewarePipelineMode,
   type IMiddlewarePipelineMode
 } from '@migaia/middleware-pipeline'
-import { executePluginHostPipeline } from '../../src/pipeline-runtime.js'
-import { DEFAULT_PIPELINE_KEY, StageLanes } from '../../src/stage-lanes.js'
+import { executePluginHostPipeline } from '../../src/pipeline-runtime.ts'
+import { DEFAULT_PIPELINE_KEY, StageLanes } from '../../src/stage-lanes.ts'
 
 /** Runs one lifted sync stage while mutating the live lane it came from. */
 const verifySnapshot = async (mode: IMiddlewarePipelineMode): Promise<void> => {

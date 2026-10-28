@@ -1,12 +1,12 @@
-import { isManagedHost, openComposition } from '../src/composition-entry.js'
+import { isManagedHost, openComposition } from '../src/composition-entry.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { mergeCleanupResults } from '@migaia/lifecycle'
 import { runInNewContext } from 'node:vm'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
-import { defineHost, PluginHost, type IPluginHostCore } from '../src/index.js'
-import { createView } from '../src/composition-entry.js'
-import { PluginHostErrorCode } from '../src/error-code.js'
+import { defineHost, PluginHost, type IPluginHostCore } from '../src/index.ts'
+import { createView } from '../src/composition-entry.ts'
+import { PluginHostErrorCode } from '../src/error-code.ts'
 
 /** 八个托管协议方法；它们经 `openComposition` 取得，不再挂在宿主实例上。 */
 const MANAGED_PROTOCOL = [

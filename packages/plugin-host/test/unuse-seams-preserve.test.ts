@@ -5,8 +5,8 @@ import {
   PluginHost,
   PluginHostErrorCode,
   type IPluginConstraint
-} from '../src/index.js'
-import { openComposition } from '../src/composition-entry.js'
+} from '../src/index.ts'
+import { openComposition } from '../src/composition-entry.ts'
 
 /** Builds the same three-level dependency chain for every unchanged-behavior check. */
 const createChain = async () => {

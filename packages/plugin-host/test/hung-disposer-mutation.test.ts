@@ -1,6 +1,6 @@
 /** A disposer that outlives its bounded cleanup step must not keep the Host locked. */
 import { describe, expect, it } from 'vitest'
-import { defineHost, definePlugin } from '../src/index.js'
+import { defineHost, definePlugin } from '../src/index.ts'
 
 /** Creates a Host whose bounded disposer step is short enough for real-time tests. */
 function createHost() {

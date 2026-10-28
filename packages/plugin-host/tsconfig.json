@@ -1,6 +1,8 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "lib": ["ES2024", "ESNext.Disposable"],

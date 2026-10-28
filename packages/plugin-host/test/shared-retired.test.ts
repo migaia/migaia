@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { definePlugin, PluginHostErrorCode } from '../src/index.js'
+import { definePlugin, PluginHostErrorCode } from '../src/index.ts'
 
 it('rejects the retired shared definition field', () => {
   expect(() =>

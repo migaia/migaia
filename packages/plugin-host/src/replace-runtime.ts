@@ -1,7 +1,7 @@
 /** Owns candidate-first replacement and capability-selected dependent rebind or restart. */
-import { reverseItems, appendCleanupErrors } from './cleanup-runtime.js'
-import type { PluginHostEnablementRuntime } from './enablement-runtime.js'
-import type { PluginHostRemovalRuntime } from './removal-runtime.js'
+import { reverseItems, appendCleanupErrors } from './cleanup-runtime.ts'
+import type { PluginHostEnablementRuntime } from './enablement-runtime.ts'
+import type { PluginHostRemovalRuntime } from './removal-runtime.ts'
 
 import {
   DependencyAction,
@@ -9,14 +9,14 @@ import {
   planRestart,
   type IDependencyPlan
 } from '@migaia/capability/graph/dependency'
-import { reportDiagnostic } from './diagnostic-report.js'
-import { PluginHostErrorCode } from './error-code.js'
-import ERROR_TEXT, { PluginHostError } from './error-text.js'
-import type { PluginHostState } from './host-state.js'
-import type { IInstallBatchContext, PluginHostInstallRuntime } from './install-runtime.js'
-import type { IInstallEntry, IRegistration } from './registry.js'
-import type { IPluginHostDiagnostic } from './host-options-types.js'
-import type { PluginHostOperationRuntime } from './operation-runtime.js'
+import { reportDiagnostic } from './diagnostic-report.ts'
+import { PluginHostErrorCode } from './error-code.ts'
+import ERROR_TEXT, { PluginHostError } from './error-text.ts'
+import type { PluginHostState } from './host-state.ts'
+import type { IInstallBatchContext, PluginHostInstallRuntime } from './install-runtime.ts'
+import type { IInstallEntry, IRegistration } from './registry.ts'
+import type { IPluginHostDiagnostic } from './host-options-types.ts'
+import type { PluginHostOperationRuntime } from './operation-runtime.ts'
 
 /** Narrow Host authority used by one replacement transaction; every call runs inside the queue. */
 type IPluginHostReplaceRuntimePort<TDomainCore extends object, TValue> = Readonly<{

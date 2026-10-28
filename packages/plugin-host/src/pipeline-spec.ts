@@ -5,9 +5,9 @@ import type {
   IAsyncMiddlewareStage,
   MiddlewarePipelineNext
 } from '@migaia/middleware-pipeline'
-import ERROR_TEXT, { tagPluginHostError } from './error-text.js'
-import { PluginHostErrorCode } from './error-code.js'
-import type { PipelineOrder } from './pipeline-constants.js'
+import ERROR_TEXT, { tagPluginHostError } from './error-text.ts'
+import { PluginHostErrorCode } from './error-code.ts'
+import type { PipelineOrder } from './pipeline-constants.ts'
 
 /** Declaration-only payload axis; no phantom property is created at runtime. */
 declare const pipelinePayload: unique symbol

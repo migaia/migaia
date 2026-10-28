@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { defineHost, definePlugin, PluginHost } from '../src/index.js'
+import { defineHost, definePlugin, PluginHost } from '../src/index.ts'
 import { deferred, type IAbortSignal } from '@migaia/utils/promise'
-import * as composition from '../src/composition-entry.js'
+import * as composition from '../src/composition-entry.ts'
 
 /** Memory fixtures disable unrelated operation/drain deadlines. */
 const execution = { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } as const

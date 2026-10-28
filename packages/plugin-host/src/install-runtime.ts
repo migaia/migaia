@@ -1,37 +1,37 @@
 /** Owns atomic installation and activation; delegates setup, feature construction and cleanup. */
-import { reverseItems } from './cleanup-runtime.js'
-import type { PluginHostRemovalRuntime } from './removal-runtime.js'
-import type { PluginHostOperationRuntime } from './operation-runtime.js'
+import { reverseItems } from './cleanup-runtime.ts'
+import type { PluginHostRemovalRuntime } from './removal-runtime.ts'
+import type { PluginHostOperationRuntime } from './operation-runtime.ts'
 
 import { assimilateCapturedThen } from '@migaia/utils/function'
 import { attachSecondaryErrors } from '@migaia/utils/error'
 import type { INativeAbortSignal } from '@migaia/utils/promise'
 import { createLifecycleScope, createProvisionalScope } from '@migaia/lifecycle'
 import type { IScheduler } from '@migaia/utils/scheduler'
-import { copyConfig } from './config.js'
+import { copyConfig } from './config.ts'
 import ERROR_TEXT, {
   identifyPluginHostCallbackFailure,
   PluginHostError,
   tagPluginHostError,
   PluginHostInternalText
-} from './error-text.js'
-import { PluginHostInstallText } from './install-constants.js'
-import { PluginHostErrorCode } from './error-code.js'
-import { reportDiagnostic } from './diagnostic-report.js'
-import { validateInstallBatch } from './dependency-runtime.js'
-import { PluginHostSetupAttempt, closeSetupAttempt } from './setup-runtime.js'
-import { PluginHostSyncRollbackRuntime } from './install-rollback-runtime.js'
-import { PluginHostInstallFeatureRuntime } from './install-feature-runtime.js'
-import type { PluginHostState } from './host-state.js'
-import { PluginHostRegistrationLifecycle } from './state-constants.js'
+} from './error-text.ts'
+import { PluginHostInstallText } from './install-constants.ts'
+import { PluginHostErrorCode } from './error-code.ts'
+import { reportDiagnostic } from './diagnostic-report.ts'
+import { validateInstallBatch } from './dependency-runtime.ts'
+import { PluginHostSetupAttempt, closeSetupAttempt } from './setup-runtime.ts'
+import { PluginHostSyncRollbackRuntime } from './install-rollback-runtime.ts'
+import { PluginHostInstallFeatureRuntime } from './install-feature-runtime.ts'
+import type { PluginHostState } from './host-state.ts'
+import { PluginHostRegistrationLifecycle } from './state-constants.ts'
 import type {
   IExtensionOwner,
   ISharedExtensionContribution,
   IInstallEntry,
   IRegistration
-} from './registry.js'
-import type { IPluginHostCore } from './plugin-core-types.js'
-import type { IPluginInstallFailureDetail, IPluginHostDiagnostic } from './host-options-types.js'
+} from './registry.ts'
+import type { IPluginHostCore } from './plugin-core-types.ts'
+import type { IPluginInstallFailureDetail, IPluginHostDiagnostic } from './host-options-types.ts'
 
 /** Candidate registries held privately until one install batch reaches its commit point. */
 export type IInstallBatchContext<TDomainCore extends object, TValue> = {

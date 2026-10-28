@@ -5,8 +5,8 @@ import {
   definePlugin,
   PluginHost,
   PluginHostErrorCode
-} from '../src/index.js'
-import type { IPluginHostCore } from '../src/index.js'
+} from '../src/index.ts'
+import type { IPluginHostCore } from '../src/index.ts'
 
 /** Explicit unbounded policy keeps enablement tests independent of wall-clock timing. */
 const execution = { mutationTimeoutMs: false as const, pipelineDrainTimeoutMs: false as const }

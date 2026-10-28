@@ -5,7 +5,7 @@ import {
   type IMiddlewarePipelineContext,
   type IMiddlewarePipelineMode
 } from '@migaia/middleware-pipeline'
-import { PluginHost } from '../../src/index.js'
+import { PluginHost } from '../../src/index.ts'
 
 /** : every host mode hands stages the lifecycle abort signal that disposal aborts. */
 class SignalHost extends PluginHost<Record<string, never>, number> {

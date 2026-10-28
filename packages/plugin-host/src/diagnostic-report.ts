@@ -1,6 +1,6 @@
 import { containAsyncRejection } from '@migaia/lifecycle'
-import type { IPluginHostDiagnostic } from './host-options-types.js'
-import type { IPluginHostErrorCode } from './error-code.js'
+import type { IPluginHostDiagnostic } from './host-options-types.ts'
+import type { IPluginHostErrorCode } from './error-code.ts'
 
 /** Runtime-provided last-resort error sink (`reportError` in browsers, Deno and Bun), if present. */
 type IGlobalErrorSink = Readonly<{ reportError?: (error: unknown) => void }>

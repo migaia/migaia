@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { PluginHostError } from '../src/error-text.js'
-import { PluginHostDisposalNodeKind, readPluginHostDisposalProvenance } from '../src/index.js'
-import * as pluginHostPublic from '../src/index.js'
-import type { IPluginHostCore } from '../src/plugin-core-types.js'
+import { PluginHostError } from '../src/error-text.ts'
+import { PluginHostDisposalNodeKind, readPluginHostDisposalProvenance } from '../src/index.ts'
+import * as pluginHostPublic from '../src/index.ts'
+import type { IPluginHostCore } from '../src/plugin-core-types.ts'
 import {
   createPipeline,
   GENERATOR_CONTINUE as middlewareContinue,
@@ -15,7 +15,7 @@ import {
   GENERATOR_HALT as hostHalt,
   GENERATOR_UNDEFINED as hostUndefined
 } from '@migaia/middleware-pipeline'
-import { Host, plugin } from './plugin-host-fixtures.js'
+import { Host, plugin } from './plugin-host-fixtures.ts'
 
 describe('PluginHost', () => {
   it('keeps the exported disposal discriminator immutable and exact', () => {

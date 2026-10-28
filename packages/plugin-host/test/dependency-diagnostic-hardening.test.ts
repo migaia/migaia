@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { defineFeature, definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.js'
-import { execution } from './dependency-lifecycle-fixtures.js'
+import { defineFeature, definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.ts'
+import { execution } from './dependency-lifecycle-fixtures.ts'
 
 describe('Feature rejection reporting through the host outlet', () => {
   it('delivers the rejection object with the reporter failure reachable and preserves its own cause', async () => {

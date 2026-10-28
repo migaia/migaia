@@ -1,10 +1,10 @@
-import { snapshotPluginDefinitions } from './admission-runtime.js'
-import { readAdmissionDefinition } from './composition.js'
-import { isFeatureReference, readDefinedFeature } from './define-feature.js'
-import { readDefinedPluginDefinition } from './define-plugin.js'
-import type { IFeatureReference } from './feature-types.js'
-import type { IPluginDefinition } from './registry.js'
-import type { IPluginConstraint } from './plugin-definition-types.js'
+import { snapshotPluginDefinitions } from './admission-runtime.ts'
+import { readAdmissionDefinition } from './composition.ts'
+import { isFeatureReference, readDefinedFeature } from './define-feature.ts'
+import { readDefinedPluginDefinition } from './define-plugin.ts'
+import type { IFeatureReference } from './feature-types.ts'
+import type { IPluginDefinition } from './registry.ts'
+import type { IPluginConstraint } from './plugin-definition-types.ts'
 
 /** Provider edge derived from a plugin's complete local Feature closure. */
 export type IPluginDependency = Readonly<{

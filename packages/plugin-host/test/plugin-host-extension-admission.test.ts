@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { PluginHostError } from '../src/error-text.js'
-import { PluginHostErrorCode } from '../src/error-code.js'
-import { type IExt, type IStageCore, Host, plugin } from './plugin-host-fixtures.js'
+import { PluginHostError } from '../src/error-text.ts'
+import { PluginHostErrorCode } from '../src/error-code.ts'
+import { type IExt, type IStageCore, Host, plugin } from './plugin-host-fixtures.ts'
 
 describe('PluginHost', () => {
   it('rejects duplicate names and invalid extension descriptors', async () => {

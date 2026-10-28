@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { defineFeature, definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.js'
-import { openComposition } from '../src/composition-entry.js'
+import { defineFeature, definePlugin, PluginHost, PluginHostErrorCode } from '../src/index.ts'
+import { openComposition } from '../src/composition-entry.ts'
 
 class V2Host extends PluginHost<Record<string, never>, string> {}
 

@@ -1,13 +1,13 @@
-import { PluginHostState } from '../src/host-state.js'
-import { createDataOrderSlotState } from '../src/composition.js'
+import { PluginHostState } from '../src/host-state.ts'
+import { createDataOrderSlotState } from '../src/composition.ts'
 import { createQuiescenceTracker } from '@migaia/lifecycle'
 import { describe, expect, it } from 'vitest'
 
-import { PluginHostErrorCode } from '../src/error-code.js'
-import { defineFeature, definePlugin } from '../src/index.js'
-import { PluginHostRemovalRuntime } from '../src/removal-runtime.js'
+import { PluginHostErrorCode } from '../src/error-code.ts'
+import { defineFeature, definePlugin } from '../src/index.ts'
+import { PluginHostRemovalRuntime } from '../src/removal-runtime.ts'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { type IExt, Host, FeatureHost, plugin } from './plugin-host-fixtures.js'
+import { type IExt, Host, FeatureHost, plugin } from './plugin-host-fixtures.ts'
 
 describe('PluginHost', () => {
   it('keeps the original construct error as primary and reports a rollback failure via diagnostic', async () => {

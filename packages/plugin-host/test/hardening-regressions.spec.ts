@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { defineFeature, definePlugin } from '../src/index.js'
+import { defineFeature, definePlugin } from '../src/index.ts'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { Host } from './hardening-fixtures.js'
+import { Host } from './hardening-fixtures.ts'
 
 describe('native Feature synchronous installation', () => {
   it('uses the same registration initializer for useSync', () => {

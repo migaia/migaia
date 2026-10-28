@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { definePlugin, isDefinedPlugin } from '../src/index.js'
+import { definePlugin, isDefinedPlugin } from '../src/index.ts'
 
 describe('trusted plugin identity', () => {
   it('accepts only the definition minted by this package instance', () => {

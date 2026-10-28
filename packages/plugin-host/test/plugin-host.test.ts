@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
-import { defineFeature, definePlugin } from '../src/index.js'
-import { openComposition } from '../src/composition-entry.js'
-import { FeatureHost } from './plugin-host-fixtures.js'
+import { defineFeature, definePlugin } from '../src/index.ts'
+import { openComposition } from '../src/composition-entry.ts'
+import { FeatureHost } from './plugin-host-fixtures.ts'
 
 describe('PluginHost', () => {
   it('keeps object extension members named install and expose while rejecting the legacy function sentinel', async () => {
