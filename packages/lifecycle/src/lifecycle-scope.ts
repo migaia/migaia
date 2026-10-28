@@ -8,15 +8,21 @@ import type {
   ILifecycleState
 } from './types.js'
 import { ASYNC_OWNER_BRAND } from './types.js'
-import { createDisposerContext } from './disposer-context.js'
-import { containAsyncRejection, createLifecycleError } from './errors.js'
+import { DisposerContext } from './disposer-context.js'
+import {
+  containAsyncRejection,
+  createErrorCollector,
+  createLifecycleError,
+  safeReport
+} from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
-import { createOwnedEntryList } from './owned-entries.js'
-import { createTerminalController } from './terminal-controller.js'
-import { DisposeTransactionKind, LifecycleState } from './state-constants.js'
-import { admitDescriptor, createDisposeTransaction } from './dispose-transaction.js'
-import { captureAbortControllerFactory, createLazyAbortController } from './abort-factory.js'
+import { OwnedEntryList } from './owned-entries.js'
+import { LifecycleState } from './state-constants.js'
+import { admitDescriptor, isValidDeadline, releaseAdmittedItems } from './dispose-transaction.js'
+import { orderDisposeItems } from './disposal-order.js'
+import { ClosingSignalSource, captureAbortControllerFactory } from './abort-factory.js'
+import type { IAbortController } from './abort.js'
 import type { IScheduler } from '@migaia/utils/scheduler'
 import { resolveSchedulerOption } from './scheduler.js'
 
@@ -29,8 +35,10 @@ const asyncDisposeKey = (Symbol as typeof Symbol & { asyncDispose?: symbol }).as
  * disposer closure". A caller whose own `force` closes over the resource defeats GC collection on
  * their end, which is outside what this package can enforce.
  */
-const finalizationRegistry: FinalizationRegistry<() => void> | undefined =
-  typeof FinalizationRegistry === 'function' ? new FinalizationRegistry((run) => run()) : undefined
+const finalizationRegistry: FinalizationRegistry<GcFallbackRelease> | undefined =
+  typeof FinalizationRegistry === 'function'
+    ? new FinalizationRegistry((release: GcFallbackRelease) => release.run())
+    : undefined
 
 export type ILifecycleScopeOptions = {
   readonly errorPolicy?: IErrorPolicy
@@ -70,6 +78,297 @@ export type ILifecycleScope = ILifecycleOwner & {
   [Symbol.asyncDispose](): Promise<void>
 }
 
+/** One live registration: the admitted descriptor snapshot taken by `own()`. */
+type IScopeEntry = {
+  readonly resource: unknown
+  readonly source: string
+  readonly descriptor: IReleaseDescriptor
+  readonly unregisterToken: object | undefined
+}
+
+/** Settled starting point for an empty scope's dispose; each call still returns a fresh array. */
+const settledEmpty: Promise<void> = Promise.resolve()
+
+/**
+ * GC-fallback held value. It holds only the caller's `force`, the scope's reporter and the captured
+ * AbortController factory, never the registered resource, so the registry cannot keep the target
+ * alive.
+ */
+class GcFallbackRelease {
+  /** Caller-supplied force callback admitted by `own()`. */
+  readonly #force: IReleaseDescriptor['force']
+  /** Scope reporter captured at construction; absent when the scope has none. */
+  readonly #report: ((error: unknown) => void) | undefined
+  /** Host AbortController factory captured by the owning scope. */
+  readonly #createController: () => IAbortController
+
+  /** Captures the release inputs once; nothing is read again when the finalizer fires. */
+  constructor(
+    force: IReleaseDescriptor['force'],
+    report: ((error: unknown) => void) | undefined,
+    createController: () => IAbortController
+  ) {
+    this.#force = force
+    this.#report = report
+    this.#createController = createController
+  }
+
+  /** Runs `force` once after the resource was collected; every failure goes to the reporter. */
+  run(): void {
+    /** Fresh, never-aborted context: the owning scope may be long gone. */
+    const context: IReleaseContext = {
+      signal: this.#createController().signal,
+      deadlineAt: undefined,
+      report: (error) => this.#reportSafely(error)
+    }
+    try {
+      containAsyncRejection(this.#force(context), (error) => context.report(error))
+    } catch (error) {
+      context.report(error)
+    }
+  }
+
+  /** Last error boundary: a GC callback has no caller left to receive a reporter failure. */
+  #reportSafely(error: unknown): void {
+    if (!this.#report) return
+    try {
+      this.#report(error)
+    } catch {
+      // Last error boundary for the reporter's own synchronous failures.
+    }
+  }
+}
+
+/**
+ * The async scope. Options are read once at construction and every descriptor is snapshotted by
+ * `own()`, so `dispose()` never calls caller getters. Methods live on the prototype and must be
+ * called on the scope (`scope.own(...)`), not detached.
+ */
+class LifecycleScope {
+  /** Error policy applied to release failures. */
+  readonly #errorPolicy: IErrorPolicy
+  /** Reporter for failures the policy does not throw or collect. */
+  readonly #report: ((error: unknown) => void) | undefined
+  /** Shared absolute deadline forwarded to every release. */
+  readonly #deadlineAt: number | undefined
+  /** Clock domain forwarded to every release; `undefined` means the default scheduler. */
+  readonly #scheduler: IScheduler | undefined
+  /** Host AbortController factory captured at construction. */
+  readonly #createController: () => IAbortController
+  /** `open` → `closing` → `terminal`. */
+  #lifecycle: ILifecycleState = LifecycleState.open
+  /** Live owned resources; created by the first `own()`. */
+  #entries: OwnedEntryList<IScopeEntry> | undefined
+  /** Next registration source id. */
+  #nextId = 0
+  /** Whether any admitted descriptor has a non-zero `order`; zero-only scopes skip ordering. */
+  #customOrder = false
+  /** Live GC-fallback registrations; dispose skips the unregister pass when there are none. */
+  #gcRegistrations = 0
+  /** Release-callback marker and `join()` capability; created by the first non-empty dispose. */
+  #disposer: DisposerContext | undefined
+  /** The one canonical dispose Promise, published before any release callback runs. */
+  #disposePromise: Promise<readonly ICollectedError[]> | undefined
+
+  /** Validates the error policy and captures every option once. */
+  constructor(options: ILifecycleScopeOptions) {
+    this.#errorPolicy = options.errorPolicy ?? 'throw'
+    this.#report = options.report
+    assertErrorPolicyReporter(this.#errorPolicy, this.#report)
+    this.#scheduler = resolveSchedulerOption(options)
+    this.#deadlineAt = options.deadlineAt
+    this.#createController = captureAbortControllerFactory()
+  }
+
+  /** Current lifecycle state. */
+  get lifecycle(): ILifecycleState {
+    return this.#lifecycle
+  }
+
+  /**
+   * Registers `resource` with a validated snapshot of `descriptor`. Throws when called from a
+   * running release callback, after `close()`, or with an invalid descriptor.
+   */
+  own<T>(resource: T, descriptor: IReleaseDescriptor): T {
+    if (this.#isInsideRelease()) {
+      throw createLifecycleError(
+        LifecycleErrorCode.scopeReentrantOwn,
+        LifecycleErrorText.scopeReentrantOwn
+      )
+    }
+    this.#assertOpen()
+    /** The snapshot used at dispose time; later descriptor changes are not observed. */
+    const admission = admitDescriptor(descriptor, true)
+    if (!admission.ok) throw admission.error
+    /** Admitted plain-data descriptor. */
+    const admitted = admission.descriptor
+    /** Token for unregistering the GC fallback, present only when one was registered. */
+    let unregisterToken: object | undefined
+    if (
+      descriptor.gcFallback &&
+      finalizationRegistry &&
+      resource !== null &&
+      typeof resource === 'object'
+    ) {
+      unregisterToken = {}
+      finalizationRegistry.register(
+        resource,
+        new GcFallbackRelease(admitted.force, this.#report, this.#createController),
+        unregisterToken
+      )
+      this.#gcRegistrations++
+    }
+    if (admitted.order !== 0) this.#customOrder = true
+    this.#entries ??= new OwnedEntryList()
+    this.#entries.push({
+      resource,
+      source: String(this.#nextId++),
+      descriptor: admitted,
+      unregisterToken
+    })
+    return resource
+  }
+
+  /** Unregisters a resource without releasing it — the caller has already released it. */
+  release(resource: unknown): boolean {
+    /** The earliest live registration for `resource`, if any. */
+    const entry = this.#entries?.release(resource)
+    if (entry === undefined) return false
+    // The caller released this resource independently; the GC fallback must not force it again.
+    this.#unregisterGcFallback(entry.unregisterToken)
+    return true
+  }
+
+  /** Synchronous, idempotent, never calls user code. */
+  close(): void {
+    if (this.#lifecycle === LifecycleState.open) this.#lifecycle = LifecycleState.closing
+  }
+
+  /**
+   * Releases every owned resource once, newest first (stable by descending `order`). Concurrent
+   * calls share one Promise; a synchronous call from a running release callback throws.
+   */
+  dispose(): Promise<readonly ICollectedError[]> {
+    if (this.#disposePromise) {
+      if (this.#isInsideRelease()) {
+        throw createLifecycleError(
+          LifecycleErrorCode.scopeReentrantDispose,
+          LifecycleErrorText.scopeReentrantDispose
+        )
+      }
+      // Concurrent, non-reentrant call: reuse the one real disposal in flight.
+      return this.#disposePromise
+    }
+    if (this.#lifecycle === LifecycleState.terminal) return Promise.resolve([])
+    this.close()
+    /** Atomic snapshot: nothing added later is released, nothing is skipped or doubled. */
+    const snapshot = this.#entries?.drain() ?? []
+    this.#entries = undefined
+    if (snapshot.length === 0) {
+      this.#disposePromise = settledEmpty.then(() => this.#finishEmpty())
+      return this.#disposePromise
+    }
+    if (this.#gcRegistrations > 0) {
+      // Every entry is about to be released explicitly; no GC fallback may fire afterwards.
+      for (const entry of snapshot) this.#unregisterGcFallback(entry.unregisterToken)
+    }
+    // Newest first; the stable order pass keeps that LIFO sequence among equal `order` values.
+    snapshot.reverse()
+    if (this.#customOrder) orderDisposeItems(snapshot)
+    this.#disposer = new DisposerContext()
+    // Publish the Promise before any release callback runs, so a callback that synchronously calls
+    // dispose() is caught as reentrant instead of starting a second teardown.
+    let resolveDispose!: (value: readonly ICollectedError[]) => void
+    let rejectDispose!: (error: unknown) => void
+    this.#disposePromise = new Promise<readonly ICollectedError[]>((resolve, reject) => {
+      resolveDispose = resolve
+      rejectDispose = reject
+    })
+    this.#release(snapshot).then(resolveDispose, rejectDispose)
+    return this.#disposePromise
+  }
+
+  /** Moves an empty scope to terminal and returns its (empty) result. */
+  #finishEmpty(): readonly ICollectedError[] {
+    this.#lifecycle = LifecycleState.terminal
+    return []
+  }
+
+  /** Releases the ordered snapshot through the shared release loop, then marks terminal. */
+  async #release(items: readonly IScopeEntry[]): Promise<readonly ICollectedError[]> {
+    try {
+      /** Applies the error policy to every release failure. */
+      const collector = createErrorCollector(this.#errorPolicy, this.#report)
+      await releaseAdmittedItems(
+        items,
+        this.#createReleaseContext(),
+        isValidDeadline(this.#deadlineAt),
+        (source, error) => collector.add(source, error)
+      )
+      return collector.finalize(LifecycleErrorText.disposeTransactionFailed)
+    } finally {
+      this.#lifecycle = LifecycleState.terminal
+    }
+  }
+
+  /**
+   * Builds the one context shared by every release callback of this dispose. `signal` is created on
+   * first read, already aborted with the scope-closed reason; callbacks that never read it cost no
+   * AbortController.
+   */
+  #createReleaseContext(): IReleaseContext {
+    /** Lazily created closing signal shared by this dispose's release callbacks. */
+    const closing = new ClosingSignalSource(this.#createController)
+    /** Reporter routed through the shared containment rules. */
+    const report = this.#report
+    return {
+      get signal() {
+        return closing.read()
+      },
+      deadlineAt: this.#deadlineAt,
+      scheduler: this.#scheduler,
+      report: (error) => safeReport(report, error),
+      disposer: this.#disposer
+    }
+  }
+
+  /** Whether a release callback of this scope is on the current synchronous stack. */
+  #isInsideRelease(): boolean {
+    return this.#disposer !== undefined && DisposerContext.isActive(this.#disposer)
+  }
+
+  /** Throws the closing or terminal boundary error for a registration after `close()`. */
+  #assertOpen(): void {
+    if (this.#lifecycle === LifecycleState.terminal) {
+      throw createLifecycleError(LifecycleErrorCode.scopeTerminal, LifecycleErrorText.scopeTerminal)
+    }
+    if (this.#lifecycle === LifecycleState.closing) {
+      throw createLifecycleError(LifecycleErrorCode.scopeClosed, LifecycleErrorText.scopeClosing)
+    }
+  }
+
+  /** Cancels one GC-fallback registration, when the entry had one. */
+  #unregisterGcFallback(unregisterToken: object | undefined): void {
+    if (unregisterToken === undefined) return
+    finalizationRegistry?.unregister(unregisterToken)
+    this.#gcRegistrations--
+  }
+}
+
+/** `await using` hook: awaits `dispose()` and discards the collected-error result. */
+async function disposeForAsyncUsing(this: LifecycleScope): Promise<void> {
+  await this.dispose()
+}
+
+// Brand read by SyncLifecycleScope to reject async owners; shared through the prototype.
+Object.defineProperty(LifecycleScope.prototype, ASYNC_OWNER_BRAND, { value: true })
+// The supported host's symbol hook is installed once, non-enumerable, on the prototype.
+if (asyncDisposeKey) {
+  Object.defineProperty(LifecycleScope.prototype, asyncDisposeKey, {
+    value: disposeForAsyncUsing
+  })
+}
+
 /**
  * Creates the general-purpose async scope: register each resource with `own(resource, descriptor)`
  * where it is created, then release them all with one `dispose()` when the owner (a page, a
@@ -83,247 +382,5 @@ export type ILifecycleScope = ILifecycleOwner & {
  * throws the reentrancy codes. Supports `await using`.
  */
 export function createLifecycleScope(options: ILifecycleScopeOptions = {}): ILifecycleScope {
-  const errorPolicy = options.errorPolicy ?? 'throw'
-  assertErrorPolicyReporter(errorPolicy, options.report)
-  const scheduler = resolveSchedulerOption(options)
-  const terminal = createTerminalController()
-  const createController = captureAbortControllerFactory()
-  /** Closing signal source; created only when a release transaction actually reads it. */
-  const closingController = createLazyAbortController(createController)
-  /** Whether `close()` already aborted the closing signal; avoids rebuilding the reason. */
-  let closingAborted = false
-  /** Immutable owner-bound capability shared by this scope's release callbacks. */
-  const disposerContext = createDisposerContext()
-  /** Live owned resources in registration order with O(1) release lookup. */
-  const entries = createOwnedEntryList<{
-    readonly resource: unknown
-    readonly source: string
-    readonly descriptor: IReleaseDescriptor
-    readonly unregisterToken?: object
-  }>()
-  let nextId = 0
-  let disposePromise: Promise<readonly ICollectedError[]> | undefined
-  /** Marks only the active disposer call frame, so unrelated callers observe the scope state. */
-  let activeDisposerSynchronously = false
-
-  /** Invokes one user callback while marking only its synchronous call frame as active. */
-  const invokeDisposerCallback = (
-    callback: (context: IReleaseContext) => void | PromiseLike<void>,
-    context: IReleaseContext
-  ): void | PromiseLike<void> => {
-    activeDisposerSynchronously = true
-    let result: void | PromiseLike<void> = undefined
-    try {
-      result = callback(context)
-    } finally {
-      activeDisposerSynchronously = false
-    }
-    return result
-  }
-
-  /**
-   * Wraps release callbacks lazily so self-dispose is fail-fast without rejecting external joiners.
-   * The facade must not read or spread descriptor fields here: `own()` already validated the shape,
-   * and DisposeTransaction owns the dispose-time snapshot read, so a getter that fails only at
-   * dispose still reaches the error policy.
-   */
-  const guardDescriptor = (descriptor: IReleaseDescriptor): IReleaseDescriptor => {
-    /** Lazy field facade consumed by DisposeTransaction's descriptor admission boundary. */
-    const guarded = {} as IReleaseDescriptor
-    Object.defineProperties(guarded, {
-      order: {
-        get: () => descriptor.order
-      },
-      graceful: {
-        get: () => {
-          const graceful = descriptor.graceful
-          return typeof graceful === 'function'
-            ? (context: IReleaseContext) => invokeDisposerCallback(graceful, context)
-            : graceful
-        }
-      },
-      gracefulTimeoutMs: {
-        get: () => descriptor.gracefulTimeoutMs
-      },
-      force: {
-        get: () => {
-          const force = descriptor.force
-          return typeof force === 'function'
-            ? (context: IReleaseContext) => invokeDisposerCallback(force, context)
-            : force
-        }
-      },
-      custom: {
-        get: () => {
-          const custom = descriptor.custom
-          return typeof custom === 'function'
-            ? (context: IReleaseContext) => invokeDisposerCallback(custom, context)
-            : custom
-        }
-      }
-    })
-    return guarded
-  }
-
-  const assertOpen = (): void => {
-    if (terminal.lifecycle === LifecycleState.terminal) {
-      throw createLifecycleError(LifecycleErrorCode.scopeTerminal, LifecycleErrorText.scopeTerminal)
-    }
-    if (terminal.lifecycle === LifecycleState.closing) {
-      throw createLifecycleError(LifecycleErrorCode.scopeClosed, LifecycleErrorText.scopeClosing)
-    }
-  }
-
-  const own = <T>(resource: T, descriptor: IReleaseDescriptor): T => {
-    if (activeDisposerSynchronously) {
-      throw createLifecycleError(
-        LifecycleErrorCode.scopeReentrantOwn,
-        LifecycleErrorText.scopeReentrantOwn
-      )
-    }
-    assertOpen()
-    // Validation only: an invalid shape fails here at the call site instead of at dispose time.
-    // Release still snapshots the descriptor through DisposeTransaction admission.
-    const admission = admitDescriptor(descriptor, true)
-    if (!admission.ok) throw admission.error
-    let unregisterToken: object | undefined
-    if (
-      descriptor.gcFallback &&
-      finalizationRegistry &&
-      resource !== null &&
-      typeof resource === 'object'
-    ) {
-      unregisterToken = {}
-      const runForce = (): void => {
-        const context: IReleaseContext = {
-          signal: createController().signal,
-          deadlineAt: undefined,
-          report: (error) => {
-            if (!options.report) return
-            try {
-              options.report(error)
-            } catch {
-              // Last error boundary for the reporter's own synchronous failures.
-            }
-          }
-        }
-        try {
-          containAsyncRejection(descriptor.force(context), (error) => context.report(error))
-        } catch (error) {
-          context.report(error)
-        }
-      }
-      finalizationRegistry.register(resource, runForce, unregisterToken)
-    }
-    entries.push({ resource, source: String(nextId++), descriptor, unregisterToken })
-    return resource
-  }
-
-  const unregisterGcFallback = (unregisterToken: object | undefined): void => {
-    if (unregisterToken !== undefined) finalizationRegistry?.unregister(unregisterToken)
-  }
-
-  const release = (resource: unknown): boolean => {
-    const entry = entries.release(resource)
-    if (entry === undefined) return false
-    // The caller has already released this resource independently — the GC-fallback finalizer
-    // must not run `force` a second time.
-    unregisterGcFallback(entry.unregisterToken)
-    return true
-  }
-
-  const close = (): void => {
-    terminal.close()
-    if (closingAborted) return
-    closingAborted = true
-    closingController.abort(
-      createLifecycleError(LifecycleErrorCode.scopeClosed, LifecycleErrorText.scopeClosedReason)
-    )
-  }
-
-  const performDispose = async (): Promise<readonly ICollectedError[]> => {
-    close()
-    // Atomic: nothing added between the snapshot and the loop, nothing skipped, nothing doubled.
-    // LIFO order; `DisposeTransaction`'s order-mode stable sort preserves this for
-    // same-`order` items.
-    const snapshot = entries.drain().reverse()
-    // Every one of these is about to be explicitly released by the transaction below; the
-    // GC-fallback finalizer must not also fire for any of them afterward.
-    for (const entry of snapshot) unregisterGcFallback(entry.unregisterToken)
-    try {
-      const transaction = createDisposeTransaction(
-        { kind: DisposeTransactionKind.order },
-        {
-          errorPolicy,
-          report: options.report,
-          deadlineAt: options.deadlineAt,
-          scheduler,
-          // An empty snapshot runs no item, so it never needs the closing signal materialized.
-          signal: snapshot.length > 0 ? closingController.signal : undefined,
-          disposer: disposerContext
-        }
-      )
-      return await transaction.run(
-        snapshot.map((entry) => ({
-          source: entry.source,
-          descriptor: guardDescriptor(entry.descriptor)
-        }))
-      )
-    } finally {
-      terminal.forceTerminal()
-    }
-  }
-
-  const dispose = (): Promise<readonly ICollectedError[]> => {
-    if (disposePromise) {
-      if (activeDisposerSynchronously) {
-        throw createLifecycleError(
-          LifecycleErrorCode.scopeReentrantDispose,
-          LifecycleErrorText.scopeReentrantDispose
-        )
-      }
-      // Concurrent, non-reentrant call: reuse the one real disposal in flight.
-      return disposePromise
-    }
-    if (terminal.lifecycle === LifecycleState.terminal) return Promise.resolve([])
-    // Assign the promise identity synchronously, *before* `performDispose()` runs any user code —
-    // calling an async function still lets its body run synchronously up to its first genuine
-    // suspension point, and for a scope whose very first owned resource reentrantly calls
-    // `dispose()` from a synchronous callback, that reentrant call happens before this function's
-    // own `await` would otherwise have assigned `disposePromise` on return. Without the early
-    // assignment here, that first-item case would see `disposePromise` still falsy and start a
-    // second, independent teardown instead of being caught as reentrant.
-    let resolveDispose!: (value: readonly ICollectedError[]) => void
-    let rejectDispose!: (error: unknown) => void
-    disposePromise = new Promise<readonly ICollectedError[]>((resolve, reject) => {
-      resolveDispose = resolve
-      rejectDispose = reject
-    })
-    performDispose().then(resolveDispose, rejectDispose)
-    return disposePromise
-  }
-
-  const scope: Omit<ILifecycleScope, typeof Symbol.asyncDispose> & { [ASYNC_OWNER_BRAND]?: true } =
-    {
-      [ASYNC_OWNER_BRAND]: true,
-      get lifecycle() {
-        return terminal.lifecycle
-      },
-      own,
-      release,
-      close,
-      dispose
-    }
-
-  if (asyncDisposeKey) {
-    Object.defineProperty(scope, asyncDisposeKey, {
-      value: async () => {
-        await dispose()
-      },
-      enumerable: false
-    })
-  }
-
-  // The supported host's symbol hook is installed above without making it enumerable.
-  return scope as ILifecycleScope
+  return new LifecycleScope(options) as unknown as ILifecycleScope
 }

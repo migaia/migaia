@@ -72,17 +72,18 @@ describe('LifecycleScope: own/release/dispose', () => {
 
 describe('LifecycleScope descriptor admission boundary', () => {
   it.each(['throw', 'collect', 'report', 'firstError'] as const)(
-    'reads one hostile force getter and keeps later LIFO/order releases under %s policy',
+    'reads a force getter once at own() and releases that snapshot in order under %s policy',
     async (errorPolicy) => {
-      const admissionError = new Error('hostile force getter failed')
       const calls: string[] = []
       const report = vi.fn()
       const hostile = { order: 0 } as Record<string, unknown>
-      // own() validates the shape once at registration; the getter fails only on the dispose-time
-      // snapshot read, which must still reach the error policy.
+      // own() snapshots the descriptor; a getter that would fail later is never read again.
       const forceGetter = vi.fn((): unknown => {
-        if (forceGetter.mock.calls.length === 1) return () => undefined
-        throw admissionError
+        if (forceGetter.mock.calls.length === 1)
+          return () => {
+            calls.push('hostile')
+          }
+        throw new Error('hostile force getter read twice')
       })
       Object.defineProperty(hostile, 'force', { get: forceGetter })
       const scope = createLifecycleScope({ errorPolicy, report })
@@ -102,19 +103,10 @@ describe('LifecycleScope descriptor admission boundary', () => {
       })
 
       expect(forceGetter).toHaveBeenCalledTimes(1)
-      const promise = scope.dispose()
-
-      if (errorPolicy === 'collect') {
-        await expect(promise).resolves.toEqual([{ source: '1', error: admissionError }])
-      } else if (errorPolicy === 'report') {
-        await expect(promise).resolves.toEqual([])
-        expect(report).toHaveBeenCalledWith(admissionError)
-      } else {
-        await expect(promise).rejects.toBe(admissionError)
-      }
-
-      expect(forceGetter).toHaveBeenCalledTimes(2)
-      expect(calls).toEqual(['high', 'low'])
+      await expect(scope.dispose()).resolves.toEqual([])
+      expect(report).not.toHaveBeenCalled()
+      expect(forceGetter).toHaveBeenCalledTimes(1)
+      expect(calls).toEqual(['high', 'hostile', 'low'])
       expect(scope.lifecycle).toBe('terminal')
     }
   )
@@ -263,7 +255,7 @@ describe('GC fallback', () => {
     const [target, heldValue] = registerSpy.mock.calls.at(-1)!
     expect(target).toBe(resource)
     expect(heldValue).not.toBe(resource)
-    expect(typeof heldValue).toBe('function')
+    expect(typeof heldValue).toBe('object')
     registerSpy.mockRestore()
   })
 })

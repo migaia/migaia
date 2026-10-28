@@ -1,6 +1,7 @@
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
 import { createLifecycleError } from './errors.js'
+import type { IReleaseContext } from './types.js'
 
 /**
  * Explicit owner-disposal capability delivered only to callbacks driven by a LifecycleScope.
@@ -13,17 +14,47 @@ export type IDisposerContext = {
 }
 
 /**
- * Creates the immutable capability supplied to a scope-owned release callback. The capability
- * carries no mutable lifecycle state or Promise; every invocation rejects immediately, including
- * after callback suspension or after the originating scope reaches terminal state.
+ * The capability supplied to a scope-owned release callback. It also owns the scope's "a release
+ * callback is running on this stack" marker, so the release loop marks each callback's synchronous
+ * frame once instead of wrapping every callback in a guard closure. `join()` rejects immediately,
+ * including after callback suspension or after the originating scope reaches terminal state.
  */
-export function createDisposerContext(): IDisposerContext {
+export class DisposerContext implements IDisposerContext {
+  /**
+   * True only during the synchronous frame of a release callback this context was handed to. The
+   * owning scope reads it to reject reentrant `own()` and self-joining `dispose()` calls.
+   */
+  #active = false
+
   /** Rejects owner-disposal self-joins without touching the canonical external Promise. */
-  const join = (): never => {
+  join(): never {
     throw createLifecycleError(
       LifecycleErrorCode.scopeReentrantDispose,
       LifecycleErrorText.scopeReentrantDispose
     )
   }
-  return Object.freeze({ join })
+
+  /** Whether a release callback driven by `disposer` is currently on the synchronous stack. */
+  static isActive(disposer: DisposerContext): boolean {
+    return disposer.#active
+  }
+
+  /**
+   * Invokes one release callback, marking only its synchronous call frame as active. Contexts
+   * without a scope-owned disposer call the callback directly.
+   */
+  static invoke(
+    callback: (context: IReleaseContext) => void | PromiseLike<void>,
+    context: IReleaseContext
+  ): void | PromiseLike<void> {
+    /** The scope-owned marker, absent for generic transactions and caller-built contexts. */
+    const disposer = context.disposer
+    if (!(disposer instanceof DisposerContext)) return callback(context)
+    disposer.#active = true
+    try {
+      return callback(context)
+    } finally {
+      disposer.#active = false
+    }
+  }
 }

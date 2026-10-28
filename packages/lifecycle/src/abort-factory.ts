@@ -138,3 +138,31 @@ export const createLazyAbortController = (create: () => IAbortController): IAbor
     }
   }
 }
+
+/**
+ * The already-aborted signal handed to a closing scope's release callbacks. The host controller and
+ * its scope-closed reason are created on the first read, so releases that never look at
+ * `context.signal` cost no AbortController and no Error.
+ */
+export class ClosingSignalSource {
+  /** Host controller factory captured by the owning scope at construction. */
+  readonly #create: () => IAbortController
+  /** Aborted controller, created on the first `read()`. */
+  #controller: IAbortController | undefined
+
+  /** Keeps the owner's captured factory; nothing is created yet. */
+  constructor(create: () => IAbortController) {
+    this.#create = create
+  }
+
+  /** Returns the aborted closing signal, creating it with the scope-closed reason on first use. */
+  read(): IAbortController['signal'] {
+    if (this.#controller === undefined) {
+      this.#controller = this.#create()
+      this.#controller.abort(
+        createLifecycleError(LifecycleErrorCode.scopeClosed, LifecycleErrorText.scopeClosedReason)
+      )
+    }
+    return this.#controller.signal
+  }
+}

@@ -208,6 +208,7 @@ describe('cross-module: a downstream adapter uses only public primitives', () =>
         name === 'index.ts' ||
         name === 'abort-factory.ts' ||
         name === 'owned-entries.ts' ||
+        name === 'disposal-order.ts' ||
         name === 'report-boundary.ts' ||
         name === 'error-boundary.ts' ||
         name === 'default-scheduler.ts' ||

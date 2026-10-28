@@ -3,7 +3,7 @@ import { defaultLifecycleScheduler } from './scheduler.js'
 import { assertErrorPolicyReporter, attachLifecycleSecondaryErrors } from './error-boundary.js'
 import { containAsyncRejection, safeReport } from './errors.js'
 import type { ICollectedError, IErrorPolicy, IReleaseContext, IReleaseDescriptor } from './types.js'
-import type { IDisposerContext } from './disposer-context.js'
+import { DisposerContext, type IDisposerContext } from './disposer-context.js'
 import { createErrorCollector, createLifecycleError, createLifecycleTypeError } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
@@ -22,6 +22,7 @@ import {
   type IObservedAbortSubscription
 } from './observed-subscription.js'
 import { DisposeTransactionKind, LifecycleState } from './state-constants.js'
+import { orderDisposeItems } from './disposal-order.js'
 import type { ILifecycleState } from './types.js'
 
 type ICallbackOutcome = { readonly ok: true } | { readonly ok: false; readonly error: unknown }
@@ -69,7 +70,7 @@ function runCallback(
 ): IMaybePromise<ICallbackOutcome> {
   let result: void | PromiseLike<void>
   try {
-    result = callback(context)
+    result = DisposerContext.invoke(callback, context)
   } catch (error) {
     return { ok: false, error }
   }
@@ -119,7 +120,7 @@ function raceGraceful(
   const effectiveDeadline = computeEffectiveDeadline(gracefulTimeoutMs, context.deadlineAt, start)
   let result: void | PromiseLike<void>
   try {
-    result = graceful(context)
+    result = DisposerContext.invoke(graceful, context)
   } catch (error) {
     return { ok: false, error }
   }
@@ -322,7 +323,7 @@ export type IDisposeItem = {
   readonly descriptor: IReleaseDescriptor
 }
 
-type IAdmittedDisposeItem = {
+export type IAdmittedDisposeItem = {
   readonly source: string
   readonly descriptor: IReleaseDescriptor
 }
@@ -486,9 +487,80 @@ export const admitItems = (
     }
   }
   if (mode.kind === DisposeTransactionKind.plan) return { admitted, rejected }
-  // Stable sort: ties (equal order) keep the caller-supplied relative sequence.
-  admitted.sort((a, b) => (b.descriptor.order ?? 0) - (a.descriptor.order ?? 0))
+  // Stable O(n) radix order: ties (equal order) keep the caller-supplied relative sequence.
+  orderDisposeItems(admitted)
   return { admitted, rejected }
+}
+
+/**
+ * Whether `deadlineAt` is absent or a valid scheduler time. Checked once per run; an invalid value
+ * is then re-validated per item so every item records its own INVALID_OPTION.
+ */
+export function isValidDeadline(deadlineAt: number | undefined): boolean {
+  if (deadlineAt === undefined) return true
+  try {
+    validateSchedulerTime(deadlineAt, 'deadlineAt')
+    return true
+  } catch {
+    // Recorded per item at run time, matching the former per-item context admission.
+    return false
+  }
+}
+
+/**
+ * Releases admitted items one after another against one shared context, recording every failure
+ * through `record`. Shared by DisposeTransaction and LifecycleScope so both run the same release
+ * semantics. A synchronous release stays on the current turn; only a genuinely asynchronous chain
+ * is awaited. One item's unexpected failure never prevents later items from being released.
+ */
+export async function releaseAdmittedItems(
+  items: readonly IAdmittedDisposeItem[],
+  context: IReleaseContext,
+  deadlineValid: boolean,
+  record: (source: string, error: unknown) => void
+): Promise<void> {
+  for (const item of items) {
+    try {
+      // Each item re-checks an invalid `deadlineAt`, so every item still records its own fresh
+      // INVALID_OPTION instead of running against a broken clock.
+      if (!deadlineValid) validateSchedulerTime(context.deadlineAt, 'deadlineAt')
+      /** Release outcome; a Promise only when some callback returned a thenable. */
+      const pendingErrors = executeAdmittedReleaseDescriptor(item.descriptor, context)
+      /** Errors this item produced, in callback order. */
+      const errors = pendingErrors instanceof Promise ? await pendingErrors : pendingErrors
+      for (const error of errors) record(item.source, error)
+    } catch (error) {
+      record(item.source, error)
+    }
+  }
+}
+
+/**
+ * Context for owner-less plan-order releases: never aborted, no deadline, no scheduler and no
+ * reporter. Frozen so one instance can serve every such release.
+ */
+const inertReleaseContext: IReleaseContext = Object.freeze({
+  signal: inertReleaseSignal,
+  deadlineAt: undefined,
+  scheduler: undefined,
+  report: (error: unknown) => safeReport(undefined, error),
+  disposer: undefined
+})
+
+/**
+ * Releases already-admitted items in the given order under `errorPolicy`, with the inert context
+ * and no reporter. Used by owners (ProvisionalScope) that snapshot descriptors at registration.
+ */
+export async function releaseInPlanOrder(
+  items: readonly IAdmittedDisposeItem[],
+  errorPolicy: IErrorPolicy
+): Promise<readonly ICollectedError[]> {
+  /** Applies the error policy to every release failure. */
+  const collector = createErrorCollector(errorPolicy, undefined)
+  await releaseAdmittedItems(items, inertReleaseContext, true, (source, error) =>
+    collector.add(source, error)
+  )
+  return collector.finalize(LifecycleErrorText.disposeTransactionFailed)
 }
 
 export function createDisposeTransaction(
@@ -504,15 +576,7 @@ export function createDisposeTransaction(
   const pending = options.pending
   const createController = captureAbortControllerFactory()
   /** Whether `deadlineAt` is absent or a valid scheduler time; checked once per transaction. */
-  let deadlineValid = true
-  if (deadlineAt !== undefined) {
-    try {
-      validateSchedulerTime(deadlineAt, 'deadlineAt')
-    } catch {
-      // Recorded per item at run time, matching the former per-item context admission.
-      deadlineValid = false
-    }
-  }
+  const deadlineValid = isValidDeadline(deadlineAt)
   return {
     mode,
     async run(items) {
@@ -553,20 +617,7 @@ export function createDisposeTransaction(
           report: (error) => safeReport(report, error),
           disposer: options.disposer
         }
-        for (const item of admission.admitted) {
-          try {
-            // Each item re-checks an invalid `deadlineAt`, so every item still records its own
-            // fresh INVALID_OPTION instead of running against a broken clock.
-            if (!deadlineValid) validateSchedulerTime(deadlineAt, 'deadlineAt')
-            const pendingErrors = executeAdmittedReleaseDescriptor(item.descriptor, context)
-            // Await only a genuinely asynchronous chain; synchronous releases stay on this turn.
-            const errors = pendingErrors instanceof Promise ? await pendingErrors : pendingErrors
-            for (const error of errors) record(item.source, error)
-          } catch (error) {
-            // Keep one unexpected item failure from preventing later admitted resources from release.
-            record(item.source, error)
-          }
-        }
+        await releaseAdmittedItems(admission.admitted, context, deadlineValid, record)
       } catch (error) {
         // Input iteration failures must not bypass pending drain or collector finalization.
         record('transaction', error)
