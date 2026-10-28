@@ -1,3 +1,11 @@
+/**
+ * Owns incremental topology facts, edge admission and isolated transaction publication. Exposes the
+ * public index contract; resource lifecycle and dependency policy stay outside L0.
+ */
+import { OverlayStore, type IKeyedStore, type IStoredTopologyNode } from './topology-store.js'
+import { TopologyTransaction } from './topology-transaction.js'
+import { TopologyLevelQueue } from './topology-level-queue.js'
+import { orderTopologyNodes, registrationTopologyNodes } from './topology-order.js'
 import {
   retainTopologyFailure,
   createTopologyReadonlyMap,
@@ -93,103 +101,6 @@ export type ITopologyIndex = ITopologyIndexReader &
     begin(): ITopologyTransaction
   }>
 
-type IStoredTopologyNode = Readonly<{
-  readonly id: string
-  readonly ordinal: number
-  readonly level: number
-  readonly dependencies: readonly ITopologyDependency[]
-}>
-
-/** The keyed-store subset the index uses, satisfied by a `Map` and by a transaction overlay. */
-type IKeyedStore<K, V> = {
-  readonly size: number
-  get(key: K): V | undefined
-  has(key: K): boolean
-  set(key: K, value: V): unknown
-  delete(key: K): boolean
-  keys(): IterableIterator<K>
-  values(): IterableIterator<V>
-}
-
-/** Marks a key an overlay removed from its base store. */
-const REMOVED: unique symbol = Symbol('topology-index.removed')
-
-/**
- * Copy-on-write view over a base store: reads fall through to the base, writes stay in the overlay.
- * Opening it costs nothing and committing it costs the number of keys written, which keeps a
- * transaction proportional to the change instead of to the whole index.
- */
-class OverlayStore<K, V> implements IKeyedStore<K, V> {
-  /** Store observed until this overlay is committed; never written by the overlay. */
-  readonly #base: IKeyedStore<K, V>
-  /** Keys written in this overlay: a replacement value or the removal marker. */
-  readonly #own = new Map<K, V | typeof REMOVED>()
-  /** Merged-view size, maintained on every write so `size` stays O(1). */
-  #size: number
-
-  /** Wraps `base` without copying it. */
-  constructor(base: IKeyedStore<K, V>) {
-    this.#base = base
-    this.#size = base.size
-  }
-
-  /** Number of keys in the merged view. */
-  get size(): number {
-    return this.#size
-  }
-
-  /** Reads the overlay value, falling back to the base for untouched keys. */
-  get(key: K): V | undefined {
-    if (!this.#own.has(key)) return this.#base.get(key)
-    const own = this.#own.get(key)
-    return own === REMOVED ? undefined : own
-  }
-
-  /** Reports membership in the merged view. */
-  has(key: K): boolean {
-    if (this.#own.has(key)) return this.#own.get(key) !== REMOVED
-    return this.#base.has(key)
-  }
-
-  /** Whether `key` was written by this overlay (its value is not shared with the base). */
-  owns(key: K): boolean {
-    return this.#own.has(key) && this.#own.get(key) !== REMOVED
-  }
-
-  /** Writes one value into the overlay. */
-  set(key: K, value: V): this {
-    if (!this.has(key)) this.#size += 1
-    this.#own.set(key, value)
-    return this
-  }
-
-  /** Removes one key from the merged view. */
-  delete(key: K): boolean {
-    if (!this.has(key)) return false
-    this.#size -= 1
-    this.#own.set(key, REMOVED)
-    return true
-  }
-
-  /** Iterates merged keys: untouched base keys first, then keys the overlay added. */
-  *keys(): IterableIterator<K> {
-    for (const key of this.#base.keys()) if (this.has(key)) yield key
-    for (const [key, value] of this.#own) if (value !== REMOVED && !this.#base.has(key)) yield key
-  }
-
-  /** Iterates merged values in `keys()` order. */
-  *values(): IterableIterator<V> {
-    for (const key of this.keys()) yield this.get(key)!
-  }
-
-  /** Applies every overlay write to `target`; costs the number of written keys. */
-  applyTo(target: IKeyedStore<K, V>): void {
-    for (const [key, value] of this.#own)
-      if (value === REMOVED) target.delete(key)
-      else target.set(key, value)
-  }
-}
-
 /** Mutable topology owner; all public values leave through frozen snapshots. */
 class TopologyIndex implements ITopologyIndex {
   /** Caller-owned error policy retained for structural failures. */
@@ -198,8 +109,8 @@ class TopologyIndex implements ITopologyIndex {
   /** Nodes indexed by stable ID, including monotonic ordinal and current level. */
   readonly #nodes: IKeyedStore<string, IStoredTopologyNode>
 
-  /** Requiredness indexed by consumer in registration order, including dangling provider IDs. */
-  readonly #consumers: IKeyedStore<string, Map<string, boolean>>
+  /** Requiredness keyed by provider and consumer, retaining dangling provider references. */
+  readonly #consumers: IKeyedStore<string, IKeyedStore<string, boolean>>
 
   /** Next monotonic registration ordinal; removals never reclaim it. */
   #nextOrdinal: number
@@ -243,6 +154,7 @@ class TopologyIndex implements ITopologyIndex {
 
   /** Returns the frozen dependency facts for one present node. */
   dependencies(id: string): readonly ITopologyDependency[] {
+    /** Present immutable node facts are the sole source for this operation. */
     const node = this.#requireNode(id)
     return node.dependencies
   }
@@ -254,8 +166,13 @@ class TopologyIndex implements ITopologyIndex {
     const required: string[] = []
     /** Optional consumers in registration order. */
     const optional: string[] = []
-    for (const [consumerId, requiredEdge] of this.#consumers.get(id) ?? []) {
-      ;(requiredEdge ? required : optional).push(consumerId)
+    /** Reverse membership stays keyed; projection alone restores registration order. */
+    const edges = this.#consumers.get(id)
+    /** Captured consumers are restricted to this provider's direct neighbourhood. */
+    const consumers: IStoredTopologyNode[] = []
+    for (const consumer of edges?.keys() ?? []) consumers.push(this.#nodes.get(consumer)!)
+    for (const consumer of registrationTopologyNodes(consumers)) {
+      ;(edges!.get(consumer.id) ? required : optional).push(consumer.id)
     }
     return Object.freeze({
       required: Object.freeze(required),
@@ -265,6 +182,7 @@ class TopologyIndex implements ITopologyIndex {
 
   /** Returns edges from one node to providers not currently present. */
   missing(id: string): readonly ITopologyDependency[] {
+    /** Present immutable node facts are the sole source for this operation. */
     const node = this.#requireNode(id)
     /** Dangling edges retained in declaration order. */
     const missing: ITopologyDependency[] = []
@@ -278,7 +196,7 @@ class TopologyIndex implements ITopologyIndex {
   closure(roots: readonly string[]): readonly string[] {
     /** IDs reached through required reverse edges. */
     const reached = new Set<string>()
-    /** Breadth-first work queue; final output is sorted independently. */
+    /** Breadth-first work queue; final output uses bounded canonical buckets. */
     const queue: string[] = []
     for (const root of roots) {
       this.#requireNode(root)
@@ -288,6 +206,7 @@ class TopologyIndex implements ITopologyIndex {
       }
     }
     for (let index = 0; index < queue.length; index += 1) {
+      /** Each reached provider expands its reverse memberships once. */
       const provider = queue[index]!
       for (const [consumerId, required] of this.#consumers.get(provider) ?? []) {
         if (!required || reached.has(consumerId)) continue
@@ -295,7 +214,7 @@ class TopologyIndex implements ITopologyIndex {
         queue.push(consumerId)
       }
     }
-    return Object.freeze(this.#sortCanonical(reached))
+    return Object.freeze(this.#orderCanonical(reached))
   }
 
   /** Returns all nodes or one validated subset in canonical level/ordinal order. */
@@ -303,18 +222,17 @@ class TopologyIndex implements ITopologyIndex {
     /** Requested IDs, deduplicated without changing their semantic set. */
     const selected = ids ? new Set(ids) : new Set(this.#nodes.keys())
     for (const id of selected) this.#requireNode(id)
-    return Object.freeze(this.#sortCanonical(selected))
+    return Object.freeze(this.#orderCanonical(selected))
   }
 
   /** Produces a deeply frozen static topology projection with dense ordinals. */
   snapshot(): ICapabilityTopology {
     /** Present nodes in raw registration order for dense ordinal projection. */
-    const ordinalNodes = [...this.#nodes.values()].sort(
-      (left, right) => left.ordinal - right.ordinal
-    )
+    const ordinalNodes = registrationTopologyNodes(this.#nodes.values())
     /** Frozen public nodes keyed by ID. */
     const publicNodes = new Map<string, ITopologyNode>()
     for (let ordinal = 0; ordinal < ordinalNodes.length; ordinal += 1) {
+      /** Registration position chooses the public dense ordinal independently of topology rank. */
       const node = ordinalNodes[ordinal]!
       publicNodes.set(
         node.id,
@@ -332,13 +250,17 @@ class TopologyIndex implements ITopologyIndex {
     /** Dense ordinal entries preserving registration order. */
     const ordinalEntries: Array<readonly [string, number]> = []
     for (let ordinal = 0; ordinal < ordinalNodes.length; ordinal += 1) {
+      /** Registration position chooses the public dense ordinal independently of topology rank. */
       const node = ordinalNodes[ordinal]!
       consumerEntries.push([node.id, node.dependencies])
+      /** Only dependencies whose providers remain present contribute indegree. */
       let indegree = 0
       for (const dependency of node.dependencies) {
+        /** Public provider membership determines whether this edge participates in the snapshot. */
         const provider = publicNodes.get(dependency.provider)
         if (!provider) continue
         indegree += 1
+        /** First consumer encounter determines the provider map's stable key order. */
         const consumers = providerEntries.get(dependency.provider)
         if (consumers) consumers.push(publicNodes.get(node.id)!)
         else providerEntries.set(dependency.provider, [publicNodes.get(node.id)!])
@@ -349,7 +271,7 @@ class TopologyIndex implements ITopologyIndex {
     }
     /** Public ordered nodes share the same immutable node instances as map values. */
     const ordered = Object.freeze(
-      this.#sortCanonical(this.#nodes.keys()).map((id) => publicNodes.get(id)!)
+      this.#orderCanonical(this.#nodes.keys()).map((id) => publicNodes.get(id)!)
     )
     return Object.freeze({
       ordered,
@@ -366,6 +288,7 @@ class TopologyIndex implements ITopologyIndex {
   /** Adds one node atomically and activates reverse-indexed dangling edges. */
   add(candidate: ITopologyIndexNode): void {
     this.#assertWritable()
+    /** Admission captures hostile fields before any index mutation. */
     const node = snapshotTopologyIndexNode(candidate, (reason, id, failure) =>
       failure === undefined
         ? this.#adapter.onInvalid(reason, id)
@@ -378,6 +301,7 @@ class TopologyIndex implements ITopologyIndex {
   #addSnapshot(node: ITopologyIndexNode): void {
     if (this.#nodes.has(node.id))
       this.#adapter.onInvalid(TopologyInvalidReason.duplicateNode, node.id)
+    /** Existing incoming references become present-provider edges when this node is admitted. */
     const danglingConsumers = this.#consumers.get(node.id)
     if (
       node.dependencies.some((dependency) => dependency.provider === node.id) ||
@@ -403,6 +327,7 @@ class TopologyIndex implements ITopologyIndex {
   /** Removes one node while retaining incoming edges as dangling reverse facts. */
   remove(id: string): void {
     this.#assertWritable()
+    /** Present immutable node facts are the sole source for this operation. */
     const node = this.#requireNode(id)
     /** Present consumers whose level may fall after this provider disappears. */
     const affected = [...(this.#consumers.get(id)?.keys() ?? [])]
@@ -416,7 +341,9 @@ class TopologyIndex implements ITopologyIndex {
   /** Replaces one node's edge set atomically without changing its ordinal. */
   setDependencies(id: string, dependencies: readonly ITopologyDependency[]): void {
     this.#assertWritable()
+    /** Present immutable node facts are the sole source for this operation. */
     const node = this.#requireNode(id)
+    /** Frozen candidate edges replace the old facts only after structural validation succeeds. */
     const snapshots = snapshotTopologyDependencies(dependencies, id, (reason, nodeId, failure) =>
       failure === undefined
         ? this.#adapter.onInvalid(reason, nodeId)
@@ -424,9 +351,11 @@ class TopologyIndex implements ITopologyIndex {
     )
     /** Newly introduced present providers that could close a back edge. */
     const oldProviders = new Set(node.dependencies.map((dependency) => dependency.provider))
+    /** Existing lower-level providers cannot create a new backward dependency path. */
     const mightCycle = snapshots.some((dependency) => {
       if (oldProviders.has(dependency.provider)) return false
       if (dependency.provider === id) return true
+      /** Current provider depth limits when cycle traversal is necessary. */
       const provider = this.#nodes.get(dependency.provider)
       return provider !== undefined && provider.level >= node.level
     })
@@ -460,7 +389,10 @@ class TopologyIndex implements ITopologyIndex {
   /** Applies a transaction view's overlay writes, then releases ownership. */
   #adopt(working: TopologyIndex): void {
     ;(working.#nodes as OverlayStore<string, IStoredTopologyNode>).applyTo(this.#nodes)
-    ;(working.#consumers as OverlayStore<string, Map<string, boolean>>).applyTo(this.#consumers)
+    ;(working.#consumers as OverlayStore<string, IKeyedStore<string, boolean>>).applyTo(
+      this.#consumers,
+      (bucket) => (bucket instanceof OverlayStore ? bucket.commitToBase() : bucket)
+    )
     this.#nextOrdinal = working.#nextOrdinal
     this.#transactionOpen = false
   }
@@ -477,49 +409,38 @@ class TopologyIndex implements ITopologyIndex {
 
   /** Returns one node or routes the unknown ID through the adapter. */
   #requireNode(id: string): IStoredTopologyNode {
+    /** Missing identity delegates its native error policy to the caller adapter. */
     const node = this.#nodes.get(id)
     if (!node) this.#adapter.onInvalid(TopologyInvalidReason.unknownNode, id)
     return node
   }
 
   /**
-   * Returns the consumer map of `provider` that this view may mutate. In a transaction view a map
-   * still shared with the base is copied first, so base readers never observe transaction edges.
+   * Returns a writable consumer bucket without copying its existing memberships. A transaction adds
+   * an O(1) nested overlay, preserving stable base readers until commit.
    */
-  #writableConsumers(provider: string): Map<string, boolean> | undefined {
+  #writableConsumers(provider: string): IKeyedStore<string, boolean> | undefined {
+    /** Existing provider bucket may still belong to the stable parent view. */
     const consumers = this.#consumers.get(provider)
     if (!consumers || !(this.#consumers instanceof OverlayStore) || this.#consumers.owns(provider))
       return consumers
-    /** Transaction-owned copy of a base bucket. */
-    const copy = new Map(consumers)
-    this.#consumers.set(provider, copy)
-    return copy
+    /** Nested overlay charges only actual consumer edits when the transaction commits. */
+    const overlay = new OverlayStore(consumers)
+    this.#consumers.set(provider, overlay)
+    return overlay
   }
 
-  /** Stores edge kind once and maintains registration order when an old consumer is rewired. */
+  /** Stores one reverse membership in O(1); readers own registration-order projection. */
   #addReverseEdge(provider: string, consumer: string, required: boolean): void {
-    /** Transaction-owned provider bucket; new nodes append in monotonic ordinal order. */
+    /** Writable bucket is owned either by this base or its transaction overlay. */
     const consumers = this.#writableConsumers(provider)
-    if (!consumers) {
-      this.#consumers.set(provider, new Map([[consumer, required]]))
-      return
-    }
-    consumers.set(consumer, required)
-    if (this.#nodes.get(consumer)!.ordinal === this.#nextOrdinal - 1) return
-    // Existing consumers may regain an edge after newer registrations. Restore order on this
-    // write so every reverse read can iterate directly without copying, sorting or edge lookup.
-    this.#consumers.set(
-      provider,
-      new Map(
-        [...consumers].sort(
-          ([left], [right]) => this.#nodes.get(left)!.ordinal - this.#nodes.get(right)!.ordinal
-        )
-      )
-    )
+    if (consumers) consumers.set(consumer, required)
+    else this.#consumers.set(provider, new Map([[consumer, required]]))
   }
 
   /** Removes one reverse edge and prunes empty provider buckets. */
   #removeReverseEdge(provider: string, consumer: string): void {
+    /** Writable bucket is owned either by this base or its transaction overlay. */
     const consumers = this.#writableConsumers(provider)
     if (!consumers) return
     consumers.delete(consumer)
@@ -540,7 +461,9 @@ class TopologyIndex implements ITopologyIndex {
     > = [{ id, dependencies, index: 0 }]
 
     while (frames.length > 0) {
+      /** Current DFS continuation resumes in declaration order after each provider. */
       const frame = frames[frames.length - 1]!
+      /** Each candidate edge is inspected at most once per completed DFS frame. */
       const dependency = frame.dependencies[frame.index]
       frame.index += 1
       if (!dependency) {
@@ -550,12 +473,15 @@ class TopologyIndex implements ITopologyIndex {
         path.pop()
         continue
       }
+      /** Provider identity either closes the active path or advances the DFS. */
       const provider = dependency.provider
+      /** Active positions identify the stable closed suffix without rescanning the path. */
       const activeIndex = active.get(provider)
       if (activeIndex !== undefined) {
         this.#adapter.onCycle(Object.freeze([...path.slice(activeIndex), provider]))
       }
       if (complete.has(provider)) continue
+      /** Absent providers remain dangling facts and do not participate in cycles. */
       const providerNode = provider === id ? undefined : this.#nodes.get(provider)
       if (!providerNode) continue
       active.set(provider, path.length)
@@ -564,24 +490,33 @@ class TopologyIndex implements ITopologyIndex {
     }
   }
 
-  /** Recomputes changed levels and propagates only through affected consumers. */
+  /**
+   * Propagates actual depth changes once per node in original-level order. Every existing provider
+   * has a strictly lower original level than its consumer. The changed registration is seeded
+   * before dangling consumers, so all changed providers settle first. Unchanged nodes stop
+   * propagation; bounded integer buckets preserve affected-region cost.
+   */
   #recomputeLevels(seeds: Iterable<string>): void {
-    /** Deduplicated propagation queue. */
-    const queue: string[] = []
-    /** IDs already waiting for recomputation. */
+    /** Original-level frontier is a graph derivation detail, not a lifecycle mutation queue. */
+    const queue = new TopologyLevelQueue()
+    /** A node enters the frontier once even when several providers change in this operation. */
     const queued = new Set<string>()
     for (const seed of seeds) {
-      if (!this.#nodes.has(seed) || queued.has(seed)) continue
+      /** Removal may leave no present node at a seed identity. */
+      const node = this.#nodes.get(seed)
+      if (!node || queued.has(seed)) continue
       queued.add(seed)
-      queue.push(seed)
+      queue.push(seed, node.level)
     }
-    for (let index = 0; index < queue.length; index += 1) {
-      const id = queue[index]!
-      queued.delete(id)
-      const node = this.#nodes.get(id)
-      if (!node) continue
+    while (queue.size > 0) {
+      /** Original levels select provider-first propagation without revisiting a consumer. */
+      const id = queue.take()!
+      /** Current node facts retain original depth until this node's single evaluation. */
+      const node = this.#nodes.get(id)!
+      /** Longest present-provider path determines this node's final depth. */
       let level = 0
       for (const dependency of node.dependencies) {
+        /** Changed providers already carry final depths; all other providers remain unchanged. */
         const provider = this.#nodes.get(dependency.provider)
         if (provider) level = Math.max(level, provider.level + 1)
       }
@@ -590,143 +525,17 @@ class TopologyIndex implements ITopologyIndex {
       for (const consumer of this.#consumers.get(id)?.keys() ?? []) {
         if (queued.has(consumer)) continue
         queued.add(consumer)
-        queue.push(consumer)
+        queue.push(consumer, this.#nodes.get(consumer)!.level)
       }
     }
   }
 
-  /** Sorts a validated ID set by canonical level and registration ordinal. */
-  #sortCanonical(ids: Iterable<string>): string[] {
-    return [...ids].sort((left, right) => {
-      const leftNode = this.#nodes.get(left)!
-      const rightNode = this.#nodes.get(right)!
-      return leftNode.level - rightNode.level || leftNode.ordinal - rightNode.ordinal
-    })
-  }
-}
-
-/** Transaction facade that invalidates every operation after settlement. */
-class TopologyTransaction implements ITopologyTransaction {
-  /** Overlay index used by transaction reads and writes. */
-  readonly #working: TopologyIndex
-
-  /** Parent-owned commit: applies the overlay and releases the parent's writer. */
-  readonly #commit: () => void
-
-  /** Parent-owned rollback: releases the parent's writer and drops the overlay. */
-  readonly #rollback: () => void
-
-  /** Parent-owned rejection for any use after settlement. */
-  readonly #rejectClosed: () => never
-
-  /** Whether commit or rollback has permanently settled this transaction. */
-  #closed = false
-
-  /**
-   * Creates a transaction over one overlay view. The parent passes its authority as closures, so no
-   * commit or rollback entry point exists on the index object itself.
-   */
-  constructor(
-    working: TopologyIndex,
-    commit: () => void,
-    rollback: () => void,
-    rejectClosed: () => never
-  ) {
-    this.#working = working
-    this.#commit = commit
-    this.#rollback = rollback
-    this.#rejectClosed = rejectClosed
-  }
-
-  /** Number of nodes in the transaction view. */
-  get size(): number {
-    this.#assertOpen()
-    return this.#working.size
-  }
-
-  /** Delegates membership reads to the transaction view. */
-  has(id: string): boolean {
-    this.#assertOpen()
-    return this.#working.has(id)
-  }
-
-  /** Reads the transaction's canonical ordinal while enforcing its existing closed guard. */
-  registrationOrdinal(id: string): number {
-    this.#assertOpen()
-    return this.#working.registrationOrdinal(id)
-  }
-
-  /** Delegates dependency reads to the transaction view. */
-  dependencies(id: string): readonly ITopologyDependency[] {
-    this.#assertOpen()
-    return this.#working.dependencies(id)
-  }
-
-  /** Delegates dependent reads to the transaction view. */
-  dependents(id: string): IGraphDependents {
-    this.#assertOpen()
-    return this.#working.dependents(id)
-  }
-
-  /** Delegates dangling-edge reads to the transaction view. */
-  missing(id: string): readonly ITopologyDependency[] {
-    this.#assertOpen()
-    return this.#working.missing(id)
-  }
-
-  /** Delegates closure reads to the transaction view. */
-  closure(roots: readonly string[]): readonly string[] {
-    this.#assertOpen()
-    return this.#working.closure(roots)
-  }
-
-  /** Delegates ordering reads to the transaction view. */
-  order(ids?: Iterable<string>): readonly string[] {
-    this.#assertOpen()
-    return this.#working.order(ids)
-  }
-
-  /** Delegates snapshot reads to the transaction view. */
-  snapshot(): ICapabilityTopology {
-    this.#assertOpen()
-    return this.#working.snapshot()
-  }
-
-  /** Adds a node only to the transaction view. */
-  add(node: ITopologyIndexNode): void {
-    this.#assertOpen()
-    this.#working.add(node)
-  }
-
-  /** Removes a node only from the transaction view. */
-  remove(id: string): void {
-    this.#assertOpen()
-    this.#working.remove(id)
-  }
-
-  /** Replaces dependencies only in the transaction view. */
-  setDependencies(id: string, dependencies: readonly ITopologyDependency[]): void {
-    this.#assertOpen()
-    this.#working.setDependencies(id, dependencies)
-  }
-
-  /** Publishes all isolated changes atomically and closes the transaction. */
-  commit(): void {
-    this.#assertOpen()
-    this.#commit()
-    this.#closed = true
-  }
-
-  /** Discards all isolated changes and closes the transaction. */
-  rollback(): void {
-    this.#assertOpen()
-    this.#rollback()
-    this.#closed = true
-  }
-
-  /** Rejects every operation after transaction settlement. */
-  #assertOpen(): void {
-    if (this.#closed) this.#rejectClosed()
+  /** Places a validated subset into fixed-width level and ordinal buckets in O(subset size). */
+  #orderCanonical(ids: Iterable<string>): string[] {
+    /** Only selected facts enter the ordering owner; unrelated graph size is not consulted. */
+    const nodes: IStoredTopologyNode[] = []
+    for (const id of ids) nodes.push(this.#nodes.get(id)!)
+    return orderTopologyNodes(nodes).map((node) => node.id)
   }
 }
 
