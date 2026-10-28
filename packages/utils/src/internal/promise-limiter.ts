@@ -310,6 +310,11 @@ function installConcurrencyListener(
   signal: IAbortSignal | undefined,
   onAbort: () => void
 ): void {
-  entry.cleanup = () => signal?.removeEventListener('abort', onAbort)
+  /**
+   * Bound before storing: V8 allocates a function literal assigned straight to a property in old
+   * space, which would keep this short-lived entry alive through minor GCs.
+   */
+  const cleanup = (): void => signal?.removeEventListener('abort', onAbort)
+  entry.cleanup = cleanup
   signal?.addEventListener('abort', onAbort, { once: true })
 }
