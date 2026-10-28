@@ -352,7 +352,9 @@ export class DependencyTracker {
       throw createReactiveError(ReactiveErrorCode.captureInvalid, ReactiveErrorText.captureInvalid)
     }
     this.#captures.delete(capture)
-    if (!this.#validateCapture(state)) return false
+    /** One commit validates each shared speculative state once, retaining every recorded edge. */
+    const validated = new Set<ICaptureState>()
+    if (!this.#validateCapture(state, validated)) return false
     /** Lazy idle checks must see the complete graph, including when the idle channel is synchronous. */
     const applied = new Map<IObservable, ICapturedDerivation>()
     try {
@@ -363,8 +365,12 @@ export class DependencyTracker {
     return true
   }
 
-  /** Validates the entire speculative dependency tree before installing any of its edges. */
-  #validateCapture(state: ICaptureState): boolean {
+  /**
+   * Validates every speculative state and its recorded edges once before installing any graph
+   * edges. Shared derivations reuse successful validation, keeping work O(captured edges).
+   */
+  #validateCapture(state: ICaptureState, validated: Set<ICaptureState>): boolean {
+    if (validated.has(state)) return true
     for (const [dep, recorded] of state.dependencies) {
       if (
         this.#terminalObservables.has(dep) ||
@@ -379,11 +385,12 @@ export class DependencyTracker {
         if (
           !derivation ||
           this.#captures.get(derivation.capture) !== derivation.state ||
-          !this.#validateCapture(derivation.state)
+          !this.#validateCapture(derivation.state, validated)
         )
           return false
       }
     }
+    validated.add(state)
     return true
   }
 
