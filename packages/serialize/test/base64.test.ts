@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { base64ToBytes, bytesToBase64, streamBase64Chunks } from '../src/base64'
+import { base64ToBytes, bytesToBase64, streamBase64Chunks } from '../src/base64.ts'
 
 function randomBytes(length: number): Uint8Array {
   const bytes = new Uint8Array(length)

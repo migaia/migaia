@@ -8,6 +8,7 @@ export function createCodecError(
   message: string,
   cause?: unknown
 ): Error {
+  /** The original native TypeError receives serialize identity without replacing its stack. */
   const error = new TypeError(message, cause === undefined ? undefined : { cause })
   Object.defineProperty(error, 'source', { value: SERIALIZE_SOURCE, enumerable: true })
   Object.defineProperty(error, 'code', { value: code, enumerable: true })

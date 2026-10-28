@@ -50,6 +50,7 @@ export function defineProtobufCodec<
 ): ICodec<MessageShape<TBinding>, Uint8Array, 'protobuf', TVersion> & {
   readonly encodedType: 'uint8array'
 } & Readonly<{ schema: IProtobufSchema<TSchemaId, TSchemaVersion> }> {
+  /** Retain the admitted literal codec revision without rereading the caller option. */
   let version: TVersion
   try {
     version = assertCodecVersion(options.version)
@@ -60,8 +61,11 @@ export function defineProtobufCodec<
       CodecErrorText.invalidVersion
     )
   }
+  /** Borrow the supplied schema only while capturing its immutable public identity. */
   let schema: IProtobufSchema<TSchemaId, TSchemaVersion>
+  /** Capture the schema name once so later getters cannot change the published identity. */
   let schemaId: TSchemaId
+  /** Capture the independent schema revision once before admission. */
   let schemaVersion: TSchemaVersion
   try {
     schema = options.schema
@@ -85,6 +89,7 @@ export function defineProtobufCodec<
   ) {
     throw createCodecError(SerializeErrorCode.invalidOption, CodecErrorText.invalidSchema)
   }
+  /** Retain the admitted generated Buf descriptor for every synchronous conversion. */
   let binding: TBinding
   try {
     binding = options.binding
@@ -95,7 +100,9 @@ export function defineProtobufCodec<
       CodecErrorText.portableValueInvalid
     )
   }
+  /** Capture the descriptor discriminator once before executable binding admission. */
   let bindingKind: unknown
+  /** Capture the generated message name once without rereading descriptor getters. */
   let bindingTypeName: unknown
   try {
     bindingKind = binding?.kind
@@ -116,6 +123,7 @@ export function defineProtobufCodec<
     encodedType: 'uint8array' as const,
     encode: (value: MessageShape<TBinding>): Uint8Array => {
       try {
+        /** Retain the complete format result before validating or publishing its carrier. */
         const encoded = toBinary(binding, value)
         if (!isUint8Array(encoded))
           throw createCodecError(SerializeErrorCode.encodeFailed, CodecErrorText.encodeFailed)

@@ -49,6 +49,7 @@ function projectDecodedSafeIntegers(value: unknown, active = new Set<object>()):
   try {
     /** Own decoded CBOR record mutated only at safe-integer projection entries. */
     const record = value as Record<string, unknown>
+    /** Process each captured own key once while preserving the existing enumeration order. */
     for (const key of Object.keys(record))
       record[key] = projectDecodedSafeIntegers(record[key], active)
     return record
@@ -73,6 +74,7 @@ export type ICborCodecOptions<TVersion extends number> = Readonly<{
 export function defineCBORCodec<const TVersion extends number>(
   options: ICborCodecOptions<TVersion>
 ): ICodec<ICodecValue, Uint8Array, 'cbor', TVersion> & { readonly encodedType: 'uint8array' } {
+  /** Retain the admitted literal codec revision without rereading the caller option. */
   const version = assertCodecVersion(options.version)
   return Object.freeze({
     id: 'cbor' as const,
@@ -80,6 +82,7 @@ export function defineCBORCodec<const TVersion extends number>(
     encodedType: 'uint8array' as const,
     encode: (value: ICodecValue): Uint8Array => {
       try {
+        /** One shared projection owns value-domain validation before format encoding. */
         const portable = toCodecPortableValue(value)
         return cborEncoder.encode(portable)
       } catch (error) {
@@ -92,6 +95,7 @@ export function defineCBORCodec<const TVersion extends number>(
     },
     decode: (value: Uint8Array): ICodecValue => {
       try {
+        /** Validate the format decoder result through the shared portable value boundary. */
         const decoded = cborDecoder.decode(value) as unknown
         return asCodecValue(projectDecodedSafeIntegers(decoded))
       } catch (error) {
