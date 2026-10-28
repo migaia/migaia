@@ -400,7 +400,8 @@ async function redisSearchVector<TPayload>(
 /**
  * FT.SEARCH already returns hits by distance (SORTBY score), which is score order for both metrics.
  * Only runs of equal score still need the id tie-break, so only those runs are sorted; distinct
- * scores cost one linear pass.
+ * scores cost one linear pass. The id comparison is arithmetic rather than a ternary because Redis
+ * returns equal-score hits in no fixed order, which made branch coverage vary between runs.
  */
 function orderVectorHits<
   T extends readonly [unknown, { readonly score: number; readonly id: string }]
@@ -411,7 +412,7 @@ function orderVectorHits<
     if (index - start > 1) {
       const run = hits
         .slice(start, index)
-        .sort((left, right) => (left[1].id < right[1].id ? -1 : left[1].id > right[1].id ? 1 : 0))
+        .sort((left, right) => Number(left[1].id > right[1].id) - Number(left[1].id < right[1].id))
       for (let offset = 0; offset < run.length; offset++) hits[start + offset] = run[offset]!
     }
     start = index
