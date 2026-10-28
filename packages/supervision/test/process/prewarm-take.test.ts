@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { createUnitBudget, SupervisionErrorCode } from '../../src/index.js'
-import { createPrewarmPool, createProcessSupervisor } from '../../src/process/index.js'
-import { memoryProcessLauncher, processSpec } from './support/memory-process-launcher.js'
-import { memoryRegistry } from './support/memory-registry.js'
+import { createUnitBudget, SupervisionErrorCode } from '../../src/index.ts'
+import { createPrewarmPool, createProcessSupervisor } from '../../src/process/index.ts'
+import { memoryProcessLauncher, processSpec } from './support/memory-process-launcher.ts'
+import { memoryRegistry } from './support/memory-registry.ts'
 
 /** Flushes pool fill and lifecycle microtasks. */
 async function settle(): Promise<void> {

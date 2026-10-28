@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { createUnitBudget, SupervisionErrorCode } from '../../src/index.js'
-import { createProcessSupervisor } from '../../src/process/index.js'
-import { memoryProcessLauncher, processSpec } from './support/memory-process-launcher.js'
+import { createUnitBudget, SupervisionErrorCode } from '../../src/index.ts'
+import { createProcessSupervisor } from '../../src/process/index.ts'
+import { memoryProcessLauncher, processSpec } from './support/memory-process-launcher.ts'
 
 describe('continuous output drain', () => {
   it('retains a bounded tail and continues after the consumer callback throws', async () => {

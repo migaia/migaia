@@ -8,7 +8,7 @@ export {
   BootstrapVia,
   OrphanProbeResult,
   ParentLossExitCode
-} from './constants.js'
+} from './constants.ts'
 export type {
   IProcessEnv,
   IProcessStdio,
@@ -29,9 +29,9 @@ export type {
   IPrewarmPoolOptions,
   IProcessSupervisorOptions,
   IProcessSupervisor
-} from './types.js'
-export type { IOrphanReclaimResult } from './orphan.js'
-export { createProcessSupervisor } from './supervisor.js'
-export { createPrewarmPool } from './prewarm.js'
-export { reclaimOrphanProcesses } from './orphan.js'
-export { createParentLossGuard } from './parent-loss.js'
+} from './types.ts'
+export type { IOrphanReclaimResult } from './orphan.ts'
+export { createProcessSupervisor } from './supervisor.ts'
+export { createPrewarmPool } from './prewarm.ts'
+export { reclaimOrphanProcesses } from './orphan.ts'
+export { createParentLossGuard } from './parent-loss.ts'

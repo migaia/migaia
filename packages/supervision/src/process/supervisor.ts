@@ -1,17 +1,17 @@
 /** Composes process output, records, sampling and prewarm adoption above the shared core. */
-import { PROCESS_KIND, SAMPLE_USAGE_MISSING, ProcessField } from './text.js'
+import { PROCESS_KIND, SAMPLE_USAGE_MISSING, ProcessField } from './text.ts'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
-import { createSupervisor, type ILaunchContext, type IUnitRuntime } from '../index.js'
-import { CapabilityLevel, LaunchCause } from '../index.js'
-import { SupervisionErrorCode } from '../error-code.js'
-import { SupervisionErrorText } from '../error-text.js'
-import { createSupervisionError } from '../errors.js'
-import { processRequirements, validateCapabilityDeclaration } from './capabilities.js'
-import { ProcessCapability } from './constants.js'
-import { attachOutput, type IOutputAttachment } from './output-tail.js'
-import { createProcessProfile } from './profile.js'
-import { registerRecord } from './registry.js'
-import { invalidProcessOption, validateProcessSpec } from './spec.js'
+import { createSupervisor, type ILaunchContext, type IUnitRuntime } from '../index.ts'
+import { CapabilityLevel, LaunchCause } from '../index.ts'
+import { SupervisionErrorCode } from '../error-code.ts'
+import { SupervisionErrorText } from '../error-text.ts'
+import { createSupervisionError } from '../errors.ts'
+import { processRequirements, validateCapabilityDeclaration } from './capabilities.ts'
+import { ProcessCapability } from './constants.ts'
+import { attachOutput, type IOutputAttachment } from './output-tail.ts'
+import { createProcessProfile } from './profile.ts'
+import { registerRecord } from './registry.ts'
+import { invalidProcessOption, validateProcessSpec } from './spec.ts'
 import type {
   IPrewarmEntry,
   IProcessHandle,
@@ -19,9 +19,9 @@ import type {
   IProcessSpec,
   IProcessSupervisor,
   IProcessSupervisorOptions
-} from './types.js'
-import { startUsageMonitor, validateUsageOptions } from './usage-monitor.js'
-import { readPrewarmRecordOwner } from './prewarm.js'
+} from './types.ts'
+import { startUsageMonitor, validateUsageOptions } from './usage-monitor.ts'
+import { readPrewarmRecordOwner } from './prewarm.ts'
 
 /** Checks process-only settings before delegating core options to the shared supervisor. */
 export function validateProcessOptions<THandle extends IProcessHandle>(

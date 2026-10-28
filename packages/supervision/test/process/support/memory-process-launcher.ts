@@ -1,4 +1,4 @@
-import type { CapabilityLevel } from '../../../src/constants.js'
+import type { CapabilityLevel } from '../../../src/constants.ts'
 import {
   StderrMode,
   StdinMode,
@@ -9,7 +9,7 @@ import {
   type IProcessExitStatus,
   type IProcessLaunchContext,
   type IProcessUsage
-} from '../../../src/process/index.js'
+} from '../../../src/process/index.ts'
 
 /** Test-only handle with explicit exit and output controls. */
 export type IMemoryProcessHandle = IProcessHandle & {

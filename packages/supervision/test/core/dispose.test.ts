@@ -5,9 +5,9 @@ import {
   createUnitBudget,
   SupervisionErrorCode,
   type ISupervisor
-} from '../../src/index.js'
-import { createMemoryLauncher, type IMemoryHandle } from '../support/memory-launcher.js'
-import { createMemoryProfile } from '../support/memory-profile.js'
+} from '../../src/index.ts'
+import { createMemoryLauncher, type IMemoryHandle } from '../support/memory-launcher.ts'
+import { createMemoryProfile } from '../support/memory-profile.ts'
 
 /** Advances the queued disposal and release descriptor continuations. */
 async function flush(): Promise<void> {

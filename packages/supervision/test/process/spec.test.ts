@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { createUnitBudget, SupervisionErrorCode } from '../../src/index.js'
-import { BootstrapVia, createProcessSupervisor, StdinMode } from '../../src/process/index.js'
-import { memoryProcessLauncher, processSpec } from './support/memory-process-launcher.js'
+import { createUnitBudget, SupervisionErrorCode } from '../../src/index.ts'
+import { BootstrapVia, createProcessSupervisor, StdinMode } from '../../src/process/index.ts'
+import { memoryProcessLauncher, processSpec } from './support/memory-process-launcher.ts'
 
 describe('closed process specification', () => {
   it('rejects shell, malformed fields and bootstrap combinations before launch', () => {

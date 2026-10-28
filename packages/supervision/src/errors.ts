@@ -1,5 +1,5 @@
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { SUPERVISION_SOURCE, type ISupervisionErrorCode } from './error-code.js'
+import { SUPERVISION_SOURCE, type ISupervisionErrorCode } from './error-code.ts'
 
 /** Native constructors retained so callers can branch on TypeError and RangeError. */
 export type ISupervisionErrorConstructor =

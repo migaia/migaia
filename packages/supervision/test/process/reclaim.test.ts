@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
-import { SupervisionErrorCode } from '../../src/index.js'
-import { reclaimOrphanProcesses, type IProcessRecord } from '../../src/process/index.js'
-import { memoryProcessLauncher } from './support/memory-process-launcher.js'
-import { memoryRegistry } from './support/memory-registry.js'
+import { SupervisionErrorCode } from '../../src/index.ts'
+import { reclaimOrphanProcesses, type IProcessRecord } from '../../src/process/index.ts'
+import { memoryProcessLauncher } from './support/memory-process-launcher.ts'
+import { memoryRegistry } from './support/memory-registry.ts'
 
 describe('prior-run orphan recovery', () => {
   it('never terminates a reused pid and collects each failed record', async () => {

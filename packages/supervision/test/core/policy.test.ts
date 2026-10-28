@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { createSupervisor, createUnitBudget, SupervisionErrorCode } from '../../src/index.js'
-import { createMemoryLauncher } from '../support/memory-launcher.js'
-import { createMemoryProfile } from '../support/memory-profile.js'
-import { createRecordingScheduler } from '../support/recording-scheduler.js'
+import { createSupervisor, createUnitBudget, SupervisionErrorCode } from '../../src/index.ts'
+import { createMemoryLauncher } from '../support/memory-launcher.ts'
+import { createMemoryProfile } from '../support/memory-profile.ts'
+import { createRecordingScheduler } from '../support/recording-scheduler.ts'
 
 /** Settles generation and timer continuations under the manual clock. */
 async function flush(): Promise<void> {

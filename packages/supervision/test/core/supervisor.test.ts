@@ -5,9 +5,9 @@ import {
   createUnitBudget,
   SupervisionErrorCode,
   SUPERVISION_SOURCE
-} from '../../src/index.js'
-import { deferred, createMemoryLauncher } from '../support/memory-launcher.js'
-import { createMemoryProfile } from '../support/memory-profile.js'
+} from '../../src/index.ts'
+import { deferred, createMemoryLauncher } from '../support/memory-launcher.ts'
+import { createMemoryProfile } from '../support/memory-profile.ts'
 
 /** Advances pending lifecycle and queue continuations. */
 async function flush(): Promise<void> {

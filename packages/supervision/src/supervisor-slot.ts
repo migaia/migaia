@@ -10,17 +10,17 @@ import {
   type IGenerationRequest,
   type ILifecycleScope
 } from '@migaia/lifecycle'
-import { ExitReason, EXIT_OBSERVATION_CAPABILITY, UnitStopMode } from './constants.js'
-import { forceAndReap, releaseWhenGone, teardownUnit, type IUnitSlot } from './unit-teardown.js'
-import { publishExit } from './supervisor-events.js'
-import type { ISupervisorContext } from './supervisor-context.js'
+import { ExitReason, EXIT_OBSERVATION_CAPABILITY, UnitStopMode } from './constants.ts'
+import { forceAndReap, releaseWhenGone, teardownUnit, type IUnitSlot } from './unit-teardown.ts'
+import { publishExit } from './supervisor-events.ts'
+import type { ISupervisorContext } from './supervisor-context.ts'
 import type {
   IHealthSnapshot,
   ILaunchContext,
   IUnitExitStatus,
   IUnitHandle,
   IUnitRuntime
-} from './types.js'
+} from './types.ts'
 
 /** Explicit record shared by lifecycle teardown and supervisor ownership decisions. */
 export type IManagedSlot<

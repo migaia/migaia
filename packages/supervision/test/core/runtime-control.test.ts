@@ -1,8 +1,8 @@
 import { expect, it } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { createSupervisor, createUnitBudget } from '../../src/index.js'
-import { createMemoryLauncher, deferred, type IMemoryHandle } from '../support/memory-launcher.js'
-import { createMemoryProfile } from '../support/memory-profile.js'
+import { createSupervisor, createUnitBudget } from '../../src/index.ts'
+import { createMemoryLauncher, deferred, type IMemoryHandle } from '../support/memory-launcher.ts'
+import { createMemoryProfile } from '../support/memory-profile.ts'
 
 it('launch metadata counts accepted executions from zero and failed replacements reuse the next ordinal', async () => {
   const native = createMemoryLauncher()

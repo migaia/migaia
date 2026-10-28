@@ -1,14 +1,14 @@
-import { PROCESS_KIND } from './text.js'
-import { ExitReason } from '../index.js'
-import type { IUnitProfile } from '../index.js'
-import { processRequirements } from './capabilities.js'
-import { validateProcessSpec } from './spec.js'
+import { PROCESS_KIND } from './text.ts'
+import { ExitReason } from '../index.ts'
+import type { IUnitProfile } from '../index.ts'
+import { processRequirements } from './capabilities.ts'
+import { validateProcessSpec } from './spec.ts'
 import type {
   IProcessExitStatus,
   IProcessHandle,
   IProcessLaunchContext,
   IProcessSpec
-} from './types.js'
+} from './types.ts'
 
 /** Supplies the process-specific exit and termination rules to the shared supervisor. */
 export function createProcessProfile<THandle extends IProcessHandle>(

@@ -2,7 +2,7 @@
  * Owns one launch attempt, its cancellation listener and timeout; serving-unit lifetime remains in
  * its slot.
  */
-import { OutcomeKind, ABORT_EVENT } from './text.js'
+import { OutcomeKind, ABORT_EVENT } from './text.ts'
 import type { IGenerationRequest } from '@migaia/lifecycle'
 import { attachSecondaryErrors } from '@migaia/utils/error'
 import {
@@ -13,18 +13,18 @@ import {
   SupervisorState,
   UnitStopMode,
   type BudgetRejection
-} from './constants.js'
-import { SupervisionErrorCode } from './error-code.js'
-import { SupervisionErrorText } from './error-text.js'
-import { createSupervisionError } from './errors.js'
-import { startHealth } from './health.js'
-import { emit, publishExit, transition } from './supervisor-events.js'
-import { onExit, retireReplacingActive } from './supervisor-exit.js'
-import { onFailure } from './supervisor-policy.js'
-import { ManagedSlot, retire, type IManagedSlot } from './supervisor-slot.js'
-import { forceAndReap } from './unit-teardown.js'
-import type { ISupervisorContext } from './supervisor-context.js'
-import type { ILaunchContext, IReadyOutcome, IUnitHandle } from './types.js'
+} from './constants.ts'
+import { SupervisionErrorCode } from './error-code.ts'
+import { SupervisionErrorText } from './error-text.ts'
+import { createSupervisionError } from './errors.ts'
+import { startHealth } from './health.ts'
+import { emit, publishExit, transition } from './supervisor-events.ts'
+import { onExit, retireReplacingActive } from './supervisor-exit.ts'
+import { onFailure } from './supervisor-policy.ts'
+import { ManagedSlot, retire, type IManagedSlot } from './supervisor-slot.ts'
+import { forceAndReap } from './unit-teardown.ts'
+import type { ISupervisorContext } from './supervisor-context.ts'
+import type { ILaunchContext, IReadyOutcome, IUnitHandle } from './types.ts'
 
 /** The original provisional outcome and optional owned candidate are consumed by the command owner. */
 export type IAttemptOutcome<

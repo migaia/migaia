@@ -1,5 +1,5 @@
-import type { IUnitProfile } from '../../src/index.js'
-import type { IMemoryExit, IMemoryHandle } from './memory-launcher.js'
+import type { IUnitProfile } from '../../src/index.ts'
+import type { IMemoryExit, IMemoryHandle } from './memory-launcher.ts'
 
 /** Profile whose termination calls are visible to memory tests. */
 export function createMemoryProfile(

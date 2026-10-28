@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { createUnitBudget, SupervisionErrorCode } from '../../src/index.js'
-import { createCoroutineSupervisor } from '../../src/coroutine/index.js'
-import { createCoroutineLauncher, terminateCoroutineHandle } from '../../src/coroutine/launcher.js'
-import { deferred } from '../support/memory-launcher.js'
+import { createUnitBudget, SupervisionErrorCode } from '../../src/index.ts'
+import { createCoroutineSupervisor } from '../../src/coroutine/index.ts'
+import { createCoroutineLauncher, terminateCoroutineHandle } from '../../src/coroutine/launcher.ts'
+import { deferred } from '../support/memory-launcher.ts'
 
 /** Flushes task and supervisor continuations without moving virtual time. */
 async function flush(): Promise<void> {

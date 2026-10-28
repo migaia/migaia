@@ -1,8 +1,8 @@
-export { SUPERVISION_SOURCE, SupervisionErrorCode } from './error-code.js'
-export type { ISupervisionErrorCode } from './error-code.js'
-export { SupervisionErrorText } from './error-text.js'
-export { createUnitBudget } from './budget.js'
-export { createSupervisor } from './supervisor.js'
+export { SUPERVISION_SOURCE, SupervisionErrorCode } from './error-code.ts'
+export type { ISupervisionErrorCode } from './error-code.ts'
+export { SupervisionErrorText } from './error-text.ts'
+export { createUnitBudget } from './budget.ts'
+export { createSupervisor } from './supervisor.ts'
 export {
   SupervisorState,
   ExitReason,
@@ -18,7 +18,7 @@ export {
   LaunchCause,
   SupervisorEventType,
   StandardCapability
-} from './constants.js'
+} from './constants.ts'
 export type {
   IUnitIdentity,
   IUnitHandle,
@@ -42,4 +42,4 @@ export type {
   IHealthSnapshot,
   ISupervisorEvent,
   ISupervisor
-} from './types.js'
+} from './types.ts'

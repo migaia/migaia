@@ -1,4 +1,4 @@
-import type { IUnitHandle, IUnitLauncher } from '../../src/index.js'
+import type { IUnitHandle, IUnitLauncher } from '../../src/index.ts'
 
 /** Externally settled promise for deterministic launch and exit ordering. */
 export function deferred<T>(): {

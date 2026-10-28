@@ -1,19 +1,19 @@
 /** Owns native exit classification and old-unit failures observed during a replacement. */
-import type { ISupervisorContext } from './supervisor-context.js'
-import type { ILaunchContext, IUnitHandle } from './types.js'
+import type { ISupervisorContext } from './supervisor-context.ts'
+import type { ILaunchContext, IUnitHandle } from './types.ts'
 import {
   ExitReason,
   UnitStopMode,
   RestartMode,
   SupervisorState,
   SupervisorEventType
-} from './constants.js'
-import { createSupervisionError } from './errors.js'
-import { SupervisionErrorCode } from './error-code.js'
-import { SupervisionErrorText } from './error-text.js'
-import { emit, publishExit, transition } from './supervisor-events.js'
-import { trimFailures, scheduleBackoff, onFailure } from './supervisor-policy.js'
-import { retire, type IManagedSlot } from './supervisor-slot.js'
+} from './constants.ts'
+import { createSupervisionError } from './errors.ts'
+import { SupervisionErrorCode } from './error-code.ts'
+import { SupervisionErrorText } from './error-text.ts'
+import { emit, publishExit, transition } from './supervisor-events.ts'
+import { trimFailures, scheduleBackoff, onFailure } from './supervisor-policy.ts'
+import { retire, type IManagedSlot } from './supervisor-slot.ts'
 /** Retains old-unit failure while the pending replacement owns the next restart decision. */
 export function retireReplacingActive<
   TSpec,

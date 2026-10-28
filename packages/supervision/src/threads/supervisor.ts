@@ -3,12 +3,12 @@ import {
   createSupervisor,
   SupervisionErrorCode,
   SupervisionErrorText
-} from '../index.js'
-import { createSupervisionError } from '../errors.js'
-import { ThreadCapability, ThreadUnitKind } from './constants.js'
-import { ThreadField } from './text.js'
-import { createThreadProfile, invalidThreadOption } from './profile.js'
-import type { IThreadHandle, IThreadSupervisor, IThreadSupervisorOptions } from './types.js'
+} from '../index.ts'
+import { createSupervisionError } from '../errors.ts'
+import { ThreadCapability, ThreadUnitKind } from './constants.ts'
+import { ThreadField } from './text.ts'
+import { createThreadProfile, invalidThreadOption } from './profile.ts'
+import type { IThreadHandle, IThreadSupervisor, IThreadSupervisorOptions } from './types.ts'
 
 /** Rejects capability levels the thread profile cannot actually monitor. */
 export function validateThreadCapabilities(

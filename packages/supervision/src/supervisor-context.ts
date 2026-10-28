@@ -5,9 +5,9 @@ import type {
   createTerminalController
 } from '@migaia/lifecycle'
 import type { IScheduler, IScheduledTask } from '@migaia/utils/scheduler'
-import type { LaunchCause, RestartMode, SupervisorState } from './constants.js'
-import type { TimestampWindow } from './timestamp-window.js'
-import type { IManagedSlot } from './supervisor-slot.js'
+import type { LaunchCause, RestartMode, SupervisorState } from './constants.ts'
+import type { TimestampWindow } from './timestamp-window.ts'
+import type { IManagedSlot } from './supervisor-slot.ts'
 import type {
   ILaunchContext,
   IReadyOutcome,
@@ -15,7 +15,7 @@ import type {
   ISupervisorOptions,
   ISupervisorSnapshot,
   IUnitHandle
-} from './types.js'
+} from './types.ts'
 
 /** One owner context; runtime modules consume it without captured component variables. */
 export type ISupervisorContext<

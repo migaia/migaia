@@ -3,7 +3,7 @@ import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import * as root from '@migaia/supervision'
 import * as threads from '@migaia/supervision/threads'
-import { SupervisionErrorCode } from '../../src/index.js'
+import { SupervisionErrorCode } from '../../src/index.ts'
 
 describe('thread public contract', () => {
   it('exports exactly the thread API from its own subpath', () => {

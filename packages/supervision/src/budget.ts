@@ -1,6 +1,6 @@
 /** Owns unit admission, FIFO requests, and composed leases; lifecycle owns queueing and counters. */
-import { OutcomeKind, ABORT_EVENT, SupervisionField } from './text.js'
-import { TimestampWindow } from './timestamp-window.js'
+import { OutcomeKind, ABORT_EVENT, SupervisionField } from './text.ts'
+import { TimestampWindow } from './timestamp-window.ts'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import {
   createAbortController,
@@ -9,11 +9,11 @@ import {
 } from '@migaia/lifecycle'
 import { resolveScheduler, resolveSchedulerOption } from '@migaia/lifecycle/scheduler'
 import { systemScheduler, type IScheduledTask } from '@migaia/utils/scheduler'
-import { BudgetRejection, BudgetOverflow } from './constants.js'
-import { SupervisionErrorCode } from './error-code.js'
-import { SupervisionErrorText } from './error-text.js'
-import { createSupervisionError } from './errors.js'
-import type { IBudgetOutcome, IUnitBudget, IUnitBudgetOptions, IUnitLease } from './types.js'
+import { BudgetRejection, BudgetOverflow } from './constants.ts'
+import { SupervisionErrorCode } from './error-code.ts'
+import { SupervisionErrorText } from './error-text.ts'
+import { createSupervisionError } from './errors.ts'
+import type { IBudgetOutcome, IUnitBudget, IUnitBudgetOptions, IUnitLease } from './types.ts'
 
 /** Rejects a malformed limit before the budget owns any queue or timer. */
 function positive(value: unknown, field: string, integer = false, zero = false): number {

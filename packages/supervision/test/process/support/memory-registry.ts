@@ -1,4 +1,4 @@
-import type { IProcessRecord, IProcessRegistry } from '../../../src/process/index.js'
+import type { IProcessRecord, IProcessRegistry } from '../../../src/process/index.ts'
 
 /** In-memory durable records with a programmable add or remove failure. */
 export function memoryRegistry() {

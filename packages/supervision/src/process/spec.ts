@@ -1,10 +1,10 @@
 /** Validates the shell-free process schema in source order without scanning growing key lists. */
-import { PROCESS_KIND, NUL_CHARACTER, limitField, nestedField, ProcessField } from './text.js'
-import { SupervisionErrorCode } from '../error-code.js'
-import { SupervisionErrorText } from '../error-text.js'
-import { createSupervisionError } from '../errors.js'
-import { BootstrapVia, ProcessLimit, StderrMode, StdinMode, StdoutMode } from './constants.js'
-import type { IProcessSpec } from './types.js'
+import { PROCESS_KIND, NUL_CHARACTER, limitField, nestedField, ProcessField } from './text.ts'
+import { SupervisionErrorCode } from '../error-code.ts'
+import { SupervisionErrorText } from '../error-text.ts'
+import { createSupervisionError } from '../errors.ts'
+import { BootstrapVia, ProcessLimit, StderrMode, StdinMode, StdoutMode } from './constants.ts'
+import type { IProcessSpec } from './types.ts'
 
 /** Rejects one named field without interpolating its value or bootstrap payload. */
 export function invalidProcessOption(field: string, range = false): never {

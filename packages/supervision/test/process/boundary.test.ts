@@ -40,13 +40,13 @@ describe('process profile boundary', () => {
       '@migaia/utils/promise'
     ])
     const allowedParent = new Set([
-      '../index.js',
-      '../errors.js',
-      '../admission.js',
-      '../error-code.js',
-      '../error-text.js',
+      '../index.ts',
+      '../errors.ts',
+      '../admission.ts',
+      '../error-code.ts',
+      '../error-text.ts',
       // Stable internal outcome tags have one core contract owner.
-      '../text.js'
+      '../text.ts'
     ])
     for (const path of processSources(join(root, 'src/process'))) {
       const text = readFileSync(path, 'utf8')
@@ -64,7 +64,7 @@ describe('process profile boundary', () => {
         const specifier = moduleSpecifier(statement)
         if (specifier === undefined) continue
         if (specifier.startsWith('../')) expect(allowedParent, path).toContain(specifier)
-        else if (specifier.startsWith('./')) expect(specifier, path).toMatch(/\.js$/)
+        else if (specifier.startsWith('./')) expect(specifier, path).toMatch(/\.ts$/)
         else expect(allowedExternal, path).toContain(specifier)
       }
     }

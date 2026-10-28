@@ -1,6 +1,6 @@
 /** Owns the failure window, bounded backoff, terminal exhaustion and optional cooldown. */
-import type { ISupervisorContext } from './supervisor-context.js'
-import type { ILaunchContext, IUnitHandle } from './types.js'
+import type { ISupervisorContext } from './supervisor-context.ts'
+import type { ILaunchContext, IUnitHandle } from './types.ts'
 import { LifecycleState } from '@migaia/lifecycle'
 import {
   TerminalPolicyMode,
@@ -9,11 +9,11 @@ import {
   LaunchCause,
   RestartMode,
   type BudgetRejection
-} from './constants.js'
-import { createSupervisionError } from './errors.js'
-import { SupervisionErrorCode } from './error-code.js'
-import { SupervisionErrorText } from './error-text.js'
-import { emit, transition } from './supervisor-events.js'
+} from './constants.ts'
+import { createSupervisionError } from './errors.ts'
+import { SupervisionErrorCode } from './error-code.ts'
+import { SupervisionErrorText } from './error-text.ts'
+import { emit, transition } from './supervisor-events.ts'
 /** Cancels and removes only this supervisor's automatic retry timers. */
 export function clearTimers<
   TSpec,

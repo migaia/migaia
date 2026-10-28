@@ -2,11 +2,11 @@
 import { createAbortController, type IAbortController } from '@migaia/lifecycle'
 import type { ILifecycleScope } from '@migaia/lifecycle'
 import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
-import { SupervisionErrorCode } from './error-code.js'
-import { SupervisionErrorText } from './error-text.js'
-import { createSupervisionError } from './errors.js'
-import { HealthState } from './constants.js'
-import type { IHealthSnapshot, ISupervisorBaseOptions } from './types.js'
+import { SupervisionErrorCode } from './error-code.ts'
+import { SupervisionErrorText } from './error-text.ts'
+import { createSupervisionError } from './errors.ts'
+import { HealthState } from './constants.ts'
+import type { IHealthSnapshot, ISupervisorBaseOptions } from './types.ts'
 
 /** One check owns its deadline and decision even after a newer check becomes active. */
 class HealthCheck<THandle> {

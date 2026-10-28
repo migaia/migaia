@@ -1,9 +1,9 @@
 /** Owns one pending readiness observer; stable supervisor facts and caller abort remove its records. */
-import { ABORT_EVENT } from './text.js'
+import { ABORT_EVENT } from './text.ts'
 import type { IAbortSignal } from '@migaia/utils/promise'
-import { readyNow } from './supervisor-events.js'
-import type { ISupervisorContext } from './supervisor-context.js'
-import type { ILaunchContext, IReadyOutcome, IUnitHandle } from './types.js'
+import { readyNow } from './supervisor-events.ts'
+import type { ISupervisorContext } from './supervisor-context.ts'
+import type { ILaunchContext, IReadyOutcome, IUnitHandle } from './types.ts'
 
 /** Allocated only when readiness cannot answer synchronously. */
 export class ReadinessWaiter<

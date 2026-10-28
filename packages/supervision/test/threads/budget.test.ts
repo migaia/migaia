@@ -1,8 +1,8 @@
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it } from 'vitest'
-import { createUnitBudget, SupervisionErrorCode } from '../../src/index.js'
-import { createThreadSupervisor, ThreadUnitKind } from '../../src/threads/index.js'
-import { memoryThreadLauncher, settle, threadSpec } from './support/memory-thread-launcher.js'
+import { createUnitBudget, SupervisionErrorCode } from '../../src/index.ts'
+import { createThreadSupervisor, ThreadUnitKind } from '../../src/threads/index.ts'
+import { memoryThreadLauncher, settle, threadSpec } from './support/memory-thread-launcher.ts'
 
 describe('thread budget', () => {
   it('rejects wrong budget kinds at both type and runtime boundaries', () => {

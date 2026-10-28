@@ -5,8 +5,8 @@ import type {
   IUnitBudget,
   IUnitHandle,
   IUnitLauncher
-} from '../index.js'
-import type { ThreadLimit, ThreadUnitKind } from './constants.js'
+} from '../index.ts'
+import type { ThreadLimit, ThreadUnitKind } from './constants.ts'
 
 /** Positive limits forwarded unchanged to the launcher. */
 export type IThreadLimits = {

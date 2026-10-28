@@ -2,7 +2,7 @@
  * Owns supervisor commands and public-object shape; policy, attempts and slots have their own
  * modules.
  */
-import { SupervisionField } from './text.js'
+import { SupervisionField } from './text.ts'
 import {
   LifecycleState,
   createGenerationController,
@@ -17,19 +17,19 @@ import {
   RestartMode,
   SupervisorState,
   UnitStopMode
-} from './constants.js'
-import { SupervisionErrorCode } from './error-code.js'
-import { SupervisionErrorText } from './error-text.js'
-import { createSupervisionError } from './errors.js'
-import { invalidOption } from './options.js'
-import { TimestampWindow } from './timestamp-window.js'
-import { LaunchAttempt } from './supervisor-attempt.js'
-import { transition, readyNow } from './supervisor-events.js'
-import { clearTimers, trimFailures } from './supervisor-policy.js'
-import { ReadinessWaiter } from './supervisor-readiness.js'
-import { replaceUnit } from './supervisor-replace.js'
-import { retire } from './supervisor-slot.js'
-import type { ISupervisorContext } from './supervisor-context.js'
+} from './constants.ts'
+import { SupervisionErrorCode } from './error-code.ts'
+import { SupervisionErrorText } from './error-text.ts'
+import { createSupervisionError } from './errors.ts'
+import { invalidOption } from './options.ts'
+import { TimestampWindow } from './timestamp-window.ts'
+import { LaunchAttempt } from './supervisor-attempt.ts'
+import { transition, readyNow } from './supervisor-events.ts'
+import { clearTimers, trimFailures } from './supervisor-policy.ts'
+import { ReadinessWaiter } from './supervisor-readiness.ts'
+import { replaceUnit } from './supervisor-replace.ts'
+import { retire } from './supervisor-slot.ts'
+import type { ISupervisorContext } from './supervisor-context.ts'
 import type {
   ILaunchContext,
   IReadyOutcome,
@@ -40,7 +40,7 @@ import type {
   ISupervisorSnapshot,
   ISupervisorStopOptions,
   IUnitHandle
-} from './types.js'
+} from './types.ts'
 
 /** Owns command Promise identity and the explicit state consumed by internal responsibility modules. */
 export class SupervisorOwner<

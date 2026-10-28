@@ -1,6 +1,6 @@
 import { systemWallClock, type IWallClock } from '@migaia/utils/scheduler'
-import type { IUnitRuntime } from '../index.js'
-import type { IProcessHandle, IProcessRegistry } from './types.js'
+import type { IUnitRuntime } from '../index.ts'
+import type { IProcessHandle, IProcessRegistry } from './types.ts'
 
 /** Registers a launched unit before ready and retains its record until exit. */
 export async function registerRecord(

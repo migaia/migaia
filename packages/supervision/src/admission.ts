@@ -1,9 +1,9 @@
-import { invalidOption } from './options.js'
-import { SupervisionField } from './text.js'
-import { CapabilityLevel, IsolationMode } from './constants.js'
-import { SupervisionErrorCode } from './error-code.js'
-import { SupervisionErrorText } from './error-text.js'
-import { createSupervisionError } from './errors.js'
+import { invalidOption } from './options.ts'
+import { SupervisionField } from './text.ts'
+import { CapabilityLevel, IsolationMode } from './constants.ts'
+import { SupervisionErrorCode } from './error-code.ts'
+import { SupervisionErrorText } from './error-text.ts'
+import { createSupervisionError } from './errors.ts'
 
 /** Admits only guaranteed capabilities in required mode and records weaker ones in best effort. */
 export function admitCapabilities(
