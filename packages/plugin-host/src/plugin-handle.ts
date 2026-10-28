@@ -1,3 +1,4 @@
+/** Owns name-addressed handles and generation-bound extensions; lifecycle authority stays in ports. */
 import { invokeCaptured } from './invocation.js'
 import { PluginHostErrorCode } from './error-code.js'
 import ERROR_TEXT, { PluginHostError } from './error-text.js'
@@ -40,6 +41,7 @@ const requireRegistration = <TDomainCore extends object, TValue>(
   name: string
 ): IRegistration<TDomainCore, TValue> => {
   port.assertActive()
+  /** Every public read selects the current registration after Host lifecycle admission. */
   const registration = port.lookup(name)
   if (!registration)
     throw new PluginHostError(
@@ -61,47 +63,131 @@ const requireRegistration = <TDomainCore extends object, TValue>(
   return registration
 }
 
+/** Owns the exact generation and receiver captured by one published callable extension. */
+class PluginHandleExtension<TDomainCore extends object, TValue> {
+  /** Host authority rechecks lifecycle and the current generation before each invocation. */
+  readonly #port: IPluginHandlePort<TDomainCore, TValue>
+  /** Exact generation captured by this extension, independently from name-addressed handles. */
+  readonly #registration: IRegistration<TDomainCore, TValue>
+  /** Original callable retains its Host receiver through the canonical invoker. */
+  readonly #value: Function
+
+  /** Captures one admitted callable without exposing the registration on the public function. */
+  constructor(
+    port: IPluginHandlePort<TDomainCore, TValue>,
+    registration: IRegistration<TDomainCore, TValue>,
+    value: Function
+  ) {
+    this.#port = port
+    this.#registration = registration
+    this.#value = value
+  }
+
+  /** Rejects stale or unavailable generations before forwarding the exact arguments. */
+  invoke(args: unknown[]): unknown {
+    this.#port.assertActive()
+    if (this.#port.lookup(this.#registration.name) !== this.#registration)
+      throw new PluginHostError(
+        PluginHostErrorCode.registrationRevoked,
+        ERROR_TEXT.REGISTRATION_REVOKED
+      )
+    if (!this.#registration.enabled)
+      throw new PluginHostError(
+        PluginHostErrorCode.pluginDisabled,
+        ERROR_TEXT.PLUGIN_DISABLED(this.#registration.name)
+      )
+    if (this.#registration.suspended)
+      throw new PluginHostError(
+        PluginHostErrorCode.pluginSuspended,
+        ERROR_TEXT.PLUGIN_SUSPENDED(this.#registration.name)
+      )
+    return invokeCaptured(this.#value, this.#port.host, args)
+  }
+}
+
 /** Publishes callable extensions bound to one exact registration generation. */
 const readExtensions = <TDomainCore extends object, TValue>(
   port: IPluginHandlePort<TDomainCore, TValue>,
   registration: IRegistration<TDomainCore, TValue>
 ): Readonly<Record<PropertyKey, unknown>> => {
+  /** The weak cache preserves the facade and callable identities for this generation. */
   const cached = extensionFacades.get(registration)
   if (cached) return cached
+  /** Null-prototype publication retains the original own enumerable descriptors. */
   const extensions = Object.create(null) as Record<PropertyKey, unknown>
   for (const { key, descriptor } of registration.extensions) {
+    /** Descriptor admission already captured this value without executing a getter. */
     const value = descriptor.value
+    /** Only callable values need an explicit generation invocation owner. */
+    const invocation =
+      typeof value === 'function' ? new PluginHandleExtension(port, registration, value) : undefined
     Object.defineProperty(extensions, key, {
       enumerable: true,
       configurable: false,
       writable: false,
-      value:
-        typeof value === 'function'
-          ? (...args: unknown[]) => {
-              port.assertActive()
-              if (port.lookup(registration.name) !== registration)
-                throw new PluginHostError(
-                  PluginHostErrorCode.registrationRevoked,
-                  ERROR_TEXT.REGISTRATION_REVOKED
-                )
-              if (!registration.enabled)
-                throw new PluginHostError(
-                  PluginHostErrorCode.pluginDisabled,
-                  ERROR_TEXT.PLUGIN_DISABLED(registration.name)
-                )
-              if (registration.suspended)
-                throw new PluginHostError(
-                  PluginHostErrorCode.pluginSuspended,
-                  ERROR_TEXT.PLUGIN_SUSPENDED(registration.name)
-                )
-              return invokeCaptured(value, port.host, args)
-            }
-          : value
+      value: invocation ? (...args: unknown[]) => invocation.invoke(args) : value
     })
   }
+  /** Freeze only after every admitted descriptor has been published. */
   const frozen = Object.freeze(extensions)
   extensionFacades.set(registration, frozen)
   return frozen
+}
+
+/** Owns handle lookup and config access while its public surface remains an ordinary frozen object. */
+class PluginHandleOwner<TDomainCore extends object, TValue> {
+  /** The handle remains name-addressed across replacement generations. */
+  readonly #name: string
+  /** Host lifecycle, registration lookup and config mutation authority. */
+  readonly #port: IPluginHandlePort<TDomainCore, TValue>
+  /** Generation probe retains only the original token, never the registration or its outputs. */
+  readonly #registrationToken: object | undefined
+
+  /** Captures the original generation token at the same time as the previous handle factory. */
+  constructor(name: string, port: IPluginHandlePort<TDomainCore, TValue>) {
+    this.#name = name
+    this.#port = port
+    this.#registrationToken = port.lookup(name)?.pipelineOwnerKey
+  }
+
+  /** Resolves the current installed generation before reading its extension facade. */
+  readExtensions(): Readonly<Record<PropertyKey, unknown>> {
+    return readExtensions(this.#port, requireRegistration(this.#port, this.#name))
+  }
+
+  /** Resolves one declared Feature through the same current-registration admission policy. */
+  getFeature(feature: string): object {
+    /** This lookup intentionally follows replacement, while the current probe retains its token. */
+    const registration = requireRegistration(this.#port, this.#name)
+    if (!registration.featureOutputs || !Object.hasOwn(registration.featureOutputs, feature))
+      throw new PluginHostError(
+        PluginHostErrorCode.featureNotDeclared,
+        ERROR_TEXT.FEATURE_NOT_DECLARED(this.#name, feature)
+      )
+    return registration.featureOutputs[feature]!
+  }
+
+  /** Reads current config after the original availability checks. */
+  readConfig(): unknown {
+    requireRegistration(this.#port, this.#name)
+    return this.#port.readConfig(this.#name)
+  }
+
+  /** Returns the exact queued update Promise without introducing an asynchronous wrapper. */
+  updateConfig(
+    recipe: (previous: Readonly<IPluginConfig>) => Partial<IPluginConfig>
+  ): Promise<void> {
+    requireRegistration(this.#port, this.#name)
+    return this.#port.updateConfig(this.#name, recipe)
+  }
+
+  /** Checks exact-generation membership without retaining the original registration. */
+  isCurrent(): boolean {
+    return (
+      this.#registrationToken !== undefined &&
+      this.#port.lookup(this.#name)?.pipelineOwnerKey === this.#registrationToken
+    )
+  }
 }
 
 /** Creates a name-addressed handle whose members resolve the current registration on every read. */
@@ -109,39 +195,28 @@ export const createPluginHandle = <TDomainCore extends object, TValue>(
   name: string,
   port: IPluginHandlePort<TDomainCore, TValue>
 ): object => {
-  /** Reuse the per-registration lease token without retaining the registration or its outputs. */
-  const registrationToken = port.lookup(name)?.pipelineOwnerKey
-  /** Member reads continue to resolve the current registration by name. */
+  /** Runtime state belongs to this explicit owner; the public object only adapts its own surface. */
+  const owner = new PluginHandleOwner(name, port)
+  /** Config remains one frozen ordinary object owned by this handle. */
+  const config = Object.freeze({
+    get() {
+      return owner.readConfig()
+    },
+    update(recipe: (previous: Readonly<IPluginConfig>) => Partial<IPluginConfig>) {
+      return owner.updateConfig(recipe)
+    }
+  })
+  /** Own key order, getter names, method lengths and ordinary prototype match the original handle. */
   const handle = Object.freeze({
     name,
     get extensions() {
-      const registration = requireRegistration(port, name)
-      return readExtensions(port, registration)
+      return owner.readExtensions()
     },
     getFeature(feature: string) {
-      const registration = requireRegistration(port, name)
-      if (!registration.featureOutputs || !Object.hasOwn(registration.featureOutputs, feature))
-        throw new PluginHostError(
-          PluginHostErrorCode.featureNotDeclared,
-          ERROR_TEXT.FEATURE_NOT_DECLARED(name, feature)
-        )
-      return registration.featureOutputs[feature]
+      return owner.getFeature(feature)
     },
-    config: Object.freeze({
-      get() {
-        requireRegistration(port, name)
-        return port.readConfig(name)
-      },
-      update(recipe: (previous: Readonly<IPluginConfig>) => Partial<IPluginConfig>) {
-        requireRegistration(port, name)
-        return port.updateConfig(name, recipe)
-      }
-    })
+    config
   })
-  handleRegistrations.set(
-    handle,
-    () =>
-      registrationToken !== undefined && port.lookup(name)?.pipelineOwnerKey === registrationToken
-  )
+  handleRegistrations.set(handle, () => owner.isCurrent())
   return handle
 }
