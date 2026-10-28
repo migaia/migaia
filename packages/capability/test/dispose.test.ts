@@ -1,4 +1,4 @@
-import type { IGenerationController, IGenerationRequest, IGenerationToken } from '@migaia/lifecycle'
+import { RecordedCapabilityRelease } from './fixtures/host-cleanup.js'
 import { describe, expect, it, vi } from 'vitest'
 
 const mockState = vi.hoisted(() => ({
@@ -6,107 +6,75 @@ const mockState = vi.hoisted(() => ({
   cleanupError: undefined as unknown
 }))
 
-vi.mock('@migaia/lifecycle', async () => {
-  const actual = await vi.importActual<typeof import('@migaia/lifecycle')>('@migaia/lifecycle')
-  let controllerCount = 0
+vi.mock('@migaia/lifecycle', mockLifecycleWithCleanupFailure)
 
-  return {
-    ...actual,
-    createGenerationController: (): IGenerationController => {
-      const controller = actual.createGenerationController()
-      const ordinal = controllerCount++
-      return {
-        get generation() {
-          return controller.generation
-        },
-        get disposed() {
-          return controller.disposed
-        },
-        begin(options?: { readonly timeoutMs?: number }): IGenerationRequest {
-          return controller.begin(options)
-        },
-        isCurrent(token: IGenerationToken): boolean {
-          return controller.isCurrent(token)
-        },
-        /** Forward the public completion increment without altering this cleanup-failure fixture. */
-        complete(token: IGenerationToken): boolean {
-          return controller.complete(token)
-        },
-        supersede(reason?: unknown): void {
-          controller.supersede(reason)
-        },
-        adopt<T>(
-          token: IGenerationToken,
-          value: T,
-          release: (released: T) => void | PromiseLike<void>,
-          onReleaseError?: (error: unknown) => void
-        ): boolean {
-          return controller.adopt(token, value, release, onReleaseError)
-        },
-        dispose(reason?: unknown): void {
-          controller.dispose(reason)
-          if (ordinal === mockState.throwOnController) throw mockState.cleanupError
-        }
-      }
-    }
-  }
-})
+/** Mock setup owns controller numbering while the fixture preserves all real lifecycle behavior. */
+async function mockLifecycleWithCleanupFailure(): Promise<typeof import('@migaia/lifecycle')> {
+  const actual = await vi.importActual<typeof import('@migaia/lifecycle')>('@migaia/lifecycle')
+  const { GenerationFailureFactory } = await import('./fixtures/generation-failure.js')
+  const factory = new GenerationFailureFactory(actual, mockState)
+  return { ...actual, createGenerationController: factory.createGenerationController }
+}
 
 import { CapabilityErrorCode, createCapabilityHost } from '../src/index.js'
 
 describe('dispose generation cleanup isolation', () => {
-  it('reports a generation cleanup failure and still releases every active handle', async () => {
-    const generationError = new Error('generation cleanup failed')
-    const handleError = new Error('second handle cleanup failed')
-    const releaseOrder: string[] = []
-    const onError = vi.fn()
-    mockState.throwOnController = 0
-    mockState.cleanupError = generationError
-    const host = createCapabilityHost(undefined, {
-      flags: { first: true, second: true },
-      onError
-    })
-    host.register({
-      name: 'first',
-      activate: () => ({
-        dispose: () => {
-          releaseOrder.push('first')
-        }
-      })
-    })
-    host.register({
-      name: 'second',
-      activate: () => ({
-        dispose: () => {
-          releaseOrder.push('second')
-          throw handleError
-        }
-      })
-    })
-
-    await host.enable('first')
-    await host.enable('second')
-    const firstDispose = host.dispose()
-
-    expect(host.disposed).toBe(true)
-    await expect(host.dispose()).rejects.toEqual(
-      expect.objectContaining({
-        source: 'capability',
-        code: CapabilityErrorCode.hostTransitioning
-      })
-    )
-    await expect(firstDispose).resolves.toBeUndefined()
-    expect(releaseOrder).toEqual(['second', 'first'])
-    expect(onError.mock.calls).toEqual([
-      ['first', generationError],
-      ['second', handleError]
-    ])
-    expect(host.error('first')).toBe(generationError)
-    expect(host.error('second')).toBe(handleError)
-    expect(host.state('first')).toBe('off')
-    expect(host.state('second')).toBe('off')
-    expect(host.handle('first')).toBeUndefined()
-    expect(host.handle('second')).toBeUndefined()
-    expect(host.dispose()).toBe(firstDispose)
-  })
+  it(
+    'reports a generation cleanup failure and still releases every active handle',
+    verifyReportsAGenerationCleanupFailureAndStillReleasesEveryActiveHandle
+  )
 })
+
+/**
+ * Executes the existing case: reports a generation cleanup failure and still releases every active
+ * handle.
+ */
+async function verifyReportsAGenerationCleanupFailureAndStillReleasesEveryActiveHandle(): Promise<void> {
+  const generationError = new Error('generation cleanup failed')
+  const handleError = new Error('second handle cleanup failed')
+  const releaseOrder: string[] = []
+  const onError = vi.fn()
+  mockState.throwOnController = 0
+  mockState.cleanupError = generationError
+  const host = createCapabilityHost(undefined, {
+    flags: { first: true, second: true },
+    onError
+  })
+  /** Cleanup fixture keeps release order and failure timing under the host's disposer call. */
+  const releaseFirst = new RecordedCapabilityRelease(releaseOrder, 'first')
+  host.register({
+    name: 'first',
+    activate: () => ({ dispose: releaseFirst.dispose })
+  })
+  /** Cleanup fixture keeps release order and failure timing under the host's disposer call. */
+  const releaseSecond = new RecordedCapabilityRelease(releaseOrder, 'second', handleError)
+  host.register({
+    name: 'second',
+    activate: () => ({ dispose: releaseSecond.dispose })
+  })
+
+  await host.enable('first')
+  await host.enable('second')
+  const firstDispose = host.dispose()
+
+  expect(host.disposed).toBe(true)
+  await expect(host.dispose()).rejects.toEqual(
+    expect.objectContaining({
+      source: 'capability',
+      code: CapabilityErrorCode.hostTransitioning
+    })
+  )
+  await expect(firstDispose).resolves.toBeUndefined()
+  expect(releaseOrder).toEqual(['second', 'first'])
+  expect(onError.mock.calls).toEqual([
+    ['first', generationError],
+    ['second', handleError]
+  ])
+  expect(host.error('first')).toBe(generationError)
+  expect(host.error('second')).toBe(handleError)
+  expect(host.state('first')).toBe('off')
+  expect(host.state('second')).toBe('off')
+  expect(host.handle('first')).toBeUndefined()
+  expect(host.handle('second')).toBeUndefined()
+  expect(host.dispose()).toBe(firstDispose)
+}

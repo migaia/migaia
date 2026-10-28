@@ -4,8 +4,13 @@ import {
   CapabilityGraphErrorCode,
   type IGraphNodeId
 } from '@migaia/capability/graph'
+import { releaseNothing } from './nonstatic-fixtures.js'
 
-it('reads the canonical value without changing frozen diagnostic snapshots or disposal visibility', async () => {
+/**
+ * Owns the isolated setup, action and assertions for: reads the canonical value without changing
+ * frozen diagnostic snapshots or disposal visibility.
+ */
+async function verifyReadsTheCanonicalValueWithoutChangingFrozenDiagnosticSnapshotsOrDisposalVisibility() {
   /** Data identity belongs to the actual started node, never a Tray mirror. */
   const value = { count: 1 }
   /** One static node has no resource other than its original release callback. */
@@ -14,16 +19,18 @@ it('reads the canonical value without changing frozen diagnostic snapshots or di
   const graph = createCapabilityGraph()
   /** The original disposer must remain exactly once. */
   let releases = 0
+  /** Primary resource owns the release observer without naming a local callback variable. */
+  const primary = {
+    value,
+    release: (): void => {
+      releases++
+    }
+  }
   graph.register({
     id,
     kind: 'value',
     dependencies: [],
-    start: () => ({
-      value,
-      release: () => {
-        releases++
-      }
-    })
+    start: () => primary
   })
   /** Diagnostics remain point-in-time snapshots even though value reads allocate no projection. */
   const initial = graph.nodeState(id)
@@ -38,9 +45,13 @@ it('reads the canonical value without changing frozen diagnostic snapshots or di
   await graph.dispose()
   expect(graph.readValue(id)).toBeUndefined()
   expect(releases).toBe(1)
-})
+}
 
-it('permits a real undefined value and keeps failed graphs unavailable', async () => {
+/**
+ * Owns the isolated setup, action and assertions for: permits a real undefined value and keeps
+ * failed graphs unavailable.
+ */
+async function verifyPermitsARealUndefinedValueAndKeepsFailedGraphsUnavailable() {
   /** Undefined is a valid payload; graph readiness, not a sentinel, indicates availability. */
   const id = 'undefined' as IGraphNodeId
   /** This independent graph proves no undefined payload sentinel is introduced. */
@@ -49,7 +60,7 @@ it('permits a real undefined value and keeps failed graphs unavailable', async (
     id,
     kind: 'value',
     dependencies: [],
-    start: () => ({ value: undefined, release: () => undefined })
+    start: () => ({ value: undefined, release: releaseNothing })
   })
   await graph.ready()
   expect(graph.state).toBe('ready')
@@ -61,7 +72,7 @@ it('permits a real undefined value and keeps failed graphs unavailable', async (
     id,
     kind: 'value',
     dependencies: [],
-    start: () => ({ value: 1, release: () => undefined })
+    start: () => ({ value: 1, release: releaseNothing })
   })
   failed.register({
     id: 'bad' as IGraphNodeId,
@@ -74,9 +85,13 @@ it('permits a real undefined value and keeps failed graphs unavailable', async (
   await expect(failed.ready()).rejects.toBeDefined()
   expect(failed.readValue(id)).toBeUndefined()
   await failed.dispose()
-})
+}
 
-it('preserves the existing unknown-node error contract for direct value reads', () => {
+/**
+ * Owns the isolated setup, action and assertions for: preserves the existing unknown-node error
+ * contract for direct value reads.
+ */
+function verifyPreservesTheExistingUnknownNodeErrorContractForDirectValueReads() {
   /** Lookup fails before any registration and retains the canonical native error surface. */
   const graph = createCapabilityGraph()
   expect(() => graph.readValue('missing' as IGraphNodeId)).toThrow(
@@ -85,4 +100,19 @@ it('preserves the existing unknown-node error contract for direct value reads', 
       code: CapabilityGraphErrorCode.unknownNode
     })
   )
-})
+}
+
+it(
+  'reads the canonical value without changing frozen diagnostic snapshots or disposal visibility',
+  verifyReadsTheCanonicalValueWithoutChangingFrozenDiagnosticSnapshotsOrDisposalVisibility
+)
+
+it(
+  'permits a real undefined value and keeps failed graphs unavailable',
+  verifyPermitsARealUndefinedValueAndKeepsFailedGraphsUnavailable
+)
+
+it(
+  'preserves the existing unknown-node error contract for direct value reads',
+  verifyPreservesTheExistingUnknownNodeErrorContractForDirectValueReads
+)

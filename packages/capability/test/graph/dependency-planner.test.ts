@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { topologyNodeId } from './nonstatic-fixtures.js'
 import {
   DependencyAction,
   DependencyMutationKind,
@@ -12,6 +13,7 @@ import {
   resolveInstallSet,
   type IDependencyNodeState,
   type IDependencyPlan,
+  type IDependencyPlanStep,
   type IDependencyStateReader
 } from '../../src/graph/dependency.js'
 import {
@@ -51,7 +53,7 @@ function states(
 function projectSnapshot(topology: ICapabilityTopology): unknown {
   return {
     ordered: topology.ordered.map((node) => node.id),
-    providers: [...topology.providers].map(([id, nodes]) => [id, nodes.map((node) => node.id)]),
+    providers: [...topology.providers].map(([id, nodes]) => [id, nodes.map(topologyNodeId)]),
     consumers: [...topology.consumers],
     indegree: [...topology.indegree],
     level: [...topology.level],
@@ -86,378 +88,478 @@ function createResumeFixture(
   return { index, state: states(entries) }
 }
 
-describe('dependency planner', () => {
-  it('plans reject, cascade, and suspend dependency mutations', () => {
-    const index = createTestIndex()
-    index.add({ id: 'p', dependencies: [] })
-    index.add({ id: 'a', dependencies: [{ provider: 'p', required: true }] })
-    index.add({ id: 'b', dependencies: [{ provider: 'a', required: true }] })
-    index.add({ id: 'c', dependencies: [{ provider: 'p', required: false }] })
-    index.add({ id: 'l', dependencies: [{ provider: 'p', required: true }] })
-    const readState = states({ l: { activated: false } })
+/** Retains the original state-reader failure for the mutation planner's throwing-input case. */
+function unavailableState(): never {
+  throw new Error('status sentinel')
+}
 
-    const rejected = planDependencyMutation(index, readState, {
-      roots: ['p'],
-      kind: DependencyMutationKind.remove,
-      policy: DependencyPolicy.reject
-    })
-    expect(rejected.blockedBy).toEqual(['b', 'l', 'a'])
-    expect(rejected.steps).toEqual([])
-
-    const cascaded = planDependencyMutation(index, readState, {
-      roots: ['p'],
-      kind: DependencyMutationKind.remove,
-      policy: DependencyPolicy.cascade
-    })
-    expect(cascaded.order).toEqual(['b', 'l', 'a', 'p'])
-    expect(cascaded.steps.every((step) => step.action === DependencyAction.release)).toBe(true)
-
-    const suspended = planDependencyMutation(index, readState, {
-      roots: ['p'],
-      kind: DependencyMutationKind.remove,
-      policy: DependencyPolicy.suspend
-    })
-    expect(suspended.steps).toEqual([
-      { id: 'b', action: DependencyAction.suspend },
-      { id: 'a', action: DependencyAction.suspend },
-      { id: 'p', action: DependencyAction.release }
-    ])
-    expect(suspended.edges).toContainEqual({ provider: 'p', consumer: 'c', optional: true })
-
-    const disabled = planDependencyMutation(index, readState, {
-      roots: ['p'],
-      kind: DependencyMutationKind.disable,
-      policy: DependencyPolicy.suspend
-    })
-    expect(disabled.steps.at(-1)).toEqual({ id: 'p', action: DependencyAction.disable })
-
-    expect(() =>
-      planDependencyMutation(index, readState, {
-        roots: ['p'],
-        kind: DependencyMutationKind.remove,
-        policy: 'unknown' as never
-      })
-    ).toThrow(expect.objectContaining({ code: 'GRAPH_INVALID_OPTION' }))
-    expect(() =>
-      planDependencyMutation(
-        index,
-        () => {
-          throw new Error('status sentinel')
-        },
-        {
-          roots: ['p'],
-          kind: DependencyMutationKind.remove,
-          policy: DependencyPolicy.suspend
-        }
-      )
-    ).toThrow('status sentinel')
-  })
-
-  it('separates direct rebinds from dependent-first restart closure', () => {
-    const index = createTestIndex()
-    index.add({ id: 'p', dependencies: [] })
-    index.add({ id: 'a', dependencies: [{ provider: 'p', required: true }] })
-    index.add({ id: 'b', dependencies: [{ provider: 'p', required: true }] })
-    index.add({ id: 'l', dependencies: [{ provider: 'p', required: true }] })
-    index.add({ id: 'd', dependencies: [{ provider: 'b', required: true }] })
-    const readState = states({ l: { activated: false } })
-
-    expect(
-      planReplacement(index, readState, {
-        target: 'p',
-        canRebind: (id) => id === 'a'
-      }).steps
-    ).toEqual([
-      { id: 'a', action: DependencyAction.rebind },
-      { id: 'd', action: DependencyAction.restart },
-      { id: 'b', action: DependencyAction.restart }
-    ])
-    expect(planRestart(index, readState, ['a']).steps).toEqual([
-      { id: 'a', action: DependencyAction.restart }
-    ])
-  })
-
-  it('resumes only satisfiable suspended closures with generation-aware actions', () => {
-    const index = createTestIndex()
-    index.add({ id: 'a', dependencies: [{ provider: 'p', required: true }] })
-    index.add({ id: 'b', dependencies: [{ provider: 'a', required: true }] })
+/** Builds the original activated ancestry plus three inactive providers and the requested root. */
+function createActivationFixture(size: number) {
+  /** Independent topology keeps fixture state isolated across both requested graph sizes. */
+  const index = createTestIndex()
+  for (let position = 0; position < size; position += 1)
     index.add({
-      id: 'e',
-      dependencies: [
-        { provider: 'p', required: true },
-        { provider: 'q', required: true }
-      ]
+      id: `c-${position}`,
+      dependencies: position === 0 ? [] : [{ provider: `c-${position - 1}`, required: true }]
     })
-    index.add({ id: 'p', dependencies: [] })
-    const readState = states({
-      a: { suspended: true },
-      b: { suspended: true },
-      e: { suspended: true }
-    })
-
-    expect(
-      planResume(index, readState, {
-        provider: 'p',
-        generationChanged: true,
-        canRebind: () => false
-      }).steps
-    ).toEqual([
-      { id: 'a', action: DependencyAction.restart },
-      { id: 'b', action: DependencyAction.restart }
-    ])
-    expect(
-      planResume(index, readState, {
-        provider: 'p',
-        generationChanged: true,
-        canRebind: (id) => id === 'a'
-      }).steps
-    ).toEqual([
-      { id: 'a', action: DependencyAction.rebind },
-      { id: 'b', action: DependencyAction.resume }
-    ])
-    expect(
-      planResume(index, readState, {
-        provider: 'p',
-        generationChanged: false,
-        canRebind: () => false
-      }).steps
-    ).toEqual([
-      { id: 'a', action: DependencyAction.resume },
-      { id: 'b', action: DependencyAction.resume }
-    ])
-    expect(
-      planResume(index, states({ a: { suspended: true, stale: true }, b: { suspended: true } }), {
-        provider: 'p',
-        generationChanged: true,
-        canRebind: () => true
-      }).steps
-    ).toEqual([
-      { id: 'a', action: DependencyAction.restart },
-      { id: 'b', action: DependencyAction.restart }
-    ])
-  })
-
-  it('plans lazy activation, install membership, and inverse teardown', () => {
-    const index = createTestIndex()
-    index.add({ id: 'l1', dependencies: [] })
-    index.add({ id: 'l2', dependencies: [{ provider: 'l1', required: true }] })
-    index.add({ id: 'e', dependencies: [{ provider: 'l2', required: true }] })
-    index.add({ id: 'l3', dependencies: [] })
-    const readState = states({
+  index.add({ id: 'l1', dependencies: [{ provider: `c-${size - 1}`, required: true }] })
+  index.add({ id: 'l2', dependencies: [{ provider: 'l1', required: true }] })
+  index.add({ id: 'l3', dependencies: [{ provider: 'l2', required: true }] })
+  index.add({ id: 'root', dependencies: [{ provider: 'l3', required: true }] })
+  return {
+    index,
+    state: states({
       l1: { activated: false },
       l2: { activated: false },
       l3: { activated: false }
     })
+  }
+}
 
-    expect(planActivation(index, readState, ['e']).steps).toEqual([
-      { id: 'l1', action: DependencyAction.activate },
-      { id: 'l2', action: DependencyAction.activate }
-    ])
-    expect([...resolveInstallSet(index, ['l1', 'l2', 'e'], (id) => id.startsWith('l'))]).toEqual([
-      'l1',
-      'l2',
-      'e'
-    ])
-    expect([...resolveInstallSet(index, ['l3'], () => true)]).toEqual([])
-    expect(planTeardown(index).order).toEqual([...index.order()].reverse())
+/** Runs the same activation plan and projects its observable steps for one fixture size. */
+function measureActivationFixture(size: number) {
+  const { index, state } = createActivationFixture(size)
+  /** Provider traversal is the behavior measured by the original two-size assertion. */
+  const plan = planActivation(index, state, ['root'])
+  return { steps: plan.steps.map((step: IDependencyPlanStep) => `${step.id}:${step.action}`) }
+}
+
+/**
+ * Owns the isolated setup, action and assertions for: plans reject, cascade, and suspend dependency
+ * mutations.
+ */
+function verifyPlansRejectCascadeAndSuspendDependencyMutations() {
+  const index = createTestIndex()
+  index.add({ id: 'p', dependencies: [] })
+  index.add({ id: 'a', dependencies: [{ provider: 'p', required: true }] })
+  index.add({ id: 'b', dependencies: [{ provider: 'a', required: true }] })
+  index.add({ id: 'c', dependencies: [{ provider: 'p', required: false }] })
+  index.add({ id: 'l', dependencies: [{ provider: 'p', required: true }] })
+  const readState = states({ l: { activated: false } })
+
+  const rejected = planDependencyMutation(index, readState, {
+    roots: ['p'],
+    kind: DependencyMutationKind.remove,
+    policy: DependencyPolicy.reject
   })
+  expect(rejected.blockedBy).toEqual(['b', 'l', 'a'])
+  expect(rejected.steps).toEqual([])
 
-  it('deeply freezes plans and leaves the index unchanged', () => {
-    const index = createTestIndex()
-    index.add({ id: 'p', dependencies: [] })
-    index.add({ id: 'a', dependencies: [{ provider: 'p', required: true }] })
-    const before = projectSnapshot(index.snapshot())
-    const plan = planDependencyMutation(index, states({}), {
+  const cascaded = planDependencyMutation(index, readState, {
+    roots: ['p'],
+    kind: DependencyMutationKind.remove,
+    policy: DependencyPolicy.cascade
+  })
+  expect(cascaded.order).toEqual(['b', 'l', 'a', 'p'])
+  expect(cascaded.steps.every((step) => step.action === DependencyAction.release)).toBe(true)
+
+  const suspended = planDependencyMutation(index, readState, {
+    roots: ['p'],
+    kind: DependencyMutationKind.remove,
+    policy: DependencyPolicy.suspend
+  })
+  expect(suspended.steps).toEqual([
+    { id: 'b', action: DependencyAction.suspend },
+    { id: 'a', action: DependencyAction.suspend },
+    { id: 'p', action: DependencyAction.release }
+  ])
+  expect(suspended.edges).toContainEqual({ provider: 'p', consumer: 'c', optional: true })
+
+  const disabled = planDependencyMutation(index, readState, {
+    roots: ['p'],
+    kind: DependencyMutationKind.disable,
+    policy: DependencyPolicy.suspend
+  })
+  expect(disabled.steps.at(-1)).toEqual({ id: 'p', action: DependencyAction.disable })
+
+  expect(() =>
+    planDependencyMutation(index, readState, {
       roots: ['p'],
       kind: DependencyMutationKind.remove,
-      policy: DependencyPolicy.cascade
+      policy: 'unknown' as never
     })
+  ).toThrow(expect.objectContaining({ code: 'GRAPH_INVALID_OPTION' }))
+  expect(() =>
+    planDependencyMutation(index, unavailableState, {
+      roots: ['p'],
+      kind: DependencyMutationKind.remove,
+      policy: DependencyPolicy.suspend
+    })
+  ).toThrow('status sentinel')
+}
 
-    expect(() => mutatePlan(plan)).toThrow(TypeError)
-    expect(() => {
-      ;(plan.steps[0] as { id: string }).id = 'changed'
-    }).toThrow(TypeError)
-    expect(() => {
-      ;(plan.edges as unknown as Array<{ provider: string }>).push({ provider: 'changed' })
-    }).toThrow(TypeError)
-    expect(projectSnapshot(index.snapshot())).toEqual(before)
+/**
+ * Owns the isolated setup, action and assertions for: separates direct rebinds from dependent-first
+ * restart closure.
+ */
+function verifySeparatesDirectRebindsFromDependentFirstRestartClosure() {
+  const index = createTestIndex()
+  index.add({ id: 'p', dependencies: [] })
+  index.add({ id: 'a', dependencies: [{ provider: 'p', required: true }] })
+  index.add({ id: 'b', dependencies: [{ provider: 'p', required: true }] })
+  index.add({ id: 'l', dependencies: [{ provider: 'p', required: true }] })
+  index.add({ id: 'd', dependencies: [{ provider: 'b', required: true }] })
+  const readState = states({ l: { activated: false } })
+
+  expect(
+    planReplacement(index, readState, {
+      target: 'p',
+      canRebind: (id) => id === 'a'
+    }).steps
+  ).toEqual([
+    { id: 'a', action: DependencyAction.rebind },
+    { id: 'd', action: DependencyAction.restart },
+    { id: 'b', action: DependencyAction.restart }
+  ])
+  expect(planRestart(index, readState, ['a']).steps).toEqual([
+    { id: 'a', action: DependencyAction.restart }
+  ])
+}
+
+/**
+ * Owns the isolated setup, action and assertions for: resumes only satisfiable suspended closures
+ * with generation-aware actions.
+ */
+function verifyResumesOnlySatisfiableSuspendedClosuresWithGenerationAwareActions() {
+  const index = createTestIndex()
+  index.add({ id: 'a', dependencies: [{ provider: 'p', required: true }] })
+  index.add({ id: 'b', dependencies: [{ provider: 'a', required: true }] })
+  index.add({
+    id: 'e',
+    dependencies: [
+      { provider: 'p', required: true },
+      { provider: 'q', required: true }
+    ]
+  })
+  index.add({ id: 'p', dependencies: [] })
+  const readState = states({
+    a: { suspended: true },
+    b: { suspended: true },
+    e: { suspended: true }
   })
 
-  it('plans the same leaf mutation across graph sizes', () => {
-    for (const background of [1_000, 8_000]) {
-      const index = createTestIndex()
-      index.add({ id: 'p', dependencies: [] })
-      index.add({ id: 'a', dependencies: [{ provider: 'p', required: true }] })
-      index.add({ id: 'c', dependencies: [{ provider: 'p', required: false }] })
-      for (let position = 0; position < background; position += 1)
-        index.add({ id: `unrelated-${position}`, dependencies: [] })
-      const plan = planDependencyMutation(index, states({}), {
-        roots: ['a'],
-        kind: DependencyMutationKind.remove,
-        policy: DependencyPolicy.cascade
-      })
-      expect(plan.order).toEqual(['a'])
-    }
-  })
-
-  it('reads disabled and suspended as orthogonal state flags', () => {
-    const index = createTestIndex()
-    index.add({ id: 'p', dependencies: [] })
-    index.add({ id: 'm', dependencies: [{ provider: 'p', required: true }] })
-
-    expect(
-      planDependencyMutation(index, states({ m: { enabled: false, suspended: true } }), {
-        roots: ['p'],
-        kind: DependencyMutationKind.remove,
-        policy: DependencyPolicy.suspend
-      }).steps
-    ).toEqual([{ id: 'p', action: DependencyAction.release }])
-    expect(
-      planDependencyMutation(index, states({ m: { enabled: false } }), {
-        roots: ['p'],
-        kind: DependencyMutationKind.remove,
-        policy: DependencyPolicy.suspend
-      }).steps
-    ).toEqual([
-      { id: 'm', action: DependencyAction.suspend },
-      { id: 'p', action: DependencyAction.release }
-    ])
-  })
-
-  it('resumes a provider without serving through a disabled recovered node', () => {
-    const index = createTestIndex()
-    index.add({ id: 'p', dependencies: [] })
-    index.add({ id: 'm', dependencies: [{ provider: 'p', required: true }] })
-    index.add({ id: 's', dependencies: [{ provider: 'm', required: true }] })
-    /** Request shape shared by the three state projections. */
-    const request = {
+  expect(
+    planResume(index, readState, {
+      provider: 'p',
+      generationChanged: true,
+      canRebind: () => false
+    }).steps
+  ).toEqual([
+    { id: 'a', action: DependencyAction.restart },
+    { id: 'b', action: DependencyAction.restart }
+  ])
+  expect(
+    planResume(index, readState, {
+      provider: 'p',
+      generationChanged: true,
+      canRebind: (id) => id === 'a'
+    }).steps
+  ).toEqual([
+    { id: 'a', action: DependencyAction.rebind },
+    { id: 'b', action: DependencyAction.resume }
+  ])
+  expect(
+    planResume(index, readState, {
       provider: 'p',
       generationChanged: false,
       canRebind: () => false
-    } as const
+    }).steps
+  ).toEqual([
+    { id: 'a', action: DependencyAction.resume },
+    { id: 'b', action: DependencyAction.resume }
+  ])
+  expect(
+    planResume(index, states({ a: { suspended: true, stale: true }, b: { suspended: true } }), {
+      provider: 'p',
+      generationChanged: true,
+      canRebind: () => true
+    }).steps
+  ).toEqual([
+    { id: 'a', action: DependencyAction.restart },
+    { id: 'b', action: DependencyAction.restart }
+  ])
+}
 
-    expect(
-      planResume(
-        index,
-        states({ m: { enabled: false, suspended: true }, s: { suspended: true } }),
-        request
-      ).steps
-    ).toEqual([{ id: 'm', action: DependencyAction.resume }])
-    expect(
-      planResume(index, states({ m: { suspended: true }, s: { suspended: true } }), {
-        ...request,
-        provider: 'm'
-      }).steps
-    ).toEqual([
-      { id: 'm', action: DependencyAction.resume },
-      { id: 's', action: DependencyAction.resume }
-    ])
-    expect(
-      planResume(index, states({ s: { suspended: true } }), { ...request, provider: 'm' }).steps
-    ).toEqual([{ id: 's', action: DependencyAction.resume }])
+/**
+ * Owns the isolated setup, action and assertions for: plans lazy activation, install membership,
+ * and inverse teardown.
+ */
+function verifyPlansLazyActivationInstallMembershipAndInverseTeardown() {
+  const index = createTestIndex()
+  index.add({ id: 'l1', dependencies: [] })
+  index.add({ id: 'l2', dependencies: [{ provider: 'l1', required: true }] })
+  index.add({ id: 'e', dependencies: [{ provider: 'l2', required: true }] })
+  index.add({ id: 'l3', dependencies: [] })
+  const readState = states({
+    l1: { activated: false },
+    l2: { activated: false },
+    l3: { activated: false }
   })
 
-  it('invalidates suspended bindings and restarts disabled consumers', () => {
+  expect(planActivation(index, readState, ['e']).steps).toEqual([
+    { id: 'l1', action: DependencyAction.activate },
+    { id: 'l2', action: DependencyAction.activate }
+  ])
+  expect([...resolveInstallSet(index, ['l1', 'l2', 'e'], (id) => id.startsWith('l'))]).toEqual([
+    'l1',
+    'l2',
+    'e'
+  ])
+  expect([...resolveInstallSet(index, ['l3'], () => true)]).toEqual([])
+  expect(planTeardown(index).order).toEqual([...index.order()].reverse())
+}
+
+/**
+ * Owns the isolated setup, action and assertions for: deeply freezes plans and leaves the index
+ * unchanged.
+ */
+function verifyDeeplyFreezesPlansAndLeavesTheIndexUnchanged() {
+  const index = createTestIndex()
+  index.add({ id: 'p', dependencies: [] })
+  index.add({ id: 'a', dependencies: [{ provider: 'p', required: true }] })
+  const before = projectSnapshot(index.snapshot())
+  const plan = planDependencyMutation(index, states({}), {
+    roots: ['p'],
+    kind: DependencyMutationKind.remove,
+    policy: DependencyPolicy.cascade
+  })
+
+  expect(() => mutatePlan(plan)).toThrow(TypeError)
+  expect(() => {
+    ;(plan.steps[0] as { id: string }).id = 'changed'
+  }).toThrow(TypeError)
+  expect(() => {
+    ;(plan.edges as unknown as Array<{ provider: string }>).push({ provider: 'changed' })
+  }).toThrow(TypeError)
+  expect(projectSnapshot(index.snapshot())).toEqual(before)
+}
+
+/**
+ * Owns the isolated setup, action and assertions for: plans the same leaf mutation across graph
+ * sizes.
+ */
+function verifyPlansTheSameLeafMutationAcrossGraphSizes() {
+  for (const background of [1_000, 8_000]) {
     const index = createTestIndex()
     index.add({ id: 'p', dependencies: [] })
     index.add({ id: 'a', dependencies: [{ provider: 'p', required: true }] })
-    index.add({ id: 'd', dependencies: [{ provider: 'p', required: true }] })
-    index.add({ id: 'x', dependencies: [{ provider: 'p', required: true }] })
-    index.add({
-      id: 'y',
-      dependencies: [
-        { provider: 'd', required: true },
-        { provider: 'q', required: true }
-      ]
+    index.add({ id: 'c', dependencies: [{ provider: 'p', required: false }] })
+    for (let position = 0; position < background; position += 1)
+      index.add({ id: `unrelated-${position}`, dependencies: [] })
+    const plan = planDependencyMutation(index, states({}), {
+      roots: ['a'],
+      kind: DependencyMutationKind.remove,
+      policy: DependencyPolicy.cascade
     })
-    const readState = states({
-      d: { enabled: false },
-      x: { suspended: true },
-      y: { suspended: true }
-    })
+    expect(plan.order).toEqual(['a'])
+  }
+}
 
+/**
+ * Owns the isolated setup, action and assertions for: reads disabled and suspended as orthogonal
+ * state flags.
+ */
+function verifyReadsDisabledAndSuspendedAsOrthogonalStateFlags() {
+  const index = createTestIndex()
+  index.add({ id: 'p', dependencies: [] })
+  index.add({ id: 'm', dependencies: [{ provider: 'p', required: true }] })
+
+  expect(
+    planDependencyMutation(index, states({ m: { enabled: false, suspended: true } }), {
+      roots: ['p'],
+      kind: DependencyMutationKind.remove,
+      policy: DependencyPolicy.suspend
+    }).steps
+  ).toEqual([{ id: 'p', action: DependencyAction.release }])
+  expect(
+    planDependencyMutation(index, states({ m: { enabled: false } }), {
+      roots: ['p'],
+      kind: DependencyMutationKind.remove,
+      policy: DependencyPolicy.suspend
+    }).steps
+  ).toEqual([
+    { id: 'm', action: DependencyAction.suspend },
+    { id: 'p', action: DependencyAction.release }
+  ])
+}
+
+/**
+ * Owns the isolated setup, action and assertions for: resumes a provider without serving through a
+ * disabled recovered node.
+ */
+function verifyResumesAProviderWithoutServingThroughADisabledRecoveredNode() {
+  const index = createTestIndex()
+  index.add({ id: 'p', dependencies: [] })
+  index.add({ id: 'm', dependencies: [{ provider: 'p', required: true }] })
+  index.add({ id: 's', dependencies: [{ provider: 'm', required: true }] })
+  /** Request shape shared by the three state projections. */
+  const request = {
+    provider: 'p',
+    generationChanged: false,
+    canRebind: () => false
+  } as const
+
+  expect(
+    planResume(
+      index,
+      states({ m: { enabled: false, suspended: true }, s: { suspended: true } }),
+      request
+    ).steps
+  ).toEqual([{ id: 'm', action: DependencyAction.resume }])
+  expect(
+    planResume(index, states({ m: { suspended: true }, s: { suspended: true } }), {
+      ...request,
+      provider: 'm'
+    }).steps
+  ).toEqual([
+    { id: 'm', action: DependencyAction.resume },
+    { id: 's', action: DependencyAction.resume }
+  ])
+  expect(
+    planResume(index, states({ s: { suspended: true } }), { ...request, provider: 'm' }).steps
+  ).toEqual([{ id: 's', action: DependencyAction.resume }])
+}
+
+/**
+ * Owns the isolated setup, action and assertions for: invalidates suspended bindings and restarts
+ * disabled consumers.
+ */
+function verifyInvalidatesSuspendedBindingsAndRestartsDisabledConsumers() {
+  const index = createTestIndex()
+  index.add({ id: 'p', dependencies: [] })
+  index.add({ id: 'a', dependencies: [{ provider: 'p', required: true }] })
+  index.add({ id: 'd', dependencies: [{ provider: 'p', required: true }] })
+  index.add({ id: 'x', dependencies: [{ provider: 'p', required: true }] })
+  index.add({
+    id: 'y',
+    dependencies: [
+      { provider: 'd', required: true },
+      { provider: 'q', required: true }
+    ]
+  })
+  const readState = states({
+    d: { enabled: false },
+    x: { suspended: true },
+    y: { suspended: true }
+  })
+
+  expect(
+    planReplacement(index, readState, {
+      target: 'p',
+      canRebind: (id) => id === 'a'
+    }).steps
+  ).toEqual([
+    { id: 'a', action: DependencyAction.rebind },
+    { id: 'x', action: DependencyAction.invalidate },
+    { id: 'y', action: DependencyAction.invalidate },
+    { id: 'd', action: DependencyAction.restart }
+  ])
+  expect(planRestart(index, readState, ['d']).steps).toEqual([
+    { id: 'y', action: DependencyAction.invalidate },
+    { id: 'd', action: DependencyAction.restart }
+  ])
+  expect(
+    planResume(index, states({ x: { suspended: true, stale: true } }), {
+      provider: 'p',
+      generationChanged: true,
+      canRebind: () => true
+    }).steps
+  ).toContainEqual({ id: 'x', action: DependencyAction.restart })
+}
+
+/**
+ * Owns the isolated setup, action and assertions for: preserves empty and suspended-frontier resume
+ * plans across graph sizes.
+ */
+function verifyPreservesEmptyAndSuspendedFrontierResumePlansAcrossGraphSizes() {
+  for (const length of [100, 2_000]) {
+    const empty = createResumeFixture(length)
     expect(
-      planReplacement(index, readState, {
-        target: 'p',
-        canRebind: (id) => id === 'a'
+      planResume(empty.index, empty.state, {
+        provider: 'p',
+        generationChanged: true,
+        canRebind: () => false
       }).steps
-    ).toEqual([
-      { id: 'a', action: DependencyAction.rebind },
-      { id: 'x', action: DependencyAction.invalidate },
-      { id: 'y', action: DependencyAction.invalidate },
-      { id: 'd', action: DependencyAction.restart }
-    ])
-    expect(planRestart(index, readState, ['d']).steps).toEqual([
-      { id: 'y', action: DependencyAction.invalidate },
-      { id: 'd', action: DependencyAction.restart }
-    ])
+    ).toEqual([])
+    const frontier = createResumeFixture(length, 3)
     expect(
-      planResume(index, states({ x: { suspended: true, stale: true } }), {
+      planResume(frontier.index, frontier.state, {
         provider: 'p',
         generationChanged: true,
         canRebind: () => true
       }).steps
-    ).toContainEqual({ id: 'x', action: DependencyAction.restart })
-  })
+    ).toEqual(
+      [0, 1, 2].map((position) => ({
+        id: `suspended-${position}`,
+        action: DependencyAction.rebind
+      }))
+    )
+  }
+}
 
-  it('preserves empty and suspended-frontier resume plans across graph sizes', () => {
-    for (const length of [100, 2_000]) {
-      const empty = createResumeFixture(length)
-      expect(
-        planResume(empty.index, empty.state, {
-          provider: 'p',
-          generationChanged: true,
-          canRebind: () => false
-        }).steps
-      ).toEqual([])
-      const frontier = createResumeFixture(length, 3)
-      expect(
-        planResume(frontier.index, frontier.state, {
-          provider: 'p',
-          generationChanged: true,
-          canRebind: () => true
-        }).steps
-      ).toEqual(
-        [0, 1, 2].map((position) => ({
-          id: `suspended-${position}`,
-          action: DependencyAction.rebind
-        }))
-      )
-    }
-  })
-  it('plans activation without walking activated ancestors', () => {
-    /** Builds an activated chain of the given length, then three inactive lazy providers and a root. */
-    const fixture = (size: number) => {
-      const index = createTestIndex()
-      for (let position = 0; position < size; position += 1)
-        index.add({
-          id: `c-${position}`,
-          dependencies: position === 0 ? [] : [{ provider: `c-${position - 1}`, required: true }]
-        })
-      index.add({ id: 'l1', dependencies: [{ provider: `c-${size - 1}`, required: true }] })
-      index.add({ id: 'l2', dependencies: [{ provider: 'l1', required: true }] })
-      index.add({ id: 'l3', dependencies: [{ provider: 'l2', required: true }] })
-      index.add({ id: 'root', dependencies: [{ provider: 'l3', required: true }] })
-      return {
-        index,
-        state: states({
-          l1: { activated: false },
-          l2: { activated: false },
-          l3: { activated: false }
-        })
-      }
-    }
-    /** Resulting activation steps at one chain length. */
-    const measure = (size: number) => {
-      const { index, state } = fixture(size)
-      const plan = planActivation(index, state, ['root'])
-      return {
-        steps: plan.steps.map((step) => `${step.id}:${step.action}`)
-      }
-    }
-    const small = measure(100)
-    const large = measure(2_000)
-    expect(small.steps).toEqual(['l1:activate', 'l2:activate', 'l3:activate'])
-    expect(large.steps).toEqual(small.steps)
-  })
+/**
+ * Owns the isolated setup, action and assertions for: plans activation without walking activated
+ * ancestors.
+ */
+function verifyPlansActivationWithoutWalkingActivatedAncestors() {
+  const small = measureActivationFixture(100)
+  const large = measureActivationFixture(2_000)
+  expect(small.steps).toEqual(['l1:activate', 'l2:activate', 'l3:activate'])
+  expect(large.steps).toEqual(small.steps)
+}
+
+describe('dependency planner', () => {
+  it(
+    'plans reject, cascade, and suspend dependency mutations',
+    verifyPlansRejectCascadeAndSuspendDependencyMutations
+  )
+
+  it(
+    'separates direct rebinds from dependent-first restart closure',
+    verifySeparatesDirectRebindsFromDependentFirstRestartClosure
+  )
+
+  it(
+    'resumes only satisfiable suspended closures with generation-aware actions',
+    verifyResumesOnlySatisfiableSuspendedClosuresWithGenerationAwareActions
+  )
+
+  it(
+    'plans lazy activation, install membership, and inverse teardown',
+    verifyPlansLazyActivationInstallMembershipAndInverseTeardown
+  )
+
+  it(
+    'deeply freezes plans and leaves the index unchanged',
+    verifyDeeplyFreezesPlansAndLeavesTheIndexUnchanged
+  )
+
+  it(
+    'plans the same leaf mutation across graph sizes',
+    verifyPlansTheSameLeafMutationAcrossGraphSizes
+  )
+
+  it(
+    'reads disabled and suspended as orthogonal state flags',
+    verifyReadsDisabledAndSuspendedAsOrthogonalStateFlags
+  )
+
+  it(
+    'resumes a provider without serving through a disabled recovered node',
+    verifyResumesAProviderWithoutServingThroughADisabledRecoveredNode
+  )
+
+  it(
+    'invalidates suspended bindings and restarts disabled consumers',
+    verifyInvalidatesSuspendedBindingsAndRestartsDisabledConsumers
+  )
+
+  it(
+    'preserves empty and suspended-frontier resume plans across graph sizes',
+    verifyPreservesEmptyAndSuspendedFrontierResumePlansAcrossGraphSizes
+  )
+  it(
+    'plans activation without walking activated ancestors',
+    verifyPlansActivationWithoutWalkingActivatedAncestors
+  )
 })
