@@ -1,3 +1,8 @@
+/**
+ * Owns capability-planned suspended-dependent recovery without changing provider installation
+ * results.
+ */
+import { reverseItems, appendCleanupErrors } from './cleanup-runtime.js'
 import type { PluginHostEnablementRuntime } from './enablement-runtime.js'
 import type { PluginHostRemovalRuntime } from './removal-runtime.js'
 
@@ -37,6 +42,7 @@ export class PluginHostResumeRuntime<TDomainCore extends object, TValue> {
   /** Narrow host authority retained by the recovery coordinator. */
   readonly #port: IPluginHostResumeRuntimePort<TDomainCore, TValue>
 
+  /** Retains canonical install, removal and state owners for recovery. */
   constructor(port: IPluginHostResumeRuntimePort<TDomainCore, TValue>) {
     this.#port = port
   }
@@ -73,26 +79,15 @@ export class PluginHostResumeRuntime<TDomainCore extends object, TValue> {
     /** Disposal failures of restarted generations, reported as cleanup diagnostics. */
     const cleanupErrors: unknown[] = []
     /** Names that capability planned to reinstall. */
-    const restart = new Set(
-      plan.steps.filter((step) => step.action === DependencyAction.restart).map((step) => step.id)
-    )
-    /** Marks a retained suspended registration stale without releasing its instance. */
-    const invalidate = (name: string): void => {
-      const waiting = this.#port.state.registrations.get(name)
-      if (waiting) this.#port.state.setStale(waiting, true)
-    }
+    const restart = new Set<string>()
     for (const step of plan.steps)
-      if (step.action === DependencyAction.invalidate) invalidate(step.id)
+      if (step.action === DependencyAction.restart) restart.add(step.id)
+    for (const step of plan.steps)
+      if (step.action === DependencyAction.invalidate) this.#invalidate(step.id)
     /** Hooks that failed and must be replanned as restart roots. */
     const failedRebinds = new Set<string>()
-    /** Applies capability's revised decisions after a failed rebind hook. */
-    const replanAfterHookFailure = (): void => {
-      for (const step of this.planAfterProvider(provider, generationChanged, failedRebinds).steps) {
-        if (step.action === DependencyAction.restart) restart.add(step.id)
-        else if (step.action === DependencyAction.invalidate) invalidate(step.id)
-      }
-    }
     for (const step of plan.steps) {
+      /** Recovery acts only on the current committed generation selected by capability. */
       const registration = this.#port.state.registrations.get(step.id)
       if (!registration || restart.has(step.id)) continue
       if (step.action === DependencyAction.resume) {
@@ -100,16 +95,13 @@ export class PluginHostResumeRuntime<TDomainCore extends object, TValue> {
         registration.featureExposeValid = true
       }
       if (step.action !== DependencyAction.rebind) continue
+      /** Explicit invocation data preserves the original plugin-definition receiver. */
+      const invocation = { registration, provider, providerRegistration }
       try {
         // An overdue rebind hook is a failed rebind and is replanned as a restart.
         this.#port.operations.begin(registration)
         await this.#port.operations.await(
-          this.#port.invokeHook(() =>
-            registration.plugin.onDependencyReplaced!(
-              provider,
-              providerRegistration.featureOutputs ?? Object.freeze({})
-            )
-          ),
+          this.#port.invokeHook(() => invokeResumeRebind(invocation)),
           registration
         )
         this.#port.state.setSuspended(registration, false)
@@ -123,25 +115,31 @@ export class PluginHostResumeRuntime<TDomainCore extends object, TValue> {
           error
         )
         failedRebinds.add(registration.name)
-        replanAfterHookFailure()
+        this.#replanAfterHookFailure(provider, generationChanged, failedRebinds, restart)
       }
     }
 
     /** Provider-first canonical order retained for reinstall after dependent-first disposal. */
-    const restartOrder = plan.order.filter((name) => restart.has(name)) as string[]
-    /** Names already placed by the canonical order; restart names outside it are appended once. */
+    const restartOrder: string[] = []
+    for (const name of plan.order) if (restart.has(name)) restartOrder.push(name)
+    /** Names already placed by capability order are tracked once before unmatched names append. */
     const ordered = new Set(restartOrder)
     for (const name of restart) if (!ordered.has(name)) restartOrder.push(name)
-    /** Current registrations to reinstall, provider-first. */
-    const restarting = restartOrder
-      .map((name) => this.#port.state.registrations.get(name))
-      .filter((registration): registration is IRegistration<TDomainCore, TValue> => !!registration)
-    for (const registration of [...restarting].reverse()) {
+    /** Current exact generations preserve provider-first reinstall order. */
+    const restarting: IRegistration<TDomainCore, TValue>[] = []
+    for (const name of restartOrder) {
+      /** A prior mutation can remove a name without manufacturing a replacement generation. */
+      const registration = this.#port.state.registrations.get(name)
+      if (registration) restarting.push(registration)
+    }
+    for (const registration of reverseItems(restarting)) {
+      /** Pre-release completes before lease retirement and physical cleanup. */
       const beforeRelease = this.#port.removal.runBeforeRelease(registration)
-      if (beforeRelease) cleanupErrors.push(...(await beforeRelease).cleanupErrors)
+      if (beforeRelease) appendCleanupErrors(cleanupErrors, (await beforeRelease).cleanupErrors)
       await this.#port.drainLeases(registration)
-      cleanupErrors.push(
-        ...(await this.#port.removal.disposeRegistration(registration)).cleanupErrors
+      appendCleanupErrors(
+        cleanupErrors,
+        (await this.#port.removal.disposeRegistration(registration)).cleanupErrors
       )
     }
 
@@ -157,6 +155,10 @@ export class PluginHostResumeRuntime<TDomainCore extends object, TValue> {
           }))
         )
         for (const registration of restarting) {
+          /**
+           * A restarted generation inherits activation and enablement from its released
+           * predecessor.
+           */
           const current = this.#port.state.registrations.get(registration.name)
           if (!current) continue
           if (registration.activated && !current.activated)
@@ -201,4 +203,40 @@ export class PluginHostResumeRuntime<TDomainCore extends object, TValue> {
         error
       )
   }
+  /** Marks a retained suspended registration stale without releasing its current instance. */
+  #invalidate(name: string): void {
+    /** Only a currently committed generation receives the capability invalidation. */
+    const waiting = this.#port.state.registrations.get(name)
+    if (waiting) this.#port.state.setStale(waiting, true)
+  }
+
+  /** Applies revised capability decisions to this recovery transaction after one failed rebind. */
+  #replanAfterHookFailure(
+    provider: string,
+    generationChanged: boolean,
+    failedRebinds: ReadonlySet<string>,
+    restart: Set<string>
+  ): void {
+    for (const step of this.planAfterProvider(provider, generationChanged, failedRebinds).steps) {
+      if (step.action === DependencyAction.restart) restart.add(step.id)
+      else if (step.action === DependencyAction.invalidate) this.#invalidate(step.id)
+    }
+  }
+}
+
+/** Resume rebind retains the original definition receiver, provider name and committed outputs. */
+type IResumeRebindInvocation<TDomainCore extends object, TValue> = Readonly<{
+  readonly registration: IRegistration<TDomainCore, TValue>
+  readonly provider: string
+  readonly providerRegistration: IRegistration<TDomainCore, TValue>
+}>
+
+/** Calls the captured resume hook without assimilating or wrapping its returned value. */
+function invokeResumeRebind<TDomainCore extends object, TValue>(
+  invocation: IResumeRebindInvocation<TDomainCore, TValue>
+): unknown {
+  return invocation.registration.plugin.onDependencyReplaced!(
+    invocation.provider,
+    invocation.providerRegistration.featureOutputs ?? Object.freeze({})
+  )
 }

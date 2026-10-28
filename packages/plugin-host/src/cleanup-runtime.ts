@@ -1,3 +1,5 @@
+/** Owns ordered cleanup collection and lifecycle release policy, without mutation planning. */
+import type { IRegistration } from './registry.js'
 import {
   createLifecycleScope,
   type ICleanupResult,
@@ -10,6 +12,46 @@ import type { IScheduler } from '@migaia/utils/scheduler'
 import ERROR_TEXT, { PluginHostError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import { PluginHostCleanupMode } from './state-constants.js'
+
+/** Visits an existing ordered group in reverse without copying its growable storage. */
+export function* reverseItems<T>(items: readonly T[]): IterableIterator<T> {
+  for (let index = items.length - 1; index >= 0; index -= 1) yield items[index]!
+}
+
+/** Collects synchronous detach failures without skipping later exact stage entries. */
+export function detachRegistrationStages<TDomainCore extends object, TValue>(
+  registration: IRegistration<TDomainCore, TValue>,
+  errors: unknown[]
+): void {
+  for (const detach of reverseItems(registration.pipelineDisposers)) {
+    try {
+      detach()
+    } catch (error) {
+      errors.push(error)
+    }
+  }
+  registration.pipelineDisposers = []
+  registration.stageEntries.clear()
+}
+
+/** Appends ordered cleanup leaves without copying an accumulating error array. */
+export function appendCleanupErrors(target: unknown[], errors: readonly unknown[]): void {
+  for (const error of errors) target.push(error)
+}
+
+/** One identity bucket owns an ordered intrusive list, so matching never rescans consumed entries. */
+type IReturnedErrorBucket = {
+  first: IReturnedErrorEntry | undefined
+  last: IReturnedErrorEntry | undefined
+}
+
+/** An error appears in at most three identity buckets and unlinks from each in constant time. */
+type IReturnedErrorEntry = {
+  readonly index: number
+  readonly bucket: IReturnedErrorBucket
+  previous: IReturnedErrorEntry | undefined
+  next: IReturnedErrorEntry | undefined
+}
 
 /** Registration-owned cleanup choice, read only when lifecycle admits a release descriptor. */
 type IPluginHostCleanupPolicy = Readonly<{
@@ -63,52 +105,7 @@ export class PluginHostCleanupRuntime {
     run: () => void | PromiseLike<void>,
     policy?: IPluginHostCleanupPolicy
   ): IReleaseDescriptor {
-    const timeoutMs = this.#options.disposeStepTimeoutMs
-    /** Normalize a custom thenable once before both lifecycle and the ledger observe it. */
-    const runObserved = (): void | PromiseLike<void> => {
-      const result = run()
-      if (!policy?.cleanupLedger) return result
-      const probe = probeThenable(result)
-      if (probe.kind === 'failed') throw probe.error
-      if (probe.kind === 'not-thenable') return
-      const pending = assimilateCapturedThen<void>(probe.thenFn, result)
-      policy.cleanupLedger.start(phase, () => pending)
-      return pending
-    }
-    let settled = false
-    return {
-      // own() validates without retaining the snapshot. At disposal the canonical scope reads
-      // the registration's selected mode; custom bypasses the bounded graceful/force chain.
-      get custom() {
-        return policy?.cleanupMode === PluginHostCleanupMode.unbounded ||
-          (timeoutMs === false && policy?.cleanupDeadlineAt === undefined)
-          ? runObserved
-          : undefined
-      },
-      graceful: async () => {
-        // One derived Promise: then() already adopts a thenable returned by run.
-        const pending: Promise<void> = Promise.resolve().then(() => run())
-        policy?.cleanupLedger?.start(phase, () => pending)
-        try {
-          await this.#options.pending.track(pending)
-        } finally {
-          settled = true
-        }
-      },
-      gracefulTimeoutMs: timeoutMs === false ? undefined : timeoutMs,
-      force: () => {
-        if (settled) return
-        throw new PluginHostError(
-          PluginHostErrorCode.disposeStepTimeout,
-          ERROR_TEXT.DISPOSE_STEP_TIMEOUT(
-            phase,
-            timeoutMs === false
-              ? Math.max(0, (policy?.cleanupDeadlineAt ?? 0) - this.#options.scheduler.now())
-              : timeoutMs
-          )
-        )
-      }
-    }
+    return new PluginHostReleaseStep(this.#options, phase, run, policy)
   }
 
   /** Disposes one ordered function group and optionally preserves exact rejection identities. */
@@ -119,6 +116,7 @@ export class PluginHostCleanupRuntime {
     policy?: IPluginHostCleanupPolicy
   ): Promise<unknown[]> {
     if (disposers.length === 0) return []
+    /** Lifecycle remains the sole owner of sequential resource release and bounded waiting. */
     const scope = createLifecycleScope({
       errorPolicy: 'collect',
       scheduler: this.#options.scheduler,
@@ -135,22 +133,28 @@ export class PluginHostCleanupRuntime {
     ledger: ISyncStartedDisposalLedger,
     preserveErrorIdentity: boolean
   ): ICleanupResult {
+    /** Capture whether actual cleanup work still outlives this logical completion. */
     const pending = ledger.pending > 0
+    /** Sealing freezes current ledger observations while retaining physical completion when needed. */
     const outcome = ledger.seal()
     /**
      * A timed-out callback can reject before the whole plan seals. Match each logical failure once
      * so that such a late rejection is retained without repeating an already returned error.
      */
     const matcher = new ReturnedErrorMatcher(errors)
+    /** Already-returned error identities are consumed once before additional leaves are published. */
     const newlyObserved = outcome.cleanupErrors.filter((entry) => {
       if (matcher.take(entry.error)) return false
       /** Provisional rollback already exposes an aggregate's children as individual failures. */
       if (entry.error instanceof AggregateError) return !matcher.takeAll(entry.error.errors)
       return true
     })
+    /** Only unmatched physical observations are appended to the logical cleanup result. */
     const additionalErrors = this.#wrapCollected(newlyObserved, undefined, preserveErrorIdentity)
+    /** Late work keeps the existing completion channel and reports newly observed cleanup failures. */
     const physicalCompletion = pending
       ? outcome.physicalCompletion.then((result) => {
+          /** Every actual late failure receives the original wrapping and diagnostic policy. */
           const lateErrors = this.#wrapCollected(
             result.cleanupErrors,
             undefined,
@@ -189,63 +193,183 @@ export class PluginHostCleanupRuntime {
   }
 }
 
-/**
- * Matches returned errors against late cleanup entries in O(1) per lookup. Each returned error is
- * consumed at most once, in its original order, matching either the entry itself or, for a package
- * wrapper, the wrapper's cause.
- */
-class ReturnedErrorMatcher {
-  /** Indexes of returned errors, keyed by the value an entry can match: the error or its cause. */
-  readonly #byMatch = new Map<unknown, number[]>()
-  /** Indexes of returned errors keyed by their own identity, for aggregate-child matching. */
-  readonly #byIdentity = new Map<unknown, number[]>()
-  /** Whether each returned error has already been matched. */
-  readonly #consumed: boolean[]
+/** Owns one lifecycle release descriptor's timeout, settlement and actual-work observation. */
+class PluginHostReleaseStep {
+  /** Scheduler, pending tracker and timeout policy remain owned by the Host cleanup runtime. */
+  readonly #options: IPluginHostCleanupRuntimeOptions
+  /** Stable cleanup phase identifies ledger work and timeout diagnostics. */
+  readonly #phase: string
+  /** Captured disposer is invoked without substituting its return value. */
+  readonly #run: () => void | PromiseLike<void>
+  /** Registration policy remains live because disposal mode is selected after scope admission. */
+  readonly #policy: IPluginHostCleanupPolicy | undefined
+  /** Force reports timeout only while the original graceful callback is still pending. */
+  #settled = false
 
-  /** Indexes the returned errors once. */
-  constructor(errors: readonly unknown[]) {
-    this.#consumed = Array.from({ length: errors.length }, () => false)
-    for (let index = 0; index < errors.length; index += 1) {
-      const error = errors[index]
-      ReturnedErrorMatcher.#append(this.#byMatch, error, index)
-      ReturnedErrorMatcher.#append(this.#byIdentity, error, index)
-      if (error instanceof PluginHostError && error.cause !== error)
-        ReturnedErrorMatcher.#append(this.#byMatch, error.cause, index)
+  /** Captures one descriptor's state instead of sharing constructor-local closures. */
+  constructor(
+    options: IPluginHostCleanupRuntimeOptions,
+    phase: string,
+    run: () => void | PromiseLike<void>,
+    policy?: IPluginHostCleanupPolicy
+  ) {
+    this.#options = options
+    this.#phase = phase
+    this.#run = run
+    this.#policy = policy
+  }
+
+  /** Unbounded cleanup bypasses the bounded graceful/force chain at disposal-time admission. */
+  get custom(): (() => void | PromiseLike<void>) | undefined {
+    return this.#policy?.cleanupMode === PluginHostCleanupMode.unbounded ||
+      (this.#options.disposeStepTimeoutMs === false &&
+        this.#policy?.cleanupDeadlineAt === undefined)
+      ? this.#runObserved
+      : undefined
+  }
+
+  /** Fixed configured timeout is unchanged; an absolute cleanup deadline is supplied by scope. */
+  get gracefulTimeoutMs(): number | undefined {
+    return this.#options.disposeStepTimeoutMs === false
+      ? undefined
+      : this.#options.disposeStepTimeoutMs
+  }
+
+  /** Captured disposer callbacks retain their original undefined receiver. */
+  #invoke(): void | PromiseLike<void> {
+    /** Property lookup is separated from invocation so no cleanup-step receiver is introduced. */
+    const run = this.#run
+    return run()
+  }
+
+  /** Receiverless lifecycle callback normalizes a custom thenable once before dual observation. */
+  readonly #runObserved = (): void | PromiseLike<void> => this.#observeRun()
+
+  /** Observes one custom disposer result through the existing ledger without adding an await. */
+  #observeRun(): void | PromiseLike<void> {
+    /** Original callback value is inspected only when actual-work tracking is required. */
+    const result = this.#invoke()
+    if (!this.#policy?.cleanupLedger) return result
+    /** A captured then is shared by lifecycle and ledger instead of being read twice. */
+    const probe = probeThenable(result)
+    if (probe.kind === 'failed') throw probe.error
+    if (probe.kind === 'not-thenable') return
+    /** Both owners observe the same assimilated Promise. */
+    const pending = assimilateCapturedThen<void>(probe.thenFn, result)
+    this.#policy.cleanupLedger.start(this.#phase, () => pending)
+    return pending
+  }
+
+  /** Receiverless lifecycle callback preserves the original derived Promise and settlement mark. */
+  readonly graceful = (): Promise<void> => this.#runGraceful()
+
+  /** Tracks the derived disposer Promise and marks its actual settlement under graceful cleanup. */
+  async #runGraceful(): Promise<void> {
+    /** One derived Promise adopts any thenable returned by the disposer. */
+    const pending: Promise<void> = Promise.resolve().then(() => this.#invoke())
+    this.#policy?.cleanupLedger?.start(this.#phase, () => pending)
+    try {
+      await this.#options.pending.track(pending)
+    } finally {
+      this.#settled = true
     }
   }
 
-  /** Adds one index under a key, keeping each list in ascending order. */
-  static #append(map: Map<unknown, number[]>, key: unknown, index: number): void {
-    const list = map.get(key)
-    if (list) list.push(index)
-    else map.set(key, [index])
+  /** Receiverless force callback retains the same native coded timeout while work is pending. */
+  readonly force = (): void => {
+    if (this.#settled) return
+    throw new PluginHostError(
+      PluginHostErrorCode.disposeStepTimeout,
+      ERROR_TEXT.DISPOSE_STEP_TIMEOUT(
+        this.#phase,
+        this.#options.disposeStepTimeoutMs === false
+          ? Math.max(0, (this.#policy?.cleanupDeadlineAt ?? 0) - this.#options.scheduler.now())
+          : this.#options.disposeStepTimeoutMs
+      )
+    )
+  }
+}
+
+/**
+ * Matches returned cleanup entries in O(1) per identity lookup. Each original error owns at most
+ * three intrusive-list entries, removed together after a match; aggregate children reserve list
+ * entries without mutation until every child has matched.
+ */
+class ReturnedErrorMatcher {
+  /** Direct and wrapper-cause matches share one ordered bucket per matching identity. */
+  readonly #byMatch = new Map<unknown, IReturnedErrorBucket>()
+  /** Aggregate children match only exact returned identities, never a wrapper's cause. */
+  readonly #byIdentity = new Map<unknown, IReturnedErrorBucket>()
+  /** Each returned error owns at most three list memberships, released together on consumption. */
+  readonly #memberships: IReturnedErrorEntry[][]
+
+  /** Builds all identity indexes once, preserving original error order within every bucket. */
+  constructor(errors: readonly unknown[]) {
+    this.#memberships = Array.from({ length: errors.length }, () => [])
+    for (let index = 0; index < errors.length; index += 1) {
+      /** Original identity and an optional package wrapper cause are the only direct match keys. */
+      const error = errors[index]
+      this.#append(this.#byMatch, error, index)
+      this.#append(this.#byIdentity, error, index)
+      if (error instanceof PluginHostError && error.cause !== error)
+        this.#append(this.#byMatch, error.cause, index)
+    }
   }
 
-  /** First unconsumed index in a list, or -1. */
-  #first(list: readonly number[] | undefined, skip?: ReadonlySet<number>): number {
-    if (!list) return -1
-    for (const index of list) if (!this.#consumed[index] && !skip?.has(index)) return index
-    return -1
+  /** Appends one membership without scanning or copying a growable bucket. */
+  #append(map: Map<unknown, IReturnedErrorBucket>, key: unknown, index: number): void {
+    /** Existing bucket retains all still-unmatched errors for this identity. */
+    let bucket = map.get(key)
+    if (!bucket) {
+      bucket = { first: undefined, last: undefined }
+      map.set(key, bucket)
+    }
+    /** Previous and next links make removal constant-time from every identity index. */
+    const entry: IReturnedErrorEntry = { index, bucket, previous: bucket.last, next: undefined }
+    if (bucket.last) bucket.last.next = entry
+    else bucket.first = entry
+    bucket.last = entry
+    this.#memberships[index]!.push(entry)
   }
 
-  /** Consumes the first returned error that matches this entry directly or as a wrapper cause. */
-  take(entry: unknown): boolean {
-    const index = this.#first(this.#byMatch.get(entry))
-    if (index < 0) return false
-    this.#consumed[index] = true
+  /** Removes all membership links for one consumed error; the per-error bound is three entries. */
+  #consume(index: number): void {
+    // The constructor inserts one direct key, one identity key and at most one cause key.
+    for (const entry of this.#memberships[index]!) {
+      if (entry.previous) entry.previous.next = entry.next
+      else entry.bucket.first = entry.next
+      if (entry.next) entry.next.previous = entry.previous
+      else entry.bucket.last = entry.previous
+    }
+    this.#memberships[index] = []
+  }
+
+  /** Consumes the first returned error matching an entry directly or through its wrapper cause. */
+  take(value: unknown): boolean {
+    /** Only a live bucket head can match, so repeated identities never rescan consumed prefixes. */
+    const entry = this.#byMatch.get(value)?.first
+    if (!entry) return false
+    this.#consume(entry.index)
     return true
   }
 
-  /** Consumes one returned error per child only when every child is present by identity. */
+  /** Consumes one exact returned error per child only after all children have matched. */
   takeAll(children: readonly unknown[]): boolean {
-    /** Indexes reserved for earlier children of this same aggregate. */
-    const reserved = new Set<number>()
+    /** Tentative heads preserve atomic matching when a later aggregate child is absent. */
+    const positions = new Map<IReturnedErrorBucket, IReturnedErrorEntry | undefined>()
+    /** Each child reserves one distinct returned-error index in its own identity bucket. */
+    const reserved: number[] = []
     for (const child of children) {
-      const index = this.#first(this.#byIdentity.get(child), reserved)
-      if (index < 0) return false
-      reserved.add(index)
+      /** Identity lookup remains constant-time for duplicate children as well as distinct values. */
+      const bucket = this.#byIdentity.get(child)
+      if (!bucket) return false
+      /** A stored undefined marks exhaustion and must not fall back to the bucket's real head. */
+      const entry = positions.has(bucket) ? positions.get(bucket) : bucket.first
+      if (!entry) return false
+      positions.set(bucket, entry.next)
+      reserved.push(entry.index)
     }
-    for (const index of reserved) this.#consumed[index] = true
+    for (const index of reserved) this.#consume(index)
     return true
   }
 }
