@@ -66,7 +66,7 @@ export function containDiagnosticRejection(
 }
 
 /** Report a diagnostic failure without allowing a failing reporter to escape the boundary. */
-function reportDiagnosticFailure(host: ITraceDiagnosticHost, error: unknown): void {
+function reportDiagnosticFailure(error: unknown, host: ITraceDiagnosticHost): void {
   try {
     host.reportError(error)
   } catch {
@@ -74,17 +74,18 @@ function reportDiagnosticFailure(host: ITraceDiagnosticHost, error: unknown): vo
   }
 }
 
-/** Read one diagnostic clock and return a fallback sample when the host clock fails. */
-export function readDiagnosticClock(
+/** Reads one clock with an explicit reporter context, avoiding per-span callback ownership. */
+export function readDiagnosticClock<T>(
   read: () => number,
   fallback: number,
-  reportFailure: (error: unknown) => void
+  reportFailure: (error: unknown, context: T) => void,
+  context: T
 ): number {
   try {
     return read()
   } catch (error) {
     try {
-      reportFailure(error)
+      reportFailure(error, context)
     } catch {
       // Reporting is already the terminal diagnostic boundary.
     }
@@ -99,13 +100,16 @@ export function emitTraceSafely(
   fallbackTimestamp = 0
 ): void {
   /** Clock failures are reported before the sink receives its fallback timestamp. */
-  const timestamp = readDiagnosticClock(host.timestamp, fallbackTimestamp, (error) =>
-    reportDiagnosticFailure(host, error)
+  const timestamp = readDiagnosticClock(
+    host.timestamp,
+    fallbackTimestamp,
+    reportDiagnosticFailure,
+    host
   )
   try {
     host.emitTrace(createEvent(timestamp))
   } catch (error) {
-    reportDiagnosticFailure(host, error)
+    reportDiagnosticFailure(error, host)
   }
 }
 
@@ -123,8 +127,6 @@ class ObserverRunTrace {
   #startedAt = 0
   /** Last timestamp sample supplies the terminal event's fallback timestamp. */
   #startedTimestamp = 0
-  /** One stable reporter avoids allocating another closure for each diagnostic clock sample. */
-  readonly #reportFailure = (error: unknown): void => reportDiagnosticFailure(this.#host, error)
 
   /** Retains the observer and host without reading any diagnostic clock or sink during creation. */
   constructor(observer: IRuntimeNodeDescriptor, host: IObserverRunTraceHost) {
@@ -146,7 +148,7 @@ class ObserverRunTrace {
     try {
       this.#host.emitTrace(event)
     } catch (error) {
-      this.#reportFailure(error)
+      reportDiagnosticFailure(error, this.#host)
     }
   }
 
@@ -154,8 +156,13 @@ class ObserverRunTrace {
   #start(): void {
     if (this.#started) return
     this.#started = true
-    this.#startedAt = readDiagnosticClock(this.#host.now, 0, this.#reportFailure)
-    this.#startedTimestamp = readDiagnosticClock(this.#host.timestamp, 0, this.#reportFailure)
+    this.#startedAt = readDiagnosticClock(this.#host.now, 0, reportDiagnosticFailure, this.#host)
+    this.#startedTimestamp = readDiagnosticClock(
+      this.#host.timestamp,
+      0,
+      reportDiagnosticFailure,
+      this.#host
+    )
     this.#emit({
       type: ReactiveTraceType.observerRun,
       timestamp: this.#startedTimestamp,
@@ -173,12 +180,14 @@ class ObserverRunTrace {
       timestamp: readDiagnosticClock(
         this.#host.timestamp,
         this.#startedTimestamp,
-        this.#reportFailure
+        reportDiagnosticFailure,
+        this.#host
       ),
       phase: ReactiveTracePhase.end,
       observer: this.#observer,
       durationMs:
-        readDiagnosticClock(this.#host.now, this.#startedAt, this.#reportFailure) - this.#startedAt
+        readDiagnosticClock(this.#host.now, this.#startedAt, reportDiagnosticFailure, this.#host) -
+        this.#startedAt
     })
   }
 
@@ -191,12 +200,14 @@ class ObserverRunTrace {
       timestamp: readDiagnosticClock(
         this.#host.timestamp,
         this.#startedTimestamp,
-        this.#reportFailure
+        reportDiagnosticFailure,
+        this.#host
       ),
       phase: ReactiveTracePhase.error,
       observer: this.#observer,
       durationMs:
-        readDiagnosticClock(this.#host.now, this.#startedAt, this.#reportFailure) - this.#startedAt,
+        readDiagnosticClock(this.#host.now, this.#startedAt, reportDiagnosticFailure, this.#host) -
+        this.#startedAt,
       error: primaryError
     })
   }

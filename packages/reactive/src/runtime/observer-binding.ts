@@ -202,7 +202,7 @@ class ObserverBinding {
     /** Effect construction runs the callback synchronously before ownership changes. */
     const current = new Effect(fn, this.#runtime, options)
     this.#observer = current
-    return new Observation(this, current).dispose
+    return new Observation(this, current).createDisposer()
   }
 
   /** Admits a capture only into the current live observer and preserves the missing-observer token. */
@@ -238,14 +238,16 @@ class Observation {
   readonly #effect: Effect
   /** Consumed before cleanup to preserve idempotency during reentrant or throwing disposal. */
   #active = true
-  /** Detached callback exposes no state or receiver requirement to the host adapter. */
-  readonly dispose: IDisposer
 
   /** Associates one independently idempotent disposer with an already installed observation. */
   constructor(binding: ObserverBinding, effect: Effect) {
     this.#binding = binding
     this.#effect = effect
-    this.dispose = () => this.#dispose()
+  }
+
+  /** Returns a detached token without retaining its callback on this short-lived observation. */
+  createDisposer(): IDisposer {
+    return () => this.#dispose()
   }
 
   /** Retires first, then disposes and releases in the original failure-sensitive order. */
