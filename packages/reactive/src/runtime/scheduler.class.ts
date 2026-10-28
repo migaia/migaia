@@ -1,3 +1,4 @@
+/** Owns queue draining, batching, scheduling requests and strategy recovery; no graph mutation. */
 import type { IFlushable, IFlushResult, ISchedulerStrategy } from './types.ts'
 import { createReactiveError, tagReactiveError } from '../errors.ts'
 import { ReactiveErrorCode } from '../error-code.ts'
@@ -28,6 +29,15 @@ const attachCauseSafely = (error: Error, cause: unknown): boolean => {
   }
 }
 
+/** One request owns synchronous-call error priority until its strategy invocation finishes. */
+type IFlushRequest = {
+  generation: number
+  insideStrategyCall: boolean
+  synchronousFlushError: unknown
+  /** Public strategies receive the same named zero-argument callback shape as before refactoring. */
+  readonly flush: () => void
+}
+
 // Owns the pending flush queue, batch depth, flush state, and replaceable trigger strategy.
 export class Scheduler {
   /**
@@ -37,11 +47,15 @@ export class Scheduler {
    */
   #maxFlushPasses: number
 
+  /** Nested batches defer scheduling until the outermost owner releases its entry. */
   batchDepth = 0
+  /** A single active drain owns reentrant work and prevents a second synchronous drain. */
   #flushing = false
+  /** One admitted strategy request coalesces writes until its callback runs or retires. */
   #scheduled = false
   /** Monotonic identity for the currently admitted scheduling request. */
   #scheduleGeneration = 0
+  /** Insertion-ordered membership deduplicates pending observers and permits constant-time removal. */
   #queued = new Set<IFlushable>()
   /** Strategy currently selected by the caller; it may not yet satisfy the runtime contract. */
   #strategy: ISchedulerStrategy
@@ -60,9 +74,8 @@ export class Scheduler {
     this.#onAsyncError = onAsyncError
     this.#maxFlushPasses = maxFlushPasses
     // 默认冲刷走注入的微任务调度入口，不直接 queueMicrotask。
-    const defaultStrategy: ISchedulerStrategy = (flush) => scheduleMicrotask(flush)
-    this.#strategy = defaultStrategy
-    this.#safeStrategy = defaultStrategy
+    this.#strategy = (flush) => scheduleMicrotask(flush)
+    this.#safeStrategy = this.#strategy
   }
 
   /**
@@ -97,33 +110,21 @@ export class Scheduler {
   requestFlush(): void {
     if (this.#scheduled || this.#flushing) return
     this.#scheduled = true
+    /** Callback generation prevents retired or duplicate strategy callbacks from flushing new work. */
     const generation = ++this.#scheduleGeneration
+    /** Recovery applies only while this captured strategy still owns the scheduling request. */
     const strategy = this.#strategy
-    let insideStrategyCall = true
-    let synchronousFlushError: unknown
-    const flush = (): void => {
-      if (generation !== this.#scheduleGeneration) return
-      // A strategy callback is valid for one scheduling request only. Retiring its generation
-      // before flushing also makes a duplicate invocation from the same strategy a no-op.
-      this.#scheduleGeneration++
-      this.#scheduled = false
-      try {
-        this.flush()
-      } catch (error) {
-        if (insideStrategyCall) {
-          synchronousFlushError = error
-          throw error
-        }
-        try {
-          this.#onAsyncError(error)
-        } catch {
-          // Error reporting is terminal; it must not create a second scheduler failure.
-        }
-      }
+    /** The queued callback retains one explicit request context rather than mutable closure state. */
+    const request: IFlushRequest = {
+      generation,
+      insideStrategyCall: true,
+      synchronousFlushError: undefined,
+      flush: () => this.#flushRequested(request)
     }
     try {
-      const result = (strategy as (flush: () => void) => unknown)(flush)
-      insideStrategyCall = false
+      /** A strategy may invoke its flush synchronously before returning a value for admission. */
+      const result = (strategy as (flush: () => void) => unknown)(request.flush)
+      request.insideStrategyCall = false
       /** Shared probe retains the original getter failure and captured then method. */
       const inspected = probeThenable(result)
       if (inspected.kind === ThenableProbeKind.notThenable) {
@@ -144,6 +145,7 @@ export class Scheduler {
         )
         return
       }
+      /** Captured then assimilation observes rejection without reading the strategy result twice. */
       const settled = assimilateCapturedThen(inspected.thenFn, result)
       void settled.then(
         () => {
@@ -168,11 +170,31 @@ export class Scheduler {
         }
       )
     } catch (error) {
-      if (synchronousFlushError === error) throw error
+      if (request.synchronousFlushError === error) throw error
       this.#recoverFromStrategyFailure(strategy, generation)
       throw error
     } finally {
-      insideStrategyCall = false
+      request.insideStrategyCall = false
+    }
+  }
+
+  /** Retires a one-shot generation before draining; synchronous failures retain throw priority. */
+  #flushRequested(request: IFlushRequest): void {
+    if (request.generation !== this.#scheduleGeneration) return
+    this.#scheduleGeneration++
+    this.#scheduled = false
+    try {
+      this.flush()
+    } catch (error) {
+      if (request.insideStrategyCall) {
+        request.synchronousFlushError = error
+        throw error
+      }
+      try {
+        this.#onAsyncError(error)
+      } catch {
+        // Error reporting is terminal; it must not create a second scheduler failure.
+      }
     }
   }
 
@@ -212,25 +234,32 @@ export class Scheduler {
       let executions: Map<IFlushable, number> | undefined
       /** The first queue snapshot already owns the exact first execution membership. */
       let firstBatch: IFlushable[] | undefined
+      /** Observer failures retain queue order and do not prevent unrelated observers from running. */
       const errors: unknown[] = []
       while (this.#queued.size) {
+        /** Each drain round owns a stable entry snapshot while callbacks enqueue later work. */
         const batch = [...this.#queued]
         this.#queued.clear()
         if (firstBatch === undefined) firstBatch = batch
         else if (executions === undefined) {
           executions = new Map()
+          /** Every first-round observer has already consumed exactly one execution from its budget. */
           for (const item of firstBatch) executions.set(item, 1)
         }
         for (let index = 0; index < batch.length; index++) {
+          /** The current entry remains in this round even when callbacks alter queued membership. */
           const item = batch[index]
           /** Runtime admission guarantees a positive budget, so first-pass count one is safe. */
           const executionCount = executions === undefined ? 1 : (executions.get(item) ?? 0) + 1
           executions?.set(item, executionCount)
           if (executionCount > this.#maxFlushPasses) {
             // Keep the unprocessed batch suffix alongside reentrant work in the diagnostic ledger.
+            /** Pending work is retained in the terminal diagnostic before the live queue is cleared. */
             const dropped = [...batch.slice(index), ...this.#queued]
             this.#queued.clear()
+            /** The existing diagnostic contract labels at most eight dropped entries. */
             const names = dropped.map((queued) => queued.debugName ?? '<anonymous>').slice(0, 8)
+            /** Loop termination preserves earlier observer failures as primary aggregate entries. */
             const loopError = createReactiveError(
               ReactiveErrorCode.flushLoop,
               ReactiveErrorText.flushLoopDetected(this.#maxFlushPasses, dropped.length, names)
@@ -285,17 +314,24 @@ export class Scheduler {
   /** Shares error priority and final flushing while retaining the public callback's zero arguments. */
   #runBatched<TArg, T>(fn: (arg: TArg) => T, arg: TArg, withArgument: boolean): T {
     this.batchDepth++
+    /** Business failure remains primary if exiting the outermost batch also fails to flush. */
     let fnError: unknown
+    /** A thrown undefined value is still a business failure and must not become a successful result. */
     let hasFnError = false
+    /** The synchronous callback result is returned only after outermost batch cleanup completes. */
     let result: T
     try {
       result = withArgument ? fn(arg) : (fn as () => T)()
+      /** Callback admission captures any then getter before synchronous batch cleanup proceeds. */
       const inspection = inspectCallbackThenable(result)
       if ('error' in inspection) {
         throw tagReactiveError(
-          new TypeError(ReactiveErrorText.synchronousCallbackReturnedThenable('batch callback'), {
-            cause: inspection.error
-          }),
+          new TypeError(
+            ReactiveErrorText.synchronousCallbackReturnedThenable(
+              ReactiveErrorText.batchCallbackLabel
+            ),
+            { cause: inspection.error }
+          ),
           ReactiveErrorCode.invalidOption
         )
       }
@@ -308,7 +344,11 @@ export class Scheduler {
           }
         })
         throw tagReactiveError(
-          new TypeError(ReactiveErrorText.synchronousCallbackReturnedThenable('batch callback')),
+          new TypeError(
+            ReactiveErrorText.synchronousCallbackReturnedThenable(
+              ReactiveErrorText.batchCallbackLabel
+            )
+          ),
           ReactiveErrorCode.invalidOption
         )
       }
@@ -323,6 +363,7 @@ export class Scheduler {
         if (!hasFnError) throw flushError // 只有 flush 出错 → 抛 flush 错误
         // Error 对象保持身份/类型；flush 错误挂到 cause。非 Error throw 值无法安全附加元数据。
         if (fnError instanceof Error) {
+          /** Reading cause once preserves getter side effects and the original getter failure. */
           const read = tryReadProperty(fnError, 'cause')
           if (read.threw) {
             /** Preserve the business, flush, and getter failures before invoking a reporter. */
@@ -337,7 +378,9 @@ export class Scheduler {
               ReactiveErrorCode.actionFlushFailed
             )
           }
+          /** Existing causes precede the new flush failure when both must remain reachable. */
           const previousCause = read.value
+          /** The original business Error remains top-level whenever its cause can be attached. */
           const mergedCause =
             previousCause === undefined
               ? flushError

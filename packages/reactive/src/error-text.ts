@@ -83,6 +83,10 @@ export const ReactiveErrorText = {
   /** Explains why synchronous callbacks cannot return PromiseLike values. */
   synchronousCallbackReturnedThenable: (callback: string): string =>
     `${callback} must return void; PromiseLike results are not supported`,
+  /** Stable batch admission label preserves the public message from synchronous callback checks. */
+  batchCallbackLabel: 'batch callback',
+  /** Stable observable hook label keeps every lifecycle admission branch on the same public text. */
+  lifecycleHookLabel: 'lifecycle hook',
   /** Explains observer failures preceding the flush-loop guard. */
   observersBeforeFlushLoop: 'observers failed before the flush-loop guard fired',
   /** Explains multiple observer failures in one flush. */
