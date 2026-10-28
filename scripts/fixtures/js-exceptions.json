@@ -40,6 +40,514 @@
     {
       "path": "packages/storage-host/test/authoring-packed-export-smoke.mjs",
       "reason": "Existing packed authoring consumer moved from storage-contract; Node invokes this plain-JavaScript fixture directly against extracted dist packages."
+    },
+    {
+      "path": "packages/capability/bench/resume-planner.mjs",
+      "reason": "Bench driver run directly by node."
+    },
+    {
+      "path": "packages/event-subscriber/test/packed-export-smoke.mjs",
+      "reason": "Plain-JavaScript consumer that exercises the packed dist/ archive through public entries."
+    },
+    {
+      "path": "packages/plugin-host/test/executable-acceptance-tooling.mjs",
+      "reason": "Test harness module loaded directly by Node-run fixtures without a TypeScript loader."
+    },
+    {
+      "path": "packages/plugin-host/test/fixtures/plugin-handle-gc.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/plugin-host/test/ownership-packed-smoke.mjs",
+      "reason": "Plain-JavaScript consumer that exercises the packed dist/ archive through public entries."
+    },
+    {
+      "path": "packages/plugin-host/test/packed-consumer-smoke.mjs",
+      "reason": "Plain-JavaScript consumer that exercises the packed dist/ archive through public entries."
+    },
+    {
+      "path": "packages/plugin-host/test/packed-feature-types.mjs",
+      "reason": "Plain-JavaScript consumer that exercises the packed dist/ archive through public entries."
+    },
+    {
+      "path": "packages/plugin-host/test/packed-smoke.mjs",
+      "reason": "Plain-JavaScript consumer that exercises the packed dist/ archive through public entries."
+    },
+    {
+      "path": "packages/rpc-contract/test/core/interop/rpc-protobuf-payload.mjs",
+      "reason": "Test harness module loaded directly by Node-run fixtures without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-host/test/core/interop/rpc-envelope-schema.mjs",
+      "reason": "Test harness module loaded directly by Node-run fixtures without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-host/test/core/packed-control-bridge-boundary.mjs",
+      "reason": "Plain-JavaScript consumer that exercises the packed dist/ archive through public entries."
+    },
+    {
+      "path": "packages/rpc-host/test/core/qualification-fullpath.config.mjs",
+      "reason": "Vitest config that reuses the package config without adding its untyped loader to the test type graph."
+    },
+    {
+      "path": "packages/rpc-host/test/replay-window/native-counters.mjs",
+      "reason": "Test harness module loaded directly by Node-run fixtures without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-host/test/replay-window/native-runtime.mjs",
+      "reason": "Test harness module loaded directly by Node-run fixtures without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-host/test/replay-window/native-telemetry.mjs",
+      "reason": "Test harness module loaded directly by Node-run fixtures without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/bench/bare-node.mjs",
+      "reason": "Bench driver run directly by node."
+    },
+    {
+      "path": "packages/rpc-integration/bench/classification.mjs",
+      "reason": "Bench driver run directly by node."
+    },
+    {
+      "path": "packages/rpc-integration/bench/cross-runtime/statistics.mjs",
+      "reason": "Bench driver run directly by node."
+    },
+    {
+      "path": "packages/rpc-integration/bench/error-text.mjs",
+      "reason": "Bench driver run directly by node."
+    },
+    {
+      "path": "packages/rpc-integration/bench/ipc-side.mjs",
+      "reason": "Bench driver run directly by node."
+    },
+    {
+      "path": "packages/rpc-integration/bench/ipc.mjs",
+      "reason": "Bench driver run directly by node."
+    },
+    {
+      "path": "packages/rpc-integration/bench/observe.mjs",
+      "reason": "Bench driver run directly by node."
+    },
+    {
+      "path": "packages/rpc-integration/bench/p3-diagnostic.mjs",
+      "reason": "Bench driver run directly by node."
+    },
+    {
+      "path": "packages/rpc-integration/bench/text.mjs",
+      "reason": "Bench driver run directly by node."
+    },
+    {
+      "path": "packages/rpc-integration/schema/vectors/generate.mjs",
+      "reason": "Schema vector generator run directly by node."
+    },
+    {
+      "path": "packages/rpc-integration/test/bench/dx-roadmap.mjs",
+      "reason": "Bench driver run directly by node."
+    },
+    {
+      "path": "packages/rpc-integration/test/bench/ipc-session.mjs",
+      "reason": "Bench driver run directly by node."
+    },
+    {
+      "path": "packages/rpc-integration/test/bridge/fixtures/jsonrpc-child.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/core/fixtures/deno-observation-proof.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/core/packed-export-smoke.mjs",
+      "reason": "Plain-JavaScript consumer that exercises the packed dist/ archive through public entries."
+    },
+    {
+      "path": "packages/rpc-integration/test/devtools/fixtures/text.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/process/fixtures/conformance-faults-persistent.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/process/fixtures/conformance-isolation-peer.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/process/fixtures/health-busy-child.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/process/fixtures/matrix-process-plugin-child.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/process/fixtures/node-child.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/process/fixtures/node-endpoint-child.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/process/fixtures/node-process-host.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/process/fixtures/node-process-plugin-child.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/process/peers/ts/node-runner.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/replay-window/native-entropy-rollback.mjs",
+      "reason": "Test harness module loaded directly by Node-run fixtures without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/replay-window/native-harness.mjs",
+      "reason": "Test harness module loaded directly by Node-run fixtures without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/replay-window/native-peer.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/replay-window/native-retirement.mjs",
+      "reason": "Test harness module loaded directly by Node-run fixtures without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/runtime-api/fixtures/automatic-process.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/runtime-api/fixtures/automatic-web-worker.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/runtime-api/fixtures/automatic-worker.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/runtime-api/fixtures/cross-runtime-parent.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/runtime-api/fixtures/directory-worker.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/runtime-api/fixtures/managed-binary-worker.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/runtime-api/fixtures/managed-worker.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/runtime-api/fixtures/native-connect-relay.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/runtime-api/fixtures/process-management.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/runtime-api/fixtures/process-source-faults.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/runtime-api/fixtures/runtime-api-parent.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/runtime-api/fixtures/runtime-api-process.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/runtime-api/fixtures/runtime-api-provide.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/runtime-api/fixtures/runtime-api-worker.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/runtime-api/fixtures/runtime-store-worker.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/runtime-api/fixtures/transfer-echo-worker.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/runtime-api/fixtures/unlaunched-worker-parent.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/runtime-api/fixtures/unlaunched-worker.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/runtime-api/fixtures/worker-faults.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-integration/test/runtime-api/fixtures/worker-source-faults.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-plugin-browser/test/replay-window/native-active.mjs",
+      "reason": "Test harness module loaded directly by Node-run fixtures without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-plugin-browser/test/replay-window/native-auth-fixture.mjs",
+      "reason": "Test harness module loaded directly by Node-run fixtures without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-plugin-browser/test/replay-window/native-diagnostic.mjs",
+      "reason": "Test harness module loaded directly by Node-run fixtures without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-plugin-browser/test/replay-window/native-lifetime.mjs",
+      "reason": "Test harness module loaded directly by Node-run fixtures without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-plugin-browser/test/replay-window/native-loaded.mjs",
+      "reason": "Test harness module loaded directly by Node-run fixtures without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-plugin-browser/test/replay-window/native-long.mjs",
+      "reason": "Test harness module loaded directly by Node-run fixtures without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-plugin-browser/test/replay-window/native-qualification.mjs",
+      "reason": "Test harness module loaded directly by Node-run fixtures without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-plugin-browser/test/replay-window/native-settlement-order.mjs",
+      "reason": "Test harness module loaded directly by Node-run fixtures without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-plugin-devtools/bench/ingest.mjs",
+      "reason": "Bench driver run directly by node."
+    },
+    {
+      "path": "packages/rpc-plugin-pool/test/fixtures/process-child.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-plugin-pool/test/fixtures/thread-child.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-plugin-process/test/process/fixtures/conformance-parent.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-plugin-process/test/process/fixtures/conformance-toolchains.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-plugin-process/test/process/fixtures/outlet-command-child.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-plugin-process/test/process/fixtures/short-parent.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-plugin-thread/test/threads/fixtures/dx-authentication.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-plugin-thread/test/threads/fixtures/dx-signed-worker.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-plugin-thread/test/threads/fixtures/lifecycle-worker.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-plugin-thread/test/threads/fixtures/outlet-command-worker.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-plugin-thread/test/threads/fixtures/rpc-worker.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-plugin-thread/test/threads/fixtures/short-spawn-host.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-plugin-thread/test/threads/fixtures/short-spawn-worker.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-plugin-thread/test/threads/fixtures/web-error-host.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-plugin-thread/test/threads/fixtures/web-error-worker.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-plugin-thread/test/threads/fixtures/web-runtime-parent.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/rpc-plugin-thread/test/threads/fixtures/web-runtime-worker.mjs",
+      "reason": "Worker or child-process fixture loaded directly by Node without a TypeScript loader."
+    },
+    {
+      "path": "packages/store-persist/test/packed-export-smoke.mjs",
+      "reason": "Plain-JavaScript consumer that exercises the packed dist/ archive through public entries."
+    },
+    {
+      "path": "packages/tray/test/packed-host-boundary.test.mjs",
+      "reason": "Plain-JavaScript consumer that exercises the packed dist/ archive through public entries."
+    },
+    {
+      "path": "packages/utils/test/collector-performance.mjs",
+      "reason": "Bench driver run directly by node."
+    },
+    {
+      "path": "packages/utils/test/packed-export-smoke.mjs",
+      "reason": "Plain-JavaScript consumer that exercises the packed dist/ archive through public entries."
+    },
+    {
+      "path": "packages/wasm/rust/examples/js/usage.js",
+      "reason": "Hand-written plain-JavaScript usage example of the wasm-pack generated glue; wasm JavaScript stays plain by the 2026-10-28 ruling."
+    },
+    {
+      "path": "scripts/check-docs-independence.mjs",
+      "reason": "Repository script run directly by node."
+    },
+    {
+      "path": "scripts/ci-run.mjs",
+      "reason": "Repository script run directly by node."
+    },
+    {
+      "path": "scripts/coverage-custody.mjs",
+      "reason": "Repository script run directly by node."
+    },
+    {
+      "path": "scripts/dist-freshness.global-setup.mjs",
+      "reason": "Repository script run directly by node."
+    },
+    {
+      "path": "scripts/dist-stamp.mjs",
+      "reason": "Repository script run directly by node."
+    },
+    {
+      "path": "scripts/docs-examples.mjs",
+      "reason": "Repository script run directly by node."
+    },
+    {
+      "path": "scripts/error-registry.mjs",
+      "reason": "Repository script run directly by node."
+    },
+    {
+      "path": "scripts/exclusive-window.mjs",
+      "reason": "Repository script run directly by node."
+    },
+    {
+      "path": "scripts/package-tree-shaking-provenance.mjs",
+      "reason": "Repository script run directly by node."
+    },
+    {
+      "path": "scripts/perf/plugin-host-admission.mjs",
+      "reason": "Repository script run directly by node."
+    },
+    {
+      "path": "scripts/public-exports.mjs",
+      "reason": "Repository script run directly by node."
+    },
+    {
+      "path": "scripts/release-plan.mjs",
+      "reason": "Repository script run directly by node."
+    },
+    {
+      "path": "scripts/release-progress.mjs",
+      "reason": "Repository script run directly by node."
+    },
+    {
+      "path": "scripts/storage-v2-complete-inverse.mjs",
+      "reason": "Repository script run directly by node."
+    },
+    {
+      "path": "scripts/storage-v2-lock-provenance.mjs",
+      "reason": "Repository script run directly by node."
+    },
+    {
+      "path": "scripts/storage-v2-package-tree.mjs",
+      "reason": "Repository script run directly by node."
+    },
+    {
+      "path": "scripts/storage-v2-retained-ledger.mjs",
+      "reason": "Repository script run directly by node."
+    },
+    {
+      "path": "scripts/test/coverage-custody.test.mjs",
+      "reason": "Repository tooling test run directly with node --test."
+    },
+    {
+      "path": "scripts/test/dist-stamp.test.mjs",
+      "reason": "Repository tooling test run directly with node --test."
+    },
+    {
+      "path": "scripts/test/docs-independence.test.mjs",
+      "reason": "Repository tooling test run directly with node --test."
+    },
+    {
+      "path": "scripts/test/error-registry.test.mjs",
+      "reason": "Repository tooling test run directly with node --test."
+    },
+    {
+      "path": "scripts/test/exclusive-window.test.mjs",
+      "reason": "Repository tooling test run directly with node --test."
+    },
+    {
+      "path": "scripts/test/package-tree-shaking.test.mjs",
+      "reason": "Repository tooling test run directly with node --test."
+    },
+    {
+      "path": "scripts/test/public-exports.test.mjs",
+      "reason": "Repository tooling test run directly with node --test."
+    },
+    {
+      "path": "scripts/test/registry-generation.test.mjs",
+      "reason": "Repository tooling test run directly with node --test."
+    },
+    {
+      "path": "scripts/test/release-plan.test.mjs",
+      "reason": "Repository tooling test run directly with node --test."
+    },
+    {
+      "path": "scripts/test/release-progress.test.mjs",
+      "reason": "Repository tooling test run directly with node --test."
+    },
+    {
+      "path": "scripts/test/rpc-merge-legacy-readers.test.mjs",
+      "reason": "Repository tooling test run directly with node --test."
+    },
+    {
+      "path": "scripts/test/rpc-merge-packed.test.mjs",
+      "reason": "Repository tooling test run directly with node --test."
+    },
+    {
+      "path": "scripts/vitest-dist-freshness.mjs",
+      "reason": "Repository script run directly by node."
+    },
+    {
+      "path": "website/test/browser-contract.test.mjs",
+      "reason": "Run directly by `bun test` (website `test:browser`) against the built storage-web theme archive."
+    },
+    {
+      "path": "scripts/test/js-exceptions.test.mjs",
+      "reason": "Repository tooling test run directly with node --test."
     }
   ]
 }

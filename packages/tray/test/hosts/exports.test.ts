@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { fixture } from './helper.js'
 
@@ -17,7 +16,7 @@ describe('Tray public boundary and lifecycle events', () => {
     ])
       expect(Object.values(api.TrayErrorCode)).toContain(code)
   })
-  it('exposes the complete instances runtime API, coded messages and listed native child fixtures', async () => {
+  it('exposes the complete instances runtime API and coded messages', async () => {
     /** Source root exercises the same public contract as native Node fixtures. */
     const api = await fixture()
     for (const symbol of [
@@ -66,22 +65,6 @@ describe('Tray public boundary and lifecycle events', () => {
     expect(() => api.createTray({ entries: [] })).toThrowError(
       expect.objectContaining({ code: 'TRAY_HOST_INVALID' })
     )
-    /** Fixture exceptions are declared in the existing repository-owned JSON destination. */
-    const exceptions = readFileSync(
-      new URL('../../../../scripts/fixtures/js-exceptions.json', import.meta.url),
-      'utf8'
-    )
-    for (const file of [
-      'hosts.mjs',
-      'fixture-text.mjs',
-      'thread-entry.mjs',
-      'process-entry.mjs',
-      'worker-entry.mjs',
-      'wiki-entry.mjs',
-      'faulty-entry.mjs',
-      'restart-failure-entry.mjs'
-    ])
-      expect(exceptions).toContain(`packages/tray/test/hosts/fixtures/${file}`)
   })
 
   it('freezes lifecycle records before listeners and watch, reports listener failure and preserves event order', async () => {

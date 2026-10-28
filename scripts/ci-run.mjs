@@ -59,6 +59,7 @@ const GateName = Object.freeze({
 const rootTestGates = Object.freeze([
   'test:coverage-custody',
   'test:dist-stamp',
+  'test:js-exceptions',
   'test:release',
   'test:tree-shaking'
 ])

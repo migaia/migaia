@@ -12,6 +12,7 @@
     "test:coverage-custody": "node --test scripts/test/coverage-custody.test.mjs",
     "test:dist-stamp": "node --test scripts/test/dist-stamp.test.mjs",
     "test:exclusive-window": "node --test scripts/test/exclusive-window.test.mjs",
+    "test:js-exceptions": "node --test scripts/test/js-exceptions.test.mjs",
     "test:release": "node --test scripts/test/release-plan.test.mjs scripts/test/release-progress.test.mjs",
     "window": "node scripts/exclusive-window.mjs",
     "registry:write": "node scripts/error-registry.mjs --write && bun scripts/public-exports.mjs --write",
