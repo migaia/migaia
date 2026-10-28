@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
-import { atomDef, createAtomStore, derivedDef } from '../src/index.js'
+import { atomDef, createAtomStore, derivedDef } from '../src/index.ts'
 
 /** Bulk writes retain the established primitive updater, notification, and failure semantics. */
 describe('AtomStore.setMany', () => {

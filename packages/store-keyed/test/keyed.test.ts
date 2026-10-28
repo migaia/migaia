@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
-import { atomDef, createAtomStore } from '../src'
+import { atomDef, createAtomStore } from '../src/index.ts'
 
 describe('store-keyed', () => {
   it('keeps definition state scoped to each AtomStore', () => {

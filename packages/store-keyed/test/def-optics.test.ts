@@ -9,7 +9,7 @@ import {
   splitDef,
   type IDefOptic,
   type IStandardWritableDef
-} from '../src'
+} from '../src/index.ts'
 
 describe('selectDef', () => {
   it('projects a read-only slice and defaults to Object.is equality', () => {

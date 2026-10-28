@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { createStoreKeyedRangeError, StoreKeyedErrorCode, STORE_KEYED_SOURCE } from '../src/errors'
+import {
+  createStoreKeyedRangeError,
+  StoreKeyedErrorCode,
+  STORE_KEYED_SOURCE
+} from '../src/errors.ts'
 
 describe('store-keyed error-code contract', () => {
   it('declares 10 unique codes under the package source', () => {

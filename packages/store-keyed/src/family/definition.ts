@@ -4,13 +4,13 @@ import {
   type IAtomDefinition,
   type IAtomGet,
   type IWritableAtomDefinition
-} from '../atom/definition.js'
+} from '../atom/definition.ts'
 import {
   createStoreKeyedError,
   createStoreKeyedRangeError,
   StoreKeyedErrorCode
-} from '../errors.js'
-import { StoreKeyedErrorText } from '../error-text.js'
+} from '../errors.ts'
+import { StoreKeyedErrorText } from '../error-text.ts'
 import { snapshotOwnDescriptors } from '@migaia/utils/object'
 
 /**

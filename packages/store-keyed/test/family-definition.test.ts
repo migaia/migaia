@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
-import { atomDef, createAtomStore, derivedFamilyDef, familyDef } from '../src'
+import { atomDef, createAtomStore, derivedFamilyDef, familyDef } from '../src/index.ts'
 
 describe('familyDef', () => {
   it('contains revoked options proxies as tagged errors', () => {

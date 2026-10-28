@@ -1,7 +1,7 @@
 import type { IDisposable, IRuntime } from '@migaia/reactive'
-import type { IAtomDefinition } from '../atom/definition.js'
-import { createStoreKeyedError, StoreKeyedErrorCode } from '../errors.js'
-import { StoreKeyedErrorText } from '../error-text.js'
+import type { IAtomDefinition } from '../atom/definition.ts'
+import { createStoreKeyedError, StoreKeyedErrorCode } from '../errors.ts'
+import { StoreKeyedErrorText } from '../error-text.ts'
 
 /**
  * Defines the atom protocol and cross-runtime validation without an atom implementation.
@@ -50,7 +50,7 @@ export type IAtomWrite<Args extends readonly unknown[], Result> = (
   ...args: Args
 ) => Result
 
-export type { IAtomUpdate } from '../atom/definition.js'
+export type { IAtomUpdate } from '../atom/definition.ts'
 
 function assertSameRuntime(runtime: IRuntime, atom: IReadableAtom<unknown>): void {
   if (atom.runtime !== runtime) {

@@ -10,7 +10,7 @@ import {
   shallowArrayEquals,
   spliceInsert,
   writeOpticPath
-} from '../src/atom/optics-path'
+} from '../src/atom/optics-path.ts'
 
 describe('readOpticPath', () => {
   it('reads a nested path', () => {

@@ -5,8 +5,8 @@ import {
   createStoreKeyedAggregateError,
   STORE_KEYED_SOURCE,
   StoreKeyedErrorCode
-} from '../errors.js'
-import { StoreKeyedErrorText } from '../error-text.js'
+} from '../errors.ts'
+import { StoreKeyedErrorText } from '../error-text.ts'
 
 import { attachErrorIdentity, isNativeErrorValue } from '@migaia/utils/error'
 
