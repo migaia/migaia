@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { StoreSsrErrorCode, STORE_SSR_SOURCE } from '../src/errors'
+import { StoreSsrErrorCode, STORE_SSR_SOURCE } from '../src/errors.ts'
 
 describe('store-ssr error-code contract', () => {
   it('declares 12 unique codes under the package source', () => {

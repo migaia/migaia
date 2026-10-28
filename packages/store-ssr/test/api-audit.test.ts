@@ -7,7 +7,7 @@ import {
   serializeSSRState,
   readSSRStateFromDocument,
   type ISSRStore
-} from '../src/index.js'
+} from '../src/index.ts'
 
 /** Complete application Store port with real Runtime ownership and idempotent caller cleanup. */
 function memoryStore(

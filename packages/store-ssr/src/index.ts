@@ -1,4 +1,4 @@
-export * from './ssr.js'
-export { SsrWireType, type ISsrWireType } from './ssr-constants.js'
+export * from './ssr.ts'
+export { SsrWireType, type ISsrWireType } from './ssr-constants.ts'
 
-export * from './errors.js'
+export * from './errors.ts'

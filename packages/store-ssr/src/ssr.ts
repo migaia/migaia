@@ -16,9 +16,9 @@ import {
   createStoreSsrTypeError,
   STORE_SSR_SOURCE,
   StoreSsrErrorCode
-} from './errors.js'
-import { SsrWireType, SsrWorkOutcome } from './ssr-constants.js'
-import { StoreSsrErrorText } from './error-text.js'
+} from './errors.ts'
+import { SsrWireType, SsrWorkOutcome } from './ssr-constants.ts'
+import { StoreSsrErrorText } from './error-text.ts'
 import { snapshotOwnDescriptors } from '@migaia/utils/object'
 import { isPlainObject } from '@migaia/utils/object'
 import { attachErrorIdentity, isNativeErrorValue } from '@migaia/utils/error'

@@ -14,9 +14,15 @@ import {
   readSSRStateFromDocumentWith,
   assertSSRState,
   SSRRequestScope
-} from '../src'
-import type { ISSRStore, ISSRResource, ISSRState, ISSRDocument, ITrustedSSRState } from '../src'
-import { createStoreSsrRangeError, StoreSsrErrorCode } from '../src/errors.js'
+} from '../src/index.ts'
+import type {
+  ISSRStore,
+  ISSRResource,
+  ISSRState,
+  ISSRDocument,
+  ITrustedSSRState
+} from '../src/index.ts'
+import { createStoreSsrRangeError, StoreSsrErrorCode } from '../src/errors.ts'
 
 describe('SSR error identity boundary', () => {
   it('preserves native error type while delegating source/code attachment', () => {
