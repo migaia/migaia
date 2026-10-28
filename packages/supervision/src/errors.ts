@@ -14,6 +14,7 @@ export function createSupervisionError(
   text: string,
   options: { readonly cause?: unknown; readonly detail?: Readonly<Record<string, unknown>> } = {}
 ): Error {
+  /** Retains the native class and the original cause before attaching semantic identity. */
   const error =
     options.cause === undefined
       ? new Constructor(text)

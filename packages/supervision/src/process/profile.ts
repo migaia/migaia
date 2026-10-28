@@ -1,3 +1,4 @@
+import { PROCESS_KIND } from './text.js'
 import { ExitReason } from '../index.js'
 import type { IUnitProfile } from '../index.js'
 import { processRequirements } from './capabilities.js'
@@ -19,7 +20,7 @@ export function createProcessProfile<THandle extends IProcessHandle>(
   >['launchContext']
 ): IUnitProfile<IProcessSpec, THandle, IProcessExitStatus, IProcessLaunchContext> {
   return {
-    kind: 'process',
+    kind: PROCESS_KIND,
     gracefulTermination: true,
     requirements: processRequirements,
     validateSpec: validateProcessSpec,

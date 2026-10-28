@@ -1,31 +1,21 @@
-import { IsolationMode, TerminationMode, LaunchPhase, ExitReason } from '../index.js'
-import {
-  boundedWait,
-  createAbortController,
-  createLifecycleScope,
-  type ILifecycleScope
-} from '@migaia/lifecycle'
+/** Owns bounded idle-pool membership and refill policy; entries own their resources. */
+import { OutcomeKind } from '../text.js'
+import { PROCESS_KIND, ProcessField } from './text.js'
+import { IsolationMode } from '../index.js'
 import { resolveScheduler, resolveSchedulerOption } from '@migaia/lifecycle/scheduler'
-import { systemScheduler, systemWallClock, type IScheduledTask } from '@migaia/utils/scheduler'
+import { systemScheduler, systemWallClock } from '@migaia/utils/scheduler'
 import { admitCapabilities } from '../admission.js'
-import { SupervisionErrorCode } from '../error-code.js'
-import { SupervisionErrorText } from '../error-text.js'
-import { createSupervisionError } from '../errors.js'
-import type { IUnitRuntime } from '../index.js'
 import { processRequirements, validateCapabilityDeclaration } from './capabilities.js'
-import { DrainedStream, ProcessCapability } from './constants.js'
 import { invalidProcessOption, validateProcessSpec } from './spec.js'
+import { PrewarmEntry, type IPrewarmContext } from './prewarm-entry.js'
 import type {
   IPrewarmEntry,
   IPrewarmPool,
   IPrewarmPoolOptions,
   IProcessHandle,
-  IProcessLaunchContext,
-  IProcessRecord,
   IProcessRegistry
 } from './types.js'
-import { startUsageMonitor, validateUsageOptions } from './usage-monitor.js'
-import { deliverOutput } from './output-tail.js'
+import { validateUsageOptions } from './usage-monitor.js'
 
 /** Provenance of an already-owned record; it does not create or duplicate the durable record. */
 type IPrewarmRecordOwner = Readonly<{ id: string; port: IProcessRegistry; namespace: string }>
@@ -37,22 +27,6 @@ export function readPrewarmRecordOwner(
   entry: IPrewarmEntry<IProcessHandle>
 ): IPrewarmRecordOwner | undefined {
   return prewarmRecordOwners.get(entry)
-}
-
-/** One idle unit and its ordered cleanup scope. */
-type IIdle<THandle extends IProcessHandle> = {
-  readonly lease: IPrewarmEntry<THandle>['lease']
-  readonly scope: ILifecycleScope
-  readonly monitors: ILifecycleScope
-  readonly controller: ReturnType<typeof createAbortController>
-  readonly chunks: Array<{ stream: DrainedStream; chunk: Uint8Array }>
-  handle?: THandle
-  launch?: Promise<THandle>
-  record?: IProcessRecord
-  timer?: IScheduledTask
-  taken: boolean
-  retired: boolean
-  output?: IProcessLaunchContext['output']
 }
 
 /**
@@ -67,389 +41,177 @@ type IIdle<THandle extends IProcessHandle> = {
 export function createPrewarmPool<THandle extends IProcessHandle>(
   options: IPrewarmPoolOptions<THandle>
 ): IPrewarmPool<THandle> {
+  validatePrewarmOptions(options)
+  return PrewarmPool.port(new PrewarmPool(options))
+}
+
+/** Rejects invalid construction before any budget lease or native unit is acquired. */
+function validatePrewarmOptions<THandle extends IProcessHandle>(
+  options: IPrewarmPoolOptions<THandle>
+): void {
   validateProcessSpec(options.spec)
   validateCapabilityDeclaration(options.launcher.capabilities)
   validateUsageOptions(options.usage)
-  if (options.budget.kind !== 'process') invalidProcessOption('budget')
-  if (!Number.isSafeInteger(options.size) || options.size < 0) invalidProcessOption('size', true)
-  if (typeof options.report !== 'function') invalidProcessOption('report')
+  if (options.budget.kind !== PROCESS_KIND) invalidProcessOption(ProcessField.budget)
+  if (!Number.isSafeInteger(options.size) || options.size < 0)
+    invalidProcessOption(ProcessField.size, true)
+  if (typeof options.report !== 'function') invalidProcessOption(ProcessField.report)
   if (
     options.registry &&
     (typeof options.launcher.probe !== 'function' ||
       typeof options.launcher.terminateRecord !== 'function')
   )
-    invalidProcessOption('registry')
+    invalidProcessOption(ProcessField.registry)
   admitCapabilities(
     [...processRequirements(options.spec), ...(options.requires ?? [])],
     options.launcher.capabilities,
     options.isolation ?? IsolationMode.required,
-    'process'
+    PROCESS_KIND
   )
-  const scheduler = resolveSchedulerOption(options) ?? resolveScheduler(systemScheduler)
-  const wallClock = options.wallClock ?? systemWallClock
-  const idle = new Set<IIdle<THandle>>()
-  const starting = new Set<IIdle<THandle>>()
-  const retiring = new Set<Promise<void>>()
-  let closed = false
-  let disposePromise: Promise<void> | undefined
-  const startupTimeoutMs = options.startupTimeoutMs ?? 10_000
-  const idleTimeoutMs = options.idleTimeoutMs ?? 60_000
-  const exitTimeoutMs = options.exitTimeoutMs ?? 5_000
-  const reapTimeoutMs = options.reapTimeoutMs ?? 5_000
-  for (const [field, value] of Object.entries({
-    startupTimeoutMs,
-    idleTimeoutMs,
-    exitTimeoutMs,
-    reapTimeoutMs
-  }))
-    if (!Number.isFinite(value) || value < 0) invalidProcessOption(field, true)
+}
 
-  /** Creates a coded diagnostic without embedding process output or bootstrap bytes. */
-  const failure = (
-    code: (typeof SupervisionErrorCode)[keyof typeof SupervisionErrorCode],
-    text: string,
-    cause?: unknown,
-    detail: Readonly<Record<string, unknown>> = {}
-  ): Error =>
-    createSupervisionError(Error, code, text, {
-      cause,
-      detail: { kind: 'process', prewarm: true, ...detail }
-    })
+/** Owns entry membership; all unit-specific lifecycle behavior lives in PrewarmEntry. */
+class PrewarmPool<THandle extends IProcessHandle> {
+  /** Shared admitted options and resolved timing ports are immutable for the pool lifetime. */
+  #context: IPrewarmContext<THandle>
+  /** Ready entries preserve first-ready iteration order for take. */
+  #idle = new Set<PrewarmEntry<THandle>>()
+  /** Starting entries count toward size and leave on readiness or retirement. */
+  #starting = new Set<PrewarmEntry<THandle>>()
+  /** Outstanding retirements remain joinable even after membership is removed. */
+  #retiring = new Set<Promise<void>>()
+  /** Closing is synchronous so reentrant callbacks cannot start replacement units. */
+  #closed = false
+  /** Disposal preserves exact Promise identity across repeated calls. */
+  #disposePromise?: Promise<void>
 
-  /** Observes one cleanup operation and keeps disposal joinable. */
-  const track = (task: Promise<void>): void => {
-    retiring.add(task)
-    void task.finally(() => retiring.delete(task))
+  /** Resolves scheduler before timeout validation, matching the baseline failure order. */
+  constructor(options: IPrewarmPoolOptions<THandle>) {
+    this.#context = {
+      options,
+      scheduler: resolveSchedulerOption(options) ?? resolveScheduler(systemScheduler),
+      wallClock: options.wallClock ?? systemWallClock,
+      startupTimeoutMs: options.startupTimeoutMs ?? 10_000,
+      idleTimeoutMs: options.idleTimeoutMs ?? 60_000,
+      exitTimeoutMs: options.exitTimeoutMs ?? 5_000,
+      reapTimeoutMs: options.reapTimeoutMs ?? 5_000
+    }
+    // Exactly four timeout fields, fixed by the pool option contract.
+    for (const [field, value] of Object.entries({
+      startupTimeoutMs: this.#context.startupTimeoutMs,
+      idleTimeoutMs: this.#context.idleTimeoutMs,
+      exitTimeoutMs: this.#context.exitTimeoutMs,
+      reapTimeoutMs: this.#context.reapTimeoutMs
+    }))
+      if (!Number.isFinite(value) || value < 0) invalidProcessOption(field, true)
+    this.#refill()
   }
 
-  /** Ends an idle entry; lease and record are released only after actual exit. */
-  const retire = (entry: IIdle<THandle>, force = false): Promise<void> => {
-    if (entry.retired) return Promise.resolve()
-    entry.retired = true
-    idle.delete(entry)
-    starting.delete(entry)
-    entry.controller.abort()
-    entry.timer?.cancel()
-    const handle = entry.handle
-    if (handle) {
-      entry.scope.own(handle, {
-        ...(force
-          ? {}
-          : {
-              graceful: () => {
-                handle.terminate(TerminationMode.graceful)
-                return handle.exited.then(() => undefined)
-              },
-              gracefulTimeoutMs: exitTimeoutMs
-            }),
-        force: async () => {
-          try {
-            handle.terminate(TerminationMode.force)
-          } catch (error) {
-            options.report(error)
-          }
-          try {
-            if (!(await boundedWait(handle.exited, scheduler.now() + reapTimeoutMs, { scheduler })))
-              options.report(
-                failure(SupervisionErrorCode.reapTimeout, SupervisionErrorText.reapTimeout)
-              )
-          } catch (error) {
-            options.report(error)
-          }
-        }
-      })
-    }
-    const task = entry.scope.dispose().then(() => undefined)
-    track(task)
-    return task
+  /** Entries read closure state through their explicit pool owner. */
+  get closed(): boolean {
+    return this.#closed
   }
 
-  /** Drops bounded buffered output into a newly attached supervisor sink in source order. */
-  const bindOutput = (entry: IIdle<THandle>, sink: IProcessLaunchContext['output']): void => {
-    for (const item of entry.chunks) deliverOutput(sink, item.stream, item.chunk, options.report)
-    entry.chunks.length = 0
-    entry.output = sink
+  /** Keeps the original own accessor, method order, mutability and detached-call behavior. */
+  static port<THandle extends IProcessHandle>(pool: PrewarmPool<THandle>): IPrewarmPool<THandle> {
+    const { options } = pool.#context
+    return {
+      id: options.id,
+      spec: options.spec,
+      budget: options.budget,
+      launcher: options.launcher,
+      get idle() {
+        return pool.#idle.size
+      },
+      take: () => pool.#take(),
+      invalidate: () => pool.#invalidate(),
+      dispose: () => pool.#dispose()
+    }
   }
 
-  /** Adds one idle unit if a nonqueuing budget lease is immediately available. */
-  const spawnOne = (): boolean => {
-    const grant = options.budget.tryAcquire()
-    if (grant.kind === 'rejected') return false
-    const controller = createAbortController()
-    const scope = createLifecycleScope({ errorPolicy: 'report', report: options.report, scheduler })
-    const monitors = createLifecycleScope({
-      errorPolicy: 'report',
-      report: options.report,
-      scheduler
-    })
-    const entry: IIdle<THandle> = {
-      lease: grant.lease,
-      scope,
-      monitors,
-      controller,
-      chunks: [],
-      taken: false,
-      retired: false
-    }
-    scope.own(grant.lease, {
-      force: async () => {
-        let handle = entry.handle
-        if (!handle && entry.launch) {
-          try {
-            if (
-              !(await boundedWait(entry.launch, scheduler.now() + reapTimeoutMs, { scheduler }))
-            ) {
-              options.report(
-                failure(
-                  SupervisionErrorCode.reapTimeout,
-                  SupervisionErrorText.reapTimeout,
-                  undefined,
-                  { phase: LaunchPhase.launch }
-                )
-              )
-              void entry.launch.then(
-                async (late) => {
-                  try {
-                    late.terminate(TerminationMode.force)
-                  } catch (error) {
-                    options.report(error)
-                  }
-                  try {
-                    await late.exited
-                  } catch (error) {
-                    options.report(error)
-                  }
-                  grant.lease.release()
-                },
-                (error) => {
-                  options.report(error)
-                  grant.lease.release()
-                }
-              )
-              return
-            }
-            handle = await entry.launch
-            entry.handle = handle
-            try {
-              handle.terminate(TerminationMode.force)
-            } catch (error) {
-              options.report(error)
-            }
-          } catch {
-            grant.lease.release()
-            return
-          }
-        }
-        if (handle) {
-          try {
-            if (
-              !(await boundedWait(handle.exited, scheduler.now() + reapTimeoutMs, { scheduler }))
-            ) {
-              void handle.exited.then(
-                () => grant.lease.release(),
-                (error) => {
-                  options.report(error)
-                  grant.lease.release()
-                }
-              )
-              return
-            }
-          } catch (error) {
-            options.report(error)
-          }
-        }
-        grant.lease.release()
-      }
-    })
-    scope.own(monitors, { force: () => monitors.dispose().then(() => undefined) })
-    starting.add(entry)
-    const output: IProcessLaunchContext['output'] = (stream, chunk) => {
-      if (entry.retired) return
-      if (entry.output) {
-        deliverOutput(entry.output, stream, chunk, options.report)
-        return
-      }
-      entry.chunks.push({ stream, chunk: chunk.slice() })
-      let bytes = entry.chunks.reduce((sum, part) => sum + part.chunk.length, 0)
-      while (bytes > 65_536 && entry.chunks.length > 1) bytes -= entry.chunks.shift()!.chunk.length
-    }
-    const launch = Promise.resolve().then(() =>
-      options.launcher.launch(options.spec, { signal: controller.signal, output })
-    )
-    entry.launch = launch
-    void (async () => {
-      try {
-        if (!(await boundedWait(launch, scheduler.now() + startupTimeoutMs, { scheduler }))) {
-          options.report(
-            failure(SupervisionErrorCode.startupTimeout, SupervisionErrorText.startupTimeout)
-          )
-          await retire(entry, true)
-          return
-        }
-        const handle = await launch
-        entry.handle = handle
-        if (closed || entry.retired) {
-          await retire(entry, true)
-          return
-        }
-        if (
-          typeof handle.sampleUsage !== 'function' &&
-          ((options.spec.limits?.memoryBytes !== undefined &&
-            options.launcher.capabilities[ProcessCapability.memoryLimit] === 'monitored') ||
-            (options.spec.limits?.cpuTimeMs !== undefined &&
-              options.launcher.capabilities[ProcessCapability.cpuTimeLimit] === 'monitored'))
-        )
-          throw createSupervisionError(
-            Error,
-            SupervisionErrorCode.capabilityUnsupported,
-            SupervisionErrorText.capabilityUnsupported,
-            { detail: { kind: 'process', reason: 'sample-usage-missing' } }
-          )
-        if (options.registry) {
-          const record: IProcessRecord = {
-            id: `${options.id}/${handle.identity.fingerprint}`,
-            namespace: options.registry.namespace,
-            identity: handle.identity,
-            launchedAt: wallClock.timestamp()
-          }
-          await options.registry.port.add(record)
-          entry.record = record
-          scope.own(record, {
-            force: async () => {
-              try {
-                if (
-                  await boundedWait(handle.exited, scheduler.now() + reapTimeoutMs, { scheduler })
-                )
-                  await options.registry!.port.remove(record.id)
-                else
-                  void handle.exited.then(
-                    () => options.registry!.port.remove(record.id).catch(options.report),
-                    options.report
-                  )
-              } catch (error) {
-                options.report(error)
-              }
-            }
-          })
-        }
-        starting.delete(entry)
-        idle.add(entry)
-        const unit: IUnitRuntime = { generation: 0, scope, monitors, signal: controller.signal }
-        startUsageMonitor(
-          handle,
-          options.spec.limits,
-          options.launcher.capabilities,
-          unit,
-          scheduler,
-          options.usage?.intervalMs ?? 1_000,
-          options.usage?.failureThreshold ?? 3,
-          (reason, detail, cause) => {
-            const code =
-              reason === ExitReason.unhealthy
-                ? SupervisionErrorCode.unhealthy
-                : SupervisionErrorCode.resourceLimitExceeded
-            options.report(
-              failure(
-                code,
-                reason === ExitReason.unhealthy
-                  ? SupervisionErrorText.unhealthy
-                  : SupervisionErrorText.resourceLimitExceeded,
-                cause,
-                detail
-              )
-            )
-            void retire(entry, true)
-          },
-          options.report
-        )
-        entry.timer = scheduler.schedule(() => {
-          void retire(entry)
-        }, idleTimeoutMs)
-        entry.timer.unref?.()
-        monitors.own(entry.timer, { force: () => entry.timer?.cancel() })
-        void handle.exited.then((status) => {
-          if (entry.taken || entry.retired) return
-          if (status.code !== 0 || status.signal !== null)
-            options.report(
-              failure(
-                SupervisionErrorCode.exitUnexpected,
-                SupervisionErrorText.exitUnexpected,
-                undefined,
-                { code: status.code, signal: status.signal }
-              )
-            )
-          void retire(entry, true)
-        }, options.report)
-      } catch (error) {
-        if (!entry.retired)
-          options.report(
-            failure(SupervisionErrorCode.launchFailed, SupervisionErrorText.launchFailed, error)
-          )
-        await retire(entry, true)
-      }
-    })()
+  /** Membership is removed synchronously before entry cancellation can reenter the pool. */
+  remove(entry: PrewarmEntry<THandle>): void {
+    this.#idle.delete(entry)
+    this.#starting.delete(entry)
+  }
+
+  /** Startup enters idle only after durable registration and sampling admission. */
+  admit(entry: PrewarmEntry<THandle>): void {
+    this.#starting.delete(entry)
+    this.#idle.add(entry)
+  }
+
+  /** The original finally observer removes each settled cleanup task from the join set. */
+  track(task: Promise<void>): void {
+    this.#retiring.add(task)
+    void task.finally(() => this.#retiring.delete(task))
+  }
+
+  /** Adds one idle unit using only immediate nonqueuing admission. */
+  #spawnOne(): boolean {
+    /** Rejected admission never creates an entry or consumes pending queue capacity. */
+    const grant = this.#context.options.budget.tryAcquire()
+    if (grant.kind === OutcomeKind.rejected) return false
+    /** One named entry owns the same controller and lifecycle resources as the baseline. */
+    const entry = new PrewarmEntry(this.#context, this, grant.lease)
+    this.#starting.add(entry)
+    entry.start()
     return true
   }
 
   /** Refills only after construction, take, or explicit invalidation. */
-  const refill = (): void => {
-    if (closed) return
-    while (idle.size + starting.size < options.size) if (!spawnOne()) break
+  #refill(): void {
+    if (this.#closed) return
+    while (this.#idle.size + this.#starting.size < this.#context.options.size)
+      if (!this.#spawnOne()) break
   }
-  refill()
-  return {
-    id: options.id,
-    spec: options.spec,
-    budget: options.budget,
-    launcher: options.launcher,
-    get idle() {
-      return idle.size
-    },
-    take() {
-      if (closed) return undefined
-      const entry = idle.values().next().value as IIdle<THandle> | undefined
-      if (!entry?.handle) {
-        refill()
-        return undefined
-      }
-      idle.delete(entry)
-      entry.taken = true
-      entry.timer?.cancel()
-      void entry.monitors.dispose()
-      entry.scope.release(entry.lease)
-      entry.scope.release(entry.monitors)
-      if (entry.record) {
-        entry.scope.release(entry.record)
-        void entry.handle.exited.then(
-          () => options.registry?.port.remove(entry.record!.id).catch(options.report),
-          options.report
-        )
-      }
-      const result: IPrewarmEntry<THandle> = {
-        handle: entry.handle,
-        lease: entry.lease,
-        bindOutput: (sink) => bindOutput(entry, sink)
-      }
-      if (entry.record && options.registry)
-        prewarmRecordOwners.set(result, {
-          id: options.id,
-          port: options.registry.port,
-          namespace: entry.record.namespace
-        })
-      refill()
-      return result
-    },
-    invalidate() {
-      if (closed) return
-      const tasks = [...idle, ...starting].map((entry) => retire(entry))
-      void Promise.all(tasks).then(refill)
-    },
-    dispose() {
-      if (disposePromise) return disposePromise
-      closed = true
-      const tasks = [...idle, ...starting].map((entry) => retire(entry))
-      disposePromise = Promise.all([...tasks, ...retiring]).then(() => undefined)
-      return disposePromise
+
+  /** Transfers the oldest ready entry and only then refills toward the configured size. */
+  #take(): IPrewarmEntry<THandle> | undefined {
+    if (this.#closed) return undefined
+    /** Insertion order is readiness order; lookup does not scan entries. */
+    const entry = this.#idle.values().next().value
+    if (!entry) {
+      this.#refill()
+      return undefined
     }
+    this.#idle.delete(entry)
+    /** Handoff detaches monitors and exit-owned resources before exposing the public entry. */
+    const result = entry.take()!
+    const { options } = this.#context
+    if (entry.record && options.registry)
+      prewarmRecordOwners.set(result, {
+        id: options.id,
+        port: options.registry.port,
+        namespace: entry.record.namespace
+      })
+    this.#refill()
+    return result
+  }
+
+  /** Snapshot semantics preserve the original membership during reentrant cleanup. */
+  #retireAll(): Promise<void>[] {
+    return [...this.#idle, ...this.#starting].map((entry) => entry.retire())
+  }
+
+  /** Explicit invalidation joins current entries before starting replacements. */
+  #invalidate(): void {
+    if (this.#closed) return
+    /** The complete current batch is retired exactly once before refill. */
+    const tasks = this.#retireAll()
+    void Promise.all(tasks).then(() => this.#refill())
+  }
+
+  /** Closing freezes refill synchronously and shares the original all-retirements join. */
+  #dispose(): Promise<void> {
+    if (this.#disposePromise) return this.#disposePromise
+    this.#closed = true
+    /** Include both newly retired entries and previously outstanding cleanup. */
+    const tasks = this.#retireAll()
+    this.#disposePromise = Promise.all([...tasks, ...this.#retiring]).then(ignoreResult)
+    return this.#disposePromise
   }
 }
+
+/** Preserves the original value-discarding Promise fulfillment stage. */
+function ignoreResult(): void {}

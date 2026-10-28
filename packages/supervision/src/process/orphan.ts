@@ -1,4 +1,6 @@
-import { createErrorCollector, type ICollectedError } from '@migaia/lifecycle'
+/** Recovers durable process identities sequentially, retaining per-record failure traceability. */
+import { PROCESS_KIND, ProcessField, RecoveryStep } from './text.js'
+import { createErrorCollector, LifecycleErrorPolicy, type ICollectedError } from '@migaia/lifecycle'
 import { SUPERVISION_SOURCE, SupervisionErrorCode } from '../error-code.js'
 import { SupervisionErrorText } from '../error-text.js'
 import { createSupervisionError } from '../errors.js'
@@ -38,28 +40,19 @@ export async function reclaimOrphanProcesses(options: {
     typeof options.launcher?.terminateRecord !== 'function' ||
     typeof options.report !== 'function'
   )
-    invalidProcessOption('registry')
+    invalidProcessOption(ProcessField.registry)
+  /** Successful termination ids preserve source record order. */
   const terminated: string[] = []
+  /** Only confirmed removal operations appear in this result. */
   const removed: string[] = []
-  const collector = createErrorCollector('collect', options.report)
-  /** Recovery failures at every storage step share the existing collection and report policy. */
-  const recordFailure = (cause: unknown, detail: Readonly<Record<string, unknown>>): void => {
-    /** The recovery error owns its semantic identity while retaining the original storage failure. */
-    const error = createSupervisionError(
-      Error,
-      SupervisionErrorCode.orphanReclaimFailed,
-      SupervisionErrorText.orphanReclaimFailed,
-      { cause, detail: { kind: 'process', ...detail } }
-    )
-    collector.add(SUPERVISION_SOURCE, error)
-    options.report(error)
-  }
+  /** All failures share the existing collect/report policy. */
+  const collector = createErrorCollector(LifecycleErrorPolicy.collect, options.report)
   /** Listing has no per-record identity yet; a failed scan must not touch any record. */
   let records: Awaited<ReturnType<IProcessRegistry['list']>>
   try {
     records = await options.registry.list(options.namespace)
   } catch (cause) {
-    recordFailure(cause, { step: 'list' })
+    recordFailure(collector, options.report, cause, { step: RecoveryStep.list })
     return {
       terminated,
       removed,
@@ -67,19 +60,21 @@ export async function reclaimOrphanProcesses(options: {
     }
   }
   for (const record of records) {
-    let step = 'probe'
+    /** Step identifies the storage/adapter operation that rejected. */
+    let step: string = RecoveryStep.probe
     try {
+      /** Fingerprint-aware probes distinguish live originals from reused identities. */
       const result = await options.launcher.probe!(record)
       if (result === OrphanProbeResult.alive) {
-        step = 'terminate'
+        step = RecoveryStep.terminate
         await options.launcher.terminateRecord!(record)
         terminated.push(record.id)
       }
-      step = 'remove'
+      step = RecoveryStep.remove
       await options.registry.remove(record.id)
       removed.push(record.id)
     } catch (cause) {
-      recordFailure(cause, { recordId: record.id, step })
+      recordFailure(collector, options.report, cause, { recordId: record.id, step })
     }
   }
   return {
@@ -87,4 +82,22 @@ export async function reclaimOrphanProcesses(options: {
     removed,
     failures: collector.finalize(SupervisionErrorText.orphanReclaimFailed)
   }
+}
+
+/** Reports recovery failures with explicit collector/report ownership and original cause identity. */
+function recordFailure(
+  collector: ReturnType<typeof createErrorCollector>,
+  report: (error: unknown) => void,
+  cause: unknown,
+  detail: Readonly<Record<string, unknown>>
+): void {
+  /** The recovery error owns its semantic identity while retaining the original storage failure. */
+  const error = createSupervisionError(
+    Error,
+    SupervisionErrorCode.orphanReclaimFailed,
+    SupervisionErrorText.orphanReclaimFailed,
+    { cause, detail: { kind: PROCESS_KIND, ...detail } }
+  )
+  collector.add(SUPERVISION_SOURCE, error)
+  report(error)
 }
