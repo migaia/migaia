@@ -187,11 +187,13 @@ function admitStorageFeatureChains(context: IStorageFeatureInstallContext, chain
       )
         duplicate(context.input.name, name)
       if (Object.hasOwn(target, name)) duplicate(context.input.name, name)
-      target[name] = function (this: object, ...args: unknown[]) {
-        /** Configuration borrows the actual fluent node; terminals retain pipeline ownership. */
-        context.input.expose.getStore!()
-        return Reflect.apply(method, this, args)
-      }
+      Object.assign(target, {
+        [name]: function (this: object, ...args: unknown[]) {
+          /** Configuration borrows the actual fluent node; terminals retain pipeline ownership. */
+          context.input.expose.getStore!()
+          return Reflect.apply(method, this, args)
+        }
+      })
     }
   }
 }

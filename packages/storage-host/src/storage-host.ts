@@ -239,7 +239,21 @@ export class StorageHost<P extends readonly IStorageBackendPluginHandle[] = read
   /** Finite host-wide budget consumed by each install batch. */
   readonly #installTimeoutMs: number
   /** Caller diagnostics are observed without becoming a lifecycle rejection. */
-  readonly #report: (error: unknown) => void
+  readonly #report = (error: unknown): void => {
+    if (this.#reporter === undefined) {
+      reportStorageUnhandledFailure(error)
+      return
+    }
+    try {
+      /** Keep the caller's original bare-call receiver while observing asynchronous failure. */
+      const result = Reflect.apply(this.#reporter, undefined, [error])
+      if (result !== undefined) void Promise.resolve(result).catch(reportStorageUnhandledFailure)
+    } catch (reporterError) {
+      reportStorageUnhandledFailure(reporterError)
+    }
+  }
+  /** The original caller reporter is snapped before any lifecycle callback can report a failure. */
+  readonly #reporter: IStorageHostOptions['report']
   /** One shared subscriber owns all host, constructor and registration listener boundaries. */
   readonly #events: ReturnType<typeof createStorageHooks>
   /**
@@ -317,18 +331,7 @@ export class StorageHost<P extends readonly IStorageBackendPluginHandle[] = read
       )
     }
     this.#installTimeoutMs = installTimeoutMs
-    this.#report = (error) => {
-      if (report === undefined) {
-        reportStorageUnhandledFailure(error)
-        return
-      }
-      try {
-        const result = report(error)
-        if (result !== undefined) void Promise.resolve(result).catch(reportStorageUnhandledFailure)
-      } catch (reporterError) {
-        reportStorageUnhandledFailure(reporterError)
-      }
-    }
+    this.#reporter = report
 
     this.#events = createStorageHooks(this.#report)
     this.#inner = createStoragePluginHost({

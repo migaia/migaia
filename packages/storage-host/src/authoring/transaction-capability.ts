@@ -142,6 +142,21 @@ function transactionSqlTag(
   }) as ISqlTag
 }
 
+/** Admit the terminal before slicing its business arguments or calling the original receiver. */
+function runTransactionQueryMethod(
+  scope: object,
+  query: object,
+  method: string,
+  args: readonly unknown[],
+  argumentCount: number
+): Promise<unknown> {
+  return runTransactionOperation(scope, () =>
+    (query as Record<string, (...values: readonly unknown[]) => unknown>)[method]!(
+      ...args.slice(0, argumentCount)
+    )
+  )
+}
+
 /** Complete read terminals enter the original operation before validation, execution and cleanup. */
 function transactionQueryReads<R>(scope: object, query: IQueryResult<R, undefined>) {
   /** Only business arguments cross this zero-context projection; stream retains its iterator owner. */
@@ -164,12 +179,10 @@ function transactionQueryReads<R>(scope: object, query: IQueryResult<R, undefine
   /** These wrappers borrow the immutable query rather than copying its nodes or owning execution. */
   const reads: Record<string, unknown> = {}
   for (const [method, argumentCount] of methods)
-    reads[method] = (...args: readonly unknown[]) =>
-      runTransactionOperation(scope, () =>
-        (query as unknown as Record<string, (...values: readonly unknown[]) => unknown>)[method]!(
-          ...args.slice(0, argumentCount)
-        )
-      )
+    Object.assign(reads, {
+      [method]: (...args: readonly unknown[]) =>
+        runTransactionQueryMethod(scope, query, method, args, argumentCount)
+    })
   return reads as Pick<IQueryResult<R, undefined>, (typeof methods)[number][0]>
 }
 
@@ -185,12 +198,10 @@ function transactionQueryWrites(scope: object, query: object): Record<string, un
     /** The original method and receiver remain fixed across the borrowed transaction view. */
     const method = Reflect.get(query, name)
     if (typeof method === 'function')
-      writes[name] = (...args: readonly unknown[]) =>
-        runTransactionOperation(scope, () =>
-          (query as Record<string, (...values: readonly unknown[]) => unknown>)[name]!(
-            ...args.slice(0, argumentCount)
-          )
-        )
+      Object.assign(writes, {
+        [name]: (...args: readonly unknown[]) =>
+          runTransactionQueryMethod(scope, query, name, args, argumentCount)
+      })
   }
   return writes
 }
@@ -223,12 +234,14 @@ function transactionQueryBranches<TQuery extends IQueryResult<unknown, undefined
     /** Canonical immutable query constructors are captured once with their original receiver. */
     const method = Reflect.get(query, name)
     if (typeof method === 'function')
-      branches[name] = (...args: readonly unknown[]) =>
-        project(
-          (query as unknown as Record<string, (...values: readonly unknown[]) => TQuery>)[name]!(
-            ...args
+      Object.assign(branches, {
+        [name]: (...args: readonly unknown[]) =>
+          project(
+            (query as unknown as Record<string, (...values: readonly unknown[]) => TQuery>)[name]!(
+              ...args
+            )
           )
-        )
+      })
   }
   return branches
 }
@@ -243,6 +256,27 @@ const transactionQueryBranchMethods = [
   RecordQueryMethod.after
 ] as const
 
+/** Preserve the pure comparator transition and project its original bounded terminal owner. */
+function transactionRecordComparator(
+  scope: object,
+  query: IQueryResult<unknown, undefined>,
+  compare: (left: unknown, right: unknown) => number
+) {
+  /** Comparator admission remains pure and keeps its one original immediate-bound protocol. */
+  const pending = (
+    query as unknown as {
+      orderByComparator(compare: (left: unknown, right: unknown) => number): unknown
+    }
+  ).orderByComparator(compare) as {
+    first(): Promise<unknown>
+    limit(count: number): IQueryResult<unknown, undefined>
+  }
+  return {
+    first: () => runTransactionQueryMethod(scope, pending, RecordQueryMethod.first, [], 0),
+    limit: (count: number) => transactionRecordQuery(scope, pending.limit(count))
+  }
+}
+
 /** Preserves the actual immutable query and every typed branch; only terminal admission is added. */
 function transactionRecordQuery<TQuery extends IQueryResult<unknown, undefined>>(
   scope: object,
@@ -255,21 +289,10 @@ function transactionRecordQuery<TQuery extends IQueryResult<unknown, undefined>>
   /** Only comparator-capable states expose this original bounded transition. */
   const comparator = Reflect.get(query, RecordQueryMethod.orderByComparator)
   if (typeof comparator === 'function')
-    branches.orderByComparator = (compare: (left: unknown, right: unknown) => number) => {
-      /** Comparator admission remains pure and keeps its one original immediate-bound protocol. */
-      const pending = (
-        query as unknown as {
-          orderByComparator(compare: (left: unknown, right: unknown) => number): unknown
-        }
-      ).orderByComparator(compare) as {
-        first(): Promise<unknown>
-        limit(count: number): IQueryResult<unknown, undefined>
-      }
-      return {
-        first: () => runTransactionOperation(scope, () => pending.first()),
-        limit: (count: number) => transactionRecordQuery(scope, pending.limit(count))
-      }
-    }
+    Object.assign(branches, {
+      orderByComparator: (compare: (left: unknown, right: unknown) => number) =>
+        transactionRecordComparator(scope, query, compare)
+    })
   return {
     ...query,
     ...transactionQueryReads(scope, query),
@@ -349,58 +372,64 @@ export function useTransactionCapability<
      * Queries bind the current user/check/operation view without opening a cursor during
      * construction.
      */
-    api.query = () => {
-      /**
-       * Actual native sources retain this original view and register their iterators with its
-       * owner.
-       */
-      const { state, binding } = liveTransactionCapability(scope, capability)
-      try {
-        /** The backend's pure query constructor must use its real scope, never a root API. */
-        const bound = (
-          binding as unknown as { forTransaction(scope: object): unknown }
-        ).forTransaction(scope)
-        return transactionRecordQuery(
-          scope,
-          (bound as { query(): IQueryResult<unknown, undefined> }).query()
-        )
-      } catch (error) {
-        throw failTransaction(state, error)
-      }
-    }
-    api.removeByPrefix = (prefix: IStorageKey) =>
-      runTransactionCapabilityMethod(scope, capability, StorageCapabilityMethod.removeByPrefix, [
-        prefix
-      ])
+    Object.assign(api, {
+      query: () => {
+        /**
+         * Actual native sources retain this original view and register their iterators with its
+         * owner.
+         */
+        const { state, binding } = liveTransactionCapability(scope, capability)
+        try {
+          /** The backend's pure query constructor must use its real scope, never a root API. */
+          const bound = (
+            binding as unknown as { forTransaction(scope: object): unknown }
+          ).forTransaction(scope)
+          return transactionRecordQuery(
+            scope,
+            (bound as { query(): IQueryResult<unknown, undefined> }).query()
+          )
+        } catch (error) {
+          throw failTransaction(state, error)
+        }
+      },
+      removeByPrefix: (prefix: IStorageKey) =>
+        runTransactionCapabilityMethod(scope, capability, StorageCapabilityMethod.removeByPrefix, [
+          prefix
+        ])
+    })
   }
   if (transaction.rdf)
-    api.match = (pattern: Partial<IQuad>) => {
-      /** Pure construction binds the actual native scope without registering another owner. */
-      const { state, binding } = liveTransactionCapability(scope, capability)
-      try {
-        /** The backend supplies its real ground query source and original iterator registration. */
-        const bound = (
-          binding as unknown as { forTransaction(scope: object): unknown }
-        ).forTransaction(scope)
-        return transactionRdfQuery(
-          scope,
-          (bound as { match(pattern: Partial<IQuad>): IRdfQuery<undefined> }).match(pattern)
-        )
-      } catch (error) {
-        throw failTransaction(state, error)
+    Object.assign(api, {
+      match: (pattern: Partial<IQuad>) => {
+        /** Pure construction binds the actual native scope without registering another owner. */
+        const { state, binding } = liveTransactionCapability(scope, capability)
+        try {
+          /** The backend supplies its real ground query source and original iterator registration. */
+          const bound = (
+            binding as unknown as { forTransaction(scope: object): unknown }
+          ).forTransaction(scope)
+          return transactionRdfQuery(
+            scope,
+            (bound as { match(pattern: Partial<IQuad>): IRdfQuery<undefined> }).match(pattern)
+          )
+        } catch (error) {
+          throw failTransaction(state, error)
+        }
       }
-    }
+    })
   if (transaction.sql)
     api.sql = transactionSqlTag(scope, capability, binding.implementation.api as ISqlExecutor)
   /** Standard scalar methods use the original fresh-view operation path, without token imports. */
   for (const method of transaction.methods)
-    api[method] = (...args: readonly unknown[]) =>
-      runTransactionCapabilityMethod(
-        scope,
-        capability,
-        method,
-        transaction.rdf ? args.slice(0, 1) : args
-      )
+    Object.assign(api, {
+      [method]: (...args: readonly unknown[]) =>
+        runTransactionCapabilityMethod(
+          scope,
+          capability,
+          method,
+          transaction.rdf ? args.slice(0, 1) : args
+        )
+    })
   /** Cache only the projection identity; the original backend scope and API remain borrowed. */
   ;(view.capabilities ??= new Map()).set(capability, {
     implementation: binding.implementation,

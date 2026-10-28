@@ -144,13 +144,13 @@ function initializeChangeIterator(iteratorState: IBackendChangeIteratorContext):
   iteratorState.failed = false
 
   /** Cleanup closures are assigned before any synchronous abort callback can schedule cleanup. */
-  iteratorState.off = () => undefined
-
-  /** Caller cancellation detaches with the same original resource cleanup. */
-  iteratorState.stopContext = () => undefined
-
-  /** Controller closure invalidates every native organization view without a resource registry. */
-  iteratorState.stopClosing = () => undefined
+  Object.assign(iteratorState, {
+    off: () => undefined,
+    /** Caller cancellation detaches with the same original resource cleanup. */
+    stopContext: () => undefined,
+    /** Controller closure invalidates every native organization view without a resource registry. */
+    stopClosing: () => undefined
+  })
 
   /** Original lifetime owns accepted native advances and both cached cleanup promises. */
   iteratorState.lifetime = createStorageIteratorLifetime<IStorageChange>({

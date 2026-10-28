@@ -552,8 +552,10 @@ export function compileQueryTraversal(
     opening: undefined,
     exhausted: false
   }
-  compiler.close = () => closeQueryTraversal(context, false)
-  compiler.report = () => closeQueryTraversal(context, true)
+  Object.assign(compiler, {
+    close: () => closeQueryTraversal(context, false),
+    report: () => closeQueryTraversal(context, true)
+  })
   return (advance, scope) => readTraversedQuery(context, advance, scope)
 }
 

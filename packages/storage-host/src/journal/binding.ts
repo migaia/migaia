@@ -37,8 +37,10 @@ export function snapshotStorageJournalBinding(
       const method = redo[key]
       if (typeof method !== 'function')
         throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-      captured[key] = (...args: unknown[]) =>
-        (redo as unknown as Record<string, (...values: unknown[]) => unknown>)[key]!(...args)
+      Object.assign(captured, {
+        [key]: (...args: unknown[]) =>
+          (redo as unknown as Record<string, (...values: unknown[]) => unknown>)[key]!(...args)
+      })
     }
     result.redo = captured
   }
@@ -72,8 +74,10 @@ export function snapshotStorageJournalBinding(
     if (method === undefined && key !== 'forOrg' && key !== 'openNamespace') continue
     if (typeof method !== 'function')
       throw new StorageContractError(StorageContractErrorCode.invalidArgument)
-    result[key] = (...args: unknown[]) =>
-      (input as unknown as Record<string, (...values: unknown[]) => unknown>)[key]!(...args)
+    Object.assign(result, {
+      [key]: (...args: unknown[]) =>
+        (input as unknown as Record<string, (...values: unknown[]) => unknown>)[key]!(...args)
+    })
   }
   return result as IStorageJournalBackendBinding
 }
