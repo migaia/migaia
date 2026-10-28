@@ -6,19 +6,19 @@ import { ERROR_SOURCE, UtilsErrorCode } from './error-code.ts'
 import { UtilsErrorText } from './error-text.ts'
 import { attachErrorIdentity } from './error.ts'
 
-/** RFC 4648 alphabet is shared with its inverse table. */
+/** RFC 4648 alphabet shared by the encoder and its inverse lookup table. */
 const base64Alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 
-/** Fixed-size canonical encoder data used by the bounded output owner. */
+/** Exactly 64 * 64 pairs cover two-sextet values in the fixed RFC 4648 alphabet. */
 const BASE64_PAIR_COUNT = 4096
 
-/** Fixed-size canonical encoder data used by the bounded output owner. */
+/** Bounded chunks retain native concatenation speed without a growing whole-output rope. */
 const BASE64_CHUNK_LENGTH = 4096
 
-/** Fixed-size canonical encoder data used by the bounded output owner. */
+/** Shared pairs halve lookups and concatenations for complete byte triples. */
 const base64Pairs = createBase64Pairs()
 
-/** Fixed-size canonical encoder data used by the bounded output owner. */
+/** Precompute the compile-time pair domain once; no caller-owned collection is scanned. */
 function createBase64Pairs(): readonly string[] {
   /** Pair indices combine exactly two six-bit alphabet indices. */
   const pairs: string[] = []
@@ -28,9 +28,9 @@ function createBase64Pairs(): readonly string[] {
   return pairs
 }
 
-/** ASCII inverse map admits only characters already accepted by canonical validation. */
+/** ASCII lookup removes the former 64-character scan from every decoded sextet. */
 const base64Values = new Uint8Array(128)
-// The compile-time RFC 4648 alphabet has exactly 64 entries.
+// The alphabet is a compile-time constant containing exactly 64 ASCII characters.
 for (let index = 0; index < base64Alphabet.length; index++)
   base64Values[base64Alphabet.charCodeAt(index)] = index
 
@@ -231,29 +231,29 @@ export function encodeUtf8(value: string): Uint8Array {
 
 /** Decodes UTF-8 bytes using replacement or fatal mode. */
 export function decodeUtf8(value: Uint8Array, options?: { readonly fatal?: boolean }): string {
+  /** Fatal mode preserves the original offset and package-coded native error. */
   const fatal = options?.fatal ?? false
-  let result = ''
+  /** Scalars are joined once rather than repeatedly copying a growing decoded string. */
+  const scalars: string[] = []
   for (let offset = 0; offset < value.length;) {
+    /** Invalid sequences resume exactly one byte after this original position. */
     const start = offset
+    /** Leading byte selects the continuation width without additional input reads. */
     const first = value[offset++]
+    /** Undefined or out-of-range values follow the established replacement policy. */
     let codePoint: number | undefined
-    const continuation = (count: number): number | undefined => {
-      if (offset + count > value.length) return undefined
-      let result = 0
-      for (let index = 0; index < count; index++) {
-        const byte = value[offset++]
-        if ((byte & 0xc0) !== 0x80) return undefined
-        result = (result << 6) | (byte & 0x3f)
-      }
-      return result
-    }
     if (first <= 0x7f) codePoint = first
-    else if (first >= 0xc2 && first <= 0xdf)
-      codePoint = ((first & 0x1f) << 6) | (continuation(1) ?? -1)
-    else if (first >= 0xe0 && first <= 0xef)
-      codePoint = ((first & 0x0f) << 12) | (continuation(2) ?? -1)
-    else if (first >= 0xf0 && first <= 0xf4)
-      codePoint = ((first & 0x07) << 18) | (continuation(3) ?? -1)
+    else if (first >= 0xc2 && first <= 0xdf) {
+      codePoint = ((first & 0x1f) << 6) | (readUtf8Continuation(value, offset, 1) ?? -1)
+      offset += 1
+    } else if (first >= 0xe0 && first <= 0xef) {
+      codePoint = ((first & 0x0f) << 12) | (readUtf8Continuation(value, offset, 2) ?? -1)
+      offset += 2
+    } else if (first >= 0xf0 && first <= 0xf4) {
+      codePoint = ((first & 0x07) << 18) | (readUtf8Continuation(value, offset, 3) ?? -1)
+      offset += 3
+    }
+    /** Minimal scalar rejects overlong sequences without changing continuation-read order. */
     const minimum = first <= 0x7f ? 0 : first <= 0xdf ? 0x80 : first <= 0xef ? 0x800 : 0x10000
     if (
       codePoint === undefined ||
@@ -263,8 +263,26 @@ export function decodeUtf8(value: Uint8Array, options?: { readonly fatal?: boole
     ) {
       if (fatal) throw encodingError(start, 'UTF-8')
       offset = start + 1
-      result += '\ufffd'
-    } else result += String.fromCodePoint(codePoint)
+      scalars.push('\ufffd')
+    } else scalars.push(String.fromCodePoint(codePoint))
+  }
+  return scalars.join('')
+}
+
+/** Reads at most three continuation bytes; failure leaves the caller's restart position intact. */
+function readUtf8Continuation(
+  value: Uint8Array,
+  offset: number,
+  count: number
+): number | undefined {
+  if (offset + count > value.length) return undefined
+  /** Accumulated continuation payload; count is bounded by the UTF-8 width of four bytes. */
+  let result = 0
+  for (let index = 0; index < count; index++) {
+    /** Read each continuation once, stopping on the first invalid prefix. */
+    const byte = value[offset++]
+    if ((byte & 0xc0) !== 0x80) return undefined
+    result = (result << 6) | (byte & 0x3f)
   }
   return result
 }
@@ -280,7 +298,7 @@ export function splitUtf8(value: string, maxBytes: number): readonly string[] {
   /** Completed chunks preserve input order and the existing empty-input special case. */
   const chunks: string[] = []
   /** Current normalized text chunk; lone surrogates become U+FFFD. */
-  let chunk = ''
+  let chunk: string[] = []
   /** Current chunk's encoded byte size. */
   let size = 0
   for (let index = 0; index < value.length;) {
@@ -289,15 +307,15 @@ export function splitUtf8(value: string, maxBytes: number): readonly string[] {
     index += codePoint > 0xffff ? 2 : 1
     /** Encoded width determines whether this entire scalar belongs in the next chunk. */
     const width = codePoint <= 0x7f ? 1 : codePoint <= 0x7ff ? 2 : codePoint <= 0xffff ? 3 : 4
-    if (chunk && size + width > maxBytes) {
-      chunks.push(chunk)
-      chunk = ''
+    if (size > 0 && size + width > maxBytes) {
+      chunks.push(chunk.join(''))
+      chunk = []
       size = 0
     }
-    chunk += String.fromCodePoint(codePoint)
+    chunk.push(String.fromCodePoint(codePoint))
     size += width
   }
-  if (chunk) chunks.push(chunk)
+  if (size > 0) chunks.push(chunk.join(''))
   return chunks
 }
 
