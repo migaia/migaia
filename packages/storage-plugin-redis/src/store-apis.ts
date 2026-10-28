@@ -6,7 +6,7 @@ import {
   snapshotStorageCounterIncrement,
   asyncDisposeKey
 } from '@migaia/storage-host/sdk'
-import { RedisCommand, RedisOperation } from './constants.js'
+import { RedisCommand, RedisOperation } from './constants.ts'
 import {
   assertStorageTtlDuration,
   type IKeyValueApi,
@@ -16,14 +16,14 @@ import {
   type ITtlTarget
 } from '@migaia/storage-contract'
 import { RedisErrorCode } from '@migaia/storage-contract/error-code'
-import { decodeRedisValue, replyOptionalString, replyInteger } from './layout.js'
-import { unsupported, redisError } from './errors.js'
-import { RedisText } from './constants.js'
-import type { IRedisNativeStore } from './types.js'
-import { redisRemovePrefix, redisIterator, redisMutate, redisTtlTarget } from './store-records.js'
-import { redisRead } from './store-state.js'
-import type { IRedisOrganizationContext } from './store-state.js'
-import { redisSelectedVector } from './store-transaction.js'
+import { decodeRedisValue, replyOptionalString, replyInteger } from './layout.ts'
+import { unsupported, redisError } from './errors.ts'
+import { RedisText } from './constants.ts'
+import type { IRedisNativeStore } from './types.ts'
+import { redisRemovePrefix, redisIterator, redisMutate, redisTtlTarget } from './store-records.ts'
+import { redisRead } from './store-state.ts'
+import type { IRedisOrganizationContext } from './store-state.ts'
+import { redisSelectedVector } from './store-transaction.ts'
 import {
   redisEmpty,
   redisCaptureEntries,
@@ -32,7 +32,7 @@ import {
   redisWriteLocks,
   redisKey,
   redisTextKey
-} from './store-write.js'
+} from './store-write.ts'
 
 /** Assemble the original keyValue methods from explicit organization state. */
 export function createRedisKeyValue(

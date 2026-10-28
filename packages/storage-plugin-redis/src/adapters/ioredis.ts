@@ -1,7 +1,7 @@
 import type { Redis } from 'ioredis'
-import type { IRedisConnection, IRedisDriver, IRedisExecEntry } from '../driver.js'
-import { normalizeRedisError, invalidArgument } from '../errors.js'
-import { RedisCommand, RedisText } from '../constants.js'
+import type { IRedisConnection, IRedisDriver, IRedisExecEntry } from '../driver.ts'
+import { normalizeRedisError, invalidArgument } from '../errors.ts'
+import { RedisCommand, RedisText } from '../constants.ts'
 import {
   runRedisCallback,
   captureCommand,
@@ -10,7 +10,7 @@ import {
   subscriptionResource,
   requireExecArray,
   RedisConnectionPool
-} from '../native.js'
+} from '../native.ts'
 import { createStorageOperationReporter, reportCleanupError } from '@migaia/storage-host/sdk'
 
 /** Owned duplicates never replay an unacknowledged command or mutate the injected root options. */

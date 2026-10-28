@@ -3,10 +3,10 @@ import { createClientPool } from 'redis'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { durableChangeFeed, type IDurableStorageChange } from '@migaia/storage-contract'
 import { deferred } from '@migaia/utils/promise'
-import { redisBackendPlugin } from '../src/index.js'
-import { nodeRedisDriver } from '../src/adapters/node-redis.js'
-import { redisChangeStreamFeature } from '../src/features/change-stream.js'
-import { createRedisLayout, encodeRedisValue } from '../src/layout.js'
+import { redisBackendPlugin } from '../src/index.ts'
+import { nodeRedisDriver } from '../src/adapters/node-redis.ts'
+import { redisChangeStreamFeature } from '../src/features/change-stream.ts'
+import { createRedisLayout, encodeRedisValue } from '../src/layout.ts'
 
 /** Explicit default-org projections remain scoped, even though the root observes the shared Stream. */
 for (const url of [

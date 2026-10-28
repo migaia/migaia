@@ -9,7 +9,7 @@ import {
   normalizeError,
   type IBackendChangeController
 } from '@migaia/storage-host/sdk'
-import { RedisCommand, RedisOperation } from './constants.js'
+import { RedisCommand, RedisOperation } from './constants.ts'
 import type {
   IDurableChangeFeedApi,
   IStorageKey,
@@ -31,13 +31,13 @@ import {
   StorageHostErrorCode,
   STORAGE_REDIS_ERROR_SOURCE
 } from '@migaia/storage-contract/error-code'
-import { RedisDraft } from './transaction.js'
-import { createRedisLayout } from './layout.js'
-import { RedisText } from './constants.js'
-import type { IRedisOptions, IRedisStore, IRedisTransactionScope } from './types.js'
-import type { IRedisConnection, IRedisDriver } from './driver.js'
-import type { IRedisVectorBinding } from './native-feature.js'
-import { createRedisOrganization } from './store.js'
+import { RedisDraft } from './transaction.ts'
+import { createRedisLayout } from './layout.ts'
+import { RedisText } from './constants.ts'
+import type { IRedisOptions, IRedisStore, IRedisTransactionScope } from './types.ts'
+import type { IRedisConnection, IRedisDriver } from './driver.ts'
+import type { IRedisVectorBinding } from './native-feature.ts'
+import { createRedisOrganization } from './store.ts'
 
 /**
  * This maintenance script rechecks actual existence atomically before deleting stale ordered

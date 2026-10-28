@@ -1,11 +1,11 @@
 import { snapshotOperationContext, decodeStorageOrgKey } from '@migaia/storage-host/sdk'
 import { type IStorageChange } from '@migaia/storage-contract'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
-import { createRedisLayout, redisUnhex } from './layout.js'
-import { redisError } from './errors.js'
+import { createRedisLayout, redisUnhex } from './layout.ts'
+import { redisError } from './errors.ts'
 import { RedisErrorCode } from '@migaia/storage-contract/error-code'
-import { RedisText } from './constants.js'
-import type { IRedisDraftEntry } from './transaction.js'
+import { RedisText } from './constants.ts'
+import type { IRedisDraftEntry } from './transaction.ts'
 
 /** The sole portable JSON codec transports bounded key identities, never application payloads. */
 const codec = defineJsonCodec({ version: 1 })

@@ -11,15 +11,15 @@ import {
   throwIfAborted,
   observeStorageBatch
 } from '@migaia/storage-host/sdk'
-import { RedisOperation } from './constants.js'
+import { RedisOperation } from './constants.ts'
 import type { IStorageResource, ILockHolding } from '@migaia/storage-contract'
 import { isUint8Array } from '@migaia/utils/bytes'
-import { createRedisLocks } from './locks.js'
-import { invalidArgument } from './errors.js'
-import { RedisText } from './constants.js'
-import { redisCapabilities, type IRedisNativeStore } from './types.js'
-import { nativeFeaturePort, type IRedisNativeFeaturePort } from './native-feature.js'
-import { redisPage, redisRemovePrefix, redisClearBytes, redisIterator } from './store-records.js'
+import { createRedisLocks } from './locks.ts'
+import { invalidArgument } from './errors.ts'
+import { RedisText } from './constants.ts'
+import { redisCapabilities, type IRedisNativeStore } from './types.ts'
+import { nativeFeaturePort, type IRedisNativeFeaturePort } from './native-feature.ts'
+import { redisPage, redisRemovePrefix, redisClearBytes, redisIterator } from './store-records.ts'
 import {
   redisAssertWrite,
   redisOperate,
@@ -28,16 +28,16 @@ import {
   redisConcurrencyStages,
   redisObserve,
   redisCommand
-} from './store-state.js'
-import type { IRedisOrganizationContext } from './store-state.js'
+} from './store-state.ts'
+import type { IRedisOrganizationContext } from './store-state.ts'
 import {
   redisGet,
   redisPut,
   redisRemove,
   redisClear,
   redisTransaction
-} from './store-transaction.js'
-import { redisWrite, redisTextKey, redisKey, redisBounds } from './store-write.js'
+} from './store-transaction.ts'
+import { redisWrite, redisTextKey, redisKey, redisBounds } from './store-write.ts'
 
 /**
  * One borrowed native resource retains its original abort subscription and underlying Promise

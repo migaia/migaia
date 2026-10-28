@@ -20,13 +20,13 @@ import {
   type IConcurrencyPolicy
 } from '@migaia/storage-contract'
 import { isUint8Array } from '@migaia/utils/bytes'
-import { RedisDraft } from './transaction.js'
-import { redisHex, encodeRedisValue, decodeRedisValue, type IRedisChannel } from './layout.js'
-import { invalidArgument } from './errors.js'
-import { RedisText } from './constants.js'
-import { redisNativeAttempt } from './store-native-attempt.js'
-import { redisOperate, redisAssertWrite } from './store-state.js'
-import type { IRedisOrganizationContext, IRedisTextInput, IRedisValueInput } from './store-state.js'
+import { RedisDraft } from './transaction.ts'
+import { redisHex, encodeRedisValue, decodeRedisValue, type IRedisChannel } from './layout.ts'
+import { invalidArgument } from './errors.ts'
+import { RedisText } from './constants.ts'
+import { redisNativeAttempt } from './store-native-attempt.ts'
+import { redisOperate, redisAssertWrite } from './store-state.ts'
+import type { IRedisOrganizationContext, IRedisTextInput, IRedisValueInput } from './store-state.ts'
 
 /** Original draft facts expose canonical point identities without retaining another key set. */
 export function redisDraftKeys(

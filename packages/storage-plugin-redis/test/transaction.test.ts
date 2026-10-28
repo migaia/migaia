@@ -4,10 +4,10 @@ import { createClientPool } from 'redis'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { deferred } from '@migaia/utils/promise'
 import { ConcurrencyPolicy } from '@migaia/storage-host/sdk'
-import { redisBackendPlugin, type IRedisDriver } from '../src/index.js'
-import { nodeRedisDriver } from '../src/adapters/node-redis.js'
-import { ioredisDriver } from '../src/adapters/ioredis.js'
-import { createRedisLayout, encodeRedisValue } from '../src/layout.js'
+import { redisBackendPlugin, type IRedisDriver } from '../src/index.ts'
+import { nodeRedisDriver } from '../src/adapters/node-redis.ts'
+import { ioredisDriver } from '../src/adapters/ioredis.ts'
+import { createRedisLayout, encodeRedisValue } from '../src/layout.ts'
 
 /** Independent genuine adapters contend only on fresh fixture keys. */
 for (const url of [process.env.MIGAIA_REDIS_URL, process.env.MIGAIA_VALKEY_URL])

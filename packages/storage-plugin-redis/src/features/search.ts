@@ -39,13 +39,13 @@ import {
 } from '@migaia/storage-host/sdk'
 import { parseObjectPath } from '@migaia/utils/object'
 import type { ICodecValue } from '@migaia/serialize/codec'
-import { redisBackendKind } from '../plugin.js'
+import { redisBackendKind } from '../plugin.ts'
 import {
   readNativeFeaturePort,
   type IRedisNativeFeaturePort,
   type IRedisVectorBinding
-} from '../native-feature.js'
-import { RedisCommand, RedisText, RedisOperation } from '../constants.js'
+} from '../native-feature.ts'
+import { RedisCommand, RedisText, RedisOperation } from '../constants.ts'
 import {
   RedisVector,
   vectorNames,
@@ -63,13 +63,13 @@ import {
   vectorSend,
   vectorRows,
   vectorExpiry
-} from '../vector-protocol.js'
-import { readRedisHash, type RedisDraft } from '../transaction.js'
-import { replyInteger, replyRevision } from '../layout.js'
-import { invalidArgument, unsupported, redisError } from '../errors.js'
+} from '../vector-protocol.ts'
+import { readRedisHash, type RedisDraft } from '../transaction.ts'
+import { replyInteger, replyRevision } from '../layout.ts'
+import { invalidArgument, unsupported, redisError } from '../errors.ts'
 import { RedisErrorCode } from '@migaia/storage-contract/error-code'
-import type { IRedisStore } from '../types.js'
-import type { IRedisConnection } from '../driver.js'
+import type { IRedisStore } from '../types.ts'
+import type { IRedisConnection } from '../driver.ts'
 /**
  * Only this selected Feature installs standard vector methods; no native duplicate query API
  * exists.

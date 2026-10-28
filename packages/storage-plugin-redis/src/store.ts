@@ -9,30 +9,30 @@ import {
   createStorageOperationReporter,
   reportCleanupError
 } from '@migaia/storage-host/sdk'
-import { RedisCommand } from './constants.js'
+import { RedisCommand } from './constants.ts'
 import { kv, records, ttl, counter, implement } from '@migaia/storage-contract'
 import type { IStoragePluginCore } from '@migaia/storage-host'
 import { RedisErrorCode } from '@migaia/storage-contract/error-code'
-import { RedisDraft } from './transaction.js'
-import { createRedisJournalBinding } from './journal.js'
-import { createRedisLayout } from './layout.js'
+import { RedisDraft } from './transaction.ts'
+import { createRedisJournalBinding } from './journal.ts'
+import { createRedisLayout } from './layout.ts'
 import {
   invalidArgument,
   unsupported,
   normalizeRedisTransactionFailure,
   redisError
-} from './errors.js'
-import { RedisText } from './constants.js'
-import { decodeRedisChange } from './changes.js'
-import type { IRedisOptions } from './types.js'
+} from './errors.ts'
+import { RedisText } from './constants.ts'
+import { decodeRedisChange } from './changes.ts'
+import type { IRedisOptions } from './types.ts'
 import {
   createRedisKeyValue,
   createRedisRecordApi,
   createRedisTtlApi,
   createRedisCounterApi
-} from './store-apis.js'
-import { redisNativeAttempt } from './store-native-attempt.js'
-import { createRedisBase } from './store-org-base.js'
+} from './store-apis.ts'
+import { redisNativeAttempt } from './store-native-attempt.ts'
+import { createRedisBase } from './store-org-base.ts'
 import {
   ttlApi,
   counterApi,
@@ -40,20 +40,20 @@ import {
   redisConcurrencyStages,
   redisForOrg,
   redisAssertWrite
-} from './store-state.js'
+} from './store-state.ts'
 import type {
   IRedisEnvironment,
   IRedisOrganizationProjection,
   IRedisOrganizationContext,
   IRedisInternalScope,
   IRedisConstruction
-} from './store-state.js'
+} from './store-state.ts'
 import {
   createRedisNativeDriver,
   redisConfigureFeatures,
   redisReleaseFeatures,
   redisClear
-} from './store-transaction.js'
+} from './store-transaction.ts'
 
 /** Drain the original accepted resources and release org publication references once. */
 async function disposeRedisEnvironment(environment: IRedisEnvironment): Promise<void> {
@@ -285,4 +285,4 @@ export function createRedisStore(
     detect: () => detectRedisEnvironment(environment)
   }
 }
-export type { IRedisConstruction } from './store-state.js'
+export type { IRedisConstruction } from './store-state.ts'

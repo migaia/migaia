@@ -8,7 +8,7 @@ import {
   asyncDisposeKey,
   snapshotKeyRange
 } from '@migaia/storage-host/sdk'
-import { RedisCommand, RedisOperation } from './constants.js'
+import { RedisCommand, RedisOperation } from './constants.ts'
 import type {
   IStorageKey,
   IKeyRange,
@@ -20,19 +20,19 @@ import type {
   ITtlTarget
 } from '@migaia/storage-contract'
 import { RedisErrorCode } from '@migaia/storage-contract/error-code'
-import { RedisDraft } from './transaction.js'
-import { encodeRedisValue, decodeRedisValue, replyOptionalString, replyInteger } from './layout.js'
-import { invalidArgument, unsupported, redisError } from './errors.js'
-import { RedisText } from './constants.js'
+import { RedisDraft } from './transaction.ts'
+import { encodeRedisValue, decodeRedisValue, replyOptionalString, replyInteger } from './layout.ts'
+import { invalidArgument, unsupported, redisError } from './errors.ts'
+import { RedisText } from './constants.ts'
 import {
   pruneScript,
   redisRead,
   redisOperate,
   redisObserve,
   redisTransactions
-} from './store-state.js'
-import type { IRedisOrganizationContext, IRedisInternalScope } from './store-state.js'
-import { redisBounds } from './store-write.js'
+} from './store-state.ts'
+import type { IRedisOrganizationContext, IRedisInternalScope } from './store-state.ts'
+import { redisBounds } from './store-write.ts'
 
 /** Ordered members are fetched in native key order and missing expired points never become rows. */
 export async function redisPage(

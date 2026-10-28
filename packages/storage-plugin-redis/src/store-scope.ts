@@ -7,21 +7,21 @@ import {
   snapshotStorageCounterIncrement,
   asyncDisposeKey
 } from '@migaia/storage-host/sdk'
-import { RedisOperation } from './constants.js'
+import { RedisOperation } from './constants.ts'
 import { assertStorageTtlDuration, readTransactionConflictPolicy } from '@migaia/storage-contract'
-import { RedisDraft } from './transaction.js'
-import { decodeRedisValue } from './layout.js'
-import { RedisText } from './constants.js'
+import { RedisDraft } from './transaction.ts'
+import { decodeRedisValue } from './layout.ts'
+import { RedisText } from './constants.ts'
 import {
   redisScoped,
   redisIterator,
   redisRemovePrefix,
   redisMutate,
   redisTtlTarget
-} from './store-records.js'
-import { ttlApi, counterApi, recordsApi } from './store-state.js'
-import type { IRedisInternalScope, IRedisOrganizationContext } from './store-state.js'
-import { redisSelectedVector } from './store-transaction.js'
+} from './store-records.ts'
+import { ttlApi, counterApi, recordsApi } from './store-state.ts'
+import type { IRedisInternalScope, IRedisOrganizationContext } from './store-state.ts'
+import { redisSelectedVector } from './store-transaction.ts'
 import {
   redisTextKey,
   redisCapturePoint,
@@ -29,7 +29,7 @@ import {
   redisKey,
   redisCaptureEntries,
   redisPrepareEntries
-} from './store-write.js'
+} from './store-write.ts'
 
 /** One Redis transaction scope: a draft over WATCH-guarded native reads for one organization. */
 class RedisScope implements IRedisInternalScope {

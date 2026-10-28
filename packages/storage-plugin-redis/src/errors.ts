@@ -3,7 +3,7 @@ import { normalizeError } from '@migaia/storage-host/sdk'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { STORAGE_REDIS_ERROR_SOURCE, RedisErrorCode } from '@migaia/storage-contract/error-code'
 import type { IRedisErrorCode } from '@migaia/storage-contract/error-code'
-import { RedisText } from './constants.js'
+import { RedisText } from './constants.ts'
 /** The normalization boundary always returns an actual registered identity. */
 export type IRedisFailure = Error & { readonly source: string; readonly code: string }
 /** Registered Redis family inspection does not accept an uncoded error with only a matching label. */

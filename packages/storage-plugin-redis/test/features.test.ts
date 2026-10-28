@@ -5,14 +5,14 @@ import { createStorageHost, createOrgId, definePlugin } from '@migaia/storage-ho
 import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { durableChangeFeed } from '@migaia/storage-contract'
 import { deferred } from '@migaia/utils/promise'
-import { redisChangeStreamFeature } from '../src/features/change-stream.js'
-import { redisBackendPlugin } from '../src/index.js'
-import { nodeRedisDriver } from '../src/adapters/node-redis.js'
-import { redisStreamsFeature } from '../src/features/streams.js'
-import { redisPubSubFeature } from '../src/features/pubsub.js'
-import { redisSortedSetsFeature } from '../src/features/sorted-sets.js'
-import { redisRateLimitFeature } from '../src/features/rate-limit.js'
-import { createRedisLayout } from '../src/layout.js'
+import { redisChangeStreamFeature } from '../src/features/change-stream.ts'
+import { redisBackendPlugin } from '../src/index.ts'
+import { nodeRedisDriver } from '../src/adapters/node-redis.ts'
+import { redisStreamsFeature } from '../src/features/streams.ts'
+import { redisPubSubFeature } from '../src/features/pubsub.ts'
+import { redisSortedSetsFeature } from '../src/features/sorted-sets.ts'
+import { redisRateLimitFeature } from '../src/features/rate-limit.ts'
+import { createRedisLayout } from '../src/layout.ts'
 
 /** All native feature fixtures use fresh same-slot namespaces on actual services. */
 for (const url of [
@@ -155,7 +155,7 @@ for (const url of [
     })
     it('runs real streams, group claim/ack, PubSub, UTF16 sorted ties and atomic fixed windows', async () => {
       if (!pool.isOpen) await pool.connect()
-      const commands: import('../src/hooks.js').IRedisCommandHookPayload[] = [],
+      const commands: import('../src/hooks.ts').IRedisCommandHookPayload[] = [],
         counts = new Map<string, number>(),
         stage = definePlugin('observe', (core) => ({
           install() {

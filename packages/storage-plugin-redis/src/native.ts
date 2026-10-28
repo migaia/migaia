@@ -7,15 +7,15 @@ import {
 } from '@migaia/storage-host/sdk'
 import { isUint8Array } from '@migaia/utils/bytes'
 import { RedisErrorCode } from '@migaia/storage-contract/error-code'
-import { redisExecCause } from './constants.js'
+import { redisExecCause } from './constants.ts'
 import {
   invalidArgument,
   normalizeRedisError,
   normalizeRedisTransactionFailure,
   redisError,
   unsupported
-} from './errors.js'
-import type { IRedisConnection, IRedisExecEntry } from './driver.js'
+} from './errors.ts'
+import type { IRedisConnection, IRedisExecEntry } from './driver.ts'
 
 /** Command capture detaches binary input before any asynchronous connection acquisition. */
 export function captureCommand(

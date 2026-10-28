@@ -1,10 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { Redis } from 'ioredis'
 import { createClientPool } from 'redis'
-import { ioredisDriver } from '../src/adapters/ioredis.js'
-import { nodeRedisDriver } from '../src/adapters/node-redis.js'
-import { redisExecCause } from '../src/constants.js'
-import type { IRedisDriver } from '../src/driver.js'
+import { ioredisDriver } from '../src/adapters/ioredis.ts'
+import { nodeRedisDriver } from '../src/adapters/node-redis.ts'
+import { redisExecCause } from '../src/constants.ts'
+import type { IRedisDriver } from '../src/driver.ts'
 
 /** Each selected service must be supplied by the repository's service launcher. */
 const services = [

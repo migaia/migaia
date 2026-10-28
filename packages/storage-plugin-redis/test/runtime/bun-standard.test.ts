@@ -3,11 +3,11 @@ import { RedisClient } from 'bun'
 import { createStorageHost } from '@migaia/storage-host'
 import { counter, kv, records, ttl, durableChangeFeed } from '@migaia/storage-contract'
 import { runConformance, type IConformanceHarness } from '@migaia/storage-contract/conformance'
-import { redisBackendPlugin } from '../../src/index.js'
-import { bunRedisDriver } from '../../src/adapters/bun.js'
-import { createRedisLayout } from '../../src/layout.js'
-import { redisCapabilities } from '../../src/types.js'
-import { redisChangeStreamFeature } from '../../src/features/change-stream.js'
+import { redisBackendPlugin } from '../../src/index.ts'
+import { bunRedisDriver } from '../../src/adapters/bun.ts'
+import { createRedisLayout } from '../../src/layout.ts'
+import { redisCapabilities } from '../../src/types.ts'
+import { redisChangeStreamFeature } from '../../src/features/change-stream.ts'
 
 /** Bun declares async matchers as void; the bridge awaits its actual native assertions. */
 const harness: IConformanceHarness = {

@@ -1,4 +1,4 @@
-import { RedisCommand, RedisReply } from './constants.js'
+import { RedisCommand, RedisReply } from './constants.ts'
 import {
   ConcurrencyHolderState,
   type IConcurrencyAttemptContext,
@@ -21,11 +21,11 @@ import {
   replyOptionalString,
   replyRevision,
   type IRedisChannel
-} from './layout.js'
-import { redisError, unsupported } from './errors.js'
+} from './layout.ts'
+import { redisError, unsupported } from './errors.ts'
 import { RedisErrorCode } from '@migaia/storage-contract/error-code'
-import { RedisText } from './constants.js'
-import { lockLost } from './transaction.js'
+import { RedisText } from './constants.ts'
+import { lockLost } from './transaction.ts'
 
 /** Native release checks the whole original owner/attempt value, never owner alone. */
 const releaseScript =

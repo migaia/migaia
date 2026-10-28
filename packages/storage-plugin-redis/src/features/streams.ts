@@ -1,10 +1,10 @@
-import { RedisOperation } from '../constants.js'
-import { RedisCommand } from '../constants.js'
+import { RedisOperation } from '../constants.ts'
+import { RedisCommand } from '../constants.ts'
 import { defineFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
 import type { IOperationContext } from '@migaia/storage-contract'
-import type { IRedisStore } from '../types.js'
-import { redisBackendKind } from '../plugin.js'
-import { readNativeFeaturePort } from '../native-feature.js'
+import type { IRedisStore } from '../types.ts'
+import { redisBackendKind } from '../plugin.ts'
+import { readNativeFeaturePort } from '../native-feature.ts'
 import {
   featureName,
   featureInteger,
@@ -12,9 +12,9 @@ import {
   readFeatureBytes,
   readStreamRows,
   blockingCommand
-} from '../feature-input.js'
-import { RedisSuffix, replyInteger, replyString } from '../layout.js'
-import { invalidArgument, redisError } from '../errors.js'
+} from '../feature-input.ts'
+import { RedisSuffix, replyInteger, replyString } from '../layout.ts'
+import { invalidArgument, redisError } from '../errors.ts'
 import { RedisErrorCode } from '@migaia/storage-contract/error-code'
 /** Stream fields are independent byte values reconstructed from the canonical text wire. */
 export type IRedisStreamEntry = {

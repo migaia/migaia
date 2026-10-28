@@ -12,9 +12,9 @@ import {
   defineCollectionsJsonCodec,
   type ICollectionsCodecValue
 } from '@migaia/serialize/codecs/collections-json'
-import { redisError, invalidArgument } from './errors.js'
+import { redisError, invalidArgument } from './errors.ts'
 import { RedisErrorCode } from '@migaia/storage-contract/error-code'
-import { RedisText } from './constants.js'
+import { RedisText } from './constants.ts'
 
 /** Native Redis names use only lowercase ASCII hex; logical tags remain owned by the contract codec. */
 export const redisHex = (bytes: Uint8Array): string =>
