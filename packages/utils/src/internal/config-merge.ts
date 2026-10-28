@@ -16,6 +16,9 @@ import { ConfigArrayMerge } from './config-array-merge.ts'
 import { cloneGraph } from './config-clone.ts'
 import { configError, defaultLimits, hasBuiltinBrand } from './config-state.ts'
 
+/** Four decision kinds are fixed by IConfigConflictDecision; no per-property array is allocated. */
+const configDecisions = new Set(['left', 'right', 'delete', 'value'])
+
 /** One prefix node keeps the first declared rule and indexes each next path segment once. */
 type IConfigPathRuleIndex = {
   /** Exact segment identity preserves the existing string/symbol prefix matching contract. */
@@ -197,7 +200,7 @@ function resolveConfigConflict(
     typeof (decision as { then?: unknown }).then === 'function'
   )
     throw configError(UtilsErrorCode.configConflict, String(key), ConfigReason.resolverSynchronous)
-  if (!['left', 'right', 'delete', 'value'].includes(decision.kind))
+  if (!configDecisions.has(decision.kind))
     throw configError(
       UtilsErrorCode.configConflict,
       String(key),
