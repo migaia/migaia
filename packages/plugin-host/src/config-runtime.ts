@@ -1,3 +1,7 @@
+/**
+ * Owns the stable config surface and queued update transaction; Host retains admission and
+ * generation authority.
+ */
 import type { PluginHostCoreRuntime } from './core-runtime.js'
 import type { PluginHostOperationRuntime } from './operation-runtime.js'
 import type { PluginHostState } from './host-state.js'
@@ -15,6 +19,7 @@ import type { IPluginConfig } from './plugin-lifecycle-types.js'
 import type { IPluginConstraint } from './plugin-definition-types.js'
 import type { IPluginHostConfigFor } from './plugin-handle-types.js'
 
+/** Narrow authority for config admission, queued hooks and committed config publication. */
 type IPluginHostConfigRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   /** Host-owned synchronous hook boundary, without changing the update result identity. */
   readonly invokeHook: <T>(invoke: () => T) => T
@@ -45,6 +50,7 @@ export class PluginHostConfigRuntime<
   /** Lazily materialized stable facade retained for the Host lifetime. */
   #facade: IPluginHostConfigFor<TInstalled> | undefined
 
+  /** Captures Host authority without allocating the lazy public config surface. */
   constructor(port: IPluginHostConfigRuntimePort<TDomainCore, TValue>) {
     this.#port = port
   }
@@ -69,7 +75,9 @@ export class PluginHostConfigRuntime<
       throw createPluginHostTypeError(PluginHostInternalText.CONFIG_PATH_REQUIRED)
     /** Plugin names cannot contain dots, so the first path segment is an exact map key. */
     const separator = path.indexOf('.')
+    /** First segment names the exact registration before config-path traversal. */
     const name = separator < 0 ? path : path.slice(0, separator)
+    /** Exact committed registration selected by the admitted plugin name. */
     const registration = this.#port.state.registrations.get(name)
     if (!registration) return undefined
     return readConfigPath(registration.config, parseConfigPath(path))
@@ -88,38 +96,65 @@ export class PluginHostConfigRuntime<
       throw this.#port.decorateError(
         new PluginHostError(PluginHostErrorCode.lifecycleMutation, ERROR_TEXT.LIFECYCLE_MUTATION)
       )
-    return this.#port.enqueue(async () => {
+    /** One immutable request keeps the queue adapter independent from individual update state. */
+    const request = { name, recipe }
+    return this.#port.enqueue(() => this.#applyUpdate(request))
+  }
+
+  /** Runs the admitted update without changing hook invocation or await boundaries. */
+  async #applyUpdate<T extends IPluginConfig>(
+    request: Readonly<{
+      readonly name: string
+      readonly recipe: (previous: Readonly<T>) => Partial<T>
+    }>
+  ): Promise<void> {
+    const { name, recipe } = request
+    try {
+      /** Exact committed registration selected by the admitted plugin name. */
+      const registration = this.#port.state.registrations.get(name)
+      if (!registration)
+        throw new PluginHostError(
+          PluginHostErrorCode.pluginNotInstalled,
+          ERROR_TEXT.PLUGIN_NOT_INSTALLED(name)
+        )
+      /** Recipe reads the original committed config until its update hook succeeds. */
+      const previous = registration.config
+      /** User recipe produces the patch synchronously under existing admission. */
+      const patch = recipe(previous as Readonly<T>)
+      /** Frozen candidate remains unpublished until the exact update generation survives. */
+      const next = copyConfigWithPatch(registration.config, patch)
       try {
-        const registration = this.#port.state.registrations.get(name)
-        if (!registration)
-          throw new PluginHostError(
-            PluginHostErrorCode.pluginNotInstalled,
-            ERROR_TEXT.PLUGIN_NOT_INSTALLED(name)
-          )
-        const previous = registration.config
-        const patch = recipe(previous as Readonly<T>)
-        const next = copyConfigWithPatch(registration.config, patch)
-        try {
-          if (registration.plugin.update) {
-            this.#port.operations.begin(registration)
-            this.#port.setHookRegistration(registration)
-            const updateResult = this.#port.invokeHook(() =>
-              invokeCaptured(registration.plugin.update!, registration.plugin.owner, [
-                next as never,
-                this.#port.core.create(registration)
-              ])
-            )
-            await this.#port.operations.await(updateResult, registration)
-            this.#port.operations.assertCurrent(registration)
-          }
-        } finally {
-          this.#port.setHookRegistration(undefined)
+        if (registration.plugin.update) {
+          this.#port.operations.begin(registration)
+          this.#port.setHookRegistration(registration)
+          /** Explicit hook context prevents the adapter from capturing transaction locals. */
+          const update = { registration, next }
+          /** Original hook result crosses the operation boundary without an extra await. */
+          const updateResult = this.#port.invokeHook(() => this.#invokeUpdate(update))
+          await this.#port.operations.await(updateResult, registration)
+          this.#port.operations.assertCurrent(registration)
         }
-        registration.config = next
-        this.#port.state.commit()
-      } catch (error) {
-        throw identifyPluginHostCallbackFailure(error)
+      } finally {
+        this.#port.setHookRegistration(undefined)
       }
-    })
+      registration.config = next
+      this.#port.state.commit()
+    } catch (error) {
+      throw identifyPluginHostCallbackFailure(error)
+    }
+  }
+
+  /** Invokes the admitted update hook with its original receiver and exact native core. */
+  #invokeUpdate(
+    request: Readonly<{
+      readonly registration: IRegistration<TDomainCore, TValue>
+      readonly next: IPluginConfig
+    }>
+  ): unknown {
+    const { registration, next } = request
+    return invokeCaptured(registration.plugin.update!, registration.plugin.owner, [
+      next as never,
+      this.#port.core.create(registration)
+    ])
   }
 }

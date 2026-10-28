@@ -1,3 +1,7 @@
+/**
+ * Owns Host stage admission and execution settlement; middleware and lifecycle retain runner and
+ * lease authority.
+ */
 import { reportDiagnostic } from './diagnostic-report.js'
 import { boundedWait, type IPendingTracker } from '@migaia/lifecycle'
 import type { IScheduler } from '@migaia/utils/scheduler'
@@ -46,6 +50,7 @@ export const createPluginHostPipelineViolationHandler =
     )
   }
 
+/** Runner, lease and pending authority borrowed from the canonical Host execution owner. */
 export type IPluginHostPipelineExecutionPort<TValue> = Readonly<{
   readonly mode: IMiddlewarePipelineMode
   readonly runner: IMiddlewarePipeline<IMiddlewarePipelineMode, TValue>
@@ -56,6 +61,7 @@ export type IPluginHostPipelineExecutionPort<TValue> = Readonly<{
   readonly pending: IPendingTracker
 }>
 
+/** Exact stage and original data-order slot authority admitted for one registration. */
 type IPluginHostStageRegistrationOptions<TDomainCore extends object, TValue> = Readonly<{
   readonly host: object
   readonly depth: number
@@ -77,6 +83,7 @@ export function ensurePluginHostStageSlot<TDomainCore extends object, TValue>(
   >,
   owner: IRegistration<TDomainCore, TValue>
 ): IDataOrderSlotState {
+  /** Original name slot survives replacement until its explicit retirement. */
   let slotState = options.stageSlots.get(owner.name)
   if (!slotState || slotState.retired) {
     slotState = {
@@ -108,6 +115,7 @@ export const registerPluginHostStage = <TDomainCore extends object, TValue>(
   if (!owner) {
     return options.lanes.appendHost(stage, options.allocateSlot(), options.forms)
   }
+  /** One canonical name slot preserves allocation order across generation changes. */
   const slotState = ensurePluginHostStageSlot(options, owner)
   return options.lanes.registerOwner(owner, slotState, stage, options.forms)
 }
@@ -119,6 +127,32 @@ function settlePluginHostPipeline<TValue>(
 ): void {
   options.leave()
   release()
+}
+
+/** Original execution-settlement state shared by fulfillment and rejection adapters. */
+type IPipelineSettlement<TValue, TResult> = Readonly<{
+  readonly options: IPluginHostPipelineExecutionPort<TValue>
+  readonly release: () => void
+  readonly result: (() => TResult) | undefined
+}>
+
+/** Releases execution authority before reading the terminal callback result. */
+function fulfillPluginHostPipeline<TValue, TResult>(
+  settlement: IPipelineSettlement<TValue, TResult>
+): TResult | undefined {
+  settlePluginHostPipeline(settlement.options, settlement.release)
+  /** Preserve the original standalone receiver of the optional result callback. */
+  const result = settlement.result
+  return result?.()
+}
+
+/** Releases execution authority before rethrowing the exact original runner rejection. */
+function rejectPluginHostPipeline<TValue, TResult>(
+  error: unknown,
+  settlement: IPipelineSettlement<TValue, TResult>
+): never {
+  settlePluginHostPipeline(settlement.options, settlement.release)
+  throw error
 }
 
 /**
@@ -135,6 +169,7 @@ export const executePluginHostPipeline = <TValue, TResult = void>(
   stages = snapshot.stages,
   result?: () => TResult
 ): void | Promise<TResult | undefined> => {
+  /** Selected middleware mode determines synchronous throw versus Promise settlement semantics. */
   const asynchronous =
     options.mode === MiddlewarePipelineMode.async ||
     options.mode === MiddlewarePipelineMode.asyncGenerator
@@ -144,6 +179,7 @@ export const executePluginHostPipeline = <TValue, TResult = void>(
     } catch (error) {
       return Promise.reject(error)
     }
+    /** Exact snapshot lease is released after execution depth leaves, including synchronous throws. */
     const release = options.retainLease(snapshot)
     options.enter()
     /** Runner Promise for this execution; its settlement releases the lease and depth. */
@@ -154,19 +190,17 @@ export const executePluginHostPipeline = <TValue, TResult = void>(
       settlePluginHostPipeline(options, release)
       return Promise.reject(error)
     }
+    /** One explicit settlement context keeps adapters independent from execution locals. */
+    const settlement = { options, release, result }
+    /** This remains the sole derived runner Promise tracked by the Host. */
     const task = running.then(
-      () => {
-        settlePluginHostPipeline(options, release)
-        return result?.()
-      },
-      (error: unknown) => {
-        settlePluginHostPipeline(options, release)
-        throw error
-      }
+      () => fulfillPluginHostPipeline(settlement),
+      (error: unknown) => rejectPluginHostPipeline(error, settlement)
     )
     return options.pending.track(task)
   }
   options.assertActive()
+  /** Synchronous execution releases this same lease in its original finally boundary. */
   const release = options.retainLease(snapshot)
   options.enter()
   try {
@@ -186,11 +220,13 @@ export const drainPipelineLeases = async (context: {
   readonly complete: boolean
   readonly physicalCompletion?: Promise<{ readonly cleanupErrors: readonly unknown[] }>
 }> => {
+  /** Single lifecycle drain Promise retains its original identity throughout the deadline race. */
   const pending = context.leases.whenZeroOnce(context.key)
   if (context.drainTimeoutMs === false) {
     await pending
     return { complete: true }
   }
+  /** Existing scheduler budget bounds logical waiting without replacing the physical drain. */
   const complete = await boundedWait(pending, context.scheduler.now() + context.drainTimeoutMs, {
     scheduler: context.scheduler
   })

@@ -98,10 +98,14 @@ export class SharedSlotView<
   }
 
   /** Ready contribution values in publication order. */
-  readonly values = (): readonly object[] =>
-    this.#port.ownerOf(this.#key) === this.#slot
+  readonly values = (): readonly object[] => this.#readValues()
+
+  /** Projects the exact committed slot's ready receipts without rebuilding any ownership index. */
+  #readValues(): readonly object[] {
+    return this.#port.ownerOf(this.#key) === this.#slot
       ? Array.from(this.#slot.contributions, (receipt) => receipt.value)
       : []
+  }
 
   /** Cold enumeration includes suspended or non-ready units, but never candidates or old owners. */
   readonly registered = (): readonly object[] => {
@@ -124,7 +128,11 @@ export class SharedSlotView<
   }
 
   /** Stages or publishes one ready contribution and returns its exact withdrawal. */
-  readonly contribute = (value: object, instanceId: string): (() => void) => {
+  readonly contribute = (value: object, instanceId: string): (() => void) =>
+    this.#contribute(value, instanceId)
+
+  /** Stages the exact receipt and returns its withdrawal under this original registration owner. */
+  #contribute(value: object, instanceId: string): () => void {
     this.#assertContribution()
     if (
       typeof value !== 'object' ||
@@ -138,18 +146,30 @@ export class SharedSlotView<
         PluginHostErrorCode.registrationRevoked,
         ERROR_TEXT.REGISTRATION_REVOKED
       )
+    /** Exact registration retains ownership even if a successor later takes the same name. */
     const registration = this.#registration
+    /** This original batch owns staged receipts until its native publication commits. */
     const batch = this.#batch
     /** Candidate rollback cannot erase any committed or successor receipt. */
     const receipt = Object.freeze({ slot: this.#slot, registration, instanceId, value })
     if (!batch.committed) batch.sharedContributions.add(receipt)
     ;(registration.sharedContributions ??= new Set()).add(receipt)
     if (batch.committed) this.#port.updateContribution(receipt, true)
-    return () => {
-      /** Candidate withdrawal never publishes and late cleanup cannot affect a successor. */
-      batch.sharedContributions.delete(receipt)
-      this.#port.updateContribution(receipt, false)
-      registration.sharedContributions?.delete(receipt)
-    }
+    /** Withdrawal carries only its exact receipt and original batch, never another generation. */
+    const withdrawal = { batch, receipt }
+    return () => this.#withdraw(withdrawal)
+  }
+
+  /** Removes the exact staged or committed receipt; late cleanup cannot affect a successor. */
+  #withdraw(
+    withdrawal: Readonly<{
+      readonly batch: IInstallBatchContext<TDomainCore, TValue>
+      readonly receipt: ISharedExtensionContribution<TDomainCore, TValue>
+    }>
+  ): void {
+    const { batch, receipt } = withdrawal
+    batch.sharedContributions.delete(receipt)
+    this.#port.updateContribution(receipt, false)
+    receipt.registration.sharedContributions?.delete(receipt)
   }
 }

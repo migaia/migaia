@@ -1,14 +1,19 @@
+/**
+ * Adapts PluginHost definitions and errors to capability-owned dependency planning; owns no graph
+ * algorithm.
+ */
 import {
   DependencyPolicy,
   planActivation,
   resolveInstallSet,
   type IDependencyPlan
 } from '@migaia/capability/graph/dependency'
-import type { ITopologyIndexNode } from '@migaia/capability/graph/topology'
+import type { ITopologyIndexNode, ITopologyTransaction } from '@migaia/capability/graph/topology'
 import {
   collectPluginFeatureDependencies,
   readDefinitionDependencies
 } from './dependency-reader.js'
+import { PluginActivation } from './state-constants.js'
 import { PluginHostErrorCode } from './error-code.js'
 import ERROR_TEXT, { PluginHostError, createPluginHostTypeError } from './error-text.js'
 import type { IFeatureReference } from './feature-types.js'
@@ -96,81 +101,123 @@ export const validateInstallBatch = <TDomainCore extends object, TValue>(
   readonly order: readonly IInstallEntry<TDomainCore, TValue>[]
   readonly installSet: ReadonlySet<string>
   readonly activationOrder: readonly string[]
-}> => {
-  /** Batch entries by stable plugin name. */
-  const byName = new Map(entries.map((entry) => [entry.name, entry]))
-  /** Isolated projected topology used only for validation and planning. */
-  const transaction = state.dependencyIndex().begin()
-  try {
-    for (const entry of entries) {
-      /** Candidate node projected into the transaction without disturbing the base index. */
-      const node = toIndexNode(entry.name, entry.plugin)
-      if (transaction.has(entry.name)) transaction.setDependencies(entry.name, node.dependencies)
-      else transaction.add(node)
-    }
-    /** Batch member names used to bound lazy-install traversal. */
-    const members = entries.map((entry) => entry.name)
-    /** Members whose install hooks execute in this transaction. */
-    const installSet = resolveInstallSet(
-      transaction,
-      members,
-      (name) => byName.get(name)!.plugin.activation === 'lazy'
-    )
-    /** Committed inactive providers that must activate before this batch installs. */
-    const activationOrder = planActivation(
-      transaction,
-      (name) =>
-        byName.has(name)
-          ? { activated: true, enabled: true, suspended: false, stale: false }
-          : state.readDependencyState(name),
-      activationRoots ?? members.filter((name) => installSet.has(name))
-    ).order.filter((name) => state.registrations.has(name))
-    for (const entry of entries) {
-      /** First Feature reference per provider retains the public diagnostic Feature name. */
-      const references = new Map(
-        collectPluginFeatureDependencies(entry.plugin).map(({ reference }) => [
-          reference.plugin,
-          reference
-        ])
+}> => new PluginHostInstallValidation(entries, state, inactive, activationRoots).validate()
+
+/** Owns only one isolated validation projection; capability retains topology and planning authority. */
+class PluginHostInstallValidation<TDomainCore extends object, TValue> {
+  /** Captured batch entries are projected and validated in their original input order. */
+  readonly #entries: readonly IInstallEntry<TDomainCore, TValue>[]
+  /** Committed registrations and the canonical dependency index remain with the Host state owner. */
+  readonly #state: PluginHostState<TDomainCore, TValue>
+  /** Async Host paths admit providers they activate before actual installation. */
+  readonly #inactive: PluginInactiveProviderPolicy
+  /** Explicit activation targets override eager batch roots only for their original callers. */
+  readonly #activationRoots: readonly string[] | undefined
+  /** Name lookup stays constant-time while capability traverses the batch once. */
+  #byName!: Map<string, IInstallEntry<TDomainCore, TValue>>
+  /** Isolated projected index always rolls back in validate's finally path. */
+  #transaction!: ITopologyTransaction
+
+  /** Captures inputs without creating or publishing graph state. */
+  constructor(
+    entries: readonly IInstallEntry<TDomainCore, TValue>[],
+    state: PluginHostState<TDomainCore, TValue>,
+    inactive: PluginInactiveProviderPolicy,
+    activationRoots?: readonly string[]
+  ) {
+    this.#entries = entries
+    this.#state = state
+    this.#inactive = inactive
+    this.#activationRoots = activationRoots
+  }
+
+  /** Projects, validates and orders one batch, then discards the temporary topology on every exit. */
+  validate(): Readonly<{
+    readonly order: readonly IInstallEntry<TDomainCore, TValue>[]
+    readonly installSet: ReadonlySet<string>
+    readonly activationOrder: readonly string[]
+  }> {
+    /** Batch entries by stable plugin name. */
+    this.#byName = new Map(this.#entries.map((entry) => [entry.name, entry]))
+    /** Isolated projected topology used only for validation and planning. */
+    this.#transaction = this.#state.dependencyIndex().begin()
+    try {
+      for (const entry of this.#entries) {
+        /** Candidate node projected into the transaction without disturbing the base index. */
+        const node = toIndexNode(entry.name, entry.plugin)
+        if (this.#transaction.has(entry.name))
+          this.#transaction.setDependencies(entry.name, node.dependencies)
+        else this.#transaction.add(node)
+      }
+      /** Batch member names used to bound lazy-install traversal. */
+      const members = this.#entries.map((entry) => entry.name)
+      /** Members whose install hooks execute in this isolated transaction. */
+      const installSet = resolveInstallSet(
+        this.#transaction,
+        members,
+        (name) => this.#byName.get(name)!.plugin.activation === PluginActivation.lazy
       )
-      for (const dependency of transaction.missing(entry.name)) {
-        if (!dependency.required) continue
-        throw createAbsentProviderError(references.get(dependency.provider)!, state.removedNames)
-      }
-      for (const dependency of transaction.dependencies(entry.name)) {
-        if (!dependency.required || byName.has(dependency.provider)) continue
-        /** Committed provider already represented by the base index. */
-        const registration = state.registrations.get(dependency.provider)!
-        /** Reference naming the Feature used by the public prerequisite diagnostic. */
-        const reference = references.get(dependency.provider)!
-        if (!registration.enabled)
-          throw new PluginHostError(
-            PluginHostErrorCode.prerequisiteDisabled,
-            ERROR_TEXT.PREREQUISITE_DISABLED(reference.feature, reference.plugin)
-          )
-        if (registration.suspended)
-          throw new PluginHostError(
-            PluginHostErrorCode.pluginSuspended,
-            ERROR_TEXT.PLUGIN_SUSPENDED(reference.plugin)
-          )
-        if (
-          !registration.activated &&
-          inactive === PluginInactiveProviderPolicy.reject &&
-          installSet.has(entry.name)
+      /** Committed inactive providers that must activate before this batch installs. */
+      const activationOrder = planActivation(
+        this.#transaction,
+        (name) =>
+          this.#byName.has(name)
+            ? { activated: true, enabled: true, suspended: false, stale: false }
+            : this.#state.readDependencyState(name),
+        this.#activationRoots ?? members.filter((name) => installSet.has(name))
+      ).order.filter((name) => this.#state.registrations.has(name))
+      for (const entry of this.#entries) {
+        /** First Feature reference per provider retains the public diagnostic Feature name. */
+        const references = new Map(
+          collectPluginFeatureDependencies(entry.plugin).map(({ reference }) => [
+            reference.plugin,
+            reference
+          ])
         )
-          throw new PluginHostError(
-            PluginHostErrorCode.pluginNotActivated,
-            ERROR_TEXT.PLUGIN_NOT_ACTIVATED(reference.plugin)
+        for (const dependency of this.#transaction.missing(entry.name)) {
+          if (!dependency.required) continue
+          throw createAbsentProviderError(
+            references.get(dependency.provider)!,
+            this.#state.removedNames
           )
+        }
+        for (const dependency of this.#transaction.dependencies(entry.name)) {
+          if (!dependency.required || this.#byName.has(dependency.provider)) continue
+          /** Committed provider already represented by the base index. */
+          const registration = this.#state.registrations.get(dependency.provider)!
+          /** Reference naming the Feature used by the public prerequisite diagnostic. */
+          const reference = references.get(dependency.provider)!
+          if (!registration.enabled)
+            throw new PluginHostError(
+              PluginHostErrorCode.prerequisiteDisabled,
+              ERROR_TEXT.PREREQUISITE_DISABLED(reference.feature, reference.plugin)
+            )
+          if (registration.suspended)
+            throw new PluginHostError(
+              PluginHostErrorCode.pluginSuspended,
+              ERROR_TEXT.PLUGIN_SUSPENDED(reference.plugin)
+            )
+          if (
+            !registration.activated &&
+            this.#inactive === PluginInactiveProviderPolicy.reject &&
+            installSet.has(entry.name)
+          )
+            throw new PluginHostError(
+              PluginHostErrorCode.pluginNotActivated,
+              ERROR_TEXT.PLUGIN_NOT_ACTIVATED(reference.plugin)
+            )
+        }
       }
+      return Object.freeze({
+        order: Object.freeze(
+          this.#transaction.order(members).map((name) => this.#byName.get(name)!)
+        ),
+        installSet,
+        activationOrder: Object.freeze(activationOrder)
+      })
+    } finally {
+      this.#transaction.rollback()
     }
-    return Object.freeze({
-      order: Object.freeze(transaction.order(members).map((name) => byName.get(name)!)),
-      installSet,
-      activationOrder: Object.freeze(activationOrder)
-    })
-  } finally {
-    transaction.rollback()
   }
 }
 
@@ -194,9 +241,11 @@ export const projectAffected = (
   applied: readonly string[],
   policy: DependencyPolicy
 ): IPluginDependencyPlan => {
+  /** Only names actually changed by this mutation may appear in its affected projection. */
   const names = new Set(applied)
   /** Tracks projected names so a repeated planner entry cannot duplicate an affected step. */
   const seenOrder = new Set<string>()
+  /** Capability steps are projected at most once per affected plugin name. */
   const seenSteps = new Set<string>()
   return Object.freeze({
     policy,
@@ -237,6 +286,7 @@ export const findUnavailableProvider = <TDomainCore extends object, TValue>(
 ): PluginHostError | undefined => {
   for (const { reference } of collectPluginFeatureDependencies(consumer.plugin)) {
     if (reference.optional) continue
+    /** A direct required provider is checked through constant-time registration lookup. */
     const provider = registrations.get(reference.plugin)
     if (!provider) return createAbsentProviderError(reference, removedNames)
     if (!provider.enabled && !enabling.has(reference.plugin))

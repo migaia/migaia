@@ -1,3 +1,4 @@
+/** Owns sparse stage order, immutable execution snapshots and their existing lifecycle leases. */
 import { createQuiescenceTracker, type IQuiescenceTracker } from '@migaia/lifecycle'
 import type {
   IAsyncMiddlewareStage,
@@ -121,6 +122,69 @@ export type IStageSnapshot<TValue> = Readonly<{
   readonly asyncStages: readonly IAsyncMiddlewareStage<TValue>[]
 }>
 
+/** Mutable projection arrays exist only while compiling one immutable execution snapshot. */
+type IStageSnapshotProjection<TValue> = {
+  readonly stages: IMiddlewarePipelineStage<IMiddlewarePipelineMode, TValue>[]
+  readonly syncStages: ISyncMiddlewareStage<TValue>[]
+  readonly asyncStages: IAsyncMiddlewareStage<TValue>[]
+}
+
+/** Appends one stage to each supported runner projection through an explicit compilation context. */
+function appendSnapshotEntry<TValue>(
+  entry: IStageEntry<TValue>,
+  projection: IStageSnapshotProjection<TValue>
+): void {
+  projection.stages.push(entry.stage)
+  if (entry.syncStage) projection.syncStages.push(entry.syncStage)
+  if (entry.asyncStage) projection.asyncStages.push(entry.asyncStage)
+}
+
+/** Owns retirement of one immutable snapshot's original generation pins. */
+class StageSnapshotRetirement<TValue> {
+  /** Existing lifecycle tracker remains the sole lease and drain authority. */
+  readonly #leases: IQuiescenceTracker<object>
+  /** Immutable snapshot is the version lease key sealed on invalidation. */
+  readonly #snapshot: IStageSnapshot<TValue>
+  /** Original owner pins release only after the retired snapshot has no executions. */
+  readonly #releases: readonly (() => void)[]
+
+  /** Captures the version and its existing pin releases without retaining any stage owner table. */
+  constructor(
+    leases: IQuiescenceTracker<object>,
+    snapshot: IStageSnapshot<TValue>,
+    releases: readonly (() => void)[]
+  ) {
+    this.#leases = leases
+    this.#snapshot = snapshot
+    this.#releases = releases
+  }
+
+  /** Releases generation pins in their original order after the last version execution leaves. */
+  readonly #releaseOwners = (): void => {
+    for (const release of this.#releases) release()
+  }
+
+  /** Seals the retired version and keeps asynchronous physical completion with lifecycle. */
+  retire(): void {
+    this.#leases.seal(this.#snapshot)
+    if (this.#leases.count(this.#snapshot) === 0) this.#releaseOwners()
+    else void this.#leases.whenZero(this.#snapshot).then(this.#releaseOwners)
+  }
+}
+
+/** Explicit host-occurrence state carried by its idempotent removal callback. */
+type IHostStageRemoval<TValue> = {
+  readonly entry: IStageEntry<TValue>
+  readonly ordinal: bigint
+  readonly forms: IStageForms<TValue>
+}
+
+/** Explicit generation-owned occurrence state carried by its idempotent removal callback. */
+type IOwnerStageRemoval<TDomainCore extends object, TValue> = {
+  readonly entry: IStageEntry<TValue>
+  readonly registration: IRegistration<TDomainCore, TValue>
+}
+
 /** Append-only allocation-order lane with one cached immutable execution snapshot per version. */
 export class StageLanes<TValue> {
   /** One lifecycle tracker owns execution, version, and generation leases. */
@@ -231,14 +295,19 @@ export class StageLanes<TValue> {
     this.#size += 1
     if (!forms.syncStage) this.#asyncStageCount += 1
     this.invalidate()
-    return () => {
-      if (!entry.alive) return
-      entry.alive = false
-      this.#order.removeHost(ordinal)
-      this.#size -= 1
-      if (!forms.syncStage) this.#asyncStageCount -= 1
-      this.invalidate()
-    }
+    /** One removal context avoids retaining the wider stage-registration method state. */
+    const removal = { entry, ordinal, forms }
+    return () => this.#removeHost(removal)
+  }
+
+  /** Removes this exact Host occurrence in O(1), preserving idempotency and counter ordering. */
+  #removeHost(removal: IHostStageRemoval<TValue>): void {
+    if (!removal.entry.alive) return
+    removal.entry.alive = false
+    this.#order.removeHost(removal.ordinal)
+    this.#size -= 1
+    if (!removal.forms.syncStage) this.#asyncStageCount -= 1
+    this.invalidate()
   }
 
   /** Records a candidate stage on its exact registration, invisible until publication. */
@@ -256,14 +325,19 @@ export class StageLanes<TValue> {
     if (!entries) registration.stageEntries.set(this.#key, (entries = []))
     entries.push(entry)
     /** The public removal handle and native cleanup share this exact idempotent disposer. */
-    const remove = (): void => {
-      if (!entry.alive) return
-      entry.alive = false
-      if (registration.segments.get(this.#key)?.owner === registration)
-        this.refreshOwner(registration)
-    }
-    registration.pipelineDisposers.push(remove)
-    return remove
+    const removal = { entry, registration }
+    /** Both public removal and native cleanup share the same short forwarding adapter. */
+    const handle = { remove: () => this.#removeOwner(removal) }
+    registration.pipelineDisposers.push(handle.remove)
+    return handle.remove
+  }
+
+  /** Removes one exact generation occurrence without touching candidates or other generations. */
+  #removeOwner<TDomainCore extends object>(removal: IOwnerStageRemoval<TDomainCore, TValue>): void {
+    if (!removal.entry.alive) return
+    removal.entry.alive = false
+    if (removal.registration.segments.get(this.#key)?.owner === removal.registration)
+      this.refreshOwner(removal.registration)
   }
 
   /** A declared group's owner participates in the same retirement index even before adding stages. */
@@ -316,17 +390,14 @@ export class StageLanes<TValue> {
     const syncStages: ISyncMiddlewareStage<TValue>[] = []
     /** Derived async forms reuse canonical middleware lifting rather than a second registry. */
     const asyncStages: IAsyncMiddlewareStage<TValue>[] = []
-    /** Appends one visible entry to each supported runner projection. */
-    const append = (entry: IStageEntry<TValue>): void => {
-      stages.push(entry.stage)
-      if (entry.syncStage) syncStages.push(entry.syncStage)
-      if (entry.asyncStage) asyncStages.push(entry.asyncStage)
-    }
+    /** One explicit context owns all three projections during this snapshot compilation. */
+    const projection = { stages, syncStages, asyncStages }
     /** Lease keys belonging to registrations that contribute visible stages. */
     const ownerKeys: object[] = this.#ownerKey ? [this.#ownerKey] : []
     for (const allocation of this.#order.values()) {
       if (allocation.kind === 'host') {
-        if (allocation.key === this.#key && allocation.entry.alive) append(allocation.entry)
+        if (allocation.key === this.#key && allocation.entry.alive)
+          appendSnapshotEntry(allocation.entry, projection)
         continue
       }
       /** Only actual stage contributions allocate a segment for this declared pipeline. */
@@ -336,7 +407,7 @@ export class StageLanes<TValue> {
       let contributed = false
       for (const entry of owner.stageEntries.get(this.#key) ?? []) {
         if (!entry.alive) continue
-        append(entry)
+        appendSnapshotEntry(entry, projection)
         contributed = true
       }
       if (contributed && owner.pipelineOwnerKey !== this.#ownerKey)
@@ -356,15 +427,9 @@ export class StageLanes<TValue> {
     })
     /** Owner pins belong to the immutable version, rather than every execution. */
     const releases = ownerKeys.map((key) => this.leases.retain(key))
-    /** Retired versions keep their owners alive until all executions have left. */
-    const releaseOwners = (): void => {
-      for (const release of releases) release()
-    }
-    this.#retireSnapshot = () => {
-      this.leases.seal(snapshot)
-      if (this.leases.count(snapshot) === 0) releaseOwners()
-      else void this.leases.whenZero(snapshot).then(releaseOwners)
-    }
+    /** Retirement borrows lifecycle rather than building another lease or drain implementation. */
+    const retirement = new StageSnapshotRetirement(this.leases, snapshot, releases)
+    this.#retireSnapshot = () => retirement.retire()
     this.#snapshot = snapshot
     return snapshot
   }

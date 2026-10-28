@@ -1,3 +1,4 @@
+/** Owns the unique Host disposal result and composes existing lifecycle drains and cleanup owners. */
 import { deferred } from '@migaia/utils/promise'
 import type { PluginHostState } from './host-state.js'
 import { reportDiagnostic } from './diagnostic-report.js'
@@ -16,6 +17,7 @@ import { PluginHostErrorCode } from './error-code.js'
 import type { IPluginHostDiagnostic } from './host-options-types.js'
 import type { IPluginHostDisposalResult } from './plugin-lifecycle-types.js'
 
+/** Existing terminal, queue, registration and reporting authority required by Host disposal. */
 type IPluginHostDisposalRuntimePort<TRegistration> = Readonly<{
   readonly terminal: ITerminalController
   readonly executionController: IAbortController
@@ -44,6 +46,7 @@ export class PluginHostDisposalRuntime<TRegistration> {
   /** Stable identity returned by every repeated dispose call. */
   #promise: Promise<IPluginHostDisposalResult> | undefined
 
+  /** Captures terminal cleanup authority without starting disposal or allocating a result Promise. */
   constructor(port: IPluginHostDisposalRuntimePort<TRegistration>) {
     this.#port = port
   }
@@ -71,67 +74,77 @@ export class PluginHostDisposalRuntime<TRegistration> {
         new PluginHostError(PluginHostErrorCode.hostDisposing, ERROR_TEXT.HOST_DISPOSING)
       )
       /** The existing terminal queue still owns every physical cleanup step. */
-      const pending = this.#port.enqueueTerminal(async () => {
-        const errors: unknown[] = []
-        /** Only continuations belong to physical completion; current errors are already returned. */
-        const physical: Promise<ICleanupResult>[] = []
-        const drained =
-          this.#port.pipelineDrainTimeoutMs === false
-            ? await this.#whenPipelineZero().then(() => true)
-            : await boundedWait(
-                this.#whenPipelineZero(),
-                this.#port.scheduler.now() + this.#port.pipelineDrainTimeoutMs,
-                { scheduler: this.#port.scheduler }
-              )
-        if (!drained)
-          errors.push(
-            new PluginHostError(
-              PluginHostErrorCode.pipelineDrainTimeout,
-              ERROR_TEXT.PIPELINE_DRAIN_TIMEOUT(this.#port.pipelineDrainTimeoutMs as number)
-            )
-          )
-        for (const registration of this.#port.registrationsInReverse()) {
-          const beforeRelease = this.#port.removal.runBeforeRelease(registration)
-          if (beforeRelease) {
-            const result = await beforeRelease
-            errors.push(...result.cleanupErrors)
-            if (result.physicalCompletion) physical.push(result.physicalCompletion)
-          }
-          const result = await this.#port.removal.disposeRegistration(registration)
-          errors.push(...result.cleanupErrors)
-          if (result.physicalCompletion) physical.push(result.physicalCompletion)
-        }
-        this.#port.clearPipelineState()
-        this.#port.terminal.forceTerminal()
-        this.#port.state.commit()
-        for (const error of errors) {
-          reportDiagnostic(
-            this.#port.diagnostic,
-            error instanceof Error ? error.message : String(error),
-            PluginHostErrorCode.cleanupIncomplete,
-            error
-          )
-        }
-        const cleanupComplete = drained && this.#port.pending.size === 0 && physical.length === 0
-        const physicalCompletion = cleanupComplete
-          ? undefined
-          : mergeCleanupResults([
-              ...physical,
-              Promise.all([this.#port.pending.drain(), this.#whenPipelineZero()]).then(() => ({
-                cleanupErrors: []
-              }))
-            ])
-        return Object.freeze({
-          logicalTerminal: true,
-          cleanupComplete,
-          cleanupErrors: Object.freeze([...errors]),
-          ...(physicalCompletion ? { physicalCompletion } : {})
-        })
-      })
+      const pending = this.#port.enqueueTerminal(() => this.#cleanup())
       void pending.then(completion.resolve, completion.reject)
     } catch (error) {
       completion.reject(error)
     }
     return this.#promise
+  }
+
+  /** Executes the admitted terminal cleanup without changing its original await boundaries. */
+  async #cleanup(): Promise<IPluginHostDisposalResult> {
+    /** Ordered logical cleanup errors are returned without replacing their original identities. */
+    const errors: unknown[] = []
+    /** Only continuations belong to physical completion; current errors are already returned. */
+    const physical: Promise<ICleanupResult>[] = []
+    /** The existing deadline selects complete drain or bounded logical continuation. */
+    const drained =
+      this.#port.pipelineDrainTimeoutMs === false
+        ? await this.#whenPipelineZero().then(() => true)
+        : await boundedWait(
+            this.#whenPipelineZero(),
+            this.#port.scheduler.now() + this.#port.pipelineDrainTimeoutMs,
+            { scheduler: this.#port.scheduler }
+          )
+    if (!drained)
+      errors.push(
+        new PluginHostError(
+          PluginHostErrorCode.pipelineDrainTimeout,
+          ERROR_TEXT.PIPELINE_DRAIN_TIMEOUT(this.#port.pipelineDrainTimeoutMs as number)
+        )
+      )
+    for (const registration of this.#port.registrationsInReverse()) {
+      /** Pre-release hooks retain their original order before physical resource disposal. */
+      const beforeRelease = this.#port.removal.runBeforeRelease(registration)
+      if (beforeRelease) {
+        /** Merge this exact hook receipt before starting resource cleanup. */
+        const result = await beforeRelease
+        errors.push(...result.cleanupErrors)
+        if (result.physicalCompletion) physical.push(result.physicalCompletion)
+      }
+      /** Removal remains the sole owner of registration revocation and physical cleanup. */
+      const result = await this.#port.removal.disposeRegistration(registration)
+      errors.push(...result.cleanupErrors)
+      if (result.physicalCompletion) physical.push(result.physicalCompletion)
+    }
+    this.#port.clearPipelineState()
+    this.#port.terminal.forceTerminal()
+    this.#port.state.commit()
+    for (const error of errors) {
+      reportDiagnostic(
+        this.#port.diagnostic,
+        error instanceof Error ? error.message : String(error),
+        PluginHostErrorCode.cleanupIncomplete,
+        error
+      )
+    }
+    /** Complete means all three existing physical owners have reached zero outstanding work. */
+    const cleanupComplete = drained && this.#port.pending.size === 0 && physical.length === 0
+    /** Existing lifecycle merger retains ordered late cleanup evidence. */
+    const physicalCompletion = cleanupComplete
+      ? undefined
+      : mergeCleanupResults([
+          ...physical,
+          Promise.all([this.#port.pending.drain(), this.#whenPipelineZero()]).then(() => ({
+            cleanupErrors: []
+          }))
+        ])
+    return Object.freeze({
+      logicalTerminal: true,
+      cleanupComplete,
+      cleanupErrors: Object.freeze([...errors]),
+      ...(physicalCompletion ? { physicalCompletion } : {})
+    })
   }
 }
