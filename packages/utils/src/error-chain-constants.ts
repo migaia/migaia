@@ -11,6 +11,24 @@ export const ErrorChainField = [
   'truncated'
 ] as const
 
+/**
+ * Default field admission is immutable package policy; custom strategy fields are still snapshotted
+ * per node.
+ */
+export const ErrorChainFieldSet: ReadonlySet<string> = new Set(ErrorChainField)
+
+/** The five mandatory wire fields share one compile-time order; send summaries retain this order. */
+export const ErrorChainRequiredField = [
+  ErrorChainField[0],
+  ErrorChainField[1],
+  ErrorChainField[2],
+  ErrorChainField[3],
+  ErrorChainField[4]
+] as const
+
+/** Constant-time scalar admission; the five members come from the fixed wire grammar above. */
+export const ErrorChainRequiredFieldSet: ReadonlySet<string> = new Set(ErrorChainRequiredField)
+
 /** Fixed send getter order preserves one-read snapshots before traversing descendants. */
 export const ErrorChainReadField = [
   'name',

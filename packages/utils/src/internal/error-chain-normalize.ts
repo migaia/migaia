@@ -5,6 +5,8 @@
 import { tryReadProperty } from './error-primitives.ts'
 import {
   ErrorChainField,
+  ErrorChainFieldSet,
+  ErrorChainRequiredFieldSet,
   ErrorChainLimit,
   ErrorChainUnknownFields,
   ErrorChainViolation
@@ -112,8 +114,12 @@ export class ErrorChainNormalizer {
       this.#invalid(pointer, ErrorChainViolation.read, error)
     }
     /** The strategy whitelist defines accepted own fields before any receiver getter is read. */
-    const known = new Set<string>(this.#fieldOrder)
-    for (const key of orderCodePointKeys(keys.filter((entry) => !known.has(entry)))) {
+    const known =
+      this.#fieldOrder === ErrorChainField ? ErrorChainFieldSet : new Set(this.#fieldOrder)
+    /** Collect unknown keys once before the existing code-point order and reporting policy. */
+    const unknown: string[] = []
+    for (const key of keys) if (!known.has(key)) unknown.push(key)
+    for (const key of unknown.length > 1 ? orderCodePointKeys(unknown) : unknown) {
       if (this.#unknownFields === ErrorChainUnknownFields.reject)
         this.#invalid(pointer, ErrorChainViolation.unknownField)
       this.#options.onUnknownField?.(pointer, key)
@@ -128,7 +134,7 @@ export class ErrorChainNormalizer {
         continue
       }
       fields[key] = this.#readOrInvalid(input as Record<string, unknown>, key, `${pointer}/${key}`)
-      if (['source', 'code', 'name', 'message', 'stack'].includes(key)) {
+      if (ErrorChainRequiredFieldSet.has(key)) {
         /**
          * Validate this held field once, preserving first-error order and mandatory text
          * requirements.

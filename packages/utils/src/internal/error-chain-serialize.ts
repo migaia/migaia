@@ -6,6 +6,7 @@ import { tryReadProperty } from './error-primitives.ts'
 import {
   ErrorChainFallback,
   ErrorChainField,
+  ErrorChainRequiredField,
   ErrorChainLimit,
   ErrorChainViolation
 } from '../error-chain-constants.ts'
@@ -207,8 +208,8 @@ export class ErrorChainSerializer {
     const object = (typeof input === 'object' && input !== null) || typeof input === 'function'
     /** Own text is accepted before data and descendants. */
     let ownBytes = 0
-    // Only the five fixed diagnostic fields are charged here.
-    for (const key of ['source', 'code', 'name', 'message', 'stack'] as const) {
+    // Only the five fixed diagnostic fields in ErrorChainRequiredField are charged here.
+    for (const key of ErrorChainRequiredField) {
       /**
        * The text strategy reports both replacement and UTF-8 size without modifying the original
        * input.

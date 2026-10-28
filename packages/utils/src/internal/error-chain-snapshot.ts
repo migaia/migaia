@@ -3,7 +3,11 @@
  * reporting.
  */
 import { tryReadProperty } from './error-primitives.ts'
-import { ErrorChainField, ErrorChainReadField } from '../error-chain-constants.ts'
+import {
+  ErrorChainFieldSet,
+  ErrorChainRequiredField,
+  ErrorChainReadField
+} from '../error-chain-constants.ts'
 import type { IErrorChainStrategy } from '../error-chain-types.ts'
 import type { IErrorSnapshot } from './error-chain-state.ts'
 
@@ -12,20 +16,21 @@ export function snapshotError(
   input: object,
   pointer: string,
   report: (pointer: string, field: string, error: unknown) => void,
-  summaryOnly = false,
-  strategy: IErrorChainStrategy = {}
+  summaryOnly: boolean,
+  strategy: IErrorChainStrategy
 ): IErrorSnapshot {
-  /** The selected whitelist controls optional getter access as well as output admission. */
-  const admitted = new Set<string>(strategy.fields ?? ErrorChainField)
+  /** Re-read caller policy at the original point; custom iterables retain their per-node snapshot. */
+  const fieldOrder = strategy.fields
+  /** The fixed default whitelist is shared; caller-owned whitelists are never cached across getters. */
+  const admitted = fieldOrder === undefined ? ErrorChainFieldSet : new Set<string>(fieldOrder)
   /** The null-prototype snapshot prevents source property names from changing record inheritance. */
   const fields: Record<string, unknown> = Object.create(null) as Record<string, unknown>
   /** Remember failed reads so projection skips them and marks the output incomplete. */
   const failed = new Set<string>()
-  for (const key of summaryOnly
-    ? ErrorChainField.slice(0, 5)
-    : ErrorChainReadField.filter((field) =>
-        field === 'cleanupErrors' ? admitted.has('errors') : admitted.has(field)
-      )) {
+  // Both getter orders have compile-time bounds: five summary fields or ten send fields.
+  for (const key of summaryOnly ? ErrorChainRequiredField : ErrorChainReadField) {
+    if (!summaryOnly && !(key === 'cleanupErrors' ? admitted.has('errors') : admitted.has(key)))
+      continue
     /** Keep each field's failure attached to its original pointer. */
     const read = tryReadProperty(input as Record<string, unknown>, key)
     if (read.threw) {
