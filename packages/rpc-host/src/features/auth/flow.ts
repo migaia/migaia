@@ -472,9 +472,11 @@ export class RpcAuthenticationFlow {
     }
     /** The record carries its compact id so this callback captures only its explicit owner/record. */
     const record = source
-    record.abort = () => {
-      this.#retire(record)
-    }
+    Object.assign(record, {
+      abort: () => {
+        this.#retire(record)
+      }
+    })
     this.#sources.set(record.id, record)
     record.signal.addEventListener('abort', record.abort, { once: true })
     if (record.signal.aborted) record.abort()

@@ -448,9 +448,11 @@ export class RpcMemberGeneration<TUnit, TSpec> {
   }
   /** One explicit waiter owns its abort callback until settlement, cancellation or release. */
   #registerWaiter(waiter: IMemberWaiter): void {
-    waiter.abort = () => {
-      this.#settle(waiter, resolveAbortReason(waiter.signal!), false)
-    }
+    waiter.abort = {
+      abort: () => {
+        this.#settle(waiter, resolveAbortReason(waiter.signal!), false)
+      }
+    }.abort
     if (waiter.signal?.aborted) {
       waiter.abort()
       return

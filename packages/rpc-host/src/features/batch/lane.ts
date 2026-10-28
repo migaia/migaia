@@ -85,10 +85,12 @@ export class RpcBatchLane {
     }
     /** One explicit cleanup receipt retains the original listener and native admission release. */
     const removal = { signal, abort, releaseAdmission }
-    entry.remove = () => {
-      removal.signal.removeEventListener('abort', removal.abort)
-      removal.releaseAdmission?.()
-    }
+    Object.assign(entry, {
+      remove: () => {
+        removal.signal.removeEventListener('abort', removal.abort)
+        removal.releaseAdmission?.()
+      }
+    })
     signal.addEventListener('abort', abort, { once: true })
     if (signal.aborted) abort()
     if (!entry.cancelled) {
