@@ -8,6 +8,7 @@ import type { IAbortSignal } from '@migaia/utils/promise'
 import { TrayErrorCode } from '../error-code.ts'
 import { attachTrayError, createTrayError } from '../errors.ts'
 import { registerArtifactCustody } from '../host/internal-capability.ts'
+import { ManagedHostOperation } from '../host/constants.ts'
 import { defineAdapter } from '../adapter/define-adapter.ts'
 import { defineLoader } from './define-loader.ts'
 import type {
@@ -128,7 +129,10 @@ export async function loadIntoHost<
     (typeof timeoutMs !== 'number' || !Number.isFinite(timeoutMs) || timeoutMs < 0)
   )
     throw createTrayError(TrayErrorCode.loaderContractInvalid)
-  if (options.mutation !== 'use' && options.mutation !== 'replace')
+  if (
+    options.mutation !== ManagedHostOperation.use &&
+    options.mutation !== ManagedHostOperation.replace
+  )
     throw createTrayError(TrayErrorCode.loaderContractInvalid)
   /** Named admission owner replaces function-local listener and reporter closures. */
   const transaction = new LoaderTransaction(options, timeoutMs)
@@ -177,7 +181,7 @@ export async function loadIntoHost<
     phase = 'mutation'
     /** The committed bit, rather than success or readiness, decides custody. */
     const result =
-      options.mutation === 'replace'
+      options.mutation === ManagedHostOperation.replace
         ? await options.host.replace<TPlugin>(plugin)
         : await options.host.use<TPlugin>(plugin)
     if (!(result && typeof result === 'object' && 'committed' in result)) {
