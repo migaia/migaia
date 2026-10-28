@@ -558,13 +558,24 @@ export function open<TValue>(
       const attachConnectionHandlers = (connected: IDBDatabase): void => {
         try {
           // 别的标签页要升级时必须让路，否则对方会一直 blocked。
-          connected.onversionchange = () => {
-            indexedDbContext.journalGeneration = {}
-            try {
-              connected.close()
-            } catch {
-              /* Host close failures must not retain a stale connection cache. */
-            } finally {
+          Object.assign(connected, {
+            onversionchange: () => {
+              indexedDbContext.journalGeneration = {}
+              try {
+                connected.close()
+              } catch {
+                /* Host close failures must not retain a stale connection cache. */
+              } finally {
+                if (indexedDbContext.activeDatabase === connected) {
+                  indexedDbContext.activeDatabase = undefined
+                  indexedDbContext.connection = undefined
+                  if (indexedDbContext.prepareState === 'ready')
+                    indexedDbContext.prepareState = 'idle'
+                }
+              }
+            },
+            onclose: () => {
+              // A stale close event from an older connection must not evict a newer cache entry.
               if (indexedDbContext.activeDatabase === connected) {
                 indexedDbContext.activeDatabase = undefined
                 indexedDbContext.connection = undefined
@@ -572,15 +583,7 @@ export function open<TValue>(
                   indexedDbContext.prepareState = 'idle'
               }
             }
-          }
-          connected.onclose = () => {
-            // A stale close event from an older connection must not evict a newer cache entry.
-            if (indexedDbContext.activeDatabase === connected) {
-              indexedDbContext.activeDatabase = undefined
-              indexedDbContext.connection = undefined
-              if (indexedDbContext.prepareState === 'ready') indexedDbContext.prepareState = 'idle'
-            }
-          }
+          })
           indexedDbContext.activeDatabase = connected
         } catch (cause) {
           throw normalizeError(

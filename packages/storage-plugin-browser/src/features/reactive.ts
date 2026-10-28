@@ -197,7 +197,7 @@ function createReactiveFeature(
   const reporter = createStorageOperationReporter()
   /** No callback runs until the one stable listener is attached below. */
   const context = { featureExpose, scheduler, signal, service, reporter } as IReactiveFeatureContext
-  context.stop = () => stopReactiveFeature(context)
+  Object.assign(context, { stop: () => stopReactiveFeature(context) })
   try {
     featureExpose.onDispose(async () => {
       signal.removeEventListener('abort', context.stop)

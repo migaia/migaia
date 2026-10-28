@@ -579,34 +579,38 @@ export function initializeReactiveQuery<T>(queryState: IReactiveQueryContext<T>)
   queryState.lease = createReactiveQueryLease(queryState)
 
   /** Terminates the lifecycle lease and Resource exactly once, even during construction races. */
-  queryState.disposeQuery = () => {
-    if (queryState.disposePromise !== undefined) return queryState.disposePromise
-    markTerminal(queryState)
-    queryState.disposePromise = queryState.lease.terminate()
-    void queryState.disposePromise.catch(() => undefined)
-    return queryState.disposePromise
-  }
+  Object.assign(queryState, {
+    disposeQuery: () => {
+      if (queryState.disposePromise !== undefined) return queryState.disposePromise
+      markTerminal(queryState)
+      queryState.disposePromise = queryState.lease.terminate()
+      void queryState.disposePromise.catch(() => undefined)
+      return queryState.disposePromise
+    }
+  })
 
   /** Keep the same callback object across registration and cleanup. */
-  queryState.onExternalAbort = () => onExternalAbort(queryState)
+  Object.assign(queryState, { onExternalAbort: () => onExternalAbort(queryState) })
 
   /** Removes the pre-allocation caller-signal listener exactly once. */
-  queryState.removeExternalAbort = (recordFailure): void => {
-    if (
-      queryState.input.signal === undefined ||
-      !queryState.externalAbortRegistrationAttempted ||
-      !queryState.externalAbortRegistrationReturned ||
-      queryState.externalAbortCleanupAttempted
-    )
-      return
-    queryState.externalAbortCleanupAttempted = true
-    try {
-      queryState.input.signal.removeEventListener('abort', queryState.onExternalAbort)
-    } catch (error) {
-      if (recordFailure === undefined) reportQuery(queryState, error)
-      else recordFailure(error)
+  Object.assign(queryState, {
+    removeExternalAbort: (recordFailure?: (error: unknown) => void): void => {
+      if (
+        queryState.input.signal === undefined ||
+        !queryState.externalAbortRegistrationAttempted ||
+        !queryState.externalAbortRegistrationReturned ||
+        queryState.externalAbortCleanupAttempted
+      )
+        return
+      queryState.externalAbortCleanupAttempted = true
+      try {
+        queryState.input.signal.removeEventListener('abort', queryState.onExternalAbort)
+      } catch (error) {
+        if (recordFailure === undefined) reportQuery(queryState, error)
+        else recordFailure(error)
+      }
     }
-  }
+  })
 }
 /**
  * Admit external cancellation before Resource construction, rolling back the original lease on

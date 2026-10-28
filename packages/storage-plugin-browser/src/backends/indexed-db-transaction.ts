@@ -376,10 +376,10 @@ function initializeIndexedDbAttempt<TValue, TResult, TScope extends ITransaction
   attemptState.scope = attemptState.input.createScope()
 
   /** Root disposal reaches this same native attempt, without creating a second resource owner. */
-  attemptState.unregisterNative = (): void => {}
+  Object.assign(attemptState, { unregisterNative: (): void => {} })
 
   /** Cancellation listener cleanup cannot replace the attempt's primary failure. */
-  attemptState.unsubscribeAbort = (): void => {}
+  Object.assign(attemptState, { unsubscribeAbort: (): void => {} })
 }
 /**
  * Register the authentic view and its original cancellation/close ports without yielding native

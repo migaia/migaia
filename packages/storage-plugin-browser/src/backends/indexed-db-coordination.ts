@@ -333,12 +333,14 @@ const createEntry = (
     drainScheduled: false,
     disposed: false
   } as IIndexedDbCoordinationEntry
-  entry.onMessage = (event) => {
-    if (entry.disposed) return
-    const decoded = decodeWireHint(event.data, options.ownOrigin, options.orgId, options.report)
-    if (decoded === undefined || !rememberHint(entry, decoded)) return
-    enqueueHint(entry, decoded)
-  }
+  Object.assign(entry, {
+    onMessage: (event: MessageEvent<unknown>) => {
+      if (entry.disposed) return
+      const decoded = decodeWireHint(event.data, options.ownOrigin, options.orgId, options.report)
+      if (decoded === undefined || !rememberHint(entry, decoded)) return
+      enqueueHint(entry, decoded)
+    }
+  })
   if (options.factory === options.realmDefaultFactory && options.broadcastChannel !== undefined) {
     try {
       const channelName = `storage-plugin-browser:${hashChannelIdentity(`${options.dbName}\u0000${options.layoutFingerprint}`)}`
