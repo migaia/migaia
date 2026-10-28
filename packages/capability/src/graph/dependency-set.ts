@@ -28,19 +28,24 @@ class DependencyReadonlySet<T> implements ReadonlySet<T> {
   /** Captures members and exposes the existing own-property protocol in its original order. */
   constructor(values: Iterable<T>) {
     this.#lookup = new Set(values)
-    this.has = (value) => this.#lookup.has(value)
+    Object.assign(this, { has: (value: T) => this.#lookup.has(value) })
     Object.defineProperty(this, 'size', {
       enumerable: true,
       configurable: true,
       get: () => this.#lookup.size
     })
-    this.entries = () => this.#lookup.entries()
-    this.keys = () => this.#lookup.keys()
-    this.values = () => this.#lookup.values()
-    this.forEach = (callback, thisArg) => {
-      for (const value of this.#lookup) Reflect.apply(callback, thisArg, [value, value, this])
-    }
-    this[Symbol.iterator] = () => this.#lookup[Symbol.iterator]()
+    Object.assign(this, {
+      entries: () => this.#lookup.entries(),
+      keys: () => this.#lookup.keys(),
+      values: () => this.#lookup.values(),
+      forEach: (
+        callback: (value: T, value2: T, set: ReadonlySet<T>) => void,
+        thisArg?: unknown
+      ) => {
+        for (const value of this.#lookup) Reflect.apply(callback, thisArg, [value, value, this])
+      },
+      [Symbol.iterator]: () => this.#lookup[Symbol.iterator]()
+    })
   }
 }
 

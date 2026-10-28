@@ -130,20 +130,28 @@ class TopologyReadonlyMap<K, V> implements ReadonlyMap<K, V> {
   /** Captures lookup facts and publishes the existing own-property protocol in its original order. */
   constructor(entries: readonly (readonly [K, V])[]) {
     this.#lookup = new Map(entries)
-    this.get = (key) => this.#lookup.get(key)
-    this.has = (key) => this.#lookup.has(key)
+    Object.assign(this, {
+      get: (key: K) => this.#lookup.get(key),
+      has: (key: K) => this.#lookup.has(key)
+    })
     Object.defineProperty(this, 'size', {
       enumerable: true,
       configurable: true,
       get: () => this.#lookup.size
     })
-    this.entries = () => this.#lookup.entries()
-    this.keys = () => this.#lookup.keys()
-    this.values = () => this.#lookup.values()
-    this.forEach = (callback, thisArg) => {
-      for (const [key, value] of this.#lookup) Reflect.apply(callback, thisArg, [value, key, this])
-    }
-    this[Symbol.iterator] = () => this.#lookup[Symbol.iterator]()
+    Object.assign(this, {
+      entries: () => this.#lookup.entries(),
+      keys: () => this.#lookup.keys(),
+      values: () => this.#lookup.values(),
+      forEach: (
+        callback: (value: V, key: K, map: ReadonlyMap<K, V>) => void,
+        thisArg?: unknown
+      ) => {
+        for (const [key, value] of this.#lookup)
+          Reflect.apply(callback, thisArg, [value, key, this])
+      },
+      [Symbol.iterator]: () => this.#lookup[Symbol.iterator]()
+    })
   }
 }
 
