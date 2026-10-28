@@ -455,8 +455,19 @@ describe('wall clock stays separate from the monotonic clock', () => {
 
 describe('scheduler module stays runtime-neutral', () => {
   it('references no host types, no bare host identifiers and only utils-local imports', () => {
-    /** Source text of the scheduler module. */
-    const text = readFileSync(new URL('../src/internal/scheduler.ts', import.meta.url), 'utf8')
+    /** Every concrete scheduler owner remains inside the same runtime-neutral boundary. */
+    const files = [
+      'scheduler',
+      'scheduler-contract',
+      'scheduler-validation',
+      'native-timer',
+      'shared-scheduler',
+      'manual-scheduler',
+    ]
+    /** Combined syntax covers the extracted implementations as well as the original entry. */
+    const text = files
+      .map((file) => readFileSync(new URL(`../src/internal/${file}.ts`, import.meta.url), 'utf8'))
+      .join('\n')
     /** Module specifiers of every import declaration. */
     const imports: string[] = []
     /** Forbidden type references found. */
@@ -467,8 +478,6 @@ describe('scheduler module stays runtime-neutral', () => {
     const hostNames = new Set(['setTimeout', 'clearTimeout', 'performance'])
     /** Identifiers that are property names rather than value references; filled by their parent. */
     const propertyNames = new Set<Node>()
-    /** Source text covered by one node. */
-    const textOf = (node: Node): string => text.slice(node.start, node.end)
     new Visitor({
       MemberExpression(node) {
         if (!node.computed) propertyNames.add(node.property)
@@ -486,11 +495,12 @@ describe('scheduler module stays runtime-neutral', () => {
         imports.push(node.source.value)
       },
       TSTypeReference(node) {
-        const name = textOf(node.typeName)
+        const name = schedulerNodeText(text, node.typeName)
         if (/^(NodeJS|Timeout|Window)\b/.test(name)) typeReferences.push(name)
       },
       TSTypeQuery(node) {
-        if (/setTimeout|clearTimeout/.test(textOf(node))) typeReferences.push(textOf(node))
+        if (/setTimeout|clearTimeout/.test(schedulerNodeText(text, node)))
+          typeReferences.push(schedulerNodeText(text, node))
       },
       Identifier(node) {
         if (hostNames.has(node.name) && !propertyNames.has(node))
@@ -500,7 +510,21 @@ describe('scheduler module stays runtime-neutral', () => {
     expect(typeReferences).toEqual([])
     expect(bareHostIdentifiers).toEqual([])
     expect(new Set(imports)).toEqual(
-      new Set(['../error.ts', '../error-code.ts', '../error-text.ts'])
+      new Set([
+        '../error.ts',
+        '../error-code.ts',
+        '../error-text.ts',
+        './scheduler-contract.ts',
+        './scheduler-validation.ts',
+        './native-timer.ts',
+        './shared-scheduler.ts',
+        './manual-scheduler.ts',
+      ])
     )
   })
 })
+
+/** Reads one AST span without a per-test captured helper function. */
+function schedulerNodeText(source: string, node: Node): string {
+  return source.slice(node.start, node.end)
+}

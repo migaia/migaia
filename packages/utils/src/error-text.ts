@@ -1,5 +1,7 @@
 /** Stable public text for errors crossing the utils package boundary. */
 export const UtilsErrorText = {
+  /** Timers and retry durations reject the same unsupported numeric domain. */
+  finiteNonNegativeNumberExpectation: 'a finite non-negative number',
   /** Option mapping failed and an immutable or conflicting native error required a causal wrapper. */
   maybeMapperFailed: '[utils] optional value mapper failed',
   /** A deadline cannot be jittered from a negative or non-finite starting value. */
