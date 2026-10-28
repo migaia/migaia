@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
-import { Resource } from '../src'
-import { deferred, flushAsync } from './helpers'
+import { Resource } from '../src/index.ts'
+import { deferred, flushAsync } from './helpers.ts'
 
 /**
  * （，批次 2 的核心验收项）。

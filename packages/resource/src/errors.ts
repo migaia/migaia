@@ -1,4 +1,5 @@
-import { ERROR_SOURCE } from './error-code.js'
+/** Canonical Resource error identity attachment and foreign-failure preservation. */
+import { ERROR_SOURCE } from './error-code.ts'
 /**
  * Source stamped onto Resource-owned failures; classified foreign errors retain their original
  * owner.
@@ -24,6 +25,7 @@ export function createResourceError(
   message: string,
   options?: { readonly cause?: unknown }
 ): IResourceError {
+  /** Boundary wrapper retains its native stack and caller-supplied cause. */
   const error = new Error(message, options)
   return attachErrorIdentity(error, { source: RESOURCE_SOURCE, code }) as IResourceError
 }
@@ -63,6 +65,7 @@ export function identifyResourceFailure(error: unknown, code: string, message: s
   if (isNativeErrorValue(error)) {
     /** A complete foreign semantic identity stays owned by its originating package. */
     const source = tryReadProperty(error as Error & { source?: unknown }, 'source')
+    /** Existing code is sampled independently so hostile accessors remain contained. */
     const existingCode = tryReadProperty(error as Error & { code?: unknown }, 'code')
     if (
       !source.threw &&

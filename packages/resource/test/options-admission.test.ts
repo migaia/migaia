@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
-import { Resource } from '../src/index.js'
-import { ResourceErrorCode } from '../src/error-code.js'
+import { Resource } from '../src/index.ts'
+import { ResourceErrorCode } from '../src/error-code.ts'
 
 describe('Resource option admission', () => {
   it('snapshots every public option once before ownership, listeners, or fetch', () => {

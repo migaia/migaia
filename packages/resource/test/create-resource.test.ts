@@ -1,8 +1,8 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { createRuntime, defaultRuntime } from '@migaia/reactive'
 import { ConfigOwner } from '@migaia/utils/config'
-import { createResource, Resource, type IResourceState } from '../src/index.js'
-import { deferred, flushAsync } from './helpers.js'
+import { createResource, Resource, type IResourceState } from '../src/index.ts'
+import { deferred, flushAsync } from './helpers.ts'
 
 describe('createResource', () => {
   it('builds a Resource from a setup callback and infers the data type', async () => {

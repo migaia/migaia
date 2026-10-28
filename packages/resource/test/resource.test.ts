@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
-import { Resource, ResourceStatus, ResourceFetchStatus } from '../src'
+import { Resource, ResourceStatus, ResourceFetchStatus } from '../src/index.ts'
 
 describe('resource foundation', () => {
   it('shares request state and settles successful fetches', async () => {

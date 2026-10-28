@@ -2,8 +2,8 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { Resource } from '../src/index.js'
-import { deferred, flushAsync } from './helpers.js'
+import { Resource } from '../src/index.ts'
+import { deferred, flushAsync } from './helpers.ts'
 
 describe('Suspense request wakeups', () => {
   it('observes a thrown dependency when its then getter cancels the request', async () => {

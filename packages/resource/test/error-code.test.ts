@@ -3,11 +3,11 @@ import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createRuntime } from '@migaia/reactive'
-import { Resource } from '../src'
-import { ResourceErrorCode } from '../src/error-code'
-import { RESOURCE_SOURCE } from '../src/errors'
-import { createResourceError, tagResourceError } from '../src/errors'
-import { deferred, flushAsync } from './helpers'
+import { Resource } from '../src/index.ts'
+import { ResourceErrorCode } from '../src/error-code.ts'
+import { RESOURCE_SOURCE } from '../src/errors.ts'
+import { createResourceError, tagResourceError } from '../src/errors.ts'
+import { deferred, flushAsync } from './helpers.ts'
 
 const srcDir = fileURLToPath(new URL('../src', import.meta.url))
 

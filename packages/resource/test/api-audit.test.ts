@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
-import { Resource, type IResourceFetchContext } from '../src/index.js'
+import { Resource, type IResourceFetchContext } from '../src/index.ts'
 import { walkErrorCauses } from '@migaia/utils/error'
 
 describe('audited resource request ownership', () => {

@@ -1,17 +1,17 @@
+/**
+ * Functional Resource setup ownership, frozen context admission and rollback; does not own request
+ * generations.
+ */
 import type { IRuntime } from '@migaia/reactive'
 import { getDefaultRuntime } from '@migaia/reactive/extension'
 import { attachSecondaryErrors } from '@migaia/utils/error'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { systemScheduler, type IScheduler } from '@migaia/utils/scheduler'
-import { ResourceErrorCode } from './error-code.js'
-import { ResourceErrorText } from './error-text.js'
-import { tagResourceError } from './errors.js'
-import {
-  Resource,
-  registerResourceCleanup,
-  type IResourceFetcher,
-  type IResourceOptions
-} from './resource.class.js'
+import { ResourceErrorCode } from './error-code.ts'
+import { ResourceErrorText } from './error-text.ts'
+import { createResourceSetupError } from './resource-failure.ts'
+import { Resource, registerResourceCleanup } from './resource.class.ts'
+import type { IResourceFetcher, IResourceOptions } from './resource-types.ts'
 
 /** Context handed to a `createResource()` setup callback. */
 export type IResourceSetupContext = {
@@ -39,9 +39,88 @@ export type ICreateResourceOptions<T> = IResourceOptions<T> & {
   readonly runtime?: IRuntime
 }
 
-/** Creates a coded native `TypeError` for the setup contract. */
-function setupError(code: string, message: string): TypeError {
-  return tagResourceError(new TypeError(message), code)
+/** Owns one synchronous setup's context, abort signal and reverse-order cleanup registration. */
+class ResourceSetupOwner {
+  /** Setup-scoped signal aborts on rollback or Resource disposal. */
+  #controller = new AbortController()
+  /** Registered cleanup order is retained for both rollback and normal disposal. */
+  #cleanups: (() => void)[] = []
+  /** Only synchronous setup may register additional cleanup ownership. */
+  #open = true
+  /** Frozen public context keeps its original own-property shape. */
+  #context: IResourceSetupContext
+
+  /** Creates the same context values after options have been split by the public builder. */
+  constructor(runtime: IRuntime, options: IResourceOptions) {
+    this.#context = Object.freeze({
+      runtime,
+      scheduler: options.scheduler ?? systemScheduler,
+      signal: this.#controller.signal,
+      debugName: options.debugName,
+      onDispose: (cleanup: () => void): IResourceSetupContext => this.#onDispose(cleanup)
+    })
+  }
+
+  /** Runs setup once, rolling back before rethrowing its original primary failure. */
+  construct<T>(
+    setup: IResourceSetup<T>,
+    runtime: IRuntime,
+    options: IResourceOptions<T>
+  ): Resource<T> {
+    /** Resource remains unexposed until setup and constructor admission both succeed. */
+    let resource: Resource<T>
+    try {
+      /** Local setup invocation retains its original undefined callback receiver. */
+      const fetcher = setup(this.#context)
+      if (typeof fetcher !== 'function')
+        throw createResourceSetupError(
+          ResourceErrorCode.setupInvalid,
+          ResourceErrorText.setupInvalid
+        )
+      resource = new Resource(fetcher, runtime, options)
+    } catch (error) {
+      this.#open = false
+      throw this.#rollback(error)
+    }
+    this.#open = false
+    for (const cleanup of this.#cleanups) registerResourceCleanup(resource, cleanup)
+    // Ownership has transferred; an escaped closed setup context need not retain the callbacks.
+    this.#cleanups = []
+    /** Disposal captures only the controller rather than the completed setup owner. */
+    const controller = this.#controller
+    // Registered last so disposal aborts setup before invoking the registered cleanups.
+    registerResourceCleanup(resource, () => controller.abort())
+    return resource
+  }
+
+  /** Admits a cleanup only during setup and returns the original frozen context. */
+  #onDispose(cleanup: () => void): IResourceSetupContext {
+    if (!this.#open)
+      throw createResourceSetupError(ResourceErrorCode.setupClosed, ResourceErrorText.setupClosed)
+    if (typeof cleanup !== 'function')
+      throw createResourceSetupError(ResourceErrorCode.setupInvalid, ResourceErrorText.setupInvalid)
+    this.#cleanups.push(cleanup)
+    return this.#context
+  }
+
+  /** Aborts before reverse cleanup and attaches secondary failures without replacing the primary. */
+  #rollback(error: unknown): unknown {
+    /** All rollback failures retain encounter order after the triggering setup/constructor error. */
+    const failures: unknown[] = []
+    try {
+      this.#controller.abort(error)
+    } catch (abortError) {
+      failures.push(abortError)
+    }
+    for (let index = this.#cleanups.length - 1; index >= 0; index -= 1) {
+      try {
+        this.#cleanups[index]()
+      } catch (cleanupError) {
+        failures.push(cleanupError)
+      }
+    }
+    return failures.length > 0 ? attachSecondaryErrors(error, failures) : error
+  }
 }
 
 /**
@@ -70,61 +149,8 @@ export function createResource<T>(
   options: ICreateResourceOptions<T> = {}
 ): Resource<T> {
   if (typeof setup !== 'function')
-    throw setupError(ResourceErrorCode.setupInvalid, ResourceErrorText.setupInvalid)
-  /**
-   * Options split once: the runtime is ours, everything else belongs to `Resource`. The shared
-   * default is acquired here, on first use, so importing this package never constructs a runtime.
-   */
+    throw createResourceSetupError(ResourceErrorCode.setupInvalid, ResourceErrorText.setupInvalid)
+  /** Import remains cold; the shared default runtime is acquired only for this builder call. */
   const { runtime = getDefaultRuntime(), ...resourceOptions } = options
-  /** Controller whose signal the setup context exposes. */
-  const controller = new AbortController()
-  /** Cleanups registered during setup, in registration order. */
-  const cleanups: (() => void)[] = []
-  /** Whether setup is still running and may register cleanups. */
-  let open = true
-  /** Frozen context shared with setup. */
-  const context: IResourceSetupContext = Object.freeze({
-    runtime,
-    scheduler: resourceOptions.scheduler ?? systemScheduler,
-    signal: controller.signal,
-    debugName: resourceOptions.debugName,
-    onDispose(cleanup: () => void): IResourceSetupContext {
-      if (!open) throw setupError(ResourceErrorCode.setupClosed, ResourceErrorText.setupClosed)
-      if (typeof cleanup !== 'function')
-        throw setupError(ResourceErrorCode.setupInvalid, ResourceErrorText.setupInvalid)
-      cleanups.push(cleanup)
-      return context
-    }
-  })
-  /** Resource under construction. */
-  let resource: Resource<T>
-  try {
-    /** Fetcher returned by setup. */
-    const fetcher = setup(context)
-    if (typeof fetcher !== 'function')
-      throw setupError(ResourceErrorCode.setupInvalid, ResourceErrorText.setupInvalid)
-    resource = new Resource(fetcher, runtime, resourceOptions)
-  } catch (error) {
-    open = false
-    /** Cleanup failures, attached behind the primary error. */
-    const failures: unknown[] = []
-    try {
-      controller.abort(error)
-    } catch (abortError) {
-      failures.push(abortError)
-    }
-    for (let index = cleanups.length - 1; index >= 0; index -= 1) {
-      try {
-        cleanups[index]()
-      } catch (cleanupError) {
-        failures.push(cleanupError)
-      }
-    }
-    throw failures.length > 0 ? attachSecondaryErrors(error, failures) : error
-  }
-  open = false
-  for (const cleanup of cleanups) registerResourceCleanup(resource, cleanup)
-  // Registered last so dispose aborts the setup signal before running setup cleanups.
-  registerResourceCleanup(resource, () => controller.abort())
-  return resource
+  return new ResourceSetupOwner(runtime, resourceOptions).construct(setup, runtime, resourceOptions)
 }

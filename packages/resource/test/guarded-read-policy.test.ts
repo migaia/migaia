@@ -1,8 +1,8 @@
 import { createRuntime } from '@migaia/reactive'
 import { describe, expect, it } from 'vitest'
-import { Resource } from '../src/index.js'
-import { ResourceErrorCode } from '../src/error-code.js'
-import { ResourceErrorText } from '../src/error-text.js'
+import { Resource } from '../src/index.ts'
+import { ResourceErrorCode } from '../src/error-code.ts'
+import { ResourceErrorText } from '../src/error-text.ts'
 
 describe('resource guarded-read policy', () => {
   it('stops after a hostile ttl getter and retains its cause', () => {

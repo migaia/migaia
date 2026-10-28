@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
-import { Resource } from '../src/index.js'
-import { ResourceErrorCode } from '../src/error-code.js'
+import { Resource } from '../src/index.ts'
+import { ResourceErrorCode } from '../src/error-code.ts'
 
 const flush = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0))
 
