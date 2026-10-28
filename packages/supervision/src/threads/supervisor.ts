@@ -6,6 +6,7 @@ import {
 } from '../index.js'
 import { createSupervisionError } from '../errors.js'
 import { ThreadCapability, ThreadUnitKind } from './constants.js'
+import { ThreadField } from './text.js'
 import { createThreadProfile, invalidThreadOption } from './profile.js'
 import type { IThreadHandle, IThreadSupervisor, IThreadSupervisorOptions } from './types.js'
 
@@ -13,6 +14,7 @@ import type { IThreadHandle, IThreadSupervisor, IThreadSupervisorOptions } from 
 export function validateThreadCapabilities(
   capabilities: Readonly<Record<string, CapabilityLevel>>
 ): void {
+  // ThreadCapability defines exactly two compile-time capability names.
   for (const capability of Object.values(ThreadCapability)) {
     /** Missing declarations are unsupported; only an explicit overclaim is invalid. */
     const level = capabilities[capability]
@@ -21,7 +23,7 @@ export function validateThreadCapabilities(
       level !== CapabilityLevel.enforced &&
       level !== CapabilityLevel.unsupported
     )
-      invalidThreadOption('launcher.capabilities', TypeError, { capability })
+      invalidThreadOption(ThreadField.capabilities, TypeError, { capability })
   }
 }
 
@@ -45,7 +47,7 @@ export function createThreadSupervisor<THandle extends IThreadHandle>(
       TypeError,
       SupervisionErrorCode.invalidOption,
       SupervisionErrorText.invalidOption,
-      { detail: { field: 'health', kind: ThreadUnitKind.thread } }
+      { detail: { field: ThreadField.health, kind: ThreadUnitKind.thread } }
     )
   return createSupervisor({ ...options, profile: createThreadProfile<THandle>() })
 }

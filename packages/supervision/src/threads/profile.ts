@@ -1,7 +1,8 @@
-import { ExitReason } from '../index.js'
+import { ExitReason, StandardCapability } from '../index.js'
 import { SupervisionErrorCode, SupervisionErrorText, type IUnitProfile } from '../index.js'
 import { createSupervisionError } from '../errors.js'
 import { ThreadCapability, ThreadLimit, ThreadUnitKind } from './constants.js'
+import { ThreadField, threadLimitField } from './text.js'
 import type { IThreadExitStatus, IThreadHandle, IThreadSpec } from './types.js'
 
 /** Rejects a thread-only option with its public field and native error class. */
@@ -21,16 +22,18 @@ export function invalidThreadOption(
 /** Validate only the thread-specific specification, including positive limits. */
 export function validateThreadSpec(spec: IThreadSpec): void {
   if (spec === null || typeof spec !== 'object' || typeof spec.entry !== 'string' || !spec.entry)
-    invalidThreadOption('spec.entry')
-  if (spec.name !== undefined && typeof spec.name !== 'string') invalidThreadOption('spec.name')
+    invalidThreadOption(ThreadField.entry)
+  if (spec.name !== undefined && typeof spec.name !== 'string')
+    invalidThreadOption(ThreadField.name)
   if (spec.limits === undefined) return
   if (spec.limits === null || typeof spec.limits !== 'object' || Array.isArray(spec.limits))
-    invalidThreadOption('spec.limits')
-  for (const field of [ThreadLimit.heapBytes, 'callWallTimeMs'] as const) {
+    invalidThreadOption(ThreadField.limits)
+  // The thread specification defines exactly two compile-time limit fields.
+  for (const field of [ThreadLimit.heapBytes, ThreadField.callWallTimeMs] as const) {
     /** Only positive finite numbers can be delegated as launcher limits. */
     const value = spec.limits[field]
     if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value) || value <= 0))
-      invalidThreadOption(`spec.limits.${field}`, RangeError)
+      invalidThreadOption(threadLimitField(field), RangeError)
   }
 }
 
@@ -45,8 +48,8 @@ export function createThreadProfile<THandle extends IThreadHandle>(): IUnitProfi
     gracefulTermination: false,
     requirements: (spec) =>
       spec.limits?.heapBytes === undefined
-        ? ['termination']
-        : ['termination', ThreadCapability.heapLimit],
+        ? [StandardCapability.termination]
+        : [StandardCapability.termination, ThreadCapability.heapLimit],
     validateSpec: validateThreadSpec,
     terminate: (handle) => handle.terminate(),
     exitStatus: (status) => ({ code: status.code }),
