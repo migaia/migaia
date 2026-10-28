@@ -5,14 +5,13 @@ import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import {
   createStorageHost,
-  StorageHostFacade,
+  StorageHost,
   definePlugin,
   defineFeature,
-  defineStorageBackendKind,
-  memoryBackendKind,
-  memoryBackendPlugin,
-  StorageErrorCode
+  defineStorageBackendKind
 } from '../src/index.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
+import { memoryBackendKind, memoryBackendPlugin } from '../src/plugins/memory.js'
 import type { IStoragePluginCore } from '../src/index.js'
 import type { IStorageBase } from '@migaia/storage-contract'
 /** The kind describes the real store and native client without granting either one. */
@@ -36,14 +35,17 @@ function plugin<const N extends string>(name: N, value: string) {
   return { plugin: definePlugin(name, descriptor), state: () => state }
 }
 describe('neutral storage installation', () => {
-  it('rejects concurrent facade batches and allows explicit retry after settlement', async () => {
+  it('queues an overlapping batch until the running one settles, failed or not', async () => {
     await using host = await createStorageHost()
     const first = plugin('batch-first', 'first')
     const second = plugin('batch-second', 'second')
+    const duplicate = plugin('batch-first', 'again')
     const pending = host.use(first.plugin)
-    expect(() => host.use(second.plugin)).toThrowError('storage host is busy installing plugins')
+    const failing = host.use(duplicate.plugin)
+    const queued = host.use(second.plugin)
     await pending
-    await host.use(second.plugin)
+    await expect(failing).rejects.toMatchObject({ code: 'BACKEND_INSTALL_FAILED' })
+    await queued
     expect([...host.backends().keys()]).toEqual(['batch-first', 'batch-second'])
   })
 
@@ -114,8 +116,8 @@ describe('neutral storage installation', () => {
       { wrong: feature }
     ])
     await expect(createStorageHost({ plugins: [definition] })).rejects.toMatchObject({
-      source: '@migaia/storage-host',
-      code: StorageErrorCode.backendInstallFailed
+      source: 'storage.host',
+      code: StorageHostErrorCode.backendInstallFailed
     })
     expect(factory).not.toHaveBeenCalled()
     expect(create).not.toHaveBeenCalled()
@@ -157,10 +159,10 @@ describe('neutral storage installation', () => {
     }))
     await using host = await createStorageHost({ plugins: [item.plugin, intervention] })
     expect(() => host.backend('values').voidSync()).toThrowError(
-      expect.objectContaining({ source: '@migaia/storage-contract', code: 'ABORTED' })
+      expect.objectContaining({ source: 'storage.contract', code: 'ABORTED' })
     )
     await expect(host.backend('values').original()).rejects.toMatchObject({
-      source: '@migaia/storage-contract',
+      source: 'storage.contract',
       code: 'ABORTED'
     })
   })
@@ -286,7 +288,7 @@ describe('neutral storage installation', () => {
     const primary = host.dispose()
     const failure = await primary.catch((error) => error)
     expect(failure).toMatchObject({
-      source: '@migaia/storage-host',
+      source: 'storage.host',
       code: 'STORAGE_HOST_DISPOSE_FAILED'
     })
     expect(failure.errors[0].cause).toBe(original)
@@ -340,7 +342,7 @@ describe('neutral storage installation', () => {
         report
       }).catch((error) => error)
       expect(failure).toMatchObject({
-        source: '@migaia/storage-host',
+        source: 'storage.host',
         code: 'BACKEND_INSTALL_FAILED'
       })
       /** Walk only the bounded existing cause chain to identify the primary semantic rejection. */
@@ -372,7 +374,7 @@ describe('neutral storage installation', () => {
     /** The kind and returned store agree; only the closing batch invalidates handoff. */
     const lateKind = defineStorageBackendKind<IStorageBase>()('late')
     /** One host owns the actual asynchronous install and its cancellation signal. */
-    const host = new StorageHostFacade({ report })
+    const host = new StorageHost({ report })
     /** Late native handoff keeps the original resource receiver. */
     const store: IStorageBase = {
       backend: 'late',

@@ -10,7 +10,8 @@ import type {
   ICapabilityInstallPort,
   IStorageBase
 } from '@migaia/storage-contract'
-import { createStorageTypeError, StorageErrorCode } from './errors.js'
+import { createStorageTypeError } from './errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from './error-text.js'
 import type {
   IStorageExecutionPort,
@@ -22,7 +23,7 @@ import { STORAGE_CHAIN_FAMILIES } from './state-constants.js'
 /** A closed output-shape failure stays at the existing backend definition boundary. */
 function invalid(cause?: unknown): never {
   throw createStorageTypeError(
-    StorageErrorCode.backendPluginInvalid,
+    StorageHostErrorCode.backendPluginInvalid,
     StorageErrorText.backendPluginInvalid,
     cause
   )
@@ -156,16 +157,15 @@ function admitStorageFeatureApis(
 ): void {
   for (const [key, value] of entries(api.store)) {
     if (Object.hasOwn(context.storeApi, key)) duplicate(context.input.name, key)
-    /** Groups outlive this synchronous install and must resist later caller mutation. */
-    const definition = snapshotFeatureApi(value)
-    context.storeApiDefinitions[key] = definition
-    context.storeApi[key] = bindFeatureApi(definition, key, featureApiContext(context.input))
+    /** Feature authors own their API groups; they are used as declared, without a defensive copy. */
+    context.storeApiDefinitions[key] = value
+    context.storeApi[key] = bindFeatureApi(value, key, featureApiContext(context.input))
   }
   for (const [key, value] of entries(api.transaction)) {
     if (typeof context.input.expose.getTransactionClient !== 'function') invalid()
     context.transactionApi ??= Object.create(null) as Record<string, unknown>
     if (Object.hasOwn(context.transactionApi, key)) duplicate(context.input.name, key)
-    context.transactionApi[key] = snapshotFeatureApi(value)
+    context.transactionApi[key] = value
   }
 }
 
@@ -254,15 +254,6 @@ function createFeatureApi(
   for (const [key, value] of Object.entries(definitions))
     api[key] = bindFeatureApi(value, key, context)
   return api
-}
-
-/** Detach nested groups once because later organization and scope construction outlives install. */
-function snapshotFeatureApi(value: unknown): unknown {
-  if (typeof value === 'function') return value
-  /** Only definition containers are copied; callable identity remains the author's original. */
-  const group = Object.create(null) as Record<string, unknown>
-  for (const [key, member] of entries(value)) group[key] = snapshotFeatureApi(member)
-  return group
 }
 
 /** Bind accepted definitions to one explicit organization or transaction context. */

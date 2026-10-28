@@ -21,7 +21,8 @@
 下面用真实内存 records 与 blob 能力演示完整流程；生产数据需要改用持久热冷后端。
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { archivePlugin } from '@migaia/storage-plugin-archive'
 
 await using base = await createStorageHost({
@@ -65,7 +66,8 @@ true
 先上传、再删除看起来简单，但两个存储之间没有一个原子操作。这里只展示，不执行。
 
 ```ts doc-test=check
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { blob } from '@migaia/storage-contract'
 
 await using host = await createStorageHost({
@@ -103,7 +105,7 @@ archive 在上传后用热层事务重新比较记录、提交归档引用，再
 | 归档一天前的事件     | rule + archiveRun         | [按保留时间归档](./USEGUIDE.md#按保留时间归档)     |
 | 查历史并按需恢复     | archiveGet + archiveSweep | [读取恢复与清理](./USEGUIDE.md#读取恢复与清理)     |
 | 同一规则服务多个组织 | host.org + historyRun/Get | [组织与自定义前缀](./USEGUIDE.md#组织与自定义前缀) |
-| 监控部分完成的任务   | hooks + 返回进度          | [观察提交进度](./USEGUIDE.md#观察提交进度)         |
+| 监控部分完成的任务   | probe 插件 + 返回进度     | [观察提交进度](./USEGUIDE.md#观察提交进度)         |
 
 ## 安装
 

@@ -21,9 +21,9 @@ import type { IOwnOptions } from '../types.js'
 export type IPersistOptions = {
   /**
    * Any `IKeyValueStore` the persisted fields are written to. Usually a backend factory result from
-   * `@migaia/storage-web` such as `localStorageHost({ namespace: 'shop' })` or `indexedDbHost({
-   * dbName: 'shop' })`; despite the `Host` suffix those factories only return a store, no storage
-   * host is created. The hub borrows the store and never disposes it.
+   * `@migaia/storage-plugin-browser` such as `localStorageHost({ namespace: 'shop' })` or
+   * `indexedDbHost({ dbName: 'shop' })`; despite the `Host` suffix those factories only return a
+   * store, no storage host is created. The hub borrows the store and never disposes it.
    */
   readonly store: Pick<IKeyValueStore, 'capabilities' | 'get' | 'set' | 'remove' | 'keys'>
   /** Quiet period before a write; default 0 writes after each commit. */

@@ -1,6 +1,5 @@
 import { defineFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
-import { refineStorageVectorQuery } from '@migaia/storage-host/authoring/query'
-import { snapshotStorageVectorCollection } from '@migaia/storage-host/authoring/vector'
+import { refineStorageVectorQuery, snapshotStorageVectorCollection } from '@migaia/storage-host/sdk'
 import { qdrantBackendKind } from '../plugin.js'
 import { readNativeFeaturePort } from '../native-feature.js'
 import {

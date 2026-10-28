@@ -386,7 +386,7 @@ export function storageV2TarballIntegrity(tarballBytes) {
  * }[]} artifacts
  *   independently packed release facts
  * @param {readonly string[]} [importerRoots] Exact direct package roots; omitted callers retain the
- *   storage-web-only profile
+ *   storage-plugin-browser-only profile
  * @returns {ReadonlyMap<
  *   string,
  *   {
@@ -403,7 +403,7 @@ export function authorizeStorageV2LockProvenance(
   lockfile,
   canonicalConsumerDirectory,
   artifacts,
-  importerRoots = ['@migaia/storage-web']
+  importerRoots = ['@migaia/storage-plugin-browser']
 ) {
   /** Strict parsed value is the sole lockfile authority. */
   const parsed = parseStorageV2PnpmLockfile(lockfile)
@@ -477,7 +477,7 @@ export function authorizeStorageV2LockProvenance(
   }
   /** Preserve the original override profile, including a directly installed storage-host pin. */
   const expectedOverrides = artifacts
-    .filter(({ name }) => name !== '@migaia/storage-web')
+    .filter(({ name }) => name !== '@migaia/storage-plugin-browser')
     .map(({ name, tarballPath }) => [name, `file:${tarballPath}`])
     .sort()
   if (JSON.stringify([...parsed.overrides.entries()].sort()) !== JSON.stringify(expectedOverrides))

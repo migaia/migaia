@@ -1,0 +1,655 @@
+import { test, expect } from '@playwright/test'
+import { NativeTransactionActivity } from './native-transaction-cases.js'
+
+for (const mode of Object.values(NativeTransactionActivity))
+  test(`真实原生事务活跃窗口 ${mode}`, async ({ page }) => {
+    await page.goto('/')
+    const result = await page.evaluate(
+      (mode) => window.runIndexedDbNativeActivityScenario(mode),
+      mode
+    )
+    if (mode === NativeTransactionActivity.microtask) {
+      expect(result.failed).toBe(false)
+      expect(result.text).toBe('after')
+      expect(result.bytes).toEqual([2])
+      expect(result.record).toEqual({ value: 'during' })
+      expect(result.changes).toEqual(['value', 'bytes', 'record'])
+    } else {
+      expect(result).toMatchObject({
+        failed: true,
+        source: 'storage.backend.browser',
+        code: 'TRANSACTION_FAILED',
+        causeName: 'TransactionInactiveError',
+        text: 'before',
+        bytes: [1],
+        record: { value: 'before' },
+        changes: []
+      })
+      if (mode !== NativeTransactionActivity.timerReturn)
+        expect(result.operationAndOuterSame).toBe(true)
+    }
+  })
+
+test('真实 IndexedDB 的基本 put/get 冒烟测试', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbSmokeScenario())
+  expect(result.ok).toBe(true)
+  expect(result.value).toEqual({ a: 1 })
+  expect(result.metadata).toEqual({ ready: true })
+})
+
+test('persistTransaction commits native entity and snapshot together and restores mirroring after rollback', async ({
+  page
+}) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbPersistNativeScenario())
+  expect(result.committed).toEqual({
+    result: 'committed',
+    envelope: { version: 0, state: { count: 1 } },
+    entity: { id: 'committed', email: 'one' },
+    business: 'committed'
+  })
+  expect(result.rolledBack).toEqual({
+    primaryReachable: true,
+    envelope: { version: 0, state: { count: 1 } },
+    entity: undefined,
+    business: null,
+    memory: 2,
+    writeErrorSame: true
+  })
+  expect(result.mirrored).toEqual({ version: 0, state: { count: 2 } })
+  expect(result.unique).toEqual({
+    code: 'INDEX_UNIQUE_CONFLICT',
+    envelope: { version: 0, state: { count: 2 } },
+    entity: undefined,
+    memory: 3
+  })
+  expect(result.cancelled).toEqual({
+    reasonReachable: true,
+    envelope: { version: 0, state: { count: 3 } },
+    entity: undefined,
+    memory: 4
+  })
+  expect(result.restored).toEqual({
+    primaryReachable: true,
+    envelope: { version: 0, state: { count: 4 } },
+    entity: undefined,
+    memory: 4
+  })
+})
+
+test('persistTransaction rolls back the native snapshot when its codec crosses a task boundary', async ({
+  page
+}) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbPersistCrossTaskCodecScenario())
+  expect(result).toEqual({
+    failed: true,
+    code: 'TRANSACTION_FAILED',
+    causeName: 'TransactionInactiveError',
+    operationAndOuterSame: true,
+    envelope: { version: 0, state: { count: 0 } },
+    business: null,
+    memory: 1
+  })
+})
+
+test('distinct pages receive a BroadcastChannel hint then reread authoritative IndexedDB state', async ({
+  page,
+  context
+}) => {
+  const receiverPage = page
+  const writerPage = await context.newPage()
+  const dbName = `r09-cross-page-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  try {
+    await Promise.all([receiverPage.goto('/'), writerPage.goto('/')])
+    await expect(
+      receiverPage.evaluate((name) => window.startIndexedDbCoordinationReceiver(name), dbName)
+    ).resolves.toEqual({ changeFeed: true })
+    await expect(
+      writerPage.evaluate((name) => window.startIndexedDbCoordinationWriter(name), dbName)
+    ).resolves.toEqual({ changeFeed: true })
+
+    const result = await receiverPage.evaluate(
+      (name) => window.awaitIndexedDbCoordinationHint(name),
+      dbName
+    )
+    expect(result.hint).toMatchObject({
+      channel: 'value',
+      kind: 'put',
+      keys: ['r09-cross-page-key'],
+      orgId: '11111111-1111-1111-1111-111111111111'
+    })
+    expect(result.watched).toEqual(result.hint)
+    expect(result.value).toBe('committed-by-writer')
+  } finally {
+    await writerPage
+      .evaluate((name) => window.finishIndexedDbCoordinationWriter(name), dbName)
+      .catch(() => undefined)
+    await writerPage.close()
+  }
+})
+
+test('真实浏览器 IndexedDB options 非法容器统一返回 INVALID_CONFIG', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbOptionsGuardScenario())
+  expect(result).toEqual([
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_ARGUMENT',
+    'INVALID_ARGUMENT',
+    'INVALID_ARGUMENT',
+    'INVALID_ARGUMENT'
+  ])
+})
+
+test('版本升级被另一个存活连接阻塞时 onblocked 触发，连接关闭后可重新打开', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbBlockedScenario())
+  expect(result.blockedErrorCode).toBe('BACKEND_UNAVAILABLE')
+  expect(result.freshInstallationRetrySucceeded).toBe(true)
+  expect(result.secondOpenSucceededAfterClose).toBe(true)
+  expect(result.hostileCloseRetrySucceeded).toBe(true)
+  expect(result.transitionCloseCode).toBe('BACKEND_UNAVAILABLE')
+  expect(result.transitionCloseRetrySucceeded).toBe(true)
+  expect(result.schemaInspectionCodes).toEqual(['BACKEND_UNAVAILABLE', 'BACKEND_UNAVAILABLE'])
+  expect(result.schemaInspectionRecovered).toBe(true)
+  expect(result.connectionSetterCodes).toEqual(['BACKEND_UNAVAILABLE', 'BACKEND_UNAVAILABLE'])
+  expect(result.connectionSetterRecovered).toBe(true)
+})
+
+test('跨 IndexedDB connection 的原生 transaction 串行后保留独立写入', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbTransactionConflictScenario())
+  expect(result.code).toBeUndefined()
+  expect(result.value).toEqual({ value: 2 })
+})
+
+test('真实 IndexedDB transaction scope 逃逸 callback 后拒绝读写', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbEscapedTransactionScopeScenario())
+  expect(result.getCode).toBe('TRANSACTION_FAILED')
+  expect(result.putCode).toBe('TRANSACTION_FAILED')
+  expect(result.deleteCode).toBe('TRANSACTION_FAILED')
+  expect(result.outsideValue).toBeUndefined()
+})
+
+test('真实 IndexedDB root KV batch 保持结构键、顺序与整批回滚', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbNativeBatchScenario())
+  expect(result).toEqual({
+    ordered: ['tuple', 'date', undefined, 'date', 'string'],
+    rollbackCode: 'DUPLICATE_KEY',
+    rolledBack: true,
+    recordPreserved: true,
+    removed: 2,
+    prefixRemoved: 2,
+    outside: [undefined, 'c', 'string']
+  })
+})
+
+test('真实 IndexedDB 小页分页扫描完整且提前停止', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbPagedScanScenario())
+  expect(result.count).toBe(257)
+  expect(result.first).toBe('record-000')
+  expect(result.last).toBe('record-256')
+  expect(result.stoppedEarly).toBe(true)
+  expect(result.listenerSetupCode).toBe('INVALID_ARGUMENT')
+  expect(result.cleanupPreserved).toBe(true)
+  expect(result.resultGetterCode).toBe('TRANSACTION_FAILED')
+  expect(result.prematureCompletionCode).toBe('TRANSACTION_FAILED')
+  expect(result.entryFailureCodes).toEqual([
+    'TRANSACTION_FAILED',
+    'TRANSACTION_FAILED',
+    'TRANSACTION_FAILED'
+  ])
+  expect(result.requestSetterCode).toBe('TRANSACTION_FAILED')
+  for (const [name, value] of Object.entries(result.queryStreams)) {
+    if (typeof value !== 'object') continue
+    expect(
+      value,
+      `${name}: native Symbol available=${result.queryStreams.nativeSymbolAvailable}`
+    ).toEqual({
+      canonicalKey: true,
+      mainCached: true,
+      symbolicCached: true,
+      distinct: true,
+      value: { index: name.endsWith('Entity') || name === 'entity' ? 7 : 0 }
+    })
+  }
+  expect(result.queryStreams.beforeQueries).toBe(2)
+  expect(result.queryStreams.afterQueries).toBe(2)
+  expect(result.queryStreams.transactionQueries).toBe(1)
+  expect(result.queryStreams.diagnostics).toBe(0)
+})
+
+test('三个连接的双原生 transaction 串行提交全部递增', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbDualTransactionScenario())
+  expect(result.committed).toBe(2)
+  expect(result.conflicts).toBe(0)
+  expect(result.value).toEqual({ value: 2 })
+})
+
+test('真实浏览器升级会迁移 legacy documents record 并写入 checkpoint', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbLegacyRecordsMigrationScenario())
+  expect(result.value).toEqual({ migrated: true })
+  expect(result.checkpoint).toMatchObject({ status: 'complete', from: 'documents', to: 'records' })
+  expect(result.legacyStorePresent).toBe(false)
+  expect(result.hostileCursorCode).toBe('TRANSACTION_FAILED')
+  expect(result.hostileOpenCode).toBe('BACKEND_UNAVAILABLE')
+  expect(result.hostileUpgradeCode).toBe('BACKEND_UNAVAILABLE')
+  expect(result.openSetterCodes).toEqual([
+    'BACKEND_UNAVAILABLE',
+    'BACKEND_UNAVAILABLE',
+    'BACKEND_UNAVAILABLE',
+    'BACKEND_UNAVAILABLE'
+  ])
+})
+
+test('四个连接同时原生 transaction 保留全部递增', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbFourWayTransactionScenario())
+  expect(result.committed).toBe(4)
+  expect(result.conflicts).toBe(0)
+  expect(result.value).toEqual({ value: 4 })
+})
+
+test('真实 IndexedDB 失败 transaction 回滚且 pre-abort 不写入', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbFailureScenario())
+  expect(result.transactionCode).toBe('TRANSACTION_FAILED')
+  expect(result.rolledBack).toBe(true)
+  expect(result.abortCode).toBe('ABORTED')
+  expect(result.abortMissing).toBe(true)
+  expect(result.invalidCallbackCodes).toEqual([
+    'INVALID_ARGUMENT',
+    'INVALID_ARGUMENT',
+    'INVALID_ARGUMENT',
+    'INVALID_ARGUMENT',
+    'INVALID_ARGUMENT'
+  ])
+  expect(result.invalidScopeOptionsCode).toBe('INVALID_ARGUMENT')
+  expect(result.invalidScopeWriteMissing).toBe(true)
+  expect(result.policyReads).toBe(1)
+})
+
+test('真实 IndexedDB commit 后 listener/report failure 不反转 write', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbPostCommitFailureScenario())
+  expect(result).toEqual({
+    syncResolved: true,
+    syncPersisted: true,
+    syncSecondListener: true,
+    lateResolved: true,
+    latePersisted: true,
+    lateSecondListener: true,
+    reporterResolved: true,
+    reporterPersisted: true,
+    reporterCalls: 2,
+    reporterThenReads: 1
+  })
+})
+
+test('真实 IndexedDB clear 被取消后不提交部分清理', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbClearAbortScenario())
+  expect(result.recordsCode).toBe('ABORTED')
+  expect(result.recordsValue).toEqual({ keep: true })
+  expect(result.allCode).toBe('ABORTED')
+  expect(result.allValue).toBe('keep')
+  expect(result.allRecord).toEqual({ keep: true })
+})
+
+test('真实 IndexedDB deleteRecord 被取消后不提交删除', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbDeleteAbortScenario())
+  expect(result.code).toBe('ABORTED')
+  expect(result.value).toEqual({ keep: true })
+})
+
+test('真实 IndexedDB putRecord 被取消后不提交部分写入', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbPutAbortScenario())
+  expect(result.code).toBe('ABORTED')
+  expect(result.value).toBeUndefined()
+})
+
+test('真实 IndexedDB entity migrate 分批迁移并清理 legacy record', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbEntityMigrationScenario())
+  expect(result.result).toMatchObject({ scanned: 1, eligible: 1, migrated: 1 })
+  expect(result.value).toEqual({ id: 'a', displayName: 'Ada' })
+  expect(result.legacyValue).toBeUndefined()
+  expect(result.invalidBatchCode).toBe('INVALID_CONFIG')
+  expect(result.invalidOptionsCodes).toEqual([
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG'
+  ])
+  expect(result.invalidBatchCallbackCodes).toEqual([
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG'
+  ])
+  expect(result.migrationOptionReads).toBe(1)
+})
+
+test('真实 IndexedDB 两连接并发 entity migrate 不留下 legacy 数据', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbConcurrentEntityMigrationScenario())
+  expect(result.results).toHaveLength(2)
+  expect(result.results.reduce((sum, item) => sum + item.migrated, 0)).toBe(2)
+  expect(result.values).toEqual([
+    { id: 'a', displayName: 'Ada' },
+    { id: 'b', displayName: 'Bob' }
+  ])
+  expect(result.legacyValues).toEqual([undefined, undefined])
+})
+
+test('真实 IndexedDB 支持 iframe realm 的 Date/ArrayBuffer/复合 key', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbCrossRealmKeyScenario())
+  expect(result.dateValue).toEqual({ kind: 'date' })
+  expect(result.bytesValue).toEqual({ kind: 'bytes' })
+  expect(result.compoundValue).toEqual({ kind: 'compound' })
+})
+
+test('真实浏览器 raw index firewall 覆盖所有 key 域并保留 rollback generation', async ({
+  page
+}) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbRawIndexFirewallScenario())
+  expect(result.rollbackPreserved).toBe(true)
+  for (const domain of Object.values(result.domains)) {
+    expect(domain).toEqual({ rotated: true, pending: true, staleCode: 'INDEX_BACKFILL_STALE' })
+  }
+})
+
+test('真实浏览器跨 connection backfill lease 忽略 wall-clock 跳变并支持 heartbeat takeover', async ({
+  page
+}) => {
+  test.setTimeout(60_000)
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbBackfillLeaseScenario())
+  const contended = { rows: [{ id: 'seed', value: 1 }], readiness: 'running' }
+  expect(result.initial).toEqual(contended)
+  expect(result.forwardJump).toEqual(contended)
+  expect(result.backwardJump).toEqual(contended)
+  expect(result.takeover).toEqual({ rows: [{ id: 'seed', value: 1 }], readiness: 'complete' })
+  expect(result.owner.readiness).toBe('complete')
+  expect(result.owner.indexed).toBe(1)
+  expect(result.owner.failures).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ code: 'INDEX_BACKFILL_FAILED' }),
+      expect.objectContaining({ code: 'BACKEND_UNAVAILABLE' })
+    ])
+  )
+})
+
+test('真实浏览器跨 page/reload 不复用 monotonic takeover observation', async ({
+  page,
+  context
+}) => {
+  test.setTimeout(60_000)
+  const ownerPage = page
+  const contenderPage = await context.newPage()
+  const dbName = `lease-pages-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  try {
+    await Promise.all([ownerPage.goto('/'), contenderPage.goto('/')])
+    await ownerPage.evaluate((name) => window.startIndexedDbBackfillLeaseOwner(name), dbName)
+    const contended = { rows: [{ id: 'seed', value: 1 }], readiness: 'running' }
+    await expect(
+      contenderPage.evaluate((name) => window.contendIndexedDbBackfillLease(name), dbName)
+    ).resolves.toEqual(contended)
+    await contenderPage.reload()
+    await expect(
+      contenderPage.evaluate((name) => window.contendIndexedDbBackfillLease(name), dbName)
+    ).resolves.toEqual(contended)
+    await contenderPage.waitForTimeout(30_100)
+    await expect(
+      contenderPage.evaluate((name) => window.contendIndexedDbBackfillLease(name), dbName)
+    ).resolves.toEqual({ rows: [{ id: 'seed', value: 1 }], readiness: 'complete' })
+    const owner = await ownerPage.evaluate(
+      (name) => window.finishIndexedDbBackfillLeaseOwner(name),
+      dbName
+    )
+    expect(owner.readiness).toBe('complete')
+    expect(owner.indexed).toBe(1)
+    expect(owner.failures).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ code: 'INDEX_BACKFILL_FAILED' }),
+        expect.objectContaining({ code: 'BACKEND_UNAVAILABLE' })
+      ])
+    )
+  } finally {
+    await ownerPage.close()
+    await contenderPage.close()
+  }
+})
+
+test('真实浏览器统一执行 timeoutMs=0 与 dispose lifecycle', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runOperationLifecycleScenario())
+  expect(result.memoryTimeoutCode).toBe('ABORTED')
+  expect(result.indexedTimeoutCode).toBe('ABORTED')
+  expect(result.indexedInvalidSignalCode).toBe('INVALID_ARGUMENT')
+  expect(result.disposedCode).toBe('STORE_DISPOSED')
+  expect(result.memoryValue).toBeNull()
+  expect(result.invalidTimeoutCode).toBe('INVALID_ARGUMENT')
+  expect(result.invalidContextCodes).toEqual([
+    'INVALID_ARGUMENT',
+    'INVALID_ARGUMENT',
+    'INVALID_ARGUMENT',
+    'INVALID_ARGUMENT'
+  ])
+  expect(result.invalidSignalCode).toBe('INVALID_ARGUMENT')
+  expect(result.abortReasonCode).toBe('ABORTED')
+  expect(result.abortReasonHasCause).toBe(true)
+  expect(result.listenerSetupCode).toBe('INVALID_ARGUMENT')
+  expect(result.cleanupPreservedResult).toBeNull()
+  expect(result.extensionListenerSetupCode).toBe('INVALID_ARGUMENT')
+  expect(result.extensionCleanupPreserved).toBe(true)
+  expect(result.migrationListenerSetupCode).toBe('INVALID_ARGUMENT')
+  expect(result.migrationCleanupPreserved).toBe(true)
+  expect(result.signalRaceCode).toBe('ABORTED')
+  expect(result.signalRaceCalls).toBe(0)
+  expect(result.mergedSignalRemoveCalls).toBe(1)
+  expect(result.mergedSignalReasonPreserved).toBe(true)
+  expect(result.idbRequestRaceCode).toBe('ABORTED')
+  expect(result.idbRequestSetupCode).toBe('INVALID_ARGUMENT')
+  expect(result.idbRequestCleanupPreserved).toBe(true)
+  expect(result.idbResultGetterCode).toBe('TRANSACTION_FAILED')
+  expect(result.idbErrorGetterCode).toBe('TRANSACTION_FAILED')
+  expect(result.idbRequestSetterCodes).toEqual(['TRANSACTION_FAILED', 'TRANSACTION_FAILED'])
+  expect(result.idbTransactionSetupCode).toBe('INVALID_ARGUMENT')
+  expect(result.idbTransactionSetupRolledBack).toBe(true)
+  expect(result.idbDestructiveSetterCodes).toEqual([
+    'TRANSACTION_FAILED',
+    'TRANSACTION_FAILED',
+    'TRANSACTION_FAILED'
+  ])
+  expect(result.idbDestructiveSetterRolledBack).toBe(true)
+  expect(result.syncOptionCodes).toEqual([
+    'INVALID_ARGUMENT',
+    'INVALID_ARGUMENT',
+    'INVALID_ARGUMENT',
+    'INVALID_ARGUMENT',
+    'INVALID_ARGUMENT',
+    'INVALID_ARGUMENT'
+  ])
+})
+
+test('真实 IndexedDB codec 异常不会提交半条 entity record', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbExtensionFailureScenario())
+  expect(result.code).toBe('EXTENSION_FAILED')
+  expect(result.value).toBeUndefined()
+})
+
+test('真实 IndexedDB 旧 entity 客户端拒绝 future version 且不覆盖原数据', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbFutureVersionScenario())
+  expect(result.getCode).toBe('VERSION_UNSUPPORTED')
+  expect(result.skippedCount).toBe(0)
+  expect(result.throwCode).toBe('VERSION_UNSUPPORTED')
+  expect(result.invalidHandlerCode).toBe('INVALID_CONFIG')
+  expect(result.rawValue).toEqual({ version: 2, state: { id: 'future', name: 'New' } })
+})
+
+test('真实 IndexedDB hanging codec 在 abort 后结束等待且不写入', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbHangingExtensionAbortScenario())
+  expect(result.code).toBe('ABORTED')
+  expect(result.value).toBeUndefined()
+})
+
+test('真实 IndexedDB hanging migration 在 abort 后结束等待且不改写 legacy', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbHangingMigrationAbortScenario())
+  expect(result.code).toBe('ABORTED')
+  expect(result.receivedSignal).toBe(true)
+  expect(result.rawValue).toEqual({ version: 1, state: { id: 'hanging', name: 'Ada' } })
+})
+
+test('真实 IndexedDB pre-abort 不调用 custom codec', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbPreAbortExtensionScenario())
+  expect(result.code).toBe('ABORTED')
+  expect(result.calls).toBe(0)
+})
+
+test('真实 IndexedDB pre-abort entity read 稳定返回 ABORTED', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbPreAbortMigrationScenario())
+  expect(result.code).toBe('ABORTED')
+})
+
+test('真实 IndexedDB schema validation failure 不提交 raw entity record', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runIndexedDbSchemaFailureScenario())
+  expect(result.code).toBe('EXTENSION_FAILED')
+  expect(result.value).toBeUndefined()
+})
+
+test('真实浏览器 entity definition 非对象入口统一返回 INVALID_CONFIG', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runEntityDefinitionGuardScenario())
+  expect(result.codes).toEqual([
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG'
+  ])
+  expect(result.storeCodes).toEqual([
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG'
+  ])
+  expect(result.storePredicates).toEqual([false, false])
+  expect(result.codecCodes).toEqual([
+    'INVALID_ARGUMENT',
+    'INVALID_ARGUMENT',
+    'INVALID_ARGUMENT',
+    'INVALID_ARGUMENT',
+    'INVALID_ARGUMENT'
+  ])
+  expect(result.schemaCodes).toEqual([
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG'
+  ])
+  expect(result.migrationCodes).toEqual([
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG'
+  ])
+  expect(result.versionCodes).toEqual(['INVALID_CONFIG'])
+  expect(result.migrationVersionCodes).toEqual(['INVALID_CONFIG'])
+  expect(result.prototypeMigrationCodes).toEqual([])
+  expect(result.nullVersionCodes).toEqual(['INVALID_CONFIG'])
+  expect(result.backendCodes).toEqual(['INVALID_CONFIG'])
+  expect(result.capabilityCodes).toEqual(['INVALID_CONFIG', 'INVALID_CONFIG', 'INVALID_CONFIG'])
+  expect(result.sparseVersionCodes).toEqual(['INVALID_CONFIG'])
+  expect(result.validateOnReadCodes).toEqual([
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG'
+  ])
+  expect(result.standardSchemaCodes).toEqual([
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG'
+  ])
+  expect(result.migrationHelperCodes).toEqual([
+    'ENVELOPE_INVALID',
+    'INVALID_ARGUMENT',
+    'INVALID_ARGUMENT'
+  ])
+  expect(result.inheritedMigrationCalls).toBe(0)
+  expect(result.inheritedMigrationCode).toBe('VERSION_UNSUPPORTED')
+  expect(result.migrationRaceCode).toBe('ABORTED')
+  expect(result.codecSelectionCodes).toEqual([
+    'INVALID_ARGUMENT',
+    'INVALID_ARGUMENT',
+    'INVALID_CONFIG'
+  ])
+})
+
+test('真实浏览器 orderBy comparator 返回非法类型时拒绝静默排序', async ({ page }) => {
+  await page.goto('/')
+  const result = await page.evaluate(() => window.runEntityComparatorGuardScenario())
+  expect(result.codes).toEqual(['EXTENSION_FAILED', 'EXTENSION_FAILED'])
+  expect(result.nullCode).toBe('INVALID_CONFIG')
+  expect(result.invalidOptionsCodes).toEqual([
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG'
+  ])
+  expect(result.rangeCodes).toEqual([
+    'INVALID_ARGUMENT',
+    'INVALID_ARGUMENT',
+    'INVALID_ARGUMENT',
+    'INVALID_ARGUMENT',
+    'INVALID_ARGUMENT',
+    'INVALID_ARGUMENT'
+  ])
+  expect(result.invalidHandlerCodes).toEqual([
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG',
+    'INVALID_CONFIG'
+  ])
+  expect(result.invalidPolicyCode).toBe('INVALID_ARGUMENT')
+})
+
+test('native IndexedDB TTL keeps expiry, rollback and reopened deadlines', async ({ page }) => {
+  await page.goto('/')
+  await expect(page.evaluate(() => window.runIndexedDbNativeTtlScenario())).resolves.toEqual({
+    expired: true,
+    rolledBack: true,
+    reopened: true,
+    remaining: true
+  })
+})

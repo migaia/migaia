@@ -1,18 +1,15 @@
-import { ERROR_SOURCE } from '../src/error-code.js'
+import {
+  STORAGE_QDRANT_ERROR_SOURCE,
+  STORAGE_HOST_ERROR_SOURCE
+} from '@migaia/storage-contract/error-code'
 import type { Schemas } from '@qdrant/js-client-rest'
 import { deferred } from '@migaia/utils/promise'
 import { describe, it, expect, vi, onTestFinished } from 'vitest'
 import { runConformance } from '@migaia/storage-contract/conformance'
-import {
-  createStorageHost,
-  memoryBackendPlugin,
-  createOrgId,
-  definePlugin,
-  STORAGE_HOST_SOURCE,
-  StorageError
-} from '@migaia/storage-host'
+import { createStorageHost, createOrgId, definePlugin, StorageError } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { vector, ttl, DeleteCountMode } from '@migaia/storage-contract'
-import { lockKey, ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'
+import { lockKey, ConcurrencyPolicy } from '@migaia/storage-host/sdk'
 import { qdrantBackendPlugin } from '../src/index.js'
 import { fetchHttp } from '../src/http.js'
 import { qdrantManagementFeature } from '../src/features/management.js'
@@ -1144,7 +1141,7 @@ describe('real native vector backend', () => {
         }
         expect(failure).toBeInstanceOf(StorageError)
         expect((failure as StorageError).code).toBe('EXTENSION_FAILED')
-        expect((failure as StorageError).source).toBe(STORAGE_HOST_SOURCE)
+        expect((failure as StorageError).source).toBe(STORAGE_HOST_ERROR_SOURCE)
         expect((failure as StorageError).cause).toBe(business)
         expect(business).toBeInstanceOf(RangeError)
         expect(business.stack).toBe(stack)
@@ -1207,7 +1204,7 @@ it.skipIf(!url)(
       if (failure.reason.code !== 'INVALID_ARGUMENT') {
         /** This engine reports an initializing collection as native 500, never a confirmed mismatch. */
         expect(failure.reason).toMatchObject({
-          source: ERROR_SOURCE,
+          source: STORAGE_QDRANT_ERROR_SOURCE,
           code: 'QDRANT_UNAVAILABLE',
           name: 'Error',
           cause: { status: 500, response: expect.any(String) }

@@ -1,13 +1,10 @@
-import { storageJournalPlugin } from '@migaia/storage-host/journal'
+import { storageProbe } from '@migaia/storage-host/plugins/probe'
+import { storageJournalPlugin } from '@migaia/storage-host/plugins/journal'
 import { Pool } from 'pg'
 import { createClientPool } from 'redis'
 import { expect, it } from 'vitest'
-import {
-  createStorageHost,
-  memoryBackendPlugin,
-  definePlugin,
-  createOrgId
-} from '@migaia/storage-host'
+import { createStorageHost, definePlugin, createOrgId } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
 import { nodeSqliteDriver } from '@migaia/storage-plugin-sqlite/node'
 import { redisBackendPlugin } from '@migaia/storage-plugin-redis'
@@ -57,13 +54,16 @@ it.each(['memory', 'sqlite', 'redis', 'postgres'] as const)(
             : postgresBackendPlugin({ id: 'data', driver: pgDriver(pg), prefix })
     const host = await createStorageHost({
       org: createOrgId(),
-      plugins: [storageJournalPlugin(), selectPlugin(), observed],
-      hooks: {
-        beforeStorageOperation: ({ operation }) => events.push('before:' + operation),
-        afterStorageOperation: ({ operation }) => events.push('after:' + operation),
-        onStorageOperationError: ({ operation }) => events.push('error:' + operation)
-      },
-      journal: { logger, namespace: 'program' }
+      plugins: [
+        storageProbe({
+          beforeStorageOperation: ({ operation }) => events.push('before:' + operation),
+          afterStorageOperation: ({ operation }) => events.push('after:' + operation),
+          onStorageOperationError: ({ operation }) => events.push('error:' + operation)
+        }),
+        storageJournalPlugin({ logger, namespace: 'program' }),
+        selectPlugin(),
+        observed
+      ]
     })
     try {
       const store = host.backend('data')

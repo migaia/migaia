@@ -1,4 +1,4 @@
-import { storageJournalPlugin } from '@migaia/storage-host/journal'
+import { storageJournalPlugin, storageLogStore } from '@migaia/storage-host/plugins/journal'
 import type {
   IStorageJournalBackendBinding,
   IStorageJournalNamespace,
@@ -12,8 +12,8 @@ import type {
   IStorageJournalRedoBinding
 } from '@migaia/storage-host'
 import type { ITransactionScope } from '@migaia/storage-contract'
-import { createOrgId, createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
-import { storageLogStore } from '@migaia/storage-host/journal'
+import { createOrgId, createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 
 /** Only actual admitted backend ids can select a private resource; org views grant no host close. */
 export async function compileStorageLogStore(): Promise<void> {
@@ -123,30 +123,37 @@ export async function compileUndoSelection(
   // @ts-expect-error Without selected journal options the memory store does not promise undo.
   void plain.backend('memory').undo
   await using noUndo = await createStorageHost({
-    plugins,
-    journal: { logger: onlyBinlog, namespace: 'binlog' }
+    plugins: [storageJournalPlugin({ logger: onlyBinlog, namespace: 'binlog' }), ...plugins]
   })
   // @ts-expect-error A binlog-only logger cannot add undo by shape inference.
   void noUndo.backend('memory').undo
-  await using direct = await createStorageHost({ plugins, journal: { logger, namespace: 'undo' } })
+  await using direct = await createStorageHost({
+    plugins: [storageJournalPlugin({ logger, namespace: 'undo' }), ...plugins]
+  })
   const result: { readonly txId: string } = await direct.backend('memory').undo('original-tx')
   await using initialized = await createStorageHost({
-    plugins,
-    journal: async ({ orgId, storageLogStore }) => {
-      const images = await storageLogStore('memory', { prefix: orgId })
-      return { logger, namespace: 'undo', atomicUndo: { memory: images } }
-    }
+    plugins: [
+      storageJournalPlugin(async ({ orgId, storageLogStore }) => {
+        const images = await storageLogStore('memory', { prefix: orgId })
+        return { logger, namespace: 'undo', atomicUndo: { memory: images } }
+      }),
+      ...plugins
+    ]
   })
   const borrowed = initialized.org(createOrgId()).backend('memory')
   await borrowed.undo(result.txId)
   // @ts-expect-error Journal methods grant no borrowed lifecycle authority.
   void borrowed.dispose
   const old: import('@migaia/storage-host').IStorageHost<typeof plugins> = plain
-  const options: import('@migaia/storage-host').IStorageHostCreateOptions<typeof plugins> = {
-    plugins,
-    journal: { logger, namespace: 'old-typed-options' }
+  const journaled = [
+    storageJournalPlugin({ logger, namespace: 'typed-options' }),
+    ...plugins
+  ] as const
+  const options: import('@migaia/storage-host').IStorageHostCreateOptions<typeof journaled> = {
+    plugins: journaled
   }
-  await using explicit = await createStorageHost<typeof plugins>(options)
+  await using explicit = await createStorageHost<typeof journaled>(options)
+  await explicit.backend('memory').undo('typed-options-tx')
   void [old, explicit]
 }
 

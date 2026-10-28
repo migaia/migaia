@@ -1,9 +1,5 @@
-import {
-  createStorageHost,
-  defineFeature,
-  memoryBackendKind,
-  memoryBackendPlugin
-} from '@migaia/storage-host'
+import { createStorageHost, defineFeature } from '@migaia/storage-host'
+import { memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { defineEntity } from '@migaia/storage-host/entity'
 import { lockKey } from '../src/authoring/concurrency.js'
 import { records, rdf, vector, type IQuad, type IVectorHit } from '@migaia/storage-contract'

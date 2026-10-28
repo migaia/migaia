@@ -23,7 +23,8 @@ Bring memory, database and file backends into one storage host, select each thro
 Write an order status to memory, then read it from the same backend. This example uses a TypeScript environment with top-level `await`.
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 
 const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
 try {
@@ -76,7 +77,7 @@ Use a Map for local data. Add the host when the application needs multiple backe
 | Commit several writes together | memory transaction                      | [Transactions and queries](./USEGUIDE.en.md#transactions-and-record-queries) |
 | Store and query keyed objects  | `/entity` + memory or a records backend | [Entities](./USEGUIDE.en.md#use-an-entity-repository)                        |
 | Serve several organizations    | `host.org(id)`                          | [Organization data](./USEGUIDE.en.md#separate-organization-data)             |
-| Store application log records  | `/journal` + optional logger            | [Log storage](./USEGUIDE.en.md#open-a-log-store)                             |
+| Store application log records  | `/plugins/journal` + optional logger    | [Log storage](./USEGUIDE.en.md#open-a-log-store)                             |
 
 ## Install
 
@@ -86,7 +87,7 @@ These storage packages are currently `private: true` workspace packages in this 
 pnpm add --workspace @migaia/storage-host @migaia/storage-contract
 ```
 
-Memory needs no database client. Install other backends through their own plugins. The optional peer below is needed only when configuring `journal` or importing `/journal`:
+Memory needs no database client. Install other backends through their own plugins. The optional peer below is needed only when importing `/plugins/journal` (for `storageJournalPlugin`):
 
 ```bash
 pnpm add --workspace @migaia/logger
@@ -99,32 +100,35 @@ pnpm add --workspace @migaia/logger
 | `createStorageHost({ plugins, ...options })` | Create a host; environment checks run before it returns by default |
 | `host.backend(id)` / `hasBackend(id)`        | Get an installed backend or check a dynamic ID                     |
 | `host.use(...plugins)`                       | Add a batch and return a host type that includes it                |
+| `host.unUse(id)`                             | Remove one plugin and release it; rejects while it is borrowed     |
 | `host.org(uuid)` / `dropOrg(uuid)`           | Obtain an organization view or remove its data from each backend   |
 | `host.detect()`                              | Run checks that have not completed successfully                    |
 | `host.dispose()`                             | Stop accepting work, wait, and release resources                   |
 
 ## Behavior to know
 
-- Plugin IDs must be unique. A batch becomes visible only after every installation succeeds; failed installation releases resources created by that batch. Overlapping batches reject with `STORAGE_HOST_BUSY`.
-- `autoDetect` defaults to `true`; `installTimeoutMs` defaults to `30000`. With `autoDetect: false`, call `await host.detect()` before data operations. Operations whose checks are unfinished reject with `UNSUPPORTED_CAPABILITY`. Check newly added backends after `use()` as well.
+- Plugin IDs must be unique. A batch becomes visible only after every installation succeeds; failed installation releases resources created by that batch. Overlapping `use` and `unUse` calls queue in call order; each starts after the previous one settles, whether it succeeded or failed.
+- `autoDetect` defaults to `true`; `installTimeoutMs` defaults to `30000` and limits each plugin's install separately (plugins in one batch are timed individually); `0` disables it. With `autoDetect: false`, call `await host.detect()` before data operations. Operations whose checks are unfinished reject with `UNSUPPORTED_CAPABILITY`. Check newly added backends after `use()` as well.
 - The default `org` is the zero UUID. Explicit IDs must be canonical lowercase UUIDs; `createOrgId()` generates one. An organization view cannot install plugins, drop organizations or close the host. `dropOrg()` attempts every backend; successful deletions remain if another fails. `ORG_DELETE_FAILED` exposes the failures through `AggregateError.errors`.
 - Capabilities depend on the actual backend instance. A non-default organization does not automatically inherit a custom capability attached only to the root backend; check `has(token)`. Native SQL/SPARQL entry points are unavailable through organization views.
 - Explicit `dispose()` rejects on cleanup failure and reuses its Promise on repeated calls. `await using` cleanup reports failures and completes so it does not replace a primary business error. See each backend's guide for closing caller-supplied native clients.
-- Host errors use `source: '@migaia/storage-host'`. Shared argument and capability errors come from `@migaia/storage-contract`. Inspect `source`, `code` and `cause` together rather than matching message text.
+- Host errors use `source: 'storage.host'`. Shared argument and capability errors come from `storage.contract`. Inspect `source`, `code` and `cause` together rather than matching message text.
 
 ## Moving backend authoring imports
 
+Subpaths are consolidated: the former `/authoring/*` and `/vector/mmr` entries are merged into `/sdk`; `/journal` becomes `/plugins/journal`; `/entity/<name>` becomes `/entity/features/<name>`; the memory backend moves from the root entry to `/plugins/memory`. The old paths are removed with no aliases.
+
 Applications that only call `backend()` do not need authoring tools. Backend implementations now import runtime tools from these entries; types, capability tokens, definitions and pure validators remain in contract.
 
-Paths beginning `/authoring/...` below are prefixed with `@migaia/storage-host`.
+Paths beginning `/sdk` below are prefixed with `@migaia/storage-host`.
 
-| Former contract runtime use                  | Current entry                                                           |
-| -------------------------------------------- | ----------------------------------------------------------------------- |
-| Query creation and condition execution       | `@migaia/storage-host/authoring/query`                                  |
-| Concurrency policy and transaction execution | `/authoring/concurrency`, `/authoring/transaction`                      |
-| Key encoding, input snapshots and resources  | `/authoring/key`, `/authoring/context`, `/authoring/resource`           |
-| Capability publication and value conversion  | `/authoring/capability`, `/authoring/codec`                             |
-| SQL, SPARQL and channel tools                | `/authoring/sql`, `/authoring/sparql`, and the respective channel entry |
+| Former contract runtime use                  | Current entry                            |
+| -------------------------------------------- | ---------------------------------------- |
+| Query creation and condition execution       | `@migaia/storage-host/sdk`               |
+| Concurrency policy and transaction execution | `/sdk`                                   |
+| Key encoding, input snapshots and resources  | `/sdk`                                   |
+| Capability publication and value conversion  | `/sdk`                                   |
+| SQL, SPARQL and channel tools                | `/sdk`, and the respective channel entry |
 
 See [storage-contract](../storage-contract/README.en.md#entries-and-dependency-direction) for full paths and dependencies. The old contract root no longer exports these runtime tools.
 
@@ -132,14 +136,17 @@ Entity assembly changes: `/entity` provides basic reads/writes. Previously autom
 
 ## Assemble optional capabilities explicitly
 
-The base host does not import journal runtime, notification controllers or change iterators. Previously journal options loaded logging automatically and memory enabled notifications and watch by default. Applications now select these capabilities so basic reads and writes do not include unused code.
+The base host does not import journal runtime, notification controllers or change iterators. Previously the host's journal option loaded logging automatically and memory enabled notifications and watch by default. Applications now select these capabilities so basic reads and writes do not include unused code.
 
-Before using journal options or `storageLogStore()`, import `storageJournalPlugin()` from `@migaia/storage-host/journal` and place it before the backend in the same plugin list. Missing assembly raises `JOURNAL_NOT_ASSEMBLED`. Journal configuration, stored records and transaction semantics retain their existing contract.
+Journal configuration goes into `storageJournalPlugin(options)` from `@migaia/storage-host/plugins/journal`, placed in the first `createStorageHost` plugin batch before the backends it records; the host has no separate `journal` option. A configured journal plugin installed later, or passed twice, rejects with `INVALID_CONFIG`. For `storageLogStore()` alone, install `storageJournalPlugin()` without options; missing assembly raises `JOURNAL_NOT_ASSEMBLED`. Journal configuration, stored records and transaction semantics retain their existing contract.
+
+Observation events are subscribed only through `storageProbe(handlers)` from `@migaia/storage-host/plugins/probe`; the host has no `hooks` option and no `host.hooks`. A probe in the `createStorageHost` plugins receives events from the first install event of that batch. After installation, `host.extensions.observe(name, handler)` adds a listener and returns its unsubscribe function; on a view of a non-default organization it receives only that organization's events. A host has at most one probe. Listener failures go to `report` and never change storage results.
 
 Memory notifications and feeds use separate Feature roots:
 
 ```ts
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'
 import { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-change-feed'
 
@@ -156,7 +163,7 @@ await host.dispose()
 
 Without the feed Feature, memory reports `capabilities.changeFeed: false` and watch raises `CHANGE_ITERATOR_NOT_ASSEMBLED`. Notifications alone enable `subscribeChanges()`. The feed requires notifications; omitting them raises `CHANGE_CONTROLLER_NOT_ASSEMBLED`. A lightweight lifecycle owner still closes physical resources and drains accepted writes.
 
-Backend authors import the controller factory from `/authoring/change-controller` and pass it explicitly to `core.createChangeController(options, createBackendChangeController)`. Basic physical resources can use `createBackendLifecycleController` from that entry. Import change iterators from `/authoring/change-iterator`; `/authoring/backend` no longer re-exports them.
+Backend authors import the controller factory from `/sdk` and pass it explicitly to `core.createChangeController(options, createBackendChangeController)`. Basic physical resources can use `createBackendLifecycleController` from that entry. Change iterators come from the same `/sdk` entry.
 
 ### Strict index query migration
 

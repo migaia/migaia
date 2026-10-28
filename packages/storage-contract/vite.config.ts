@@ -12,7 +12,11 @@ export default defineConfig(
     build: {
       target: 'es2022',
       lib: {
-        entry: { index: 'src/index.ts', conformance: 'src/conformance/index.ts' },
+        entry: {
+          index: 'src/index.ts',
+          'error-code': 'src/error-codes.ts',
+          conformance: 'src/conformance/index.ts'
+        },
         formats: ['es'],
         fileName: (_format, name) => `${name}.js`
       },

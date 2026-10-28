@@ -1,19 +1,17 @@
 import type { Redis } from 'ioredis'
 import type { IRedisConnection, IRedisDriver, IRedisExecEntry } from '../driver.js'
 import { normalizeRedisError, invalidArgument } from '../errors.js'
-import { RedisText } from '../constants.js'
+import { RedisCommand, RedisText } from '../constants.js'
 import {
   runRedisCallback,
   captureCommand,
   captureCommands,
   nativeArguments,
   subscriptionResource,
-  requireExecArray
+  requireExecArray,
+  RedisConnectionPool
 } from '../native.js'
-import {
-  createStorageOperationReporter,
-  reportCleanupError
-} from '@migaia/storage-host/authoring/backend'
+import { createStorageOperationReporter, reportCleanupError } from '@migaia/storage-host/sdk'
 
 /** Owned duplicates never replay an unacknowledged command or mutate the injected root options. */
 function duplicate<M extends 'legacy' | 'resp3'>(client: Redis<M>) {
@@ -42,69 +40,77 @@ class IoredisDriver<M extends 'legacy' | 'resp3'> implements IRedisDriver<Redis<
   constructor(root: Redis<M>) {
     this.#root = root
   }
+  /** Dedicated duplicates reused across callbacks; each one is UNWATCHed before reuse. */
+  readonly #pool = new RedisConnectionPool<Redis<M>>({
+    open: async () => {
+      const owned = duplicate(this.#root)
+      try {
+        await owned.connect()
+      } catch (error) {
+        owned.disconnect()
+        throw error
+      }
+      return owned
+    },
+    reset: async (owned) => {
+      await owned.call(RedisCommand.unwatch)
+    },
+    close: (owned) => close(owned),
+    report: (error) => reportCleanupError(this.#reporter, normalizeRedisError(error))
+  })
   /** Keep the complete original native callback inside the SDK's lease and unwind path. */
   readonly withConnection: IRedisDriver<Redis<M>>['withConnection'] = async <T>(
     run: (connection: IRedisConnection<Redis<M>>) => Promise<T>
   ): Promise<T> => {
     if (typeof run !== 'function') throw invalidArgument()
-    const owned = duplicate(this.#root)
-    let result: T
     try {
-      await owned.connect()
-      result = await runRedisCallback(run, {
-        getClient: () => owned,
-        command: async (input) => {
-          const args = captureCommand(input, false)
-          try {
-            return await owned.call(args[0] as string, nativeArguments(args.slice(1)))
-          } catch (error) {
-            throw normalizeRedisError(error)
+      return await this.#pool.run((owned) =>
+        runRedisCallback(run, {
+          getClient: () => owned,
+          command: async (input) => {
+            const args = captureCommand(input, false)
+            try {
+              return await owned.call(args[0] as string, nativeArguments(args.slice(1)))
+            } catch (error) {
+              throw normalizeRedisError(error)
+            }
+          },
+          binaryCommand: async (input) => {
+            const args = captureCommand(input, true)
+            try {
+              return await owned.callBuffer(args[0] as string, nativeArguments(args.slice(1)))
+            } catch (error) {
+              throw normalizeRedisError(error)
+            }
+          },
+          exec: async (commands) => {
+            const captured = captureCommands(commands, true)
+            if (captured.length === 0) return []
+            const multi = owned.multi()
+            for (const args of captured)
+              multi.callBuffer(args[0] as string, nativeArguments(args.slice(1)))
+            let replies: unknown
+            try {
+              replies = await multi.exec()
+            } catch (error) {
+              throw normalizeRedisError(error)
+            }
+            if (replies === null) return null
+            const entries = requireExecArray(replies).map((reply): IRedisExecEntry => {
+              const pair = requireExecArray(reply),
+                error = pair[0]
+              return error instanceof Error ? { ok: false, error } : { ok: true, value: pair[1] }
+            })
+            return entries
           }
-        },
-        binaryCommand: async (input) => {
-          const args = captureCommand(input, true)
-          try {
-            return await owned.callBuffer(args[0] as string, nativeArguments(args.slice(1)))
-          } catch (error) {
-            throw normalizeRedisError(error)
-          }
-        },
-        exec: async (commands) => {
-          const captured = captureCommands(commands, true)
-          if (captured.length === 0) return []
-          const multi = owned.multi()
-          for (const args of captured)
-            multi.callBuffer(args[0] as string, nativeArguments(args.slice(1)))
-          let replies: unknown
-          try {
-            replies = await multi.exec()
-          } catch (error) {
-            throw normalizeRedisError(error)
-          }
-          if (replies === null) return null
-          const entries = requireExecArray(replies).map((reply): IRedisExecEntry => {
-            const pair = requireExecArray(reply),
-              error = pair[0]
-            return error instanceof Error ? { ok: false, error } : { ok: true, value: pair[1] }
-          })
-          return entries
-        }
-      })
-    } catch (error) {
-      try {
-        await close(owned)
-      } catch (cleanup) {
-        reportCleanupError(this.#reporter, normalizeRedisError(cleanup))
-      }
-      throw normalizeRedisError(error)
-    }
-    try {
-      await close(owned)
+        })
+      )
     } catch (error) {
       throw normalizeRedisError(error)
     }
-    return result
   }
+  /** Close the idle duplicates this driver opened; the caller's root client stays open. */
+  readonly release: NonNullable<IRedisDriver<Redis<M>>['release']> = () => this.#pool.release()
   /** Capture caller arguments before asynchronous native lease acquisition. */
   readonly command: IRedisDriver<Redis<M>>['command'] = (input) => {
     const args = captureCommand(input, false) as string[]

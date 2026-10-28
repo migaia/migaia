@@ -21,7 +21,7 @@ Expected output: active, then 1. The explicit lock protects a logical key; organ
 import { createClientPool } from 'redis'
 import { createStorageHost } from '@migaia/storage-host'
 import { kv, ttl, counter } from '@migaia/storage-contract'
-import { lockKey } from '@migaia/storage-host/authoring/concurrency'
+import { lockKey } from '@migaia/storage-host/sdk'
 import { redisBackendPlugin } from '@migaia/storage-plugin-redis'
 import { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'
 const pool = createClientPool({ url: process.env.REDIS_URL }, { maximum: 8 })
@@ -153,7 +153,7 @@ try {
 }
 ```
 
-maxLen is a positive safe integer and uses native approximate MAXLEN trimming. readChanges({after,limit}) defaults to 100 and reads after the exclusive cursor. Finish derived effects and checkpoint persistence before a tail callback succeeds. Tail advances only after onChange succeeds; rejection reports and closes without skipping the failed item. Cursors are native Stream IDs; preserve strings rather than converting them into imprecise numbers.
+Each commit is appended to two Streams: the shared one and its organization's own. The root store reads the shared Stream and sees every organization; an organization store reads only its own Stream, so a busy organization cannot push a quiet organization's history out of retention or make its reads scan foreign entries. A cursor belongs to the Stream of the store that returned it; do not pass a root cursor to an organization store or the reverse. dropOrg keeps the organization's change history. maxLen is a positive safe integer, applies to each Stream separately and uses native approximate MAXLEN trimming. readChanges({after,limit}) defaults to 100 and reads after the exclusive cursor. Finish derived effects and checkpoint persistence before a tail callback succeeds. Tail advances only after onChange succeeds; rejection reports and closes without skipping the failed item. Cursors are native Stream IDs; preserve strings rather than converting them into imprecise numbers.
 
 A noninitial cursor behind retained history raises CHANGE_CURSOR_EXPIRED. 0-0 does not bypass lost history: it resumes only when XINFO proves nothing has been removed, and rejects after trimming. Crossing a trim boundary also rejects conservatively. This history covers standard library commits, not external native commands or immediate natural-expiry events. Ordinary best-effort change hints cannot replace it.
 
@@ -214,4 +214,4 @@ Package failures use source storage.backend.redis: REDIS_FAILED for commands/con
 
 Host journal configuration supports post-commit external binlog and telemetry. A success log is appended only after every EXEC item succeeds; partial or unknown outcomes do not append success or replay. Binlog failure reports but cannot roll back committed data: external append is not atomic with business writes. Standard values, bytes, records and vector images retain actual wire values and absolute expiry. Complete before images for historical vector deletion require binary ports; without them that logging combination rejects before modification.
 
-The backend declares nativeAtomic:false. Combinations requiring strongly atomic binlog in the same EXEC, WAL intent/marker or undo currently reject and must not be treated as supported. Import storageLogStore separately from `@migaia/storage-host/journal`; it reads the current private index for every operation. Multiple instances may share a namespace and sequence without a cross-operation index cache. Native Feature APIs are not standard business-channel journal sources. Telemetry is opt-in and records each root operation or whole transaction once across retries. The application releases its logger and log storage after the host.
+The backend declares nativeAtomic:false. Combinations requiring strongly atomic binlog in the same EXEC, WAL intent/marker or undo currently reject and must not be treated as supported. Import storageLogStore separately from `@migaia/storage-host/plugins/journal`; it reads the current private index for every operation. Multiple instances may share a namespace and sequence without a cross-operation index cache. Native Feature APIs are not standard business-channel journal sources. Telemetry is opt-in and records each root operation or whole transaction once across retries. The application releases its logger and log storage after the host.

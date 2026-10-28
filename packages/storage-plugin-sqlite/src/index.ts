@@ -1,6 +1,5 @@
 export { sqliteBackendPlugin, sqliteBackendKind } from './plugin.js'
-export { SqliteErrorCode } from './error-code.js'
-export type { ISqliteErrorCode } from './error-code.js'
+
 export type {
   ISqliteValue,
   ISqliteRow,

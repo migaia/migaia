@@ -1,4 +1,4 @@
-export { createStorageHost, StorageHostFacade } from './storage-host.js'
+export { createStorageHost, StorageHost } from './storage-host.js'
 export { createOrgId } from './org.js'
 export {
   assertStorageBackendId,
@@ -9,10 +9,7 @@ export {
 export type { IStoragePluginCore, IStorageNativePluginDescriptor } from './types.js'
 export type * from './types.js'
 export type * from './journal/types.js'
-export { StorageError, StorageErrorCode, STORAGE_HOST_SOURCE } from './errors.js'
-export type { IStorageErrorCode, IStorageErrorDetails } from './errors.js'
+export { StorageError } from './errors.js'
+export type { IStorageErrorDetails } from './errors.js'
 export { StorageErrorText } from './error-text.js'
 export type * from './hook-types.js'
-
-export { memoryBackendKind, memoryBackendPlugin } from './backends/memory-plugin.js'
-export type { IMemoryOptions, IMemoryBackendStore } from './backends/memory.js'

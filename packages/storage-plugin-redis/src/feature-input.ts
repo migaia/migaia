@@ -1,14 +1,14 @@
-import { throwIfAborted } from '@migaia/storage-host/authoring/backend'
-import type { IRedisNativeFeaturePort } from './native-feature.js'
-import { assertStringStorageKey } from '@migaia/storage-contract'
 import {
+  throwIfAborted,
   encodeOrderedStorageKey,
   decodeOrderedStorageKey
-} from '@migaia/storage-host/authoring/key'
+} from '@migaia/storage-host/sdk'
+import type { IRedisNativeFeaturePort } from './native-feature.js'
+import { assertStringStorageKey } from '@migaia/storage-contract'
 import { base64ToBytes, bytesToBase64 } from '@migaia/serialize/core'
 import { isUint8Array } from '@migaia/utils/bytes'
 import { invalidArgument, redisError } from './errors.js'
-import { RedisErrorCode } from './error-code.js'
+import { RedisErrorCode } from '@migaia/storage-contract/error-code'
 import { RedisText } from './constants.js'
 import { redisHex, redisUnhex, replyString } from './layout.js'
 /** Feature names follow the same logical string domain as standard text keys. */

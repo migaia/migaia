@@ -293,7 +293,7 @@ describe('ordered storage key encoding', () => {
     for (const key of [[], NaN, Infinity, new Date(NaN), {}, [undefined]]) {
       expect(() => encodeOrderedStorageKey(key, 'catalog')).toThrowError(
         expect.objectContaining({
-          source: '@migaia/storage-contract',
+          source: 'storage.contract',
           code: 'INVALID_KEY',
           backend: 'catalog'
         })

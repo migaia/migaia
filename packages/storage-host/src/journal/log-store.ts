@@ -16,7 +16,8 @@ import {
   type ITransactionScope
 } from '@migaia/storage-contract'
 import { PluginHostError } from '@migaia/plugin-host'
-import { StorageError, StorageErrorCode } from '../errors.js'
+import { StorageError } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.js'
 import { isStorageErrorFamily } from '../core/error-family.js'
 import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.js'
@@ -48,7 +49,7 @@ function journalFailure(cause: unknown): Error {
   return isStorageErrorFamily(cause)
     ? cause
     : new StorageError(
-        StorageErrorCode.journalRecoveryFailed,
+        StorageHostErrorCode.journalRecoveryFailed,
         { cause },
         StorageErrorText.journalRecoveryFailed
       )
@@ -204,7 +205,7 @@ async function writeStorageLog<R>(
   } catch (cause) {
     if (!entered) {
       if (isStorageErrorFamily(cause) || cause instanceof PluginHostError) throw cause
-      throw new StorageError(StorageErrorCode.extensionFailed, { cause })
+      throw new StorageError(StorageHostErrorCode.extensionFailed, { cause })
     }
     if (!writing) throw journalFailure(cause)
     context.failure = journalFailure(cause)

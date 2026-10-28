@@ -10,11 +10,11 @@ import {
 import {
   readConcurrencyLockIdentities,
   snapshotConcurrencyLockKeys,
-  snapshotConcurrencyLockHoldings
-} from '@migaia/storage-host/authoring/concurrency'
+  snapshotConcurrencyLockHoldings,
+  throwIfAborted
+} from '@migaia/storage-host/sdk'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { sleep } from '@migaia/utils/promise'
-import { throwIfAborted } from '@migaia/storage-host/authoring/backend'
 import {
   createRedisLayout,
   replyInteger,
@@ -23,7 +23,7 @@ import {
   type IRedisChannel
 } from './layout.js'
 import { redisError, unsupported } from './errors.js'
-import { RedisErrorCode } from './error-code.js'
+import { RedisErrorCode } from '@migaia/storage-contract/error-code'
 import { RedisText } from './constants.js'
 import { lockLost } from './transaction.js'
 

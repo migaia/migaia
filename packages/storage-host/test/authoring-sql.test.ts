@@ -187,7 +187,7 @@ describe('shared SQL composition and original execution', () => {
       const query = fixture.tag(template(` /* prefix */ ${command.toLowerCase()}`))
       for (const execute of [() => query.all(), () => query.get(), () => query.run()])
         await expect(execute()).rejects.toMatchObject({
-          source: '@migaia/storage-contract',
+          source: 'storage.contract',
           code: 'INVALID_ARGUMENT'
         })
       expect(fixture.prepared).toEqual([])

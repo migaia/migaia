@@ -13,9 +13,8 @@ import {
 import { walkErrorCauses } from '@migaia/utils/error'
 import { deferred } from '@migaia/utils/promise'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
-import { storageJournalPlugin, storageLogStore } from '@migaia/storage-host/journal'
-import { encodeFlatStorageKey } from '@migaia/storage-host/authoring/backend'
-import { ConcurrencyPolicy, lockKey } from '@migaia/storage-host/authoring/concurrency'
+import { storageJournalPlugin, storageLogStore } from '@migaia/storage-host/plugins/journal'
+import { encodeFlatStorageKey, ConcurrencyPolicy, lockKey } from '@migaia/storage-host/sdk'
 import { kv, ttl, vector } from '@migaia/storage-contract'
 import { redisBackendPlugin, type IRedisDriver } from '../src/index.js'
 import { nodeRedisDriver } from '../src/adapters/node-redis.js'
@@ -172,7 +171,7 @@ for (const service of [
       })
       const host = await createStorageHost({
         plugins: [
-          storageJournalPlugin(),
+          storageJournalPlugin({ logger, namespace: 'telemetry', telemetry: true }),
           redisBackendPlugin(
             { driver, prefix },
             {
@@ -180,8 +179,7 @@ for (const service of [
               pubsub: redisPubSubFeature()
             }
           )
-        ] as const,
-        journal: { logger, namespace: 'telemetry', telemetry: true }
+        ] as const
       })
       try {
         const store = host.backend('redis')
@@ -282,8 +280,10 @@ for (const service of [
         logger = createJournalLogger()
       namespaces.push(prefix)
       const host = await createStorageHost({
-        plugins: [storageJournalPlugin(), redisBackendPlugin({ driver, prefix })] as const,
-        journal: { logger, namespace: 'ordered', binlogValues: true }
+        plugins: [
+          storageJournalPlugin({ logger, namespace: 'ordered', binlogValues: true }),
+          redisBackendPlugin({ driver, prefix })
+        ] as const
       })
       try {
         const store = host.backend('redis')
@@ -353,38 +353,40 @@ for (const service of [
       namespaces.push(prefix)
       let pause = false
       const host = await createStorageHost({
-        plugins: [storageJournalPlugin(), redisBackendPlugin({ driver, prefix })] as const,
-        journal: ({ orgId }) => {
-          const logger = new Logger({
-            ...loggerOptions,
-            plugins: [binlog({ store: memoryLogStore() })] as const
-          })
-          loggers.set(orgId, logger)
-          const original = logger.binlog
-          return {
-            namespace: 'application',
-            binlogValues: true,
-            logger: {
-              dispatchRaw: logger.dispatchRaw,
-              onFailure: logger.onFailure,
-              hook: logger.hook,
-              flush: logger.flush,
-              defer: logger.defer,
-              binlog: {
-                ...original,
-                append: async (...args: Parameters<typeof original.append>) => {
-                  const result = await original.append(...args)
-                  if (pause) {
-                    pause = false
-                    entered.resolve()
-                    await resume.promise
+        plugins: [
+          storageJournalPlugin(({ orgId }) => {
+            const logger = new Logger({
+              ...loggerOptions,
+              plugins: [binlog({ store: memoryLogStore() })] as const
+            })
+            loggers.set(orgId, logger)
+            const original = logger.binlog
+            return {
+              namespace: 'application',
+              binlogValues: true,
+              logger: {
+                dispatchRaw: logger.dispatchRaw,
+                onFailure: logger.onFailure,
+                hook: logger.hook,
+                flush: logger.flush,
+                defer: logger.defer,
+                binlog: {
+                  ...original,
+                  append: async (...args: Parameters<typeof original.append>) => {
+                    const result = await original.append(...args)
+                    if (pause) {
+                      pause = false
+                      entered.resolve()
+                      await resume.promise
+                    }
+                    return result
                   }
-                  return result
                 }
               }
             }
-          }
-        }
+          }),
+          redisBackendPlugin({ driver, prefix })
+        ] as const
       })
       try {
         const store = host.backend('redis'),
@@ -475,10 +477,9 @@ for (const service of [
         const options = { logger, namespace: 'vector', binlogValues: true }
         const host = await createStorageHost({
           plugins: [
-            storageJournalPlugin(),
+            storageJournalPlugin(options),
             redisBackendPlugin({ driver, prefix }, { search: rediSearchVectorFeature() })
-          ] as const,
-          journal: options
+          ] as const
         })
         try {
           const store = host.org(orgId).backend('redis'),
@@ -504,8 +505,7 @@ for (const service of [
           await host.dispose()
         }
         const reopened = await createStorageHost({
-          plugins: [storageJournalPlugin(), redisBackendPlugin({ driver, prefix })] as const,
-          journal: options
+          plugins: [storageJournalPlugin(options), redisBackendPlugin({ driver, prefix })] as const
         })
         try {
           await reopened.dropOrg(orgId)
@@ -565,10 +565,9 @@ for (const service of [
         const host = await createStorageHost({
           org,
           plugins: [
-            storageJournalPlugin(),
+            storageJournalPlugin({ logger, namespace: 'application' }),
             redisBackendPlugin({ driver: injected, prefix })
-          ] as const,
-          journal: { logger, namespace: 'application' }
+          ] as const
         })
         try {
           const store = host.backend('redis')
@@ -613,14 +612,13 @@ for (const service of [
         try {
           const failure = await createStorageHost({
             plugins: [
-              storageJournalPlugin(),
+              storageJournalPlugin({
+                logger,
+                namespace: 'unsupported',
+                ...(choice === 'atomic' ? { atomicBinlog: { redis: records } } : {})
+              }),
               redisBackendPlugin({ driver: observed, prefix: crypto.randomUUID() })
-            ] as const,
-            journal: {
-              logger,
-              namespace: 'unsupported',
-              ...(choice === 'atomic' ? { atomicBinlog: { redis: records } } : {})
-            }
+            ] as const
           }).then(
             () => undefined,
             (cause) => cause as unknown

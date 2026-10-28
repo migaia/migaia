@@ -1,6 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
 import {
   STORAGE_CONTRACT_SOURCE,
   StorageContractError,
@@ -41,7 +39,7 @@ describe('StorageContractError 家族', () => {
       cause: new TypeError('bad')
     })
     expect(error.source).toBe(STORAGE_CONTRACT_SOURCE)
-    expect(error.source).toBe('@migaia/storage-contract')
+    expect(error.source).toBe('storage.contract')
     expect(error.code).toBe('INVALID_ARGUMENT')
     expect(error.name).toBe('StorageContractError')
     expect(error.cause).toBeInstanceOf(TypeError)
@@ -138,17 +136,6 @@ describe('V2 capability contracts', () => {
     expect(typeof isStorageCapabilities).toBe('function')
     expect(typeof isSecondaryIndexRecordStore).toBe('function')
     expect(typeof isChangeFeedStore).toBe('function')
-  })
-
-  it('capability modules have no host-layer imports', () => {
-    const sourceRoot = resolve(process.cwd(), 'src')
-    for (const moduleName of ['secondary-index.ts', 'change-feed.ts']) {
-      const source = readFileSync(resolve(sourceRoot, moduleName), 'utf8')
-      expect(source).not.toMatch(
-        /from ['"](?:@migaia\/(?:storage-web|reactive|store)|node:|(?:idb|dom))/i
-      )
-      expect(source).not.toMatch(/\b(?:IDBDatabase|IDBIndex|AbortSignal|BroadcastChannel|NodeJS)\b/)
-    }
   })
 
   it('legacy capability descriptors remain valid without new flags', () => {

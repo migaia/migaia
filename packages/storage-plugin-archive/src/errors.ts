@@ -4,9 +4,14 @@ import {
   isStorageContractError
 } from '@migaia/storage-contract'
 import { PluginHostError } from '@migaia/plugin-host'
-import { StorageError, StorageErrorCode } from '@migaia/storage-host'
+import { StorageError } from '@migaia/storage-host'
+import {
+  StorageHostErrorCode,
+  ArchiveErrorCode,
+  STORAGE_ARCHIVE_ERROR_SOURCE
+} from '@migaia/storage-contract/error-code'
+import type { IArchiveErrorCode } from '@migaia/storage-contract/error-code'
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { ArchiveErrorCode, ERROR_SOURCE, type IArchiveErrorCode } from './error-code.js'
 import { Archive } from './constants.js'
 import { ArchiveText } from './error-text.js'
 
@@ -14,7 +19,10 @@ import { ArchiveText } from './error-text.js'
 export function isArchiveError(
   value: unknown
 ): value is Error & { readonly code: IArchiveErrorCode } {
-  return value instanceof Error && (value as { source?: unknown }).source === ERROR_SOURCE
+  return (
+    value instanceof Error &&
+    (value as { source?: unknown }).source === STORAGE_ARCHIVE_ERROR_SOURCE
+  )
 }
 /** Existing coded native/contract failures cross unchanged; uncoded failures retain their class. */
 export function archiveError(code: IArchiveErrorCode, cause?: unknown): Error {
@@ -28,8 +36,8 @@ export function archiveError(code: IArchiveErrorCode, cause?: unknown): Error {
     return cause
   if (
     cause instanceof StorageError &&
-    (cause.code === StorageErrorCode.storageHostDisposed ||
-      cause.code === StorageErrorCode.backendNotInstalled)
+    (cause.code === StorageHostErrorCode.storageHostDisposed ||
+      cause.code === StorageHostErrorCode.backendNotInstalled)
   )
     return cause
   if (cause instanceof PluginHostError) return cause
@@ -56,7 +64,7 @@ function createArchiveError(
               ? new AggregateError(kind.errors, text, { cause })
               : new Error(text, cause === undefined ? undefined : { cause })
   if (error instanceof DOMException) Object.defineProperty(error, 'cause', { value: cause })
-  return attachErrorIdentity(error, { source: ERROR_SOURCE, code })
+  return attachErrorIdentity(error, { source: STORAGE_ARCHIVE_ERROR_SOURCE, code })
 }
 /** Segment validation remains Archive-owned even when the original codec supplied the cause. */
 export function invalidSegment(cause?: unknown): Error {

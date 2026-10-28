@@ -15,7 +15,7 @@ import {
   createBackendJournalNamespace,
   type IBackendJournalTransaction,
   type IBackendChangeController
-} from '@migaia/storage-host/authoring/backend'
+} from '@migaia/storage-host/sdk'
 import { encodeRedisValue, decodeRedisValue, type IRedisChannel } from './layout.js'
 import { invalidArgument } from './errors.js'
 import { RedisText } from './constants.js'
@@ -198,9 +198,7 @@ export function createRedisJournalBinding(input: {
   readonly run: <R>(work: (draft: RedisDraft) => Promise<R>) => Promise<R>
   readonly state: (scope: Omit<ITransactionScope, 'use'>) => {
     readonly draft: RedisDraft
-    readonly info: ReturnType<
-      typeof import('@migaia/storage-host/authoring/transaction').assertTransactionOwner
-    >
+    readonly info: ReturnType<typeof import('@migaia/storage-host/sdk').assertTransactionOwner>
   }
 }): IStorageJournalBackendBinding {
   return {

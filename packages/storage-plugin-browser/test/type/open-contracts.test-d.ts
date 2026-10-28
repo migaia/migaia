@@ -1,0 +1,42 @@
+import { expectTypeOf } from 'vitest'
+import type { ICookiesOptions } from '../../src/backends/cookie.js'
+import type { ICookieScope } from '../../src/types/cookie.js'
+import type { IExtensionStage } from '../../src/types/errors.js'
+import type { ISyncCapableStore } from '../../src/types/storage.js'
+import type { IMemoryBackendStore } from '@migaia/storage-host/plugins/memory'
+
+expectTypeOf<ICookiesOptions>().toMatchTypeOf<{ scope?: ICookieScope }>()
+expectTypeOf<IExtensionStage>().toEqualTypeOf<
+  NonNullable<import('@migaia/storage-host').IStorageErrorDetails['extensionStage']>
+>()
+expectTypeOf<IMemoryBackendStore>().toMatchTypeOf<ISyncCapableStore<IMemoryBackendStore>>()
+import type { ICodec } from '@migaia/storage-contract'
+import type { ISchemaAdapter } from '@migaia/storage-host/entity'
+
+/** Schema/codec 是面向开发者的开放契约：任何手写实现（不 import 任何第三方库） 都应该能被类型系统接受，不需要绕过 as any。 */
+const customCodec: ICodec<{ n: number }, string> = {
+  name: 'custom',
+  output: 'text',
+  encode: async (value) => String(value.n),
+  decode: async (raw) => ({ n: Number(raw) })
+}
+expectTypeOf(customCodec).toMatchTypeOf<ICodec<{ n: number }, string>>()
+
+const customSchema: ISchemaAdapter<{ n: number }, string> = {
+  name: 'custom-schema',
+  validate: async (value) => {
+    if (typeof value !== 'object' || value === null || !('n' in value))
+      throw new TypeError('invalid')
+    return value as { n: number }
+  },
+  encode: async (value) => String(value.n),
+  decode: async (raw) => ({ n: Number(raw) })
+}
+expectTypeOf(customSchema).toMatchTypeOf<ISchemaAdapter<{ n: number }, string>>()
+
+// normalize/encode/decode 均为可选——最小实现只需 name + validate。
+const minimalSchema: ISchemaAdapter<unknown> = {
+  name: 'minimal',
+  validate: async (value) => value
+}
+expectTypeOf(minimalSchema).toMatchTypeOf<ISchemaAdapter<unknown>>()

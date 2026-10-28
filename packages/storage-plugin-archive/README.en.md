@@ -21,7 +21,8 @@ Move rarely read records out of the storage used for everyday updates and into b
 Use real in-memory records and blobs to demonstrate the whole flow. Choose persistent backends for production data.
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { archivePlugin } from '@migaia/storage-plugin-archive'
 
 await using base = await createStorageHost({
@@ -65,7 +66,8 @@ For age-based selection, read [Archive by retention time](./USEGUIDE.en.md#archi
 Upload-then-delete looks simple, but it is not one atomic operation across two stores. This example is shown without execution.
 
 ```ts doc-test=check
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { blob } from '@migaia/storage-contract'
 
 await using host = await createStorageHost({
@@ -103,7 +105,7 @@ Publish hot/cold first, then call host.use(archivePlugin(...)) and detect. Opera
 | Archive events older than a day    | rule + archiveRun         | [Archive by retention time](./USEGUIDE.en.md#archive-by-retention-time)                 |
 | Read history and restore on demand | archiveGet + archiveSweep | [Read restore and clean up](./USEGUIDE.en.md#read-restore-and-clean-up)                 |
 | Share rules across organizations   | host.org + historyRun/Get | [Organizations and custom prefixes](./USEGUIDE.en.md#organizations-and-custom-prefixes) |
-| Monitor a partially completed job  | hooks + progress results  | [Observe committed progress](./USEGUIDE.en.md#observe-committed-progress)               |
+| Monitor a partially completed job  | probe plugin + progress   | [Observe committed progress](./USEGUIDE.en.md#observe-committed-progress)               |
 
 ## Install
 

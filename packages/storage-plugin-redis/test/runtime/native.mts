@@ -3,8 +3,9 @@ import { createClientPool } from 'redis'
 import Redis from 'ioredis'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { kv, records, ttl, counter, vector, durableChangeFeed } from '@migaia/storage-contract'
-import { encodeOrderedStorageKey } from '@migaia/storage-host/authoring/key'
-import { ERROR_SOURCE, redisBackendPlugin, type IRedisDriver } from '@migaia/storage-plugin-redis'
+import { encodeOrderedStorageKey } from '@migaia/storage-host/sdk'
+import { redisBackendPlugin, type IRedisDriver } from '@migaia/storage-plugin-redis'
+import { STORAGE_REDIS_ERROR_SOURCE } from '@migaia/storage-contract/error-code'
 import { nodeRedisDriver } from '@migaia/storage-plugin-redis/node-redis'
 import { ioredisDriver } from '@migaia/storage-plugin-redis/ioredis'
 import { bunRedisDriver } from '@migaia/storage-plugin-redis/bun'
@@ -15,7 +16,7 @@ import { redisRateLimitFeature } from '@migaia/storage-plugin-redis/features/rat
 import { redisChangeStreamFeature } from '@migaia/storage-plugin-redis/features/change-stream'
 import { rediSearchVectorFeature } from '@migaia/storage-plugin-redis/features/search'
 
-assert.equal(ERROR_SOURCE, 'storage.backend.redis')
+assert.equal(STORAGE_REDIS_ERROR_SOURCE, 'storage.backend.redis')
 /** Built public entries consume genuine clients in every runtime; only Bun loads its native SDK. */
 for (const service of [
   'MIGAIA_REDIS_URL',

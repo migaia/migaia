@@ -1,5 +1,6 @@
 import type { ICollectionsCodecValue } from '@migaia/serialize/codecs/collections-json'
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { archivePlugin, type IArchiveApi, type IArchiveRunResult } from '../src/index.js'
 /** Literal extension identities survive the flat extension functions' public projection. */
 async function declarations() {

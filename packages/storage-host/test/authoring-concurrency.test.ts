@@ -67,7 +67,7 @@ describe('registered concurrency policy metadata', () => {
     expect(() =>
       defineConcurrencyPolicy(definition as Parameters<typeof defineConcurrencyPolicy>[0])
     ).toThrowError(
-      expect.objectContaining({ source: '@migaia/storage-contract', code: 'INVALID_ARGUMENT' })
+      expect.objectContaining({ source: 'storage.contract', code: 'INVALID_ARGUMENT' })
     )
   })
 

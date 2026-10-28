@@ -99,13 +99,13 @@ const repositoryRoot = resolve(import.meta.dirname, '..')
 /** Reviewed finite capability catalog for the bounded architecture audit. */
 const catalogPath = resolve(
   repositoryRoot,
-  'packages/storage-web/test/fixtures/storage-v2-bounded-capability-catalog.json'
+  'packages/storage-plugin-browser/test/fixtures/storage-v2-bounded-capability-catalog.json'
 )
 
 /** Permanent finite hostile mutations for the declared failure surface. */
 const hostilePath = resolve(
   repositoryRoot,
-  'packages/storage-web/test/fixtures/storage-v2-bounded-hostile.json'
+  'packages/storage-plugin-browser/test/fixtures/storage-v2-bounded-hostile.json'
 )
 
 /** Exact hostile IDs, mutation kinds, and failure codes required by the audit acceptance. */
@@ -135,7 +135,7 @@ const requiredHostileCaseContract = [
 const requiredTargetedRuleContract = [
   {
     id: 'DUPLICATE_STORAGE_LISTENER_OWNER',
-    packages: ['@migaia/storage-web'],
+    packages: ['@migaia/storage-plugin-browser'],
     pathPattern: '^src/backends/(?!index\\.ts$)[^/]+\\.ts$',
     sourcePatterns: [
       'storageListeners\\s*=\\s*new\\s+Set',
@@ -144,13 +144,13 @@ const requiredTargetedRuleContract = [
   },
   {
     id: 'DUPLICATE_REACTIVE_SCHEDULER',
-    packages: ['@migaia/storage-web'],
+    packages: ['@migaia/storage-plugin-browser'],
     pathPattern: '^src/',
     sourcePatterns: ['class\\s+StorageReactiveScheduler', 'createStorageReactiveScheduler\\s*[=(]']
   },
   {
     id: 'DUPLICATE_OPERATION_TIMEOUT',
-    packages: ['@migaia/storage-web'],
+    packages: ['@migaia/storage-plugin-browser'],
     pathPattern: '^src/core/operation\\.ts$',
     sourcePatterns: [
       'storageTimeoutController\\s*=\\s*new\\s+AbortController',
@@ -162,7 +162,7 @@ const requiredTargetedRuleContract = [
     packages: [
       '@migaia/serialize',
       '@migaia/storage-contract',
-      '@migaia/storage-web',
+      '@migaia/storage-plugin-browser',
       '@migaia/store-persist',
       '@migaia/store-worker',
       '@migaia/rpc-contract',
@@ -697,8 +697,8 @@ const audit = (
 
   /** Rule whose path scope must cover every concrete backend source except the barrel. */
   const listenerOwnerRule = catalog.targetedRules.find((rule) => rule.id === 'DUPLICATE_STORAGE_LISTENER_OWNER')!
-  /** Current finite backend source inventory derived independently from storage-web. */
-  const backendPaths = [...(facts.sources.get('@migaia/storage-web')?.keys() ?? [])]
+  /** Current finite backend source inventory derived independently from storage-plugin-browser. */
+  const backendPaths = [...(facts.sources.get('@migaia/storage-plugin-browser')?.keys() ?? [])]
     .filter((path) => /^src\/backends\/[^/]+\.ts$/.test(path) && path !== 'src/backends/index.ts')
     .sort()
   /** Backend files selected by the reviewed listener-owner path expression. */

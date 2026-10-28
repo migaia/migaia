@@ -1,4 +1,5 @@
-import { StorageError, StorageErrorCode } from '../errors.js'
+import { StorageError } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { EntityText } from './text.js'
 import type { EntityRepositoryOwner } from './repository.js'
 import type { IRepositoryConfig } from './repository-shared.js'
@@ -16,7 +17,7 @@ export type IEntityFeature = Readonly<{
 /** Reject an undeclared capability before backend or application extension work starts. */
 export function missingEntityFeature(name: string): never {
   throw new StorageError(
-    StorageErrorCode.entityFeatureRequired,
+    StorageHostErrorCode.entityFeatureRequired,
     {},
     EntityText.featureRequired(name)
   )

@@ -2,9 +2,9 @@ import {
   snapshotStorageRdfQuad,
   encodeStorageRdfQuad,
   prefixStorageOrgGraph,
-  term
-} from '@migaia/storage-host/authoring/rdf'
-import { sparqlFragment } from '@migaia/storage-host/authoring/sparql'
+  term,
+  sparqlFragment
+} from '@migaia/storage-host/sdk'
 import { assertStorageRdfPattern, type IQuad, type ISparqlFragment } from '@migaia/storage-contract'
 import { bytesToBase64 } from '@migaia/utils/bytes'
 import { invalidArgument } from './errors.js'

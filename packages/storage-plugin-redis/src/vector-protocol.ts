@@ -1,4 +1,5 @@
 import { isUint8Array } from '@migaia/utils/bytes'
+import { sleep, type IAbortSignal } from '@migaia/utils/promise'
 import { asCodecValue, type ICodecValue } from '@migaia/serialize/codec'
 import {
   QueryOperator,
@@ -15,7 +16,7 @@ import {
 } from './layout.js'
 import { readRedisHash } from './transaction.js'
 import { redisError, invalidArgument, unsupported } from './errors.js'
-import { RedisErrorCode } from './error-code.js'
+import { RedisErrorCode } from '@migaia/storage-contract/error-code'
 import type { IRedisConnection } from './driver.js'
 /** Native schema, field and reply names have one owner for every selected vector path. */
 export const RedisVector = {
@@ -24,6 +25,8 @@ export const RedisVector = {
   create: 'FT.CREATE',
   alter: 'FT.ALTER',
   search: 'FT.SEARCH',
+  /** Per-query TIMEOUT word; 0 disables the server limit so FT.SEARCH never truncates silently. */
+  timeout: 'TIMEOUT',
   on: 'ON',
   hash: 'HASH',
   prefix: 'PREFIX',
@@ -58,6 +61,12 @@ export const RedisVector = {
   return: 'RETURN',
   dialect: 'DIALECT',
   query: 'query',
+  /** FT.INFO field that stays non-zero while the index's background keyspace scan runs. */
+  indexing: 'indexing',
+  /** First poll delay while waiting for a background scan; doubles up to `scanPollMaxMs`. */
+  scanPollMs: 1,
+  /** Upper bound of the scan poll delay, so a finished scan is noticed within this many ms. */
+  scanPollMaxMs: 50,
   cosine: 'COSINE',
   dot: 'IP',
   euclid: 'L2'
@@ -105,12 +114,49 @@ export type IRedisVectorSchema = {
   readonly configuration: IStorageVectorConfiguration
   readonly fields: ReadonlySet<string>
 }
-/** Missing native indices are distinguished by the server's existing index listing, not error text. */
+/**
+ * Queries pass this to `resolveVectorSchema` so ranking starts only after the index finished its
+ * background scan. The signal is the caller's operation signal and cancels the wait.
+ */
+export type IRedisVectorSettle = { readonly signal: IAbortSignal | undefined }
+/** Reads the FT.INFO `indexing` flag, which RESP2 and RESP3 replies encode differently. */
+function vectorIndexing(info: Record<string, unknown>): boolean {
+  const raw = info[RedisVector.indexing],
+    flag = typeof raw === 'number' ? raw : Number(vectorText(raw))
+  if (!Number.isFinite(flag)) throw redisError(RedisErrorCode.decodeFailed, info)
+  return flag !== 0
+}
+/**
+ * Waits until the index finished the background keyspace scan started by FT.CREATE or FT.ALTER. On
+ * Redis 8, a point written while that scan runs can be missing from query results until the scan
+ * passes it, so a query issued during the scan would silently return too few hits. The wait polls
+ * FT.INFO with a doubling delay and returns the settled reply; it costs no extra command when the
+ * index is not scanning. Aborting the signal rejects with the signal's reason.
+ */
+async function settleVectorIndex(
+  connection: IRedisConnection,
+  index: string,
+  info: Record<string, unknown>,
+  signal: IAbortSignal | undefined
+): Promise<Record<string, unknown>> {
+  let delay: number = RedisVector.scanPollMs
+  while (vectorIndexing(info)) {
+    await sleep(delay, { signal })
+    delay = Math.min(delay * 2, RedisVector.scanPollMaxMs)
+    info = vectorMap(await connection.command([RedisVector.info, index]))
+  }
+  return info
+}
+/**
+ * Missing native indices are distinguished by the server's existing index listing, not error text.
+ * With `settle`, the returned schema is read only after the index's background scan finished.
+ */
 export async function resolveVectorSchema(
   connection: IRedisConnection,
   layout: ReturnType<typeof createRedisLayout>,
   name: string,
-  expected?: IStorageVectorConfiguration
+  expected?: IStorageVectorConfiguration,
+  settle?: IRedisVectorSettle
 ): Promise<IRedisVectorSchema> {
   const names = vectorNames(layout, name),
     indices = await connection.command([RedisVector.list])
@@ -161,8 +207,10 @@ export async function resolveVectorSchema(
       if (!Array.isArray(current) || !current.map(vectorText).includes(names.index)) throw error
     }
   }
-  const info = vectorMap(await connection.command([RedisVector.info, names.index])),
-    attributes = info.attributes
+  let info = vectorMap(await connection.command([RedisVector.info, names.index]))
+  if (settle !== undefined)
+    info = await settleVectorIndex(connection, names.index, info, settle.signal)
+  const attributes = info.attributes
   if (!Array.isArray(attributes)) throw redisError(RedisErrorCode.decodeFailed, info)
   const fields = new Set<string>()
   let configuration: IStorageVectorConfiguration | undefined

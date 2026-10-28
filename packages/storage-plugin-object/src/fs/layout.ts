@@ -6,15 +6,15 @@ import {
   type IBlobInfo,
   type IOperationContext
 } from '@migaia/storage-contract'
-import { createStorageBlobBodyReader } from '@migaia/storage-host/authoring/blob'
-import { orderStorageKeysByBytes } from '@migaia/storage-host/authoring/key'
 import {
+  createStorageBlobBodyReader,
+  orderStorageKeysByBytes,
   subscribeToAbort,
   throwIfAborted,
   readAbortReason
-} from '@migaia/storage-host/authoring/backend'
+} from '@migaia/storage-host/sdk'
 import { ObjectDriverKind, ObjectNames } from '../constants.js'
-import { ObjectErrorCode } from '../error-code.js'
+import { ObjectErrorCode } from '@migaia/storage-contract/error-code'
 import { ObjectErrorText } from '../error-text.js'
 import { invalidArgument, isMissing, normalizeObjectError, objectError } from '../errors.js'
 import type { IObjectNative, IObjectOpenContext, IObjectRead } from '../types.js'

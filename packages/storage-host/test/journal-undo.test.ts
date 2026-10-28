@@ -5,7 +5,8 @@ import { binlog, undoLog, type ILogStore } from '@migaia/logger/plugins/durable'
 import { lockKey } from '../src/authoring/concurrency.js'
 import { ttl, vector, rdf } from '@migaia/storage-contract'
 import { term } from '../src/authoring/rdf.js'
-import { createOrgId, createStorageHost, memoryBackendPlugin } from '../src/index.js'
+import { createOrgId, createStorageHost } from '../src/index.js'
+import { memoryBackendPlugin } from '../src/plugins/memory.js'
 
 /** Actual durable plugins retain their existing scheduler and committed indexes. */
 const runtimeManager = {
@@ -27,19 +28,21 @@ const createLogger = (records: ILogStore, images: ILogStore) =>
 async function fixture() {
   const loggers = new Map<string, ReturnType<typeof createLogger>>()
   const host = await createStorageHost({
-    plugins: [storageJournalPlugin(), memoryBackendPlugin()],
-    journal: async ({ orgId, storageLogStore }) => {
-      const records = await storageLogStore('memory', { prefix: 'undo-binlog' })
-      const images = await storageLogStore('memory', { prefix: 'undo-images' })
-      const logger = createLogger(records, images)
-      loggers.set(orgId, logger)
-      return {
-        logger,
-        namespace: 'undo',
-        atomicBinlog: { memory: records },
-        atomicUndo: { memory: images }
-      }
-    }
+    plugins: [
+      storageJournalPlugin(async ({ orgId, storageLogStore }) => {
+        const records = await storageLogStore('memory', { prefix: 'undo-binlog' })
+        const images = await storageLogStore('memory', { prefix: 'undo-images' })
+        const logger = createLogger(records, images)
+        loggers.set(orgId, logger)
+        return {
+          logger,
+          namespace: 'undo',
+          atomicBinlog: { memory: records },
+          atomicUndo: { memory: images }
+        }
+      }),
+      memoryBackendPlugin()
+    ]
   })
   return {
     host,

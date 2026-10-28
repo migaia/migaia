@@ -1,4 +1,4 @@
-import { createSqlTag } from '@migaia/storage-host/authoring/sql'
+import { createSqlTag } from '@migaia/storage-host/sdk'
 import { type ICompiledStorageSql, type IOperationContext } from '@migaia/storage-contract'
 import { SqliteLimits } from './constants.js'
 import { normalizeSqliteFailure } from './errors.js'

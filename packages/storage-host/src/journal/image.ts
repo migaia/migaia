@@ -1,7 +1,8 @@
 import { asCodecValue } from '@migaia/serialize/codec'
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { base64ToBytes, bytesToBase64 } from '@migaia/utils/bytes'
-import { StorageError, StorageErrorCode } from '../errors.js'
+import { StorageError } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.js'
 import type { IStorageJournalImage } from './types.js'
 
@@ -50,7 +51,7 @@ export function decodeStorageJournalImage(
     if (typeof value !== 'string') throw invalid()
     return { present, value: base64ToBytes(value) }
   } catch (cause) {
-    if (cause instanceof StorageError && cause.code === StorageErrorCode.journalRecordInvalid)
+    if (cause instanceof StorageError && cause.code === StorageHostErrorCode.journalRecordInvalid)
       throw cause
     throw invalid(cause)
   }
@@ -59,7 +60,7 @@ export function decodeStorageJournalImage(
 /** This is owned persisted image corruption; original codec failures stay on the cause chain. */
 function invalid(cause?: unknown): StorageError {
   return new StorageError(
-    StorageErrorCode.journalRecordInvalid,
+    StorageHostErrorCode.journalRecordInvalid,
     { cause },
     StorageErrorText.journalRecordInvalid
   )

@@ -1,9 +1,10 @@
+import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import { it, expect, onTestFinished, vi } from 'vitest'
 import { createStorageHost, definePlugin } from '@migaia/storage-host'
 import { kv } from '@migaia/storage-contract'
-import { ConcurrencyPolicy, lockKey } from '@migaia/storage-host/authoring/concurrency'
+import { ConcurrencyPolicy, lockKey } from '@migaia/storage-host/sdk'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { postgresBackendPlugin } from '../src/index.js'
 import { pgDriver } from '../src/pg.js'
@@ -37,7 +38,7 @@ it('rejects invalid identifiers before DDL and retains native quoted identifier 
   ]) {
     statements.length = 0
     const failure = await createStorageHost({
-      plugins: [postgresBackendPlugin({ driver, ...options })] as const
+      plugins: [storageProbe(), postgresBackendPlugin({ driver, ...options })] as const
     }).then(
       () => undefined,
       (cause: unknown) => cause
@@ -59,7 +60,7 @@ it('rejects invalid identifiers before DDL and retains native quoted identifier 
   ]) {
     const host = await createStorageHost({
       org: randomUUID(),
-      plugins: [postgresBackendPlugin({ driver, prefix })] as const
+      plugins: [storageProbe(), postgresBackendPlugin({ driver, prefix })] as const
     })
     try {
       await host.backend('postgres').set('native', 'quoted')
@@ -87,6 +88,7 @@ it('keeps original before hooks report-only and one pipeline per actual operatio
   }))
   const host = await createStorageHost({
     plugins: [
+      storageProbe(),
       postgresBackendPlugin({
         driver: pgDriver(pool),
         prefix: 'pg_hooks_' + randomUUID().slice(0, 8)
@@ -111,11 +113,11 @@ it('keeps original before hooks report-only and one pipeline per actual operatio
     'beforeCommit',
     'beforeLockAcquire'
   ] as const) {
-    host.hooks.on(hook, () => {
+    host.extensions.observe(hook, () => {
       seen.add(hook)
       throw original
     })
-    host.hooks.on(hook, () => Promise.reject(original))
+    host.extensions.observe(hook, () => Promise.reject(original))
   }
   const store = host.backend('postgres')
   operations.length = 0
@@ -162,6 +164,7 @@ it('uses one native array binding for a batch beyond the PostgreSQL parameter li
   const host = await createStorageHost({
     org: randomUUID(),
     plugins: [
+      storageProbe(),
       postgresBackendPlugin({
         driver: pgDriver(pool),
         prefix: 'pg_large_' + randomUUID().slice(0, 8)
@@ -214,6 +217,7 @@ it('keeps disposal promise identity and the original return failure without clos
   })
   const host = await createStorageHost({
     plugins: [
+      storageProbe(),
       postgresBackendPlugin({ driver, prefix: 'pg_return_' + randomUUID().slice(0, 8) })
     ] as const
   })

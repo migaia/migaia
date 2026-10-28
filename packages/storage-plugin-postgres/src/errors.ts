@@ -1,8 +1,12 @@
 import { PgNames } from './constants.js'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { normalizeError, isStorageErrorFamily } from '@migaia/storage-host/authoring/backend'
-import { ERROR_SOURCE, PostgresErrorCode, type IPostgresErrorCode } from './error-code.js'
+import { normalizeError, isStorageErrorFamily } from '@migaia/storage-host/sdk'
+import {
+  STORAGE_POSTGRES_ERROR_SOURCE,
+  PostgresErrorCode
+} from '@migaia/storage-contract/error-code'
+import type { IPostgresErrorCode } from '@migaia/storage-contract/error-code'
 import { PostgresErrorText } from './error-text.js'
 /** Add the registered package identity while retaining the untouched native failure on cause. */
 export function postgresError(
@@ -18,13 +22,15 @@ export function postgresError(
           ? PostgresErrorText.duplicateKey
           : PostgresErrorText.sqlFailed
   return attachErrorIdentity(new Error(message, { cause }), {
-    source: ERROR_SOURCE,
+    source: STORAGE_POSTGRES_ERROR_SOURCE,
     code
   }) as Error & { readonly source: string; readonly code: IPostgresErrorCode }
 }
 /** Recognize only this package's actual owned failure; contract and host ownership stays canonical. */
 function isPostgresError(value: unknown): value is Error {
-  return value instanceof Error && 'source' in value && value.source === ERROR_SOURCE
+  return (
+    value instanceof Error && 'source' in value && value.source === STORAGE_POSTGRES_ERROR_SOURCE
+  )
 }
 /** Query/connection failures keep already-owned error identities unchanged. */
 export function normalizePostgresError(cause: unknown): Error {

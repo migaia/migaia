@@ -13,7 +13,8 @@ import { compareStorageKeys, snapshotStorageKey } from '../authoring/key.js'
 import { STORAGE_MEMORY_BACKEND } from '../state-constants.js'
 import { isArrayBuffer } from '@migaia/utils/bytes'
 import { StorageErrorText } from '../error-text.js'
-import { StorageErrorCode, createStorageRangeError, createStorageTypeError } from '../errors.js'
+import { createStorageRangeError, createStorageTypeError } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 
 /** Neutral typing borrows the original structured clone without importing a platform library. */
 const keyCloneHost = globalThis as unknown as { structuredClone?: <T>(value: T) => T }
@@ -100,12 +101,12 @@ export const decodeFlatStorageKey = (
       nodes += 1
       if (nodes > KEY_DOMAIN_LIMITS.maxNodes || depth > KEY_DOMAIN_LIMITS.maxDepth)
         throw createStorageRangeError(
-          StorageErrorCode.deserializeFailed,
+          StorageHostErrorCode.deserializeFailed,
           StorageErrorText.storageKeyDecodeLimitExceeded
         )
       if (!Array.isArray(wire) || wire.length !== 2 || typeof wire[0] !== 'string')
         throw createStorageTypeError(
-          StorageErrorCode.deserializeFailed,
+          StorageHostErrorCode.deserializeFailed,
           StorageErrorText.storageKeyWireInvalid
         )
       const [tag, payload] = wire
@@ -122,7 +123,7 @@ export const decodeFlatStorageKey = (
         const bytes = base64ToBytes(payload)
         if (bytes.byteLength > KEY_DOMAIN_LIMITS.maxBinaryBytes)
           throw createStorageRangeError(
-            StorageErrorCode.deserializeFailed,
+            StorageHostErrorCode.deserializeFailed,
             StorageErrorText.storageKeyBinaryTooLarge
           )
         return bytes.slice().buffer as ArrayBuffer
@@ -130,7 +131,7 @@ export const decodeFlatStorageKey = (
       if (tag === FlatStorageKeyWire.array && Array.isArray(payload) && payload.length > 0)
         return payload.map((item) => decode(item, depth + 1))
       throw createStorageTypeError(
-        StorageErrorCode.deserializeFailed,
+        StorageHostErrorCode.deserializeFailed,
         StorageErrorText.storageKeyWireTagInvalid
       )
     }

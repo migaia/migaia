@@ -16,7 +16,8 @@
 初始插件放在 `plugins` 数组中。后续 `use()` 返回带新增后端类型的宿主；两者共享同一个生命周期，关闭其中一个宿主引用一次即可。
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 
 const original = await createStorageHost({
   plugins: [memoryBackendPlugin({ id: 'session' })]
@@ -42,7 +43,8 @@ try {
 memory 的文本、字节和记录可以在同一个事务中写入。回调失败时草稿不提交。查询从 `records` 能力取得，下面在事务结束后读取已提交记录。
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { records } from '@migaia/storage-contract'
 
 type IOrder = { state: string; total: number }
@@ -86,17 +88,18 @@ await users.put({ id: 'u1', name: 'Ada' })
 console.log(await users.get('u1'))
 ```
 
-只在 `features` 中选择用到的单元：`/entity/query` 的 `entityQueryFeature()` 开启 query/list/stream；`/entity/indexes` 的 `entityIndexesFeature()` 开启索引声明和规划；`/entity/unique` 的 `entityUniqueFeature()` 开启唯一提交检查；`/entity/migration` 的 `entityMigrationFeature()` 开启版本计划和持久迁移；`/entity/keyset` 的 `entityKeysetFeature()` 准入 page/after。索引查询与唯一约束的回退校验还需要 query。没有索引或唯一约束的迁移直接扫描原生记录或文本键，不需要 query 或 unique。单元不会自动开启其他单元。
+只在 `features` 中选择用到的单元：`/entity/features/query` 的 `entityQueryFeature()` 开启 query/list/stream；`/entity/features/indexes` 的 `entityIndexesFeature()` 开启索引声明和规划；`/entity/features/unique` 的 `entityUniqueFeature()` 开启唯一提交检查；`/entity/features/migration` 的 `entityMigrationFeature()` 开启版本计划和持久迁移；`/entity/features/keyset` 的 `entityKeysetFeature()` 准入 page/after。索引查询与唯一约束的回退校验还需要 query。没有索引或唯一约束的迁移直接扫描原生记录或文本键，不需要 query 或 unique。单元不会自动开启其他单元。
 
 unique 单元能单独捕获约束投影，不会因此开启索引规划；仅做唯一写入检查时不需 indexes 单元。
 
 `defineEntity<T>()({...})` 声明对象的主键与索引，`connect(store)` 连接实际后端。下面先写入，再用同一声明查询。
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { defineEntity } from '@migaia/storage-host/entity'
-import { entityQueryFeature } from '@migaia/storage-host/entity/query'
-import { entityIndexesFeature } from '@migaia/storage-host/entity/indexes'
+import { entityQueryFeature } from '@migaia/storage-host/entity/features/query'
+import { entityIndexesFeature } from '@migaia/storage-host/entity/features/indexes'
 
 type IOrder = { id: string; state: string; total: number }
 const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
@@ -125,9 +128,10 @@ try {
 迁移没有索引或唯一约束的记录时，只需选择 migration 单元。读取旧记录会升级返回值；需要持久化新版本信封时，再调用 `migrate()`。内存记录的每个迁移批次沿用原生事务。
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { defineEntity } from '@migaia/storage-host/entity'
-import { entityMigrationFeature } from '@migaia/storage-host/entity/migration'
+import { entityMigrationFeature } from '@migaia/storage-host/entity/features/migration'
 
 type IUser = { id: string; name: string }
 const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
@@ -162,7 +166,8 @@ try {
 组织 ID 是规范小写 UUID。保存组织视图后，同一视图的提取方法也继续使用该组织。
 
 ```ts doc-test=run
-import { createStorageHost, createOrgId, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost, createOrgId } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 
 const host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
 try {
@@ -189,8 +194,9 @@ try {
 先安装可选 peer `@migaia/logger`。`storageLogStore()` 是异步工厂，接受宿主或组织视图、后端 ID 和非空 `prefix`，不能传普通 KV 对象。下面追加一条记录，再读取序号与待处理状态。
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
-import { storageLogStore, storageJournalPlugin } from '@migaia/storage-host/journal'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
+import { storageLogStore, storageJournalPlugin } from '@migaia/storage-host/plugins/journal'
 import { LogRecordState } from '@migaia/logger/plugins/durable'
 
 const host = await createStorageHost({ plugins: [storageJournalPlugin(), memoryBackendPlugin()] })
@@ -211,11 +217,11 @@ try {
 
 日志记录与业务键分开；业务枚举、clear 和容量限制不会操作日志。后端必须支持所需日志存储，打开时先恢复已确认状态。独占存储上的同一组织与前缀只允许一个打开句柄；支持共享事务的存储可允许多个句柄。序号不因截断而重用。写入是否提交无法确认时，日志停止接纳操作，应关闭后重新打开恢复。`dropOrg()` 后旧日志句柄报 `STORE_DISPOSED`。
 
-打开日志不等于开启自动业务日志。自动记录需要 `createStorageHost({ plugins: [storageJournalPlugin(), backend], journal: ... })`；配置可以直接提供 `{ logger, namespace, ... }`，或用异步初始化函数为每个组织准备配置。初始化函数接收 `orgId` 和异步 `storageLogStore(id, { prefix })`。宿主借用 logger，不负责 shutdown。
+打开日志不等于开启自动业务日志。自动记录需要 `createStorageHost({ plugins: [storageJournalPlugin(options), backend] })`；`options` 可以直接提供 `{ logger, namespace, ... }`，或用异步初始化函数为每个组织准备配置。初始化函数接收 `orgId` 和异步 `storageLogStore(id, { prefix })`。宿主借用 logger，不负责 shutdown。
 
 根据需要选择 binlog、WAL、undo 与同事务日志对象。`atomicBinlog` / `atomicUndo` 按后端 ID 指定真实日志存储；需要它们与业务后端能在同一事务提交。其它组合是否可用由实际后端支持决定，不支持会在业务修改前拒绝。外置 binlog 追加失败会报告，已提交业务数据不回滚；结果未知不能通过盲目重放写入恢复。undo 先检查记录与修订，冲突为 `UNDO_CONFLICT`，缺失为 `UNDO_NOT_FOUND`。
 
-开启 `telemetry: true` 还需要 logger 的 level 插件；日志可能包含操作 payload 和错误，应按应用要求配置 logger。只开 telemetry 也会安装异步阶段，此时使用异步数据方法；同步读写会报 `ASYNC_STAGE_IN_SYNC_ENTRY`。没有配置 journal 且没有导入 `/journal` 时，宿主运行时不加载 logger。更多 logger 配置见 [logger 指南](../logger/USEGUIDE.md)。
+开启 `telemetry: true` 还需要 logger 的 level 插件；日志可能包含操作 payload 和错误，应按应用要求配置 logger。只开 telemetry 也会安装异步阶段，此时使用异步数据方法；同步读写会报 `ASYNC_STAGE_IN_SYNC_ENTRY`。没有导入 `/plugins/journal` 时，宿主运行时不加载 logger。更多 logger 配置见 [logger 指南](../logger/USEGUIDE.md)。
 
 ## 检查错误与结束工作
 
@@ -235,14 +241,19 @@ try {
 
 ## 显式装配可选能力
 
-基础宿主不导入 journal runtime、通知控制器或变更迭代器。此前 journal 选项会自动加载日志实现，memory 默认提供变更通知和 watch；现在这些能力由业务显式选择，避免基础存读包含未使用代码。
+基础宿主不导入 journal runtime、通知控制器或变更迭代器。此前宿主的 journal 选项会自动加载日志实现，memory 默认提供变更通知和 watch；现在这些能力由业务显式选择，避免基础存读包含未使用代码。
 
-使用 journal 选项或 `storageLogStore()` 前，在同一插件列表中把从 `@migaia/storage-host/journal` 导入的 `storageJournalPlugin()` 放到后端前。缺少插件时报 `JOURNAL_NOT_ASSEMBLED`。配置格式、日志内容和事务提交语义保持原契约。
+日志配置写在从 `@migaia/storage-host/plugins/journal` 导入的 `storageJournalPlugin(options)` 里，放在 `createStorageHost` 第一批插件中、要记录的后端之前；宿主没有单独的 `journal` 选项。后装或重复传入带配置的日志插件会报 `INVALID_CONFIG`。只用 `storageLogStore()` 时装 `storageJournalPlugin()` 即可，缺少插件时报 `JOURNAL_NOT_ASSEMBLED`。配置格式、日志内容和事务提交语义保持原契约。
+
+`host.unUse(id)` 卸载一个已安装的插件：先撤下它的后端、扩展方法和 probe 监听，再按逆序释放资源。后端仍被其他插件借用（例如 cache 的某一层）时报 `BACKEND_IN_USE`，应先卸载借用方；未知 id 报 `BACKEND_NOT_INSTALLED`；安装进行中调用时会排在该安装之后执行；带配置的日志插件不能卸载，报 `INVALID_CONFIG`。卸载后可用同一个 id 重新安装，之后照常调用 `detect()`。
+
+观察事件只通过 `@migaia/storage-host/plugins/probe` 的 `storageProbe(handlers)` 订阅，宿主没有 `hooks` 选项，也没有 `host.hooks`。probe 放进 `createStorageHost` 的 plugins 时，从这一批的第一个安装事件起就能收到；安装后用 `host.extensions.observe(name, handler)` 追加监听，返回值是退订函数。在非默认组织的视图上调用时只收到该组织的事件。一个宿主只装一个 probe；监听器失败交给 `report`，不改变存储结果。
 
 memory 通知和变更流分别由两个 Feature 装配：
 
 ```ts
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'
 import { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-change-feed'
 
@@ -259,7 +270,7 @@ await host.dispose()
 
 未选择变更流时，memory 的 `capabilities.changeFeed` 为 `false`；调用 watch 报 `CHANGE_ITERATOR_NOT_ASSEMBLED`。只选通知可调用 `subscribeChanges()`；变更流依赖通知，缺少通知时报 `CHANGE_CONTROLLER_NOT_ASSEMBLED`。基础读写与物理资源关闭仍由轻量生命周期 owner 负责。
 
-后端作者从 `/authoring/change-controller` 导入通知工厂，并显式传给 `core.createChangeController(options, createBackendChangeController)`。基础物理资源可使用同入口的 `createBackendLifecycleController`。变更迭代器改从 `/authoring/change-iterator` 导入，不再从 `/authoring/backend` 转出。
+后端作者从 `/sdk` 导入通知工厂，并显式传给 `core.createChangeController(options, createBackendChangeController)`。基础物理资源可使用同入口的 `createBackendLifecycleController`。变更迭代器也从同一个 `/sdk` 入口导入。
 
 ### 严格索引查询迁移
 

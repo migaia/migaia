@@ -1,10 +1,11 @@
-import { isStorageErrorFamily } from '@migaia/storage-host/authoring/backend'
+import { isStorageErrorFamily } from '@migaia/storage-host/sdk'
 import {
   isStorageContractError,
   StorageContractError,
   StorageContractErrorCode
 } from '@migaia/storage-contract'
-import { ERROR_SOURCE, SqliteErrorCode, type ISqliteErrorCode } from './error-code.js'
+import { STORAGE_SQLITE_ERROR_SOURCE, SqliteErrorCode } from '@migaia/storage-contract/error-code'
+import type { ISqliteErrorCode } from '@migaia/storage-contract/error-code'
 import { SqliteErrorText } from './error-text.js'
 /** Attach the public package identity without replacing the native error type or stack. */
 export function sqliteError(
@@ -23,7 +24,7 @@ export function sqliteError(
   /** Original native/codec failure remains exactly reachable. */
   const error = new Error(text, { cause })
   Object.defineProperties(error, {
-    source: { value: ERROR_SOURCE, enumerable: true },
+    source: { value: STORAGE_SQLITE_ERROR_SOURCE, enumerable: true },
     code: { value: code, enumerable: true }
   })
   return error as Error & { readonly source: string; readonly code: ISqliteErrorCode }
@@ -46,7 +47,7 @@ export function normalizeTransactionFailure(
   if (
     error instanceof Error &&
     'source' in error &&
-    error.source === ERROR_SOURCE &&
+    error.source === STORAGE_SQLITE_ERROR_SOURCE &&
     'code' in error &&
     error.code === SqliteErrorCode.transactionFailed
   )
@@ -55,7 +56,8 @@ export function normalizeTransactionFailure(
 }
 /** Driver boundaries do not wrap their own failures a second time. */
 export function normalizeSqliteFailure(error: unknown): Error {
-  if (error instanceof Error && 'source' in error && error.source === ERROR_SOURCE) return error
+  if (error instanceof Error && 'source' in error && error.source === STORAGE_SQLITE_ERROR_SOURCE)
+    return error
   return sqliteError(SqliteErrorCode.sqliteFailed, error)
 }
 /**
@@ -70,7 +72,7 @@ export function transactionCleanupFailure(
   const original =
     primary instanceof Error &&
     'source' in primary &&
-    primary.source === ERROR_SOURCE &&
+    primary.source === STORAGE_SQLITE_ERROR_SOURCE &&
     'code' in primary &&
     primary.code === SqliteErrorCode.transactionFailed &&
     primary.cause !== undefined
@@ -79,7 +81,7 @@ export function transactionCleanupFailure(
   /** Aggregation never substitutes either native error or its stack. */
   const error = new AggregateError([original, cleanup], SqliteErrorText.transactionFailed)
   Object.defineProperties(error, {
-    source: { value: ERROR_SOURCE, enumerable: true },
+    source: { value: STORAGE_SQLITE_ERROR_SOURCE, enumerable: true },
     code: { value: SqliteErrorCode.transactionFailed, enumerable: true }
   })
   return error as AggregateError & { readonly source: string; readonly code: ISqliteErrorCode }

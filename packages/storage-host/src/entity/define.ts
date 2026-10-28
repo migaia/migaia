@@ -13,7 +13,8 @@ import type {
   IEntityConnectOptions,
   IEntityStoreQueryMethods
 } from './types.js'
-import { StorageError, StorageErrorCode } from '../errors.js'
+import { StorageError } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { assertCodec } from '@migaia/storage-contract'
 import type { IRepositoryConfig } from './repository-shared.js'
 import { missingEntityFeature } from './assembly.js'
@@ -37,7 +38,7 @@ type IDefineEntityBuilder<TDomain, TStored> = {
 const RESERVED_ENTITY_PREFIX = '__'
 /** Definition admission retains its existing native TypeError cause and public config code. */
 function invalidDefinition(message: string): never {
-  throw new StorageError(StorageErrorCode.invalidConfig, { cause: new TypeError(message) })
+  throw new StorageError(StorageHostErrorCode.invalidConfig, { cause: new TypeError(message) })
 }
 /** Validate public schema ports while borrowing the original class/object receiver. */
 function assertEntitySchema<TDomain, TStored>(

@@ -6,8 +6,14 @@ import {
   type ITransactionInfo,
   type ISqlRow
 } from '@migaia/storage-contract'
-import { runTransactionOperation } from '@migaia/storage-host/authoring/transaction'
-import { snapshotStorageKeyPrefix } from '@migaia/storage-host/authoring/key'
+import {
+  runTransactionOperation,
+  snapshotStorageKeyPrefix,
+  createStorageOperationReporter,
+  reportCleanupError,
+  encodeFlatStorageKey,
+  decodeFlatStorageKey
+} from '@migaia/storage-host/sdk'
 import type {
   IStorageJournalNamespace,
   IStorageJournalNamespaceView,
@@ -16,7 +22,7 @@ import type {
   IStorageJournalChange,
   IStorageJournalBackendBinding
 } from '@migaia/storage-host'
-import type { IBackendChangeController } from '@migaia/storage-host/authoring/backend'
+import type { IBackendChangeController } from '@migaia/storage-host/sdk'
 import { pgResource } from './driver-resource.js'
 import { pgKey, pgKeyHex, pgRecordKey, pgTextKey, encodePgRecord, decodePgRecord } from './codec.js'
 import {
@@ -31,16 +37,10 @@ import {
 } from './native.js'
 import type { IPgConfiguration, IPgTables } from './schema.js'
 import { invalidArgument, postgresError } from './errors.js'
-import { PostgresErrorCode } from './error-code.js'
+import { PostgresErrorCode } from '@migaia/storage-contract/error-code'
 import { PgNames } from './constants.js'
 import { deferred } from '@migaia/utils/promise'
 import { base64ToBytes, bytesToBase64 } from '@migaia/utils/bytes'
-import {
-  createStorageOperationReporter,
-  reportCleanupError,
-  encodeFlatStorageKey,
-  decodeFlatStorageKey
-} from '@migaia/storage-host/authoring/backend'
 /** The image keeps exact original native wire values and absolute PostgreSQL deadlines. */
 export type IPgJournalWire = Readonly<{
   version: 1

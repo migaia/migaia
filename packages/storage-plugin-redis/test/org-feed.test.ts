@@ -15,6 +15,56 @@ for (const url of [
   process.env.MIGAIA_REDIS_STACK_URL
 ]) {
   describe.skipIf(!url)('organization feed ownership', () => {
+    it('retains a quiet org history while another org exceeds the stream length', async () => {
+      const pool = createClientPool({ url }, { maximum: 8 }),
+        prefix = crypto.randomUUID()
+      await pool.connect()
+      const driver = nodeRedisDriver(pool),
+        host = await createStorageHost({
+          plugins: [
+            redisBackendPlugin(
+              { driver, prefix },
+              { history: redisChangeStreamFeature({ maxLen: 10 }) }
+            )
+          ] as const
+        })
+      try {
+        const root = host.backend('redis'),
+          quiet = host.org(createOrgId()).backend('redis'),
+          busy = host.org(createOrgId()).backend('redis')
+        await root.set('warm', 'up')
+        await quiet.set('quiet', 'one')
+        for (let index = 0; index < 300; index++) await busy.set('busy:' + index, 'value')
+        const own = await quiet.use(durableChangeFeed).readChanges({ limit: 10 })
+        expect(own.changes.map((change) => change.keys)).toEqual([['quiet']])
+        const busyPage = await busy.use(durableChangeFeed).readChanges({ limit: 10 })
+        expect(busyPage.changes).toHaveLength(10)
+        expect(
+          busyPage.changes.every((change) => change.orgId === busyPage.changes[0]!.orgId)
+        ).toBe(true)
+        const all = await root.use(durableChangeFeed).readChanges({ limit: 1000 })
+        expect(all.changes.length).toBeLessThan(301)
+        expect(all.changes.at(-1)?.keys).toEqual(['busy:299'])
+      } finally {
+        await host.dispose()
+        let cursor = '0'
+        const tag = createRedisLayout(prefix, crypto.randomUUID()).tag
+        do {
+          const reply = (await driver.command([
+            'SCAN',
+            cursor,
+            'MATCH',
+            tag + ':*',
+            'COUNT',
+            '256'
+          ])) as [string, string[]]
+          cursor = reply[0]
+          if (reply[1].length) await driver.command(['DEL', ...reply[1]])
+        } while (cursor !== '0')
+        await pool.close()
+      }
+    })
+
     it('keeps default and two other orgs isolated in replay and confirmed tail delivery', async () => {
       const pool = createClientPool({ url }, { maximum: 8 }),
         prefix = crypto.randomUUID()

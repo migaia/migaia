@@ -1,12 +1,16 @@
-import { entityMigrationFeature } from '@migaia/storage-host/entity/migration'
+import { entityMigrationFeature } from '@migaia/storage-host/entity/features/migration'
 import { afterEach, describe, expect, it } from 'vitest'
 import { defineEntity } from '@migaia/storage-host/entity'
-import { entityUniqueFeature } from '@migaia/storage-host/entity/unique'
-import { entityQueryFeature } from '@migaia/storage-host/entity/query'
-import { entityIndexesFeature } from '@migaia/storage-host/entity/indexes'
-import { entityKeysetFeature } from '@migaia/storage-host/entity/keyset'
-import { StorageErrorCode } from '../../src/error-code.js'
-import { createStorageHost, memoryBackendPlugin, STORAGE_HOST_SOURCE } from '@migaia/storage-host'
+import { entityUniqueFeature } from '@migaia/storage-host/entity/features/unique'
+import { entityQueryFeature } from '@migaia/storage-host/entity/features/query'
+import { entityIndexesFeature } from '@migaia/storage-host/entity/features/indexes'
+import { entityKeysetFeature } from '@migaia/storage-host/entity/features/keyset'
+import {
+  StorageHostErrorCode,
+  STORAGE_HOST_ERROR_SOURCE
+} from '@migaia/storage-contract/error-code'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 /** These public-entry cases keep one emitted package identity for host, transactions and entities. */
 const hosts: Array<{ dispose(): Promise<void> }> = []
 afterEach(async () => {
@@ -25,8 +29,8 @@ type IRow = { id: string; group: string }
 /** Every missing unit names its exact public migration entry before any backend work. */
 function missing(name: string) {
   return {
-    source: STORAGE_HOST_SOURCE,
-    code: StorageErrorCode.entityFeatureRequired,
+    source: STORAGE_HOST_ERROR_SOURCE,
+    code: StorageHostErrorCode.entityFeatureRequired,
     message: expect.stringContaining(`@migaia/storage-host/entity/${name}`)
   }
 }
@@ -154,7 +158,7 @@ describe('explicit entity assembly', () => {
     }).connect(await memoryBackend())
     await repository.put({ id: 'a', group: 'one' })
     await expect(repository.put({ id: 'b', group: 'one' })).rejects.toMatchObject({
-      code: StorageErrorCode.indexUniqueConflict
+      code: StorageHostErrorCode.indexUniqueConflict
     })
     expect(() => repository.query().index('group')).toThrow(
       expect.objectContaining(missing('indexes'))

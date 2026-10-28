@@ -32,7 +32,7 @@ export { collectUniqueIndexOwners } from '../core/unique-index.js'
 export type { IUniqueIndexOwner, IUniqueIndexErrorFactory } from '../core/unique-index.js'
 export { isStorageErrorFamily, normalizeError } from '../core/error-family.js'
 export type { IStorageErrorFamily } from '../core/error-family.js'
-export { invokeExtension } from '../core/errors.js'
+export { invokeExtension } from '../core/invoke-extension.js'
 export {
   readAbortReason,
   subscribeToAbort,

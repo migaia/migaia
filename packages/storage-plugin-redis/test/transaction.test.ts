@@ -3,7 +3,7 @@ import { Redis } from 'ioredis'
 import { createClientPool } from 'redis'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { deferred } from '@migaia/utils/promise'
-import { ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'
+import { ConcurrencyPolicy } from '@migaia/storage-host/sdk'
 import { redisBackendPlugin, type IRedisDriver } from '../src/index.js'
 import { nodeRedisDriver } from '../src/adapters/node-redis.js'
 import { ioredisDriver } from '../src/adapters/ioredis.js'
@@ -17,6 +17,37 @@ for (const url of [process.env.MIGAIA_REDIS_URL, process.env.MIGAIA_VALKEY_URL])
     afterAll(async () => {
       if (pool.isOpen) await pool.close()
       if (client.status !== 'wait' && client.status !== 'end') await client.quit()
+    })
+    it('pages a transaction draft in the same order and content a committed read returns', async () => {
+      await pool.connect()
+      const prefix = crypto.randomUUID(),
+        host = await createStorageHost({
+          plugins: [redisBackendPlugin({ driver: nodeRedisDriver(pool), prefix })] as const
+        })
+      try {
+        const store = host.backend('redis')
+        /** 200 committed rows, then a draft that adds 100 interleaved keys and drops 20 rows. */
+        for (let index = 0; index < 200; index++)
+          await store.putRecord({ index }, 'k' + String(index).padStart(3, '0'))
+        const collect = async (iterator: AsyncIterable<readonly [unknown, unknown]>) => {
+          const rows: [unknown, unknown][] = []
+          for await (const [key, value] of iterator) rows.push([key, value])
+          return rows
+        }
+        const drafted = await store.transaction(async (scope) => {
+          for (let index = 0; index < 100; index++)
+            await scope.putRecord({ added: index }, 'k' + String(index * 2).padStart(3, '0') + 'x')
+          for (let index = 0; index < 20; index++)
+            await scope.deleteRecord('k' + String(index * 10).padStart(3, '0'))
+          return collect(scope.iterateRecords() as never)
+        })
+        const committed = await collect(store.iterateRecords() as never)
+        expect(drafted).toHaveLength(280)
+        expect(drafted).toEqual(committed)
+        expect(new Set(drafted.map(([key]) => String(key))).size).toBe(280)
+      } finally {
+        await host.dispose()
+      }
     })
     it('retries real WATCH conflicts for two independent fifty-increment clients', async () => {
       await pool.connect()

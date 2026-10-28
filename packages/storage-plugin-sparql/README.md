@@ -24,7 +24,7 @@
 import { Store } from 'oxigraph'
 import { createStorageHost } from '@migaia/storage-host'
 import { rdf } from '@migaia/storage-contract'
-import { term } from '@migaia/storage-host/authoring/rdf'
+import { term } from '@migaia/storage-host/sdk'
 import { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'
 import { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'
 

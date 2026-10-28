@@ -1,3 +1,4 @@
+import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { createClientPool } from 'redis'
 import { createOrgId, createStorageHost } from '@migaia/storage-host'
@@ -59,7 +60,10 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_VALKEY_URL'] as const) {
             )
         },
         host = await createStorageHost({
-          plugins: [redisBackendPlugin({ driver: observed, prefix: prefix() })] as const
+          plugins: [
+            storageProbe(),
+            redisBackendPlugin({ driver: observed, prefix: prefix() })
+          ] as const
         }),
         controller = new AbortController()
       try {
@@ -87,7 +91,7 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_VALKEY_URL'] as const) {
         resume = deferred<void>(),
         host = await createStorageHost({
           org,
-          plugins: [redisBackendPlugin({ driver, prefix: value })] as const
+          plugins: [storageProbe(), redisBackendPlugin({ driver, prefix: value })] as const
         }),
         store = host.backend('redis')
       let closed = false
@@ -129,18 +133,24 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_VALKEY_URL'] as const) {
         release = deferred<void>(),
         a = await createStorageHost({
           org,
-          plugins: [redisBackendPlugin({ driver, prefix: value, maxLockMs: 100 })] as const
+          plugins: [
+            storageProbe(),
+            redisBackendPlugin({ driver, prefix: value, maxLockMs: 100 })
+          ] as const
         }),
         b = await createStorageHost({
           org,
-          plugins: [redisBackendPlugin({ driver, prefix: value, maxLockMs: 1000 })] as const
+          plugins: [
+            storageProbe(),
+            redisBackendPlugin({ driver, prefix: value, maxLockMs: 1000 })
+          ] as const
         })
       let lost = 0,
         inspected = 0
-      a.hooks.on('onLockLost', () => {
+      a.extensions.observe('onLockLost', () => {
         lost++
       })
-      b.hooks.on('beforeLockInspect', () => {
+      b.extensions.observe('beforeLockInspect', () => {
         inspected++
       })
       let second: Promise<void> | undefined
@@ -203,7 +213,10 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_VALKEY_URL'] as const) {
           }
         },
         host = await createStorageHost({
-          plugins: [redisBackendPlugin({ driver: observed, prefix: prefix() })] as const
+          plugins: [
+            storageProbe(),
+            redisBackendPlugin({ driver: observed, prefix: prefix() })
+          ] as const
         }),
         store = host.backend('redis')
       try {

@@ -64,7 +64,7 @@ describe('controlled backend change authoring', () => {
       if (coded) expect(failure).toBe(original)
       else
         expect(failure).toMatchObject({
-          source: '@migaia/storage-host',
+          source: 'storage.host',
           code: 'STORAGE_HOST_DISPOSE_FAILED',
           cause: original
         })

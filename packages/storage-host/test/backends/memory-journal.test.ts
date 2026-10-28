@@ -5,10 +5,10 @@ import { ConcurrencyPolicy } from '../../src/authoring/concurrency.js'
 import {
   createStorageHost,
   createOrgId,
-  memoryBackendPlugin,
   type IStorageJournalNamespaceView,
   type IStorageJournalNamespace
 } from '../../src/index.js'
+import { memoryBackendPlugin } from '../../src/plugins/memory.js'
 import { resolveStorageJournalBinding } from '../../src/journal/binding.js'
 
 /** These cases use the actual native owner; the internal resolver is not a public KV escape hatch. */

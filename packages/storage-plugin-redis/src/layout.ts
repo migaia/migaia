@@ -3,7 +3,7 @@ import {
   encodeStorageOrgKey,
   decodeStorageOrgKey,
   snapshotStorageOrgKeyPrefix
-} from '@migaia/storage-host/authoring/key'
+} from '@migaia/storage-host/sdk'
 import { type IStorageKey } from '@migaia/storage-contract'
 import { asCodecValue, type ICodecValue } from '@migaia/serialize/codec'
 import { bytesToBase64, base64ToBytes } from '@migaia/serialize/core'
@@ -13,7 +13,7 @@ import {
   type ICollectionsCodecValue
 } from '@migaia/serialize/codecs/collections-json'
 import { redisError, invalidArgument } from './errors.js'
-import { RedisErrorCode } from './error-code.js'
+import { RedisErrorCode } from '@migaia/storage-contract/error-code'
 import { RedisText } from './constants.js'
 
 /** Native Redis names use only lowercase ASCII hex; logical tags remain owned by the contract codec. */
@@ -129,6 +129,9 @@ export function createRedisLayout(prefix: string, orgId: string) {
     revisions: context.tag + ':' + RedisSuffix.revisions,
     changes: context.tag + ':' + RedisSuffix.changes,
     durableChanges: context.tag + ':' + RedisSuffix.durableChanges,
+    /** This organization's own durable Stream; trimmed by its own writes only. */
+    orgDurableChanges:
+      context.tag + ':' + RedisSuffix.durableChanges + ':' + redisPortableIdentity(context.orgId),
     journal: (namespace: string): string =>
       context.tag + ':' + RedisSuffix.journal + ':' + redisLayoutEncode(context, namespace),
     encode: (value: IStorageKey) => redisLayoutEncode(context, value),

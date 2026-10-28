@@ -11,7 +11,8 @@ import {
 } from '@migaia/storage-contract'
 import { term } from '../../src/authoring/rdf.js'
 import { lockKey, ConcurrencyPolicy } from '../../src/authoring/concurrency.js'
-import { createStorageHost, createOrgId, memoryBackendPlugin } from '../../src/index.js'
+import { createStorageHost, createOrgId } from '../../src/index.js'
+import { memoryBackendPlugin } from '../../src/plugins/memory.js'
 
 /** Ground fixtures use the same public term factories as applications and server authors. */
 function quad(subject: string, object: string, graph = term.defaultGraph): IQuad {

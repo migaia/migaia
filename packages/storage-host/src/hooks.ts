@@ -1,7 +1,8 @@
 import { tryReadProperty } from '@migaia/utils/error'
 import { createEventHub, EventDelivery } from '@migaia/event-subscriber'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
-import { createStorageTypeError, StorageErrorCode } from './errors.js'
+import { createStorageTypeError } from './errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from './error-text.js'
 import type { IStorageHookMap, IStorageHooks } from './hook-types.js'
 
@@ -28,7 +29,7 @@ export function createStorageHooks(report: (error: unknown) => void): {
       on(name, handler) {
         if (typeof handler !== 'function')
           throw createStorageTypeError(
-            StorageErrorCode.invalidConfig,
+            StorageHostErrorCode.invalidConfig,
             StorageErrorText.invalidHookHandler
           )
         return hub.subscribe(

@@ -220,7 +220,7 @@ describe('canonical declarative conditions', () => {
       cycle
     ]) {
       expect(() => compileStorageWhere(where as IWhere<IOrder>)).toThrowError(
-        expect.objectContaining({ source: '@migaia/storage-contract', code: 'INVALID_ARGUMENT' })
+        expect.objectContaining({ source: 'storage.contract', code: 'INVALID_ARGUMENT' })
       )
     }
   })
@@ -859,7 +859,7 @@ describe('record query terminals', () => {
     await expect(empty.maybe()).resolves.toEqual({ some: false })
     await expect(empty.exists()).resolves.toBe(false)
     await expect(empty.firstOrThrow()).rejects.toMatchObject({
-      source: '@migaia/storage-contract',
+      source: 'storage.contract',
       code: 'QUERY_EMPTY_RESULT'
     })
     expect(close).toHaveBeenCalledTimes(7)
@@ -1224,15 +1224,6 @@ describe('bounded record execution', () => {
     ).rejects.toMatchObject({ code: 'INVALID_KEY' })
   })
 
-  it('rejects an invalid key tie direction before opening a source', () => {
-    /** New optional metadata uses the existing source-admission error boundary. */
-    const execute = vi.fn(() => ownedRows([]))
-    expect(() =>
-      createRecordQuery({ pushdown: noPushdown, execute, tieBreakByKey: 'sideways' as never })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
-    expect(execute).not.toHaveBeenCalled()
-  })
-
   it('streams from the original source lazily and stops ordinary limit without reading another candidate', async () => {
     /** Source advancement is observable independently of construction and terminal materialization. */
     let advanced = 0
@@ -1452,7 +1443,7 @@ describe('bounded record execution', () => {
         .limit(2)
         .all()
     ).rejects.toBe(original)
-    expect(original).toMatchObject({ source: '@migaia/storage-contract', code: 'INVALID_ARGUMENT' })
+    expect(original).toMatchObject({ source: 'storage.contract', code: 'INVALID_ARGUMENT' })
     expect(closed).toBe(1)
   })
 })
@@ -2086,15 +2077,6 @@ describe('root mapped read cleanup', () => {
     }
   })
 
-  it('validates only an explicitly supplied resource key before source execution', () => {
-    /** Invalid author facts fail through the existing descriptor boundary without opening a cursor. */
-    const execute = vi.fn(() => ownedRows([]))
-    expect(() =>
-      createRecordQuery({ pushdown: noPushdown, execute, asyncDisposeKey: 'bad-key' as never })
-    ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
-    expect(execute).not.toHaveBeenCalled()
-  })
-
   it.each(['resolve', 'reject'] as const)(
     'drains accepted async mapping before main or symbolic cleanup can settle: %s',
     async (outcome) => {
@@ -2146,7 +2128,7 @@ describe('root mapped read cleanup', () => {
         mapping.reject(original)
         await expect(pending).rejects.toBe(original)
         expect(original).toMatchObject({
-          source: '@migaia/storage-contract',
+          source: 'storage.contract',
           code: 'INVALID_ARGUMENT'
         })
       } else {

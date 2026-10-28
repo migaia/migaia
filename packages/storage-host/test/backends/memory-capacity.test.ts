@@ -1,3 +1,4 @@
+import { storageProbe } from '../../src/plugins/probe/index.js'
 import { describe, expect, it, vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { deferred } from '@migaia/utils/promise'
@@ -5,7 +6,8 @@ import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections
 import { utf8ByteLength } from '@migaia/utils/bytes'
 import { ConcurrencyPolicy, lockKey } from '../../src/authoring/concurrency.js'
 import { counter, kv, ttl, vector } from '@migaia/storage-contract'
-import { createStorageHost, createOrgId, memoryBackendPlugin } from '../../src/index.js'
+import { createStorageHost, createOrgId } from '../../src/index.js'
+import { memoryBackendPlugin } from '../../src/plugins/memory.js'
 import { createMemoryCapacityIndex } from '../../src/backends/memory-capacity.js'
 
 /**
@@ -14,7 +16,9 @@ import { createMemoryCapacityIndex } from '../../src/backends/memory-capacity.js
  */
 describe('native memory capacity', () => {
   it('preserves unbounded records and distinguishes linked LRU from LFU hits', async () => {
-    await using unlimited = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+    await using unlimited = await createStorageHost({
+      plugins: [storageProbe(), memoryBackendPlugin()]
+    })
     const cycle: { self?: unknown; date: Date } = { date: new Date(1) }
     cycle.self = cycle
     await unlimited.backend('memory').putRecord(cycle, 'cycle')
@@ -22,7 +26,7 @@ describe('native memory capacity', () => {
     expect(restored.self).toBe(restored)
     for (const eviction of ['lru', 'lfu'] as const) {
       await using host = await createStorageHost({
-        plugins: [memoryBackendPlugin({ capacity: { maxEntries: 2, eviction } })]
+        plugins: [storageProbe(), memoryBackendPlugin({ capacity: { maxEntries: 2, eviction } })]
       })
       const store = host.backend('memory')
       await store.set('a', 'a')
@@ -46,11 +50,11 @@ describe('native memory capacity', () => {
       const scheduler = createManualScheduler()
       await using host = await createStorageHost({
         scheduler,
-        plugins: [memoryBackendPlugin({ capacity: { maxEntries: 2, eviction } })]
+        plugins: [storageProbe(), memoryBackendPlugin({ capacity: { maxEntries: 2, eviction } })]
       })
       const store = host.backend('memory')
       const evicted = vi.fn()
-      host.hooks.on('onEvict', evicted)
+      host.extensions.observe('onEvict', evicted)
       await store.set('old-live', 'A')
       await store.use(kv).setMany([{ key: 'new-expired', value: 'B', ttlMs: 1 }])
       scheduler.advance(1)
@@ -73,7 +77,7 @@ describe('native memory capacity', () => {
     const payload = new Map([['key', new Set(['值'])]])
     const size = utf8ByteLength(codec.encode(payload))
     await using host = await createStorageHost({
-      plugins: [memoryBackendPlugin({ capacity: { maxBytes: size } })]
+      plugins: [storageProbe(), memoryBackendPlugin({ capacity: { maxBytes: size } })]
     })
     const store = host.backend('memory')
     await store.putRecord(payload, 'record')
@@ -97,7 +101,7 @@ describe('native memory capacity', () => {
 
   it('isolates only nonencodable maxBytes records before replacements or any draft changes', async () => {
     await using host = await createStorageHost({
-      plugins: [memoryBackendPlugin({ capacity: { maxBytes: 100 } })]
+      plugins: [storageProbe(), memoryBackendPlugin({ capacity: { maxBytes: 100 } })]
     })
     const store = host.backend('memory')
     await store.set('same', 'retained')
@@ -128,12 +132,12 @@ describe('native memory capacity', () => {
     const listenerFailure = new Error('eviction observer')
     await using host = await createStorageHost({
       report,
-      plugins: [memoryBackendPlugin({ capacity: { maxEntries: 2 } })]
+      plugins: [storageProbe(), memoryBackendPlugin({ capacity: { maxEntries: 2 } })]
     })
     const store = host.backend('memory')
     const evicted = vi.fn()
-    host.hooks.on('onEvict', evicted)
-    host.hooks.on('onEvict', () => {
+    host.extensions.observe('onEvict', evicted)
+    host.extensions.observe('onEvict', () => {
       throw listenerFailure
     })
     await store.set('a', 'a')
@@ -184,7 +188,7 @@ describe('native memory capacity', () => {
 
   it('uses original victim locks, waiting budgets and independent organization capacity', async () => {
     await using host = await createStorageHost({
-      plugins: [memoryBackendPlugin({ capacity: { maxEntries: 1 } })]
+      plugins: [storageProbe(), memoryBackendPlugin({ capacity: { maxEntries: 1 } })]
     })
     const store = host.backend('memory')
     await store.set('a', 'a')
@@ -274,7 +278,9 @@ describe('native memory capacity', () => {
         return 1
       }
     }
-    await using host = await createStorageHost({ plugins: [memoryBackendPlugin({ capacity })] })
+    await using host = await createStorageHost({
+      plugins: [storageProbe(), memoryBackendPlugin({ capacity })]
+    })
     await host.org(createOrgId()).backend('memory').set('a', 'a')
     expect(reads).toBe(1)
     for (const invalid of [{ maxEntries: 0 }, { maxBytes: NaN }, { eviction: 'random' }])

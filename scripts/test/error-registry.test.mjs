@@ -443,7 +443,7 @@ for (const [modeIndex, mode] of sourceValidationModes.entries())
 
 test('source domains known source readers contain no legacy error identities', () => {
   /**
-   * These non-storage comparisons are independent witnesses; the deferred storage-web reader stays
+   * These non-storage comparisons are independent witnesses; the deferred storage-plugin-browser reader stays
    * with its owner.
    */
   const readers = [

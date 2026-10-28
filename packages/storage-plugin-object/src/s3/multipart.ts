@@ -10,16 +10,17 @@ import {
   type PutObjectCommandOutput
 } from '@aws-sdk/client-s3'
 import { StorageContractError, type IBlobApi } from '@migaia/storage-contract'
-import { createStorageBlobBodyReader } from '@migaia/storage-host/authoring/blob'
 import {
+  createStorageBlobBodyReader,
   subscribeToAbort,
   readAbortReason,
   throwIfAborted
-} from '@migaia/storage-host/authoring/backend'
+} from '@migaia/storage-host/sdk'
 import { isUint8Array } from '@migaia/utils/bytes'
 import { ObjectNames } from '../constants.js'
 import { ObjectErrorText } from '../error-text.js'
-import { ERROR_SOURCE, ObjectErrorCode, type IObjectErrorCode } from '../error-code.js'
+import { STORAGE_OBJECT_ERROR_SOURCE, ObjectErrorCode } from '@migaia/storage-contract/error-code'
+import type { IObjectErrorCode } from '@migaia/storage-contract/error-code'
 import { invalidArgument, normalizeObjectError, objectError } from '../errors.js'
 import type { createObjectSender } from './send.js'
 /**
@@ -263,7 +264,9 @@ class ObjectMultipartUpload {
                   cause: aggregate
                 })
               : objectError(
-                  'source' in primary && primary.source === ERROR_SOURCE && 'code' in primary
+                  'source' in primary &&
+                    primary.source === STORAGE_OBJECT_ERROR_SOURCE &&
+                    'code' in primary
                     ? (primary.code as IObjectErrorCode)
                     : ObjectErrorCode.failed,
                   aggregate

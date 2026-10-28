@@ -6,10 +6,10 @@ import {
   binaryConformance,
   recordsConformance,
   iterationConformance,
-  transactionsConformance,
   crossChannelConformance,
   syncBinaryConformance
-} from './legacy.js'
+} from './channels.js'
+import { transactionsConformance } from './transaction-cases.js'
 import { syncConformance, indexConformance, feedConformance } from './features.js'
 import { standardConformance } from './standards.js'
 import { nativeTransactionsConformance } from './transactions.js'

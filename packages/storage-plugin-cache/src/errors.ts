@@ -1,7 +1,8 @@
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { CacheText } from './constants.js'
-import { CacheErrorCode, ERROR_SOURCE, type ICacheErrorCode } from './error-code.js'
+import { CacheErrorCode, STORAGE_CACHE_ERROR_SOURCE } from '@migaia/storage-contract/error-code'
+import type { ICacheErrorCode } from '@migaia/storage-contract/error-code'
 
 /**
  * Cache callback failures retain their native class and expose their original failure as first
@@ -30,7 +31,7 @@ export function cacheError(code: ICacheErrorCode, cause?: unknown, tier?: number
               : new Error(message, cause === undefined ? undefined : { cause })
   if (error instanceof DOMException) Object.defineProperty(error, 'cause', { value: cause })
   if (tier !== undefined) Object.defineProperty(error, 'tier', { value: tier, enumerable: true })
-  return attachErrorIdentity(error, { source: ERROR_SOURCE, code })
+  return attachErrorIdentity(error, { source: STORAGE_CACHE_ERROR_SOURCE, code })
 }
 
 /** Public invalid input uses the existing domain guard before starting any layer operation. */

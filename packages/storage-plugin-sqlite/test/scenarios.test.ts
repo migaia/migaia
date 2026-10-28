@@ -5,12 +5,12 @@ import { join } from 'node:path'
 import { it, expect, onTestFinished, vi } from 'vitest'
 import { createStorageHost, createOrgId, defineFeature, definePlugin } from '@migaia/storage-host'
 import { deferred, sleep } from '@migaia/utils/promise'
-import { lockKey } from '@migaia/storage-host/authoring/concurrency'
-import { sql, type IOperationContext, type IStorageChange } from '@migaia/storage-contract'
 import {
+  lockKey,
   readTransactionOperationContext,
   runTransactionOperation
-} from '@migaia/storage-host/authoring/transaction'
+} from '@migaia/storage-host/sdk'
+import { sql, type IOperationContext, type IStorageChange } from '@migaia/storage-contract'
 import { sqliteBackendPlugin, sqliteBackendKind, type ISqliteDriver } from '../src/index.js'
 import { nodeSqliteDriver } from '../src/node.js'
 import { sqliteMaintenanceFeature } from '../src/features/maintenance.js'
@@ -287,7 +287,7 @@ it('shares the original attempt context with cancellable transaction composition
   const failure = await result
   expect((failure as Error).cause).toBe(cancelledWorkFailure)
   expect(failure).toMatchObject({
-    source: '@migaia/storage-plugin-sqlite',
+    source: 'storage.backend.sqlite',
     code: 'TRANSACTION_FAILED',
     cause: cancelledWorkFailure
   })

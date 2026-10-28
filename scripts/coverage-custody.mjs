@@ -35,7 +35,7 @@ const BASELINE_RESET_TEST_TRANSFORMS = Object.freeze([
     ])
   }),
   Object.freeze({
-    path: 'packages/storage-web/test/bundle-boundary.spec.ts',
+    path: 'packages/storage-plugin-browser/test/bundle-boundary.spec.ts',
     replace: Object.freeze([
       '@migaia/event-subscriber/dist/channel-D8-zrqiP.js',
       '@migaia/event-subscriber/dist/channel-BqvtJPfL.js'

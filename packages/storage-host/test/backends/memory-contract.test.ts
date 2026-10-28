@@ -1,3 +1,4 @@
+import { storageProbe } from '../../src/plugins/probe/index.js'
 import { describe, expect, it } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import {
@@ -8,12 +9,8 @@ import {
 } from '@migaia/storage-contract'
 import { lockKey, ConcurrencyPolicy } from '../../src/authoring/concurrency.js'
 import { registerTransactionFinalizer } from '../../src/authoring/transaction.js'
-import {
-  createStorageHost,
-  definePlugin,
-  memoryBackendPlugin,
-  StorageError
-} from '../../src/index.js'
+import { createStorageHost, definePlugin, StorageError } from '../../src/index.js'
+import { memoryBackendPlugin } from '../../src/plugins/memory.js'
 import type { IStorageHookMap } from '../../src/index.js'
 
 /** The selected row domain belongs to the actual native memory record channel. */
@@ -38,14 +35,17 @@ describe('memory native contract integration', () => {
       }
     }))
     await using host = await createStorageHost({
-      plugins: [memoryBackendPlugin(), counting],
-      hooks: {
-        beforeStorageOperation: (payload) => {
-          beforePayloads.push(payload)
-          observations.push(`before:${payload.operation}`)
-        },
-        afterStorageOperation: ({ operation }) => observations.push(`after:${operation}`)
-      }
+      plugins: [
+        storageProbe({
+          beforeStorageOperation: (payload) => {
+            beforePayloads.push(payload)
+            observations.push(`before:${payload.operation}`)
+          },
+          afterStorageOperation: ({ operation }) => observations.push(`after:${operation}`)
+        }),
+        memoryBackendPlugin(),
+        counting
+      ]
     })
     const store = host.backend('memory')
     const text = store.use(kv)
@@ -104,15 +104,17 @@ describe('memory native contract integration', () => {
     /** Failure payloads retain only the original identity, operation, code and batch count. */
     const errors: IStorageHookMap['onStorageOperationError'][] = []
     await using host = await createStorageHost({
-      plugins: [memoryBackendPlugin()],
-      hooks: {
-        beforeTransaction: () => {
-          transactions++
-        },
-        onStorageOperationError: (payload) => {
-          errors.push(payload)
-        }
-      }
+      plugins: [
+        storageProbe({
+          beforeTransaction: () => {
+            transactions++
+          },
+          onStorageOperationError: (payload) => {
+            errors.push(payload)
+          }
+        }),
+        memoryBackendPlugin()
+      ]
     })
     const store = host.backend('memory')
     const text = store.use(kv)
@@ -163,12 +165,15 @@ describe('memory native contract integration', () => {
       }
     }))
     await using host = await createStorageHost({
-      plugins: [memoryBackendPlugin(), counting],
-      hooks: {
-        beforeStorageOperation: () => {
-          observations++
-        }
-      }
+      plugins: [
+        storageProbe({
+          beforeStorageOperation: () => {
+            observations++
+          }
+        }),
+        memoryBackendPlugin(),
+        counting
+      ]
     })
     const store = host.backend('memory')
     expect(await store.getMany([])).toEqual([])
@@ -280,7 +285,7 @@ describe('memory native contract integration', () => {
     const expiredFailure = await expired.getRecord('one').catch((error) => error)
     expect(expiredFailure).toBeInstanceOf(StorageError)
     expect(expiredFailure).toMatchObject({
-      source: '@migaia/storage-host',
+      source: 'storage.host',
       code: 'TRANSACTION_FAILED',
       operation: 'transaction.scope'
     })
@@ -329,7 +334,7 @@ describe('memory native contract integration', () => {
       })
     ).toThrowError(
       expect.objectContaining({
-        source: '@migaia/storage-host',
+        source: 'storage.host',
         code: 'INVALID_CONFIG',
         cause: original
       })
@@ -351,7 +356,7 @@ describe('memory native contract integration', () => {
         }
       })
     ).rejects.toSatisfy((error: unknown) => error === first)
-    expect(first).toMatchObject({ source: '@migaia/storage-host', code: 'DUPLICATE_KEY' })
+    expect(first).toMatchObject({ source: 'storage.host', code: 'DUPLICATE_KEY' })
     /** Ordinary callback normalization retains its own native cause without expiry metadata. */
     const original = new TypeError('ordinary transaction callback')
     const failure = await store
@@ -371,7 +376,7 @@ describe('memory native contract integration', () => {
           { key: ['duplicate', 1], value: 'second' }
         ])
       )
-    ).rejects.toMatchObject({ source: '@migaia/storage-contract', code: 'INVALID_ARGUMENT' })
+    ).rejects.toMatchObject({ source: 'storage.contract', code: 'INVALID_ARGUMENT' })
     expect(await store.transaction((scope) => scope.use(kv).getMany([['duplicate', 1]]))).toEqual([
       undefined
     ])

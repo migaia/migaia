@@ -23,7 +23,8 @@ Arrange installed key-value backends from faster to slower cache tiers, share lo
 Install the data tier before the cache. The second request reads the cached value without running the loader again.
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { cachePlugin } from '@migaia/storage-plugin-cache'
 
 const base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'values' })] })

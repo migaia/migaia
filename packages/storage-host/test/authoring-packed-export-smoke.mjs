@@ -93,15 +93,7 @@ function main() {
     writeFileSync(
       join(consumerDirectory, 'identity.mjs'),
       `import { defineStorageCapability, implement, sql, blob, durableChangeFeed, sparql, rdf, vector, DeleteCountMode } from '@migaia/storage-contract'
-import { provideCapabilities, hasStorageCapability, useStorageCapability } from '@migaia/storage-host/authoring/capability'
-import { createSqlTag, deriveStorageSqlQuery } from '@migaia/storage-host/authoring/sql'
-import { snapshotStorageBlobPut, snapshotStorageBlobGet, snapshotStorageBlobList, createStorageBlobObject } from '@migaia/storage-host/authoring/blob'
-import { orderStorageKeysByBytes, encodeStorageOrgStringPrefix, encodeOrderedStorageKey, decodeOrderedStorageKey, prefixStorageOrgKey } from '@migaia/storage-host/authoring/key'
-import { sparqlFragment, createSparqlTag } from '@migaia/storage-host/authoring/sparql'
-import { term } from '@migaia/storage-host/authoring/rdf'
-import { snapshotStorageVectorIds, snapshotStorageDeleteCountMode } from '@migaia/storage-host/authoring/vector'
-import { createStorageIteratorLifetime } from '@migaia/storage-host/authoring/resource'
-import { createRecordQuery, snapshotStorageWhere, compileStorageQueryCondition } from '@migaia/storage-host/authoring/query'
+import { provideCapabilities, hasStorageCapability, useStorageCapability, createSqlTag, deriveStorageSqlQuery, snapshotStorageBlobPut, snapshotStorageBlobGet, snapshotStorageBlobList, createStorageBlobObject, orderStorageKeysByBytes, encodeStorageOrgStringPrefix, encodeOrderedStorageKey, decodeOrderedStorageKey, prefixStorageOrgKey, sparqlFragment, createSparqlTag, term, snapshotStorageVectorIds, snapshotStorageDeleteCountMode, createStorageIteratorLifetime, createRecordQuery, snapshotStorageWhere, compileStorageQueryCondition } from '@migaia/storage-host/sdk'
 import * as conformance from '@migaia/storage-contract/conformance'
 import { isArrayBuffer as utilsBuffer, isUint8Array as utilsBytes } from '@migaia/utils/bytes'
 /** Independent resource bases exercise package-root capability reads without acquiring external clients. */
@@ -126,7 +118,7 @@ if (hasStorageCapability(raw, token) || Object.hasOwn(raw, 'use')) throw new Err
 /** The real package-root error remains the declared unsupported failure rather than a missing export. */
 let missing
 try { useStorageCapability(raw, token) } catch (error) { missing = error }
-if (missing?.source !== '@migaia/storage-contract' || missing.code !== 'UNSUPPORTED_CAPABILITY' || missing.backend !== 'packed-fixture' || Object.hasOwn(raw, 'use')) throw new Error('packed missing capability identity mismatch')
+if (missing?.source !== 'storage.contract' || missing.code !== 'UNSUPPORTED_CAPABILITY' || missing.backend !== 'packed-fixture' || Object.hasOwn(raw, 'use')) throw new Error('packed missing capability identity mismatch')
 /** Admission callbacks fail if a token lookup unexpectedly performs native work. */
 const noAdmissionIo = () => { throw new Error('capability admission performed I/O') }
 /** Packed RDF/vector publication preserves exact native APIs without generic vector transactions. */

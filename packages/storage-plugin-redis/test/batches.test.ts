@@ -1,8 +1,9 @@
+import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { afterAll, describe, expect, it } from 'vitest'
 import { createClientPool } from 'redis'
 import { createOrgId, createStorageHost, definePlugin } from '@migaia/storage-host'
 import { kv, records, vector } from '@migaia/storage-contract'
-import { snapshotConcurrencyLockKeys } from '@migaia/storage-host/authoring/concurrency'
+import { snapshotConcurrencyLockKeys } from '@migaia/storage-host/sdk'
 import { redisBackendPlugin, type IRedisDriver } from '../src/index.js'
 import { nodeRedisDriver } from '../src/adapters/node-redis.js'
 import { RedisCommand, RedisText } from '../src/constants.js'
@@ -62,6 +63,7 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_VALKEY_URL'] as const) {
           name = crypto.randomUUID()
         const host = await createStorageHost({
           plugins: [
+            storageProbe(),
             redisBackendPlugin(
               { driver, prefix },
               {
@@ -94,6 +96,7 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_VALKEY_URL'] as const) {
           if (service === 'MIGAIA_REDIS_URL') {
             const search = await createStorageHost({
               plugins: [
+                storageProbe(),
                 redisBackendPlugin({ driver, prefix }, { search: rediSearchVectorFeature() })
               ] as const
             })
@@ -133,7 +136,7 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_VALKEY_URL'] as const) {
         physical = layout.value('text', 'recreated'),
         writer = await createStorageHost({
           org,
-          plugins: [redisBackendPlugin({ driver: original, prefix })] as const
+          plugins: [storageProbe(), redisBackendPlugin({ driver: original, prefix })] as const
         })
       let recreate = false,
         prunes = 0
@@ -163,7 +166,7 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_VALKEY_URL'] as const) {
       }
       const reader = await createStorageHost({
         org,
-        plugins: [redisBackendPlugin({ driver: observed, prefix })] as const
+        plugins: [storageProbe(), redisBackendPlugin({ driver: observed, prefix })] as const
       })
       try {
         await writer.backend('redis').set('recreated', 'old')
@@ -216,7 +219,11 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_VALKEY_URL'] as const) {
         }
       }))
       const host = await createStorageHost({
-        plugins: [redisBackendPlugin({ driver, prefix: crypto.randomUUID() }), counting] as const,
+        plugins: [
+          storageProbe(),
+          redisBackendPlugin({ driver, prefix: crypto.randomUUID() }),
+          counting
+        ] as const,
         report: (cause) => {
           reports.push(cause)
         }
@@ -229,13 +236,13 @@ for (const service of ['MIGAIA_REDIS_URL', 'MIGAIA_VALKEY_URL'] as const) {
         'beforeLockAcquire',
         'beforeLockInspect'
       ] as const) {
-        host.hooks.on(hook, (payload) => {
+        host.extensions.observe(hook, (payload) => {
           seen.add(hook)
           if (hook === 'beforeStorageOperation' && 'operation' in payload)
             hooks.push(String(payload.operation))
           throw failure
         })
-        host.hooks.on(hook, () => Promise.reject(failure))
+        host.extensions.observe(hook, () => Promise.reject(failure))
       }
       const reset = () => {
         commands.length = 0

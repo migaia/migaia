@@ -5,7 +5,8 @@ import type {
   IBackendChangeControllerOptions,
   IBackendLifecycleController
 } from '../core/change-types.js'
-import { StorageError, StorageErrorCode } from '../errors.js'
+import { StorageError } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.js'
 
 /** Memory base retains physical lifecycle while optional notification calls fail explicitly. */
@@ -45,7 +46,7 @@ class MemoryLifecycleController implements IBackendChangeController {
   /** External notifications require explicit assembly and cannot silently disappear. */
   readonly publishExternal = (_change: IStorageChange): void => {
     throw new StorageError(
-      StorageErrorCode.changeControllerNotAssembled,
+      StorageHostErrorCode.changeControllerNotAssembled,
       {},
       StorageErrorText.changeControllerNotAssembled
     )
@@ -53,7 +54,7 @@ class MemoryLifecycleController implements IBackendChangeController {
   /** Subscriptions require the selected notification Feature. */
   readonly subscribe = (_listener: (change: IStorageChange) => void): (() => void) => {
     throw new StorageError(
-      StorageErrorCode.changeControllerNotAssembled,
+      StorageHostErrorCode.changeControllerNotAssembled,
       {},
       StorageErrorText.changeControllerNotAssembled
     )

@@ -23,7 +23,8 @@ import { snapshotKeyValueStoreDetailed, snapshotRecordStore } from '../authoring
 import { compareStorageKeys } from '../authoring/key.js'
 import { assertTransactionOwner } from '../authoring/transaction.js'
 
-import { StorageError, StorageErrorCode } from '../errors.js'
+import { StorageError } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 
 import { isStorageKeyInRange } from '../core/query-state.js'
 import { normalizeError as normalizeStorageError } from '../core/error-family.js'
@@ -177,7 +178,7 @@ export const stageFailure = (stage: IStageFailure['stage'], cause: unknown): ISt
   }
   if (isStorageContractError(cause)) return cause as unknown as IStageFailure
   return new StorageError(
-    StorageErrorCode.extensionFailed,
+    StorageHostErrorCode.extensionFailed,
     { cause },
     undefined,
     stage
@@ -190,7 +191,7 @@ export const validateLimit = (
   backend: IKeyValueStore['backend']
 ): void => {
   if (limit !== undefined && (!Number.isSafeInteger(limit) || limit < 0))
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageHostErrorCode.invalidConfig, {
       backend,
       cause: new RangeError(EntityText.listLimitMustBeANonNegativeSafeInteger)
     })
@@ -198,7 +199,7 @@ export const validateLimit = (
 
 export const validateOrderBy = (orderBy: unknown, backend: IKeyValueStore['backend']): void => {
   if (orderBy !== undefined && typeof orderBy !== 'function')
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageHostErrorCode.invalidConfig, {
       backend,
       cause: new TypeError(EntityText.listOrderByMustBeAFunction)
     })
@@ -209,7 +210,7 @@ export const validateListOptions = (options: unknown, backend: IKeyValueStore['b
     options !== undefined &&
     (typeof options !== 'object' || options === null || Array.isArray(options))
   )
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageHostErrorCode.invalidConfig, {
       backend,
       cause: new TypeError(EntityText.listOptionsMustBeAnObject)
     })
@@ -222,7 +223,7 @@ export const snapshotEntityStore = (store: IEntityConnectStore): IBackendEntityA
   if (access !== undefined) return access
   const snapshot = snapshotKeyValueStoreDetailed(store)
   if (!snapshot.valid)
-    throw new StorageError(StorageErrorCode.invalidConfig, { cause: snapshot.cause })
+    throw new StorageError(StorageHostErrorCode.invalidConfig, { cause: snapshot.cause })
   /** Every other input retains the original complete raw resource and record admission. */
   return {
     store: snapshot.store,
@@ -265,7 +266,7 @@ export const idOf = <TDomain>(
 ): IStorageKey => {
   const id = (value as Record<string, unknown>)[keyProp]
   if (id === undefined || id === null)
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageHostErrorCode.invalidConfig, {
       backend,
       cause: new TypeError(EntityText.entityMissingStorageKey(entityName, keyProp))
     })

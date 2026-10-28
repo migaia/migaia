@@ -1,6 +1,6 @@
 import { PluginHost } from '@migaia/plugin-host'
 import { createStorageHost } from '@migaia/storage-host'
-import { localStorageBackendPlugin } from '@migaia/storage-web/local-storage'
+import { localStorageBackendPlugin } from '@migaia/storage-plugin-browser/local-storage'
 
 class RendererHost extends PluginHost<Record<string, never>> {}
 

@@ -140,7 +140,7 @@ const packedCommands = Object.freeze({
     'node',
     'test/packed-export-smoke.mjs'
   ],
-  'storage-web': [
+  'storage-plugin-browser': [
     'pnpm run build && vitest run test/bundle-boundary.spec.ts',
     'pnpm',
     'exec',
@@ -433,12 +433,12 @@ const finishPackage = async (result, runtime) => {
       if (manifest.scripts[gate] !== packed[0]) throw new Error(text.packedChanged(result.name))
       /** Pnpm preserves the original script PATH for compilers launched from temporary consumers. */
       const command = packed[1] === 'node' ? 'pnpm' : packed[1]
-      /** The storage-web narrow packed run must not overwrite the full unit's coverage reports. */
+      /** The storage-plugin-browser narrow packed run must not overwrite the full unit's coverage reports. */
       const args = packed[1] === 'node' ? ['exec', ...packed.slice(1)] : packed.slice(2)
-      if (result.name === 'storage-web')
+      if (result.name === 'storage-plugin-browser')
         args.push(
           `--maxWorkers=${runtime.workers}`,
-          `--coverage.reportsDirectory=${join(runtime.reportRoot, 'storage-web-packed')}`
+          `--coverage.reportsDirectory=${join(runtime.reportRoot, 'storage-plugin-browser-packed')}`
         )
       result.gates.push(
         await runGate(`${result.name}/${gate}`, 'required', command, args, {

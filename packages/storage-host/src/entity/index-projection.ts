@@ -10,7 +10,8 @@ import type {
 } from '@migaia/storage-contract'
 import { assertStorageKey, QueryOperator } from '@migaia/storage-contract'
 import { snapshotStorageKey, compareStorageKeys } from '../authoring/key.js'
-import { StorageError, StorageErrorCode } from '../errors.js'
+import { StorageError } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import type { IKeyValueStore } from '@migaia/storage-contract'
 
 type IStorageBackend = IKeyValueStore['backend']
@@ -38,7 +39,7 @@ const normalizeProjection = (
   if (value === undefined) return undefined
   if (multiEntry) {
     if (!Array.isArray(value))
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageHostErrorCode.invalidConfig, {
         backend,
         cause: new TypeError(EntityText.entityIndexMultiEntryProjectionMustBeAnArray(label))
       })
@@ -60,7 +61,7 @@ const normalizeCustomProjection = (
 ): IRecordIndexProjectionValue | undefined => {
   if (value === undefined) return undefined
   if (typeof value !== 'object' || value === null || Array.isArray(value))
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageHostErrorCode.invalidConfig, {
       backend,
       cause: new TypeError(EntityText.entitySelectorIndexProjectionMustBeAnObject(label))
     })
@@ -72,7 +73,7 @@ const normalizeCustomProjection = (
   }
   if (kind === 'multiple') {
     if (!Array.isArray(keys))
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageHostErrorCode.invalidConfig, {
         backend,
         cause: new TypeError(EntityText.entitySelectorIndexMultipleProjectionMustBeAnArray(label))
       })
@@ -82,7 +83,7 @@ const normalizeCustomProjection = (
     })
     return { kind, keys: normalizedKeys }
   }
-  throw new StorageError(StorageErrorCode.invalidConfig, {
+  throw new StorageError(StorageHostErrorCode.invalidConfig, {
     backend,
     cause: new TypeError(EntityText.entitySelectorIndexProjectionKindIsInvalid(label))
   })
@@ -139,7 +140,7 @@ export const snapshotEntityIndexes = <TDomain>(
 ): ISnapshotEntityIndexes<TDomain> => {
   if (configured === undefined) return {}
   if (configured === null || typeof configured !== 'object' || Array.isArray(configured))
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageHostErrorCode.invalidConfig, {
       cause: new TypeError(EntityText.entityIndexesMustBeAnObject)
     })
   /** Declaration entries are ordinary input; the owner retains their parsed facts for future writes. */
@@ -147,43 +148,43 @@ export const snapshotEntityIndexes = <TDomain>(
   const indexes: Record<string, ISnapshotEntityIndex<TDomain>> = {}
   for (const [name, raw] of entries) {
     if (name.trim() === '' || name.startsWith(RESERVED_INDEX_PREFIX))
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageHostErrorCode.invalidConfig, {
         cause: new TypeError(EntityText.entityIndexNameMustBeNonEmptyAndNonReserved)
       })
     if (raw === null || typeof raw !== 'object' || Array.isArray(raw))
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageHostErrorCode.invalidConfig, {
         cause: new TypeError(EntityText.entityIndexMustBeAnObject(name))
       })
     /** Canonical declaration alternatives share the original shape checks. */
     const { path, paths, select, unique, multiEntry, revision } = raw as Record<string, unknown>
     const modes = [path !== undefined, paths !== undefined, select !== undefined].filter(Boolean)
     if (modes.length !== 1)
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageHostErrorCode.invalidConfig, {
         cause: new TypeError(EntityText.entityIndexMustDeclareExactlyOneProjectionMode(name))
       })
     if (unique !== undefined && typeof unique !== 'boolean')
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageHostErrorCode.invalidConfig, {
         cause: new TypeError(EntityText.entityIndexUniqueMustBeABoolean(name))
       })
     if (multiEntry !== undefined && typeof multiEntry !== 'boolean')
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageHostErrorCode.invalidConfig, {
         cause: new TypeError(EntityText.entityIndexMultiEntryMustBeABoolean(name))
       })
     const normalizedRevision = revision === undefined ? 1 : revision
     if (!Number.isSafeInteger(normalizedRevision) || (normalizedRevision as number) < 1)
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageHostErrorCode.invalidConfig, {
         cause: new RangeError(EntityText.entityIndexRevisionMustBeAPositiveSafeInteger(name))
       })
     if (select !== undefined && (typeof select !== 'function' || revision === undefined))
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageHostErrorCode.invalidConfig, {
         cause: new TypeError(EntityText.entitySelectorIndexRequiresAFunctionAndRevision(name))
       })
     if (select !== undefined && multiEntry !== undefined)
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageHostErrorCode.invalidConfig, {
         cause: new TypeError(EntityText.entitySelectorIndexDoesNotSupportMultiEntry(name))
       })
     if (paths !== undefined && (multiEntry === true || !Array.isArray(paths) || paths.length === 0))
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageHostErrorCode.invalidConfig, {
         cause: new TypeError(EntityText.entityCompoundIndexRequiresNonEmptyPaths(name))
       })
     const parsedPath = path === undefined ? undefined : parseObjectPath(path as IObjectPathTuple)

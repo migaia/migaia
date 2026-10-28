@@ -41,3 +41,8 @@ export const STORAGE_CHAIN_FAMILIES = Object.freeze({
 
 /** Stable native plugin identity for explicit journal runtime installation and duplicate detection. */
 export const STORAGE_JOURNAL_PLUGIN_ID = 'storage-journal'
+/**
+ * Fixed plugin id of `storageProbe()`. One probe is installed per host, like rpc's probe plugin;
+ * `unUse` with this id removes every subscription it owns.
+ */
+export const STORAGE_PROBE_PLUGIN_ID = 'storage-probe'

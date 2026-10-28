@@ -42,7 +42,7 @@ describe('store-persist hydration failure boundary', () => {
     const store = createStore({ count: 0 })
     const handle = persist(store, { key: 'both-fail', storage, version: 1 })
     await expect(handle.ready).rejects.toMatchObject({
-      source: '@migaia/storage-contract',
+      source: 'storage.contract',
       code: 'VERSION_UNSUPPORTED'
     })
 
@@ -52,11 +52,11 @@ describe('store-persist hydration failure boundary', () => {
     }
     store.count = 2
     await expect(handle.flush()).rejects.toMatchObject({
-      source: '@migaia/storage-contract',
+      source: 'storage.contract',
       code: 'VERSION_UNSUPPORTED'
     })
     expect(handle.error.value).toMatchObject({
-      source: '@migaia/storage-contract',
+      source: 'storage.contract',
       code: 'VERSION_UNSUPPORTED'
     })
     handle.dispose()

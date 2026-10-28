@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { cacheKey, CacheWriteMode, CacheErrorCode, ERROR_SOURCE } from '../src/index.js'
+import { cacheKey, CacheWriteMode } from '../src/index.js'
+import { CacheErrorCode, STORAGE_CACHE_ERROR_SOURCE } from '@migaia/storage-contract/error-code'
 import { cacheError } from '../src/errors.js'
 
 describe('canonical cache inputs', () => {
@@ -28,7 +29,7 @@ describe('canonical cache inputs', () => {
       error = cacheError(CacheErrorCode.loadFailed, original)
     expect(error).toBeInstanceOf(RangeError)
     expect(error).toMatchObject({
-      source: ERROR_SOURCE,
+      source: STORAGE_CACHE_ERROR_SOURCE,
       code: 'CACHE_LOAD_FAILED',
       cause: original
     })

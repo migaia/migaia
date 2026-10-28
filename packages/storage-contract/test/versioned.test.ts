@@ -38,7 +38,7 @@ describe('versioned envelope admission', () => {
   ])('rejects invalid envelope %#', (input) => {
     expect(() => assertVersionedEnvelope(input)).toThrow(
       expect.objectContaining({
-        source: '@migaia/storage-contract',
+        source: 'storage.contract',
         code: StorageContractErrorCode.envelopeInvalid
       })
     )

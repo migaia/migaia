@@ -5,7 +5,8 @@ import {
   type ILockKey
 } from '@migaia/storage-contract'
 import { decodeFlatStorageKey, encodeFlatStorageKey } from '../core/key-domain.js'
-import { StorageError, StorageErrorCode } from '../errors.js'
+import { StorageError } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.js'
 import { STORAGE_MEMORY_BACKEND } from '../state-constants.js'
 import type { IStorageJournalTarget } from '../journal/types.js'
@@ -63,7 +64,7 @@ export function snapshotMemoryJournalTarget(target: IStorageJournalTarget): {
     if (lock.channel === 'rdf' || memoryJournalDeadlineTarget(lock).key !== key) throw invalid()
     return { target: { channel: 'metadata', key }, lock, metadata: true }
   } catch (cause) {
-    if (cause instanceof StorageError && cause.code === StorageErrorCode.journalRecordInvalid)
+    if (cause instanceof StorageError && cause.code === StorageHostErrorCode.journalRecordInvalid)
       throw cause
     throw invalid(cause)
   }
@@ -72,7 +73,7 @@ export function snapshotMemoryJournalTarget(target: IStorageJournalTarget): {
 /** This is owned persisted image/identity corruption, rather than a second codec validation rule. */
 function invalid(cause?: unknown): StorageError {
   return new StorageError(
-    StorageErrorCode.journalRecordInvalid,
+    StorageHostErrorCode.journalRecordInvalid,
     { cause },
     StorageErrorText.journalRecordInvalid
   )

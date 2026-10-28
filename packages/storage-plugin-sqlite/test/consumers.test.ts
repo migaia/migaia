@@ -1,3 +1,4 @@
+import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { it, expect, expectTypeOf, onTestFinished } from 'vitest'
 import {
   createStorageHost,
@@ -10,7 +11,7 @@ import { createStore } from '@migaia/store-light'
 import { persist } from '@migaia/store-persist/light'
 import { persistTransaction } from '@migaia/store-persist'
 import { kv, records, sql, type ISqlExecutor } from '@migaia/storage-contract'
-import { lockKey } from '@migaia/storage-host/authoring/concurrency'
+import { lockKey } from '@migaia/storage-host/sdk'
 import {
   sqliteBackendPlugin,
   sqliteBackendKind,
@@ -33,8 +34,10 @@ it('commits persistence and native SQL through one original transaction', async 
   const operations: string[] = []
   const connection = nodeSqliteDriver(':memory:')
   const host = await createStorageHost({
-    hooks: { beforeStorageOperation: ({ operation }) => operations.push(operation) },
-    plugins: [sqliteBackendPlugin({ driver: connection })] as const
+    plugins: [
+      storageProbe({ beforeStorageOperation: ({ operation }) => operations.push(operation) }),
+      sqliteBackendPlugin({ driver: connection })
+    ] as const
   })
   const storage = host.backend('sqlite')
   expect(storage.use(sql).sql).toBe(storage.sql)

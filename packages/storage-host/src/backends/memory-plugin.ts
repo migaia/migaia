@@ -1,5 +1,6 @@
 import { type ITransactionScope, type records } from '@migaia/storage-contract'
-import { StorageError, StorageErrorCode } from '../errors.js'
+import { StorageError } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.js'
 import { isStorageErrorFamily } from '../core/error-family.js'
 import { definePlugin, defineStorageBackendKind } from '../contracts.js'
@@ -78,7 +79,7 @@ export function memoryBackendPlugin<
       }
     } catch (cause) {
       if (isStorageErrorFamily(cause)) throw cause
-      throw new StorageError(StorageErrorCode.invalidConfig, { backend: 'memory', cause })
+      throw new StorageError(StorageHostErrorCode.invalidConfig, { backend: 'memory', cause })
     }
   })()
   /** The descriptor captures only its own constructed store, controller and provider installer. */

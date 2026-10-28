@@ -1,6 +1,6 @@
 # @migaia/storage-contract
 
-运行时中立的存储契约。根入口只拥有类型、能力 token/定义、错误、枚举式常量和纯校验；执行、资源与作者快照由 `@migaia/storage-host/authoring/*` 拥有。基础包不依赖 host、浏览器存储或数据库客户端。
+运行时中立的存储契约。根入口只拥有类型、能力 token/定义、错误、枚举式常量和纯校验；执行、资源与作者快照由 `@migaia/storage-host/sdk` 拥有。基础包不依赖 host、浏览器存储或数据库客户端。
 
 ## 入口与依赖方向
 
@@ -8,27 +8,27 @@
 - `@migaia/storage-contract/conformance`：由消费者现有 runner 执行的后端契约组；不内置 runner，也不依赖 host。
 - 后端和 host 向内依赖本包。运行时作者 API 从下表入口导入；根入口不保留旧名称重导出或兼容别名。
 
-| host 入口后缀            | 既有作者能力                                                                                   |
-| ------------------------ | ---------------------------------------------------------------------------------------------- |
-| `/authoring/capability`  | provideCapabilities、hasStorageCapability、useStorageCapability、readTransactionImplementation |
-| `/authoring/query`       | createRecordQuery、createVectorQuery、createRdfQuery、条件编译与快照                           |
-| `/authoring/concurrency` | ConcurrencyPolicy、lockKey、runWithConcurrency、锁身份与快照                                   |
-| `/authoring/transaction` | createTransactionOwner、createTransactionBuilder、事务执行与游标派生                           |
-| `/authoring/key`         | 键快照、有序键/组织编码、批次键 capture/projection                                             |
-| `/authoring/context`     | snapshotOperationContext、snapshotSyncWriteOptions                                             |
-| `/authoring/store`       | store/capabilities 的 snapshot 准入                                                            |
-| `/authoring/resource`    | createStorageIteratorLifetime                                                                  |
-| `/authoring/sql`         | sqlFragment、createSqlTag、deriveStorageSqlQuery                                               |
-| `/authoring/sparql`      | sparqlFragment、createSparqlTag                                                                |
-| `/authoring/rdf`         | term、RDF 快照/编码、组织图映射                                                                |
-| `/authoring/vector`      | 向量输入快照、recommendStorageVector                                                           |
-| `/authoring/ttl`         | snapshotStorageTtlTarget                                                                       |
-| `/authoring/counter`     | snapshotStorageCounterIncrement                                                                |
-| `/authoring/blob`        | blob 输入快照、body reader 与 object 资源                                                      |
-| `/authoring/codec`       | fromValueCodec、snapshotCodec                                                                  |
-| `/authoring/migration`   | createMigrationPlan、迁移执行与 envelope 恢复                                                  |
+| host 入口后缀 | 既有作者能力                                                                                   |
+| ------------- | ---------------------------------------------------------------------------------------------- |
+| `/sdk`        | provideCapabilities、hasStorageCapability、useStorageCapability、readTransactionImplementation |
+| `/sdk`        | createRecordQuery、createVectorQuery、createRdfQuery、条件编译与快照                           |
+| `/sdk`        | ConcurrencyPolicy、lockKey、runWithConcurrency、锁身份与快照                                   |
+| `/sdk`        | createTransactionOwner、createTransactionBuilder、事务执行与游标派生                           |
+| `/sdk`        | 键快照、有序键/组织编码、批次键 capture/projection                                             |
+| `/sdk`        | snapshotOperationContext、snapshotSyncWriteOptions                                             |
+| `/sdk`        | store/capabilities 的 snapshot 准入                                                            |
+| `/sdk`        | createStorageIteratorLifetime                                                                  |
+| `/sdk`        | sqlFragment、createSqlTag、deriveStorageSqlQuery                                               |
+| `/sdk`        | sparqlFragment、createSparqlTag                                                                |
+| `/sdk`        | term、RDF 快照/编码、组织图映射                                                                |
+| `/sdk`        | 向量输入快照、recommendStorageVector                                                           |
+| `/sdk`        | snapshotStorageTtlTarget                                                                       |
+| `/sdk`        | snapshotStorageCounterIncrement                                                                |
+| `/sdk`        | blob 输入快照、body reader 与 object 资源                                                      |
+| `/sdk`        | fromValueCodec、snapshotCodec                                                                  |
+| `/sdk`        | createMigrationPlan、迁移执行与 envelope 恢复                                                  |
 
-这些入口属于 `@migaia/storage-host`。`/authoring/backend` 继续拥有既有有限后端接点；共享模板捕获仅是 SQL/SPARQL 的内部模块，不是公开子路径。使用步骤见 [USEGUIDE](./USEGUIDE.md) 与 [host 指南](../storage-host/USEGUIDE.md)。
+这些入口属于 `@migaia/storage-host`。`/sdk` 继续拥有既有有限后端接点；共享模板捕获仅是 SQL/SPARQL 的内部模块，不是公开子路径。使用步骤见 [USEGUIDE](./USEGUIDE.md) 与 [host 指南](../storage-host/USEGUIDE.md)。
 
 ## 类型与纯校验
 
@@ -63,11 +63,11 @@ shape guard 面向普通受支持输入，不承诺拦截抛错 getter、Proxy�
 
 `defineStorageCapability`、标准 `kv/records/sql/ttl/counter/vector/rdf/sparql/blob/durableChangeFeed` token 和 `implement` 留在本包。名称只作诊断；同名 token 不能互换。`readCapabilityTokenFacts` 与 `readStorageImplementation` 只读取原定义身份，不发布能力、不执行回调、不维护每 store 表。
 
-publication、store has/use 和 transaction implementation lookup 统一由 host `/authoring/capability` 拥有。调用方继续使用同一 token 和原 API 实例；支持合法 class 的方法 receiver。查询/事务/锁/iterator 的状态表也只在 host 中存在。
+publication、store has/use 和 transaction implementation lookup 统一由 host `/sdk` 拥有。调用方继续使用同一 token 和原 API 实例；支持合法 class 的方法 receiver。查询/事务/锁/iterator 的状态表也只在 host 中存在。
 
 ## 错误与已接受边界
 
-`StorageContractError` 保持 `source: '@migaia/storage-contract'`、公开 code、原 `cause`、原 stack 与扩展 details。未改名或新增错误码。`INVALID_ARGUMENT` 表示输入结构问题，`INVALID_KEY` 表示 typed-key 域问题，`UNSUPPORTED_CAPABILITY` 表示缺少已请求能力；执行拥有者继续使用本包既有生命周期、并发、查询和迁移码。
+`StorageContractError` 保持 `source: 'storage.contract'`、公开 code、原 `cause`、原 stack 与扩展 details。未改名或新增错误码。`INVALID_ARGUMENT` 表示输入结构问题，`INVALID_KEY` 表示 typed-key 域问题，`UNSUPPORTED_CAPABILITY` 表示缺少已请求能力；执行拥有者继续使用本包既有生命周期、并发、查询和迁移码。
 
 错误实例保留既有冻结行为，cause 对象不会随之冻结。归档迁移的进度错误通过既有 `onArchiveRunError` 通道报告，不修改已冻结错误实例。codec 不承诺冻结或复制：纯 `assertCodec` 只校验；host `snapshotCodec` 校验后返回同一实例，使 `#private` 方法保持 receiver。
 
@@ -77,4 +77,4 @@ publication、store has/use 和 transaction implementation lookup 统一由 host
 
 存储 codec 使用的 `@migaia/serialize` 格式编码器现按对象自身的属性枚举顺序输出字段，不再按字段名排序。相同字段和值、不同插入顺序的对象，编码字节可能不同；解码后的字段和值不变。依赖旧排序字节的快照、签名输入或缓存键应按新顺序重新生成，不能把旧字节顺序当作存储契约。
 
-递归 `Map`、`Set` 值改用 `@migaia/serialize/codecs/collections-json` 的 `defineCollectionsJsonCodec`，再从 `@migaia/storage-host/authoring/codec` 使用 `fromValueCodec` 适配。普通 JSON codec 不隐式开启集合编码；新写入格式的旧消费者需同步迁移。格式细节见 [serialize 指南](../serialize/USEGUIDE.md)。
+递归 `Map`、`Set` 值改用 `@migaia/serialize/codecs/collections-json` 的 `defineCollectionsJsonCodec`，再从 `@migaia/storage-host/sdk` 使用 `fromValueCodec` 适配。普通 JSON codec 不隐式开启集合编码；新写入格式的旧消费者需同步迁移。格式细节见 [serialize 指南](../serialize/USEGUIDE.md)。

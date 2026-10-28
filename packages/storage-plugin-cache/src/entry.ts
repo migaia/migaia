@@ -1,5 +1,5 @@
 import type { ICodecValue } from '@migaia/serialize/codec'
-import { CacheErrorCode } from './error-code.js'
+import { CacheErrorCode } from '@migaia/storage-contract/error-code'
 import { cacheError, invalidArgument } from './errors.js'
 import { shorten, type ICacheConfiguration, type ICachePolicy } from './policy.js'
 import type { ICacheEntryInfo } from './types.js'

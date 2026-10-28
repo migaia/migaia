@@ -1,7 +1,7 @@
 import type { IBackendValueCommit } from './core/backend-registry.js'
 import type { IBackendRevisionPort } from './backends/revisions.js'
 import type { IBackendKeyLockPort } from './backends/key-locks.js'
-import type { IStorageHooks, IStorageHookMap } from './hook-types.js'
+import type { IStorageHooks } from './hook-types.js'
 import type { IStorageHookEmitter } from './hooks.js'
 import type {
   IPluginHostCore,
@@ -353,6 +353,11 @@ export type IStoragePluginCore<F extends IStorageFeatureRecord = {}> = Pick<
     readonly defaultOrgId: string
     readonly execution: IStorageExecutionPort
     readonly hooks: IStorageHooks
+    /**
+     * Subscribe to the host event registry at any time, not only during `install()`. The caller
+     * owns the returned unsubscribe function and must call it when its plugin is disposed.
+     */
+    readonly subscribeStorageHook: IStorageHooks['on']
     readonly stageBindings: IBackendStageBindings
     /** Project selected transaction methods onto the original backend-created view before freeze. */
     createTransactionApi(scope: object): object | undefined
@@ -583,24 +588,17 @@ export type IRejectInstalledOrDuplicateIds<
     : never
 /** Construction captures timing and diagnostic ownership before a plugin runs. */
 export type IStorageHostOptions = {
-  readonly journal?: import('./journal/types.js').IStorageJournalConfiguration
   readonly org?: string
   readonly autoDetect?: boolean
   readonly installTimeoutMs?: number
   readonly scheduler?: IScheduler
   readonly report?: (error: unknown) => void | PromiseLike<void>
-  readonly hooks?: { readonly [K in keyof IStorageHookMap]?: (payload: IStorageHookMap[K]) => void }
 }
 /** Exact initial tuple participates in duplicate admission and store inference. */
-export type IStorageHostCreateOptions<
-  P extends readonly IStorageBackendPluginHandle[],
-  J extends import('./journal/types.js').IStorageJournalConfiguration | undefined =
-    | import('./journal/types.js').IStorageJournalConfiguration
-    | undefined
-> = Omit<IStorageHostOptions, 'journal'> & {
-  readonly journal?: J
-  readonly plugins?: IRejectInstalledOrDuplicateIds<{}, P>
-}
+export type IStorageHostCreateOptions<P extends readonly IStorageBackendPluginHandle[]> =
+  IStorageHostOptions & {
+    readonly plugins?: IRejectInstalledOrDuplicateIds<{}, P>
+  }
 /** Only an actual statically selected undo extension adds the public undo business method. */
 type IStorageJournalUndoSurface<J> = (
   J extends (...args: never[]) => infer R ? Awaited<R> : J
@@ -610,9 +608,9 @@ type IStorageJournalUndoSurface<J> = (
 /** Neutral host registry and lifetime; backend implementations remain separate from installation. */
 export type IStorageHost<
   P extends readonly IStorageBackendPluginHandle[],
-  J extends import('./journal/types.js').IStorageJournalConfiguration | undefined = undefined
+  J extends import('./journal/types.js').IStorageJournalConfiguration | undefined =
+    import('./journal/types.js').IStorageJournalOf<P>
 > = import('@migaia/storage-contract').IStorageResource & {
-  readonly hooks: IStorageHooks
   detect(): Promise<void>
   org(orgId: string): IStorageOrgView<P, J>
   dropOrg(orgId: string): Promise<void>
@@ -644,6 +642,11 @@ export type IStorageHost<
   use<const Next extends readonly IStorageBackendPluginHandle[]>(
     ...plugins: IRejectInstalledOrDuplicateIds<{ [N in IStoragePluginId<P[number]>]: true }, Next>
   ): Promise<IStorageHost<readonly [...P, ...Next], J>>
+  /**
+   * Remove one installed plugin by id and release its resources. Rejects while another plugin
+   * borrows the backend (BACKEND_IN_USE). The static host type keeps listing the plugin.
+   */
+  unUse(id: IStoragePluginId<P[number]>): Promise<void>
   backend<N extends keyof IPluginStoreMap<P> & string>(
     id: N
   ): IPluginStoreMap<P>[N] & IStorageJournalUndoSurface<J>
@@ -657,10 +660,18 @@ export type IStorageHost<
 /** A business view retains inference while lifecycle and installation stay with its root host. */
 export type IStorageOrgView<
   P extends readonly IStorageBackendPluginHandle[],
-  J extends import('./journal/types.js').IStorageJournalConfiguration | undefined = undefined
+  J extends import('./journal/types.js').IStorageJournalConfiguration | undefined =
+    import('./journal/types.js').IStorageJournalOf<P>
 > = Omit<
   IStorageHost<P, J>,
-  'use' | 'dropOrg' | 'dispose' | typeof Symbol.asyncDispose | 'backend' | 'backends' | 'org'
+  | 'use'
+  | 'unUse'
+  | 'dropOrg'
+  | 'dispose'
+  | typeof Symbol.asyncDispose
+  | 'backend'
+  | 'backends'
+  | 'org'
 > & {
   readonly orgId: string
   org(orgId: string): IStorageOrgView<P, J>
@@ -716,6 +727,7 @@ export type IStorageDefinePlugin = {
         | 'execution'
         | 'defaultOrgId'
         | 'hooks'
+        | 'subscribeStorageHook'
         | 'emit'
         | 'registerDetect'
         | 'getPublishedBackend'

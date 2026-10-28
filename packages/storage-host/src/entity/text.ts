@@ -36,16 +36,16 @@ export const EntityText = {
   comparatorLimit: 'entity orderBy requires a limit',
   /** Value-only sources retain their authoritative full-key scan diagnostic. */
   valueScan: (name: string) =>
-    `[storage-web] entity "${name}".list/stream on a value-only backend performs a full key scan`,
+    `[storage-host] entity "${name}".list/stream on a value-only backend performs a full key scan`,
   /** Invalid records are reported observationally after the selected skip policy. */
   invalidRecord: (name: string, id: unknown) =>
-    `[storage-web] entity "${name}" skipped invalid record ${String(id)}`,
+    `[storage-host] entity "${name}" skipped invalid record ${String(id)}`,
   /** Index lookup rejects undeclared names before source I/O. */
   indexMissing: (name: string, index: string) =>
     `entity "${name}" index "${index}" is not declared`,
   /** An unavailable native projection uses the same actual materialization fallback. */
   indexFallback: (name: string, index: string) =>
-    `[storage-web] entity "${name}" index "${index}" uses authoritative full-scan fallback`,
+    `[storage-host] entity "${name}" index "${index}" uses authoritative full-scan fallback`,
   /** Preserve the existing entity boundary diagnostic across root and transaction paths. */
   entitySchemaMustBeAnObject: 'entity schema must be an object',
   /** Preserve the existing entity boundary diagnostic across root and transaction paths. */
@@ -133,7 +133,7 @@ export const EntityText = {
     arg0: unknown,
     arg1: unknown,
     arg2: unknown
-  ) => `[storage-web] entity "${arg0}" skipped invalid index backfill record ${arg1}: ${arg2}`,
+  ) => `[storage-host] entity "${arg0}" skipped invalid index backfill record ${arg1}: ${arg2}`,
   /** Preserve the existing entity boundary diagnostic across root and transaction paths. */
   entityRequiresVersion: (arg0: unknown, arg1: unknown) =>
     `entity "${arg0}" requires version ${arg1}`,
@@ -153,7 +153,7 @@ export const EntityText = {
   oninvalidHandlerMustReturnSkipOrThrow: 'onInvalid handler must return skip or throw',
   /** Preserve the existing entity boundary diagnostic across root and transaction paths. */
   storageWebEntityFindByOnNonUniqueIndexReturnedTheFirst: (arg0: unknown, arg1: unknown) =>
-    `[storage-web] entity "${arg0}" findBy on non-unique index "${arg1}" returned the first canonical match`,
+    `[storage-host] entity "${arg0}" findBy on non-unique index "${arg1}" returned the first canonical match`,
   /** Preserve the existing entity boundary diagnostic across root and transaction paths. */
   migrationFromVersionMustBeANonNegativeSafeInteger:
     'migration fromVersion must be a non-negative safe integer',

@@ -1,8 +1,9 @@
+import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import { it, expect, onTestFinished } from 'vitest'
 import { createStorageHost, definePlugin } from '@migaia/storage-host'
-import { ConcurrencyPolicy, lockKey } from '@migaia/storage-host/authoring/concurrency'
+import { ConcurrencyPolicy, lockKey } from '@migaia/storage-host/sdk'
 import { type IConcurrencyPolicy } from '@migaia/storage-contract'
 import { postgresBackendPlugin } from '../src/index.js'
 import { pgDriver } from '../src/pg.js'
@@ -68,18 +69,21 @@ async function installed(
     }
   }
   const host = await createStorageHost({
-    hooks: {
-      onLockConflict: () => {
-        counts.conflicts += 1
-      },
-      onRetry: (payload) => {
-        if (payload.reason === 'physical') {
-          counts.physical += 1
-          observation?.retried?.()
+    plugins: [
+      storageProbe({
+        onLockConflict: () => {
+          counts.conflicts += 1
+        },
+        onRetry: (payload) => {
+          if (payload.reason === 'physical') {
+            counts.physical += 1
+            observation?.retried?.()
+          }
         }
-      }
-    },
-    plugins: [postgresBackendPlugin({ driver, prefix }), inspect] as const
+      }),
+      postgresBackendPlugin({ driver, prefix }),
+      inspect
+    ] as const
   })
   onTestFinished(async () => {
     await host.dispose()

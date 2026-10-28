@@ -1,4 +1,4 @@
-import { storageJournalPlugin } from '@migaia/storage-host/journal'
+import { storageJournalPlugin } from '@migaia/storage-host/plugins/journal'
 import { expect, it, onTestFinished, vi } from 'vitest'
 import { Logger } from '@migaia/logger'
 import { binlog, undoLog, wal, memoryLogStore } from '@migaia/logger/plugins/durable'
@@ -30,8 +30,10 @@ it.each([
       ]
     })
     const host = await createStorageHost({
-      plugins: [storageJournalPlugin(), sqliteBackendPlugin({ driver: connection })] as const,
-      journal: { logger, namespace: 'expiry', binlogValues: true }
+      plugins: [
+        storageJournalPlugin({ logger, namespace: 'expiry', binlogValues: true }),
+        sqliteBackendPlugin({ driver: connection })
+      ] as const
     })
     onTestFinished(async () => {
       vi.restoreAllMocks()

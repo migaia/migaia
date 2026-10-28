@@ -1,3 +1,4 @@
+import { storageProbe } from '../src/plugins/probe/index.js'
 import { describe, expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import {
@@ -116,7 +117,7 @@ describe('storage environment checks', () => {
     /** The highest actual native client boundary answers whether any business work was invoked. */
     const read = vi.spyOn(state.client, 'get')
     await expect(host.backend('delayed').get('key')).rejects.toMatchObject({
-      source: '@migaia/storage-contract',
+      source: 'storage.contract',
       code: 'UNSUPPORTED_CAPABILITY'
     })
     expect(prefix).not.toHaveBeenCalled()
@@ -272,12 +273,12 @@ describe('storage environment checks', () => {
     const plugin = definePlugin('ordinary', () => ({ install }))
     await using _host = await createStorageHost({
       org,
-      plugins: [plugin],
-      hooks: { beforeDetect: ({ orgId }) => identities.push(orgId) }
+      plugins: [storageProbe({ beforeDetect: ({ orgId }) => identities.push(orgId) }), plugin]
     })
-    expect(identities).toEqual([org])
+    /** Each installed registration reports its check pass; every one carries the configured org. */
+    expect([...new Set(identities)]).toEqual([org])
     await expect(createStorageHost({ org: 'UPPERCASE', plugins: [plugin] })).rejects.toMatchObject({
-      source: '@migaia/storage-contract',
+      source: 'storage.contract',
       code: 'INVALID_ARGUMENT'
     })
     expect(install).toHaveBeenCalledTimes(1)

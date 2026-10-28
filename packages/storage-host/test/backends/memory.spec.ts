@@ -9,7 +9,8 @@ import {
   type IStorageResource
 } from '@migaia/storage-contract'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createStorageHost, memoryBackendPlugin } from '../../src/index.js'
+import { createStorageHost } from '../../src/index.js'
+import { memoryBackendPlugin } from '../../src/plugins/memory.js'
 import { composeRepositoryKey } from '../../src/entity/key.js'
 
 /** Test-owned real host resources are closed after every migrated baseline case. */

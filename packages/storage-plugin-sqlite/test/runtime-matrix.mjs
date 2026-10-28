@@ -1,14 +1,15 @@
 import assert from 'node:assert/strict'
 import { createStorageHost } from '@migaia/storage-host'
+import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import { defineEntity } from '@migaia/storage-host/entity'
-import { entityQueryFeature } from '@migaia/storage-host/entity/query'
-import { entityMigrationFeature } from '@migaia/storage-host/entity/migration'
+import { entityQueryFeature } from '@migaia/storage-host/entity/features/query'
+import { entityMigrationFeature } from '@migaia/storage-host/entity/features/migration'
 import { sqliteBackendPlugin } from '@migaia/storage-plugin-sqlite'
 import { createStore } from '@migaia/store-light'
 import { persist } from '@migaia/store-persist/light'
 import { kv, records, sql, ttl, counter } from '@migaia/storage-contract'
-import { lockKey } from '@migaia/storage-host/authoring/concurrency'
+import { lockKey } from '@migaia/storage-host/sdk'
 
 /** Each invocation performs exactly one real process phase against its runtime-owned test file. */
 const [mode, path] = process.argv.slice(2)
@@ -23,8 +24,8 @@ const connection =
 let iterationCloses = 0
 /** The actual public plugin installs its own native store. */
 const host = await createStorageHost({
-  hooks: { onStorageIterationClose: () => iterationCloses++ },
   plugins: [
+    storageProbe({ onStorageIterationClose: () => iterationCloses++ }),
     sqliteBackendPlugin({ driver: connection, maxLockMs: mode === 'hold' ? 1000 : undefined })
   ]
 })

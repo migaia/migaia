@@ -32,7 +32,7 @@ Most community solutions cover only one part of the problem. qiankun's `initGlob
 pnpm add @migaia/micro-hub
 ```
 
-Install the optional peer `@migaia/resource` only when you share asynchronous values. Persistence needs a storage backend, for example `@migaia/storage-web`.
+Install the optional peer `@migaia/resource` only when you share asynchronous values. Persistence needs a storage backend, for example `storage.backend.browser`.
 
 ### Module Federation configuration
 
@@ -75,7 +75,7 @@ import { createMicroHub } from '@migaia/micro-hub'
 import { events } from '@migaia/micro-hub/events'
 import { state } from '@migaia/micro-hub/state'
 import { persist } from '@migaia/micro-hub/persist'
-import { localStorageHost } from '@migaia/storage-web/local-storage'
+import { localStorageHost } from '@migaia/storage-plugin-browser/local-storage'
 
 createMicroHub({
   plugins: [events(), state(), persist({ store: localStorageHost({ namespace: 'shop' }) })]

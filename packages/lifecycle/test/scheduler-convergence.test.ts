@@ -176,13 +176,16 @@ describe('single scheduler contract across the workspace', () => {
     }
   })
 
-  it('routes storage-web catalog scheduler symbols through the utils scheduler subpath', () => {
+  it('routes storage-plugin-browser catalog scheduler symbols through the utils scheduler subpath', () => {
     /** Non-capability edge of the bounded capability catalog. */
     type ICatalogEdge = { readonly route: string; readonly symbols: readonly string[] }
     /** Parsed catalog fixture. */
     const catalog = JSON.parse(
       readFileSync(
-        join(packagesRoot, 'storage-web/test/fixtures/storage-v2-bounded-capability-catalog.json'),
+        join(
+          packagesRoot,
+          'storage-plugin-browser/test/fixtures/storage-v2-bounded-capability-catalog.json'
+        ),
         'utf8'
       )
     ) as { readonly nonCapabilityEdges: readonly ICatalogEdge[] }
@@ -198,9 +201,9 @@ describe('single scheduler contract across the workspace', () => {
       (edge) => edge.route === '@migaia/utils/scheduler'
     )
     expect(schedulerEdge).toBeDefined()
-    /** Symbols storage-web source imports from the utils scheduler route. */
+    /** Symbols storage-plugin-browser source imports from the utils scheduler route. */
     const imported = new Set<string>()
-    for (const path of listSources(join(packagesRoot, 'storage-web/src')))
+    for (const path of listSources(join(packagesRoot, 'storage-plugin-browser/src')))
       new Visitor({
         ImportDeclaration(node) {
           if (node.source.value === '@migaia/utils/scheduler')

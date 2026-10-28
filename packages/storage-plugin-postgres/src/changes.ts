@@ -1,9 +1,6 @@
 import type { IStorageResource } from '@migaia/storage-contract'
-import type { IBackendChangeController } from '@migaia/storage-host/authoring/backend'
-import {
-  createStorageOperationReporter,
-  reportCleanupError
-} from '@migaia/storage-host/authoring/backend'
+import type { IBackendChangeController } from '@migaia/storage-host/sdk'
+import { createStorageOperationReporter, reportCleanupError } from '@migaia/storage-host/sdk'
 import type { IPgConfiguration } from './schema.js'
 import type { IPgState } from './native.js'
 import { PgNotificationChannel } from './constants.js'

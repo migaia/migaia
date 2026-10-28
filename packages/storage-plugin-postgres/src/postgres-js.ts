@@ -13,7 +13,7 @@ import {
   readAbortReason,
   createStorageOperationReporter,
   reportCleanupError
-} from '@migaia/storage-host/authoring/backend'
+} from '@migaia/storage-host/sdk'
 /** Raw query-local results bypass caller transforms and retain each actual server OID. */
 async function query(
   client: Sql | ReservedSql,

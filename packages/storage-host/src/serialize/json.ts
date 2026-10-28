@@ -1,7 +1,8 @@
 import { defineJsonCodec } from '@migaia/serialize/codecs/json'
 import { type ICodec } from '@migaia/storage-contract'
 import { fromValueCodec } from '../authoring/codec.js'
-import { StorageError, StorageErrorCode } from '../errors.js'
+import { StorageError } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 
 /** The original portable JSON implementation owns validation and value projection. */
 const adaptedJson = fromValueCodec(defineJsonCodec({ version: 1 }))
@@ -17,14 +18,14 @@ export const jsonCodec: ICodec<unknown, string> = Object.freeze({
     try {
       return await adaptedJson.encode(value as Parameters<typeof adaptedJson.encode>[0], context)
     } catch (cause) {
-      throw new StorageError(StorageErrorCode.serializeFailed, { cause })
+      throw new StorageError(StorageHostErrorCode.serializeFailed, { cause })
     }
   },
   decode: async (raw, context) => {
     try {
       return await adaptedJson.decode(raw, context)
     } catch (cause) {
-      throw new StorageError(StorageErrorCode.deserializeFailed, { cause })
+      throw new StorageError(StorageHostErrorCode.deserializeFailed, { cause })
     }
   }
 })

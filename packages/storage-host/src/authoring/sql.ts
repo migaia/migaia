@@ -251,48 +251,9 @@ function assertSingleSqlStatement(text: string, dialect: 'sqlite' | 'postgres'):
       character === '"' ||
       (dialect === SqlDialect.sqlite && (character === '`' || character === '['))
     ) {
-      /**
-       * Quoted pragma names, including SQLite single-quoted names, are decoded for the ownership
-       * guard.
-       */
-      const identifier = character !== "'"
-      /** Square-bracket quoting has a distinct terminator and no doubled-close escape in SQLite. */
-      const closer = character === '[' ? ']' : character
-      /** PostgreSQL E strings, unlike standard strings or identifiers, consume backslash escapes. */
-      const escapes =
-        dialect === SqlDialect.postgres &&
-        character === "'" &&
-        (text[index - 1] === 'E' || text[index - 1] === 'e') &&
-        !isSqlIdentifierPart(text[index - 2])
-      /** Identifier parts join once; arbitrary string contents need no retained copy. */
-      const parts: string[] = []
-      /** A closing delimiter must actually be observed, including at the final source position. */
-      let closed = false
-      index++
-      while (index < text.length) {
-        if (escapes && text[index] === '\\') {
-          index += 2
-          continue
-        }
-        if (text[index] === closer) {
-          if (character !== '[' && text[index + 1] === closer) {
-            if (identifier || dialect === SqlDialect.sqlite) parts.push(closer)
-            index += 2
-            continue
-          }
-          index++
-          closed = true
-          break
-        }
-        if (identifier || dialect === SqlDialect.sqlite) parts.push(text[index]!)
-        index++
-      }
-      if (!closed) throw invalidSqlStatement()
-      token({
-        text: parts.join(''),
-        word: false,
-        pragmaName: identifier || dialect === SqlDialect.sqlite
-      })
+      const read = readSqlQuoted(text, index, dialect)
+      index = read.index
+      token(read.token)
       continue
     }
     if (dialect === SqlDialect.postgres && character === '$') {
@@ -324,6 +285,74 @@ function assertSingleSqlStatement(text: string, dialect: 'sqlite' | 'postgres'):
     index++
   }
   if (!hasContent) throw invalidSqlStatement()
+  assertSqlStatementPrefix(prefix, dialect)
+}
+
+/**
+ * Read one quoted string or identifier that starts at `start`. Identifier text (and SQLite string
+ * text, which can name a pragma) is decoded for the ownership guard; other string contents are
+ * skipped. Returns the index after the closing quote and the token to record.
+ */
+function readSqlQuoted(
+  text: string,
+  start: number,
+  dialect: 'sqlite' | 'postgres'
+): { readonly index: number; readonly token: ISqlToken } {
+  const character = text[start]!
+  let index = start
+  /** Quoted pragma names, including SQLite single-quoted names, are decoded for the ownership guard. */
+  const identifier = character !== "'"
+  /** Square-bracket quoting has a distinct terminator and no doubled-close escape in SQLite. */
+  const closer = character === '[' ? ']' : character
+  /** PostgreSQL E strings, unlike standard strings or identifiers, consume backslash escapes. */
+  const escapes =
+    dialect === SqlDialect.postgres &&
+    character === "'" &&
+    (text[index - 1] === 'E' || text[index - 1] === 'e') &&
+    !isSqlIdentifierPart(text[index - 2])
+  /** Identifier parts join once; arbitrary string contents need no retained copy. */
+  const parts: string[] = []
+  /** A closing delimiter must actually be observed, including at the final source position. */
+  let closed = false
+  index++
+  while (index < text.length) {
+    if (escapes && text[index] === '\\') {
+      index += 2
+      continue
+    }
+    if (text[index] === closer) {
+      if (character !== '[' && text[index + 1] === closer) {
+        if (identifier || dialect === SqlDialect.sqlite) parts.push(closer)
+        index += 2
+        continue
+      }
+      index++
+      closed = true
+      break
+    }
+    if (identifier || dialect === SqlDialect.sqlite) parts.push(text[index]!)
+    index++
+  }
+  if (!closed) throw invalidSqlStatement()
+  return {
+    index,
+    token: {
+      text: parts.join(''),
+      word: false,
+      pragmaName: identifier || dialect === SqlDialect.sqlite
+    }
+  }
+}
+
+/**
+ * Apply the fixed ownership guards to a scanned statement prefix: transaction control belongs to
+ * the transaction owner and SQLite journal_mode changes belong to the journal. EXPLAIN prefixes
+ * cannot hide either.
+ */
+function assertSqlStatementPrefix(
+  prefix: readonly ISqlToken[],
+  dialect: 'sqlite' | 'postgres'
+): void {
   /** Optional explain prefixes cannot disguise transaction control or journal mutation. */
   let command = 0
   if (prefix[command]?.word && prefix[command]!.text.toUpperCase() === SqlWord.explain) {
@@ -435,16 +464,6 @@ export function createSqlTag<
   TValue extends ISqlValue = ISqlValue,
   TResult extends ISqlRunResult = ISqlRunResult
 >(options: ISqlBindingOptions<TValue, TResult>): ISqlTag<TValue, TResult> {
-  if (
-    typeof options !== 'object' ||
-    options === null ||
-    Array.isArray(options) ||
-    (options.dialect !== SqlDialect.sqlite && options.dialect !== SqlDialect.postgres) ||
-    typeof options.all !== 'function' ||
-    typeof options.get !== 'function' ||
-    typeof options.run !== 'function'
-  )
-    throw invalidSqlArgument()
   /** This small callable adapter creates the named per-query owner; it holds no mutable query state. */
   function tag<
     TRow extends object & { readonly [K in keyof TRow]: TValue } = Readonly<Record<string, TValue>>
@@ -507,12 +526,6 @@ export function deriveStorageSqlQuery<
 ): ISqlQuery<TRow, TResult> {
   /** Authentication preserves the original graph without expansion or compilation. */
   const node = sqlNode(fragment)
-  if (
-    typeof terminals.all !== 'function' ||
-    typeof terminals.get !== 'function' ||
-    typeof terminals.run !== 'function'
-  )
-    throw invalidSqlArgument()
   return new DerivedSqlQuery(node, terminals) as unknown as ISqlQuery<TRow, TResult>
 }
 

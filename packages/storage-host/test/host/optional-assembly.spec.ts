@@ -1,10 +1,10 @@
 import { expect, it } from 'vitest'
+import { createStorageHost } from '../../src/index.js'
 import {
-  createStorageHost,
-  memoryBackendPlugin,
-  STORAGE_HOST_SOURCE,
-  StorageErrorCode
-} from '../../src/index.js'
+  STORAGE_HOST_ERROR_SOURCE,
+  StorageHostErrorCode
+} from '@migaia/storage-contract/error-code'
+import { memoryBackendPlugin } from '../../src/plugins/memory.js'
 import { storageLogStore, storageJournalPlugin } from '../../src/journal.js'
 import { memoryNotificationsFeature } from '../../src/features/memory-notifications.js'
 import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.js'
@@ -17,19 +17,19 @@ it('keeps base reads and writes usable while rejecting missing optional assembli
   expect(store.capabilities.changeFeed).toBe(false)
   expect(() => store.watch('all')).toThrowError(
     expect.objectContaining({
-      source: STORAGE_HOST_SOURCE,
-      code: StorageErrorCode.changeIteratorNotAssembled
+      source: STORAGE_HOST_ERROR_SOURCE,
+      code: StorageHostErrorCode.changeIteratorNotAssembled
     })
   )
   expect(() => store.subscribeChanges(() => {})).toThrowError(
     expect.objectContaining({
-      source: STORAGE_HOST_SOURCE,
-      code: StorageErrorCode.changeControllerNotAssembled
+      source: STORAGE_HOST_ERROR_SOURCE,
+      code: StorageHostErrorCode.changeControllerNotAssembled
     })
   )
   await expect(storageLogStore(host, 'memory', { prefix: 'missing' })).rejects.toMatchObject({
-    source: STORAGE_HOST_SOURCE,
-    code: StorageErrorCode.journalNotAssembled
+    source: STORAGE_HOST_ERROR_SOURCE,
+    code: StorageHostErrorCode.journalNotAssembled
   })
 })
 
@@ -45,7 +45,7 @@ it('selects notification and iterator roots independently in the original backen
   expect(changes).toHaveLength(1)
   expect(store.capabilities.changeFeed).toBe(false)
   expect(() => store.watch('all')).toThrowError(
-    expect.objectContaining({ code: StorageErrorCode.changeIteratorNotAssembled })
+    expect.objectContaining({ code: StorageHostErrorCode.changeIteratorNotAssembled })
   )
 })
 
@@ -63,4 +63,25 @@ it('opens private logs only through the selected native journal plugin', async (
   await log.append([{ kind: 'created', payload: { id: 'one' } }])
   expect(await log.lastSeq()).toBe(1)
   expect(host.backend('memory').capabilities.changeFeed).toBe(true)
+})
+
+it('accepts journal configuration only once, in the first install batch', async () => {
+  /** Rejection happens before any organization initializes, so the initializer never runs. */
+  const unused = () => {
+    throw new Error('journal initializer must not run')
+  }
+  await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] })
+  await expect(
+    host.use(storageJournalPlugin(unused), memoryBackendPlugin({ id: 'late' }))
+  ).rejects.toMatchObject({
+    code: StorageHostErrorCode.backendInstallFailed,
+    cause: { code: StorageHostErrorCode.invalidConfig }
+  })
+  expect(host.hasBackend('late')).toBe(false)
+  await expect(
+    createStorageHost({
+      // @ts-expect-error Two journal plugins share one plugin id, which the types already reject.
+      plugins: [storageJournalPlugin(unused), storageJournalPlugin(unused), memoryBackendPlugin()]
+    })
+  ).rejects.toMatchObject({ cause: { code: StorageHostErrorCode.invalidConfig } })
 })

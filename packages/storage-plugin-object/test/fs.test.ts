@@ -1,3 +1,4 @@
+import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { mkdtemp, rm, readdir, writeFile, readFile, realpath } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -15,7 +16,10 @@ import { ObjectNames } from '../src/constants.js'
 async function installed() {
   const directory = await mkdtemp(join(tmpdir(), 'migaia-object-'))
   const host = await createStorageHost({
-    plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: directory }) })] as const
+    plugins: [
+      storageProbe(),
+      objectBackendPlugin({ driver: fsObjectDriver({ root: directory }) })
+    ] as const
   })
   onTestFinished(async () => {
     await host.dispose()
@@ -231,7 +235,10 @@ describe('native filesystem objects', () => {
     await api.put('file', new Uint8Array([1]))
     await expect(
       createStorageHost({
-        plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: directory }) })]
+        plugins: [
+          storageProbe(),
+          objectBackendPlugin({ driver: fsObjectDriver({ root: directory }) })
+        ]
       })
     ).rejects.toThrow()
     const directories = await readdir(directory)
@@ -240,7 +247,10 @@ describe('native filesystem objects', () => {
     await writeFile(join(physical, 'orphan.tmp'), 'incomplete upload')
     await host.dispose()
     const next = await createStorageHost({
-      plugins: [objectBackendPlugin({ driver: fsObjectDriver({ root: directory }) })] as const
+      plugins: [
+        storageProbe(),
+        objectBackendPlugin({ driver: fsObjectDriver({ root: directory }) })
+      ] as const
     })
     try {
       expect(await readFile(join(physical, 'current'), 'utf8')).toBe(current)
@@ -266,6 +276,7 @@ describe('native filesystem objects', () => {
     await expect(
       createStorageHost({
         plugins: [
+          storageProbe(),
           objectBackendPlugin(
             { driver: fsObjectDriver({ root: join(directory, 'feature') }) },
             { presign: objectPresignFeature() }
@@ -283,13 +294,13 @@ describe('native filesystem objects', () => {
     const before: unknown[] = []
     const after: unknown[] = []
     const errors: unknown[] = []
-    host.hooks.on('beforeStorageOperation', (event) => {
+    host.extensions.observe('beforeStorageOperation', (event) => {
       before.push(event)
     })
-    host.hooks.on('afterStorageOperation', (event) => {
+    host.extensions.observe('afterStorageOperation', (event) => {
       after.push(event)
     })
-    host.hooks.on('onStorageOperationError', (event) => {
+    host.extensions.observe('onStorageOperationError', (event) => {
       errors.push(event)
     })
     await api.put('secret-key', new Uint8Array([1]), { metadata: { secret: 'content' } })

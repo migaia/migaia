@@ -16,12 +16,11 @@ import {
   createStorageHost,
   createOrgId,
   definePlugin,
-  memoryBackendPlugin,
-  memoryBackendKind,
   type IStoragePluginCore,
   type IStorageJournalNamespaceView,
   type IStorageJournalBackendBinding
 } from '../src/index.js'
+import { memoryBackendPlugin, memoryBackendKind } from '../src/plugins/memory.js'
 import { storageLogStore } from '../src/journal.js'
 import { resolveStorageLogNativeAccess } from '../src/journal/append-port.js'
 import { createMemoryBackend } from '../src/backends/memory.js'

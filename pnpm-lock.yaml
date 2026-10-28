@@ -875,9 +875,9 @@ importers:
       '@migaia/storage-plugin-sqlite':
         specifier: workspace:^
         version: link:../storage-plugin-sqlite
-      '@migaia/storage-web':
+      '@migaia/storage-plugin-browser':
         specifier: workspace:^
-        version: link:../storage-web
+        version: link:../storage-plugin-browser
       '@types/pg':
         specifier: 8.23.1
         version: 8.23.1
@@ -1105,7 +1105,7 @@ importers:
         specifier: workspace:^
         version: link:../store-persist
 
-  packages/storage-web:
+  packages/storage-plugin-browser:
     dependencies:
       '@migaia/event-subscriber':
         specifier: workspace:^

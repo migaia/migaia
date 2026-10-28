@@ -1,5 +1,9 @@
-import { snapshotStorageKey, snapshotStorageKeyPrefix } from '@migaia/storage-host/authoring/key'
-import { snapshotConcurrencyLockKeys, lockKey } from '@migaia/storage-host/authoring/concurrency'
+import {
+  snapshotStorageKey,
+  snapshotStorageKeyPrefix,
+  snapshotConcurrencyLockKeys,
+  lockKey
+} from '@migaia/storage-host/sdk'
 import {
   type IStorageKey,
   type IStorageBatchKey,
@@ -13,7 +17,7 @@ import type { IPgConnection, IPgNativeParameter } from './types.js'
 import type { IPgTables } from './schema.js'
 import { pgKey, pgKeyHex, pgRecordKey, pgTextKey } from './codec.js'
 import { postgresError } from './errors.js'
-import { PostgresErrorCode } from './error-code.js'
+import { PostgresErrorCode } from '@migaia/storage-contract/error-code'
 import { PgNames } from './constants.js'
 /** These channels are real physical tables, rather than a second public data model. */
 export type IPgChannel = 'text' | 'bytes' | 'record' | 'metadata'
@@ -473,6 +477,10 @@ export async function commitPgRevisions(
   }
   for (const identity of increments) identities.add(identity)
   if (identities.size === 0) return
+  /**
+   * Kept sort: revision rows are locked in one fixed order so concurrent transactions cannot
+   * deadlock. The input is this one transaction's touched keys, not a store-wide collection.
+   */
   const ordered = [...identities].sort()
   await preparePgRevisionRows(state, tables, ordered)
   const rows = await readPgRevisionRows(state, tables, ordered, true)

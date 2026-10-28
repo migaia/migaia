@@ -1,6 +1,5 @@
 import { EntityFeatureName } from './constants.js'
 import {
-  getBackendEnvelopeStages,
   getBackendValueCommit,
   type IBackendEntityAccess,
   type IEntityKeyValueMethods,
@@ -8,12 +7,10 @@ import {
 } from '../core/backend-registry.js'
 import {
   StorageContractError,
-  assertVersionedEnvelope,
   type IMigrationPlan,
   StorageContractErrorCode,
   assertStorageKey,
   StorageStageKind,
-  type ICodecStageObserver,
   type IQueryStageObserver,
   type ITransactionScope,
   type IRecordIndexHandle
@@ -25,21 +22,18 @@ import {
 } from '../authoring/transaction.js'
 import { lockKey } from '../authoring/concurrency.js'
 import { isStorageErrorFamily } from '../core/error-family.js'
-import { StorageError, StorageErrorCode } from '../errors.js'
+import { StorageError } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.js'
-import { readStorageHookFailureCode } from '../hooks.js'
 import { selectCodec } from '../serialize/index.js'
 import { jsonCodec } from '../serialize/json.js'
 import { structuredCodec } from '../serialize/structured.js'
 import { composeFlatKey, composeRepositoryKey, composeStructuredKey } from './key.js'
 import { encodeFlatStorageKey } from '../core/key-domain.js'
-import { invokeExtension } from '../core/errors.js'
 import { createStorageOperationRuntime, reportCleanupError } from '../core/operation-reporter.js'
 import { EntityText } from './text.js'
 import { snapshotOperationContext } from '../authoring/context.js'
 import type { IOperationContext, IStorageKey } from '@migaia/storage-contract'
-import type { ISchemaAdapter } from '../entity.js'
-import type { ISelectedCodec } from '../entity.js'
 import type {
   IEntityTransactionScope,
   IEntityConnectOptions,
@@ -50,16 +44,12 @@ import type {
   IInvalidRecordIssue
 } from './types.js'
 import type { ISnapshotEntityIndexes } from './index-projection.js'
-
-import { StorageOperation, StorageRecordStage } from './constants.js'
+import { StorageRecordStage } from './constants.js'
 import {
   IEntityOperationRuntime,
   entityRuntime,
-  observeEntity,
   IEnvelope,
-  IStageFailure,
   IWriteTarget,
-  stageFailure,
   snapshotEntityStore,
   IRepositoryConfig,
   idOf,
@@ -71,6 +61,7 @@ import type { EntityIndexesOwner } from './indexes-owner.js'
 import type { EntityQueryOwner } from './query-owner.js'
 import type { IEntityKeysetOwner } from './keyset.js'
 import { missingEntityFeature } from './assembly.js'
+import { EntityRecordCodec } from './record-codec.js'
 
 export class EntityRepositoryOwner<
   TDomain,
@@ -93,19 +84,12 @@ export class EntityRepositoryOwner<
   #keyProp: Extract<keyof TDomain, string>
   /** Materialization and migration write envelopes at this target version. */
   #version: number
-  /** The original schema object receives validation and conversion calls with its receiver. */
-  #schema: ISchemaAdapter<TDomain, TStored>
   /** The shared plan owns version transitions instead of repository-local migration rules. */
   #migrationPlan: IMigrationPlan | undefined
-  /** Read materialization validates domain data only when the declaration enables it. */
-  #validateOnRead: boolean
   /** The original application callback receives non-fatal entity diagnostics. */
   #onDiagnostic: (message: string) => void
   /** An optional application comparator orders bounded entity query results. */
   #defaultOrderBy: ((left: TDomain, right: TDomain) => number) | undefined
-
-  /** The codec observer receives conversion phases for this repository and its transactions. */
-  #codecStages: ICodecStageObserver | undefined
 
   /** The declared query observer reports actual read counts and transaction phases. */
   #queryStages: IQueryStageObserver | undefined
@@ -122,15 +106,8 @@ export class EntityRepositoryOwner<
   /** Native and fallback commits share the same canonical unique-key ownership rule. */
   #uniqueDefinitions: readonly ISnapshotEntityIndexes<TDomain>[string]['definition'][]
 
-  /**
-   * Select one codec for every repository path. Structured backends use the identity-like
-   * structured codec by default, while text-only backends use JSON; an explicit codec is always
-   * routed through capability validation.
-   */
-  #selectedCodec: ISelectedCodec
-
-  /** The selected route preserves the original codec identity for observation. */
-  #codecName: string
+  /** Encode, decode and materialize envelopes with this repository's selected codec and schema. */
+  readonly #codec: EntityRecordCodec<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
 
   /** The declared schema and version route identify resumable checkpoint compatibility. */
   #migrationFingerprint: string
@@ -153,19 +130,18 @@ export class EntityRepositoryOwner<
     this.#name = config.name
     this.#keyProp = config.key
     this.#version = config.version
-    this.#schema = config.schema
     this.#migrationPlan = config.migrationPlan
-    this.#validateOnRead = config.validateOnRead
     this.#onDiagnostic = config.onDiagnostic
     this.#defaultOrderBy = config.defaultOrderBy
 
-    this.#codecStages = connectOptions?.codecStages
+    /** The codec observer receives conversion phases for this repository and its transactions. */
+    const codecStages = connectOptions?.codecStages
     this.#queryStages = connectOptions?.queryStages
     if (
-      (this.#codecStages !== undefined && this.#codecStages.kind !== StorageStageKind.codec) ||
+      (codecStages !== undefined && codecStages.kind !== StorageStageKind.codec) ||
       (this.#queryStages !== undefined && this.#queryStages.kind !== StorageStageKind.query)
     )
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageHostErrorCode.invalidConfig, {
         backend: this.#store.backend,
         cause: new TypeError(StorageErrorText.backendKindMismatch)
       })
@@ -175,19 +151,36 @@ export class EntityRepositoryOwner<
       Object.entries(this.#config.indexes).filter(([, index]) => index.definition.unique)
     )
     this.#uniqueDefinitions = Object.values(this.#uniqueIndexes).map((index) => index.definition)
-    this.#selectedCodec = selectCodec(
+    /**
+     * Select one codec for every repository path. Structured backends use the identity-like
+     * structured codec by default, while text-only backends use JSON; an explicit codec is always
+     * routed through capability validation.
+     */
+    const selectedCodec = selectCodec(
       this.#config.codec ?? (this.#records ? structuredCodec : jsonCodec),
       this.#store.capabilities,
       this.#emitDiagnostic
     )
-    this.#codecName =
+    /** The selected route preserves the original codec identity for observation. */
+    const codecName =
       this.#config.codec?.name ?? (this.#records ? structuredCodec.name : jsonCodec.name)
+    this.#codec = new EntityRecordCodec(this, {
+      store: this.#store,
+      name: this.#name,
+      version: this.#version,
+      schema: config.schema,
+      validateOnRead: config.validateOnRead,
+      codecStages,
+      recordStore: this.#recordStore,
+      selectedCodec,
+      codecName
+    })
     this.#migrationFingerprint = [
       this.#name,
       String(this.#version),
       this.#keyProp,
-      this.#schema.name,
-      this.#config.codec?.name ?? (this.#records ? structuredCodec.name : jsonCodec.name),
+      config.schema.name,
+      codecName,
       `range:${this.#migrationPlan?.baseVersion ?? 1}:${this.#migrationPlan?.version ?? this.#version}`
     ].join('|')
     for (const feature of config.features) this.#features.set(feature.name, feature.create(this))
@@ -209,17 +202,44 @@ export class EntityRepositoryOwner<
     }
   }
 
-  /** Drive backend-private projection migration without exposing its lease/checkpoint protocol. */
-  get #backfillIndexes(): EntityIndexesOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['backfillIndexes'] {
-    return this.#feature<
+  /**
+   * Resolve the assembled indexes feature on demand; a missing unit throws its required-feature
+   * error.
+   */
+  get #indexes(): EntityIndexesOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed> {
+    return this.feature<
       EntityIndexesOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.indexes).backfillIndexes
+    >(EntityFeatureName.indexes)
+  }
+
+  /**
+   * Resolve the assembled query feature on demand; a missing unit throws its required-feature
+   * error.
+   */
+  get #query(): EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed> {
+    return this.feature<EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>>(
+      EntityFeatureName.query
+    )
+  }
+
+  /**
+   * Resolve the assembled unique feature on demand; a missing unit throws its required-feature
+   * error.
+   */
+  get #unique(): EntityUniqueOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed> {
+    return this.feature<
+      EntityUniqueOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
+    >(EntityFeatureName.unique)
+  }
+
+  /**
+   * Resolve the assembled migration feature on demand; a missing unit throws its required-feature
+   * error.
+   */
+  get #migration(): EntityMigrationOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed> {
+    return this.feature<
+      EntityMigrationOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
+    >(EntityFeatureName.migration)
   }
 
   /** Perform the repository writeEnvelopeAt operation using its own state. */
@@ -231,7 +251,7 @@ export class EntityRepositoryOwner<
   ): Promise<void> => {
     await this.#writeEncodedEnvelopeAt(
       target,
-      await this.#encodeEnvelope(envelope, ctx, runtime),
+      await this.#codec.encodeEnvelope(envelope, ctx, runtime),
       ctx
     )
   }
@@ -251,196 +271,6 @@ export class EntityRepositoryOwner<
     }
   }
 
-  /** Every real conversion emits exactly one matching observation sequence. */
-  #codecCall = async <R>(
-    phase: 'encode' | 'decode',
-    invoke: () => Promise<R>,
-    runtime: IEntityOperationRuntime
-  ): Promise<R> => {
-    const stages =
-      runtime.scope === undefined
-        ? this.#codecStages
-        : this.#codecStages?.forTransaction(runtime.scope)
-    const operation =
-      phase === 'encode' ? StorageOperation.entityCodecEncode : StorageOperation.entityCodecDecode
-    const before = phase === 'encode' ? 'beforeEncode' : 'beforeDecode'
-    const after = phase === 'encode' ? 'afterEncode' : 'afterDecode'
-    const failed = phase === 'encode' ? 'onEncodeError' : 'onDecodeError'
-    if (stages?.[before] !== undefined)
-      observeEntity(stages!, () => stages![before]!(operation, this.#codecName))
-    try {
-      const value = await invoke()
-      if (stages?.[after] !== undefined)
-        observeEntity(stages!, () => stages![after]!(operation, this.#codecName))
-      return value
-    } catch (cause) {
-      if (stages?.[failed] !== undefined)
-        observeEntity(stages!, () =>
-          stages![failed]!(
-            operation,
-            this.#codecName,
-            readStorageHookFailureCode(cause, stages!.report)
-          )
-        )
-      throw cause
-    }
-  }
-
-  /** Encode every repository write through the original codec and extension error boundary. */
-  #encodeEnvelope = (
-    envelope: IEnvelope,
-    ctx: IOperationContext | undefined,
-    runtime: IEntityOperationRuntime
-  ): Promise<unknown> =>
-    this.#codecCall(
-      'encode',
-      () =>
-        invokeExtension(
-          () => this.#selectedCodec.encode(envelope, ctx),
-          this.#store.backend,
-          StorageOperation.entityCodecEncode,
-          'codec',
-          ctx?.signal,
-          runtime
-        ),
-      runtime
-    )
-
-  /** Perform the repository materialize operation using its own state. */
-  #materialize = async (
-    envelope: IEnvelope | undefined,
-    ctx: IOperationContext | undefined,
-    runtime: IEntityOperationRuntime
-  ): Promise<TDomain | undefined> => {
-    if (!envelope) return undefined
-    const stored =
-      envelope.version === this.#version
-        ? envelope.state
-        : await this.#feature<
-            EntityMigrationOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-          >(EntityFeatureName.migration).materializeEnvelope(envelope, ctx, runtime)
-    let decoded: TDomain
-    try {
-      decoded = this.#schema.decode
-        ? await invokeExtension(
-            () => this.#schema.decode!(stored as TStored, ctx),
-            this.#store.backend,
-            StorageOperation.entitySchemaDecode,
-            'schema',
-            ctx?.signal,
-            runtime
-          )
-        : (stored as TDomain)
-    } catch (cause) {
-      throw stageFailure('decode', cause)
-    }
-    if (!this.#validateOnRead) return decoded
-    try {
-      return await invokeExtension(
-        () => this.#schema.validate(decoded, ctx),
-        this.#store.backend,
-        StorageOperation.entitySchemaValidate,
-        'schema',
-        ctx?.signal,
-        runtime
-      )
-    } catch (cause) {
-      throw stageFailure('validate', cause)
-    }
-  }
-
-  /** Perform the repository toEnvelope operation using its own state. */
-  #toEnvelope = async (
-    value: TDomain,
-    ctx: IOperationContext | undefined,
-    runtime: IEntityOperationRuntime
-  ): Promise<{ readonly domain: TDomain; readonly envelope: IEnvelope }> => {
-    const domain = await invokeExtension(
-      () => this.#schema.validate(value, ctx),
-      this.#store.backend,
-      StorageOperation.entitySchemaValidate,
-      'schema',
-      ctx?.signal,
-      runtime
-    )
-    const normalized = this.#schema.normalize
-      ? await invokeExtension(
-          () => this.#schema.normalize!(domain, ctx),
-          this.#store.backend,
-          StorageOperation.entitySchemaNormalize,
-          'schema',
-          ctx?.signal,
-          runtime
-        )
-      : domain
-    const stored = this.#schema.encode
-      ? await invokeExtension(
-          () => this.#schema.encode!(normalized, ctx),
-          this.#store.backend,
-          StorageOperation.entitySchemaEncode,
-          'schema',
-          ctx?.signal,
-          runtime
-        )
-      : (normalized as unknown as TStored)
-    try {
-      return {
-        domain: normalized,
-        envelope: assertVersionedEnvelope({ version: this.#version, state: stored })
-      }
-    } catch (cause) {
-      throw new StorageError(StorageErrorCode.serializeFailed, { cause })
-    }
-  }
-
-  /** Perform the repository decodeEnvelope operation using its own state. */
-  #decodeEnvelope = async (
-    raw: unknown,
-    ctx: IOperationContext | undefined,
-    runtime: IEntityOperationRuntime
-  ): Promise<IEnvelope> => {
-    const decoded: unknown = await this.#codecCall(
-      'decode',
-      () =>
-        invokeExtension(
-          () => this.#selectedCodec.decode(raw, ctx),
-          this.#store.backend,
-          StorageOperation.entityCodecDecode,
-          'codec',
-          ctx?.signal,
-          runtime
-        ),
-      runtime
-    )
-    /** Hooks observe the same validated version envelope used for materialization. */
-    const stages = getBackendEnvelopeStages(this.#store, {
-      operation: StorageOperation.entityEnvelope,
-      targetVersion: this.#version
-    })
-    stages?.beforeEnvelopeCheck()
-    try {
-      const envelope = assertVersionedEnvelope(decoded)
-      stages?.afterEnvelopeCheck(envelope.version)
-      return envelope
-    } catch (cause) {
-      stages?.onVersionRejected(undefined, StorageContractErrorCode.envelopeInvalid)
-      throw new StorageError(StorageErrorCode.deserializeFailed, { cause })
-    }
-  }
-
-  /** Apply the invalid-record policy once so handler failures have one stable error boundary. */
-  get #invalidAction(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['invalidAction'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).invalidAction
-  }
-
   /** Own shared invalid-record policy without requiring optional query assembly. */
   #validateInvalidHandler = (handler: unknown): void => {
     if (
@@ -449,49 +279,10 @@ export class EntityRepositoryOwner<
       handler !== 'throw' &&
       typeof handler !== 'function'
     )
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageHostErrorCode.invalidConfig, {
         backend: this.#store.backend,
         cause: new TypeError(EntityText.oninvalidMustBeSkipThrowOrAHandler)
       })
-  }
-
-  /** Detach list bounds before the lazy source opens and awaits native reads. */
-  get #normalizeListOptions(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['normalizeListOptions'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).normalizeListOptions
-  }
-
-  /** Detach indexed list bounds before lazy native work can outlive caller mutation. */
-  get #snapshotIndexedListOptions(): EntityIndexesOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['snapshotIndexedListOptions'] {
-    return this.#feature<
-      EntityIndexesOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.indexes).snapshotIndexedListOptions
-  }
-
-  /** Build an indexed snapshot for the findManyBy/findBy/streamBy APIs. */
-  get #createIndexedListSnapshot(): EntityIndexesOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['createIndexedListSnapshot'] {
-    return this.#feature<
-      EntityIndexesOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.indexes).createIndexedListSnapshot
   }
 
   /** Own shared invalid-record policy without requiring optional query assembly. */
@@ -502,12 +293,12 @@ export class EntityRepositoryOwner<
     /** Missing assembly is an operation failure, never corrupt data eligible for skipping. */
     if (
       isStorageErrorFamily(issue.cause) &&
-      issue.cause.code === StorageErrorCode.entityFeatureRequired
+      issue.cause.code === StorageHostErrorCode.entityFeatureRequired
     )
       throw issue.cause
     if (handler === undefined || handler === 'skip' || handler === 'throw') return handler ?? 'skip'
     if (typeof handler !== 'function')
-      throw new StorageError(StorageErrorCode.invalidConfig, {
+      throw new StorageError(StorageHostErrorCode.invalidConfig, {
         backend: this.#store.backend,
         key: issue.key,
         cause: new TypeError(EntityText.oninvalidMustBeSkipThrowOrAHandler)
@@ -515,15 +306,16 @@ export class EntityRepositoryOwner<
     try {
       const action = handler(issue)
       if (action !== 'skip' && action !== 'throw')
-        throw new StorageError(StorageErrorCode.invalidConfig, {
+        throw new StorageError(StorageHostErrorCode.invalidConfig, {
           backend: this.#store.backend,
           key: issue.key,
           cause: new TypeError(EntityText.oninvalidHandlerMustReturnSkipOrThrow)
         })
       return action
     } catch (cause) {
-      if (isStorageErrorFamily(cause) && cause.code === StorageErrorCode.invalidConfig) throw cause
-      throw new StorageError(StorageErrorCode.validationFailed, {
+      if (isStorageErrorFamily(cause) && cause.code === StorageHostErrorCode.invalidConfig)
+        throw cause
+      throw new StorageError(StorageHostErrorCode.validationFailed, {
         backend: this.#store.backend,
         key: issue.key,
         cause
@@ -537,10 +329,10 @@ export class EntityRepositoryOwner<
     if (isStorageErrorFamily(issue.cause)) throw issue.cause
     const code =
       issue.stage === StorageRecordStage.migrate
-        ? StorageErrorCode.migrationFailed
+        ? StorageHostErrorCode.migrationFailed
         : issue.stage === StorageRecordStage.decode
-          ? StorageErrorCode.deserializeFailed
-          : StorageErrorCode.validationFailed
+          ? StorageHostErrorCode.deserializeFailed
+          : StorageHostErrorCode.validationFailed
     throw new StorageError(code, {
       backend: this.#store.backend,
       key: issue.key,
@@ -549,176 +341,7 @@ export class EntityRepositoryOwner<
     /* c8 ignore stop */
   }
 
-  /** Perform the repository materializeForRead operation using its own state. */
-  #materializeForRead = async (
-    id: IStorageKey,
-    envelope: IEnvelope | undefined,
-    ctx: IOperationContext | undefined,
-    runtime: IEntityOperationRuntime
-  ): Promise<TDomain | undefined> => {
-    try {
-      return await this.#materialize(envelope, ctx, runtime)
-    } catch (cause) {
-      /* c8 ignore start -- materialize's extension boundaries already return StorageError. */
-      if (isStorageErrorFamily(cause)) throw cause
-      const stage = (cause as Partial<IStageFailure>).stage ?? StorageRecordStage.validate
-      const code =
-        stage === StorageRecordStage.migrate
-          ? StorageErrorCode.migrationFailed
-          : stage === StorageRecordStage.decode
-            ? StorageErrorCode.deserializeFailed
-            : StorageErrorCode.validationFailed
-      throw new StorageError(code, { backend: this.#store.backend, key: id, cause })
-    }
-  }
-
-  /** Perform the repository readEnvelope operation using its own state. */
-  #readEnvelope = async (
-    id: IStorageKey,
-    ctx: IOperationContext | undefined,
-    runtime: IEntityOperationRuntime
-  ): Promise<IEnvelope | undefined> => {
-    if (this.#recordStore) {
-      let raw = await this.#recordStore.getRecord(composeRepositoryKey(this.#name, id), ctx)
-      if (raw === undefined)
-        raw = await this.#recordStore.getRecord(composeStructuredKey(this.#name, id), ctx)
-      if (raw === undefined) return undefined
-      return this.#decodeEnvelope(raw, ctx, runtime)
-    }
-    const raw = await this.#store.get(composeFlatKey(this.#name, id), ctx)
-    if (raw === null) return undefined
-    return this.#decodeEnvelope(raw, ctx, runtime)
-  }
-
-  /**
-   * Canonical ID ordering uses the same radix structure; comparator scans retain only heap
-   * candidates.
-   */
-  get #streamImpl(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['streamImpl'] {
-    const feature =
-      this.#feature<EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>>(
-        'query'
-      )
-    return (...args) => feature.streamImpl(...args)
-  }
-
-  /**
-   * New fallback write checks reuse the existing extension boundary without changing native
-   * backfill identity.
-   */
-  get #projectUniqueWrite(): EntityUniqueOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['projectUniqueWrite'] {
-    return this.#feature<
-      EntityUniqueOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.unique).projectUniqueWrite
-  }
-
-  /** Use one normal record revision as a phantom barrier, with no sidecar or duplicate queue. */
-  get #validateUniqueRecordCommit(): EntityUniqueOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['validateUniqueRecordCommit'] {
-    return this.#feature<
-      EntityUniqueOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.unique).validateUniqueRecordCommit
-  }
-
-  /**
-   * Preserve KV support: validate outside the critical section, then compare-and-commit under its
-   * host owner.
-   */
-  get #writeUniqueValue(): EntityUniqueOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['writeUniqueValue'] {
-    return this.#feature<
-      EntityUniqueOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.unique).writeUniqueValue
-  }
-
-  /** Fixed ordering metadata concatenates two canonical encodings without taxing a synthetic key. */
-  get #encodeIndexOrder(): EntityIndexesOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['encodeIndexOrder'] {
-    return this.#feature<
-      EntityIndexesOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.indexes).encodeIndexOrder
-  }
-
-  /** Perform the repository indexRows operation using its own state. */
-  get #indexRows(): EntityIndexesOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['indexRows'] {
-    return this.#feature<
-      EntityIndexesOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.indexes).indexRows
-  }
-
-  /** Perform the repository createIndexQuery operation using its own state. */
-  get #createIndexQuery(): EntityIndexesOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['createIndexQuery'] {
-    return this.#feature<
-      EntityIndexesOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.indexes).createIndexQuery
-  }
-
   /** Source adaptation contributes no second AST or query executor. */
-
-  /** Adapt the application index callback at the entity boundary. */
-  get #queryIndex(): EntityIndexesOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['queryIndex'] {
-    return this.#feature<
-      EntityIndexesOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.indexes).queryIndex
-  }
-
-  /** Select the canonical index plan using explicit source facts. */
-  get #planEntitySource(): EntityIndexesOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['planEntitySource'] {
-    return this.#feature<
-      EntityIndexesOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.indexes).planEntitySource
-  }
 
   /** Perform the repository bindRepository operation using its own state. */
   #bindRepository = (
@@ -730,30 +353,18 @@ export class EntityRepositoryOwner<
     const activeChanges =
       this.#uniqueDefinitions.length === 0
         ? undefined
-        : this.#feature<
-            EntityUniqueOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-          >(EntityFeatureName.unique).bindChanges(scope, info)
+        : this.feature<EntityUniqueOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>>(
+            EntityFeatureName.unique
+          ).bindChanges(scope, info)
     /** Bound endpoints retain only the same weak mutation state and authentic scope. */
     const binding: IEntityRepositoryBinding = { scope, expectedIdentity, activeChanges }
     return {
-      query: () => this.#boundQuery(binding),
+      query: () => this.#query.boundQuery(binding),
       get: (id) => this.#boundGet(binding, id),
       put: (value) => this.#boundPut(binding, value),
       remove: (id) => this.#boundRemove(binding, id),
-      list: (options) => this.#boundList(binding, options)
+      list: (options) => this.#query.boundList(binding, options)
     }
-  }
-  /** Perform transaction-bound query work through its authentic original scope. */
-  get #boundQuery(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['boundQuery'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).boundQuery
   }
   /** Perform transaction-bound get work through its authentic original scope. */
   #boundGet = (
@@ -770,9 +381,9 @@ export class EntityRepositoryOwner<
         (await current.getRecord(composeStructuredKey(this.#name, id)))
       return raw === undefined
         ? undefined
-        : this.#materializeForRead(
+        : this.#codec.materializeForRead(
             id,
-            await this.#decodeEnvelope(raw, context, runtime),
+            await this.#codec.decodeEnvelope(raw, context, runtime),
             context,
             runtime
           )
@@ -786,18 +397,18 @@ export class EntityRepositoryOwner<
       this.#backend.assertScope(current)
       const context = readTransactionOperationContext(current)
       const runtime = entityRuntime(current)
-      const prepared = await this.#toEnvelope(value, context, runtime)
+      const prepared = await this.#codec.toEnvelope(value, context, runtime)
       const id = idOf(this.#name, this.#keyProp, prepared.domain, this.#store.backend)
       /** Query patches cannot move a physical record or overwrite another entity identity. */
       if (
         binding.expectedIdentity !== undefined &&
         compareStorageKeys(id, binding.expectedIdentity) !== 0
       )
-        throw new StorageError(StorageErrorCode.invalidConfig, {
+        throw new StorageError(StorageHostErrorCode.invalidConfig, {
           backend: this.#store.backend,
           cause: new TypeError(EntityText.queryIdentityChanged)
         })
-      const raw = await this.#encodeEnvelope(prepared.envelope, context, runtime)
+      const raw = await this.#codec.encodeEnvelope(prepared.envelope, context, runtime)
       /** A historical repository handle is usable only after this native snapshot confirms it. */
       const handle =
         this.#readyHandle !== undefined && (await current.isRecordIndexReady?.(this.#readyHandle))
@@ -808,7 +419,7 @@ export class EntityRepositoryOwner<
           raw,
           composeRepositoryKey(this.#name, id),
           handle,
-          this.#feature<
+          this.feature<
             EntityIndexesOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
           >(EntityFeatureName.indexes).projectAllIndexes(prepared.domain),
           { conflictPolicy: 'replace' }
@@ -820,7 +431,7 @@ export class EntityRepositoryOwner<
       await current.deleteRecord(composeStructuredKey(this.#name, id))
       binding.activeChanges?.deref()!.set(encodeFlatStorageKey(id), {
         id,
-        projection: this.#projectUniqueWrite(prepared.domain)
+        projection: this.#unique.projectUniqueWrite(prepared.domain)
       })
       return id
     })
@@ -836,45 +447,21 @@ export class EntityRepositoryOwner<
       await current.deleteRecord(composeStructuredKey(this.#name, id))
       binding.activeChanges?.deref()!.set(encodeFlatStorageKey(id), { id, projection: undefined })
     })
-  /** Perform transaction-bound list work through its authentic original scope. */
-  get #boundList(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['boundList'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).boundList
-  }
 
   /** Publish the original repository methods without exposing its internal state. */
   #createApi = (): IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods> => ({
-    query: (...args) => this.#apiQuery(...args),
+    query: (...args) => this.#query.apiQuery(...args),
     get: this.#apiGet,
     put: this.#apiPut,
     remove: this.#apiRemove,
-    list: (...args) => this.#apiList(...args),
-    stream: (...args) => this.#apiStream(...args),
-    findBy: (...args) => this.#apiFindBy(...args),
-    migrate: (...args) => this.#apiMigrate(...args),
+    list: (...args) => this.#query.apiList(...args),
+    stream: (...args) => this.#query.apiStream(...args),
+    findBy: (...args) => this.#indexes.apiFindBy(...args),
+    migrate: (...args) => this.#migration.apiMigrate(...args),
     in: this.#apiIn,
     lockKey: this.#apiLockKey,
     batch: this.#apiBatch
   })
-  /** Perform the public query operation using this repository state. */
-  get #apiQuery(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['apiQuery'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).apiQuery
-  }
   /** Perform the public get operation using this repository state. */
   #apiGet: IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods>['get'] = async (
     id,
@@ -883,9 +470,9 @@ export class EntityRepositoryOwner<
     const context = snapshotOperationContext(ctx)
     const runtime = createStorageOperationRuntime()
     assertStorageKey(id, this.#store.backend, `entity "${this.#name}" id`)
-    return this.#materializeForRead(
+    return this.#codec.materializeForRead(
       id,
-      await this.#readEnvelope(id, context, runtime),
+      await this.#codec.readEnvelope(id, context, runtime),
       context,
       runtime
     )
@@ -903,10 +490,10 @@ export class EntityRepositoryOwner<
       })
     const context = snapshotOperationContext(ctx)
     const runtime = createStorageOperationRuntime()
-    const prepared = await this.#toEnvelope(value, context, runtime)
+    const prepared = await this.#codec.toEnvelope(value, context, runtime)
     const id = idOf(this.#name, this.#keyProp, prepared.domain, this.#store.backend)
     if (this.#uniqueDefinitions.length > 0)
-      await this.#writeUniqueValue(id, prepared.domain, prepared.envelope, context)
+      await this.#unique.writeUniqueValue(id, prepared.domain, prepared.envelope, context)
     else
       await this.#writeEnvelopeAt(
         { flatKey: composeFlatKey(this.#name, id) },
@@ -926,54 +513,6 @@ export class EntityRepositoryOwner<
     assertStorageKey(id, this.#store.backend)
     await this.#store.remove(composeFlatKey(this.#name, id), ctx)
   }
-  /** Perform the public list operation using this repository state. */
-  get #apiList(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['apiList'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).apiList
-  }
-  /** Perform the public stream operation using this repository state. */
-  get #apiStream(): EntityQueryOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['apiStream'] {
-    return this.#feature<
-      EntityQueryOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.query).apiStream
-  }
-  /** Perform the public findBy operation using this repository state. */
-  get #apiFindBy(): EntityIndexesOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['apiFindBy'] {
-    return this.#feature<
-      EntityIndexesOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.indexes).apiFindBy
-  }
-  /** Perform the public migrate operation using this repository state. */
-  get #apiMigrate(): EntityMigrationOwner<
-    TDomain,
-    TStored,
-    TIndexes,
-    TAugmentMethods,
-    TChangeFeed
-  >['apiMigrate'] {
-    return this.#feature<
-      EntityMigrationOwner<TDomain, TStored, TIndexes, TAugmentMethods, TChangeFeed>
-    >(EntityFeatureName.migration).apiMigrate
-  }
 
   /** Perform the public in operation using this repository state. */
   #apiIn: IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods>['in'] = (scope) =>
@@ -989,7 +528,7 @@ export class EntityRepositoryOwner<
   #apiBatch: IRepository<TDomain, TIndexes, TChangeFeed, TAugmentMethods>['batch'] = (run, ctx) => {
     if (typeof run !== 'function')
       return Promise.reject(
-        new StorageError(StorageErrorCode.invalidConfig, {
+        new StorageError(StorageHostErrorCode.invalidConfig, {
           backend: this.#store.backend,
           cause: new TypeError(EntityText.batchCallbackMustBeAFunction)
         })
@@ -1005,7 +544,7 @@ export class EntityRepositoryOwner<
 
   /** Keyset admission resolves only its explicit owner and preserves the original query result. */
   get runKeyset(): IEntityKeysetOwner['run'] {
-    return this.#feature<IEntityKeysetOwner>(EntityFeatureName.keyset).run
+    return this.feature<IEntityKeysetOwner>(EntityFeatureName.keyset).run
   }
   /** An absent keyset unit never imports or constructs its query implementation. */
   get keysetQuery(): IEntityKeysetOwner['query'] | undefined {
@@ -1018,7 +557,7 @@ export class EntityRepositoryOwner<
   /** Only explicitly supplied feature units retain their implementation owners. */
   #features = new Map<string, object>()
   /** Resolve one required assembly without enabling any other capability. */
-  #feature<T extends object>(name: string): T {
+  feature<T extends object>(name: string): T {
     const feature = this.#features.get(name)
     if (feature === undefined) return missingEntityFeature(name)
     return feature as T
@@ -1099,7 +638,7 @@ export class EntityRepositoryOwner<
   }
   /** Internal port shares the original backfillIndexes fact or operation with an assembled owner. */
   get backfillIndexes() {
-    return this.#backfillIndexes
+    return this.#indexes.backfillIndexes
   }
   /** Internal port shares the original writeEnvelopeAt fact or operation with an assembled owner. */
   get writeEnvelopeAt() {
@@ -1108,23 +647,23 @@ export class EntityRepositoryOwner<
 
   /** Internal port shares the original encodeEnvelope fact or operation with an assembled owner. */
   get encodeEnvelope() {
-    return this.#encodeEnvelope
+    return this.#codec.encodeEnvelope
   }
   /** Internal port shares the original materialize fact or operation with an assembled owner. */
   get materialize() {
-    return this.#materialize
+    return this.#codec.materialize
   }
   /** Internal port shares the original toEnvelope fact or operation with an assembled owner. */
   get toEnvelope() {
-    return this.#toEnvelope
+    return this.#codec.toEnvelope
   }
   /** Internal port shares the original decodeEnvelope fact or operation with an assembled owner. */
   get decodeEnvelope() {
-    return this.#decodeEnvelope
+    return this.#codec.decodeEnvelope
   }
   /** Internal port shares the original invalidAction fact or operation with an assembled owner. */
   get invalidAction() {
-    return this.#invalidAction
+    return this.#query.invalidAction
   }
   /**
    * Internal port shares the original validateInvalidHandler fact or operation with an assembled
@@ -1138,21 +677,21 @@ export class EntityRepositoryOwner<
    * owner.
    */
   get normalizeListOptions() {
-    return this.#normalizeListOptions
+    return this.#query.normalizeListOptions
   }
   /**
    * Internal port shares the original snapshotIndexedListOptions fact or operation with an
    * assembled owner.
    */
   get snapshotIndexedListOptions() {
-    return this.#snapshotIndexedListOptions
+    return this.#indexes.snapshotIndexedListOptions
   }
   /**
    * Internal port shares the original createIndexedListSnapshot fact or operation with an assembled
    * owner.
    */
   get createIndexedListSnapshot() {
-    return this.#createIndexedListSnapshot
+    return this.#indexes.createIndexedListSnapshot
   }
 
   /**
@@ -1169,12 +708,13 @@ export class EntityRepositoryOwner<
 
   /** Internal port shares the original streamImpl fact or operation with an assembled owner. */
   get streamImpl() {
-    return this.#streamImpl
+    const feature = this.#query
+    return (...args: Parameters<typeof feature.streamImpl>) => feature.streamImpl(...args)
   }
 
   /** Internal port shares the original projectUniqueWrite fact or operation with an assembled owner. */
   get projectUniqueWrite() {
-    return this.#projectUniqueWrite
+    return this.#unique.projectUniqueWrite
   }
 
   /**
@@ -1182,34 +722,34 @@ export class EntityRepositoryOwner<
    * assembled owner.
    */
   get validateUniqueRecordCommit() {
-    return this.#validateUniqueRecordCommit
+    return this.#unique.validateUniqueRecordCommit
   }
 
   /** Internal port shares the original writeUniqueValue fact or operation with an assembled owner. */
   get writeUniqueValue() {
-    return this.#writeUniqueValue
+    return this.#unique.writeUniqueValue
   }
   /** Internal port shares the original encodeIndexOrder fact or operation with an assembled owner. */
   get encodeIndexOrder() {
-    return this.#encodeIndexOrder
+    return this.#indexes.encodeIndexOrder
   }
   /** Internal port shares the original indexRows fact or operation with an assembled owner. */
   get indexRows() {
-    return this.#indexRows
+    return this.#indexes.indexRows
   }
   /** Internal port shares the original createIndexQuery fact or operation with an assembled owner. */
   get createIndexQuery() {
-    return this.#createIndexQuery
+    return this.#indexes.createIndexQuery
   }
 
   /** Internal port shares the original queryIndex fact or operation with an assembled owner. */
   get queryIndex() {
-    return this.#queryIndex
+    return this.#indexes.queryIndex
   }
 
   /** Internal port shares the original planEntitySource fact or operation with an assembled owner. */
   get planEntitySource() {
-    return this.#planEntitySource
+    return this.#indexes.planEntitySource
   }
 
   /** Internal port shares the original bindRepository fact or operation with an assembled owner. */

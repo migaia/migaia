@@ -128,6 +128,30 @@ for (const [name, url] of services)
         await client.quit()
       }
     })
+    it('ioredis reuses its dedicated connections instead of opening one per operation', async () => {
+      const client = new Redis(url, { lazyConnect: true }),
+        key = 'driver-reuse:' + crypto.randomUUID()
+      await client.connect()
+      const driver = ioredisDriver(client)
+      /** Server-side ids of the dedicated connections the driver handed to callbacks. */
+      const ids = new Set<string>()
+      try {
+        await driver.command(['SET', key, '0'])
+        for (let index = 0; index < 50; index++) {
+          await driver.command(['INCR', key])
+          await driver.withConnection(async (connection) => {
+            ids.add(String(await connection.command(['CLIENT', 'ID'])))
+          })
+        }
+        /** Sequential callbacks reuse one connection; before pooling each one opened a new one. */
+        expect(ids.size).toBe(1)
+        expect(await driver.command(['GET', key])).toBe('50')
+      } finally {
+        await driver.command(['DEL', key])
+        await driver.release?.()
+        await client.quit()
+      }
+    })
     it('node-redis retains native execution evidence and the borrowed pool', async () => {
       const pool = createClientPool({ url }, { minimum: 1, maximum: 3 }),
         key = 'driver-test:' + crypto.randomUUID()

@@ -6,13 +6,8 @@ import { assertTransactionOwner } from '../src/authoring/transaction.js'
 import { records, type ITransactionScope } from '@migaia/storage-contract'
 import { createMemoryBackend } from '../src/backends/memory.js'
 import type { IStoragePluginCore } from '../src/index.js'
-import {
-  createStorageHost,
-  defineFeature,
-  definePlugin,
-  memoryBackendKind,
-  memoryBackendPlugin
-} from '../src/index.js'
+import { createStorageHost, defineFeature, definePlugin } from '../src/index.js'
+import { memoryBackendKind, memoryBackendPlugin } from '../src/plugins/memory.js'
 
 /** Real memory transactions retain their undefined native client while supporting scoped methods. */
 const scopedFeature = () =>
@@ -98,7 +93,7 @@ describe('Feature transaction methods on original native views', () => {
       saved = scope.api.identity
     })
     await expect(saved()).rejects.toMatchObject({
-      source: '@migaia/storage-host',
+      source: 'storage.host',
       code: 'TRANSACTION_FAILED'
     })
     await store

@@ -8,7 +8,8 @@ import {
   type ILogStoreRecoveryRow,
   type ILogStoreSnapshot
 } from './logger-runtime.js'
-import { StorageError, StorageErrorCode } from '../errors.js'
+import { StorageError } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.js'
 import type { IStorageJournalNamespaceView } from './types.js'
 
@@ -43,7 +44,7 @@ type IStorageLogState = {
 /** Corrupt private bytes carry no record data in their stable public diagnostic. */
 function invalid(cause?: unknown): never {
   throw new StorageError(
-    StorageErrorCode.journalRecordInvalid,
+    StorageHostErrorCode.journalRecordInvalid,
     { cause },
     StorageErrorText.journalRecordInvalid
   )
@@ -182,7 +183,10 @@ export async function recoverStorageLog(
     /** The canonical validator can retain this generator's original journal error on one cause. */
     const original =
       cause instanceof StorageError ? cause : cause instanceof Error ? cause.cause : undefined
-    if (original instanceof StorageError && original.code === StorageErrorCode.journalRecordInvalid)
+    if (
+      original instanceof StorageError &&
+      original.code === StorageHostErrorCode.journalRecordInvalid
+    )
       throw original
     invalid(cause)
   }

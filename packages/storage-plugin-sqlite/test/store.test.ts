@@ -1,3 +1,4 @@
+import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -5,9 +6,12 @@ import { describe, it, expect, onTestFinished, vi } from 'vitest'
 import { createStorageHost, createOrgId, definePlugin } from '@migaia/storage-host'
 import { deferred } from '@migaia/utils/promise'
 import { kv, ttl, counter, records, sql, type IStorageKey } from '@migaia/storage-contract'
-import { sqlFragment } from '@migaia/storage-host/authoring/sql'
-import { lockKey, ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'
-import { compareStorageKeys } from '@migaia/storage-host/authoring/key'
+import {
+  sqlFragment,
+  lockKey,
+  ConcurrencyPolicy,
+  compareStorageKeys
+} from '@migaia/storage-host/sdk'
 import { runConformance } from '@migaia/storage-contract/conformance'
 import { sqliteBackendPlugin, type ISqliteValue } from '../src/index.js'
 import { nodeSqliteDriver } from '../src/node.js'
@@ -359,8 +363,10 @@ describe('native SQLite installation', () => {
     const counts: number[] = []
     const connection = nodeSqliteDriver(':memory:')
     const host = await createStorageHost({
-      hooks: { onStorageIterationClose: ({ count }) => counts.push(count) },
-      plugins: [sqliteBackendPlugin({ driver: connection })] as const
+      plugins: [
+        storageProbe({ onStorageIterationClose: ({ count }) => counts.push(count) }),
+        sqliteBackendPlugin({ driver: connection })
+      ] as const
     })
     onTestFinished(async () => {
       await host.dispose()
@@ -408,12 +414,15 @@ describe('native SQLite installation', () => {
     }))
     /** Hooks receive only the canonical operation/count identity, never the batch values. */
     const host = await createStorageHost({
-      hooks: {
-        afterStorageOperation: (payload) => {
-          observations.push({ operation: payload.operation, count: payload.count })
-        }
-      },
-      plugins: [execution, sqliteBackendPlugin({ driver: connection })] as const
+      plugins: [
+        storageProbe({
+          afterStorageOperation: (payload) => {
+            observations.push({ operation: payload.operation, count: payload.count })
+          }
+        }),
+        execution,
+        sqliteBackendPlugin({ driver: connection })
+      ] as const
     })
     onTestFinished(async () => {
       await host.dispose()
@@ -646,7 +655,7 @@ describe('native SQLite installation', () => {
     )
     await store.metadata.set('\ud800\u0000', { keep: true })
     await expect(store.setBytes('text', new Uint8Array([5]))).rejects.toMatchObject({
-      source: '@migaia/storage-plugin-sqlite',
+      source: 'storage.backend.sqlite',
       code: 'DUPLICATE_KEY'
     })
     await store.setBytes('text', new Uint8Array([5]), { conflictPolicy: 'replace' })

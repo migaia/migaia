@@ -13,7 +13,7 @@ import {
   subscribeToAbort,
   createStorageOperationReporter,
   reportCleanupError
-} from '@migaia/storage-host/authoring/backend'
+} from '@migaia/storage-host/sdk'
 import type {
   IPgLogicalReplicationPort,
   IPgLogicalReplicationRoute,

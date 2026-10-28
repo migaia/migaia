@@ -200,16 +200,6 @@ type ISparqlBindingOptions = {
 
 /** Bind one native callable tag; graph and compiled state belong to each named query. */
 export function createSparqlTag(options: ISparqlBindingOptions): ISparqlApi {
-  if (
-    typeof options !== 'object' ||
-    options === null ||
-    Array.isArray(options) ||
-    typeof options.select !== 'function' ||
-    typeof options.ask !== 'function' ||
-    typeof options.construct !== 'function' ||
-    typeof options.update !== 'function'
-  )
-    throw invalidSparqlArgument()
   /** This adapter only constructs query owners; it does not capture mutable execution state. */
   function tag<
     TRow extends object & { readonly [K in keyof TRow]: IRdfBindingTerm | undefined } = ISparqlRow

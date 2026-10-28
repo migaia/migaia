@@ -5,7 +5,7 @@ import {
   type IStorageIterator
 } from '../src/index.js'
 import { conformanceRows, type IConformanceHarness } from '../src/conformance/harness.js'
-import { conformanceTransactionFailure } from '../src/conformance/legacy.js'
+import { conformanceTransactionFailure } from '../src/conformance/channels.js'
 describe('consumer conformance helpers', () => {
   it('retains iterator read failure before original iterator cleanup failure', async () => {
     const primary = new Error('iterator read failed')
@@ -25,7 +25,7 @@ describe('consumer conformance helpers', () => {
     await expect(conformanceRows(iterator)).rejects.toBe(primary)
     expect((primary as Error & { errors: unknown[] }).errors).toEqual([cleanup])
   })
-  it('observes native transaction causes while rejecting wrong codes and preserving legacy outer errors', async () => {
+  it('observes native transaction causes while rejecting wrong codes and preserving existing outer errors', async () => {
     const harness: IConformanceHarness = { describe: () => undefined, it: () => undefined, expect }
     const native = { backend: 'sqlite' }
     const original = new StorageContractError(StorageContractErrorCode.invalidArgument)

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
 import { ConcurrencyPolicy } from '../../src/authoring/concurrency.js'
-import { createStorageHost, definePlugin, memoryBackendPlugin } from '../../src/index.js'
+import { createStorageHost, definePlugin } from '../../src/index.js'
+import { memoryBackendPlugin } from '../../src/plugins/memory.js'
 import { MemoryOperation } from '../../src/backends/memory-constants.js'
 
 describe('memory execution and the original concurrency budget', () => {
@@ -64,7 +65,7 @@ describe('memory execution and the original concurrency budget', () => {
     await new Promise<void>((resolve) => setTimeout(resolve, 35))
     ready.resolve()
     await expect(pending).rejects.toMatchObject({
-      source: '@migaia/storage-contract',
+      source: 'storage.contract',
       code: 'ABORTED'
     })
     expect(await store.get('late')).toBeNull()

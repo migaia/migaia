@@ -1,5 +1,5 @@
 import type { ISqliteValue } from '../src/types.js'
-import { decodeFlatStorageKey } from '@migaia/storage-host/authoring/backend'
+import { decodeFlatStorageKey, lockKey } from '@migaia/storage-host/sdk'
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
 import { Logger } from '@migaia/logger'
 import {
@@ -10,14 +10,13 @@ import {
   LogRecordState,
   type ILogStore
 } from '@migaia/logger/plugins/durable'
-import { lockKey } from '@migaia/storage-host/authoring/concurrency'
 import { ttl } from '@migaia/storage-contract'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { expect, it, onTestFinished } from 'vitest'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
-import { storageJournalPlugin, storageLogStore } from '@migaia/storage-host/journal'
+import { storageJournalPlugin, storageLogStore } from '@migaia/storage-host/plugins/journal'
 import { sqliteBackendPlugin } from '../src/index.js'
 import { nodeSqliteDriver } from '../src/node.js'
 
@@ -178,10 +177,9 @@ it.each([false, true])(
     })
     const host = await createStorageHost({
       plugins: [
-        storageJournalPlugin(),
+        storageJournalPlugin({ logger, namespace: 'external-native' }),
         sqliteBackendPlugin({ driver: connection, wal: walMode })
-      ] as const,
-      journal: { logger, namespace: 'external-native' }
+      ] as const
     })
     onTestFinished(async () => {
       await host.dispose()
@@ -239,24 +237,26 @@ it('keeps data and native binlog/undo indexes at the same actual memory commit',
     })
   let logger: ReturnType<typeof makeLogger> | undefined
   const host = await createStorageHost({
-    plugins: [storageJournalPlugin(), sqliteBackendPlugin({ driver: connection })] as const,
-    journal: async ({ storageLogStore: openNativeLog }) => {
-      const changes = await openNativeLog('sqlite', { prefix: 'native-binlog' })
-      const images = await openNativeLog('sqlite', { prefix: 'native-undo' })
-      logs.push(changes, images)
-      const current = new Logger({
-        execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-        plugins: [binlog({ store: changes }), undoLog({ store: images })]
-      })
-      logger = current
-      return {
-        logger: current,
-        namespace: 'same-native',
-        binlogValues: true,
-        atomicBinlog: { sqlite: changes },
-        atomicUndo: { sqlite: images }
-      }
-    }
+    plugins: [
+      storageJournalPlugin(async ({ storageLogStore: openNativeLog }) => {
+        const changes = await openNativeLog('sqlite', { prefix: 'native-binlog' })
+        const images = await openNativeLog('sqlite', { prefix: 'native-undo' })
+        logs.push(changes, images)
+        const current = new Logger({
+          execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
+          plugins: [binlog({ store: changes }), undoLog({ store: images })]
+        })
+        logger = current
+        return {
+          logger: current,
+          namespace: 'same-native',
+          binlogValues: true,
+          atomicBinlog: { sqlite: changes },
+          atomicUndo: { sqlite: images }
+        }
+      }),
+      sqliteBackendPlugin({ driver: connection })
+    ] as const
   })
   onTestFinished(async () => {
     await host.dispose()
@@ -341,8 +341,10 @@ it('keeps revision births unique after upgrading an old private layout and dropp
   })
   const host = await createStorageHost({
     org: orgId,
-    plugins: [storageJournalPlugin(), sqliteBackendPlugin({ driver: connection })] as const,
-    journal: { logger, namespace: 'old-native-layout' }
+    plugins: [
+      storageJournalPlugin({ logger, namespace: 'old-native-layout' }),
+      sqliteBackendPlugin({ driver: connection })
+    ] as const
   })
   onTestFinished(async () => {
     await host.dispose()
@@ -412,8 +414,10 @@ it('recovers a committed marker after a lost native COMMIT acknowledgement witho
   })
   const open = () =>
     createStorageHost({
-      plugins: [storageJournalPlugin(), sqliteBackendPlugin({ driver })] as const,
-      journal: { logger, namespace: 'native-marker-recovery' }
+      plugins: [
+        storageJournalPlugin({ logger, namespace: 'native-marker-recovery' }),
+        sqliteBackendPlugin({ driver })
+      ] as const
     })
   let host = await open()
   onTestFinished(async () => {

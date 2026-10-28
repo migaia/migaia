@@ -1,10 +1,10 @@
+import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { describe, it, expect, onTestFinished } from 'vitest'
 import { Store } from 'oxigraph'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { createStorageHost, createOrgId, definePlugin, defineFeature } from '@migaia/storage-host'
 import { rdf, sparql, type IQuad } from '@migaia/storage-contract'
-import { term, prefixStorageOrgGraph } from '@migaia/storage-host/authoring/rdf'
-import { ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'
+import { term, prefixStorageOrgGraph, ConcurrencyPolicy } from '@migaia/storage-host/sdk'
 import { sparqlBackendPlugin, sparqlBackendKind } from '../src/index.js'
 import { oxigraphEndpoint } from '../src/oxigraph.js'
 import { graphStoreFeature } from '../src/features/graph-store.js'
@@ -52,6 +52,7 @@ async function installed(
       reports.push(error)
     },
     plugins: [
+      storageProbe(),
       sparqlBackendPlugin(
         { endpoint },
         { graphs: graphStoreFeature(), ontology: ontologyFeature(), extension }
@@ -406,6 +407,7 @@ describe('native RDF storage and atomic transactions', () => {
           reports.push(error)
         },
         plugins: [
+          storageProbe(),
           sparqlBackendPlugin(
             { endpoint: oxigraphEndpoint(new Store()) },
             { graphs: graphStoreFeature() }
@@ -414,10 +416,10 @@ describe('native RDF storage and atomic transactions', () => {
         ] as const
       })
     onTestFinished(() => host.dispose())
-    host.hooks.on('beforeSparqlUpdate', () => {
+    host.extensions.observe('beforeSparqlUpdate', () => {
       throw new TypeError('observer failed')
     })
-    host.hooks.on('beforeStorageOperation', async () => {
+    host.extensions.observe('beforeStorageOperation', async () => {
       throw new RangeError('observer rejected')
     })
     const store = host.backend('sparql')
@@ -449,6 +451,7 @@ describe('native RDF storage and atomic transactions', () => {
     const started = Promise.withResolvers<void>()
     const readHost = await createStorageHost({
       plugins: [
+        storageProbe(),
         sparqlBackendPlugin({
           endpoint: {
             query: (body, _accept, signal) =>

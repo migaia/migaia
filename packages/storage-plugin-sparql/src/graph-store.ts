@@ -1,4 +1,4 @@
-import { snapshotStorageRdfTerm } from '@migaia/storage-host/authoring/rdf'
+import { snapshotStorageRdfTerm } from '@migaia/storage-host/sdk'
 import { RdfTermType } from '@migaia/storage-contract'
 import { invalidArgument } from './errors.js'
 import { SparqlText } from './text.js'

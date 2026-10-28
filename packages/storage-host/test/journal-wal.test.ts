@@ -10,7 +10,8 @@ import {
 } from '@migaia/logger/plugins/durable'
 import { lockKey } from '../src/authoring/concurrency.js'
 import { ttl, type IStorageResource } from '@migaia/storage-contract'
-import { createStorageHost, createOrgId, memoryBackendPlugin } from '../src/index.js'
+import { createStorageHost, createOrgId } from '../src/index.js'
+import { memoryBackendPlugin } from '../src/plugins/memory.js'
 import { resolveStorageJournalBinding } from '../src/journal/binding.js'
 import { snapshotStorageJournalConfiguration } from '../src/journal/configuration-options.js'
 import { createStorageNativeJournal } from '../src/journal/commit.js'
@@ -161,8 +162,7 @@ describe('external storage WAL', () => {
       plugins: [binlog({ store: records }), wal({ store: intents })]
     })
     await using host = await createStorageHost({
-      plugins: [storageJournalPlugin(), memoryBackendPlugin()],
-      journal: { logger, namespace: 'automatic-wal' }
+      plugins: [storageJournalPlugin({ logger, namespace: 'automatic-wal' }), memoryBackendPlugin()]
     })
     try {
       const store = host.backend('memory')
@@ -207,8 +207,10 @@ describe('external storage WAL', () => {
       plugins: [undoLog({ store: images }), wal({ store: intents })]
     })
     await using host = await createStorageHost({
-      plugins: [storageJournalPlugin(), memoryBackendPlugin()],
-      journal: { logger, namespace: 'external-undo-only' }
+      plugins: [
+        storageJournalPlugin({ logger, namespace: 'external-undo-only' }),
+        memoryBackendPlugin()
+      ]
     })
     try {
       const store = host.backend('memory')

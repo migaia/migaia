@@ -4,8 +4,8 @@ import { it, expect, onTestFinished } from 'vitest'
 import { Logger, type ILogEntry } from '@migaia/logger'
 import { level } from '@migaia/logger/plugins'
 import { createStorageHost } from '@migaia/storage-host'
-import { storageJournalPlugin } from '@migaia/storage-host/journal'
-import { ConcurrencyPolicy, lockKey } from '@migaia/storage-host/authoring/concurrency'
+import { storageJournalPlugin } from '@migaia/storage-host/plugins/journal'
+import { ConcurrencyPolicy, lockKey } from '@migaia/storage-host/sdk'
 import { deferred } from '@migaia/utils/promise'
 import { postgresBackendPlugin } from '../src/index.js'
 import { pgDriver } from '../src/pg.js'
@@ -26,13 +26,12 @@ it('observes complete original retry loops once with canonical native keys and f
   })
   const host = await createStorageHost({
     plugins: [
-      storageJournalPlugin(),
+      storageJournalPlugin({ logger, namespace: 'telemetry', telemetry: true }),
       postgresBackendPlugin({
         driver: pgDriver(pool),
         prefix: 'pg_telemetry_' + randomUUID().slice(0, 8)
       })
-    ] as const,
-    journal: { logger, namespace: 'telemetry', telemetry: true }
+    ] as const
   })
   onTestFinished(async () => {
     await host.dispose()
@@ -138,24 +137,22 @@ it('keeps disabled level methods unread and contains a closed logger failure', a
   }
   const disabled = await createStorageHost({
     plugins: [
-      storageJournalPlugin(),
+      storageJournalPlugin({ logger: borrowed, namespace: 'disabled' }),
       postgresBackendPlugin({
         driver: pgDriver(pool),
         prefix: 'pg_telemetry_off_' + randomUUID().slice(0, 8)
       })
-    ] as const,
-    journal: { logger: borrowed, namespace: 'disabled' }
+    ] as const
   })
   const reports: unknown[] = []
   const enabled = await createStorageHost({
     plugins: [
-      storageJournalPlugin(),
+      storageJournalPlugin({ logger, namespace: 'enabled', telemetry: true }),
       postgresBackendPlugin({
         driver: pgDriver(pool),
         prefix: 'pg_telemetry_closed_' + randomUUID().slice(0, 8)
       })
     ] as const,
-    journal: { logger, namespace: 'enabled', telemetry: true },
     report: (error) => {
       reports.push(error)
     }

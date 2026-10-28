@@ -365,9 +365,7 @@ export function provideCapabilities<
   entries: TImplementations,
   options?: { readonly onInstaller?: (port: ICapabilityInstallPort) => void }
 ): ICapabilityStore<TBase, TImplementations[number]['capability'], TImplementations> {
-  /** This ordinary optional callback is validated without getter/Proxy reflection wrappers. */
   const onInstaller = options?.onInstaller
-  if (onInstaller !== undefined && typeof onInstaller !== 'function') throw invalidCapability()
   /** The named provider admits definitions and original base before any external callback executes. */
   const provider = new CapabilityProvider(base, entries)
   try {

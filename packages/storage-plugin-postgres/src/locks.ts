@@ -12,16 +12,16 @@ import {
   readConcurrencyLockIdentities,
   snapshotConcurrencyLockKeys,
   snapshotConcurrencyLockRange,
-  snapshotConcurrencyLockHoldings
-} from '@migaia/storage-host/authoring/concurrency'
+  snapshotConcurrencyLockHoldings,
+  throwIfAborted
+} from '@migaia/storage-host/sdk'
 import { sleep } from '@migaia/utils/promise'
-import { throwIfAborted } from '@migaia/storage-host/authoring/backend'
 import type { IPgConfiguration, IPgTables } from './schema.js'
 import type { IPgConnection } from './types.js'
 import { pgTextKey } from './codec.js'
 import { PgNames } from './constants.js'
 import { normalizeTransactionFailure, postgresError } from './errors.js'
-import { PostgresErrorCode } from './error-code.js'
+import { PostgresErrorCode } from '@migaia/storage-contract/error-code'
 import { PostgresErrorText } from './error-text.js'
 /** A backend-created lock conflict is consumed before it can leave the original attempt. */
 export class PgLockConflict extends Error {

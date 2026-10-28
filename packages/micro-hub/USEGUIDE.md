@@ -96,7 +96,7 @@
 
 ## 6. 持久化
 
-`persist({ store, debounceMs?, keyPrefix? })` 需要 `state()`。`store` 是任意 `IKeyValueStore`，例如 `@migaia/storage-web/local-storage` 的 `localStorageHost({ namespace })` 或 `@migaia/storage-web/indexed-db` 的 `indexedDbHost({ dbName })`。这两个工厂名字带 `Host`，但只返回一个 store，不会创建 storage-web 的 host；micro-hub 也不使用 storage-web 的 `./plugins/*`（它们只能装进 storage host）。hub 只借用这个 store，不会释放它。
+`persist({ store, debounceMs?, keyPrefix? })` 需要 `state()`。`store` 是任意 `IKeyValueStore`，例如 `@migaia/storage-plugin-browser/local-storage` 的 `localStorageHost({ namespace })` 或 `@migaia/storage-plugin-browser/indexed-db` 的 `indexedDbHost({ dbName })`。这两个工厂名字带 `Host`，但只返回一个 store，不会创建 storage-plugin-browser 的 host；micro-hub 也不使用 storage-plugin-browser 的 `./plugins/*`（它们只能装进 storage host）。hub 只借用这个 store，不会释放它。
 
 `own(contract, { persist: ['items'], persistKey? })` 把所选普通字段写到 `<keyPrefix><persistKey ?? 契约名>`，并在 owner 启动时读回。读回期间发生的写入不会被存档覆盖（store-persist 的 hydrate 合并规则）。同一 hub 内更换 owner 时，已恢复或已写入的字段保留内存值，不再被旧存档覆盖；新 hub 仍会恢复存档。存档版本取契约 `version`；主版本升级后旧存档被丢弃，字段从契约初始值开始。`owned.persistence.ready` 在首次读回成功后兑现。owner 断开或 `release()` 时停止持久化。keyed 字段不能持久化。
 

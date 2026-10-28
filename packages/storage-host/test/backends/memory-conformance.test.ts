@@ -3,7 +3,8 @@ import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.j
 import { describe, expect, it, onTestFinished } from 'vitest'
 import { runConformance, type IConformanceHarness } from '@migaia/storage-contract/conformance'
 import { kv, records, ttl, counter, vector, rdf, blob } from '@migaia/storage-contract'
-import { createStorageHost, memoryBackendPlugin } from '../../src/index.js'
+import { createStorageHost } from '../../src/index.js'
+import { memoryBackendPlugin } from '../../src/plugins/memory.js'
 
 /** The owning package consumes the one public suite with its complete real native manifest. */
 const harness: IConformanceHarness = { describe, expect, it }

@@ -14,7 +14,8 @@ import {
 } from './logger-runtime.js'
 import { readStorageJournalTarget, storageJournalTargetIdentity } from './targets.js'
 import { createStorageOperationReporter, reportCleanupError } from '../core/operation-reporter.js'
-import { StorageError, StorageErrorCode } from '../errors.js'
+import { StorageError } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.js'
 import type { IStorageJournalBackendAccess } from './binding.js'
 import { StorageJournalKind } from './constants.js'
@@ -34,7 +35,7 @@ export type IStorageJournalTargetIdentity = Readonly<{
 /** Only this bridge's own persisted kind is interpreted, preserving original causes on damage. */
 function invalid(cause?: unknown): never {
   throw new StorageError(
-    StorageErrorCode.journalRecordInvalid,
+    StorageHostErrorCode.journalRecordInvalid,
     { cause },
     StorageErrorText.journalRecordInvalid
   )
@@ -73,7 +74,7 @@ export function readStorageJournalIntentTarget(input: unknown): IStorageJournalT
   try {
     return identity(object(input).target)
   } catch (cause) {
-    if (cause instanceof StorageError && cause.code === StorageErrorCode.journalRecordInvalid)
+    if (cause instanceof StorageError && cause.code === StorageHostErrorCode.journalRecordInvalid)
       throw cause
     return invalid(cause)
   }
@@ -146,7 +147,7 @@ export function readStorageJournalIntent(input: unknown, backend: IBackendKind, 
       changes
     }
   } catch (cause) {
-    if (cause instanceof StorageError && cause.code === StorageErrorCode.journalRecordInvalid)
+    if (cause instanceof StorageError && cause.code === StorageHostErrorCode.journalRecordInvalid)
       throw cause
     return invalid(cause)
   }
@@ -220,7 +221,10 @@ async function recoverStorageWal(context: IStorageExternalWalContext): Promise<v
       try {
         owner = identity(object(record.payload).target)
       } catch (cause) {
-        if (cause instanceof StorageError && cause.code === StorageErrorCode.journalRecordInvalid)
+        if (
+          cause instanceof StorageError &&
+          cause.code === StorageHostErrorCode.journalRecordInvalid
+        )
           throw cause
         invalid(cause)
       }
@@ -240,10 +244,10 @@ async function recoverStorageWal(context: IStorageExternalWalContext): Promise<v
     context.options.afterRecover?.(recovered, Date.now() - started)
   } catch (cause) {
     const failure =
-      cause instanceof StorageError && cause.code === StorageErrorCode.journalRecordInvalid
+      cause instanceof StorageError && cause.code === StorageHostErrorCode.journalRecordInvalid
         ? cause
         : new StorageError(
-            StorageErrorCode.journalRecoveryFailed,
+            StorageHostErrorCode.journalRecoveryFailed,
             { cause },
             StorageErrorText.journalRecoveryFailed
           )

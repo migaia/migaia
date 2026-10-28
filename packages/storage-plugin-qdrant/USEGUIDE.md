@@ -58,7 +58,7 @@ a
 ```ts doc-test=run
 import { createStorageHost } from '@migaia/storage-host'
 import { vector, ttl, DeleteCountMode } from '@migaia/storage-contract'
-import { lockKey } from '@migaia/storage-host/authoring/concurrency'
+import { lockKey } from '@migaia/storage-host/sdk'
 import { qdrantBackendPlugin } from '@migaia/storage-plugin-qdrant'
 
 await using host = await createStorageHost({
@@ -91,7 +91,7 @@ undefined
 
 删除包含仍物理存在的过期点。默认 precount 先 exact count，再以同一 filter 做 wait:true 删除；并发修改可能让计数不同于最终删除量。scroll 在删除前逐页收集匹配 ID，再按 ID 批删，返回成功提交的 ID 数。扫描不是快照：新点可能被读到或留下，收集后变得不匹配的 ID 仍会删除。
 
-precount 与管理 `deleteByFilter` 无法精确表达条件时，报 source `@migaia/storage-contract`、code `UNSUPPORTED_CAPABILITY`。通用条件可显式选 `count: 'scroll'`，扫描当前组织候选并执行共享 predicate。
+precount 与管理 `deleteByFilter` 无法精确表达条件时，报 source `storage.contract`、code `UNSUPPORTED_CAPABILITY`。通用条件可显式选 `count: 'scroll'`，扫描当前组织候选并执行共享 predicate。
 
 ## 多向量重排
 

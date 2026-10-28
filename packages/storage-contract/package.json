@@ -20,6 +20,10 @@
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
     },
+    "./error-code": {
+      "types": "./dist/error-codes.d.ts",
+      "default": "./dist/error-code.js"
+    },
     "./conformance": {
       "types": "./dist/conformance/index.d.ts",
       "default": "./dist/conformance.js"

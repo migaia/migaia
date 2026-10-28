@@ -1,13 +1,17 @@
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { ERROR_SOURCE, ObjectErrorCode, type IObjectErrorCode } from './error-code.js'
+import { STORAGE_OBJECT_ERROR_SOURCE, ObjectErrorCode } from '@migaia/storage-contract/error-code'
+import type { IObjectErrorCode } from '@migaia/storage-contract/error-code'
 import { ObjectErrorText } from './error-text.js'
 import { ObjectNames } from './constants.js'
 /** Attach domain and code to a new native Error while preserving the exact original cause. */
 export function objectError(
   code: IObjectErrorCode,
   cause?: unknown
-): Error & { readonly source: typeof ERROR_SOURCE; readonly code: IObjectErrorCode } {
+): Error & {
+  readonly source: typeof STORAGE_OBJECT_ERROR_SOURCE
+  readonly code: IObjectErrorCode
+} {
   const error = new Error(
     code === ObjectErrorCode.dataInvalid
       ? ObjectErrorText.dataInvalid
@@ -17,10 +21,13 @@ export function objectError(
     { cause }
   )
   Object.defineProperties(error, {
-    source: { value: ERROR_SOURCE, enumerable: true },
+    source: { value: STORAGE_OBJECT_ERROR_SOURCE, enumerable: true },
     code: { value: code, enumerable: true }
   })
-  return error as Error & { readonly source: typeof ERROR_SOURCE; readonly code: IObjectErrorCode }
+  return error as Error & {
+    readonly source: typeof STORAGE_OBJECT_ERROR_SOURCE
+    readonly code: IObjectErrorCode
+  }
 }
 /**
  * Native argument/platform error identity and stacks survive code attachment; owner errors stay
@@ -29,7 +36,7 @@ export function objectError(
 export function normalizeObjectError(error: unknown): Error {
   if (
     error instanceof StorageContractError ||
-    (error instanceof Error && 'source' in error && error.source === ERROR_SOURCE)
+    (error instanceof Error && 'source' in error && error.source === STORAGE_OBJECT_ERROR_SOURCE)
   )
     return error
   if (
@@ -48,13 +55,13 @@ export function normalizeObjectError(error: unknown): Error {
       if (replacement instanceof DOMException)
         Object.defineProperty(replacement, 'cause', { value: error })
       return attachErrorIdentity(replacement, {
-        source: ERROR_SOURCE,
+        source: STORAGE_OBJECT_ERROR_SOURCE,
         code: ObjectErrorCode.failed
       })
     }
     return attachErrorIdentity<Error>(
       error,
-      { source: ERROR_SOURCE, code: ObjectErrorCode.failed },
+      { source: STORAGE_OBJECT_ERROR_SOURCE, code: ObjectErrorCode.failed },
       { onConflict: fallback, onFailure: fallback }
     )
   }

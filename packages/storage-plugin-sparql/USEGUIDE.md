@@ -17,7 +17,7 @@
 import { Store } from 'oxigraph'
 import { createStorageHost } from '@migaia/storage-host'
 import { rdf } from '@migaia/storage-contract'
-import { term } from '@migaia/storage-host/authoring/rdf'
+import { term } from '@migaia/storage-host/sdk'
 import { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'
 import { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'
 
@@ -65,8 +65,8 @@ quad 的 subject/predicate 用命名节点，object 用命名节点或字面量�
 import { Store } from 'oxigraph'
 import { createStorageHost } from '@migaia/storage-host'
 import { rdf } from '@migaia/storage-contract'
-import { ConcurrencyPolicy } from '@migaia/storage-host/authoring/concurrency'
-import { term } from '@migaia/storage-host/authoring/rdf'
+import { ConcurrencyPolicy } from '@migaia/storage-host/sdk'
+import { term } from '@migaia/storage-host/sdk'
 import { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'
 import { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'
 
@@ -113,7 +113,7 @@ Ada
 ```ts doc-test=run
 import { createStorageHost } from '@migaia/storage-host'
 import { sparql } from '@migaia/storage-contract'
-import { term } from '@migaia/storage-host/authoring/rdf'
+import { term } from '@migaia/storage-host/sdk'
 import { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'
 import { httpEndpoint } from '@migaia/storage-plugin-sparql/http'
 
@@ -156,7 +156,7 @@ queryUrl/updateUrl 必填，graphStoreUrl 仅图文档功能需要。URL 为不�
 import { Store } from 'oxigraph'
 import { createStorageHost } from '@migaia/storage-host'
 import { rdf } from '@migaia/storage-contract'
-import { term } from '@migaia/storage-host/authoring/rdf'
+import { term } from '@migaia/storage-host/sdk'
 import { sparqlBackendPlugin } from '@migaia/storage-plugin-sparql'
 import { oxigraphEndpoint } from '@migaia/storage-plugin-sparql/oxigraph'
 import { graphStoreFeature } from '@migaia/storage-plugin-sparql/features/graph-store'

@@ -3,12 +3,8 @@ import { memoryChangeFeedFeature } from '../../src/features/memory-change-feed.j
 import { describe, expect, it } from 'vitest'
 import { isPlainObject } from '@migaia/utils/object'
 import { utf8ByteLength } from '@migaia/utils/bytes'
-import {
-  createStorageHost,
-  defineFeature,
-  memoryBackendKind,
-  memoryBackendPlugin
-} from '../../src/index.js'
+import { createStorageHost, defineFeature } from '../../src/index.js'
+import { memoryBackendKind, memoryBackendPlugin } from '../../src/plugins/memory.js'
 import {
   safeJsonPayloadByteLength,
   type IBackendChangeController

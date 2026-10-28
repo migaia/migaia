@@ -17,7 +17,7 @@
     "packages/rpc/test/core/errors.test.ts",
     "packages/rpc/test/layering/naming.test.ts",
     "packages/rpc/test/merge/error-source.test.ts",
-    "packages/storage-web/test/types/error-serialization.spec.ts",
+    "packages/storage-plugin-browser/test/types/error-serialization.spec.ts",
     "packages/store-worker/e2e/store-worker.spec.ts",
     "packages/store-worker/test/exports.test.ts"
   ],

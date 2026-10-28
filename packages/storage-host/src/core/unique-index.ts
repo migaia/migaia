@@ -5,7 +5,8 @@ import type {
   IStorageKey
 } from '@migaia/storage-contract'
 import { encodeFlatStorageKey } from './key-domain.js'
-import { StorageError, StorageErrorCode } from '../errors.js'
+import { StorageError } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.js'
 
 /** One unique projected value and its original logical record identity. */
@@ -40,7 +41,7 @@ export function collectUniqueIndexOwners(
       if (definition === undefined)
         throw (
           errors?.invalidConfig(backend) ??
-          new StorageError(StorageErrorCode.invalidConfig, { backend })
+          new StorageError(StorageHostErrorCode.invalidConfig, { backend })
         )
       if (!definition.unique || entry === undefined) continue
       /** Projection normalization already admitted every actual storage key. */
@@ -54,7 +55,7 @@ export function collectUniqueIndexOwners(
           throw (
             errors?.uniqueConflict(backend, record.key, indexName) ??
             new StorageError(
-              StorageErrorCode.indexUniqueConflict,
+              StorageHostErrorCode.indexUniqueConflict,
               { backend, key: record.key },
               StorageErrorText.indexUniqueConflict(indexName)
             )

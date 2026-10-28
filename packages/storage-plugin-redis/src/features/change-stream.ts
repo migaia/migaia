@@ -2,7 +2,11 @@ import { RedisOperation } from '../constants.js'
 import { RedisCommand, RedisText } from '../constants.js'
 import type { IRedisConnection } from '../driver.js'
 import { defineFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
-import { asyncDisposeKey, throwIfAborted } from '@migaia/storage-host/authoring/backend'
+import {
+  asyncDisposeKey,
+  throwIfAborted,
+  createStorageIteratorLifetime
+} from '@migaia/storage-host/sdk'
 import {
   durableChangeFeed,
   implement,
@@ -13,14 +17,13 @@ import {
   type ICapabilityImpl,
   type IStorageResource
 } from '@migaia/storage-contract'
-import { createStorageIteratorLifetime } from '@migaia/storage-host/authoring/resource'
 import { redisBackendKind } from '../plugin.js'
 import { readNativeFeaturePort, type IRedisNativeFeaturePort } from '../native-feature.js'
 import { featureInteger, readStreamRows } from '../feature-input.js'
 import { decodeRedisChange } from '../changes.js'
 import { replyString, RedisSuffix } from '../layout.js'
 import { redisError, invalidArgument, normalizeRedisTransactionFailure } from '../errors.js'
-import { RedisErrorCode } from '../error-code.js'
+import { RedisErrorCode } from '@migaia/storage-contract/error-code'
 /** Reliable change cursors are actual native Stream IDs, with no client-side acknowledgement ledger. */
 export type IRedisChangeStreamOutput = IStorageFeatureOutput<
   readonly [ICapabilityImpl<typeof durableChangeFeed, IDurableChangeFeedApi>],
@@ -63,6 +66,13 @@ function changes(reply: unknown): readonly IDurableStorageChange[] {
     }
     return { ...decodeRedisChange(replyString(row[1][1])), cursor: id }
   })
+}
+/** Root projections read the shared Stream; org projections read only their own org Stream. */
+function durableStream(
+  port: IRedisNativeFeaturePort,
+  layout: IRedisNativeFeaturePort['layout']
+): string {
+  return port.allOrganizations ? layout.durableChanges : layout.orgDurableChanges
 }
 /** Native retention facts distinguish an initial empty cursor from actually lost retained history. */
 async function assertRetained(
@@ -144,8 +154,8 @@ export function redisChangeStreamFeature(options: { readonly maxLen: number }) {
 class RedisDurableTail implements IStorageResource {
   /** Native driver and report ports retain the selected organization's original owner. */
   readonly #port: IRedisNativeFeaturePort
-  /** One immutable org layout selects the same private durable Stream. */
-  readonly #layout: IRedisNativeFeaturePort['layout']
+  /** The one durable Stream this tail reads: shared for root projections, own for org projections. */
+  readonly #stream: string
   /** Canonical operation cancellation remains cooperative with the original blocking read. */
   readonly #signal: AbortSignal | undefined
   /** Native cursor advances only after the caller's original callback succeeds. */
@@ -166,7 +176,7 @@ class RedisDurableTail implements IStorageResource {
     onError: Parameters<IDurableChangeFeedApi['tailChanges']>[0]['onError']
   ) {
     this.#port = port
-    this.#layout = layout
+    this.#stream = durableStream(port, layout)
     this.#signal = signal
     this.#current = current
     this.#onChange = onChange
@@ -192,7 +202,7 @@ class RedisDurableTail implements IStorageResource {
   async #consume(connection: IRedisConnection): Promise<void> {
     while (!this.#lifetime.isClosing()) {
       throwIfAborted(this.#signal)
-      await assertRetained(connection, this.#layout.durableChanges, this.#current)
+      await assertRetained(connection, this.#stream, this.#current)
       /** A real native block remains bounded so original cancellation and close can drain. */
       const reply = await connection.command([
         RedisCommand.xread,
@@ -201,21 +211,19 @@ class RedisDurableTail implements IStorageResource {
         RedisCommand.block,
         '1000',
         RedisCommand.streams,
-        this.#layout.durableChanges,
+        this.#stream,
         this.#current
       ])
       if (reply === null) continue
       /** Only rows for this exact Stream enter native summary decoding. */
-      const rows = readStreamRows(reply, this.#layout.durableChanges)
-      await assertRetained(connection, this.#layout.durableChanges, this.#current)
+      const rows = readStreamRows(reply, this.#stream)
+      await assertRetained(connection, this.#stream, this.#current)
       for (const change of changes(rows)) {
         if (this.#lifetime.isClosing()) return
         throwIfAborted(this.#signal)
-        if (change.orgId === this.#layout.orgId || this.#port.allOrganizations) {
-          /** Listener callbacks keep the original bare-call receiver, unlike native port methods. */
-          const onChange = this.#onChange
-          await onChange(change)
-        }
+        /** Listener callbacks keep the original bare-call receiver, unlike native port methods. */
+        const onChange = this.#onChange
+        await onChange(change)
         this.#current = change.cursor
       }
     }
@@ -261,29 +269,20 @@ class RedisDurableFeed implements IDurableChangeFeedApi {
       async (input, connection, layout) => {
         if (input.after !== undefined) cursor(input.after)
         featureInteger(input.limit)
-        if (input.after !== undefined)
-          await assertRetained(connection, layout.durableChanges, input.after)
-        let current = input.after ?? '0-0'
-        const result: IDurableStorageChange[] = []
-        for (;;) {
-          const page = changes(
-            await connection.command([
-              RedisCommand.xrange,
-              layout.durableChanges,
-              '(' + current,
-              '+',
-              RedisCommand.count,
-              String(input.limit - result.length)
-            ])
-          )
-          if (page.length === 0) break
-          for (const change of page) {
-            current = change.cursor
-            if (change.orgId === layout.orgId || port.allOrganizations) result.push(change)
-          }
-          if (result.length === input.limit) break
-        }
-        return { changes: result, cursor: current }
+        const stream = durableStream(port, layout)
+        if (input.after !== undefined) await assertRetained(connection, stream, input.after)
+        /** The selected Stream holds only visible changes, so one bounded range read fills the page. */
+        const page = changes(
+          await connection.command([
+            RedisCommand.xrange,
+            stream,
+            '(' + (input.after ?? '0-0'),
+            '+',
+            RedisCommand.count,
+            String(input.limit)
+          ])
+        )
+        return { changes: page, cursor: page.at(-1)?.cursor ?? input.after ?? '0-0' }
       }
     )
   }
@@ -306,7 +305,7 @@ class RedisDurableFeed implements IDurableChangeFeedApi {
           const last = changes(
             await port.driver.command([
               RedisCommand.xrevrange,
-              layout.durableChanges,
+              durableStream(port, layout),
               '+',
               '-',
               RedisCommand.count,

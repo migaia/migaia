@@ -1,4 +1,5 @@
-import { StorageError, StorageErrorCode, createStorageTypeError } from '../errors.js'
+import { StorageError, createStorageTypeError } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageErrorText } from '../error-text.js'
 import { EntityAdapterName } from '../adapter-constants.js'
 import type { ISchemaAdapter } from './types.js'
@@ -39,7 +40,7 @@ export const fromStandardSchema = <T>(
   schema: IStandardSchemaV1<unknown, T>
 ): ISchemaAdapter<T, T> => {
   if (typeof schema !== 'object' || schema === null || Array.isArray(schema))
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageHostErrorCode.invalidConfig, {
       cause: new TypeError(StorageErrorText.standardSchemaObject)
     })
   /** Capture the external protocol once before descriptor validation. */
@@ -47,10 +48,10 @@ export const fromStandardSchema = <T>(
   try {
     standard = (schema as { readonly '~standard'?: unknown })['~standard']
   } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidConfig, { cause })
+    throw new StorageError(StorageHostErrorCode.invalidConfig, { cause })
   }
   if (typeof standard !== 'object' || standard === null || Array.isArray(standard))
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageHostErrorCode.invalidConfig, {
       cause: new TypeError(StorageErrorText.standardSchemaDescriptor)
     })
   /** Read only the captured protocol object, preserving throwing getters as causes. */
@@ -66,7 +67,7 @@ export const fromStandardSchema = <T>(
     vendor = candidate.vendor
     validate = candidate.validate
   } catch (cause) {
-    throw new StorageError(StorageErrorCode.invalidConfig, { cause })
+    throw new StorageError(StorageHostErrorCode.invalidConfig, { cause })
   }
   if (
     version !== 1 ||
@@ -74,7 +75,7 @@ export const fromStandardSchema = <T>(
     vendor.trim() === '' ||
     typeof validate !== 'function'
   )
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageHostErrorCode.invalidConfig, {
       cause: new TypeError(StorageErrorText.standardSchemaDescriptor)
     })
   return {
@@ -85,10 +86,10 @@ export const fromStandardSchema = <T>(
       try {
         result = await (validate as IStandardSchemaV1<unknown, T>['~standard']['validate'])(value)
       } catch (cause) {
-        throw new StorageError(StorageErrorCode.validationFailed, { cause })
+        throw new StorageError(StorageHostErrorCode.validationFailed, { cause })
       }
       if (typeof result !== 'object' || result === null || Array.isArray(result))
-        throw new StorageError(StorageErrorCode.validationFailed, {
+        throw new StorageError(StorageHostErrorCode.validationFailed, {
           cause: new TypeError(StorageErrorText.standardSchemaResult)
         })
       /** Read the single returned result without reconstructing its value. */
@@ -104,11 +105,11 @@ export const fromStandardSchema = <T>(
         hasValue = Object.hasOwn(resultCandidate, 'value')
         if (issues === undefined && hasValue) output = resultCandidate.value
       } catch (cause) {
-        throw new StorageError(StorageErrorCode.validationFailed, { cause })
+        throw new StorageError(StorageHostErrorCode.validationFailed, { cause })
       }
       if (issues !== undefined) {
         if (!Array.isArray(issues))
-          throw new StorageError(StorageErrorCode.validationFailed, {
+          throw new StorageError(StorageHostErrorCode.validationFailed, {
             cause: new TypeError(StorageErrorText.standardSchemaIssuesInvalid)
           })
         /** Join original issue text while retaining failure classification. */
@@ -117,27 +118,27 @@ export const fromStandardSchema = <T>(
           for (const issue of issues) {
             if (typeof issue !== 'object' || issue === null || Array.isArray(issue))
               throw createStorageTypeError(
-                StorageErrorCode.validationFailed,
+                StorageHostErrorCode.validationFailed,
                 StorageErrorText.standardSchemaIssuesInvalid
               )
             /** Each issue message is captured once. */
             const message = (issue as { readonly message?: unknown }).message
             if (typeof message !== 'string')
               throw createStorageTypeError(
-                StorageErrorCode.validationFailed,
+                StorageHostErrorCode.validationFailed,
                 StorageErrorText.standardSchemaIssuesInvalid
               )
             messages.push(message)
           }
         } catch (cause) {
-          throw new StorageError(StorageErrorCode.validationFailed, { cause })
+          throw new StorageError(StorageHostErrorCode.validationFailed, { cause })
         }
-        throw new StorageError(StorageErrorCode.validationFailed, {
+        throw new StorageError(StorageHostErrorCode.validationFailed, {
           cause: new Error(messages.join('; '))
         })
       }
       if (!hasValue)
-        throw new StorageError(StorageErrorCode.validationFailed, {
+        throw new StorageError(StorageHostErrorCode.validationFailed, {
           cause: new TypeError(StorageErrorText.standardSchemaMissingValue)
         })
       return output as T

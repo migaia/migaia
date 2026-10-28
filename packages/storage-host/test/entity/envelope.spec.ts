@@ -1,3 +1,4 @@
+import { storageProbe } from '../../src/plugins/probe/index.js'
 import { entityQueryFeature } from '../../src/entity/query-feature.js'
 import { entityUniqueFeature } from '../../src/entity/unique-feature.js'
 import { entityMigrationFeature } from '../../src/entity/migration-feature.js'
@@ -152,7 +153,7 @@ describe('entity envelopes through the shared plan owner', () => {
         }
       }).connect(store)
       await expect(unique.put({ id: 'new', email: 'one' })).rejects.toMatchObject({
-        source: '@migaia/storage-contract',
+        source: 'storage.contract',
         code: 'UNSUPPORTED_CAPABILITY'
       })
       await expect(unique.migrate()).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
@@ -191,22 +192,26 @@ describe('entity envelopes through the shared plan owner', () => {
     const firstRaw = rawPlugin()
     const seen: string[] = []
     const first = await createStorageHost({
-      plugins: [firstRaw.plugin],
-      hooks: {
-        beforeEnvelopeCheck: () => {
-          seen.push('first')
-        }
-      }
+      plugins: [
+        storageProbe({
+          beforeEnvelopeCheck: () => {
+            seen.push('first')
+          }
+        }),
+        firstRaw.plugin
+      ]
     })
     const store = firstRaw.getStore()
     const secondRaw = rawPlugin(store)
     await using second = await createStorageHost({
-      plugins: [secondRaw.plugin],
-      hooks: {
-        beforeEnvelopeCheck: () => {
-          seen.push('second')
-        }
-      }
+      plugins: [
+        storageProbe({
+          beforeEnvelopeCheck: () => {
+            seen.push('second')
+          }
+        }),
+        secondRaw.plugin
+      ]
     })
     expect(second.backend('raw')).toBe(store)
     const repo = defineEntity<{ id: string }>({
@@ -234,25 +239,27 @@ describe('entity envelopes through the shared plan owner', () => {
     const order: string[] = []
     const raw = rawPlugin()
     await using host = await createStorageHost({
-      plugins: [raw.plugin],
-      hooks: {
-        beforeEnvelopeCheck: () => {
-          order.push('check')
-        },
-        afterEnvelopeCheck: () => {
-          order.push('checked')
-        },
-        beforeMigrationStep: () => {
-          order.push('step')
-        },
-        afterMigrationStep: () => {
-          order.push('stepped')
-        },
-        afterMigrate: (event) => {
-          expect(event.stepCount).toBe(1)
-          order.push('migrated')
-        }
-      }
+      plugins: [
+        storageProbe({
+          beforeEnvelopeCheck: () => {
+            order.push('check')
+          },
+          afterEnvelopeCheck: () => {
+            order.push('checked')
+          },
+          beforeMigrationStep: () => {
+            order.push('step')
+          },
+          afterMigrationStep: () => {
+            order.push('stepped')
+          },
+          afterMigrate: (event) => {
+            expect(event.stepCount).toBe(1)
+            order.push('migrated')
+          }
+        }),
+        raw.plugin
+      ]
     })
     const store = raw.getStore()
     expect(host.backend('raw')).toBe(store)
@@ -304,18 +311,18 @@ describe('entity envelopes through the shared plan owner', () => {
       JSON.stringify({ __v: 2, data: { id: 'old' } })
     )
     await expect(repo.get('old')).rejects.toMatchObject({
-      source: '@migaia/storage-host',
+      source: 'storage.host',
       code: 'DESERIALIZE_FAILED',
-      cause: { source: '@migaia/storage-contract', code: 'ENVELOPE_INVALID' }
+      cause: { source: 'storage.contract', code: 'ENVELOPE_INVALID' }
     })
     await store.set(
       composeFlatKey('invalid', 'future'),
       JSON.stringify({ version: 3, state: { id: 'future' } })
     )
     await expect(repo.get('future')).rejects.toMatchObject({
-      source: '@migaia/storage-host',
+      source: 'storage.host',
       code: 'VERSION_UNSUPPORTED',
-      cause: { source: '@migaia/storage-contract', code: 'VERSION_UNSUPPORTED' }
+      cause: { source: 'storage.contract', code: 'VERSION_UNSUPPORTED' }
     })
     const invalidWrite = defineEntity<{ id: string }, null>({
       features: [
@@ -334,9 +341,9 @@ describe('entity envelopes through the shared plan owner', () => {
       }
     }).connect(store)
     await expect(invalidWrite.put({ id: 'a' })).rejects.toMatchObject({
-      source: '@migaia/storage-host',
+      source: 'storage.host',
       code: 'SERIALIZE_FAILED',
-      cause: { source: '@migaia/storage-contract', code: 'ENVELOPE_INVALID' }
+      cause: { source: 'storage.contract', code: 'ENVELOPE_INVALID' }
     })
     expect(await store.get(composeFlatKey('null-state', 'a'))).toBeNull()
   })
@@ -371,7 +378,7 @@ describe('entity envelopes through the shared plan owner', () => {
     await expect(repo.get('a')).rejects.toMatchObject({
       code: 'MIGRATION_FAILED',
       stage: 'migrate',
-      cause: { source: '@migaia/storage-contract', code: 'MIGRATION_FAILED', cause: original }
+      cause: { source: 'storage.contract', code: 'MIGRATION_FAILED', cause: original }
     })
   })
 })

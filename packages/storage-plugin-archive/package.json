@@ -35,10 +35,10 @@
   },
   "devDependencies": {
     "@migaia/storage-host": "workspace:^",
+    "@migaia/storage-plugin-browser": "workspace:^",
     "@migaia/storage-plugin-object": "workspace:^",
     "@migaia/storage-plugin-postgres": "workspace:^",
     "@migaia/storage-plugin-sqlite": "workspace:^",
-    "@migaia/storage-web": "workspace:^",
     "@types/pg": "8.23.1",
     "fake-indexeddb": "6.2.5",
     "pg": "8.23.1"

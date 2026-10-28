@@ -2,10 +2,13 @@
 export const StorageErrorText = {
   /** Tell host callers which assembly supplies journal runtime and private log stores. */
   journalNotAssembled:
-    'Install storageJournalPlugin() from @migaia/storage-host/journal before using journal options or log stores.',
+    'Install storageJournalPlugin() from @migaia/storage-host/plugins/journal before using log stores.',
+  /** A configured journal plugin arrived after the first install batch, or a second one did. */
+  journalConfigurationLate:
+    'Pass storageJournalPlugin(options) once, in the first plugin batch, before any backend is installed.',
   /** Tell backend authors and memory callers which notification assembly is missing. */
   changeControllerNotAssembled:
-    'Install the backend notification Feature or pass createBackendChangeController from @migaia/storage-host/authoring/change-controller.',
+    'Install the backend notification Feature or pass createBackendChangeController from @migaia/storage-host/sdk.',
   /** Tell memory callers how to select the omitted change-feed iterator owner. */
   changeIteratorNotAssembled:
     'Install memoryChangeFeedFeature() from @migaia/storage-host/features/memory-change-feed before watching changes.',
@@ -75,7 +78,7 @@ export const StorageErrorText = {
   /** Empty or reversed bounds reject before backend iteration. */
   keyRangeInvalid: 'invalid key range',
   /** Preserve the original final backend cleanup diagnostic when its neutral implementation moves. */
-  operationCleanupFailed: '[storage-web] operation cleanup failed',
+  operationCleanupFailed: '[storage-host] operation cleanup failed',
   /** Environment checks must be callable before their original installation resource is acquired. */
   invalidDetectCheck: 'storage environment check must be a function',
   /** Detection mode is a boolean captured before backend construction. */
@@ -88,7 +91,7 @@ export const StorageErrorText = {
    * Preserve the original fallback diagnostic text while the package source transfers to its
    * neutral owner.
    */
-  defaultError: (code: string) => `[storage-web] ${code}`,
+  defaultError: (code: string) => `[storage-host] ${code}`,
   /** Stable text for rejecting malformed backend identifiers before host mutation. */
   backendIdInvalid: 'storage backend id is invalid',
   /** Stable text for duplicate backend registration or install-batch identifiers. */
@@ -99,8 +102,10 @@ export const StorageErrorText = {
   backendPluginInvalid: 'storage backend plugin is invalid',
   /** Stable text for backend factory, preparation, or PluginHost install failure. */
   backendInstallFailed: 'storage backend installation failed',
-  /** Stable text for rejecting host mutation while another batch is installing. */
-  storageHostBusy: 'storage host is busy installing plugins',
+  /** Message for BACKEND_IN_USE: another installed plugin still borrows the backend. */
+  backendInUse: 'storage backend is still borrowed by another installed plugin',
+  /** Message when unUse targets a journal plugin whose recording is bound to installed backends. */
+  journalPluginInUse: 'a configured storageJournalPlugin cannot be removed while the host is open',
   /** Stable text for host operations after seal or terminal disposal. */
   storageHostDisposed: 'storage host is disposed',
   /** Stable text for aggregate host cleanup failure. */
@@ -130,13 +135,13 @@ export const StorageErrorText = {
   /** Optional route diagnostics must be callable. */
   codecDiagnostic: 'onDiagnostic must be a function',
   /** Preserve the original final reporting diagnostic for a rejected route observer. */
-  codecDiagnosticFailure: '[storage-web] operation reporter failed',
+  codecDiagnosticFailure: '[storage-host] operation reporter failed',
   /** Structured codec values cannot be converted to text without changing their domain. */
   structuredCodecUnsupported: (name: string) =>
     `codec "${name}" produces structured output but the backend only supports text`,
   /** Stable diagnostic records the real expansion of the explicit binary-to-text route. */
   codecBinaryFallback: (name: string) =>
-    `[storage-web] codec "${name}" falls back to base64 on a text-only backend (+33% size)`
+    `[storage-host] codec "${name}" falls back to base64 on a text-only backend (+33% size)`
 } as const
 
 /** Preserve aggregate backfill diagnostics while both original failures remain reachable. */

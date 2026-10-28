@@ -28,7 +28,8 @@ pnpm add @migaia/store-persist @migaia/store-light @migaia/storage-host
 
 ```ts doc-test=run
 import { createStore } from '@migaia/store-light'
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { persist } from '@migaia/store-persist/light'
 
 await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })
@@ -59,7 +60,8 @@ The same settings-save task, displayed without execution:
 
 ```ts doc-test=check
 import { createStore } from '@migaia/store-light'
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 
 const store = createStore({ count: 0 })
 await using host = await createStorageHost({ plugins: [memoryBackendPlugin()] as const })
@@ -136,7 +138,7 @@ This package connects state changes to storage: it reads archives, reconciles lo
 | `@migaia/store-persist/indexed` | persistCollection, IPersistableCollection, IPersistCollectionOptions.                                                                 |
 | `@migaia/store-persist/keyed`   | persistKeyed, clearFamily, IPersistKeyedOptions, IPersistKeyedHandle.                                                                 |
 
-reactive, storage-contract, utils, and lifecycle are runtime dependencies. store-light, store-indexed, and store-keyed are optional peers: install the model you use. Install storage-web only when using its backend or codec. Directly install packages your code imports rather than relying on transitive visibility. Obtain memoryStorageHost, localStorageHost, or indexedDbHost from storage-web's precise backend subentries; this package does not depend on concrete storage-web runtime values.
+reactive, storage-contract, utils, and lifecycle are runtime dependencies. store-light, store-indexed, and store-keyed are optional peers: install the model you use. Install storage-plugin-browser only when using its backend or codec. Directly install packages your code imports rather than relying on transitive visibility. Obtain memoryStorageHost, localStorageHost, or indexedDbHost from storage-plugin-browser's precise backend subentries; this package does not depend on concrete storage-plugin-browser runtime values.
 
 ### Shared options and synchronous callbacks
 
@@ -178,7 +180,7 @@ clearFamily(storage, namespace) requires both arguments and returns `Promise<num
 
 ### Loading, migration, and local edits
 
-Attachment creates one migration plan before subscribing. Hydration uses storage-contract assertVersionedEnvelope and storage-host/authoring/migration migrateEnvelopeSync. Matching versions preserve state. Reachable older archives run contiguous steps or one reset; future archives fail with VERSION_UNSUPPORTED. Contract hydration errors pass through unchanged and close writes. Upgrading/restoring alone never writes back; application changes and flush retain existing scheduling.
+Attachment creates one migration plan before subscribing. Hydration uses storage-contract assertVersionedEnvelope and storage-host/sdk migrateEnvelopeSync. Matching versions preserve state. Reachable older archives run contiguous steps or one reset; future archives fail with VERSION_UNSUPPORTED. Contract hydration errors pass through unchanged and close writes. Upgrading/restoring alone never writes back; application changes and flush retain existing scheduling.
 
 Default merging handles plain objects with Object.prototype or null prototypes. It shallowly compares each current field against construction-time startup state using Object.is: locally changed fields win, untouched fields accept the archive, and unarchived current fields remain. It is not deep conflict resolution; mutation inside a retained nested reference is not recursively compared. Retry uses that same startup baseline. Arrays, Maps, Sets, and other non-plain shapes accept the persisted shape wholesale; a custom merge owns its application rules.
 
@@ -270,9 +272,10 @@ Existing package scripts include fmt, lint, typecheck, typecheck:test, test, bui
 ## Canonical codec composition and observation
 
 ```ts
-import { fromValueCodec } from '@migaia/storage-host/authoring/codec'
+import { fromValueCodec } from '@migaia/storage-host/sdk'
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { createStore } from '@migaia/store-light'
 import { persist } from '@migaia/store-persist/light'
 
@@ -302,7 +305,8 @@ The default codec already preserves collections. Use `{ ...row }` to project a n
 
 ```ts doc-test=check
 import { createStore } from '@migaia/store-light'
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { persistTransaction } from '@migaia/store-persist'
 import { persist } from '@migaia/store-persist/light'
 

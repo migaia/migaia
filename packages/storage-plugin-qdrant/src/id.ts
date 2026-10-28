@@ -1,4 +1,4 @@
-import { encodeOrderedStorageKey } from '@migaia/storage-host/authoring/key'
+import { encodeOrderedStorageKey } from '@migaia/storage-host/sdk'
 import { QdrantText } from './constants.js'
 /** UUID's standard DNS namespace supplies one fixed package-independent v5 namespace. */
 const namespace = Uint8Array.of(

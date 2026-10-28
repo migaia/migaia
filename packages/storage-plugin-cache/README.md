@@ -23,7 +23,8 @@
 先安装数据层，再安装缓存。第二次请求从缓存取得同一值，不再运行加载函数。
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { cachePlugin } from '@migaia/storage-plugin-cache'
 
 const base = await createStorageHost({ plugins: [memoryBackendPlugin({ id: 'values' })] })

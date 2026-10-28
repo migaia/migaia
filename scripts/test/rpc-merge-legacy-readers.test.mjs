@@ -32,7 +32,7 @@ function filesUnder(directory) {
     }
     if (relativePath.startsWith('scripts/test/rpc-merge-')) return []
     if (/^packages\/rpc-integration\/test\/fixtures\/legacy-.*\.json$/.test(relativePath)) return []
-    if (relativePath.startsWith('packages/storage-web/test/fixtures/storage-v2-')) return []
+    if (relativePath.startsWith('packages/storage-plugin-browser/test/fixtures/storage-v2-')) return []
     if (
       relativePath === 'packages/event-subscriber/test/fixtures/storage-v2-capability-map.json'
     )

@@ -9,7 +9,7 @@ import {
   createStorageOperationReporter,
   asyncDisposeKey,
   reportCleanupError
-} from '@migaia/storage-host/authoring/backend'
+} from '@migaia/storage-host/sdk'
 /** Native borrowed resources reuse the original lifecycle tracker for accepted work and release. */
 class PgBorrowedResource {
   /** One stable identity lets the canonical tracker own admission and drain. */

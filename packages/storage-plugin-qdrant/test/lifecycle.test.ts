@@ -1,3 +1,4 @@
+import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { createServer } from 'node:http'
 import { describe, expect, it, vi } from 'vitest'
 import { QdrantClient } from '@qdrant/js-client-rest'
@@ -120,6 +121,7 @@ describe('real SDK request and backend lifetime boundaries', () => {
       await native.client.createCollection(name, { vectors: { size: 2, distance: 'Dot' } })
       const host = await createStorageHost({
         plugins: [
+          storageProbe(),
           qdrantBackendPlugin(
             { url: native.origin, http: native.http },
             { management: qdrantManagementFeature() }
@@ -184,6 +186,7 @@ describe('real SDK request and backend lifetime boundaries', () => {
       const native = await forwardedNative()
       const host = await createStorageHost({
         plugins: [
+          storageProbe(),
           qdrantBackendPlugin({
             url: native.origin,
             http: native.http,
@@ -246,6 +249,7 @@ describe('real SDK request and backend lifetime boundaries', () => {
       }))
       const host = await createStorageHost({
         plugins: [
+          storageProbe(),
           qdrantBackendPlugin({
             url: native.origin,
             http: native.http,
@@ -261,14 +265,14 @@ describe('real SDK request and backend lifetime boundaries', () => {
         new RangeError('before acquire sync'),
         new TypeError('before acquire rejection')
       ]
-      host.hooks.on('beforeStorageOperation', () => {
+      host.extensions.observe('beforeStorageOperation', () => {
         throw failures[0]
       })
-      host.hooks.on('beforeStorageOperation', () => Promise.reject(failures[1]))
-      host.hooks.on('beforeLockAcquire', () => {
+      host.extensions.observe('beforeStorageOperation', () => Promise.reject(failures[1]))
+      host.extensions.observe('beforeLockAcquire', () => {
         throw failures[2]
       })
-      host.hooks.on('beforeLockAcquire', () => Promise.reject(failures[3]))
+      host.extensions.observe('beforeLockAcquire', () => Promise.reject(failures[3]))
       const collection = host
         .backend('qdrant')
         .use(vector)

@@ -23,10 +23,12 @@ import {
   type IVectorFilter,
   type ILockKey
 } from '@migaia/storage-contract'
-import { createVectorQuery, snapshotStorageWhere } from '@migaia/storage-host/authoring/query'
-import { createStorageIteratorLifetime } from '@migaia/storage-host/authoring/resource'
-import { asyncDisposeKey, throwIfAborted } from '@migaia/storage-host/authoring/backend'
 import {
+  createVectorQuery,
+  snapshotStorageWhere,
+  createStorageIteratorLifetime,
+  asyncDisposeKey,
+  throwIfAborted,
   recommendStorageVector,
   snapshotStorageVector,
   snapshotStorageVectorCollection,
@@ -34,7 +36,7 @@ import {
   snapshotStorageVectorIds,
   snapshotStorageVectorSearch,
   snapshotStorageDeleteCountMode
-} from '@migaia/storage-host/authoring/vector'
+} from '@migaia/storage-host/sdk'
 import { parseObjectPath } from '@migaia/utils/object'
 import type { ICodecValue } from '@migaia/serialize/codec'
 import { redisBackendKind } from '../plugin.js'
@@ -65,7 +67,7 @@ import {
 import { readRedisHash, type RedisDraft } from '../transaction.js'
 import { replyInteger, replyRevision } from '../layout.js'
 import { invalidArgument, unsupported, redisError } from '../errors.js'
-import { RedisErrorCode } from '../error-code.js'
+import { RedisErrorCode } from '@migaia/storage-contract/error-code'
 import type { IRedisStore } from '../types.js'
 import type { IRedisConnection } from '../driver.js'
 /**
@@ -294,7 +296,8 @@ async function redisSearchVector<TPayload>(
     connection,
     layout,
     query.state.name,
-    query.state.configuration
+    query.state.configuration,
+    { signal }
   )
   query.state.configuration = schema.configuration
   if (query.metric !== undefined && query.metric !== schema.configuration.metric) unsupported()
@@ -363,6 +366,8 @@ async function redisSearchVector<TPayload>(
       RedisVector.payload,
       RedisVector.score,
       ...(actual.withVector ? [field] : []),
+      RedisVector.timeout,
+      '0',
       RedisVector.dialect,
       '2'
     ])
@@ -390,11 +395,29 @@ async function redisSearchVector<TPayload>(
       }
     ])
   }
-  return hits.sort(
-    (left, right) =>
-      right[1].score - left[1].score ||
-      (left[1].id < right[1].id ? -1 : left[1].id > right[1].id ? 1 : 0)
-  )
+  return orderVectorHits(hits)
+}
+/**
+ * FT.SEARCH already returns hits by distance (SORTBY score), which is score order for both metrics.
+ * Only runs of equal score still need the id tie-break, so only those runs are sorted; distinct
+ * scores cost one linear pass. The id comparison is arithmetic rather than a ternary because Redis
+ * returns equal-score hits in no fixed order, which made branch coverage vary between runs.
+ */
+function orderVectorHits<
+  T extends readonly [unknown, { readonly score: number; readonly id: string }]
+>(hits: T[]): T[] {
+  let start = 0
+  for (let index = 1; index <= hits.length; index++) {
+    if (index < hits.length && hits[index]![1].score === hits[start]![1].score) continue
+    if (index - start > 1) {
+      const run = hits
+        .slice(start, index)
+        .sort((left, right) => Number(left[1].id > right[1].id) - Number(left[1].id < right[1].id))
+      for (let offset = 0; offset < run.length; offset++) hits[start + offset] = run[offset]!
+    }
+    start = index
+  }
+  return hits
 }
 /** Bind the canonical vector query owner to this explicit native source and cursor. */
 function redisVectorQuery<TPayload>(
@@ -481,263 +504,288 @@ function redisRemoveVectors(
     ctx?.concurrency
   )
 }
+
+/**
+ * One Redis vector collection: near, similarity, recommend, upsert and delete over its search
+ * index.
+ */
+class RedisVectorCollection<TPayload> implements IVectorCollection<TPayload, false, true> {
+  /** Owner state passed in by the constructor caller; read by the members below. */
+  readonly #collection: IRedisVectorCollectionContext
+
+  near: IVectorCollection<TPayload, false, true>['near'] = (input, options) => {
+    const { exact = false, metric } = options ?? {}
+    if (typeof exact !== 'boolean') throw invalidArgument()
+    if (metric !== undefined && !['cosine', 'dot', 'euclid'].includes(metric))
+      throw invalidArgument()
+    if (
+      metric !== undefined &&
+      this.#collection.current.configuration &&
+      metric !== this.#collection.current.configuration.metric
+    )
+      unsupported()
+    /** A deferred query stores its own caller vector across future FT.INFO/sample awaits. */
+    const direction = snapshotStorageVector(
+      input,
+      this.#collection.current.configuration,
+      RedisText.backend
+    )
+    return redisVectorQuery<TPayload>(
+      this.#collection.binding,
+      this.#collection.current,
+      async () => ({ query: direction, exclude: [] }),
+      exact,
+      metric,
+      [],
+      { kind: VectorQueryOriginKind.near, vector: direction }
+    )
+  }
+
+  similarTo: IVectorCollection<TPayload, false, true>['similarTo'] = (id) => {
+    assertStorageVectorIds([id], RedisText.backend)
+    const captured = id
+    return redisVectorQuery<TPayload>(
+      this.#collection.binding,
+      this.#collection.current,
+      async (connection, configuration) => ({
+        query: (
+          await redisVectorSamples(
+            this.#collection.binding,
+            connection,
+            this.#collection.current,
+            configuration,
+            [captured]
+          )
+        )[0]!,
+        exclude: [captured]
+      }),
+      false,
+      undefined,
+      [],
+      { kind: VectorQueryOriginKind.similarTo, id: captured }
+    )
+  }
+
+  recommend: IVectorCollection<TPayload, false, true>['recommend'] = (examples) => {
+    /** Query sample IDs outlive this synchronous chain construction and native loading awaits. */
+    const { positive, negative } = examples,
+      pos = snapshotStorageVectorIds(positive, RedisText.backend),
+      neg = snapshotStorageVectorIds(negative ?? [], RedisText.backend)
+    if (!pos.length || new Set([...pos, ...neg]).size !== pos.length + neg.length)
+      throw invalidArgument()
+    return redisVectorQuery<TPayload>(
+      this.#collection.binding,
+      this.#collection.current,
+      async (connection, configuration) => {
+        const values = await redisVectorSamples(
+          this.#collection.binding,
+          connection,
+          this.#collection.current,
+          configuration,
+          [...pos, ...neg]
+        )
+        return {
+          query: recommendStorageVector(
+            values.slice(0, pos.length) as [readonly number[], ...(readonly number[])[]],
+            values.slice(pos.length)
+          ),
+          exclude: [...pos, ...neg]
+        }
+      },
+      false,
+      undefined,
+      [],
+      { kind: VectorQueryOriginKind.recommend, positive: pos, negative: neg }
+    )
+  }
+
+  upsert: IVectorCollection<TPayload, false, true>['upsert'] = (points, ctx) => {
+    const ttlMs = ctx?.ttlMs,
+      policy = ctx?.concurrency
+    if (ttlMs !== undefined) assertStorageTtlDuration(ttlMs, RedisText.backend)
+    /** Transformed point data must remain fixed through native schema, lock and HASH awaits. */
+    const capture = (input: readonly IStorageVectorPoint<TPayload>[]) =>
+      snapshotStorageVectorUpsert(
+        input,
+        this.#collection.current.configuration,
+        RedisText.backend
+      ).map((point) => ({
+        point,
+        bytes: vectorBytes(point.vector),
+        projection: vectorProjection(point.payload as ICodecValue | undefined),
+        payload: point.payload === undefined ? undefined : payloadBytes(point.payload)
+      }))
+    /** Detach caller vectors and payloads before asynchronous middleware can borrow them. */
+    const initial = snapshotStorageVectorUpsert(
+      points,
+      this.#collection.current.configuration,
+      RedisText.backend
+    )
+    return this.#collection.port.mutate(
+      RedisOperation.vectorUpsert,
+      initial,
+      ctx,
+      capture,
+      (actual) => actual.map(({ point }) => lock(this.#collection.name, point.id)),
+      async (draft, actual) => {
+        if (!actual.length) return
+        const sampleTags = await Promise.all(actual.map(({ point }) => vectorSample(point.id)))
+        const schema = await resolveVectorSchema(
+          draft.connection,
+          draft.layout,
+          this.#collection.name,
+          this.#collection.current.configuration
+        )
+        this.#collection.current.configuration = schema.configuration
+        const names = vectorNames(draft.layout, this.#collection.name)
+        /** One local batch union avoids repeated DDL for a newly observed scalar path. */
+        const projections = new Map(actual.flatMap((item) => [...item.projection]))
+        for (const item of actual)
+          assertStorageVector(
+            vectorValues(item.bytes, schema.configuration.dimensions),
+            schema.configuration,
+            RedisText.backend
+          )
+        await registerVectorFields(draft.connection, names.index, schema, projections)
+        for (const [index, { point, bytes, projection, payload }] of actual.entries()) {
+          await draft.guardVector(lock(this.#collection.name, point.id))
+          const entry = await redisVectorHash(draft, this.#collection.name, point.id)
+          const deadline =
+            ttlMs === undefined ? entry.deadline : (await draft.now()) + Math.ceil(ttlMs)
+          const fields = new Map(projection)
+          fields.set(RedisVector.org, vectorString(draft.layout.orgId))
+          fields.set(RedisVector.id, payloadBytes(point.id))
+          fields.set(RedisVector.collection, payloadBytes(this.#collection.name))
+          fields.set(RedisVector.sample, vectorString(sampleTags[index]!))
+          fields.set(RedisVector.approximate, bytes)
+          fields.set(RedisVector.exact, bytes)
+          if (payload !== undefined) fields.set(RedisVector.payload, payload)
+          draft.changeHash(
+            entry,
+            ttlMs === 0 ? new Map() : vectorExpiry(fields, deadline),
+            deadline
+          )
+        }
+      },
+      policy
+    )
+  }
+
+  delete: IVectorCollection<TPayload, false, true>['delete'] = (ids, ctx) =>
+    redisRemoveVectors(this.#collection, ids, ctx)
+
+  deleteWhere: IVectorCollection<TPayload, false, true>['deleteWhere'] = (where, ctx) => {
+    if (typeof where === 'function') unsupported()
+    /** A deferred native delete retains a canonical condition AST across pipeline and query I/O. */
+    const condition = snapshotStorageWhere(where),
+      mode = snapshotStorageDeleteCountMode(ctx?.count, RedisText.backend)
+    if (vectorCondition(condition) === undefined) unsupported()
+    void mode
+    return this.#collection.port.mutate(
+      RedisOperation.vectorDeleteWhere,
+      condition,
+      ctx,
+      (actual) => actual,
+      () => [],
+      async (draft, actual) => {
+        const schema = await resolveVectorSchema(
+            draft.connection,
+            draft.layout,
+            this.#collection.name,
+            this.#collection.current.configuration,
+            { signal: ctx?.signal }
+          ),
+          names = vectorNames(draft.layout, this.#collection.name),
+          translated = vectorCondition(actual, schema.fields)
+        const ids = new Map<string, string>()
+        for (let offset = 0; ; offset += 256) {
+          const rows = vectorRows(
+            await vectorSend(draft.connection, [
+              RedisVector.search,
+              names.index,
+              '(@' +
+                RedisVector.org +
+                ':{' +
+                draft.layout.orgId.replaceAll('-', '\\-') +
+                '} ' +
+                translated +
+                ')',
+              RedisCommand.limit,
+              String(offset),
+              '256',
+              RedisVector.return,
+              '2',
+              RedisVector.id,
+              RedisVector.collection,
+              RedisVector.timeout,
+              '0',
+              RedisVector.dialect,
+              '2'
+            ])
+          )
+          for (const row of rows) {
+            const point = vectorPoint(row.fields, this.#collection.name, row.key, names)
+            ids.set(row.key, point.id)
+          }
+          if (rows.length < 256) break
+        }
+        let count = 0
+        for (const [physical, id] of ids) {
+          await draft.guardVector(lock(this.#collection.name, id))
+          const point = await draft.hash(physical, lock(this.#collection.name, id))
+          if (point.fields.size) {
+            draft.changeHash(point, new Map())
+            count++
+          }
+        }
+        return count
+      },
+      ctx?.concurrency
+    )
+  }
+
+  search: IVectorCollection<TPayload, false, true>['search'] = async (input, options, ctx) => {
+    /** The public search owns its caller vector/options while the query executes asynchronously. */
+    const captured = snapshotStorageVectorSearch(
+        input,
+        options,
+        this.#collection.current.configuration,
+        RedisText.backend
+      ),
+      conditions = captured.options.filter ? [filterCondition(captured.options.filter)] : []
+    if (conditions.some((condition) => vectorCondition(condition) === undefined)) unsupported()
+    const chain = redisVectorQuery<TPayload>(
+      this.#collection.binding,
+      this.#collection.current,
+      async () => ({ query: captured.query, exclude: [] }),
+      captured.options.exact,
+      undefined,
+      conditions
+    )
+    if (captured.options.k === 0) {
+      this.#collection.port.assertLive()
+      assertOperationContext(ctx)
+      return []
+    }
+    const hits = await chain.topK(captured.options.k).all(ctx)
+    return hits.map((hit) => ({
+      id: hit.id,
+      score: hit.score,
+      ...(captured.options.withPayload && hit.payload !== undefined ? { payload: hit.payload } : {})
+    }))
+  }
+
+  /** Capture the owner state; members are own-property arrows so the public shape is unchanged. */
+  constructor(collection: IRedisVectorCollectionContext) {
+    this.#collection = collection
+  }
+}
+
 /** Collection methods are a fixed explicit-context table with no mutable lexical component state. */
 function createRedisVectorCollectionApi<TPayload>(
   collection: IRedisVectorCollectionContext
 ): IVectorCollection<TPayload, false, true> {
-  return {
-    near(input, options) {
-      const { exact = false, metric } = options ?? {}
-      if (typeof exact !== 'boolean') throw invalidArgument()
-      if (metric !== undefined && !['cosine', 'dot', 'euclid'].includes(metric))
-        throw invalidArgument()
-      if (
-        metric !== undefined &&
-        collection.current.configuration &&
-        metric !== collection.current.configuration.metric
-      )
-        unsupported()
-      /** A deferred query stores its own caller vector across future FT.INFO/sample awaits. */
-      const direction = snapshotStorageVector(
-        input,
-        collection.current.configuration,
-        RedisText.backend
-      )
-      return redisVectorQuery<TPayload>(
-        collection.binding,
-        collection.current,
-        async () => ({ query: direction, exclude: [] }),
-        exact,
-        metric,
-        [],
-        { kind: VectorQueryOriginKind.near, vector: direction }
-      )
-    },
-    similarTo(id) {
-      assertStorageVectorIds([id], RedisText.backend)
-      const captured = id
-      return redisVectorQuery<TPayload>(
-        collection.binding,
-        collection.current,
-        async (connection, configuration) => ({
-          query: (
-            await redisVectorSamples(
-              collection.binding,
-              connection,
-              collection.current,
-              configuration,
-              [captured]
-            )
-          )[0]!,
-          exclude: [captured]
-        }),
-        false,
-        undefined,
-        [],
-        { kind: VectorQueryOriginKind.similarTo, id: captured }
-      )
-    },
-    recommend(examples) {
-      /** Query sample IDs outlive this synchronous chain construction and native loading awaits. */
-      const { positive, negative } = examples,
-        pos = snapshotStorageVectorIds(positive, RedisText.backend),
-        neg = snapshotStorageVectorIds(negative ?? [], RedisText.backend)
-      if (!pos.length || new Set([...pos, ...neg]).size !== pos.length + neg.length)
-        throw invalidArgument()
-      return redisVectorQuery<TPayload>(
-        collection.binding,
-        collection.current,
-        async (connection, configuration) => {
-          const values = await redisVectorSamples(
-            collection.binding,
-            connection,
-            collection.current,
-            configuration,
-            [...pos, ...neg]
-          )
-          return {
-            query: recommendStorageVector(
-              values.slice(0, pos.length) as [readonly number[], ...(readonly number[])[]],
-              values.slice(pos.length)
-            ),
-            exclude: [...pos, ...neg]
-          }
-        },
-        false,
-        undefined,
-        [],
-        { kind: VectorQueryOriginKind.recommend, positive: pos, negative: neg }
-      )
-    },
-    upsert(points, ctx) {
-      const ttlMs = ctx?.ttlMs,
-        policy = ctx?.concurrency
-      if (ttlMs !== undefined) assertStorageTtlDuration(ttlMs, RedisText.backend)
-      /** Transformed point data must remain fixed through native schema, lock and HASH awaits. */
-      const capture = (input: readonly IStorageVectorPoint<TPayload>[]) =>
-        snapshotStorageVectorUpsert(input, collection.current.configuration, RedisText.backend).map(
-          (point) => ({
-            point,
-            bytes: vectorBytes(point.vector),
-            projection: vectorProjection(point.payload as ICodecValue | undefined),
-            payload: point.payload === undefined ? undefined : payloadBytes(point.payload)
-          })
-        )
-      /** Detach caller vectors and payloads before asynchronous middleware can borrow them. */
-      const initial = snapshotStorageVectorUpsert(
-        points,
-        collection.current.configuration,
-        RedisText.backend
-      )
-      return collection.port.mutate(
-        RedisOperation.vectorUpsert,
-        initial,
-        ctx,
-        capture,
-        (actual) => actual.map(({ point }) => lock(collection.name, point.id)),
-        async (draft, actual) => {
-          if (!actual.length) return
-          const sampleTags = await Promise.all(actual.map(({ point }) => vectorSample(point.id)))
-          const schema = await resolveVectorSchema(
-            draft.connection,
-            draft.layout,
-            collection.name,
-            collection.current.configuration
-          )
-          collection.current.configuration = schema.configuration
-          const names = vectorNames(draft.layout, collection.name)
-          /** One local batch union avoids repeated DDL for a newly observed scalar path. */
-          const projections = new Map(actual.flatMap((item) => [...item.projection]))
-          for (const item of actual)
-            assertStorageVector(
-              vectorValues(item.bytes, schema.configuration.dimensions),
-              schema.configuration,
-              RedisText.backend
-            )
-          await registerVectorFields(draft.connection, names.index, schema, projections)
-          for (const [index, { point, bytes, projection, payload }] of actual.entries()) {
-            await draft.guardVector(lock(collection.name, point.id))
-            const entry = await redisVectorHash(draft, collection.name, point.id)
-            const deadline =
-              ttlMs === undefined ? entry.deadline : (await draft.now()) + Math.ceil(ttlMs)
-            const fields = new Map(projection)
-            fields.set(RedisVector.org, vectorString(draft.layout.orgId))
-            fields.set(RedisVector.id, payloadBytes(point.id))
-            fields.set(RedisVector.collection, payloadBytes(collection.name))
-            fields.set(RedisVector.sample, vectorString(sampleTags[index]!))
-            fields.set(RedisVector.approximate, bytes)
-            fields.set(RedisVector.exact, bytes)
-            if (payload !== undefined) fields.set(RedisVector.payload, payload)
-            draft.changeHash(
-              entry,
-              ttlMs === 0 ? new Map() : vectorExpiry(fields, deadline),
-              deadline
-            )
-          }
-        },
-        policy
-      )
-    },
-    delete: (ids, ctx) => redisRemoveVectors(collection, ids, ctx),
-    deleteWhere(where, ctx) {
-      if (typeof where === 'function') unsupported()
-      /** A deferred native delete retains a canonical condition AST across pipeline and query I/O. */
-      const condition = snapshotStorageWhere(where),
-        mode = snapshotStorageDeleteCountMode(ctx?.count, RedisText.backend)
-      if (vectorCondition(condition) === undefined) unsupported()
-      void mode
-      return collection.port.mutate(
-        RedisOperation.vectorDeleteWhere,
-        condition,
-        ctx,
-        (actual) => actual,
-        () => [],
-        async (draft, actual) => {
-          const schema = await resolveVectorSchema(
-              draft.connection,
-              draft.layout,
-              collection.name,
-              collection.current.configuration
-            ),
-            names = vectorNames(draft.layout, collection.name),
-            translated = vectorCondition(actual, schema.fields)
-          const ids = new Map<string, string>()
-          for (let offset = 0; ; offset += 256) {
-            const rows = vectorRows(
-              await vectorSend(draft.connection, [
-                RedisVector.search,
-                names.index,
-                '(@' +
-                  RedisVector.org +
-                  ':{' +
-                  draft.layout.orgId.replaceAll('-', '\\-') +
-                  '} ' +
-                  translated +
-                  ')',
-                RedisCommand.limit,
-                String(offset),
-                '256',
-                RedisVector.return,
-                '2',
-                RedisVector.id,
-                RedisVector.collection,
-                RedisVector.dialect,
-                '2'
-              ])
-            )
-            for (const row of rows) {
-              const point = vectorPoint(row.fields, collection.name, row.key, names)
-              ids.set(row.key, point.id)
-            }
-            if (rows.length < 256) break
-          }
-          let count = 0
-          for (const [physical, id] of ids) {
-            await draft.guardVector(lock(collection.name, id))
-            const point = await draft.hash(physical, lock(collection.name, id))
-            if (point.fields.size) {
-              draft.changeHash(point, new Map())
-              count++
-            }
-          }
-          return count
-        },
-        ctx?.concurrency
-      )
-    },
-    async search(input, options, ctx) {
-      /** The public search owns its caller vector/options while the query executes asynchronously. */
-      const captured = snapshotStorageVectorSearch(
-          input,
-          options,
-          collection.current.configuration,
-          RedisText.backend
-        ),
-        conditions = captured.options.filter ? [filterCondition(captured.options.filter)] : []
-      if (conditions.some((condition) => vectorCondition(condition) === undefined)) unsupported()
-      const chain = redisVectorQuery<TPayload>(
-        collection.binding,
-        collection.current,
-        async () => ({ query: captured.query, exclude: [] }),
-        captured.options.exact,
-        undefined,
-        conditions
-      )
-      if (captured.options.k === 0) {
-        collection.port.assertLive()
-        assertOperationContext(ctx)
-        return []
-      }
-      const hits = await chain.topK(captured.options.k).all(ctx)
-      return hits.map((hit) => ({
-        id: hit.id,
-        score: hit.score,
-        ...(captured.options.withPayload && hit.payload !== undefined
-          ? { payload: hit.payload }
-          : {})
-      }))
-    }
-  }
+  return new RedisVectorCollection<TPayload>(collection)
 }
 /** Admit collection input once and publish a view of the original selected provider state. */
 function createRedisVectorCollection<TPayload>(

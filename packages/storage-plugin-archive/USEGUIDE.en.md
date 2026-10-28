@@ -14,7 +14,8 @@
 Archive events older than a day while keeping new records hot.
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { archivePlugin } from '@migaia/storage-plugin-archive'
 
 await using base = await createStorageHost({
@@ -66,7 +67,8 @@ Archive is an explicit operation, without a background scheduler or automatic ag
 Referenced cold segments remain. Once the last record is restored, Sweep can reclaim its segment.
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { archivePlugin } from '@migaia/storage-plugin-archive'
 
 await using base = await createStorageHost({
@@ -118,7 +120,8 @@ Sweep uses native opaque blob pages within this plugin's prefix. It deletes only
 With id history, the flat functions are historyRun, historyGet and historySweep. Organization views call them normally.
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { archivePlugin } from '@migaia/storage-plugin-archive'
 
 await using base = await createStorageHost({
@@ -166,11 +169,13 @@ Operations use the invoking organization and project both hot/cold into it. Do n
 afterArchiveRun observes a successful result; business code should still use returned progress.
 
 ```ts doc-test=run
-import { createStorageHost, memoryBackendPlugin } from '@migaia/storage-host'
+import { createStorageHost } from '@migaia/storage-host'
+import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
+import { storageProbe } from '@migaia/storage-host/plugins/probe'
 import { archivePlugin } from '@migaia/storage-plugin-archive'
 
 await using base = await createStorageHost({
-  plugins: [memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]
+  plugins: [storageProbe(), memoryBackendPlugin({ id: 'hot' }), memoryBackendPlugin({ id: 'cold' })]
 })
 const host = await base.use(
   archivePlugin({
@@ -189,7 +194,7 @@ const host = await base.use(
 )
 await host.detect()
 const hot = host.backend('hot')
-host.hooks.on('afterArchiveRun', (event) => console.log(event.archived))
+host.extensions.observe('afterArchiveRun', (event) => console.log(event.archived))
 await hot.putRecord({ createdAt: 0, value: 42 }, 'event:a')
 const result = await host.extensions.archiveRun()
 console.log(result.segments)

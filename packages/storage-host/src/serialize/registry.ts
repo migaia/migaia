@@ -1,4 +1,5 @@
-import { StorageError, StorageErrorCode } from '../errors.js'
+import { StorageError } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -16,7 +17,7 @@ import { StorageErrorText } from '../error-text.js'
 /** Snapshot a binary codec result before wrapping it as text. */
 const toBinaryBytes = (value: unknown): Uint8Array => {
   if (!isUint8Array(value))
-    throw new StorageError(StorageErrorCode.serializeFailed, {
+    throw new StorageError(StorageHostErrorCode.serializeFailed, {
       cause: new TypeError(StorageErrorText.binaryCodecResult)
     })
   /** Preserve the original view bounds while isolating its bytes. */
@@ -27,13 +28,13 @@ const toBinaryBytes = (value: unknown): Uint8Array => {
 /** Restore the explicit binary fallback carrier or retain its native decoding cause. */
 const fromBase64 = (value: unknown): Uint8Array => {
   if (typeof value !== 'string')
-    throw new StorageError(StorageErrorCode.deserializeFailed, {
+    throw new StorageError(StorageHostErrorCode.deserializeFailed, {
       cause: new TypeError(StorageErrorText.binaryFallbackInput)
     })
   try {
     return base64ToBytes(value)
   } catch (cause) {
-    throw new StorageError(StorageErrorCode.deserializeFailed, { cause })
+    throw new StorageError(StorageHostErrorCode.deserializeFailed, { cause })
   }
 }
 
@@ -77,7 +78,7 @@ export const selectCodec = (
       cause: new TypeError(StorageErrorText.codecCapabilities)
     })
   if (onDiagnostic !== undefined && typeof onDiagnostic !== 'function')
-    throw new StorageError(StorageErrorCode.invalidConfig, {
+    throw new StorageError(StorageHostErrorCode.invalidConfig, {
       cause: new TypeError(StorageErrorText.codecDiagnostic)
     })
   if (normalizedCodec.output === 'structured') {

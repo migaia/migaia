@@ -212,7 +212,7 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
     ],
   'packages/web-rpc/test/internal/web-rpc-plugin-host.test.ts::WebRPC PluginHost shell keeps fixed kernel-to-activation order and prevents activation after rollback':
     [
-      'packages/plugin-host/test/async-setup.test.ts::async setup installation rolls setup resources back in reverse order and retains the primary cause'
+      'packages/plugin-host/test/async-setup-rollback.test.ts::async setup installation rolls setup resources back in reverse order and retains the primary cause'
     ],
   'packages/web-rpc/test/internal/web-rpc-plugin-host.test.ts::WebRPC PluginHost shell preserves async and direct-host synchronous rollback identities':
     [
@@ -221,7 +221,7 @@ const currentCaseReceivers: Readonly<Record<string, readonly string[]>> = {
     ],
   'packages/web-rpc/test/internal/web-rpc-plugin-host.test.ts::WebRPC PluginHost shell uses typed shared symbols and one host rollback transaction':
     [
-      'packages/plugin-host/test/async-setup.test.ts::async setup installation rolls setup resources back in reverse order and retains the primary cause',
+      'packages/plugin-host/test/async-setup-rollback.test.ts::async setup installation rolls setup resources back in reverse order and retains the primary cause',
       'packages/rpc-host/test/host/duplicate-owner-rollback.test.ts::rolls back native resources and public publication without replacing the install cause'
     ],
   'packages/web-rpc/test/middleware/chunk.test.ts::canonical framing contract does not retain the former root chunk middleware export':

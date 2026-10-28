@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { projectEntityIndexes, snapshotEntityIndexes } from '../../src/entity/index-projection.js'
-import { StorageErrorCode } from '../../src/errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { StorageContractErrorCode } from '@migaia/storage-contract'
 
 describe('entity index projection contract', () => {
@@ -47,47 +47,47 @@ describe('entity index projection contract', () => {
 
   it('rejects malformed declaration and explicit projection shapes', () => {
     for (const value of [null, [], 42, 'indexes'])
-      expect(() => snapshotEntityIndexes(value)).toThrow(StorageErrorCode.invalidConfig)
+      expect(() => snapshotEntityIndexes(value)).toThrow(StorageHostErrorCode.invalidConfig)
     expect(() => snapshotEntityIndexes({ __private: { path: 'id' } })).toThrow(
-      StorageErrorCode.invalidConfig
+      StorageHostErrorCode.invalidConfig
     )
     expect(() => snapshotEntityIndexes({ '': { path: 'id' } })).toThrow(
-      StorageErrorCode.invalidConfig
+      StorageHostErrorCode.invalidConfig
     )
-    expect(() => snapshotEntityIndexes({ bad: null })).toThrow(StorageErrorCode.invalidConfig)
-    expect(() => snapshotEntityIndexes({ bad: [] })).toThrow(StorageErrorCode.invalidConfig)
+    expect(() => snapshotEntityIndexes({ bad: null })).toThrow(StorageHostErrorCode.invalidConfig)
+    expect(() => snapshotEntityIndexes({ bad: [] })).toThrow(StorageHostErrorCode.invalidConfig)
     expect(() => snapshotEntityIndexes({ bad: { path: 'id', paths: ['id'] } })).toThrow(
-      StorageErrorCode.invalidConfig
+      StorageHostErrorCode.invalidConfig
     )
     expect(() => snapshotEntityIndexes({ bad: { unique: 'yes', path: 'id' } })).toThrow(
-      StorageErrorCode.invalidConfig
+      StorageHostErrorCode.invalidConfig
     )
     expect(() => snapshotEntityIndexes({ bad: { multiEntry: 'yes', path: 'id' } })).toThrow(
-      StorageErrorCode.invalidConfig
+      StorageHostErrorCode.invalidConfig
     )
     expect(() => snapshotEntityIndexes({ bad: { revision: 0, path: 'id' } })).toThrow(
-      StorageErrorCode.invalidConfig
+      StorageHostErrorCode.invalidConfig
     )
     expect(() => snapshotEntityIndexes({ bad: { select: 'not-a-function' } })).toThrow(
-      StorageErrorCode.invalidConfig
+      StorageHostErrorCode.invalidConfig
     )
     expect(() => snapshotEntityIndexes({ bad: { select: () => undefined } })).toThrow(
-      StorageErrorCode.invalidConfig
+      StorageHostErrorCode.invalidConfig
     )
     expect(() =>
       snapshotEntityIndexes({ bad: { select: () => undefined, revision: 1, multiEntry: true } })
-    ).toThrow(StorageErrorCode.invalidConfig)
+    ).toThrow(StorageHostErrorCode.invalidConfig)
     expect(() => snapshotEntityIndexes({ bad: { paths: [], multiEntry: true } })).toThrow(
-      StorageErrorCode.invalidConfig
+      StorageHostErrorCode.invalidConfig
     )
     expect(() => snapshotEntityIndexes({ bad: { paths: 'id' } })).toThrow(
-      StorageErrorCode.invalidConfig
+      StorageHostErrorCode.invalidConfig
     )
 
     for (const [select, errorCode] of [
-      [() => 1, StorageErrorCode.invalidConfig],
-      [() => ({ kind: 'multiple' }), StorageErrorCode.invalidConfig],
-      [() => ({ kind: 'unknown', key: 'id' }), StorageErrorCode.invalidConfig],
+      [() => 1, StorageHostErrorCode.invalidConfig],
+      [() => ({ kind: 'multiple' }), StorageHostErrorCode.invalidConfig],
+      [() => ({ kind: 'unknown', key: 'id' }), StorageHostErrorCode.invalidConfig],
       [() => ({ kind: 'single', key: {} }), StorageContractErrorCode.invalidKey]
     ] as const) {
       const indexes = snapshotEntityIndexes<{ id: string }>({ bad: { select, revision: 1 } })
@@ -100,7 +100,7 @@ describe('entity index projection contract', () => {
       multi: { select: () => ['ok', 1], revision: 1 }
     })
     expect(() => projectEntityIndexes(indexes, { id: 'u1' }, 'memory')).toThrow(
-      StorageErrorCode.invalidConfig
+      StorageHostErrorCode.invalidConfig
     )
   })
 })

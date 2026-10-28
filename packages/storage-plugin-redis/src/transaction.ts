@@ -8,17 +8,20 @@ import {
   type IStorageKey,
   type ILockKey
 } from '@migaia/storage-contract'
-import { snapshotStorageCounterIncrement } from '@migaia/storage-host/authoring/counter'
 import {
+  snapshotStorageCounterIncrement,
   createStorageOperationReporter,
-  reportCleanupError
-} from '@migaia/storage-host/authoring/backend'
-import { planChannelWrite } from '@migaia/storage-host/authoring/backend'
+  reportCleanupError,
+  planChannelWrite,
+  createOrderedRecordIndex,
+  type IOrderedRecordIndex,
+  type IOrderedRecordRange
+} from '@migaia/storage-host/sdk'
 import type { IStorageJournalAttempt } from '@migaia/storage-host'
 import { captureRedisJournalStage, redisJournalTarget, type IRedisJournalStage } from './journal.js'
 import type { IRedisConnection, IRedisExecEntry } from './driver.js'
 import { redisError, invalidArgument } from './errors.js'
-import { RedisErrorCode } from './error-code.js'
+import { RedisErrorCode } from '@migaia/storage-contract/error-code'
 import { RedisText, redisExecCause } from './constants.js'
 import {
   createRedisLayout,
@@ -122,6 +125,8 @@ export class RedisDraft {
   readonly context: IConcurrencyAttemptContext
   /** Native data facts and changes are distinct from owner lifecycle state. */
   readonly entries = new Map<string, IRedisDraftEntry>()
+  /** Members with a draft value, per channel, in native ZSET order; pages read ranges from it. */
+  readonly #ordered = new Map<IRedisChannel, IOrderedRecordIndex<string>>()
   /** Original revision fields distinguish logical conflicts from unrelated shared WATCH aborts. */
   readonly revisions = new Map<string, number>()
   /** Native HASH state belongs to this same transaction draft, never another attempt. */
@@ -208,6 +213,7 @@ export class RedisDraft {
         expiry: 'keep'
       }
     this.entries.set(id, entry)
+    this.#track(entry)
     return entry
   }
   /** Batch loading issues one native MGET and retains duplicate input positions in its caller. */
@@ -255,6 +261,7 @@ export class RedisDraft {
           changed: false,
           expiry: 'keep'
         })
+        this.#track(this.entries.get(id)!)
       }
     }
     return keys.map((key) => this.entries.get(this.layout.revision(channel, key))!)
@@ -324,6 +331,32 @@ export class RedisDraft {
    * Capture immutable raw before/after images at the actual staging point, then update this same
    * draft.
    */
+  /** Keep one entry's membership in its channel index equal to "has a draft value". */
+  #track(entry: IRedisDraftEntry): void {
+    let index = this.#ordered.get(entry.channel)
+    if (!index) {
+      if (entry.value === undefined) return
+      index = createOrderedRecordIndex<string>()
+      this.#ordered.set(entry.channel, index)
+    }
+    const key = redisMemberBytes(entry.encoded)
+    if (entry.value === undefined) index.delete(key)
+    else index.set(key, entry.encoded)
+  }
+  /**
+   * Up to `limit` members with a draft value inside a ZRANGEBYLEX range (`[x`, `(x`, `-`, `+`), in
+   * native member order. Work is proportional to the members returned, not to the draft size.
+   */
+  rangeMembers(channel: IRedisChannel, lower: string, upper: string, limit: number): string[] {
+    const index = this.#ordered.get(channel),
+      members: string[] = []
+    if (!index) return members
+    for (const leaf of index.range(redisLexRange(lower, upper))) {
+      if (members.length === limit) break
+      members.push(leaf.value)
+    }
+    return members
+  }
   #changeEntry(entry: IRedisDraftEntry, value: string | undefined, expiry = entry.expiry): void {
     const deadline = (value: IRedisDraftEntry['expiry']) =>
       value === 'keep' ? entry.originalExpiry : value === 'persist' ? undefined : value
@@ -341,6 +374,7 @@ export class RedisDraft {
     entry.value = value
     entry.expiry = expiry
     entry.changed = true
+    this.#track(entry)
   }
   /**
    * Native vector calls stage through this same HASH owner, preserving cross-channel operation
@@ -709,4 +743,20 @@ export function validateRedisExec(entries: readonly IRedisExecEntry[], expected:
 /** Native locks expire by Redis clock; a missing or replaced original token is lock loss. */
 export function lockLost(): StorageContractError {
   return new StorageContractError(StorageContractErrorCode.lockLost, { backend: RedisText.backend })
+}
+
+/** Encoded members are ASCII hex, so their bytes sort exactly like the native ZSET members. */
+function redisMemberBytes(member: string): Uint8Array {
+  return new TextEncoder().encode(member)
+}
+/** Translate ZRANGEBYLEX bounds into ordered-index bounds; `-` and `+` leave a side open. */
+function redisLexRange(lower: string, upper: string): IOrderedRecordRange {
+  return {
+    ...(lower === '-'
+      ? {}
+      : { lower: redisMemberBytes(lower.slice(1)), lowerOpen: lower[0] === '(' }),
+    ...(upper === '+'
+      ? {}
+      : { upper: redisMemberBytes(upper.slice(1)), upperOpen: upper[0] === '(' })
+  }
 }

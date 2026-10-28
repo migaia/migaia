@@ -63,11 +63,11 @@ jobs:
       - name: Build neutral owners before peer consumers
         run: node scripts/exclusive-window.mjs run --window storage-owners --wait 2700 -- pnpm -r --workspace-concurrency=2 --filter @migaia/storage-host... --filter @migaia/store-persist... run build
       - name: Build native packages and browser adapters
-        run: node scripts/exclusive-window.mjs run --window storage-build --wait 2700 -- pnpm -r --workspace-concurrency=2 --filter '@migaia/storage-plugin-*' --filter @migaia/storage-web run build
+        run: node scripts/exclusive-window.mjs run --window storage-build --wait 2700 -- pnpm -r --workspace-concurrency=2 --filter '@migaia/storage-plugin-*' --filter @migaia/storage-plugin-browser run build
       - name: Check formatting and lint
         run: pnpm -r --no-bail --filter '@migaia/storage-*' run fmt --check && pnpm -r --no-bail --filter '@migaia/storage-*' run lint
       - name: Check storage source and test types
-        run: pnpm -r --no-bail --filter '@migaia/storage-*' run typecheck && pnpm -r --no-bail --filter '@migaia/storage-*' run typecheck:test && pnpm --filter @migaia/storage-web run typecheck:e2e
+        run: pnpm -r --no-bail --filter '@migaia/storage-*' run typecheck && pnpm -r --no-bail --filter '@migaia/storage-*' run typecheck:test && pnpm --filter @migaia/storage-plugin-browser run typecheck:e2e
       - name: Require the declared native service environment
         if: ${{ !cancelled() }}
         shell: bash
@@ -86,7 +86,7 @@ jobs:
         run: pnpm exec playwright install --with-deps chromium webkit
       - name: Run the existing real browser matrix
         if: ${{ !cancelled() }}
-        run: node scripts/exclusive-window.mjs run --window storage-browser --wait 2700 -- pnpm --filter @migaia/storage-web test:e2e
+        run: node scripts/exclusive-window.mjs run --window storage-browser --wait 2700 -- pnpm --filter @migaia/storage-plugin-browser test:e2e
       - name: Retain native environment status
         if: always()
         run: node scripts/storage-services.mts status

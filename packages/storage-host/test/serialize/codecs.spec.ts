@@ -14,10 +14,10 @@ describe('jsonCodec', () => {
   it('rejects non-portable values with the original codec failure chain', async () => {
     for (const value of [undefined, NaN, Infinity, () => undefined, Symbol('value')])
       await expect(jsonCodec.encode(value)).rejects.toMatchObject({
-        source: '@migaia/storage-host',
+        source: 'storage.host',
         code: 'SERIALIZE_FAILED',
         cause: {
-          source: '@migaia/storage-contract',
+          source: 'storage.contract',
           code: 'INVALID_ARGUMENT',
           cause: { source: SERIALIZE_SOURCE }
         }

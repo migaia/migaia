@@ -12,7 +12,7 @@ import {
   type IRecordIndexProjection
 } from '@migaia/storage-contract'
 
-import { StorageErrorCode } from '../errors.js'
+import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 
 import {
   composeFlatKey,
@@ -95,7 +95,7 @@ export class EntityUniqueOwner<
       throw normalizeError(
         cause,
         this.#context.store.backend,
-        StorageErrorCode.extensionFailed,
+        StorageHostErrorCode.extensionFailed,
         StorageOperation.entityIndexProjection
       )
     }

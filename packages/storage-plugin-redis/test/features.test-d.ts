@@ -3,7 +3,8 @@ import {
   postgresBackendKind,
   type IPgDriver
 } from '@migaia/storage-plugin-postgres'
-import { createStorageHost, memoryBackendKind, type IStorageFeature } from '@migaia/storage-host'
+import { createStorageHost, type IStorageFeature } from '@migaia/storage-host'
+import { memoryBackendKind } from '@migaia/storage-host/plugins/memory'
 import {
   durableChangeFeed,
   vector,

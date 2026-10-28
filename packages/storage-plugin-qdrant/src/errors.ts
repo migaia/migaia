@@ -1,8 +1,13 @@
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import { attachErrorIdentity, walkErrorCauses } from '@migaia/utils/error'
-import { normalizeError } from '@migaia/storage-host/authoring/backend'
-import { StorageError, StorageErrorCode } from '@migaia/storage-host'
-import { ERROR_SOURCE, QdrantErrorCode, type IQdrantErrorCode } from './error-code.js'
+import { normalizeError } from '@migaia/storage-host/sdk'
+import { StorageError } from '@migaia/storage-host'
+import {
+  StorageHostErrorCode,
+  STORAGE_QDRANT_ERROR_SOURCE,
+  QdrantErrorCode
+} from '@migaia/storage-contract/error-code'
+import type { IQdrantErrorCode } from '@migaia/storage-contract/error-code'
 import { QdrantErrorText } from './error-text.js'
 import { QdrantText } from './constants.js'
 /** Attach native identity through the original helper, retaining immutable failures as causes. */
@@ -26,7 +31,7 @@ export function qdrantError(code: IQdrantErrorCode, cause?: unknown): Error {
               : new Error(message, { cause })
     if (typeof DOMException !== 'undefined' && error instanceof DOMException)
       Object.defineProperty(error, 'cause', { value: cause })
-    return attachErrorIdentity(error, { source: ERROR_SOURCE, code })
+    return attachErrorIdentity(error, { source: STORAGE_QDRANT_ERROR_SOURCE, code })
   }
   if (
     cause instanceof TypeError ||
@@ -37,7 +42,7 @@ export function qdrantError(code: IQdrantErrorCode, cause?: unknown): Error {
   )
     return attachErrorIdentity<Error>(
       cause,
-      { source: ERROR_SOURCE, code },
+      { source: STORAGE_QDRANT_ERROR_SOURCE, code },
       { onConflict: wrap, onFailure: wrap }
     )
   return wrap()
@@ -67,7 +72,7 @@ export function normalizeQdrantError(error: unknown): Error {
       )
     },
     (value): value is Error =>
-      value instanceof Error && 'source' in value && value.source === ERROR_SOURCE
+      value instanceof Error && 'source' in value && value.source === STORAGE_QDRANT_ERROR_SOURCE
   )
 }
 /** Pure public input failures remain owned by the existing shared contract. */
@@ -83,12 +88,12 @@ export function normalizeOperationError(error: unknown, operation: string): Erro
   return normalizeError(
     error,
     (cause) =>
-      new StorageError(StorageErrorCode.extensionFailed, {
+      new StorageError(StorageHostErrorCode.extensionFailed, {
         backend: QdrantText.backend,
         operation,
         cause
       }),
     (value): value is Error =>
-      value instanceof Error && 'source' in value && value.source === ERROR_SOURCE
+      value instanceof Error && 'source' in value && value.source === STORAGE_QDRANT_ERROR_SOURCE
   )
 }

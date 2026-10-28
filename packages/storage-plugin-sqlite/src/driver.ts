@@ -1,8 +1,5 @@
 import { asyncDisposeKey } from '@migaia/plugin-host'
-import {
-  createStorageOperationReporter,
-  reportCleanupError
-} from '@migaia/storage-host/authoring/backend'
+import { createStorageOperationReporter, reportCleanupError } from '@migaia/storage-host/sdk'
 import type {
   ISqliteConnection,
   ISqliteStatement,
@@ -11,7 +8,7 @@ import type {
   ISqliteRunResult
 } from './types.js'
 import { normalizeSqliteFailure, sqliteError } from './errors.js'
-import { SqliteErrorCode } from './error-code.js'
+import { SqliteErrorCode } from '@migaia/storage-contract/error-code'
 import { SqliteErrorText } from './error-text.js'
 /** Native statements are captured by their actual adapter, without a second statement cache. */
 export type INativeStatement = {

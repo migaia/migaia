@@ -5,7 +5,7 @@
       "id": "cycle1-callable-fact-ledger",
       "path": "packages/event-subscriber/test/fixtures/storage-v2-b00-fact-dispositions.json",
       "disposition": "deleted",
-      "evidence": "packages/storage-web/test/fixtures/storage-v2-c2-observation-snapshot.jsonl"
+      "evidence": "packages/storage-plugin-browser/test/fixtures/storage-v2-c2-observation-snapshot.jsonl"
     }
   ],
   "sharedProviders": [
@@ -28,17 +28,17 @@
   },
   "v1Gates": [
     {
-      "packageName": "@migaia/storage-web",
+      "packageName": "@migaia/storage-plugin-browser",
       "script": "test/conformance/kv.spec.ts",
       "requires": ["event.dispatch-policy"]
     },
     {
-      "packageName": "@migaia/storage-web",
+      "packageName": "@migaia/storage-plugin-browser",
       "script": "test/conformance/document.spec.ts",
       "requires": ["event.dispatch-policy"]
     },
     {
-      "packageName": "@migaia/storage-web",
+      "packageName": "@migaia/storage-plugin-browser",
       "script": "test/conformance/sync.spec.ts",
       "requires": ["event.dispatch-policy"]
     }
@@ -69,7 +69,7 @@
       "requires": ["event.dispatch-policy"]
     },
     {
-      "packageName": "@migaia/storage-web",
+      "packageName": "@migaia/storage-plugin-browser",
       "script": "typecheck",
       "kind": "package-script",
       "requires": ["event.dispatch-policy", "utils.abort-timeout-signal"]

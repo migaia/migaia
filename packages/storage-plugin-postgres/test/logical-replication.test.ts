@@ -406,7 +406,7 @@ it('replays partial multi-org commits and confirms only complete caller-processe
 })
 
 /** A real replication transport must reject startup failures instead of leaving open pending. */
-for (const mode of ['pid-query', 'abort', 'ready-query-abort'] as const) {
+for (const mode of ['pid-query', 'abort', 'ready-query-abort', 'pid-mismatch'] as const) {
   it('drains and rejects actual replication startup ' + mode, async () => {
     const connectionString = replicationService.connectionString
     const publication = process.env.MIGAIA_PG_PUBLICATION
@@ -443,15 +443,22 @@ for (const mode of ['pid-query', 'abort', 'ready-query-abort'] as const) {
             mode === 'ready-query-abort' &&
             typeof text === 'string' &&
             text.includes('SELECT active_pid')
-          const prepared = waiting
-            ? {
-                ...input,
-                text: text.replace(
-                  'FROM pg_replication_slots',
-                  'FROM pg_replication_slots CROSS JOIN pg_sleep(0.075)'
-                )
-              }
-            : input
+          /** A slot held by another backend must fail readiness instead of reporting ready. */
+          const foreign =
+            mode === 'pid-mismatch' &&
+            typeof text === 'string' &&
+            text.includes('SELECT active_pid')
+          const prepared = foreign
+            ? { ...input, text: text.replace('SELECT active_pid', 'SELECT -1 AS active_pid') }
+            : waiting
+              ? {
+                  ...input,
+                  text: text.replace(
+                    'FROM pg_replication_slots',
+                    'FROM pg_replication_slots CROSS JOIN pg_sleep(0.075)'
+                  )
+                }
+              : input
           const pending = target.query(prepared)
           if (waiting) cancellation.abort(original)
           const result = await pending
@@ -463,6 +470,11 @@ for (const mode of ['pid-query', 'abort', 'ready-query-abort'] as const) {
       }
     })
     const port = pgDriver(observedPool).logicalReplication!
+    /** Startup rejection each mode must produce; only the injected failures carry the original. */
+    const expected =
+      mode === 'pid-mismatch'
+        ? { code: StorageContractErrorCode.unsupported }
+        : { code: mode === 'pid-query' ? 'SQL_FAILED' : 'ABORTED', cause: original }
     try {
       await expect(
         port.open(
@@ -479,14 +491,8 @@ for (const mode of ['pid-query', 'abort', 'ready-query-abort'] as const) {
           },
           { signal: cancellation.signal }
         )
-      ).rejects.toMatchObject({
-        code: mode === 'pid-query' ? 'SQL_FAILED' : 'ABORTED',
-        cause: original
-      })
-      expect(reported).toMatchObject({
-        code: mode === 'pid-query' ? 'SQL_FAILED' : 'ABORTED',
-        cause: original
-      })
+      ).rejects.toMatchObject(expected)
+      expect(reported).toMatchObject(expected)
       if (mode === 'ready-query-abort') expect(startupSettled).toBe(true)
       expect((await pool.query('SELECT 1::int4 AS alive')).rows[0]).toEqual({ alive: 1 })
     } finally {

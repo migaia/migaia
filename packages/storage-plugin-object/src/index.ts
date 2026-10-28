@@ -6,4 +6,3 @@ export type {
   IObjectAddress,
   IObjectPostCommitError
 } from './types.js'
-export { ERROR_SOURCE, ObjectErrorCode, type IObjectErrorCode } from './error-code.js'

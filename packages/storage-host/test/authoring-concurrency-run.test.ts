@@ -315,7 +315,7 @@ describe('canonical concurrency attempts', () => {
       await expect(
         run(store, async () => conflict(phase, original), {}, ConcurrencyPolicy.fail())
       ).rejects.toMatchObject({
-        source: '@migaia/storage-contract',
+        source: 'storage.contract',
         code: phase === 'acquire' ? 'LOCK_REJECTED' : 'WRITE_CONFLICT',
         cause: original
       })
@@ -658,7 +658,7 @@ describe('canonical concurrency attempts', () => {
         throw new Error('expected rejection')
       } catch (error) {
         expect(error).toMatchObject({
-          source: '@migaia/storage-contract',
+          source: 'storage.contract',
           holder,
           cause: original,
           keys: [{ channel: 'record', key: new Date(1) }]

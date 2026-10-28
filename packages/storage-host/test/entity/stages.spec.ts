@@ -1,3 +1,4 @@
+import { storageProbe } from '../../src/plugins/probe/index.js'
 import { entityQueryFeature } from '../../src/entity/query-feature.js'
 import { entityUniqueFeature } from '../../src/entity/unique-feature.js'
 import { entityMigrationFeature } from '../../src/entity/migration-feature.js'
@@ -8,12 +9,8 @@ import { asyncDisposeKey } from '@migaia/plugin-host'
 import { deferred } from '@migaia/utils/promise'
 import { assertTransactionOwner } from '../../src/authoring/transaction.js'
 import { type ICodecStageObserver, type IQueryStageObserver } from '@migaia/storage-contract'
-import {
-  createStorageHost,
-  definePlugin,
-  memoryBackendKind,
-  type IStoragePluginCore
-} from '../../src/index.js'
+import { createStorageHost, definePlugin, type IStoragePluginCore } from '../../src/index.js'
+import { memoryBackendKind } from '../../src/plugins/memory.js'
 import { createMemoryBackend } from '../../src/backends/memory.js'
 import { defineEntity } from '../../src/entity.js'
 
@@ -54,29 +51,31 @@ it('binds codec conversions and whole queries to the actual store and current tr
   const query: unknown[] = []
   const waiting = deferred<void>()
   await using host = await createStorageHost({
-    plugins: [fixture.plugin],
-    hooks: {
-      beforeEncode: (payload) => {
-        encode.push(payload)
-        return waiting.promise
-      },
-      afterEncode: (payload) => {
-        encode.push(payload)
-      },
-      beforeDecode: (payload) => {
-        decode.push(payload)
-      },
-      afterDecode: (payload) => {
-        decode.push(payload)
-      },
-      beforeQuery: (payload) => {
-        query.push(payload)
-        return waiting.promise
-      },
-      afterQuery: (payload) => {
-        query.push(payload)
-      }
-    }
+    plugins: [
+      storageProbe({
+        beforeEncode: (payload) => {
+          encode.push(payload)
+          return waiting.promise
+        },
+        afterEncode: (payload) => {
+          encode.push(payload)
+        },
+        beforeDecode: (payload) => {
+          decode.push(payload)
+        },
+        afterDecode: (payload) => {
+          decode.push(payload)
+        },
+        beforeQuery: (payload) => {
+          query.push(payload)
+          return waiting.promise
+        },
+        afterQuery: (payload) => {
+          query.push(payload)
+        }
+      }),
+      fixture.plugin
+    ]
   })
   const store = host.backend('observed-memory')
   const repo = defineEntity<{ id: string; score: number }>({

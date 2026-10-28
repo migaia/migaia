@@ -21,7 +21,7 @@ import {
 import { isUint8Array } from '@migaia/utils/bytes'
 import { defineObjectDriver } from './driver.js'
 import { ObjectDriverKind, ObjectNames } from './constants.js'
-import { ObjectErrorCode } from './error-code.js'
+import { ObjectErrorCode } from '@migaia/storage-contract/error-code'
 import { ObjectErrorText } from './error-text.js'
 import { invalidArgument, normalizeObjectError, objectError } from './errors.js'
 import { createObjectSender } from './s3/send.js'

@@ -64,7 +64,7 @@ describe('authoritative fallback unique writes', () => {
           }
         }).connect(store)
         await expect(repo.put({ id: 'row', email: 'same' })).rejects.toMatchObject({
-          source: '@migaia/storage-host',
+          source: 'storage.host',
           code: 'EXTENSION_FAILED',
           operation: 'entity.index.project',
           cause: original
@@ -88,7 +88,7 @@ describe('authoritative fallback unique writes', () => {
         const second = users.connect(store)
         await first.put({ id: 'a', email: 'same' })
         await expect(second.put({ id: 'b', email: 'same' })).rejects.toMatchObject({
-          source: '@migaia/storage-host',
+          source: 'storage.host',
           code: 'INDEX_UNIQUE_CONFLICT'
         })
         await expect(first.put({ id: 'a', email: 'same' })).resolves.toBe('a')
@@ -156,7 +156,7 @@ describe('authoritative fallback unique writes', () => {
       ])
       expect(results.filter((result) => result.status === 'fulfilled')).toHaveLength(1)
       expect(results.find((result) => result.status === 'rejected')).toMatchObject({
-        reason: { source: '@migaia/storage-contract', code: 'WRITE_CONFLICT' }
+        reason: { source: 'storage.contract', code: 'WRITE_CONFLICT' }
       })
     } finally {
       release()

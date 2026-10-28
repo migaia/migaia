@@ -14,7 +14,7 @@ const consumerDirectory = '/tmp/storage-v2-lock-consumer'
 
 /** Synthetic tarball digests are exact independent artifact facts for the two-package graph. */
 const utilsIntegrity = storageV2TarballIntegrity(Buffer.from('utils tarball bytes'))
-const storageWebIntegrity = storageV2TarballIntegrity(Buffer.from('storage-web tarball bytes'))
+const storageWebIntegrity = storageV2TarballIntegrity(Buffer.from('storage-plugin-browser tarball bytes'))
 
 /** Finite two-package graph exercises root and transitive provenance without filesystem access. */
 const artifacts: readonly IStorageV2ArtifactProvenance[] = [
@@ -26,9 +26,9 @@ const artifacts: readonly IStorageV2ArtifactProvenance[] = [
     dependencies: {}
   },
   {
-    name: '@migaia/storage-web',
+    name: '@migaia/storage-plugin-browser',
     version: '0.0.3',
-    tarballPath: '/tmp/storage-v2-lock-pack/migaia-storage-web-0.0.3.tgz',
+    tarballPath: '/tmp/storage-v2-lock-pack/migaia-storage-plugin-browser-0.0.3.tgz',
     integrity: storageWebIntegrity,
     dependencies: { '@migaia/utils': '^0.0.2' }
   }
@@ -48,14 +48,14 @@ importers:
 
   .:
     dependencies:
-      '@migaia/storage-web':
-        specifier: file:/tmp/storage-v2-lock-pack/migaia-storage-web-0.0.3.tgz
-        version: file:../storage-v2-lock-pack/migaia-storage-web-0.0.3.tgz
+      '@migaia/storage-plugin-browser':
+        specifier: file:/tmp/storage-v2-lock-pack/migaia-storage-plugin-browser-0.0.3.tgz
+        version: file:../storage-v2-lock-pack/migaia-storage-plugin-browser-0.0.3.tgz
 
 packages:
 
-  '@migaia/storage-web@file:../storage-v2-lock-pack/migaia-storage-web-0.0.3.tgz':
-    resolution: {integrity: ${storageWebIntegrity}, tarball: file:../storage-v2-lock-pack/migaia-storage-web-0.0.3.tgz}
+  '@migaia/storage-plugin-browser@file:../storage-v2-lock-pack/migaia-storage-plugin-browser-0.0.3.tgz':
+    resolution: {integrity: ${storageWebIntegrity}, tarball: file:../storage-v2-lock-pack/migaia-storage-plugin-browser-0.0.3.tgz}
     version: 0.0.3
     engines: {node: '>=24.16.0'}
 
@@ -65,7 +65,7 @@ packages:
 
 snapshots:
 
-  '@migaia/storage-web@file:../storage-v2-lock-pack/migaia-storage-web-0.0.3.tgz':
+  '@migaia/storage-plugin-browser@file:../storage-v2-lock-pack/migaia-storage-plugin-browser-0.0.3.tgz':
     dependencies:
       '@migaia/utils': file:../storage-v2-lock-pack/migaia-utils-0.0.2.tgz
 
@@ -73,13 +73,13 @@ snapshots:
 `
 
 /** Direct roots and the peer suffix match an offline pnpm 12.11.2 tarball calibration. */
-const peerRoots = ['@migaia/storage-host', '@migaia/storage-web'] as const
+const peerRoots = ['@migaia/storage-host', '@migaia/storage-plugin-browser'] as const
 /** Distinct bytes bind every package row, including the exact-version third-party leaf. */
 const peerArtifacts: readonly IStorageV2ArtifactProvenance[] = [
   {
-    name: '@migaia/storage-web',
+    name: '@migaia/storage-plugin-browser',
     version: '0.0.0',
-    tarballPath: '/tmp/storage-v2-lock-pack/storage-web.tgz',
+    tarballPath: '/tmp/storage-v2-lock-pack/storage-plugin-browser.tgz',
     integrity: storageV2TarballIntegrity(Buffer.from('web with host peer')),
     dependencies: {},
     peerDependencies: { '@migaia/storage-host': '^0.0.0' }
@@ -110,7 +110,7 @@ const peerArtifacts: readonly IStorageV2ArtifactProvenance[] = [
 ]
 /** Base tarball and resolved instance remain separate independent fixture expectations. */
 const webPeerLocator =
-  'file:../storage-v2-lock-pack/storage-web.tgz(@migaia/storage-host@file:../storage-v2-lock-pack/storage-host.tgz)'
+  'file:../storage-v2-lock-pack/storage-plugin-browser.tgz(@migaia/storage-host@file:../storage-v2-lock-pack/storage-host.tgz)'
 /** Complete dual-root graph keeps the host pin and optional codec metadata from packed manifests. */
 const peerLockfile = `lockfileVersion: '9.0'
 settings:
@@ -126,15 +126,15 @@ importers:
       '@migaia/storage-host':
         specifier: file:/tmp/storage-v2-lock-pack/storage-host.tgz
         version: file:../storage-v2-lock-pack/storage-host.tgz
-      '@migaia/storage-web':
-        specifier: file:/tmp/storage-v2-lock-pack/storage-web.tgz
+      '@migaia/storage-plugin-browser':
+        specifier: file:/tmp/storage-v2-lock-pack/storage-plugin-browser.tgz
         version: ${webPeerLocator}
 packages:
   '@migaia/storage-host@file:../storage-v2-lock-pack/storage-host.tgz':
     resolution: {integrity: ${peerArtifacts[1].integrity}, tarball: file:../storage-v2-lock-pack/storage-host.tgz}
     version: 0.0.0
-  '@migaia/storage-web@file:../storage-v2-lock-pack/storage-web.tgz':
-    resolution: {integrity: ${peerArtifacts[0].integrity}, tarball: file:../storage-v2-lock-pack/storage-web.tgz}
+  '@migaia/storage-plugin-browser@file:../storage-v2-lock-pack/storage-plugin-browser.tgz':
+    resolution: {integrity: ${peerArtifacts[0].integrity}, tarball: file:../storage-v2-lock-pack/storage-plugin-browser.tgz}
     version: 0.0.0
     peerDependencies:
       '@migaia/storage-host': ^0.0.0
@@ -154,7 +154,7 @@ snapshots:
     dependencies:
       '@migaia/serialize': file:../storage-v2-lock-pack/serialize.tgz
       ansis: file:../storage-v2-lock-pack/ansis.tgz
-  '@migaia/storage-web@${webPeerLocator}':
+  '@migaia/storage-plugin-browser@${webPeerLocator}':
     dependencies:
       '@migaia/storage-host': file:../storage-v2-lock-pack/storage-host.tgz
   '@migaia/serialize@file:../storage-v2-lock-pack/serialize.tgz': {}
@@ -188,10 +188,10 @@ describe('root-owned strict lock provenance tool', () => {
 
   it('authorizes one exact importer-rooted package/snapshot graph', () => {
     const authorized = authorizeStorageV2LockProvenance(validLockfile, consumerDirectory, artifacts)
-    expect([...authorized.keys()].sort()).toEqual(['@migaia/storage-web', '@migaia/utils'])
-    expect(authorized.get('@migaia/storage-web')).toMatchObject({
-      lockIdentity: '@migaia/storage-web@file:../storage-v2-lock-pack/migaia-storage-web-0.0.3.tgz',
-      tarballLocator: 'file:../storage-v2-lock-pack/migaia-storage-web-0.0.3.tgz',
+    expect([...authorized.keys()].sort()).toEqual(['@migaia/storage-plugin-browser', '@migaia/utils'])
+    expect(authorized.get('@migaia/storage-plugin-browser')).toMatchObject({
+      lockIdentity: '@migaia/storage-plugin-browser@file:../storage-v2-lock-pack/migaia-storage-plugin-browser-0.0.3.tgz',
+      tarballLocator: 'file:../storage-v2-lock-pack/migaia-storage-plugin-browser-0.0.3.tgz',
       version: '0.0.3'
     })
   })
@@ -206,18 +206,18 @@ describe('root-owned strict lock provenance tool', () => {
     expect([...authorized.keys()].sort()).toEqual([
       '@migaia/serialize',
       '@migaia/storage-host',
-      '@migaia/storage-web',
+      '@migaia/storage-plugin-browser',
       'ansis'
     ])
-    expect(authorized.get('@migaia/storage-web')).toEqual({
-      lockIdentity: `@migaia/storage-web@${webPeerLocator}`,
-      tarballLocator: 'file:../storage-v2-lock-pack/storage-web.tgz',
+    expect(authorized.get('@migaia/storage-plugin-browser')).toEqual({
+      lockIdentity: `@migaia/storage-plugin-browser@${webPeerLocator}`,
+      tarballLocator: 'file:../storage-v2-lock-pack/storage-plugin-browser.tgz',
       version: '0.0.0',
       root: resolve(
         consumerDirectory,
         'node_modules/.pnpm',
-        pnpmDependencyPathToFilename(`@migaia/storage-web@${webPeerLocator}`),
-        'node_modules/@migaia/storage-web'
+        pnpmDependencyPathToFilename(`@migaia/storage-plugin-browser@${webPeerLocator}`),
+        'node_modules/@migaia/storage-plugin-browser'
       )
     })
     expect(authorized.get('ansis')?.version).toBe('4.3.1')
@@ -234,7 +234,7 @@ describe('root-owned strict lock provenance tool', () => {
       [
         ...authorizeStorageV2LockProvenance(optionalLockfile, consumerDirectory, artifacts).keys()
       ].sort()
-    ).toEqual(['@migaia/storage-web', '@migaia/utils'])
+    ).toEqual(['@migaia/storage-plugin-browser', '@migaia/utils'])
     expect(() =>
       authorizeStorageV2LockProvenance(
         replaceUnique(
@@ -245,7 +245,7 @@ describe('root-owned strict lock provenance tool', () => {
         consumerDirectory,
         artifacts
       )
-    ).toThrow('@migaia/storage-web resolved dependency edges mismatch')
+    ).toThrow('@migaia/storage-plugin-browser resolved dependency edges mismatch')
     expect(() =>
       authorizeStorageV2LockProvenance(
         replaceUnique(
@@ -256,7 +256,7 @@ describe('root-owned strict lock provenance tool', () => {
         consumerDirectory,
         artifacts
       )
-    ).toThrow('@migaia/storage-web resolved dependency edges mismatch')
+    ).toThrow('@migaia/storage-plugin-browser resolved dependency edges mismatch')
     expect(() =>
       authorizeStorageV2LockProvenance(
         replaceUnique(
@@ -296,15 +296,15 @@ describe('root-owned strict lock provenance tool', () => {
       replaceUnique(
         peerLockfile,
         `version: ${webPeerLocator}`,
-        'version: file:../storage-v2-lock-pack/storage-web.tgz(@migaia/storage-host@file:../forged/host.tgz)'
+        'version: file:../storage-v2-lock-pack/storage-plugin-browser.tgz(@migaia/storage-host@file:../forged/host.tgz)'
       )
     ],
     [
       'snapshot peer identity substitution',
       replaceUnique(
         peerLockfile,
-        `'@migaia/storage-web@${webPeerLocator}':`,
-        "'@migaia/storage-web@file:../storage-v2-lock-pack/storage-web.tgz':"
+        `'@migaia/storage-plugin-browser@${webPeerLocator}':`,
+        "'@migaia/storage-plugin-browser@file:../storage-v2-lock-pack/storage-plugin-browser.tgz':"
       )
     ],
     [
@@ -333,7 +333,7 @@ describe('root-owned strict lock provenance tool', () => {
     ],
     [
       'extra peer instance snapshot',
-      `${peerLockfile}\n  '@migaia/storage-web@file:../storage-v2-lock-pack/storage-web.tgz': {}\n`
+      `${peerLockfile}\n  '@migaia/storage-plugin-browser@file:../storage-v2-lock-pack/storage-plugin-browser.tgz': {}\n`
     ]
   ])('rejects dual-root %s without weakening graph or integrity checks', (_label, lockfile) => {
     expect(() =>
@@ -353,7 +353,7 @@ describe('root-owned strict lock provenance tool', () => {
         consumerDirectory,
         artifacts
       )
-    ).toThrow('@migaia/storage-web package integrity mismatch')
+    ).toThrow('@migaia/storage-plugin-browser package integrity mismatch')
   })
 
   it.each([
@@ -363,16 +363,16 @@ describe('root-owned strict lock provenance tool', () => {
       'duplicate nested dependency group',
       replaceUnique(
         validLockfile,
-        "    dependencies:\n      '@migaia/storage-web':",
-        "    dependencies: {}\n    dependencies:\n      '@migaia/storage-web':"
+        "    dependencies:\n      '@migaia/storage-plugin-browser':",
+        "    dependencies: {}\n    dependencies:\n      '@migaia/storage-plugin-browser':"
       )
     ],
     [
       'duplicate importer field',
       replaceUnique(
         validLockfile,
-        '        specifier: file:/tmp/storage-v2-lock-pack/migaia-storage-web-0.0.3.tgz',
-        '        specifier: file:/tmp/storage-v2-lock-pack/migaia-storage-web-0.0.3.tgz\n        specifier: file:/forged.tgz'
+        '        specifier: file:/tmp/storage-v2-lock-pack/migaia-storage-plugin-browser-0.0.3.tgz',
+        '        specifier: file:/tmp/storage-v2-lock-pack/migaia-storage-plugin-browser-0.0.3.tgz\n        specifier: file:/forged.tgz'
       )
     ],
     [
@@ -409,16 +409,16 @@ describe('root-owned strict lock provenance tool', () => {
       'root specifier substitution',
       replaceUnique(
         validLockfile,
-        'specifier: file:/tmp/storage-v2-lock-pack/migaia-storage-web-0.0.3.tgz',
-        'specifier: file:/forged/storage-web.tgz'
+        'specifier: file:/tmp/storage-v2-lock-pack/migaia-storage-plugin-browser-0.0.3.tgz',
+        'specifier: file:/forged/storage-plugin-browser.tgz'
       )
     ],
     [
       'root resolved version substitution',
       replaceUnique(
         validLockfile,
-        'version: file:../storage-v2-lock-pack/migaia-storage-web-0.0.3.tgz',
-        'version: file:../forged/storage-web.tgz'
+        'version: file:../storage-v2-lock-pack/migaia-storage-plugin-browser-0.0.3.tgz',
+        'version: file:../forged/storage-plugin-browser.tgz'
       )
     ],
     [

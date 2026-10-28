@@ -1,7 +1,7 @@
-import { encodeOrderedStorageKey, snapshotStorageKey } from '@migaia/storage-host/authoring/key'
+import { encodeOrderedStorageKey, snapshotStorageKey } from '@migaia/storage-host/sdk'
 import { type IStorageKey } from '@migaia/storage-contract'
 import { sqliteError } from './errors.js'
-import { SqliteErrorCode } from './error-code.js'
+import { SqliteErrorCode } from '@migaia/storage-contract/error-code'
 import { SqliteErrorText } from './error-text.js'
 /** Persisted TEXT identities contain canonical ordered bytes, never SQLite's UTF-8 string order. */
 export function keyHex(bytes: Uint8Array): string {
