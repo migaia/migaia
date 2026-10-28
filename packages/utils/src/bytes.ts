@@ -1,6 +1,6 @@
-import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
-import { UtilsErrorText } from './error-text.js'
-import { attachErrorIdentity } from './error.js'
+import { ERROR_SOURCE, UtilsErrorCode } from './error-code.ts'
+import { UtilsErrorText } from './error-text.ts'
+import { attachErrorIdentity } from './error.ts'
 
 /** Captured `%TypedArray%.prototype` used as the receiver-independent brand probe. */
 const typedArrayPrototype = Object.getPrototypeOf(Uint8Array.prototype)

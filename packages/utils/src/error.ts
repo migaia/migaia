@@ -1,5 +1,5 @@
-import { ERROR_SOURCE, UtilsErrorCode, type IUtilsErrorCode } from './error-code.js'
-import { UtilsErrorText } from './error-text.js'
+import { ERROR_SOURCE, UtilsErrorCode, type IUtilsErrorCode } from './error-code.ts'
+import { UtilsErrorText } from './error-text.ts'
 
 /** Public utils error domain; callers compare this stable identity across package moves. */
 export const UTILS_SOURCE = ERROR_SOURCE
@@ -353,7 +353,7 @@ function isAggregateErrorLike(value: unknown): value is AggregateError {
 export { UtilsErrorCode }
 export type { IUtilsErrorCode }
 
-export { IdentifyError } from './identify-error.js'
+export { IdentifyError } from './identify-error.ts'
 export type {
   IErrorIdentityComparison,
   IErrorIdentityMatch,
@@ -364,7 +364,7 @@ export type {
   IIdentifyErrorIdentity,
   IIdentifyErrorOptions,
   IMutableErrorIdentity
-} from './identify-error.js'
+} from './identify-error.ts'
 
 export {
   serializeErrorChain,
@@ -373,9 +373,9 @@ export {
   reachErrorChain,
   sanitizeErrorText,
   countErrorDataText
-} from './error-chain.js'
+} from './error-chain.ts'
 export type {
   IErrorChainStrategy,
   ISerializedErrorChain,
   IErrorChainData
-} from './error-chain-types.js'
+} from './error-chain-types.ts'

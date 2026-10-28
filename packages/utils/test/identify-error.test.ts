@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { attachErrorIdentity, IdentifyError, type IIdentifiedError } from '../src/error.js'
+import { attachErrorIdentity, IdentifyError, type IIdentifiedError } from '../src/error.ts'
 
 describe('IdentifyError', () => {
   it('wraps a native error without replacing its type, stack or cause', () => {

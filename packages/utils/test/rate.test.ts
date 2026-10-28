@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { coalesce, debounce, repeat, throttle } from '../src/scheduler.js'
-import { createManualScheduler } from '../src/testing.js'
+import { coalesce, debounce, repeat, throttle } from '../src/scheduler.ts'
+import { createManualScheduler } from '../src/testing.ts'
 
 afterEach(() => {
   vi.unstubAllGlobals()

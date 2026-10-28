@@ -4,7 +4,7 @@ import type {
   IDiscriminatedByPath,
   IObjectPathInput,
   IObjectPathValue
-} from '../src/typing.js'
+} from '../src/typing.ts'
 
 type IEvent =
   | {

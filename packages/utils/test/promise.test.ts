@@ -11,8 +11,8 @@ import {
   sleep,
   toPromise,
   withTimeout
-} from '../src/promise.js'
-import { createManualScheduler } from '../src/testing.js'
+} from '../src/promise.ts'
+import { createManualScheduler } from '../src/testing.ts'
 
 /** Creates a manually triggered signal whose cancellation reason getter is hostile. */
 const createHostileReasonSignal = (cause: Error) => {

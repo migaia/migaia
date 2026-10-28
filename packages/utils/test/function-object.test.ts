@@ -5,21 +5,21 @@ import {
   once,
   onceAsync,
   probeThenable
-} from '../src/function.js'
-import * as utils from '../src/index.js'
+} from '../src/function.ts'
+import * as utils from '../src/index.ts'
 import {
   diagnosticSnapshot,
   immutableSnapshot,
   isPlainObject,
   probeProperty,
   snapshotOwnDescriptors
-} from '../src/object.js'
+} from '../src/object.ts'
 
 describe('function and object primitives', () => {
   it('reserves the manual scheduler for the explicit testing entry', async () => {
     expect(Object.hasOwn(utils, 'createManualScheduler')).toBe(false)
     /** The dedicated entry retains the existing deterministic scheduler behavior. */
-    const testing = await import('../src/testing.js')
+    const testing = await import('../src/testing.ts')
     /** A cancelled test task must release its pending slot through the same canonical heap. */
     const clock = testing.createManualScheduler()
     /** Cancellation remains idempotent after the export migration. */

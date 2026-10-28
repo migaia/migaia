@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { createSafeRecord } from '../src/object.js'
-import { tryString } from '../src/string.js'
-import { isSafeIntegerValue } from '../src/value.js'
+import { createSafeRecord } from '../src/object.ts'
+import { tryString } from '../src/string.ts'
+import { isSafeIntegerValue } from '../src/value.ts'
 
 describe('safe value primitives', () => {
   it('keeps strings and performs native conversion exactly once', () => {

@@ -1,6 +1,6 @@
-import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
-import { UtilsErrorText } from './error-text.js'
-import { attachErrorIdentity } from './error.js'
+import { ERROR_SOURCE, UtilsErrorCode } from './error-code.ts'
+import { UtilsErrorText } from './error-text.ts'
+import { attachErrorIdentity } from './error.ts'
 
 /** Property keys accepted by tuple paths. */
 export type IObjectPathSegment = string | number | symbol

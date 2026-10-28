@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { retry, RetryAttemptStart, type IRetryContext } from '../src/promise.js'
-import { UtilsAbortError } from '../src/error.js'
-import { createManualScheduler } from '../src/testing.js'
+import { retry, RetryAttemptStart, type IRetryContext } from '../src/promise.ts'
+import { UtilsAbortError } from '../src/error.ts'
+import { createManualScheduler } from '../src/testing.ts'
 
 /** Host controller constructor restored after each allocation-counting case. */
 const NativeAbortController = globalThis.AbortController

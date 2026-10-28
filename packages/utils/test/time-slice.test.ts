@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { timeSlice, timeSliceMap, timeSliceReduce } from '../src/scheduler.js'
+import { timeSlice, timeSliceMap, timeSliceReduce } from '../src/scheduler.ts'
 
 /** Clock that advances by `step` milliseconds on every read, so slices end deterministically. */
 const steppingClock = (step: number) => {

@@ -1,6 +1,6 @@
 import { afterEach, expect, it, vi } from 'vitest'
-import { deferTask, systemScheduler } from '../src/scheduler.js'
-import { createManualScheduler } from '../src/testing.js'
+import { deferTask, systemScheduler } from '../src/scheduler.ts'
+import { createManualScheduler } from '../src/testing.ts'
 
 afterEach(() => vi.unstubAllGlobals())
 

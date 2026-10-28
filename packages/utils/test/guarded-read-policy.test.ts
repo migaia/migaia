@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { inspectThenable, probeThenable, ThenableProbeKind } from '../src/function.js'
+import { inspectThenable, probeThenable, ThenableProbeKind } from '../src/function.ts'
 
 describe('thenable guarded-read policy', () => {
   it('skips primitives and preserves non-function and function results', () => {

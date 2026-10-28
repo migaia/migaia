@@ -10,8 +10,8 @@ import {
   retry,
   set,
   walkErrorCauses
-} from '../src/index.js'
-import { createManualScheduler } from '../src/testing.js'
+} from '../src/index.ts'
+import { createManualScheduler } from '../src/testing.ts'
 
 describe('contract regressions', () => {
   it('preserves missing-versus-undefined presence and array descriptors', () => {

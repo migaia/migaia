@@ -1,8 +1,8 @@
-import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
-import { UtilsErrorText } from './error-text.js'
-import { attachErrorIdentity } from './error.js'
+import { ERROR_SOURCE, UtilsErrorCode } from './error-code.ts'
+import { UtilsErrorText } from './error-text.ts'
+import { attachErrorIdentity } from './error.ts'
 
-export * from './object-path.js'
+export * from './object-path.ts'
 
 /** Creates a new null-prototype dictionary whose untrusted keys cannot invoke prototype setters. */
 export function createSafeRecord<T>(): Partial<Record<string, T>> {

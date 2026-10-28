@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { isSome, isNone, unwrapOr, mapMaybe, toUndefined, type IMaybe } from '../src/index.js'
+import { isSome, isNone, unwrapOr, mapMaybe, toUndefined, type IMaybe } from '../src/index.ts'
 
 describe('explicit optional values', () => {
   it('distinguishes a present undefined from absence and narrows both variants', () => {

@@ -7,7 +7,7 @@ import {
   patchConfig,
   readConfigPath,
   readonlyConfig
-} from '../src/config.js'
+} from '../src/config.ts'
 
 describe('config primitives', () => {
   it('retains one accumulator while synchronous conflicts observe current contents', () => {

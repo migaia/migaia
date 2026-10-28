@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs'
 import { parseSync, Visitor, type Node } from 'oxc-parser'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { systemScheduler, systemWallClock, type IScheduler } from '../src/scheduler.js'
-import { createManualScheduler } from '../src/testing.js'
+import { systemScheduler, systemWallClock, type IScheduler } from '../src/scheduler.ts'
+import { createManualScheduler } from '../src/testing.ts'
 
 /** Largest delay one host timer segment may carry. */
 const MAXIMUM_TIMER_DELAY = 2_147_483_647
@@ -48,7 +48,7 @@ function stubRecordingTimers() {
 /** Reloads the scheduler module so the default implementation is observed after global stubs. */
 async function reloadedSystemScheduler(): Promise<IScheduler> {
   vi.resetModules()
-  return (await import('../src/scheduler.js')).systemScheduler
+  return (await import('../src/scheduler.ts')).systemScheduler
 }
 
 /** Captures a synchronous throw for identity assertions. */
@@ -443,7 +443,7 @@ describe('wall clock stays separate from the monotonic clock', () => {
     const dateNow = vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_123)
     vi.stubGlobal('performance', { now: () => 7 })
     vi.resetModules()
-    const module = await import('../src/scheduler.js')
+    const module = await import('../src/scheduler.ts')
     expect(module.systemWallClock.timestamp()).toBe(1_700_000_000_123)
     expect(module.systemScheduler.now()).toBe(7)
     dateNow.mockReturnValue(1_600_000_000_000)
@@ -500,7 +500,7 @@ describe('scheduler module stays runtime-neutral', () => {
     expect(typeReferences).toEqual([])
     expect(bareHostIdentifiers).toEqual([])
     expect(new Set(imports)).toEqual(
-      new Set(['../error.js', '../error-code.js', '../error-text.js'])
+      new Set(['../error.ts', '../error-code.ts', '../error-text.ts'])
     )
   })
 })

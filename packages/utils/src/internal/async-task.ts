@@ -4,10 +4,10 @@
  * scheduler. Host APIs are read structurally from `globalThis` on every call, so the module needs
  * no DOM or Node types and test hosts can substitute globals.
  */
-import { ERROR_SOURCE, UtilsErrorCode, type IUtilsErrorCode } from '../error-code.js'
-import { UtilsErrorText } from '../error-text.js'
-import { attachErrorIdentity, tryReadProperty, UtilsAbortError } from '../error.js'
-import type { IAbortSignal } from '../promise.js'
+import { ERROR_SOURCE, UtilsErrorCode, type IUtilsErrorCode } from '../error-code.ts'
+import { UtilsErrorText } from '../error-text.ts'
+import { attachErrorIdentity, tryReadProperty, UtilsAbortError } from '../error.ts'
+import type { IAbortSignal } from '../promise.ts'
 
 /**
  * Every supported way to schedule a callback. Pick by the queue you need; unsupported strategies

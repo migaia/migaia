@@ -3,17 +3,17 @@
  * the host between them, so rendering, input, timers and I/O keep running. The slice budget is
  * measured on a monotonic clock; yields go through `asyncTask` strategies.
  */
-import { ERROR_SOURCE, UtilsErrorCode } from '../error-code.js'
-import { UtilsErrorText } from '../error-text.js'
+import { ERROR_SOURCE, UtilsErrorCode } from '../error-code.ts'
+import { UtilsErrorText } from '../error-text.ts'
 import {
   attachErrorIdentity,
   attachSecondaryErrors,
   tryReadProperty,
   UtilsAbortError
-} from '../error.js'
-import type { IAbortSignal } from '../promise.js'
-import { resolveAsyncTaskStrategy, yieldToHost, type AsyncTaskStrategy } from './async-task.js'
-import { systemScheduler } from './scheduler.js'
+} from '../error.ts'
+import type { IAbortSignal } from '../promise.ts'
+import { resolveAsyncTaskStrategy, yieldToHost, type AsyncTaskStrategy } from './async-task.ts'
+import { systemScheduler } from './scheduler.ts'
 
 /** Progress of one time-sliced run. */
 export type ITimeSliceReport = {

@@ -10,7 +10,7 @@ import {
   splitUtf8,
   streamBase64Chunks,
   utf8ByteLength
-} from '../src/bytes.js'
+} from '../src/bytes.ts'
 
 /** Frozen UTF-8 boundaries and seeded UTF-16 strings exercise replacement and pair handling. */
 function utf8EquivalenceInputs(): string[] {

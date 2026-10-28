@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it } from 'vitest'
-import { collect, type ICollector, type IFieldCollector } from '../src/collector.js'
+import { collect, type ICollector, type IFieldCollector } from '../src/collector.ts'
 
 type IUser = {
   readonly id: number

@@ -6,7 +6,7 @@ import {
   formatInteger,
   formatNumber,
   formatPercent
-} from '../src/number.js'
+} from '../src/number.ts'
 
 describe('number formatting', () => {
   it('formats decimal, currency, percent, inventory, and compact quantitative values', () => {

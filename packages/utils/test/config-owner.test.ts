@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
-import { CONFIG_DELETE, ConfigOwner } from '../src/config.js'
+import { CONFIG_DELETE, ConfigOwner } from '../src/config.ts'
 
 /** Shared typed fixture shape. */
 type IAppConfig = {

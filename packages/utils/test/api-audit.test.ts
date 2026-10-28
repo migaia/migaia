@@ -1,11 +1,11 @@
 import { describe, expect, expectTypeOf, it, vi } from 'vitest'
 import { ElectronProcessType, GlobalScopeKind, ServerRuntime } from '@migaia/utils'
-import { attachErrorIdentity, isUtilsError, UtilsErrorCode } from '../src/error.js'
-import { decodeUtf8, splitUtf8, streamBase64Chunks } from '../src/bytes.js'
-import { inspectThenable, observeThenableRejection, onceAsync } from '../src/function.js'
-import { probeProperty } from '../src/object.js'
-import { probeObjectPathSegments } from '../src/object-path.js'
-import { createManualScheduler } from '../src/testing.js'
+import { attachErrorIdentity, isUtilsError, UtilsErrorCode } from '../src/error.ts'
+import { decodeUtf8, splitUtf8, streamBase64Chunks } from '../src/bytes.ts'
+import { inspectThenable, observeThenableRejection, onceAsync } from '../src/function.ts'
+import { probeProperty } from '../src/object.ts'
+import { probeObjectPathSegments } from '../src/object-path.ts'
+import { createManualScheduler } from '../src/testing.ts'
 import {
   createAbortTimeoutSignal,
   createConcurrencyLimiter,
@@ -13,7 +13,7 @@ import {
   retry,
   sleep,
   withTimeout
-} from '../src/promise.js'
+} from '../src/promise.ts'
 
 describe('utils audited public contracts', () => {
   it('exports the exact runtime detection domains from the package entry', () => {

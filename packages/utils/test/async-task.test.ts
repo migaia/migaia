@@ -5,7 +5,7 @@ import {
   isAsyncTaskSupported,
   resolveAsyncTaskStrategy,
   yieldToHost
-} from '../src/scheduler.js'
+} from '../src/scheduler.ts'
 
 afterEach(() => {
   vi.unstubAllGlobals()

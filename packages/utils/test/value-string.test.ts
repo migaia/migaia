@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { format } from '../src/string.js'
-import { isBlankString, isEmptyValue, isNullish, isPrimitive } from '../src/value.js'
+import { format } from '../src/string.ts'
+import { isBlankString, isEmptyValue, isNullish, isPrimitive } from '../src/value.ts'
 
 describe('value predicates', () => {
   it('recognizes business emptiness without collapsing valid falsy values', () => {

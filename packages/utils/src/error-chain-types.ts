@@ -1,4 +1,4 @@
-import type { ErrorChainViolation } from './error-chain-constants.js'
+import type { ErrorChainViolation } from './error-chain-constants.ts'
 
 /** Plain, finite JSON data accepted by the generic error boundary and structured clone. */
 export type IErrorChainData =

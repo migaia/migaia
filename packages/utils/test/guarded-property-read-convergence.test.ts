@@ -81,7 +81,7 @@ describe('guarded property read convergence', () => {
         expect(source).not.toContain('function inspectThenable')
       } else expect(source).toContain('tryReadProperty(')
       if (path.startsWith('packages/rpc-')) expect(source).toContain("from '@migaia/utils/error'")
-      if (path === 'packages/utils/src/function.ts') expect(source).toContain("from './error.js'")
+      if (path === 'packages/utils/src/function.ts') expect(source).toContain("from './error.ts'")
     }
 
     const declarations = readdirSync(resolve(repositoryRoot, 'packages'), {

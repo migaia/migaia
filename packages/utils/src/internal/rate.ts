@@ -3,13 +3,13 @@
  * and the non-overlapping `repeat` loop. Timer-driven invocations have no caller to throw to, so
  * their failures go to the host's uncaught-error queue instead of being dropped.
  */
-import { ERROR_SOURCE, UtilsErrorCode } from '../error-code.js'
-import { UtilsErrorText } from '../error-text.js'
-import { attachErrorIdentity, tryReadProperty, UtilsAbortError } from '../error.js'
-import { reportUnhandledError } from '../host-report.js'
-import type { IAbortSignal } from '../promise.js'
-import { asyncTask, type AsyncTaskStrategy } from './async-task.js'
-import { systemScheduler, type IScheduledTask, type IScheduler } from './scheduler.js'
+import { ERROR_SOURCE, UtilsErrorCode } from '../error-code.ts'
+import { UtilsErrorText } from '../error-text.ts'
+import { attachErrorIdentity, tryReadProperty, UtilsAbortError } from '../error.ts'
+import { reportUnhandledError } from '../host-report.ts'
+import type { IAbortSignal } from '../promise.ts'
+import { asyncTask, type AsyncTaskStrategy } from './async-task.ts'
+import { systemScheduler, type IScheduledTask, type IScheduler } from './scheduler.ts'
 
 /** Largest wait host timers accept without overflowing. */
 const MAXIMUM_DELAY = 2_147_483_647

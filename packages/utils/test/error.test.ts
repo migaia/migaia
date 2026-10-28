@@ -9,7 +9,7 @@ import {
   toError,
   UtilsErrorCode,
   walkErrorCauses
-} from '../src/error.js'
+} from '../src/error.ts'
 
 describe('error primitives', () => {
   it('source domains keeps public utils errors and source exports aligned', () => {

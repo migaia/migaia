@@ -8,7 +8,7 @@ import {
   type IObjectPath,
   type IObjectPathTupleFor,
   type IObjectPathWriteValue
-} from '../src/object.js'
+} from '../src/object.ts'
 
 type IFixture = {
   readonly user: {

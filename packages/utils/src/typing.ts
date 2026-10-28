@@ -1,4 +1,4 @@
-import type { IObjectPathInput, IObjectPathTuple, IObjectPathValue } from './object-path.js'
+import type { IObjectPathInput, IObjectPathTuple, IObjectPathValue } from './object-path.ts'
 
 export type {
   IObjectPath,
@@ -8,10 +8,10 @@ export type {
   IObjectPathTupleFor,
   IObjectPathValue,
   IObjectPathWriteValue
-} from './object-path.js'
-export type { IProbePropertyResult } from './object.js'
-export type { IAbortSignal, IDeferred, INativeAbortSignal } from './promise.js'
-export type { IUrlLike } from './url.js'
+} from './object-path.ts'
+export type { IProbePropertyResult } from './object.ts'
+export type { IAbortSignal, IDeferred, INativeAbortSignal } from './promise.ts'
+export type { IUrlLike } from './url.ts'
 
 /** Groups a discriminated union by one top-level property-key field. */
 export type IDiscriminatedByField<F extends PropertyKey, T extends Record<F, PropertyKey>> = {

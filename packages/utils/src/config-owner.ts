@@ -1,12 +1,12 @@
 /** Own immutable configuration snapshots, validation, asynchronous loading and scoped watchers. */
-import { ERROR_SOURCE, UtilsErrorCode, type IUtilsErrorCode } from './error-code.js'
-import { UtilsErrorText } from './error-text.js'
-import { attachErrorIdentity, safeErrorReason } from './error.js'
-import { isPlainObject } from './object.js'
-import type { IObjectPath, IObjectPathValue, IObjectPathWriteValue } from './object-path.js'
-import { reportUnhandledError } from './host-report.js'
-import { raceWithAbort, withTimeout, type IAbortSignal } from './promise.js'
-import { orderStringKeys } from './internal/string-order.js'
+import { ERROR_SOURCE, UtilsErrorCode, type IUtilsErrorCode } from './error-code.ts'
+import { UtilsErrorText } from './error-text.ts'
+import { attachErrorIdentity, safeErrorReason } from './error.ts'
+import { isPlainObject } from './object.ts'
+import type { IObjectPath, IObjectPathValue, IObjectPathWriteValue } from './object-path.ts'
+import { reportUnhandledError } from './host-report.ts'
+import { raceWithAbort, withTimeout, type IAbortSignal } from './promise.ts'
+import { orderStringKeys } from './internal/string-order.ts'
 import {
   CONFIG_DELETE,
   combineConfig,
@@ -22,7 +22,7 @@ import {
   type IConfigRecord,
   type IOwnConfigOptions,
   type IOwnedConfig
-} from './config.js'
+} from './config.ts'
 
 /** Deep readonly view type returned by `view()`, `get()` and watch listeners. */
 export type IConfigView<T> = T extends (...args: never[]) => unknown

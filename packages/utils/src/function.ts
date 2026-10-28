@@ -1,7 +1,7 @@
-import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
-import { UtilsErrorText } from './error-text.js'
-import { tryReadProperty } from './error.js'
-import { reportUnhandledError } from './host-report.js'
+import { ERROR_SOURCE, UtilsErrorCode } from './error-code.ts'
+import { UtilsErrorText } from './error-text.ts'
+import { tryReadProperty } from './error.ts'
+import { reportUnhandledError } from './host-report.ts'
 
 /**
  * Maximum synchronous reentrancy before consumers spill work from the native stack.

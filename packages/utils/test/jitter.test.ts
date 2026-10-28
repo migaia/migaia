@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { jitter as rootJitter } from '../src/index.js'
-import { jitter } from '../src/number.js'
+import { jitter as rootJitter } from '../src/index.ts'
+import { jitter } from '../src/number.ts'
 
 afterEach(() => vi.restoreAllMocks())
 

@@ -1,8 +1,8 @@
 /** Numeric and stable-key calculations own their validation; scheduling and IO remain external. */
-import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
-import { UtilsErrorText } from './error-text.js'
-import { attachErrorIdentity } from './error.js'
-import { orderStringKeys } from './internal/string-order.js'
+import { ERROR_SOURCE, UtilsErrorCode } from './error-code.ts'
+import { UtilsErrorText } from './error-text.ts'
+import { attachErrorIdentity } from './error.ts'
+import { orderStringKeys } from './internal/string-order.ts'
 
 /** Builds a native argument error while retaining an injected random callback's thrown value. */
 function jitterArgumentError(message: string, cause?: unknown): RangeError {

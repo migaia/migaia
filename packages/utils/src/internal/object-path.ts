@@ -1,4 +1,4 @@
-import type { IObjectPathTuple } from '../object-path.js'
+import type { IObjectPathTuple } from '../object-path.ts'
 
 /**
  * Reads a previously validated object path without allocating diagnostic probe objects. Missing and

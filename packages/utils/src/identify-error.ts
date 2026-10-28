@@ -1,5 +1,5 @@
-import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
-import { UtilsErrorText } from './error-text.js'
+import { ERROR_SOURCE, UtilsErrorCode } from './error-code.ts'
+import { UtilsErrorText } from './error-text.ts'
 import {
   attachErrorIdentity,
   attachSecondaryErrors,
@@ -10,9 +10,9 @@ import {
   tryReadProperty,
   walkErrorCauses,
   type IErrorIdentity
-} from './error.js'
-import { deserializeErrorChain, serializeErrorChain } from './error-chain.js'
-import type { IErrorChainStrategy, ISerializedErrorChain } from './error-chain-types.js'
+} from './error.ts'
+import { deserializeErrorChain, serializeErrorChain } from './error-chain.ts'
+import type { IErrorChainStrategy, ISerializedErrorChain } from './error-chain-types.ts'
 
 /** Identity accepted by `IdentifyError`; literal `source`/`code` types flow into the instance. */
 export type IIdentifyErrorIdentity<S extends string = string, C extends string = string> = {

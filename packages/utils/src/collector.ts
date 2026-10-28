@@ -1,13 +1,13 @@
-import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
-import { UtilsErrorText } from './error-text.js'
-import { attachErrorIdentity } from './error.js'
-import { readObjectPathSegments } from './internal/object-path.js'
+import { ERROR_SOURCE, UtilsErrorCode } from './error-code.ts'
+import { UtilsErrorText } from './error-text.ts'
+import { attachErrorIdentity } from './error.ts'
+import { readObjectPathSegments } from './internal/object-path.ts'
 import {
   parseObjectPath,
   type IObjectPathInput,
   type IObjectPathTuple,
   type IObjectPathValue
-} from './object-path.js'
+} from './object-path.ts'
 
 /** Stable stage tags for the collector's ordered, single-pass evaluator. */
 const CollectorStageKind = {

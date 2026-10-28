@@ -1,8 +1,8 @@
 /** Owned configuration admission, snapshots and source-ordered merge policy. */
-import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
-import { UtilsErrorText } from './error-text.js'
-import { ConfigArrayMerge } from './internal/config-array-merge.js'
-import { parseObjectPath, probeObjectPath, type IObjectPathTupleFor } from './object-path.js'
+import { ERROR_SOURCE, UtilsErrorCode } from './error-code.ts'
+import { UtilsErrorText } from './error-text.ts'
+import { ConfigArrayMerge } from './internal/config-array-merge.ts'
+import { parseObjectPath, probeObjectPath, type IObjectPathTupleFor } from './object-path.ts'
 
 /**
  * Input domains of an owned config: `data` (default) accepts portable plain data and rejects
@@ -1480,7 +1480,7 @@ function configError(code: string, path: string, reason: string, cause?: unknown
   return error
 }
 
-export { ConfigOwner } from './config-owner.js'
+export { ConfigOwner } from './config-owner.ts'
 export type {
   IConfigAsyncSource,
   IConfigDiffEntry,
@@ -1495,4 +1495,4 @@ export type {
   IConfigValidator,
   IConfigView,
   IMergedConfig
-} from './config-owner.js'
+} from './config-owner.ts'

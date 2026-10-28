@@ -1,16 +1,16 @@
 /** Own Promise completion, retry and concurrency primitives together with their native cleanup. */
-import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
-import { UtilsErrorText } from './error-text.js'
+import { ERROR_SOURCE, UtilsErrorCode } from './error-code.ts'
+import { UtilsErrorText } from './error-text.ts'
 import {
   attachErrorIdentity,
   tryReadProperty,
   UtilsAbortError,
   UtilsTimeoutError
-} from './error.js'
-import { systemScheduler, type IScheduledTask, type IScheduler } from './scheduler.js'
-import { reportUnhandledError } from './host-report.js'
+} from './error.ts'
+import { systemScheduler, type IScheduledTask, type IScheduler } from './scheduler.ts'
+import { reportUnhandledError } from './host-report.ts'
 
-export { UtilsAbortError } from './error.js'
+export { UtilsAbortError } from './error.ts'
 
 /**
  * Structural abort signal accepted by every input in this module. Native `AbortSignal` objects from

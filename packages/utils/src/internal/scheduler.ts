@@ -10,9 +10,9 @@
  * implementation reads them structurally from `globalThis` on every call instead of importing DOM
  * or Node types. Reading per call keeps `vi.stubGlobal`-style host substitution observable.
  */
-import { ERROR_SOURCE, UtilsErrorCode, type IUtilsErrorCode } from '../error-code.js'
-import { UtilsErrorText } from '../error-text.js'
-import { attachErrorIdentity } from '../error.js'
+import { ERROR_SOURCE, UtilsErrorCode, type IUtilsErrorCode } from '../error-code.ts'
+import { UtilsErrorText } from '../error-text.ts'
+import { attachErrorIdentity } from '../error.ts'
 
 /**
  * Handle of one scheduled callback. `cancel()` is idempotent; after it, or after the callback ran,

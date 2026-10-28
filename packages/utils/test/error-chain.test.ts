@@ -7,7 +7,7 @@ import {
   reachErrorChain,
   sanitizeErrorText,
   serializeErrorChain
-} from '../src/error.js'
+} from '../src/error.ts'
 
 /** RPC's existing limits are copied as oracle data; utils has no RPC dependency. */
 const oracleStrategy: IErrorChainStrategy = {

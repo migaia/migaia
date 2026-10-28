@@ -3,10 +3,10 @@
  * policies. Generic traversal preserves native errors and diagnostics without granting package or
  * RPC authority.
  */
-import { attachErrorIdentity, tryReadProperty } from './error.js'
-import { ERROR_SOURCE, UtilsErrorCode } from './error-code.js'
-import { UtilsErrorText } from './error-text.js'
-import { orderCodePointKeys } from './internal/string-order.js'
+import { attachErrorIdentity, tryReadProperty } from './error.ts'
+import { ERROR_SOURCE, UtilsErrorCode } from './error-code.ts'
+import { UtilsErrorText } from './error-text.ts'
+import { orderCodePointKeys } from './internal/string-order.ts'
 import {
   ErrorChainFallback,
   ErrorChainField,
@@ -15,7 +15,7 @@ import {
   ErrorChainReadField,
   ErrorChainUnknownFields,
   ErrorChainViolation
-} from './error-chain-constants.js'
+} from './error-chain-constants.ts'
 import type {
   IErrorChainData,
   IErrorChainLimits,
@@ -24,7 +24,7 @@ import type {
   INormalizeErrorChainOptions,
   ISerializedErrorChain,
   ISerializeErrorChainOptions
-} from './error-chain-types.js'
+} from './error-chain-types.ts'
 
 /** Fields read once from an object before deciding whether it is error-like. */
 type IErrorSnapshot = Readonly<{

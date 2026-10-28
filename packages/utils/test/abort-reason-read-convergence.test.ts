@@ -25,7 +25,7 @@ describe('abort reason read convergence', () => {
       expect(source, file).not.toMatch(/\bsignal\??\.reason\b/)
       expect(source, file).toContain('tryReadProperty(')
       expect(source, file).toContain(
-        file.includes('packages/utils/') ? "from './error.js'" : "from '@migaia/utils/error'"
+        file.includes('packages/utils/') ? "from './error.ts'" : "from '@migaia/utils/error'"
       )
     }
     for (const name of readdirSync(join(repository, 'packages'))) {

@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
-import { tryReadProperty } from '../src/error.js'
+import { tryReadProperty } from '../src/error.ts'
 
 describe('tryReadProperty', () => {
   it('returns each successful value without probing it', () => {
