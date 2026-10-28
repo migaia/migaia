@@ -8,14 +8,14 @@ import { deferred, type IAbortSignal } from '@migaia/utils/promise'
 import { attachSecondaryErrors } from '@migaia/utils/error'
 import { defaultRpcReporter } from '@migaia/rpc-host'
 import { RpcPoolErrorCode } from '@migaia/rpc-contract/error-code'
-import type { IRpcPoolControls, IRpcPoolStats, IPoolPluginOptions } from './types.js'
-import { queuedPoolAbort, tagPoolError } from './error.js'
+import type { IRpcPoolControls, IRpcPoolStats, IPoolPluginOptions } from './types.ts'
+import { queuedPoolAbort, tagPoolError } from './error.ts'
 import {
   RPC_POOL_DEFAULT_MAX_QUEUE,
   RPC_POOL_MAX_IDLE_TIMEOUT_MS,
   RpcPoolState,
   RpcPoolText
-} from './text.js'
+} from './text.ts'
 
 /** Pool owns acquired native resources; business execution remains with the actual Host owners. */
 export type IPoolResource = Readonly<{ close(): Promise<void> }>
