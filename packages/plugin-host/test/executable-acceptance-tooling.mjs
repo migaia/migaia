@@ -22,7 +22,21 @@ const vite = resolve(workspaceRoot, 'node_modules/vite/bin/vite.js')
 const run = (command, args, cwd) =>
   execFileSync(command, args, { cwd, encoding: 'utf8', stdio: 'inherit' })
 
-/** Execute isolated source guard mutations and require each mapped oracle to flip then restore. */
+/**
+ * Execute isolated source guard mutations and require each mapped oracle to flip then restore.
+ *
+ * This existing 151-code-line producer is one artifact transaction: each baseline, fault and
+ * restoration must use the same sandbox and exact oracle state before its result is published. The
+ * body remains unchanged in this refactor; splitting its sequential transaction solely for line
+ * count would hide the restoration boundary rather than establish another responsibility.
+ *
+ * @returns {{
+ *   sandbox: string
+ *   results: { name: string; baseline: string; fault: string; restored: string }[]
+ * }}
+ *   The retained sandbox and completed phase artifacts for every original fault case.
+ * @throws {Error} If a tool, mapped oracle or exact restoration check fails.
+ */
 export const runRuntimeFaultProducer = () => {
   const sandbox = mkdtempSync(join(tmpdir(), 'plugin-host-runtime-faults-'))
   const workspace = join(sandbox, 'workspace')
