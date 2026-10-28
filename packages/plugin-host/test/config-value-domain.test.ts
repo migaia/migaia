@@ -17,6 +17,85 @@ class ConfigHost extends PluginHost<Record<string, never>, unknown> {
 const install = (config: object) =>
   definePlugin({ name: 'config', config: config as IPluginConfig, install: () => ({}) })
 
+/** Plain-data DAG node admits only the original object grammar and repeated child identities. */
+type ISharedConfigNode = {
+  readonly left?: ISharedConfigNode
+  readonly right?: ISharedConfigNode
+  readonly value?: number
+}
+
+/** Counts source enumeration while exposing only ordinary plain-data Proxy nodes. */
+class SharedConfigGraph {
+  /** Root retains the complete shared graph supplied to installation or one patch operation. */
+  readonly #root: ISharedConfigNode
+  /** Number of distinct source nodes constructed by this fixture. */
+  #nodes = 0
+  /** Enumeration count distinguishes unique-node validation/copying from repeated path traversal. */
+  #enumerations = 0
+
+  /** Builds a bounded shared DAG without materializing its exponentially many paths. */
+  constructor(depth: number) {
+    /** Each new parent references the same previous node through both child keys. */
+    let current = this.#observe({ value: 1 })
+    for (let index = 0; index < depth; index += 1)
+      current = this.#observe({ left: current, right: current })
+    this.#root = current
+  }
+
+  /** Wraps one ordinary source record while counting only its own-key enumerations. */
+  #observe(value: ISharedConfigNode): ISharedConfigNode {
+    this.#nodes += 1
+    return new Proxy(value, { ownKeys: (target) => this.#readKeys(target) })
+  }
+
+  /** Records the original source traversal without changing its keys, descriptors or values. */
+  #readKeys(target: ISharedConfigNode): (string | symbol)[] {
+    this.#enumerations += 1
+    return Reflect.ownKeys(target)
+  }
+
+  /** Number of unique nodes expected in the immutable output. */
+  get nodes(): number {
+    return this.#nodes
+  }
+
+  /** Validation and ownership must each enumerate every source node exactly once. */
+  get enumerations(): number {
+    return this.#enumerations
+  }
+
+  /** Supplies two root aliases without nesting another callback inside the test body. */
+  readonly patch = (): IPluginConfig => this.#createPatch()
+
+  /** Creates a fresh patch record while preserving its two exact source-root references. */
+  #createPatch(): IPluginConfig {
+    return { first: this.#root, second: this.#root }
+  }
+}
+
+/** Checks every unique output node, its frozen state and both aliases without timing or a bench. */
+function expectSharedConfigGraph(root: ISharedConfigNode, expectedNodes: number): void {
+  /** Identity set ensures the single-branch walk does not revisit any output node. */
+  const visited = new WeakSet<object>()
+  /** Current unique node advances through the graph's shared child rather than all paths. */
+  let current = root
+  /** Unique output count must equal the source fixture's linear node count. */
+  let nodes = 0
+  while (true) {
+    expect(visited.has(current)).toBe(false)
+    visited.add(current)
+    nodes += 1
+    expect(Object.isFrozen(current)).toBe(true)
+    if (current.left === undefined) {
+      expect(current.value).toBe(1)
+      break
+    }
+    expect(current.left).toBe(current.right)
+    current = current.left
+  }
+  expect(nodes).toBe(expectedNodes)
+}
+
 describe('config value domain', () => {
   const expectInvalid = (
     value: object,
@@ -131,6 +210,30 @@ describe('config value domain', () => {
     expect(after.change).not.toBe(before.change)
     expect(Object.isFrozen(after.change)).toBe(true)
   })
+  it('validates and clones each shared DAG node once for install and patch', async () => {
+    /** Twelve shared layers expose repeated traversal without a timing-dependent performance oracle. */
+    const initial = new SharedConfigGraph(12)
+    /** Existing public Host and config recipe entries exercise both ownership operations. */
+    const host = new ConfigHost(options)
+    await host.use(install(initial.patch()))
+    /** Installation exposes one frozen copy per original node through both public root paths. */
+    const installed = host.config.get('config.first') as ISharedConfigNode
+    expect(installed).toBe(host.config.get('config.second'))
+    expect(initial.enumerations).toBe(initial.nodes * 2)
+    expectSharedConfigGraph(installed, initial.nodes)
+
+    /** A separate patch graph proves operation-local caching across multiple changed root keys. */
+    const patch = new SharedConfigGraph(12)
+    await host.config.update('config', patch.patch)
+    /** Patched roots share their new copy while the earlier immutable generation remains separate. */
+    const updated = host.config.get('config.first') as ISharedConfigNode
+    expect(updated).toBe(host.config.get('config.second'))
+    expect(updated).not.toBe(installed)
+    expect(patch.enumerations).toBe(patch.nodes * 2)
+    expectSharedConfigGraph(updated, patch.nodes)
+    await host.dispose()
+  })
+
   it('update rollback recipe throws', async () => {
     const host = new ConfigHost(options)
     const original = new Error('recipe')
