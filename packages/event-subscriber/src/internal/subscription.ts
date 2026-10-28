@@ -40,7 +40,7 @@ class SubscriptionOwner<T extends ISubscriptionHandle<unknown>> {
   /** Terminal marker prevents duplicate cleanup and rejects extension before reading user input. */
   #closed = false
   /** Callable surface retains this owner; all cancellation aliases share this exact identity. */
-  readonly #handle: T
+  readonly #handle = (() => this.#release()) as T
   /** Small extension callback retains only this owner and returns its original handle. */
   readonly #subscribe = (...args: never[]): ISubscriptionHandle<T> => {
     if (this.#closed)
@@ -60,7 +60,6 @@ class SubscriptionOwner<T extends ISubscriptionHandle<unknown>> {
   constructor(first: () => void, extend: (...args: never[]) => void | (() => void)) {
     this.#disposers = [first]
     this.#extend = extend
-    this.#handle = (() => this.#release()) as T
   }
 
   /** Installs immutable aliases, rolling back owned registrations on projection failure. */

@@ -55,12 +55,14 @@ class EventContext<T, R, V> implements IEventContext<T> {
   /** Captures one dispatch without reusing contexts or installing per-instance accessors. */
   constructor(value: T, snapshot: IEventDispatchSnapshot<T, R, V>) {
     this.#state = { value, snapshot }
-    this.abort = (reason?: unknown): void => {
-      snapshot.control.abort(reason)
-    }
-    this.setTaskId = (taskId: string | undefined): void => {
-      snapshot.control.setTaskId(taskId)
-    }
+    Object.assign(this, {
+      abort: (reason?: unknown): void => {
+        snapshot.control.abort(reason)
+      },
+      setTaskId: (taskId: string | undefined): void => {
+        snapshot.control.setTaskId(taskId)
+      }
+    })
   }
 
   /** Returns the original payload without cloning or projection. */
