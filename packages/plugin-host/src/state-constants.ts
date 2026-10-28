@@ -1,4 +1,7 @@
-/** Plugin-host lifecycle and pipeline modes. */
+/**
+ * Owns stable Host, registration, cleanup and activation state vocabulary; state values are never
+ * thrown error codes.
+ */
 export const PluginHostStatus = {
   /** Accepts new operations; existing registrations can publish through their normal guards. */
   active: 'active',
@@ -35,3 +38,14 @@ export type IPluginHostStatus = (typeof PluginHostStatus)[keyof typeof PluginHos
 /** Hook/resource-acquisition phase vocabulary for one registration. */
 export type IPluginHostRegistrationLifecycle =
   (typeof PluginHostRegistrationLifecycle)[keyof typeof PluginHostRegistrationLifecycle]
+
+/** Installation timing values shared by raw/trusted admission and capability install-set selection. */
+export const PluginActivation = {
+  /** Eager definitions construct during installation unless another prerequisite rejects the batch. */
+  eager: 'eager',
+  /** Lazy definitions retain cold registration identity until explicitly or transitively activated. */
+  lazy: 'lazy'
+} as const
+
+/** Exact activation vocabulary; runtime values and the same-named union have one owner. */
+export type PluginActivation = (typeof PluginActivation)[keyof typeof PluginActivation]
