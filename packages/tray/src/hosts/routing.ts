@@ -61,7 +61,8 @@ class RoutingRegistry {
   }
   /**
    * Pick one current ready admission; business calls never retry or migrate. The policy contract
-   * receives every ready candidate, requiring one O(n) snapshot pass; returned id lookup is O(1).
+   * receives every ready candidate in the target host, requiring one O(h) snapshot pass over that
+   * host's admissions rather than all registry records; returned id lookup remains O(1).
    */
   pick = (host: string, name: string): ITrayRecord => {
     const policy = this.#policies.get(name)
@@ -70,12 +71,8 @@ class RoutingRegistry {
     const candidates: ITrayRecord[] = []
     /** Index only this snapshot so policy reentrancy cannot admit a later same-id replacement. */
     const candidateIds = new Map<string, ITrayRecord>()
-    for (const record of this.#registry.records.values())
-      if (
-        record.definition.name === host &&
-        record.state === TrayInstanceState.ready &&
-        !record.removed
-      ) {
+    for (const record of this.#registry.recordsForHost(host))
+      if (record.state === TrayInstanceState.ready && !record.removed) {
         candidates.push(record)
         candidateIds.set(record.id, record)
       }
