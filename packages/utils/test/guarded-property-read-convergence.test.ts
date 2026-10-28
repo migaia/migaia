@@ -64,7 +64,7 @@ describe('guarded property read convergence', () => {
       'packages/utils/src/internal/error-chain-serialize.ts',
       'packages/utils/src/internal/error-chain-normalize.ts',
       'packages/utils/src/internal/error-chain-data.ts',
-      'packages/reactive/src/runtime/runtime.class.ts',
+      'packages/reactive/src/runtime/runtime-options.ts',
       'packages/reactive/src/runtime/scheduler.class.ts',
       'packages/resource/src/resource.class.ts'
     ]

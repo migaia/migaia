@@ -16,7 +16,7 @@ describe('abort reason read convergence', () => {
     const files = [
       'packages/utils/src/internal/promise-abort.ts',
       'packages/serialize/src/signal-snapshot.ts',
-      'packages/serialize/src/stream.ts',
+      'packages/serialize/src/operation-support.ts',
       'packages/lifecycle/src/observed-subscription.ts',
       'packages/event-subscriber/src/internal/abort-subscription.ts'
     ]
