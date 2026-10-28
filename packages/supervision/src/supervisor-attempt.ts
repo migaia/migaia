@@ -59,7 +59,7 @@ export class LaunchAttempt<
   /** Rejection settles the same cancellation Promise observed by launch, attach and readiness. */
   #rejectWait!: (reason: unknown) => void
   /** Listener identity is stable from registration to finally removal. */
-  #aborted!: () => void
+  readonly #aborted = (): void => this.#rejectWait(this.#request.signal.reason)
 
   /** Begins the original generation synchronously, before the acquire hook can reenter. */
   constructor(
@@ -124,7 +124,6 @@ export class LaunchAttempt<
     const cancelled = new Promise<never>((_, reject) => {
       this.#rejectWait = reject
     })
-    this.#aborted = () => this.#rejectWait(this.#request.signal.reason)
     request.signal.addEventListener(ABORT_EVENT, this.#aborted, { once: true })
     if (request.signal.aborted) this.#aborted()
     /** Timeout errors and their stacks are allocated only if the original timer actually fires. */
