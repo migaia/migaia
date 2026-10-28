@@ -155,8 +155,10 @@ export class PortableWalker {
       violation
     }
     this.#context = portableWalkerContext(this)
-    this.result.value = (value, ancestors, depth = 0, guard) =>
-      this.#value(value, ancestors, depth, guard)
+    Object.assign(this.result, {
+      value: (value: unknown, ancestors?: Set<object>, depth = 0, guard?: () => never) =>
+        this.#value(value, ancestors, depth, guard)
+    })
   }
 
   /** Query only the current ancestor path; completed sibling occurrences remain independent. */
