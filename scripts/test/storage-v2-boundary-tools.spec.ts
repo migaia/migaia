@@ -93,4 +93,134 @@ describe('root-owned package-tree and retained-ledger tools', () => {
       normalizeRetainedModules([join(packageRoot, 'escaped.mjs')], consumer, installed)
     ).toEqual([`escaped-package:${join(packageRoot, 'escaped.mjs')}`])
   })
+
+  it(
+    'preserves semantic eight-letter suffixes and candidates without chunk evidence',
+    preservesSemanticSuffixes
+  )
+  it('normalizes chunks proven by source maps or declared-entry imports', normalizesProvenChunks)
+  it(
+    'rejects distinct proven chunks that normalize to the same identity',
+    rejectsProvenChunkCollisions
+  )
 })
+
+/** Exact declarations and source-map identities keep real module names distinct from hash suffixes. */
+function preservesSemanticSuffixes(): void {
+  /** This isolated package has no relationship to workspace source or build directories. */
+  const fixture = mkdtempSync(join(tmpdir(), 'storage-v2-semantic-suffix-'))
+  /** Normalization still begins from the real consumer root. */
+  const consumer = join(fixture, 'consumer')
+  /** All evidence belongs to the exact admitted installed package. */
+  const packageRoot = join(fixture, 'node_modules/@migaia/utils')
+  mkdirSync(consumer, { recursive: true })
+  mkdirSync(join(packageRoot, 'dist'), { recursive: true })
+  /** Three literal fixture names cover a declaration, a source map and absent metadata. */
+  const modules = ['host-defaults.js', 'host-identity.js', 'worker-abcdefgh.js'] as const
+  // The loop is bounded by the three literal fixture names above.
+  for (const module of modules)
+    writeFileSync(join(packageRoot, 'dist', module), 'export const stable = true\n')
+  writeFileSync(join(packageRoot, 'dist/host-defaults.d.ts'), 'export declare const stable: true\n')
+  writeFileSync(
+    join(packageRoot, 'dist/host-identity.js.map'),
+    JSON.stringify({ version: 3, file: 'host-identity.js', sources: ['../src/host-identity.ts'] })
+  )
+  /** The immutable installed snapshot owns declaration and map evidence for this operation. */
+  const installed = new Map([['@migaia/utils', { root: realpathSync(packageRoot) }]])
+  /** Full semantic suffixes and unproven candidates must remain three separate identities. */
+  const normalized = normalizeRetainedModules(
+    [
+      join(packageRoot, 'dist/host-defaults.js'),
+      join(packageRoot, 'dist/host-identity.js'),
+      join(packageRoot, 'dist/worker-abcdefgh.js')
+    ],
+    consumer,
+    installed
+  )
+  expect(normalized).toEqual([
+    '@migaia/utils/dist/host-defaults.js',
+    '@migaia/utils/dist/host-identity.js',
+    '@migaia/utils/dist/worker-abcdefgh.js'
+  ])
+}
+
+/** Real map ownership and parsed static imports prove both single-source and multi-source chunks. */
+function normalizesProvenChunks(): void {
+  /** The fixture models installed output without an unpublished src tree. */
+  const fixture = mkdtempSync(join(tmpdir(), 'storage-v2-proven-chunks-'))
+  /** Consumer provenance is independent from the package's bundle metadata. */
+  const consumer = join(fixture, 'consumer')
+  /** Both candidate chunks and the declared scheduler entry belong to this admitted package. */
+  const packageRoot = join(fixture, 'node_modules/@migaia/utils')
+  mkdirSync(consumer, { recursive: true })
+  mkdirSync(join(packageRoot, 'dist'), { recursive: true })
+  writeFileSync(
+    join(packageRoot, 'dist/projection-AbCd1234.js'),
+    'export const projection = true\n'
+  )
+  writeFileSync(
+    join(packageRoot, 'dist/projection-AbCd1234.js.map'),
+    JSON.stringify({
+      version: 3,
+      file: 'projection-AbCd1234.js',
+      sources: ['../src/entity/projection.ts']
+    })
+  )
+  writeFileSync(join(packageRoot, 'dist/scheduler-XyZq5678.js'), 'export const timer = true\n')
+  writeFileSync(
+    join(packageRoot, 'dist/scheduler-XyZq5678.js.map'),
+    JSON.stringify({
+      version: 3,
+      file: 'scheduler-XyZq5678.js',
+      sources: ['../src/internal/timer.ts', '../src/internal/rate.ts']
+    })
+  )
+  writeFileSync(
+    join(packageRoot, 'dist/scheduler.js'),
+    "import './scheduler-XyZq5678.js'\nexport const value = 1\n"
+  )
+  writeFileSync(join(packageRoot, 'dist/scheduler.d.ts'), 'export declare const value: number\n')
+  /** Both branches use the same immutable package record as the real retained ledger. */
+  const installed = new Map([['@migaia/utils', { root: realpathSync(packageRoot) }]])
+  expect(
+    normalizeRetainedModules(
+      [
+        join(packageRoot, 'dist/projection-AbCd1234.js'),
+        join(packageRoot, 'dist/scheduler-XyZq5678.js')
+      ],
+      consumer,
+      installed
+    )
+  ).toEqual(['@migaia/utils/dist/projection-[chunk].js', '@migaia/utils/dist/scheduler-[chunk].js'])
+}
+
+/** Positive chunk evidence never grants permission to collapse two distinct raw module files. */
+function rejectsProvenChunkCollisions(): void {
+  /** Each raw file has its own real path and source map inside one admitted package. */
+  const fixture = mkdtempSync(join(tmpdir(), 'storage-v2-chunk-collision-'))
+  /** Collision checking retains the existing consumer-root admission. */
+  const consumer = join(fixture, 'consumer')
+  /** Both generated variants intentionally claim one reviewed source stem. */
+  const packageRoot = join(fixture, 'node_modules/@migaia/utils')
+  mkdirSync(consumer, { recursive: true })
+  mkdirSync(join(packageRoot, 'dist'), { recursive: true })
+  /** Two literal generated variants establish an actual many-to-one normalization collision. */
+  const modules = ['projection-AbCd1234.js', 'projection-XyZq5678.js'] as const
+  // The loop is bounded by the two literal generated variants above.
+  for (const module of modules) {
+    writeFileSync(join(packageRoot, 'dist', module), 'export const projection = true\n')
+    writeFileSync(
+      join(packageRoot, 'dist', `${module}.map`),
+      JSON.stringify({ version: 3, file: module, sources: ['../src/entity/projection.ts'] })
+    )
+  }
+  /** Original package provenance remains required before either variant can be normalized. */
+  const installed = new Map([['@migaia/utils', { root: realpathSync(packageRoot) }]])
+  /** The error must identify the exact distinct raw files, not merely reject for another reason. */
+  const first = join(packageRoot, 'dist', modules[0])
+  /** Input order determines the second raw identity named by the unchanged collision guard. */
+  const second = join(packageRoot, 'dist', modules[1])
+  expect(() => normalizeRetainedModules([first, second], consumer, installed)).toThrow(
+    `retained module identity collision: @migaia/utils/dist/projection-[chunk].js: ${first}, ${second}`
+  )
+}
