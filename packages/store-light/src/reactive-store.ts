@@ -506,37 +506,39 @@ function createStoreCore<S extends Record<string, unknown>>(
         /** Stable diagnostic identity belongs to the action definition, not each invocation. */
         const actionName = `${debugName}.${key}`
         let warnedAsync = false
-        store[key] = (...args: unknown[]) => {
-          assertNotDisposed()
-          /** The Action owns its return value; synchronous mutation callbacks return void. */
-          let result: unknown
-          runtime.runTracedAction(actionName, () =>
-            runMutation(() =>
-              runtime.untracked(() => {
-                result = (store as Record<PropertyKey, (...values: unknown[]) => unknown>)[
-                  contextKey
-                ](...args)
-              })
-            )
-          )
-          if (warnAsyncActions && !warnedAsync) {
-            /** Inspect once without consuming or replacing the action's returned thenable. */
-            const probe = probeThenable(result)
-            if (probe.kind === ThenableProbeKind.failed)
-              runtime.reportError(probe.error, { phase: ReactiveErrorPhase.asyncFlush })
-            else if (probe.kind === ThenableProbeKind.thenable) {
-              warnedAsync = true
-              runtime.reportError(
-                createStoreLightError(
-                  StoreLightErrorCode.actionBatchBoundary,
-                  StoreLightErrorText.asyncAction(key)
-                ),
-                { phase: ReactiveErrorPhase.asyncFlush }
+        Object.assign(store, {
+          [key]: (...args: unknown[]) => {
+            assertNotDisposed()
+            /** The Action owns its return value; synchronous mutation callbacks return void. */
+            let result: unknown
+            runtime.runTracedAction(actionName, () =>
+              runMutation(() =>
+                runtime.untracked(() => {
+                  result = (store as Record<PropertyKey, (...values: unknown[]) => unknown>)[
+                    contextKey
+                  ](...args)
+                })
               )
+            )
+            if (warnAsyncActions && !warnedAsync) {
+              /** Inspect once without consuming or replacing the action's returned thenable. */
+              const probe = probeThenable(result)
+              if (probe.kind === ThenableProbeKind.failed)
+                runtime.reportError(probe.error, { phase: ReactiveErrorPhase.asyncFlush })
+              else if (probe.kind === ThenableProbeKind.thenable) {
+                warnedAsync = true
+                runtime.reportError(
+                  createStoreLightError(
+                    StoreLightErrorCode.actionBatchBoundary,
+                    StoreLightErrorText.asyncAction(key)
+                  ),
+                  { phase: ReactiveErrorPhase.asyncFlush }
+                )
+              }
             }
+            return result
           }
-          return result
-        }
+        })
         continue
       }
 
