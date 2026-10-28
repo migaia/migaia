@@ -1,4 +1,5 @@
 import { invalidOption } from './options.js'
+import { SupervisionField } from './text.js'
 import { CapabilityLevel, IsolationMode } from './constants.js'
 import { SupervisionErrorCode } from './error-code.js'
 import { SupervisionErrorText } from './error-text.js'
@@ -11,12 +12,17 @@ export function admitCapabilities(
   isolation: IsolationMode,
   kind: string
 ): { readonly degraded: readonly string[]; readonly diagnostics: readonly Error[] } {
-  if (!Object.values(IsolationMode).includes(isolation)) invalidOption('isolation')
+  // IsolationMode contains exactly two compile-time modes.
+  if (!Object.values(IsolationMode).includes(isolation)) invalidOption(SupervisionField.isolation)
+  /** Ordered weaker capabilities become the public degradation snapshot. */
   const degraded: string[] = []
+  /** Each weaker capability reports its original coded diagnostic once at start. */
   const diagnostics: Error[] = []
   for (const capability of new Set(requirements)) {
+    /** Missing declarations provide no guarantee. */
     const level = capabilities[capability] ?? CapabilityLevel.unsupported
     if (level === CapabilityLevel.enforced || level === CapabilityLevel.monitored) continue
+    /** Admission preserves the native diagnostic and its capability details. */
     const error = createSupervisionError(
       Error,
       SupervisionErrorCode.capabilityUnsupported,
