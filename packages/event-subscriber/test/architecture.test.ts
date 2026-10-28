@@ -71,7 +71,10 @@ describe('runtime-neutral boundary', () => {
   })
 
   it('keeps registration removal structural rather than scan-based', () => {
-    const source = readFileSync(resolve(import.meta.dirname, '../src/channel.ts'), 'utf8')
+    const source = readFileSync(
+      resolve(import.meta.dirname, '../src/internal/channel-registrations.ts'),
+      'utf8'
+    )
     expect(source).not.toMatch(/\.indexOf\(|\.find\(|\.filter\(/)
     expect(source).toContain('owner.previous')
     expect(source).toContain('owner.next')
@@ -114,10 +117,10 @@ describe('runtime-neutral boundary', () => {
   it('uses explicit owner import graph and runtime recursion trap', async () => {
     const sourceRoot = resolve(import.meta.dirname, '../src')
     const hub = readFileSync(resolve(sourceRoot, 'hub.ts'), 'utf8')
-    const channel = readFileSync(resolve(sourceRoot, 'channel.ts'), 'utf8')
+    const channel = readFileSync(resolve(sourceRoot, 'internal/channel-owner.ts'), 'utf8')
     const owner = readFileSync(resolve(sourceRoot, 'internal/subscription.ts'), 'utf8')
     expect(hub).toContain("from './internal/subscription.js'")
-    expect(channel).toContain("from './internal/subscription.js'")
+    expect(channel).toContain("from './subscription.js'")
     expect(owner).toContain('createRawSubscriptionOwner')
     expect(owner).not.toContain('setSubscriptionReleaseProbe')
     const { createEventHub } = await import('../src/index.js')
@@ -126,14 +129,19 @@ describe('runtime-neutral boundary', () => {
     expect(handle.subscribe('done', () => undefined)).toBe(handle)
     handle.unsubscribe()
     expect(eventHub.size()).toBe(0)
-    const channelSource = readFileSync(resolve(import.meta.dirname, '../src/channel.ts'), 'utf8')
-    expect(channelSource).toContain('const shared = admitUnique(listener, taskId, delivery)')
+    const channelSource = readFileSync(
+      resolve(import.meta.dirname, '../src/internal/channel-owner.ts'),
+      'utf8'
+    )
     expect(channelSource).toContain(
-      'const admission = shared ? undefined : registerRaw(listener, taskId, delivery)'
+      'const shared = this.#registrations.admitUnique(listener, taskId, delivery)'
+    )
+    expect(channelSource).toContain(
+      'const admission = shared ? undefined : this.#registrations.register(listener, taskId, delivery)'
     )
     expect(channelSource).toContain('createRawSubscriptionOwner(')
     expect(channelSource).toContain(
-      'const nextAdmission = registerRaw(nextListener, nextTaskId, nextDelivery)'
+      'const admission = this.#registrations.register(listener, taskId, delivery)'
     )
   })
 

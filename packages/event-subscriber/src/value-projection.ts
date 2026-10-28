@@ -1,3 +1,7 @@
+/**
+ * Owns static payload-path planning and context alias data; controls and dispatch stay with their
+ * original owners.
+ */
 import {
   parseObjectPath,
   probeObjectPathSegments,
@@ -8,6 +12,7 @@ import {
 } from '@migaia/utils/object-path'
 import { EventSubscriberErrorCode } from './error-code.js'
 import { createEventTypeError, eventErrorText } from './errors.js'
+import { createInvalidOptionsError } from './internal/channel-options.js'
 import {
   createSystemTerminalRuntime,
   reportTerminalDiagnostic
@@ -36,75 +41,54 @@ export type IEventProjectionOutcome = {
 /** Shares the canonical host terminal sinks without adding a projection-specific scheduler. */
 const systemTerminalRuntime = createSystemTerminalRuntime()
 
+/** Fixed context/prototype names mirror the type-level alias collision contract; allocated once. */
+const reservedContextKeys = new Set([
+  '__proto__',
+  'prototype',
+  'constructor',
+  'value',
+  'aborted',
+  'abortReason',
+  'taskId',
+  'abort',
+  'setTaskId'
+])
+
 /** Reads a static valueConfig once and freezes its parsed path before registration can escape. */
 export function createEventValueProjectionPlan(config: unknown): IEventProjectionPlan | undefined {
   if (config === undefined) return undefined
   if (typeof config !== 'object' || config === null || Array.isArray(config))
-    throw createEventTypeError(
-      EventSubscriberErrorCode.invalidOptions,
-      eventErrorText(EventSubscriberErrorCode.invalidOptions)
-    )
+    throw createInvalidOptionsError()
   /** Raw `readPath` member, read once. */
   let readPath: unknown
   try {
     readPath = (config as { readonly readPath?: unknown }).readPath
   } catch (error) {
-    throw createEventTypeError(
-      EventSubscriberErrorCode.invalidOptions,
-      eventErrorText(EventSubscriberErrorCode.invalidOptions),
-      error
-    )
+    throw createInvalidOptionsError(error)
   }
   if (readPath === undefined) return undefined
-  if (typeof readPath !== 'string')
-    throw createEventTypeError(
-      EventSubscriberErrorCode.invalidOptions,
-      eventErrorText(EventSubscriberErrorCode.invalidOptions)
-    )
+  if (typeof readPath !== 'string') throw createInvalidOptionsError()
   if (readPath.trim() === '') return undefined
   /** Raw `alias` member, read once. */
   let alias: unknown
   try {
     alias = (config as { readonly alias?: unknown }).alias
   } catch (error) {
-    throw createEventTypeError(
-      EventSubscriberErrorCode.invalidOptions,
-      eventErrorText(EventSubscriberErrorCode.invalidOptions),
-      error
-    )
+    throw createInvalidOptionsError(error)
   }
-  /** Names an alias may not use at runtime, matching the type-level check. */
-  const reservedContextKeys = new Set([
-    '__proto__',
-    'prototype',
-    'constructor',
-    'value',
-    'aborted',
-    'abortReason',
-    'taskId',
-    'abort',
-    'setTaskId'
-  ])
   if (
     typeof alias !== 'string' ||
     alias.length === 0 ||
     alias !== alias.trim() ||
     reservedContextKeys.has(alias)
   )
-    throw createEventTypeError(
-      EventSubscriberErrorCode.invalidOptions,
-      eventErrorText(EventSubscriberErrorCode.invalidOptions)
-    )
+    throw createInvalidOptionsError()
   /** Path segments parsed from `readPath`. */
   let segments: IObjectPathTuple
   try {
     segments = parseObjectPath(readPath)
   } catch (error) {
-    throw createEventTypeError(
-      EventSubscriberErrorCode.invalidOptions,
-      eventErrorText(EventSubscriberErrorCode.invalidOptions),
-      error
-    )
+    throw createInvalidOptionsError(error)
   }
   return Object.freeze({ alias, readPath, segments })
 }

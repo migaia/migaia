@@ -713,9 +713,9 @@ it('preflights descriptor commit and leaks no partial alias surface', () => {
 
 it('proves the default hot path is style-free and stays within the bundle bound', () => {
   const packageRoot = resolve(import.meta.dirname, '..')
-  const source = readFileSync(resolve(packageRoot, 'src/channel.ts'), 'utf8')
-  const dispatchStart = source.indexOf('const dispatchValue')
-  const publishStart = source.indexOf('const publishValue', dispatchStart)
+  const source = readFileSync(resolve(packageRoot, 'src/internal/channel-dispatch.ts'), 'utf8')
+  const dispatchStart = source.indexOf('#dispatchValue(value: T)')
+  const publishStart = source.indexOf('publish(initialValue: T)', dispatchStart)
   const hotPath = source.slice(dispatchStart, publishStart)
   expect(hotPath).not.toContain('style')
   expect(hotPath).not.toContain('projectEventApiStyle')

@@ -1,5 +1,9 @@
 /** Public entry for subscription helpers that operate through the canonical `subscribe()` contract. */
-export { subscribeOnce, subscribeSubscriber, subscribeUntil } from './channel.js'
+export {
+  subscribeOnce,
+  subscribeSubscriber,
+  subscribeUntil
+} from './internal/source-subscription.js'
 export type {
   IEventChannelLike,
   IEventContext,

@@ -1,11 +1,12 @@
+/**
+ * Owns asynchronous listener settlement; selection and dispatch remain canonical-channel
+ * capabilities.
+ */
 import { EventSubscriberErrorCode } from './error-code.js'
 import { createEventAggregateError, createEventTypeError, eventErrorText } from './errors.js'
-import {
-  createEventContext,
-  getCapability,
-  invokeDispatchSnapshot,
-  validateTaskId
-} from './channel.js'
+import { createEventContext, invokeDispatchSnapshot } from './internal/dispatch-context.js'
+import { getCapability } from './internal/channel-capability.js'
+import { validateTaskId } from './internal/channel-options.js'
 import { reportEventProjectionFailure } from './value-projection.js'
 import { EventSubscriberState } from './state-constants.js'
 import type {
@@ -78,19 +79,7 @@ export const invokeParallelSettled = <T, R, V = undefined>(
 ): Promise<readonly IListenerResult<R>[]> => {
   const { snapshots, capability } = targetSnapshots(channel)
   if (snapshots.length === 0) return Promise.resolve([])
-  /** Value-path projection computed once for every listener of this call. */
-  const projection = capability.plan
-    ? { plan: capability.plan, outcome: capability.project(value) }
-    : undefined
-  /** One settlement per listener, started in registration order without waiting. */
-  const pending = snapshots.map((snapshot) => settleSnapshot(snapshot, value, projection))
-  if (projection?.outcome.diagnostic)
-    reportEventProjectionFailure(
-      capability.options,
-      createEventContext(value, snapshots[0]!, projection),
-      projection.outcome.diagnostic
-    )
-  return Promise.all(pending)
+  return new AsyncInvocation<T, R, V>(value, capability).parallel(snapshots)
 }
 
 /**
@@ -108,50 +97,26 @@ export const invokeSerialSettled = <T, R, V = undefined>(
 ): Promise<readonly IListenerResult<R>[]> => {
   const { snapshots, capability } = targetSnapshots(channel)
   if (snapshots.length === 0) return Promise.resolve([])
-  /** Value-path projection computed once for every listener of this call. */
-  const projection = capability.plan
-    ? { plan: capability.plan, outcome: capability.project(value) }
-    : undefined
-  return (async (): Promise<readonly IListenerResult<R>[]> => {
-    /** Settled results in registration order; each listener starts after the previous one settles. */
-    const results: IListenerResult<R>[] = []
-    for (const snapshot of snapshots)
-      results.push(await settleSnapshot(snapshot, value, projection))
-    if (projection?.outcome.diagnostic)
-      reportEventProjectionFailure(
-        capability.options,
-        createEventContext(value, snapshots[0]!, projection),
-        projection.outcome.diagnostic
-      )
-    return results
-  })()
+  return new AsyncInvocation<T, R, V>(value, capability).serial(snapshots)
 }
 
 /** Converts settled results to throwing values while retaining every listener failure. */
 const throwOnFailures = <R>(results: readonly IListenerResult<R>[]): readonly Awaited<R>[] => {
-  /** Rejected results; when any exist they are thrown together, keeping every reason. */
-  const failures = results.filter(
-    (result) => result.status === EventSubscriberState.rejected
-  ) as readonly {
-    readonly status: typeof EventSubscriberState.rejected
-    readonly reason: unknown
-  }[]
-  if (failures.length > 0) {
+  /** Original failure reasons, collected in one pass without filtering the growing result list. */
+  const failures: unknown[] = []
+  /** Successful values preserve registration order and are returned only when every target succeeds. */
+  const values: Awaited<R>[] = []
+  for (const result of results) {
+    if (result.status === EventSubscriberState.rejected) failures.push(result.reason)
+    else values.push(result.value)
+  }
+  if (failures.length > 0)
     throw createEventAggregateError(
       EventSubscriberErrorCode.publishFailed,
-      failures.map((failure) => failure.reason),
+      failures,
       eventErrorText(EventSubscriberErrorCode.publishFailed)
     )
-  }
-  return results.map(
-    (result) =>
-      (
-        result as {
-          readonly status: typeof EventSubscriberState.fulfilled
-          readonly value: Awaited<R>
-        }
-      ).value
-  )
+  return values
 }
 
 /**
@@ -189,19 +154,15 @@ const selectTask = <T, R, V = undefined>(
   /** Task name after validation; a non-string or empty name has already thrown. */
   const validated = validateTaskId(taskId, false) as string
   const { capability } = getCapability(channel)
-  /** Registrations currently carrying that task name. */
-  const snapshots = capability.snapshot(validated)
-  if (snapshots.length === 0) {
+  /** The maintained task index admits a unique target without scanning unrelated registrations. */
+  const { snapshot, matchCount } = capability.selectTask(validated)
+  if (matchCount === 0) {
     throw createTaskSelectionError(EventSubscriberErrorCode.taskNotFound, validated, 0)
   }
-  if (snapshots.length !== 1) {
-    throw createTaskSelectionError(
-      EventSubscriberErrorCode.taskNotUnique,
-      validated,
-      snapshots.length
-    )
+  if (matchCount !== 1) {
+    throw createTaskSelectionError(EventSubscriberErrorCode.taskNotUnique, validated, matchCount)
   }
-  return { snapshot: snapshots[0], capability }
+  return { snapshot: snapshot!, capability }
 }
 
 /**
@@ -220,23 +181,7 @@ export const invokeTaskSettled = <T, R, V = undefined>(
   value: T
 ): Promise<IListenerResult<R>> => {
   const { snapshot, capability } = selectTask(channel, taskId)
-  /** Value-path projection for the selected listener. */
-  const projection = capability.plan
-    ? { plan: capability.plan, outcome: capability.project(value) }
-    : undefined
-  /** Settlement of the single selected listener. */
-  const settled = settleSnapshot(snapshot, value, projection)
-  /** Projection failure to report once the listener has settled. */
-  const diagnostic = projection?.outcome.diagnostic
-  if (!diagnostic) return settled
-  return settled.then((result) => {
-    reportEventProjectionFailure(
-      capability.options,
-      createEventContext(value, snapshot, projection),
-      diagnostic
-    )
-    return result
-  })
+  return new AsyncInvocation<T, R, V>(value, capability).task(snapshot)
 }
 
 /**
@@ -261,4 +206,70 @@ export const invokeTask = <T, R, V = undefined>(
     }
     return result.value
   })
+}
+
+/** Owns one operation's payload and projection while listeners settle through canonical dispatch. */
+class AsyncInvocation<T, R, V> {
+  /** Original payload is shared unchanged by every selected listener. */
+  readonly #value: T
+  /** Existing channel capability owns snapshot controls, reporters, and the static projection plan. */
+  readonly #capability: ReturnType<typeof getCapability<T, R, V>>['capability']
+  /** Path is probed once before any listener starts; all contexts share this projection outcome. */
+  readonly #projection: Parameters<typeof createEventContext<T, R, V>>[2]
+
+  /** Computes projection once after synchronous target admission has completed. */
+  constructor(value: T, capability: ReturnType<typeof getCapability<T, R, V>>['capability']) {
+    this.#value = value
+    this.#capability = capability
+    this.#projection = capability.plan
+      ? { plan: capability.plan, outcome: capability.project(value) }
+      : undefined
+  }
+
+  /** Starts every selected listener before reporting projection failure or awaiting settlement. */
+  parallel(
+    snapshots: readonly IEventDispatchSnapshot<T, R, V>[]
+  ): Promise<readonly IListenerResult<R>[]> {
+    /** One promise per selected listener; O(n) is required to invoke each captured registration. */
+    const pending = snapshots.map((snapshot) =>
+      settleSnapshot(snapshot, this.#value, this.#projection)
+    )
+    this.#reportProjection(snapshots[0]!)
+    return Promise.all(pending)
+  }
+
+  /** Awaits each captured target once before starting the next; failures remain result entries. */
+  async serial(
+    snapshots: readonly IEventDispatchSnapshot<T, R, V>[]
+  ): Promise<readonly IListenerResult<R>[]> {
+    /** Results retain the original registration order, independent of listener settlement details. */
+    const results: IListenerResult<R>[] = []
+    for (const snapshot of snapshots)
+      results.push(await settleSnapshot(snapshot, this.#value, this.#projection))
+    this.#reportProjection(snapshots[0]!)
+    return results
+  }
+
+  /** Returns the original settlement promise when no projection diagnostic needs a continuation. */
+  task(snapshot: IEventDispatchSnapshot<T, R, V>): Promise<IListenerResult<R>> {
+    /** The selected listener starts immediately, before any diagnostic report. */
+    const settled = settleSnapshot(snapshot, this.#value, this.#projection)
+    if (!this.#projection?.outcome.diagnostic) return settled
+    return settled.then((result) => {
+      this.#reportProjection(snapshot)
+      return result
+    })
+  }
+
+  /** Reports a projection failure once at the mode's original report point. */
+  #reportProjection(snapshot: IEventDispatchSnapshot<T, R, V>): void {
+    /** Failed probing is independent from listener settlement and keeps its original diagnostic. */
+    const diagnostic = this.#projection?.outcome.diagnostic
+    if (diagnostic)
+      reportEventProjectionFailure(
+        this.#capability.options,
+        createEventContext(this.#value, snapshot, this.#projection),
+        diagnostic
+      )
+  }
 }
