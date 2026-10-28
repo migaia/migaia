@@ -4,14 +4,14 @@ import {
   createSerializeTypeError,
   SerializeErrorCode,
   SerializeErrorText
-} from './errors.js'
+} from './errors.ts'
 import { createAbortController } from '@migaia/lifecycle/abort'
 import {
   isSerializeTaggedError,
   readAborted,
   readReason,
   snapshotSerializeSignal
-} from './signal-snapshot.js'
+} from './signal-snapshot.ts'
 
 /** Internal registration record used to make signal-listener rollback idempotent. */
 type IListenerRegistration = {

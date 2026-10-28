@@ -1,4 +1,4 @@
-import type { ICodec } from '../codec.js'
+import type { ICodec } from '../codec.ts'
 
 /**
  * Frozen identity/v1 codec for whole-frame transports that already carry values directly. Encode

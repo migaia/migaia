@@ -4,7 +4,7 @@ import {
   SerializeErrorCode,
   SerializeErrorText,
   SERIALIZE_SOURCE
-} from './errors.js'
+} from './errors.ts'
 import { tryReadProperty } from '@migaia/utils/error'
 
 /** Keep tagged serialize failures intact while wrapping hostile signal accessors. */

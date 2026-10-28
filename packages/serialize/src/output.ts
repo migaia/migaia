@@ -1,8 +1,8 @@
-import { createSerializeTypeError, SerializeErrorCode, SerializeErrorText } from './errors.js'
-import { SerializeTextFormat, type ISerializeTextFormat } from './format-constants.js'
-import { jsonParser } from './plugins/json.js'
+import { createSerializeTypeError, SerializeErrorCode, SerializeErrorText } from './errors.ts'
+import { SerializeTextFormat, type ISerializeTextFormat } from './format-constants.ts'
+import { jsonParser } from './plugins/json.ts'
 import { createAbortController } from '@migaia/lifecycle/abort'
-import type { ISerializeChunk, ISerializeContext } from './types.js'
+import type { ISerializeChunk, ISerializeContext } from './types.ts'
 
 /** Text formats share one admitted data graph; unsupported values cannot be silently omitted. */
 type IOutputValue =

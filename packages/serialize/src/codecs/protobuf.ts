@@ -1,8 +1,8 @@
 import { fromBinary, toBinary, type DescMessage, type MessageShape } from '@bufbuild/protobuf'
 import { isUint8Array } from '@migaia/utils/bytes'
-import { SerializeErrorCode } from '../error-code.js'
-import { CodecErrorText, normalizeCodecFailure, type ICodec } from '../codec.js'
-import { assertCodecVersion, createCodecError } from '../internal/codec.js'
+import { SerializeErrorCode } from '../error-code.ts'
+import { CodecErrorText, normalizeCodecFailure, type ICodec } from '../codec.ts'
+import { assertCodecVersion, createCodecError } from '../internal/codec.ts'
 
 /** Stable public schema identity remains independent from codec and binding versions. */
 export type IProtobufSchema<TId extends string, TVersion extends number> = Readonly<{

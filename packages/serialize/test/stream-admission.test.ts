@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { collectStream, encodeStream, type ISerializeChunk } from '../src/index.js'
+import { collectStream, encodeStream, type ISerializeChunk } from '../src/index.ts'
 
 describe('serialize admission and streaming boundaries', () => {
   it('treats truthy iterator done as completion without reading value', async () => {

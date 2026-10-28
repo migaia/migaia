@@ -1,6 +1,6 @@
-import { SerializeErrorCode } from '../error-code.js'
-import { SERIALIZE_SOURCE } from '../errors.js'
-import { CodecErrorText } from '../codec-text.js'
+import { SerializeErrorCode } from '../error-code.ts'
+import { SERIALIZE_SOURCE } from '../errors.ts'
+import { CodecErrorText } from '../codec-text.ts'
 
 /** Construct a native error with package identity while retaining the original cause. */
 export function createCodecError(

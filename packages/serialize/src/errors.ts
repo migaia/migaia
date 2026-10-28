@@ -1,4 +1,4 @@
-import { ERROR_SOURCE, SerializeErrorCode, type ISerializeErrorCode } from './error-code.js'
+import { ERROR_SOURCE, SerializeErrorCode, type ISerializeErrorCode } from './error-code.ts'
 import { attachErrorIdentity, isNativeErrorValue } from '@migaia/utils/error'
 
 export { SerializeErrorCode, type ISerializeErrorCode }

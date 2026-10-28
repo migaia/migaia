@@ -3,7 +3,7 @@
  * `btoa`/`atob`.
  */
 
-import { createSerializeTypeError, SerializeErrorCode, SerializeErrorText } from './errors.js'
+import { createSerializeTypeError, SerializeErrorCode, SerializeErrorText } from './errors.ts'
 import {
   base64ToBytes as decodeCanonicalBase64,
   bytesToBase64 as encodeCanonicalBase64,

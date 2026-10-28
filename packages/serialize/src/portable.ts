@@ -1,8 +1,8 @@
 import { isUint8Array } from '@migaia/utils/bytes'
-import { bytesToBase64url, isCanonicalBase64url } from './base64.js'
-import { createSerializeTypeError, SerializeErrorCode } from './errors.js'
-import { CodecErrorText } from './codec-text.js'
-import type { ICodecValue } from './codec.js'
+import { bytesToBase64url, isCanonicalBase64url } from './base64.ts'
+import { createSerializeTypeError, SerializeErrorCode } from './errors.ts'
+import { CodecErrorText } from './codec-text.ts'
+import type { ICodecValue } from './codec.ts'
 
 /** Factory tools keep binary detection and canonical base64url in the codec owner. */
 type IPortableWalkerContext = Readonly<{

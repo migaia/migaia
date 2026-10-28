@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
-import { createPortableWalker, type IPortableWalkerStrategy } from '../src/codec.js'
-import { rpcPortableStrategy } from './fixtures/rpc-portable-strategy.js'
+import { createPortableWalker, type IPortableWalkerStrategy } from '../src/codec.ts'
+import { rpcPortableStrategy } from './fixtures/rpc-portable-strategy.ts'
 
 /** Ancestor operations are caller-owned; root failures stay raw while a parent maps child failures. */
 const ancestorWalker = createPortableWalker({

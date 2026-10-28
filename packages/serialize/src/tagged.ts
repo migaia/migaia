@@ -1,11 +1,11 @@
 import { isUint8Array } from '@migaia/utils/bytes'
 import { isPlainObject } from '@migaia/utils/object'
-import { type ICodec, type ICodecEncodedType, normalizeCodecFailure } from './codec.js'
-import { CodecErrorText } from './codec-text.js'
-import { SerializeErrorCode } from './error-code.js'
-import { TaggedCodecFormat } from './format-constants.js'
-import { createCodecError } from './internal/codec.js'
-import { SERIALIZE_TYPE_PATTERN } from './types.js'
+import { type ICodec, type ICodecEncodedType, normalizeCodecFailure } from './codec.ts'
+import { CodecErrorText } from './codec-text.ts'
+import { SerializeErrorCode } from './error-code.ts'
+import { TaggedCodecFormat } from './format-constants.ts'
+import { createCodecError } from './internal/codec.ts'
+import { SERIALIZE_TYPE_PATTERN } from './types.ts'
 
 /** Source carrier stays explicit even when unknown-carrier codecs happen to encode strings. */
 type ITaggedSourceCodec<TValue, TEncoded, TFormat extends ICodecEncodedType> = ICodec<

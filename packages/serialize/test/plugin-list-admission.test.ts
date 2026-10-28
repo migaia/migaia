@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createSerializeRegistry, type ISerializePlugin } from '../src/index.js'
+import { createSerializeRegistry, type ISerializePlugin } from '../src/index.ts'
 
 /** Assert native TypeError tagging and exact cause preservation for plugin-list failures. */
 const expectPluginListFailure = (plugins: unknown, cause: unknown): void => {

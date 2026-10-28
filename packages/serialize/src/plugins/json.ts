@@ -1,4 +1,4 @@
-import type { ISerializeChunk, ISerializeParser, ISerializePlugin, ITextDecoder } from '../types.js'
+import type { ISerializeChunk, ISerializeParser, ISerializePlugin, ITextDecoder } from '../types.ts'
 import {
   createSerializeError,
   createSerializeTypeError,
@@ -6,8 +6,8 @@ import {
   SerializeErrorText,
   tagSerializeFailure,
   SERIALIZE_SOURCE
-} from '../errors.js'
-import { SerializeChunkKind, SerializePluginType } from '../format-constants.js'
+} from '../errors.ts'
+import { SerializeChunkKind, SerializePluginType } from '../format-constants.ts'
 
 /** Native JSON callback and text-decoding options, captured when a parser is created. */
 export type IJsonPluginOptions = {

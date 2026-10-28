@@ -13,15 +13,15 @@ import {
   createSerializeTypeError,
   SerializeErrorCode,
   SerializeErrorText
-} from './errors.js'
+} from './errors.ts'
 import { isUint8Array } from '@migaia/utils/bytes'
-import type { ISerializeErrorCode } from './error-code.js'
+import type { ISerializeErrorCode } from './error-code.ts'
 import {
   SerializeChunkKind,
   SerializeCleanupKind,
   SerializeCleanupPolicy,
   SerializePhase
-} from './format-constants.js'
+} from './format-constants.ts'
 
 /**
  * Serialization chunk protocol.

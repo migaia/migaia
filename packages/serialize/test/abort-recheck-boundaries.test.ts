@@ -7,8 +7,8 @@ import {
   type ISerializeChunk,
   type ISerializeParser,
   type ITextEncoder
-} from '../src/index.js'
-import { composeSerializeSignal } from '../src/signal.js'
+} from '../src/index.ts'
+import { composeSerializeSignal } from '../src/signal.ts'
 
 const plugin = (output: ISerializeChunk | readonly ISerializeChunk[]) => ({
   type: 'fixture-type',

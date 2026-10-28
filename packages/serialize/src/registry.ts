@@ -18,7 +18,7 @@ import {
   type ISerializeTimeoutDiagnostic,
   type ITextDecoder,
   type ITextEncoder
-} from './types.js'
+} from './types.ts'
 import { createAbortController } from '@migaia/lifecycle/abort'
 import { createLifecycleScope, type ILifecycleScope } from '@migaia/lifecycle/scope'
 import { createPendingTracker, type IPendingTracker } from '@migaia/lifecycle/quiescence'
@@ -32,15 +32,15 @@ import {
   SerializeErrorCode,
   SerializeErrorText,
   tagSerializeFailure
-} from './errors.js'
+} from './errors.ts'
 import {
   SerializeChunkKind,
   SerializeCleanupKind,
   SerializeCleanupPolicy,
   SerializePhase
-} from './format-constants.js'
-import { composeSerializeSignal } from './signal.js'
-import { snapshotSerializeSignal } from './signal-snapshot.js'
+} from './format-constants.ts'
+import { composeSerializeSignal } from './signal.ts'
+import { snapshotSerializeSignal } from './signal-snapshot.ts'
 import { attachSecondaryErrors, safeErrorReason } from '@migaia/utils/error'
 
 const NEVER_ABORTED: IAbortSignal = {
@@ -411,7 +411,7 @@ export type {
   ISerializeTimeoutDiagnostic,
   ITextDecoder,
   ITextEncoder
-} from './types.js'
+} from './types.ts'
 
 /**
  * 双 Promise 模型：把 parserTask 与「composed signal 已 abort」赛跑，使调用方在 parser 阻塞（encode/decode 永不

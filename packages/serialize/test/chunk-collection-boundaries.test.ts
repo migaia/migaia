@@ -6,7 +6,7 @@ import {
   encodeStream,
   jsonPlugin,
   type ISerializeChunk
-} from '../src/index.js'
+} from '../src/index.ts'
 
 const scheduler = {
   now: () => 0,

@@ -6,11 +6,11 @@ import {
   createPortableWalker,
   toPortableValue,
   type ICodecValue
-} from '../src/codec.js'
-import { defineJsonCodec } from '../src/codecs/json.js'
-import { SerializeErrorCode } from '../src/error-code.js'
-import { base64ToBytes, bytesToBase64 } from '../src/base64.js'
-import { rpcPortableStrategy, rpcPortableWalker } from './fixtures/rpc-portable-strategy.js'
+} from '../src/codec.ts'
+import { defineJsonCodec } from '../src/codecs/json.ts'
+import { SerializeErrorCode } from '../src/error-code.ts'
+import { base64ToBytes, bytesToBase64 } from '../src/base64.ts'
+import { rpcPortableStrategy, rpcPortableWalker } from './fixtures/rpc-portable-strategy.ts'
 
 /** Package-owned copy of the RPC portable data; no RPC implementation participates in this oracle. */
 type IPortableVectors = {

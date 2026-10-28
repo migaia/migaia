@@ -1,6 +1,6 @@
-import { createCodecError } from './internal/codec.js'
-import { SerializeErrorCode } from './error-code.js'
-import { SERIALIZE_SOURCE } from './errors.js'
+import { createCodecError } from './internal/codec.ts'
+import { SerializeErrorCode } from './error-code.ts'
+import { SERIALIZE_SOURCE } from './errors.ts'
 
 /** Encoded carrier selected by a codec, independent of its business value type. */
 export type ICodecEncodedType = 'unknown' | 'string' | 'uint8array'
@@ -43,7 +43,7 @@ export type ICodecValue =
   | readonly ICodecValue[]
   | Readonly<{ [key: string]: ICodecValue }>
 
-export { CodecErrorText } from './codec-text.js'
+export { CodecErrorText } from './codec-text.ts'
 
 /** Recognizes errors already normalized by this package so format failures stay wrapped once. */
 function isSerializeCodecError(value: unknown): value is Error & {
@@ -62,8 +62,8 @@ export {
   toPortableValue,
   assertPortableValue,
   asCodecValue
-} from './portable.js'
-export type { IPortableWalkerStrategy, IPortableBinaryResult } from './portable.js'
+} from './portable.ts'
+export type { IPortableWalkerStrategy, IPortableBinaryResult } from './portable.ts'
 
 /**
  * Returns an already serialize-owned Error unchanged, preserving its existing semantic code.

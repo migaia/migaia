@@ -7,7 +7,7 @@ import {
   type ISerializeChunk,
   type ISerializeRegistry,
   type ITextEncoder
-} from './types.js'
+} from './types.ts'
 import {
   createSerializeError,
   createSerializeRangeError,
@@ -16,10 +16,10 @@ import {
   SerializeErrorText,
   SERIALIZE_SOURCE,
   type ISerializeErrorCode
-} from './errors.js'
-import { SerializeChunkKind, SerializePhase } from './format-constants.js'
-import { createSerializeOperationSignal } from './signal.js'
-import { snapshotSerializeSignal } from './signal-snapshot.js'
+} from './errors.ts'
+import { SerializeChunkKind, SerializePhase } from './format-constants.ts'
+import { createSerializeOperationSignal } from './signal.ts'
+import { snapshotSerializeSignal } from './signal-snapshot.ts'
 import { attachSecondaryErrors, safeErrorReason, tryReadProperty } from '@migaia/utils/error'
 
 type ISerializeScheduledTask = { cancel(): void }

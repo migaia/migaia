@@ -4,8 +4,8 @@ import {
   collectStream,
   encodeStream,
   type ISerializeChunk
-} from '../src/index.js'
-import { validateSerializeChunk } from '../src/types.js'
+} from '../src/index.ts'
+import { validateSerializeChunk } from '../src/types.ts'
 
 type IRejectionHost = {
   on(event: 'unhandledRejection', listener: () => void): void

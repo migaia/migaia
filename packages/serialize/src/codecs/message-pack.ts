@@ -1,14 +1,14 @@
-import { toCodecPortableValue } from '../portable.js'
+import { toCodecPortableValue } from '../portable.ts'
 import { decode, encode } from '@msgpack/msgpack'
-import { SerializeErrorCode } from '../error-code.js'
+import { SerializeErrorCode } from '../error-code.ts'
 import {
   asCodecValue,
   CodecErrorText,
   normalizeCodecFailure,
   type ICodec,
   type ICodecValue
-} from '../codec.js'
-import { assertCodecVersion } from '../internal/codec.js'
+} from '../codec.ts'
+import { assertCodecVersion } from '../internal/codec.ts'
 
 /** Options for the MessagePack codec factory. */
 export type IMessagePackCodecOptions<TVersion extends number> = Readonly<{
