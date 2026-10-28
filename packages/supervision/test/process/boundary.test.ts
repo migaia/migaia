@@ -44,7 +44,9 @@ describe('process profile boundary', () => {
       '../errors.js',
       '../admission.js',
       '../error-code.js',
-      '../error-text.js'
+      '../error-text.js',
+      // Stable internal outcome tags have one core contract owner.
+      '../text.js'
     ])
     for (const path of processSources(join(root, 'src/process'))) {
       const text = readFileSync(path, 'utf8')
