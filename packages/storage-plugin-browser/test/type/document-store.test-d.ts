@@ -1,8 +1,8 @@
 import { expectTypeOf } from 'vitest'
-import { asRecordStore } from '../../src/types/storage'
+import { asRecordStore } from '../../src/types/storage.ts'
 import type { IMemoryBackendStore } from '@migaia/storage-host/plugins/memory'
-import type { ILocalStorageBackendStore } from '../../src/local-storage.js'
-import type { IRecordStore, IKeyValueStore } from '../../src/types/storage'
+import type { ILocalStorageBackendStore } from '../../src/local-storage.ts'
+import type { IRecordStore, IKeyValueStore } from '../../src/types/storage.ts'
 
 // asRecordStore 正确收窄到 IRecordStore。
 declare const anyStore: IKeyValueStore

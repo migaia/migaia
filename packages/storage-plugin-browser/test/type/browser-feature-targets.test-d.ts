@@ -1,7 +1,7 @@
-import { memoryTestFeatures } from '../helpers/memory-features.js'
+import { memoryTestFeatures } from '../helpers/memory-features.ts'
 import { memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
-import { localStorageBackendKind, localStorageBackendPlugin } from '../../src/local-storage.js'
-import { reactiveFeature } from '../../src/features/reactive.js'
+import { localStorageBackendKind, localStorageBackendPlugin } from '../../src/local-storage.ts'
+import { reactiveFeature } from '../../src/features/reactive.ts'
 
 /** Targets retain opaque native identities through the backend's second Feature argument. */
 memoryBackendPlugin(undefined, {

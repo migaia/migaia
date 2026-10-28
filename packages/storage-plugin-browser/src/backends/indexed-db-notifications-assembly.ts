@@ -4,14 +4,14 @@ import type {
 } from '@migaia/storage-host/sdk'
 import { createBackendChangeController } from '@migaia/storage-host/sdk'
 import { type IStorageChange } from '@migaia/storage-contract'
-import { acquireIndexedDbCoordination } from './indexed-db-coordination.js'
+import { acquireIndexedDbCoordination } from './indexed-db-coordination.ts'
 import {
   IIndexedDbContext,
   IIndexedDbNativeCallback,
   IIndexedDbNativeRun,
   type IIndexedDbStore,
   assertLive
-} from './indexed-db.js'
+} from './indexed-db.ts'
 /** Route existing post-commit events through the one private controller owner. */
 export function publishChange<TValue>(
   indexedDbContext: IIndexedDbContext<TValue>,

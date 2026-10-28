@@ -1,8 +1,8 @@
-import type { IBackendKind } from '../types/capabilities.js'
-import { StorageError, createStorageTypeError } from '../types/errors.js'
+import type { IBackendKind } from '../types/capabilities.ts'
+import { StorageError, createStorageTypeError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
-import { normalizeError } from '../backends/backend-errors.js'
+import { StorageErrorText } from '../error-text.ts'
+import { normalizeError } from '../backends/backend-errors.ts'
 import { utf8ByteLength } from '@migaia/utils/bytes'
 import {
   StorageContractError,

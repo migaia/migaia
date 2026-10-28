@@ -10,10 +10,10 @@ import {
   createStorageOperationReporter,
   type IBackendValueCommit
 } from '@migaia/storage-host/sdk'
-import { createTextRedo, type ITextRedoStore } from './text-redo.js'
-import { bindBrowserExecution, textExecutionKeys } from './execution.js'
-import { createBrowserOrgBinding } from './organizations.js'
-import { createTextBatchApi, BrowserBatchMethod } from './batch.js'
+import { createTextRedo, type ITextRedoStore } from './text-redo.ts'
+import { bindBrowserExecution, textExecutionKeys } from './execution.ts'
+import { createBrowserOrgBinding } from './organizations.ts'
+import { createTextBatchApi, BrowserBatchMethod } from './batch.ts'
 import {
   implement,
   kv,
@@ -27,25 +27,25 @@ import {
   namespacedStorageKey,
   admitNamespaceCodec,
   stripStorageNamespace
-} from '../utils/key.js'
-import type { INamespaceCodec } from '../utils/key.js'
-import { parseCookieEntries, serializeCookieRemoval } from '../utils/cookie-string.js'
-import { StorageError, createStorageTypeError } from '../types/errors.js'
+} from '../utils/key.ts'
+import type { INamespaceCodec } from '../utils/key.ts'
+import { parseCookieEntries, serializeCookieRemoval } from '../utils/cookie-string.ts'
+import { StorageError, createStorageTypeError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
-import { normalizeStorageException } from '../utils/quota.js'
-import { StorageBackend, StorageOperation, storageBackendOperation } from '../constants.js'
-import { assertValueSnapshot, withNativeValueWrite } from './native-value-write.js'
+import { StorageErrorText } from '../error-text.ts'
+import { normalizeStorageException } from '../utils/quota.ts'
+import { StorageBackend, StorageOperation, storageBackendOperation } from '../constants.ts'
+import { assertValueSnapshot, withNativeValueWrite } from './native-value-write.ts'
 import type {
   ICookieRemoveContext,
   ICookieScope,
   ICookieStore,
   ICookieWriteContext,
   ISyncCookieStore
-} from '../types/cookie.js'
-import type { IStorageCapabilities } from '../types/capabilities.js'
-import type { IOperationContext, IStorageKey } from '../types/context.js'
-import type { ISyncCapableStore } from '../types/storage.js'
+} from '../types/cookie.ts'
+import type { IStorageCapabilities } from '../types/capabilities.ts'
+import type { IOperationContext, IStorageKey } from '../types/context.ts'
+import type { ISyncCapableStore } from '../types/storage.ts'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import {
   provideBackendConstruction,
@@ -53,8 +53,8 @@ import {
   type IBackendConstruction,
   type IBackendRuntime,
   type IKeyValueBackendStore
-} from './construction.js'
-import { createCookieSync, prepareCookie } from './cookie-sync.js'
+} from './construction.ts'
+import { createCookieSync, prepareCookie } from './cookie-sync.ts'
 
 const CAPABILITIES: IStorageCapabilities = {
   batch: false,

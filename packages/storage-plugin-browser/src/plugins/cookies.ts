@@ -1,7 +1,7 @@
-import { StorageBackend } from '../constants.js'
-import { cookiesHost, type ICookiesOptions } from '../backends/cookie.js'
-import { createBuiltInBackendPlugin, readBuiltInPluginId } from './builtin-factory.js'
-import { cookieBackendKind, type IBuiltInPluginId } from '../host/builtin-kinds.js'
+import { StorageBackend } from '../constants.ts'
+import { cookiesHost, type ICookiesOptions } from '../backends/cookie.ts'
+import { createBuiltInBackendPlugin, readBuiltInPluginId } from './builtin-factory.ts'
+import { cookieBackendKind, type IBuiltInPluginId } from '../host/builtin-kinds.ts'
 import type {
   IStorageBackendPlugin,
   IStorageFeatureRecord,

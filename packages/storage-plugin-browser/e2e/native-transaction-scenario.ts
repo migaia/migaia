@@ -1,7 +1,7 @@
-import { indexedDbTestFeatures } from '../test/helpers/indexed-db-features.js'
+import { indexedDbTestFeatures } from '../test/helpers/indexed-db-features.ts'
 import { createStorageHost } from '@migaia/storage-host'
-import { indexedDbBackendPlugin } from '../src/indexed-db.js'
-import { NativeTransactionActivity } from './native-transaction-cases.js'
+import { indexedDbBackendPlugin } from '../src/indexed-db.ts'
+import { NativeTransactionActivity } from './native-transaction-cases.ts'
 
 /** Only plain evidence crosses the browser boundary; actual error identity is compared in realm. */
 type INativeActivityResult = {

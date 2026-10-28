@@ -10,7 +10,7 @@ import { memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host/plu
 import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'
 import { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-change-feed'
 import { walkErrorCauses } from '@migaia/utils/error'
-import { reactiveFeature } from '../../src/features/reactive.js'
+import { reactiveFeature } from '../../src/features/reactive.ts'
 
 /** Web consumers select the original neutral memory owners independently of browser adapters. */
 describe('explicit memory owners used by web Features', () => {

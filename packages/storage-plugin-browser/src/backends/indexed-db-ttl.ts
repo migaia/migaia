@@ -2,7 +2,7 @@ import {
   IndexedDbDeadlineMetadata,
   IndexedDbTtlLayout,
   indexedDbDeadlineMetadataKey
-} from './indexed-db-deadline-metadata.js'
+} from './indexed-db-deadline-metadata.ts'
 import type { IStorageKey } from '@migaia/storage-contract'
 import { encodeFlatStorageKey } from '@migaia/storage-host/sdk'
 import type { IScheduler } from '@migaia/utils/scheduler'

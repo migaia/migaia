@@ -10,9 +10,9 @@ import {
   StorageConflictPolicy,
   StorageTransactionOperation,
   storageBackendOperation
-} from '../constants.js'
-import type { IWriteOptions } from '../types/context.js'
-import { BrowserBatchMethod, observeBrowserBatch, snapshotBrowserBatchEntries } from './batch.js'
+} from '../constants.ts'
+import type { IWriteOptions } from '../types/context.ts'
+import { BrowserBatchMethod, observeBrowserBatch, snapshotBrowserBatchEntries } from './batch.ts'
 import {
   IIndexedDbContext,
   IIndexedDbScopeContext,
@@ -27,7 +27,7 @@ import {
   rootMutation,
   toIdbKey,
   write
-} from './indexed-db.js'
+} from './indexed-db.ts'
 /** Counted observations enclose the original native root pipeline without another executor. */
 export function runRootBatch<TValue, I, R>(
   indexedDbContext: IIndexedDbContext<TValue>,

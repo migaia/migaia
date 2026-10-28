@@ -1,7 +1,7 @@
 import type { IKeyValueStore } from '@migaia/storage-contract'
 import type { IStorageOrgBinding } from '@migaia/storage-host'
 import { resolveStorageNamespace } from '@migaia/storage-host/sdk'
-import type { IBackendConstruction, IBackendRuntime } from './construction.js'
+import type { IBackendConstruction, IBackendRuntime } from './construction.ts'
 
 /** One org registry retains physical constructions while original native owners retain cleanup. */
 class BrowserOrgBinding<

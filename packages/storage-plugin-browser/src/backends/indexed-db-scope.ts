@@ -1,5 +1,5 @@
 // Transaction scope channels and native registration for the IndexedDB backend (see ./indexed-db.ts).
-import { IndexedDbFeature } from '../constants.js'
+import { IndexedDbFeature } from '../constants.ts'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import {
   assertTransactionOwner,
@@ -11,15 +11,15 @@ import {
   snapshotStorageKey,
   createStorageToken
 } from '@migaia/storage-host/sdk'
-import { StorageError } from '../types/errors.js'
+import { StorageError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
-import { StorageBackend, StorageTransactionOperation } from '../constants.js'
+import { StorageErrorText } from '../error-text.ts'
+import { StorageBackend, StorageTransactionOperation } from '../constants.ts'
 import { assertStringStorageKey } from '@migaia/storage-contract'
 import { isUint8Array } from '@migaia/utils/bytes'
 import { readTransactionConflictPolicy } from '@migaia/storage-contract'
-import { indexedDbFeatureMissing } from './indexed-db-base-access.js'
-import { runNativeIndexedDbTransaction } from './indexed-db-transaction.js'
+import { indexedDbFeatureMissing } from './indexed-db-base-access.ts'
+import { runNativeIndexedDbTransaction } from './indexed-db-transaction.ts'
 import {
   request,
   write,
@@ -28,17 +28,17 @@ import {
   executeOperation,
   clearRoot,
   removePrefix
-} from './indexed-db-attempt.js'
-import type { IIndexedDbNativeCallback } from './indexed-db-attempt.js'
+} from './indexed-db-attempt.ts'
+import type { IIndexedDbNativeCallback } from './indexed-db-attempt.ts'
 import {
   readIndexedDbBytes,
   toIdbKey,
   snapshotWriteValue,
   REVISIONS_STORE_NAME,
   RECORD_EPOCH_KEY
-} from './indexed-db-layout.js'
-import { indexScopeEpochKey } from './indexed-db-lifecycle.js'
-import type { IIndexedDbTransactionScope, IIndexedDbContext } from './indexed-db.js'
+} from './indexed-db-layout.ts'
+import { indexScopeEpochKey } from './indexed-db-lifecycle.ts'
+import type { IIndexedDbTransactionScope, IIndexedDbContext } from './indexed-db.ts'
 
 /** Every short-lived view closes over the same native transaction and complete method set. */
 /** Each complete view borrows the same original native callback and transaction admission. */

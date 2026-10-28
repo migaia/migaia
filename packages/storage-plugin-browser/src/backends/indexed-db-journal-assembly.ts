@@ -1,15 +1,15 @@
-import { IndexedDbFeature } from '../constants.js'
-import { indexedDbFeatureMissing } from './indexed-db-base-access.js'
+import { IndexedDbFeature } from '../constants.ts'
+import { indexedDbFeatureMissing } from './indexed-db-base-access.ts'
 import {
   createIndexedDbJournalImages,
   indexedDbJournalTarget,
   isIndexedDbJournalRevision
-} from './indexed-db-images.js'
+} from './indexed-db-images.ts'
 import {
   createIndexedDbJournalTerminal,
   createIndexedDbJournalView,
   IndexedDbJournalLayout
-} from './indexed-db-journal.js'
+} from './indexed-db-journal.ts'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -30,8 +30,8 @@ import {
   encodeFlatStorageKey
 } from '@migaia/storage-host/sdk'
 import type { IStorageJournalBackendBinding } from '@migaia/storage-host'
-import { StorageBackend } from '../constants.js'
-import type { IOperationContext } from '../types/context.js'
+import { StorageBackend } from '../constants.ts'
+import type { IOperationContext } from '../types/context.ts'
 import { type ITransactionScope } from '@migaia/storage-contract'
 import {
   journalNative,
@@ -49,7 +49,7 @@ import {
   toIdbKey,
   withMutationLease,
   type IIndexedDbStore
-} from './indexed-db.js'
+} from './indexed-db.ts'
 /** Private journal methods authenticate exact live views through this original native registry. */
 
 /** Borrow the same native registration's journal operations without adding a resource owner. */

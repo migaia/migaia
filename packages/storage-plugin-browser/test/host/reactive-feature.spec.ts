@@ -1,4 +1,4 @@
-import { memoryTestFeatures } from '../helpers/memory-features.js'
+import { memoryTestFeatures } from '../helpers/memory-features.ts'
 import { createRuntime } from '@migaia/reactive'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import { records } from '@migaia/storage-contract'
@@ -10,8 +10,8 @@ import {
 import { memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
-import { reactiveFeature } from '../../src/features/reactive.js'
-import * as reactiveModule from '../../src/host/reactive.js'
+import { reactiveFeature } from '../../src/features/reactive.ts'
+import * as reactiveModule from '../../src/host/reactive.ts'
 
 /** Public Feature cases use actual installed record queries and the original Resource lifecycle. */
 describe('reactive Feature', () => {

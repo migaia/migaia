@@ -1,8 +1,8 @@
-import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
+import { indexedDbTestFeatures } from '../helpers/indexed-db-features.ts'
 import { IDBDatabase, IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
 import { createStorageHost } from '@migaia/storage-host'
-import { indexedDbBackendPlugin } from '../../src/plugins/indexed-db.js'
+import { indexedDbBackendPlugin } from '../../src/plugins/indexed-db.ts'
 
 describe('IndexedDB backend plugin', () => {
   it('prepares the canonical layout before publishing the exact store', async () => {

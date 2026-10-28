@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi, onTestFinished } from 'vitest'
-import { createLocalTestStore } from '../helpers/installed-backends.js'
+import { createLocalTestStore } from '../helpers/installed-backends.ts'
 
 describe('localStorageHost 默认注入', () => {
   afterEach(() => {

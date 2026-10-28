@@ -1,7 +1,7 @@
 import type { IStorageBase, IOperationContext, ILockKey } from '@migaia/storage-contract'
 import { lockKey } from '@migaia/storage-host/sdk'
-import type { IBackendRuntime } from './construction.js'
-import { storageBackendOperation } from '../constants.js'
+import type { IBackendRuntime } from './construction.ts'
+import { storageBackendOperation } from '../constants.ts'
 
 /** Declared async endpoints retain the exact existing operation-context argument position. */
 const asyncEndpoints = {

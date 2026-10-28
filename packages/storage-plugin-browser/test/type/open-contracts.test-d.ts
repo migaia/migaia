@@ -1,8 +1,8 @@
 import { expectTypeOf } from 'vitest'
-import type { ICookiesOptions } from '../../src/backends/cookie.js'
-import type { ICookieScope } from '../../src/types/cookie.js'
-import type { IExtensionStage } from '../../src/types/errors.js'
-import type { ISyncCapableStore } from '../../src/types/storage.js'
+import type { ICookiesOptions } from '../../src/backends/cookie.ts'
+import type { ICookieScope } from '../../src/types/cookie.ts'
+import type { IExtensionStage } from '../../src/types/errors.ts'
+import type { ISyncCapableStore } from '../../src/types/storage.ts'
 import type { IMemoryBackendStore } from '@migaia/storage-host/plugins/memory'
 
 expectTypeOf<ICookiesOptions>().toMatchTypeOf<{ scope?: ICookieScope }>()

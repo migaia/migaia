@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { normalizeStorageException } from '../../src/utils/quota'
-import { StorageError } from '../../src/types/errors'
+import { normalizeStorageException } from '../../src/utils/quota.ts'
+import { StorageError } from '../../src/types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 
 describe('normalizeStorageException', () => {

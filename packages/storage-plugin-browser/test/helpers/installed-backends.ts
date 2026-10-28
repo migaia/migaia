@@ -1,6 +1,6 @@
 import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'
 import { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-change-feed'
-import { indexedDbTestFeatures } from './indexed-db-features.js'
+import { indexedDbTestFeatures } from './indexed-db-features.ts'
 import { onTestFinished, vi } from 'vitest'
 import * as entityOwner from '@migaia/storage-host/entity'
 import type { IRecordIndexBackfillStore } from '@migaia/storage-host/entity'
@@ -14,22 +14,22 @@ import {
   localStorageBackendPlugin,
   type ILocalStorageOptions,
   type ILocalStorageBackendStore
-} from '../../src/local-storage.js'
+} from '../../src/local-storage.ts'
 import {
   sessionStorageBackendPlugin,
   type ISessionStorageOptions,
   type ISessionStorageBackendStore
-} from '../../src/session-storage.js'
+} from '../../src/session-storage.ts'
 import {
   cookieBackendPlugin,
   type ICookiesOptions,
   type ICookieBackendStore
-} from '../../src/cookies.js'
+} from '../../src/cookies.ts'
 import {
   indexedDbBackendPlugin,
   type IIndexedDbOptions,
   type IIndexedDbBackendStore
-} from '../../src/indexed-db.js'
+} from '../../src/indexed-db.ts'
 
 /** Existing backend cases acquire the real public installation and release its original host. */
 export async function createLocalTestStore(

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test'
-import { NativeTransactionActivity } from './native-transaction-cases.js'
+import { NativeTransactionActivity } from './native-transaction-cases.ts'
 
 for (const mode of Object.values(NativeTransactionActivity))
   test(`真实原生事务活跃窗口 ${mode}`, async ({ page }) => {

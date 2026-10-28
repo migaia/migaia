@@ -1,7 +1,7 @@
-import { entityTestFeatures } from './helpers/entity-features.js'
+import { entityTestFeatures } from './helpers/entity-features.ts'
 import { describe, expect, it } from 'vitest'
 import { IDBFactory, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
-import { createIndexedDbTestStore } from './helpers/installed-backends.js'
+import { createIndexedDbTestStore } from './helpers/installed-backends.ts'
 import { defineEntity } from '@migaia/storage-host/entity'
 
 /** A complete injected IDB factory delays only delivery of its real open-success event. */

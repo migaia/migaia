@@ -1,13 +1,13 @@
-import { memoryTestFeatures } from '../helpers/memory-features.js'
-import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
+import { memoryTestFeatures } from '../helpers/memory-features.ts'
+import { indexedDbTestFeatures } from '../helpers/indexed-db-features.ts'
 // @vitest-environment node
 import { IDBFactory, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
 import { describe, expect, it, vi, onTestFinished } from 'vitest'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { createStorageHost, createOrgId, defineFeature } from '@migaia/storage-host'
 import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
-import { indexedDbBackendPlugin, indexedDbBackendKind } from '../../src/indexed-db.js'
-import { indexedDbBlobFeature } from '../../src/features/blobs.js'
+import { indexedDbBackendPlugin, indexedDbBackendKind } from '../../src/indexed-db.ts'
+import { indexedDbBlobFeature } from '../../src/features/blobs.ts'
 
 describe('native IndexedDB Blob Feature', () => {
   it('uses exact physical org clients and shares the original native record transaction', async () => {

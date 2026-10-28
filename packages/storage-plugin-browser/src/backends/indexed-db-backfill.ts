@@ -10,12 +10,12 @@ import {
   snapshotKeyRange,
   createStorageToken
 } from '@migaia/storage-host/sdk'
-import { StorageError } from '../types/errors.js'
+import { StorageError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageBackend, StorageTransactionOperation } from '../constants.js'
-import { collectUniqueIndexOwners } from './backend-errors.js'
-import { fromIdbRequest, idbTransactionCommit } from '../utils/idb-request.js'
-import type { IKeyRange, IOperationContext, IStorageKey } from '../types/context.js'
+import { StorageBackend, StorageTransactionOperation } from '../constants.ts'
+import { collectUniqueIndexOwners } from './backend-errors.ts'
+import { fromIdbRequest, idbTransactionCommit } from '../utils/idb-request.ts'
+import type { IKeyRange, IOperationContext, IStorageKey } from '../types/context.ts'
 import type {
   IRecordIndexDefinition,
   IRecordIndexHandle,
@@ -57,18 +57,18 @@ import {
   toIdbRange,
   withMutationLease,
   write
-} from './indexed-db.js'
+} from './indexed-db.ts'
 import {
   validateIndexedDbBackfillSession,
   acquireIndexedDbBackfillLease,
   prepareIndexedDbBackfillCandidates,
   indexedDbBackfillFail,
   commitIndexedDbBackfillNative
-} from './indexed-db-backfill-commit.js'
+} from './indexed-db-backfill-commit.ts'
 import {
   ensureRecordIndexes,
   IndexedDbTransactionIndexSource
-} from './indexed-db-indexes-assembly.js'
+} from './indexed-db-indexes-assembly.ts'
 
 export type IIndexedDbBackfillSession<TValue> = {
   /** Original indexedDbContext is borrowed by this native backfill session. */

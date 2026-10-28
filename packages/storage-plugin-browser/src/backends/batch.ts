@@ -12,11 +12,11 @@ import {
   observeStorageBatch,
   withAbort
 } from '@migaia/storage-host/sdk'
-import { storageBackendOperation } from '../constants.js'
-import { StorageErrorText } from '../error-text.js'
-import type { IBackendKind } from '../types/capabilities.js'
-import { isStorageErrorFamily } from './backend-errors.js'
-import type { IBrowserBatchApi, IBackendRuntime } from './construction.js'
+import { storageBackendOperation } from '../constants.ts'
+import { StorageErrorText } from '../error-text.ts'
+import type { IBackendKind } from '../types/capabilities.ts'
+import { isStorageErrorFamily } from './backend-errors.ts'
+import type { IBrowserBatchApi, IBackendRuntime } from './construction.ts'
 
 /** Browser operation labels retain the standard capability's method names on every native path. */
 export const BrowserBatchMethod = {

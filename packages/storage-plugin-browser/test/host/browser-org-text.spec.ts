@@ -1,16 +1,16 @@
-import { entityTestFeatures } from '../helpers/entity-features.js'
+import { entityTestFeatures } from '../helpers/entity-features.ts'
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { defineEntity } from '@migaia/storage-host/entity'
 import { STORAGE_CONTRACT_SOURCE } from '@migaia/storage-contract'
 import { walkErrorCauses } from '@migaia/utils/error'
-import { localStorageBackendPlugin } from '../../src/local-storage.js'
-import { sessionStorageBackendPlugin } from '../../src/session-storage.js'
-import { cookieBackendPlugin } from '../../src/cookies.js'
-import { lengthPrefixedNamespaceCodec } from '../../src/utils/key.js'
-import { fakeWebStorage } from '../../src/testing/fake-web-storage.js'
-import { fakeCookieDocument } from '../../src/testing/fake-cookie-document.js'
+import { localStorageBackendPlugin } from '../../src/local-storage.ts'
+import { sessionStorageBackendPlugin } from '../../src/session-storage.ts'
+import { cookieBackendPlugin } from '../../src/cookies.ts'
+import { lengthPrefixedNamespaceCodec } from '../../src/utils/key.ts'
+import { fakeWebStorage } from '../../src/testing/fake-web-storage.ts'
+import { fakeCookieDocument } from '../../src/testing/fake-cookie-document.ts'
 
 /** Existing isolated platform fixtures retain one native text data universe per scenario. */
 const factories = [

@@ -20,8 +20,8 @@ import { entityMigrationFeature } from '@migaia/storage-host/entity/features/mig
 import { entityIndexesFeature } from '@migaia/storage-host/entity/features/indexes'
 import { entityKeysetFeature } from '@migaia/storage-host/entity/features/keyset'
 import { walkErrorCauses } from '@migaia/utils/error'
-import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
-import { indexedDbIndexesFeature } from '../../src/features/indexed-db-indexes.js'
+import { indexedDbBackendPlugin } from '../../src/indexed-db.ts'
+import { indexedDbIndexesFeature } from '../../src/features/indexed-db-indexes.ts'
 
 /** One domain retains identical records while each case selects only its actual owners. */
 type IRow = { id: string; group: string }

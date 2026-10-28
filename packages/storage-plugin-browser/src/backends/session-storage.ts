@@ -1,18 +1,18 @@
-import type { ITextRedoStore } from './text-redo.js'
+import type { ITextRedoStore } from './text-redo.ts'
 import {
   createWebStorageBackend,
   assertWebStorageOptions,
   type IWebStorageOptions
-} from './web-storage.js'
-import type { IKeyValueStore, ISyncCapableStore, IWebStorageLike } from '../types/storage.js'
-import { StorageError } from '../types/errors.js'
+} from './web-storage.ts'
+import type { IKeyValueStore, ISyncCapableStore, IWebStorageLike } from '../types/storage.ts'
+import { StorageError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageBackend } from '../constants.js'
+import { StorageBackend } from '../constants.ts'
 import type {
   IBackendConstruction,
   IBackendRuntime,
   IKeyValueBackendStore
-} from './construction.js'
+} from './construction.ts'
 
 /** Namespace and optional borrowed Storage port for a session-storage backend. */
 export type ISessionStorageOptions = IWebStorageOptions & {

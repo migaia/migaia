@@ -1,7 +1,7 @@
-import { StorageBackend } from '../constants.js'
-import { localStorageHost, type ILocalStorageOptions } from '../backends/local-storage.js'
-import { createBuiltInBackendPlugin, readBuiltInPluginId } from './builtin-factory.js'
-import { localStorageBackendKind, type IBuiltInPluginId } from '../host/builtin-kinds.js'
+import { StorageBackend } from '../constants.ts'
+import { localStorageHost, type ILocalStorageOptions } from '../backends/local-storage.ts'
+import { createBuiltInBackendPlugin, readBuiltInPluginId } from './builtin-factory.ts'
+import { localStorageBackendKind, type IBuiltInPluginId } from '../host/builtin-kinds.ts'
 import type {
   IStorageBackendPlugin,
   IStorageFeatureRecord,

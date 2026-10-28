@@ -1,20 +1,20 @@
-import { IndexedDbDeadlineMetadata } from './indexed-db-deadline-metadata.js'
+import { IndexedDbDeadlineMetadata } from './indexed-db-deadline-metadata.ts'
 import type { IStorageJournalBackendBinding } from '@migaia/storage-host'
-import { IndexedDbFeature } from '../constants.js'
+import { IndexedDbFeature } from '../constants.ts'
 import type { IStorageKey } from '@migaia/storage-contract'
-import { IndexedDbPointRevisions } from './indexed-db-revisions.js'
-import type { createIndexedDbTtlAccess, IIndexedDbTtlInput } from './indexed-db-ttl.js'
-import type { createIndexedDbJournalImages } from './indexed-db-images.js'
+import { IndexedDbPointRevisions } from './indexed-db-revisions.ts'
+import type { createIndexedDbTtlAccess, IIndexedDbTtlInput } from './indexed-db-ttl.ts'
+import type { createIndexedDbJournalImages } from './indexed-db-images.ts'
 import type {
   IIndexedDbNativeRegistration,
   IIndexedDbStore,
   IIndexedDbTransactionScope
-} from './indexed-db.js'
-import type { IBrowserBatchApi } from './construction.js'
-import { StorageError } from '../types/errors.js'
+} from './indexed-db.ts'
+import type { IBrowserBatchApi } from './construction.ts'
+import { StorageError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
-import { indexedDbFeatureMissingText } from '../error-text.js'
-import { StorageBackend } from '../constants.js'
+import { indexedDbFeatureMissingText } from '../error-text.ts'
+import { StorageBackend } from '../constants.ts'
 /** Missing optional operations fail before native admission and identify their required Feature. */
 export const indexedDbFeatureMissing = {
   fail(feature: string): never {

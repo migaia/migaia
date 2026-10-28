@@ -8,9 +8,9 @@ import { memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host/plu
 import { defineEntity } from '@migaia/storage-host/entity'
 import { memoryNotificationsFeature } from '@migaia/storage-host/features/memory-notifications'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
-import { createReactiveServiceFixture } from '../helpers/reactive-service.js'
-import { createStorageReactiveService } from '../../src/host/reactive.js'
-import { reactiveFeature } from '../../src/features/reactive.js'
+import { createReactiveServiceFixture } from '../helpers/reactive-service.ts'
+import { createStorageReactiveService } from '../../src/host/reactive.ts'
+import { reactiveFeature } from '../../src/features/reactive.ts'
 
 /** One ordinary record shape is shared by public query and entity invalidation cases. */
 type IReactiveFixtureRow = { id: string; value: string }

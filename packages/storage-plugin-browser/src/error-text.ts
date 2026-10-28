@@ -1,4 +1,4 @@
-import { IndexedDbFeature } from './constants.js'
+import { IndexedDbFeature } from './constants.ts'
 /** Stable diagnostic text shared by backend, entity, Host and reactive boundaries. */
 export const StorageErrorText = Object.freeze({
   /** Default message of a browser StorageError, prefixed with this package's name. */

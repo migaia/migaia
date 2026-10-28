@@ -1,7 +1,7 @@
 import { StorageError as HostStorageError } from '@migaia/storage-host'
-import { StorageErrorText } from '../error-text.js'
-import type { IBackendKind } from './capabilities.js'
-import type { IStorageKey } from './context.js'
+import { StorageErrorText } from '../error-text.ts'
+import type { IBackendKind } from './capabilities.ts'
+import type { IStorageKey } from './context.ts'
 import { STORAGE_BROWSER_ERROR_SOURCE } from '@migaia/storage-contract/error-code'
 import type { IStorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 

@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { assertExactRetainedModules } from '../../../scripts/storage-v2-retained-ledger.mjs'
-import * as storageWeb from '../src/index.js'
+import * as storageWeb from '../src/index.ts'
 
 /**
  * `docs/store/public-exports.baseline.json` 记录跨包公开面基线，移除任何 导出都要求一次显式的兼容性决定。这条测试是仓库里第一次真正把这份 JSON
@@ -88,7 +88,7 @@ describe('package-owner bundle boundary', () => {
     expect(notifications).toContain('from "@migaia/storage-host/sdk"')
     expect(notifications).toContain('from "@migaia/event-subscriber"')
     expect(controllerEntry).toContain(
-      "export { createBackendChangeController } from '../core/change-controller.js'"
+      "export { createBackendChangeController } from '../core/change-controller.ts'"
     )
     expect(source).not.toContain('//#region ../utils/')
     expect(source).not.toContain('//#region ../event-subscriber/')

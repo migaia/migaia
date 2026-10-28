@@ -1,13 +1,13 @@
-import { entityTestFeatures } from './helpers/entity-features.js'
+import { entityTestFeatures } from './helpers/entity-features.ts'
 import { describe, expect, it } from 'vitest'
-import { lengthPrefixedNamespaceCodec } from '../src/index.js'
+import { lengthPrefixedNamespaceCodec } from '../src/index.ts'
 import { StorageError } from '@migaia/storage-host'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { defineEntity } from '@migaia/storage-host/entity'
 import { fromStandardSchema } from '@migaia/storage-host/entity'
-import { createMemoryTestStore } from './helpers/installed-backends.js'
-import { createLocalTestStore } from './helpers/installed-backends.js'
-import { fakeWebStorage } from '../src/testing/fake-web-storage.js'
+import { createMemoryTestStore } from './helpers/installed-backends.ts'
+import { createLocalTestStore } from './helpers/installed-backends.ts'
+import { fakeWebStorage } from '../src/testing/fake-web-storage.ts'
 
 /** Follow only standard error links to prove the exact original instance remains reachable. */
 const reaches = (error: unknown, original: unknown, seen = new Set<unknown>()): boolean => {

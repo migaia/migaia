@@ -8,9 +8,9 @@ import {
   createStorageAggregateError,
   createStorageTypeError,
   StorageError
-} from '../types/errors.js'
+} from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
+import { StorageErrorText } from '../error-text.ts'
 import type { IBackendChangeController } from '@migaia/storage-host/sdk'
 import { reportCleanupError } from '@migaia/storage-host/sdk'
 import {
@@ -21,8 +21,8 @@ import {
   type IStorageChange
 } from '@migaia/storage-contract'
 import { raceWithAbort, withTimeout } from '@migaia/utils/promise'
-import type { ILiveQuery, IReactiveConsistency, IStorageReactiveFeatureMetadata } from './types.js'
-import { isStorageReactiveVisibility } from './state-constants.js'
+import type { ILiveQuery, IReactiveConsistency, IStorageReactiveFeatureMetadata } from './types.ts'
+import { isStorageReactiveVisibility } from './state-constants.ts'
 import {
   createReactiveQuery,
   createReactiveQueryLease,
@@ -37,8 +37,8 @@ import {
   createReactivePublicState,
   request,
   projectCurrentPromise
-} from './reactive-query.js'
-import type { IReactiveQueryContext } from './reactive-query.js'
+} from './reactive-query.ts'
+import type { IReactiveQueryContext } from './reactive-query.ts'
 
 /** Query terminal callback invoked when its owning adapter seals, with a failure collector. */
 export type IStorageReactiveQueryTerminal = (

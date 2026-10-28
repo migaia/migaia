@@ -1,6 +1,6 @@
 // Native attempts, writes, clears, prefix removal and record iterators for the IndexedDB backend (see ./indexed-db.ts).
-import { IndexedDbFeature } from '../constants.js'
-import type { createIndexedDbJournalTerminal } from './indexed-db-journal.js'
+import { IndexedDbFeature } from '../constants.ts'
+import type { createIndexedDbJournalTerminal } from './indexed-db-journal.ts'
 import {
   TransactionBeforeStage,
   TransactionObservedStage,
@@ -14,18 +14,18 @@ import {
   compareStorageKeys,
   snapshotKeyRange
 } from '@migaia/storage-host/sdk'
-import type { IStorageErrorFamily } from './backend-errors.js'
+import type { IStorageErrorFamily } from './backend-errors.ts'
 import type { IStorageJournalAttempt } from '@migaia/storage-host'
-import { StorageBackend, StorageTransactionOperation } from '../constants.js'
-import { planChannelWrite } from './backend-errors.js'
-import { fromIdbRequest } from '../utils/idb-request.js'
-import type { IKeyRange, IStorageKey } from '../types/context.js'
+import { StorageBackend, StorageTransactionOperation } from '../constants.ts'
+import { planChannelWrite } from './backend-errors.ts'
+import { fromIdbRequest } from '../utils/idb-request.ts'
+import type { IKeyRange, IStorageKey } from '../types/context.ts'
 import type { IRecordIndexHandle } from '@migaia/storage-contract'
 import { assertTransactionCallback, type ITransactionScope } from '@migaia/storage-contract'
-import { indexedDbFeatureMissing } from './indexed-db-base-access.js'
-import type { IBackendRuntime } from './construction.js'
-import { observeIndexedDbStage, runNativeIndexedDbTransaction } from './indexed-db-transaction.js'
-import type { IIndexedDbAdmittedAttempt } from './indexed-db-construction.js'
+import { indexedDbFeatureMissing } from './indexed-db-base-access.ts'
+import type { IBackendRuntime } from './construction.ts'
+import { observeIndexedDbStage, runNativeIndexedDbTransaction } from './indexed-db-transaction.ts'
+import type { IIndexedDbAdmittedAttempt } from './indexed-db-construction.ts'
 import {
   REVISIONS_STORE_NAME,
   INDEX_RECORDS_STORE_NAME,
@@ -35,17 +35,17 @@ import {
   readIndexedDbBytes,
   toIdbKey,
   toIdbRange
-} from './indexed-db-layout.js'
-import { assertLive, deleteOwnedMetaKeys, deleteOwnedRevisionKeys } from './indexed-db-lifecycle.js'
-import { open, createTransaction } from './indexed-db-open.js'
-import { createNativeDataAccess, assertExpiryRemoval } from './indexed-db-root.js'
+} from './indexed-db-layout.ts'
+import { assertLive, deleteOwnedMetaKeys, deleteOwnedRevisionKeys } from './indexed-db-lifecycle.ts'
+import { open, createTransaction } from './indexed-db-open.ts'
+import { createNativeDataAccess, assertExpiryRemoval } from './indexed-db-root.ts'
 import {
   createScope,
   indexedDbNativeRegisterNative,
   indexedDbNativeBeforeCommit,
   indexedDbNativeValidateCommit
-} from './indexed-db-scope.js'
-import type { IIndexedDbTransactionScope } from './indexed-db.js'
+} from './indexed-db-scope.ts'
+import type { IIndexedDbTransactionScope } from './indexed-db.ts'
 
 /** Public transactions have one outer endpoint; internal roots use their operation. */
 /** One native callback owns physical requests, private images and its original draft views. */

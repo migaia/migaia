@@ -1,13 +1,13 @@
-import { memoryTestFeatures } from '../helpers/memory-features.js'
+import { memoryTestFeatures } from '../helpers/memory-features.ts'
 import { records } from '@migaia/storage-contract'
 import { createStorageHost, defineFeature } from '@migaia/storage-host'
 import { memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { describe, expect, it } from 'vitest'
-import { cookieBackendPlugin } from '../../src/cookies.js'
-import { localStorageBackendPlugin } from '../../src/local-storage.js'
-import { sessionStorageBackendPlugin } from '../../src/session-storage.js'
-import { fakeWebStorage } from '../../src/testing/fake-web-storage.js'
-import { fakeCookieDocument } from '../../src/testing/fake-cookie-document.js'
+import { cookieBackendPlugin } from '../../src/cookies.ts'
+import { localStorageBackendPlugin } from '../../src/local-storage.ts'
+import { sessionStorageBackendPlugin } from '../../src/session-storage.ts'
+import { fakeWebStorage } from '../../src/testing/fake-web-storage.ts'
+import { fakeCookieDocument } from '../../src/testing/fake-cookie-document.ts'
 
 describe('browser plugin materialization', () => {
   it('materializes five named registrations with exact identities', async () => {

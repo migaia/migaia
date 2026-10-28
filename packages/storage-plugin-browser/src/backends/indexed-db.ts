@@ -1,7 +1,7 @@
 import type { IStorageChange } from '@migaia/storage-contract'
-import { bindBrowserExecution } from './execution.js'
-import type { createIndexedDbJournalImages } from './indexed-db-images.js'
-import type { captureIndexedDbTtlClock } from './indexed-db-ttl.js'
+import { bindBrowserExecution } from './execution.ts'
+import type { createIndexedDbJournalImages } from './indexed-db-images.ts'
+import type { captureIndexedDbTtlClock } from './indexed-db-ttl.ts'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -32,29 +32,29 @@ import type {
   IStorageJournalImage,
   IStorageJournalTarget
 } from '@migaia/storage-host'
-import { StorageError } from '../types/errors.js'
+import { StorageError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageBackend } from '../constants.js'
-import type { IOperationContext, IStorageKey, IWriteOptions } from '../types/context.js'
-import type { IRecordStore } from '../types/storage.js'
+import { StorageBackend } from '../constants.ts'
+import type { IOperationContext, IStorageKey, IWriteOptions } from '../types/context.ts'
+import type { IRecordStore } from '../types/storage.ts'
 import type {
   IRecordIndexHandle,
   ISecondaryIndexTransactionScope,
   ISecondaryIndexRecordStore
 } from '@migaia/storage-contract'
 import type { ITransactionScope } from '@migaia/storage-contract'
-import type { IStorageCapabilities } from '../types/capabilities.js'
-import type { acquireIndexedDbCoordination } from './indexed-db-coordination.js'
+import type { IStorageCapabilities } from '../types/capabilities.ts'
+import type { acquireIndexedDbCoordination } from './indexed-db-coordination.ts'
 import type { IBackendLifecycleController } from '@migaia/storage-host/sdk'
-import { indexedDbFeatureMissing } from './indexed-db-base-access.js'
-import type { IIndexedDbAssemblyPlan } from './indexed-db-assembly.js'
+import { indexedDbFeatureMissing } from './indexed-db-base-access.ts'
+import type { IIndexedDbAssemblyPlan } from './indexed-db-assembly.ts'
 import type {
   IBrowserKeyValueApi,
   IBackendConstruction,
   IBackendRuntime,
   IBrowserBatchApi
-} from './construction.js'
-import { createBrowserOrgBinding } from './organizations.js'
+} from './construction.ts'
+import { createBrowserOrgBinding } from './organizations.ts'
 import {
   captureIndexedDbConfiguration,
   resolveIndexedDbLayout,
@@ -63,9 +63,9 @@ import {
   createIndexedDbTransactionOwner,
   createIndexedDbPhysical,
   createIndexedDbOrgBinding
-} from './indexed-db-construction.js'
-import { createMonotonicClock } from './indexed-db-layout.js'
-import { createIndexedDbStore, createIndexedDbRecordApi } from './indexed-db-root.js'
+} from './indexed-db-construction.ts'
+import { createMonotonicClock } from './indexed-db-layout.ts'
+import { createIndexedDbStore, createIndexedDbRecordApi } from './indexed-db-root.ts'
 
 /** Both record APIs declare the same native support; each query captures its own planner facts. */
 export const recordQueryPushdown = {
@@ -559,8 +559,8 @@ export {
   snapshotWriteValue,
   readIndexedDbBytes,
   toIdbRange
-} from './indexed-db-layout.js'
-export type { IBackfillLease } from './indexed-db-layout.js'
+} from './indexed-db-layout.ts'
+export type { IBackfillLease } from './indexed-db-layout.ts'
 export {
   recordRevisionKey,
   indexMetadataKey,
@@ -573,9 +573,9 @@ export {
   applyRawMutationFirewall,
   assertLive,
   withMutationLease
-} from './indexed-db-lifecycle.js'
-export { open, createTransaction } from './indexed-db-open.js'
-export { runTransaction, rootMutation, rootKeys } from './indexed-db-root.js'
+} from './indexed-db-lifecycle.ts'
+export { open, createTransaction } from './indexed-db-open.ts'
+export { runTransaction, rootMutation, rootKeys } from './indexed-db-root.ts'
 export {
   request,
   putNative,
@@ -584,14 +584,14 @@ export {
   removePrefix,
   executeOperation,
   recordIterator
-} from './indexed-db-attempt.js'
+} from './indexed-db-attempt.ts'
 export type {
   IIndexedDbNativeCallback,
   IIndexedDbTransactionRecordSource
-} from './indexed-db-attempt.js'
-export { indexedDbScopeOperation } from './indexed-db-scope.js'
+} from './indexed-db-attempt.ts'
+export { indexedDbScopeOperation } from './indexed-db-scope.ts'
 export type {
   IIndexedDbScopeContext,
   IIndexedDbNativeRun,
   IIndexedDbNativeRegistration
-} from './indexed-db-scope.js'
+} from './indexed-db-scope.ts'

@@ -4,8 +4,8 @@ import {
   STORAGE_BROWSER_ERROR_SOURCE
 } from '@migaia/storage-contract/error-code'
 import { walkErrorCauses } from '@migaia/utils/error'
-import { createCookieTestStore } from '../helpers/installed-backends.js'
-import { fakeCookieDocument } from '../../src/testing/fake-cookie-document.js'
+import { createCookieTestStore } from '../helpers/installed-backends.ts'
+import { fakeCookieDocument } from '../../src/testing/fake-cookie-document.ts'
 
 /** Public installation retains the original cookie failure below the host/plugin wrappers. */
 const expectNativeInstallationFailure = async (

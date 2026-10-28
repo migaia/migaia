@@ -1,6 +1,6 @@
-import { indexedDbKeysetFeature } from '../../src/features/indexed-db-keyset.js'
-import { indexedDbIndexesFeature } from '../../src/features/indexed-db-indexes.js'
-import { indexedDbJournalFeature } from '../../src/features/indexed-db-journal.js'
+import { indexedDbKeysetFeature } from '../../src/features/indexed-db-keyset.ts'
+import { indexedDbIndexesFeature } from '../../src/features/indexed-db-indexes.ts'
+import { indexedDbJournalFeature } from '../../src/features/indexed-db-journal.ts'
 import { storageJournalPlugin, storageLogStore } from '@migaia/storage-host/plugins/journal'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { IDBFactory, IDBIndex, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
@@ -16,11 +16,11 @@ import {
   StorageContractErrorCode,
   STORAGE_CONTRACT_SOURCE
 } from '@migaia/storage-contract'
-import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
-import { indexedDbTtlFeature } from '../../src/features/indexed-db-ttl.js'
-import { indexedDbBatchFeature } from '../../src/features/indexed-db-batch.js'
-import { indexedDbNotificationsFeature } from '../../src/features/indexed-db-notifications.js'
-import { indexedDbChangeFeedFeature } from '../../src/features/indexed-db-change-feed.js'
+import { indexedDbBackendPlugin } from '../../src/indexed-db.ts'
+import { indexedDbTtlFeature } from '../../src/features/indexed-db-ttl.ts'
+import { indexedDbBatchFeature } from '../../src/features/indexed-db-batch.ts'
+import { indexedDbNotificationsFeature } from '../../src/features/indexed-db-notifications.ts'
+import { indexedDbChangeFeedFeature } from '../../src/features/indexed-db-change-feed.ts'
 import {
   StorageBrowserErrorCode,
   STORAGE_BROWSER_ERROR_SOURCE

@@ -1,20 +1,20 @@
 import { storageProbe } from '@migaia/storage-host/plugins/probe'
-import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
+import { indexedDbTestFeatures } from '../helpers/indexed-db-features.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { IDBDatabase, IDBFactory, IDBKeyRange } from 'fake-indexeddb'
 import { createStorageHost, definePlugin } from '@migaia/storage-host'
 import { kv } from '@migaia/storage-contract'
 import { walkErrorCauses } from '@migaia/utils/error'
-import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
-import { fakeWebStorage } from '../../src/testing/fake-web-storage.js'
-import { fakeCookieDocument } from '../../src/testing/fake-cookie-document.js'
-import { serializeCookieAssignment } from '../../src/utils/cookie-string.js'
-import { lengthPrefixedNamespaceCodec, namespacedStorageKey } from '../../src/utils/key.js'
+import { indexedDbBackendPlugin } from '../../src/indexed-db.ts'
+import { fakeWebStorage } from '../../src/testing/fake-web-storage.ts'
+import { fakeCookieDocument } from '../../src/testing/fake-cookie-document.ts'
+import { serializeCookieAssignment } from '../../src/utils/cookie-string.ts'
+import { lengthPrefixedNamespaceCodec, namespacedStorageKey } from '../../src/utils/key.ts'
 import {
   createCookieTestStore,
   createLocalTestStore,
   createSessionTestStore
-} from '../helpers/installed-backends.js'
+} from '../helpers/installed-backends.ts'
 
 describe('standard native KV batches', () => {
   it('keeps a scoped invalid batch on the original first-failure path', async () => {

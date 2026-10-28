@@ -1,7 +1,7 @@
-import { indexedDbTestFeatures } from '../test/helpers/indexed-db-features.js'
+import { indexedDbTestFeatures } from '../test/helpers/indexed-db-features.ts'
 import { createStorageHost } from '@migaia/storage-host'
 import { kv } from '@migaia/storage-contract'
-import { indexedDbBackendPlugin } from '../src/indexed-db.js'
+import { indexedDbBackendPlugin } from '../src/indexed-db.ts'
 
 declare global {
   /** Declaration merging adds this scenario to the existing browser runner's real Window. */

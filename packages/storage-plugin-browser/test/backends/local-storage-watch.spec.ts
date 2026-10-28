@@ -2,9 +2,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { asChangeFeedStore, isChangeFeedStore } from '@migaia/storage-contract'
 import { createOrgId, createStorageHost } from '@migaia/storage-host'
-import { localStorageBackendPlugin } from '../../src/local-storage.js'
-import { fakeWebStorage } from '../../src/testing/fake-web-storage.js'
-import { lengthPrefixedNamespaceCodec } from '../../src/utils/key.js'
+import { localStorageBackendPlugin } from '../../src/local-storage.ts'
+import { fakeWebStorage } from '../../src/testing/fake-web-storage.ts'
+import { lengthPrefixedNamespaceCodec } from '../../src/utils/key.ts'
 
 describe('native localStorage text watch', () => {
   it('does not admit a Storage-like injection without its matching native event source', async () => {

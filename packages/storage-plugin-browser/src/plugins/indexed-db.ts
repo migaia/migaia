@@ -1,8 +1,8 @@
-import { indexedDbFeatureMissing } from '../backends/indexed-db-base-access.js'
-import type { IIndexedDbAssemblyPlan } from '../backends/indexed-db-assembly.js'
-import { readBuiltInPluginId } from './builtin-factory.js'
-import { indexedDbHost, type IIndexedDbOptions } from '../backends/indexed-db.js'
-import { indexedDbBackendKind, type IBuiltInPluginId } from '../host/builtin-kinds.js'
+import { indexedDbFeatureMissing } from '../backends/indexed-db-base-access.ts'
+import type { IIndexedDbAssemblyPlan } from '../backends/indexed-db-assembly.ts'
+import { readBuiltInPluginId } from './builtin-factory.ts'
+import { indexedDbHost, type IIndexedDbOptions } from '../backends/indexed-db.ts'
+import { indexedDbBackendKind, type IBuiltInPluginId } from '../host/builtin-kinds.ts'
 import {
   definePlugin,
   type IStorageBackendPlugin,
@@ -10,10 +10,10 @@ import {
   type IStorageFeatureStoreCompatibility,
   type IStoragePluginCore
 } from '@migaia/storage-host'
-import { StorageError } from '../types/errors.js'
+import { StorageError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
-import { StorageBackend, IndexedDbFeature } from '../constants.js'
+import { StorageErrorText } from '../error-text.ts'
+import { StorageBackend, IndexedDbFeature } from '../constants.ts'
 /** One installed backend owns its schema declarations and optional assembly selection. */
 class IndexedDbPluginInstallation<F extends IStorageFeatureRecord> {
   /** Borrowed validated options remain fixed for this installation. */

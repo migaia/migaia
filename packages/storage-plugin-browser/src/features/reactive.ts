@@ -1,5 +1,5 @@
-import { indexedDbFeatureMissing } from '../backends/indexed-db-base-access.js'
-import { IndexedDbFeature } from '../constants.js'
+import { indexedDbFeatureMissing } from '../backends/indexed-db-base-access.ts'
+import { IndexedDbFeature } from '../constants.ts'
 import {
   defineFeature,
   StorageError as HostStorageError,
@@ -27,18 +27,18 @@ import {
   indexedDbBackendKind,
   localStorageBackendKind,
   sessionStorageBackendKind
-} from '../host/builtin-kinds.js'
-import { createStorageReactiveService, type IStorageReactiveAdapter } from '../host/reactive.js'
+} from '../host/builtin-kinds.ts'
+import { createStorageReactiveService, type IStorageReactiveAdapter } from '../host/reactive.ts'
 import type {
   ILiveQuery,
   ILiveQueryOptions,
   IStorageReactiveFeatureMetadata
-} from '../host/types.js'
-import { StorageReactiveVisibility } from '../host/state-constants.js'
-import { StorageErrorText } from '../error-text.js'
-import { StorageError } from '../types/errors.js'
+} from '../host/types.ts'
+import { StorageReactiveVisibility } from '../host/state-constants.ts'
+import { StorageErrorText } from '../error-text.ts'
+import { StorageError } from '../types/errors.ts'
 
-export type { ILiveQuery, ILiveQueryOptions } from '../host/types.js'
+export type { ILiveQuery, ILiveQueryOptions } from '../host/types.ts'
 
 /** The existing query captures its backend and terminal; the runtime remains caller-owned. */
 export type IChainLiveQueryOptions<TResult> = Pick<

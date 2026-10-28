@@ -1,7 +1,7 @@
-import { indexedDbTestFeatures } from './indexed-db-features.js'
+import { indexedDbTestFeatures } from './indexed-db-features.ts'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
-import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
-import { indexedDbBlobFeature } from '../../src/features/blobs.js'
+import { indexedDbBackendPlugin } from '../../src/indexed-db.ts'
+import { indexedDbBlobFeature } from '../../src/features/blobs.ts'
 
 /** Real engines prove File metadata, original rollback, physical organization and reopening. */
 export async function runBrowserIndexedDbBlobsScenario() {

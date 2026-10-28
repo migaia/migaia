@@ -1,7 +1,7 @@
-import { StorageBackend } from '../constants.js'
-import { sessionStorageHost, type ISessionStorageOptions } from '../backends/session-storage.js'
-import { createBuiltInBackendPlugin, readBuiltInPluginId } from './builtin-factory.js'
-import { sessionStorageBackendKind, type IBuiltInPluginId } from '../host/builtin-kinds.js'
+import { StorageBackend } from '../constants.ts'
+import { sessionStorageHost, type ISessionStorageOptions } from '../backends/session-storage.ts'
+import { createBuiltInBackendPlugin, readBuiltInPluginId } from './builtin-factory.ts'
+import { sessionStorageBackendKind, type IBuiltInPluginId } from '../host/builtin-kinds.ts'
 import type {
   IStorageBackendPlugin,
   IStorageFeatureRecord,

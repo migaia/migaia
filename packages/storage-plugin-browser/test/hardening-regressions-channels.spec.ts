@@ -1,4 +1,4 @@
-import { entityTestFeatures } from './helpers/entity-features.js'
+import { entityTestFeatures } from './helpers/entity-features.ts'
 /**
  * Round-1 hardening regressions. Most of these invariants now also have dedicated coverage under
  * test/conformance/; this file stays as the permanent record of the original adversarial findings
@@ -10,9 +10,9 @@ import {
   createIndexedDbTestStore,
   createLocalTestStore,
   createMemoryTestStore
-} from './helpers/installed-backends.js'
+} from './helpers/installed-backends.ts'
 import { defineEntity } from '@migaia/storage-host/entity'
-import { fakeWebStorage } from '../src/testing/fake-web-storage'
+import { fakeWebStorage } from '../src/testing/fake-web-storage.ts'
 import type { IRecordStore } from '@migaia/storage-contract'
 
 const freshIdb = (): Promise<IRecordStore> =>

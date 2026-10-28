@@ -3,8 +3,8 @@ import {
   type IStorageFeature,
   type IStorageFeatureOutput
 } from '@migaia/storage-host'
-import { indexedDbBackendKind } from '../host/builtin-kinds.js'
-import type { IIndexedDbAssemblyPlan } from '../backends/indexed-db-assembly.js'
+import { indexedDbBackendKind } from '../host/builtin-kinds.ts'
+import type { IIndexedDbAssemblyPlan } from '../backends/indexed-db-assembly.ts'
 /** Backend-native assembly contributes implementation ports without allocating another store. */
 export type IIndexedDbAssemblyOutput = IStorageFeatureOutput<
   readonly [],

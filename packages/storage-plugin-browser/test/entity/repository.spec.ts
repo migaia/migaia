@@ -1,8 +1,8 @@
-import { entityTestFeatures } from '../helpers/entity-features.js'
+import { entityTestFeatures } from '../helpers/entity-features.ts'
 import { describe, expect, it } from 'vitest'
 import { defineEntity } from '@migaia/storage-host/entity'
-import { createLocalTestStore } from '../helpers/installed-backends.js'
-import { fakeWebStorage } from '../../src/testing/fake-web-storage.js'
+import { createLocalTestStore } from '../helpers/installed-backends.ts'
+import { fakeWebStorage } from '../../src/testing/fake-web-storage.ts'
 import type { IStorageKey } from '@migaia/storage-contract'
 
 /**

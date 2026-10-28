@@ -1,11 +1,11 @@
-import { memoryTestFeatures } from '../helpers/memory-features.js'
+import { memoryTestFeatures } from '../helpers/memory-features.ts'
 import { createRuntime } from '@migaia/reactive'
 import { describe, expect, it } from 'vitest'
 import { createStorageHost } from '@migaia/storage-host'
 import { memoryBackendKind, memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
-import { createStorageReactiveService } from '../../src/host/reactive.js'
-import { createReactiveServiceFixture } from '../helpers/reactive-service.js'
-import { reactiveFeature } from '../../src/features/reactive.js'
+import { createStorageReactiveService } from '../../src/host/reactive.ts'
+import { createReactiveServiceFixture } from '../helpers/reactive-service.ts'
+import { reactiveFeature } from '../../src/features/reactive.ts'
 import { records } from '@migaia/storage-contract'
 
 /** Proves the public Host capability projection and runtime guard remain exact. */

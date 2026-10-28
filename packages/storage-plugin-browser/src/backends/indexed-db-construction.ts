@@ -1,5 +1,5 @@
 // Physical construction, layout resolution, native state and admitted attempts for the IndexedDB backend (see ./indexed-db.ts).
-import type { createIndexedDbJournalImages } from './indexed-db-images.js'
+import type { createIndexedDbJournalImages } from './indexed-db-images.ts'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -23,39 +23,39 @@ import {
   resolveStorageNamespace
 } from '@migaia/storage-host/sdk'
 import type { IStorageJournalImage, IStorageJournalTarget } from '@migaia/storage-host'
-import { StorageError } from '../types/errors.js'
+import { StorageError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
-import { StorageBackend, StorageBrowserOwnerLabel, StorageOperation } from '../constants.js'
-import type { IStorageKey } from '../types/context.js'
+import { StorageErrorText } from '../error-text.ts'
+import { StorageBackend, StorageBrowserOwnerLabel, StorageOperation } from '../constants.ts'
+import type { IStorageKey } from '../types/context.ts'
 import type { ITransactionScope } from '@migaia/storage-contract'
-import { acquireIndexedDbLocks } from './indexed-db-locks.js'
-import { indexedDbFeatureMissing } from './indexed-db-base-access.js'
+import { acquireIndexedDbLocks } from './indexed-db-locks.ts'
+import { indexedDbFeatureMissing } from './indexed-db-base-access.ts'
 import {
   provideBackendConstruction,
   browserKeyValueApi,
   type IBackendRuntime
-} from './construction.js'
+} from './construction.ts'
 import { asyncDisposeKey } from '@migaia/plugin-host'
-import { createBrowserOrgBinding } from './organizations.js'
-import { attemptNative } from './indexed-db-attempt.js'
+import { createBrowserOrgBinding } from './organizations.ts'
+import { attemptNative } from './indexed-db-attempt.ts'
 import {
   isValidStoreName,
   INTERNAL_STORE_NAMES,
   indexedDbLayoutFingerprint,
   normalizeIndexedDbOperationError
-} from './indexed-db-layout.js'
-import { assertLive, createIndexedDbController } from './indexed-db-lifecycle.js'
-import { open } from './indexed-db-open.js'
-import { dropData, transactionRecordApi } from './indexed-db-root.js'
-import type { IIndexedDbLogicalTransaction } from './indexed-db-root.js'
-import { CAPABILITIES, indexedDbHost } from './indexed-db.js'
+} from './indexed-db-layout.ts'
+import { assertLive, createIndexedDbController } from './indexed-db-lifecycle.ts'
+import { open } from './indexed-db-open.ts'
+import { dropData, transactionRecordApi } from './indexed-db-root.ts'
+import type { IIndexedDbLogicalTransaction } from './indexed-db-root.ts'
+import { CAPABILITIES, indexedDbHost } from './indexed-db.ts'
 import type {
   IIndexedDbContext,
   IIndexedDbProvidedStore,
   IIndexedDbPhysical,
   IIndexedDbTransactionScope
-} from './indexed-db.js'
+} from './indexed-db.ts'
 
 /** Retain the original provider, transaction owner, and native deletion closure for every org. */
 export function createIndexedDbPhysical<TValue>(

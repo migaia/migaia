@@ -1,6 +1,6 @@
-import { entityTestFeatures } from './helpers/entity-features.js'
+import { entityTestFeatures } from './helpers/entity-features.ts'
 import { describe, expect, it } from 'vitest'
-import { createMemoryTestStore } from './helpers/installed-backends.js'
+import { createMemoryTestStore } from './helpers/installed-backends.ts'
 import { defineEntity } from '@migaia/storage-host/entity'
 
 describe('storage-plugin-browser audit high severity regressions', () => {

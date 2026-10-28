@@ -10,9 +10,9 @@ import {
   createStorageOperationReporter,
   type IBackendValueCommit
 } from '@migaia/storage-host/sdk'
-import { createTextRedo, type ITextRedoStore } from './text-redo.js'
-import { bindBrowserExecution, textExecutionKeys } from './execution.js'
-import { createTextBatchApi } from './batch.js'
+import { createTextRedo, type ITextRedoStore } from './text-redo.ts'
+import { bindBrowserExecution, textExecutionKeys } from './execution.ts'
+import { createTextBatchApi } from './batch.ts'
 import {
   implement,
   kv,
@@ -23,31 +23,31 @@ import {
   type IStorageChange,
   type IStorageStore
 } from '@migaia/storage-contract'
-import { createBrowserOrgBinding } from './organizations.js'
+import { createBrowserOrgBinding } from './organizations.ts'
 import {
   lengthPrefixedNamespaceCodec,
   namespacedKey,
   namespacedStorageKey,
   admitNamespaceCodec,
   stripStorageNamespace
-} from '../utils/key.js'
-import type { INamespaceCodec } from '../utils/key.js'
-import { probeWebStorage } from '../utils/availability.js'
-import { normalizeStorageException } from '../utils/quota.js'
-import { StorageError, createStorageTypeError } from '../types/errors.js'
+} from '../utils/key.ts'
+import type { INamespaceCodec } from '../utils/key.ts'
+import { probeWebStorage } from '../utils/availability.ts'
+import { normalizeStorageException } from '../utils/quota.ts'
+import { StorageError, createStorageTypeError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
-import { StorageBackend, StorageOperation, storageBackendOperation } from '../constants.js'
-import { subscribeLocalStorageEvents } from './web-storage-events.js'
-import { assertValueSnapshot, withNativeValueWrite } from './native-value-write.js'
+import { StorageErrorText } from '../error-text.ts'
+import { StorageBackend, StorageOperation, storageBackendOperation } from '../constants.ts'
+import { subscribeLocalStorageEvents } from './web-storage-events.ts'
+import { assertValueSnapshot, withNativeValueWrite } from './native-value-write.ts'
 import type {
   IKeyValueStore,
   ISyncCapableStore,
   ISyncKeyValueStore,
   IWebStorageLike
-} from '../types/storage.js'
-import type { IBackendKind, IStorageCapabilities } from '../types/capabilities.js'
-import type { IStorageKey } from '../types/context.js'
+} from '../types/storage.ts'
+import type { IBackendKind, IStorageCapabilities } from '../types/capabilities.ts'
+import type { IStorageKey } from '../types/context.ts'
 import { asyncDisposeKey } from '@migaia/plugin-host'
 import {
   provideBackendConstruction,
@@ -55,7 +55,7 @@ import {
   type IBackendConstruction,
   type IBackendRuntime,
   type IKeyValueBackendStore
-} from './construction.js'
+} from './construction.ts'
 
 const CAPABILITIES: IStorageCapabilities = {
   batch: false,

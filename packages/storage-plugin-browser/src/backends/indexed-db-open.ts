@@ -1,12 +1,12 @@
 // Layout validation, legacy migration, database open and metadata reads/writes for the IndexedDB backend (see ./indexed-db.ts).
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import type { IStorageOperationRuntime } from '@migaia/storage-host/sdk'
-import { isStorageErrorFamily } from './backend-errors.js'
-import { StorageError, createStorageError } from '../types/errors.js'
+import { isStorageErrorFamily } from './backend-errors.ts'
+import { StorageError, createStorageError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
-import { StorageBackend, StorageMigrationStatus, StorageOperation } from '../constants.js'
-import { normalizeError } from './backend-errors.js'
+import { StorageErrorText } from '../error-text.ts'
+import { StorageBackend, StorageMigrationStatus, StorageOperation } from '../constants.ts'
+import { normalizeError } from './backend-errors.ts'
 import {
   fromIdbRequest,
   idbTransactionCommit,
@@ -17,8 +17,8 @@ import {
   readIdbRequestError,
   readIdbRequestResult,
   readIdbTransactionError
-} from '../utils/idb-request.js'
-import type { IStorageKey } from '../types/context.js'
+} from '../utils/idb-request.ts'
+import type { IStorageKey } from '../types/context.ts'
 import {
   REVISIONS_STORE_NAME,
   META_STORE_NAME,
@@ -31,7 +31,7 @@ import {
   META_SCHEMA_KEY,
   CURRENT_SCHEMA_VERSION,
   LEGACY_META_SCHEMA_KEY
-} from './indexed-db-layout.js'
+} from './indexed-db-layout.ts'
 import {
   withInternalMutationLease,
   recordRevisionKey,
@@ -39,9 +39,9 @@ import {
   applyRawMutationFirewall,
   tryCloseDatabase,
   closeForTransition
-} from './indexed-db-lifecycle.js'
-import { publishChange } from './indexed-db.js'
-import type { IIndexedDbContext, IMutationLeaseContext } from './indexed-db.js'
+} from './indexed-db-lifecycle.ts'
+import { publishChange } from './indexed-db.ts'
+import type { IIndexedDbContext, IMutationLeaseContext } from './indexed-db.ts'
 
 /** Validate the fixed native layout before any metadata can influence backend authority. */
 function validatePhysicalLayout<TValue>(

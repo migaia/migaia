@@ -1,10 +1,10 @@
-import { entityTestFeatures } from './entity-features.js'
+import { entityTestFeatures } from './entity-features.ts'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { defineEntity } from '@migaia/storage-host/entity'
-import { localStorageBackendPlugin } from '../../src/local-storage.js'
-import { sessionStorageBackendPlugin } from '../../src/session-storage.js'
-import { cookieBackendPlugin } from '../../src/cookies.js'
-import { lengthPrefixedNamespaceCodec } from '../../src/utils/key.js'
+import { localStorageBackendPlugin } from '../../src/local-storage.ts'
+import { sessionStorageBackendPlugin } from '../../src/session-storage.ts'
+import { cookieBackendPlugin } from '../../src/cookies.ts'
+import { lengthPrefixedNamespaceCodec } from '../../src/utils/key.ts'
 
 /**
  * Real browser ports prove default mapping, child isolation, drop and native unique write

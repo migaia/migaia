@@ -1,9 +1,9 @@
 import { defineStorageBackendKind, type IStorageBackendKind } from '@migaia/storage-host'
-import type { cookiesHost } from '../backends/cookie.js'
-import type { localStorageHost } from '../backends/local-storage.js'
-import type { sessionStorageHost } from '../backends/session-storage.js'
-import type { indexedDbHost, IIndexedDbFeatureExpose } from '../backends/indexed-db.js'
-import { StorageBackend } from '../constants.js'
+import type { cookiesHost } from '../backends/cookie.ts'
+import type { localStorageHost } from '../backends/local-storage.ts'
+import type { sessionStorageHost } from '../backends/session-storage.ts'
+import type { indexedDbHost, IIndexedDbFeatureExpose } from '../backends/indexed-db.ts'
+import { StorageBackend } from '../constants.ts'
 
 /** Built-in plugin IDs stay caller-selectable while their kind tokens remain package-private. */
 export type IBuiltInPluginId<TId extends string> = {

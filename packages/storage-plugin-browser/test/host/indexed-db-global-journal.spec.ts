@@ -1,5 +1,5 @@
 import { storageJournalPlugin } from '@migaia/storage-host/plugins/journal'
-import { indexedDbTestFeatures } from '../helpers/indexed-db-features.js'
+import { indexedDbTestFeatures } from '../helpers/indexed-db-features.ts'
 // @vitest-environment node
 import { IDBFactory, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
@@ -10,8 +10,8 @@ import { kv, ttl } from '@migaia/storage-contract'
 import { lockKey, decodeFlatStorageKey } from '@migaia/storage-host/sdk'
 import { createOrgId, createStorageHost } from '@migaia/storage-host'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { indexedDbBlobFeature } from '../../src/features/blobs.js'
-import { indexedDbBackendPlugin } from '../../src/indexed-db.js'
+import { indexedDbBlobFeature } from '../../src/features/blobs.ts'
+import { indexedDbBackendPlugin } from '../../src/indexed-db.ts'
 
 /** Only the original durable plugins and actual native private stores participate in the fixture. */
 const createLogger = (

@@ -5,7 +5,7 @@ import {
   parseCookieString,
   serializeCookieAssignment,
   serializeCookieRemoval
-} from '../../src/utils/cookie-string'
+} from '../../src/utils/cookie-string.ts'
 
 describe('parseCookieString', () => {
   it('解析多个键值对', () => {

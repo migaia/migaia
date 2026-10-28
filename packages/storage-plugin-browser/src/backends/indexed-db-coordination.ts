@@ -1,4 +1,4 @@
-import { acquireIndexedDbLocks } from './indexed-db-locks.js'
+import { acquireIndexedDbLocks } from './indexed-db-locks.ts'
 import { assertOperationContext, type IStorageChange } from '@migaia/storage-contract'
 import {
   createEventChannel,
@@ -13,8 +13,8 @@ import {
   reportCleanupError
 } from '@migaia/storage-host/sdk'
 import type { IBackendKeyLockPort } from '@migaia/storage-host/sdk'
-import { StorageErrorText } from '../error-text.js'
-import { createStorageTypeError } from '../types/errors.js'
+import { StorageErrorText } from '../error-text.ts'
+import { createStorageTypeError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
 /** Versioned metadata-only message shape used by admitted IndexedDB transports. */
 type IIndexedDbWireHint = {

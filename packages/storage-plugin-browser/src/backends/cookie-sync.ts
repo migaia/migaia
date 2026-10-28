@@ -1,15 +1,15 @@
 // Cookie write preparation and the synchronous cookie view for the cookie backend (see ./cookie.ts).
 import { snapshotSyncWriteOptions } from '@migaia/storage-host/sdk'
-import type { ITextPrepared } from './text-redo.js'
+import type { ITextPrepared } from './text-redo.ts'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
-import { namespacedKey, namespacedStorageKey } from '../utils/key.js'
-import { serializeCookieAssignment, serializeCookieRemoval } from '../utils/cookie-string.js'
-import { StorageError } from '../types/errors.js'
+import { namespacedKey, namespacedStorageKey } from '../utils/key.ts'
+import { serializeCookieAssignment, serializeCookieRemoval } from '../utils/cookie-string.ts'
+import { StorageError } from '../types/errors.ts'
 import { StorageBrowserErrorCode } from '@migaia/storage-contract/error-code'
-import { StorageErrorText } from '../error-text.js'
-import { StorageBackend, StorageOperation } from '../constants.js'
-import type { ICookieWriteContext } from '../types/cookie.js'
-import type { IStorageKey } from '../types/context.js'
+import { StorageErrorText } from '../error-text.ts'
+import { StorageBackend, StorageOperation } from '../constants.ts'
+import type { ICookieWriteContext } from '../types/cookie.ts'
+import type { IStorageKey } from '../types/context.ts'
 import {
   readVisibleCookie,
   writeCookie,
@@ -17,8 +17,8 @@ import {
   assertLive,
   namespacedEntries,
   clearNamespacedEntries
-} from './cookie.js'
-import type { ICookieContext } from './cookie.js'
+} from './cookie.ts'
+import type { ICookieContext } from './cookie.ts'
 
 /** Prepare one visible-cookie assignment before WAL; ordinary sync writes use the same validation. */
 export function prepareCookie(
