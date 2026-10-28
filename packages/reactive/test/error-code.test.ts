@@ -42,6 +42,10 @@ function stripComments(source: string): string {
 }
 
 // 正向： 的每个码都要有一个真实、可验证的触发点。
+/**
+ * Enumerates real triggers for one stable error-code contract; each case is an independent trigger
+ * rather than one long algorithm.
+ */
 describe('every declared code has a real trigger', () => {
   it('shared attachment preserves native Error identity, cause, and stack', () => {
     const cause = new Error('cause')

@@ -3,6 +3,10 @@ import { currentRuntimeVersion } from '../src/entry/extension.ts'
 import { describe, expect, it } from 'vitest'
 import { createRuntime } from '../src/index.ts'
 
+/**
+ * Groups the public Signal contract; each case independently owns its runtime, value operations and
+ * disposal.
+ */
 describe('Signal', () => {
   it('rebuilds conditional dependencies after an untracked preview', () => {
     const runtime = createRuntime()

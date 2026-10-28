@@ -21,6 +21,10 @@ function observerRunEvents(events: readonly IRuntimeTraceEvent[]): IObserverRunE
   )
 }
 
+/**
+ * Groups the single diagnostic-containment invariant at graph commit; each case independently
+ * checks one failure source.
+ */
 describe('diagnostic failures preserve graph commit', () => {
   it('Signal setter commits value/version and dirties every subscriber after clock failure', () => {
     const events: IRuntimeTraceEvent[] = []

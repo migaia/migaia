@@ -9,6 +9,10 @@ import {
   type ITrackedObserverBinding
 } from '../src/entry/extension.ts'
 
+/**
+ * Groups the public callback boundary contract; individual cases remain independent, with no shared
+ * execution algorithm in this container.
+ */
 describe('audited reactive boundary contracts', () => {
   it.each(['native', 'getter'] as const)(
     'preserves a thrown %s Suspense object without probing its then getter',

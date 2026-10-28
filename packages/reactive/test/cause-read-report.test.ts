@@ -45,6 +45,10 @@ function runRuntimeFailure(
   return { caught, actionError, flushError, reads, stacks }
 }
 
+/**
+ * Groups one cause-read reporting policy across native, aggregate and reporter failures; each case
+ * owns its own transaction.
+ */
 describe('batch cause-read reporting', () => {
   it('reports the original getter failure and keeps all three errors in order', () => {
     const getterFailure = new Error('cause getter failed')

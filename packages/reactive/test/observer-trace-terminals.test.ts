@@ -19,6 +19,10 @@ function observerRunEvents(events: readonly IRuntimeTraceEvent[]): IObserverRunE
   )
 }
 
+/**
+ * Groups one observer-span terminal-containment contract; separate cases cover its clocks, primary
+ * failures and sink isolation.
+ */
 describe('failure-contained observer trace terminals', () => {
   it('Effect start-clock failures report and still close a successful span', () => {
     const events: IRuntimeTraceEvent[] = []

@@ -283,6 +283,10 @@ describe('Sol scheduler strategy admission', () => {
   })
 })
 
+/**
+ * Groups the scheduling-strategy contract in one framework container; each independent case owns
+ * its setup and recovery assertions.
+ */
 describe('scheduler strategy runtime contract', () => {
   it('reports async rejection once, observes it, and recovers with the prior strategy', async () => {
     const rejection = new Error('async strategy rejection')
