@@ -1,6 +1,6 @@
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
-import type { IBinlogExt, IUndoLogExt, IWalExt, ILogStore } from '@migaia/logger/plugins/durable'
-import type { ILevelPluginExt } from '@migaia/logger/plugins'
+import type { IBinlogExt, IUndoLogExt, IWalExt, ILogStore } from '@migaia/log-plugin-durable'
+import type { ILevelPluginExt } from '@migaia/log-host'
 import type { IStorageJournalConfiguration } from './types.ts'
 
 /** Configuration data stays with the original org cell; these maps grant no backend authority. */

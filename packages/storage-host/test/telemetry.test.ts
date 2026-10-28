@@ -1,7 +1,8 @@
+import { StorageLogObserver } from './helpers/log-observer.ts'
 import { storageJournalPlugin } from '../src/journal.ts'
 import { describe, expect, it } from 'vitest'
-import { Logger, type ILogEntry } from '@migaia/logger'
-import { level } from '@migaia/logger/plugins'
+import { createLogHost } from '@migaia/log-host'
+import { levelPlugin } from '@migaia/log-host'
 import { ConcurrencyPolicy, lockKey } from '../src/authoring/concurrency.ts'
 import { deferred } from '@migaia/utils/promise'
 import { createOrgId, createStorageHost } from '../src/index.ts'
@@ -12,11 +13,11 @@ const execution = { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } as
 
 describe('ordinary storage telemetry', () => {
   it('preserves payloads, original errors, fixed org and one record for a retried public transaction', async () => {
-    const entries: ILogEntry[] = []
-    const logger = new Logger({ execution, plugins: [level()] })
-    logger.useSink((entry) => {
-      entries.push(entry)
-    })
+    /** Observation stays installed in the real logger rather than on its frozen public facade. */
+    const observer = new StorageLogObserver()
+    /** The fixture reads the exact snapshots retained by its own observation plugin. */
+    const entries = observer.entries
+    const logger = createLogHost({ execution, plugins: [levelPlugin(), observer] })
     /** Every first endpoint shares the original once-per-org initializer. */
     const preparations = new Map<string, number>()
     await using host = await createStorageHost({
@@ -31,6 +32,7 @@ describe('ordinary storage telemetry', () => {
     try {
       const store = host.backend('memory')
       await store.set('key', 'before')
+      await logger.flush()
       expect(entries).toHaveLength(1)
       expect(entries[0]).toMatchObject({
         tag: 'storage',
@@ -45,6 +47,7 @@ describe('ordinary storage telemetry', () => {
       })
       const payload = { nested: { visible: true } }
       await store.putRecord(payload, 'record')
+      await logger.flush()
       expect((entries[1]!.meta!.payload as { value: unknown }).value).toBe(payload)
       entries.length = 0
       const entered = deferred<void>()
@@ -67,6 +70,7 @@ describe('ordinary storage telemetry', () => {
       resume.resolve()
       await pending
       expect(calls).toBe(2)
+      await logger.flush()
       const transactions = entries.filter((entry) => entry.message === 'transaction')
       expect(transactions).toHaveLength(1)
       expect(transactions[0]!.meta).toMatchObject({
@@ -82,6 +86,7 @@ describe('ordinary storage telemetry', () => {
           throw original
         })
       ).rejects.toMatchObject({ cause: original })
+      await logger.flush()
       expect(entries).toHaveLength(1)
       expect(entries[0]).toMatchObject({
         tag: 'storage',
@@ -94,6 +99,7 @@ describe('ordinary storage telemetry', () => {
       await other.transaction(async (scope) => {
         await scope.set('key', 'org')
       })
+      await logger.flush()
       expect(entries).toHaveLength(1)
       expect(entries[0]!.message).toBe('transaction')
       expect(entries[0]!.meta).toMatchObject({
@@ -102,12 +108,14 @@ describe('ordinary storage telemetry', () => {
       })
       const extracted = other.get
       expect(await extracted('key')).toBe('org')
+      await logger.flush()
       expect(entries[1]!.meta!.orgId).toBe(orgId)
       expect(preparations.get(orgId)).toBe(1)
       entries.length = 0
       const readOrgId = createOrgId()
       const readOnly = host.org(readOrgId).backend('memory')
       expect(await readOnly.get('missing')).toBeNull()
+      await logger.flush()
       expect(entries).toHaveLength(1)
       expect(entries[0]).toMatchObject({
         message: 'get',
@@ -119,15 +127,10 @@ describe('ordinary storage telemetry', () => {
     }
   })
 
-  it('keeps telemetry disabled and contains a closed logger failure', async () => {
-    const logger = new Logger({ execution, plugins: [level()] })
+  it('keeps telemetry disabled and contains a borrowed level capability failure', async () => {
+    const logger = createLogHost({ execution, plugins: [levelPlugin()] })
     let calls = 0
     const borrowed = {
-      dispatchRaw: logger.dispatchRaw,
-      onFailure: logger.onFailure,
-      hook: logger.hook,
-      flush: logger.flush,
-      defer: logger.defer,
       atLevel: (...args: Parameters<typeof logger.atLevel>) => {
         calls++
         return logger.atLevel(...args)
@@ -141,10 +144,20 @@ describe('ordinary storage telemetry', () => {
     })
     await disabled.backend('memory').set('key', 'value')
     expect(calls).toBe(0)
+    /** A borrowed capability may fail even though the real log host itself never throws. */
+    const original = new RangeError('borrowed telemetry capability failed')
+    /** Preserve the real level methods while making its borrowed invocation failure explicit. */
+    const failing = {
+      ...logger,
+      /** Keep storage's existing catch/report boundary observable with the exact original error. */
+      atLevel() {
+        throw original
+      }
+    }
     const reports: unknown[] = []
     await using enabled = await createStorageHost({
       plugins: [
-        storageJournalPlugin({ logger, namespace: 'enabled', telemetry: true }),
+        storageJournalPlugin({ logger: failing, namespace: 'enabled', telemetry: true }),
         memoryBackendPlugin()
       ],
       report: (error) => {
@@ -154,6 +167,7 @@ describe('ordinary storage telemetry', () => {
     await logger.shutdown('manual')
     await expect(enabled.backend('memory').set('key', 'committed')).resolves.toBeUndefined()
     expect(reports).toHaveLength(1)
+    expect(reports[0]).toBe(original)
     expect(await disabled.backend('memory').get('key')).toBe('value')
   })
 })

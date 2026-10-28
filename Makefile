@@ -6,7 +6,7 @@ export PNPM_CONFIG_VERIFY_DEPS_BEFORE_RUN := false
 
 # Publish foundations before every consumer. scripts/release-plan.mjs verifies
 # that this remains a closed, dependency-topological release set.
-RELEASE_PACKAGES := utils event-subscriber lifecycle reactive middleware-pipeline serialize resource storage-contract capability plugin-host supervision rpc-contract rpc-host rpc-plugin-process rpc-plugin-thread rpc-plugin-coroutines tray rpc-plugin-pool rpc-plugin-browser rpc-plugin-devtools logger storage-host storage-plugin-sqlite storage-plugin-browser
+RELEASE_PACKAGES := utils event-subscriber lifecycle reactive middleware-pipeline serialize resource storage-contract capability plugin-host supervision rpc-contract rpc-host rpc-plugin-process rpc-plugin-thread rpc-plugin-coroutines tray rpc-plugin-pool rpc-plugin-browser rpc-plugin-devtools log-host log-plugin-console log-plugin-http log-plugin-file log-plugin-process log-plugin-reasoning log-plugin-durable storage-host storage-plugin-sqlite storage-plugin-browser
 # Store packages release independently from the foundation ship. `wasm` is the
 # package-owned prerequisite for store-wasm and therefore leads this plan.
 STORE_RELEASE_PACKAGES := wasm store-light store-keyed store-shared store-ssr store-worker store-indexed store-middleware store-react store-persist store-devtools store-wasm micro-hub
@@ -104,7 +104,7 @@ ship-dry-run:
 	@$(MAKE) ship-pack-check
 	@echo "==> ship dry-run passed; no release mutations performed"
 
-# Build every package in Turbo's dependency-topological order (cached) before release
+# Build every package in dependency order with bounded workspace concurrency before release
 # validation reads package outputs. Repository gates retain their own exit codes;
 # no release mutation or registry authentication runs.
 ci:

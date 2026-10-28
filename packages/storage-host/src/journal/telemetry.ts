@@ -3,7 +3,7 @@ import type { IStorageJournalConfigurationSnapshot } from './configuration-optio
 import { STORAGE_TELEMETRY_TAG } from './constants.ts'
 
 /** Resolve the optional logger only when the selected journal runtime is evaluated. */
-const { LoggerLevel } = await import('@migaia/logger')
+const { LogLevel } = await import('@migaia/log-host')
 
 /** One observed endpoint retains only its current policy and timing facts until settlement. */
 type IStorageTelemetryContext = {
@@ -35,7 +35,7 @@ function emitStorageTelemetry(
         if (typeof field === 'string') failure[name] = field
       }
     }
-    const level = outcome === 'success' ? LoggerLevel.debug : LoggerLevel.error
+    const level = outcome === 'success' ? LogLevel.debug : LogLevel.error
     const result: unknown = options.atLevel!(level, {
       tag: STORAGE_TELEMETRY_TAG,
       message: request.operation,

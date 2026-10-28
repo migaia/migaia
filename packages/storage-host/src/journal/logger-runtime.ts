@@ -1,8 +1,8 @@
 /** Keep the optional logger behind the journal's asynchronous module boundary. */
-const runtime = await import('@migaia/logger/plugins/durable')
+const runtime = await import('@migaia/log-plugin-durable')
 
 /** Preserve the logger assertion signature without wrapping its original function. */
-export const assertLogInteger: typeof import('@migaia/logger/plugins/durable').assertLogInteger =
+export const assertLogInteger: typeof import('@migaia/log-plugin-durable').assertLogInteger =
   runtime.assertLogInteger
 
 /** Borrow the original functions and state constants after module loading completes. */
@@ -15,7 +15,7 @@ export const {
 } = runtime
 
 /** Preserve the logger's original record state domain in journal annotations. */
-export type LogRecordState = import('@migaia/logger/plugins/durable').LogRecordState
+export type LogRecordState = import('@migaia/log-plugin-durable').LogRecordState
 
 export type {
   IBinlogExt,
@@ -30,4 +30,4 @@ export type {
   IUndoImage,
   IUndoLogExt,
   IWalExt
-} from '@migaia/logger/plugins/durable'
+} from '@migaia/log-plugin-durable'

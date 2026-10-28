@@ -7,7 +7,8 @@ const dependencies = [
   '@migaia/event-subscriber',
   '@migaia/utils',
   '@migaia/serialize',
-  '@migaia/logger'
+  '@migaia/log-host',
+  '@migaia/log-plugin-durable'
 ]
 /** Emit a browser-safe host without bundling another lifecycle or capability owner. */
 export default defineConfig({

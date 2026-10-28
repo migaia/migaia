@@ -1,7 +1,7 @@
 import { storageJournalPlugin, storageLogStore } from '@migaia/storage-host/plugins/journal'
 import { indexedDbTestFeatures } from './indexed-db-features.ts'
-import { Logger, type ILoggerCore } from '@migaia/logger'
-import { wal, type IWalExt } from '@migaia/logger/plugins/durable'
+import { createLogHost, type ILogHost } from '@migaia/log-host'
+import { walPlugin, type IWalExt } from '@migaia/log-plugin-durable'
 import { kv } from '@migaia/storage-contract'
 import { createStorageHost } from '@migaia/storage-host'
 import { indexedDbBackendPlugin } from '../../src/indexed-db.ts'
@@ -10,11 +10,7 @@ import { sessionStorageBackendPlugin } from '../../src/session-storage.ts'
 import { cookieBackendPlugin } from '../../src/cookies.ts'
 
 /** The opener retains the actual WAL object and its sole persistent native resource. */
-type ITextRedoLogger = Pick<
-  ILoggerCore,
-  'dispatchRaw' | 'onFailure' | 'hook' | 'flush' | 'defer' | 'shutdown'
-> &
-  IWalExt
+type ITextRedoLogger = Pick<ILogHost, 'dispatchRaw' | 'onFailure' | 'flush' | 'shutdown'> & IWalExt
 /** The opener alone retains this original logger and native resource lifetime. */
 type ITextRedoOwner = {
   readonly logger: ReturnType<typeof createLogger>
@@ -24,9 +20,9 @@ type ITextRedoOwner = {
 }
 /** Durable storage remains the original IDB namespace resource, never a second page-local cache. */
 const createLogger = (store: Awaited<ReturnType<typeof storageLogStore>>): ITextRedoLogger =>
-  new Logger({
+  createLogHost({
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-    plugins: [wal({ store })]
+    plugins: [walPlugin({ store })]
   })
 
 /** Open one real persistent carrier; only this page owns its lifetime. */

@@ -6,15 +6,17 @@ import type {
   ITransactionInfo,
   ITransactionScope
 } from '@migaia/storage-contract'
-import type { ILogPayload, ILogStore, IWalExt } from '@migaia/logger/plugins/durable'
-import type { ILoggerCore } from '@migaia/logger'
-import type { ILevelPluginExt } from '@migaia/logger/plugins'
+import type {
+  IBinlogExt,
+  ILogPayload,
+  ILogStore,
+  IWalExt,
+  IUndoLogExt
+} from '@migaia/log-plugin-durable'
+import type { ILevelPluginExt } from '@migaia/log-host'
 
 /** A configured logger remains borrowed; storage never acquires shutdown or installation rights. */
-type IStorageJournalLogger = Pick<
-  ILoggerCore,
-  'dispatchRaw' | 'onFailure' | 'hook' | 'flush' | 'defer'
->
+type IStorageJournalLogger = object & Partial<IBinlogExt & IWalExt & IUndoLogExt>
 /** One immutable org configuration selects the original logger and explicit native log objects. */
 export type IStorageJournalOptions<L extends IStorageJournalLogger> = {
   readonly logger: L

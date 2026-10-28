@@ -79,9 +79,8 @@ export function compileJournalChange(target: IStorageJournalTarget): IStorageJou
 
 /** Global configuration borrows the logger and exposes only fixed-org preparation to backends. */
 export function compileJournalOptions(
-  logger: import('@migaia/logger').ILoggerCore,
-  levelLogger: import('@migaia/logger').ILoggerCore &
-    import('@migaia/logger/plugins').ILevelPluginExt,
+  logger: import('@migaia/log-host').ILogHost,
+  levelLogger: import('@migaia/log-host').ILogHost & import('@migaia/log-host').ILevelPluginExt,
   port: IStorageJournalExecutionPort
 ): void {
   const ordinary: IStorageJournalOptions<typeof logger> = {
@@ -113,10 +112,8 @@ export function compileJournalOptions(
 
 /** Real selected logger extensions add undo without widening older one-parameter host types. */
 export async function compileUndoSelection(
-  logger: import('@migaia/logger').ILoggerCore &
-    import('@migaia/logger/plugins/durable').IUndoLogExt,
-  onlyBinlog: import('@migaia/logger').ILoggerCore &
-    import('@migaia/logger/plugins/durable').IBinlogExt
+  logger: import('@migaia/log-host').ILogHost & import('@migaia/log-plugin-durable').IUndoLogExt,
+  onlyBinlog: import('@migaia/log-host').ILogHost & import('@migaia/log-plugin-durable').IBinlogExt
 ): Promise<void> {
   const plugins = [memoryBackendPlugin()] as const
   await using plain = await createStorageHost({ plugins })
@@ -174,4 +171,89 @@ export function compileRedoAuthor(
   // @ts-expect-error Redo never gives the original store or shutdown handle to callers.
   void binding.getStore
   void [id, protectedValue, operation]
+}
+
+/** Optional journal extensions accept every approved selection without borrowing host methods. */
+export function compileOptionalJournalExtensions(
+  core: import('@migaia/log-host').ILogHost,
+  level: import('@migaia/log-host').ILevelPluginExt,
+  binlog: import('@migaia/log-plugin-durable').IBinlogExt,
+  wal: import('@migaia/log-plugin-durable').IWalExt,
+  undo: import('@migaia/log-plugin-durable').IUndoLogExt,
+  binlogUndo: import('@migaia/log-plugin-durable').IBinlogExt &
+    import('@migaia/log-plugin-durable').IUndoLogExt,
+  binlogWal: import('@migaia/log-plugin-durable').IBinlogExt &
+    import('@migaia/log-plugin-durable').IWalExt,
+  undoWal: import('@migaia/log-plugin-durable').IUndoLogExt &
+    import('@migaia/log-plugin-durable').IWalExt
+): void {
+  /** Each option preserves its exact borrowed logger type, including single-plugin selections. */
+  const coreOnly: IStorageJournalOptions<typeof core> = { logger: core, namespace: 'core' }
+  /** Standard level methods alone permit telemetry without any durable extension. */
+  const levelOnly: IStorageJournalOptions<typeof level> = {
+    logger: level,
+    namespace: 'level',
+    telemetry: true
+  }
+  /** A binlog selection grants no WAL or undo requirement. */
+  const binlogOnly: IStorageJournalOptions<typeof binlog> = { logger: binlog, namespace: 'binlog' }
+  /** A WAL selection grants no binlog or undo requirement. */
+  const walOnly: IStorageJournalOptions<typeof wal> = { logger: wal, namespace: 'wal' }
+  /** An undo selection grants no binlog or WAL requirement. */
+  const undoOnly: IStorageJournalOptions<typeof undo> = { logger: undo, namespace: 'undo' }
+  /** The native atomic pair does not require a WAL extension. */
+  const selectedBinlogUndo: IStorageJournalOptions<typeof binlogUndo> = {
+    logger: binlogUndo,
+    namespace: 'binlog-undo'
+  }
+  /** The redo/commit pair does not require an undo extension. */
+  const selectedBinlogWal: IStorageJournalOptions<typeof binlogWal> = {
+    logger: binlogWal,
+    namespace: 'binlog-wal'
+  }
+  /** The recovery pair does not require a binlog extension. */
+  const selectedUndoWal: IStorageJournalOptions<typeof undoWal> = {
+    logger: undoWal,
+    namespace: 'undo-wal'
+  }
+  /** Exact selection keeps binlog methods available instead of widening to an optional member. */
+  const exactBinlog: typeof binlog = binlogOnly.logger
+  /** This counterexample guards against reintroducing a mandatory three-member view. */
+  // @ts-expect-error Requiring all three members would incorrectly reject a supported single plugin.
+  const required: Pick<typeof binlogUndo & typeof wal, 'binlog' | 'wal' | 'undo'> = binlog
+  /** This counterexample guards the object intersection needed by a core-only host. */
+  // @ts-expect-error A bare Partial weak type would incorrectly reject a supported core-only host.
+  const weak: Partial<typeof binlogUndo & typeof wal> = core
+  /** Durable capability ownership alone never supplies severity methods. */
+  const withoutLevel: IStorageJournalOptions<typeof binlog> = {
+    logger: binlog,
+    namespace: 'no-level',
+    // @ts-expect-error Telemetry still requires the actual level extension.
+    telemetry: true
+  }
+  /** A malformed overlapping capability remains invalid despite optional selection. */
+  // @ts-expect-error A present durable property must retain its original extension shape.
+  const wrongWal: IStorageJournalOptions<{ wal: string }> = {
+    logger: { wal: 'invalid' },
+    namespace: 'wrong-wal'
+  }
+  /** Primitive values cannot represent a borrowed journal capability. */
+  // @ts-expect-error Journal capabilities must be an object, never a primitive.
+  const primitive: IStorageJournalOptions<number> = { logger: 1, namespace: 'primitive' }
+  void [
+    coreOnly,
+    levelOnly,
+    binlogOnly,
+    walOnly,
+    undoOnly,
+    selectedBinlogUndo,
+    selectedBinlogWal,
+    selectedUndoWal,
+    exactBinlog,
+    required,
+    weak,
+    withoutLevel,
+    wrongWal,
+    primitive
+  ]
 }

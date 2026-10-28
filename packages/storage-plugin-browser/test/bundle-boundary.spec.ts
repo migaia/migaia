@@ -164,25 +164,16 @@ const browserFullQueryEntry = [
 
 /** Diagnose full assembly through the same packed resolver, bundler and emitted-chunk counter. */
 async function measureFullBrowserAssembly(smokeDirectory: string): Promise<void> {
-  /** The optional logger and its unchanged external dependency exist only in this consumer. */
-  const ansisRoot = realpathSync(resolve(repositoryRoot, 'packages/logger/node_modules/ansis'))
-  /** Native manifest identity is preserved when packing the already-installed logger dependency. */
-  const ansisManifest = readJson(join(ansisRoot, 'package.json'))
   /** Extra artifacts cannot affect the original base consumer's dependency closure. */
   const artifacts = packReleaseArtifacts(join(smokeDirectory, 'full-artifacts'), repositoryRoot, [
     ...packedPackages,
-    packageDefinition('logger', '@migaia/logger'),
-    {
-      directory: 'ansis',
-      name: 'ansis',
-      version: String(ansisManifest.version),
-      sourceDirectory: ansisRoot
-    }
+    packageDefinition('log-host', '@migaia/log-host'),
+    packageDefinition('log-plugin-durable', '@migaia/log-plugin-durable')
   ])
   /** The full variant has its own ordinary install and complete optional peer closure. */
   const consumer = join(smokeDirectory, 'full-consumer')
-  /** Logger remains an explicitly installed application root, never an implicit base dependency. */
-  const roots = [...browserPackedRoots, '@migaia/logger']
+  /** Logging remains explicitly installed by the application, outside the base dependency closure. */
+  const roots = [...browserPackedRoots, '@migaia/log-host', '@migaia/log-plugin-durable']
   installPackedConsumer(
     consumer,
     artifacts,

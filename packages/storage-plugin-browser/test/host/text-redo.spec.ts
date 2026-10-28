@@ -4,9 +4,8 @@ import { locks } from 'node:worker_threads'
 import { deferred } from '@migaia/utils/promise'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Logger, type ILogEntry } from '@migaia/logger'
-import { level } from '@migaia/logger/plugins'
-import { binlog, memoryLogStore, wal } from '@migaia/logger/plugins/durable'
+import { createLogHost, levelPlugin, type ILogEntry, type ILogPluginCore } from '@migaia/log-host'
+import { binlogPlugin, memoryLogStore, walPlugin } from '@migaia/log-plugin-durable'
 import {
   ConcurrencyPolicy,
   lockKey,
@@ -21,10 +20,29 @@ import { fakeWebStorage } from '../../src/testing/fake-web-storage.ts'
 
 /** Native LockManager, original durable plugins and the native-shaped Storage port own the work. */
 const createLogger = () =>
-  new Logger({
+  createLogHost({
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-    plugins: [wal({ store: memoryLogStore() }), binlog({ store: memoryLogStore() })]
+    plugins: [walPlugin({ store: memoryLogStore() }), binlogPlugin({ store: memoryLogStore() })]
   })
+
+/** Telemetry observation uses the supported plugin capability and its original owning host. */
+class BrowserLogObserver {
+  /** This fixture installs one observation plugin alongside the severity extension. */
+  readonly name = 'browser-test-log-observer'
+  /** Preserve the entries emitted by the actual host for the scalar telemetry assertion. */
+  readonly entries: ILogEntry[] = []
+
+  /** Register collection during plugin installation instead of extending the public facade. */
+  install(core: ILogPluginCore): Record<string, never> {
+    core.useSink((entry) => this.receive(entry))
+    return {}
+  }
+
+  /** Keep the received entry and its payload identity intact. */
+  receive(entry: ILogEntry): void {
+    this.entries.push(entry)
+  }
+}
 
 afterEach(() => vi.unstubAllGlobals())
 
@@ -255,9 +273,9 @@ describe('text redo through the original host and WAL owners', () => {
   it('recovers a failed durable completion before an already-open peer reads and notifies', async () => {
     vi.stubGlobal('navigator', { locks })
     const carrier = memoryLogStore()
-    const logger = new Logger({
+    const logger = createLogHost({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-      plugins: [wal({ store: carrier })]
+      plugins: [walPlugin({ store: carrier })]
     })
     const storage = fakeWebStorage()
     const options = { storage, namespace: 'complete', redo: true as const }
@@ -376,7 +394,7 @@ describe('text redo through the original host and WAL owners', () => {
     vi.stubGlobal('navigator', { locks })
     const storage = fakeWebStorage()
     const assigned = vi.spyOn(storage, 'setItem')
-    const logger = new Logger({
+    const logger = createLogHost({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false }
     })
     try {
@@ -404,9 +422,9 @@ describe('text redo through the original host and WAL owners', () => {
       } finally {
         await durable.shutdown('manual')
       }
-      const walOnly = new Logger({
+      const walOnly = createLogHost({
         execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-        plugins: [wal({ store: memoryLogStore() })]
+        plugins: [walPlugin({ store: memoryLogStore() })]
       })
       try {
         await expect(
@@ -510,14 +528,14 @@ describe('text redo through the original host and WAL owners', () => {
         .use(kv)
         .setMany([{ key: 'x', value: 'unsupported' }])
     ).rejects.toMatchObject({ code: 'UNSUPPORTED_CAPABILITY' })
-    const logger = new Logger({
+    /** The installed observer receives telemetry through the real plugin core. */
+    const observer = new BrowserLogObserver()
+    const logger = createLogHost({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-      plugins: [level({ level: 'debug' })]
+      plugins: [levelPlugin(), observer]
     })
-    const entries: ILogEntry[] = []
-    logger.useSink((entry) => {
-      entries.push(entry)
-    })
+    /** Assertions inspect the exact entries captured by the installed observer. */
+    const entries = observer.entries
     const initialized: string[] = []
     const host = await createStorageHost({
       plugins: [

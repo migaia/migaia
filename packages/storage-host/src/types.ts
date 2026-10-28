@@ -602,7 +602,7 @@ export type IStorageHostCreateOptions<P extends readonly IStorageBackendPluginHa
 /** Only an actual statically selected undo extension adds the public undo business method. */
 type IStorageJournalUndoSurface<J> = (
   J extends (...args: never[]) => infer R ? Awaited<R> : J
-) extends { readonly logger: import('@migaia/logger/plugins/durable').IUndoLogExt }
+) extends { readonly logger: import('@migaia/log-plugin-durable').IUndoLogExt }
   ? import('./journal/types.ts').IUndoableStore
   : Record<never, never>
 /** Neutral host registry and lifetime; backend implementations remain separate from installation. */

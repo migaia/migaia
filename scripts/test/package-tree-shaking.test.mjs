@@ -25,6 +25,59 @@ import {
   sourceMapSources
 } from '../package-tree-shaking-provenance.mjs'
 
+/** Seven approved logging roots share the existing public-entry oracles; this inventory is fixed. */
+const loggingPackages = Object.freeze([
+  {
+    name: 'log-host',
+    minimal: 'LogHostErrorCode',
+    full: 'createLogHost',
+    minimalMarker: 'INVALID_OPTION',
+    fullMarker: 'createLogHost'
+  },
+  {
+    name: 'log-plugin-console',
+    minimal: 'LogConsoleErrorCode',
+    full: 'consolePlugin',
+    minimalMarker: 'LogConsoleErrorCode',
+    fullMarker: 'consolePlugin'
+  },
+  {
+    name: 'log-plugin-file',
+    minimal: 'LogFileErrorCode',
+    full: 'filePlugin',
+    minimalMarker: 'FILE_SINK_UNAVAILABLE',
+    fullMarker: 'filePlugin'
+  },
+  {
+    name: 'log-plugin-http',
+    minimal: 'LogHttpErrorCode',
+    full: 'httpPlugin',
+    minimalMarker: 'SERIALIZE_FAILED',
+    fullMarker: 'httpPlugin'
+  },
+  {
+    name: 'log-plugin-process',
+    minimal: 'LogProcessErrorCode',
+    full: 'processPlugin',
+    minimalMarker: 'RUNTIME_SHUTTING_DOWN',
+    fullMarker: 'processPlugin'
+  },
+  {
+    name: 'log-plugin-reasoning',
+    minimal: 'LogReasoningErrorCode',
+    full: 'reasoningPlugin',
+    minimalMarker: 'LogReasoningErrorCode',
+    fullMarker: 'reasoningPlugin'
+  },
+  {
+    name: 'log-plugin-durable',
+    minimal: 'LogDurableErrorCode',
+    full: 'binlogPlugin',
+    minimalMarker: 'LOG_STORE_CORRUPT',
+    fullMarker: 'binlogPlugin'
+  }
+])
+
 /** Creates source files needed to prove package-root containment in each fixture. */
 function createPackageFixture() {
   const root = mkdtempSync(join(tmpdir(), 'migaia-tree-shaking-'))
@@ -71,7 +124,12 @@ test('semantic identity ignores hash-named emitted paths but tracks source and b
 })
 
 test('package effect metadata is explicit for each admitted root', () => {
-  for (const packageName of ['plugin-host', 'logger', 'tray', 'wasm']) {
+  for (const packageName of [
+    'plugin-host',
+    ...loggingPackages.map(({ name }) => name),
+    'tray',
+    'wasm'
+  ]) {
     const manifest = JSON.parse(
       readFileSync(new URL(`../../packages/${packageName}/package.json`, import.meta.url), 'utf8')
     )
@@ -138,7 +196,7 @@ function createConsumerFixture() {
   return { root, consumer: join(root, 'consumer'), packageRoot: installedRoot }
 }
 
-/** Copies the four admitted package publications into an isolated packed-like consumer. */
+/** Packs the admitted package publications into one isolated consumer with their real dependencies. */
 function createActualPackageFixture(selectedPackages) {
   const root = mkdtempSync(join(tmpdir(), 'migaia-tree-shaking-packages-'))
   const consumer = join(root, 'consumer')
@@ -146,7 +204,7 @@ function createActualPackageFixture(selectedPackages) {
   mkdirSync(packDirectory, { recursive: true })
   const packageNames = selectedPackages ?? [
     'plugin-host',
-    'logger',
+    ...loggingPackages.map(({ name }) => name),
     'tray',
     'wasm',
     'lifecycle',
@@ -185,6 +243,13 @@ function createActualPackageFixture(selectedPackages) {
       '--strip-components=1'
     ])
   }
+  /** Console alone owns this installed third-party publication; other fixtures need no copy. */
+  if (packageNames.includes('log-plugin-console'))
+    cpSync(
+      join(process.cwd(), 'packages/log-plugin-console/node_modules/ansis'),
+      join(consumer, 'node_modules/ansis'),
+      { recursive: true, dereference: true }
+    )
   return { root, consumer }
 }
 
@@ -244,7 +309,7 @@ for (const style of ['named', 'default']) {
       /** Both supported import forms retain a callable factory rather than a dead bare import. */
       const source =
         style === 'named'
-          ? "import { timeout } from '@migaia/rpc-host/features'; export { timeout }"
+          ? "import { timeoutFeature } from '@migaia/rpc-host/features'; export { timeoutFeature }"
           : "import timeout from '@migaia/rpc-host/features/timeout'; export { timeout }"
       /** Actual bundler output proves retained implementations, independently of export baselines. */
       const result = await buildConsumer(fixture.consumer, source)
@@ -274,7 +339,7 @@ for (const style of ['named', 'default']) {
       const entry = join(fixture.consumer, 'timeout-identity.mjs')
       writeFileSync(
         entry,
-        "import { strict as assert } from 'node:assert'; import { timeout } from '@migaia/rpc-host/features'; import direct from '@migaia/rpc-host/features/timeout'; assert.equal(timeout, direct)"
+        "import { strict as assert } from 'node:assert'; import { timeoutFeature } from '@migaia/rpc-host/features'; import direct from '@migaia/rpc-host/features/timeout'; assert.equal(timeoutFeature, direct)"
       )
       execFileSync(process.execPath, [entry], { cwd: fixture.consumer, stdio: 'pipe' })
     } finally {
@@ -315,7 +380,7 @@ for (const style of ['named', 'default']) {
       /** Retain the complete factory so elimination must follow actual optional-owner references. */
       const source =
         style === 'named'
-          ? "import { chunk } from '@migaia/rpc-host/plugins'; export { chunk }"
+          ? "import { chunkFeature } from '@migaia/rpc-host/plugins'; export { chunkFeature }"
           : "import chunk from '@migaia/rpc-host/plugins/chunk'; export { chunk }"
       /** Rendered module provenance distinguishes shared mandatory owners from unrelated plugins. */
       const result = await buildConsumer(fixture.consumer, source)
@@ -333,7 +398,7 @@ for (const style of ['named', 'default']) {
       const entry = join(fixture.consumer, 'chunk-identity.mjs')
       writeFileSync(
         entry,
-        "import { strict as assert } from 'node:assert'; import { chunk } from '@migaia/rpc-host/plugins'; import direct from '@migaia/rpc-host/plugins/chunk'; assert.equal(chunk, direct)"
+        "import { strict as assert } from 'node:assert'; import { chunkFeature } from '@migaia/rpc-host/plugins'; import direct from '@migaia/rpc-host/plugins/chunk'; assert.equal(chunkFeature, direct)"
       )
       execFileSync(process.execPath, [entry], { cwd: fixture.consumer, stdio: 'pipe' })
     } finally {
@@ -344,16 +409,21 @@ for (const style of ['named', 'default']) {
 
 /** Each remaining Host optional owner is selected through both declared publication forms. */
 const rpcOptionalSelections = [
-  { factory: 'auth', folder: 'auth', kind: 'plugins', implementation: 'features' },
-  { factory: 'batch', folder: 'batch', kind: 'plugins', implementation: 'features' },
-  { factory: 'errorMap', folder: 'error-map', kind: 'plugins', implementation: 'features' },
-  { factory: 'idempotency', folder: 'idempotency', kind: 'plugins', implementation: 'features' },
-  { factory: 'limits', folder: 'limits', kind: 'plugins', implementation: 'features' },
-  { factory: 'schema', folder: 'schema', kind: 'plugins', implementation: 'features' },
+  { factory: 'authFeature', folder: 'auth', kind: 'plugins', implementation: 'features' },
+  { factory: 'batchFeature', folder: 'batch', kind: 'plugins', implementation: 'features' },
+  { factory: 'errorMapFeature', folder: 'error-map', kind: 'plugins', implementation: 'features' },
+  {
+    factory: 'idempotencyFeature',
+    folder: 'idempotency',
+    kind: 'plugins',
+    implementation: 'features'
+  },
+  { factory: 'limitsFeature', folder: 'limits', kind: 'plugins', implementation: 'features' },
+  { factory: 'schemaFeature', folder: 'schema', kind: 'plugins', implementation: 'features' },
   { factory: 'probe', folder: 'probe', kind: 'plugins' },
   { factory: 'typegen', folder: 'typegen', kind: 'plugins' },
   { factory: 'linkPolicy', folder: 'link-policy', kind: 'plugins' },
-  { factory: 'retry', folder: 'retry', kind: 'features' }
+  { factory: 'retryFeature', folder: 'retry', kind: 'features' }
 ]
 /** Probe observes shared wire identifiers without retaining batch/chunk execution owners. */
 const probeProtocolMetadata = new Set([
@@ -426,9 +496,9 @@ for (const selection of rpcOptionalSelections) {
 
 /** Native feature leaves keep their genuine shared lane owner without retaining process IO. */
 const rpcProcessSelections = [
-  { factory: 'flowControl', folder: 'flow-control', allowed: ['flow-control'] },
-  { factory: 'sendQueue', folder: 'send-queue', allowed: ['send-queue', 'flow-control'] },
-  { factory: 'ipcLog', folder: 'log', allowed: ['log'] }
+  { factory: 'flowControlFeature', folder: 'flow-control', allowed: ['flow-control'] },
+  { factory: 'sendQueueFeature', folder: 'send-queue', allowed: ['send-queue', 'flow-control'] },
+  { factory: 'ipcLogFeature', folder: 'log', allowed: ['log'] }
 ]
 for (const selection of rpcProcessSelections) {
   for (const style of ['named', 'default']) {
@@ -660,13 +730,7 @@ test('root consumer exercises actual packed package matrix', async () => {
       minimalMarker: 'PLUGIN_',
       fullMarker: 'PluginHost'
     },
-    {
-      name: '@migaia/logger',
-      minimal: 'LoggerErrorCode',
-      full: 'Logger',
-      minimalMarker: 'INVALID_OPTION',
-      fullMarker: 'Logger'
-    },
+    ...loggingPackages.map((entry) => ({ ...entry, name: `@migaia/${entry.name}` })),
     {
       name: '@migaia/tray',
       minimal: 'TrayErrorCode',
@@ -719,7 +783,7 @@ test('closure packet proves exact exclusions, frozen budgets, browser wasm, and 
   const fixture = createActualPackageFixture()
   const cases = [
     { name: 'plugin-host', minimal: 'PluginHostErrorCode', full: 'PluginHost' },
-    { name: 'logger', minimal: 'LoggerErrorCode', full: 'Logger' },
+    ...loggingPackages,
     { name: 'tray', minimal: 'TrayErrorCode', full: 'createTrayGraph' },
     { name: 'wasm', minimal: 'byte_len_of', full: 'ConversionResult' }
   ]
@@ -780,7 +844,7 @@ test('closure packet proves exact exclusions, frozen budgets, browser wasm, and 
         assert.equal(packageModules(bare, packageCase.name).length, 0)
       const minimalModules = packageModules(minimal, packageCase.name)
       assert.ok(minimalModules.length > 0)
-      if (packageCase.name === 'plugin-host' || packageCase.name === 'logger')
+      if (packageCase.name === 'plugin-host' || packageCase.name.startsWith('log-'))
         assert.deepEqual(
           minimalModules,
           minimalModules.filter((module) => module.endsWith('error-code.js'))

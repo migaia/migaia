@@ -1,15 +1,15 @@
 import type { ISqliteValue } from '../src/types.ts'
 import { decodeFlatStorageKey, lockKey } from '@migaia/storage-host/sdk'
 import { defineCollectionsJsonCodec } from '@migaia/serialize/codecs/collections-json'
-import { Logger } from '@migaia/logger'
+import { createLogHost } from '@migaia/log-host'
 import {
-  binlog,
-  undoLog,
-  wal,
+  binlogPlugin,
+  undoLogPlugin,
+  walPlugin,
   memoryLogStore,
   LogRecordState,
   type ILogStore
-} from '@migaia/logger/plugins/durable'
+} from '@migaia/log-plugin-durable'
 import { ttl } from '@migaia/storage-contract'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -167,12 +167,12 @@ it.each([false, true])(
   async (walMode) => {
     const directory = mkdtempSync(join(tmpdir(), 'migaia-sqlite-undo-'))
     const connection = nodeSqliteDriver(join(directory, 'data.sqlite'))
-    const logger = new Logger({
+    const logger = createLogHost({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       plugins: [
-        binlog({ store: memoryLogStore() }),
-        wal({ store: memoryLogStore() }),
-        undoLog({ store: memoryLogStore() })
+        binlogPlugin({ store: memoryLogStore() }),
+        walPlugin({ store: memoryLogStore() }),
+        undoLogPlugin({ store: memoryLogStore() })
       ]
     })
     const host = await createStorageHost({
@@ -231,9 +231,9 @@ it('keeps data and native binlog/undo indexes at the same actual memory commit',
   const connection = nodeSqliteDriver(':memory:')
   const logs: Array<{ dispose(): Promise<void> }> = []
   const makeLogger = (changes: ILogStore, images: ILogStore) =>
-    new Logger({
+    createLogHost({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-      plugins: [binlog({ store: changes }), undoLog({ store: images })]
+      plugins: [binlogPlugin({ store: changes }), undoLogPlugin({ store: images })]
     })
   let logger: ReturnType<typeof makeLogger> | undefined
   const host = await createStorageHost({
@@ -242,9 +242,9 @@ it('keeps data and native binlog/undo indexes at the same actual memory commit',
         const changes = await openNativeLog('sqlite', { prefix: 'native-binlog' })
         const images = await openNativeLog('sqlite', { prefix: 'native-undo' })
         logs.push(changes, images)
-        const current = new Logger({
+        const current = createLogHost({
           execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-          plugins: [binlog({ store: changes }), undoLog({ store: images })]
+          plugins: [binlogPlugin({ store: changes }), undoLogPlugin({ store: images })]
         })
         logger = current
         return {
@@ -331,12 +331,12 @@ it('keeps revision births unique after upgrading an old private layout and dropp
     'CREATE TABLE migaia_revisions(org_id TEXT NOT NULL,key TEXT NOT NULL,revision INTEGER NOT NULL,PRIMARY KEY(org_id,key))'
   )
   const orgId = createOrgId()
-  const logger = new Logger({
+  const logger = createLogHost({
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
     plugins: [
-      binlog({ store: memoryLogStore() }),
-      wal({ store: memoryLogStore() }),
-      undoLog({ store: memoryLogStore() })
+      binlogPlugin({ store: memoryLogStore() }),
+      walPlugin({ store: memoryLogStore() }),
+      undoLogPlugin({ store: memoryLogStore() })
     ]
   })
   const host = await createStorageHost({
@@ -404,12 +404,12 @@ it('recovers a committed marker after a lost native COMMIT acknowledgement witho
           }
     }
   }
-  const logger = new Logger({
+  const logger = createLogHost({
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
     plugins: [
-      binlog({ store: memoryLogStore() }),
-      wal({ store: memoryLogStore() }),
-      undoLog({ store: memoryLogStore() })
+      binlogPlugin({ store: memoryLogStore() }),
+      walPlugin({ store: memoryLogStore() }),
+      undoLogPlugin({ store: memoryLogStore() })
     ]
   })
   const open = () =>

@@ -23,7 +23,8 @@ const packageDirectories = [
   'capability',
   'middleware-pipeline',
   'plugin-host',
-  'logger',
+  'log-host',
+  'log-plugin-durable',
   'serialize',
   'storage-contract',
   'storage-host'

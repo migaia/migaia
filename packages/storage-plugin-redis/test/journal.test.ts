@@ -1,15 +1,19 @@
+import {
+  ignoreLogFailure,
+  StorageLogObserver
+} from '../../storage-host/test/helpers/log-observer.ts'
 import { afterAll, describe, expect, it, vi } from 'vitest'
 import { createClientPool } from 'redis'
-import { Logger, type ILogEntry } from '@migaia/logger'
-import { level } from '@migaia/logger/plugins'
+import { createLogHost } from '@migaia/log-host'
+import { levelPlugin } from '@migaia/log-host'
 import {
-  binlog,
+  binlogPlugin,
   memoryLogStore,
-  undoLog,
-  wal,
+  undoLogPlugin,
+  walPlugin,
   LogRecordState,
   type ILogStore
-} from '@migaia/logger/plugins/durable'
+} from '@migaia/log-plugin-durable'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { deferred } from '@migaia/utils/promise'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
@@ -26,16 +30,12 @@ import { createRedisLayout, decodeRedisValue } from '../src/layout.ts'
 /** Real logger plugins retain their own durable owner and remain borrowed by storage. */
 const loggerOptions = {
   execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-  runtimeManager: {
-    randomUUID: () => crypto.randomUUID(),
-    defer: (task: () => void) => queueMicrotask(task),
-    write: () => undefined
-  }
+  report: ignoreLogFailure
 } as const
 
 /** Each org owns an independent real logger index over an external log store. */
 const createJournalLogger = () =>
-  new Logger({ ...loggerOptions, plugins: [binlog({ store: memoryLogStore() })] as const })
+  createLogHost({ ...loggerOptions, plugins: [binlogPlugin({ store: memoryLogStore() })] as const })
 
 for (const service of [
   'MIGAIA_REDIS_URL',
@@ -160,15 +160,14 @@ for (const service of [
     })
     it('observes one public endpoint across native retries with canonical keys and fixed org', async () => {
       await connect()
+      /** The existing backend fixture borrows one real entry observation registration. */
+      const observer = new StorageLogObserver()
       const prefix = crypto.randomUUID(),
-        entries: ILogEntry[] = [],
-        logger = new Logger({ ...loggerOptions, plugins: [level()] }),
+        entries = observer.entries,
+        logger = createLogHost({ ...loggerOptions, plugins: [levelPlugin(), observer] }),
         entered = deferred<void>(),
         resume = deferred<void>()
       namespaces.push(prefix)
-      logger.useSink((entry) => {
-        entries.push(entry)
-      })
       const host = await createStorageHost({
         plugins: [
           storageJournalPlugin({ logger, namespace: 'telemetry', telemetry: true }),
@@ -184,6 +183,7 @@ for (const service of [
       try {
         const store = host.backend('redis')
         await store.set('value', 'initial')
+        await logger.flush()
         expect(entries).toHaveLength(1)
         expect(entries[0]).toMatchObject({
           message: 'set',
@@ -194,8 +194,10 @@ for (const service of [
           }
         })
         await store.get('value')
+        await logger.flush()
         expect(entries[1]!.meta!.keys).toEqual([lockKey.text('value')])
         await store.use(kv).getMany(['value', 'absent'])
+        await logger.flush()
         expect(entries[2]!.meta!.keys).toEqual([lockKey.text('value'), lockKey.text('absent')])
         entries.length = 0
         let calls = 0
@@ -216,6 +218,7 @@ for (const service of [
         resume.resolve()
         await pending
         expect(calls).toBe(2)
+        await logger.flush()
         expect(entries.map((entry) => entry.message)).toEqual(['set', 'transaction'])
         expect(entries[1]!.meta).toMatchObject({
           keys: expect.arrayContaining([lockKey.text('value')]),
@@ -229,6 +232,7 @@ for (const service of [
             throw original
           })
         ).rejects.toBe(original)
+        await logger.flush()
         expect(entries).toHaveLength(1)
         expect(entries[0]!.meta).toMatchObject({ outcome: 'error', code: 'TRANSACTION_FAILED' })
         expect(entries[0]!.args[0]).toBe(original)
@@ -238,11 +242,13 @@ for (const service of [
         await peer.set('value', 'org')
         const extracted = peer.get
         expect(await extracted('value')).toBe('org')
+        await logger.flush()
         expect(entries).toHaveLength(2)
         expect(entries.every((entry) => entry.meta!.orgId === orgId)).toBe(true)
         entries.length = 0
         const readOnlyOrg = createOrgId()
         expect(await host.org(readOnlyOrg).backend('redis').get('absent')).toBeNull()
+        await logger.flush()
         expect(entries).toHaveLength(1)
         expect(entries[0]).toMatchObject({
           message: 'get',
@@ -251,6 +257,7 @@ for (const service of [
         entries.length = 0
         const nativeOrg = createOrgId()
         expect(await host.org(nativeOrg).backend('redis').api.streams.range('jobs')).toEqual([])
+        await logger.flush()
         expect(entries).toHaveLength(1)
         expect(entries[0]).toMatchObject({
           message: 'streams.range',
@@ -263,6 +270,7 @@ for (const service of [
             .backend('redis')
             .api.pubsub.subscribe('events', () => undefined)
         await subscription.dispose()
+        await logger.flush()
         expect(entries).toHaveLength(1)
         expect(entries[0]).toMatchObject({
           message: 'pubsub.subscribe',
@@ -355,9 +363,9 @@ for (const service of [
       const host = await createStorageHost({
         plugins: [
           storageJournalPlugin(({ orgId }) => {
-            const logger = new Logger({
+            const logger = createLogHost({
               ...loggerOptions,
-              plugins: [binlog({ store: memoryLogStore() })] as const
+              plugins: [binlogPlugin({ store: memoryLogStore() })] as const
             })
             loggers.set(orgId, logger)
             const original = logger.binlog
@@ -365,11 +373,6 @@ for (const service of [
               namespace: 'application',
               binlogValues: true,
               logger: {
-                dispatchRaw: logger.dispatchRaw,
-                onFailure: logger.onFailure,
-                hook: logger.hook,
-                flush: logger.flush,
-                defer: logger.defer,
                 binlog: {
                   ...original,
                   append: async (...args: Parameters<typeof original.append>) => {
@@ -532,9 +535,9 @@ for (const service of [
         const prefix = crypto.randomUUID(),
           org = createOrgId(),
           layout = createRedisLayout(prefix, org),
-          logger = new Logger({
+          logger = createLogHost({
             ...loggerOptions,
-            plugins: [binlog({ store: memoryLogStore() })] as const
+            plugins: [binlogPlugin({ store: memoryLogStore() })] as const
           }),
           failure = new RangeError('lost native EXEC evidence')
         namespaces.push(prefix)
@@ -601,12 +604,12 @@ for (const service of [
               )
           },
           records = memoryLogStore(),
-          logger = new Logger({
+          logger = createLogHost({
             ...loggerOptions,
             plugins: [
-              binlog({ store: records }),
-              ...(choice === 'wal' ? [wal({ store: memoryLogStore() })] : []),
-              ...(choice === 'undo' ? [undoLog({ store: memoryLogStore() })] : [])
+              binlogPlugin({ store: records }),
+              ...(choice === 'wal' ? [walPlugin({ store: memoryLogStore() })] : []),
+              ...(choice === 'undo' ? [undoLogPlugin({ store: memoryLogStore() })] : [])
             ]
           })
         try {

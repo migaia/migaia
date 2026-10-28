@@ -1,18 +1,19 @@
+import { ignoreLogFailure } from '../../storage-host/test/helpers/log-observer.ts'
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import postgres from 'postgres'
 import { it, expect, onTestFinished, describe } from 'vitest'
 import { createStorageHost } from '@migaia/storage-host'
 import { storageJournalPlugin, storageLogStore } from '@migaia/storage-host/plugins/journal'
-import { Logger } from '@migaia/logger'
+import { createLogHost } from '@migaia/log-host'
 import {
-  binlog,
-  wal,
-  undoLog,
+  binlogPlugin,
+  walPlugin,
+  undoLogPlugin,
   memoryLogStore,
   LogRecordState,
   type ILogStore
-} from '@migaia/logger/plugins/durable'
+} from '@migaia/log-plugin-durable'
 import { kv, vector, ttl } from '@migaia/storage-contract'
 import { lockKey } from '@migaia/storage-host/sdk'
 import { deferred } from '@migaia/utils/promise'
@@ -26,11 +27,7 @@ import { decodePgText } from '../src/codec.ts'
 /** The original borrowed logger owns append/index/cleanup; PostgreSQL owns only native changes. */
 const loggerOptions = {
   execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-  runtimeManager: {
-    randomUUID: () => crypto.randomUUID(),
-    defer: (task: () => void) => queueMicrotask(task),
-    write: () => undefined
-  }
+  report: ignoreLogFailure
 } as const
 /** Native addresses must come from the same declared service wrapper as every other server case. */
 const connectionString = process.env.MIGAIA_PG_URL
@@ -44,9 +41,9 @@ describe.each(['pg', 'postgres-js'] as const)('%s original global journal', (ada
       driver = adapter === 'pg' ? pgDriver(pool) : postgresJsDriver(client),
       logs: Array<{ dispose(): Promise<void> }> = []
     const makeLogger = (changes: ILogStore, images: ILogStore) =>
-      new Logger({
+      createLogHost({
         ...loggerOptions,
-        plugins: [binlog({ store: changes }), undoLog({ store: images })]
+        plugins: [binlogPlugin({ store: changes }), undoLogPlugin({ store: images })]
       })
     let logger: ReturnType<typeof makeLogger> | undefined
     const host = await createStorageHost({
@@ -106,12 +103,12 @@ describe.each(['pg', 'postgres-js'] as const)('%s original global journal', (ada
     const driver = adapter === 'pg' ? pgDriver(pool) : postgresJsDriver(client)
     const prefix = 'pg_drop_undo_' + randomUUID().slice(0, 8),
       org = randomUUID()
-    const logger = new Logger({
+    const logger = createLogHost({
       ...loggerOptions,
       plugins: [
-        binlog({ store: memoryLogStore() }),
-        wal({ store: memoryLogStore() }),
-        undoLog({ store: memoryLogStore() })
+        binlogPlugin({ store: memoryLogStore() }),
+        walPlugin({ store: memoryLogStore() }),
+        undoLogPlugin({ store: memoryLogStore() })
       ]
     })
     const open = () =>
@@ -170,12 +167,12 @@ describe.each(['pg', 'postgres-js'] as const)('%s original global journal', (ada
     const pool = new Pool({ connectionString })
     const client = postgres(connectionString!, { max: 8 })
     const driver = adapter === 'pg' ? pgDriver(pool) : postgresJsDriver(client)
-    const logger = new Logger({
+    const logger = createLogHost({
       ...loggerOptions,
       plugins: [
-        binlog({ store: memoryLogStore() }),
-        wal({ store: memoryLogStore() }),
-        undoLog({ store: memoryLogStore() })
+        binlogPlugin({ store: memoryLogStore() }),
+        walPlugin({ store: memoryLogStore() }),
+        undoLogPlugin({ store: memoryLogStore() })
       ]
     })
     const prefix = 'pg_undo_' + randomUUID().slice(0, 8),
@@ -255,9 +252,9 @@ describe.each(['pg', 'postgres-js'] as const)('%s original global journal', (ada
     const pool = new Pool({ connectionString })
     const client = postgres(connectionString!, { max: 8 })
     const driver = adapter === 'pg' ? pgDriver(pool) : postgresJsDriver(client)
-    const logger = new Logger({
+    const logger = createLogHost({
       ...loggerOptions,
-      plugins: [binlog({ store: memoryLogStore() }), wal({ store: memoryLogStore() })]
+      plugins: [binlogPlugin({ store: memoryLogStore() }), walPlugin({ store: memoryLogStore() })]
     })
     let fail = true
     const original = new Error('external WAL append after native commit')
@@ -323,12 +320,12 @@ describe.each(['pg', 'postgres-js'] as const)('%s original global journal', (ada
     const pool = new Pool({ connectionString }),
       client = postgres(connectionString!, { max: 8 }),
       driver = adapter === 'pg' ? pgDriver(pool) : postgresJsDriver(client),
-      logger = new Logger({
+      logger = createLogHost({
         ...loggerOptions,
         plugins: [
-          binlog({ store: memoryLogStore() }),
-          wal({ store: memoryLogStore() }),
-          undoLog({ store: memoryLogStore() })
+          binlogPlugin({ store: memoryLogStore() }),
+          walPlugin({ store: memoryLogStore() }),
+          undoLogPlugin({ store: memoryLogStore() })
         ]
       }),
       host = await createStorageHost({
@@ -405,7 +402,10 @@ describe.each(['pg', 'postgres-js'] as const)('%s original global journal', (ada
     const pool = new Pool({ connectionString })
     const client = postgres(connectionString!, { max: 8 })
     const driver = adapter === 'pg' ? pgDriver(pool) : postgresJsDriver(client)
-    const logger = new Logger({ ...loggerOptions, plugins: [binlog({ store: memoryLogStore() })] })
+    const logger = createLogHost({
+      ...loggerOptions,
+      plugins: [binlogPlugin({ store: memoryLogStore() })]
+    })
     const org = randomUUID()
     const host = await createStorageHost({
       org,
@@ -526,9 +526,9 @@ it('retains a pending WAL intent when lost COMMIT evidence leaves the native out
       }
     }
   }
-  const logger = new Logger({
+  const logger = createLogHost({
     ...loggerOptions,
-    plugins: [binlog({ store: memoryLogStore() }), wal({ store: memoryLogStore() })]
+    plugins: [binlogPlugin({ store: memoryLogStore() }), walPlugin({ store: memoryLogStore() })]
   })
   let host = await createStorageHost({
     org,
@@ -570,17 +570,15 @@ it('retains a pending WAL intent when lost COMMIT evidence leaves the native out
 
 it('awaits original external append settlement without replacing a committed result', async () => {
   const pool = new Pool({ connectionString })
-  const logger = new Logger({ ...loggerOptions, plugins: [binlog({ store: memoryLogStore() })] })
+  const logger = createLogHost({
+    ...loggerOptions,
+    plugins: [binlogPlugin({ store: memoryLogStore() })]
+  })
   const entered = deferred<void>(),
     release = deferred<void>()
   const original = new Error('external-append-failure')
   const reports: unknown[] = []
   const borrowed = {
-    dispatchRaw: logger.dispatchRaw,
-    onFailure: logger.onFailure,
-    hook: logger.hook,
-    flush: logger.flush,
-    defer: logger.defer,
     binlog: {
       ...logger.binlog,
       append: async () => {

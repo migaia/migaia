@@ -187,7 +187,7 @@ type IStorageNativeAttemptContext = {
 /** Report post-commit publication failure without rewriting an authentic committed outcome. */
 async function publishStorageNativeCommit(
   attempt: IStorageNativeAttemptContext,
-  payload: import('@migaia/logger/plugins/durable').ILogPayload,
+  payload: import('@migaia/log-plugin-durable').ILogPayload,
   intent: Awaited<ReturnType<NonNullable<IStorageNativeJournalContext['wal']>['begin']>> | undefined
 ): Promise<void> {
   /** Binlog observers describe append failures only; undo/WAL failures use report. */

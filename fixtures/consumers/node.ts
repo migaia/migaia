@@ -2,7 +2,12 @@
 // The neutral StorageHost owns its builtin memory backend; browser backends remain separate.
 import { MessageChannel } from 'node:worker_threads'
 import type { IRpcMessageIO } from '@migaia/rpc-host/sdk'
-import { Logger, type ILogEntry, type ISink } from '@migaia/logger'
+import {
+  createLogHost,
+  type ILogEntry,
+  type ILogPlugin,
+  type ILogPluginCore
+} from '@migaia/log-host'
 import { createCapabilityHost } from '@migaia/capability'
 import { jsonPlugin } from '@migaia/serialize'
 import { createRuntime } from '@migaia/reactive'
@@ -44,21 +49,25 @@ subscribeUntil(eventChannel, eventSignal, (event) => {
   void event.value
 })
 
-const sink: ISink = (entry: ILogEntry) => {
+/** A real consumer observes the exact public entry through its installed plugin's core. */
+const sink = (entry: ILogEntry): void => {
   void entry.message
 }
-new Logger({
+/** Sink registration retains the package's actual plugin contract without widening its core. */
+const capture: ILogPlugin = {
+  name: 'consumer-sink',
+  /** Register during the original host installation window. */
+  install(core: ILogPluginCore) {
+    core.useSink(sink)
+    return {}
+  }
+}
+/** The consumer owns the created log host and releases its original lifecycle. */
+const logger = createLogHost({
   execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-  plugins: [
-    {
-      name: 'consumer-sink',
-      install: (core: any) => {
-        core.useSink(sink)
-        return {}
-      }
-    }
-  ] as const
+  plugins: [capture] as const
 })
+await logger.shutdown('manual')
 
 /** The native channel remains the consumer's resource rather than a second RPC endpoint. */
 const channel = new MessageChannel()

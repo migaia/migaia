@@ -95,13 +95,18 @@
     "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
-    "@migaia/logger": "workspace:^"
+    "@migaia/log-host": "workspace:^",
+    "@migaia/log-plugin-durable": "workspace:^"
   },
   "peerDependencies": {
-    "@migaia/logger": "workspace:^"
+    "@migaia/log-host": "workspace:^",
+    "@migaia/log-plugin-durable": "workspace:^"
   },
   "peerDependenciesMeta": {
-    "@migaia/logger": {
+    "@migaia/log-host": {
+      "optional": true
+    },
+    "@migaia/log-plugin-durable": {
       "optional": true
     }
   }

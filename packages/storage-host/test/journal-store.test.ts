@@ -2,7 +2,7 @@ import { memoryNotificationsFeature } from '../src/features/memory-notifications
 import { memoryChangeFeedFeature } from '../src/features/memory-change-feed.ts'
 import { storageJournalPlugin } from '../src/journal.ts'
 import { describe, expect, it, vi } from 'vitest'
-import { LogRecordState } from '@migaia/logger/plugins/durable'
+import { LogRecordState } from '@migaia/log-plugin-durable'
 import { deferred } from '@migaia/utils/promise'
 import {
   createOrgId,

@@ -1,10 +1,11 @@
-import { Logger, type ILoggerCore } from '@migaia/logger'
+import { ignoreLogFailure } from '../../../storage-host/test/helpers/log-observer.ts'
+import { createLogHost } from '@migaia/log-host'
 import {
-  binlog,
+  binlogPlugin,
   memoryLogStore,
   type ILogStore,
   type IBinlogExt
-} from '@migaia/logger/plugins/durable'
+} from '@migaia/log-plugin-durable'
 import { defineEntity } from '@migaia/storage-host/entity'
 import { entityQueryFeature } from '@migaia/storage-host/entity/features/query'
 import { asRecordStore, kv, type IKeyValueStore } from '@migaia/storage-contract'
@@ -93,18 +94,13 @@ export async function runStorageProgramBatch(storage: IKeyValueStore) {
 /** The unchanged application selects the same original binlog owner in Node and browser hosts. */
 export function createStorageProgramJournal(): {
   logs: ILogStore
-  logger: Pick<ILoggerCore, 'dispatchRaw' | 'onFailure' | 'hook' | 'flush' | 'defer'> &
-    IBinlogExt & { shutdown(reason: 'manual'): Promise<unknown> }
+  logger: IBinlogExt & { shutdown(reason: 'manual'): Promise<unknown> }
 } {
   const logs = memoryLogStore()
-  const logger = new Logger({
+  const logger = createLogHost({
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-    plugins: [binlog({ store: logs })],
-    runtimeManager: {
-      randomUUID: () => crypto.randomUUID(),
-      defer: (task: () => void) => queueMicrotask(task),
-      write: () => undefined
-    }
+    plugins: [binlogPlugin({ store: logs })],
+    report: ignoreLogFailure
   })
   return { logs, logger }
 }

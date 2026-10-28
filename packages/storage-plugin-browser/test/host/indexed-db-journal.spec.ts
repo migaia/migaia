@@ -4,7 +4,7 @@ import { IDBFactory, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
 import { createOrgId, createStorageHost } from '@migaia/storage-host'
 import { storageLogStore, storageJournalPlugin } from '@migaia/storage-host/plugins/journal'
-import { LogRecordState } from '@migaia/logger/plugins/durable'
+import { LogRecordState } from '@migaia/log-plugin-durable'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { indexedDbBackendPlugin } from '../../src/indexed-db.ts'
 

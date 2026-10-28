@@ -6,8 +6,8 @@ import { walkErrorCauses } from '@migaia/utils/error'
 import { IDBFactory, IDBIndex, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { BroadcastChannel as NativeBroadcastChannel } from 'node:worker_threads'
-import { Logger } from '@migaia/logger'
-import { binlog, undoLog } from '@migaia/logger/plugins/durable'
+import { createLogHost } from '@migaia/log-host'
+import { binlogPlugin, undoLogPlugin } from '@migaia/log-plugin-durable'
 import { createStorageHost } from '@migaia/storage-host'
 import {
   kv,
@@ -37,12 +37,12 @@ afterEach(() => vi.restoreAllMocks())
 
 /** Keep the real durable plugin tuple so its public binlog and undo extensions stay typed. */
 function createAssemblyLogger(
-  records: Parameters<typeof binlog>[0]['store'],
-  images: Parameters<typeof undoLog>[0]['store']
+  records: Parameters<typeof binlogPlugin>[0]['store'],
+  images: Parameters<typeof undoLogPlugin>[0]['store']
 ) {
-  return new Logger({
+  return createLogHost({
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-    plugins: [binlog({ store: records }), undoLog({ store: images })]
+    plugins: [binlogPlugin({ store: records }), undoLogPlugin({ store: images })]
   })
 }
 

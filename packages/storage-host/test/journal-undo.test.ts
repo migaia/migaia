@@ -1,27 +1,22 @@
+import { ignoreLogFailure } from './helpers/log-observer.ts'
 import { storageJournalPlugin } from '../src/journal.ts'
 import { describe, expect, it } from 'vitest'
-import { Logger } from '@migaia/logger'
-import { binlog, undoLog, type ILogStore } from '@migaia/logger/plugins/durable'
+import { createLogHost } from '@migaia/log-host'
+import { binlogPlugin, undoLogPlugin, type ILogStore } from '@migaia/log-plugin-durable'
 import { lockKey } from '../src/authoring/concurrency.ts'
 import { ttl, vector, rdf } from '@migaia/storage-contract'
 import { term } from '../src/authoring/rdf.ts'
 import { createOrgId, createStorageHost } from '../src/index.ts'
 import { memoryBackendPlugin } from '../src/plugins/memory.ts'
 
-/** Actual durable plugins retain their existing scheduler and committed indexes. */
-const runtimeManager = {
-  randomUUID: () => crypto.randomUUID(),
-  defer: (task: () => void) => queueMicrotask(task),
-  write: () => undefined
-}
 /** This fixture does not add a second timeout or logger lifecycle owner. */
 const execution = { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } as const
 /** A real same-registration logger carries native binlog and final undo images. */
 const createLogger = (records: ILogStore, images: ILogStore) =>
-  new Logger({
+  createLogHost({
     execution,
-    runtimeManager,
-    plugins: [binlog({ store: records }), undoLog({ store: images })]
+    report: ignoreLogFailure,
+    plugins: [binlogPlugin({ store: records }), undoLogPlugin({ store: images })]
   })
 
 /** Every organization keeps its own original data/log namespace and borrowed logger lifetime. */

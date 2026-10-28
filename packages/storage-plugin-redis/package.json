@@ -68,7 +68,8 @@
     "@migaia/utils": "workspace:^"
   },
   "devDependencies": {
-    "@migaia/logger": "workspace:^",
+    "@migaia/log-host": "workspace:^",
+    "@migaia/log-plugin-durable": "workspace:^",
     "@migaia/storage-host": "workspace:^",
     "@migaia/storage-plugin-postgres": "workspace:^",
     "@types/bun": "1.4.3",

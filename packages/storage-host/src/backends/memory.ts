@@ -63,7 +63,7 @@ import type {
   IStorageJournalImage,
   IStorageJournalTarget
 } from '../journal/types.ts'
-import type { ILogPayload } from '@migaia/logger/plugins/durable'
+import type { ILogPayload } from '@migaia/log-plugin-durable'
 import { storageJournalLockKey, StorageJournalLock } from '../journal/keys.ts'
 import { detectServerRuntime } from '@migaia/utils'
 import { StorageError, type IStorageChannel } from '../errors.ts'

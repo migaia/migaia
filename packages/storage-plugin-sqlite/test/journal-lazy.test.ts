@@ -1,7 +1,7 @@
 import { storageJournalPlugin } from '@migaia/storage-host/plugins/journal'
 import { expect, it, onTestFinished, vi } from 'vitest'
-import { Logger } from '@migaia/logger'
-import { binlog, undoLog, wal, memoryLogStore } from '@migaia/logger/plugins/durable'
+import { createLogHost } from '@migaia/log-host'
+import { binlogPlugin, undoLogPlugin, walPlugin, memoryLogStore } from '@migaia/log-plugin-durable'
 import { kv, ttl } from '@migaia/storage-contract'
 import { createStorageHost } from '@migaia/storage-host'
 import { sqliteBackendPlugin } from '../src/index.ts'
@@ -21,12 +21,12 @@ it.each([
   'journals lazy expiry from the original %s read and restores its raw deadline with undo',
   async (method) => {
     const connection = nodeSqliteDriver(':memory:')
-    const logger = new Logger({
+    const logger = createLogHost({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
       plugins: [
-        wal({ store: memoryLogStore() }),
-        binlog({ store: memoryLogStore() }),
-        undoLog({ store: memoryLogStore() })
+        walPlugin({ store: memoryLogStore() }),
+        binlogPlugin({ store: memoryLogStore() }),
+        undoLogPlugin({ store: memoryLogStore() })
       ]
     })
     const host = await createStorageHost({

@@ -1,6 +1,14 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import {
+  existsSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join, relative, resolve } from 'node:path'
 import test from 'node:test'
@@ -11,6 +19,90 @@ import * as registry from '../error-registry.mjs'
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 /** URL imported by locale-specific child processes. */
 const registryUrl = pathToFileURL(join(repositoryRoot, 'scripts/error-registry.mjs')).href
+
+/** Normal regex slash escaping keeps the product scan independent of this assertion's source. */
+const retiredLogImport = /@migaia\/logger|packages\/logger/u
+
+/**
+ * Require the only historical comparison section to contain every retired import in one guide.
+ *
+ * @param {string} file Repository-relative guide path.
+ * @returns {void} Completes when the approved section owns every historical spelling.
+ * @throws {Error} Missing, repeated, or out-of-section historical imports fail the oracle.
+ */
+function assertLogMigrationSection(file) {
+  /** Exact headings distinguish the permanent guide comparison from arbitrary old imports. */
+  const heading = /^## (?:从 `@migaia\/logger` 迁移|Migrating from `@migaia\/logger`)\s*$/gmu
+  /** The guide is read as shipped rather than reconstructed from a test fixture. */
+  const content = readFileSync(join(repositoryRoot, file), 'utf8')
+  /** A single admitted section is the complete historical comparison allowance. */
+  const sections = [...content.matchAll(heading)]
+  assert.equal(sections.length, 1, `${file} must contain one migration section`)
+  /** Text following the heading ends at the next peer section, if any. */
+  const start = sections[0].index + sections[0][0].length
+  /** A following section is ordinary product documentation and cannot contain retired imports. */
+  const following = content.slice(start).search(/^## /mu)
+  /** Without a later section the approved migration comparison extends to the end. */
+  const end = following === -1 ? content.length : start + following
+  assert.doesNotMatch(content.slice(0, sections[0].index), retiredLogImport)
+  assert.doesNotMatch(content.slice(end), retiredLogImport)
+}
+
+test('logging migration retires product imports and registers all seven owners', () => {
+  /** Release order comes from the actual root registration rather than a second package plan. */
+  const makefile = readFileSync(join(repositoryRoot, 'Makefile'), 'utf8')
+  /** The explicit declaration is the only foundation release owner list. */
+  const declaration = makefile.match(/^RELEASE_PACKAGES := (.+)$/mu)
+  assert.ok(declaration)
+  /** Membership lookups preserve the exact declared release set without sorting or rewriting it. */
+  const releasePackages = new Set(declaration[1].split(/\s+/u))
+  assert.equal(releasePackages.has('logger'), false)
+  // Seven owners are fixed by integration R2, independently of workspace package growth.
+  for (const name of [
+    'log-host',
+    'log-plugin-console',
+    'log-plugin-file',
+    'log-plugin-http',
+    'log-plugin-process',
+    'log-plugin-reasoning',
+    'log-plugin-durable'
+  ])
+    assert.ok(releasePackages.has(name), `${name} is absent from the release plan`)
+  assert.equal(existsSync(join(repositoryRoot, 'packages', 'logger')), false)
+  // Only these two guides have the permanent historical comparison allowance in integration R2.
+  for (const file of ['packages/log-host/USEGUIDE.md', 'packages/log-host/USEGUIDE.en.md'])
+    assertLogMigrationSection(file)
+  /** Ripgrep applies the exact product boundary, including website and tracked baselines. */
+  const scan = spawnSync(
+    'rg',
+    [
+      '-l',
+      retiredLogImport.source,
+      '.',
+      '-g',
+      '!**/node_modules/**',
+      '-g',
+      '!**/dist/**',
+      '-g',
+      '!docs/**',
+      '-g',
+      '!packages/log-host/USEGUIDE.md',
+      '-g',
+      '!packages/log-host/USEGUIDE.en.md',
+      '-g',
+      '!website/package.json',
+      '-g',
+      '!website/bun.lock',
+      '-g',
+      '!website/app/log.ts',
+      '-g',
+      '!website/app/log-runtime.ts'
+    ],
+    { cwd: repositoryRoot, encoding: 'utf8' }
+  )
+  assert.ifError(scan.error)
+  assert.equal(scan.status, 1, scan.stdout || scan.stderr)
+})
 
 /**
  * Creates an isolated source tree for one registry assertion. Callers own and remove the returned

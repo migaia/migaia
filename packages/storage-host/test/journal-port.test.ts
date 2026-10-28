@@ -1,3 +1,4 @@
+import { ignoreLogFailure } from './helpers/log-observer.ts'
 import { memoryNotificationsFeature } from '../src/features/memory-notifications.ts'
 import { memoryChangeFeedFeature } from '../src/features/memory-change-feed.ts'
 import { storageJournalPlugin } from '../src/journal.ts'
@@ -7,11 +8,11 @@ import { lockKey } from '../src/authoring/concurrency.ts'
 import { runTransactionOperation } from '../src/authoring/transaction.ts'
 import {
   LogRecordState,
-  binlog,
-  undoLog,
-  wal,
+  binlogPlugin,
+  undoLogPlugin,
+  walPlugin,
   memoryLogStore
-} from '@migaia/logger/plugins/durable'
+} from '@migaia/log-plugin-durable'
 import {
   createStorageHost,
   createOrgId,
@@ -24,7 +25,7 @@ import { memoryBackendPlugin, memoryBackendKind } from '../src/plugins/memory.ts
 import { storageLogStore } from '../src/journal.ts'
 import { resolveStorageLogNativeAccess } from '../src/journal/append-port.ts'
 import { createMemoryBackend } from '../src/backends/memory.ts'
-import { Logger } from '@migaia/logger'
+import { createLogHost } from '@migaia/log-host'
 import {
   resolveStorageJournalBinding,
   snapshotStorageJournalBinding
@@ -114,9 +115,9 @@ describe('original native log append port', () => {
       ]
     })
     await using images = await storageLogStore(host, 'memory', { prefix: 'opt-in-images' })
-    const logger = new Logger({
+    const logger = createLogHost({
       execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-      plugins: [undoLog({ store: images })]
+      plugins: [undoLogPlugin({ store: images })]
     })
     try {
       const access = resolveStorageJournalBinding(host, 'memory')
@@ -174,21 +175,20 @@ describe('original native log append port', () => {
     await using walRecords = memoryLogStore()
     await using selected = await storageLogStore(host, 'data', { prefix: 'non-atomic-selected' })
     const execution = { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } as const
-    const runtimeManager = {
-      randomUUID: () => crypto.randomUUID(),
-      defer: (task: () => void) => queueMicrotask(task),
-      write: () => undefined
-    }
-    const logger = new Logger({ execution, runtimeManager, plugins: [binlog({ store: external })] })
-    const walLogger = new Logger({
+    const logger = createLogHost({
       execution,
-      runtimeManager,
-      plugins: [binlog({ store: walRecords }), wal({ store: intents })]
+      report: ignoreLogFailure,
+      plugins: [binlogPlugin({ store: external })]
     })
-    const undoLogger = new Logger({
+    const walLogger = createLogHost({
       execution,
-      runtimeManager,
-      plugins: [undoLog({ store: selected })]
+      report: ignoreLogFailure,
+      plugins: [binlogPlugin({ store: walRecords }), walPlugin({ store: intents })]
+    })
+    const undoLogger = createLogHost({
+      execution,
+      report: ignoreLogFailure,
+      plugins: [undoLogPlugin({ store: selected })]
     })
     try {
       const store = host.backend('data')

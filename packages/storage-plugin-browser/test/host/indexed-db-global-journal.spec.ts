@@ -3,9 +3,9 @@ import { indexedDbTestFeatures } from '../helpers/indexed-db-features.ts'
 // @vitest-environment node
 import { IDBFactory, IDBKeyRange, IDBObjectStore } from 'fake-indexeddb'
 import { describe, expect, it, vi } from 'vitest'
-import { Logger } from '@migaia/logger'
-import { level } from '@migaia/logger/plugins'
-import { binlog, undoLog } from '@migaia/logger/plugins/durable'
+import { createLogHost } from '@migaia/log-host'
+import { levelPlugin } from '@migaia/log-host'
+import { binlogPlugin, undoLogPlugin } from '@migaia/log-plugin-durable'
 import { kv, ttl } from '@migaia/storage-contract'
 import { lockKey, decodeFlatStorageKey } from '@migaia/storage-host/sdk'
 import { createOrgId, createStorageHost } from '@migaia/storage-host'
@@ -15,12 +15,12 @@ import { indexedDbBackendPlugin } from '../../src/indexed-db.ts'
 
 /** Only the original durable plugins and actual native private stores participate in the fixture. */
 const createLogger = (
-  records: Parameters<typeof binlog>[0]['store'],
-  images: Parameters<typeof undoLog>[0]['store']
+  records: Parameters<typeof binlogPlugin>[0]['store'],
+  images: Parameters<typeof undoLogPlugin>[0]['store']
 ) =>
-  new Logger({
+  createLogHost({
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-    plugins: [binlog({ store: records }), undoLog({ store: images })]
+    plugins: [binlogPlugin({ store: records }), undoLogPlugin({ store: images })]
   })
 
 describe('global IndexedDB native journal', () => {
@@ -236,9 +236,9 @@ describe('global IndexedDB native journal', () => {
 
   it('isolates raw native Features only for active commit journals, preserving telemetry-only clients', async () => {
     for (const active of [true, false]) {
-      const telemetryLogger = new Logger({
+      const telemetryLogger = createLogHost({
         execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-        plugins: [level()]
+        plugins: [levelPlugin()]
       })
       let logger: ReturnType<typeof createLogger> | undefined
       await using host = await createStorageHost({

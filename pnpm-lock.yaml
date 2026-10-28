@@ -166,6 +166,30 @@ importers:
 
   .:
     devDependencies:
+      '@migaia/log-host':
+        specifier: workspace:^
+        version: link:packages/log-host
+      '@migaia/log-plugin-console':
+        specifier: workspace:^
+        version: link:packages/log-plugin-console
+      '@migaia/log-plugin-durable':
+        specifier: workspace:^
+        version: link:packages/log-plugin-durable
+      '@migaia/log-plugin-file':
+        specifier: workspace:^
+        version: link:packages/log-plugin-file
+      '@migaia/log-plugin-http':
+        specifier: workspace:^
+        version: link:packages/log-plugin-http
+      '@migaia/log-plugin-process':
+        specifier: workspace:^
+        version: link:packages/log-plugin-process
+      '@migaia/log-plugin-reasoning':
+        specifier: workspace:^
+        version: link:packages/log-plugin-reasoning
+      '@migaia/storage-host':
+        specifier: workspace:^
+        version: link:packages/storage-host
       '@playwright/test':
         specifier: ^1.62.1
         version: 1.62.1
@@ -245,7 +269,7 @@ importers:
         specifier: 4.1.10
         version: 4.1.10(@types/node@24.13.2)(@vitest/coverage-v8@4.1.10)(jsdom@29.1.1)(vite@8.1.1(@types/node@24.13.2)(esbuild@0.28.2)(jiti@1.21.7)(yaml@2.9.0))
 
-  packages/logger:
+  packages/log-host:
     dependencies:
       '@migaia/event-subscriber':
         specifier: workspace:^
@@ -262,9 +286,78 @@ importers:
       '@migaia/utils':
         specifier: workspace:^
         version: link:../utils
+
+  packages/log-plugin-console:
+    dependencies:
+      '@migaia/utils':
+        specifier: workspace:^
+        version: link:../utils
       ansis:
         specifier: 4.3.1
         version: 4.3.1
+    devDependencies:
+      '@migaia/log-host':
+        specifier: workspace:0.0.11
+        version: link:../log-host
+
+  packages/log-plugin-durable:
+    dependencies:
+      '@migaia/event-subscriber':
+        specifier: workspace:^
+        version: link:../event-subscriber
+      '@migaia/plugin-host':
+        specifier: workspace:^
+        version: link:../plugin-host
+      '@migaia/utils':
+        specifier: workspace:^
+        version: link:../utils
+    devDependencies:
+      '@migaia/log-host':
+        specifier: workspace:*
+        version: link:../log-host
+      '@types/node':
+        specifier: 24.13.2
+        version: 24.13.2
+
+  packages/log-plugin-file:
+    dependencies:
+      '@migaia/utils':
+        specifier: workspace:^
+        version: link:../utils
+    devDependencies:
+      '@migaia/log-host':
+        specifier: workspace:0.0.11
+        version: link:../log-host
+
+  packages/log-plugin-http:
+    dependencies:
+      '@migaia/utils':
+        specifier: workspace:^
+        version: link:../utils
+    devDependencies:
+      '@migaia/log-host':
+        specifier: workspace:0.0.11
+        version: link:../log-host
+
+  packages/log-plugin-process:
+    dependencies:
+      '@migaia/utils':
+        specifier: workspace:^
+        version: link:../utils
+    devDependencies:
+      '@migaia/log-host':
+        specifier: workspace:0.0.11
+        version: link:../log-host
+
+  packages/log-plugin-reasoning:
+    dependencies:
+      '@migaia/utils':
+        specifier: workspace:^
+        version: link:../utils
+    devDependencies:
+      '@migaia/log-host':
+        specifier: workspace:0.0.11
+        version: link:../log-host
 
   packages/micro-hub:
     dependencies:
@@ -841,9 +934,12 @@ importers:
         specifier: workspace:^
         version: link:../utils
     devDependencies:
-      '@migaia/logger':
+      '@migaia/log-host':
         specifier: workspace:^
-        version: link:../logger
+        version: link:../log-host
+      '@migaia/log-plugin-durable':
+        specifier: workspace:^
+        version: link:../log-plugin-durable
 
   packages/storage-plugin-archive:
     dependencies:
@@ -866,6 +962,9 @@ importers:
       '@migaia/storage-host':
         specifier: workspace:^
         version: link:../storage-host
+      '@migaia/storage-plugin-browser':
+        specifier: workspace:^
+        version: link:../storage-plugin-browser
       '@migaia/storage-plugin-object':
         specifier: workspace:^
         version: link:../storage-plugin-object
@@ -875,9 +974,6 @@ importers:
       '@migaia/storage-plugin-sqlite':
         specifier: workspace:^
         version: link:../storage-plugin-sqlite
-      '@migaia/storage-plugin-browser':
-        specifier: workspace:^
-        version: link:../storage-plugin-browser
       '@types/pg':
         specifier: 8.23.1
         version: 8.23.1
@@ -887,6 +983,55 @@ importers:
       pg:
         specifier: 8.23.1
         version: 8.23.1
+
+  packages/storage-plugin-browser:
+    dependencies:
+      '@migaia/event-subscriber':
+        specifier: workspace:^
+        version: link:../event-subscriber
+      '@migaia/lifecycle':
+        specifier: workspace:^
+        version: link:../lifecycle
+      '@migaia/plugin-host':
+        specifier: workspace:^
+        version: link:../plugin-host
+      '@migaia/reactive':
+        specifier: workspace:^
+        version: link:../reactive
+      '@migaia/resource':
+        specifier: workspace:^
+        version: link:../resource
+      '@migaia/storage-contract':
+        specifier: workspace:^
+        version: link:../storage-contract
+      '@migaia/utils':
+        specifier: workspace:^
+        version: link:../utils
+    devDependencies:
+      '@migaia/log-host':
+        specifier: workspace:*
+        version: link:../log-host
+      '@migaia/log-plugin-durable':
+        specifier: workspace:*
+        version: link:../log-plugin-durable
+      '@migaia/rpc-contract':
+        specifier: workspace:*
+        version: link:../rpc-contract
+      '@migaia/storage-host':
+        specifier: workspace:^
+        version: link:../storage-host
+      '@migaia/store-persist':
+        specifier: workspace:*
+        version: link:../store-persist
+      '@vitest/coverage-v8':
+        specifier: 4.1.10
+        version: 4.1.10(vitest@4.1.10)
+      fake-indexeddb:
+        specifier: 6.2.5
+        version: 6.2.5
+      jsdom:
+        specifier: 29.1.1
+        version: 29.1.1
 
   packages/storage-plugin-cache:
     dependencies:
@@ -900,9 +1045,12 @@ importers:
         specifier: workspace:^
         version: link:../utils
     devDependencies:
-      '@migaia/logger':
+      '@migaia/log-host':
         specifier: workspace:^
-        version: link:../logger
+        version: link:../log-host
+      '@migaia/log-plugin-durable':
+        specifier: workspace:^
+        version: link:../log-plugin-durable
       '@migaia/storage-host':
         specifier: workspace:^
         version: link:../storage-host
@@ -965,9 +1113,12 @@ importers:
         specifier: workspace:^
         version: link:../utils
     devDependencies:
-      '@migaia/logger':
+      '@migaia/log-host':
         specifier: workspace:^
-        version: link:../logger
+        version: link:../log-host
+      '@migaia/log-plugin-durable':
+        specifier: workspace:^
+        version: link:../log-plugin-durable
       '@migaia/storage-host':
         specifier: workspace:^
         version: link:../storage-host
@@ -1027,9 +1178,12 @@ importers:
         specifier: workspace:^
         version: link:../utils
     devDependencies:
-      '@migaia/logger':
+      '@migaia/log-host':
         specifier: workspace:^
-        version: link:../logger
+        version: link:../log-host
+      '@migaia/log-plugin-durable':
+        specifier: workspace:^
+        version: link:../log-plugin-durable
       '@migaia/storage-host':
         specifier: workspace:^
         version: link:../storage-host
@@ -1092,9 +1246,12 @@ importers:
         specifier: workspace:^
         version: link:../utils
     devDependencies:
-      '@migaia/logger':
+      '@migaia/log-host':
         specifier: workspace:^
-        version: link:../logger
+        version: link:../log-host
+      '@migaia/log-plugin-durable':
+        specifier: workspace:^
+        version: link:../log-plugin-durable
       '@migaia/storage-host':
         specifier: workspace:^
         version: link:../storage-host
@@ -1104,52 +1261,6 @@ importers:
       '@migaia/store-persist':
         specifier: workspace:^
         version: link:../store-persist
-
-  packages/storage-plugin-browser:
-    dependencies:
-      '@migaia/event-subscriber':
-        specifier: workspace:^
-        version: link:../event-subscriber
-      '@migaia/lifecycle':
-        specifier: workspace:^
-        version: link:../lifecycle
-      '@migaia/plugin-host':
-        specifier: workspace:^
-        version: link:../plugin-host
-      '@migaia/reactive':
-        specifier: workspace:^
-        version: link:../reactive
-      '@migaia/resource':
-        specifier: workspace:^
-        version: link:../resource
-      '@migaia/storage-contract':
-        specifier: workspace:^
-        version: link:../storage-contract
-      '@migaia/utils':
-        specifier: workspace:^
-        version: link:../utils
-    devDependencies:
-      '@migaia/logger':
-        specifier: workspace:*
-        version: link:../logger
-      '@migaia/rpc-contract':
-        specifier: workspace:*
-        version: link:../rpc-contract
-      '@migaia/storage-host':
-        specifier: workspace:^
-        version: link:../storage-host
-      '@migaia/store-persist':
-        specifier: workspace:*
-        version: link:../store-persist
-      '@vitest/coverage-v8':
-        specifier: 4.1.10
-        version: 4.1.10(vitest@4.1.10)
-      fake-indexeddb:
-        specifier: 6.2.5
-        version: 6.2.5
-      jsdom:
-        specifier: 29.1.1
-        version: 29.1.1
 
   packages/store-devtools:
     dependencies:

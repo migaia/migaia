@@ -4,7 +4,7 @@ import type {
   IConcurrencyHolder,
   IConcurrencyDecision
 } from '@migaia/storage-contract'
-import type { ILogObservation } from '@migaia/logger/plugins/durable'
+import type { ILogObservation } from '@migaia/log-plugin-durable'
 
 /** Listener registration shares one host event owner and returns its actual unsubscribe handle. */
 export type IStorageHooks = {

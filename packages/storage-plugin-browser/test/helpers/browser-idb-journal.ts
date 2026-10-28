@@ -1,7 +1,7 @@
 import { storageJournalPlugin, storageLogStore } from '@migaia/storage-host/plugins/journal'
 import { indexedDbTestFeatures } from './indexed-db-features.ts'
-import { Logger } from '@migaia/logger'
-import { binlog, undoLog } from '@migaia/logger/plugins/durable'
+import { createLogHost } from '@migaia/log-host'
+import { binlogPlugin, undoLogPlugin } from '@migaia/log-plugin-durable'
 import { createOrgId, createStorageHost } from '@migaia/storage-host'
 import { decodeFlatStorageKey } from '@migaia/storage-host/sdk'
 import { indexedDbBackendPlugin } from '../../src/indexed-db.ts'
@@ -64,12 +64,12 @@ async function closeIndexedDbJournal() {
 
 /** The actual native durable plugins retain their original inferred logger surface. */
 const createNativeJournalLogger = (
-  records: Parameters<typeof binlog>[0]['store'],
-  images: Parameters<typeof undoLog>[0]['store']
+  records: Parameters<typeof binlogPlugin>[0]['store'],
+  images: Parameters<typeof undoLogPlugin>[0]['store']
 ) =>
-  new Logger({
+  createLogHost({
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-    plugins: [binlog({ store: records }), undoLog({ store: images })]
+    plugins: [binlogPlugin({ store: records }), undoLogPlugin({ store: images })]
   })
 
 /** Actual browser activity windows must permit native logs and undo without another terminal. */

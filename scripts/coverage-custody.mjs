@@ -408,7 +408,7 @@ export const buildWorkspaceOutput = () => {
   const filters = [...workspacePackages().entries()]
     .filter(([, directory]) => isStampable(directory))
     .flatMap(([name]) => ['--filter', `./packages/${name}`])
-  run('pnpm', ['-r', ...filters, 'run', 'build'])
+  run('pnpm', ['-r', '--workspace-concurrency=2', ...filters, 'run', 'build'])
 }
 
 /**

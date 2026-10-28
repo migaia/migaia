@@ -153,7 +153,13 @@ const packedCommands = Object.freeze({
   ]
 })
 /** Turbo builds packages only; the website keeps its own bun gates and is never a turbo task. */
-const turboBuildArgs = Object.freeze(['exec', 'turbo', 'run', 'build', '--filter=./packages/*'])
+const workspaceBuildArgs = Object.freeze([
+  '-r',
+  '--workspace-concurrency=2',
+  '--filter=./packages/*',
+  'run',
+  'build'
+])
 
 /**
  * Run one package script through Turbo so unchanged inputs replay their cached result. `--only`
@@ -350,9 +356,8 @@ export const runPool = async (entries, jobs, execute) => {
  * @returns {Promise<IGateResult>} The package test's native child status.
  */
 const captureTest = async (name, runtime) => {
-  /** Logger's root test file was already part of release-check and must not be omitted. */
+  /** Each package's existing coverage invocation owns its complete test inventory. */
   const args = coverageArguments(name, runtime.reportRoot)
-  if (name === 'logger') args.splice(args.indexOf('--coverage'), 0, 'logger.test.ts')
   args.push(`--maxWorkers=${name === 'tray' ? 1 : runtime.workers}`)
   /** Exit markers prevent custody from retrying failed captures merely because V8 wrote JSON. */
   const result = await runGate(`${name}/test`, 'required', 'pnpm', args, {
@@ -735,7 +740,7 @@ export const runCi = async (
   /** Root rows stay in their old order even though both package groups now share one pool. */
   const results = []
   results.push(
-    await runGate(GateName.build, 'required', 'pnpm', [...turboBuildArgs], { env: runtime.env })
+    await runGate(GateName.build, 'required', 'pnpm', [...workspaceBuildArgs], { env: runtime.env })
   )
   for (const name of [GateName.dependencies, GateName.release])
     results.push(
@@ -993,7 +998,7 @@ const preparePackages = async (runtime) => {
   } catch (error) {
     if (error?.code !== DistStampErrorCode.stale) throw error
     console.log(text.preparation)
-    return runCommand('pnpm', [...turboBuildArgs], { env: runtime.env })
+    return runCommand('pnpm', [...workspaceBuildArgs], { env: runtime.env })
   }
 }
 

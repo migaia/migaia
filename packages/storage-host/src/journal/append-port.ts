@@ -1,4 +1,4 @@
-import type { ILogAppendPort, ILogStore } from '@migaia/logger/plugins/durable'
+import type { ILogAppendPort, ILogStore } from '@migaia/log-plugin-durable'
 import {
   StorageContractError,
   StorageContractErrorCode,

@@ -1,8 +1,9 @@
+import { StorageLogObserver } from '../../storage-host/test/helpers/log-observer.ts'
 import { randomUUID } from 'node:crypto'
 import { Pool } from 'pg'
 import { it, expect, onTestFinished } from 'vitest'
-import { Logger, type ILogEntry } from '@migaia/logger'
-import { level } from '@migaia/logger/plugins'
+import { createLogHost } from '@migaia/log-host'
+import { levelPlugin } from '@migaia/log-host'
 import { createStorageHost } from '@migaia/storage-host'
 import { storageJournalPlugin } from '@migaia/storage-host/plugins/journal'
 import { ConcurrencyPolicy, lockKey } from '@migaia/storage-host/sdk'
@@ -19,11 +20,11 @@ const execution = { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } as
 
 it('observes complete original retry loops once with canonical native keys and fixed organization', async () => {
   const pool = new Pool({ connectionString })
-  const entries: ILogEntry[] = []
-  const logger = new Logger({ execution, plugins: [level()] })
-  logger.useSink((entry) => {
-    entries.push(entry)
-  })
+  /** A real installed plugin observes the asynchronous log host's original entries. */
+  const observer = new StorageLogObserver()
+  /** Keep the existing assertions over the observer's exact entry array. */
+  const entries = observer.entries
+  const logger = createLogHost({ execution, plugins: [levelPlugin(), observer] })
   const host = await createStorageHost({
     plugins: [
       storageJournalPlugin({ logger, namespace: 'telemetry', telemetry: true }),
@@ -40,6 +41,7 @@ it('observes complete original retry loops once with canonical native keys and f
   })
   const store = host.backend('postgres')
   await store.set('key', 'before')
+  await logger.flush()
   expect(entries).toHaveLength(1)
   expect(entries[0]).toMatchObject({
     tag: 'storage',
@@ -53,6 +55,7 @@ it('observes complete original retry loops once with canonical native keys and f
     }
   })
   await store.metadata.set('private-version', 1)
+  await logger.flush()
   expect(entries).toHaveLength(1)
   entries.length = 0
   const entered = deferred<void>(),
@@ -75,6 +78,7 @@ it('observes complete original retry loops once with canonical native keys and f
   release.resolve()
   await pending
   expect(calls).toBe(2)
+  await logger.flush()
   expect(entries.map((entry) => entry.message)).toEqual(['set', 'transaction'])
   expect(entries[1]!.meta).toMatchObject({
     outcome: 'success',
@@ -92,6 +96,7 @@ it('observes complete original retry loops once with canonical native keys and f
       (cause: unknown) => cause
     )
   expect(failure).toMatchObject({ code: 'TRANSACTION_FAILED', cause: original })
+  await logger.flush()
   expect(entries).toHaveLength(1)
   expect(entries[0]!.args[0]).toBe(failure)
   expect(entries[0]!.meta).toMatchObject({ outcome: 'error', code: 'TRANSACTION_FAILED' })
@@ -101,6 +106,7 @@ it('observes complete original retry loops once with canonical native keys and f
   await other.set('key', 'org')
   const get = other.get
   expect(await get('key')).toBe('org')
+  await logger.flush()
   expect(entries).toHaveLength(2)
   expect(entries.every((entry) => entry.meta!.orgId === orgId)).toBe(true)
   expect(entries[0]!.meta!.keys).toEqual([
@@ -111,6 +117,7 @@ it('observes complete original retry loops once with canonical native keys and f
   entries.length = 0
   const readOnlyOrg = randomUUID()
   expect(await host.org(readOnlyOrg).backend('postgres').get('never-written')).toBeNull()
+  await logger.flush()
   expect(entries).toHaveLength(1)
   expect(entries[0]!.meta).toMatchObject({
     orgId: readOnlyOrg,
@@ -120,16 +127,11 @@ it('observes complete original retry loops once with canonical native keys and f
   })
 })
 
-it('keeps disabled level methods unread and contains a closed logger failure', async () => {
+it('keeps disabled level methods unread and contains a borrowed level capability failure', async () => {
   const pool = new Pool({ connectionString })
-  const logger = new Logger({ execution, plugins: [level()] })
+  const logger = createLogHost({ execution, plugins: [levelPlugin()] })
   let reads = 0
   const borrowed = {
-    dispatchRaw: logger.dispatchRaw,
-    onFailure: logger.onFailure,
-    hook: logger.hook,
-    flush: logger.flush,
-    defer: logger.defer,
     get atLevel() {
       reads += 1
       return logger.atLevel
@@ -144,10 +146,19 @@ it('keeps disabled level methods unread and contains a closed logger failure', a
       })
     ] as const
   })
+  /** A borrowed capability can throw even though the authentic host contains dispatch failures. */
+  const original = new RangeError('borrowed native telemetry capability failed')
+  /** Retain the real level methods while preserving storage's original catch/report boundary. */
+  const failing = {
+    ...logger,
+    atLevel() {
+      throw original
+    }
+  }
   const reports: unknown[] = []
   const enabled = await createStorageHost({
     plugins: [
-      storageJournalPlugin({ logger, namespace: 'enabled', telemetry: true }),
+      storageJournalPlugin({ logger: failing, namespace: 'enabled', telemetry: true }),
       postgresBackendPlugin({
         driver: pgDriver(pool),
         prefix: 'pg_telemetry_closed_' + randomUUID().slice(0, 8)
@@ -168,5 +179,6 @@ it('keeps disabled level methods unread and contains a closed logger failure', a
   await logger.shutdown('manual')
   await expect(enabled.backend('postgres').set('key', 'committed')).resolves.toBeUndefined()
   expect(reports).toHaveLength(1)
+  expect(reports[0]).toBe(original)
   expect(await disabled.backend('postgres').get('key')).toBe('value')
 })

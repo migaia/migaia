@@ -1,6 +1,7 @@
+import { ignoreLogFailure } from '../../storage-host/test/helpers/log-observer.ts'
 import { storageJournalPlugin } from '@migaia/storage-host/plugins/journal'
-import { Logger } from '@migaia/logger'
-import { binlog, wal, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'
+import { createLogHost } from '@migaia/log-host'
+import { binlogPlugin, walPlugin, undoLogPlugin, memoryLogStore } from '@migaia/log-plugin-durable'
 import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -91,14 +92,14 @@ describe('native borrowed cache tiers', () => {
       changes = memoryLogStore(),
       intents = memoryLogStore(),
       images = memoryLogStore(),
-      logger = new Logger({
+      logger = createLogHost({
         execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-        runtimeManager: {
-          randomUUID: () => crypto.randomUUID(),
-          defer: (task: () => void) => queueMicrotask(task),
-          write: () => undefined
-        },
-        plugins: [binlog({ store: changes }), wal({ store: intents }), undoLog({ store: images })]
+        report: ignoreLogFailure,
+        plugins: [
+          binlogPlugin({ store: changes }),
+          walPlugin({ store: intents }),
+          undoLogPlugin({ store: images })
+        ]
       }),
       host = await createStorageHost({
         plugins: [

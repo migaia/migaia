@@ -5,7 +5,6 @@
     "paths": {
       "@migaia/plugin-host": ["../../packages/plugin-host/dist/index.d.ts"],
       "@migaia/event-subscriber": ["../../packages/event-subscriber/dist/index.d.ts"],
-      "@migaia/logger": ["../../packages/logger/dist/index.d.ts"],
       "@migaia/capability": ["../../packages/capability/dist/index.d.ts"],
       "@migaia/reactive": ["../../packages/reactive/dist/index.d.ts"],
       "@migaia/resource": ["../../packages/resource/dist/index.d.ts"],
@@ -26,7 +25,26 @@
       "@migaia/storage-host": ["../../packages/storage-host/dist/index.d.ts"],
       "@migaia/storage-host/*": ["../../packages/storage-host/dist/*"],
       "@migaia/lifecycle": ["../../packages/lifecycle/dist/index.d.ts"],
-      "@migaia/utils/promise": ["../../packages/utils/dist/promise.d.ts"]
+      "@migaia/utils/promise": ["../../packages/utils/dist/promise.d.ts"],
+      "@migaia/log-host": ["../../packages/log-host/dist/index.d.ts"],
+      "@migaia/log-host/plugin": ["../../packages/log-host/dist/plugin.d.ts"],
+      "@migaia/log-host/features": ["../../packages/log-host/dist/features/index.d.ts"],
+      "@migaia/log-host/features/threshold": [
+        "../../packages/log-host/dist/features/threshold.d.ts"
+      ],
+      "@migaia/log-host/features/filter": ["../../packages/log-host/dist/features/filter.d.ts"],
+      "@migaia/log-host/features/uuid": ["../../packages/log-host/dist/features/uuid.d.ts"],
+      "@migaia/log-host/features/format": ["../../packages/log-host/dist/features/format.d.ts"],
+      "@migaia/log-host/features/batch": ["../../packages/log-host/dist/features/batch.d.ts"],
+      "@migaia/log-host/features/retry": ["../../packages/log-host/dist/features/retry.d.ts"],
+      "@migaia/log-host/features/timeout": ["../../packages/log-host/dist/features/timeout.d.ts"],
+      "@migaia/log-plugin-console": ["../../packages/log-plugin-console/dist/index.d.ts"],
+      "@migaia/log-plugin-file": ["../../packages/log-plugin-file/dist/index.d.ts"],
+      "@migaia/log-plugin-http": ["../../packages/log-plugin-http/dist/index.d.ts"],
+      "@migaia/log-plugin-process": ["../../packages/log-plugin-process/dist/index.d.ts"],
+      "@migaia/log-plugin-reasoning": ["../../packages/log-plugin-reasoning/dist/index.d.ts"],
+      "@migaia/log-plugin-durable": ["../../packages/log-plugin-durable/dist/index.d.ts"],
+      "@migaia/log-plugin-durable/file": ["../../packages/log-plugin-durable/dist/file.d.ts"]
     },
     "skipLibCheck": false,
     "verbatimModuleSyntax": true

@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
-import { Logger } from '@migaia/logger'
-import { level } from '@migaia/logger/plugins'
+import { createLogHost } from '@migaia/log-host'
+import { levelPlugin } from '@migaia/log-host'
 import { createStorageHost, definePlugin } from '../../src/index.ts'
 import { StorageHostErrorCode } from '@migaia/storage-contract/error-code'
 import { memoryBackendPlugin } from '../../src/plugins/memory.ts'
@@ -46,9 +46,9 @@ it('refuses a borrowed backend until its borrower is removed', async () => {
 
 it('rejects an unknown id, a configured journal plugin and removal during an install', async () => {
   /** A borrowed telemetry logger is the smallest real journal configuration. */
-  const logger = new Logger({
+  const logger = createLogHost({
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-    plugins: [level()]
+    plugins: [levelPlugin()]
   })
   await using host = await createStorageHost({
     plugins: [

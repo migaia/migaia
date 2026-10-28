@@ -1,37 +1,32 @@
+import { ignoreLogFailure } from './helpers/log-observer.ts'
 import { storageProbe } from '../src/plugins/probe/index.ts'
 import { storageJournalPlugin } from '../src/journal.ts'
 import { memoryNotificationsFeature } from '../src/features/memory-notifications.ts'
 import { memoryChangeFeedFeature } from '../src/features/memory-change-feed.ts'
 import { describe, expect, it } from 'vitest'
-import { Logger } from '@migaia/logger'
+import { createLogHost } from '@migaia/log-host'
 import { deferred } from '@migaia/utils/promise'
 import {
-  binlog,
-  undoLog,
+  binlogPlugin,
+  undoLogPlugin,
   memoryLogStore,
   LogRecordState,
   type ILogStore
-} from '@migaia/logger/plugins/durable'
+} from '@migaia/log-plugin-durable'
 import { blob, counter, kv, rdf, ttl, vector } from '@migaia/storage-contract'
 import { lockKey } from '../src/authoring/concurrency.ts'
 import { term } from '../src/authoring/rdf.ts'
 import { createOrgId, createStorageHost } from '../src/index.ts'
 import { memoryBackendPlugin } from '../src/plugins/memory.ts'
 
-/** Real durable scheduling keeps failures observable without writing test diagnostics to stdout. */
-const runtimeManager = {
-  randomUUID: () => crypto.randomUUID(),
-  defer: (task: () => void) => queueMicrotask(task),
-  write: () => undefined
-}
 /** Existing durable plugins require their original explicit unbounded execution budget. */
 const execution = { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } as const
 /** Each fixture borrows two authentic stores through the real installed durable plugins. */
 const createJournalLogger = (records: ILogStore, images: ILogStore) =>
-  new Logger({
+  createLogHost({
     execution,
-    runtimeManager,
-    plugins: [binlog({ store: records }), undoLog({ store: images })]
+    report: ignoreLogFailure,
+    plugins: [binlogPlugin({ store: records }), undoLogPlugin({ store: images })]
   })
 
 describe('global native storage journal', () => {
@@ -170,11 +165,6 @@ describe('global native storage journal', () => {
             }
           }
           const borrowed = {
-            dispatchRaw: original.dispatchRaw,
-            onFailure: original.onFailure,
-            hook: original.hook,
-            flush: original.flush,
-            defer: original.defer,
             binlog,
             undo: original.undo
           }
@@ -326,7 +316,11 @@ describe('global native storage journal', () => {
 describe('external storage binlog', () => {
   it('waits for commit-only append and reports its failure without reversing committed data', async () => {
     await using records = memoryLogStore()
-    const logger = new Logger({ execution, runtimeManager, plugins: [binlog({ store: records })] })
+    const logger = createLogHost({
+      execution,
+      report: ignoreLogFailure,
+      plugins: [binlogPlugin({ store: records })]
+    })
     const entered = deferred<void>()
     const release = deferred<void>()
     const original = new RangeError('external durable append failed after commit')
@@ -334,16 +328,11 @@ describe('external storage binlog', () => {
     const failures: unknown[] = []
     let calls = 0
     const borrowed = {
-      dispatchRaw: logger.dispatchRaw,
-      onFailure: logger.onFailure,
-      hook: logger.hook,
-      flush: logger.flush,
-      defer: logger.defer,
       binlog: {
         ...logger.binlog,
         append: async <T>(
           kind: string,
-          payload: T & import('@migaia/logger/plugins/durable').ILogPayloadInput<T>
+          payload: T & import('@migaia/log-plugin-durable').ILogPayloadInput<T>
         ) => {
           calls++
           if (calls === 1) {

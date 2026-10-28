@@ -1,7 +1,8 @@
+import { ignoreLogFailure } from './helpers/log-observer.ts'
 import { storageJournalPlugin } from '../src/journal.ts'
 import { describe, expect, it } from 'vitest'
-import { Logger } from '@migaia/logger'
-import { binlog, undoLog, memoryLogStore } from '@migaia/logger/plugins/durable'
+import { createLogHost } from '@migaia/log-host'
+import { binlogPlugin, undoLogPlugin, memoryLogStore } from '@migaia/log-plugin-durable'
 import { lockKey } from '../src/authoring/concurrency.ts'
 import { createStorageHost, createOrgId } from '../src/index.ts'
 import { memoryBackendPlugin } from '../src/plugins/memory.ts'
@@ -10,12 +11,6 @@ import { resolveStorageJournalBinding } from '../src/journal/binding.ts'
 import { createStorageNativeJournal } from '../src/journal/commit.ts'
 import { decodeFlatStorageKey } from '../src/core/key-domain.ts'
 
-/** Real logger scheduling stays active while expected diagnostics avoid process output. */
-const runtimeManager = {
-  randomUUID: () => crypto.randomUUID(),
-  defer: (task: () => void) => queueMicrotask(task),
-  write: () => undefined
-}
 /** Durable plugin preparation uses the logger's required original execution-budget contract. */
 const execution = { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } as const
 
@@ -27,10 +22,10 @@ describe('native storage journal commit bridge', () => {
     const store = host.backend('memory')
     const binlogStore = await storageLogStore(host, 'memory', { prefix: 'native-binlog' })
     const undoStore = await storageLogStore(host, 'memory', { prefix: 'native-undo' })
-    const logger = new Logger({
+    const logger = createLogHost({
       execution,
-      runtimeManager,
-      plugins: [binlog({ store: binlogStore }), undoLog({ store: undoStore })]
+      report: ignoreLogFailure,
+      plugins: [binlogPlugin({ store: binlogStore }), undoLogPlugin({ store: undoStore })]
     })
     try {
       const native = await createStorageNativeJournal({
@@ -145,7 +140,11 @@ describe('native storage journal commit bridge', () => {
     const store = host.backend('memory')
     const selected = await storageLogStore(host, 'memory', { prefix: 'selected' })
     const actual = await storageLogStore(host, 'memory', { prefix: 'actual' })
-    const logger = new Logger({ execution, runtimeManager, plugins: [binlog({ store: actual })] })
+    const logger = createLogHost({
+      execution,
+      report: ignoreLogFailure,
+      plugins: [binlogPlugin({ store: actual })]
+    })
     try {
       const options = {
         access: resolveStorageJournalBinding(host, 'memory'),

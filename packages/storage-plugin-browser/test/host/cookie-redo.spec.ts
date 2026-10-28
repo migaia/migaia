@@ -1,8 +1,8 @@
 // @vitest-environment node
 import { locks } from 'node:worker_threads'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { Logger } from '@migaia/logger'
-import { memoryLogStore, wal } from '@migaia/logger/plugins/durable'
+import { createLogHost } from '@migaia/log-host'
+import { memoryLogStore, walPlugin } from '@migaia/log-plugin-durable'
 import { kv } from '@migaia/storage-contract'
 import { createStorageHost, createOrgId } from '@migaia/storage-host'
 import { decodeStorageJournalImage } from '@migaia/storage-host/sdk'
@@ -14,9 +14,9 @@ afterEach(() => vi.unstubAllGlobals())
 
 /** The actual logger index and native cookie semantics remain the only recovery participants. */
 const createLogger = (store = memoryLogStore()) =>
-  new Logger({
+  createLogHost({
     execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },
-    plugins: [wal({ store })]
+    plugins: [walPlugin({ store })]
   })
 
 describe('visible-cookie redo', () => {

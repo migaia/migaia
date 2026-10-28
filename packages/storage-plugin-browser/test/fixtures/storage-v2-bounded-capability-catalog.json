@@ -4,7 +4,7 @@
     "@migaia/capability",
     "@migaia/event-subscriber",
     "@migaia/lifecycle",
-    "@migaia/logger",
+    "@migaia/log-host",
     "@migaia/middleware-pipeline",
     "@migaia/plugin-host",
     "@migaia/reactive",
@@ -44,7 +44,7 @@
       "routes": ["@migaia/event-subscriber"],
       "symbols": ["EventDispatchPolicy", "createEventChannel"],
       "consumers": [
-        "@migaia/logger",
+        "@migaia/log-host",
         "@migaia/rpc-core",
         "@migaia/storage-plugin-browser",
         "@migaia/store-light"

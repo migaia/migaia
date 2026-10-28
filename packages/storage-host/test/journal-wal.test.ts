@@ -1,13 +1,14 @@
+import { ignoreLogFailure } from './helpers/log-observer.ts'
 import { storageJournalPlugin } from '../src/journal.ts'
 import { describe, expect, it } from 'vitest'
-import { Logger } from '@migaia/logger'
+import { createLogHost } from '@migaia/log-host'
 import {
-  binlog,
-  undoLog,
-  wal,
+  binlogPlugin,
+  undoLogPlugin,
+  walPlugin,
   memoryLogStore,
   type ILogPayloadInput
-} from '@migaia/logger/plugins/durable'
+} from '@migaia/log-plugin-durable'
 import { lockKey } from '../src/authoring/concurrency.ts'
 import { ttl, type IStorageResource } from '@migaia/storage-contract'
 import { createStorageHost, createOrgId } from '../src/index.ts'
@@ -17,12 +18,6 @@ import { snapshotStorageJournalConfiguration } from '../src/journal/configuratio
 import { createStorageNativeJournal } from '../src/journal/commit.ts'
 import { StorageJournalKind } from '../src/journal/constants.ts'
 
-/** Real durable plugins use their existing scheduling and explicit execution budget. */
-const runtimeManager = {
-  randomUUID: () => crypto.randomUUID(),
-  defer: (task: () => void) => queueMicrotask(task),
-  write: () => undefined
-}
 /** Disable only the existing logger timeout for this deterministic storage fixture. */
 const execution = { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false } as const
 
@@ -30,8 +25,16 @@ describe('external storage WAL', () => {
   it('retains the selected original WAL and refuses a different pending owner', async () => {
     await using first = memoryLogStore()
     await using second = memoryLogStore()
-    const logger = new Logger({ execution, runtimeManager, plugins: [wal({ store: first })] })
-    const other = new Logger({ execution, runtimeManager, plugins: [wal({ store: second })] })
+    const logger = createLogHost({
+      execution,
+      report: ignoreLogFailure,
+      plugins: [walPlugin({ store: first })]
+    })
+    const other = createLogHost({
+      execution,
+      report: ignoreLogFailure,
+      plugins: [walPlugin({ store: second })]
+    })
     try {
       const snapshot = snapshotStorageJournalConfiguration({
         logger,
@@ -51,10 +54,10 @@ describe('external storage WAL', () => {
   it('recovers committed intents by the original marker and aborts uncommitted intents without touching foreign targets', async () => {
     await using records = memoryLogStore()
     await using intents = memoryLogStore()
-    const logger = new Logger({
+    const logger = createLogHost({
       execution,
-      runtimeManager,
-      plugins: [binlog({ store: records }), wal({ store: intents })]
+      report: ignoreLogFailure,
+      plugins: [binlogPlugin({ store: records }), walPlugin({ store: intents })]
     })
     await using host = await createStorageHost({
       plugins: [storageJournalPlugin(), memoryBackendPlugin()]
@@ -156,10 +159,10 @@ describe('external storage WAL', () => {
   it('uses actual global preparation and aborts an intent after a native rollback', async () => {
     await using records = memoryLogStore()
     await using intents = memoryLogStore()
-    const logger = new Logger({
+    const logger = createLogHost({
       execution,
-      runtimeManager,
-      plugins: [binlog({ store: records }), wal({ store: intents })]
+      report: ignoreLogFailure,
+      plugins: [binlogPlugin({ store: records }), walPlugin({ store: intents })]
     })
     await using host = await createStorageHost({
       plugins: [storageJournalPlugin({ logger, namespace: 'automatic-wal' }), memoryBackendPlugin()]
@@ -201,10 +204,10 @@ describe('external storage WAL', () => {
   it('publishes external undo through the same global WAL and records undo as a new native commit', async () => {
     await using images = memoryLogStore()
     await using intents = memoryLogStore()
-    const logger = new Logger({
+    const logger = createLogHost({
       execution,
-      runtimeManager,
-      plugins: [undoLog({ store: images }), wal({ store: intents })]
+      report: ignoreLogFailure,
+      plugins: [undoLogPlugin({ store: images }), walPlugin({ store: intents })]
     })
     await using host = await createStorageHost({
       plugins: [
@@ -241,10 +244,10 @@ describe('external storage WAL', () => {
   it('recovers an external mirror after publication failure and skips only an identical already-published mirror', async () => {
     await using images = memoryLogStore()
     await using intents = memoryLogStore()
-    const logger = new Logger({
+    const logger = createLogHost({
       execution,
-      runtimeManager,
-      plugins: [undoLog({ store: images }), wal({ store: intents })]
+      report: ignoreLogFailure,
+      plugins: [undoLogPlugin({ store: images }), walPlugin({ store: intents })]
     })
     await using host = await createStorageHost({
       plugins: [storageJournalPlugin(), memoryBackendPlugin()]
@@ -336,10 +339,10 @@ describe('external storage WAL', () => {
   it('rejects damaged owned intents and missing external-await authority before opening a business scope', async () => {
     await using records = memoryLogStore()
     await using intents = memoryLogStore()
-    const logger = new Logger({
+    const logger = createLogHost({
       execution,
-      runtimeManager,
-      plugins: [binlog({ store: records }), wal({ store: intents })]
+      report: ignoreLogFailure,
+      plugins: [binlogPlugin({ store: records }), walPlugin({ store: intents })]
     })
     await using host = await createStorageHost({
       plugins: [storageJournalPlugin(), memoryBackendPlugin()]
