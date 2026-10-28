@@ -11,41 +11,45 @@ export function sanitizeErrorText(
   maxBytes: number = ErrorChainLimit.maxStringBytes,
   truncate = true
 ): IErrorChainText {
-  /** Collect the admitted scalar prefix once; one final join avoids copying a growing string. */
-  const chunks: string[] = []
-  /** Count UTF-8 text units only; structural field names do not consume the error text budget. */
+  /** Allocate replacement pieces only when the original string cannot be returned unchanged. */
+  let chunks: string[] | undefined
+  /** The unmodified substring after the last replacement is appended only once. */
+  let segmentStart = 0
+  /** Only admitted complete scalars contribute to the existing UTF-8 budget. */
   let bytes = 0
-  /** Any replacement or truncation must surface through the returned diagnostic flag. */
-  let changed = false
-  for (let index = 0; index < value.length; index += 1) {
-    /** Inspect UTF-16 units so lone surrogates are replaced without splitting valid scalar pairs. */
+  for (let index = 0; index < value.length;) {
+    /** Read UTF-16 directly so one scan validates pairs and computes their scalar width. */
     const first = value.charCodeAt(index)
-    /** One complete Unicode scalar is appended only if its whole UTF-8 encoding fits. */
-    let scalar: string
+    /** A valid pair consumes two units; a lone half is replaced with the existing U+FFFD. */
+    let units = 1
+    /** ASCII, two-byte, and three-byte scalar ranges avoid creating one string per character. */
+    let size = first <= 0x7f ? 1 : first <= 0x7ff ? 2 : 3
+    /** Replacement is recorded only after this scalar fits, matching the old admitted prefix. */
+    let replace = false
     if (first >= 0xd800 && first <= 0xdbff) {
-      /** A following low surrogate completes this scalar; otherwise retain an explicit replacement. */
+      /** The next code unit is inspected once, even when this scalar exceeds the byte budget. */
       const second = value.charCodeAt(index + 1)
       if (second >= 0xdc00 && second <= 0xdfff) {
-        scalar = value.slice(index, index + 2)
-        index += 1
-      } else {
-        scalar = '\ufffd'
-        changed = true
-      }
-    } else if (first >= 0xdc00 && first <= 0xdfff) {
-      scalar = '\ufffd'
-      changed = true
-    } else scalar = value[index]!
-    /** The scalar-safe UTF-8 width is checked before debiting the relevant text budget. */
-    const size = utf8Bytes(scalar)
+        units = 2
+        size = 4
+      } else replace = true
+    } else if (first >= 0xdc00 && first <= 0xdfff) replace = true
     if (truncate && bytes + size > maxBytes) {
-      changed = true
-      break
+      if (chunks === undefined) return { value: value.slice(0, index), bytes, changed: true }
+      chunks.push(value.slice(segmentStart, index))
+      return { value: chunks.join(''), bytes, changed: true }
     }
-    chunks.push(scalar)
+    if (replace) {
+      chunks ??= []
+      chunks.push(value.slice(segmentStart, index), '\ufffd')
+      segmentStart = index + 1
+    }
     bytes += size
+    index += units
   }
-  return { value: chunks.join(''), bytes, changed }
+  if (chunks === undefined) return { value, bytes, changed: false }
+  chunks.push(value.slice(segmentStart))
+  return { value: chunks.join(''), bytes, changed: true }
 }
 
 /** Sanitize portable data and count only its text units, excluding error-node field names. */
