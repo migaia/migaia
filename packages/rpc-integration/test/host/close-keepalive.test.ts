@@ -9,7 +9,7 @@ import { defineFlowFeature, type IRpcFlowInstallation } from '@migaia/rpc-host/s
 import { RpcProbeDirection, RpcProbeKind } from '@migaia/rpc-contract/interfaces'
 import { RpcError } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
-import { CloseFixture, closeFixtureReason, type ICloseFixtureMode } from './fixtures/close-child.js'
+import { CloseFixture, closeFixtureReason, type ICloseFixtureMode } from './fixtures/close-child.ts'
 
 /** The same public namespace exposes either actual native medium; the child itself has its own Host. */
 function transport(kind: 'process' | 'thread', mode: ICloseFixtureMode = 'namespace') {

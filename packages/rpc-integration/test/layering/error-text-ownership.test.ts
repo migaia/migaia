@@ -225,7 +225,7 @@ describe('error text ownership', () => {
     for (const path of boundaries) {
       /** A missing owner cannot turn the architecture assertion into an empty scan. */
       const text = files.find(([entry]) => entry === path)?.[1]
-      expect(text, path).toMatch(/import .*resolveAbortReason.*abort-reason\.js/u)
+      expect(text, path).toMatch(/import .*resolveAbortReason.*abort-reason\.ts/u)
       expect(text, path).not.toMatch(/(?:[sS]ignal|\))\??\.reason\b/u)
     }
     /** The canonical boundary keeps getter failure itself reachable as the abort reason. */

@@ -23,7 +23,7 @@ import {
   wireFrames,
   deployment,
   installBusinessClient
-} from './fixtures/conformance-business.js'
+} from './fixtures/conformance-business.ts'
 import { type IScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { deferred } from '@migaia/utils/promise'

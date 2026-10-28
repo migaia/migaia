@@ -18,7 +18,7 @@ import {
   business,
   wireFrames,
   installBusinessClient
-} from './fixtures/conformance-business.js'
+} from './fixtures/conformance-business.ts'
 
 beforeAll(async () => {
   const { admitConformanceToolchains } = await import(

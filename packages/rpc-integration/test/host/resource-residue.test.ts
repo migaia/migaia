@@ -24,8 +24,8 @@ import { RpcHost } from '../../../rpc-host/dist/host/rpc-host.js'
 import { RpcFlowProgram } from '../../../rpc-host/dist/sdk/flow-program.js'
 import { RpcBatchFlow } from '../../../rpc-host/dist/features/batch/flow.js'
 import { RpcLimitsFlow } from '../../../rpc-host/dist/features/limits/flow.js'
-import { coreMemoryServer } from '../../../rpc-host/test/host/core-fixture.js'
-import { MemoryCarrier } from '../../../rpc-host/test/fixtures/core-carrier.js'
+import { coreMemoryServer } from '../../../rpc-host/test/host/core-fixture.ts'
+import { MemoryCarrier } from '../../../rpc-host/test/fixtures/core-carrier.ts'
 
 /** Fixed business categories each execute 2,000 times, evenly split between both namespaces. */
 const operationKinds = ['request', 'notify', 'stream', 'cancel', 'timeout'] as const

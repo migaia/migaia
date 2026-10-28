@@ -32,7 +32,7 @@ import {
   deployment,
   wireFrames,
   installBusinessClient
-} from './fixtures/conformance-business.js'
+} from './fixtures/conformance-business.ts'
 
 /** Only the original admitted native language recipes participate in this matrix. */
 type IPeer = (typeof peers)[number]
