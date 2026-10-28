@@ -1,9 +1,10 @@
-import {
-  TopologyInvalidReason,
-  type ITopologyDependency,
-  type ITopologyInvalidReason
-} from './topology.js'
+import { TopologyInvalidReason } from './topology-reasons.js'
+/**
+ * Owns hostile topology admission and immutable collection projections. Exposes captured facts and
+ * read-only maps; graph lifecycle and error policy remain caller-owned.
+ */
 import { attachSecondaryErrors } from '@migaia/utils/error'
+import { type ITopologyDependency, type ITopologyInvalidReason } from './topology.js'
 
 /** Getter metadata reaches caller-owned policy while the pure boundary retains the original cause. */
 export type ITopologySnapshotFailure = (
@@ -102,29 +103,53 @@ export function snapshotTopologyIndexNode(
   })
 }
 
+/** Owns immutable lookup facts while preserving the original frozen facade's own-key shape. */
+class TopologyReadonlyMap<K, V> implements ReadonlyMap<K, V> {
+  /** Snapshot lookup remains unreachable through the public mutation-incapable instance. */
+  readonly #lookup: Map<K, V>
+  /** Bound lookup remains callable after method extraction, matching the original facade. */
+  declare readonly get: (key: K) => V | undefined
+  /** Bound membership query retains constant-time keyed access. */
+  declare readonly has: (key: K) => boolean
+  /** Own accessor preserves the original facade's enumerable property order. */
+  declare readonly size: number
+  /** Bound pair iterator preserves insertion order. */
+  declare readonly entries: () => MapIterator<[K, V]>
+  /** Bound key iterator preserves insertion order. */
+  declare readonly keys: () => MapIterator<K>
+  /** Bound value iterator preserves insertion order. */
+  declare readonly values: () => MapIterator<V>
+  /** Standard callback protocol retains this immutable facade as its map argument. */
+  declare readonly forEach: (
+    callback: (value: V, key: K, map: ReadonlyMap<K, V>) => void,
+    thisArg?: unknown
+  ) => void
+  /** Bound default iterator supports extraction like the original facade. */
+  declare readonly [Symbol.iterator]: () => MapIterator<[K, V]>
+
+  /** Captures lookup facts and publishes the existing own-property protocol in its original order. */
+  constructor(entries: readonly (readonly [K, V])[]) {
+    this.#lookup = new Map(entries)
+    this.get = (key) => this.#lookup.get(key)
+    this.has = (key) => this.#lookup.has(key)
+    Object.defineProperty(this, 'size', {
+      enumerable: true,
+      configurable: true,
+      get: () => this.#lookup.size
+    })
+    this.entries = () => this.#lookup.entries()
+    this.keys = () => this.#lookup.keys()
+    this.values = () => this.#lookup.values()
+    this.forEach = (callback, thisArg) => {
+      for (const [key, value] of this.#lookup) Reflect.apply(callback, thisArg, [value, key, this])
+    }
+    this[Symbol.iterator] = () => this.#lookup[Symbol.iterator]()
+  }
+}
+
 /** Creates a mutation-incapable map facade over an immutable entry snapshot. */
 export function createTopologyReadonlyMap<K, V>(
   entries: readonly (readonly [K, V])[]
 ): ReadonlyMap<K, V> {
-  /** Private lookup hidden behind the frozen facade. */
-  const lookup = new Map(entries)
-  /** Read-only map implementation returned to callers. */
-  const facade = {
-    get: (key: K): V | undefined => lookup.get(key),
-    has: (key: K): boolean => lookup.has(key),
-    get size(): number {
-      return lookup.size
-    },
-    entries: (): MapIterator<[K, V]> => lookup.entries(),
-    keys: (): MapIterator<K> => lookup.keys(),
-    values: (): MapIterator<V> => lookup.values(),
-    forEach: (
-      callback: (value: V, key: K, map: ReadonlyMap<K, V>) => void,
-      thisArg?: unknown
-    ): void => {
-      for (const [key, value] of lookup) Reflect.apply(callback, thisArg, [value, key, facade])
-    },
-    [Symbol.iterator]: (): MapIterator<[K, V]> => lookup[Symbol.iterator]()
-  } as ReadonlyMap<K, V>
-  return Object.freeze(facade)
+  return Object.freeze(new TopologyReadonlyMap(entries))
 }

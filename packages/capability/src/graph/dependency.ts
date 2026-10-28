@@ -1,3 +1,8 @@
+/**
+ * Owns pure dependency mutation and recovery planning over topology facts. Exposes frozen plans;
+ * state, resource execution and lifecycle ownership remain with consumers.
+ */
+import { createDependencyReadonlySet } from './dependency-set.js'
 import { CapabilityGraphErrorCode } from './error-code.js'
 import { graphFailure, graphMessageFor } from './errors.js'
 import type { ITopologyDependency, ITopologyIndexReader } from './topology.js'
@@ -141,30 +146,6 @@ function invalidOption(): never {
   )
 }
 
-/** Returns a mutation-incapable set facade over one immutable insertion order. */
-function createReadonlySet<T>(values: Iterable<T>): ReadonlySet<T> {
-  /** Private lookup hidden behind the frozen facade. */
-  const lookup = new Set(values)
-  /** Frozen read-only set implementation. */
-  const facade = {
-    has: (value: T): boolean => lookup.has(value),
-    get size(): number {
-      return lookup.size
-    },
-    entries: (): SetIterator<[T, T]> => lookup.entries(),
-    keys: (): SetIterator<T> => lookup.keys(),
-    values: (): SetIterator<T> => lookup.values(),
-    forEach: (
-      callback: (value: T, value2: T, set: ReadonlySet<T>) => void,
-      thisArg?: unknown
-    ): void => {
-      for (const value of lookup) Reflect.apply(callback, thisArg, [value, value, facade])
-    },
-    [Symbol.iterator]: (): SetIterator<T> => lookup[Symbol.iterator]()
-  } as ReadonlySet<T>
-  return Object.freeze(facade)
-}
-
 /** Deep-freezes a complete dependency plan without retaining mutable caller arrays. */
 function createPlan(
   steps: readonly IDependencyPlanStep[],
@@ -217,6 +198,7 @@ function requiredProvidersAvailable(
   for (const dependency of dependencies) {
     if (!dependency.required) continue
     if (!index.has(dependency.provider)) return false
+    /** Live provider state decides availability unless this plan already restores service. */
     const providerState = state(dependency.provider)
     if (recoverable.has(dependency.provider) && providerState.enabled) continue
     if (!isServing(providerState)) return false
@@ -236,6 +218,7 @@ function collectResumeCandidates(
   /** Providers whose direct required dependents still need inspection. */
   const queue = [provider]
   for (let position = 0; position < queue.length; position += 1) {
+    /** Each admitted suspended provider expands its direct required frontier once. */
     const current = queue[position]!
     for (const dependent of index.dependents(current).required) {
       if (candidates.has(dependent) || !state(dependent).suspended) continue
@@ -313,10 +296,12 @@ export function planDependencyMutation(
   const edges = collectPlanEdges(index, affected)
 
   if (request.policy === DependencyPolicy.reject) {
+    /** Constant-time root membership keeps blocker projection linear in the closure. */
     const blockedBy = teardown.filter((id) => !roots.has(id))
     if (blockedBy.length > 0) return createPlan([], edges, blockedBy)
   }
 
+  /** Root kind selects the existing external teardown instruction. */
   const rootAction =
     request.kind === DependencyMutationKind.remove
       ? DependencyAction.release
@@ -334,6 +319,7 @@ export function planDependencyMutation(
       steps.push({ id, action: rootAction })
       continue
     }
+    /** Orthogonal state flags select only actions permitted by the planner contract. */
     const nodeState = state(id)
     if (nodeState.activated && !nodeState.suspended)
       steps.push({ id, action: DependencyAction.suspend })
@@ -355,6 +341,7 @@ export function planRestart(
   const affected = new Set(index.closure(roots))
   /** Restart steps skip nodes that have never activated. */
   const steps = dependentFirst(index, affected).flatMap((id) => {
+    /** Orthogonal state flags select only actions permitted by the planner contract. */
     const nodeState = state(id)
     if (!nodeState.activated) return []
     return [
@@ -386,6 +373,7 @@ export function planReplacement(
   /** Direct activated consumers that require restart closure. */
   const restartRoots: string[] = []
   for (const dependent of index.dependents(request.target).required) {
+    /** Only activated direct consumers own bindings affected by replacement. */
     const nodeState = state(dependent)
     if (!nodeState.activated) continue
     if (nodeState.suspended) {
@@ -396,6 +384,7 @@ export function planReplacement(
       rebinds.push({ id: dependent, action: DependencyAction.rebind })
     else restartRoots.push(dependent)
   }
+  /** One shared restart closure removes duplicate downstream traversal across roots. */
   const restarts =
     restartRoots.length === 0 ? createPlan([], []) : planRestart(index, state, restartRoots)
   /** Target is affected even though replacement execution is consumer-owned. */
@@ -436,10 +425,12 @@ export function planResume(
   const rebind = new Set<string>()
   /** Recoverable nodes whose retained instance must restart. */
   const restartRoots = new Set<string>()
+  /** Generation-sensitive binding changes concern only the provider's direct consumers. */
   const direct = request.generationChanged
     ? new Set(index.dependents(request.provider).required)
     : new Set<string>()
   for (const id of recoverable) {
+    /** Orthogonal state flags select only actions permitted by the planner contract. */
     const nodeState = state(id)
     if (nodeState.stale) {
       restartRoots.add(id)
@@ -454,18 +445,21 @@ export function planResume(
   const restart = new Set<string>()
   /** Candidate members blocked behind a restart root remain stale and suspended. */
   const invalidate = new Set<string>()
+  /** Candidate membership bounds restart propagation to the suspended frontier. */
   const candidateSet = new Set(candidates)
-  for (const root of restartRoots) {
-    /** Suspended-only restart traversal bounded by the candidate frontier. */
-    const queue = [root]
-    const visited = new Set<string>()
-    for (let position = 0; position < queue.length; position += 1) {
-      const id = queue[position]!
-      if (visited.has(id) || !candidateSet.has(id)) continue
-      visited.add(id)
-      if (recoverable.has(id)) restart.add(id)
-      else invalidate.add(id)
-      for (const dependent of index.dependents(id).required) queue.push(dependent)
+  /** All restart roots share one walk; overlapping downstream paths are visited once. */
+  const queue = [...restartRoots]
+  /** Membership is recorded at admission so duplicate edges cannot expand the queue. */
+  const visited = new Set(restartRoots)
+  for (let position = 0; position < queue.length; position += 1) {
+    /** Candidate whose restart dominates any weaker recovery action. */
+    const id = queue[position]!
+    if (recoverable.has(id)) restart.add(id)
+    else invalidate.add(id)
+    for (const dependent of index.dependents(id).required) {
+      if (visited.has(dependent) || !candidateSet.has(dependent)) continue
+      visited.add(dependent)
+      queue.push(dependent)
     }
   }
 
@@ -500,20 +494,29 @@ export function planActivation(
    * deep chain cost the whole ancestry.
    */
   const reached = new Set<string>()
-  /** Upstream traversal queue: the roots, then only inactive providers. */
-  const queue = [...roots]
+  /** Root membership also prevents repeated work when a requested root is another root's provider. */
+  const rootSet = new Set(roots)
+  /** Upstream queue contains each root or inactive provider at most once. */
+  const queue = [...rootSet]
+  /** Queue membership remains distinct from provider reachability and root exclusion. */
+  const queued = new Set(rootSet)
   for (let position = 0; position < queue.length; position += 1) {
+    /** Each queued consumer contributes its required-provider edges once. */
     const consumer = queue[position]!
     for (const dependency of index.dependencies(consumer)) {
       if (!dependency.required || !index.has(dependency.provider)) continue
       if (reached.has(dependency.provider)) continue
       if (state(dependency.provider).activated) continue
       reached.add(dependency.provider)
-      queue.push(dependency.provider)
+      if (!queued.has(dependency.provider)) {
+        queued.add(dependency.provider)
+        queue.push(dependency.provider)
+      }
     }
   }
-  /** Inactive providers emitted in canonical provider-first order. */
-  const activating = index.order(reached).filter((id) => !roots.includes(id))
+  /** Inactive providers emitted in canonical order with constant-time root exclusion. */
+  const activating: string[] = []
+  for (const id of index.order(reached)) if (!rootSet.has(id)) activating.push(id)
   return createPlan(
     activating.map((id) => ({ id, action: DependencyAction.activate })),
     collectPlanEdges(index, new Set(activating))
@@ -537,11 +540,12 @@ export function resolveInstallSet(
   /** Required-provider traversal seeded only by non-lazy members. */
   const queue: string[] = []
   for (const member of members) {
-    if (isLazy(member)) continue
+    if (isLazy(member) || selected.has(member)) continue
     selected.add(member)
     queue.push(member)
   }
   for (let position = 0; position < queue.length; position += 1) {
+    /** Each queued consumer contributes its required-provider edges once. */
     const consumer = queue[position]!
     for (const dependency of index.dependencies(consumer)) {
       if (!dependency.required || !memberSet.has(dependency.provider)) continue
@@ -550,7 +554,7 @@ export function resolveInstallSet(
       queue.push(dependency.provider)
     }
   }
-  return createReadonlySet(index.order(selected))
+  return createDependencyReadonlySet(index.order(selected))
 }
 
 /**

@@ -9,6 +9,7 @@ import type { IGraphDependents as ITopologyGraphDependents } from '../../src/gra
 describe('dependency planner public contract', () => {
   it('exposes the dependency planner and incremental topology entry points', () => {
     /** Runtime dependency-planner surface. */
+    // The ESM namespace has exactly the 12 compile-time exports asserted below.
     const dependencyExports = Object.keys(dependency).sort()
     expect(dependencyExports).toEqual([
       'DependencyAction',

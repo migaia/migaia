@@ -30,23 +30,26 @@ function unexpectedTopologyFailure(message: string): never {
   throw new Error(message)
 }
 
+/** Verifies one immutable golden fixture without nesting topology callbacks in the test callback. */
+function preservesGoldenTopology(fixture: ITopologyGoldenFixture): void {
+  /** Topology projection produced by the implementation under test. */
+  const topology = buildCapabilityTopology(
+    fixture.nodes,
+    (nodeId, provider) => unexpectedTopologyFailure(`unknown provider ${provider} for ${nodeId}`),
+    (path) => unexpectedTopologyFailure(`cycle ${path.join(' -> ')}`),
+    (reason, nodeId) =>
+      unexpectedTopologyFailure(`invalid ${reason}${nodeId ? ` for ${nodeId}` : ''}`)
+  )
+
+  expect(topology.ordered.map((node) => node.id)).toEqual(fixture.expected.ordered)
+  expect(Object.fromEntries(topology.level)).toEqual(fixture.expected.level)
+  expect(Object.fromEntries(topology.indegree)).toEqual(fixture.expected.indegree)
+  expect([...topology.providers.keys()]).toEqual(fixture.expected.providers)
+}
+
 describe('topology golden compatibility', () => {
   for (const fixture of golden.fixtures) {
-    it(`preserves ${fixture.name} topology facts from ${golden.baseCommit}`, () => {
-      /** Topology projection produced by the implementation under test. */
-      const topology = buildCapabilityTopology(
-        fixture.nodes,
-        (nodeId, provider) =>
-          unexpectedTopologyFailure(`unknown provider ${provider} for ${nodeId}`),
-        (path) => unexpectedTopologyFailure(`cycle ${path.join(' -> ')}`),
-        (reason, nodeId) =>
-          unexpectedTopologyFailure(`invalid ${reason}${nodeId ? ` for ${nodeId}` : ''}`)
-      )
-
-      expect(topology.ordered.map((node) => node.id)).toEqual(fixture.expected.ordered)
-      expect(Object.fromEntries(topology.level)).toEqual(fixture.expected.level)
-      expect(Object.fromEntries(topology.indegree)).toEqual(fixture.expected.indegree)
-      expect([...topology.providers.keys()]).toEqual(fixture.expected.providers)
-    })
+    it(`preserves ${fixture.name} topology facts from ${golden.baseCommit}`, () =>
+      preservesGoldenTopology(fixture))
   }
 })
