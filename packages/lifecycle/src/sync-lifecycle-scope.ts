@@ -1,14 +1,21 @@
 import { assertErrorPolicyReporter } from './error-boundary.js'
-import type { ICollectedError, IErrorPolicy, IReleaseDescriptor, ILifecycleState } from './types.js'
+import type {
+  ICollectedError,
+  IErrorPolicy,
+  IReleaseContext,
+  IReleaseDescriptor,
+  ILifecycleState
+} from './types.js'
 import { ASYNC_OWNER_BRAND } from './types.js'
 import { createLifecycleError } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
-import { createOwnedEntryList } from './owned-entries.js'
-import { createTerminalController } from './terminal-controller.js'
-import { captureAbortControllerFactory } from './abort-factory.js'
-import { DisposeTransactionKind, LifecycleState } from './state-constants.js'
-import { admitDescriptor, admitItems } from './dispose-transaction.js'
+import { OwnedEntryList } from './owned-entries.js'
+import { ClosingSignalSource, captureAbortControllerFactory } from './abort-factory.js'
+import type { IAbortController } from './abort.js'
+import { LifecycleState } from './state-constants.js'
+import { admitDescriptor } from './dispose-transaction.js'
+import { orderDisposeItems } from './disposal-order.js'
 import { executeSyncDisposeTransaction } from './sync-dispose-transaction.js'
 
 const disposeKey = (Symbol as typeof Symbol & { dispose?: symbol }).dispose
@@ -37,55 +44,72 @@ export type ISyncLifecycleScope = {
   [Symbol.dispose](): void
 }
 
-/**
- * The `syncSafe`-only scope. Exists so a scope that owns nothing but reactive-graph-style nodes can
- * offer a real, deterministic `[Symbol.dispose]` instead of the general `LifecycleScope`'s
- * always-async `[Symbol.asyncDispose]`.
- */
-export function createSyncLifecycleScope(
-  options: ISyncLifecycleScopeOptions = {}
-): ISyncLifecycleScope {
-  const createController = captureAbortControllerFactory()
-  const errorPolicy = options.errorPolicy ?? 'throw'
-  assertErrorPolicyReporter(errorPolicy, options.report)
-  const terminal = createTerminalController()
-  /** Live owned resources in registration order with O(1) release lookup. */
-  const entries = createOwnedEntryList<{
-    readonly resource: unknown
-    readonly source: string
-    readonly descriptor: ISyncReleaseDescriptor
-  }>()
-  let nextId = 0
-  let disposed = false
-  let currentlyReleasing = false
+/** One live registration: the admitted descriptor snapshot taken by `own()`. */
+type ISyncScopeEntry = {
+  readonly resource: unknown
+  readonly source: string
+  readonly descriptor: IReleaseDescriptor
+}
 
-  const assertOpen = (): void => {
-    if (terminal.lifecycle === LifecycleState.terminal) {
-      throw createLifecycleError(LifecycleErrorCode.scopeTerminal, LifecycleErrorText.scopeTerminal)
-    }
-    if (terminal.lifecycle === LifecycleState.closing) {
-      throw createLifecycleError(LifecycleErrorCode.scopeClosed, LifecycleErrorText.scopeClosing)
-    }
+/** Shared admission-failure list: own() already rejected every invalid descriptor. */
+const noRejectedItems: readonly ICollectedError[] = Object.freeze([])
+
+/**
+ * The synchronous scope. Options are read once at construction and every descriptor is snapshotted
+ * by `own()`. Methods live on the prototype and must be called on the scope, not detached.
+ */
+class SyncLifecycleScope {
+  /** Error policy applied to release failures. */
+  readonly #errorPolicy: IErrorPolicy
+  /** Reporter for failures the policy does not throw or collect. */
+  readonly #report: ((error: unknown) => void) | undefined
+  /** Host AbortController factory captured at construction. */
+  readonly #createController: () => IAbortController
+  /** `open` → `closing` → `terminal`. */
+  #lifecycle: ILifecycleState = LifecycleState.open
+  /** Live owned resources; created by the first `own()`. */
+  #entries: OwnedEntryList<ISyncScopeEntry> | undefined
+  /** Next registration source id. */
+  #nextId = 0
+  /** Whether any admitted descriptor has a non-zero `order`; zero-only scopes skip ordering. */
+  #customOrder = false
+  /** Whether dispose() already started; later calls return an empty result. */
+  #disposed = false
+  /** True while release callbacks run; rejects reentrant `own()` and `dispose()`. */
+  #releasing = false
+
+  /** Captures the host controller factory first, then validates the error policy. */
+  constructor(options: ISyncLifecycleScopeOptions) {
+    this.#createController = captureAbortControllerFactory()
+    this.#errorPolicy = options.errorPolicy ?? 'throw'
+    this.#report = options.report
+    assertErrorPolicyReporter(this.#errorPolicy, this.#report)
   }
 
-  const own = <T>(resource: T, descriptor: ISyncReleaseDescriptor): T => {
-    if (currentlyReleasing) {
+  /** Current lifecycle state. */
+  get lifecycle(): ILifecycleState {
+    return this.#lifecycle
+  }
+
+  /** Registers a `syncSafe` resource with a validated snapshot of its descriptor. */
+  own<T>(resource: T, descriptor: ISyncReleaseDescriptor): T {
+    if (this.#releasing) {
       throw createLifecycleError(
         LifecycleErrorCode.scopeReentrantOwn,
         LifecycleErrorText.scopeReentrantOwn
       )
     }
-    assertOpen()
+    this.#assertOpen()
     if (descriptor?.syncSafe !== true) {
       throw createLifecycleError(
         LifecycleErrorCode.scopeSyncViolation,
         LifecycleErrorText.syncScopeRequiresSyncSafe
       )
     }
-    // Validation only, shared with the async path so a bad `order` or missing `force` gets the same
-    // INVALID_OPTION at registration; dispose() keeps its own descriptor snapshot.
+    /** Same admission as the async scope; the snapshot is what dispose() releases. */
     const admission = admitDescriptor(descriptor, true)
     if (!admission.ok) throw admission.error
+    /** Async owners carry this brand and cannot be released synchronously. */
     const brand = (resource as { readonly [ASYNC_OWNER_BRAND]?: true } | null | undefined)?.[
       ASYNC_OWNER_BRAND
     ]
@@ -95,21 +119,30 @@ export function createSyncLifecycleScope(
         LifecycleErrorText.syncScopeOwnsAsyncOwner
       )
     }
-    entries.push({ resource, source: String(nextId++), descriptor })
+    if (admission.descriptor.order !== 0) this.#customOrder = true
+    this.#entries ??= new OwnedEntryList()
+    this.#entries.push({
+      resource,
+      source: String(this.#nextId++),
+      descriptor: admission.descriptor
+    })
     return resource
   }
 
-  const release = (resource: unknown): boolean => {
-    return entries.release(resource) !== undefined
+  /** Unregisters a resource without releasing it. */
+  release(resource: unknown): boolean {
+    return this.#entries?.release(resource) !== undefined
   }
 
-  const close = (): void => {
-    terminal.close()
+  /** Synchronous, idempotent, never calls user code. */
+  close(): void {
+    if (this.#lifecycle === LifecycleState.open) this.#lifecycle = LifecycleState.closing
   }
 
-  const dispose = (): readonly ICollectedError[] => {
-    if (disposed || terminal.lifecycle === LifecycleState.terminal) {
-      if (currentlyReleasing) {
+  /** Releases every owned resource synchronously, newest first (stable by descending `order`). */
+  dispose(): readonly ICollectedError[] {
+    if (this.#disposed || this.#lifecycle === LifecycleState.terminal) {
+      if (this.#releasing) {
         throw createLifecycleError(
           LifecycleErrorCode.scopeReentrantDispose,
           LifecycleErrorText.scopeReentrantDispose
@@ -117,59 +150,87 @@ export function createSyncLifecycleScope(
       }
       return []
     }
-    close()
-    disposed = true
-    const released = entries.drain().reverse()
-    /** Canonical admission snapshots every item before the first callback and preserves LIFO ties. */
-    const admission = admitItems(released, { kind: DisposeTransactionKind.order }, true)
-    currentlyReleasing = true
-    const controller = createController()
-    controller.abort(
-      createLifecycleError(LifecycleErrorCode.scopeClosed, LifecycleErrorText.scopeClosedReason)
-    )
+    this.close()
+    this.#disposed = true
+    /** Atomic snapshot in registration order, released newest first. */
+    const released = this.#entries?.drain() ?? []
+    this.#entries = undefined
+    if (released.length === 0) {
+      this.#lifecycle = LifecycleState.terminal
+      return []
+    }
+    released.reverse()
+    if (this.#customOrder) orderDisposeItems(released)
+    this.#releasing = true
     try {
+      /** Reporter routed through the last error boundary for the reporter's own failures. */
+      const report = (error: unknown): void => this.#reportSafely(error)
+      /** One lazily created closing signal shared by every item of this dispose. */
+      const closing = new ClosingSignalSource(this.#createController)
       return executeSyncDisposeTransaction(
-        admission,
-        () => ({
-          signal: controller.signal,
-          deadlineAt: undefined,
-          report: (error) => {
-            if (!options.report) return
-            try {
-              options.report(error)
-            } catch {
-              // Last error boundary for the reporter's own synchronous failures.
-            }
-          }
-        }),
-        errorPolicy,
-        options.report
+        { admitted: released, rejected: noRejectedItems },
+        () => this.#createReleaseContext(report, closing),
+        this.#errorPolicy,
+        this.#report
       )
     } finally {
-      currentlyReleasing = false
-      terminal.forceTerminal()
+      this.#releasing = false
+      this.#lifecycle = LifecycleState.terminal
     }
   }
 
-  const scope: Omit<ISyncLifecycleScope, typeof Symbol.dispose> = {
-    get lifecycle() {
-      return terminal.lifecycle
-    },
-    own,
-    release,
-    close,
-    dispose
-  }
-
-  if (disposeKey) {
-    Object.defineProperty(scope, disposeKey, {
-      value: () => {
-        dispose()
+  /** Builds one item's fresh context; its `signal` is created on first read, already aborted. */
+  #createReleaseContext(
+    report: (error: unknown) => void,
+    closing: ClosingSignalSource
+  ): IReleaseContext {
+    return {
+      get signal() {
+        return closing.read()
       },
-      enumerable: false
-    })
+      deadlineAt: undefined,
+      report
+    }
   }
 
-  // The supported host's symbol hook is installed above without making it enumerable.
-  return scope as ISyncLifecycleScope
+  /** Last error boundary for the reporter's own synchronous failures. */
+  #reportSafely(error: unknown): void {
+    if (!this.#report) return
+    try {
+      this.#report(error)
+    } catch {
+      // Last error boundary for the reporter's own synchronous failures.
+    }
+  }
+
+  /** Throws the closing or terminal boundary error for a registration after `close()`. */
+  #assertOpen(): void {
+    if (this.#lifecycle === LifecycleState.terminal) {
+      throw createLifecycleError(LifecycleErrorCode.scopeTerminal, LifecycleErrorText.scopeTerminal)
+    }
+    if (this.#lifecycle === LifecycleState.closing) {
+      throw createLifecycleError(LifecycleErrorCode.scopeClosed, LifecycleErrorText.scopeClosing)
+    }
+  }
+}
+
+/** `using` hook: disposes synchronously and discards the collected-error result. */
+function disposeForUsing(this: SyncLifecycleScope): void {
+  this.dispose()
+}
+
+// The supported host's symbol hook is installed once, non-enumerable, on the prototype.
+if (disposeKey) {
+  Object.defineProperty(SyncLifecycleScope.prototype, disposeKey, { value: disposeForUsing })
+}
+
+/**
+ * The `syncSafe`-only scope. Exists so a scope that owns nothing but reactive-graph-style nodes can
+ * offer a real, deterministic `[Symbol.dispose]` instead of the general `LifecycleScope`'s
+ * always-async `[Symbol.asyncDispose]`.
+ */
+export function createSyncLifecycleScope(
+  options: ISyncLifecycleScopeOptions = {}
+): ISyncLifecycleScope {
+  return new SyncLifecycleScope(options) as unknown as ISyncLifecycleScope
 }

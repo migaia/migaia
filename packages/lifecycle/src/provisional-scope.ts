@@ -4,17 +4,22 @@ import { ASYNC_OWNER_BRAND } from './types.js'
 import { createLifecycleError, createLifecycleFailure } from './errors.js'
 import { LifecycleErrorCode } from './error-code.js'
 import { LifecycleErrorText } from './error-text.js'
-import { admitDescriptor, createDisposeTransaction } from './dispose-transaction.js'
+import {
+  admitDescriptor,
+  releaseInPlanOrder,
+  type IAdmittedDisposeItem
+} from './dispose-transaction.js'
 import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import { captureAbortControllerFactory } from './abort-factory.js'
+import type { IAbortController } from './abort.js'
 import {
   observeAbortSubscription,
   type IObservedAbortSubscription
 } from './observed-subscription.js'
 import {
-  DisposeTransactionKind,
   LifecycleErrorPolicy,
-  ProvisionalScopeState
+  ProvisionalScopeState,
+  type IProvisionalScopeState
 } from './state-constants.js'
 
 export type IProvisionalScopeOptions = {
@@ -44,248 +49,171 @@ export type IProvisionalScope = {
 type IEntry = {
   readonly resource: unknown
   readonly source: string
+  /** The caller's descriptor, handed unchanged to `parent.own()` on commit. */
   readonly descriptor: IReleaseDescriptor
+  /** Order-blind snapshot taken by `own()`, released on rollback. */
+  readonly admitted: IReleaseDescriptor
 }
 
 /**
- * Creates a temporary owner for multi-step initialisation: register what each step creates, then
- * either hand everything to the long-lived scope with `commitTo(parent)` or release it with
- * `rollback()` when a step fails — never both, never neither.
- *
- * `rollback()` releases in reverse order. If the parent refuses partway through `commitTo()`, what
- * was handed over stays with the parent and the rest is released and awaited before the error is
- * rethrown (wrapped as `PROVISIONAL_PARENT_CLOSED` when the parent was closing).
+ * The provisional owner. Without a parent signal its AbortController and settle reason are created
+ * on the first `signal` read; with one, the controller exists from construction so the parent's
+ * abort can be forwarded. Methods live on the prototype and must be called on the scope.
  */
-export function createProvisionalScope(options: IProvisionalScopeOptions = {}): IProvisionalScope {
-  const createController = captureAbortControllerFactory()
-  const controller = createController()
-  const parentSignal = options.parentSignal
-  let parentSubscription: IObservedAbortSubscription | undefined
-  const registrationErrors: unknown[] = []
-  const forwardAbort = (reason: unknown): void => controller.abort(reason)
-  /** Finalize the live listener failure channel at settlement, after every detach attempt. */
-  const detachParent = (): void => {
-    parentSubscription?.unsubscribe()
-    if (registrationErrors.length > 0)
-      throw attachLifecycleSecondaryErrors(
-        createLifecycleFailure(
-          LifecycleErrorCode.scopeDisposalFailed,
-          LifecycleErrorText.provisionalCleanupFailed,
-          registrationErrors[0]
-        ),
-        registrationErrors.slice(1),
-        LifecycleErrorText.provisionalCleanupFailed
-      )
-  }
-  if (parentSignal?.aborted) {
-    controller.abort(parentSignal.reason)
-  } else if (parentSignal) {
+class ProvisionalScope {
+  /** Host AbortController factory captured at construction. */
+  readonly #createController: () => IAbortController
+  /** This scope's controller; eager only when a parent signal must be forwarded. */
+  #controller: IAbortController | undefined
+  /** Live parent abort subscription, detached at settlement. */
+  #parentSubscription: IObservedAbortSubscription | undefined
+  /** Listener-cleanup failures reported by the parent subscription. */
+  readonly #registrationErrors: unknown[] = []
+  /** Owned resources in registration order. */
+  #entries: IEntry[] = []
+  /** Next registration source id. */
+  #nextId = 0
+  /** Pending → committed | rolledback. */
+  #state: IProvisionalScopeState = ProvisionalScopeState.pending
+  /** How the scope settled; the lazy signal is aborted with the matching reason. */
+  #settledBy: IProvisionalScopeState = ProvisionalScopeState.pending
+  /** The one settle Promise reused by repeated rollback() and commit compensation. */
+  #rollbackPromise: Promise<void> | undefined
+
+  /**
+   * Captures the host controller factory and subscribes to `parentSignal` synchronously, so a
+   * failing registration throws from the factory.
+   */
+  constructor(options: IProvisionalScopeOptions) {
+    this.#createController = captureAbortControllerFactory()
+    /** Read once; absent means no forwarding and a lazily created controller. */
+    const parentSignal = options.parentSignal
+    if (parentSignal === undefined) return
+    this.#controller = this.#createController()
+    if (parentSignal.aborted) {
+      this.#controller.abort(parentSignal.reason)
+      return
+    }
     try {
-      parentSubscription = observeAbortSubscription(parentSignal, forwardAbort, (error) =>
-        registrationErrors.push(error)
+      this.#parentSubscription = observeAbortSubscription(
+        parentSignal,
+        (reason) => this.#controller!.abort(reason),
+        (error) => this.#registrationErrors.push(error)
       )
-      parentSubscription.retryRegistrationCleanup()
-      if (registrationErrors.length > 0) throw registrationErrors[0]
+      this.#parentSubscription.retryRegistrationCleanup()
+      if (this.#registrationErrors.length > 0) throw this.#registrationErrors[0]
     } catch (error) {
       throw attachLifecycleSecondaryErrors(
         error,
-        registrationErrors,
+        this.#registrationErrors,
         LifecycleErrorText.provisionalCleanupFailed
       )
     }
   }
 
-  let entries: IEntry[] = []
-  let nextId = 0
-  let state: (typeof ProvisionalScopeState)[keyof typeof ProvisionalScopeState] =
-    ProvisionalScopeState.pending
-  /** 唯一 settle 事实：并发第二次 rollback / commit 补偿都复用，避免「提前完成」的伪幂等。 */
-  let rollbackPromise: Promise<void> | undefined
-
-  const assertPending = (): void => {
-    if (state !== ProvisionalScopeState.pending) {
-      throw createLifecycleError(
-        LifecycleErrorCode.provisionalSettled,
-        LifecycleErrorText.provisionalSettled
-      )
+  /** Aborted once the scope commits or rolls back (or the parent aborts). */
+  get signal(): INativeAbortSignal {
+    if (this.#controller === undefined) {
+      this.#controller = this.#createController()
+      if (this.#settledBy !== ProvisionalScopeState.pending)
+        this.#controller.abort(createSettleReason(this.#settledBy))
     }
+    return this.#controller.signal as INativeAbortSignal
   }
 
-  const own = <T>(resource: T, descriptor: IReleaseDescriptor): T => {
-    assertPending()
-    // Validation only, with the same order-blind admission as this scope's plan-mode release; the
-    // parent's own() validates `order` again on commit.
+  /** Registers a resource with a validated, order-blind snapshot of its descriptor. */
+  own<T>(resource: T, descriptor: IReleaseDescriptor): T {
+    this.#assertPending()
+    // The parent's own() validates `order` again on commit.
     const admission = admitDescriptor(descriptor, false)
     if (!admission.ok) throw admission.error
-    entries.push({ resource, source: String(nextId++), descriptor })
+    this.#entries.push({
+      resource,
+      source: String(this.#nextId++),
+      descriptor,
+      admitted: admission.descriptor
+    })
     return resource
   }
 
-  const releaseEntries = async (list: readonly IEntry[]): Promise<void> => {
-    if (list.length === 0) return
-    const transaction = createDisposeTransaction(
-      { kind: DisposeTransactionKind.plan },
-      { errorPolicy: LifecycleErrorPolicy.throw }
-    )
-    // Release in reverse-of-registration order, matching the rest of the package's LIFO convention.
-    await transaction.run(
-      [...list].reverse().map((entry) => ({ source: entry.source, descriptor: entry.descriptor }))
-    )
-  }
-
-  /** Releases `list` (reverse order) and returns every cleanup failure instead of throwing. */
-  const releaseEntriesCollecting = async (list: readonly IEntry[]): Promise<readonly unknown[]> => {
-    if (list.length === 0) return []
-    const transaction = createDisposeTransaction(
-      { kind: DisposeTransactionKind.plan },
-      { errorPolicy: LifecycleErrorPolicy.collect }
-    )
-    const collected = await transaction.run(
-      [...list].reverse().map((entry) => ({ source: entry.source, descriptor: entry.descriptor }))
-    )
-    return collected.map((entry) => entry.error)
-  }
-
-  const rollback = (): Promise<void> => {
-    // 复用唯一 settle Promise：并发第二次 rollback 严格 `===` 首个 rollback，而非 async 包装新 Promise。
-    if (rollbackPromise) return rollbackPromise
-    try {
-      assertPending() // throws PROVISIONAL_SETTLED if already committed
-    } catch (error) {
-      // 保持公开契约：已 settle 时返回 rejected Promise（不是同步 throw）。
-      return Promise.reject(error)
-    }
-    state = ProvisionalScopeState.rolledBack
+  /**
+   * Releases every owned resource in reverse order. Repeated calls reuse the first Promise,
+   * including its rejection; a committed scope returns a rejected Promise.
+   */
+  rollback(): Promise<void> {
+    if (this.#rollbackPromise) return this.#rollbackPromise
+    if (this.#state !== ProvisionalScopeState.pending) return Promise.reject(createSettledError())
+    this.#state = ProvisionalScopeState.rolledBack
+    // Publish the Promise before aborting, so an abort listener that calls rollback() gets it.
     let resolveRollback!: () => void
     let rejectRollback!: (error: unknown) => void
-    rollbackPromise = new Promise<void>((resolve, reject) => {
+    this.#rollbackPromise = new Promise<void>((resolve, reject) => {
       resolveRollback = resolve
       rejectRollback = reject
     })
-    let abortFailed = false
-    let abortError: unknown
-    try {
-      controller.abort(
-        createLifecycleError(
-          LifecycleErrorCode.provisionalSettled,
-          LifecycleErrorText.provisionalRolledBackReason
-        )
-      )
-    } catch (error) {
-      abortFailed = true
-      abortError = error
-    }
-    const remaining = entries
-    entries = []
-    try {
-      detachParent()
-    } catch (error) {
-      if (abortFailed)
-        abortError = attachLifecycleSecondaryErrors(
-          abortError,
-          [error],
-          LifecycleErrorText.provisionalCleanupFailed
-        )
-      else {
-        abortFailed = true
-        abortError = error
-      }
-    }
-    const releasePromise = releaseEntries(remaining)
-    releasePromise.then(
-      () => {
-        if (abortFailed) rejectRollback(abortError)
-        else resolveRollback()
-      },
-      (cleanupError: unknown) => {
-        if (abortFailed)
-          rejectRollback(
-            attachLifecycleSecondaryErrors(
-              abortError,
-              [cleanupError],
-              LifecycleErrorText.provisionalCleanupFailed
-            )
-          )
-        else rejectRollback(cleanupError)
-      }
-    )
-    return rollbackPromise
+    /** Abort or detach failure; the release still runs and the failure is rethrown after it. */
+    const settleError = this.#settle(ProvisionalScopeState.rolledBack)
+    /** Owned resources, released newest first. */
+    const remaining = this.#takeEntries()
+    remaining.reverse()
+    releaseRollback(remaining, settleError).then(resolveRollback, rejectRollback)
+    return this.#rollbackPromise
   }
 
-  const commitTo = (parent: ILifecycleOwner): Promise<void> => {
-    // Synchronous fail-fast for the "already settled" invariant (PROVISIONAL_SETTLED); only the
-    // actual transfer + compensation is async so it can await the leftover release before settling.
-    assertPending()
-    const remaining = entries
-    entries = []
-    state = ProvisionalScopeState.committed
-    let abortFailed = false
-    let abortError: unknown
-    try {
-      controller.abort(
-        createLifecycleError(
-          LifecycleErrorCode.provisionalSettled,
-          LifecycleErrorText.provisionalCommittedReason
-        )
-      )
-    } catch (error) {
-      abortFailed = true
-      abortError = error
-    }
-    try {
-      detachParent()
-    } catch (error) {
-      if (abortFailed)
-        abortError = attachLifecycleSecondaryErrors(
-          abortError,
-          [error],
-          LifecycleErrorText.provisionalCleanupFailed
-        )
-      else {
-        abortFailed = true
-        abortError = error
-      }
-    }
-    const transferPromise = commitEntries(parent, remaining)
-    if (!abortFailed) return transferPromise
+  /**
+   * Transfers every owned resource to `parent` in registration order. A partial transfer keeps what
+   * the parent accepted and releases the rest before the original error is rethrown.
+   */
+  commitTo(parent: ILifecycleOwner): Promise<void> {
+    this.#assertPending()
+    /** Owned resources in registration order. */
+    const remaining = this.#takeEntries()
+    this.#state = ProvisionalScopeState.committed
+    /** Abort or detach failure, attached after the transfer settles. */
+    const settleError = this.#settle(ProvisionalScopeState.committed)
+    /** Transfer plus compensation for anything the parent refused. */
+    const transferPromise = this.#commitEntries(parent, remaining)
+    if (settleError === noSettleError) return transferPromise
     return transferPromise.then(
       () => {
-        throw abortError
+        throw settleError
       },
       (transferError: unknown) => {
         throw attachLifecycleSecondaryErrors(
           transferError,
-          [abortError],
+          [settleError],
           LifecycleErrorText.provisionalCleanupFailed
         )
       }
     )
   }
 
-  const commitEntries = async (
-    parent: ILifecycleOwner,
-    remaining: readonly IEntry[]
-  ): Promise<void> => {
+  /** Hands entries to `parent`; on refusal releases the rest and rethrows the parent's error. */
+  async #commitEntries(parent: ILifecycleOwner, remaining: readonly IEntry[]): Promise<void> {
+    /** Index of the first entry the parent has not accepted. */
     let index = 0
     try {
       for (; index < remaining.length; index++) {
+        /** Entry being transferred. */
         const entry = remaining[index]!
         parent.own(entry.resource, entry.descriptor)
       }
     } catch (error) {
-      // Everything from `index` onward never reached `parent` — it must be released by us so it
-      // isn't leaked; everything before `index` is now `parent`'s responsibility. The compensation
-      // is awaited before this Promise settles, so no background release outlives the commit.
+      // Everything from `index` onward never reached `parent` and must be released by this scope;
+      // the compensation is awaited before this Promise settles.
       const leftover = remaining.slice(index)
-      state = ProvisionalScopeState.rolledBack
-      // 补偿即回滚：复用唯一 `rollbackPromise`，禁止第三条独立释放路径。
-      const cleanupPromise = releaseEntriesCollecting(leftover)
-      rollbackPromise = cleanupPromise.then(() => undefined)
-      const cleanupErrors = await cleanupPromise
-      // A closed/terminal parent is a specific, common reason `own()` rejects — surface it as a
-      // provisional-scope-level signal too, without discarding the parent's own error (kept as
-      // `cause`), so a caller can distinguish "my parent was closing" from any other reason `own()`
-      // might have refused this resource.
+      leftover.reverse()
+      this.#state = ProvisionalScopeState.rolledBack
+      // Compensation is the rollback: reuse the single `#rollbackPromise`.
+      const cleanupPromise = releaseInPlanOrder(
+        toAdmittedItems(leftover),
+        LifecycleErrorPolicy.collect
+      )
+      this.#rollbackPromise = cleanupPromise.then(() => undefined)
+      /** Raw cleanup failures, in release order. */
+      const cleanupErrors = (await cleanupPromise).map((entry) => entry.error)
+      // A closing/terminal parent is surfaced as its own provisional code, keeping the parent's
+      // error as `cause`.
       const parentCode = (error as { readonly code?: unknown } | null)?.code
       if (
         parentCode === LifecycleErrorCode.scopeClosed ||
@@ -305,15 +233,126 @@ export function createProvisionalScope(options: IProvisionalScopeOptions = {}): 
     }
   }
 
-  const scope: IProvisionalScope & { [ASYNC_OWNER_BRAND]?: true } = {
-    [ASYNC_OWNER_BRAND]: true,
-    get signal() {
-      return controller.signal
-    },
-    own,
-    commitTo,
-    rollback
+  /**
+   * Aborts the signal (now, if it exists; lazily otherwise) and detaches the parent listener.
+   * Returns the combined failure, or `noSettleError` when both steps succeeded.
+   */
+  #settle(settledBy: IProvisionalScopeState): unknown {
+    this.#settledBy = settledBy
+    /** First settle failure; later failures are attached to it. */
+    let settleError: unknown = noSettleError
+    if (this.#controller !== undefined) {
+      try {
+        this.#controller.abort(createSettleReason(settledBy))
+      } catch (error) {
+        settleError = error
+      }
+    }
+    try {
+      this.#detachParent()
+    } catch (error) {
+      settleError =
+        settleError === noSettleError
+          ? error
+          : attachLifecycleSecondaryErrors(
+              settleError,
+              [error],
+              LifecycleErrorText.provisionalCleanupFailed
+            )
+    }
+    return settleError
   }
 
-  return scope
+  /** Unsubscribes from the parent, then throws any listener-cleanup failure seen so far. */
+  #detachParent(): void {
+    this.#parentSubscription?.unsubscribe()
+    if (this.#registrationErrors.length === 0) return
+    throw attachLifecycleSecondaryErrors(
+      createLifecycleFailure(
+        LifecycleErrorCode.scopeDisposalFailed,
+        LifecycleErrorText.provisionalCleanupFailed,
+        this.#registrationErrors[0]
+      ),
+      this.#registrationErrors.slice(1),
+      LifecycleErrorText.provisionalCleanupFailed
+    )
+  }
+
+  /** Removes and returns every owned entry. */
+  #takeEntries(): IEntry[] {
+    /** Entries owned before settlement. */
+    const entries = this.#entries
+    this.#entries = []
+    return entries
+  }
+
+  /** Throws PROVISIONAL_SETTLED once the scope has committed or rolled back. */
+  #assertPending(): void {
+    if (this.#state !== ProvisionalScopeState.pending) throw createSettledError()
+  }
+}
+
+/** Sentinel meaning "abort and detach both succeeded"; distinct from any thrown value. */
+const noSettleError: unique symbol = Symbol('no settle error')
+
+/** Builds the PROVISIONAL_SETTLED error for use after commit or rollback. */
+function createSettledError(): Error {
+  return createLifecycleError(
+    LifecycleErrorCode.provisionalSettled,
+    LifecycleErrorText.provisionalSettled
+  )
+}
+
+/** Builds the `signal.reason` for a scope settled by commit or rollback. */
+function createSettleReason(settledBy: IProvisionalScopeState): Error {
+  return createLifecycleError(
+    LifecycleErrorCode.provisionalSettled,
+    settledBy === ProvisionalScopeState.committed
+      ? LifecycleErrorText.provisionalCommittedReason
+      : LifecycleErrorText.provisionalRolledBackReason
+  )
+}
+
+/**
+ * Releases rollback entries under the `throw` policy, then rejects with the settle failure (with
+ * any release failure attached) or with the release failure alone.
+ */
+async function releaseRollback(items: readonly IEntry[], settleError: unknown): Promise<void> {
+  if (items.length > 0) {
+    try {
+      await releaseInPlanOrder(toAdmittedItems(items), LifecycleErrorPolicy.throw)
+    } catch (cleanupError) {
+      if (settleError === noSettleError) throw cleanupError
+      throw attachLifecycleSecondaryErrors(
+        settleError,
+        [cleanupError],
+        LifecycleErrorText.provisionalCleanupFailed
+      )
+    }
+  }
+  if (settleError !== noSettleError) throw settleError
+}
+
+/** Maps entries to release items carrying their admitted snapshot; one pass over the list. */
+function toAdmittedItems(items: readonly IEntry[]): IAdmittedDisposeItem[] {
+  /** Release items in the entries' order. */
+  const admitted: IAdmittedDisposeItem[] = []
+  for (const entry of items) admitted.push({ source: entry.source, descriptor: entry.admitted })
+  return admitted
+}
+
+// Brand read by SyncLifecycleScope to reject async owners; shared through the prototype.
+Object.defineProperty(ProvisionalScope.prototype, ASYNC_OWNER_BRAND, { value: true })
+
+/**
+ * Creates a temporary owner for multi-step initialisation: register what each step creates, then
+ * either hand everything to the long-lived scope with `commitTo(parent)` or release it with
+ * `rollback()` when a step fails — never both, never neither.
+ *
+ * `rollback()` releases in reverse order. If the parent refuses partway through `commitTo()`, what
+ * was handed over stays with the parent and the rest is released and awaited before the error is
+ * rethrown (wrapped as `PROVISIONAL_PARENT_CLOSED` when the parent was closing).
+ */
+export function createProvisionalScope(options: IProvisionalScopeOptions = {}): IProvisionalScope {
+  return new ProvisionalScope(options) as unknown as IProvisionalScope
 }

@@ -19,7 +19,7 @@ exports[`no-setup installation preservation > keeps hook arity, order, and micro
       "c.featureExpose:1",
       "c.install:1",
     ],
-    "providerToDependent": 20,
+    "providerToDependent": 18,
   },
   "sync": {
     "completedBeforeReturn": true,

@@ -179,17 +179,16 @@ describe('ProvisionalScope: rollback/abort/expiry', () => {
     expect(released).toEqual(['c', 'a'])
   })
 
-  it('rollback keeps releasing resources after one descriptor fails admission', async () => {
-    const admissionError = new Error('rollback descriptor admission failed')
+  it('rollback releases the descriptor snapshot taken by own()', async () => {
     const released: string[] = []
     const hostile = { force: vi.fn() } as Record<string, unknown>
-    /** Own() validates the shape on the first read; rollback's admission read then fails. */
+    /** Own() reads the getter once; rollback must not read it again. */
     let gracefulReads = 0
     Object.defineProperty(hostile, 'graceful', {
       get: () => {
         gracefulReads += 1
         if (gracefulReads === 1) return undefined
-        throw admissionError
+        throw new Error('graceful read after own()')
       }
     })
     const provisional = createProvisionalScope()
@@ -205,7 +204,9 @@ describe('ProvisionalScope: rollback/abort/expiry', () => {
       }
     })
 
-    await expect(provisional.rollback()).rejects.toBe(admissionError)
+    await expect(provisional.rollback()).resolves.toBeUndefined()
+    expect(gracefulReads).toBe(1)
+    expect(hostile.force).toHaveBeenCalledTimes(1)
     expect(released).toEqual(['later', 'first'])
   })
 

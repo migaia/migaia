@@ -62,37 +62,30 @@ describe('SyncLifecycleScope: rejects async descriptors and async-owner instance
   })
 })
 
-describe('shared release admission', () => {
+describe('descriptor snapshot at own()', () => {
   it.each(['order', 'force'] as const)(
-    're-admits a changed %s before any release runs',
+    'releases with the %s admitted by own(), ignoring later descriptor changes',
     (field) => {
-      /** Collecting keeps a rejected item observable while the remaining resource still releases. */
       const scope = createSyncLifecycleScope({ errorPolicy: 'collect' })
-      /** This valid resource proves admission failure cannot discard the remaining plan. */
       const kept = vi.fn()
-      /** This callback must never run after its descriptor changes to an invalid shape. */
-      const rejected = vi.fn()
-      /** Switches getter output only after own() has accepted the original descriptor. */
+      /** The force admitted at registration; it must still run after the getter changes. */
+      const admitted = vi.fn()
       let mutated = false
       scope.own('kept', { syncSafe: true, force: kept })
       scope.own('changed', {
         syncSafe: true,
-        /** Registration sees a valid order; disposal must reject its later invalid value. */
         get order() {
           return mutated && field === 'order' ? NaN : 0
         },
-        /** A previously valid callback can disappear before the descriptor is re-admitted. */
         get force() {
-          return mutated && field === 'force' ? (undefined as never) : rejected
+          return mutated && field === 'force' ? (undefined as never) : admitted
         }
       })
       mutated = true
-      /** The shared admission policy returns the coded failure synchronously. */
       const errors = scope.dispose()
-      expect(errors).toHaveLength(1)
-      expect(errors[0].error).toMatchObject({ code: LifecycleErrorCode.invalidOption })
+      expect(errors).toEqual([])
+      expect(admitted).toHaveBeenCalledTimes(1)
       expect(kept).toHaveBeenCalledTimes(1)
-      expect(rejected).not.toHaveBeenCalled()
     }
   )
 })
