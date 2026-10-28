@@ -1,6 +1,19 @@
+/**
+ * Owns runtime-neutral byte brands, Base64 and UTF-8 conversion, including canonical input errors.
+ * Exposes byte/text primitives without transport, persistence or host-specific resource ownership.
+ */
 import { ERROR_SOURCE, UtilsErrorCode } from './error-code.ts'
 import { UtilsErrorText } from './error-text.ts'
 import { attachErrorIdentity } from './error.ts'
+
+/** RFC 4648 alphabet is shared with its inverse table. */
+const base64Alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+
+/** ASCII inverse map admits only characters already accepted by canonical validation. */
+const base64Values = new Uint8Array(128)
+// The compile-time RFC 4648 alphabet has exactly 64 entries.
+for (let index = 0; index < base64Alphabet.length; index++)
+  base64Values[base64Alphabet.charCodeAt(index)] = index
 
 /** Captured `%TypedArray%.prototype` used as the receiver-independent brand probe. */
 const typedArrayPrototype = Object.getPrototypeOf(Uint8Array.prototype)
@@ -61,16 +74,15 @@ export const isArrayBuffer = (value: unknown): value is ArrayBuffer => {
 
 /** Encodes bytes using the canonical RFC 4648 alphabet. */
 export function bytesToBase64(value: Uint8Array): string {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
   let result = ''
   for (let index = 0; index < value.length; index += 3) {
     const first = value[index]
     const second = value[index + 1]
     const third = value[index + 2]
-    result += alphabet[first >> 2]
-    result += alphabet[((first & 3) << 4) | ((second ?? 0) >> 4)]
-    result += second === undefined ? '=' : alphabet[((second & 15) << 2) | ((third ?? 0) >> 6)]
-    result += third === undefined ? '=' : alphabet[third & 63]
+    result += base64Alphabet[first >> 2]
+    result += base64Alphabet[((first & 3) << 4) | ((second ?? 0) >> 4)]
+    result += second === undefined ? '=' : base64Alphabet[((second & 15) << 2) | ((third ?? 0) >> 6)]
+    result += third === undefined ? '=' : base64Alphabet[third & 63]
   }
   return result
 }
@@ -83,7 +95,7 @@ export function base64ToBytes(value: string, target?: Uint8Array): Uint8Array {
   if (!/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(value))
     throw encodingError(0)
   if (value.length % 4 !== 0) throw encodingError(value.length)
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
+  /** Padding is examined only after the original canonical-text admission. */
   const padding = value.endsWith('==') ? 2 : value.endsWith('=') ? 1 : 0
   /** The destination length is derived from validated text before any output write. */
   const length = (value.length / 4) * 3 - padding
@@ -99,13 +111,20 @@ export function base64ToBytes(value: string, target?: Uint8Array): Uint8Array {
     )
   /** Default callers retain their existing one allocation; supplied targets allocate no backing. */
   const output = target ?? new Uint8Array(length)
+  /** Next destination position; partial writes retain the existing pad-bit failure behavior. */
   let outputOffset = 0
   for (let index = 0; index < value.length; index += 4) {
-    const first = alphabet.indexOf(value[index])
-    const second = alphabet.indexOf(value[index + 1])
-    const third = value[index + 2] === '=' ? 0 : alphabet.indexOf(value[index + 2])
-    const fourth = value[index + 3] === '=' ? 0 : alphabet.indexOf(value[index + 3])
+    /** Validated ASCII characters map directly to their six-bit values. */
+    const first = base64Values[value.charCodeAt(index)]
+    /** Double padding requires the second sextet's low four bits to be zero. */
+    const second = base64Values[value.charCodeAt(index + 1)]
+    /** Padding contributes zero bits without entering the ASCII table. */
+    const third = value[index + 2] === '=' ? 0 : base64Values[value.charCodeAt(index + 2)]
+    /** Final sextet contributes zero bits when the final byte is absent. */
+    const fourth = value[index + 3] === '=' ? 0 : base64Values[value.charCodeAt(index + 3)]
+    /** First padding marker determines whether a second output byte exists. */
     const thirdPadding = value[index + 2] === '='
+    /** Final padding marker determines whether a third output byte exists. */
     const fourthPadding = value[index + 3] === '='
     if ((thirdPadding && (second & 15) !== 0) || (fourthPadding && (third & 3) !== 0))
       throw encodingError(index)
