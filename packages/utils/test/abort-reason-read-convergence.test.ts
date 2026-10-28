@@ -14,7 +14,7 @@ describe('abort reason read convergence', () => {
   it('uses the shared guarded read at every owned reason site', () => {
     const repository = join(import.meta.dirname, '../../..')
     const files = [
-      'packages/utils/src/promise.ts',
+      'packages/utils/src/internal/promise-abort.ts',
       'packages/serialize/src/signal-snapshot.ts',
       'packages/serialize/src/stream.ts',
       'packages/lifecycle/src/observed-subscription.ts',
@@ -25,7 +25,7 @@ describe('abort reason read convergence', () => {
       expect(source, file).not.toMatch(/\bsignal\??\.reason\b/)
       expect(source, file).toContain('tryReadProperty(')
       expect(source, file).toContain(
-        file.includes('packages/utils/') ? "from './error.ts'" : "from '@migaia/utils/error'"
+        file.includes('packages/utils/') ? "from '../error.ts'" : "from '@migaia/utils/error'"
       )
     }
     for (const name of readdirSync(join(repository, 'packages'))) {

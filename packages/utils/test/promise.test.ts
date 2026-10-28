@@ -405,7 +405,10 @@ describe('promise primitives', () => {
   })
 
   it('keeps the signal primitive runtime-neutral and storage-policy free', () => {
-    const source = readFileSync(new URL('../src/promise.ts', import.meta.url), 'utf8')
+    const source =
+      readFileSync(new URL('../src/promise.ts', import.meta.url), 'utf8') +
+      readFileSync(new URL('../src/internal/promise-abort-timeout.ts', import.meta.url), 'utf8') +
+      readFileSync(new URL('../src/internal/promise-abort.ts', import.meta.url), 'utf8')
     expect(source).not.toContain('@migaia/storage')
     expect(source).not.toContain('StorageContractError')
     expect(createAbortTimeoutSignal.name).toBe('createAbortTimeoutSignal')

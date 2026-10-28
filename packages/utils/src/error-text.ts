@@ -1,5 +1,9 @@
 /** Stable public text for errors crossing the utils package boundary. */
 export const UtilsErrorText = {
+  /** Signal admission across async owners uses this exact public expectation text. */
+  abortSignalExpectation: 'an AbortSignal',
+  /** Retry and concurrency admission share this unchanged positive-count contract. */
+  positiveSafeIntegerExpectation: 'a positive safe integer',
   /** Timers and retry durations reject the same unsupported numeric domain. */
   finiteNonNegativeNumberExpectation: 'a finite non-negative number',
   /** Option mapping failed and an immutable or conflicting native error required a causal wrapper. */
