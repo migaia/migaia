@@ -3,7 +3,7 @@ import { memoryChangeFeedFeature } from '@migaia/storage-host/features/memory-ch
 import { expect, it } from 'vitest'
 import { createStorageHost } from '@migaia/storage-host'
 import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
-import { cachePlugin } from '../src/index.js'
+import { cachePlugin } from '../src/index.ts'
 
 /** Real native memory commits deliver through the original subscription owner. */
 it('routes ephemeral commits by immutable org and ignores non-value channels and unrelated keys', async () => {

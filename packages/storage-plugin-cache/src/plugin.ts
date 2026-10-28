@@ -5,10 +5,10 @@ import {
   type IStorageFeatureStoreCompatibility,
   type IStoragePluginCore
 } from '@migaia/storage-host'
-import { cacheBackendKind } from './kind.js'
-import { snapshotCacheOptions } from './policy.js'
-import { createCacheStore } from './store.js'
-import type { ICacheOptions, ICacheStore } from './types.js'
+import { cacheBackendKind } from './kind.ts'
+import { snapshotCacheOptions } from './policy.ts'
+import { createCacheStore } from './store.ts'
+import type { ICacheOptions, ICacheStore } from './types.ts'
 
 /** Install only after borrowed tiers have been published by an earlier host batch. */
 export function cachePlugin<

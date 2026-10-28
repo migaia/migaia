@@ -17,7 +17,7 @@ import {
   createStorageProgramJournal,
   runStorageProgramOrgs,
   storageProgramBatchObservations
-} from '../../storage-plugin-sqlite/test/helpers/program-app.js'
+} from '../../storage-plugin-sqlite/test/helpers/program-app.ts'
 
 /** All native addresses come from the existing repository service launcher. */
 const redisUrl = process.env.MIGAIA_REDIS_URL,

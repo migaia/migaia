@@ -13,7 +13,7 @@ import { kv, ttl, type IStorageBase } from '@migaia/storage-contract'
 import { lockKey } from '@migaia/storage-host/sdk'
 import { deferred } from '@migaia/utils/promise'
 import { IdentifyError, walkErrorCauses } from '@migaia/utils/error'
-import { cachePlugin, type ICacheOptions } from '../src/index.js'
+import { cachePlugin, type ICacheOptions } from '../src/index.ts'
 import { CacheErrorCode } from '@migaia/storage-contract/error-code'
 
 /** Every case owns fresh native memory tiers and an independently installed cache. */

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { cacheKey, CacheWriteMode } from '../src/index.js'
+import { cacheKey, CacheWriteMode } from '../src/index.ts'
 import { CacheErrorCode, STORAGE_CACHE_ERROR_SOURCE } from '@migaia/storage-contract/error-code'
-import { cacheError } from '../src/errors.js'
+import { cacheError } from '../src/errors.ts'
 
 describe('canonical cache inputs', () => {
   it('uses portable object ordering while retaining part order and content', async () => {

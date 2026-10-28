@@ -4,7 +4,7 @@ import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { blob, records, ttl } from '@migaia/storage-contract'
 import { lockKey } from '@migaia/storage-host/sdk'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { cachePlugin } from '../src/index.js'
+import { cachePlugin } from '../src/index.ts'
 
 describe('cache policy composition', () => {
   it('loads exactly four absent batch keys while preserving three-tier provenance and an existing flight', async () => {

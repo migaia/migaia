@@ -6,8 +6,8 @@ import { memoryBackendPlugin } from '@migaia/storage-host/plugins/memory'
 import { postgresBackendPlugin } from '@migaia/storage-plugin-postgres'
 import { pgDriver } from '@migaia/storage-plugin-postgres/pg'
 import { pgLogicalReplicationFeature } from '@migaia/storage-plugin-postgres/features/logical-replication'
-import { cachePlugin } from '../src/index.js'
-import { PgReplicationTestService } from '../../storage-plugin-postgres/test/helpers/replication-service.js'
+import { cachePlugin } from '../src/index.ts'
+import { PgReplicationTestService } from '../../storage-plugin-postgres/test/helpers/replication-service.ts'
 
 /** Cache joins the same scheduler as the PostgreSQL logical-decoding files. */
 const replicationService = new PgReplicationTestService()

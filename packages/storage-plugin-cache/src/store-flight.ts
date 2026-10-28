@@ -3,12 +3,12 @@ import { lockKey, ConcurrencyPolicy } from '@migaia/storage-host/sdk'
 import { assertStringStorageKey } from '@migaia/storage-contract'
 import type { ICodecValue } from '@migaia/serialize/codec'
 import type { IStorageBorrowedBackend } from '@migaia/storage-host'
-import { CacheText, CacheOperation, CacheHook } from './constants.js'
-import { invalidArgument } from './errors.js'
-import { snapshotCachePolicy, type ICachePolicy } from './policy.js'
-import { encodeEntry, type ICacheEntry, type ICacheFound } from './entry.js'
-import type { ICacheEntryInfo, ICacheLoader } from './types.js'
-import { loadLockedCacheFlight } from './store-batch-flight.js'
+import { CacheText, CacheOperation, CacheHook } from './constants.ts'
+import { invalidArgument } from './errors.ts'
+import { snapshotCachePolicy, type ICachePolicy } from './policy.ts'
+import { encodeEntry, type ICacheEntry, type ICacheFound } from './entry.ts'
+import type { ICacheEntryInfo, ICacheLoader } from './types.ts'
+import { loadLockedCacheFlight } from './store-batch-flight.ts'
 import {
   route,
   callLoader,
@@ -19,9 +19,9 @@ import {
   tierError,
   writeOne,
   batchPolicy
-} from './store-tier.js'
-import { physical, report } from './store.js'
-import type { ICacheOrganizationContext, IFlight, ICacheNative } from './store.js'
+} from './store-tier.ts'
+import { physical, report } from './store.ts'
+import type { ICacheOrganizationContext, IFlight, ICacheNative } from './store.ts'
 
 /** The shared flight lease survives cancellation of every individual caller. */
 /** Physical cache composition shares the original controller and explicit borrowed tiers. */

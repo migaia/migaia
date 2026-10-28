@@ -8,7 +8,7 @@ import type {
   IKeyValueApi,
   kv
 } from '@migaia/storage-contract'
-import type { CacheWriteMode } from './constants.js'
+import type { CacheWriteMode } from './constants.ts'
 
 /** One already-published backend owns this tier's physical storage and hard expiry. */
 export type ICacheTierOptions = {

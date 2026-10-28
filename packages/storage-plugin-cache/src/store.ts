@@ -1,4 +1,4 @@
-import './hooks.js'
+import './hooks.ts'
 import {
   createBackendChangeController,
   provideCapabilities,
@@ -25,14 +25,14 @@ import type { ICodecValue } from '@migaia/serialize/codec'
 import type { IStoragePluginCore, IStorageBorrowedBackend } from '@migaia/storage-host'
 import { IdentifyError } from '@migaia/utils/error'
 import type { IScheduledTask } from '@migaia/utils/scheduler'
-import { CacheText, CacheWriteMode, CacheOperation } from './constants.js'
-import { cacheError, invalidArgument, missingCapability } from './errors.js'
+import { CacheText, CacheWriteMode, CacheOperation } from './constants.ts'
+import { cacheError, invalidArgument, missingCapability } from './errors.ts'
 import { CacheErrorCode } from '@migaia/storage-contract/error-code'
-import type { ICacheConfiguration, ICachePolicy } from './policy.js'
-import type { ICacheEntry } from './entry.js'
-import type { ICacheStore, ICacheEntryInfo } from './types.js'
-import { createCacheStoreApi, createCacheStoreBase } from './store-api.js'
-import { flush, erase } from './store-flight.js'
+import type { ICacheConfiguration, ICachePolicy } from './policy.ts'
+import type { ICacheEntry } from './entry.ts'
+import type { ICacheStore, ICacheEntryInfo } from './types.ts'
+import { createCacheStoreApi, createCacheStoreBase } from './store-api.ts'
+import { flush, erase } from './store-flight.ts'
 
 /** Borrowed native extras are admitted individually; capability methods retain their exact token. */
 export type ICacheNative = {

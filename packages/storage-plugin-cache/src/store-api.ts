@@ -7,15 +7,15 @@ import {
   type IRecordStore
 } from '@migaia/storage-contract'
 import type { ICodecValue } from '@migaia/serialize/codec'
-import { CacheText, CacheOperation } from './constants.js'
-import { cacheError, invalidArgument, missingCapability } from './errors.js'
+import { CacheText, CacheOperation } from './constants.ts'
+import { cacheError, invalidArgument, missingCapability } from './errors.ts'
 import { CacheErrorCode } from '@migaia/storage-contract/error-code'
-import { snapshotCachePolicy, type ICachePolicy } from './policy.js'
-import { encodeEntry, type ICacheEntry } from './entry.js'
-import type { ICacheEntryInfo } from './types.js'
-import { cacheStats } from './store-batch-flight.js'
-import { captureKeys, readBatch, writeBatch, loadMany } from './store-batch.js'
-import { get, defaults, erase, captureEntries, loadEntry, flush } from './store-flight.js'
+import { snapshotCachePolicy, type ICachePolicy } from './policy.ts'
+import { encodeEntry, type ICacheEntry } from './entry.ts'
+import type { ICacheEntryInfo } from './types.ts'
+import { cacheStats } from './store-batch-flight.ts'
+import { captureKeys, readBatch, writeBatch, loadMany } from './store-batch.ts'
+import { get, defaults, erase, captureEntries, loadEntry, flush } from './store-flight.ts'
 import {
   run,
   supersede,
@@ -28,9 +28,9 @@ import {
   read,
   route,
   blobAt
-} from './store-tier.js'
-import { physical, report } from './store.js'
-import type { ICacheOrganizationContext } from './store.js'
+} from './store-tier.ts'
+import { physical, report } from './store.ts'
+import type { ICacheOrganizationContext } from './store.ts'
 
 /**
  * Store shape the CacheStoreApi class implements; named because implements cannot take an

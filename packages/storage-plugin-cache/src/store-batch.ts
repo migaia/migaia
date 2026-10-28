@@ -2,13 +2,13 @@
 import { lockKey } from '@migaia/storage-host/sdk'
 import { ttl, assertStringStorageKey } from '@migaia/storage-contract'
 import type { ICodecValue } from '@migaia/serialize/codec'
-import { CacheText, CacheWriteMode, CacheOperation, CacheHook } from './constants.js'
-import { cacheError, invalidArgument } from './errors.js'
+import { CacheText, CacheWriteMode, CacheOperation, CacheHook } from './constants.ts'
+import { cacheError, invalidArgument } from './errors.ts'
 import { CacheErrorCode } from '@migaia/storage-contract/error-code'
-import type { ICachePolicy } from './policy.js'
-import type { ICacheFound } from './entry.js'
-import type { ICacheEntryInfo, ICacheBatchLoader } from './types.js'
-import { executeCacheBatch } from './store-batch-flight.js'
+import type { ICachePolicy } from './policy.ts'
+import type { ICacheFound } from './entry.ts'
+import type { ICacheEntryInfo, ICacheBatchLoader } from './types.ts'
+import { executeCacheBatch } from './store-batch-flight.ts'
 import {
   plan,
   indexTags,
@@ -20,15 +20,15 @@ import {
   route,
   decode,
   supersede
-} from './store-tier.js'
-import { schedule, physical, report } from './store.js'
+} from './store-tier.ts'
+import { schedule, physical, report } from './store.ts'
 import type {
   ICacheOrganizationContext,
   IWriteItem,
   IPending,
   IFlight,
   ICacheBackendContext
-} from './store.js'
+} from './store.ts'
 
 /** All selected entries share one native batch per through tier, with per-key back coalescing. */
 export async function writeBatch(

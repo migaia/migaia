@@ -7,7 +7,7 @@ import {
 } from '@migaia/serialize/codec'
 import { SerializeErrorCode } from '@migaia/serialize/core'
 import { encodeUtf8 } from '@migaia/utils/bytes'
-import { invalidArgument } from './errors.js'
+import { invalidArgument } from './errors.ts'
 
 /** Digest original bytes once; cache request identities and offloaded content share this primitive. */
 export async function hashCacheBytes(bytes: Uint8Array): Promise<string> {
