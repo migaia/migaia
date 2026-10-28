@@ -5,7 +5,7 @@ import {
   jsonPlugin,
   type ISerializeChunk,
   type ISerializeContext
-} from '../src/index'
+} from '../src/index.ts'
 
 describe('jsonParser：encode', () => {
   it('把值编成 text chunk', () => {
