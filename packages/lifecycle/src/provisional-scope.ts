@@ -1,26 +1,26 @@
-import { attachLifecycleSecondaryErrors } from './error-boundary.js'
-import type { ILifecycleOwner, IReleaseDescriptor } from './types.js'
-import { ASYNC_OWNER_BRAND } from './types.js'
-import { createLifecycleError, createLifecycleFailure } from './errors.js'
-import { LifecycleErrorCode } from './error-code.js'
-import { LifecycleErrorText } from './error-text.js'
+import { attachLifecycleSecondaryErrors } from './error-boundary.ts'
+import type { ILifecycleOwner, IReleaseDescriptor } from './types.ts'
+import { ASYNC_OWNER_BRAND } from './types.ts'
+import { createLifecycleError, createLifecycleFailure } from './errors.ts'
+import { LifecycleErrorCode } from './error-code.ts'
+import { LifecycleErrorText } from './error-text.ts'
 import {
   admitDescriptor,
   releaseInPlanOrder,
   type IAdmittedDisposeItem
-} from './dispose-transaction.js'
+} from './dispose-transaction.ts'
 import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
-import { captureAbortControllerFactory } from './abort-factory.js'
-import type { IAbortController } from './abort.js'
+import { captureAbortControllerFactory } from './abort-factory.ts'
+import type { IAbortController } from './abort.ts'
 import {
   observeAbortSubscription,
   type IObservedAbortSubscription
-} from './observed-subscription.js'
+} from './observed-subscription.ts'
 import {
   LifecycleErrorPolicy,
   ProvisionalScopeState,
   type IProvisionalScopeState
-} from './state-constants.js'
+} from './state-constants.ts'
 
 export type IProvisionalScopeOptions = {
   /** Forwarded so `signal` also reflects a parent's abort (e.g. a superseded generation). */

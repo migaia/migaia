@@ -6,9 +6,9 @@ import {
   SupervisionErrorCode,
   SUPERVISION_SOURCE,
   type ISupervisorEvent
-} from '../../src/index.js'
-import { createMemoryLauncher, type IMemoryHandle } from '../support/memory-launcher.js'
-import { createMemoryProfile } from '../support/memory-profile.js'
+} from '../../src/index.ts'
+import { createMemoryLauncher, type IMemoryHandle } from '../support/memory-launcher.ts'
+import { createMemoryProfile } from '../support/memory-profile.ts'
 
 /** Flushes the release descriptor chain after a clock advance. */
 async function flush(): Promise<void> {

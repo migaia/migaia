@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { createLifecycleUnit } from '../src/lifecycle-unit'
-import { LifecycleErrorCode } from '../src/error-code'
+import { createLifecycleUnit } from '../src/lifecycle-unit.ts'
+import { LifecycleErrorCode } from '../src/error-code.ts'
 
 describe('LifecycleUnit: synchronous value vs thenable probing', () => {
   it('a synchronous return commits directly to loaded, never observed as loading', () => {

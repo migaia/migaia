@@ -2,19 +2,19 @@
  * Reads channel construction options once and validates their public contract before state exists.
  * Exposes the admitted configuration; registration and dispatch own all mutable runtime state.
  */
-import { validateEventReporter } from './channel-options.js'
-import { EventSubscriberErrorCode } from '../error-code.js'
-import { codeExistingError } from '../errors.js'
+import { validateEventReporter } from './channel-options.ts'
+import { EventSubscriberErrorCode } from '../error-code.ts'
+import { codeExistingError } from '../errors.ts'
 import {
   EventAdmissionPolicy,
   EventDispatchPolicy,
   EventRemovalPolicy
-} from '../state-constants.js'
-import { readEventApiStyle, type IEventApiStyle, type IEventApiStylePlan } from '../style.js'
-import type { IEventChannelOptions } from '../types.js'
-import { createEventValueProjectionPlan, type IEventProjectionPlan } from '../value-projection.js'
-import { isRecord } from './record.js'
-import { createInvalidOptionsError } from './channel-options.js'
+} from '../state-constants.ts'
+import { readEventApiStyle, type IEventApiStyle, type IEventApiStylePlan } from '../style.ts'
+import type { IEventChannelOptions } from '../types.ts'
+import { createEventValueProjectionPlan, type IEventProjectionPlan } from '../value-projection.ts'
+import { isRecord } from './record.ts'
+import { createInvalidOptionsError } from './channel-options.ts'
 
 /** Validated configuration shared by the channel's composed runtime owners. */
 export type IChannelConfiguration<T, V> = {

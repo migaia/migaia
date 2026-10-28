@@ -2,14 +2,14 @@ import {
   LateGraphStartup,
   releaseGraphBatch,
   emptyGraphInstance
-} from './fixtures/graph-boundary.js'
+} from './fixtures/graph-boundary.ts'
 import { describe, expect, it } from 'vitest'
 import {
   createCapabilityGraph,
   type IGraphNodeId,
   type IGraphNodeInstance
-} from '../src/graph/index.js'
-import { createDynamicCapabilityGraph } from '../src/graph/dynamic.js'
+} from '../src/graph/index.ts'
+import { createDynamicCapabilityGraph } from '../src/graph/dynamic.ts'
 
 describe('audited capability cleanup ownership', () => {
   it(

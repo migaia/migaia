@@ -4,7 +4,7 @@ import {
   CapabilityGraphErrorCode,
   type IGraphNodeId
 } from '@migaia/capability/graph'
-import { releaseNothing } from './nonstatic-fixtures.js'
+import { releaseNothing } from './nonstatic-fixtures.ts'
 
 /**
  * Owns the isolated setup, action and assertions for: reads the canonical value without changing

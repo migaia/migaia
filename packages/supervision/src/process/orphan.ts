@@ -1,12 +1,12 @@
 /** Recovers durable process identities sequentially, retaining per-record failure traceability. */
-import { PROCESS_KIND, ProcessField, RecoveryStep } from './text.js'
+import { PROCESS_KIND, ProcessField, RecoveryStep } from './text.ts'
 import { createErrorCollector, LifecycleErrorPolicy, type ICollectedError } from '@migaia/lifecycle'
-import { SUPERVISION_SOURCE, SupervisionErrorCode } from '../error-code.js'
-import { SupervisionErrorText } from '../error-text.js'
-import { createSupervisionError } from '../errors.js'
-import { invalidProcessOption } from './spec.js'
-import { OrphanProbeResult } from './constants.js'
-import type { IProcessLauncher, IProcessRegistry } from './types.js'
+import { SUPERVISION_SOURCE, SupervisionErrorCode } from '../error-code.ts'
+import { SupervisionErrorText } from '../error-text.ts'
+import { createSupervisionError } from '../errors.ts'
+import { invalidProcessOption } from './spec.ts'
+import { OrphanProbeResult } from './constants.ts'
+import type { IProcessLauncher, IProcessRegistry } from './types.ts'
 
 /** Recoverable result of scanning records left by an earlier parent run. */
 export type IOrphanReclaimResult = {

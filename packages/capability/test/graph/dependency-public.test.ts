@@ -1,10 +1,10 @@
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
-import * as dependency from '../../src/graph/dependency.js'
-import * as topology from '../../src/graph/topology.js'
-import type { IGraphDependents as IDynamicGraphDependents } from '../../src/graph/dynamic.js'
-import type { IGraphDependents as ITopologyGraphDependents } from '../../src/graph/topology.js'
+import * as dependency from '../../src/graph/dependency.ts'
+import * as topology from '../../src/graph/topology.ts'
+import type { IGraphDependents as IDynamicGraphDependents } from '../../src/graph/dynamic.ts'
+import type { IGraphDependents as ITopologyGraphDependents } from '../../src/graph/topology.ts'
 
 describe('dependency planner public contract', () => {
   it('exposes the dependency planner and incremental topology entry points', () => {

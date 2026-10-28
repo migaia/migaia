@@ -1,7 +1,7 @@
 /** Owns per-unit diagnostic output and bounded byte tails; sinks only observe drained data. */
-import type { IUnitRuntime } from '../index.js'
-import { DrainedStream } from './constants.js'
-import type { IProcessLaunchContext } from './types.js'
+import type { IUnitRuntime } from '../index.ts'
+import { DrainedStream } from './constants.ts'
+import type { IProcessLaunchContext } from './types.ts'
 
 /** One unit's bounded diagnostic tails and an always-draining output sink. */
 export type IOutputAttachment = {

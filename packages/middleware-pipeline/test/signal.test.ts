@@ -1,11 +1,11 @@
 import { describe, expect, it, vi } from 'vitest'
-import { GENERATOR_CONTINUE } from '../src/index.js'
+import { GENERATOR_CONTINUE } from '../src/index.ts'
 import {
   runAsyncForTest,
   runAsyncGeneratorForTest,
   runGeneratorForTest,
   runSyncForTest
-} from './pipeline-test-helpers.js'
+} from './pipeline-test-helpers.ts'
 
 type ITestSignal = {
   aborted: boolean
@@ -23,7 +23,7 @@ const signal = (aborted = false, reason?: unknown): ITestSignal => ({
 
 describe('signal contract', () => {
   it('exports structural signal surface and preserves package boundary', async () => {
-    const module = await import('../src/index.js')
+    const module = await import('../src/index.ts')
     expect(typeof module.createPipeline).toBe('function')
     expect(module).not.toHaveProperty('runSyncMiddleware')
     expect(module).not.toHaveProperty('runAsyncMiddleware')

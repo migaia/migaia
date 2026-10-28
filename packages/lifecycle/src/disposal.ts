@@ -6,11 +6,11 @@ export {
   type IDisposeTransaction,
   type IDisposeTransactionMode,
   type IDisposeTransactionOptions
-} from './dispose-transaction.js'
+} from './dispose-transaction.ts'
 export {
   createSyncStartedDisposalLedger,
   mergeCleanupResults,
   type ICleanupResult,
   type ISyncStartedDisposalLedger,
   type ISyncStartedDisposalOutcome
-} from './dispose-transaction.js'
+} from './dispose-transaction.ts'

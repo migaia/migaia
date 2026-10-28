@@ -1,6 +1,6 @@
 /** Small resource fixtures used by dynamic graph and direct-value contract cases. */
-import type { IGraphStartEntry } from '../../src/graph/dynamic.js'
-import type { IGraphNodeInstance } from '../../src/graph/index.js'
+import type { IGraphStartEntry } from '../../src/graph/dynamic.ts'
+import type { IGraphNodeInstance } from '../../src/graph/index.ts'
 
 /** Completes a primary release synchronously without creating another resource. */
 export function releaseNothing(): void {}

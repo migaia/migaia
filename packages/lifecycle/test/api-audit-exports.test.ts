@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import * as lifecycle from '../src/index.js'
-import * as scheduler from '../src/scheduler-entry.js'
-import * as errors from '../src/errors-entry.js'
+import * as lifecycle from '../src/index.ts'
+import * as scheduler from '../src/scheduler-entry.ts'
+import * as errors from '../src/errors-entry.ts'
 
 describe('lifecycle public ownership boundaries', () => {
   it('retains scheduler admission while hiding internal arithmetic', () => {

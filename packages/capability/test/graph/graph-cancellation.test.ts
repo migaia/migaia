@@ -4,9 +4,9 @@ import {
   CapabilityGraphErrorCode,
   CapabilityGraphState,
   createCapabilityGraph
-} from '../../src/graph/index.js'
+} from '../../src/graph/index.ts'
 
-import { id, instance, deferred } from './static-fixtures.js'
+import { id, instance, deferred } from './static-fixtures.ts'
 
 /**
  * Covers the contract: disposes while two same-level starts are pending and releases both late

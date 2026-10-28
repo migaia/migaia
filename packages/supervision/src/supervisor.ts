@@ -4,11 +4,11 @@
  */
 import { resolveScheduler, resolveSchedulerOption } from '@migaia/lifecycle/scheduler'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { admitCapabilities } from './admission.js'
-import { IsolationMode } from './constants.js'
-import { validateSupervisorOptions } from './options.js'
-import { SupervisorOwner } from './supervisor-owner.js'
-import type { ILaunchContext, ISupervisor, ISupervisorOptions, IUnitHandle } from './types.js'
+import { admitCapabilities } from './admission.ts'
+import { IsolationMode } from './constants.ts'
+import { validateSupervisorOptions } from './options.ts'
+import { SupervisorOwner } from './supervisor-owner.ts'
+import type { ILaunchContext, ISupervisor, ISupervisorOptions, IUnitHandle } from './types.ts'
 
 /**
  * Creates a supervisor for one kind of unit, for adapters that bring their own profile and

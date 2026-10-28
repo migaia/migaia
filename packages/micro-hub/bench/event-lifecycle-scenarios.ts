@@ -4,7 +4,7 @@ import mitt from 'mitt'
 import { createMicroHub, defineContract, event } from '../dist/index.js'
 import { events } from '../dist/events/index.js'
 import { state } from '../dist/state/index.js'
-import type { IBenchFixture, ILibrary, IObservation } from './types.js'
+import type { IBenchFixture, ILibrary, IObservation } from './types.ts'
 
 /** One payload event is shared by all S3/S4 implementations without a projection layer. */
 const EVENT_NAME = 'pulse'

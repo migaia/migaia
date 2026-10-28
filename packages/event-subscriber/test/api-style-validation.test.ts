@@ -1,7 +1,7 @@
 /** Event API style boundary validation. Cases preserve the existing behavioral assertions. */
 import { describe, expect, it } from 'vitest'
-import { createEventChannel, createEventHub, EventSubscriberErrorCode } from '../src/index.js'
-import { normalizeEventApiStyle, projectEventApiStyle } from '../src/style.js'
+import { createEventChannel, createEventHub, EventSubscriberErrorCode } from '../src/index.ts'
+import { normalizeEventApiStyle, projectEventApiStyle } from '../src/style.ts'
 
 /** Invokes the public factory at its JavaScript boundary for hostile-value coverage. */
 const callUntrustedChannel = (options: unknown): unknown =>

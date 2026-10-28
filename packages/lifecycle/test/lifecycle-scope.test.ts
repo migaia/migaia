@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createLifecycleScope } from '../src/lifecycle-scope'
-import { LifecycleErrorCode } from '../src/error-code'
-import type { IReleaseDescriptor } from '../src/types'
+import { createLifecycleScope } from '../src/lifecycle-scope.ts'
+import { LifecycleErrorCode } from '../src/error-code.ts'
+import type { IReleaseDescriptor } from '../src/types.ts'
 
 const forceDescriptor = (force: IReleaseDescriptor['force']): IReleaseDescriptor => ({ force })
 

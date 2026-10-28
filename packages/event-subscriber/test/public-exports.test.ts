@@ -1,10 +1,10 @@
-import { subscribeUntil } from '../src/subscriber.js'
+import { subscribeUntil } from '../src/subscriber.ts'
 import type { IAbortSignal } from '@migaia/utils/promise'
-import * as EventSubscriber from '../src/index.js'
+import * as EventSubscriber from '../src/index.ts'
 import { readFileSync } from 'node:fs'
-import { createEventChannel, createEventHub, type IEventSubscriber } from '../src/index.js'
+import { createEventChannel, createEventHub, type IEventSubscriber } from '../src/index.ts'
 import { describe, expect, it } from 'vitest'
-import * as SubscriberEntry from '../src/subscriber.js'
+import * as SubscriberEntry from '../src/subscriber.ts'
 
 describe('public exports', () => {
   it('keeps literal style inference in TypeScript without a runtime identity helper', () => {

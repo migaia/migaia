@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createObjectLeaseRegistry, createStringLeaseRegistry } from '../src/quiescence-tracker'
+import { createObjectLeaseRegistry, createStringLeaseRegistry } from '../src/quiescence-tracker.ts'
 
 describe('LeaseRegistry: object keys vs string keys', () => {
   it('object-keyed and string-keyed registries are isolated from each other', () => {

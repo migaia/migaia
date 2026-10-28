@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { createParentLossGuard, ParentLossExitCode } from '../../src/process/index.js'
+import { createParentLossGuard, ParentLossExitCode } from '../../src/process/index.ts'
 
 describe('parent disappearance guard', () => {
   it('completes once when shutdown settles within the grace period', async () => {

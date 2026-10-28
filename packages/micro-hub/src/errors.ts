@@ -1,5 +1,5 @@
 import { attachErrorIdentity } from '@migaia/utils/error'
-import { ERROR_SOURCE, MicroHubErrorCode, type IMicroHubErrorCode } from './error-code.js'
+import { ERROR_SOURCE, MicroHubErrorCode, type IMicroHubErrorCode } from './error-code.ts'
 
 export { MicroHubErrorCode, type IMicroHubErrorCode }
 

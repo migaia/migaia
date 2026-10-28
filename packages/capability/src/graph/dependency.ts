@@ -2,10 +2,10 @@
  * Owns pure dependency mutation and recovery planning over topology facts. Exposes frozen plans;
  * state, resource execution and lifecycle ownership remain with consumers.
  */
-import { createDependencyReadonlySet } from './dependency-set.js'
-import { CapabilityGraphErrorCode } from './error-code.js'
-import { graphFailure, graphMessageFor } from './errors.js'
-import type { ITopologyDependency, ITopologyIndexReader } from './topology.js'
+import { createDependencyReadonlySet } from './dependency-set.ts'
+import { CapabilityGraphErrorCode } from './error-code.ts'
+import { graphFailure, graphMessageFor } from './errors.ts'
+import type { ITopologyDependency, ITopologyIndexReader } from './topology.ts'
 
 /** Pure-planner policies for mutations affecting required consumers; no lifecycle work is executed. */
 export const DependencyPolicy = {

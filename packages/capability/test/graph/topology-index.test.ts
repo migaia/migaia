@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { topologyNodeId } from './nonstatic-fixtures.js'
+import { topologyNodeId } from './nonstatic-fixtures.ts'
 import {
   buildCapabilityTopology,
   createTopologyIndex,
   type ICapabilityTopology,
   type ITopologyDependency,
   type ITopologyIndex
-} from '../../src/graph/topology.js'
+} from '../../src/graph/topology.ts'
 
 type IReferenceNode = Readonly<{
   readonly id: string

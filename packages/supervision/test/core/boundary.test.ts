@@ -52,7 +52,7 @@ describe('runtime-neutral boundary', () => {
         const specifier = moduleSpecifier(statement)
         if (specifier === undefined) continue
         if (specifier.startsWith('.')) {
-          expect(specifier, relativePath).toMatch(/\.js$/)
+          expect(specifier, relativePath).toMatch(/\.ts$/)
           if (!relativePath.startsWith('coroutine/'))
             expect(specifier, relativePath).not.toMatch(/coroutine|process|threads/)
           else expect(specifier, relativePath).not.toMatch(/process|threads/)

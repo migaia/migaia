@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { walkErrorCauses } from '@migaia/utils/error'
-import { boundedWait, createSyncLifecycleScope, executeReleaseDescriptor } from '../src/index.js'
+import { boundedWait, createSyncLifecycleScope, executeReleaseDescriptor } from '../src/index.ts'
 
 describe('lifecycle audited release contracts', () => {
   it('retains the task primary when timer cancellation also fails', async () => {

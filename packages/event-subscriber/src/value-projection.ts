@@ -10,15 +10,15 @@ import {
   type IObjectPathTupleFor,
   type IPathProbe
 } from '@migaia/utils/object-path'
-import { EventSubscriberErrorCode } from './error-code.js'
-import { createEventTypeError, eventErrorText } from './errors.js'
-import { createInvalidOptionsError } from './internal/channel-options.js'
+import { EventSubscriberErrorCode } from './error-code.ts'
+import { createEventTypeError, eventErrorText } from './errors.ts'
+import { createInvalidOptionsError } from './internal/channel-options.ts'
 import {
   createSystemTerminalRuntime,
   reportTerminalDiagnostic
-} from './internal/terminal-runtime.js'
-import type { IEventChannelOptions, IEventContext } from './types.js'
-import type { IEventApiStyle } from './style.js'
+} from './internal/terminal-runtime.ts'
+import type { IEventChannelOptions, IEventContext } from './types.ts'
+import type { IEventApiStyle } from './style.ts'
 
 /** Validated value alias: its property name, the dotted read path, and the parsed path segments. */
 export type IEventProjectionPlan = {

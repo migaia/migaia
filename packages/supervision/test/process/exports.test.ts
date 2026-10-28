@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import * as root from '../../src/index.js'
-import * as processEntry from '../../src/process/index.js'
+import * as root from '../../src/index.ts'
+import * as processEntry from '../../src/process/index.ts'
 
 describe('process subpath exports', () => {
   it('keeps the exact runtime surface out of the root entry', () => {

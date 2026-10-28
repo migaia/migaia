@@ -1,6 +1,6 @@
 import { createRuntime, type IReactiveSignal } from '@migaia/reactive'
 import { Resource, ResourceStatus, type IResourceState } from '@migaia/resource'
-import { isMarker } from '../contract.js'
+import { isMarker } from '../contract.ts'
 import {
   defineMicroPlugin,
   type IAppRuntime,
@@ -9,17 +9,17 @@ import {
   type IHubRuntime,
   type IMicroDriver,
   type IMicroPlugin
-} from '../driver.js'
-import { MicroHubErrorCode } from '../error-code.js'
-import { MicroHubErrorText } from '../error-text.js'
-import { createMicroHubError, createMicroHubTypeError } from '../errors.js'
-import { ContractMarker, MicroCapability } from '../text.js'
+} from '../driver.ts'
+import { MicroHubErrorCode } from '../error-code.ts'
+import { MicroHubErrorText } from '../error-text.ts'
+import { createMicroHubError, createMicroHubTypeError } from '../errors.ts'
+import { ContractMarker, MicroCapability } from '../text.ts'
 import {
   MicroResourceStatus,
   type IMicroResourceFetcher,
   type IMicroResourceState,
   type IReadable
-} from '../types.js'
+} from '../types.ts'
 
 /** Per-contract slot: one signal per resource name holding the owner's current `Resource`. */
 type IResourceSlot = ReadonlyMap<string, IReactiveSignal<Resource<unknown> | undefined>>

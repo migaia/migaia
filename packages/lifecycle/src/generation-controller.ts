@@ -1,6 +1,6 @@
-import { defaultLifecycleScheduler } from './scheduler.js'
-import { attachLifecycleSecondaryErrors } from './error-boundary.js'
-import { safeReport } from './errors.js'
+import { defaultLifecycleScheduler } from './scheduler.ts'
+import { attachLifecycleSecondaryErrors } from './error-boundary.ts'
+import { safeReport } from './errors.ts'
 import { attachSecondaryErrors } from '@migaia/utils/error'
 import {
   containAsyncRejection,
@@ -9,18 +9,18 @@ import {
   createLifecycleTypeError,
   tagLifecycleError,
   type ILifecycleError
-} from './errors.js'
-import { LifecycleErrorCode } from './error-code.js'
-import { LifecycleErrorText } from './error-text.js'
+} from './errors.ts'
+import { LifecycleErrorCode } from './error-code.ts'
+import { LifecycleErrorText } from './error-text.ts'
 import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
-import { type IAbortController } from './abort.js'
-import { captureAbortControllerFactory, createLazyAbortController } from './abort-factory.js'
+import { type IAbortController } from './abort.ts'
+import { captureAbortControllerFactory, createLazyAbortController } from './abort-factory.ts'
 import {
   observeAbortSubscription,
   type IObservedAbortSubscription
-} from './observed-subscription.js'
+} from './observed-subscription.ts'
 import type { IScheduledTask, IScheduler } from '@migaia/utils/scheduler'
-import { resolveSchedulerOption, validateSchedulerDelay } from './scheduler.js'
+import { resolveSchedulerOption, validateSchedulerDelay } from './scheduler.ts'
 
 export type IGenerationToken = object
 

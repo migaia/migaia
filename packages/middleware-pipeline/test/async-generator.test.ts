@@ -4,13 +4,13 @@ import {
   GENERATOR_HALT,
   GENERATOR_UNDEFINED,
   MiddlewarePipelineMode
-} from '../src/index.js'
-import type { IAsyncGeneratorMiddlewareStage, IMiddlewarePipelineMode } from '../src/index.js'
+} from '../src/index.ts'
+import type { IAsyncGeneratorMiddlewareStage, IMiddlewarePipelineMode } from '../src/index.ts'
 import {
   liftGeneratorToAsyncGeneratorForTest,
   liftSyncToAsyncGeneratorForTest,
   runAsyncGeneratorForTest
-} from './pipeline-test-helpers.js'
+} from './pipeline-test-helpers.ts'
 
 describe('runAsyncGeneratorMiddleware', () => {
   it('exports the additive async-generator mode without changing existing identities', () => {
@@ -233,7 +233,7 @@ describe('async-generator adapters', () => {
     /** Number of synchronous generator factory invocations. */
     let calls = 0
     /** Original generator stage with two yielded candidates. */
-    const stage: import('../src/index.js').IGeneratorMiddlewareStage<number> = function* (value) {
+    const stage: import('../src/index.ts').IGeneratorMiddlewareStage<number> = function* (value) {
       calls += 1
       yield value + 1
       yield value + 2

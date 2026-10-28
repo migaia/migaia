@@ -8,7 +8,7 @@ import { PerformanceObserver, performance, type PerformanceEntry } from 'node:pe
 import { fileURLToPath } from 'node:url'
 import { isMainThread, threadId } from 'node:worker_threads'
 import { it } from 'vitest'
-import type { IBenchFixture, ILibrary, IObservation, IParameters } from './types.js'
+import type { IBenchFixture, ILibrary, IObservation, IParameters } from './types.ts'
 
 /** One scenario cell fixes work before any samples run; calibration never changes mid-run. */
 type ICell = {
@@ -176,9 +176,9 @@ it('captures all six scenarios with paired A/A rounds and independent execution 
     }
   })
   /** Adapters load only after the native module inventory hook is installed. */
-  const stateModule = await import('./state-scenarios.js')
+  const stateModule = await import('./state-scenarios.ts')
   /** Event/lifecycle adapters share no fixture or singleton with the state adapters. */
-  const eventModule = await import('./event-lifecycle-scenarios.js')
+  const eventModule = await import('./event-lifecycle-scenarios.ts')
   /** Canonical freshness implementation is reused for initial/final dist checks. */
   const stamp: {
     assertClosureFresh(path: string): void

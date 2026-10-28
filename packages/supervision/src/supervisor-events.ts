@@ -1,6 +1,6 @@
 /** Owns synchronous event snapshots, readiness observations and native exit publication. */
-import type { ISupervisorContext } from './supervisor-context.js'
-import type { ILaunchContext, IUnitHandle } from './types.js'
+import type { ISupervisorContext } from './supervisor-context.ts'
+import type { ILaunchContext, IUnitHandle } from './types.ts'
 import { LifecycleState } from '@migaia/lifecycle'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import {
@@ -8,9 +8,9 @@ import {
   SupervisorEventType,
   type SupervisorState as ISupervisorState,
   type ExitReason
-} from './constants.js'
-import type { IReadyOutcome, ISupervisorEvent } from './types.js'
-import type { IManagedSlot } from './supervisor-slot.js'
+} from './constants.ts'
+import type { IReadyOutcome, ISupervisorEvent } from './types.ts'
+import type { IManagedSlot } from './supervisor-slot.ts'
 /** Isolates listener failures while mutations affect only later, including nested, publication. */
 export function emit<
   TSpec,

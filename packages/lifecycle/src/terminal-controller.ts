@@ -1,5 +1,5 @@
-import type { ILifecycleState } from './types.js'
-import { LifecycleState } from './state-constants.js'
+import type { ILifecycleState } from './types.ts'
+import { LifecycleState } from './state-constants.ts'
 
 /**
  * Owns the `open → closing → terminal` axis (, axis 1). Ported near-verbatim from

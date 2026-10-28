@@ -9,7 +9,7 @@ import {
   type IAsyncGeneratorMiddlewareStage,
   type IGeneratorMiddlewareStage,
   type IMiddlewarePipelineMode
-} from '../src/index.js'
+} from '../src/index.ts'
 
 /** Creates a structural signal whose reason getter records exactly one read and throws. */
 const throwingReasonSignal = (failure: unknown, initiallyAborted: boolean) => {

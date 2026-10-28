@@ -1,12 +1,12 @@
-import { unavailableRequiredProvider } from './provider-availability.js'
+import { unavailableRequiredProvider } from './provider-availability.ts'
 /**
  * Serializes the public dynamic graph operations and owns terminal admission. Pure topology and
  * dependency plans stay with their modules; frontier resource work uses dynamic-runtime context.
  */
 import { createMutationQueue, type IEnqueueOptions, type IMutationQueue } from '@migaia/lifecycle'
-import { CapabilityGraphErrorCode } from './error-code.js'
-import { graphFailure } from './errors.js'
-import { dynamicFailure, snapshotDynamicNode } from './dynamic-admission.js'
+import { CapabilityGraphErrorCode } from './error-code.ts'
+import { graphFailure } from './errors.ts'
+import { dynamicFailure, snapshotDynamicNode } from './dynamic-admission.ts'
 import {
   closureDynamicEntries,
   createDynamicContext,
@@ -22,16 +22,16 @@ import {
   startDynamicEntries,
   type IDynamicGraphContext,
   type IDynamicStoredNode
-} from './dynamic-runtime.js'
+} from './dynamic-runtime.ts'
 import {
   CapabilityGraphNodeState,
   CapabilityGraphState,
   GraphBindingReleaseReason,
   GraphBlockedReason
-} from './state-constants.js'
-import { planRestart } from './dependency.js'
-import type { IGraphNodeDiagnostic, IGraphNodeId } from './index.js'
-import type { IGraphDependents } from './topology.js'
+} from './state-constants.ts'
+import { planRestart } from './dependency.ts'
+import type { IGraphNodeDiagnostic, IGraphNodeId } from './index.ts'
+import type { IGraphDependents } from './topology.ts'
 import type {
   IDynamicCapabilityGraph,
   IDynamicCapabilityGraphOptions,
@@ -40,7 +40,7 @@ import type {
   IGraphDependencyMutationOptions,
   IGraphMutationResult,
   IGraphReplaceOptions
-} from './dynamic.js'
+} from './dynamic.ts'
 
 /** Dynamic graph mutation coordinator; lifecycle remains the sole FIFO and lease owner. */
 export class DynamicCapabilityGraph<TBinding> implements IDynamicCapabilityGraph<TBinding> {

@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { createSupervisor, createUnitBudget, type IUnitBudget } from '../../src/index.js'
-import { createMemoryLauncher } from '../support/memory-launcher.js'
-import { createMemoryProfile } from '../support/memory-profile.js'
+import { createSupervisor, createUnitBudget, type IUnitBudget } from '../../src/index.ts'
+import { createMemoryLauncher } from '../support/memory-launcher.ts'
+import { createMemoryProfile } from '../support/memory-profile.ts'
 
 describe('inverse scope release', () => {
   it('cancels monitors, then stops the unit, then releases attachments and lease', async () => {

@@ -10,7 +10,7 @@ import type {
   ISupervisorBaseOptions,
   IsolationMode,
   TerminationMode
-} from '../index.js'
+} from '../index.ts'
 import type {
   BootstrapVia,
   DrainedStream,
@@ -18,7 +18,7 @@ import type {
   StderrMode,
   StdinMode,
   StdoutMode
-} from './constants.js'
+} from './constants.ts'
 
 /** Explicit environment allowlist; launchers cannot add ambient variables. */
 export type IProcessEnv = {

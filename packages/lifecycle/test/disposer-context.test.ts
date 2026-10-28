@@ -4,9 +4,9 @@ import {
   createLifecycleScope,
   createSyncLifecycleScope,
   LifecycleErrorCode
-} from '../src/index.js'
+} from '../src/index.ts'
 import { createManualScheduler } from '@migaia/utils/testing'
-import type { IReleaseContext } from '../src/index.js'
+import type { IReleaseContext } from '../src/index.ts'
 
 describe('disposer context owner-join contract', () => {
   it('rejects synchronous and suspended owner joins with the package error code', async () => {

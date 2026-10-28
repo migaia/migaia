@@ -1,5 +1,5 @@
 /** Owns required-provider availability scans shared by static and dynamic graph startup. */
-import { CapabilityGraphNodeState, type ICapabilityGraphNodeState } from './state-constants.js'
+import { CapabilityGraphNodeState, type ICapabilityGraphNodeState } from './state-constants.ts'
 
 /** Finds the first unavailable required edge in declaration order, inspecting each edge once. */
 export function unavailableRequiredProvider(

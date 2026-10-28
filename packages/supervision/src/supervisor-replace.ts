@@ -2,8 +2,8 @@
  * Owns the replacement transaction; only success commits specification, degradation and serving
  * ownership.
  */
-import { OutcomeKind } from './text.js'
-import { admitCapabilities } from './admission.js'
+import { OutcomeKind } from './text.ts'
+import { admitCapabilities } from './admission.ts'
 import {
   IsolationMode,
   ReplaceStrategy,
@@ -12,13 +12,13 @@ import {
   SupervisorEventType,
   LaunchCause,
   UnitStopMode
-} from './constants.js'
-import { LaunchAttempt, type IAttemptOutcome } from './supervisor-attempt.js'
-import { emit, transition } from './supervisor-events.js'
-import { enterTerminal, restartDelay, scheduleBackoff } from './supervisor-policy.js'
-import { retire } from './supervisor-slot.js'
-import type { ISupervisorContext } from './supervisor-context.js'
-import type { ILaunchContext, IReplaceOutcome, IUnitHandle } from './types.js'
+} from './constants.ts'
+import { LaunchAttempt, type IAttemptOutcome } from './supervisor-attempt.ts'
+import { emit, transition } from './supervisor-events.ts'
+import { enterTerminal, restartDelay, scheduleBackoff } from './supervisor-policy.ts'
+import { retire } from './supervisor-slot.ts'
+import type { ISupervisorContext } from './supervisor-context.ts'
+import type { ILaunchContext, IReplaceOutcome, IUnitHandle } from './types.ts'
 /** Preserves ordered degradation comparison for growable custom-profile capability lists in O(n). */
 function sameDegraded(previous: readonly string[], next: readonly string[]): boolean {
   if (previous.length !== next.length) return false

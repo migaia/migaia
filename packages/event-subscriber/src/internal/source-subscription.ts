@@ -1,15 +1,15 @@
 /** Owns structural subscription helpers; source installation stays in the shared subscription owner. */
-import { validateEventListener } from './channel-options.js'
+import { validateEventListener } from './channel-options.ts'
 import { admitAbortSignal, type IAbortSignal } from '@migaia/utils/promise'
-import { EventSubscriberErrorCode } from '../error-code.js'
-import { codeExistingError, createEventTypeError, eventErrorText } from '../errors.js'
-import type { IEventChannelLike, IEventContext, IEventListener, IUnsubscribe } from '../types.js'
-import { validateChannelLike, readTaskOption, type IValidatedChannel } from './channel-options.js'
-import { channelCapabilities } from './channel-capability.js'
-import { isRecord } from './record.js'
-import { installSubscriptionSource } from './subscription.js'
-import { AbortSubscription } from './abort-subscription.js'
-import { INVALID_SIGNAL_ADMISSION, ABORTED_SIGNAL_GETTER_FAILURE } from './source-state.js'
+import { EventSubscriberErrorCode } from '../error-code.ts'
+import { codeExistingError, createEventTypeError, eventErrorText } from '../errors.ts'
+import type { IEventChannelLike, IEventContext, IEventListener, IUnsubscribe } from '../types.ts'
+import { validateChannelLike, readTaskOption, type IValidatedChannel } from './channel-options.ts'
+import { channelCapabilities } from './channel-capability.ts'
+import { isRecord } from './record.ts'
+import { installSubscriptionSource } from './subscription.ts'
+import { AbortSubscription } from './abort-subscription.ts'
+import { INVALID_SIGNAL_ADMISSION, ABORTED_SIGNAL_GETTER_FAILURE } from './source-state.ts'
 
 /** Owns once-only delivery while preserving the source disposer returned to the caller. */
 class OnceSubscription<T, R, V> {

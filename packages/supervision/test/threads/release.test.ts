@@ -1,13 +1,13 @@
 import { createManualScheduler } from '@migaia/utils/testing'
 import { createAbortController } from '@migaia/lifecycle'
 import { describe, expect, it } from 'vitest'
-import { createUnitBudget, SupervisionErrorCode } from '../../src/index.js'
+import { createUnitBudget, SupervisionErrorCode } from '../../src/index.ts'
 import {
   createThreadSupervisor,
   ThreadUnitKind,
   type IThreadBudget
-} from '../../src/threads/index.js'
-import { memoryThreadLauncher, settle, threadSpec } from './support/memory-thread-launcher.js'
+} from '../../src/threads/index.ts'
+import { memoryThreadLauncher, settle, threadSpec } from './support/memory-thread-launcher.ts'
 
 describe('thread resource release', () => {
   it.each(['clean', 'crash', 'launch', 'ready', 'heap', 'stop'] as const)(

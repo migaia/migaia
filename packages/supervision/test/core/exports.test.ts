@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { SupervisionErrorCode } from '../../src/index.js'
+import { SupervisionErrorCode } from '../../src/index.ts'
 
 /** Core codes remain a subset when later profiles extend the one package table. */
 const coreCodes = {

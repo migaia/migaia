@@ -10,7 +10,7 @@ import {
   type IMiddlewarePipelineControlOptions,
   type IMiddlewarePipelineViolationHandler,
   type ISyncMiddlewareStage
-} from '../src/index.js'
+} from '../src/index.ts'
 
 /** Async construction options accepted by migrated behavior-baseline calls. */
 type IAsyncTestOptions = Omit<ICreatePipelineOptions<typeof MiddlewarePipelineMode.async>, 'mode'>

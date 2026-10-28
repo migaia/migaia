@@ -1,14 +1,14 @@
 /** Captures static node definitions and direct-edge membership; owns no resources or scheduling. */
 import type { IGenerationToken } from '@migaia/lifecycle'
-import type { IGraphNodeId, IGraphDependency, IGraphNodeDefinition } from './index.js'
-import { CapabilityGraphNodeState, type ICapabilityGraphNodeState } from './state-constants.js'
-import { CapabilityGraphErrorCode, type ICapabilityGraphErrorCode } from './error-code.js'
+import type { IGraphNodeId, IGraphDependency, IGraphNodeDefinition } from './index.ts'
+import { CapabilityGraphNodeState, type ICapabilityGraphNodeState } from './state-constants.ts'
+import { CapabilityGraphErrorCode, type ICapabilityGraphErrorCode } from './error-code.ts'
 import {
   createCapabilityGraphError,
   graphFailure,
   graphMessageFor,
   type ICapabilityGraphError
-} from './errors.js'
+} from './errors.ts'
 
 /** Constructs the canonical static graph boundary error without replacing native failures. */
 export function staticGraphFailure(

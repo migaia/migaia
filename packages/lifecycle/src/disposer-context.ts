@@ -1,7 +1,7 @@
-import { LifecycleErrorCode } from './error-code.js'
-import { LifecycleErrorText } from './error-text.js'
-import { createLifecycleError } from './errors.js'
-import type { IReleaseContext } from './types.js'
+import { LifecycleErrorCode } from './error-code.ts'
+import { LifecycleErrorText } from './error-text.ts'
+import { createLifecycleError } from './errors.ts'
+import type { IReleaseContext } from './types.ts'
 
 /**
  * Explicit owner-disposal capability delivered only to callbacks driven by a LifecycleScope.

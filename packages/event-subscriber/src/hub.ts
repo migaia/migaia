@@ -2,18 +2,18 @@
  * Owns keyed channel routing and aggregate registration bookkeeping; dispatch remains
  * channel-owned.
  */
-import { validateEventReporter } from './internal/channel-options.js'
-import { validateEventListener } from './internal/channel-options.js'
-import { EventSubscriberErrorCode } from './error-code.js'
-import { createCanonicalChannel, createChannelWithProjection } from './channel.js'
-import { readDeliveryOption } from './internal/channel-options.js'
+import { validateEventReporter } from './internal/channel-options.ts'
+import { validateEventListener } from './internal/channel-options.ts'
+import { EventSubscriberErrorCode } from './error-code.ts'
+import { createCanonicalChannel, createChannelWithProjection } from './channel.ts'
+import { readDeliveryOption } from './internal/channel-options.ts'
 import {
   copyEventProjection,
   createEventValueProjectionPlan,
   type IEventProjectionPlan
-} from './value-projection.js'
-import { createEventTypeError, eventErrorText } from './errors.js'
-import { createInvalidOptionsError } from './internal/channel-options.js'
+} from './value-projection.ts'
+import { createEventTypeError, eventErrorText } from './errors.ts'
+import { createInvalidOptionsError } from './internal/channel-options.ts'
 import type {
   ICanonicalEventChannel,
   IEventHub,
@@ -26,15 +26,15 @@ import type {
   IEventValueListener,
   IStyledEventHub,
   IStyledEventHubOptions
-} from './types.js'
-import { createRawSubscriptionOwner } from './internal/subscription.js'
-import { EventDelivery } from './state-constants.js'
+} from './types.ts'
+import { createRawSubscriptionOwner } from './internal/subscription.ts'
+import { EventDelivery } from './state-constants.ts'
 import {
   readEventApiStyle,
   projectEventApiStyle,
   type IEventApiStyle,
   type IEventApiStylePlan
-} from './style.js'
+} from './style.ts'
 
 /**
  * Creates a keyed event hub when each event name has a different payload type. A channel is created

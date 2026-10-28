@@ -5,9 +5,9 @@ import {
   runMultipleSyncPipeline,
   runMultipleGeneratorPipeline,
   runMultipleAsyncGeneratorPipeline
-} from './execution-runtime.js'
+} from './execution-runtime.ts'
 import type { IAbortSignal } from '@migaia/utils/promise'
-import { throwMiddlewarePipelineDownstreamFailures } from './errors.js'
+import { throwMiddlewarePipelineDownstreamFailures } from './errors.ts'
 import {
   admit,
   check,
@@ -16,7 +16,7 @@ import {
   cleanupSyncIterator,
   cleanupAsyncIterator,
   snapshotStages
-} from './runtime-context.js'
+} from './runtime-context.ts'
 
 import {
   MiddlewarePipelineGeneratorSignals,
@@ -24,7 +24,7 @@ import {
   MiddlewarePipelineViolation,
   type IGeneratorMiddlewareSignals,
   type IMiddlewarePipelineViolationHandler
-} from './state-constants.js'
+} from './state-constants.ts'
 
 /** Explicit generator result used when the payload itself may be undefined. */
 type IGeneratorUndefinedSignal<

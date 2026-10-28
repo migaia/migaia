@@ -13,12 +13,12 @@ import {
   type IReleaseContext,
   type IReleaseDescriptor
 } from '@migaia/lifecycle'
-import type { IGraphNodeId, IGraphNodeInstance, IGraphStartContext } from './index.js'
-import { CapabilityGraphNodeState } from './state-constants.js'
-import { CapabilityGraphErrorCode } from './error-code.js'
-import { graphFailure } from './errors.js'
-import { staticGraphFailure, type IAdmittedNode } from './static-node.js'
-import { orderedAuxiliaryDescriptor } from './node-start-descriptor.js'
+import type { IGraphNodeId, IGraphNodeInstance, IGraphStartContext } from './index.ts'
+import { CapabilityGraphNodeState } from './state-constants.ts'
+import { CapabilityGraphErrorCode } from './error-code.ts'
+import { graphFailure } from './errors.ts'
+import { staticGraphFailure, type IAdmittedNode } from './static-node.ts'
+import { orderedAuxiliaryDescriptor } from './node-start-descriptor.ts'
 
 /** Explicit graph transaction capabilities used by one node, without a reverse runtime dependency. */
 export type IStaticStartOwner = {

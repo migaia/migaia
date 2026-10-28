@@ -3,7 +3,7 @@ import {
   CapabilityErrorCode,
   snapshotGraphReadiness,
   type ICapabilityReadinessSource
-} from '../src/index.js'
+} from '../src/index.ts'
 
 describe('graph readiness adapter', () => {
   it(

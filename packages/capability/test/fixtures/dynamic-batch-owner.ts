@@ -2,8 +2,8 @@ import type {
   IDynamicCapabilityGraphOptions,
   IGraphReleaseEntry,
   IGraphStartEntry
-} from '../../src/graph/dynamic.js'
-import type { IGraphNodeId, IGraphNodeInstance } from '../../src/graph/index.js'
+} from '../../src/graph/dynamic.ts'
+import type { IGraphNodeId, IGraphNodeInstance } from '../../src/graph/index.ts'
 
 /** Batch callbacks a dynamic graph requires; the fixture supplies both. */
 type IBatchOwner<TBinding> = Pick<

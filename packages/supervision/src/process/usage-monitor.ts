@@ -1,17 +1,17 @@
 /** Owns process sampling timers and in-flight samples; limits never run in parallel. */
-import { USAGE_PROBE, ProcessField } from './text.js'
-import { ExitReason } from '../index.js'
+import { USAGE_PROBE, ProcessField } from './text.ts'
+import { ExitReason } from '../index.ts'
 import type { IScheduler, IScheduledTask } from '@migaia/utils/scheduler'
-import type { IUnitRuntime } from '../index.js'
-import { CapabilityLevel } from '../index.js'
-import { ProcessCapability, ProcessLimit } from './constants.js'
+import type { IUnitRuntime } from '../index.ts'
+import { CapabilityLevel } from '../index.ts'
+import { ProcessCapability, ProcessLimit } from './constants.ts'
 import type {
   IProcessHandle,
   IProcessLimits,
   IProcessUsage,
   IProcessSupervisorOptions
-} from './types.js'
-import { invalidProcessOption } from './spec.js'
+} from './types.ts'
+import { invalidProcessOption } from './spec.ts'
 
 /** Both process entry points admit the same finite positive sampling interval and failure count. */
 export function validateUsageOptions(

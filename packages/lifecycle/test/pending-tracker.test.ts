@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createPendingTracker } from '../src/quiescence-tracker'
+import { createPendingTracker } from '../src/quiescence-tracker.ts'
 
 const deferred = <T>(): { promise: Promise<T>; resolve: (value: T) => void } => {
   let resolve!: (value: T) => void

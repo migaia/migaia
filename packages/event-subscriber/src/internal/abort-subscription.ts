@@ -4,20 +4,20 @@
  */
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { tryReadProperty } from '@migaia/utils/error'
-import { EventSubscriberErrorCode } from '../error-code.js'
+import { EventSubscriberErrorCode } from '../error-code.ts'
 import {
   attachEventErrorCode,
   codeExistingError,
   createEventTypeError,
   eventErrorText
-} from '../errors.js'
-import type { IEventChannelLike, IEventContext, IEventListener, IUnsubscribe } from '../types.js'
-import { EventSubscriberState } from '../state-constants.js'
-import { copyEventProjection, type IEventProjectionPlan } from '../value-projection.js'
-import { channelCapabilities } from './channel-capability.js'
-import type { IValidatedChannel } from './channel-options.js'
-import { installSubscriptionSource } from './subscription.js'
-import { SIGNAL_REASON_PROPERTY } from './source-state.js'
+} from '../errors.ts'
+import type { IEventChannelLike, IEventContext, IEventListener, IUnsubscribe } from '../types.ts'
+import { EventSubscriberState } from '../state-constants.ts'
+import { copyEventProjection, type IEventProjectionPlan } from '../value-projection.ts'
+import { channelCapabilities } from './channel-capability.ts'
+import type { IValidatedChannel } from './channel-options.ts'
+import { installSubscriptionSource } from './subscription.ts'
+import { SIGNAL_REASON_PROPERTY } from './source-state.ts'
 
 /** State read by contexts retained after signal or source release. */
 type IAbortOverlayState = {

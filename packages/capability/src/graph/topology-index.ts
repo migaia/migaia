@@ -1,25 +1,25 @@
-import { TopologyInvalidReason } from './topology-reasons.js'
+import { TopologyInvalidReason } from './topology-reasons.ts'
 /**
  * Owns incremental topology facts, edge admission and isolated transaction publication. Exposes the
  * public index contract; resource lifecycle and dependency policy stay outside L0.
  */
-import { OverlayStore, type IKeyedStore, type IStoredTopologyNode } from './topology-store.js'
-import { TopologyTransaction } from './topology-transaction.js'
-import { TopologyConsumerBucket } from './topology-consumers.js'
-import { TopologyLevelQueue } from './topology-level-queue.js'
-import { orderTopologyNodes, registrationTopologyNodes } from './topology-order.js'
+import { OverlayStore, type IKeyedStore, type IStoredTopologyNode } from './topology-store.ts'
+import { TopologyTransaction } from './topology-transaction.ts'
+import { TopologyConsumerBucket } from './topology-consumers.ts'
+import { TopologyLevelQueue } from './topology-level-queue.ts'
+import { orderTopologyNodes, registrationTopologyNodes } from './topology-order.ts'
 import {
   retainTopologyFailure,
   createTopologyReadonlyMap,
   snapshotTopologyDependencies,
   snapshotTopologyIndexNode
-} from './topology-admission.js'
+} from './topology-admission.ts'
 import {
   type ICapabilityTopology,
   type ITopologyDependency,
   type ITopologyInvalidReason,
   type ITopologyNode
-} from './topology.js'
+} from './topology.ts'
 
 /** Required caller-owned error policy, copied when the empty index is created. */
 export type ITopologyIndexAdapter = Readonly<{

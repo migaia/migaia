@@ -8,14 +8,14 @@ import {
   type IAsyncMiddlewareStage,
   type IGeneratorMiddlewareStage,
   type ISyncMiddlewareStage
-} from '../src/index.js'
+} from '../src/index.ts'
 import {
   liftSyncToAsyncForTest,
   liftSyncToGeneratorForTest,
   runAsyncForTest,
   runGeneratorForTest,
   runSyncForTest
-} from './pipeline-test-helpers.js'
+} from './pipeline-test-helpers.ts'
 
 /** Minimal process surface used to assert that downstream rejection is owned immediately. */
 type IRejectionHost = {

@@ -13,11 +13,11 @@ import {
   TerminationMode,
   UnitStopMode,
   TeardownPhase
-} from './constants.js'
-import { SupervisionErrorCode } from './error-code.js'
-import { SupervisionErrorText } from './error-text.js'
-import { createSupervisionError } from './errors.js'
-import type { ILaunchContext, IUnitHandle, IUnitProfile } from './types.js'
+} from './constants.ts'
+import { SupervisionErrorCode } from './error-code.ts'
+import { SupervisionErrorText } from './error-text.ts'
+import { createSupervisionError } from './errors.ts'
+import type { ILaunchContext, IUnitHandle, IUnitProfile } from './types.ts'
 
 /** One launched or launching unit and the ownership facts needed by its single teardown path. */
 export type IUnitSlot<

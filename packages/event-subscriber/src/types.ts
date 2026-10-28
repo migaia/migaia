@@ -1,12 +1,12 @@
 /** Owns public event, channel, Hub and subscription types; no runtime registration state lives here. */
 import type { IObjectPath, IObjectPathValue } from '@migaia/utils/object-path'
-import { EventDelivery, EventSubscriberState } from './state-constants.js'
+import { EventDelivery, EventSubscriberState } from './state-constants.ts'
 import type {
   IEventAdmissionPolicy,
   IEventDispatchPolicy,
   IEventRemovalPolicy
-} from './state-constants.js'
-import type { IEventApiStyle, IEventApiStyleMethodNames, IEventApiStyleOption } from './style.js'
+} from './state-constants.ts'
+import type { IEventApiStyle, IEventApiStyleMethodNames, IEventApiStyleOption } from './style.ts'
 /** Releases an owned subscription synchronously. Repeated calls do not release it again. */
 export type IUnsubscribe = () => void
 /** Registration metadata shared by canonical channels, naming aliases, and subscription chains. */

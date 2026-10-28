@@ -2,28 +2,28 @@
  * Public static graph contracts and construction; scheduling and node resources have separate
  * owners.
  */
-import { StaticCapabilityGraph } from './static-graph.js'
+import { StaticCapabilityGraph } from './static-graph.ts'
 import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import { type IReleaseDescriptor } from '@migaia/lifecycle'
-import { CapabilityGraphErrorCode } from './error-code.js'
+import { CapabilityGraphErrorCode } from './error-code.ts'
 
-import { CapabilityGraphErrorText } from './error-text.js'
-import { createCapabilityGraphError } from './errors.js'
+import { CapabilityGraphErrorText } from './error-text.ts'
+import { createCapabilityGraphError } from './errors.ts'
 import {
   GraphBlockedReason,
   type ICapabilityGraphNodeState,
   type ICapabilityGraphState
-} from './state-constants.js'
+} from './state-constants.ts'
 
-export { CapabilityGraphErrorCode, type ICapabilityGraphErrorCode } from './error-code.js'
-export { CAPABILITY_GRAPH_SOURCE, type ICapabilityGraphError } from './errors.js'
+export { CapabilityGraphErrorCode, type ICapabilityGraphErrorCode } from './error-code.ts'
+export { CAPABILITY_GRAPH_SOURCE, type ICapabilityGraphError } from './errors.ts'
 export {
   CapabilityGraphNodeState,
   CapabilityGraphState,
   GraphBlockedReason,
   type ICapabilityGraphNodeState,
   type ICapabilityGraphState
-} from './state-constants.js'
+} from './state-constants.ts'
 export {
   buildCapabilityTopology,
   TopologyInvalidReason,
@@ -31,7 +31,7 @@ export {
   type ITopologyInvalidReason,
   type ITopologyDependency,
   type ITopologyNode
-} from './topology.js'
+} from './topology.ts'
 
 /** Nominal node identity accepted by a graph registration. */
 export type IGraphNodeId = string & { readonly __graphNodeId: unique symbol }

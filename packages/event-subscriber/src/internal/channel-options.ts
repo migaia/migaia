@@ -1,9 +1,9 @@
 /** Owns structural channel and registration-option admission; stores no registration state. */
-import { EventSubscriberErrorCode } from '../error-code.js'
-import { codeExistingError, createEventTypeError, eventErrorText } from '../errors.js'
-import type { IEventChannelLike } from '../types.js'
-import { EventDelivery } from '../state-constants.js'
-import { isRecord } from './record.js'
+import { EventSubscriberErrorCode } from '../error-code.ts'
+import { codeExistingError, createEventTypeError, eventErrorText } from '../errors.ts'
+import type { IEventChannelLike } from '../types.ts'
+import { EventDelivery } from '../state-constants.ts'
+import { isRecord } from './record.ts'
 
 /** Creates the canonical options failure while preserving whether a cause was supplied. */
 export const createInvalidOptionsError = (

@@ -6,8 +6,8 @@ import {
   EventAdmissionPolicy,
   EventSubscriberErrorCode,
   invokeTask
-} from '../src/index.js'
-import { measureRootClosure } from './bundle-size-closure.js'
+} from '../src/index.ts'
+import { measureRootClosure } from './bundle-size-closure.ts'
 
 describe('channel admission policies', () => {
   it('exports the stable admission modes without a sync error policy', () => {

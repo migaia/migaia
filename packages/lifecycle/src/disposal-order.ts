@@ -2,7 +2,7 @@
  * Orders already-admitted finite numeric disposal keys in O(n) total work. Fixed-width IEEE-754
  * keys permit stable radix buckets without comparison sorting or narrowing the public number API.
  */
-import type { IReleaseDescriptor } from './types.js'
+import type { IReleaseDescriptor } from './types.ts'
 
 /** An admitted descriptor contains plain snapshotted data, never caller-owned accessors. */
 type IOrderedItem = { readonly descriptor: IReleaseDescriptor }

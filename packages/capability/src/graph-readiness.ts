@@ -1,6 +1,6 @@
-import { CapabilityErrorCode } from './error-code.js'
-import { CapabilityErrorText } from './error-text.js'
-import { createCapabilityError, tagCapabilityError } from './errors.js'
+import { CapabilityErrorCode } from './error-code.ts'
+import { CapabilityErrorText } from './error-text.ts'
+import { createCapabilityError, tagCapabilityError } from './errors.ts'
 import { isNativeErrorValue } from '@migaia/utils/error'
 
 /** Read-only Host boundary consumed once during Graph admission. */

@@ -1,4 +1,4 @@
-import { ERROR_SOURCE } from './error-code.js'
+import { ERROR_SOURCE } from './error-code.ts'
 /** `source` value stamped onto every error this package throws. */
 export const CAPABILITY_SOURCE = ERROR_SOURCE
 

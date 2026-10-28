@@ -1,5 +1,5 @@
-import { createEventChannel } from '../src/index.js'
-import type { IEventProjectionPlan } from '../src/value-projection.js'
+import { createEventChannel } from '../src/index.ts'
+import type { IEventProjectionPlan } from '../src/value-projection.ts'
 
 /** Internal Hub projection plans must not become public factory parameters. */
 declare const plan: IEventProjectionPlan

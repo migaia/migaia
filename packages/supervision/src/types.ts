@@ -13,7 +13,7 @@ import type {
   RestartMode,
   SupervisorState,
   TerminationMode
-} from './constants.js'
+} from './constants.ts'
 
 /** Stable identity of one launched unit. */
 export type IUnitIdentity = { readonly fingerprint: string }

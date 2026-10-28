@@ -1,8 +1,8 @@
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it } from 'vitest'
-import { createUnitBudget, SUPERVISION_SOURCE, SupervisionErrorCode } from '../../src/index.js'
-import { createThreadSupervisor, ThreadUnitKind } from '../../src/threads/index.js'
-import { memoryThreadLauncher, settle, threadSpec } from './support/memory-thread-launcher.js'
+import { createUnitBudget, SUPERVISION_SOURCE, SupervisionErrorCode } from '../../src/index.ts'
+import { createThreadSupervisor, ThreadUnitKind } from '../../src/threads/index.ts'
+import { memoryThreadLauncher, settle, threadSpec } from './support/memory-thread-launcher.ts'
 
 describe('thread supervision and exit classification', () => {
   it('restarts on the core backoff schedule and keeps a coded cause chain', async () => {

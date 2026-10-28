@@ -6,14 +6,14 @@ import {
   reportingGraphInstance,
   emptyGraphBatch,
   emptyGraphInstance
-} from './fixtures/graph-boundary.js'
+} from './fixtures/graph-boundary.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { walkErrorCauses } from '@migaia/utils/error'
-import { createCapabilityHost, snapshotGraphReadiness } from '../src/index.js'
-import { createCapabilityGraph, type IGraphNodeId } from '../src/graph/index.js'
-import { createDynamicCapabilityGraph } from '../src/graph/dynamic.js'
-import { createTopologyIndex, buildCapabilityTopology } from '../src/graph/topology.js'
-import { resolveInstallSet } from '../src/graph/dependency.js'
+import { createCapabilityHost, snapshotGraphReadiness } from '../src/index.ts'
+import { createCapabilityGraph, type IGraphNodeId } from '../src/graph/index.ts'
+import { createDynamicCapabilityGraph } from '../src/graph/dynamic.ts'
+import { createTopologyIndex, buildCapabilityTopology } from '../src/graph/topology.ts'
+import { resolveInstallSet } from '../src/graph/dependency.ts'
 
 describe('audited capability boundary contracts', () => {
   it(

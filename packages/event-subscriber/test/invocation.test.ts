@@ -4,7 +4,7 @@ import {
   createEventChannel,
   invokeEachLive,
   withSnapshotEntries
-} from '../src/index.js'
+} from '../src/index.ts'
 
 describe('public invocation helpers', () => {
   it('closes each snapshot invocation after one use or completion', () => {

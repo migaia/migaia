@@ -1,16 +1,16 @@
 import { describe, expect, it } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { createSupervisor, createUnitBudget } from '../src/index.js'
-import { createCoroutineSupervisor } from '../src/coroutine/index.js'
-import { createMemoryLauncher, deferred } from './support/memory-launcher.js'
-import { createMemoryProfile } from './support/memory-profile.js'
+import { createSupervisor, createUnitBudget } from '../src/index.ts'
+import { createCoroutineSupervisor } from '../src/coroutine/index.ts'
+import { createMemoryLauncher, deferred } from './support/memory-launcher.ts'
+import { createMemoryProfile } from './support/memory-profile.ts'
 import {
   createPrewarmPool,
   createProcessSupervisor,
   reclaimOrphanProcesses
-} from '../src/process/index.js'
-import { memoryProcessLauncher, processSpec } from './process/support/memory-process-launcher.js'
-import { memoryRegistry } from './process/support/memory-registry.js'
+} from '../src/process/index.ts'
+import { memoryProcessLauncher, processSpec } from './process/support/memory-process-launcher.ts'
+import { memoryRegistry } from './process/support/memory-registry.ts'
 
 /** Drains the existing task, scope, and budget continuations without advancing deadlines. */
 async function flush(): Promise<void> {

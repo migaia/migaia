@@ -1,8 +1,8 @@
 import { attachSecondaryErrors, safeErrorReason, tryReadProperty } from '@migaia/utils/error'
-import type { IErrorPolicy } from './types.js'
-import { LifecycleErrorCode } from './error-code.js'
-import { LifecycleErrorText } from './error-text.js'
-import { createLifecycleTypeError, tagLifecycleError } from './errors.js'
+import type { IErrorPolicy } from './types.ts'
+import { LifecycleErrorCode } from './error-code.ts'
+import { LifecycleErrorText } from './error-text.ts'
+import { createLifecycleTypeError, tagLifecycleError } from './errors.ts'
 
 /**
  * Lifecycle's single entry point for attaching secondary failures (cleanup, rollback, cancellation)

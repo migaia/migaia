@@ -6,12 +6,12 @@ import {
   admitTopologyId,
   snapshotTopologyDependencies,
   type ITopologySnapshotFailure
-} from './topology-admission.js'
-import { TopologyInvalidReason } from './topology.js'
-import { CapabilityGraphErrorCode, type ICapabilityGraphErrorCode } from './error-code.js'
-import { graphFailure, graphMessageFor } from './errors.js'
-import type { IDynamicGraphNodeDefinition } from './dynamic.js'
-import type { IGraphNodeId } from './index.js'
+} from './topology-admission.ts'
+import { TopologyInvalidReason } from './topology.ts'
+import { CapabilityGraphErrorCode, type ICapabilityGraphErrorCode } from './error-code.ts'
+import { graphFailure, graphMessageFor } from './errors.ts'
+import type { IDynamicGraphNodeDefinition } from './dynamic.ts'
+import type { IGraphNodeId } from './index.ts'
 
 /** Constructs the existing graph error without changing its message or native-error identity. */
 export function dynamicFailure(code: ICapabilityGraphErrorCode) {

@@ -4,11 +4,11 @@ import {
   createLifecycleError,
   createLifecycleFailure,
   safeReport
-} from './errors.js'
-import { LifecycleErrorCode } from './error-code.js'
-import { LifecycleErrorText } from './error-text.js'
-import type { IAdmissionBatch } from './dispose-transaction.js'
-import type { ICollectedError, IErrorPolicy, IReleaseContext, IReleaseDescriptor } from './types.js'
+} from './errors.ts'
+import { LifecycleErrorCode } from './error-code.ts'
+import { LifecycleErrorText } from './error-text.ts'
+import type { IAdmissionBatch } from './dispose-transaction.ts'
+import type { ICollectedError, IErrorPolicy, IReleaseContext, IReleaseDescriptor } from './types.ts'
 
 type ICallbackOutcome = { readonly ok: true } | { readonly ok: false; readonly error: unknown }
 

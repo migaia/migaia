@@ -1,10 +1,10 @@
 /** Validates common construction policies before the supervisor owns resources. */
-import { SupervisionField } from './text.js'
-import { RestartMode, TerminalPolicyMode } from './constants.js'
-import { SupervisionErrorCode } from './error-code.js'
-import { SupervisionErrorText } from './error-text.js'
-import { createSupervisionError } from './errors.js'
-import type { ILaunchContext, ISupervisorOptions, IUnitHandle } from './types.js'
+import { SupervisionField } from './text.ts'
+import { RestartMode, TerminalPolicyMode } from './constants.ts'
+import { SupervisionErrorCode } from './error-code.ts'
+import { SupervisionErrorText } from './error-text.ts'
+import { createSupervisionError } from './errors.ts'
+import type { ILaunchContext, ISupervisorOptions, IUnitHandle } from './types.ts'
 
 /** Throws a native, coded option error before any unit or timer is created. */
 export function invalidOption(

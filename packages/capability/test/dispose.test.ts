@@ -1,4 +1,4 @@
-import { RecordedCapabilityRelease } from './fixtures/host-cleanup.js'
+import { RecordedCapabilityRelease } from './fixtures/host-cleanup.ts'
 import { describe, expect, it, vi } from 'vitest'
 
 const mockState = vi.hoisted(() => ({
@@ -11,12 +11,12 @@ vi.mock('@migaia/lifecycle', mockLifecycleWithCleanupFailure)
 /** Mock setup owns controller numbering while the fixture preserves all real lifecycle behavior. */
 async function mockLifecycleWithCleanupFailure(): Promise<typeof import('@migaia/lifecycle')> {
   const actual = await vi.importActual<typeof import('@migaia/lifecycle')>('@migaia/lifecycle')
-  const { GenerationFailureFactory } = await import('./fixtures/generation-failure.js')
+  const { GenerationFailureFactory } = await import('./fixtures/generation-failure.ts')
   const factory = new GenerationFailureFactory(actual, mockState)
   return { ...actual, createGenerationController: factory.createGenerationController }
 }
 
-import { CapabilityErrorCode, createCapabilityHost } from '../src/index.js'
+import { CapabilityErrorCode, createCapabilityHost } from '../src/index.ts'
 
 describe('dispose generation cleanup isolation', () => {
   it(

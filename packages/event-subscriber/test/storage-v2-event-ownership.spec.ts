@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createEventChannel, EventDispatchPolicy } from '../src/index.js'
+import { createEventChannel, EventDispatchPolicy } from '../src/index.ts'
 
 describe('event ownership reset', () => {
   it('preserves canonical and explicit queued nested publish traces', () => {

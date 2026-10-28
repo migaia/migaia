@@ -1,6 +1,6 @@
-import { ignoreHostCleanup } from './fixtures/host-cleanup.js'
+import { ignoreHostCleanup } from './fixtures/host-cleanup.ts'
 import { describe, expect, it } from 'vitest'
-import { createCapabilityHost, CapabilityErrorCode } from '../src/index'
+import { createCapabilityHost, CapabilityErrorCode } from '../src/index.ts'
 
 describe('capability terminal read-only query ruling', () => {
   it(

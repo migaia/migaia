@@ -3,8 +3,8 @@ import type {
   IGraphNodeInstance,
   IGraphReleaseContext,
   IGraphStartContext
-} from '../../src/graph/index.js'
-import type { IGraphReleaseEntry, IGraphStartEntry } from '../../src/graph/dynamic.js'
+} from '../../src/graph/index.ts'
+import type { IGraphReleaseEntry, IGraphStartEntry } from '../../src/graph/dynamic.ts'
 
 /** No-op physical release is fixture data, without nested callbacks inside startup. */
 export function emptyGraphRelease(): void {}

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { CapabilityGraphErrorCode, createCapabilityGraph } from '../../src/graph/index.js'
+import { CapabilityGraphErrorCode, createCapabilityGraph } from '../../src/graph/index.ts'
 
 import {
   id,
@@ -9,7 +9,7 @@ import {
   startWithDescriptorAdmission,
   asyncReleaseFailureInstance,
   readStaticGraphSource
-} from './static-fixtures.js'
+} from './static-fixtures.ts'
 
 /** Covers the contract: rejects missing force at own admission and preserves the coded cause. */
 async function rejectsMissingForceAtOwnAdmissionAndPreservesTheCodedCause(): Promise<void> {

@@ -1,5 +1,5 @@
 /** Event channel. Cases preserve the existing behavioral assertions. */
-import { subscribeOnce, subscribeSubscriber, subscribeUntil } from '../src/subscriber.js'
+import { subscribeOnce, subscribeSubscriber, subscribeUntil } from '../src/subscriber.ts'
 import { describe, expect, it, vi } from 'vitest'
 import {
   EventSubscriberErrorCode,
@@ -8,7 +8,7 @@ import {
   invokeSerialSettled,
   invokeTask,
   invokeTaskSettled
-} from '../src/index.js'
+} from '../src/index.ts'
 
 describe('event channel', () => {
   it('preserves the receiver and rejects synchronous structural delivery', () => {

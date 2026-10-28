@@ -1,7 +1,7 @@
 /** Owns ordered idle output; only whole oldest chunks are evicted before handoff. */
-import { DrainedStream } from './constants.js'
-import { deliverOutput } from './output-tail.js'
-import type { IProcessLaunchContext } from './types.js'
+import { DrainedStream } from './constants.ts'
+import { deliverOutput } from './output-tail.ts'
+import type { IProcessLaunchContext } from './types.ts'
 
 /** Baseline pool retention bound; one final oversized chunk is deliberately retained. */
 const OUTPUT_BYTES = 65_536

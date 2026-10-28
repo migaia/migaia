@@ -1,4 +1,4 @@
-import type { IMicroApp } from '../types.js'
+import type { IMicroApp } from '../types.ts'
 
 /**
  * Context key of the app handle in the Web Components Community Group Context Protocol. A string

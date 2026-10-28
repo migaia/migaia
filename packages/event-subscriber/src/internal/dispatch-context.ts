@@ -9,14 +9,14 @@ import type {
   IEventListener,
   IEventValueListener,
   IUnsubscribe
-} from '../types.js'
-import { EventDelivery } from '../state-constants.js'
+} from '../types.ts'
+import { EventDelivery } from '../state-constants.ts'
 import {
   addEventProjection,
   type IEventProjectionPlan,
   type IEventProjectionOutcome
-} from '../value-projection.js'
-import { validateTaskId } from './channel-options.js'
+} from '../value-projection.ts'
+import { validateTaskId } from './channel-options.ts'
 
 /** Live registration state needed by the immutable control surface. */
 export type IRegistrationControlOwner = {

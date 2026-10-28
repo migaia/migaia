@@ -1,21 +1,21 @@
 /** Owns bounded idle-pool membership and refill policy; entries own their resources. */
-import { OutcomeKind } from '../text.js'
-import { PROCESS_KIND, ProcessField } from './text.js'
-import { IsolationMode } from '../index.js'
+import { OutcomeKind } from '../text.ts'
+import { PROCESS_KIND, ProcessField } from './text.ts'
+import { IsolationMode } from '../index.ts'
 import { resolveScheduler, resolveSchedulerOption } from '@migaia/lifecycle/scheduler'
 import { systemScheduler, systemWallClock } from '@migaia/utils/scheduler'
-import { admitCapabilities } from '../admission.js'
-import { processRequirements, validateCapabilityDeclaration } from './capabilities.js'
-import { invalidProcessOption, validateProcessSpec } from './spec.js'
-import { PrewarmEntry, type IPrewarmContext } from './prewarm-entry.js'
+import { admitCapabilities } from '../admission.ts'
+import { processRequirements, validateCapabilityDeclaration } from './capabilities.ts'
+import { invalidProcessOption, validateProcessSpec } from './spec.ts'
+import { PrewarmEntry, type IPrewarmContext } from './prewarm-entry.ts'
 import type {
   IPrewarmEntry,
   IPrewarmPool,
   IPrewarmPoolOptions,
   IProcessHandle,
   IProcessRegistry
-} from './types.js'
-import { validateUsageOptions } from './usage-monitor.js'
+} from './types.ts'
+import { validateUsageOptions } from './usage-monitor.ts'
 
 /** Provenance of an already-owned record; it does not create or duplicate the durable record. */
 type IPrewarmRecordOwner = Readonly<{ id: string; port: IProcessRegistry; namespace: string }>

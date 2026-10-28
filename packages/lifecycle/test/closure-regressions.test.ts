@@ -1,8 +1,8 @@
-import { createLifecycleUnit } from '../src/lifecycle-unit.js'
+import { createLifecycleUnit } from '../src/lifecycle-unit.ts'
 import { describe, expect, it, vi } from 'vitest'
-import { boundedWait, createProvisionalScope } from '../src/index.js'
+import { boundedWait, createProvisionalScope } from '../src/index.ts'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { observeAbortSubscription } from '../src/observed-subscription.js'
+import { observeAbortSubscription } from '../src/observed-subscription.ts'
 
 describe('lifecycle closure regressions', () => {
   it('contains a task rejection after boundedWait timeout without a host throw', async () => {
@@ -102,7 +102,7 @@ describe('lifecycle closure regressions', () => {
         return { cancel: vi.fn() }
       }
     }
-    const { createMutationQueue } = await import('../src/mutation-queue.js')
+    const { createMutationQueue } = await import('../src/mutation-queue.ts')
     const queue = createMutationQueue({ scheduler, queueAdmissionTimeoutMs: 1 })
     void queue.enqueue(() => new Promise<void>(() => {}))
     const queued = queue.enqueue(() => undefined)

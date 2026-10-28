@@ -13,9 +13,9 @@ import type {
   ICapabilityEnableResult,
   ICapabilityHandle,
   ICapabilityState
-} from './index.js'
-import { asHostCleanupPromise, snapshotHostDisposer } from './host-admission.js'
-import { CapabilityEnableStatus, CapabilityState } from './state-constants.js'
+} from './index.ts'
+import { asHostCleanupPromise, snapshotHostDisposer } from './host-admission.ts'
+import { CapabilityEnableStatus, CapabilityState } from './state-constants.ts'
 
 /** Explicit host services used by entries; resource state never lives in captured factory locals. */
 export type IHostEntryOwner<Context> = {

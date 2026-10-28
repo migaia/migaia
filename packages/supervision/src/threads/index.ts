@@ -1,5 +1,5 @@
-export { ThreadUnitKind, ThreadCapability, ThreadLimit } from './constants.js'
-export { createThreadSupervisor } from './supervisor.js'
+export { ThreadUnitKind, ThreadCapability, ThreadLimit } from './constants.ts'
+export { createThreadSupervisor } from './supervisor.ts'
 export type {
   IThreadLimits,
   IThreadSpec,
@@ -11,4 +11,4 @@ export type {
   IThreadBudget,
   IThreadSupervisorOptions,
   IThreadSupervisor
-} from './types.js'
+} from './types.ts'

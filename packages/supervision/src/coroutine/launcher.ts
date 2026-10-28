@@ -1,20 +1,20 @@
 /** Owns cooperative execution and exposure; supervision policy remains in the core. */
-import { ABORT_EVENT } from '../text.js'
+import { ABORT_EVENT } from '../text.ts'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { createAbortController } from '@migaia/lifecycle'
 import type { IScheduler } from '@migaia/utils/scheduler'
-import { SupervisionErrorCode } from '../error-code.js'
-import { SupervisionErrorText } from '../error-text.js'
-import { createSupervisionError } from '../errors.js'
-import type { IUnitLauncher } from '../types.js'
-import { coroutineCapabilities, CoroutineOutcome } from './constants.js'
-import { coroutineFingerprint, CoroutineField } from './contract.js'
+import { SupervisionErrorCode } from '../error-code.ts'
+import { SupervisionErrorText } from '../error-text.ts'
+import { createSupervisionError } from '../errors.ts'
+import type { IUnitLauncher } from '../types.ts'
+import { coroutineCapabilities, CoroutineOutcome } from './constants.ts'
+import { coroutineFingerprint, CoroutineField } from './contract.ts'
 import type {
   ICoroutineExitStatus,
   ICoroutineHandle,
   ICoroutineRunContext,
   ICoroutineSpec
-} from './types.js'
+} from './types.ts'
 
 /** Weak ownership preserves private termination authority without retaining handles. */
 const termination = new WeakMap<ICoroutineHandle<unknown>, () => void>()

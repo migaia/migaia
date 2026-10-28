@@ -1,10 +1,10 @@
 /** Owns child-side shutdown cancellation and once-only exit after parent loss. */
-import { ProcessField } from './text.js'
+import { ProcessField } from './text.ts'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { createAbortController } from '@migaia/lifecycle'
 import { systemScheduler, type IScheduler, type IScheduledTask } from '@migaia/utils/scheduler'
-import { ParentLossExitCode } from './constants.js'
-import { invalidProcessOption } from './spec.js'
+import { ParentLossExitCode } from './constants.ts'
+import { invalidProcessOption } from './spec.ts'
 
 /**
  * Runs inside a child process: when the parent connection is lost, `trigger()` starts `shutdown`

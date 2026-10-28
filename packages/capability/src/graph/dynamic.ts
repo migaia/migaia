@@ -2,18 +2,18 @@
  * Declares the public dynamic graph contract and constructs its named mutation owner. Topology,
  * frontier reconciliation and physical resource execution remain with their existing owners.
  */
-import { DynamicCapabilityGraph } from './dynamic-owner.js'
-import type { ICapabilityGraphState } from './state-constants.js'
-import { GraphBindingReleaseReason } from './state-constants.js'
-export { GraphBindingReleaseReason } from './state-constants.js'
-import { DependencyPolicy } from './dependency.js'
-import { type IGraphDependents } from './topology.js'
+import { DynamicCapabilityGraph } from './dynamic-owner.ts'
+import type { ICapabilityGraphState } from './state-constants.ts'
+import { GraphBindingReleaseReason } from './state-constants.ts'
+export { GraphBindingReleaseReason } from './state-constants.ts'
+import { DependencyPolicy } from './dependency.ts'
+import { type IGraphDependents } from './topology.ts'
 import type {
   IGraphNodeDefinition,
   IGraphNodeDiagnostic,
   IGraphNodeId,
   IGraphNodeInstance
-} from './index.js'
+} from './index.ts'
 
 /** Result returned after one dynamic graph mutation commits. */
 export type IGraphMutationResult = Readonly<{
@@ -31,7 +31,7 @@ export type IGraphDependencyMutationPolicy = Exclude<
   typeof DependencyPolicy.suspend
 >
 
-export type { IGraphDependents } from './topology.js'
+export type { IGraphDependents } from './topology.ts'
 
 /** Options for removal and suspension. */
 export type IGraphDependencyMutationOptions = Readonly<{

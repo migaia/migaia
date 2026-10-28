@@ -1,4 +1,4 @@
-import { unavailableRequiredProvider } from './provider-availability.js'
+import { unavailableRequiredProvider } from './provider-availability.ts'
 /**
  * Static graph registry, level startup and terminal transaction; node resources belong to
  * GraphNodeStart.
@@ -17,18 +17,18 @@ import type {
   IGraphNodeDefinition,
   IGraphNodeDiagnostic,
   IGraphNodeId
-} from './index.js'
-import { CapabilityGraphErrorCode } from './error-code.js'
-import { invokeCapabilityReporter } from '../reporter.js'
-import { graphFailure } from './errors.js'
+} from './index.ts'
+import { CapabilityGraphErrorCode } from './error-code.ts'
+import { invokeCapabilityReporter } from '../reporter.ts'
+import { graphFailure } from './errors.ts'
 import {
   CapabilityGraphNodeState,
   CapabilityGraphState,
   type ICapabilityGraphState
-} from './state-constants.js'
-import { buildCapabilityTopology, TopologyInvalidReason } from './topology.js'
-import { staticGraphFailure, readStaticNode, type IAdmittedNode } from './static-node.js'
-import { GraphNodeStart, type IStaticStartOwner } from './node-start.js'
+} from './state-constants.ts'
+import { buildCapabilityTopology, TopologyInvalidReason } from './topology.ts'
+import { staticGraphFailure, readStaticNode, type IAdmittedNode } from './static-node.ts'
+import { GraphNodeStart, type IStaticStartOwner } from './node-start.ts'
 
 /** Owns one fixed registry and its canonical readiness/disposal promises. */
 export class StaticCapabilityGraph implements ICapabilityGraph {

@@ -2,8 +2,8 @@
  * Owns host diagnostic adaptation and the terminal failure ladder; it does not schedule event
  * dispatch.
  */
-import { EventSubscriberErrorCode } from '../error-code.js'
-import { createEventAggregateError, eventErrorText } from '../errors.js'
+import { EventSubscriberErrorCode } from '../error-code.ts'
+import { createEventAggregateError, eventErrorText } from '../errors.ts'
 
 /** Internal host terminal sinks; this type never crosses the package public boundary. */
 export type IEventTerminalRuntime = {

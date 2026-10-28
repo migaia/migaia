@@ -4,8 +4,8 @@ import { subscribeWithSelector } from 'zustand/middleware'
 import { createStore } from 'zustand/vanilla'
 import { createMicroHub, defineContract, keyed } from '../dist/index.js'
 import { state } from '../dist/state/index.js'
-import { createGlobalState, type IGlobalStateSnapshot } from './baselines/global-state.js'
-import type { IBenchFixture, ILibrary, IObservation, IParameters } from './types.js'
+import { createGlobalState, type IGlobalStateSnapshot } from './baselines/global-state.ts'
+import type { IBenchFixture, ILibrary, IObservation, IParameters } from './types.ts'
 
 /** State scenarios share numeric fields so each library performs the same application update. */
 type IStateScenario = 'S1' | 'S2' | 'S5'

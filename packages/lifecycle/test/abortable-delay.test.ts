@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { type IScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { abortableDelay, createAbortController, LifecycleErrorCode } from '../src/index.js'
+import { abortableDelay, createAbortController, LifecycleErrorCode } from '../src/index.ts'
 
 describe('review 1c abortableDelay', () => {
   it('resolves elapsed and aborted waits without leaving a timer owned', async () => {

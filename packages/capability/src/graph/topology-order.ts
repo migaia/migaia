@@ -2,7 +2,7 @@
  * Owns stable integer-key ordering for topology projections and requested subsets. Uses bounded
  * byte buckets; never scans unrelated nodes or executes comparison sorting.
  */
-import type { IStoredTopologyNode } from './topology-store.js'
+import type { IStoredTopologyNode } from './topology-store.ts'
 
 /** Orders captured nodes by their immutable registration position in linear subset work. */
 export function registrationTopologyNodes(

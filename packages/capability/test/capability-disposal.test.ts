@@ -1,7 +1,7 @@
-import { RecordedCapabilityRelease, AsyncCapabilityRelease } from './fixtures/host-cleanup.js'
+import { RecordedCapabilityRelease, AsyncCapabilityRelease } from './fixtures/host-cleanup.ts'
 import { describe, expect, it, vi } from 'vitest'
-import { createCapabilityHost, CapabilityErrorCode, type ICapabilityHandle } from '../src/index.js'
-import { handleOf, deferred, enabledHost } from './fixtures/capability-host.js'
+import { createCapabilityHost, CapabilityErrorCode, type ICapabilityHandle } from '../src/index.ts'
+import { handleOf, deferred, enabledHost } from './fixtures/capability-host.ts'
 
 /** Existing host cases grouped by one lifecycle concern; assertions remain unchanged. */
 describe('能力闸门：终态排空与释放顺序', () => {

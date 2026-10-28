@@ -4,9 +4,9 @@ import {
   createErrorCollector,
   createGenerationController,
   createProvisionalScope
-} from '../src/index.js'
-import { createLifecycleFailure } from '../src/errors.js'
-import { snapshotScheduler } from '../src/scheduler-entry.js'
+} from '../src/index.ts'
+import { createLifecycleFailure } from '../src/errors.ts'
+import { snapshotScheduler } from '../src/scheduler-entry.ts'
 
 describe('lifecycle audited error observation', () => {
   it('requires a reporter at the public collector entry', () => {

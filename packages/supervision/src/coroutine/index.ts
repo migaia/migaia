@@ -1,5 +1,5 @@
-export { CoroutineOutcome, coroutineCapabilities } from './constants.js'
-export { createCoroutineSupervisor } from './supervisor.js'
+export { CoroutineOutcome, coroutineCapabilities } from './constants.ts'
+export { createCoroutineSupervisor } from './supervisor.ts'
 export type {
   ICoroutineRunContext,
   ICoroutineTask,
@@ -8,4 +8,4 @@ export type {
   ICoroutineHandle,
   ICoroutineSupervisorOptions,
   ICoroutineSupervisor
-} from './types.js'
+} from './types.ts'

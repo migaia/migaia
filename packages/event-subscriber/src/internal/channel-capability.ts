@@ -8,11 +8,11 @@ import type {
   IEventDispatchSnapshot,
   IEventInvocation,
   IFilteredEventChannel
-} from '../types.js'
-import type { IEventApiStyle } from '../style.js'
-import type { IEventProjectionOutcome, IEventProjectionPlan } from '../value-projection.js'
-import { EventSubscriberErrorCode } from '../error-code.js'
-import { createEventTypeError, eventErrorText } from '../errors.js'
+} from '../types.ts'
+import type { IEventApiStyle } from '../style.ts'
+import type { IEventProjectionOutcome, IEventProjectionPlan } from '../value-projection.ts'
+import { EventSubscriberErrorCode } from '../error-code.ts'
+import { createEventTypeError, eventErrorText } from '../errors.ts'
 
 /**
  * Package-internal operations of one channel, kept off the public object and looked up through a

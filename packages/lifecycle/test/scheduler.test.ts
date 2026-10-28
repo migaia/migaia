@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { addSchedulerTime, resolveScheduler, snapshotScheduler } from '../src/scheduler.js'
-import { boundedWait } from '../src/bounded-wait.js'
-import { createLifecycleScope } from '../src/lifecycle-scope.js'
-import { createDisposeTransaction } from '../src/dispose-transaction.js'
-import { LifecycleErrorCode } from '../src/error-code.js'
-import { createGenerationController } from '../src/generation-controller.js'
-import { createMutationQueue } from '../src/mutation-queue.js'
+import { addSchedulerTime, resolveScheduler, snapshotScheduler } from '../src/scheduler.ts'
+import { boundedWait } from '../src/bounded-wait.ts'
+import { createLifecycleScope } from '../src/lifecycle-scope.ts'
+import { createDisposeTransaction } from '../src/dispose-transaction.ts'
+import { LifecycleErrorCode } from '../src/error-code.ts'
+import { createGenerationController } from '../src/generation-controller.ts'
+import { createMutationQueue } from '../src/mutation-queue.ts'
 
 /** Captures a synchronous throw for identity assertions. */
 function captureThrow(run: () => unknown): unknown {

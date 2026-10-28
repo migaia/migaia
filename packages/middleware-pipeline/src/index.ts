@@ -6,7 +6,7 @@ export {
   type IMiddlewarePipelineLiftSource,
   type IMiddlewarePipelineRunResult,
   type IMiddlewarePipelineStage
-} from './create-pipeline.js'
+} from './create-pipeline.ts'
 export {
   GENERATOR_CONTINUE,
   GENERATOR_HALT,
@@ -19,7 +19,7 @@ export {
   type IMiddlewarePipelineMode,
   type IMiddlewarePipelineViolation,
   type IMiddlewarePipelineViolationHandler
-} from './state-constants.js'
+} from './state-constants.ts'
 export {
   type IAsyncGeneratorMiddlewareStage,
   type IAsyncMiddlewareStage,
@@ -27,6 +27,6 @@ export {
   type IMiddlewarePipelineContext,
   type IMiddlewarePipelineControlOptions,
   type ISyncMiddlewareStage
-} from './runtime.js'
-export { MIDDLEWARE_PIPELINE_SOURCE, MiddlewarePipelineErrorCode } from './error-code.js'
-export type { IMiddlewarePipelineErrorCode } from './error-code.js'
+} from './runtime.ts'
+export { MIDDLEWARE_PIPELINE_SOURCE, MiddlewarePipelineErrorCode } from './error-code.ts'
+export type { IMiddlewarePipelineErrorCode } from './error-code.ts'

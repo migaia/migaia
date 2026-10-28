@@ -3,12 +3,12 @@
  * settlement.
  */
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
-import { EventSubscriberErrorCode } from '../error-code.js'
-import { createEventAggregateError, eventErrorText } from '../errors.js'
-import type { IEventChannelOptions, IEventContext, IEventDispatchSnapshot } from '../types.js'
-import type { IEventApiStyle } from '../style.js'
-import { createSystemTerminalRuntime, reportTerminalDiagnostic } from './terminal-runtime.js'
-import { createEventContext } from './dispatch-context.js'
+import { EventSubscriberErrorCode } from '../error-code.ts'
+import { createEventAggregateError, eventErrorText } from '../errors.ts'
+import type { IEventChannelOptions, IEventContext, IEventDispatchSnapshot } from '../types.ts'
+import type { IEventApiStyle } from '../style.ts'
+import { createSystemTerminalRuntime, reportTerminalDiagnostic } from './terminal-runtime.ts'
+import { createEventContext } from './dispatch-context.ts'
 
 /** The host adapter remains lazy until the terminal path needs a sink. */
 const systemTerminalRuntime = createSystemTerminalRuntime()

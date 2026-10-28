@@ -1,4 +1,4 @@
-import { EXIT_OBSERVATION_CAPABILITY } from '../constants.js'
+import { EXIT_OBSERVATION_CAPABILITY } from '../constants.ts'
 
 /** Unit kind shared by the thread profile and its budget. */
 export const ThreadUnitKind = { thread: 'thread' } as const

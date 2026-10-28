@@ -1,7 +1,7 @@
 /** Event-subscriber abort hardening. Cases preserve the existing behavioral assertions. */
-import { subscribeUntil } from '../src/subscriber.js'
+import { subscribeUntil } from '../src/subscriber.ts'
 import { describe, expect, it, vi } from 'vitest'
-import { EventSubscriberErrorCode, createEventChannel } from '../src/index.js'
+import { EventSubscriberErrorCode, createEventChannel } from '../src/index.ts'
 
 describe('event-subscriber abort hardening', () => {
   it('removes a signal-linked registration on manual unsubscribe', () => {

@@ -1,6 +1,6 @@
 /** Hub. Cases preserve the existing behavioral assertions. */
 import { describe, expect, it } from 'vitest'
-import { createEventChannel, createEventHub, invokeTaskSettled } from '../src/index.js'
+import { createEventChannel, createEventHub, invokeTaskSettled } from '../src/index.ts'
 
 describe('hub', () => {
   it('keeps total size exact across clear and stale unsubscribe', () => {

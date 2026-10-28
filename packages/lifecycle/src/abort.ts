@@ -1,11 +1,11 @@
 import type { INativeAbortSignal } from '@migaia/utils/promise'
-import { instantiateCurrentAbortController } from './abort-factory.js'
+import { instantiateCurrentAbortController } from './abort-factory.ts'
 
 export {
   observeAbortSubscription,
   type IObservedAbortFailureSink,
   type IObservedAbortSubscription
-} from './observed-subscription.js'
+} from './observed-subscription.ts'
 
 /** Structural controller returned by the public factory. */
 export type IAbortController = {

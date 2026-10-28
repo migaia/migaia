@@ -2,14 +2,14 @@ import {
   MIDDLEWARE_PIPELINE_SOURCE,
   MiddlewarePipelineErrorCode,
   type IMiddlewarePipelineErrorCode
-} from './error-code.js'
+} from './error-code.ts'
 import {
   attachErrorIdentity,
   attachSecondaryErrors,
   isNativeErrorValue,
   tryReadProperty
 } from '@migaia/utils/error'
-import { MiddlewarePipelineErrorText } from './error-text.js'
+import { MiddlewarePipelineErrorText } from './error-text.ts'
 
 /**
  * Preserves both original stage and downstream errors and attaches the package-boundary identity to

@@ -4,7 +4,7 @@ import {
   createErrorCollector,
   createLifecycleError,
   LIFECYCLE_SOURCE
-} from '../src/errors'
+} from '../src/errors.ts'
 
 describe('containAsyncRejection: non-Promise thenable', () => {
   it('reads `then` exactly once and observes the eventual rejection', async () => {

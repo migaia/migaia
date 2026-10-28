@@ -6,7 +6,7 @@ import {
   invokeParallelSettled,
   invokeSerialSettled,
   invokeTaskSettled
-} from '../src/index.js'
+} from '../src/index.ts'
 
 type IValue = {
   readonly data: {

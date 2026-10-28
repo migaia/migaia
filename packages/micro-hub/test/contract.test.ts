@@ -12,7 +12,7 @@ import {
   resource,
   type IContractView,
   type IOwnedContract
-} from '../src/index.js'
+} from '../src/index.ts'
 
 describe('contract definitions', () => {
   it('copies and freezes contract sections and writer permissions', () => {

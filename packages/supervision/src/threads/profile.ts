@@ -1,9 +1,9 @@
-import { ExitReason, StandardCapability } from '../index.js'
-import { SupervisionErrorCode, SupervisionErrorText, type IUnitProfile } from '../index.js'
-import { createSupervisionError } from '../errors.js'
-import { ThreadCapability, ThreadLimit, ThreadUnitKind } from './constants.js'
-import { ThreadField, threadLimitField } from './text.js'
-import type { IThreadExitStatus, IThreadHandle, IThreadSpec } from './types.js'
+import { ExitReason, StandardCapability } from '../index.ts'
+import { SupervisionErrorCode, SupervisionErrorText, type IUnitProfile } from '../index.ts'
+import { createSupervisionError } from '../errors.ts'
+import { ThreadCapability, ThreadLimit, ThreadUnitKind } from './constants.ts'
+import { ThreadField, threadLimitField } from './text.ts'
+import type { IThreadExitStatus, IThreadHandle, IThreadSpec } from './types.ts'
 
 /** Rejects a thread-only option with its public field and native error class. */
 export function invalidThreadOption(

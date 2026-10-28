@@ -3,8 +3,8 @@ import {
   ERROR_SOURCE,
   CapabilityGraphErrorCode,
   type ICapabilityGraphErrorCode
-} from './error-code.js'
-import { CapabilityGraphErrorText } from './error-text.js'
+} from './error-code.ts'
+import { CapabilityGraphErrorText } from './error-text.ts'
 
 /** Stable source identity for all Graph-owned errors. */
 export const CAPABILITY_GRAPH_SOURCE = ERROR_SOURCE

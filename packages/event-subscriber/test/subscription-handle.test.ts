@@ -1,11 +1,11 @@
-import { subscribeUntil } from '../src/subscriber.js'
+import { subscribeUntil } from '../src/subscriber.ts'
 import { describe, expect, it, vi } from 'vitest'
 import {
   createEventChannel,
   createEventHub,
   EVENT_SUBSCRIBER_SOURCE,
   EventSubscriberErrorCode
-} from '../src/index.js'
+} from '../src/index.ts'
 
 describe('callable subscription handles', () => {
   it('removes the strict abort observer before surfacing second-site ABORTED', () => {

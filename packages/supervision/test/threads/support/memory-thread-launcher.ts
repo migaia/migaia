@@ -1,10 +1,10 @@
-import type { CapabilityLevel, ILaunchContext } from '../../../src/index.js'
+import type { CapabilityLevel, ILaunchContext } from '../../../src/index.ts'
 import type {
   IThreadExitStatus,
   IThreadHandle,
   IThreadLauncher,
   IThreadSpec
-} from '../../../src/threads/index.js'
+} from '../../../src/threads/index.ts'
 
 /** Controllable thread handle that exposes termination and actual exit separately. */
 export type IMemoryThreadHandle = IThreadHandle & {

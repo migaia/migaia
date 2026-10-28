@@ -1,14 +1,14 @@
 /** Event API style subscription ownership. Cases preserve the existing behavioral assertions. */
-import { subscribeOnce, subscribeSubscriber, subscribeUntil } from '../src/subscriber.js'
+import { subscribeOnce, subscribeSubscriber, subscribeUntil } from '../src/subscriber.ts'
 import { describe, expect, it, vi } from 'vitest'
 import {
   createEventChannel,
   EventSubscriberErrorCode,
   invokeParallelSettled
-} from '../src/index.js'
-import type { IEventContext } from '../src/index.js'
-import { createRawSubscriptionOwner } from '../src/internal/subscription.js'
-import { normalizeEventApiStyle } from '../src/style.js'
+} from '../src/index.ts'
+import type { IEventContext } from '../src/index.ts'
+import { createRawSubscriptionOwner } from '../src/internal/subscription.ts'
+import { normalizeEventApiStyle } from '../src/style.ts'
 
 describe('event API style subscription ownership', () => {
   it('rolls back first registration when handle projection fails', () => {

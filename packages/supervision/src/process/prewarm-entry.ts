@@ -1,5 +1,5 @@
 /** Owns one prewarmed launch, output handoff and exit-ordered resource release. */
-import { PROCESS_KIND, SAMPLE_USAGE_MISSING } from './text.js'
+import { PROCESS_KIND, SAMPLE_USAGE_MISSING } from './text.ts'
 import {
   boundedWait,
   createAbortController,
@@ -13,13 +13,13 @@ import {
   LaunchPhase,
   TerminationMode,
   type IUnitRuntime
-} from '../index.js'
-import { SupervisionErrorCode } from '../error-code.js'
-import { SupervisionErrorText } from '../error-text.js'
-import { createSupervisionError } from '../errors.js'
-import { DrainedStream, ProcessCapability } from './constants.js'
-import { deliverOutput } from './output-tail.js'
-import { PrewarmOutput } from './prewarm-output.js'
+} from '../index.ts'
+import { SupervisionErrorCode } from '../error-code.ts'
+import { SupervisionErrorText } from '../error-text.ts'
+import { createSupervisionError } from '../errors.ts'
+import { DrainedStream, ProcessCapability } from './constants.ts'
+import { deliverOutput } from './output-tail.ts'
+import { PrewarmOutput } from './prewarm-output.ts'
 import type {
   IPrewarmEntry,
   IPrewarmPoolOptions,
@@ -27,8 +27,8 @@ import type {
   IProcessExitStatus,
   IProcessLaunchContext,
   IProcessRecord
-} from './types.js'
-import { startUsageMonitor } from './usage-monitor.js'
+} from './types.ts'
+import { startUsageMonitor } from './usage-monitor.ts'
 
 /** Immutable pool policy shared by entries without allocating per-entry adapters. */
 export type IPrewarmContext<THandle extends IProcessHandle> = {

@@ -1,4 +1,4 @@
-import { createEventChannel, createEventHub, type IEventApiStyleNames } from '../src/index.js'
+import { createEventChannel, createEventHub, type IEventApiStyleNames } from '../src/index.ts'
 
 // Custom styles require explicit generic placement and retain exact keys.
 const inlineChannel = createEventChannel<

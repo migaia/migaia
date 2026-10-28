@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { createSupervisor, createUnitBudget, SupervisionErrorCode } from '../../src/index.js'
-import { createMemoryLauncher, deferred } from '../support/memory-launcher.js'
-import { createMemoryProfile } from '../support/memory-profile.js'
+import { createSupervisor, createUnitBudget, SupervisionErrorCode } from '../../src/index.ts'
+import { createMemoryLauncher, deferred } from '../support/memory-launcher.ts'
+import { createMemoryProfile } from '../support/memory-profile.ts'
 
 /** Lets the candidate pass its budget and launch continuations. */
 async function flush(): Promise<void> {

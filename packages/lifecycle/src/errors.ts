@@ -1,9 +1,9 @@
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
-import type { ICollectedError, IErrorPolicy } from './types.js'
+import type { ICollectedError, IErrorPolicy } from './types.ts'
 import { attachErrorIdentity, attachSecondaryErrors, tryReadProperty } from '@migaia/utils/error'
-import { ERROR_SOURCE, LifecycleErrorCode } from './error-code.js'
-import { LifecycleErrorText } from './error-text.js'
-import { assertErrorPolicyReporter } from './error-boundary.js'
+import { ERROR_SOURCE, LifecycleErrorCode } from './error-code.ts'
+import { LifecycleErrorText } from './error-text.ts'
+import { assertErrorPolicyReporter } from './error-boundary.ts'
 
 /** `source` value stamped onto every error this package throws. */
 export const LIFECYCLE_SOURCE = ERROR_SOURCE

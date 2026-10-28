@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { createMicroHub, defineContract, event, getMicroHub, request } from '../src/index.js'
-import { events } from '../src/events/index.js'
+import { createMicroHub, defineContract, event, getMicroHub, request } from '../src/index.ts'
+import { events } from '../src/events/index.ts'
 
 /** Releases the singleton and restores real clocks between independent app lifetimes. */
 afterEach(async () => {

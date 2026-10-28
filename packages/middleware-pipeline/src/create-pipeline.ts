@@ -1,11 +1,11 @@
 /** Admits immutable pipeline options and exposes the public runner and canonical lift matrix. */
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { tryReadProperty } from '@migaia/utils/error'
-import { MiddlewarePipelineErrorText } from './error-text.js'
+import { MiddlewarePipelineErrorText } from './error-text.ts'
 import {
   createMiddlewarePipelineInvalidOptionError,
   identifyMiddlewarePipelineFailure
-} from './errors.js'
+} from './errors.ts'
 import {
   adaptGeneratorStageToAsyncGenerator,
   adaptSyncStageToAsync,
@@ -22,7 +22,7 @@ import {
   type IMiddlewarePipelineOptions,
   type IMiddlewarePipelineControlOptions,
   type ISyncMiddlewareStage
-} from './runtime.js'
+} from './runtime.ts'
 import {
   MiddlewarePipelineGeneratorSignals,
   MiddlewarePipelineMode,
@@ -31,7 +31,7 @@ import {
   type IMiddlewarePipelineMode,
   type IMiddlewarePipelineViolationHandler,
   type IMiddlewarePipelineViolation
-} from './state-constants.js'
+} from './state-constants.ts'
 
 /**
  * Stage shape for the selected mode. Sync/async stages receive a next callback; generator stages

@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import { buildCapabilityTopology, type ITopologyNode } from '../../src/graph/topology.js'
+import { buildCapabilityTopology, type ITopologyNode } from '../../src/graph/topology.ts'
 
 type ITopologyGoldenExpected = Readonly<{
   readonly ordered: readonly string[]

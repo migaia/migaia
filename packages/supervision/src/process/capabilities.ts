@@ -1,10 +1,10 @@
-import { PROCESS_KIND, capabilityField } from './text.js'
-import { CapabilityLevel, StandardCapability } from '../index.js'
-import { SupervisionErrorCode } from '../error-code.js'
-import { SupervisionErrorText } from '../error-text.js'
-import { createSupervisionError } from '../errors.js'
-import { BootstrapVia, ProcessCapability } from './constants.js'
-import type { IProcessSpec } from './types.js'
+import { PROCESS_KIND, capabilityField } from './text.ts'
+import { CapabilityLevel, StandardCapability } from '../index.ts'
+import { SupervisionErrorCode } from '../error-code.ts'
+import { SupervisionErrorText } from '../error-text.ts'
+import { createSupervisionError } from '../errors.ts'
+import { BootstrapVia, ProcessCapability } from './constants.ts'
+import type { IProcessSpec } from './types.ts'
 
 /** Only these two fixed process limits support monitored enforcement. */
 const monitored = new Set<string>([ProcessCapability.memoryLimit, ProcessCapability.cpuTimeLimit])

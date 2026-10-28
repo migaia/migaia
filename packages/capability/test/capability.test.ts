@@ -2,10 +2,10 @@ import {
   AsyncCapabilityRelease,
   activateHostHandle,
   loadCapabilityModule
-} from './fixtures/host-cleanup.js'
+} from './fixtures/host-cleanup.ts'
 import { describe, expect, it, vi } from 'vitest'
-import { createCapabilityHost, type ICapabilityHandle } from '../src/index.js'
-import { handleOf, enabledHost } from './fixtures/capability-host.js'
+import { createCapabilityHost, type ICapabilityHandle } from '../src/index.ts'
+import { handleOf, enabledHost } from './fixtures/capability-host.ts'
 
 /** Existing host cases grouped by one lifecycle concern; assertions remain unchanged. */
 describe('能力闸门：激活、登记与隔离', () => {

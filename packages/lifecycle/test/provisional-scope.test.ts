@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createProvisionalScope } from '../src/provisional-scope'
-import { createLifecycleScope } from '../src/lifecycle-scope'
-import { LifecycleErrorCode } from '../src/error-code'
-import type { ILifecycleOwner, IReleaseDescriptor } from '../src/types'
+import { createProvisionalScope } from '../src/provisional-scope.ts'
+import { createLifecycleScope } from '../src/lifecycle-scope.ts'
+import { LifecycleErrorCode } from '../src/error-code.ts'
+import type { ILifecycleOwner, IReleaseDescriptor } from '../src/types.ts'
 
 describe('ProvisionalScope: commit', () => {
   it('transfers every resource to the parent, in registration order', async () => {

@@ -3,10 +3,10 @@
  * owns input and thenable admission; it does not retain resources or drive host transitions.
  */
 import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/utils/function'
-import type { ICapabilityDefinition, ICapabilityHandle, ICapabilityHostOptions } from './index.js'
-import { CapabilityErrorCode } from './error-code.js'
-import { CapabilityErrorText } from './error-text.js'
-import { createCapabilityError, tagCapabilityError } from './errors.js'
+import type { ICapabilityDefinition, ICapabilityHandle, ICapabilityHostOptions } from './index.ts'
+import { CapabilityErrorCode } from './error-code.ts'
+import { CapabilityErrorText } from './error-text.ts'
+import { createCapabilityError, tagCapabilityError } from './errors.ts'
 
 /** Construction snapshot preserves the original reporter receiver without rereading options. */
 export type IHostOptionsSnapshot = {

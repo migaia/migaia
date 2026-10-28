@@ -1,11 +1,11 @@
 import { assimilateCapturedThen, probeThenable, ThenableProbeKind } from '@migaia/utils/function'
-import type { ILifecycleState, IUnitState } from './types.js'
-import { containAsyncRejection, createLifecycleError } from './errors.js'
-import { LifecycleErrorCode } from './error-code.js'
-import { LifecycleErrorText } from './error-text.js'
-import { createTerminalController } from './terminal-controller.js'
-import { LifecycleState, LifecycleUnitState } from './state-constants.js'
-import { createGenerationController } from './generation-controller.js'
+import type { ILifecycleState, IUnitState } from './types.ts'
+import { containAsyncRejection, createLifecycleError } from './errors.ts'
+import { LifecycleErrorCode } from './error-code.ts'
+import { LifecycleErrorText } from './error-text.ts'
+import { createTerminalController } from './terminal-controller.ts'
+import { LifecycleState, LifecycleUnitState } from './state-constants.ts'
+import { createGenerationController } from './generation-controller.ts'
 
 export type ILifecycleUnitOptions = {
   /**

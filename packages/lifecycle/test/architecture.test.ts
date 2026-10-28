@@ -2,16 +2,16 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { join } from 'node:path'
-import * as publicRoot from '../src/index.js'
-import * as publicErrors from '../src/errors-entry.js'
-import * as publicScheduler from '../src/scheduler-entry.js'
-import * as publicQuiescence from '../src/quiescence-tracker.js'
+import * as publicRoot from '../src/index.ts'
+import * as publicErrors from '../src/errors-entry.ts'
+import * as publicScheduler from '../src/scheduler-entry.ts'
+import * as publicQuiescence from '../src/quiescence-tracker.ts'
 import {
   createLifecycleScope,
   createGenerationController,
   createPendingTracker,
   createMutationQueue
-} from '../src/index'
+} from '../src/index.ts'
 
 const srcRoot = fileURLToPath(new URL('../src/', import.meta.url))
 const packageJsonPath = fileURLToPath(new URL('../package.json', import.meta.url))
@@ -219,7 +219,7 @@ describe('cross-module: a downstream adapter uses only public primitives', () =>
         name === 'disposal.ts'
       )
         continue
-      const moduleSpecifier = `./${name.replace(/\.ts$/, '')}`
+      const moduleSpecifier = `./${name}`
       expect(indexSource.includes(moduleSpecifier), `index.ts must re-export from ${name}`).toBe(
         true
       )

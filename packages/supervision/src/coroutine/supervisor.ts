@@ -1,21 +1,21 @@
-import { ExitReason } from '../index.js'
+import { ExitReason } from '../index.ts'
 import { resolveScheduler, resolveSchedulerOption } from '@migaia/lifecycle/scheduler'
 import { systemScheduler } from '@migaia/utils/scheduler'
-import { createSupervisor } from '../supervisor.js'
-import { SupervisionErrorCode } from '../error-code.js'
-import { SupervisionErrorText } from '../error-text.js'
-import { createSupervisionError } from '../errors.js'
-import type { IUnitProfile } from '../types.js'
-import { CoroutineOutcome } from './constants.js'
-import { COROUTINE_KIND, CoroutineField } from './contract.js'
-import { createCoroutineLauncher, terminateCoroutineHandle } from './launcher.js'
+import { createSupervisor } from '../supervisor.ts'
+import { SupervisionErrorCode } from '../error-code.ts'
+import { SupervisionErrorText } from '../error-text.ts'
+import { createSupervisionError } from '../errors.ts'
+import type { IUnitProfile } from '../types.ts'
+import { CoroutineOutcome } from './constants.ts'
+import { COROUTINE_KIND, CoroutineField } from './contract.ts'
+import { createCoroutineLauncher, terminateCoroutineHandle } from './launcher.ts'
 import type {
   ICoroutineExitStatus,
   ICoroutineHandle,
   ICoroutineSpec,
   ICoroutineSupervisor,
   ICoroutineSupervisorOptions
-} from './types.js'
+} from './types.ts'
 
 /**
  * Supervises a task that runs on the current event loop and stops when its `signal` aborts.

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { createLifecycleScope } from '../src/lifecycle-scope'
-import { createSyncLifecycleScope } from '../src/sync-lifecycle-scope'
-import { LifecycleErrorCode } from '../src/error-code'
+import { createLifecycleScope } from '../src/lifecycle-scope.ts'
+import { createSyncLifecycleScope } from '../src/sync-lifecycle-scope.ts'
+import { LifecycleErrorCode } from '../src/error-code.ts'
 
 /**
  * "异步父可收纳同步子错误；同步父拒绝异步子 scope"。

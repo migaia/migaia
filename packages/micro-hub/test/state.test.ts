@@ -6,8 +6,8 @@ import {
   keyed,
   type IMicroHub,
   type IStatePatch
-} from '../src/index.js'
-import { state } from '../src/state/index.js'
+} from '../src/index.ts'
+import { state } from '../src/state/index.ts'
 
 /** Singleton created by the current case, always disposed before another case starts. */
 let hub: IMicroHub | undefined
