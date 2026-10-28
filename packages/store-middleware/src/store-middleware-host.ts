@@ -1,4 +1,4 @@
-import { identifyMiddlewareFailure } from './error-boundary.js'
+import { identifyMiddlewareFailure } from './error-boundary.ts'
 import { MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
 import {
   defineHost,
@@ -13,18 +13,18 @@ import {
   type IRuntimeErrorContext
 } from '@migaia/reactive'
 import type { IReactiveStore } from '@migaia/store-light'
-import { createStoreMiddlewareAggregateError, createStoreMiddlewareError } from './errors.js'
-import { StoreMiddlewareErrorCode } from './error-code.js'
-import { StoreMiddlewareErrorText } from './error-text.js'
+import { createStoreMiddlewareAggregateError, createStoreMiddlewareError } from './errors.ts'
+import { StoreMiddlewareErrorCode } from './error-code.ts'
+import { StoreMiddlewareErrorText } from './error-text.ts'
 import {
   createMutationPolicy,
   type IDevToolsAdapter,
   type IMiddlewareEvent,
   type MutationPolicy
-} from './middleware.js'
+} from './middleware.ts'
 import type { IPluginHostDisposalResult } from '@migaia/plugin-host'
-import { ClonePolicy } from './tolerant-clone.js'
-import { MiddlewareEventPhase, MiddlewareEventType } from './event-constants.js'
+import { ClonePolicy } from './tolerant-clone.ts'
+import { MiddlewareEventPhase, MiddlewareEventType } from './event-constants.ts'
 import { snapshotOwnDescriptors } from '@migaia/utils/object'
 
 /** Routes middleware diagnostics to the Runtime reporter, which already contains reporter failures. */

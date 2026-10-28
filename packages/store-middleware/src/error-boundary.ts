@@ -3,9 +3,9 @@ import {
   createStoreMiddlewareError,
   createStoreMiddlewareAggregateError,
   STORE_MIDDLEWARE_SOURCE
-} from './errors.js'
-import { StoreMiddlewareErrorCode, type IStoreMiddlewareErrorCode } from './error-code.js'
-import { StoreMiddlewareErrorText } from './error-text.js'
+} from './errors.ts'
+import { StoreMiddlewareErrorCode, type IStoreMiddlewareErrorCode } from './error-code.ts'
+import { StoreMiddlewareErrorText } from './error-text.ts'
 
 /**
  * Gives this domain boundary an identity while preserving native errors and existing package

@@ -1,5 +1,5 @@
-export * from './middleware.js'
-export { ReduxDevToolsCommand, type IReduxDevToolsCommand } from './devtools-constants.js'
+export * from './middleware.ts'
+export { ReduxDevToolsCommand, type IReduxDevToolsCommand } from './devtools-constants.ts'
 export {
   MiddlewareEventType,
   MiddlewareEventPhase,
@@ -7,7 +7,7 @@ export {
   type IMiddlewareEventType,
   type IMiddlewareCommandType,
   type IMiddlewareEventPhase
-} from './event-constants.js'
-export * from './store-middleware-host.js'
+} from './event-constants.ts'
+export * from './store-middleware-host.ts'
 
-export * from './errors.js'
+export * from './errors.ts'

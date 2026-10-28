@@ -9,8 +9,8 @@ import {
   type IDevToolsCommand,
   type IMiddlewareEvent,
   type IStoreMiddlewarePlugin
-} from '../src/index'
-import { ClonePolicy } from '../src/tolerant-clone'
+} from '../src/index.ts'
+import { ClonePolicy } from '../src/tolerant-clone.ts'
 
 /** Covers the direct consumer after migration to canonical plugin-host pipeline exports. */
 type IState = { readonly value: number }

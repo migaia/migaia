@@ -3,7 +3,7 @@ import {
   createMutationPolicy,
   createStoreMiddlewareHost,
   type IStoreMiddlewarePlugin
-} from '../src/index'
+} from '../src/index.ts'
 import { createRuntime } from '@migaia/reactive'
 
 /** Explicit unbounded policy used by the Store export smoke test. */
