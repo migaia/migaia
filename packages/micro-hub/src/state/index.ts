@@ -316,37 +316,39 @@ function createStateDriver(hub: IHubRuntime): IStateDriver {
     const commands: Record<string, (...args: unknown[]) => ICommitResult> = {}
     const { contract } = entry
     for (const [name, fn] of Object.entries(contract.commands)) {
-      commands[name] = (...args) => {
-        app.assertConnected()
-        if (entry.owner?.name !== app.name && !contract.writers.includes(app.name)) {
-          throw createMicroHubError(
-            MicroHubErrorCode.writeDenied,
-            MicroHubErrorText.writeDenied(contract.name, app.name)
+      Object.assign(commands, {
+        [name]: (...args: unknown[]) => {
+          app.assertConnected()
+          if (entry.owner?.name !== app.name && !contract.writers.includes(app.name)) {
+            throw createMicroHubError(
+              MicroHubErrorCode.writeDenied,
+              MicroHubErrorText.writeDenied(contract.name, app.name)
+            )
+          }
+          /** Patch computed from current committed state. */
+          const patch = (fn as (state: unknown, ...rest: unknown[]) => unknown)(
+            slot.commandValues,
+            ...args
           )
+          /** Capture then once and observe rejected async results before rejecting this command. */
+          const inspection = inspectThenable(patch)
+          if ('error' in inspection) {
+            throw createMicroHubTypeError(
+              MicroHubErrorCode.commandAsync,
+              MicroHubErrorText.commandAsync(contract.name, name),
+              { cause: inspection.error }
+            )
+          }
+          if (inspection.then !== undefined) {
+            observeThenableRejection(patch, inspection, (error) => hub.report(error))
+            throw createMicroHubTypeError(
+              MicroHubErrorCode.commandAsync,
+              MicroHubErrorText.commandAsync(contract.name, name)
+            )
+          }
+          return Object.freeze({ revision: commit(entry, slot, patch as IStatePatch<any>) })
         }
-        /** Patch computed from current committed state. */
-        const patch = (fn as (state: unknown, ...rest: unknown[]) => unknown)(
-          slot.commandValues,
-          ...args
-        )
-        /** Capture then once and observe rejected async results before rejecting this command. */
-        const inspection = inspectThenable(patch)
-        if ('error' in inspection) {
-          throw createMicroHubTypeError(
-            MicroHubErrorCode.commandAsync,
-            MicroHubErrorText.commandAsync(contract.name, name),
-            { cause: inspection.error }
-          )
-        }
-        if (inspection.then !== undefined) {
-          observeThenableRejection(patch, inspection, (error) => hub.report(error))
-          throw createMicroHubTypeError(
-            MicroHubErrorCode.commandAsync,
-            MicroHubErrorText.commandAsync(contract.name, name)
-          )
-        }
-        return Object.freeze({ revision: commit(entry, slot, patch as IStatePatch<any>) })
-      }
+      })
     }
     return Object.freeze(commands)
   }

@@ -190,27 +190,29 @@ function createEventsDriver(hub: IHubRuntime, options: IEventsOptions): IMicroDr
       /** Request callers per request. */
       const requests: Record<string, unknown> = {}
       for (const name of Object.keys(entry.contract.requests)) {
-        requests[name] = async (input: unknown, options: IRequestOptions = {}) => {
-          app.assertConnected()
-          if (!slot.handled.has(name)) {
-            if (options.waitForOwner === undefined) {
-              throw createMicroHubError(
-                MicroHubErrorCode.ownerAbsent,
-                MicroHubErrorText.ownerAbsent(entry.contract.name, name)
-              )
-            }
-            await waitForHandler(slot, entry, app, name, options.waitForOwner)
-            // Registration resumes us in a microtask; either app may leave before that runs.
+        Object.assign(requests, {
+          [name]: async (input: unknown, options: IRequestOptions = {}) => {
             app.assertConnected()
             if (!slot.handled.has(name)) {
-              throw createMicroHubError(
-                MicroHubErrorCode.ownerAbsent,
-                MicroHubErrorText.ownerAbsent(entry.contract.name, name)
-              )
+              if (options.waitForOwner === undefined) {
+                throw createMicroHubError(
+                  MicroHubErrorCode.ownerAbsent,
+                  MicroHubErrorText.ownerAbsent(entry.contract.name, name)
+                )
+              }
+              await waitForHandler(slot, entry, app, name, options.waitForOwner)
+              // Registration resumes us in a microtask; either app may leave before that runs.
+              app.assertConnected()
+              if (!slot.handled.has(name)) {
+                throw createMicroHubError(
+                  MicroHubErrorCode.ownerAbsent,
+                  MicroHubErrorText.ownerAbsent(entry.contract.name, name)
+                )
+              }
             }
+            return dispatch(slot, name, input)
           }
-          return dispatch(slot, name, input)
-        }
+        })
       }
       return { events: Object.freeze(events), requests: Object.freeze(requests) }
     },
