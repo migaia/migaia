@@ -186,7 +186,7 @@ export class CollectorWatcher {
     this.#filter.after = this.#readSequence()
     this.#active.push(this)
     /** Stream cancellation wakes the existing pending read; it creates no second lifetime owner. */
-    this.#abortListener = (): void => this.close()
+    this.#abortListener = { listener: (): void => this.close() }.listener
     this.#signal?.addEventListener('abort', this.#abortListener, { once: true })
     if (this.#signal?.aborted) this.close()
     try {
