@@ -65,9 +65,9 @@ export const LogLevel = {
   debug: 'debug',
   info: 'info',
   error: 'error'
-} as const;
+} as const
 
-export type LogLevel = keyof typeof LogLevel;
+export type LogLevel = keyof typeof LogLevel
 ```
 
 - New and modified code must follow these rules. Pre-existing violations are migration debt: fix them when their owning API is intentionally changed, but do not perform unrelated mass renames inside a scoped task.
@@ -111,6 +111,7 @@ export type LogLevel = keyof typeof LogLevel;
   - deliberately private module-level state.
 
   A closure never forms the backbone of a component.
+
 - **Closure shape limits.**
   - **One callback level.** A callback's body must not contain another callback or function expression.
   - **No local function declarations.** A function or method body must not declare a named function, with `function` or as a `const`/`let` arrow. Move the helper to module level or make it a method, and pass the state it needs as parameters.
@@ -118,10 +119,10 @@ export type LogLevel = keyof typeof LogLevel;
   - **Control flow without nested functions.** Retry and fallback logic is an explicit loop or a named state machine.
   - **No function literal assigned straight to a property on short-lived objects.** V8 allocates a function literal that is the direct right-hand side of an assignment (`obj.f = () => ...`, `this.#f = function () {}`, `obj[key] = () => ...`) directly in old space, on the guess that it is a long-lived method. On a type that is created and disposed often (per request, call, stream, frame, lease or Resource), that old closure keeps its captured context, and the young instance behind it, alive through every minor GC. The instance is promoted and freed only by a major GC.
     - Prefer a method on the owner, or a module-level function that receives the context.
-    - When a per-instance closure is required, create it where V8 allocates it young: bind it to a local `const` and then store it, or create it in an object literal, a call argument or a class field initializer.
-    - Measured case: `this.#context.startRequest = () => this.#startRequest()` made every disposed `Resource` promote. Reactive weak tables keyed by the promoted nodes grew 4×, so each instance left 258 bytes after a forced GC instead of 67, and create-dispose became 12% slower. The same closure written as `() => 0`, or stored on the instance, cost the same. Binding it to a local `const` first restored 67 bytes and the original minor-GC count.
+    - When a per-instance closure is required, create it where V8 allocates it young: in an object literal, a call argument or a class field initializer. Named local arrows are not available because the local-function rule forbids them.
+    - Measured case: `this.#context.startRequest = () => this.#startRequest()` made every disposed `Resource` promote. Reactive weak tables keyed by the promoted nodes grew 4×, so each instance left 258 bytes after a forced GC instead of 67, and create-dispose became 12% slower. The same closure written as `() => 0`, or stored on the instance, cost the same. Moving only the allocation form restored 67 bytes and the original minor-GC count.
     - The cost depends on what the old closure keeps young. On the rpc call path and the storage op path, removing such closures left the heap kept after a forced GC unchanged (21 and 3 bytes per op) and cut minor GCs by at most 6%.
-    - Check a suspected site directly with `%InYoungGeneration(fn)` under `node --allow-natives-syntax`, or by the old-space growth per instance after one minor GC. Settle the cost with an A/B against an A/A baseline before changing existing per-message or per-frame code, after excluding fixture artifacts such as a carrier that records every frame.
+    - Rewrite confirmed sites directly using the forms above. The allocation behavior is established; no per-site A/B or performance measurement is required.
     - Long-lived objects (hosts, registries, runtimes) are not affected.
 
 - **Shared behaviour abstracted once.** When several packages or backends need the same logic, move it to its correct owner, such as an authoring subpath or a shared base type, instead of repeating it.
@@ -196,9 +197,9 @@ export const FooErrorCode = {
    * instead of reviving this one. Enforces the two-phase contract.
    */
   scopeClosed: 'SCOPE_CLOSED'
-} as const;
+} as const
 
-export type IFooErrorCode = (typeof FooErrorCode)[keyof typeof FooErrorCode];
+export type IFooErrorCode = (typeof FooErrorCode)[keyof typeof FooErrorCode]
 ```
 
 - Packages whose code table is not finalized yet still obey the structural and traceability rules above: register the code in `docs/contracts/error-codes.md` and declare it in `src/error-code.ts` first, then use it.
