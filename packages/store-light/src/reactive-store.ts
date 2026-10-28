@@ -14,7 +14,7 @@ import {
   type IAsyncFieldBuilder,
   type IMutationPolicy,
   type IRaw
-} from './store-protocol.js'
+} from './store-protocol.ts'
 import {
   getDefaultRuntime,
   ReactiveErrorPhase,
@@ -36,11 +36,11 @@ import {
   createStoreLightError,
   createStoreLightTypeError,
   StoreLightErrorCode
-} from './errors.js'
-import { StoreLightErrorText } from './error-text.js'
+} from './errors.ts'
+import { StoreLightErrorText } from './error-text.ts'
 import { attachSecondaryErrors } from '@migaia/utils/error'
 import { snapshotOwnDescriptors } from '@migaia/utils/object'
-import { identifyStoreLightFailure } from './error-boundary.js'
+import { identifyStoreLightFailure } from './error-boundary.ts'
 
 /**
  * Re-throws the construction primary with the cleanup failure appended to its non-enumerable
@@ -76,9 +76,9 @@ function assertStoreInput(value: unknown, name: string, expected: string): void 
       StoreLightErrorText.inputType(name, expected)
     )
 }
-import { StoreFieldMode } from './field-mode-constants.js'
-import { StoreInitializationStatus } from './resource-state-constants.js'
-export { createStoreResource, createStoreResourceScope } from './store-resource.js'
+import { StoreFieldMode } from './field-mode-constants.ts'
+import { StoreInitializationStatus } from './resource-state-constants.ts'
+export { createStoreResource, createStoreResourceScope } from './store-resource.ts'
 export type {
   IStoreResource,
   IResourceCapture,
@@ -88,7 +88,7 @@ export type {
   IStoreResourceConfig,
   IStoreResourceLoadContext,
   IStoreResourceOptions
-} from './store-resource.js'
+} from './store-resource.ts'
 
 // 甜 API：一个普通对象字面量进来，自动拆成响应式图——
 //   普通值      → Signal（可读可写，读时自动订阅）

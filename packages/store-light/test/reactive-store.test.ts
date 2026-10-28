@@ -1,4 +1,4 @@
-import { StoreLightErrorCode } from '../src/error-code.js'
+import { StoreLightErrorCode } from '../src/error-code.ts'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { describe, expect, it, vi } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
@@ -13,7 +13,7 @@ import {
   FIELD_BUILDER,
   type IFieldBuilder,
   type IFieldContext
-} from '../src'
+} from '../src/index.ts'
 
 // Minimal sync IFieldBuilder used to exercise the IFieldBuilder protocol without
 // pulling in a real implementation package (store-wasm). Mirrors the USEGUIDE

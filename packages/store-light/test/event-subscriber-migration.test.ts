@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createStoreResource } from '../src/store-resource.js'
+import { createStoreResource } from '../src/store-resource.ts'
 
 describe('event-subscriber listener migration', () => {
   it('preserves Set dedupe, snapshot dispatch, and idempotent unsubscribe', async () => {

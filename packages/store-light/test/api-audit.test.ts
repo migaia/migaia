@@ -8,7 +8,7 @@ import {
   StoreFieldMode,
   isRaw,
   isFieldBuilder
-} from '../src/index.js'
+} from '../src/index.ts'
 
 describe('store-light audit regressions', () => {
   it.each(['sync', 'async'] as const)(

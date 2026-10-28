@@ -1,7 +1,7 @@
 import { attachSecondaryErrors } from '@migaia/utils/error'
 import { systemScheduler, type IScheduler, type IScheduledTask } from '@migaia/utils/scheduler'
-import { createStoreLightError, StoreLightErrorCode } from './errors.js'
-import { StoreLightErrorText } from './error-text.js'
+import { createStoreLightError, StoreLightErrorCode } from './errors.ts'
+import { StoreLightErrorText } from './error-text.ts'
 
 const CAPTURES = Symbol('store-resource-captures')
 

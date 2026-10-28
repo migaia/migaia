@@ -2,9 +2,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
 import { createManualScheduler } from '@migaia/utils/testing'
-import { ResourceOwnershipRegistry } from '../src/store-resource-ownership.js'
-import { ResourceCachePolicy } from '../src/store-resource-cache-policy.js'
-import { createStoreResource, createStoreResourceScope } from '../src/store-resource.js'
+import { ResourceOwnershipRegistry } from '../src/store-resource-ownership.ts'
+import { ResourceCachePolicy } from '../src/store-resource-cache-policy.ts'
+import { createStoreResource, createStoreResourceScope } from '../src/store-resource.ts'
 
 describe('ResourceOwnershipRegistry', () => {
   it('rejects invalid factory and options shapes before creating resource state', () => {

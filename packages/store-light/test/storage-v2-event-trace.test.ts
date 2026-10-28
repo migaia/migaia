@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { createStoreResource } from '../src/store-resource.js'
+import { createStoreResource } from '../src/store-resource.ts'
 
 /** Creates one externally settled load used to force exact notification timing. */
 const deferred = <T>(): { readonly promise: Promise<T>; readonly resolve: (value: T) => void } => {

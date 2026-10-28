@@ -2,8 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
 import { claimOwnership } from '@migaia/reactive/extension'
 import type { IDisposable } from '@migaia/reactive'
-import { createStore, createAsyncStore, FIELD_BUILDER, type IFieldBuilder } from '../src'
-import { createStoreLightRangeError, StoreLightErrorCode, STORE_LIGHT_SOURCE } from '../src/errors'
+import { createStore, createAsyncStore, FIELD_BUILDER, type IFieldBuilder } from '../src/index.ts'
+import {
+  createStoreLightRangeError,
+  StoreLightErrorCode,
+  STORE_LIGHT_SOURCE
+} from '../src/errors.ts'
 
 describe('store-light error-code contract', () => {
   it('declares 14 unique codes under the package source', () => {

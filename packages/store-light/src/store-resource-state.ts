@@ -1,5 +1,5 @@
-import type { IVersionToken } from './store-resource-ownership.js'
-import { StoreResourceKind } from './resource-state-constants.js'
+import type { IVersionToken } from './store-resource-ownership.ts'
+import { StoreResourceKind } from './resource-state-constants.ts'
 
 export type IResourceVersion<T> = {
   readonly id: number
