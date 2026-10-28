@@ -353,13 +353,16 @@ export function combineErrors(errors: Iterable<unknown>, message: string): Error
   return new AggregateError(collected, message)
 }
 
+/** Registered codes are a compile-time table; build its membership index once for public guards. */
+const utilsErrorCodes: ReadonlySet<unknown> = new Set(Object.values(UtilsErrorCode))
+
 /** Recognizes diagnostic error shapes only when both utils identity fields are valid. */
 export function isUtilsError(value: unknown): value is UtilsError {
   if (!isErrorLike(value)) return false
   try {
     /** Code admission must prove the union promised by this type guard. */
     const code = (value as { code?: unknown }).code
-    return (value as { source?: unknown }).source === ERROR_SOURCE && Object.values(UtilsErrorCode).some((registered) => registered === code)
+    return (value as { source?: unknown }).source === ERROR_SOURCE && utilsErrorCodes.has(code)
   } catch {
     return false
   }
