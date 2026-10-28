@@ -66,17 +66,14 @@ describe('guarded property read convergence', () => {
       'packages/utils/src/internal/error-chain-data.ts',
       'packages/reactive/src/runtime/runtime-options.ts',
       'packages/reactive/src/runtime/scheduler.class.ts',
-      'packages/resource/src/resource.class.ts'
+      'packages/resource/src/resource-options.ts',
+      'packages/resource/src/resource-failure.ts'
     ]
     for (const path of targets) {
       const source = readFileSync(resolve(repositoryRoot, path), 'utf8')
-      // Abort admission and the explicitly optimized then inspection own these single reads.
+      // The explicitly optimized then inspection owns this single read.
       const excludedRead =
-        path === 'packages/resource/src/resource.class.ts'
-          ? 'signal.aborted'
-          : path === 'packages/utils/src/function.ts'
-            ? '(value as { then?: unknown }).then'
-            : undefined
+        path === 'packages/utils/src/function.ts' ? '(value as { then?: unknown }).then' : undefined
       expect(hasSingleReadTry(source, excludedRead), path).toBe(false)
       if (path.endsWith('scheduler.class.ts')) {
         expect(source).toContain('probeThenable(')
@@ -86,6 +83,10 @@ describe('guarded property read convergence', () => {
       if (path.startsWith('packages/rpc-')) expect(source).toContain("from '@migaia/utils/error'")
       if (path === 'packages/utils/src/function.ts') expect(source).toContain("from './error.ts'")
     }
+
+    // Resource spans several modules; only abort admission keeps its own `signal.aborted` read.
+    for (const path of sourceFiles(resolve(repositoryRoot, 'packages/resource/src')))
+      expect(hasSingleReadTry(readFileSync(path, 'utf8'), 'signal.aborted'), path).toBe(false)
 
     const declarations = readdirSync(resolve(repositoryRoot, 'packages'), {
       withFileTypes: true
