@@ -7,15 +7,15 @@ import { RpcCarrierFrameKind as K } from '@migaia/rpc-contract/protocol'
 import { deferred, type IAbortSignal } from '@migaia/utils/promise'
 import { inspectThenable, assimilateCapturedThen } from '@migaia/utils/function'
 import { attachSecondaryErrors } from '@migaia/utils/error'
-import { createRpcAbortError } from '../../host/error-owner.js'
+import { createRpcAbortError } from '../../host/error-owner.ts'
 import {
   RpcBatchExtension,
   RpcBatchAdmissionChanged,
   RPC_BATCH_FIXED_BYTES,
   RPC_BATCH_MAX_BYTES,
   RPC_BATCH_STRING_BYTE_BOUND
-} from './constants.js'
-import type { IRpcBatchInput, IRpcBatchEntry } from './types.js'
+} from './constants.ts'
+import type { IRpcBatchInput, IRpcBatchEntry } from './types.ts'
 
 /** Reuse the original busy-writer Set queue with independent logical member settlements. */
 export class RpcBatchLane {

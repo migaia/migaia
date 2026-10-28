@@ -20,7 +20,7 @@ import { it, vi } from 'vitest'
 import { CallTable } from '../../dist/call/table.js'
 import { ProviderAdmissionRegistry } from '../../dist/features/limits/provider-admission.js'
 import { SessionTable } from '../../dist/session/table.js'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 // The original 16MiB result and 500ms deadline remain exact.
 /** Both capture and final encoding failures must seal the same genuine completed group exactly once. */

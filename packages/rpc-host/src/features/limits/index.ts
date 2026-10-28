@@ -3,13 +3,13 @@
  * installation creates the actual lease/governor owner; Host dispatch and Session lifecycles supply
  * facts without executing this optional policy in their own owners.
  */
-import { defineBuiltinFlowFeature } from '../../sdk/flow-feature.js'
-import type { IRpcFlowFeature } from '../../sdk/types.js'
-import { RpcLimitsFlow } from './flow.js'
-import { RpcLimitsPluginName } from './constants.js'
-import type { IRpcLimitsOptions } from './types.js'
+import { defineBuiltinFlowFeature } from '../../sdk/flow-feature.ts'
+import type { IRpcFlowFeature } from '../../sdk/types.ts'
+import { RpcLimitsFlow } from './flow.ts'
+import { RpcLimitsPluginName } from './constants.ts'
+import type { IRpcLimitsOptions } from './types.ts'
 
-export type { IRpcLimitsOptions, IRpcLimitsOverflow, IRpcProviderRejection } from './types.js'
+export type { IRpcLimitsOptions, IRpcLimitsOverflow, IRpcProviderRejection } from './types.ts'
 
 /** Install one real host-local quota owner; absent installation creates no optional policy state. */
 export function limits(options: IRpcLimitsOptions = {}): IRpcFlowFeature {

@@ -3,7 +3,7 @@ import { deferred } from '@migaia/utils/promise'
 import { createRpcHost } from '@migaia/rpc-host'
 import { defineFlowFeature } from '@migaia/rpc-host/sdk'
 import type { IRpcWriteAdmission } from '@migaia/rpc-contract/interfaces'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 describe('native Session frame pipelines', () => {
   it('joins every unawaited native next branch before releasing one logical write admission', async () => {

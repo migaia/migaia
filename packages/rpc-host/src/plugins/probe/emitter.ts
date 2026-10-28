@@ -8,30 +8,30 @@ import {
   RpcProbeAuthentication,
   type IRpcObservation
 } from '@migaia/rpc-contract/interfaces'
-import { createRpcError } from '../../host/error-owner.js'
+import { createRpcError } from '../../host/error-owner.ts'
 import { tagRpcError, RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 import { inspectThenable, observeThenableRejection } from '@migaia/utils/function'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcCarrierFrameKind } from '@migaia/rpc-contract/protocol'
-import { defaultRpcReporter, reportDiagnostic } from '../../host/report.js'
+import { defaultRpcReporter, reportDiagnostic } from '../../host/report.ts'
 import {
   RpcProbeDirection,
   RpcProbeOutcome,
   RpcProbeStage,
   RpcProbeStageName
-} from './constants.js'
-import { readProbeState, subscribeProbeStages, type IRpcProbeState } from './internal.js'
-import { rpcProbeSampleKey } from './sample.js'
+} from './constants.ts'
+import { readProbeState, subscribeProbeStages, type IRpcProbeState } from './internal.ts'
+import { rpcProbeSampleKey } from './sample.ts'
 import type {
   IRpcProbe,
   IRpcProbeDescriptor,
   IRpcProbeEventView,
   IRpcProbeObservation
-} from './types.js'
-import { ProbeText } from './text.js'
-import { captureTransferredContent } from '../../sdk/wire/probe-content.js'
-import { RpcChunkExtension } from '../../features/chunk/constants.js'
-import { RpcBatchExtension } from '../../features/batch/constants.js'
+} from './types.ts'
+import { ProbeText } from './text.ts'
+import { captureTransferredContent } from '../../sdk/wire/probe-content.ts'
+import { RpcChunkExtension } from '../../features/chunk/constants.ts'
+import { RpcBatchExtension } from '../../features/batch/constants.ts'
 
 /** Project only shallow physical extension headers; codec and Feature owners retain admission. */
 function physicalFrameFacts(input: IRpcProbeObservation): IRpcProbeObservation {

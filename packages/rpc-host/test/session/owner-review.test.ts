@@ -15,8 +15,8 @@ import type {
 } from '@migaia/rpc-contract/interfaces'
 import { deserializeRpcWireError, RpcWireHandshakeStep } from '@migaia/rpc-contract/protocol'
 import { assert, expect, it, vi } from 'vitest'
-import { connectedCoreHosts, coreMemoryServer } from '../host/core-fixture.js'
-import { MemoryCarrier } from '../fixtures/core-carrier.js'
+import { connectedCoreHosts, coreMemoryServer } from '../host/core-fixture.ts'
+import { MemoryCarrier } from '../fixtures/core-carrier.ts'
 
 /** A real accept hook lends its actual connection signal and can hold only its own continuation. */
 class ClosingAcceptGate {

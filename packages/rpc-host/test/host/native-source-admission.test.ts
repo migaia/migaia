@@ -9,7 +9,7 @@ import {
 } from '@migaia/rpc-host/sdk'
 import { RpcWireKind } from '@migaia/rpc-contract/protocol'
 import { expect, it, vi } from 'vitest'
-import { MemoryCarrier } from '../fixtures/core-carrier.js'
+import { MemoryCarrier } from '../fixtures/core-carrier.ts'
 
 /** The functional native Host lends its real owner only after cold declarations are constructed. */
 function nativeSourceHost() {

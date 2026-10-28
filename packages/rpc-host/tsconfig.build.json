@@ -4,6 +4,8 @@
   // input only: tsc never emits `.d.ts` inputs, so they never ship to consumers.
   // Run via `pnpm --filter ./packages/rpc run build`.
   "compilerOptions": {
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
     "target": "es2023",
     "lib": ["ES2023", "ESNext.Disposable"],
     "module": "esnext",

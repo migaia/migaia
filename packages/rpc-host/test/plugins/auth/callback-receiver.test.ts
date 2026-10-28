@@ -2,7 +2,7 @@
 import { expect, it } from 'vitest'
 import { createRpcHost } from '@migaia/rpc-host'
 import { auth } from '@migaia/rpc-host/plugins'
-import { coreMemoryServer } from '../../host/core-fixture.js'
+import { coreMemoryServer } from '../../host/core-fixture.ts'
 
 it('calls verifyCredentials without a receiver through a public connection', async () => {
   /** A normal function exposes the receiver chosen by the production call site. */

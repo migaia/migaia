@@ -7,7 +7,7 @@ import { linkPolicy } from '@migaia/rpc-host/plugins/link-policy'
 import { retry } from '@migaia/rpc-host/features/retry'
 import { timeout } from '@migaia/rpc-host/features/timeout'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 /** The original provider timer resolves the same value after exactly its original 30 ms delay. */
 function resolveWait(resolve: (value: string) => void): void {

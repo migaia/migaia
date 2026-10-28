@@ -17,8 +17,8 @@ import type {
 } from '@migaia/rpc-contract/interfaces'
 import { deferred } from '@migaia/utils/promise'
 import { expect, it, vi } from 'vitest'
-import { coreMemoryServer } from './core-fixture.js'
-import { MemoryCarrier } from '../fixtures/core-carrier.js'
+import { coreMemoryServer } from './core-fixture.ts'
+import { MemoryCarrier } from '../fixtures/core-carrier.ts'
 import { probe, type IRpcProbeEventView } from '@migaia/rpc-host/plugins/probe'
 import { RpcProbeLifecycle } from '@migaia/rpc-contract/interfaces'
 

@@ -13,8 +13,8 @@ import type {
   IRpcTransportContext
 } from '@migaia/rpc-contract/interfaces'
 import type { IRpcEnvelopeCommon } from '@migaia/rpc-contract/protocol'
-import { MemoryCarrier } from '../../fixtures/core-carrier.js'
-import { coreMemoryServer } from '../../host/core-fixture.js'
+import { MemoryCarrier } from '../../fixtures/core-carrier.ts'
+import { coreMemoryServer } from '../../host/core-fixture.ts'
 import { createNodeThreadCarrier } from '../../../../rpc-plugin-thread/dist/threads/channel.js'
 import { FlowRegistry } from '../../../dist/flow/registry.js'
 import { setAuthenticationReplayCounter } from '../../../dist/features/auth/counter.js'

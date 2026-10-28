@@ -9,11 +9,11 @@ import { deferTask, type IScheduledTask, type IScheduler } from '@migaia/utils/s
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 import { RpcSessionRetirement } from '@migaia/rpc-contract/interfaces'
-import { createRpcError, createRpcLifecycleError } from '../../host/error-owner.js'
-import { registerLocalErrorWireSummary } from '../../host/error-wire-metadata.js'
-import { portableBytes } from '../../sdk/wire/portable-size.js'
-import { RpcLimitsIdleTimeoutText, RpcLimitsRateWindowMs } from './constants.js'
-import type { IRpcLimitsOptions } from './types.js'
+import { createRpcError, createRpcLifecycleError } from '../../host/error-owner.ts'
+import { registerLocalErrorWireSummary } from '../../host/error-wire-metadata.ts'
+import { portableBytes } from '../../sdk/wire/portable-size.ts'
+import { RpcLimitsIdleTimeoutText, RpcLimitsRateWindowMs } from './constants.ts'
+import type { IRpcLimitsOptions } from './types.ts'
 
 /** One actual connection lends only lifecycle, reporting and the existing scheduler. */
 export type ILimitsGovernorPorts = Readonly<{

@@ -70,26 +70,26 @@ import {
   createRpcTimeoutError,
   createRpcTransportError,
   isLocalRpcError
-} from '../host/error-owner.js'
+} from '../host/error-owner.ts'
 import {
   hostErrorWireMetadata,
   serializeHostHandshakeError,
   serializeHostWireError
-} from '../host/error-wire-metadata.js'
-import { SessionText } from './text.js'
+} from '../host/error-wire-metadata.ts'
+import { SessionText } from './text.ts'
 import {
   createDirectorySnapshot,
   projectDirectory,
   sameDirectoryFingerprint,
   type IRpcDirectoryFingerprint
-} from './view.js'
-import { RpcSessionObservation } from '../sdk/carrier/observation.js'
-import { portableBytes } from '../sdk/wire/portable-size.js'
+} from './view.ts'
+import { RpcSessionObservation } from '../sdk/carrier/observation.ts'
+import { portableBytes } from '../sdk/wire/portable-size.ts'
 import { rpcPortableBackingLength } from '@migaia/rpc-contract/portable'
-import { isRpcCarrierAdmissionFailure } from '../sdk/carrier/admission.js'
-import { RpcFlowPoint } from '../sdk/flow-pipelines.js'
-import type { IRpcSessionOptions, IRpcSessionWriteOptions } from './types.js'
-import { bindSessionCredentials, type ISessionCredentials } from './credentials.js'
+import { isRpcCarrierAdmissionFailure } from '../sdk/carrier/admission.ts'
+import { RpcFlowPoint } from '../sdk/flow-pipelines.ts'
+import type { IRpcSessionOptions, IRpcSessionWriteOptions } from './types.ts'
+import { bindSessionCredentials, type ISessionCredentials } from './credentials.ts'
 
 /** A live control record holds settlement only, never a business payload or request facade. */
 type IControlPending = { completion: IDeferred<void>; signal: IAbortSignal }

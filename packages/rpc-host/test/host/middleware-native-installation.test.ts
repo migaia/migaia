@@ -2,7 +2,7 @@
 import { defineHost, definePlugin, type IPluginHostCore } from '@migaia/plugin-host'
 import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { expect, it } from 'vitest'
-import { coreMemoryServer } from './core-fixture.js'
+import { coreMemoryServer } from './core-fixture.ts'
 
 /** A genuine native install hook lends its original core without role descriptors or port facades. */
 function nativeLifecyclePlugin(name: string, install: (core: IPluginHostCore) => void) {

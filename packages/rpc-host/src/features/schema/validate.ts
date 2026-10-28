@@ -3,13 +3,13 @@
  * failures and secondary issue-reading failures in the Host schema error boundary; schema lookup
  * performs no transport IO, provider registration or Session admission.
  */
-import { createRpcSchemaValidationError } from '../../host/error-owner.js'
+import { createRpcSchemaValidationError } from '../../host/error-owner.ts'
 
 import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
-import type { IRpcSchemaOptions } from './types.js'
+import type { IRpcSchemaOptions } from './types.ts'
 import { safeRead } from '@migaia/rpc-contract/errors'
 import { safeString } from '@migaia/rpc-contract/errors'
-import { RpcContractFailureKind } from './text.js'
+import { RpcContractFailureKind } from './text.ts'
 
 /** Validates one contract payload and preserves schema-library issues in the public error. */
 export function validateContractData(

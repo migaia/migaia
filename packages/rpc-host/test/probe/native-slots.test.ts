@@ -3,7 +3,7 @@ import { createRpcHost } from '@migaia/rpc-host'
 import { RpcCarrierObservation } from '@migaia/rpc-host/sdk'
 import { defineProbe, probe } from '@migaia/rpc-host/plugins/probe'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 /** Assertion or acquisition failures must also release this test's passthrough prototype spy. */
 afterEach(() => vi.restoreAllMocks())

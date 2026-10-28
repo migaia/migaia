@@ -2,8 +2,8 @@
 import { defineHost, definePlugin } from '@migaia/plugin-host'
 import { defineTransportPlugin, rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { assert, expect, it, vi } from 'vitest'
-import { coreMemoryServer } from './core-fixture.js'
-import { MemoryCarrier } from '../fixtures/core-carrier.js'
+import { coreMemoryServer } from './core-fixture.ts'
+import { MemoryCarrier } from '../fixtures/core-carrier.ts'
 
 /** Real accepted client ownership is borrowed from the existing native memory fixture. */
 type IConnectedClient = Awaited<ReturnType<ReturnType<typeof coreMemoryServer>['connect']>>

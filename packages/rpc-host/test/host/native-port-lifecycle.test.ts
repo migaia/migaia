@@ -9,8 +9,8 @@ import type { IRpcTransportDefinition } from '@migaia/rpc-contract/interfaces'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { assert, expect, it, vi, type MockInstance as IMockInstance } from 'vitest'
 import { readRpcDefinition } from '../../dist/sdk/metadata.js'
-import { coreMemoryServer } from './core-fixture.js'
-import { MemoryCarrier } from '../fixtures/core-carrier.js'
+import { coreMemoryServer } from './core-fixture.ts'
+import { MemoryCarrier } from '../fixtures/core-carrier.ts'
 
 /** Ownership describes only this pre-Session raw native resource, never an attached Session. */
 type ISourceInput = Readonly<{

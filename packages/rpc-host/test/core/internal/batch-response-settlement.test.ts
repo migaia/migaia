@@ -16,8 +16,8 @@ import {
 import { RpcWireKind, type IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
 import { RpcHost } from '../../../dist/host/rpc-host.js'
 import { RpcFlowProgram } from '../../../dist/sdk/flow-program.js'
-import { coreMemoryServer } from '../../host/core-fixture.js'
-import { MemoryCarrier } from '../../fixtures/core-carrier.js'
+import { coreMemoryServer } from '../../host/core-fixture.ts'
+import { MemoryCarrier } from '../../fixtures/core-carrier.ts'
 
 /** Only this case retains a real caller Root for fixed private-table observation. */
 const inspectorRoot = '__rpcBatchResponseCaller'

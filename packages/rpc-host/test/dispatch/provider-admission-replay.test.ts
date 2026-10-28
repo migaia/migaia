@@ -7,8 +7,8 @@ import { deserializeRpcWireError, type IRpcSemanticFrame } from '@migaia/rpc-con
 import type { IRpcProviderRejection } from '@migaia/rpc-contract/errors'
 import { deferred } from '@migaia/utils/promise'
 import { assert, expect, it, vi } from 'vitest'
-import { MemoryCarrier } from '../fixtures/core-carrier.js'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { MemoryCarrier } from '../fixtures/core-carrier.ts'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 /** The real handshake verifier recognizes only this fixture's portable credential. */
 const replayCredential = 'provider-replay-fixture-credential'

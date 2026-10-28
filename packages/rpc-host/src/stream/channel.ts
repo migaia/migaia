@@ -14,20 +14,20 @@ import { RpcCoreErrorCode, RpcContractErrorCode } from '@migaia/rpc-contract/err
 import { RpcAbortError, RpcCoreErrorText, createContractError } from '@migaia/rpc-contract/errors'
 import type { IRpcFlowContext, IRpcTargetSource } from '@migaia/rpc-contract/interfaces'
 import { deferred, type IDeferred, type IAbortSignal } from '@migaia/utils/promise'
-import { createRpcError, createRpcLifecycleError, isLocalRpcError } from '../host/error-owner.js'
-import type { ICallLocalOptions, ICallTargetRef } from '../call/types.js'
-import { StreamConsumer } from './consumer.js'
-import { StreamProducer } from './producer.js'
-import { RpcStreamErrorText } from './error-text.js'
-import { sameTask } from '../call/envelope.js'
+import { createRpcError, createRpcLifecycleError, isLocalRpcError } from '../host/error-owner.ts'
+import type { ICallLocalOptions, ICallTargetRef } from '../call/types.ts'
+import { StreamConsumer } from './consumer.ts'
+import { StreamProducer } from './producer.ts'
+import { RpcStreamErrorText } from './error-text.ts'
+import { sameTask } from '../call/envelope.ts'
 import type {
   IStreamChannelOptions,
   IStreamAdmissionFailure,
   IStreamConsumer,
   IStreamOwner,
   IStreamProducer
-} from './types.js'
-export type { IStreamChannelOptions } from './types.js'
+} from './types.ts'
+export type { IStreamChannelOptions } from './types.ts'
 
 /** One physical source owns only its own stream states; retiring k streams is O(k). */
 export class StreamChannel {

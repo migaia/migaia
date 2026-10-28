@@ -5,7 +5,7 @@ import { createRpcHost } from '@migaia/rpc-host'
 import { auth } from '@migaia/rpc-host/plugins/auth'
 import { createRpcIdempotencyStore, idempotency } from '@migaia/rpc-host/plugins/idempotency'
 import { limits } from '@migaia/rpc-host/plugins/limits'
-import { coreMemoryServer } from '../../host/core-fixture.js'
+import { coreMemoryServer } from '../../host/core-fixture.ts'
 
 /** These public fixture credentials are shared only by the real verifier and actual clients. */
 const principals = { alice: 'principal-alice', bob: 'principal-bob' }

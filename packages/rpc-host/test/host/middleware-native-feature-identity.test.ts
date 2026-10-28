@@ -2,7 +2,7 @@
 import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'
 import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { expect, it } from 'vitest'
-import { coreMemoryServer } from './core-fixture.js'
+import { coreMemoryServer } from './core-fixture.ts'
 
 /** One real native transaction owns both the RPC transport and ordinary Feature resources. */
 function receivingHost() {

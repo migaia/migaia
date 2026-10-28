@@ -2,8 +2,8 @@
 import { defineHost, definePlugin } from '@migaia/plugin-host'
 import { defineTransportPlugin, rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { expect, it, vi } from 'vitest'
-import { coreMemoryServer } from './core-fixture.js'
-import { MemoryCarrier } from '../fixtures/core-carrier.js'
+import { coreMemoryServer } from './core-fixture.ts'
+import { MemoryCarrier } from '../fixtures/core-carrier.ts'
 
 /** The one native Host owns all original registration cleanup and transaction rollback. */
 function receivingHost() {

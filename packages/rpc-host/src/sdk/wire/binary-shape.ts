@@ -18,7 +18,7 @@ import {
   rpcPortableBackingLength,
   rpcPortableViewLength
 } from '@migaia/rpc-contract/portable'
-import { RpcBinaryViolation } from './binary-constants.js'
+import { RpcBinaryViolation } from './binary-constants.ts'
 
 /** Actual binary default allocation ceiling retains the existing sixteen MiB bounded codec domain. */
 export const RPC_BINARY_MAX_BYTES = 16 * 1024 * 1024

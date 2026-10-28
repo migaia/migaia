@@ -9,7 +9,7 @@ import type { IRpcPortableValue } from '@migaia/rpc-contract/protocol'
 import { RpcCoreErrorCode, RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcProtocolError } from '@migaia/rpc-contract/errors'
 import { deferred } from '@migaia/utils/promise'
-import { coreMemoryServer } from '../../host/core-fixture.js'
+import { coreMemoryServer } from '../../host/core-fixture.ts'
 
 /** This public test key uses the unchanged HMAC callback algorithm. */
 const signingKey = 'core-refactor-public-fixture-key'

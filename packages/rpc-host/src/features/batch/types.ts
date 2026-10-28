@@ -5,7 +5,7 @@
  */
 import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IRpcFramePayload, IRpcFrameWriteOptions } from '@migaia/rpc-contract/interfaces'
-import type { IRpcFlowStage } from '../../sdk/flow-pipelines.js'
+import type { IRpcFlowStage } from '../../sdk/flow-pipelines.ts'
 
 /** Required negotiation remains independent from the transport-selected feature placement. */
 export type IRpcBatchOptions = Readonly<{ required?: boolean }>

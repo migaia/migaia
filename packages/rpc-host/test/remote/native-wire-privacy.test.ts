@@ -9,7 +9,7 @@ import { timeout } from '@migaia/rpc-host/features/timeout'
 import { errorMap } from '@migaia/rpc-host/plugins/error-map'
 import { deserializeRpcError } from '@migaia/rpc-contract/errors'
 import { hostErrorWireMetadata, serializeRpcError } from '../../dist/host/error-wire-metadata.js'
-import { connectedCoreHosts } from '../host/core-fixture.js'
+import { connectedCoreHosts } from '../host/core-fixture.ts'
 
 /**
  * The wire snapshot reads hostile getters and retains the native Contract type/code and local

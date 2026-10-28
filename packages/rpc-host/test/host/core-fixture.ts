@@ -10,7 +10,7 @@ import type {
   IRpcConnectionContext,
   IRpcSessionHandle
 } from '@migaia/rpc-contract/interfaces'
-import { MemoryCarrier } from '../fixtures/core-carrier.js'
+import { MemoryCarrier } from '../fixtures/core-carrier.ts'
 
 /** Extra cold plugins are optional and install before the actual connecting transport. */
 type ICoreConnectionOptions = Omit<IRpcHostOptions, 'self' | 'plugins'> &

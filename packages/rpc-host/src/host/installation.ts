@@ -5,22 +5,22 @@ import {
   type IHostHandle,
   type IPluginHostCore
 } from '@migaia/plugin-host'
-import type { IRpcDefinitionMetadata } from '../sdk/metadata.js'
+import type { IRpcDefinitionMetadata } from '../sdk/metadata.ts'
 import {
   rpcHostPipelines,
   rpcPipelineOwner,
   type IRpcNativePipelineCore
-} from '../sdk/flow-pipelines.js'
+} from '../sdk/flow-pipelines.ts'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { tagRpcError } from '@migaia/rpc-contract/errors'
-import { HostErrorText } from './error-text.js'
-import { RpcHost } from './rpc-host.js'
-import { RpcFlowProgram } from '../sdk/flow-program.js'
-import { readRpcDefinition, RpcDefinitionKind } from '../sdk/metadata.js'
-import type { IRpcHostPlugin } from '../sdk/types.js'
-import type { IRpcHost } from './public.js'
-import type { IRpcSelf } from './identity.js'
-import { originalRpcInstallationFailure, rpcConstructionFailure } from './error-owner.js'
+import { HostErrorText } from './error-text.ts'
+import { RpcHost } from './rpc-host.ts'
+import { RpcFlowProgram } from '../sdk/flow-program.ts'
+import { readRpcDefinition, RpcDefinitionKind } from '../sdk/metadata.ts'
+import type { IRpcHostPlugin } from '../sdk/types.ts'
+import type { IRpcHost } from './public.ts'
+import type { IRpcSelf } from './identity.ts'
+import { originalRpcInstallationFailure, rpcConstructionFailure } from './error-owner.ts'
 
 /** Only createRpcHost supplies this private domain field on its actual native installation core. */
 export const rpcInstallationOwner = Symbol('rpc-installation-owner')

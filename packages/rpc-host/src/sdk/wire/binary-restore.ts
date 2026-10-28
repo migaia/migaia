@@ -9,11 +9,11 @@ import {
   type IRpcPortableValue
 } from '@migaia/rpc-contract/protocol'
 import { RPC_PORTABLE_MAX_DEPTH } from '@migaia/rpc-contract/portable'
-import { BinaryShape } from './binary-shape.js'
-import { RpcBinaryProfile, RpcBinaryStorage, RpcBinaryTag as T } from './binary-constants.js'
-import { markRpcPortableBinary, hasRpcPortableBinary } from './portable.js'
-import { projectRpcFrameSlots } from './frame-slots.js'
-import type { IRpcBinaryRestoreOptions } from './binary-types.js'
+import { BinaryShape } from './binary-shape.ts'
+import { RpcBinaryProfile, RpcBinaryStorage, RpcBinaryTag as T } from './binary-constants.ts'
+import { markRpcPortableBinary, hasRpcPortableBinary } from './portable.ts'
+import { projectRpcFrameSlots } from './frame-slots.ts'
+import type { IRpcBinaryRestoreOptions } from './binary-types.ts'
 
 /** Decode the original unpadded byte spelling into the final offset view with no temporary backing. */
 function decodeBytes(value: string, offset: number, shape: BinaryShape): Uint8Array {

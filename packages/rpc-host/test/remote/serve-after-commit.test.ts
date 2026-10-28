@@ -15,7 +15,7 @@ import * as catalog from '../../dist/dispatch/catalog.js'
 import * as exposure from '../../dist/dispatch/exposure.js'
 import type { IProviderCommitGate } from '../../dist/dispatch/types.js'
 import { timeout } from '@migaia/rpc-host/features/timeout'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 /** The existing connection owns the exact public Host rather than a per-session Peer facade. */
 type IConnectedHost = Awaited<ReturnType<ReturnType<typeof coreMemoryServer>['connect']>>['host']

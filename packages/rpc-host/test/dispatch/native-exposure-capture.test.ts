@@ -2,7 +2,7 @@
 import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'
 import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { expect, it } from 'vitest'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 it('captures one native output descriptor inventory for repeated exposure selectors', async () => {
   /** Only cold RPC exposure after native Feature publication is counted. */

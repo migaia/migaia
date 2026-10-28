@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { it, vi } from 'vitest'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import type { IRpcSemanticFrame, IRpcEnvelope } from '@migaia/rpc-contract/protocol'
-import { header } from '../../../rpc-contract/test/fixtures/core-profile.js'
+import { header } from '../../../rpc-contract/test/fixtures/core-profile.ts'
 import { prepareRpcBinary, RpcBinaryStorage } from '../../dist/sdk/wire/binary.js'
 import { utf8ByteLength } from '@migaia/utils/bytes'
 

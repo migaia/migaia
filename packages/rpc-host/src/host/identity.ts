@@ -6,10 +6,10 @@ import type { IRpcDirectory, IRpcGeneration } from '@migaia/rpc-contract/protoco
 import type { IRpcLocalSourceFacts } from '@migaia/rpc-contract/interfaces'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcCoreErrorText, RuntimeApiErrorText } from '@migaia/rpc-contract/errors'
-import { createRpcConfigurationError, createRpcError } from './error-owner.js'
-import { sameGeneration } from '../call/envelope.js'
-import { RpcWarningCode, type IRpcWarning } from './warning.js'
-import { HostWarningText } from './warning-text.js'
+import { createRpcConfigurationError, createRpcError } from './error-owner.ts'
+import { sameGeneration } from '../call/envelope.ts'
+import { RpcWarningCode, type IRpcWarning } from './warning.ts'
+import { HostWarningText } from './warning-text.ts'
 
 /** Public identity is global to the host; a transport never creates a second public self. */
 export type IRpcSelf = Readonly<{ name: string; instanceId: string }>

@@ -13,13 +13,13 @@ import {
 import { createRpcHost } from '@migaia/rpc-host'
 import { defineFlowPlugin } from '@migaia/rpc-host/sdk'
 import type { IRpcCarrier } from '@migaia/rpc-contract/interfaces'
-import { coreMemoryServer } from './core-fixture.js'
+import { coreMemoryServer } from './core-fixture.ts'
 import {
   managedMemoryTransport,
   nativeManagedMemoryUnits,
   openManagedMemoryCarrier,
   silentManagedMemoryCarrier
-} from './managed-memory-fixture.js'
+} from './managed-memory-fixture.ts'
 
 /** Original providers retain their genuine unit's completion gate and ordinal values. */
 function restartProviders(ordinal: number, finished: Promise<void>, entered: () => void) {

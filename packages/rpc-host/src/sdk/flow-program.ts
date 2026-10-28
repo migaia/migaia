@@ -9,17 +9,17 @@ import { inspectFeatures } from '@migaia/plugin-host/composition'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { tagRpcError } from '@migaia/rpc-contract/errors'
-import { HostErrorText } from '../host/error-text.js'
-import { installRpcDefinition } from '../host/installation.js'
-import { RpcFlowSetup } from './flow-setup.js'
-import { RpcBuiltinFeature } from './flow-feature.js'
+import { HostErrorText } from '../host/error-text.ts'
+import { installRpcDefinition } from '../host/installation.ts'
+import { RpcFlowSetup } from './flow-setup.ts'
+import { RpcBuiltinFeature } from './flow-feature.ts'
 import {
   readRpcDefinition,
   registerRpcDefinition,
   RpcDefinitionKind,
   type IRpcFlowEntry,
   type IRpcSharedFlows
-} from './metadata.js'
+} from './metadata.ts'
 import type {
   IRpcFlowDefinition,
   IRpcFlowFeature,
@@ -27,7 +27,7 @@ import type {
   IRpcHostPlugin,
   IRpcFlowPlugin,
   IRpcTransportPlugin
-} from './types.js'
+} from './types.ts'
 
 /** The common native registration owns shared setup independently from transport lifetimes. */
 const flowPluginName = 'rpc-flow-features'

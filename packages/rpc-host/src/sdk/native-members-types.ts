@@ -10,19 +10,19 @@ import type {
   IReplaceOutcome
 } from '@migaia/supervision'
 import type { ISerializeTextFormat } from '@migaia/serialize'
-import type { IRpcMemberCurrent } from './member-types.js'
+import type { IRpcMemberCurrent } from './member-types.ts'
 import type {
   IRpcMemberIdentity,
   IRpcMemberOverview,
   IRpcMemberConnectionDetail,
   IRpcMemberQueryOptions
-} from './native-members-overview.js'
-import type { IRpcMemberEventPublisher } from './native-members-events.js'
+} from './native-members-overview.ts'
+import type { IRpcMemberEventPublisher } from './native-members-events.ts'
 import type {
   RpcMemberSourceKind,
   RpcMemberConnectionDirection,
   RpcNativeMemberKind
-} from './native-members-constants.js'
+} from './native-members-constants.ts'
 
 /** The exact native registration supplies all facts; no request directory or supervisor is copied. */
 export type IRpcNativeMemberRecord = Readonly<{

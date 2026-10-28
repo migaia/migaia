@@ -4,7 +4,7 @@
  */
 import { createStringLeaseRegistry } from '@migaia/lifecycle'
 import type { IRpcAuthenticationRetain } from '@migaia/rpc-contract/interfaces'
-import { RpcAuthenticationReplayPolicy as Policy } from './constants.js'
+import { RpcAuthenticationReplayPolicy as Policy } from './constants.ts'
 
 /** Use the source's signed counter window to decide completed retention. */
 export type IRequestReplaySource = Readonly<{

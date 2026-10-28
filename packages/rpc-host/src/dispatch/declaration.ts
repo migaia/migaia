@@ -7,8 +7,8 @@ import {
   type IRpcShapeCheck
 } from '@migaia/rpc-contract/protocol'
 import { RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
-import { createRemoteLayerError } from '../host/remote-error-owner.js'
-import { hostErrorWireMetadata } from '../host/error-wire-metadata.js'
+import { createRemoteLayerError } from '../host/remote-error-owner.ts'
+import { hostErrorWireMetadata } from '../host/error-wire-metadata.ts'
 
 /**
  * Original locally constructed contract errors retain identity when another input getter throws

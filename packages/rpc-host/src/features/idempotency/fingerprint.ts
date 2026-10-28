@@ -1,12 +1,12 @@
 /** Capture keyed invocation bodies through the sole SDK binary owner and stringify in own-key order. */
 import type { IRpcEnvelope, IRpcStep } from '@migaia/rpc-contract/protocol'
 import { RpcWireKind } from '@migaia/rpc-contract/protocol'
-import { captureRpcBinary } from '../../sdk/wire/binary-capture.js'
-import { encodeBytes, finishRpcBinaryCapture } from '../../sdk/wire/binary.js'
-import { BinaryShape, RPC_BINARY_MAX_BYTES } from '../../sdk/wire/binary-shape.js'
-import { RpcBinaryStorage } from '../../sdk/wire/binary-constants.js'
-import { createRpcBackingDigest } from '../../sdk/carrier/digest.js'
-import { hostErrorWireMetadata } from '../../host/error-wire-metadata.js'
+import { captureRpcBinary } from '../../sdk/wire/binary-capture.ts'
+import { encodeBytes, finishRpcBinaryCapture } from '../../sdk/wire/binary.ts'
+import { BinaryShape, RPC_BINARY_MAX_BYTES } from '../../sdk/wire/binary-shape.ts'
+import { RpcBinaryStorage } from '../../sdk/wire/binary-constants.ts'
+import { createRpcBackingDigest } from '../../sdk/carrier/digest.ts'
+import { hostErrorWireMetadata } from '../../host/error-wire-metadata.ts'
 
 /** Only actual provider-bearing operations claim keys; lookup has its separate read-only path. */
 export type IIdempotentEnvelope = Extract<IRpcEnvelope, { kind: 'call' | 'group' }>

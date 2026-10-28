@@ -19,9 +19,9 @@ import {
   createRpcError,
   createRpcTimeoutError,
   isLocalRpcError
-} from '../host/error-owner.js'
-import { defaultRpcReporter, reportDiagnostic } from '../host/report.js'
-import { RpcTimeoutFeatureText } from './timeout-text.js'
+} from '../host/error-owner.ts'
+import { defaultRpcReporter, reportDiagnostic } from '../host/report.ts'
+import { RpcTimeoutFeatureText } from './timeout-text.ts'
 
 /** Clock and reporting are explicit policy resources, independent from host call selection. */
 export type ITimeoutFeatureOptions = Readonly<{

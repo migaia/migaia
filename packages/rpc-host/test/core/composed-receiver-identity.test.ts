@@ -1,6 +1,6 @@
 import { createRpcHost } from '@migaia/rpc-host'
 import { describe, expect, it } from 'vitest'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 /** Proves composed provider admission rejects frames not addressed to its receiver identity. */
 describe('composed receiver identity admission', () => {

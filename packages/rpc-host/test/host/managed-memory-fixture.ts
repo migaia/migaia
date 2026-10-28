@@ -16,7 +16,7 @@ import type { IRpcCarrierWriteOptions } from '@migaia/rpc-contract/interfaces'
 import { deferred } from '@migaia/utils/promise'
 import { systemScheduler } from '@migaia/utils/scheduler'
 import type { IUnitHandle, IUnitLauncher, IUnitProfile } from '@migaia/supervision'
-import { coreMemoryServer } from './core-fixture.js'
+import { coreMemoryServer } from './core-fixture.ts'
 
 /** A MessagePort lends its actual native listener/remover and write operations to one SDK carrier. */
 class ManagedMessageIO implements IRpcMessageIO {

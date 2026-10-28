@@ -12,7 +12,7 @@ import {
 } from '@migaia/rpc-contract/interfaces'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { tagRpcError } from '@migaia/rpc-contract/errors'
-import { HostErrorText } from '../host/error-text.js'
+import { HostErrorText } from '../host/error-text.ts'
 
 /** Reject unsupported policy syntax at the boundary without constructing a policy in host. */
 function validateFeature(

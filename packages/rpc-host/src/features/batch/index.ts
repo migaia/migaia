@@ -3,13 +3,13 @@
  * setup provides the cancellation lifetime and negotiated extension declarations; the entry does
  * not allocate semantic task identities or provider groups.
  */
-import { defineBuiltinFlowFeature } from '../../sdk/flow-feature.js'
-import type { IRpcFlowFeature } from '../../sdk/types.js'
-import { RpcBatchFlow } from './flow.js'
-import { RpcBatchPluginName } from './constants.js'
-import type { IRpcBatchOptions } from './types.js'
+import { defineBuiltinFlowFeature } from '../../sdk/flow-feature.ts'
+import type { IRpcFlowFeature } from '../../sdk/types.ts'
+import { RpcBatchFlow } from './flow.ts'
+import { RpcBatchPluginName } from './constants.ts'
+import type { IRpcBatchOptions } from './types.ts'
 
-export type { IRpcBatchOptions } from './types.js'
+export type { IRpcBatchOptions } from './types.ts'
 
 /** Install the actual optional physical queue; absent installation allocates no batching state. */
 export function batch(options: IRpcBatchOptions = {}): IRpcFlowFeature {

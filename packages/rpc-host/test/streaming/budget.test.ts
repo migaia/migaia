@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { measurePortableStreamValue, RpcStreamLimit } from '@migaia/rpc-contract'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
-import { connectedCoreHosts } from '../host/core-fixture.js'
+import { connectedCoreHosts } from '../host/core-fixture.ts'
 
 /** Compares the portable value budget with producer-side rejection before sending. */
 describe('streaming portable value budget', () => {

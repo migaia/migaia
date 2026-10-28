@@ -4,17 +4,17 @@
  */
 import { jsonParser } from '@migaia/serialize/plugins'
 import { isUint8Array } from '@migaia/utils/bytes'
-import { createRpcAuthenticationError } from '../../host/error-owner.js'
-import type { IRpcJsonTextParser } from '../../sdk/carrier/types.js'
-import { decodeRpcCarrierText } from '../../sdk/carrier/json.js'
-import { RpcUtf8 } from '../../sdk/carrier/utf8.js'
-import { hostErrorWireMetadata } from '../../host/error-wire-metadata.js'
+import { createRpcAuthenticationError } from '../../host/error-owner.ts'
+import type { IRpcJsonTextParser } from '../../sdk/carrier/types.ts'
+import { decodeRpcCarrierText } from '../../sdk/carrier/json.ts'
+import { RpcUtf8 } from '../../sdk/carrier/utf8.ts'
+import { hostErrorWireMetadata } from '../../host/error-wire-metadata.ts'
 import {
   RpcAuthenticationEncoding as Encoding,
   RpcAuthenticationEnvelope as Format
-} from './constants.js'
-import { RpcAuthenticationText as Text } from './text.js'
-import type { IAuthenticationEnvelope, IRpcAuthenticationOptions } from './types.js'
+} from './constants.ts'
+import { RpcAuthenticationText as Text } from './text.ts'
+import type { IAuthenticationEnvelope, IRpcAuthenticationOptions } from './types.ts'
 
 /** Adapt the replay binding at the prepared-metadata stage. */
 export class AuthenticationRepresentation {

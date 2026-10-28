@@ -4,7 +4,7 @@ import { createRpcHost } from '@migaia/rpc-host'
 import { defineFlowFeature } from '@migaia/rpc-host/sdk'
 import { RpcWireKind, type IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
 import { validateContractData } from '../../dist/features/schema/validate.js'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 describe('safeString failure reporting', () => {
   it('preserves the original public provider registration failure', async () => {

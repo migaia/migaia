@@ -4,7 +4,7 @@ import type { IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
 import { createRpcBackingDigest, RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { deferred } from '@migaia/utils/promise'
 import { expect, it, vi } from 'vitest'
-import { connectedCoreHosts } from '../host/core-fixture.js'
+import { connectedCoreHosts } from '../host/core-fixture.ts'
 
 it('snapshots transfer once and sends the owned list only on the unchunked frame', async () => {
   /** The original opaque transfer member becomes a valid native backing without changing count. */

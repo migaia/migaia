@@ -1,7 +1,7 @@
 /** Original provider input snapshots are observed through real public Hosts and directories. */
 import { createRpcHost } from '@migaia/rpc-host'
 import { expect, it } from 'vitest'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 // Public directory retains the original captured provider count.
 it('retains one captured provider after public source mutation', async () => {

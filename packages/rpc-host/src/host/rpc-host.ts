@@ -22,36 +22,36 @@ import {
 } from '@migaia/rpc-contract/protocol'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcCoreErrorText, tagRpcError } from '@migaia/rpc-contract/errors'
-import { CallTable } from '../call/table.js'
-import { ProviderDispatcher } from '../dispatch/dispatcher.js'
-import type { ProviderRegistration } from '../dispatch/registration.js'
-import type { IRpcProvide, IRpcProvideOptions, IProviderCommitGate } from '../dispatch/types.js'
-import { createProviderCommitGate, exposedProvide } from '../dispatch/exposure.js'
-import { FeatureScope } from '../feature/scope.js'
-import { FlowRegistry, type IRpcFlowGroup } from '../flow/registry.js'
-import { Forwarder } from '../forward/forwarder.js'
-import { Namespace } from '../namespace/namespace.js'
-import { SessionTable } from '../session/table.js'
-import type { IRpcSessionScope, IRpcSessionWriteOptions } from '../session/types.js'
-import { StreamChannel } from '../stream/channel.js'
-import type { IRpcTransportSetupContext } from '../sdk/types.js'
+import { CallTable } from '../call/table.ts'
+import { ProviderDispatcher } from '../dispatch/dispatcher.ts'
+import type { ProviderRegistration } from '../dispatch/registration.ts'
+import type { IRpcProvide, IRpcProvideOptions, IProviderCommitGate } from '../dispatch/types.ts'
+import { createProviderCommitGate, exposedProvide } from '../dispatch/exposure.ts'
+import { FeatureScope } from '../feature/scope.ts'
+import { FlowRegistry, type IRpcFlowGroup } from '../flow/registry.ts'
+import { Forwarder } from '../forward/forwarder.ts'
+import { Namespace } from '../namespace/namespace.ts'
+import { SessionTable } from '../session/table.ts'
+import type { IRpcSessionScope, IRpcSessionWriteOptions } from '../session/types.ts'
+import { StreamChannel } from '../stream/channel.ts'
+import type { IRpcTransportSetupContext } from '../sdk/types.ts'
 import {
   rpcPipelineOwner,
   type IRpcPipelineOwner,
   type IRpcNativePipelineCore
-} from '../sdk/flow-pipelines.js'
-import type { RpcFlowProgram, RpcTransportFlowProgram } from '../sdk/flow-program.js'
-import type { IRpcDefinitionMetadata, IRpcSharedFlows } from '../sdk/metadata.js'
-import { RpcDefinitionKind } from '../sdk/metadata.js'
-import { HostIdentity, defaultRpcId } from './identity.js'
-import { createRpcAbortError, createRpcError, createRpcLifecycleError } from './error-owner.js'
-import { HostErrorText } from './error-text.js'
-import { HostObservationKind, RpcProtocolEvent } from './state-constants.js'
-import { deserializeHostWireError } from './error-wire-metadata.js'
-import { ownRpcTransportClose, RpcHostInstallation } from './installation.js'
-import type { IRpcHost, IRpcRuntimeOptions } from './public.js'
-import { defaultRpcReporter, reportDiagnostic } from './report.js'
-import { resolveAbortReason } from './abort-reason.js'
+} from '../sdk/flow-pipelines.ts'
+import type { RpcFlowProgram, RpcTransportFlowProgram } from '../sdk/flow-program.ts'
+import type { IRpcDefinitionMetadata, IRpcSharedFlows } from '../sdk/metadata.ts'
+import { RpcDefinitionKind } from '../sdk/metadata.ts'
+import { HostIdentity, defaultRpcId } from './identity.ts'
+import { createRpcAbortError, createRpcError, createRpcLifecycleError } from './error-owner.ts'
+import { HostErrorText } from './error-text.ts'
+import { HostObservationKind, RpcProtocolEvent } from './state-constants.ts'
+import { deserializeHostWireError } from './error-wire-metadata.ts'
+import { ownRpcTransportClose, RpcHostInstallation } from './installation.ts'
+import type { IRpcHost, IRpcRuntimeOptions } from './public.ts'
+import { defaultRpcReporter, reportDiagnostic } from './report.ts'
+import { resolveAbortReason } from './abort-reason.ts'
 
 /** This family identifies actual RPC namespace publication inside native shared-slot admission. */
 const namespaceFamily = Object.freeze({})
@@ -290,7 +290,7 @@ export class RpcHost {
   }
 
   /** Flow setup borrows stable Root work ports while native cores retain resource ownership. */
-  #flowSetupContext(core: IPluginHostCore): import('../sdk/types.js').IRpcFlowSetupContext {
+  #flowSetupContext(core: IPluginHostCore): import('../sdk/types.ts').IRpcFlowSetupContext {
     return {
       signal: core.lifecycle.signal,
       report: this.#report,

@@ -4,7 +4,7 @@ import { attachErrorIdentity } from '@migaia/utils/error'
 import { createRpcHost } from '@migaia/rpc-host'
 import { RpcLifecycleError } from '@migaia/rpc-host/contract'
 import { expect, it, vi } from 'vitest'
-import { coreMemoryServer } from './core-fixture.js'
+import { coreMemoryServer } from './core-fixture.ts'
 
 /** Follow only standard error edges so local cleanup must retain the exact original failure. */
 function reachesOriginal(error: unknown, original: Error): boolean {

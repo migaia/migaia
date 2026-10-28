@@ -11,8 +11,8 @@ import {
 } from '@migaia/rpc-host/sdk'
 import { RpcWireKind, type IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
 import { RpcTransportError } from '@migaia/rpc-contract/errors'
-import { coreMemoryServer } from '../../host/core-fixture.js'
-import { MemoryCarrier } from '../../fixtures/core-carrier.js'
+import { coreMemoryServer } from '../../host/core-fixture.ts'
+import { MemoryCarrier } from '../../fixtures/core-carrier.ts'
 
 /** Observe original physical handoff through a genuine native Feature, never an old sender facade. */
 class IdleWriteWitness {

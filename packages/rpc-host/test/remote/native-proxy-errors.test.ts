@@ -6,7 +6,7 @@ import { createRpcHost } from '@migaia/rpc-host'
 import { defineFlowFeature, RpcFlowPoint, type IRpcFlowStage } from '@migaia/rpc-host/sdk'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { describe, expect, it, vi } from 'vitest'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 /** The original three public construction routes grant diagnostics, never generation authority. */
 type IForgeKind = 'class' | 'constructor' | 'tag'

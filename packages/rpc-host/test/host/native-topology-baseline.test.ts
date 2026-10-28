@@ -2,7 +2,7 @@
 import { defineFeature, defineHost, definePlugin } from '@migaia/plugin-host'
 import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { describe, expect, it } from 'vitest'
-import { coreMemoryServer } from './core-fixture.js'
+import { coreMemoryServer } from './core-fixture.ts'
 
 describe('native capability topology', () => {
   it('preserves transitive order while keeping one installer path', async () => {

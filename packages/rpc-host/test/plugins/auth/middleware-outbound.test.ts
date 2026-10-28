@@ -22,7 +22,7 @@ import { RpcCarrierFrameKind } from '@migaia/rpc-contract/protocol'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { deferred } from '@migaia/utils/promise'
-import { coreMemoryServer } from '../../host/core-fixture.js'
+import { coreMemoryServer } from '../../host/core-fixture.ts'
 import { createRpcAuthenticationError } from '../../../dist/host/error-owner.js'
 import { RpcBatchExtension } from '../../../dist/features/batch/constants.js'
 

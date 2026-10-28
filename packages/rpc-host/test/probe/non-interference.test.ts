@@ -27,7 +27,7 @@ import type {
   IRpcSessionHandle,
   IRpcTransportContext
 } from '@migaia/rpc-contract/interfaces'
-import { MemoryCarrier } from '../fixtures/core-carrier.js'
+import { MemoryCarrier } from '../fixtures/core-carrier.ts'
 import { ProviderAdmissionRegistry } from '../../dist/features/limits/provider-admission.js'
 
 /** One actual installed SDK context lends its original health-check port and Session handle. */

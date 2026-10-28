@@ -1,5 +1,5 @@
 /** Stable protocol coordination diagnostics for the actual session owner. */
-import { RPC_CARRIER_HANDSHAKE_FRAME_BYTES } from '../sdk/carrier/constants.js'
+import { RPC_CARRIER_HANDSHAKE_FRAME_BYTES } from '../sdk/carrier/constants.ts'
 
 /** Session negotiation and physical byte framing share the same initial admission quota. */
 export const SessionText = {

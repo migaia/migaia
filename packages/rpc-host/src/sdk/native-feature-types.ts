@@ -7,10 +7,10 @@ import type {
   IRpcPrivateSession,
   IRpcSessionView
 } from '@migaia/rpc-contract/interfaces'
-import type { IRpcTransportSetupContext } from './types.js'
-import type { IRpcNativeMemberRecord } from './native-members-types.js'
-import type { IRpcMemberCurrent } from './member-types.js'
-import type { RpcNativeMemberKind } from './native-members-constants.js'
+import type { IRpcTransportSetupContext } from './types.ts'
+import type { IRpcNativeMemberRecord } from './native-members-types.ts'
+import type { IRpcMemberCurrent } from './member-types.ts'
+import type { RpcNativeMemberKind } from './native-members-constants.ts'
 
 /** This discriminant selects a concrete native installer, never a host-side call policy. */
 export const RpcNativeFeatureKind = { pool: 'pool' } as const

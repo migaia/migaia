@@ -2,7 +2,7 @@
 import { createRpcHost } from '@migaia/rpc-host'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { expect, it } from 'vitest'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 // Retire only the old selector/capture/spread interleaving.
 it('sole-profile request retains caller option counts before codec capture', async () => {

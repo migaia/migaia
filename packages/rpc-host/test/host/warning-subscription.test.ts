@@ -10,8 +10,8 @@ import {
 import { defineFlowFeature, defineFlowPlugin, defineTransportPlugin } from '@migaia/rpc-host/sdk'
 import { errorMap } from '@migaia/rpc-host/plugins/error-map'
 import type { IRpcTransportContext } from '@migaia/rpc-contract/interfaces'
-import { MemoryCarrier } from '../fixtures/core-carrier.js'
-import { coreMemoryServer } from './core-fixture.js'
+import { MemoryCarrier } from '../fixtures/core-carrier.ts'
+import { coreMemoryServer } from './core-fixture.ts'
 
 /** One physical pair lends actual native startup facts to the unchanged public Host constructor. */
 class WarningPair {

@@ -2,7 +2,7 @@
 import { createRpcHost, type IRpcNamespace } from '@migaia/rpc-host'
 import { expect, it, vi } from 'vitest'
 import { Forwarder } from '../../dist/forward/forwarder.js'
-import { coreMemoryServer } from './core-fixture.js'
+import { coreMemoryServer } from './core-fixture.ts'
 
 /** Existing physical clients expose only their public host and actual carrier pair. */
 type IDirectoryClient = Awaited<ReturnType<ReturnType<typeof coreMemoryServer>['connect']>>

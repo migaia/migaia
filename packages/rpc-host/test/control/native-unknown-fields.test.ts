@@ -1,6 +1,6 @@
 /** Additive route fields reach the real provider through the sole current wire grammar. */
 import { assert, expect, it, vi } from 'vitest'
-import { connectedCoreHosts } from '../host/core-fixture.js'
+import { connectedCoreHosts } from '../host/core-fixture.ts'
 
 // Removes warnings, preserving all four original business entries.
 it('keeps processing three additive route records after the original directed request', async () => {

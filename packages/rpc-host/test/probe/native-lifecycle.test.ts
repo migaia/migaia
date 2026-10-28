@@ -8,7 +8,7 @@ import {
   type IRpcProbeEventView
 } from '@migaia/rpc-host/plugins/probe'
 import { assert, expect, it } from 'vitest'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 // The acquired native Session owns lifecycle and reentrant close.
 it('probe observes native handshake, ready and reentrant close without changing calls', async () => {

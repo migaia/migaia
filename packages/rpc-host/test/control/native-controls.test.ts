@@ -8,7 +8,7 @@ import type {
   IRpcSessionHandle
 } from '@migaia/rpc-contract/interfaces'
 import type { IRpcControlFrame, IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
-import { MemoryCarrier } from '../fixtures/core-carrier.js'
+import { MemoryCarrier } from '../fixtures/core-carrier.ts'
 
 /** One genuine native installation lends its original control methods and observation receipt. */
 class NativeControlSource {

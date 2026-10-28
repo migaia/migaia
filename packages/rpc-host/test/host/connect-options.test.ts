@@ -16,8 +16,8 @@ import { retry } from '@migaia/rpc-host/features/retry'
 import { linkPolicy } from '@migaia/rpc-host/plugins/link-policy'
 import type { IRpcCarrier } from '@migaia/rpc-contract/interfaces'
 import type { IRpcEnvelope } from '@migaia/rpc-contract/protocol'
-import { coreMemoryServer } from './core-fixture.js'
-import { SilentManagedMessageIO } from './managed-memory-fixture.js'
+import { coreMemoryServer } from './core-fixture.ts'
+import { SilentManagedMessageIO } from './managed-memory-fixture.ts'
 
 /** The original silent byte source has no native subscription work to release. */
 function releaseSilentSource(): void {}

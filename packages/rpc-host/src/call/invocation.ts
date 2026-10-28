@@ -8,10 +8,10 @@ import type {
 } from '@migaia/rpc-contract/interfaces'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
-import { createRpcError, createRpcTimeoutError } from '../host/error-owner.js'
-import type { FeatureScope } from '../feature/scope.js'
-import { resolveAbortReason } from '../host/abort-reason.js'
-import type { ICallCommand, ICallLocalOptions, ICallTargetRef } from './types.js'
+import { createRpcError, createRpcTimeoutError } from '../host/error-owner.ts'
+import type { FeatureScope } from '../feature/scope.ts'
+import { resolveAbortReason } from '../host/abort-reason.ts'
+import type { ICallCommand, ICallLocalOptions, ICallTargetRef } from './types.ts'
 
 /** Only this explicit port can start an attempt or retire the originating feature execution. */
 export type ICallInvocationOwner = Readonly<{

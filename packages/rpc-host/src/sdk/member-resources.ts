@@ -6,11 +6,11 @@
 import { createGenerationController } from '@migaia/lifecycle'
 import { deferred, raceWithAbort, type IAbortSignal } from '@migaia/utils/promise'
 import { RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
-import { createRemoteLayerError } from '../host/remote-error-owner.js'
-import { resolveAbortReason } from '../host/abort-reason.js'
-import { localErrorWireSummary } from '../host/error-wire-metadata.js'
-import { memberAggregate } from './member-errors.js'
-import type { IRpcMemberRegistration } from './member-types.js'
+import { createRemoteLayerError } from '../host/remote-error-owner.ts'
+import { resolveAbortReason } from '../host/abort-reason.ts'
+import { localErrorWireSummary } from '../host/error-wire-metadata.ts'
+import { memberAggregate } from './member-errors.ts'
+import type { IRpcMemberRegistration } from './member-types.ts'
 
 /** Original reverse-acquisition rollback groups transfer to exactly one accepted member generation. */
 export class RpcMemberResources {

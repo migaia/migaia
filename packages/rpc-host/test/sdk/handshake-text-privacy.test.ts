@@ -3,7 +3,7 @@ import { inspect } from 'node:util'
 import { RpcJsonCarrierCodec, RpcUtf8 } from '@migaia/rpc-host/sdk'
 import type { IRpcCodecContext } from '@migaia/rpc-contract/interfaces'
 import { expect, it, vi } from 'vitest'
-import { TOKEN, leaks } from '../../../rpc-contract/test/fixtures/handshake-privacy.js'
+import { TOKEN, leaks } from '../../../rpc-contract/test/fixtures/handshake-privacy.ts'
 
 /** Only the real codec's borrowed physical budget participates in these parse-only failures. */
 const context: IRpcCodecContext = { codec: 'json', nativeBinary: false, maxFrameBytes: 65536 }

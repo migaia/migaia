@@ -6,7 +6,7 @@ import { auth, type IRpcAuthenticationOptions } from '@migaia/rpc-host/plugins/a
 import { createRpcBackingDigest, RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import type { IRpcPortableValue } from '@migaia/rpc-contract/protocol'
 import { RpcAuthenticationEnvelope } from '../../../dist/features/auth/constants.js'
-import { coreMemoryServer } from '../../host/core-fixture.js'
+import { coreMemoryServer } from '../../host/core-fixture.ts'
 
 /** The original fixture uses this public key with SHA-256 over JSON.stringify(value). */
 const signingKey = 'core-refactor-public-fixture-key'

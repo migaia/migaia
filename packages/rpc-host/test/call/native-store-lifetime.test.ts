@@ -7,7 +7,7 @@ import { limits } from '@migaia/rpc-host/plugins/limits'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { deferred } from '@migaia/utils/promise'
 import { ProviderAdmissionRegistry } from '../../dist/features/limits/provider-admission.js'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 /** The original stream body is created only by its genuine provider if queued execution starts. */
 async function* queuedValues(): AsyncGenerator<number, number> {

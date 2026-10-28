@@ -4,8 +4,8 @@ import { createRpcHost } from '@migaia/rpc-host'
 import { defineTransportPlugin, rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { expect, it, vi } from 'vitest'
-import { coreMemoryServer } from './core-fixture.js'
-import { MemoryCarrier } from '../fixtures/core-carrier.js'
+import { coreMemoryServer } from './core-fixture.ts'
+import { MemoryCarrier } from '../fixtures/core-carrier.ts'
 
 /** Native disposal remains the native owner's API, separate from public RPC Root.close. */
 function receivingHost() {

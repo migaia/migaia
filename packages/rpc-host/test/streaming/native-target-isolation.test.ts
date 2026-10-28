@@ -13,8 +13,8 @@ import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { deferred } from '@migaia/utils/promise'
 import { StreamChannel } from '../../dist/stream/channel.js'
 import { ProviderDispatcher } from '../../dist/dispatch/dispatcher.js'
-import { MemoryCarrier } from '../fixtures/core-carrier.js'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { MemoryCarrier } from '../fixtures/core-carrier.ts'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 /** Actual encoded replies retain their original route and provider-produced value. */
 type IStreamItem = Readonly<{ targetId: string; value: unknown }>

@@ -1,7 +1,7 @@
 /** Retires transient default names while preserving explicit-name departure diagnostics. */
 import { createRpcHost } from '@migaia/rpc-host'
 import { expect, it, vi, type MockInstance as IMockInstance } from 'vitest'
-import { coreMemoryServer } from './core-fixture.js'
+import { coreMemoryServer } from './core-fixture.ts'
 
 /** Read only the trie structure observed at its real native Map writes. */
 type IObservedPrefix = Readonly<{

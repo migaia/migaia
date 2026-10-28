@@ -3,11 +3,11 @@
  * installation receives its own RpcChunkFlow; the entry declares extension participation without
  * implementing a second codec, Session or fragment store.
  */
-import { defineBuiltinFlowFeature } from '../../sdk/flow-feature.js'
-import type { IRpcFlowFeature } from '../../sdk/types.js'
-import { RpcChunkPluginName } from './constants.js'
-import { RpcChunkFlow } from './flow.js'
-import type { IRpcChunkOptions } from './types.js'
+import { defineBuiltinFlowFeature } from '../../sdk/flow-feature.ts'
+import type { IRpcFlowFeature } from '../../sdk/types.ts'
+import { RpcChunkPluginName } from './constants.ts'
+import { RpcChunkFlow } from './flow.ts'
+import type { IRpcChunkOptions } from './types.ts'
 
 /** Required negotiation remains separate from transport-selected feature placement. */
 export type IRpcChunkFeatureOptions = Omit<IRpcChunkOptions, 'errorMetadata'> &

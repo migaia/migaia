@@ -17,8 +17,8 @@ import {
 } from '../../../dist/features/auth/request-replay.js'
 import { ProviderDispatcher } from '../../../dist/dispatch/dispatcher.js'
 import { readAuthenticationRetain } from '../../../dist/features/auth/config.js'
-import { coreMemoryServer } from '../../host/core-fixture.js'
-import { MemoryCarrier } from '../../fixtures/core-carrier.js'
+import { coreMemoryServer } from '../../host/core-fixture.ts'
+import { MemoryCarrier } from '../../fixtures/core-carrier.ts'
 
 /** Observe stored bodies through Map's existing write boundary, including completion headers. */
 function observeStoredReplayBody(

@@ -28,14 +28,14 @@ import {
   type IRpcEnvelope,
   type IRpcPortableValue
 } from '@migaia/rpc-contract/protocol'
-import { RpcStreamErrorText } from './error-text.js'
-import { createRpcAbortError, createRpcTimeoutError } from '../host/error-owner.js'
-import { serializeHostWireError, deserializeHostWireError } from '../host/error-wire-metadata.js'
-import { sameTask } from '../call/envelope.js'
-import { resolveAbortReason } from '../host/abort-reason.js'
-import { callTarget } from '../call/target.js'
-import type { ICallLocalOptions, ICallTargetRef, IPreparedCall } from '../call/types.js'
-import type { IStreamOwner, IStreamTerminal, IStreamAdmissionFailure } from './types.js'
+import { RpcStreamErrorText } from './error-text.ts'
+import { createRpcAbortError, createRpcTimeoutError } from '../host/error-owner.ts'
+import { serializeHostWireError, deserializeHostWireError } from '../host/error-wire-metadata.ts'
+import { sameTask } from '../call/envelope.ts'
+import { resolveAbortReason } from '../host/abort-reason.ts'
+import { callTarget } from '../call/target.ts'
+import type { ICallLocalOptions, ICallTargetRef, IPreparedCall } from '../call/types.ts'
+import type { IStreamOwner, IStreamTerminal, IStreamAdmissionFailure } from './types.ts'
 
 /** One lazy public iterator owns its input until first physical handoff, then only compact state. */
 export class StreamConsumer {

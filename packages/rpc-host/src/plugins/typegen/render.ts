@@ -7,7 +7,7 @@ import { encodeUtf8 } from '@migaia/utils/bytes'
 import { RuntimeApiMode, type IRpcDirectory } from '@migaia/rpc-contract/protocol'
 import type { IRpcMethodSchema } from '@migaia/rpc-contract/protocol'
 import type { IRpcPortableValue } from '@migaia/rpc-contract'
-import { RpcTypegenText } from './text.js'
+import { RpcTypegenText } from './text.ts'
 
 /** Each rendering operation owns only transient alias bookkeeping for one accepted schema root. */
 type ISchemaContext = {

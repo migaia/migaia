@@ -8,7 +8,7 @@ import {
 } from '@migaia/rpc-contract/protocol'
 import type { IRpcCodecContext } from '@migaia/rpc-contract/interfaces'
 import { RpcJsonCarrierCodec, RpcUtf8 } from '@migaia/rpc-host/sdk'
-import { hello } from '../../../rpc-contract/test/fixtures/core-profile.js'
+import { hello } from '../../../rpc-contract/test/fixtures/core-profile.ts'
 
 /** Sole-profile input retains the original initiator's codec and optional-extension preferences. */
 const initiator = normalizeRpcHandshake({

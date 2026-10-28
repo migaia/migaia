@@ -8,7 +8,7 @@ import { deferred, type IAbortSignal } from '@migaia/utils/promise'
 import { systemScheduler, systemWallClock } from '@migaia/utils/scheduler'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { describe, expect, it, vi } from 'vitest'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 /** Borrow the existing native timer/clock backends; each real Host still owns its own timers. */
 class DeadlineClock {

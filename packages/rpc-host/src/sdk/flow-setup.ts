@@ -5,13 +5,13 @@ import { attachSecondaryErrors, UtilsAbortError } from '@migaia/utils/error'
 import { raceWithAbort, type IAbortSignal, type INativeAbortSignal } from '@migaia/utils/promise'
 import { identifyRpcBoundaryFailure, RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
-import { createRpcAbortError } from '../host/error-owner.js'
+import { createRpcAbortError } from '../host/error-owner.ts'
 import type {
   IRpcFlowDefinition,
   IRpcFlowInstallation,
   IRpcFlowSetupContext,
   IRpcTransportSetupContext
-} from './types.js'
+} from './types.ts'
 
 /** One native install borrows its original acquisition, cleanup admission and operation signals. */
 type IInstallationSetupInput<T> = Readonly<{

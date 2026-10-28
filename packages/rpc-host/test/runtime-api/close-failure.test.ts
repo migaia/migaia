@@ -3,7 +3,7 @@ import { it, vi } from 'vitest'
 import { tagRpcError } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { walkErrorCauses } from '@migaia/utils/error'
-import { connectedCoreHosts } from '../host/core-fixture.js'
+import { connectedCoreHosts } from '../host/core-fixture.ts'
 
 it('[L2] a failed physical close keeps the original error and repeated close Promise', async () => {
   /** The same cleanup failure must have one background diagnostic owner. */

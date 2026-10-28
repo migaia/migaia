@@ -1,7 +1,7 @@
 /** Cold native Feature definitions share one SDK adapter; no feature runs while being defined. */
 import { defineFeature } from '@migaia/plugin-host'
-import type { IRpcFlowDefinition, IRpcFlowFeature } from './types.js'
-import { registerRpcDefinition, RpcDefinitionKind } from './metadata.js'
+import type { IRpcFlowDefinition, IRpcFlowFeature } from './types.ts'
+import { registerRpcDefinition, RpcDefinitionKind } from './metadata.ts'
 
 /** Private capability identities prevent a third-party display name from impersonating a builtin. */
 export const RpcBuiltinFeature = {

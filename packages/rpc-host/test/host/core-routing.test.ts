@@ -3,7 +3,7 @@ import { deferred } from '@migaia/utils/promise'
 import type { IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
 import { createRpcHost } from '@migaia/rpc-host'
 import { describe, expect, it, vi } from 'vitest'
-import { coreMemoryServer } from './core-fixture.js'
+import { coreMemoryServer } from './core-fixture.ts'
 
 /** Fully drain only the concrete returned iterators used by these business assertions. */
 async function items(value: AsyncIterable<unknown>) {

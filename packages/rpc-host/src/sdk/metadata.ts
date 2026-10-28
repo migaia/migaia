@@ -9,9 +9,9 @@ import type {
   IRpcFlowSetupContext,
   IRpcLinkPolicyDefinition,
   IRpcTransportSetupContext
-} from './types.js'
-import type { IRpcBuiltinFeature } from './flow-feature.js'
-import type { RpcTransportFlowProgram } from './flow-program.js'
+} from './types.ts'
+import type { IRpcBuiltinFeature } from './flow-feature.ts'
+import type { RpcTransportFlowProgram } from './flow-program.ts'
 
 /** Prepared placements retain native Feature identity and one actual setup result. */
 export type IRpcFlowEntry = Readonly<{

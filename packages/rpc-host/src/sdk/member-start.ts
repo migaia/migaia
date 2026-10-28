@@ -10,7 +10,7 @@ import {
   type IReadyOutcome
 } from '@migaia/supervision'
 import { deferred, type IAbortSignal } from '@migaia/utils/promise'
-import { resolveAbortReason } from '../host/abort-reason.js'
+import { resolveAbortReason } from '../host/abort-reason.ts'
 
 /** Original first launch stops at its first backoff; later native restart policy remains untouched. */
 export class RpcMemberFirstStart<TUnit, TSpec> {

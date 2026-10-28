@@ -8,7 +8,7 @@ import {
 } from '@migaia/plugin-host'
 import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { expect, it } from 'vitest'
-import { coreMemoryServer } from './core-fixture.js'
+import { coreMemoryServer } from './core-fixture.ts'
 
 /** A genuine native Host supplies the same identity and transaction to its RPC transport. */
 function receivingHost(name: string) {

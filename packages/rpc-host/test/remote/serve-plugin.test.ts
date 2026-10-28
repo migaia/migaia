@@ -5,7 +5,7 @@ import { RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
 import { deserializeRpcError } from '@migaia/rpc-contract/errors'
 import { serializeRpcError } from '../../dist/host/error-wire-metadata.js'
 import { createRemoteLayerError } from '../../dist/host/remote-error-owner.js'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 /** The actual remote method tree preserves scalar and stream call modes for held capabilities. */
 type IContextMethods = {

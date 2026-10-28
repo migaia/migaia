@@ -4,7 +4,7 @@ import { createManualScheduler } from '@migaia/utils/testing'
 import { createRpcHost } from '@migaia/rpc-host'
 import { limits, type IRpcProviderRejection } from '@migaia/rpc-host/plugins/limits'
 import { deserializeRpcWireError } from '@migaia/rpc-contract/protocol'
-import { coreMemoryServer } from '../../host/core-fixture.js'
+import { coreMemoryServer } from '../../host/core-fixture.ts'
 import { LimitsGovernor } from '../../../dist/features/limits/governor.js'
 
 /** One real business hold keeps fixture state in an explicit owner rather than captured callbacks. */

@@ -20,12 +20,12 @@ import {
   createRpcAbortError,
   createRpcConfigurationError,
   createRpcLifecycleError
-} from '../../host/error-owner.js'
+} from '../../host/error-owner.ts'
 import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
-import { resolveAbortReason } from '../../host/abort-reason.js'
-import { RpcCarrierCodecId, RpcCarrierErrorText } from './constants.js'
-import { RpcJsonCarrierCodec } from './json-codec.js'
-import type { IRpcMessageCarrierOptions } from './types.js'
+import { resolveAbortReason } from '../../host/abort-reason.ts'
+import { RpcCarrierCodecId, RpcCarrierErrorText } from './constants.ts'
+import { RpcJsonCarrierCodec } from './json-codec.ts'
+import type { IRpcMessageCarrierOptions } from './types.ts'
 
 /** Each original write remains owned until its native drain, physical close or original failure. */
 type ICarrierWrite = ReturnType<typeof deferred<void>>

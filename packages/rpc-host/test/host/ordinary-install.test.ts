@@ -18,7 +18,7 @@ import { deferred, type IDeferred } from '@migaia/utils/promise'
 import { describe, expect, it, vi, type MockInstance as IMockInstance } from 'vitest'
 import { readRpcDefinition } from '../../dist/sdk/metadata.js'
 import { LimitsGovernor } from '../../dist/features/limits/governor.js'
-import { coreMemoryServer } from './core-fixture.js'
+import { coreMemoryServer } from './core-fixture.ts'
 
 /** Native Host defaults remain the same as tray's receiving plugin-host runtime. */
 function ordinaryHost() {

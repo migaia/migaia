@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { getEventListeners } from 'node:events'
 import { expect, it, vi } from 'vitest'
 import { deferred } from '@migaia/utils/promise'
-import { connectedCoreHosts } from '../host/core-fixture.js'
+import { connectedCoreHosts } from '../host/core-fixture.ts'
 import { CallRecord } from '../../dist/call/record.js'
 
 it('ordinary notifications release their records and caller listeners when physical sending completes', async () => {

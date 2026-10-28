@@ -1,10 +1,10 @@
 /** Encode signed freshness metadata while the installed source record owns each challenge. */
 import type { IRpcPortableValue } from '@migaia/rpc-contract/protocol'
-import { createRpcAuthenticationError } from '../../host/error-owner.js'
-import { RpcAuthenticationHandshake as Format } from './constants.js'
-import { isAuthenticationNonce } from './envelope.js'
-import { RpcAuthenticationText as Text } from './text.js'
-import type { IAuthenticationHandshake } from './types.js'
+import { createRpcAuthenticationError } from '../../host/error-owner.ts'
+import { RpcAuthenticationHandshake as Format } from './constants.ts'
+import { isAuthenticationNonce } from './envelope.ts'
+import { RpcAuthenticationText as Text } from './text.ts'
+import type { IAuthenticationHandshake } from './types.ts'
 
 /** Bind configured credentials to this source's challenge and peer echo. */
 export function wrapAuthenticationHandshake(

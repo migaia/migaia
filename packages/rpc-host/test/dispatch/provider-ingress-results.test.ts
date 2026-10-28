@@ -4,7 +4,7 @@ import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { deserializeRpcWireError, type IRpcSemanticFrame } from '@migaia/rpc-contract/protocol'
 import { deferred } from '@migaia/utils/promise'
 import { assert, expect, it, vi } from 'vitest'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 // Only the old response DTO spelling/correlation allocation is .
 it('accepted provider ingress checks receiver identity before a second execution', async () => {

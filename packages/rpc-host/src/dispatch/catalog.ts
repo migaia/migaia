@@ -16,8 +16,8 @@ import {
   type IRpcProviderDeclaration
 } from '@migaia/rpc-contract/protocol'
 
-import { createRpcError } from '../host/error-owner.js'
-import { normalizeRpcProviderDeclaration } from './declaration.js'
+import { createRpcError } from '../host/error-owner.ts'
+import { normalizeRpcProviderDeclaration } from './declaration.ts'
 
 import { RuntimeApiErrorText } from '@migaia/rpc-contract/errors'
 import type {
@@ -27,7 +27,7 @@ import type {
   IProviderMethodEntry,
   IRpcProvide,
   IRpcProviderMethod
-} from './types.js'
+} from './types.ts'
 
 /** Peer-name grammar shared by the protocol's single-segment forwarding hint. */
 const forwardSegment = new RegExp(REMOTE_NAME_PATTERN, 'u')

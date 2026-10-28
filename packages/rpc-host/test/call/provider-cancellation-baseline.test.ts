@@ -1,7 +1,7 @@
 import { deferred } from '@migaia/utils/promise'
 import type { IRpcContext } from '@migaia/rpc-host'
 import { describe, expect, it } from 'vitest'
-import { connectedCoreHosts } from '../host/core-fixture.js'
+import { connectedCoreHosts } from '../host/core-fixture.ts'
 
 /** The real provider signal and business finally expose cancellation without a controller registry. */
 class AbortBaselineProvider {

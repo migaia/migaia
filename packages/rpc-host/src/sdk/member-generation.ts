@@ -18,18 +18,18 @@ import type {
 } from '@migaia/rpc-contract/interfaces'
 import { RpcCoreErrorCode, RpcRemoteLayerErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcAuthenticationError } from '@migaia/rpc-contract/errors'
-import { createRemoteLayerError } from '../host/remote-error-owner.js'
-import { isLocalRpcError, localRpcErrorCode } from '../host/error-owner.js'
-import { resolveAbortReason } from '../host/abort-reason.js'
-import { memberAggregate } from './member-errors.js'
-import { RpcMemberFirstStart } from './member-start.js'
-import { RpcMemberResources } from './member-resources.js'
-import { nativeMemberStartup } from './flow-setup.js'
+import { createRemoteLayerError } from '../host/remote-error-owner.ts'
+import { isLocalRpcError, localRpcErrorCode } from '../host/error-owner.ts'
+import { resolveAbortReason } from '../host/abort-reason.ts'
+import { memberAggregate } from './member-errors.ts'
+import { RpcMemberFirstStart } from './member-start.ts'
+import { RpcMemberResources } from './member-resources.ts'
+import { nativeMemberStartup } from './flow-setup.ts'
 import type {
   IRpcMemberGenerationOptions,
   IRpcMemberSource,
   IRpcMemberCurrent
-} from './member-types.js'
+} from './member-types.ts'
 
 /** Readiness waiters retain only one target ordinal and their exact optional abort subscription. */
 type IMemberWaiter = {

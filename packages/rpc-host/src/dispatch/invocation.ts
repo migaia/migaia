@@ -59,24 +59,24 @@ import {
   createRpcTimeoutError,
   isLocalRpcError,
   localRpcErrorCode
-} from '../host/error-owner.js'
+} from '../host/error-owner.ts'
 import {
   serializeHostWireError,
   registerLocalErrorWireSummary,
   hostErrorWireMetadata
-} from '../host/error-wire-metadata.js'
-import { ProviderContext } from './context.js'
-import { callTarget } from '../call/target.js'
-import { readProviderCommitGate, readProviderPreflight } from './catalog.js'
-import { completeProviderReturn } from './return.js'
-import { RpcFlowPoint } from '../sdk/flow-pipelines.js'
-import type { IProviderOrderReceipt, ProviderOrdering } from './ordering.js'
-import { isRpcCarrierAdmissionFailure } from '../sdk/carrier/admission.js'
+} from '../host/error-wire-metadata.ts'
+import { ProviderContext } from './context.ts'
+import { callTarget } from '../call/target.ts'
+import { readProviderCommitGate, readProviderPreflight } from './catalog.ts'
+import { completeProviderReturn } from './return.ts'
+import { RpcFlowPoint } from '../sdk/flow-pipelines.ts'
+import type { IProviderOrderReceipt, ProviderOrdering } from './ordering.ts'
+import { isRpcCarrierAdmissionFailure } from '../sdk/carrier/admission.ts'
 import type {
   IProviderCommitGate,
   IProviderDispatcherOptions,
   IProviderMethodEntry
-} from './types.js'
+} from './types.ts'
 
 /** Outcome lookup has no call-only policy metadata and cannot invent cancellation options. */
 const outcomeCallOptions: IRpcCallOptions = Object.freeze({})
@@ -397,7 +397,7 @@ export class ProviderInvocation {
       try {
         this.#begin(steps.length)
         return await this.#input.ports.forward.group(
-          entries as readonly import('./types.js').IProviderForwardEntry[],
+          entries as readonly import('./types.ts').IProviderForwardEntry[],
           steps,
           context.value,
           this.#input.source,

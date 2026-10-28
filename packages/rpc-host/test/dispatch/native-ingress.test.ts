@@ -12,7 +12,7 @@ import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcWireKind } from '@migaia/rpc-contract/protocol'
 import { deferred, type IDeferred } from '@migaia/utils/promise'
 import { assert, expect, it, vi } from 'vitest'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 import { SessionTable } from '../../dist/session/table.js'
 import { ProviderAdmissionRegistry } from '../../dist/features/limits/provider-admission.js'
 

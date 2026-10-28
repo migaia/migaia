@@ -5,7 +5,7 @@ import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { deferred } from '@migaia/utils/promise'
 import { expect, it } from 'vitest'
 import { RpcAuthenticationEnvelope } from '../../dist/features/auth/constants.js'
-import { coreMemoryServer } from './core-fixture.js'
+import { coreMemoryServer } from './core-fixture.ts'
 
 /** The original callback observations exclude the retired endpoint-context DTO. */
 type IAuthenticationCall = Readonly<{ name: string; value: unknown }>

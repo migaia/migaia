@@ -1,6 +1,6 @@
 import { createRpcHost, type IRpcContext } from '@migaia/rpc-host'
 import { expect, it } from 'vitest'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 it('passes trace to the provider and rejects invalid values before sending', async () => {
   /** Real native connection setup preserves the original directed client/provider identities. */

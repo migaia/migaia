@@ -4,7 +4,7 @@ import { defineTransportPlugin, RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk
 import { chunk } from '@migaia/rpc-host/plugins/chunk'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { expect, it } from 'vitest'
-import { coreMemoryServer } from '../host/core-fixture.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
 
 /** This source owns only its registered cleanup resource, with no separate listener to release. */
 function releaseSource(): void {}

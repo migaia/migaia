@@ -6,7 +6,7 @@
 import { isUint8Array, utf8ByteLength } from '@migaia/utils/bytes'
 import { createContractError, type IRpcErrorWireMetadata } from '@migaia/rpc-contract/errors'
 import { RpcContractErrorCode } from '@migaia/rpc-contract/error-code'
-import { markRpcCarrierAdmissionFailure } from '../carrier/admission.js'
+import { markRpcCarrierAdmissionFailure } from '../carrier/admission.ts'
 
 /** Maximum payload carried by one native process frame. */
 export const RPC_STREAM_MAX_FRAME_BYTES = 16 * 1024 * 1024

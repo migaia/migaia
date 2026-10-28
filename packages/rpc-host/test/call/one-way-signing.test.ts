@@ -7,8 +7,8 @@ import { auth } from '@migaia/rpc-host/plugins/auth'
 import { timeout } from '@migaia/rpc-host/features/timeout'
 import { RpcJsonCarrierCodec } from '@migaia/rpc-host/sdk'
 import { it, vi } from 'vitest'
-import { coreMemoryServer } from '../host/core-fixture.js'
-import { RuntimeApiFixtureText } from '../fixtures/runtime-api-text.js'
+import { coreMemoryServer } from '../host/core-fixture.ts'
+import { RuntimeApiFixtureText } from '../fixtures/runtime-api-text.ts'
 
 /** Each original case controls one genuine authentication suspension, never a replacement sender. */
 class SigningControl {

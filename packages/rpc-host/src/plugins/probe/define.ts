@@ -6,9 +6,9 @@
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 import { identifyRpcBoundaryFailure, tagRpcError } from '@migaia/rpc-contract/errors'
-import { RpcProbeStageName, type IRpcProbeStageName } from './constants.js'
-import { readProbeState, registerProbeState, type IRpcProbeState } from './internal.js'
-import type { IRpcProbe, IRpcProbeDefinition } from './types.js'
+import { RpcProbeStageName, type IRpcProbeStageName } from './constants.ts'
+import { readProbeState, registerProbeState, type IRpcProbeState } from './internal.ts'
+import type { IRpcProbe, IRpcProbeDefinition } from './types.ts'
 
 /** Reserves exactly these own fields; unrelated host members, including emit, remain untouched. */
 const ProbeHostField = {

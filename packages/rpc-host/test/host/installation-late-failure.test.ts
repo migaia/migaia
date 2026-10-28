@@ -5,7 +5,7 @@ import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { walkErrorCauses } from '@migaia/utils/error'
 import { deferred } from '@migaia/utils/promise'
 import { expect, it, vi } from 'vitest'
-import { coreMemoryServer } from './core-fixture.js'
+import { coreMemoryServer } from './core-fixture.ts'
 
 it('keeps caller cancellation terminal before reporting the original late setup failure', async (test) => {
   /** The real supported setup callback establishes its own original installation entry. */

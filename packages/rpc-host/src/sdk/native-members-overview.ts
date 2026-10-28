@@ -14,7 +14,7 @@ import {
   RpcMemberQueryClock,
   type RpcMemberSourceKind,
   type RpcMemberConnectionDirection
-} from './native-members-constants.js'
+} from './native-members-constants.ts'
 /** Only these two already-admitted native identity fields enter local member output. */
 export type IRpcMemberIdentity = Readonly<{ name: string; instanceId: string }>
 /** Formatting is a local cold-query option, never application or wire configuration. */

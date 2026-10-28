@@ -5,10 +5,10 @@
 import type { IRpcAuthenticationRetain } from '@migaia/rpc-contract/interfaces'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
-import { createRpcError } from '../../host/error-owner.js'
-import { RpcAuthenticationText as Text } from './text.js'
-import type { IRpcAuthenticationOptions } from './types.js'
-import { RpcAuthenticationEncoding as Encoding } from './constants.js'
+import { createRpcError } from '../../host/error-owner.ts'
+import { RpcAuthenticationText as Text } from './text.ts'
+import type { IRpcAuthenticationOptions } from './types.ts'
+import { RpcAuthenticationEncoding as Encoding } from './constants.ts'
 
 /** Default omitted retention to false, then validate the auth or physical-connection policy. */
 export function readAuthenticationRetain(

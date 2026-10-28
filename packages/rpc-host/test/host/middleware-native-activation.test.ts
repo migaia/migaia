@@ -4,8 +4,8 @@ import type { IRpcCarrierReceiver } from '@migaia/rpc-contract/interfaces'
 import { rpcHostPipelines } from '@migaia/rpc-host/sdk'
 import { deferred, type IDeferred } from '@migaia/utils/promise'
 import { expect, it, vi } from 'vitest'
-import { MemoryCarrier } from '../fixtures/core-carrier.js'
-import { coreMemoryServer } from './core-fixture.js'
+import { MemoryCarrier } from '../fixtures/core-carrier.ts'
+import { coreMemoryServer } from './core-fixture.ts'
 
 /** The actual native method is captured before any scoped observation replaces its lookup. */
 const nativeSubscribe = MemoryCarrier.prototype.subscribe

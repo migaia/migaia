@@ -10,10 +10,10 @@ import { createRpcHost } from '@migaia/rpc-host'
 import { createUnitBudget } from '@migaia/supervision'
 import { createCoroutineSupervisor } from '@migaia/supervision/coroutine'
 import { deferred } from '@migaia/utils/promise'
-import { managedMemoryTransport } from '../host/managed-memory-fixture.js'
+import { managedMemoryTransport } from '../host/managed-memory-fixture.ts'
 import { createSharedWorkerCarrier } from '../../../rpc-plugin-browser/dist/browser/adapters/shared-worker.js'
 import { createDedicatedWorkerCarrier } from '../../../rpc-plugin-browser/dist/browser/adapters/dedicated-worker.js'
-import { reaches } from './audit-byte-fixture.js'
+import { reaches } from './audit-byte-fixture.ts'
 import type { IRpcCarrier, IRpcCarrierFrame } from '@migaia/rpc-contract/interfaces'
 
 /** Only native callback registration and physical close belong to this fixture. */

@@ -86,7 +86,7 @@ describe('web-rpc 边界：不得依赖 src/store', () => {
         for (const [, , specifier] of source.matchAll(
           /export\s+(\*|\{[^}]*\})\s+from\s+['"]([^'"]+)['"]/g
         )) {
-          if (!/(?:\/internal\/|(?:^|\/)(?:wire|endpoint)\.js$)/.test(specifier)) continue
+          if (!/(?:\/internal\/|(?:^|\/)(?:wire|endpoint)\.ts$)/.test(specifier)) continue
           violations.push(`${path} exports an internal module`)
         }
       }

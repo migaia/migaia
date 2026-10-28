@@ -2,7 +2,7 @@
 import { RpcError, RpcSerializationError, RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { expect, it, vi } from 'vitest'
-import { connectedCoreHosts } from '../host/core-fixture.js'
+import { connectedCoreHosts } from '../host/core-fixture.ts'
 
 it('preserves a semantic encode error before framing', async () => {
   /** The original codec throws this exact semantic admission failure before physical handoff. */

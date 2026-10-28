@@ -24,10 +24,10 @@ import {
 } from '@migaia/rpc-contract/protocol'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
 import { RpcCoreErrorText } from '@migaia/rpc-contract/errors'
-import { createRpcAbortError, createRpcError } from '../host/error-owner.js'
-import { resolveAbortReason } from '../host/abort-reason.js'
-import { sameTask } from './envelope.js'
-import type { ICallWriteOptions } from './types.js'
+import { createRpcAbortError, createRpcError } from '../host/error-owner.ts'
+import { resolveAbortReason } from '../host/abort-reason.ts'
+import { sameTask } from './envelope.ts'
+import type { ICallWriteOptions } from './types.ts'
 
 /** Record collaborators perform actual IO and index removal without exposing another owner. */
 export type ICallRecordOwner = Readonly<{

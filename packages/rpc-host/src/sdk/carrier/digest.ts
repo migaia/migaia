@@ -3,7 +3,7 @@
  * codec supplies capture order and uses the returned SHA-256 text; this helper does not own binary
  * traversal, authentication decisions or native transport acquisition.
  */
-import type { IRpcBinaryDigest } from '../wire/binary-types.js'
+import type { IRpcBinaryDigest } from '../wire/binary-types.ts'
 
 /** Encode one native digest byte; the enclosing SHA-256 result has exactly 32 bytes. */
 function digestByteHex(byte: number): string {

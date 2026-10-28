@@ -8,9 +8,9 @@ import { inspectThenable, assimilateCapturedThen } from '@migaia/utils/function'
 import { attachSecondaryErrors } from '@migaia/utils/error'
 import { identifyRpcBoundaryFailure, RpcCoreErrorText } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
-import type { IRpcByteIO } from './byte-pump.js'
+import type { IRpcByteIO } from './byte-pump.ts'
 import { RpcProbeDirection, type IRpcCarrierWriteOptions } from '@migaia/rpc-contract/interfaces'
-import type { RpcCarrierObservation } from '../carrier/observation.js'
+import type { RpcCarrierObservation } from '../carrier/observation.ts'
 
 /** Native emitter streams retain their original listener and pause/resume semantics. */
 export type IRpcEventByteReader = Readonly<{

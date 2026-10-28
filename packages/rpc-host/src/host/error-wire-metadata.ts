@@ -14,7 +14,7 @@ import {
   identifyRpcBoundaryFailure
 } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
-import { createRpcSerializationError, localRpcErrorCode } from './error-owner.js'
+import { createRpcSerializationError, localRpcErrorCode } from './error-owner.ts'
 
 /** Core and Remote retain presentation only for Error references they actually construct. */
 const summaries = new WeakMap<Error, IRpcErrorWireSummary>()

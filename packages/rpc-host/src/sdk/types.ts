@@ -10,8 +10,8 @@ import type {
 } from '@migaia/plugin-host'
 import type { IAbortSignal } from '@migaia/utils/promise'
 import type { IRpcDirectory } from '@migaia/rpc-contract/protocol'
-import type { ICallCommand } from '../call/types.js'
-import type { IRpcCallOptions } from '../namespace/types.js'
+import type { ICallCommand } from '../call/types.ts'
+import type { IRpcCallOptions } from '../namespace/types.ts'
 import type {
   IRpcCallFeature,
   IRpcDispose,
@@ -20,10 +20,10 @@ import type {
   RpcSessionRetirement
 } from '@migaia/rpc-contract/interfaces'
 import type { IRpcTransportContext } from '@migaia/rpc-contract/interfaces'
-import type { IRpcFlowStages, RpcFlowPipelines } from './flow-pipelines.js'
-import type { IRpcNativeTransportFeature } from './native-feature-types.js'
-import type { IRpcIntersection } from '../namespace/types.js'
-import type { IRpcWarning } from '../host/warning.js'
+import type { IRpcFlowStages, RpcFlowPipelines } from './flow-pipelines.ts'
+import type { IRpcNativeTransportFeature } from './native-feature-types.ts'
+import type { IRpcIntersection } from '../namespace/types.ts'
+import type { IRpcWarning } from '../host/warning.ts'
 
 /** Native source policy borrows its genuine installation core, including dependency liquidation. */
 export type IRpcTransportSetupContext = IRpcTransportContext &

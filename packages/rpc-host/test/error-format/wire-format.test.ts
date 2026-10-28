@@ -2,7 +2,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { serializeRpcError, RpcLifecycleError } from '@migaia/rpc-contract/errors'
 import { timeout } from '@migaia/rpc-host/features/timeout'
-import { connectedCoreHosts } from '../host/core-fixture.js'
+import { connectedCoreHosts } from '../host/core-fixture.ts'
 
 /** The actual public report port lends native coded errors directly, without a retired hook wrapper. */
 type IReportedError = Error & { readonly code?: string }

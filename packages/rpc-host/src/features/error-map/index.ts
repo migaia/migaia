@@ -11,14 +11,14 @@ import {
   type IRpcStepOutcome,
   type IRpcWireError
 } from '@migaia/rpc-contract/protocol'
-import { originalHostWireError, serializeHostWireError } from '../../host/error-wire-metadata.js'
-import { createRpcConfigurationError } from '../../host/error-owner.js'
-import { defineBuiltinFlowFeature } from '../../sdk/flow-feature.js'
-import { RpcFlowPoint, invalidFlow, type IRpcFlowStage } from '../../sdk/flow-pipelines.js'
-import type { IRpcFlowFeature } from '../../sdk/types.js'
-import { RpcErrorMapName, RpcErrorMapText } from './text.js'
-import type { IRpcErrorMap } from './types.js'
-export type { IRpcErrorMap } from './types.js'
+import { originalHostWireError, serializeHostWireError } from '../../host/error-wire-metadata.ts'
+import { createRpcConfigurationError } from '../../host/error-owner.ts'
+import { defineBuiltinFlowFeature } from '../../sdk/flow-feature.ts'
+import { RpcFlowPoint, invalidFlow, type IRpcFlowStage } from '../../sdk/flow-pipelines.ts'
+import type { IRpcFlowFeature } from '../../sdk/types.ts'
+import { RpcErrorMapName, RpcErrorMapText } from './text.ts'
+import type { IRpcErrorMap } from './types.ts'
+export type { IRpcErrorMap } from './types.ts'
 
 /** One installed mapper changes fixed wire error slots without observing business payload graphs. */
 class OutboundErrorMapping {

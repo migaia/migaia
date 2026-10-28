@@ -7,7 +7,7 @@ import {
 } from '@migaia/rpc-host/plugins/probe'
 import { createProbeEmitter } from '../../dist/plugins/probe/emitter.js'
 import { createDirectorySnapshot } from '../../dist/session/view.js'
-import { MemoryCarrier } from '../fixtures/core-carrier.js'
+import { MemoryCarrier } from '../fixtures/core-carrier.ts'
 import { describe, expect, it, vi } from 'vitest'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { deferred } from '@migaia/utils/promise'
@@ -20,7 +20,7 @@ import {
   type IRpcFlowInstallation
 } from '@migaia/rpc-host/sdk'
 import { PassThrough } from 'node:stream'
-import { TOKEN, leaks } from '../../../rpc-contract/test/fixtures/handshake-privacy.js'
+import { TOKEN, leaks } from '../../../rpc-contract/test/fixtures/handshake-privacy.ts'
 
 import {
   RpcWireProfile,

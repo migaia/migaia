@@ -1,7 +1,7 @@
 /** One provider catalog owns exact entries, cold reservations and their cached directory. */
 import type { IRpcMethodDescription } from '@migaia/rpc-contract/protocol'
-import { ProviderRegistration } from './registration.js'
-import type { IProviderMethodEntry } from './types.js'
+import { ProviderRegistration } from './registration.ts'
+import type { IProviderMethodEntry } from './types.ts'
 
 /** Public providers use the global scope; ordinary native exposure uses its transport namespace. */
 export class ProviderCatalog {

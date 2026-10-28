@@ -2,7 +2,7 @@
 import { expect, it } from 'vitest'
 import { RPC_CORE_ERROR_SOURCE } from '@migaia/rpc-contract/errors'
 import { RpcCoreErrorCode } from '@migaia/rpc-contract/error-code'
-import { connectedCoreHosts } from './core-fixture.js'
+import { connectedCoreHosts } from './core-fixture.ts'
 
 // Preserve business values; replaces deleted sendAll shape.
 it('real outbound send and broadcast preserve canonical results', async () => {

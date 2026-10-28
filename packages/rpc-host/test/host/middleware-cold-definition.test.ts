@@ -1,7 +1,7 @@
 /** Cold SDK definitions retain the actual native carrier without acquiring its Session IO. */
 import { defineTransportPlugin } from '@migaia/rpc-host/sdk'
 import { expect, it, vi } from 'vitest'
-import { MemoryCarrier } from '../fixtures/core-carrier.js'
+import { MemoryCarrier } from '../fixtures/core-carrier.ts'
 
 /** The original source has no separate listener resource beyond its eventual Session attachment. */
 function releaseSource(): void {}

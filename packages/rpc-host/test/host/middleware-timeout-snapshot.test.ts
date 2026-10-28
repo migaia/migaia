@@ -3,7 +3,7 @@ import { createRpcHost } from '@migaia/rpc-host'
 import { timeout } from '@migaia/rpc-host/features/timeout'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { expect, it, vi } from 'vitest'
-import { coreMemoryServer } from './core-fixture.js'
+import { coreMemoryServer } from './core-fixture.ts'
 
 // C063/C064: captures configuration at the complete feature factory, before installation.
 it.each(
