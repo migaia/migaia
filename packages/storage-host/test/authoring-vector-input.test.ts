@@ -11,11 +11,14 @@ describe('vector native input snapshots', () => {
       name: 'existing',
       options: undefined
     })
-    const captured = contractAuthoringVector.snapshotStorageVectorCollection('docs', configuration)
-    expect(captured).toEqual({ name: 'docs', options: configuration })
+    const captured = contractAuthoringVector.snapshotStorageVectorCollection(
+      'articles',
+      configuration
+    )
+    expect(captured).toEqual({ name: 'articles', options: configuration })
     for (const dimensions of [0, -1, 1.5, Infinity, Number.MAX_SAFE_INTEGER + 1])
       expect(() =>
-        contractAuthoringVector.snapshotStorageVectorCollection('docs', {
+        contractAuthoringVector.snapshotStorageVectorCollection('articles', {
           ...configuration,
           dimensions
         })
@@ -26,7 +29,7 @@ describe('vector native input snapshots', () => {
         })
       )
     expect(() =>
-      contractAuthoringVector.snapshotStorageVectorCollection('docs', {
+      contractAuthoringVector.snapshotStorageVectorCollection('articles', {
         dimensions: 2,
         metric: { toString: () => 'dot' } as never
       })

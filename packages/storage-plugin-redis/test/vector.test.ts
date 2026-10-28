@@ -562,7 +562,7 @@ for (const url of [process.env.MIGAIA_VALKEY_URL]) {
         const collection = host
           .backend('redis')
           .use(vector)
-          .collection('docs', { dimensions: 1, metric: 'dot' })
+          .collection('articles', { dimensions: 1, metric: 'dot' })
         await expect(collection.upsert([{ id: 'a', vector: [1] }])).rejects.toMatchObject({
           code: 'UNSUPPORTED_CAPABILITY'
         })

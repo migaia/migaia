@@ -75,7 +75,7 @@ describe.each(['pg', 'postgres-js'] as const)('%s real pgvector', (adapter) => {
     const { store } = await installed(adapter)
     const collection = store
       .use(vector)
-      .collection<{ kind: string; rank: number; note?: string }>('docs', {
+      .collection<{ kind: string; rank: number; note?: string }>('articles', {
         dimensions: 2,
         metric: 'dot'
       })
@@ -119,7 +119,7 @@ describe.each(['pg', 'postgres-js'] as const)('%s real pgvector', (adapter) => {
       (
         await store
           .use(vector)
-          .collection('docs')
+          .collection('articles')
           .search([1, 0], {
             k: 1,
             exact: true,

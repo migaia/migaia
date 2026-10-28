@@ -72,7 +72,7 @@ describe('memory native vectors', () => {
     expect(store.has(vector)).toBe(true)
     const collection = store
       .use(vector)
-      .collection<IPayload>('docs', { dimensions: 2, metric: 'cosine' })
+      .collection<IPayload>('articles', { dimensions: 2, metric: 'cosine' })
     class Payload {
       group = 'kept'
       order = 1
@@ -104,9 +104,9 @@ describe('memory native vectors', () => {
       order: 1
     })
     expect(() =>
-      store.use(vector).collection('docs', { dimensions: 3, metric: 'cosine' })
+      store.use(vector).collection('articles', { dimensions: 3, metric: 'cosine' })
     ).toThrowError(expect.objectContaining({ code: 'INVALID_ARGUMENT' }))
-    expect(store.use(vector).collection('docs')).toBeDefined()
+    expect(store.use(vector).collection('articles')).toBeDefined()
     await expect(
       collection.upsert([
         { id: 'uncommitted', vector: [1, 0] },
@@ -130,7 +130,7 @@ describe('memory native vectors', () => {
     const collection = host
       .backend('memory')
       .use(vector)
-      .collection<IPayload>('docs', { dimensions: 2, metric: 'dot' })
+      .collection<IPayload>('articles', { dimensions: 2, metric: 'dot' })
     await collection.upsert([
       { id: 'best', vector: [3, 0], payload: { group: 'excluded', order: 3 } },
       { id: 'second', vector: [2, 0], payload: { group: 'kept', order: 2 } },
@@ -181,7 +181,7 @@ describe('memory native vectors', () => {
     const collection = host
       .backend('memory')
       .use(vector)
-      .collection('docs', { dimensions: 2, metric: 'cosine' })
+      .collection('articles', { dimensions: 2, metric: 'cosine' })
     await collection.upsert([
       { id: 'a', vector: [1, 0] },
       { id: 'b', vector: [1, 0] },
@@ -242,8 +242,8 @@ describe('memory native vectors', () => {
       ]
     })
     const store = host.backend('memory')
-    const collection = store.use(vector).collection('docs', { dimensions: 2, metric: 'dot' })
-    const target = lockKey.vector('docs', 'a')
+    const collection = store.use(vector).collection('articles', { dimensions: 2, metric: 'dot' })
+    const target = lockKey.vector('articles', 'a')
     await collection.upsert([{ id: 'a', vector: [1, 0] }])
     await store.set('marker', 'before')
     const original = new Error('rollback vector deadline')
@@ -302,7 +302,7 @@ describe('memory native vectors', () => {
     const store = host.backend('memory')
     const collection = store
       .use(vector)
-      .collection<{ group: string }>('docs', { dimensions: 2, metric: 'dot' })
+      .collection<{ group: string }>('articles', { dimensions: 2, metric: 'dot' })
     await collection.upsert([{ id: 'expired', vector: [1, 0], payload: { group: 'same' } }], {
       ttlMs: 1
     })
@@ -318,7 +318,7 @@ describe('memory native vectors', () => {
     expect(
       await collection.deleteWhere({ group: 'same' }, { count: DeleteCountMode.precount })
     ).toBe(0)
-    expect(await store.use(ttl).remaining(lockKey.vector('docs', 'expired'))).toBeUndefined()
+    expect(await store.use(ttl).remaining(lockKey.vector('articles', 'expired'))).toBeUndefined()
     /** A lazy-expired first radix leaf must not detach the live successor from native ranking. */
     await collection.upsert([{ id: 'expired-first', vector: [3, 0] }], { ttlMs: 1 })
     await collection.upsert([{ id: 'live-next', vector: [4, 0] }])
@@ -339,8 +339,8 @@ describe('memory native vectors', () => {
     const second = createOrgId()
     const left = host.org(first).backend('memory')
     const right = host.org(second).backend('memory')
-    const collection = left.use(vector).collection('docs', { dimensions: 2, metric: 'dot' })
-    const other = right.use(vector).collection('docs', { dimensions: 2, metric: 'dot' })
+    const collection = left.use(vector).collection('articles', { dimensions: 2, metric: 'dot' })
+    const other = right.use(vector).collection('articles', { dimensions: 2, metric: 'dot' })
     const changes: IStorageChange[] = []
     left.subscribeChanges((change) => changes.push(change))
     await collection.upsert([{ id: 'a', vector: [1, 0] }])
@@ -351,7 +351,7 @@ describe('memory native vectors', () => {
     const finish = deferred<void>()
     const held = left
       .tx()
-      .lock(lockKey.vector('docs', 'a'))
+      .lock(lockKey.vector('articles', 'a'))
       .run(async () => {
         entered.resolve()
         await finish.promise
