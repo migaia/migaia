@@ -1,9 +1,9 @@
 import type { Schemas } from '@qdrant/js-client-rest'
 import type { IStorageVectorConfiguration } from '@migaia/storage-contract'
-import { QdrantManagedVectorName } from './constants.js'
-import { invalidArgument, qdrantError } from './errors.js'
+import { QdrantManagedVectorName } from './constants.ts'
+import { invalidArgument, qdrantError } from './errors.ts'
 import { QdrantErrorCode } from '@migaia/storage-contract/error-code'
-import type { IQdrantRescoreConfiguration } from './feature-types.js'
+import type { IQdrantRescoreConfiguration } from './feature-types.ts'
 /** Native distances retain the public metric's exact engine meaning. */
 export const QdrantDistance = { cosine: 'Cosine', dot: 'Dot', euclid: 'Euclid' } as const
 /** Cosine's second Dot slot preserves input amplitude without participating in ranking. */

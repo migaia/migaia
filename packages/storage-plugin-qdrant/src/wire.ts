@@ -1,4 +1,4 @@
-import { QdrantWireField } from './constants.js'
+import { QdrantWireField } from './constants.ts'
 
 /** The supported runtimes expose standard raw JSON tokens without changing numeric values. */
 type IQdrantJson = typeof JSON & { rawJSON(value: string): unknown }

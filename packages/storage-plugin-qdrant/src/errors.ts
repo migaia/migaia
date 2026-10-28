@@ -8,8 +8,8 @@ import {
   QdrantErrorCode
 } from '@migaia/storage-contract/error-code'
 import type { IQdrantErrorCode } from '@migaia/storage-contract/error-code'
-import { QdrantErrorText } from './error-text.js'
-import { QdrantText } from './constants.js'
+import { QdrantErrorText } from './error-text.ts'
+import { QdrantText } from './constants.ts'
 /** Attach native identity through the original helper, retaining immutable failures as causes. */
 export function qdrantError(code: IQdrantErrorCode, cause?: unknown): Error {
   const message =

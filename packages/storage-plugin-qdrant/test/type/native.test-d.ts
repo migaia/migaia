@@ -1,9 +1,9 @@
 import { createStorageHost } from '@migaia/storage-host'
 import { vector, ttl, type IVectorApi } from '@migaia/storage-contract'
-import { qdrantBackendPlugin, type IQdrantStore } from '../../src/index.js'
-import { qdrantManagementFeature } from '../../src/features/management.js'
-import { qdrantHybridFeature } from '../../src/features/hybrid.js'
-import { qdrantRescoreFeature } from '../../src/features/rescore.js'
+import { qdrantBackendPlugin, type IQdrantStore } from '../../src/index.ts'
+import { qdrantManagementFeature } from '../../src/features/management.ts'
+import { qdrantHybridFeature } from '../../src/features/hybrid.ts'
+import { qdrantRescoreFeature } from '../../src/features/rescore.ts'
 /** Compile the actual native store with a nonempty Feature projection. No runtime work occurs. */
 export async function nativeTypes() {
   const host = await createStorageHost({

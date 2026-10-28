@@ -1,8 +1,8 @@
 import { createServer } from 'node:http'
 import { describe, it, expect } from 'vitest'
 import { QdrantClient } from '@qdrant/js-client-rest'
-import { fetchHttp } from '../src/http.js'
-import { qdrantClientHttp } from '../src/client.js'
+import { fetchHttp } from '../src/http.ts'
+import { qdrantClientHttp } from '../src/client.ts'
 /** The original shared launcher supplies the actual native-service address. */
 const url = process.env.MIGAIA_QDRANT_URL
 describe('native Qdrant protocol adapters', () => {

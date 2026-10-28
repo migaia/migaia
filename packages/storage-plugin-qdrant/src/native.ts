@@ -1,6 +1,6 @@
-import { QdrantRoute } from './constants.js'
+import { QdrantRoute } from './constants.ts'
 import type { IOperationContext } from '@migaia/storage-contract'
-import type { IQdrantHttp, IQdrantOperationName } from './types.js'
+import type { IQdrantHttp, IQdrantOperationName } from './types.ts'
 /** A finite adapter delegates only actual SDK-shaped methods, without a generic public request API. */
 export function nativeHttp(
   invoke: <K extends IQdrantOperationName>(

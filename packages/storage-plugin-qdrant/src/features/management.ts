@@ -1,11 +1,11 @@
-import { QdrantRoute } from '../constants.js'
+import { QdrantRoute } from '../constants.ts'
 import { defineFeature, type IStorageFeature } from '@migaia/storage-host'
 import type { IOperationContext, IWriteConcurrencyOptions, IWhere } from '@migaia/storage-contract'
-import { qdrantBackendKind } from '../plugin.js'
-import { readNativeFeaturePort } from '../native-feature.js'
-import { nativeRequest } from '../feature-input.js'
-import type { IQdrantHttp } from '../types.js'
-import type { IQdrantManagementOutput } from '../feature-types.js'
+import { qdrantBackendKind } from '../plugin.ts'
+import { readNativeFeaturePort } from '../native-feature.ts'
+import { nativeRequest } from '../feature-input.ts'
+import type { IQdrantHttp } from '../types.ts'
+import type { IQdrantManagementOutput } from '../feature-types.ts'
 /**
  * Native management returns real SDK results; only org-constrained deletion is available to org
  * views.
@@ -114,4 +114,4 @@ export function qdrantManagementFeature(): IStorageFeature<
     })
   )
 }
-export type { IQdrantManagementApi, IQdrantManagementOutput } from '../feature-types.js'
+export type { IQdrantManagementApi, IQdrantManagementOutput } from '../feature-types.ts'

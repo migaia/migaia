@@ -1,14 +1,14 @@
 import type { QdrantClient } from '@qdrant/js-client-rest'
 import type { IOperationContext } from '@migaia/storage-contract'
 import { throwIfAborted } from '@migaia/storage-host/sdk'
-import { nativeHttp } from './native.js'
-import { nativeResult } from './protocol.js'
-import { qdrantWireValue } from './wire.js'
-import { normalizeQdrantError } from './errors.js'
-import { QdrantRoute } from './constants.js'
+import { nativeHttp } from './native.ts'
+import { nativeResult } from './protocol.ts'
+import { qdrantWireValue } from './wire.ts'
+import { normalizeQdrantError } from './errors.ts'
+import { QdrantRoute } from './constants.ts'
 import { QdrantErrorCode } from '@migaia/storage-contract/error-code'
-import { qdrantError } from './errors.js'
-import type { IQdrantHttp, IQdrantOperationName } from './types.js'
+import { qdrantError } from './errors.ts'
+import type { IQdrantHttp, IQdrantOperationName } from './types.ts'
 /** Borrow one real SDK client; its timeout/configuration and lifetime remain caller-owned. */
 export function qdrantClientHttp(client: QdrantClient): IQdrantHttp {
   /** Borrowed client ports belong to one named adapter, never a second client or cleanup owner. */

@@ -20,11 +20,11 @@ import {
   type IStorageKey
 } from '@migaia/storage-contract'
 import type { ICodecValue } from '@migaia/serialize/codec'
-import { QdrantRoute, QdrantText, QdrantManagedVectorName } from './constants.js'
-import { invalidArgument } from './errors.js'
-import { nativeId } from './id.js'
-import { encodePointPayload, assertPointPayload } from './envelope.js'
-import { nativeCondition, orgFilter } from './filter.js'
+import { QdrantRoute, QdrantText, QdrantManagedVectorName } from './constants.ts'
+import { invalidArgument } from './errors.ts'
+import { nativeId } from './id.ts'
+import { encodePointPayload, assertPointPayload } from './envelope.ts'
+import { nativeCondition, orgFilter } from './filter.ts'
 import {
   unsupported,
   query,
@@ -36,8 +36,8 @@ import {
   send,
   deleteWhere,
   vectorCondition
-} from './store.js'
-import type { IQdrantOrganizationContext, ICollectionState } from './store.js'
+} from './store.ts'
+import type { IQdrantOrganizationContext, ICollectionState } from './store.ts'
 
 /** A fixed organization collection owns its canonical schema reference and public vector ports. */
 export class QdrantVectorCollection<TPayload> implements IVectorCollection<TPayload, true> {

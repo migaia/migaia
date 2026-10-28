@@ -5,9 +5,9 @@ import { QdrantClient } from '@qdrant/js-client-rest'
 import { deferred } from '@migaia/utils/promise'
 import { vector } from '@migaia/storage-contract'
 import { createStorageHost, definePlugin } from '@migaia/storage-host'
-import { qdrantBackendPlugin } from '../src/plugin.js'
-import { qdrantClientHttp } from '../src/client.js'
-import { qdrantManagementFeature } from '../src/features/management.js'
+import { qdrantBackendPlugin } from '../src/plugin.ts'
+import { qdrantClientHttp } from '../src/client.ts'
+import { qdrantManagementFeature } from '../src/features/management.ts'
 
 /** The canonical launcher supplies the actual engine; no alternate service or private API is used. */
 const url = process.env.MIGAIA_QDRANT_URL

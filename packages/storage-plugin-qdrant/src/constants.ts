@@ -1,4 +1,4 @@
-import type { IQdrantOperationName } from './types.js'
+import type { IQdrantOperationName } from './types.ts'
 /** Canonical API metadata is shared by native fetch, SDK adaptation and observation. */
 export const QdrantRoute: {
   readonly [K in IQdrantOperationName]: {

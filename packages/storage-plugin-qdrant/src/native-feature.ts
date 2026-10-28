@@ -4,8 +4,8 @@ import type {
   IQdrantOperationName,
   IQdrantStore,
   IQdrantUpdateResult
-} from './types.js'
-import type { IQdrantRescorePoint, IQdrantRescoreResult } from './feature-types.js'
+} from './types.ts'
+import type { IQdrantRescorePoint, IQdrantRescoreResult } from './feature-types.ts'
 /** Only the exact installed store lends this finite original execution port to its Features. */
 export const nativeFeaturePort = Symbol('qdrant-native-feature')
 export type IQdrantNativeFeaturePort = {

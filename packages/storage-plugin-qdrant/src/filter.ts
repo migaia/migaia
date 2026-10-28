@@ -1,7 +1,7 @@
 import type { Schemas } from '@qdrant/js-client-rest'
 import { QueryOperator, type IQueryCondition } from '@migaia/storage-contract'
-import { projectedPath, projectedScalar } from './envelope.js'
-import { QdrantText } from './constants.js'
+import { projectedPath, projectedScalar } from './envelope.ts'
+import { QdrantText } from './constants.ts'
 /**
  * Native filter expressions are only produced when the original condition's full domain is
  * faithful.

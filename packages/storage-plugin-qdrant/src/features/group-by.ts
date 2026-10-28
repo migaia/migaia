@@ -1,10 +1,10 @@
 import { defineFeature, type IStorageFeature } from '@migaia/storage-host'
 import type { IOperationContext } from '@migaia/storage-contract'
-import { qdrantBackendKind } from '../plugin.js'
-import { readNativeFeaturePort } from '../native-feature.js'
-import { nativeRequest } from '../feature-input.js'
-import { invalidArgument } from '../errors.js'
-import type { IQdrantGroupByOutput, IQdrantGroupByRequest } from '../feature-types.js'
+import { qdrantBackendKind } from '../plugin.ts'
+import { readNativeFeaturePort } from '../native-feature.ts'
+import { nativeRequest } from '../feature-input.ts'
+import { invalidArgument } from '../errors.ts'
+import type { IQdrantGroupByOutput, IQdrantGroupByRequest } from '../feature-types.ts'
 /** Native multivalue groups retain Qdrant's result shape; the SDK's dropped lookup option is absent. */
 export function qdrantGroupByFeature(): IStorageFeature<
   typeof qdrantBackendKind,
@@ -40,4 +40,4 @@ export type {
   IQdrantGroupByRequest,
   IQdrantGroupByResult,
   IQdrantGroupByOutput
-} from '../feature-types.js'
+} from '../feature-types.ts'

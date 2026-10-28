@@ -1,19 +1,19 @@
 import { defineFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
 import { refineStorageVectorQuery, snapshotStorageVectorCollection } from '@migaia/storage-host/sdk'
-import { qdrantBackendKind } from '../plugin.js'
-import { readNativeFeaturePort } from '../native-feature.js'
+import { qdrantBackendKind } from '../plugin.ts'
+import { readNativeFeaturePort } from '../native-feature.ts'
 import {
   snapshotRescoreOptions,
   snapshotRescorePoints,
   snapshotRescoreVector
-} from '../feature-input.js'
-import { invalidArgument } from '../errors.js'
-import { QdrantText } from '../constants.js'
+} from '../feature-input.ts'
+import { invalidArgument } from '../errors.ts'
+import { QdrantText } from '../constants.ts'
 import type {
   IQdrantRescoreOptions,
   IQdrantRescoreMethods,
   IQdrantRescoreApi
-} from '../feature-types.js'
+} from '../feature-types.ts'
 /** Extra vectors and their native ranking reuse the original installed backend and query nodes. */
 export function qdrantRescoreFeature(options: IQdrantRescoreOptions) {
   const configuration = snapshotRescoreOptions(options)
@@ -75,4 +75,4 @@ export type {
   IQdrantRescoreMethods,
   IQdrantRescoreApi,
   IQdrantRescoreResult
-} from '../feature-types.js'
+} from '../feature-types.ts'
