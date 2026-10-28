@@ -166,11 +166,10 @@ export const LIBRARY_REFERENCE_DESCRIPTIONS_EN = {
 
 /** Returns reader-facing ownership context for a linked library reference. */
 export function libraryReferenceDescription(locale: ILocale, slug: string): string {
-  if (locale === 'zh')
-    return LIBRARY_REFERENCE_DESCRIPTIONS_ZH[slug as keyof typeof LIBRARY_REFERENCE_DESCRIPTIONS_ZH]
-  return (
-    LIBRARY_REFERENCE_DESCRIPTIONS_EN[slug as keyof typeof LIBRARY_REFERENCE_DESCRIPTIONS_EN] ??
-    LIBRARY_INDEX.find((entry) => entry.slug === slug)?.description ??
-    slug
-  )
+  /** Locale table first; generated libraries without a maintained summary fall back like English. */
+  const maintained =
+    locale === 'zh'
+      ? LIBRARY_REFERENCE_DESCRIPTIONS_ZH[slug as keyof typeof LIBRARY_REFERENCE_DESCRIPTIONS_ZH]
+      : LIBRARY_REFERENCE_DESCRIPTIONS_EN[slug as keyof typeof LIBRARY_REFERENCE_DESCRIPTIONS_EN]
+  return maintained ?? LIBRARY_INDEX.find((entry) => entry.slug === slug)?.description ?? slug
 }
