@@ -1,3 +1,8 @@
+/**
+ * Owns captured-then admission and once-only invocation state, preserving receivers and Promise
+ * identity. Exposes synchronous and asynchronous function primitives without scheduling or
+ * cancellation policy.
+ */
 import { ERROR_SOURCE, UtilsErrorCode } from './error-code.ts'
 import { UtilsErrorText } from './error-text.ts'
 import { tryReadProperty } from './error.ts'
@@ -189,9 +194,11 @@ class OnceAsyncInvocation<T> {
   constructor(functionValue: () => PromiseLike<T>) {
     this.#functionValue = functionValue
   }
+  /** Stable microtask callback preserves detached invocation without nesting callbacks. */
+  readonly #onStart = (): Promise<T> => this.#start()
   /** Start in the original microtask and memoize before user code can reenter. */
   readonly invoke = (): Promise<T> => {
-    this.#promise ??= Promise.resolve().then(() => this.#start())
+    this.#promise ??= Promise.resolve().then(this.#onStart)
     return this.#promise
   }
   /** Admit the original then protocol once before using the canonical assimilation owner. */
