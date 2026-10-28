@@ -188,32 +188,34 @@ class ProcessPlugin implements ILoggerPlugin<IEmptyPluginExt, IProcessPluginConf
         const originalExitReceiver = runtimeProcess
         ProcessPlugin.#originalExit = originalExit
         ProcessPlugin.#originalExitReceiver = originalExitReceiver
-        runtimeProcess.exit = ((code?: number) => {
-          void (async () => {
-            try {
-              await ProcessPlugin.#flushAllWithTimeout(config.shutdownTimeoutMs)
-            } catch (error) {
-              const cleanupError = createLoggerAggregateError(
-                LoggerErrorCode.pluginShutdownCleanupFailed,
-                LoggerErrorText.pluginShutdownCleanupFailed,
-                [error]
-              )
-              reportRuntimeFailure(cleanupError)
-            }
-            try {
-              Reflect.apply(originalExit, originalExitReceiver, [code])
-            } catch (error) {
-              reportRuntimeFailure(
-                createLoggerError(
+        runtimeProcess.exit = {
+          exit: ((code?: number) => {
+            void (async () => {
+              try {
+                await ProcessPlugin.#flushAllWithTimeout(config.shutdownTimeoutMs)
+              } catch (error) {
+                const cleanupError = createLoggerAggregateError(
                   LoggerErrorCode.pluginShutdownCleanupFailed,
                   LoggerErrorText.pluginShutdownCleanupFailed,
-                  { cause: error }
+                  [error]
                 )
-              )
-            }
-          })()
-          return undefined as never
-        }) as ILoggerProcess['exit']
+                reportRuntimeFailure(cleanupError)
+              }
+              try {
+                Reflect.apply(originalExit, originalExitReceiver, [code])
+              } catch (error) {
+                reportRuntimeFailure(
+                  createLoggerError(
+                    LoggerErrorCode.pluginShutdownCleanupFailed,
+                    LoggerErrorText.pluginShutdownCleanupFailed,
+                    { cause: error }
+                  )
+                )
+              }
+            })()
+            return undefined as never
+          }) as ILoggerProcess['exit']
+        }.exit
       }
     } catch (error) {
       const rollbackErrors: unknown[] = []

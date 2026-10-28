@@ -85,7 +85,9 @@ class ColorPlugin implements ILoggerPlugin<
    */
   #instance!: Ansis
   #colorMap!: Record<string, (text: string) => string>
+  /** Most recently exposed painter also serves the installed console sink. */
   #paint!: IPaintFn
+  /** Most recently exposed dimmer shares the current Ansis instance with the painter. */
   #dim!: IDimFn
 
   constructor(config: IColorPluginConfig) {
@@ -107,12 +109,18 @@ class ColorPlugin implements ILoggerPlugin<
       ...this.#resolvedConfig.colorMap
     }
 
-    this.#paint = (tag, text) => {
-      const fn = this.#colorMap[tag] ?? ((t: string) => t)
-      return fn(text)
+    /** Each exposure owns fresh bound renderers while preserving the logger's latest color state. */
+    const renderers: IColorShared = {
+      paint: (tag, text) => {
+        /** Unknown tags retain their original text without allocating an identity callback. */
+        const fn = this.#colorMap[tag]
+        return fn === undefined || fn === null ? text : fn(text)
+      },
+      dim: (text) => this.#instance.dim(text)
     }
-    this.#dim = (text) => this.#instance.dim(text)
-    return { paint: this.#paint, dim: this.#dim }
+    this.#paint = renderers.paint
+    this.#dim = renderers.dim
+    return renderers
   }
 
   install(core: ILoggerPluginCore): IEmptyPluginExt {
