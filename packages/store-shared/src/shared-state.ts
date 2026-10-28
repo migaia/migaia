@@ -19,16 +19,16 @@ import {
   createStoreSharedError,
   createStoreSharedRangeError,
   STORE_SHARED_SOURCE
-} from './errors.js'
+} from './errors.ts'
 import { attachErrorIdentity, isNativeErrorValue } from '@migaia/utils/error'
-import { StoreSharedErrorCode } from './error-code.js'
-import { StoreSharedErrorText } from './error-text.js'
+import { StoreSharedErrorCode } from './error-code.ts'
+import { StoreSharedErrorText } from './error-text.ts'
 import {
   SHARED_ABI_MAGIC,
   SHARED_ABI_VERSION,
   SharedAbiKind,
   SharedAbiReady
-} from './shared-constants.js'
+} from './shared-constants.ts'
 
 /**
  * SharedArrayBuffer 支撑的跨线程状态。

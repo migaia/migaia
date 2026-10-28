@@ -3,7 +3,7 @@ import {
   createStoreSharedRangeError,
   StoreSharedErrorCode,
   STORE_SHARED_SOURCE
-} from '../src/errors'
+} from '../src/errors.ts'
 
 describe('store-shared error-code contract', () => {
   it('declares 8 unique codes under the package source', () => {

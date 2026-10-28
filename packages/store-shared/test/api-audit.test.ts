@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createRuntime } from '@migaia/reactive'
 import { createManualScheduler } from '@migaia/utils/testing'
 import { UtilsAbortError } from '@migaia/utils/promise'
-import { sharedInt32, sharedInt32Array, SharedInt32Signal } from '../src/index.js'
+import { sharedInt32, sharedInt32Array, SharedInt32Signal } from '../src/index.ts'
 
 describe('store-shared audit regressions', () => {
   it('preserves unseen remote cells across a local write to another cell', () => {
