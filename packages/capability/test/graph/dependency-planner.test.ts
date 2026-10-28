@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { topologyNodeId } from './nonstatic-fixtures.js'
+import { topologyNodeId } from './nonstatic-fixtures.ts'
 import {
   DependencyAction,
   DependencyMutationKind,
@@ -15,12 +15,12 @@ import {
   type IDependencyPlan,
   type IDependencyPlanStep,
   type IDependencyStateReader
-} from '../../src/graph/dependency.js'
+} from '../../src/graph/dependency.ts'
 import {
   createTopologyIndex,
   type ICapabilityTopology,
   type ITopologyIndex
-} from '../../src/graph/topology.js'
+} from '../../src/graph/topology.ts'
 
 /** Creates a topology index whose structural errors remain directly inspectable. */
 function createTestIndex(): ITopologyIndex {

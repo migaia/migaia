@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { CapabilityErrorCode, createCapabilityHost } from '../src/index.js'
+import { CapabilityErrorCode, createCapabilityHost } from '../src/index.ts'
 
 const source = 'capability'
 

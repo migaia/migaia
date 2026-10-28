@@ -7,10 +7,10 @@ import {
   CapabilityGraphNodeState,
   CapabilityGraphState,
   createCapabilityGraph
-} from '../../src/graph/index.js'
-import { CapabilityGraphErrorText } from '../../src/graph/error-text.js'
-import { CAPABILITY_GRAPH_SOURCE } from '../../src/graph/errors.js'
-import { buildCapabilityTopology, type ITopologyNode } from '../../src/graph/topology.js'
+} from '../../src/graph/index.ts'
+import { CapabilityGraphErrorText } from '../../src/graph/error-text.ts'
+import { CAPABILITY_GRAPH_SOURCE } from '../../src/graph/errors.ts'
+import { buildCapabilityTopology, type ITopologyNode } from '../../src/graph/topology.ts'
 
 import {
   id,
@@ -23,7 +23,7 @@ import {
   measureStaticStartup,
   deferred,
   readStaticGraphSource
-} from './static-fixtures.js'
+} from './static-fixtures.ts'
 
 /**
  * Covers the contract: settles a failed level and preserves ordinal primary plus secondary

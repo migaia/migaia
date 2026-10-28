@@ -3,8 +3,8 @@ import type {
   ICapabilityEnableResult,
   ICapabilityHandle,
   ICapabilityHost
-} from '../../src/index.js'
-import { handleOf } from './capability-host.js'
+} from '../../src/index.ts'
+import { handleOf } from './capability-host.ts'
 import { vi } from 'vitest'
 
 /** A handle fixture with no cleanup effects. */

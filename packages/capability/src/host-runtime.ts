@@ -10,19 +10,19 @@ import type {
   ICapabilityHandle,
   ICapabilityHost,
   ICapabilityState
-} from './index.js'
-import { ActivationOrder } from './activation-order.js'
-import { CapabilityEntry, type IHostEntryOwner } from './host-entry.js'
+} from './index.ts'
+import { ActivationOrder } from './activation-order.ts'
+import { CapabilityEntry, type IHostEntryOwner } from './host-entry.ts'
 import {
   copyHostFlags,
   rejectedHostOperation,
   snapshotHostDefinition,
   type IHostOptionsSnapshot
-} from './host-admission.js'
-import { CapabilityErrorCode } from './error-code.js'
-import { CapabilityErrorText } from './error-text.js'
-import { createCapabilityError } from './errors.js'
-import { invokeCapabilityReporter } from './reporter.js'
+} from './host-admission.ts'
+import { CapabilityErrorCode } from './error-code.ts'
+import { CapabilityErrorText } from './error-text.ts'
+import { createCapabilityError } from './errors.ts'
+import { invokeCapabilityReporter } from './reporter.ts'
 
 /** Isolated flag and resource coordinator with receiver-independent public operations. */
 export class CapabilityHost<Context> implements ICapabilityHost<Context> {

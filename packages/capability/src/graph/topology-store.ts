@@ -2,7 +2,7 @@
  * Owns keyed topology storage and copy-on-write transaction overlays. Exposes node facts and
  * stores; ordering and graph policy remain with their owners.
  */
-import type { ITopologyDependency } from './topology.js'
+import type { ITopologyDependency } from './topology.ts'
 
 export type IStoredTopologyNode = Readonly<{
   readonly id: string

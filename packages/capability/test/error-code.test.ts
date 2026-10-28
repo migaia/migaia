@@ -1,10 +1,10 @@
-import { activateHostHandle } from './fixtures/host-cleanup.js'
+import { activateHostHandle } from './fixtures/host-cleanup.ts'
 import { describe, expect, it } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { CapabilityErrorCode, createCapabilityHost, type ICapabilityHandle } from '../src/index'
-import { CAPABILITY_SOURCE, createCapabilityError } from '../src/errors'
+import { CapabilityErrorCode, createCapabilityHost, type ICapabilityHandle } from '../src/index.ts'
+import { CAPABILITY_SOURCE, createCapabilityError } from '../src/errors.ts'
 
 const srcDir = fileURLToPath(new URL('../src', import.meta.url))
 

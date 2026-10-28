@@ -7,8 +7,8 @@ import type {
   ITopologyIndexNode,
   ITopologyTransaction,
   IGraphDependents
-} from './topology-index.js'
-import type { ICapabilityTopology, ITopologyDependency } from './topology.js'
+} from './topology-index.ts'
+import type { ICapabilityTopology, ITopologyDependency } from './topology.ts'
 
 /** Transaction facade that invalidates every operation after settlement. */
 export class TopologyTransaction implements ITopologyTransaction {

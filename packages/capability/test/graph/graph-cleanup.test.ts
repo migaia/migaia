@@ -4,7 +4,7 @@ import {
   CapabilityGraphErrorCode,
   CapabilityGraphNodeState,
   createCapabilityGraph
-} from '../../src/graph/index.js'
+} from '../../src/graph/index.ts'
 
 import {
   id,
@@ -19,7 +19,7 @@ import {
   readinessReentryInstance,
   disposalReentryInstance,
   deferred
-} from './static-fixtures.js'
+} from './static-fixtures.ts'
 
 /** Covers the contract: starts a whole level before awaiting it and preserves reverse release. */
 async function startsAWholeLevelBeforeAwaitingItAndPreservesReverseRelease(): Promise<void> {

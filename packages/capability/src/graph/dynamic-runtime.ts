@@ -1,13 +1,13 @@
-import { unavailableRequiredProvider } from './provider-availability.js'
+import { unavailableRequiredProvider } from './provider-availability.ts'
 /**
  * Owns dynamic graph facts and frontier reconciliation through an explicit context. Startup and
  * physical cleanup stay with composition callbacks; leases stay with lifecycle.
  */
 import { createQuiescenceTracker, type IQuiescenceTracker } from '@migaia/lifecycle'
-import { invokeCapabilityReporter } from '../reporter.js'
-import { CapabilityGraphErrorCode } from './error-code.js'
-import { dynamicFailure } from './dynamic-admission.js'
-import { graphFailure, graphMessageFor } from './errors.js'
+import { invokeCapabilityReporter } from '../reporter.ts'
+import { CapabilityGraphErrorCode } from './error-code.ts'
+import { dynamicFailure } from './dynamic-admission.ts'
+import { graphFailure, graphMessageFor } from './errors.ts'
 import {
   CapabilityGraphNodeState,
   CapabilityGraphState,
@@ -15,22 +15,22 @@ import {
   type GraphBindingReleaseReason,
   type ICapabilityGraphNodeState,
   type ICapabilityGraphState
-} from './state-constants.js'
-import { createTopologyIndex, TopologyInvalidReason, type ITopologyIndex } from './topology.js'
+} from './state-constants.ts'
+import { createTopologyIndex, TopologyInvalidReason, type ITopologyIndex } from './topology.ts'
 import {
   DependencyMutationKind,
   DependencyPolicy,
   planDependencyMutation,
   type IDependencyNodeState
-} from './dependency.js'
+} from './dependency.ts'
 import type {
   IDynamicCapabilityGraphOptions,
   IDynamicGraphNodeDefinition,
   IGraphDependencyMutationOptions,
   IGraphMutationResult,
   IGraphReleaseEntry
-} from './dynamic.js'
-import type { IGraphNodeInstance } from './index.js'
+} from './dynamic.ts'
+import type { IGraphNodeInstance } from './index.ts'
 
 /** One registered definition and its exact current binding/resource generation. */
 export type IDynamicStoredNode<TBinding> = {

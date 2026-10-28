@@ -6,7 +6,7 @@ import {
   createCapabilityGraph,
   type IGraphNodeId,
   type IGraphStartContext
-} from '../../src/graph/index.js'
+} from '../../src/graph/index.ts'
 
 import {
   id,
@@ -16,7 +16,7 @@ import {
   pendingReleaseInstance,
   deferred,
   readStaticGraphSource
-} from './static-fixtures.js'
+} from './static-fixtures.ts'
 
 /** Covers the contract: preserves strict-equality treatment of a NaN auxiliary value. */
 async function preservesStrictEqualityTreatmentOfANaNAuxiliaryValue(): Promise<void> {

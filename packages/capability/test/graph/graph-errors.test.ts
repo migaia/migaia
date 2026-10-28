@@ -4,10 +4,10 @@ import {
   CapabilityGraphErrorCode,
   CapabilityGraphNodeState,
   createCapabilityGraph
-} from '../../src/graph/index.js'
+} from '../../src/graph/index.ts'
 
-import { createDynamicCapabilityGraph } from '../../src/graph/dynamic.js'
-import { createTestBatchOwner } from '../fixtures/dynamic-batch-owner.js'
+import { createDynamicCapabilityGraph } from '../../src/graph/dynamic.ts'
+import { createTestBatchOwner } from '../fixtures/dynamic-batch-owner.ts'
 import {
   id,
   instance,
@@ -15,7 +15,7 @@ import {
   freshReleaseFailureInstance,
   assertGraphErrorCode,
   deferred
-} from './static-fixtures.js'
+} from './static-fixtures.ts'
 
 /** Covers the contract: wraps non-Error startup throws with reachable cause. */
 async function wrapsNonErrorStartupThrowsWithReachableCause(): Promise<void> {

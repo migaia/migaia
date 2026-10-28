@@ -5,7 +5,7 @@ import {
   TopologyInvalidReason,
   type ITopologyDependency,
   type ITopologyNode
-} from '../../src/graph/topology.js'
+} from '../../src/graph/topology.ts'
 
 /** Missing required providers retain the original fixture diagnostic. */
 export function throwUnknownTopologyProvider(): never {

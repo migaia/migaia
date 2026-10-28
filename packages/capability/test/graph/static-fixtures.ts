@@ -8,7 +8,7 @@ import {
   type IGraphNodeDefinition,
   type IGraphNodeId,
   type IGraphStartContext
-} from '../../src/graph/index.js'
+} from '../../src/graph/index.ts'
 
 /** Gives fixture IDs the public nominal type. */
 export const id = (value: string): IGraphNodeId => value as IGraphNodeId

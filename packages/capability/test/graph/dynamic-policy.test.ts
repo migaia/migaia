@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest'
 import {
   createDynamicCapabilityGraph,
   type IDynamicGraphNodeDefinition
-} from '../../src/graph/dynamic.js'
-import type { IGraphNodeId } from '../../src/graph/index.js'
-import { createTestBatchOwner } from '../fixtures/dynamic-batch-owner.js'
-import { tracedInstance } from './nonstatic-fixtures.js'
+} from '../../src/graph/dynamic.ts'
+import type { IGraphNodeId } from '../../src/graph/index.ts'
+import { createTestBatchOwner } from '../fixtures/dynamic-batch-owner.ts'
+import { tracedInstance } from './nonstatic-fixtures.ts'
 
 /** Creates a traced node with explicitly strong or optional provider edges. */
 const node = (

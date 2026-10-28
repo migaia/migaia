@@ -2,7 +2,7 @@
  * Owns static topology projection and public contracts; structural reason values live in the
  * dependency leaf.
  */
-import { TopologyInvalidReason as topologyInvalidReason } from './topology-reasons.js'
+import { TopologyInvalidReason as topologyInvalidReason } from './topology-reasons.ts'
 import {
   admitTopologyId,
   createTopologyReadonlyMap,
@@ -10,7 +10,7 @@ import {
   snapshotTopologyDependencies,
   retainTopologyFailure,
   type ITopologySnapshotFailure
-} from './topology-admission.js'
+} from './topology-admission.ts'
 
 /** Stable structural reasons passed to the caller-owned topology error adapter. */
 export const TopologyInvalidReason = topologyInvalidReason
@@ -250,4 +250,4 @@ export {
   type ITopologyIndexReader,
   type ITopologyIndexWriter,
   type ITopologyTransaction
-} from './topology-index.js'
+} from './topology-index.ts'

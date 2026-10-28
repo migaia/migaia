@@ -14,21 +14,21 @@
  * 但省下体积的是打包器，不是闸门。
  */
 
-import { CapabilityHost } from './host-runtime.js'
-import { snapshotHostOptions } from './host-admission.js'
-import { CapabilityEnableStatus, CapabilityState } from './state-constants.js'
-export * from './state-constants.js'
+import { CapabilityHost } from './host-runtime.ts'
+import { snapshotHostOptions } from './host-admission.ts'
+import { CapabilityEnableStatus, CapabilityState } from './state-constants.ts'
+export * from './state-constants.ts'
 export {
   GraphReadinessState,
   snapshotGraphReadiness,
   type ICapabilityReadinessSource,
   type IGraphReadinessSnapshot
-} from './graph-readiness.js'
+} from './graph-readiness.ts'
 
 // Error codes are public API.
 // Export constants and types from the main entry so callers can branch on `(source, code)`.
-export { CapabilityErrorCode, type ICapabilityErrorCode } from './error-code.js'
-export { CAPABILITY_SOURCE } from './errors.js'
+export { CapabilityErrorCode, type ICapabilityErrorCode } from './error-code.ts'
+export { CAPABILITY_SOURCE } from './errors.ts'
 
 /**
  * Activated resource whose release is owned by the host, including results that arrive after

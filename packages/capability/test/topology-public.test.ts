@@ -9,16 +9,16 @@ import {
   expectInvalidTopology,
   CountedTopologyNode,
   TopologyCycleFailure
-} from './fixtures/topology-public.js'
+} from './fixtures/topology-public.ts'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it, vi } from 'vitest'
-import { buildCapabilityTopology as graphBuildCapabilityTopology } from '../src/graph/index.js'
+import { buildCapabilityTopology as graphBuildCapabilityTopology } from '../src/graph/index.ts'
 import {
   buildCapabilityTopology,
   TopologyInvalidReason,
   type ITopologyNode
-} from '../src/graph/topology.js'
+} from '../src/graph/topology.ts'
 
 const id = (value: string): string => value
 

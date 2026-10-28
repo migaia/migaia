@@ -1,6 +1,6 @@
 /** Shared host fixtures own controlled handles and deferred activation/cleanup, without resources. */
 import { vi, type Mock } from 'vitest'
-import { createCapabilityHost, type ICapabilityHandle } from '../../src/index.js'
+import { createCapabilityHost, type ICapabilityHandle } from '../../src/index.ts'
 
 /** Build the exact handle fixture while retaining the caller's disposer mock identity. */
 export const handleOf = (

@@ -2,20 +2,20 @@ import { describe, expect, it } from 'vitest'
 import {
   createDynamicCapabilityGraph,
   type IDynamicCapabilityGraph
-} from '../../src/graph/dynamic.js'
+} from '../../src/graph/dynamic.ts'
 import {
   CapabilityGraphErrorCode,
   type IGraphNodeDefinition,
   type IGraphNodeDiagnostic,
   type IGraphNodeId
-} from '../../src/graph/index.js'
-import { createTestBatchOwner } from '../fixtures/dynamic-batch-owner.js'
+} from '../../src/graph/index.ts'
+import { createTestBatchOwner } from '../fixtures/dynamic-batch-owner.ts'
 import {
   bindingInstance,
   releaseNothing,
   releaseNothingAsync,
   tracedInstance
-} from './nonstatic-fixtures.js'
+} from './nonstatic-fixtures.ts'
 
 type INodeBinding = Readonly<{ readonly name: string }>
 

@@ -4,11 +4,11 @@ import {
   CapabilityGraphErrorCode,
   CapabilityGraphNodeState,
   createCapabilityGraph
-} from '../../src/graph/index.js'
+} from '../../src/graph/index.ts'
 
-import { createDynamicCapabilityGraph } from '../../src/graph/dynamic.js'
-import { createTestBatchOwner } from '../fixtures/dynamic-batch-owner.js'
-import { id, instance, readyInstance } from './static-fixtures.js'
+import { createDynamicCapabilityGraph } from '../../src/graph/dynamic.ts'
+import { createTestBatchOwner } from '../fixtures/dynamic-batch-owner.ts'
+import { id, instance, readyInstance } from './static-fixtures.ts'
 
 /** Covers the contract: contains asynchronous diagnostic rejection without changing removal. */
 async function containsAsynchronousDiagnosticRejectionWithoutChangingRemoval(): Promise<void> {
