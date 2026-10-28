@@ -3,7 +3,7 @@ import { join, resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 /** Collects every TypeScript source file below one package source root. */
-function collectSourceFiles(directory) {
+function collectSourceFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name)
     return entry.isDirectory() ? collectSourceFiles(path) : path.endsWith('.ts') ? [path] : []
@@ -11,7 +11,7 @@ function collectSourceFiles(directory) {
 }
 
 /** Reads source text once so every closed-world assertion observes one snapshot. */
-function readSources(directory) {
+function readSources(directory: string): string {
   return collectSourceFiles(directory)
     .sort()
     .map((path) => readFileSync(path, 'utf8'))
