@@ -38,9 +38,9 @@ import {
   type ICoroutineReplaceSpec,
   type ICoroutineUserTask,
   type ICoroutineConnect
-} from './coroutine-task.js'
-import { coroutineCarrier } from './coroutine-port.js'
-import type { ICoroutinePluginOptions } from './coroutine-plugin.js'
+} from './coroutine-task.ts'
+import { coroutineCarrier } from './coroutine-port.ts'
+import type { ICoroutinePluginOptions } from './coroutine-plugin.ts'
 
 /** The original cooperative profile owns restart, terminal, capacity, stop and heartbeat policy. */
 export type ICoroutineSupervisorPolicy = Readonly<

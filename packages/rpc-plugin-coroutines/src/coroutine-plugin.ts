@@ -16,14 +16,14 @@ import {
   type IRpcTransportPlugin
 } from '@migaia/rpc-host/sdk'
 import type { IRpcAuthenticationRetain, IRpcCallFeature } from '@migaia/rpc-contract/interfaces'
-import { CoroutineSource, type ICoroutineSupervisorPolicy } from './coroutine-source.js'
+import { CoroutineSource, type ICoroutineSupervisorPolicy } from './coroutine-source.ts'
 import {
   connectionOf,
   createCoroutineSourceError,
   type ICoroutineConnect,
   type ICoroutineUserTask
-} from './coroutine-task.js'
-import { CoroutineText } from './error-text.js'
+} from './coroutine-task.ts'
+import { CoroutineText } from './error-text.ts'
 
 /** Host owns self/provider/auth; native coroutine configuration contains only its actual source. */
 export type ICoroutineCommonOptions = Readonly<{

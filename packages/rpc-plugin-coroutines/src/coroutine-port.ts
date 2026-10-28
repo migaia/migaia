@@ -16,8 +16,8 @@ import {
   RpcProbeDirection,
   type IRpcCarrierWriteOptions
 } from '@migaia/rpc-contract/interfaces'
-import type { ICoroutineMessagePort } from './coroutine-task.js'
-import { CoroutineText } from './error-text.js'
+import type { ICoroutineMessagePort } from './coroutine-task.ts'
+import { CoroutineText } from './error-text.ts'
 import { inspectThenable, assimilateCapturedThen } from '@migaia/utils/function'
 
 /** Native EventTarget receiver adaptation owns activation only; the SDK owns capture and codec IO. */

@@ -4,7 +4,7 @@ import type { IRpcMemberEvent } from '@migaia/rpc-host/sdk'
 import { deferred } from '@migaia/utils/promise'
 import { BudgetRejection, createUnitBudget, SupervisorState } from '@migaia/supervision'
 import { connectionOf } from '../../dist/coroutine-task.js'
-import { ordinaryHost, outlet, runtimeService } from './fixture.js'
+import { ordinaryHost, outlet, runtimeService } from './fixture.ts'
 
 describe('coroutine runtime lifecycle', () => {
   it.each([1, 2])(
