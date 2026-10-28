@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { RpcLifecycleError } from '@migaia/rpc-contract/errors'
 import { RPC_ENDPOINT_ERROR_SOURCE } from '@migaia/rpc-contract/error-code'
-import { StoreWorkerErrorCode } from '../src/error-code.js'
-import { workerParser } from '../src/serialize/worker.js'
+import { StoreWorkerErrorCode } from '../src/error-code.ts'
+import { workerParser } from '../src/serialize/worker.ts'
 
 describe('workerParser lifecycle', () => {
   it('rejects null options with a tagged configuration error', () => {

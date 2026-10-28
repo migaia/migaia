@@ -1,9 +1,9 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'vitest'
 import { RpcWireKind, RpcCallMode, type IRpcEnvelope } from '@migaia/rpc-contract/protocol'
-import { workerFrames } from './worker-frame.js'
-import { WorkerAdapter, createWorkerHandler } from '../src/index.js'
-import { createWorkerContractEndpoint } from '../src/worker-contract.js'
+import { workerFrames } from './worker-frame.ts'
+import { WorkerAdapter, createWorkerHandler } from '../src/index.ts'
+import { createWorkerContractEndpoint } from '../src/worker-contract.ts'
 
 /** Worker-like linked ports expose actual physical frames while retaining the canonical factories. */
 function linked() {

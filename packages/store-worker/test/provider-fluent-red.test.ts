@@ -58,7 +58,7 @@ class LinkedWorkerPort implements ILinkedWorkerPort {
 
 describe('Store Worker provider consumer RED matrix', () => {
   it('constructs the real handler seam and preserves request/result/repeated disposal', async () => {
-    const { WorkerAdapter, createWorkerHandler } = await import('../src/index.js')
+    const { WorkerAdapter, createWorkerHandler } = await import('../src/index.ts')
     /** One named fixture owns the real worker message boundary. */
     const port = new LinkedWorkerPort()
     const handler = createWorkerHandler(
@@ -74,11 +74,11 @@ describe('Store Worker provider consumer RED matrix', () => {
   })
 
   it('owning handler consumes WebRPC fluent provider seam without a Store export', async () => {
-    type IStoreWorkerModule = typeof import('../src/worker.js')
+    type IStoreWorkerModule = typeof import('../src/worker.ts')
     expectTypeOf<IStoreWorkerModule>().not.toHaveProperty('createProviderEndpoint')
 
-    const { WorkerAdapter } = await import('../src/index.js')
-    const { createWorkerHandler } = await import('../src/worker.js')
+    const { WorkerAdapter } = await import('../src/index.ts')
+    const { createWorkerHandler } = await import('../src/worker.ts')
     const port = new LinkedWorkerPort()
     const handler = createWorkerHandler(
       (value: unknown) => `reply:${String(value)}`,
@@ -99,7 +99,7 @@ describe('Store Worker provider consumer RED matrix', () => {
   })
 
   it('routes a custom clientId through the canonical provider response path', async () => {
-    const { WorkerAdapter, createWorkerHandler } = await import('../src/index.js')
+    const { WorkerAdapter, createWorkerHandler } = await import('../src/index.ts')
     const port = new LinkedWorkerPort()
     const handler = createWorkerHandler(
       (value: unknown) => `custom:${String(value)}`,

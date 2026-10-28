@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { MessageChannel } from 'node:worker_threads'
 import { isChunkShape, type ISerializeChunk, type ISerializeParser } from '@migaia/serialize'
-import { createSerializeWorkerHandler, workerParser } from '../src/serialize/worker.js'
+import { createSerializeWorkerHandler, workerParser } from '../src/serialize/worker.ts'
 
 /** Reads the existing error/cause/aggregate graph for cross-realm contract assertions. */
 function errorChain(root: unknown): Error[] {

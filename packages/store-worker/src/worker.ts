@@ -2,19 +2,19 @@
  * Bridge worker computations to the canonical RPC endpoint; physical Worker lifetime stays
  * borrowed.
  */
-import { WorkerMessagePort, type IWorkerMessagePort } from './worker-message-event.js'
+import { WorkerMessagePort, type IWorkerMessagePort } from './worker-message-event.ts'
 import type { IAbortSignal, INativeAbortSignal } from '@migaia/utils/promise'
 import type { IRuntime } from '@migaia/reactive'
 import { defaultRuntime } from '@migaia/reactive'
 import { Resource, type IResourceOptions } from '@migaia/resource'
-import { createWorkerContractEndpoint, type IWorkerContractEndpoint } from './worker-contract.js'
-import { toManagedRpcHandler, type IManagedRpcHandler } from './managed-rpc-handler.js'
-import { createStoreWorkerError, STORE_WORKER_SOURCE, StoreWorkerErrorCode } from './errors.js'
-import { StoreWorkerErrorText } from './error-text.js'
-import { WorkerRpcIdentity } from './worker-constants.js'
+import { createWorkerContractEndpoint, type IWorkerContractEndpoint } from './worker-contract.ts'
+import { toManagedRpcHandler, type IManagedRpcHandler } from './managed-rpc-handler.ts'
+import { createStoreWorkerError, STORE_WORKER_SOURCE, StoreWorkerErrorCode } from './errors.ts'
+import { StoreWorkerErrorText } from './error-text.ts'
+import { WorkerRpcIdentity } from './worker-constants.ts'
 import { snapshotOwnDescriptors } from '@migaia/utils/object'
 
-export type { IManagedRpcHandler } from './managed-rpc-handler.js'
+export type { IManagedRpcHandler } from './managed-rpc-handler.ts'
 /** Borrowed Web-worker-shaped message port; logical adapter disposal does not terminate its host. */
 export type IWorkerPort = IWorkerMessagePort
 

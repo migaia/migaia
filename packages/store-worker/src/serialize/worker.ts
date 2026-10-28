@@ -3,7 +3,7 @@
  * owners.
  */
 import { attachErrorIdentity, attachSecondaryErrors, isNativeErrorValue } from '@migaia/utils/error'
-import { WorkerMessagePort, type IWorkerMessagePort } from '../worker-message-event.js'
+import { WorkerMessagePort, type IWorkerMessagePort } from '../worker-message-event.ts'
 import {
   SerializeCodecError,
   SerializeChunkKind,
@@ -16,16 +16,16 @@ import {
 } from '@migaia/serialize'
 import { isUint8Array } from '@migaia/utils/bytes'
 import { RpcLifecycleError } from '@migaia/rpc-host/contract'
-import { createWorkerContractEndpoint, type IWorkerContractEndpoint } from '../worker-contract.js'
-import { toManagedRpcHandler, type IManagedRpcHandler } from '../managed-rpc-handler.js'
+import { createWorkerContractEndpoint, type IWorkerContractEndpoint } from '../worker-contract.ts'
+import { toManagedRpcHandler, type IManagedRpcHandler } from '../managed-rpc-handler.ts'
 import {
   createStoreWorkerAggregateError,
   createStoreWorkerError,
   STORE_WORKER_SOURCE,
   StoreWorkerErrorCode
-} from '../errors.js'
-import type { IStoreWorkerErrorCode } from '../error-code.js'
-import { StoreWorkerErrorText } from '../error-text.js'
+} from '../errors.ts'
+import type { IStoreWorkerErrorCode } from '../error-code.ts'
+import { StoreWorkerErrorText } from '../error-text.ts'
 import { snapshotOwnDescriptors } from '@migaia/utils/object'
 import {
   WorkerDiagnosticType,
@@ -33,8 +33,8 @@ import {
   WorkerSerializeFrameKind,
   WorkerSerializeFrameMethod,
   WorkerSerializePhase
-} from '../worker-constants.js'
-import { CursorQueue } from '../cursor-queue.js'
+} from '../worker-constants.ts'
+import { CursorQueue } from '../cursor-queue.ts'
 
 /**
  * Identifies the `error` and `messageerror` worker failure events. Both must be observed so

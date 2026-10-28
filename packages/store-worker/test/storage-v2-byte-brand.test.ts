@@ -1,6 +1,6 @@
 import { runInNewContext } from 'node:vm'
 import { describe, expect, it } from 'vitest'
-import { workerParser } from '../src/serialize/worker.js'
+import { workerParser } from '../src/serialize/worker.ts'
 import { MessageChannel } from 'node:worker_threads'
 
 describe('store-worker byte boundaries', () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { CursorQueue } from '../src/cursor-queue.js'
+import { CursorQueue } from '../src/cursor-queue.ts'
 
 describe('CursorQueue', () => {
   it('preserves FIFO order across repeated empty and refill cycles', () => {
