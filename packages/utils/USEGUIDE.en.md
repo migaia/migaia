@@ -787,6 +787,8 @@ function retry<T>(
       context: IRetryFailureContext
     ) => boolean | PromiseLike<boolean>
     readonly delay?: number | ((error: unknown, context: IRetryFailureContext) => number)
+    readonly beforeRetry?: (error: unknown, context: IRetryFailureContext) => void | PromiseLike<void>
+    readonly attemptStart?: 'sync' | 'microtask' | 'macrotask'
     readonly totalTimeoutMs?: number
     readonly attemptTimeoutMs?: number
     readonly signal?: IAbortSignal
@@ -802,11 +804,15 @@ function retry<T>(
 Serial retries with three layers of limits:
 
 - `maxAttempts`: a positive safe integer. If attempt number `maxAttempts` still fails, its error is thrown.
-- `attemptTimeoutMs`: a separate timeout for each attempt (wrapped in `withTimeout` internally).
+- `attemptTimeoutMs`: a separate timeout for each attempt. When it fires, the attempt's `signal` aborts first, then `UtilsTimeoutError('attempt', attemptTimeoutMs)` goes to `shouldRetry` like any other failure.
 - `totalTimeoutMs`: a deadline for the whole run, all attempts and backoff waits included; exceeding it throws `UtilsTimeoutError('total', totalTimeoutMs)`.
 - `shouldRetry(error, context)`: decides whether a failure is worth retrying. Returning `false`, or running out of `maxAttempts`, ends the run and throws that error.
-- `delay`: a fixed number of milliseconds or a `(error, context) => milliseconds` backoff function for the wait between attempts (done with an internal `sleep`, which also honours `signal` / `signals`).
+- `beforeRetry(error, context)`: awaited after `shouldRetry` accepts a failure and before `delay`, for preparation such as waiting until a connection is usable again. Its time counts against `totalTimeoutMs`; if it rejects, the run ends with that rejection unchanged.
+- `delay`: a fixed number of milliseconds or a `(error, context) => milliseconds` backoff function for the wait between attempts; the wait also honours `signal` / `signals`.
+- `attemptStart`: when each attempt starts. `sync` starts at once, `microtask` waits one microtask, `macrotask` waits for a zero-delay task of the scheduler. Unset keeps the original timing: an attempt starts at once without outside signals or when a deadline is set, and waits one microtask when only outside signals are given. An outside abort during a deferred start means the attempt never runs.
 - When an outside signal aborts at any point, the whole run ends with `UtilsAbortError` and no further attempt starts.
+
+Each attempt's `context.signal` is created only when read. An operation that never reads it allocates no `AbortController`; reading it after the attempt was cancelled returns an aborted signal carrying the reason. `signal` is a getter on the context's prototype, so `{ ...context }` does not copy it. Cleanup failures, such as a listener removal or timer cancel that throws, go to `report` with `phase: 'cleanup'` and do not change the result.
 
 ```ts doc-test=skip reason="Fragment that relies on illustrative outside functions or values"
 await retry(

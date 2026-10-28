@@ -128,8 +128,23 @@ export type IRetryContext = {
   readonly signal: INativeAbortSignal
   readonly remainingMs?: number
 }
-/** Context passed to `shouldRetry` and a `delay` function after a failed attempt. */
+/** Context passed to `shouldRetry`, `beforeRetry` and a `delay` function after a failed attempt. */
 export type IRetryFailureContext = IRetryContext & { readonly maxAttempts: number }
+/**
+ * When `retry` starts each attempt, relative to the code that reached it. Leaving the option unset
+ * keeps the default: an attempt runs synchronously unless outside signals are attached, in which
+ * case it waits one microtask. - `sync`: start in the same turn, before `retry` (or its previous
+ * wait) returns control. - `microtask`: start after one microtask. - `macrotask`: start in a
+ * zero-delay timer task of the scheduler.
+ *
+ * An outside abort that lands while a deferred start is waiting still wins before the attempt runs.
+ */
+export const RetryAttemptStart = {
+  sync: 'sync',
+  microtask: 'microtask',
+  macrotask: 'macrotask'
+} as const
+export type RetryAttemptStart = keyof typeof RetryAttemptStart
 /**
  * Receives failures that happen after a result was already settled: late rejections, cleanup
  * failures and failures of a custom reporter. `operation` names the API and `phase` the kind of
@@ -169,8 +184,94 @@ export type IDeadlineOnlyOperation<T> = (context: {
   readonly signal: IAbortSignal
 }) => T | PromiseLike<T>
 
-/** Internal controller hand-off used by retry so operation and policy share one attempt signal. */
-const retryAttemptController = Symbol('retry attempt controller')
+/**
+ * Attempt cancellation owner for `retry`. The host `AbortController` is allocated only when some
+ * code reads `signal`, so an attempt that never looks at its signal costs no controller. An abort
+ * before allocation is recorded and replayed onto the controller when it is created, so a late
+ * reader still sees an aborted signal with the original reason.
+ */
+class LazyAbortController implements IAbortControllerLike {
+  /** Host controller, created on the first `signal` read. */
+  #controller: AbortController | undefined
+  /** Whether `abort` ran before the controller existed. */
+  #aborted = false
+  /** Reason recorded by an abort that ran before the controller existed. */
+  #reason: unknown
+
+  /** Returns the attempt signal, allocating the controller and replaying a recorded abort. */
+  get signal(): INativeAbortSignal {
+    if (this.#controller === undefined) {
+      this.#controller = new AbortController()
+      if (this.#aborted) this.#controller.abort(this.#reason)
+    }
+    return this.#controller.signal as unknown as INativeAbortSignal
+  }
+
+  /** Whether `error` only acknowledges this attempt's cancellation (its exact abort reason). */
+  acknowledges(error: unknown): boolean {
+    if (this.#controller !== undefined)
+      return acknowledgesCancellation(error, this.#controller.signal as unknown as IAbortSignal)
+    return this.#aborted && Object.is(error, this.#reason)
+  }
+
+  /** Aborts the attempt; like the native controller, only the first call has an effect. */
+  abort(reason?: unknown): void {
+    if (this.#controller !== undefined) {
+      this.#controller.abort(reason)
+      return
+    }
+    if (this.#aborted) return
+    this.#aborted = true
+    this.#reason = reason
+  }
+}
+
+/**
+ * Context one attempt receives. `signal` is a prototype getter, so the host controller is created
+ * only when the operation reads it; `attempt` and `remainingMs` are own data properties.
+ */
+class RetryAttemptContext implements IRetryContext {
+  /** 1-based attempt number. */
+  readonly attempt: number
+  /** Remaining total budget at the attempt start, when a total deadline is set. */
+  readonly remainingMs: number | undefined
+  /** Lazy cancellation owner of this attempt. */
+  readonly #owner: LazyAbortController
+
+  /** Captures the attempt facts. */
+  constructor(owner: LazyAbortController, attempt: number, remainingMs: number | undefined) {
+    this.#owner = owner
+    this.attempt = attempt
+    this.remainingMs = remainingMs
+  }
+
+  /** The attempt signal, allocated on first read. */
+  get signal(): INativeAbortSignal {
+    return this.#owner.signal
+  }
+}
+
+/** Context shared by `shouldRetry`, `beforeRetry` and `delay` after one failure. */
+class RetryFailureContext implements IRetryFailureContext {
+  /** 1-based number of the failed attempt. */
+  readonly attempt: number
+  /** Configured attempt limit. */
+  readonly maxAttempts: number
+  /** Lazy cancellation owner of the failed attempt. */
+  readonly #owner: LazyAbortController
+
+  /** Captures the failure facts. */
+  constructor(owner: LazyAbortController, attempt: number, maxAttempts: number) {
+    this.#owner = owner
+    this.attempt = attempt
+    this.maxAttempts = maxAttempts
+  }
+
+  /** The failed attempt's signal, allocated on first read. */
+  get signal(): INativeAbortSignal {
+    return this.#owner.signal
+  }
+}
 
 /** Stable reporter operation owned by the signal-only composition primitive. */
 const abortTimeoutSignalOperation = 'abort-timeout-signal' as const
@@ -558,10 +659,6 @@ type IWithTimeoutOptions = IAsyncControls & {
   readonly zeroTimeoutBehavior?: 'skip' | 'start'
   /** Disables internal cancellation allocation for deadline-only operations. */
   readonly cooperativeCancellation?: boolean
-  readonly [retryAttemptController]?: {
-    readonly controller: IAbortControllerLike
-    readonly scope: 'attempt' | 'total'
-  }
 }
 
 /** Own one withTimeout settlement, cancellation and cleanup transaction. */
@@ -793,19 +890,14 @@ export function withTimeout<T>(
     )
   const signals = snapshotSignals(signalsOption, signal)
   const report = reportOption ?? hostRethrowReporter
-  /** Retry owns the attempt controller and the semantic scope of its deadline. */
-  const internalDeadline = options[retryAttemptController]
-  const controller =
-    internalDeadline?.controller ?? (cooperativeCancellation ? new AbortController() : undefined)
-  /** Ordinary withTimeout calls retain operation scope; retry passes its actual budget scope. */
-  const timeoutScope = internalDeadline?.scope ?? 'operation'
+  const controller = cooperativeCancellation ? new AbortController() : undefined
   const operationSignal = controller?.signal
   return new TimeoutOperation<T>(
     operation,
     signals,
     report,
     controller,
-    timeoutScope,
+    'operation',
     operationSignal,
     timeoutMs,
     zeroTimeoutBehavior,
@@ -988,157 +1080,453 @@ export function raceWithAbort<T>(
   ).promise
 }
 
-/** Retries serially under explicit attempt and total limits. */
-async function retryCore<T>(
-  operation: (context: IRetryContext) => T | PromiseLike<T>,
-  options: {
-    readonly maxAttempts: number
-    readonly shouldRetry: (
-      error: unknown,
-      context: IRetryFailureContext
-    ) => boolean | PromiseLike<boolean>
-    readonly delay?: number | ((error: unknown, context: IRetryFailureContext) => number)
-    readonly totalTimeoutMs?: number
-    readonly attemptTimeoutMs?: number
-    readonly signal?: IAbortSignal
-    readonly signals?: readonly IAbortSignal[]
-    readonly zeroTimeoutBehavior?: 'skip' | 'start'
-    readonly report?: IUtilsReporter
-    readonly unref?: boolean
-    readonly scheduler?: IScheduler
-  }
-): Promise<T> {
-  if (!Number.isSafeInteger(options.maxAttempts) || options.maxAttempts < 1)
-    throw attachErrorIdentity(
-      new RangeError(UtilsErrorText.invalidArgument('maxAttempts', 'a positive safe integer')),
-      { source: ERROR_SOURCE, code: UtilsErrorCode.invalidArgument }
-    )
+/**
+ * Options of `retry`. `maxAttempts` and `shouldRetry` are required; every other field is optional.
+ * `signal` and `signals` are mutually exclusive.
+ */
+export type IRetryOptions = {
+  readonly maxAttempts: number
+  readonly shouldRetry: (
+    error: unknown,
+    context: IRetryFailureContext
+  ) => boolean | PromiseLike<boolean>
+  readonly delay?: number | ((error: unknown, context: IRetryFailureContext) => number)
+  /**
+   * Awaited after `shouldRetry` accepts a failure and before `delay`, for example to wait until a
+   * connection is usable again. It counts against `totalTimeoutMs`; an outside abort ends the run
+   * with `UtilsAbortError`; a rejection ends the run with that rejection unchanged.
+   */
+  readonly beforeRetry?: (error: unknown, context: IRetryFailureContext) => void | PromiseLike<void>
+  /** When each attempt starts; see `RetryAttemptStart`. Unset keeps the default timing. */
+  readonly attemptStart?: RetryAttemptStart
+  readonly totalTimeoutMs?: number
+  readonly attemptTimeoutMs?: number
+  readonly signal?: IAbortSignal
+  readonly signals?: readonly IAbortSignal[]
+  readonly zeroTimeoutBehavior?: 'skip' | 'start'
+  readonly report?: IUtilsReporter
+  readonly unref?: boolean
+  readonly scheduler?: IScheduler
+}
+
+/** Policy hook a failure is currently waiting on. */
+type IRetryPolicyStep = 'shouldRetry' | 'beforeRetry'
+
+/** Builds the INVALID_ARGUMENT error for one rejected retry option. */
+function invalidRetryOption(
+  ErrorType: typeof RangeError | typeof TypeError,
+  name: string,
+  expected: string
+): Error {
+  return attachErrorIdentity(new ErrorType(UtilsErrorText.invalidArgument(name, expected)), {
+    source: ERROR_SOURCE,
+    code: UtilsErrorCode.invalidArgument
+  })
+}
+
+/** Whether an optional retry duration is absent or a finite non-negative number. */
+function isRetryDuration(value: number | undefined): boolean {
+  return value === undefined || (Number.isFinite(value) && value >= 0)
+}
+
+/** Listener options of the run-long outside abort listener; shared to avoid one object per run. */
+const retryAbortListenerOptions = { once: true } as const
+
+/** Empty signal list of a run without outside signals. */
+const noRetrySignals: readonly IAbortSignal[] = Object.freeze([])
+
+/** Copies the outside signals of a retry snapshot; the copy fixes cleanup ownership. */
+function copyRetrySignals(options: IRetryOptions): readonly IAbortSignal[] {
+  if (options.signals !== undefined) return [...options.signals]
+  return options.signal === undefined ? noRetrySignals : [options.signal]
+}
+
+/** Returns the first invalid-option error of a retry snapshot, or undefined when it is valid. */
+function validateRetryOptions(options: IRetryOptions): Error | undefined {
   if (options.signal && options.signals)
-    throw attachErrorIdentity(
-      new TypeError(
-        UtilsErrorText.invalidArgument('signal', 'signal and signals are mutually exclusive')
-      ),
-      { source: ERROR_SOURCE, code: UtilsErrorCode.invalidArgument }
-    )
-  for (const [name, value] of [
-    ['totalTimeoutMs', options.totalTimeoutMs],
-    ['attemptTimeoutMs', options.attemptTimeoutMs]
-  ] as const)
-    if (value !== undefined && (!Number.isFinite(value) || value < 0))
-      throw attachErrorIdentity(
-        new RangeError(UtilsErrorText.invalidArgument(name, 'a finite non-negative number')),
-        { source: ERROR_SOURCE, code: UtilsErrorCode.invalidArgument }
-      )
-  const externalSignals = options.signals ?? (options.signal ? [options.signal] : [])
-  const preAbort = observeAbort(externalSignals)
-  if (preAbort.kind === 'failed') throw preAbort.error
-  if (preAbort.kind === 'aborted') throw new UtilsAbortError(preAbort.reason)
-  let lastError: unknown
-  const startedAt = options.scheduler?.now() ?? systemScheduler.now()
-  for (let attempt = 1; attempt <= options.maxAttempts; attempt += 1) {
-    const attemptController = new AbortController()
-    const signal = attemptController.signal as unknown as INativeAbortSignal
-    const remainingMs =
-      options.totalTimeoutMs === undefined
-        ? undefined
-        : options.totalTimeoutMs - ((options.scheduler?.now() ?? systemScheduler.now()) - startedAt)
+    return invalidRetryOption(TypeError, 'signal', 'signal and signals are mutually exclusive')
+  if (!Number.isSafeInteger(options.maxAttempts) || options.maxAttempts < 1)
+    return invalidRetryOption(RangeError, 'maxAttempts', 'a positive safe integer')
+  if (!isRetryDuration(options.totalTimeoutMs))
+    return invalidRetryOption(RangeError, 'totalTimeoutMs', 'a finite non-negative number')
+  if (!isRetryDuration(options.attemptTimeoutMs))
+    return invalidRetryOption(RangeError, 'attemptTimeoutMs', 'a finite non-negative number')
+  if (options.attemptStart !== undefined && !Object.hasOwn(RetryAttemptStart, options.attemptStart))
+    return invalidRetryOption(TypeError, 'attemptStart', 'one of sync, microtask, macrotask')
+  return undefined
+}
+
+/**
+ * One `retry` run: a state machine that owns every resource of the run. The outside signals are
+ * listened to once for the whole run, the total deadline is one timer, and each attempt adds only
+ * its lazy cancellation owner (plus a timer when `attemptTimeoutMs` is set). Each step runs from
+ * the callback of the previous one, so no async function or nested deadline wrapper is involved.
+ *
+ * Default timing matches the earlier composition: an attempt starts synchronously, except that it
+ * waits one microtask when outside signals are attached and no deadline is configured; policy hooks
+ * are deferred one microtask when an outside signal or the total deadline is present.
+ */
+class RetryRun<T> {
+  /** The caller's operation, invoked without a receiver. */
+  readonly #operation: (context: IRetryContext) => T | PromiseLike<T>
+  /** Options read once at entry. */
+  readonly #options: IRetryOptions
+  /** Frozen outside signals; listened to for the whole run. */
+  readonly #signals: readonly IAbortSignal[]
+  /** Destination of late rejections and cleanup failures. */
+  readonly #report: IUtilsReporter
+  /** Clock and timer owner of every wait of the run. */
+  readonly #scheduler: IScheduler
+  /** Clock reading at entry when a total budget exists; the budget counts from here. */
+  readonly #startedAt: number
+  /** True when attempts start one microtask late by default (signals, no deadline). */
+  readonly #deferStart: boolean
+  /** True when policy hooks start one microtask late (signals or total deadline). */
+  readonly #deferPolicy: boolean
+  /** Reporter operation of a late attempt rejection: deadline-limited runs keep `withTimeout`. */
+  readonly #lateOperation: 'retry' | 'withTimeout'
+  /** Signals whose abort listener was installed, removed in reverse order at the end. */
+  readonly #admitted: IAbortSignal[] = []
+  /** Pending total-deadline timer. */
+  #totalTimer: IScheduledTask | undefined
+  /** Pending timer of the current attempt deadline, start deferral or backoff. */
+  #stepTimer: IScheduledTask | undefined
+  /** 1-based number of the current or last attempt. */
+  #attempt = 0
+  /** Cancellation owner of the current attempt; also the token that identifies it. */
+  #controller: LazyAbortController | undefined
+  /** True while the current attempt's result is still awaited. */
+  #attemptOpen = false
+  /** Failure being decided by the policy hooks. */
+  #error: unknown
+  /** Context shared by the policy hooks of the failure being decided. */
+  #failureContext: IRetryFailureContext | undefined
+  /** Set once; every later callback becomes inert. */
+  #settled = false
+  /** Settles the public Promise with a value. */
+  #resolve!: (value: T) => void
+  /** Settles the public Promise with a failure. */
+  #reject!: (reason: unknown) => void
+  /** Public Promise of the run. */
+  readonly promise: Promise<T>
+
+  /** Captures a validated snapshot and starts the run synchronously. */
+  constructor(operation: (context: IRetryContext) => T | PromiseLike<T>, options: IRetryOptions) {
+    this.#operation = operation
+    this.#options = options
+    this.#signals = copyRetrySignals(options)
+    this.#report = options.report ?? hostRethrowReporter
+    this.#scheduler = options.scheduler ?? systemScheduler
+    this.#startedAt = options.totalTimeoutMs === undefined ? 0 : this.#scheduler.now()
+    const deadline = options.totalTimeoutMs !== undefined || options.attemptTimeoutMs !== undefined
+    this.#deferStart = this.#signals.length > 0 && !deadline
+    this.#deferPolicy = this.#signals.length > 0 || options.totalTimeoutMs !== undefined
+    this.#lateOperation = deadline ? 'withTimeout' : 'retry'
+    this.promise = new Promise<T>((resolve, reject) => {
+      this.#resolve = resolve
+      this.#reject = reject
+    })
+    this.#start()
+  }
+
+  /** Checks the outside signals, admits listeners, arms the total deadline and starts attempt 1. */
+  #start(): void {
+    const initial = observeAbort(this.#signals)
+    if (initial.kind === 'failed') return this.#fail(initial.error)
+    if (initial.kind === 'aborted') return this.#fail(new UtilsAbortError(initial.reason))
+    const total = this.#options.totalTimeoutMs
+    if (total === 0) return this.#fail(new UtilsTimeoutError('total', 0))
     try {
-      if (remainingMs !== undefined && remainingMs <= 0)
-        throw new UtilsTimeoutError('total', options.totalTimeoutMs!)
-      /** Lend only the same three inputs retained by the original attempt callback. */
-      const operationInput = { operation, attempt, remainingMs }
-      const operationCall: ITimeoutOperation<T> = (context) => {
-        /** The original operation remains a plain call rather than a method on its input record. */
-        const operation = operationInput.operation
-        return operation({
-          attempt: operationInput.attempt,
-          signal: context.signal,
-          remainingMs: operationInput.remainingMs
-        })
+      for (const signal of this.#signals) {
+        // A failed registration may still have installed the listener.
+        this.#admitted.push(signal)
+        signal.addEventListener('abort', this.#onAbort, retryAbortListenerOptions)
+        if (signal.aborted) return this.#onAbort()
       }
-      if (options.attemptTimeoutMs !== undefined) {
-        return await withTimeout(operationCall, {
-          timeoutMs: options.attemptTimeoutMs,
-          scheduler: options.scheduler,
-          signals: externalSignals,
-          zeroTimeoutBehavior: options.zeroTimeoutBehavior,
-          unref: options.unref,
-          report: options.report,
-          [retryAttemptController]: { controller: attemptController, scope: 'attempt' }
-        })
-      }
-      if (remainingMs !== undefined) {
-        try {
-          return await withTimeout(operationCall, {
-            timeoutMs: remainingMs,
-            scheduler: options.scheduler,
-            signals: externalSignals,
-            zeroTimeoutBehavior: options.zeroTimeoutBehavior,
-            unref: options.unref,
-            report: options.report,
-            [retryAttemptController]: { controller: attemptController, scope: 'total' }
-          })
-        } catch (error) {
-          if (error instanceof UtilsTimeoutError)
-            throw new UtilsTimeoutError('total', options.totalTimeoutMs!)
-          throw error
-        }
-      }
-      if (externalSignals.length === 0) return await operationCall({ signal })
-      return await runWithAbort(
-        () => operationCall({ signal }),
-        externalSignals,
-        attemptController,
-        options.report
-      )
+      if (total !== undefined) this.#totalTimer = this.#schedule(this.#onTotalTimeout, total)
     } catch (error) {
-      const externalAbort = observeAbort(externalSignals)
-      if (externalAbort.kind === 'failed') throw externalAbort.error
-      if (externalAbort.kind === 'aborted' && error instanceof UtilsAbortError) throw error
-      lastError = error
-      /** A late policy retains its original inputs without also retaining the business operation. */
-      const policyInput = { options, error, attempt, signal }
-      if (
-        attempt >= options.maxAttempts ||
-        (error instanceof UtilsTimeoutError && error.scope === 'total') ||
-        !(await (externalSignals.length === 0
-          ? options.shouldRetry(error, { attempt, maxAttempts: options.maxAttempts, signal })
-          : runWithAbort(
-              () =>
-                policyInput.options.shouldRetry(policyInput.error, {
-                  attempt: policyInput.attempt,
-                  maxAttempts: policyInput.options.maxAttempts,
-                  signal: policyInput.signal
-                }),
-              externalSignals,
-              attemptController,
-              options.report
-            )))
-      )
-        throw error
-      const delay =
-        typeof options.delay === 'function'
-          ? options.delay(error, { attempt, maxAttempts: options.maxAttempts, signal })
-          : (options.delay ?? 0)
-      if (!Number.isFinite(delay) || delay < 0)
-        throw attachErrorIdentity(
-          new RangeError(UtilsErrorText.invalidArgument('delay', 'a finite non-negative number')),
-          { source: ERROR_SOURCE, code: UtilsErrorCode.invalidArgument }
-        )
-      if (options.totalTimeoutMs !== undefined) {
-        const elapsed = (options.scheduler?.now() ?? systemScheduler.now()) - startedAt
-        if (elapsed + delay >= options.totalTimeoutMs)
-          throw new UtilsTimeoutError('total', options.totalTimeoutMs)
-      }
-      if (delay > 0)
-        await sleep(delay, {
-          scheduler: options.scheduler,
-          signals: externalSignals,
-          unref: options.unref
-        })
+      return this.#fail(error)
+    }
+    this.#beginAttempt()
+  }
+
+  /** Ends the run when an outside signal is aborted or unreadable; true when it did. */
+  #abortedNow(): boolean {
+    if (observeAbort(this.#signals).kind === 'none') return false
+    this.#onAbort()
+    return true
+  }
+
+  /** Schedules one timer of this run, applying the unref policy. */
+  #schedule(callback: () => void, delayMs: number): IScheduledTask {
+    const task = this.#scheduler.schedule(callback, delayMs)
+    if (this.#options.unref) task.unref?.()
+    return task
+  }
+
+  /** Starts the next attempt at the configured start point. */
+  #beginAttempt(): void {
+    this.#attempt += 1
+    const start =
+      this.#options.attemptStart ??
+      (this.#deferStart ? RetryAttemptStart.microtask : RetryAttemptStart.sync)
+    if (start === RetryAttemptStart.sync) return this.#runAttempt()
+    if (start === RetryAttemptStart.microtask) {
+      void Promise.resolve().then(this.#onDeferredStart)
+      return
+    }
+    try {
+      this.#stepTimer = this.#schedule(this.#onDeferredStart, 0)
+    } catch (error) {
+      this.#fail(error)
     }
   }
-  throw lastError
+
+  /** Runs a deferred attempt unless the run ended or an outside abort landed meanwhile. */
+  readonly #onDeferredStart = (): void => {
+    this.#stepTimer = undefined
+    if (this.#settled || this.#abortedNow()) return
+    this.#runAttempt()
+  }
+
+  /** Invokes the operation once with a fresh lazy cancellation owner. */
+  #runAttempt(): void {
+    const total = this.#options.totalTimeoutMs
+    const remainingMs =
+      total === undefined ? undefined : total - (this.#scheduler.now() - this.#startedAt)
+    if (remainingMs !== undefined && remainingMs <= 0)
+      return this.#fail(new UtilsTimeoutError('total', total!))
+    const controller = new LazyAbortController()
+    this.#controller = controller
+    this.#attemptOpen = true
+    const attemptTimeoutMs = this.#options.attemptTimeoutMs
+    if (attemptTimeoutMs !== undefined) {
+      if (attemptTimeoutMs === 0 && this.#options.zeroTimeoutBehavior !== 'start') {
+        this.#attemptOpen = false
+        return this.#onFailure(new UtilsTimeoutError('attempt', 0))
+      }
+      try {
+        this.#stepTimer = this.#schedule(this.#onAttemptTimeout, attemptTimeoutMs)
+      } catch (error) {
+        return this.#fail(error)
+      }
+    }
+    let result: T | PromiseLike<T>
+    try {
+      result = Reflect.apply(this.#operation, undefined, [
+        new RetryAttemptContext(controller, this.#attempt, remainingMs)
+      ])
+    } catch (error) {
+      return this.#onAttemptRejected(controller, error)
+    }
+    Promise.resolve(result).then(
+      (value) => this.#onAttemptFulfilled(controller, value),
+      (error: unknown) => this.#onAttemptRejected(controller, error)
+    )
+  }
+
+  /** Whether `controller` belongs to the attempt whose result is still awaited. */
+  #isOpen(controller: LazyAbortController): boolean {
+    return !this.#settled && this.#attemptOpen && controller === this.#controller
+  }
+
+  /** Ends the current attempt: cancels its deadline timer. */
+  #closeAttempt(): void {
+    this.#attemptOpen = false
+    this.#cancelStepTimer()
+  }
+
+  /** Publishes the value of the current attempt; a late value is discarded. */
+  #onAttemptFulfilled(controller: LazyAbortController, value: T): void {
+    if (!this.#isOpen(controller)) return
+    this.#closeAttempt()
+    this.#settle()
+    this.#resolve(value)
+  }
+
+  /** Hands the failure of the current attempt to the policy, or reports a late one. */
+  #onAttemptRejected(controller: LazyAbortController, error: unknown): void {
+    if (!this.#isOpen(controller)) {
+      if (!controller.acknowledges(error))
+        reportDiagnostic(this.#report, error, {
+          operation: this.#lateOperation,
+          phase: 'late-rejection'
+        })
+      return
+    }
+    this.#closeAttempt()
+    this.#onFailure(error)
+  }
+
+  /** Fails the current attempt at its own deadline, cancelling its signal first. */
+  readonly #onAttemptTimeout = (): void => {
+    this.#stepTimer = undefined
+    if (this.#settled || !this.#attemptOpen) return
+    this.#attemptOpen = false
+    const error = new UtilsTimeoutError('attempt', this.#options.attemptTimeoutMs!)
+    this.#controller!.abort(error)
+    this.#onFailure(error)
+  }
+
+  /** Ends the run on the last attempt or a total deadline; otherwise asks `shouldRetry`. */
+  #onFailure(error: unknown): void {
+    if (this.#abortedNow()) return
+    if (
+      this.#attempt >= this.#options.maxAttempts ||
+      (error instanceof UtilsTimeoutError && error.scope === 'total')
+    )
+      return this.#fail(error)
+    this.#error = error
+    this.#failureContext = new RetryFailureContext(
+      this.#controller!,
+      this.#attempt,
+      this.#options.maxAttempts
+    )
+    this.#runPolicy('shouldRetry')
+  }
+
+  /** Calls one policy hook with the current failure. */
+  #callPolicy(step: IRetryPolicyStep): unknown {
+    return step === 'shouldRetry'
+      ? Reflect.apply(this.#options.shouldRetry, undefined, [this.#error, this.#failureContext])
+      : Reflect.apply(this.#options.beforeRetry!, undefined, [this.#error, this.#failureContext])
+  }
+
+  /** Runs a policy hook now or one microtask later, then continues with its result. */
+  #runPolicy(step: IRetryPolicyStep): void {
+    const controller = this.#controller!
+    if (this.#deferPolicy) {
+      Promise.resolve()
+        .then(() => (this.#settled || this.#abortedNow() ? undefined : this.#callPolicy(step)))
+        .then(
+          (value) => this.#onPolicyResult(controller, step, value),
+          (error: unknown) => this.#onPolicyError(controller, error)
+        )
+      return
+    }
+    let result: unknown
+    try {
+      result = this.#callPolicy(step)
+    } catch (error) {
+      return this.#onPolicyError(controller, error)
+    }
+    Promise.resolve(result).then(
+      (value) => this.#onPolicyResult(controller, step, value),
+      (error: unknown) => this.#onPolicyError(controller, error)
+    )
+  }
+
+  /** Ends the run with a policy failure, or reports one that arrives after the run ended. */
+  #onPolicyError(controller: LazyAbortController, error: unknown): void {
+    if (this.#settled) {
+      if (!controller.acknowledges(error))
+        reportDiagnostic(this.#report, error, { operation: 'retry', phase: 'late-rejection' })
+      return
+    }
+    this.#fail(error)
+  }
+
+  /** Continues after `shouldRetry` or `beforeRetry` resolved. */
+  #onPolicyResult(controller: LazyAbortController, step: IRetryPolicyStep, value: unknown): void {
+    if (this.#settled || controller !== this.#controller) return
+    if (step === 'shouldRetry') {
+      if (!value) return this.#fail(this.#error)
+      if (this.#options.beforeRetry !== undefined) return this.#runPolicy('beforeRetry')
+    }
+    this.#scheduleNext()
+  }
+
+  /** Waits for the backoff, if any, then starts the next attempt. */
+  #scheduleNext(): void {
+    const option = this.#options.delay
+    let delay: number
+    try {
+      delay =
+        typeof option === 'function'
+          ? Reflect.apply(option, undefined, [this.#error, this.#failureContext])
+          : (option ?? 0)
+    } catch (error) {
+      return this.#fail(error)
+    }
+    if (!Number.isFinite(delay) || delay < 0)
+      return this.#fail(invalidRetryOption(RangeError, 'delay', 'a finite non-negative number'))
+    const total = this.#options.totalTimeoutMs
+    if (total !== undefined && this.#scheduler.now() - this.#startedAt + delay >= total)
+      return this.#fail(new UtilsTimeoutError('total', total))
+    this.#error = undefined
+    this.#failureContext = undefined
+    if (delay === 0) return this.#beginAttempt()
+    try {
+      this.#stepTimer = this.#schedule(this.#onDelayDone, delay)
+    } catch (error) {
+      this.#fail(error)
+    }
+  }
+
+  /** Starts the next attempt once the backoff elapsed. */
+  readonly #onDelayDone = (): void => {
+    this.#stepTimer = undefined
+    if (!this.#settled) this.#beginAttempt()
+  }
+
+  /** Ends the run at the total deadline, cancelling the current attempt first. */
+  readonly #onTotalTimeout = (): void => {
+    this.#totalTimer = undefined
+    if (this.#settled) return
+    const error = new UtilsTimeoutError('total', this.#options.totalTimeoutMs!)
+    this.#controller?.abort(error)
+    this.#fail(error)
+  }
+
+  /** Ends the run on an outside abort, cancelling the current attempt with the same reason. */
+  readonly #onAbort = (): void => {
+    if (this.#settled) return
+    const observation = observeAbort(this.#signals)
+    if (observation.kind === 'failed') return this.#fail(observation.error)
+    const reason = observation.kind === 'aborted' ? observation.reason : undefined
+    this.#controller?.abort(reason)
+    this.#fail(new UtilsAbortError(reason))
+  }
+
+  /** Rejects the run after releasing its resources. */
+  #fail(error: unknown): void {
+    if (this.#settled) return
+    this.#settle()
+    this.#reject(error)
+  }
+
+  /** Cancels the pending step timer, reporting a failing cancel. */
+  #cancelStepTimer(): void {
+    const timer = this.#stepTimer
+    this.#stepTimer = undefined
+    try {
+      timer?.cancel()
+    } catch (error) {
+      reportDiagnostic(this.#report, error, { operation: 'retry', phase: 'cleanup' })
+    }
+  }
+
+  /** Marks the run settled and releases timers and listeners; failures are reported. */
+  #settle(): void {
+    this.#settled = true
+    this.#cancelStepTimer()
+    const total = this.#totalTimer
+    this.#totalTimer = undefined
+    try {
+      total?.cancel()
+    } catch (error) {
+      reportDiagnostic(this.#report, error, { operation: 'retry', phase: 'cleanup' })
+    }
+    for (const signal of this.#admitted.reverse())
+      try {
+        signal.removeEventListener('abort', this.#onAbort)
+      } catch (error) {
+        reportDiagnostic(this.#report, error, { operation: 'retry', phase: 'cleanup' })
+      }
+    this.#admitted.length = 0
+    this.#error = undefined
+    this.#failureContext = undefined
+  }
 }
 
 /**
@@ -1146,164 +1534,19 @@ async function retryCore<T>(
  * `maxAttempts` throws that original error unchanged. `delay` sets the wait between attempts,
  * `attemptTimeoutMs` limits each attempt and `totalTimeoutMs` limits the whole run, waits included
  * (`UtilsTimeoutError` with scope `attempt` / `total`). An outside abort ends the run with
- * `UtilsAbortError`. Invalid limits reject with `INVALID_ARGUMENT`.
+ * `UtilsAbortError`. `beforeRetry` is awaited between an accepted failure and `delay`;
+ * `attemptStart` chooses when each attempt starts (`RetryAttemptStart`). Each attempt's `signal` is
+ * created only when read. Invalid options reject with `INVALID_ARGUMENT`; cleanup failures and late
+ * rejections go to `report`.
  */
 export function retry<T>(
   operation: (context: IRetryContext) => T | PromiseLike<T>,
-  options: Parameters<typeof retryCore<T>>[1]
+  options: IRetryOptions
 ): Promise<T> {
   const snapshot = { ...options }
-  if (snapshot.signal && snapshot.signals)
-    return Promise.reject(
-      attachErrorIdentity(
-        new TypeError(
-          UtilsErrorText.invalidArgument('signal', 'signal and signals are mutually exclusive')
-        ),
-        { source: ERROR_SOURCE, code: UtilsErrorCode.invalidArgument }
-      )
-    )
-  if (snapshot.totalTimeoutMs === undefined) return retryCore(operation, snapshot)
-  const externalSignals = snapshotSignals(snapshot.signals, snapshot.signal)
-  /** The original entry snapshot is still spread only when its existing deadline operation runs. */
-  const executionInput = { operation, snapshot, externalSignals }
-  return withTimeout(
-    ({ signal }) =>
-      retryCore(executionInput.operation, {
-        ...executionInput.snapshot,
-        signal: undefined,
-        signals: [...executionInput.externalSignals, signal],
-        totalTimeoutMs: executionInput.snapshot.totalTimeoutMs
-      }),
-    {
-      timeoutMs: snapshot.totalTimeoutMs,
-      scheduler: snapshot.scheduler,
-      unref: snapshot.unref,
-      zeroTimeoutBehavior: snapshot.zeroTimeoutBehavior,
-      // The outer retry owner already settles the caller; late attempt cancellation is contained
-      // here rather than delegated to the host uncaught-exception reporter.
-      report: snapshot.report ?? (() => undefined)
-    }
-  ).catch((error: unknown) => {
-    if (error instanceof UtilsTimeoutError && error.scope === 'operation')
-      throw new UtilsTimeoutError('total', snapshot.totalTimeoutMs!)
-    throw error
-  })
-}
-
-/** Own one runWithAbort settlement, cancellation and cleanup transaction. */
-class RetryAbortOperation<T> {
-  /** The admitted user callback stays unchanged and is invoked without a receiver. */
-  #operation: () => T | PromiseLike<T>
-  /** The original signal snapshot fixes listener admission and abort observation order. */
-  #signals: readonly IAbortSignal[]
-  /** The original cooperative cancellation controller owns the operation signal and reason. */
-  #controller: AbortController
-  /** Background and late failures keep the original diagnostic destination. */
-  #report: IUtilsReporter
-  /** Admitted listeners are removed in original reverse registration order. */
-  #admitted: IAbortSignal[] = []
-  /** Terminal settlement prevents duplicate cleanup and callbacks. */
-  #settled: boolean = false
-  /** Native settlement callbacks belong to the same Promise returned to the caller. */
-  #resolve!: (value: T | PromiseLike<T>) => void
-  /** Rejection preserves the original primary or cleanup reason. */
-  #reject!: (reason?: unknown) => void
-  /** The single result retains native Promise settlement and identity. */
-  readonly promise: Promise<T>
-  /** Capture admitted inputs before installing timers or abort listeners. */
-  constructor(
-    operation: () => T | PromiseLike<T>,
-    signals: readonly IAbortSignal[],
-    controller: AbortController,
-    report: IUtilsReporter
-  ) {
-    this.#operation = operation
-    this.#signals = signals
-    this.#controller = controller
-    this.#report = report
-    this.promise = new Promise<T>((resolve, reject) => {
-      this.#resolve = resolve
-      this.#reject = reject
-      this.#run()
-    })
-  }
-  /** Admit resources and start the original operation in its original order. */
-  #run(): void {
-    const initial = observeAbort(this.#signals)
-    if (initial.kind === 'failed' || initial.kind === 'aborted') return this.#onAbort()
-    try {
-      for (const signal of this.#signals) {
-        this.#admitted.push(signal)
-        signal.addEventListener('abort', this.#onAbort, { once: true })
-        const after = observeAbort([signal])
-        if (after.kind !== 'none') return this.#onAbort()
-      }
-    } catch (error) {
-      this.#settled = true
-      this.#cleanup()
-      this.#reject(error)
-      return
-    }
-    const afterAdmission = observeAbort(this.#signals)
-    if (afterAdmission.kind !== 'none') return this.#onAbort()
-    Promise.resolve()
-      .then(this.#operation)
-      .then(
-        (value) => {
-          if (this.#settled) return
-          this.#settled = true
-          this.#cleanup()
-          this.#resolve(value)
-        },
-        (error) => {
-          if (this.#settled) {
-            if (!acknowledgesCancellation(error, this.#controller.signal))
-              reportDiagnostic(this.#report, error, { operation: 'retry', phase: 'late-rejection' })
-            return
-          }
-          this.#settled = true
-          this.#cleanup()
-          this.#reject(error)
-        }
-      )
-  }
-  /** Release the originally admitted resources before publishing settlement. */
-  #cleanup = (): void => {
-    for (const signal of this.#admitted.reverse())
-      try {
-        signal.removeEventListener('abort', this.#onAbort)
-      } catch (error) {
-        reportDiagnostic(this.#report, error, { operation: 'retry', phase: 'cleanup' })
-      }
-  }
-  /** Observe the original outside signal and settle its cancellation. */
-  #onAbort = (): void => {
-    if (this.#settled) return
-    const observation = observeAbort(this.#signals)
-    this.#settled = true
-    if (observation.kind === 'failed') {
-      this.#cleanup()
-      this.#reject(observation.error)
-      return
-    }
-    const reason = observation.kind === 'aborted' ? observation.reason : undefined
-    this.#controller.abort(reason)
-    this.#cleanup()
-    this.#reject(new UtilsAbortError(reason))
-  }
-}
-
-/**
- * Runs an operation with externally linked cooperative cancellation when no deadline wrapper
- * exists.
- */
-function runWithAbort<T>(
-  operation: () => T | PromiseLike<T>,
-  signals: readonly IAbortSignal[],
-  controller: AbortController,
-  report: IUtilsReporter = hostRethrowReporter
-): Promise<T> {
-  return new RetryAbortOperation<T>(operation, signals, controller, report).promise
+  const invalid = validateRetryOptions(snapshot)
+  if (invalid !== undefined) return Promise.reject(invalid)
+  return new RetryRun(operation, snapshot).promise
 }
 
 /** Cleared queue tombstones retain no caller callback or cancellation closure. */

@@ -855,6 +855,8 @@ function retry<T>(
       context: IRetryFailureContext
     ) => boolean | PromiseLike<boolean>
     readonly delay?: number | ((error: unknown, context: IRetryFailureContext) => number)
+    readonly beforeRetry?: (error: unknown, context: IRetryFailureContext) => void | PromiseLike<void>
+    readonly attemptStart?: 'sync' | 'microtask' | 'macrotask'
     readonly totalTimeoutMs?: number
     readonly attemptTimeoutMs?: number
     readonly signal?: IAbortSignal
@@ -870,11 +872,15 @@ function retry<T>(
 串行重试，带三层限制：
 
 - `maxAttempts`：必须是正安全整数，第 `maxAttempts` 次仍失败则直接抛出最后一次的错误。
-- `attemptTimeoutMs`：每次尝试单独的超时（内部用 `withTimeout` 包裹）。
+- `attemptTimeoutMs`：每次尝试单独的超时；到点先中止这次尝试的 `signal`，再以 `UtilsTimeoutError('attempt', attemptTimeoutMs)` 交给 `shouldRetry` 判断。
 - `totalTimeoutMs`：整个重试过程（包含所有尝试与退避等待）的总截止时间；超出会抛 `UtilsTimeoutError('total', totalTimeoutMs)`。
 - `shouldRetry(error, context)`：决定某次失败是否值得重试；返回 `false` 或 `maxAttempts` 已用尽都会终止重试并抛出该错误。
-- `delay`：固定毫秒数或 `(error, context) => 毫秒数` 的退避函数，作用于两次尝试之间的等待（通过内部 `sleep`，同样遵守 `signal`/`signals`）。
+- `beforeRetry(error, context)`：`shouldRetry` 同意重试之后、`delay` 之前等待它完成，适合“等连接恢复再重试”这类准备工作。它的耗时计入 `totalTimeoutMs`；它拒绝时，整个重试以这个错误原样结束。
+- `delay`：固定毫秒数或 `(error, context) => 毫秒数` 的退避函数，作用于两次尝试之间的等待，同样遵守 `signal`/`signals`。
+- `attemptStart`：每次尝试何时开始。`sync` 立即开始，`microtask` 等一个微任务，`macrotask` 等调度器的一个 0 毫秒任务。不设置时保持原有时序：没有外部信号或设置了截止时间时立即开始，只有外部信号时等一个微任务。延后开始期间收到外部中止，这次尝试不会执行。
 - 外部信号在重试过程中的任意时刻中止，都会以 `UtilsAbortError` 结束整个重试，不再进入下一次尝试。
+
+每次尝试的 `context.signal` 只在被读取时才创建。不读它的操作不分配 `AbortController`；读取时如果这次尝试已经被中止，拿到的是带原因的已中止信号。`signal` 是上下文对象原型上的 getter，展开 `{ ...context }` 不会复制它。监听移除、计时器取消等清理失败交给 `report`（`phase: 'cleanup'`），不改变重试结果。
 
 ```ts doc-test=skip reason="片段，依赖示意中的外部函数或变量"
 await retry(
