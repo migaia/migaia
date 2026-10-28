@@ -281,7 +281,10 @@ describe('rule gate: no Function.prototype call/apply/bind; Reflect.apply only i
       'lifecycle/src/observed-subscription.ts',
       'lifecycle/src/scheduler.ts',
       'plugin-host/src/invocation.ts',
-      'reactive/src/runtime/receiver.ts'
+      'reactive/src/runtime/receiver.ts',
+      // Resource attempts and subscriptions invoke stored callbacks with their original receivers.
+      'resource/src/resource-attempt.ts',
+      'resource/src/resource-subscription.ts'
     ])
   })
 })
