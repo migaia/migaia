@@ -25,6 +25,7 @@
       "@migaia/storage-plugin-browser": ["../../packages/storage-plugin-browser/dist/index.d.ts"],
       "@migaia/storage-plugin-browser/*": ["../../packages/storage-plugin-browser/dist/*"],
       "@migaia/storage-host": ["../../packages/storage-host/dist/index.d.ts"],
+      "@migaia/storage-host/*": ["../../packages/storage-host/dist/*"],
       "@migaia/lifecycle": ["../../packages/lifecycle/dist/index.d.ts"],
       "@migaia/utils/promise": ["../../packages/utils/dist/promise.d.ts"]
     },
