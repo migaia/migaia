@@ -1,3 +1,7 @@
+/**
+ * Owns reversible reachability transitions and restore tokens; Host keeps mutation admission and
+ * lifecycle ownership.
+ */
 import { containAsyncRejection, createAbortController } from '@migaia/lifecycle'
 import {
   DependencyAction,
@@ -12,19 +16,17 @@ import ERROR_TEXT, { PluginHostError } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 import type { PluginHostState } from './host-state.js'
 import type { IRegistration } from './registry.js'
-import type {
-  IPluginConstraint,
-  IPluginEnablement,
-  IPluginDependencyMutationOptions,
-  IPluginRegistrationContext,
-  IPluginHostDiagnostic
-} from './typing.js'
+import type { IPluginConstraint } from './plugin-definition-types.js'
+import type { IPluginEnablement, IPluginDependencyMutationOptions } from './plugin-handle-types.js'
+import type { IPluginRegistrationContext } from './plugin-lifecycle-types.js'
+import type { IPluginHostDiagnostic } from './host-options-types.js'
 import {
   admitDependencyMutationOptions,
   findUnavailableProvider,
   toPluginPlan
 } from './dependency-runtime.js'
 
+/** Committed state and reporting authority used by reversible availability transitions. */
 type IPluginHostEnablementRuntimePort<TDomainCore extends object, TValue> = Readonly<{
   /** Marks synchronous notification reentry without extending the marker over its Promise. */
   readonly invokeHook: <T>(invoke: () => T) => T
@@ -47,12 +49,14 @@ export class PluginHostEnablementRuntime<TDomainCore extends object, TValue> {
   /** Disabled names in transition order; enabling removes the corresponding entry. */
   readonly #disabled = new Set<string>()
 
+  /** Captures canonical state without duplicating registration or resource ownership. */
   constructor(port: IPluginHostEnablementRuntimePort<TDomainCore, TValue>) {
     this.#port = port
   }
 
   /** Resolves one exact installed registration or reports the existing not-installed contract. */
   requireInstalled(name: string): IRegistration<TDomainCore, TValue> {
+    /** Name lookup selects only the current committed registration. */
     const registration = this.#port.state.registrations.get(name)
     if (!registration)
       throw new PluginHostError(
@@ -70,6 +74,7 @@ export class PluginHostEnablementRuntime<TDomainCore extends object, TValue> {
     registration: IRegistration<TDomainCore, TValue>,
     enabling: ReadonlySet<string> = new Set()
   ): void {
+    /** Canonical dependency validation returns the original classified failure. */
     const unavailable = findUnavailableProvider(
       registration,
       this.#port.state.registrations,
@@ -148,27 +153,52 @@ export class PluginHostEnablementRuntime<TDomainCore extends object, TValue> {
 
   /** Runs one captured notification hook; failure is diagnostic-only and never rolls state back. */
   #notify(hook: 'onEnable' | 'onDisable', registration: IRegistration<TDomainCore, TValue>): void {
+    /** Captured notification preserves the admitted definition's original hook identity. */
     const callback = registration.plugin[hook]
     if (!callback) return
-    const report = (error: unknown): void => {
-      reportDiagnostic(
-        this.#port.diagnostic,
-        ERROR_TEXT.ENABLEMENT_HOOK_FAILED(registration.name, hook, error),
-        PluginHostErrorCode.pluginInstallFailed,
-        error
-      )
-    }
+    /** Reporting context belongs only to this hook invocation. */
+    const notification = { registration, hook }
+    /** Registration signal is the original lifecycle controller, created only if needed. */
     const context = Object.freeze({
       signal: (registration.lifecycleController ??= createAbortController()).signal
     }) satisfies IPluginRegistrationContext
+    /** Explicit hook request avoids capturing unrelated notification locals in the adapter. */
+    const request = { callback, registration, context }
     try {
       containAsyncRejection(
-        this.#port.invokeHook(() => invokeCaptured(callback, registration.plugin.owner, [context])),
-        report
+        this.#port.invokeHook(() => this.#invokeNotification(request)),
+        (error) => this.#reportNotification(notification, error)
       )
     } catch (error) {
-      report(error)
+      this.#reportNotification(notification, error)
     }
+  }
+
+  /** Sends the original classified hook failure without rolling the committed transition back. */
+  #reportNotification(
+    notification: Readonly<{
+      readonly registration: IRegistration<TDomainCore, TValue>
+      readonly hook: 'onEnable' | 'onDisable'
+    }>,
+    error: unknown
+  ): void {
+    reportDiagnostic(
+      this.#port.diagnostic,
+      ERROR_TEXT.ENABLEMENT_HOOK_FAILED(notification.registration.name, notification.hook, error),
+      PluginHostErrorCode.pluginInstallFailed,
+      error
+    )
+  }
+
+  /** Runs one captured notification under the exact admitted plugin receiver. */
+  #invokeNotification(
+    request: Readonly<{
+      readonly callback: Function
+      readonly registration: IRegistration<TDomainCore, TValue>
+      readonly context: IPluginRegistrationContext
+    }>
+  ): unknown {
+    return invokeCaptured(request.callback, request.registration.plugin.owner, [request.context])
   }
 }
 
@@ -219,13 +249,18 @@ class PluginHostEnablementFacade<THost, TDomainCore extends object, TValue> {
   }
 
   /** Disables a registration and its planned dependents, or returns the dry-run plan. */
-  readonly disable = async (name: string, options: IPluginDependencyMutationOptions = {}) => {
+  readonly disable = async (name: string, options: IPluginDependencyMutationOptions = {}) =>
+    this.#disableQueued(name, options)
+
+  /** Admits and queues one disable operation while retaining its original async task boundary. */
+  #disableQueued(name: string, options: IPluginDependencyMutationOptions) {
     this.#admit()
     return this.#port.enqueue(async () => this.#disableNow(name, options))
   }
 
   /** Runs one queued disable mutation. */
   #disableNow(name: string, options: IPluginDependencyMutationOptions) {
+    /** This facade delegates every state transition to the same canonical runtime. */
     const runtime = this.#runtime
     runtime.requireInstalled(name)
     /** Validated breaking option shape and default reject policy. */
@@ -239,8 +274,10 @@ class PluginHostEnablementFacade<THost, TDomainCore extends object, TValue> {
         { detail: { blockedBy: plan.blockedBy } }
       )
     if (admitted.dryRun) return toPluginPlan(plan, admitted.policy)
+    /** Restore token contains only registrations whose enabled state actually changed. */
     const disabled: IRegistration<TDomainCore, TValue>[] = []
     for (const step of plan.steps) {
+      /** Plan steps address exact currently installed generations. */
       const dependent = runtime.requireInstalled(step.id)
       if (step.action === DependencyAction.suspend) runtime.suspend(dependent)
       else if (step.action === DependencyAction.disable && runtime.disable(dependent))
@@ -252,29 +289,44 @@ class PluginHostEnablementFacade<THost, TDomainCore extends object, TValue> {
   }
 
   /** Queues the restore of one disable call's registrations; only issued tokens receive it. */
-  readonly #restore = (disabled: readonly IRegistration<TDomainCore, TValue>[]): Promise<void> => {
+  readonly #restore = (disabled: readonly IRegistration<TDomainCore, TValue>[]): Promise<void> =>
+    this.#restoreQueued(disabled)
+
+  /** Admits a token restore before handing its exact registration set to the existing queue. */
+  #restoreQueued(disabled: readonly IRegistration<TDomainCore, TValue>[]): Promise<void> {
     this.#admit()
-    return this.#port.enqueue(async () => {
-      // Check the whole restore set first so a rejected token enables nothing.
-      const enabling = new Set(disabled.map((item) => item.name))
-      for (const item of disabled) this.#runtime.assertProvidersAvailable(item, enabling)
-      for (let index = disabled.length - 1; index >= 0; index -= 1) {
-        const item = disabled[index]!
-        this.#runtime.enable(item)
-        await this.#port.resumeAfterProvider(item.name, false)
-      }
-    })
+    return this.#port.enqueue(() => this.#restoreNow(disabled))
+  }
+
+  /** Checks the entire restore set before enabling any registration, then restores reverse order. */
+  async #restoreNow(disabled: readonly IRegistration<TDomainCore, TValue>[]): Promise<void> {
+    /** One membership set lets each provider prerequisite check remain an indexed lookup. */
+    const enabling = new Set(disabled.map((item) => item.name))
+    for (const item of disabled) this.#runtime.assertProvidersAvailable(item, enabling)
+    for (let index = disabled.length - 1; index >= 0; index -= 1) {
+      /** Reverse disable order preserves provider-first recovery. */
+      const item = disabled[index]!
+      this.#runtime.enable(item)
+      await this.#port.resumeAfterProvider(item.name, false)
+    }
   }
 
   /** Enables one registration after its providers are available. */
-  readonly enable = async (name: string) => {
+  readonly enable = async (name: string) => this.#enableQueued(name)
+
+  /** Admits one named enable operation before queuing its transition and dependent recovery. */
+  #enableQueued(name: string): Promise<void> {
     this.#admit()
-    return this.#port.enqueue(async () => {
-      const registration = this.#runtime.requireInstalled(name)
-      this.#runtime.assertProvidersAvailable(registration)
-      this.#runtime.enable(registration)
-      await this.#port.resumeAfterProvider(name, false)
-    })
+    return this.#port.enqueue(() => this.#enableNow(name))
+  }
+
+  /** Runs the original queued enable transition and its dependent recovery. */
+  async #enableNow(name: string): Promise<void> {
+    /** Exact committed generation remains the target throughout this serialized transition. */
+    const registration = this.#runtime.requireInstalled(name)
+    this.#runtime.assertProvidersAvailable(registration)
+    this.#runtime.enable(registration)
+    await this.#port.resumeAfterProvider(name, false)
   }
 
   /** Names currently disabled, in transition order. */

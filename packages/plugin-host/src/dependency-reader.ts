@@ -4,7 +4,7 @@ import { isFeatureReference, readDefinedFeature } from './define-feature.js'
 import { readDefinedPluginDefinition } from './define-plugin.js'
 import type { IFeatureReference } from './feature-types.js'
 import type { IPluginDefinition } from './registry.js'
-import type { IPluginConstraint } from './typing.js'
+import type { IPluginConstraint } from './plugin-definition-types.js'
 
 /** Provider edge derived from a plugin's complete local Feature closure. */
 export type IPluginDependency = Readonly<{

@@ -1,3 +1,7 @@
+/**
+ * Owns canonical install-core construction and provenance; domain state remains with its
+ * registration.
+ */
 import ERROR_TEXT, {
   PluginHostError,
   createPluginHostTypeError,
@@ -15,11 +19,12 @@ import {
 import type {
   IPluginConfig,
   IPluginResource,
-  IPluginHostCore,
   IPluginOperationContext,
   IPluginRegistrationContext,
   IReadonlyConfig
-} from './typing.js'
+} from './plugin-lifecycle-types.js'
+import type { IPluginHostCore } from './plugin-core-types.js'
+import { PluginCoreKey } from './core-constants.js'
 import type { IRegistration } from './registry.js'
 
 /** Registration-scoped publication stages exact receipts in the original install batch. */
@@ -114,7 +119,7 @@ export function getPluginRuntimeIntegration(core: unknown): IPluginRuntimeIntegr
   return integration
 }
 
-type IPluginCoreContext<TDomainCore extends object, TValue> = {
+export type IPluginCoreContext<TDomainCore extends object, TValue> = {
   readonly registration: IRegistration<TDomainCore, TValue>
   readonly createDomainCore: () => TDomainCore
   readonly assertRegistrationValid: () => void
@@ -129,75 +134,120 @@ type IPluginCoreContext<TDomainCore extends object, TValue> = {
 
 /** Core members the Host defines; a domain core may not supply any of them. */
 const reservedCoreKeys: ReadonlySet<PropertyKey> = new Set<PropertyKey>([
-  'config',
-  'operation',
-  'lifecycle',
-  'onDispose',
-  'usePipeline',
-  'useAsyncPipeline',
-  'useGeneratorPipeline',
-  'useAsyncGeneratorPipeline',
-  'pipeline'
+  PluginCoreKey.config,
+  PluginCoreKey.operation,
+  PluginCoreKey.lifecycle,
+  PluginCoreKey.onDispose,
+  PluginCoreKey.usePipeline,
+  PluginCoreKey.useAsyncPipeline,
+  PluginCoreKey.useGeneratorPipeline,
+  PluginCoreKey.useAsyncGeneratorPipeline,
+  PluginCoreKey.pipeline
 ])
 
-export const createPluginCore = <TDomainCore extends object, TValue>(
-  context: IPluginCoreContext<TDomainCore, TValue>
-): TDomainCore & IPluginHostCore<TValue> => {
-  const domainCore = context.createDomainCore() as object
-  const prototype = Object.getPrototypeOf(domainCore)
-  if (prototype !== Object.prototype && prototype !== null)
-    throw createPluginHostTypeError(PluginHostInternalText.DOMAIN_CORE_OBJECT)
-  const facade: Record<PropertyKey, unknown> = {}
-  for (const key of Reflect.ownKeys(domainCore)) {
-    if (reservedCoreKeys.has(key))
-      throw createPluginHostTypeError(PluginHostInternalText.DOMAIN_CORE_RESERVED(key))
-    const descriptor = Object.getOwnPropertyDescriptor(domainCore, key)
-    if (!descriptor || !('value' in descriptor) || !descriptor.enumerable)
-      throw createPluginHostTypeError(PluginHostInternalText.DOMAIN_CORE_DATA)
-    Object.defineProperty(facade, key, descriptor)
+/** Owns one core surface while keeping all registration state in its explicit context. */
+export class PluginCoreSurface<TDomainCore extends object, TValue> {
+  /** Exact registration authority supplied by the core runtime. */
+  readonly #context: IPluginCoreContext<TDomainCore, TValue>
+  /** Original plain, extensible facade returned to domain hooks. */
+  readonly #facade: Record<PropertyKey, unknown> = {}
+
+  /** Validates the domain surface before publishing any canonical Host capabilities. */
+  constructor(context: IPluginCoreContext<TDomainCore, TValue>) {
+    this.#context = context
+    this.#copyDomainCore()
+    this.#defineCapabilities()
+    runtimeIntegrations.set(this.#facade, context.runtimeIntegration())
   }
-  const define = (key: PropertyKey, value: unknown): void => {
-    Object.defineProperty(facade, key, {
+
+  /** Returns the exact original facade; fluent capabilities always return this same object. */
+  get facade(): TDomainCore & IPluginHostCore<TValue> {
+    return this.#facade as TDomainCore & IPluginHostCore<TValue>
+  }
+
+  /** Captures enumerable data descriptors without invoking accessors or accepting reserved keys. */
+  #copyDomainCore(): void {
+    /** Domain fields retain their captured descriptors rather than being read through getters. */
+    const domainCore = this.#context.createDomainCore() as object
+    /** Only ordinary or null-prototype domain surfaces participate in core construction. */
+    const prototype = Object.getPrototypeOf(domainCore)
+    if (prototype !== Object.prototype && prototype !== null)
+      throw createPluginHostTypeError(PluginHostInternalText.DOMAIN_CORE_OBJECT)
+    for (const key of Reflect.ownKeys(domainCore)) {
+      if (reservedCoreKeys.has(key))
+        throw createPluginHostTypeError(PluginHostInternalText.DOMAIN_CORE_RESERVED(key))
+      /** Admission copies the descriptor unchanged after excluding accessors and hidden keys. */
+      const descriptor = Object.getOwnPropertyDescriptor(domainCore, key)
+      if (!descriptor || !('value' in descriptor) || !descriptor.enumerable)
+        throw createPluginHostTypeError(PluginHostInternalText.DOMAIN_CORE_DATA)
+      Object.defineProperty(this.#facade, key, descriptor)
+    }
+  }
+
+  /** Installs the existing own-property surface; small adapters preserve detached method calls. */
+  #defineCapabilities(): void {
+    this.#define(PluginCoreKey.config, {
+      get: <T extends IPluginConfig = IPluginConfig>() => this.#readConfig<T>()
+    })
+    Object.defineProperty(this.#facade, PluginCoreKey.operation, {
+      enumerable: true,
+      configurable: false,
+      get: () => this.#readOperation()
+    })
+    Object.defineProperty(this.#facade, PluginCoreKey.lifecycle, {
+      enumerable: true,
+      configurable: false,
+      get: () => this.#readLifecycle()
+    })
+    this.#define(PluginCoreKey.onDispose, (resource: IPluginResource) =>
+      this.#context.registerResource(resource)
+    )
+    this.#define(PluginCoreKey.usePipeline, (stage: ISyncMiddlewareStage<TValue>) =>
+      this.#registerStage(stage, MiddlewarePipelineMode.sync)
+    )
+    this.#define(PluginCoreKey.useAsyncPipeline, (stage: IAsyncMiddlewareStage<TValue>) =>
+      this.#registerStage(stage, MiddlewarePipelineMode.async)
+    )
+    this.#define(PluginCoreKey.useGeneratorPipeline, (stage: IGeneratorMiddlewareStage<TValue>) =>
+      this.#registerStage(stage, MiddlewarePipelineMode.generator)
+    )
+    this.#define(
+      PluginCoreKey.useAsyncGeneratorPipeline,
+      (stage: IAsyncGeneratorMiddlewareStage<TValue>) =>
+        this.#registerStage(stage, MiddlewarePipelineMode.asyncGenerator)
+    )
+    this.#define(PluginCoreKey.pipeline, (name: string) => this.#context.pipeline(name))
+  }
+
+  /** Defines mutable enumerable capabilities with their original property attributes. */
+  #define(key: PropertyKey, value: unknown): void {
+    Object.defineProperty(this.#facade, key, {
       value,
       enumerable: true,
       configurable: true,
       writable: true
     })
   }
-  define('config', {
-    get: <T extends IPluginConfig = IPluginConfig>() => {
-      context.assertRegistrationValid()
-      return context.registration.config as IReadonlyConfig<T>
-    }
-  })
-  Object.defineProperty(facade, 'operation', {
-    enumerable: true,
-    configurable: false,
-    get: () => Object.freeze(context.operation())
-  })
-  Object.defineProperty(facade, 'lifecycle', {
-    enumerable: true,
-    configurable: false,
-    get: () => Object.freeze(context.lifecycle())
-  })
-  define('onDispose', (resource: IPluginResource) => context.registerResource(resource))
-  define('usePipeline', (stage: ISyncMiddlewareStage<TValue>) => {
-    context.registerStage(stage, MiddlewarePipelineMode.sync)
-    return facade
-  })
-  define('useAsyncPipeline', (stage: IAsyncMiddlewareStage<TValue>) => {
-    context.registerStage(stage, MiddlewarePipelineMode.async)
-    return facade
-  })
-  define('useGeneratorPipeline', (stage: IGeneratorMiddlewareStage<TValue>) => {
-    context.registerStage(stage, MiddlewarePipelineMode.generator)
-    return facade
-  })
-  define('useAsyncGeneratorPipeline', (stage: IAsyncGeneratorMiddlewareStage<TValue>) => {
-    context.registerStage(stage, MiddlewarePipelineMode.asyncGenerator)
-    return facade
-  })
-  define('pipeline', (name: string) => context.pipeline(name))
-  runtimeIntegrations.set(facade, context.runtimeIntegration())
-  return facade as TDomainCore & IPluginHostCore<TValue>
+
+  /** Reads the current immutable config only after original registration admission succeeds. */
+  #readConfig<T extends IPluginConfig>(): IReadonlyConfig<T> {
+    this.#context.assertRegistrationValid()
+    return this.#context.registration.config as IReadonlyConfig<T>
+  }
+
+  /** Each read freezes the original operation snapshot without caching across hook attempts. */
+  #readOperation(): IPluginOperationContext {
+    return Object.freeze(this.#context.operation())
+  }
+
+  /** Registration lifetime snapshots remain independent from per-operation cancellation. */
+  #readLifecycle(): IPluginRegistrationContext {
+    return Object.freeze(this.#context.lifecycle())
+  }
+
+  /** Owns fluent registration routing without changing the canonical stage admission path. */
+  #registerStage(stage: Function, kind: IMiddlewarePipelineMode): Record<PropertyKey, unknown> {
+    this.#context.registerStage(stage, kind)
+    return this.#facade
+  }
 }

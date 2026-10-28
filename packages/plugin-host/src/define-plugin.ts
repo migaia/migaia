@@ -1,5 +1,11 @@
+/**
+ * Owns trusted definition identity and immutable hook/metadata admission; per-registration
+ * factories run only under the install owner.
+ */
+import { PluginActivation } from './state-constants.js'
+import { PluginDefinitionKey, PluginDefinitionText } from './definition-constants.js'
 import type { IPipelineDefinitions } from './pipeline-spec.js'
-import { snapshotPipelineDefinitions } from './named-pipelines.js'
+import { snapshotPipelineDefinitions } from './pipeline-declarations.js'
 import { copyConfig } from './config.js'
 import { snapshotDisposer } from './disposal.js'
 import { invokeCaptured } from './invocation.js'
@@ -21,38 +27,44 @@ import type {
   IDefinedPluginConstraint,
   IPlugin,
   IPluginCommon,
-  IPluginConfig,
   IPluginConstraint,
   IPluginSetupHooks
-} from './typing.js'
+} from './plugin-definition-types.js'
+import type { IPluginConfig } from './plugin-lifecycle-types.js'
 
+/** Trusted identity stores one captured definition and never a live Host registration. */
 type IStoredDefinition = IPluginDefinition<any>
 
 /** Module-private identity authority for functional definitions. It never stores Host state. */
 const definitions = new WeakMap<object, IStoredDefinition>()
 
+/**
+ * Fixed admission keys remain excluded from metadata; user getFeature metadata keeps its old
+ * treatment.
+ */
 const knownKeys = new Set<PropertyKey>([
-  'name',
-  'config',
-  'install',
-  'setup',
-  'update',
-  'onEnable',
-  'onDisable',
-  'dispose',
-  'beforeRelease',
-  'shared',
-  'features',
-  'pipelines',
-  'featureExpose',
-  'activation',
-  'onDependencyReplaced',
+  PluginDefinitionKey.name,
+  PluginDefinitionKey.config,
+  PluginDefinitionKey.install,
+  PluginDefinitionKey.setup,
+  PluginDefinitionKey.update,
+  PluginDefinitionKey.onEnable,
+  PluginDefinitionKey.onDisable,
+  PluginDefinitionKey.dispose,
+  PluginDefinitionKey.beforeRelease,
+  PluginDefinitionKey.shared,
+  PluginDefinitionKey.features,
+  PluginDefinitionKey.pipelines,
+  PluginDefinitionKey.featureExpose,
+  PluginDefinitionKey.activation,
+  PluginDefinitionKey.onDependencyReplaced,
   Symbol.dispose,
   Symbol.asyncDispose
 ])
 
 /** Read one descriptor field once and reject getters that could change admission semantics. */
 const readData = (source: object, key: PropertyKey): unknown => {
+  /** Own-property descriptors are inspected without invoking getter values during admission. */
   const descriptor = Object.getOwnPropertyDescriptor(source, key)
   if (!descriptor) return undefined
   if (!('value' in descriptor))
@@ -86,27 +98,28 @@ type IDefinitionFields = Readonly<{
 
 /** Reads an optional symbol-keyed disposer; accessor descriptors are ignored as before. */
 const readSymbolDisposer = (source: object, key: symbol): unknown => {
+  /** Own-property descriptors are inspected without invoking getter values during admission. */
   const descriptor = Object.getOwnPropertyDescriptor(source, key)
   return descriptor && 'value' in descriptor ? descriptor.value : undefined
 }
 
 /** Reads every supported definition field once, as own data. */
 const readDefinitionFields = (source: object): IDefinitionFields => ({
-  name: readData(source, 'name'),
-  rawConfig: readData(source, 'config'),
-  install: readData(source, 'install'),
-  setup: readData(source, 'setup'),
-  update: readData(source, 'update'),
-  onEnable: readData(source, 'onEnable'),
-  onDisable: readData(source, 'onDisable'),
-  onDependencyReplaced: readData(source, 'onDependencyReplaced'),
-  activation: readData(source, 'activation') ?? 'eager',
-  retiredShared: readData(source, 'shared'),
-  dispose: readData(source, 'dispose'),
-  beforeRelease: readData(source, 'beforeRelease'),
-  features: readData(source, 'features'),
-  pipelines: readData(source, 'pipelines'),
-  featureExpose: readData(source, 'featureExpose'),
+  name: readData(source, PluginDefinitionKey.name),
+  rawConfig: readData(source, PluginDefinitionKey.config),
+  install: readData(source, PluginDefinitionKey.install),
+  setup: readData(source, PluginDefinitionKey.setup),
+  update: readData(source, PluginDefinitionKey.update),
+  onEnable: readData(source, PluginDefinitionKey.onEnable),
+  onDisable: readData(source, PluginDefinitionKey.onDisable),
+  onDependencyReplaced: readData(source, PluginDefinitionKey.onDependencyReplaced),
+  activation: readData(source, PluginDefinitionKey.activation) ?? PluginActivation.eager,
+  retiredShared: readData(source, PluginDefinitionKey.shared),
+  dispose: readData(source, PluginDefinitionKey.dispose),
+  beforeRelease: readData(source, PluginDefinitionKey.beforeRelease),
+  features: readData(source, PluginDefinitionKey.features),
+  pipelines: readData(source, PluginDefinitionKey.pipelines),
+  featureExpose: readData(source, PluginDefinitionKey.featureExpose),
   asyncDisposer: readSymbolDisposer(source, Symbol.asyncDispose),
   syncDisposer: readSymbolDisposer(source, Symbol.dispose)
 })
@@ -139,11 +152,11 @@ export const assertDefinitionLifecycle = (fields: IDefinitionLifecycleFields): v
     throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_BEFORE_RELEASE_FUNCTION)
   // Fixed five optional hooks; the bound comes from the definition contract, not from input.
   for (const [key, value] of [
-    ['update', fields.update],
-    ['onEnable', fields.onEnable],
-    ['onDisable', fields.onDisable],
-    ['onDependencyReplaced', fields.onDependencyReplaced],
-    ['dispose', fields.dispose]
+    [PluginDefinitionKey.update, fields.update],
+    [PluginDefinitionKey.onEnable, fields.onEnable],
+    [PluginDefinitionKey.onDisable, fields.onDisable],
+    [PluginDefinitionKey.onDependencyReplaced, fields.onDependencyReplaced],
+    [PluginDefinitionKey.dispose, fields.dispose]
   ] as const)
     if (value !== undefined && typeof value !== 'function')
       throw createPluginHostTypeError(PluginHostInternalText.PLUGIN_HOOK_FUNCTION(key))
@@ -151,7 +164,7 @@ export const assertDefinitionLifecycle = (fields: IDefinitionLifecycleFields): v
 
 /** Rejects an unknown activation or the retired shared field, after hook-shape checks. */
 export const assertDefinitionPolicy = (fields: IDefinitionLifecycleFields): void => {
-  if (fields.activation !== 'eager' && fields.activation !== 'lazy')
+  if (fields.activation !== PluginActivation.eager && fields.activation !== PluginActivation.lazy)
     throw createPluginDefinitionTypeError()
   if (fields.retiredShared !== undefined) throw createPluginDefinitionTypeError()
 }
@@ -159,7 +172,11 @@ export const assertDefinitionPolicy = (fields: IDefinitionLifecycleFields): void
 /** Rejects a malformed name, hook, activation, retired field or Feature expose value. */
 const assertDefinitionFields = (fields: IDefinitionFields): void => {
   const { name, featureExpose } = fields
-  if (typeof name !== 'string' || name.length === 0 || name.includes('.'))
+  if (
+    typeof name !== 'string' ||
+    name.length === 0 ||
+    name.includes(PluginDefinitionText.nameSeparator)
+  )
     throw createPluginHostTypeError(PluginHostInternalText.PLUGIN_NAME_STRICT)
   assertDefinitionLifecycle(fields)
   // Two symbol disposers; checked after the named hooks, as before.
@@ -180,12 +197,15 @@ const assertDefinitionFields = (fields: IDefinitionFields): void => {
 
 /** Copies unknown own keys as frozen, enumerable metadata; accessors and hidden keys are rejected. */
 const snapshotDefinitionMetadata = (source: object): Record<PropertyKey, unknown> => {
+  /** Only unknown enumerable own-data keys become immutable public definition metadata. */
   const metadata: Record<PropertyKey, unknown> = {}
   for (const key of Reflect.ownKeys(source)) {
     if (knownKeys.has(key)) continue
+    /** Own-property descriptors are inspected without invoking getter values during admission. */
     const descriptor = Object.getOwnPropertyDescriptor(source, key)
     if (!descriptor || !('value' in descriptor) || !descriptor.enumerable)
       throw createPluginHostTypeError(PluginHostInternalText.PLUGIN_METADATA_DATA)
+    /** Array metadata is copied once so later source mutation cannot change the trusted definition. */
     const value = Array.isArray(descriptor.value)
       ? Object.freeze([...descriptor.value])
       : descriptor.value
@@ -233,23 +253,32 @@ const createFrozenPlugin = (
   ownedConfig: IPluginConfig,
   metadata: Record<PropertyKey, unknown>
 ): Record<PropertyKey, unknown> => {
+  /** The captured immutable name owns Feature references and the frozen public identity. */
   const name = fields.name as string
+  /** Capture installation before wrapping it so the original definition remains its receiver. */
   const install = fields.install as Function
+  /** Own property creation order preserves the existing frozen definition surface. */
   const plugin: Record<PropertyKey, unknown> = {}
-  Object.defineProperty(plugin, 'name', { value: name, enumerable: true })
-  Object.defineProperty(plugin, 'config', {
+  Object.defineProperty(plugin, PluginDefinitionKey.name, { value: name, enumerable: true })
+  Object.defineProperty(plugin, PluginDefinitionKey.config, {
     value: fields.rawConfig === undefined ? undefined : ownedConfig,
     enumerable: true
   })
   if (fields.pipelines !== undefined)
-    Object.defineProperty(plugin, 'pipelines', { value: fields.pipelines, enumerable: true })
-  Object.defineProperty(plugin, 'install', {
+    Object.defineProperty(plugin, PluginDefinitionKey.pipelines, {
+      value: fields.pipelines,
+      enumerable: true
+    })
+  Object.defineProperty(plugin, PluginDefinitionKey.install, {
     value: (...args: unknown[]) => invokeCaptured(install, source, args),
     enumerable: true
   })
-  defineCapturedHook(plugin, 'setup', fields.setup, source, 1)
-  Object.defineProperty(plugin, 'activation', { value: fields.activation, enumerable: true })
-  Object.defineProperty(plugin, 'getFeature', {
+  defineCapturedHook(plugin, PluginDefinitionKey.setup, fields.setup, source, 1)
+  Object.defineProperty(plugin, PluginDefinitionKey.activation, {
+    value: fields.activation,
+    enumerable: true
+  })
+  Object.defineProperty(plugin, PluginDefinitionKey.getFeature, {
     enumerable: false,
     value: (feature: string, options?: Readonly<{ readonly optional?: boolean }>) => {
       if (!Object.hasOwn(featureRecord, feature))
@@ -260,15 +289,22 @@ const createFrozenPlugin = (
       return createFeatureReference(name, feature, options?.optional === true)
     }
   })
-  defineCapturedHook(plugin, 'update', fields.update, source, 2)
-  defineCapturedHook(plugin, 'onEnable', fields.onEnable, source, 1)
-  defineCapturedHook(plugin, 'onDisable', fields.onDisable, source, 1)
-  defineCapturedHook(plugin, 'onDependencyReplaced', fields.onDependencyReplaced, source, 2)
-  defineCapturedHook(plugin, 'dispose', fields.dispose, source, 1)
-  defineCapturedHook(plugin, 'beforeRelease', fields.beforeRelease, source, 1)
+  defineCapturedHook(plugin, PluginDefinitionKey.update, fields.update, source, 2)
+  defineCapturedHook(plugin, PluginDefinitionKey.onEnable, fields.onEnable, source, 1)
+  defineCapturedHook(plugin, PluginDefinitionKey.onDisable, fields.onDisable, source, 1)
+  defineCapturedHook(
+    plugin,
+    PluginDefinitionKey.onDependencyReplaced,
+    fields.onDependencyReplaced,
+    source,
+    2
+  )
+  defineCapturedHook(plugin, PluginDefinitionKey.dispose, fields.dispose, source, 1)
+  defineCapturedHook(plugin, PluginDefinitionKey.beforeRelease, fields.beforeRelease, source, 1)
   defineCapturedHook(plugin, Symbol.asyncDispose, fields.asyncDisposer, source, 0, false)
   defineCapturedHook(plugin, Symbol.dispose, fields.syncDisposer, source, 0, false)
   for (const key of Reflect.ownKeys(metadata)) {
+    /** Own-property descriptors are inspected without invoking getter values during admission. */
     const descriptor = Object.getOwnPropertyDescriptor(metadata, key)
     if (descriptor) Object.defineProperty(plugin, key, descriptor)
   }
@@ -279,19 +315,30 @@ const createFrozenPlugin = (
 const createDefinition = <TPlugin extends IPluginConstraint<any>>(
   source: TPlugin & object
 ): IStoredDefinition & { readonly plugin: TPlugin } => {
+  /** Read every supported source field once before validation or derived snapshots run. */
   const captured = readDefinitionFields(source)
+  /** Pipeline declarations are normalized at their original point before field-shape checks. */
   const fields = { ...captured, pipelines: snapshotPipelineDefinitions(captured.pipelines) }
   assertDefinitionFields(fields)
+  /** Feature root identity is captured before metadata and configuration admission. */
   const featureRecord = snapshotFeatureRecord(fields.features)
+  /** Only unknown enumerable own-data keys become immutable public definition metadata. */
   const metadata = snapshotDefinitionMetadata(source)
+  /**
+   * Only explicitly supplied config creates the frozen configuration snapshot exposed by the
+   * definition.
+   */
   const ownedConfig =
     fields.rawConfig === undefined
       ? {}
-      : copyConfig(fields.rawConfig as IPluginConfig, 'plugin config')
+      : copyConfig(fields.rawConfig as IPluginConfig, PluginDefinitionText.configRecord)
+  /** Own property creation order preserves the existing frozen definition surface. */
   const plugin = createFrozenPlugin(source, fields, featureRecord, ownedConfig, metadata)
+  /** Resolve symbol cleanup from the finished frozen plugin, keeping captured hook wrappers. */
   const disposer = snapshotDisposer(
-    plugin as unknown as import('./typing.js').IPluginResource
+    plugin as unknown as import('./plugin-lifecycle-types.js').IPluginResource
   ).disposer
+  /** The private WeakMap stores one immutable definition identity without Host state. */
   const definition: IStoredDefinition = {
     owner: plugin as unknown as IPluginConstraint<any>,
     name: fields.name as string,
@@ -339,7 +386,7 @@ export function definePlugin<
   name: TName,
   descriptorFactory: (
     core: TCore &
-      import('./typing.js').IPluginHostCore<TValue> &
+      import('./plugin-core-types.js').IPluginHostCore<TValue> &
       Readonly<{ readonly features: IFeatureOutputs<TFeatures>; readonly featureExpose: TExpose }>
   ) => IPluginDescriptor<TExtension, TPublic, TExpose, TShared> &
     (keyof IFeatureRecordRequiredExpose<TFeatures> extends never
@@ -381,16 +428,16 @@ export function definePlugin<
 >(
   definition: IPluginCommon<
     TCore &
-      import('./typing.js').IPluginHostCore<TValue> &
-      import('./typing.js').IPluginPipelineCore<TPipelines, TFeatures>,
+      import('./plugin-core-types.js').IPluginHostCore<TValue> &
+      import('./plugin-core-types.js').IPluginPipelineCore<TPipelines, TFeatures>,
     TConfig,
     TFeatures,
     TExpose
   > &
     IPluginSetupHooks<
       TCore &
-        import('./typing.js').IPluginHostCore<TValue> &
-        import('./typing.js').IPluginPipelineCore<TPipelines, TFeatures>,
+        import('./plugin-core-types.js').IPluginHostCore<TValue> &
+        import('./plugin-core-types.js').IPluginPipelineCore<TPipelines, TFeatures>,
       TExtension,
       TConfig,
       TFeatures,
@@ -433,8 +480,8 @@ export function definePlugin<
 >(
   definition: IPlugin<
     TCore &
-      import('./typing.js').IPluginHostCore<TValue> &
-      import('./typing.js').IPluginPipelineCore<TPipelines, TFeatures>,
+      import('./plugin-core-types.js').IPluginHostCore<TValue> &
+      import('./plugin-core-types.js').IPluginPipelineCore<TPipelines, TFeatures>,
     TExtension,
     TConfig,
     TShared,
@@ -458,17 +505,20 @@ export function definePlugin<
 > &
   Readonly<Omit<TDefinition, keyof IPlugin<any, any, any, any> | 'name'>>
 
+/** Dispatches by the first argument only; definition capture never runs a descriptor factory. */
 export function definePlugin(
   ...args: readonly [unknown, unknown?, unknown?]
 ): IDefinedPluginConstraint {
   if (typeof args[0] === 'string') {
     if (typeof args[1] !== 'function')
       throw createPluginHostTypeError(ERROR_TEXT.PLUGIN_DESCRIPTOR_HOOK_DATA)
+    /** The private WeakMap stores one immutable definition identity without Host state. */
     const definition = createDefinition({
       name: args[0],
       install: () => ({}),
       features: args[2]
     } as IPluginConstraint<any>)
+    /** Only the newly minted definition receives its original per-registration descriptor factory. */
     const stored = definitions.get(definition.plugin)!
     Object.assign(
       stored as {

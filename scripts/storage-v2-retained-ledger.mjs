@@ -1,5 +1,14 @@
-import { isAbsolute, relative, resolve } from 'node:path'
-import { realpathSync } from 'node:fs'
+import { basename, dirname, extname, isAbsolute, relative, resolve } from 'node:path'
+import { existsSync, readFileSync, realpathSync } from 'node:fs'
+import { parseSync } from 'oxc-parser'
+
+/**
+ * Parsed entry references belong to one admitted immutable package snapshot. Weak keys release the
+ * cache with its package record; each same-stem entry is read and parsed only once per snapshot.
+ *
+ * @type {WeakMap<object, Map<string, ReadonlySet<string>>>}
+ */
+const entryImportsByPackage = new WeakMap()
 
 /**
  * Converts one raw bundler module ID only after proving its installed package root. Non-package,
@@ -55,14 +64,110 @@ export function normalizeRetainedModule(moduleId, consumerDirectory, installedPa
     const packageModule = relative(approvedPackage.root, canonicalModule)
     if (packageModule === '' || packageModule.startsWith('..') || isAbsolute(packageModule))
       return `escaped-package:${moduleId}`
-    /** Content hashes are build-instance data; the chunk stem is the stable reviewed identity. */
-    const stablePackageModule = packageModule.replace(
-      /^(dist\/[^/]+)-[A-Za-z0-9_-]{8}\.js$/,
-      '$1-[chunk].js'
+    /** Only source-map or declared-entry evidence can identify a generated chunk suffix. */
+    const stablePackageModule = normalizePackageChunk(
+      packageModule,
+      canonicalModule,
+      approvedPackage
     )
     return `${packageName}/${stablePackageModule}`
   }
   return `path:${moduleId}`
+}
+
+/**
+ * Distinguishes a generated chunk from a semantic module name using admitted package files. The
+ * suffix shape selects candidates only; missing or inconclusive metadata preserves the raw name.
+ *
+ * @param {string} packageModule Exact package-relative module path
+ * @param {string} canonicalModule Exact canonical module filename
+ * @param {{ readonly root: string }} approvedPackage Admitted immutable package snapshot
+ * @returns {string} Original semantic path or proven stable chunk identity
+ */
+function normalizePackageChunk(packageModule, canonicalModule, approvedPackage) {
+  /** The former suffix pattern is only a candidate shape, never proof that a suffix is a hash. */
+  const candidate = /^(dist\/[^/]+)-[A-Za-z0-9_-]{8}\.js$/.exec(packageModule)
+  if (!candidate) return packageModule
+  if (existsSync(resolve(approvedPackage.root, packageModule.replace(/\.js$/, '.d.ts'))))
+    return packageModule
+  /** Source-map ownership must match this exact emitted file before source names are evidence. */
+  const sourceMap = readChunkSourceMap(canonicalModule)
+  if (!sourceMap) return packageModule
+  /** A source with the complete emitted stem proves the suffix is part of its semantic name. */
+  const completeStem = basename(packageModule, '.js')
+  /** A source matching the stem before the suffix proves this is its generated output variant. */
+  const chunkStem = basename(candidate[1])
+  /** Scan all sources so a complete semantic name always takes precedence over a shorter stem. */
+  let generatedSource = false
+  for (const source of sourceMap.sources) {
+    /** Paths are source-map metadata; packed packages need not include their original src tree. */
+    const sourceStem = basename(source, extname(source))
+    if (sourceStem === completeStem) return packageModule
+    if (sourceStem === chunkStem) generatedSource = true
+  }
+  if (
+    generatedSource ||
+    readStableEntryImports(approvedPackage, `${candidate[1]}.js`).has(canonicalModule)
+  )
+    return `${candidate[1]}-[chunk].js`
+  return packageModule
+}
+
+/**
+ * Reads source identities only from the map naming this exact emitted module. Missing, malformed,
+ * or mismatched maps provide no normalization authority and leave the original module distinct.
+ *
+ * @param {string} canonicalModule Exact admitted JavaScript module filename
+ * @returns {{ readonly sources: readonly string[] } | undefined} Proven source-map identities
+ */
+function readChunkSourceMap(canonicalModule) {
+  try {
+    /** Bundler metadata is read without requiring unpublished source files to exist on disk. */
+    const sourceMap = JSON.parse(readFileSync(`${canonicalModule}.map`, 'utf8'))
+    if (sourceMap?.file !== basename(canonicalModule) || !Array.isArray(sourceMap.sources))
+      return undefined
+    for (const source of sourceMap.sources) if (typeof source !== 'string') return undefined
+    return { sources: sourceMap.sources }
+  } catch {
+    // An unproven candidate retains its raw identity for the unchanged exact-set gate.
+    return undefined
+  }
+}
+
+/**
+ * Resolves actual static imports from a same-stem declared entry. This proves multi-source chunks
+ * such as utils scheduler helpers without mistaking comments or string payloads for imports.
+ *
+ * @param {{ readonly root: string }} approvedPackage Owner of the immutable installed snapshot
+ * @param {string} entryModule Same-stem package-relative JavaScript entry
+ * @returns {ReadonlySet<string>} Exact filenames referenced by a successfully parsed typed entry
+ */
+function readStableEntryImports(approvedPackage, entryModule) {
+  /** Per-package entries share their original parsed reference set across candidate chunks. */
+  let byEntry = entryImportsByPackage.get(approvedPackage)
+  if (!byEntry) entryImportsByPackage.set(approvedPackage, (byEntry = new Map()))
+  /** Empty cached sets also record missing or unproven entries without repeated parsing. */
+  const cached = byEntry.get(entryModule)
+  if (cached) return cached
+  /** Only this function populates the cached set; callers receive read-only reference authority. */
+  const references = new Set()
+  byEntry.set(entryModule, references)
+  if (!existsSync(resolve(approvedPackage.root, entryModule.replace(/\.js$/, '.d.ts'))))
+    return references
+  /** A matching declaration establishes the stable module whose real imports are inspected. */
+  const entryPath = resolve(approvedPackage.root, entryModule)
+  try {
+    /** Existing parser metadata identifies static imports without filename or source-text guesses. */
+    const parsed = parseSync(entryPath, readFileSync(entryPath, 'utf8'))
+    if (parsed.errors.length > 0) return references
+    for (const imported of parsed.module.staticImports)
+      if (imported.moduleRequest.value.startsWith('.'))
+        references.add(resolve(dirname(entryPath), imported.moduleRequest.value))
+  } catch {
+    // Unavailable or invalid entry metadata cannot authorize normalization.
+    return references
+  }
+  return references
 }
 
 /**

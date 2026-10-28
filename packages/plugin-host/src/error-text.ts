@@ -1,6 +1,8 @@
-import type { IPluginHostErrorCode, IPluginHostErrorDetail } from './typing.js'
+/** Owns package error construction, identity attachment and canonical error/diagnostic text. */
+import type { IPluginHostErrorCode } from './error-code.js'
+import type { IPluginHostErrorDetail } from './error-types.js'
 import { PLUGIN_HOST_SOURCE, PluginHostErrorCode } from './error-code.js'
-import { readHostIdentity } from './host-identity.js'
+import { readHostIdentity } from './host-identity-authority.js'
 import {
   attachErrorIdentity,
   attachSecondaryErrors,
@@ -147,10 +149,16 @@ export function createPluginDefinitionTypeError(): TypeError & {
   )
 }
 
+/** Existing package prefix keeps public messages stable across every producing module. */
 const PREFIX = '[plugin-host] '
 
 /** Uses stable English package text; consumers localize by `(source, code)` at their boundary. */
 const prefixed = (en: string): string => `${PREFIX}${en}`
+
+/** Renders one original rollback failure without changing the captured error list or its identity. */
+function formatRollbackFailure(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
 
 /** PluginHost 错误与诊断文本集中维护处；按稳定 code 分类，文本工厂只格式化消息而不创建错误。 */
 const ERROR_TEXT = {
@@ -414,6 +422,9 @@ export default ERROR_TEXT
  * keep their unprefixed spelling; the root's public ERROR_TEXT object remains unchanged.
  */
 export const PluginHostInternalText = {
+  /** Queue wait observation preserves the existing public diagnostic text and optional owner suffix. */
+  MUTATION_QUEUE_WAIT: (waitedMs: number, owner: string | undefined) =>
+    prefixed(`mutation waited in the queue for ${waitedMs}ms${owner ? ` (owner: ${owner})` : ''}`),
   /** Native domain integrations report original failures through the configured Host diagnostic. */
   DOMAIN_REPORTED_FAILURE: 'domain runtime reported a failure',
   /** Optional budget validation used during Host option admission. */
@@ -476,9 +487,7 @@ export const PluginHostInternalText = {
   /** Secondary messages preserve rollback order; raw failures remain in the diagnostic aggregate. */
   PLUGIN_ROLLBACK_FAILURE_DETAIL: (name: string, errors: readonly unknown[]): string => {
     /** Display-only collation never changes the original error list or its identities. */
-    const detail = errors
-      .map((error) => (error instanceof Error ? error.message : String(error)))
-      .join('; ')
+    const detail = errors.map(formatRollbackFailure).join('; ')
     return `${ERROR_TEXT.PLUGIN_ROLLBACK_FAILED(name)}: ${detail}`
   },
   /** Identifies the plugin-first release step in cleanup diagnostics and late error provenance. */

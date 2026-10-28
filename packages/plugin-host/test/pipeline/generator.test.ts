@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest'
 import { createPipeline, MiddlewarePipelineMode } from '@migaia/middleware-pipeline'
-import { GENERATOR_CONTINUE, GENERATOR_HALT, GENERATOR_UNDEFINED } from '../../src/typing'
+import {
+  GENERATOR_CONTINUE,
+  GENERATOR_HALT,
+  GENERATOR_UNDEFINED
+} from '@migaia/middleware-pipeline'
 
 describe('runGeneratorPipeline', () => {
   it('uses final return value and last yield fallback', () => {

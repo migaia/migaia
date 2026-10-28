@@ -54,6 +54,7 @@ describe('architecture boundaries', () => {
     for (const module of [
       'config',
       'core',
+      'core-constants',
       'disposal',
       'extension',
       'pipeline-runtime',

@@ -1,6 +1,7 @@
+/** Owns Host queue diagnostics and error translation; lifecycle remains the sole queue authority. */
 import { reportDiagnostic } from './diagnostic-report.js'
 import { LifecycleErrorCode } from '@migaia/lifecycle'
-import ERROR_TEXT, { PluginHostError } from './error-text.js'
+import ERROR_TEXT, { PluginHostError, PluginHostInternalText } from './error-text.js'
 import { PluginHostErrorCode } from './error-code.js'
 
 /**
@@ -19,7 +20,7 @@ export const reportQueueWait = (
 ): void => {
   reportDiagnostic(
     diagnostic,
-    `[plugin-host] mutation waited in the queue for ${info.waitedMs}ms${info.owner ? ` (owner: ${info.owner})` : ''}`
+    PluginHostInternalText.MUTATION_QUEUE_WAIT(info.waitedMs, info.owner)
   )
 }
 
@@ -37,6 +38,7 @@ export const translateQueueRejection = (error: unknown, threshold: number | fals
     (error as { code?: unknown }).code !== LifecycleErrorCode.queueAdmissionTimeout
   )
     return error
+  /** Retain the lifecycle timeout receipt while adding the Host boundary classification. */
   const detail = (error as { detail?: { owner?: unknown; waitedMs?: number } }).detail
   return new PluginHostError(
     PluginHostErrorCode.mutationQueueTimeout,

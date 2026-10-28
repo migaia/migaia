@@ -1,18 +1,13 @@
+/**
+ * Owns Host identity admission, monotonic issuance and entropy; the authority leaf owns
+ * exact-target records.
+ */
 import ERROR_TEXT, { createPluginHostTypeError } from './error-text.js'
+import type { IPluginHostIdentity } from './host-identity-types.js'
+import { readHostIdentityRecord, recordHostIdentity } from './host-identity-authority.js'
+export type { IPluginHostIdentity } from './host-identity-types.js'
+export { readHostIdentity, readHostNodeId } from './host-identity-authority.js'
 
-/** Public, immutable identity assigned by this module to one Host surface. */
-export type IPluginHostIdentity = Readonly<{
-  /** Human-readable label supplied by the caller, or `DEFAULT` when omitted. */
-  readonly name: string
-  /** Process-local identifier issued from this module's monotonic sequence. */
-  readonly id: string
-}>
-
-/** Module-private identity authority; entries disappear with their Host targets. */
-const identities = new WeakMap<
-  object,
-  Readonly<{ identity: IPluginHostIdentity; nodeId: string }>
->()
 /** Monotonic process-local sequence used only after an identity name passes validation. */
 let issued = 0
 
@@ -25,12 +20,13 @@ export const issueHostIdentity = (
   if (typeof name !== 'string' || name.length === 0)
     throw createPluginHostTypeError(ERROR_TEXT.HOST_IDENTITY_NAME)
   /** A public facade and its runtime represent one Host, including identity and private node. */
-  const owner = nodeOwner ? identities.get(nodeOwner) : undefined
+  const owner = nodeOwner ? readHostIdentityRecord(nodeOwner) : undefined
   if (owner) {
-    identities.set(host, owner)
+    recordHostIdentity(host, owner)
     return owner.identity
   }
   issued += 1
+  /** The label and monotonic sequence retain their exact original issuance order. */
   const identity = Object.freeze({ name, id: `${name}#${issued}` })
   /** Each newly issued Host owns one private random node; facade issuance reuses the original. */
   let nodeId: string
@@ -45,18 +41,6 @@ export const issueHostIdentity = (
   } catch (cause) {
     throw createPluginHostTypeError(ERROR_TEXT.HOST_IDENTITY_ENTROPY, { cause })
   }
-  identities.set(host, Object.freeze({ identity, nodeId }))
+  recordHostIdentity(host, Object.freeze({ identity, nodeId }))
   return identity
 }
-
-/** Reads an identity only when this module issued one for the exact target. */
-export const readHostIdentity = (target: unknown): IPluginHostIdentity | undefined =>
-  (typeof target === 'object' || typeof target === 'function') && target !== null
-    ? identities.get(target as object)?.identity
-    : undefined
-
-/**
- * Only the original integration owner reads the private node fact; it is absent from public
- * identity.
- */
-export const readHostNodeId = (target: object): string => identities.get(target)!.nodeId

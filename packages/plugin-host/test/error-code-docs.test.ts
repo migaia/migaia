@@ -1,6 +1,6 @@
 import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
-import { PluginHostErrorCode } from '../src/typing'
+import { PluginHostErrorCode } from '../src/error-code.js'
 import { PluginHostError, createPluginHostTypeError } from '../src/error-text'
 
 /** Links PLUGIN_SUSPENDED and every public error code to maintained documentation. */
