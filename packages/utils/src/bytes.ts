@@ -9,6 +9,25 @@ import { attachErrorIdentity } from './error.ts'
 /** RFC 4648 alphabet is shared with its inverse table. */
 const base64Alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/'
 
+/** Fixed-size canonical encoder data used by the bounded output owner. */
+const BASE64_PAIR_COUNT = 4096
+
+/** Fixed-size canonical encoder data used by the bounded output owner. */
+const BASE64_CHUNK_LENGTH = 4096
+
+/** Fixed-size canonical encoder data used by the bounded output owner. */
+const base64Pairs = createBase64Pairs()
+
+/** Fixed-size canonical encoder data used by the bounded output owner. */
+function createBase64Pairs(): readonly string[] {
+  /** Pair indices combine exactly two six-bit alphabet indices. */
+  const pairs: string[] = []
+  // BASE64_PAIR_COUNT is the fixed 64-symbol alphabet squared, independent of input size.
+  for (let index = 0; index < BASE64_PAIR_COUNT; index++)
+    pairs.push(base64Alphabet[index >> 6] + base64Alphabet[index & 63])
+  return pairs
+}
+
 /** ASCII inverse map admits only characters already accepted by canonical validation. */
 const base64Values = new Uint8Array(128)
 // The compile-time RFC 4648 alphabet has exactly 64 entries.
@@ -74,17 +93,35 @@ export const isArrayBuffer = (value: unknown): value is ArrayBuffer => {
 
 /** Encodes bytes using the canonical RFC 4648 alphabet. */
 export function bytesToBase64(value: Uint8Array): string {
-  let result = ''
+  /** Completed bounded chunks are joined once, keeping total output construction linear. */
+  const chunks: string[] = []
+  /** This string never exceeds the compile-time BASE64_CHUNK_LENGTH of 4096 code units. */
+  let chunk = ''
   for (let index = 0; index < value.length; index += 3) {
+    /** Read each byte once in the established input order. */
     const first = value[index]
+    /** A missing second byte selects the first padding position. */
     const second = value[index + 1]
+    /** A missing third byte selects the final padding position. */
     const third = value[index + 2]
-    result += base64Alphabet[first >> 2]
-    result += base64Alphabet[((first & 3) << 4) | ((second ?? 0) >> 4)]
-    result += second === undefined ? '=' : base64Alphabet[((second & 15) << 2) | ((third ?? 0) >> 6)]
-    result += third === undefined ? '=' : base64Alphabet[third & 63]
+    // Concatenation is bounded by BASE64_CHUNK_LENGTH; input growth adds chunks, never chunk width.
+    if (second !== undefined && third !== undefined) {
+      chunk += base64Pairs[(first << 4) | (second >> 4)]
+      chunk += base64Pairs[((second & 15) << 8) | third]
+    } else {
+      chunk += base64Alphabet[first >> 2]
+      chunk += base64Alphabet[((first & 3) << 4) | ((second ?? 0) >> 4)]
+      chunk +=
+        second === undefined ? '=' : base64Alphabet[((second & 15) << 2) | ((third ?? 0) >> 6)]
+      chunk += third === undefined ? '=' : base64Alphabet[third & 63]
+    }
+    if (chunk.length === BASE64_CHUNK_LENGTH) {
+      chunks.push(chunk)
+      chunk = ''
+    }
   }
-  return result
+  if (chunk) chunks.push(chunk)
+  return chunks.join('')
 }
 
 /**
