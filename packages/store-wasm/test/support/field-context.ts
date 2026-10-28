@@ -5,7 +5,7 @@
 import { createRuntime } from '@migaia/reactive'
 import type { IRuntime } from '@migaia/reactive'
 import { createFieldSource } from '@migaia/reactive/extension'
-import type { IFieldContext } from '../../src/field'
+import type { IFieldContext } from '../../src/field.ts'
 
 export function makeFieldContext(runtime: IRuntime = createRuntime()): {
   context: IFieldContext

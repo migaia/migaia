@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { array, boolean, number, record, string } from '../src/index'
+import { array, boolean, number, record, string } from '../src/index.ts'
 
 describe('store-wasm exports', () => {
   it('exposes the field builders without loading a Store facade', () => {

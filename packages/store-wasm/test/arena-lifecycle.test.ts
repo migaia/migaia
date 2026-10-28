@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { createWasmModuleMock } from './support/wasm-fake.js'
-import { makeFieldContext } from './support/field-context.js'
+import type { createWasmModuleMock } from './support/wasm-fake.ts'
+import { makeFieldContext } from './support/field-context.ts'
 
 /** Only the public allocator exports are replaceable; the helper owns real linear memory. */
 type IWasmModule = ReturnType<typeof createWasmModuleMock> & {
@@ -10,7 +10,7 @@ type IWasmModule = ReturnType<typeof createWasmModuleMock> & {
 
 vi.mock('@migaia/wasm', async () => {
   /** The established allocator fixture retains its allocation table and real Memory internally. */
-  const { createWasmModuleMock } = await import('./support/wasm-fake.js')
+  const { createWasmModuleMock } = await import('./support/wasm-fake.ts')
   /** Wrap only the native exports whose failure contracts this package must preserve. */
   const native = createWasmModuleMock()
   return {
@@ -30,7 +30,7 @@ async function fixture() {
   native.__control.reset()
   vi.clearAllMocks()
   /** Public construction, readiness, and field operations remain real package code. */
-  const api = await import('../src/index.js')
+  const api = await import('../src/index.ts')
   return { native, ...api }
 }
 

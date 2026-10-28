@@ -5,7 +5,7 @@ import {
   disposeAllWasm,
   disposeWasmField,
   throwWasmConstructionFailure
-} from './arena.js'
+} from './arena.ts'
 import {
   assertWasmFieldNotAborted,
   createStoreWasmError,
@@ -13,10 +13,10 @@ import {
   createStoreWasmTypeError,
   identifyStoreWasmFailure,
   StoreWasmErrorCode
-} from './errors.js'
-import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from './field.js'
+} from './errors.ts'
+import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from './field.ts'
 import { StoreFieldMode } from '@migaia/store-light'
-import { StoreWasmErrorText } from './error-text.js'
+import { StoreWasmErrorText } from './error-text.ts'
 
 const DEFAULT_GRANULARITY = 64
 const MAX_FLOAT64_LENGTH = Math.floor(0xffff_ffff / Float64Array.BYTES_PER_ELEMENT)

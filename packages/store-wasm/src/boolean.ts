@@ -1,20 +1,20 @@
-import { memoryView } from './memory-view.js'
+import { memoryView } from './memory-view.ts'
 import type { IDisposable } from '@migaia/reactive'
 import {
   allocateOwnedSync,
   disposeAllWasm,
   disposeWasmField,
   throwWasmConstructionFailure
-} from './arena.js'
+} from './arena.ts'
 import {
   assertWasmFieldNotAborted,
   createStoreWasmError,
   createStoreWasmTypeError,
   StoreWasmErrorCode
-} from './errors.js'
-import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from './field.js'
+} from './errors.ts'
+import { FIELD_BUILDER, type IFieldBuilder, type IFieldContext } from './field.ts'
 import { StoreFieldMode } from '@migaia/store-light'
-import { StoreWasmErrorText } from './error-text.js'
+import { StoreWasmErrorText } from './error-text.ts'
 
 /** Owned single-byte boolean field; the Store field owner releases its Source and native block. */
 export type IWasmBooleanField = IDisposable & {

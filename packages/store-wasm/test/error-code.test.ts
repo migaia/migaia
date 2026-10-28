@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { createStoreWasmAggregateError, StoreWasmErrorCode, STORE_WASM_SOURCE } from '../src/errors'
+import {
+  createStoreWasmAggregateError,
+  StoreWasmErrorCode,
+  STORE_WASM_SOURCE
+} from '../src/errors.ts'
 
 describe('store-wasm error-code contract', () => {
   it('declares 8 unique codes under the package source', () => {
