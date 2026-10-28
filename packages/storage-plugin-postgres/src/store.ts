@@ -5,7 +5,7 @@ import {
   provideCapabilities,
   createStorageOperationReporter
 } from '@migaia/storage-host/sdk'
-import type { IPgQuantizedOptions } from './features/quantized.js'
+import type { IPgQuantizedOptions } from './features/quantized.ts'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -26,22 +26,22 @@ import type {
   IStorageOrgBinding,
   IStorageJournalBackendBinding
 } from '@migaia/storage-host'
-import { snapshotPostgresOptions, postgresTables, ensurePostgresTables } from './schema.js'
-import { probePostgres } from './probe.js'
-import { createPgTransactions } from './transaction.js'
-import { createPgChanges } from './changes.js'
-import type { IPgReplicationSelection } from './logical-replication.js'
-import type { IPgState } from './native.js'
-import { PgNames } from './constants.js'
-import { normalizePostgresError } from './errors.js'
-import { PostgresErrorText } from './error-text.js'
+import { snapshotPostgresOptions, postgresTables, ensurePostgresTables } from './schema.ts'
+import { probePostgres } from './probe.ts'
+import { createPgTransactions } from './transaction.ts'
+import { createPgChanges } from './changes.ts'
+import type { IPgReplicationSelection } from './logical-replication.ts'
+import type { IPgState } from './native.ts'
+import { PgNames } from './constants.ts'
+import { normalizePostgresError } from './errors.ts'
+import { PostgresErrorText } from './error-text.ts'
 import type {
   IPostgresStore,
   IPostgresOptions,
   IPostgresTransactionScope,
   IPgServer,
   IPgConnection
-} from './types.js'
+} from './types.ts'
 import {
   createPgOrgTtlApi,
   createPgOrgCounterApi,
@@ -52,22 +52,22 @@ import {
   createPgOrgJournal,
   pgOrgVectors,
   reportPgReplication
-} from './store-apis.js'
-import { createPgOrgBase } from './store-org-base.js'
-import { createPgOrgScope } from './store-scope.js'
+} from './store-apis.ts'
+import { createPgOrgBase } from './store-org-base.ts'
+import { createPgOrgScope } from './store-scope.ts'
 import {
   runPgRootOperation,
   observePgOrgOperation,
   recordsScope,
   ttlScope,
   counterScope
-} from './store-state.js'
+} from './store-state.ts'
 import type {
   IPgOrganizationContext,
   IPgScope,
   IPgStoreEnvironment,
   IPostgresConstruction
-} from './store-state.js'
+} from './store-state.ts'
 
 /** Borrow native execution only for the root route and outside an active journal. */
 function runPgNative<T, R>(
@@ -414,4 +414,4 @@ export async function createPostgresStore<T>(
     throw cause
   }
 }
-export type { IPostgresConstruction } from './store-state.js'
+export type { IPostgresConstruction } from './store-state.ts'

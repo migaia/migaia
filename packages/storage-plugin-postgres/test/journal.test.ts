@@ -17,12 +17,12 @@ import { kv, vector, ttl } from '@migaia/storage-contract'
 import { lockKey } from '@migaia/storage-host/sdk'
 import { deferred } from '@migaia/utils/promise'
 import { walkErrorCauses } from '@migaia/utils/error'
-import { postgresBackendPlugin } from '../src/index.js'
-import { pgDriver } from '../src/pg.js'
-import { postgresJsDriver } from '../src/postgres-js.js'
-import { pgvectorFeature } from '../src/features/pgvector.js'
-import { decodePgJournalImage } from '../src/journal.js'
-import { decodePgText } from '../src/codec.js'
+import { postgresBackendPlugin } from '../src/index.ts'
+import { pgDriver } from '../src/pg.ts'
+import { postgresJsDriver } from '../src/postgres-js.ts'
+import { pgvectorFeature } from '../src/features/pgvector.ts'
+import { decodePgJournalImage } from '../src/journal.ts'
+import { decodePgText } from '../src/codec.ts'
 /** The original borrowed logger owns append/index/cleanup; PostgreSQL owns only native changes. */
 const loggerOptions = {
   execution: { mutationTimeoutMs: false, pipelineDrainTimeoutMs: false },

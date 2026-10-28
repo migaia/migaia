@@ -9,9 +9,9 @@ import type {
   IPgDriver,
   IPgLogicalReplicationOptions,
   IPgLogicalReplicationRoute
-} from './types.js'
-import { invalidArgument } from './errors.js'
-import { PgNames, PgOperation, PgTruncatePolicy } from './constants.js'
+} from './types.ts'
+import { invalidArgument } from './errors.ts'
+import { PgNames, PgOperation, PgTruncatePolicy } from './constants.ts'
 /** Original Feature ownership is captured once; child APIs retain only their own immutable route. */
 export type IPgReplicationSelection = IPgLogicalReplicationOptions & {
   own(resource: IStorageResource): IStorageResource

@@ -1,10 +1,10 @@
 import { defineFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
-import { postgresBackendKind } from '../plugin.js'
-import type { IPgCopyApi } from '../types.js'
-import { copyCommand } from '../copy-command.js'
-import { PgNames, PgOperation } from '../constants.js'
-import { invalidArgument } from '../errors.js'
+import { postgresBackendKind } from '../plugin.ts'
+import type { IPgCopyApi } from '../types.ts'
+import { copyCommand } from '../copy-command.ts'
+import { PgNames, PgOperation } from '../constants.ts'
+import { invalidArgument } from '../errors.ts'
 /** Native COPY is admitted and drained by the original transaction operation owner. */
 export function pgCopyFeature() {
   return defineFeature<

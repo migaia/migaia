@@ -1,12 +1,12 @@
 import { defineFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import { createLifecycleScope } from '@migaia/lifecycle'
-import { postgresBackendKind } from '../plugin.js'
-import type { IPgListenApi, IPgTransactionNotifyApi } from '../types.js'
-import { PgNames, PgOperation } from '../constants.js'
-import { invalidArgument } from '../errors.js'
-import type {} from '../hooks.js'
-import { pgResource } from '../driver-resource.js'
+import { postgresBackendKind } from '../plugin.ts'
+import type { IPgListenApi, IPgTransactionNotifyApi } from '../types.ts'
+import { PgNames, PgOperation } from '../constants.ts'
+import { invalidArgument } from '../errors.ts'
+import type {} from '../hooks.ts'
+import { pgResource } from '../driver-resource.ts'
 /** PostgreSQL channel and payload limits are measured in native UTF-8 bytes before I/O. */
 function notification(channel: string, payload?: string): void {
   if (

@@ -7,7 +7,7 @@ import {
   type IStoragePluginCore
 } from '@migaia/storage-host'
 import type { ICapabilityInstallPort } from '@migaia/storage-contract'
-import { createPostgresStore, type IPostgresConstruction } from './store.js'
+import { createPostgresStore, type IPostgresConstruction } from './store.ts'
 import type {
   IPostgresStore,
   IPgDriver,
@@ -16,10 +16,10 @@ import type {
   IPgServer,
   IPgConnection,
   IPgNativeOperation
-} from './types.js'
-import { PgNames } from './constants.js'
-import type { IPgQuantizedOptions } from './features/quantized.js'
-import type { IPgReplicationSelection } from './logical-replication.js'
+} from './types.ts'
+import { PgNames } from './constants.ts'
+import type { IPgQuantizedOptions } from './features/quantized.ts'
+import type { IPgReplicationSelection } from './logical-replication.ts'
 /** Exact backend identity gates each selected Feature before any native client can be borrowed. */
 export const postgresBackendKind = defineStorageBackendKind<
   IPostgresStore<IPgServer>,
@@ -30,10 +30,10 @@ export const postgresBackendKind = defineStorageBackendKind<
     selectVector(): void
     selectQuantized(mode: IPgQuantizedOptions['mode']): void
     selectReplication(options: IPgReplicationSelection): void
-    getReplicationRoute(): import('./types.js').IPgLogicalReplicationRoute
+    getReplicationRoute(): import('./types.ts').IPgLogicalReplicationRoute
     getServer(): IPgServer
     createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi
-    reportReplication(facts: import('./types.js').IPgReplicationHealth): void
+    reportReplication(facts: import('./types.ts').IPgReplicationHealth): void
     assertNativeRoot(value: object): void
     createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>
   }
@@ -107,7 +107,7 @@ class PgBackendInstallation<TValue, TServer extends IPgServer, F extends IStorag
           prefix: this.#construction.configuration.prefix
         }),
         createDurableApi: () => this.#construction.createDurableApi(),
-        reportReplication: (facts: import('./types.js').IPgReplicationHealth) =>
+        reportReplication: (facts: import('./types.ts').IPgReplicationHealth) =>
           this.#construction.reportReplication(facts),
         assertNativeRoot: (value: object) => this.#construction.assertNativeRoot(value),
         createVectorApi: () => this.#construction.createVectorApi()

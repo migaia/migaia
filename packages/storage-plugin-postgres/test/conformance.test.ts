@@ -5,13 +5,13 @@ import { afterAll, beforeAll, describe, it, expect, onTestFinished } from 'vites
 import { createStorageHost } from '@migaia/storage-host'
 import { runConformance } from '@migaia/storage-contract/conformance'
 import { kv, records, ttl, counter, sql, vector, durableChangeFeed } from '@migaia/storage-contract'
-import { postgresBackendPlugin } from '../src/index.js'
-import { pgDriver } from '../src/pg.js'
-import { postgresJsDriver } from '../src/postgres-js.js'
-import { pgvectorFeature } from '../src/features/pgvector.js'
-import { pgLogicalReplicationFeature } from '../src/features/logical-replication.js'
-import { decodePgRecord } from '../src/codec.js'
-import { PgReplicationTestService } from './helpers/replication-service.js'
+import { postgresBackendPlugin } from '../src/index.ts'
+import { pgDriver } from '../src/pg.ts'
+import { postgresJsDriver } from '../src/postgres-js.ts'
+import { pgvectorFeature } from '../src/features/pgvector.ts'
+import { pgLogicalReplicationFeature } from '../src/features/logical-replication.ts'
+import { decodePgRecord } from '../src/codec.ts'
+import { PgReplicationTestService } from './helpers/replication-service.ts'
 /** The pg adapter owns slots; postgres-js conformance keeps using the ordinary service. */
 const replicationService = new PgReplicationTestService()
 beforeAll(() => replicationService.acquire(), 120000)

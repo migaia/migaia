@@ -1,6 +1,6 @@
-export { postgresBackendKind, postgresBackendPlugin } from './plugin.js'
+export { postgresBackendKind, postgresBackendPlugin } from './plugin.ts'
 
-export type { IPgCapabilityProbeHookPayload, IPgNotifyHookPayload } from './hooks.js'
+export type { IPgCapabilityProbeHookPayload, IPgNotifyHookPayload } from './hooks.ts'
 export type {
   IPgNativeOperation,
   IPgListenApi,
@@ -10,7 +10,7 @@ export type {
   IPgNativeVectorSearchOptions,
   IPgNativeVectorHit,
   IPgNativeVectorApi
-} from './types.js'
+} from './types.ts'
 export type {
   IPgResult,
   IPgCopyTarget,
@@ -28,4 +28,4 @@ export type {
   IPostgresTransactionScope,
   IPostgresStore,
   IPostgresOptions
-} from './types.js'
+} from './types.ts'

@@ -13,12 +13,12 @@ import {
   type ISqlValue,
   type ISqlRow
 } from '@migaia/storage-contract'
-import type { IPgConnection, IPgNativeParameter } from './types.js'
-import type { IPgTables } from './schema.js'
-import { pgKey, pgKeyHex, pgRecordKey, pgTextKey } from './codec.js'
-import { postgresError } from './errors.js'
+import type { IPgConnection, IPgNativeParameter } from './types.ts'
+import type { IPgTables } from './schema.ts'
+import { pgKey, pgKeyHex, pgRecordKey, pgTextKey } from './codec.ts'
+import { postgresError } from './errors.ts'
 import { PostgresErrorCode } from '@migaia/storage-contract/error-code'
-import { PgNames } from './constants.js'
+import { PgNames } from './constants.ts'
 /** These channels are real physical tables, rather than a second public data model. */
 export type IPgChannel = 'text' | 'bytes' | 'record' | 'metadata'
 /** Selected native vectors share the original revision ledger without a fixed data table. */
@@ -28,7 +28,7 @@ export type IPgRevision = { readonly version: bigint; readonly birth: string | u
 /** An original native attempt retains observations only until its real COMMIT or ROLLBACK. */
 export type IPgState = {
   /** Complete journal facts belong only to this original native attempt. */
-  journal?: import('./journal.js').IPgJournalCapture
+  journal?: import('./journal.ts').IPgJournalCapture
   /** Native terminal listeners have no independent commit or admission authority. */
   readonly terminal: {
     readonly committed: Set<() => void>
@@ -37,7 +37,7 @@ export type IPgState = {
     readonly ended: Set<() => void>
     settled: boolean
   }
-  readonly codecs: ReturnType<typeof import('./codec.js').createPgCodecs>
+  readonly codecs: ReturnType<typeof import('./codec.ts').createPgCodecs>
   readonly client: IPgConnection
   readonly orgId: string
   readonly ctx: IOperationContext | undefined

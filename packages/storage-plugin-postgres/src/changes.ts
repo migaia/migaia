@@ -1,9 +1,9 @@
 import type { IStorageResource } from '@migaia/storage-contract'
 import type { IBackendChangeController } from '@migaia/storage-host/sdk'
 import { createStorageOperationReporter, reportCleanupError } from '@migaia/storage-host/sdk'
-import type { IPgConfiguration } from './schema.js'
-import type { IPgState } from './native.js'
-import { PgNotificationChannel } from './constants.js'
+import type { IPgConfiguration } from './schema.ts'
+import type { IPgState } from './native.ts'
+import { PgNotificationChannel } from './constants.ts'
 /** Native LISTEN transports only bounded hints, never portable values or a second replay log. */
 export async function createPgChanges(
   configuration: IPgConfiguration,

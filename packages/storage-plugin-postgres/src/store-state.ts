@@ -7,7 +7,7 @@ import {
   throwIfAborted,
   type IBackendChangeController
 } from '@migaia/storage-host/sdk'
-import type { IPgQuantizedOptions } from './features/quantized.js'
+import type { IPgQuantizedOptions } from './features/quantized.ts'
 import {
   StorageContractError,
   StorageContractErrorCode,
@@ -34,27 +34,27 @@ import type {
   IStorageOrgBinding,
   IStorageJournalBackendBinding
 } from '@migaia/storage-host'
-import type { IPgConfiguration, IPgTables } from './schema.js'
-import { probePostgres } from './probe.js'
-import { createPgTransactions, observePg } from './transaction.js'
-import { createPgJournalImages, createPgJournalBinding } from './journal.js'
-import { createPgChanges } from './changes.js'
-import { createPgVectors } from './vector.js'
-import type { IPgReplicationSelection } from './logical-replication.js'
-import { pgLockKey, type IPgState } from './native.js'
-import { createPgCodecs } from './codec.js'
-import { PgNames } from './constants.js'
-import { invalidArgument } from './errors.js'
-import { PostgresErrorText } from './error-text.js'
+import type { IPgConfiguration, IPgTables } from './schema.ts'
+import { probePostgres } from './probe.ts'
+import { createPgTransactions, observePg } from './transaction.ts'
+import { createPgJournalImages, createPgJournalBinding } from './journal.ts'
+import { createPgChanges } from './changes.ts'
+import { createPgVectors } from './vector.ts'
+import type { IPgReplicationSelection } from './logical-replication.ts'
+import { pgLockKey, type IPgState } from './native.ts'
+import { createPgCodecs } from './codec.ts'
+import { PgNames } from './constants.ts'
+import { invalidArgument } from './errors.ts'
+import { PostgresErrorText } from './error-text.ts'
 import type {
   IPostgresStore,
   IPostgresTransactionScope,
   IPgServer,
   IPgConnection,
   IPgNativeOperation
-} from './types.js'
-import { createPgOrgVectorApi } from './store-apis.js'
-import { createPgOrgBase } from './store-org-base.js'
+} from './types.ts'
+import { createPgOrgVectorApi } from './store-apis.ts'
+import { createPgOrgBase } from './store-org-base.ts'
 
 /** These original scope extensions bind standard tokens to exactly one native transaction. */
 export const ttlScope = Symbol('postgres-ttl')
@@ -81,7 +81,7 @@ export type IPostgresConstruction<T> = {
   createVectorApi(): import('@migaia/storage-contract').IVectorApi<true>
   createDurableApi(): import('@migaia/storage-contract').IDurableChangeFeedApi
   dropVectorOrg(client: IPgConnection, orgId: string): Promise<void>
-  reportReplication(facts: import('./types.js').IPgReplicationHealth): void
+  reportReplication(facts: import('./types.ts').IPgReplicationHealth): void
   releaseOrgCapabilities(): void
   getTransactionClient(scope: IPostgresTransactionScope): IPgConnection
   assertNativeRoot(value: object): void

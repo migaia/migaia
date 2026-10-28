@@ -20,12 +20,12 @@ import type {
   IPgLogicalReplicationOptions,
   IPgNativeParameter,
   IPgResult
-} from './types.js'
-import { pgResource } from './driver-resource.js'
-import { invalidArgument, normalizePostgresError } from './errors.js'
-import { PgNames, PgTruncatePolicy, PgPublicationOperation } from './constants.js'
-import { PostgresErrorText } from './error-text.js'
-import { quotePgIdentifier } from './copy-command.js'
+} from './types.ts'
+import { pgResource } from './driver-resource.ts'
+import { invalidArgument, normalizePostgresError } from './errors.ts'
+import { PgNames, PgTruncatePolicy, PgPublicationOperation } from './constants.ts'
+import { PostgresErrorText } from './error-text.ts'
+import { quotePgIdentifier } from './copy-command.ts'
 
 /** Durable positions contain no row values and are scoped to one original store/slot/route. */
 type IPgCursor = {

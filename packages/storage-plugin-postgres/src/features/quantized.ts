@@ -1,9 +1,9 @@
 import { defineFeature, type IStorageFeatureOutput } from '@migaia/storage-host'
 import { refineStorageVectorQuery } from '@migaia/storage-host/sdk'
 import { type IVectorQuery, type IVectorNativeQuery } from '@migaia/storage-contract'
-import { postgresBackendKind } from '../plugin.js'
-import { PgQuantizedMode } from '../constants.js'
-import { invalidArgument } from '../errors.js'
+import { postgresBackendKind } from '../plugin.ts'
+import { PgQuantizedMode } from '../constants.ts'
+import { invalidArgument } from '../errors.ts'
 
 /** The selected expression layout preserves the original full-precision vector column. */
 export type IPgQuantizedOptions = {

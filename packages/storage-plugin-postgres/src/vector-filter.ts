@@ -1,6 +1,6 @@
 import type { IQueryCondition, IVectorFilter, ISqlValue } from '@migaia/storage-contract'
 import { parseObjectPath } from '@migaia/utils/object'
-import type { IPgNativeParameter } from './types.js'
+import type { IPgNativeParameter } from './types.ts'
 /** PostgreSQL JSON cannot contain NUL or isolated UTF-16 code units. */
 export function pgJsonString(value: string): boolean {
   return !value.includes('\0') && value.isWellFormed()

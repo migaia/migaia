@@ -6,10 +6,10 @@ import {
   type ICollectionsCodecValue
 } from '@migaia/serialize/codecs/collections-json'
 import { PostgresErrorCode } from '@migaia/storage-contract/error-code'
-import { PostgresErrorText } from './error-text.js'
-import { postgresError } from './errors.js'
-import { PgNames } from './constants.js'
-import { observePg } from './transaction.js'
+import { PostgresErrorText } from './error-text.ts'
+import { postgresError } from './errors.ts'
+import { PgNames } from './constants.ts'
+import { observePg } from './transaction.ts'
 /** Text values use the original portable JSON codec, including PostgreSQL-inexpressible code units. */
 const textCodec = defineJsonCodec({ version: 1 })
 /** Record/metadata values keep the single canonical collection codec and its own validation. */

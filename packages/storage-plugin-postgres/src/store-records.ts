@@ -18,7 +18,7 @@ import {
   type ISqlExecutor,
   type ICompiledStorageSql
 } from '@migaia/storage-contract'
-import { observePg } from './transaction.js'
+import { observePg } from './transaction.ts'
 import {
   writePg,
   removePg,
@@ -26,11 +26,11 @@ import {
   prunePg,
   markPgChanged,
   type IPgState
-} from './native.js'
-import { pgKey } from './codec.js'
-import { PgNames, PgOperation } from './constants.js'
-import { runPgScopeOperation, runPgRootOperation, pgOrgTtlTarget } from './store-state.js'
-import type { IPgOrganizationContext, IPgScope } from './store-state.js'
+} from './native.ts'
+import { pgKey } from './codec.ts'
+import { PgNames, PgOperation } from './constants.ts'
+import { runPgScopeOperation, runPgRootOperation, pgOrgTtlTarget } from './store-state.ts'
+import type { IPgOrganizationContext, IPgScope } from './store-state.ts'
 
 /**
  * Native SQL compiles lazily only after original operation admission and retains its statement

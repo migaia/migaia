@@ -1,6 +1,6 @@
-import type { IPgCopyTarget, IPgCopyOptions } from './types.js'
-import { invalidArgument } from './errors.js'
-import { PostgresErrorText } from './error-text.js'
+import type { IPgCopyTarget, IPgCopyOptions } from './types.ts'
+import { invalidArgument } from './errors.ts'
+import { PostgresErrorText } from './error-text.ts'
 /**
  * PostgreSQL identifier quoting belongs to this native DDL/protocol mapping; user SQL uses the
  * shared tag.

@@ -20,20 +20,20 @@ import {
   asyncDisposeKey,
   createStorageOperationReporter
 } from '@migaia/storage-host/sdk'
-import type { IPgConfiguration, IPgTables } from './schema.js'
-import { ensurePgQuantizedIndex, pgQuantizedExpression } from './schema.js'
-import type { IPgQuantizedOptions } from './features/quantized.js'
-import type { IPgState } from './native.js'
-import { observePgRevision, observePgRange, observePgBatch, markPgChanged } from './native.js'
-import type { IPgNativeParameter, IPgConnection } from './types.js'
-import { pgKey, pgTextKey, encodePgRecord, decodePgRecord } from './codec.js'
-import { quotePgIdentifier } from './copy-command.js'
-import { pgVectorCondition } from './vector-filter.js'
-import { invalidArgument, postgresError } from './errors.js'
+import type { IPgConfiguration, IPgTables } from './schema.ts'
+import { ensurePgQuantizedIndex, pgQuantizedExpression } from './schema.ts'
+import type { IPgQuantizedOptions } from './features/quantized.ts'
+import type { IPgState } from './native.ts'
+import { observePgRevision, observePgRange, observePgBatch, markPgChanged } from './native.ts'
+import type { IPgNativeParameter, IPgConnection } from './types.ts'
+import { pgKey, pgTextKey, encodePgRecord, decodePgRecord } from './codec.ts'
+import { quotePgIdentifier } from './copy-command.ts'
+import { pgVectorCondition } from './vector-filter.ts'
+import { invalidArgument, postgresError } from './errors.ts'
 import { PostgresErrorCode } from '@migaia/storage-contract/error-code'
-import { PgNames, PgQuantizedMode } from './constants.js'
-import { encodePgJournalImage, decodePgJournalImage, type IPgJournalVectorPort } from './journal.js'
-import { PgVectorCollection } from './vector-collection.js'
+import { PgNames, PgQuantizedMode } from './constants.ts'
+import { encodePgJournalImage, decodePgJournalImage, type IPgJournalVectorPort } from './journal.ts'
+import { PgVectorCollection } from './vector-collection.ts'
 
 /** One native table belongs to the store-wide logical collection rather than one organization. */
 type IPgVectorCollectionState = IStorageVectorConfiguration & { readonly table: string }

@@ -6,8 +6,8 @@ import { createStorageHost, definePlugin } from '@migaia/storage-host'
 import { kv } from '@migaia/storage-contract'
 import { ConcurrencyPolicy, lockKey } from '@migaia/storage-host/sdk'
 import { walkErrorCauses } from '@migaia/utils/error'
-import { postgresBackendPlugin } from '../src/index.js'
-import { pgDriver } from '../src/pg.js'
+import { postgresBackendPlugin } from '../src/index.ts'
+import { pgDriver } from '../src/pg.ts'
 /** Real service facts own native length and client-lifetime admission. */
 const connectionString = process.env.MIGAIA_PG_URL
 if (!connectionString)

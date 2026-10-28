@@ -1,4 +1,4 @@
-import { PgNames } from './constants.js'
+import { PgNames } from './constants.ts'
 import { StorageContractError, StorageContractErrorCode } from '@migaia/storage-contract'
 import { attachErrorIdentity } from '@migaia/utils/error'
 import { normalizeError, isStorageErrorFamily } from '@migaia/storage-host/sdk'
@@ -7,7 +7,7 @@ import {
   PostgresErrorCode
 } from '@migaia/storage-contract/error-code'
 import type { IPostgresErrorCode } from '@migaia/storage-contract/error-code'
-import { PostgresErrorText } from './error-text.js'
+import { PostgresErrorText } from './error-text.ts'
 /** Add the registered package identity while retaining the untouched native failure on cause. */
 export function postgresError(
   code: IPostgresErrorCode,

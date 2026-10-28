@@ -16,13 +16,13 @@ import {
   throwIfAborted
 } from '@migaia/storage-host/sdk'
 import { sleep } from '@migaia/utils/promise'
-import type { IPgConfiguration, IPgTables } from './schema.js'
-import type { IPgConnection } from './types.js'
-import { pgTextKey } from './codec.js'
-import { PgNames } from './constants.js'
-import { normalizeTransactionFailure, postgresError } from './errors.js'
+import type { IPgConfiguration, IPgTables } from './schema.ts'
+import type { IPgConnection } from './types.ts'
+import { pgTextKey } from './codec.ts'
+import { PgNames } from './constants.ts'
+import { normalizeTransactionFailure, postgresError } from './errors.ts'
 import { PostgresErrorCode } from '@migaia/storage-contract/error-code'
-import { PostgresErrorText } from './error-text.js'
+import { PostgresErrorText } from './error-text.ts'
 /** A backend-created lock conflict is consumed before it can leave the original attempt. */
 export class PgLockConflict extends Error {
   constructor(
