@@ -1,3 +1,7 @@
+/**
+ * Owns safe string conversion and literal template formatting, plus the canonical key-order export.
+ * Exposes text operations without host formatting, lifecycle or configuration ownership.
+ */
 import { ERROR_SOURCE, UtilsErrorCode } from './error-code.ts'
 import { UtilsErrorText } from './error-text.ts'
 import { attachErrorIdentity } from './error.ts'
@@ -133,7 +137,11 @@ function probeFormatValue(values: Readonly<Record<string, unknown>>, path: strin
   return { kind: 'value', value: current }
 }
 
-/** Collapses doubled closing delimiters in literal spans without compiling a dynamic RegExp. */
+/**
+ * Collapses doubled closing delimiters without rescanning the entire remaining template per span.
+ * Lookahead retains the original handling of a doubled delimiter beginning before the span ends.
+ * Delimiters are capped at 64 units by snapshotFormatPolicy, so overlap adds at most 127 units.
+ */
 function appendLiteral(
   output: string[],
   source: string,
@@ -141,10 +149,18 @@ function appendLiteral(
   end: number,
   close: string
 ): void {
+  if (start >= end) return
+  /** Only the current literal span is consumed by this invocation. */
   let cursor = start
+  /** A doubled delimiter has the compile-time admitted maximum width of 128 UTF-16 units. */
   const escapedClose = close + close
+  /** Bound native substring search while preserving matches that start inside the literal span. */
+  const span = source.slice(start, end + escapedClose.length - 1)
   while (cursor < end) {
-    const escapeAt = source.indexOf(escapedClose, cursor)
+    /** Relative search position is translated back to the original template for unchanged slices. */
+    const found = span.indexOf(escapedClose, cursor - start)
+    /** Negative means absent, rather than the original start minus one. */
+    const escapeAt = found < 0 ? -1 : start + found
     if (escapeAt < 0 || escapeAt >= end) {
       output.push(source.slice(cursor, end))
       return
