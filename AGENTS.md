@@ -87,7 +87,6 @@ export type LogLevel = keyof typeof LogLevel
     - An extensionless specifier therefore compiles cleanly and then fails at runtime with `ERR_MODULE_NOT_FOUND`. This bug once existed repo-wide (about 640 specifiers across 19 packages); do not reintroduce it.
   - **Plain-JavaScript exceptions** (`.mjs`) keep their own real extensions.
   - **Package entries.** Specifiers that name a package entry (`@migaia/foo/sub`) are unaffected.
-  - **Transition.** Until the TS-only migration (`docs/repo/codex-prompt-2026-10-13-ts-only-migration.md`) lands on `main` and sets the compiler options, code on branches that predate it keeps that branch's existing `.js` specifier style. Do not mix the two styles in one package.
 
 ## JSDoc for State and Behavior
 
